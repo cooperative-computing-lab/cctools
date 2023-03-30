@@ -171,7 +171,7 @@ class Task(object):
             pass
 
     @staticmethod
-    def _determine_mount_flags(watch=False, failure_only=False, success_only=False):
+    def _determine_mount_flags(watch=False, failure_only=False, success_only=False, strict_input=False):
         flags = VINE_TRANSFER_ALWAYS
         if watch:
             flags |= VINE_WATCH
@@ -179,6 +179,8 @@ class Task(object):
             flags |= VINE_FAILURE_ONLY
         if success_only:
             flags |= VINE_SUCCESS_ONLY
+        if strict_input:
+            flags |= VINE_FIXED_LOCATION
         return flags
 
     @staticmethod
@@ -271,8 +273,9 @@ class Task(object):
     # @param self          Reference to the current task object.
     # @param file          A file object of class @ref File, such as from @ref declare_file, @ref declare_buffer, @ref declare_url, etc.
     # @param remote_name   The name of the file at the execution site.
-    # @param cache         Whether the file should be cached at workers (True/False)
-    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs). Default is False.
+    # @param strict_input  Whether the file should be transfered to the worker
+    #                      for execution. If no worker has all the input files already cached marked
+    #                      as strict inputs for the task, the task fails.
     #
     # For example:
     # @code
@@ -280,12 +283,13 @@ class Task(object):
     # >>> f = m.declare_untar(url)
     # >>> task.add_input(f,"data")
     # @endcode
-    def add_input(self, file, remote_name):
+    def add_input(self, file, remote_name, strict_input=False):
         # SWIG expects strings
         if not isinstance(remote_name, str):
             raise TypeError(f"remote_name {remote_name} is not a str")
 
-        flags = Task._determine_mount_flags()
+        flags = Task._determine_mount_flags(strict_input=strict_input)
+
         return vine_task_add_input(self._task, file._file, remote_name, flags)
 
     ##

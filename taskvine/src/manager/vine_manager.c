@@ -1195,6 +1195,34 @@ static int expire_waiting_tasks(struct vine_manager *q)
 	return expired;
 }
 
+/*
+Consider the set of tasks that are waiting with strict inputs
+Terminate those to which no such worker exists.
+*/
+static int enforce_waiting_fixed_locations(struct vine_manager *q)
+{
+	struct vine_task *t;
+	int terminated = 0;
+	int count;
+
+	count = task_state_count(q, NULL, VINE_TASK_READY);
+	while(count > 0)
+	{
+		count--;
+
+		t = list_pop_head(q->ready_list);
+		if(t->has_fixed_locations && !vine_schedule_check_fixed_location(q, t)) {
+			vine_task_set_result(t, VINE_RESULT_FIXED_LOCATION_MISSING);
+			change_task_state(q, t, VINE_TASK_RETRIEVED);
+			terminated++;
+		} else {
+			list_push_tail(q->ready_list, t);
+		}
+	}
+
+	return terminated;
+}
+
 
 /*
 This function handles app-level failures. It remove the task from WQ and marks
@@ -3662,6 +3690,9 @@ const char *vine_result_string(vine_result_t result) {
 		case VINE_RESULT_OUTPUT_TRANSFER_ERROR:
 			str = "OUTPUT_TRANSFER_ERROR";
 			break;
+		case VINE_RESULT_FIXED_LOCATION_MISSING:
+			str = "FIXED_LOCATION_MISSING";
+			break;
 	}
 
 	return str;
@@ -3764,6 +3795,10 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 	/* Issue warnings if the files are set up strangely. */
 	vine_task_check_consistency(t);
+
+	if(t->has_fixed_locations) {
+		vine_task_set_scheduler(t, VINE_SCHEDULE_FILES);
+	}
 
 	return vine_submit_internal(q, t);
 }
@@ -4159,10 +4194,11 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 		// expired tasks
 		BEGIN_ACCUM_TIME(q, time_internal);
-		result = expire_waiting_tasks(q);
+		result  = expire_waiting_tasks(q);
+		result |= enforce_waiting_fixed_locations(q);
 		END_ACCUM_TIME(q, time_internal);
 		if(result) {
-			// expired at least one task
+			// expired or ended at least one task
 			events++;
 			compute_manager_load(q, 1);
 			continue;
