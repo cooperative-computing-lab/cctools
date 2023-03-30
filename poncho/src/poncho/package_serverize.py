@@ -22,13 +22,9 @@ def library_network_code():
     import json
     import os
     import sys
-    import threading
-    import queue
 
     def remote_execute(func):
-        def remote_wrapper(event, q=None):
-            if q:
-                event = json.loads(event)
+        def remote_wrapper(event):
             kwargs = event["fn_kwargs"]
             args = event["fn_args"]
             try:
@@ -77,14 +73,7 @@ def library_network_code():
                     event = json.loads(event_str)
                     # see if the user specified an execution method
                     exec_method = event.get("remote_task_exec_method", None)
-                    if exec_method == "thread":
-                        # create a forked process for function handler
-                        q = queue.Queue()
-                        p = threading.Thread(target=globals()[function_name], args=(event_str, q))
-                        p.start()
-                        p.join()
-                        response = json.dumps(q.get())
-                    elif exec_method == "direct":
+                    if exec_method == "direct":
                         response = json.dumps(globals()[function_name](event))
                     else:
                         p = os.fork()
@@ -115,12 +104,8 @@ def wq_network_code():
     import json
     import os
     import sys
-    import threading
-    import queue
     def remote_execute(func):
-        def remote_wrapper(event, q=None):
-            if q:
-                event = json.loads(event)
+        def remote_wrapper(event):
             kwargs = event["fn_kwargs"]
             args = event["fn_args"]
             try:
@@ -182,14 +167,7 @@ def wq_network_code():
                         # see if the user specified an execution method
                         exec_method = event.get("remote_task_exec_method", None)
                         os.chdir(f"t.{task_id}")
-                        if exec_method == "thread":
-                            # create a forked process for function handler
-                            q = queue.Queue()
-                            p = threading.Thread(target=globals()[function_name], args=(event_str, q))
-                            p.start()
-                            p.join()
-                            response = json.dumps(q.get()).encode("utf-8")
-                        elif exec_method == "direct":
+                        if exec_method == "direct":
                             response = json.dumps(globals()[function_name](event)).encode("utf-8")
                         else:
                             p = os.fork()
