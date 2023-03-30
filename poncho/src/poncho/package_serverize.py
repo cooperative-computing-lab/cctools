@@ -37,16 +37,14 @@ def library_network_code():
                     "StatusCode": 200
                 }
             except Exception as e:
-                response = { 
+                response = {
                     "Result": str(e),
-                    "StatusCode": 500 
+                    "StatusCode": 500
                 }
-            if not q:
-                return response
-            q.put(response)
+            return response
         return remote_wrapper
-        
-    read, write = os.pipe() 
+
+    read, write = os.pipe()
 
     def send_configuration(config):
         config_string = json.dumps(config)
@@ -96,9 +94,9 @@ def library_network_code():
                             os._exit(0)
                         elif p < 0:
                             print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)
-                            response = { 
+                            response = {
                                 "Result": "unable to fork",
-                                "StatusCode": 500 
+                                "StatusCode": 500
                             }
                         else:
                             max_read = 65536
@@ -131,16 +129,14 @@ def wq_network_code():
                     "StatusCode": 200
                 }
             except Exception as e:
-                response = { 
+                response = {
                     "Result": str(e),
-                    "StatusCode": 500 
+                    "StatusCode": 500
                 }
-            if not q:
-                return response
-            q.put(response)
+            return response
         return remote_wrapper
-        
-    read, write = os.pipe() 
+
+    read, write = os.pipe()
     def send_configuration(config):
         config_string = json.dumps(config)
         config_cmd = f"{len(config_string) + 1}\n{config_string}\n"
@@ -203,9 +199,9 @@ def wq_network_code():
                                 os._exit(0)
                             elif p < 0:
                                 print(f'Network function: unable to fork to execute {function_name}', file=sys.stderr)
-                                response = { 
+                                response = {
                                     "Result": "unable to fork",
-                                    "StatusCode": 500 
+                                    "StatusCode": 500
                                 }
                             else:
                                 max_read = 65536
@@ -258,7 +254,7 @@ def create_library_code(path, funcs, dest, version):
 					funcs.remove(stmt.name)
 	if name_source_code == "":
 		print("No name function found, defaulting to my_coprocess")
-		name_source_code = default_name_func	
+		name_source_code = default_name_func
 	for func in funcs:
 		print(f"No function found named {func}, skipping")
 	# create output file
