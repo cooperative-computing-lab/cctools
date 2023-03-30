@@ -61,7 +61,7 @@ def library_network_code():
                 # if the worker closed the pipe connected to the input of this process, we should just exit
                 except EOFError:
                     exit(0)
-                function_name, event_size = line.split(" ")
+                function_name, event_size, function_sandbox = line.split(" ", maxsplit=2)
                 if event_size:
                     # receive the bytes containing the event and turn it into a string
                     event_str = input()
