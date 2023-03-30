@@ -74,11 +74,19 @@ def library_network_code():
                     # see if the user specified an execution method
                     exec_method = event.get("remote_task_exec_method", None)
                     if exec_method == "direct":
-                        response = json.dumps(globals()[function_name](event))
+                        library_sandbox = os.getcwd()
+                        try:
+                            os.chdir(function_sandbox)
+                            response = json.dumps(globals()[function_name](event))
+                        except Exception as e:
+                            print(f'Library code: Function call failed due to {e}', file=sys.stderr)
+                        finally:
+                            os.chdir(library_sandbox)
                     else:
                         p = os.fork()
                         if p == 0:
-                            response =globals()[function_name](event)
+                            os.chdir(function_sandbox)
+                            response = globals()[function_name](event)
                             os.write(write, json.dumps(response).encode("utf-8"))
                             os._exit(0)
                         elif p < 0:
