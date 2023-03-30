@@ -60,7 +60,7 @@ def library_network_code():
                     line = input()
                 # if the worker closed the pipe connected to the input of this process, we should just exit
                 except EOFError:
-                    exit(0)
+                    sys.exit(0)
                 function_name, event_size, function_sandbox = line.split(" ", maxsplit=2)
                 if event_size:
                     # receive the bytes containing the event and turn it into a string
@@ -68,7 +68,7 @@ def library_network_code():
                     if len(event_str) != int(event_size):
                         print(event_str, len(event_str), event_size, file=sys.stderr)
                         print("Size of event does not match what was sent: exiting", file=sys.stderr)
-                        exit(0)
+                        sys.exit(1)
                     # turn the event into a python dictionary
                     event = json.loads(event_str)
                     # see if the user specified an execution method
@@ -80,6 +80,7 @@ def library_network_code():
                             response = json.dumps(globals()[function_name](event))
                         except Exception as e:
                             print(f'Library code: Function call failed due to {e}', file=sys.stderr)
+                            sys.exit(1)
                         finally:
                             os.chdir(library_sandbox)
                     else:
@@ -143,7 +144,7 @@ def wq_network_code():
         except Exception as e:
             s.close()
             print(e, file=sys.stderr)
-            exit(1)
+            sys.exit(1)
         # information to print to stdout for worker
         config = {
                 "name": name(),
