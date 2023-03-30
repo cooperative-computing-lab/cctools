@@ -463,24 +463,42 @@ class TxnPlot:
             end = m.termination
         return end
 
-    def make_tick_time(self, origin, end, x, pos):
-        def roundb(b, x):
-            return b * math.ceil(x/b)
 
-        # round seconds to multiples of 5
-        t = roundb(5, x - origin)
-        u = "s"
-        if end > 900:
-            # round to minutes
-            t = roundb(1, t/60)
+    def roundb(self, end, t):
+        def rd(fact, x):
+            return fact * math.ceil(x/fact)
+
+        # if end in order hours, round to 5min
+        if end >= 3600:
+            return rd(300, t)
+
+        # if end in order 5minutes, round to minutes
+        if end >= 300:
+            return rd(60, t)
+
+        # if end in order 1minutes, round to 5s
+        if end >= 60:
+            return rd(5, t)
+        
+        # less, don't round
+        return t
+
+
+    def make_tick_time(self, end, t, pos):
+        u = "s"   # unit
+        l = t     # label
+        if end >= 300:
+            # if end in order of minutes
             u = "m"
-        elif end > 3600 * 24:
-            t = roundb(1, t/(3600 * 24))
-            u = "h"
-        if x != end:
+            l = math.ceil(l/60)
+
+        if t != end:
             # print units only for last value
             u = ""
-        return "{:.0f}{}".format(t, u)
+
+        return "{:.0f}{}".format(l, u)
+
+
 
     def bh(self, fig, slots, left, width, color, **kwargs):
         # bar plot with some defaults
@@ -501,12 +519,21 @@ class TxnPlot:
 
             s.axis(xmin=plot_origin, xmax=plot_end)
 
-            ticks = [ plot_origin + i*(plot_end-plot_origin)/self.opts.time_ticks_n for i in range(self.opts.time_ticks_n+1) ]
-            ticks.extend(self.opts.time_tick)
-            ticks.sort()
+            # auto ticks
+            step  = self.roundb(plot_end, (plot_end-plot_origin)/self.opts.time_ticks_n)
+            ticks = [ self.roundb(plot_end, i*step) for i in range(self.opts.time_ticks_n) ]
+
+            # add plot end, remove last auto tick if it is too close
+            if len(ticks) > 1 and plot_end - ticks[-1] < 2*step/3:
+                ticks[-1] = plot_end
+            else:
+                ticks.append(plot_end)
+
+            ticks.extend(x - plot_origin for x in self.opts.time_tick)
+            ticks = sorted(list(set(ticks)))
             s.set_xticks(ticks)
 
-            s.xaxis.set_major_formatter(plticker.FuncFormatter(partial(self.make_tick_time, plot_origin, plot_end)))
+            s.xaxis.set_major_formatter(plticker.FuncFormatter(partial(self.make_tick_time, plot_end)))
             s.set_xlabel("time")
             s.tick_params(axis='both', which='major', labelsize=15)
 
@@ -672,7 +699,7 @@ if __name__ == "__main__":
     parser.add_argument('--expand-waiting', action='store_true', help='show complete lifetime of waiting tasks at the worker')
     parser.add_argument('--display', action='store_true', help='show plot using matplotlib internal viewer')
     parser.add_argument('--legend', nargs='?', help='position of the legend. ("best" may take longer to render.) ', choices=['upper right', 'upper left', 'lower right', 'lower left', 'best'], default='upper left')
-    parser.add_argument('--time-ticks-n', nargs='?', type=int, help='number of time ticks (adds a time tick every (origin-end)/time-ticks-n)', default=1)
+    parser.add_argument('--time-ticks-n', nargs='?', type=int, help='adds a time tick every (origin-end)/time-ticks-n), rounded to units of time', default=5)
     parser.add_argument('--time-tick', nargs='?', type=int, action='append', help="tick value to add, in seconds from manager's start. May be specified multiple times.", default=[])
     parser.add_argument('--width', nargs='?', type=float, help='width in inches', default=12)
     parser.add_argument('--height', nargs='?', type=float, help='height in inches. Default is 2/3 of width', default=None)
