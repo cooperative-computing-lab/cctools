@@ -564,7 +564,7 @@ class TxnPlotManager(TxnPlot):
 class TxnPlotTasks(TxnPlot):
     def plot(self, fig, manager):
         library_tasks = manager.tasks.loc[manager.tasks['library'] > 0]
-        regular_tasks = manager.tasks.loc[manager.tasks['library'].isnull()]
+        regular_tasks = manager.tasks.loc[manager.tasks['library'].isnull()].copy()
         regular_tasks.sort_values("time_commit_start", ignore_index=True, inplace=True)
         manager.tasks = pd.concat([regular_tasks, library_tasks])
         
