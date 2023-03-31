@@ -83,12 +83,10 @@ class Manager:
     def make_table_tasks(self, expand_waiting=False):
         all_tasks = []
         keys = None
-        print(self.tasks_attempts.values())
         for attempts in self.tasks_attempts.values():
             for attempt in attempts.values():
                 all_tasks.append(attempt)
         tasks_df = pd.DataFrame.from_records(all_tasks)
-        print(tasks_df)
         try:
             tasks_df["measured_wall_time"] = tasks_df["time_worker_end"] - tasks_df["time_worker_start"]
         except KeyError:
@@ -136,7 +134,6 @@ class Manager:
             events.append((index, False, row["time_worker_end"]))
 
         events.sort(key=lambda s: s[2])
-
         for (index, start, time) in events:
             if start:
                 ts.loc[index, "slot"] = next_slot(index)
@@ -316,15 +313,20 @@ class ParseTxn:
             pass
 
     def _parse_library(self, time, manager_pid, task_id, event, arg):
-        if event == "SENT":
-            self.cm.task_last_attempt[task_id] = 0
+        task_id = int(task_id)
         la = self.cm.task_last_attempt[task_id]
         ca = self.cm.tasks_attempts[task_id][la]
 
         if event == "SENT":
-            pass
+            ca["time_worker_start"] = time
+            ca["time_commit_start"] = time
         elif event == "STARTED":
             ca["library"] = time
+            ca["RETRIEVED"] = ca["DONE"]
+            ca["time_worker_end"] = time
+            ca["time_commit_end"] = time
+            ca["reason"] = "SUCCESS"
+            ca["exit_code"] = 0
         elif event == "FAILURE":
             pass
 
@@ -561,7 +563,11 @@ class TxnPlotManager(TxnPlot):
 
 class TxnPlotTasks(TxnPlot):
     def plot(self, fig, manager):
-        manager.tasks.sort_values("time_commit_start", ignore_index=True, inplace=True)
+        library_tasks = manager.tasks.loc[manager.tasks['library'] > 0]
+        regular_tasks = manager.tasks.loc[manager.tasks['library'].isnull()]
+        regular_tasks.sort_values("time_commit_start", ignore_index=True, inplace=True)
+        manager.tasks = pd.concat([regular_tasks, library_tasks])
+        
 
         # divided tasks on whether we have a full report
         at = manager.tasks
