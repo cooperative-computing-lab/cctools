@@ -225,7 +225,7 @@ class ParseTxn:
         start_time = float(start_time)/1e6
 
         if start_time < self.cm.origin:
-            # guard for cases when start time was unknown 
+            # guard for cases when start time was unknown
             start_time = time - wall_time
         else:
             start_time -= self.cm.origin
@@ -464,9 +464,11 @@ class TxnPlot:
         return end
 
 
+    def rd(self, fact, x):
+        return fact * math.ceil(x/fact)
+
     def roundb(self, end, t):
-        def rd(fact, x):
-            return fact * math.ceil(x/fact)
+        rd = self.rd
 
         # if end in order hours, round to 5min
         if end >= 3600:
@@ -479,24 +481,26 @@ class TxnPlot:
         # if end in order 1minutes, round to 5s
         if end >= 60:
             return rd(5, t)
-        
+
         # less, don't round
         return t
 
 
-    def make_tick_time(self, end, t, pos):
-        u = "s"   # unit
-        l = t     # label
+    def make_tick_time(self, origin, end, t, pos):
+        rd = self.rd
+
+        u = "s"         # unit
+        l = t - origin  # label
         if end >= 300:
-            # if end in order of minutes
+            # if end in order of minutes, in 15s increments
             u = "m"
-            l = math.ceil(l/60)
+            l = rd(15, l)/60
 
         if t != end:
             # print units only for last value
             u = ""
 
-        return "{:.0f}{}".format(l, u)
+        return "{:.3g}{}".format(l, u)
 
 
 
@@ -507,6 +511,25 @@ class TxnPlot:
         if not args["edgecolor"]:
             args["edgecolor"] = color
         fig.barh(slots, **args)
+
+    def generate_ticks(self, plot_origin, plot_end):
+        # auto ticks
+        step  = self.roundb(plot_end, (plot_end-plot_origin)/self.opts.time_ticks_n)
+        ticks = [ plot_origin + self.roundb(plot_end, i*step) for i in range(self.opts.time_ticks_n - 1) ]
+
+        # add plot end, remove last auto tick if it is too close
+        while ticks and ticks[-1] > plot_end:
+            ticks.pop()
+
+        if len(ticks) > 1 and plot_end - ticks[-1] < 3*step/4:
+            ticks[-1] = plot_end
+        else:
+            ticks.append(plot_end)
+
+        ticks.extend(x - plot_origin for x in self.opts.time_tick)
+        ticks = sorted(list(set(ticks)))
+        return ticks
+
 
     def display_plot(self):
         plt.title(self.opts.title)
@@ -519,21 +542,10 @@ class TxnPlot:
 
             s.axis(xmin=plot_origin, xmax=plot_end)
 
-            # auto ticks
-            step  = self.roundb(plot_end, (plot_end-plot_origin)/self.opts.time_ticks_n)
-            ticks = [ self.roundb(plot_end, i*step) for i in range(self.opts.time_ticks_n) ]
-
-            # add plot end, remove last auto tick if it is too close
-            if len(ticks) > 1 and plot_end - ticks[-1] < 3*step/4:
-                ticks[-1] = plot_end
-            else:
-                ticks.append(plot_end)
-
-            ticks.extend(x - plot_origin for x in self.opts.time_tick)
-            ticks = sorted(list(set(ticks)))
+            ticks = self.generate_ticks(plot_origin, plot_end)
             s.set_xticks(ticks)
 
-            s.xaxis.set_major_formatter(plticker.FuncFormatter(partial(self.make_tick_time, plot_end)))
+            s.xaxis.set_major_formatter(plticker.FuncFormatter(partial(self.make_tick_time, plot_origin, plot_end)))
             s.set_xlabel("time")
             s.tick_params(axis='both', which='major', labelsize=15)
 
