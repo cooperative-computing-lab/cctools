@@ -649,7 +649,7 @@ static int handle_completed_tasks(struct link *manager)
 
 			/* collect the resources associated with the process */
 			reap_process(p,manager);
-			
+
 			/* must reset the table iterator because an item was removed. */
 			itable_firstkey(procs_running);
 		}
