@@ -227,11 +227,11 @@ struct vine_coprocess *vine_coprocess_find_state(struct list *coprocess_list, vi
 	struct vine_coprocess *coprocess;
 	LIST_ITERATE(coprocess_list,coprocess){
 		if (coprocess->state == state && !strcmp(coprocess->name, coprocess_name)) {
-			debug(D_VINE, "Found coprocess with valid state with pid: %d\n", coprocess->pid);
+			debug(D_VINE, "Found coprocess with state %d with pid: %d\n", state, coprocess->pid);
 			return coprocess;
 		}
 	}
-	debug(D_VINE, "Found no valid coprocesses for state\n");
+
 	return NULL;
 }
 
