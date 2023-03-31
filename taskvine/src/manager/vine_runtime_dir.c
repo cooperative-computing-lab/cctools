@@ -130,7 +130,7 @@ char *vine_get_runtime_path_staging(struct vine_manager *m, const char *path) {
 
 char *vine_get_runtime_path_caching(struct vine_manager *m, const char *path) {
     char abs[PATH_MAX];
-    char *tmp = string_format("%s/../vine-cache/%s", m->runtime_directory, path);
+    char *tmp = string_format("%s/../vine-cache/%s", m->runtime_directory, path ? path : "");
     path_collapse(tmp, abs, 1);
     free(tmp);
     return xxstrdup(abs);
