@@ -5,18 +5,26 @@ import sys
 import re
 import operator
 from collections import defaultdict
+    
+path1_regex = re.compile('</.+>')
+path2_regex = re.compile('<.+>,')
+pid1_re = re.compile('\[pid [0-9]+\]')
+bytes_re = re.compile('= [0-9]+$')
+
 
 # Classes
 class Properties:
-    def __init__(self, path="",action = '?',freq = 0, size = 0 , command = "", read_freq = 0, write_freq = 0, sub_pid = []):
+    def __init__(self, path="",action = '?',freq = 0, command = "", read_freq = 0, write_freq = 0, sub_pid = [], read_size = 0, write_size = 0, size = 0):
         self.path = path
         self.action = action
         self.freq = freq
-        self.size = size
         self.command = command
         self.read_freq = read_freq
+        self.read_size = read_size
         self.write_freq = write_freq
+        self.write_size = write_size
         self.sub_pid = sub_pid.copy()
+        self.size = size
 
 # Funtions
 def usage():
@@ -38,7 +46,7 @@ def usage():
 def create_trace_file(arg):
     """ Runs strace and redirects its output to <name>.fout1.txt """
     arguments = ' '.join(arg)
-    os.system(f'strace -f -y --trace=file,read,write {arguments} 2> {arg[0]}.fout1.txt')
+    os.system(f'strace -f -y --trace=file,read,write,mmap {arguments} 2> {arg[0]}.fout1.txt')
 
 
 def create_dict(name):
@@ -46,16 +54,10 @@ def create_dict(name):
     """
     path_dict = {}
     subprocess_dict = {}
-    path = False
-
-    path1_regex = re.compile('</.+>')
-    path2_regex = re.compile('<.+>,')
-    pid1_regex = re.compile('\[pid [0-9]+\]')
-    pid2_regex = re.compile('= [0-9]+$')
 
     with open(name + ".fout1.txt") as file:
         for line in file: 
-            if "openat" in line or "stat" in line:
+            if "openat(" in line or "stat" in line:
                 try: # Try get file path
                     path = path1_regex.search(line).group(0).strip('<>')
                 except AttributeError: # AttributeError if file not found
@@ -63,31 +65,30 @@ def create_dict(name):
                         path = line.split('"')[1]
                     except IndexError:
                         continue
-                                        
+                path = os.path.realpath(path) # make all paths absolute
+                          
                 if path not in path_dict: 
                         path_dict[path] = Properties(path=path)
 
-
                 path_dict[path].command = line
-                path_dict[path].action = file_actions(path_dict, path)
+                path_dict[path].action = openat_stat_actions(path_dict, path)
                 path_dict[path].freq += 1
 
-                if line.startswith('[pid '):
-                    path_dict[path].sub_pid.append(pid1_regex.search(line).group(0).replace('[pid ','').replace(']',''))
+                if line.startswith('[pid '): # checks is it is a subprocess
+                    path_dict[path].sub_pid.append(pid1_re.search(line).group(0).strip('[pid ]'))
 
-            if "read" in line or "write" in line:
+            elif "read(" in line or "write(" in line:
+                read_write_actions(path_dict,line)
+            elif "mmap(" in line:
                 try:
                     path = path2_regex.search(line).group(0).strip('<>,')
-                    bytes_written = pid2_regex.search(line).group(0).replace('= ','')
+                    path = os.path.realpath(path)
 
                     if path not in path_dict: 
-                        path_dict[path] = Properties(path=path, size=int(bytes_written))
-                 
-                    path_dict[path].size += int(bytes_written)
-                    
-                except (IndexError, AttributeError) as e:
-                    continue
-
+                        path_dict[path] = Properties(path=path, action='M')
+                except AttributeError:
+                    pass
+                
             if "strace: Process " in line: # new process created
                 find_pid(line, subprocess_dict)
             if "execve" in line: # finds command associated with process
@@ -96,7 +97,7 @@ def create_dict(name):
     return path_dict, subprocess_dict 
 
 
-def file_actions(path_dict, path):
+def openat_stat_actions(path_dict, path):
     """ Lablels the action for each path:
         A  : read but file not found
         R  : Read only
@@ -110,20 +111,13 @@ def file_actions(path_dict, path):
         if "ENOENT" in command:
             action = 'OU'
         elif "RDONLY" in command:
-            action = 'R'
-            path_dict[path].read_freq += 1
+            action = 'M'
         elif "WRONLY" in command:
             action = 'W'
-            path_dict[path].write_freq += 1
         elif "RDWR" in command:
             action = 'WR'
-            path_dict[path].read_freq += 1
-            path_dict[path].write_freq += 1
         else:
             action = '?'
-
-        if (path_dict[path].read_freq > 0) and (path_dict[path].write_freq > 0):
-            action = 'WR'
 
     elif "stat" in command:
         if "ENOENT" in command:
@@ -132,8 +126,33 @@ def file_actions(path_dict, path):
             action = 'S'
 
     return action
-    
-    
+   
+def read_write_actions(path_dict, line):
+    try:
+        path = path2_regex.search(line).group(0).strip('<>,')
+        path = os.path.realpath(path)
+        bytes_returned = int(bytes_re.search(line).group(0).replace('= ',''))
+
+    except (IndexError, AttributeError) as e:
+        return 0
+
+    if path not in path_dict: 
+        path_dict[path] = Properties(path=path)
+
+    if "read(" in line:
+        path_dict[path].action = 'R'
+        path_dict[path].read_freq += 1
+        path_dict[path].read_size += bytes_returned
+    elif "write(" in line:
+        path_dict[path].action = 'W'
+        path_dict[path].write_freq += 1
+        path_dict[path].write_size += bytes_returned
+    if (path_dict[path].read_freq > 0) and (path_dict[path].write_freq > 0):
+        action = 'WR'
+    path_dict[path].size += bytes_returned
+    path_dict[path].freq = path_dict[path].read_freq + path_dict[path].write_freq
+
+
 def print_summary_2(path_dict, name):
     """ Creates the file <name>.fout2.txt which contains the freqency,
     action, and path of each entry
@@ -151,20 +170,21 @@ def print_summary_2(path_dict, name):
 
     f.close()
 
-def find_command(line, subprocess_dict): 
-    pid1_regex = re.compile('\[pid [0-9]+\]')
-    if pid1_regex.search(line): 
-        pid = pid1_regex.search(line).group(0).replace('[pid ','').replace(']','')
+def find_command(line, subprocess_dict):
+    command_re = re.compile('\[".+\]')
+    if pid1_re.search(line): 
+        pid = pid1_re.search(line).group(0).strip('[pid ]')
         try:
-            command = str(re.search('\[".+\]',line).group(0)).strip('[]').replace('", "',' ')
+            command = str(command_re.search(line).group(0)).strip('[]').replace('", "',' ')
             subprocess_dict[pid] = {"command" : command, "files": set()}
         except AttributeError:
             pass
     return
 
 def find_pid(line, subprocess_dict):
-    if re.search('strace: Process [0-9]+',line): 
-        pid = re.search('strace: Process [0-9]+',line).group(0).replace('strace: Process ','')
+    process_re = re.compile('strace: Process [0-9]+')
+    if process_re.search(line): 
+        pid = process_re.search(line).group(0).replace('strace: Process ','')
         subprocess_dict[pid] = {"command" : "", "files": set()} 
 
 def print_subprocess_summary(subprocess_dict, name):
@@ -193,14 +213,20 @@ def find_major_directories(path_dict, subprocess_dict, top, dirLvl, name):
 
     f = open(name + ".fout3.txt", "w")
 
+    common = find_common_path(path_dict.keys(),dirLvl)
+    common.insert(0,'/usr/lib64/')
+
     for path in path_dict:
         action = path_dict[path].action
         freq = path_dict[path].freq
         size = path_dict[path].size
         sub_pid = path_dict[path].sub_pid
 
-        short_path = '/'.join(path.split('/')[0:dirLvl])
-
+        # short_path = '/'.join(path.split('/')[0:dirLvl])
+        
+        for short_path in common:
+            if short_path in path:
+                break
         major_dict[short_path][0] += freq
         major_dict[short_path][1] += size
         
@@ -224,7 +250,7 @@ def find_major_directories(path_dict, subprocess_dict, top, dirLvl, name):
 
     f.write("\nMajor Directories\n\n")
     for index, path in enumerate(major_dict,1):
-        f.write(f"{major_dict[path][1]:6} {major_dict[path][0]:2}  {path}\n")
+        f.write(f"{convert_bytes(major_dict[path][1]):>8} {major_dict[path][0]:<5}  {path}\n")
         if index == top:
             break
 
@@ -242,6 +268,38 @@ def find_major_directories(path_dict, subprocess_dict, top, dirLvl, name):
 
     f.close()
 
+def find_common_path(arr,dirLvl):
+    arr = sorted(arr)
+    prefixes = set(['/'.join(path.split('/')[1:dirLvl]) for path in arr])
+    common = []
+    for prefix in prefixes:
+        a = []
+        for index, path in enumerate(arr):
+            if path.startswith('/'+ prefix):
+                a.append(arr.pop(index))
+        try:
+            short_path = os.path.commonpath(a)
+        except ValueError:
+            short_path = '/'+ prefix
+            common.append(short_path)
+        if short_path == '/':
+            continue
+        common.append(short_path)
+    
+    common = sorted(common, reverse=True)
+    return common
+
+def convert_bytes(num):
+    if num > 1000000:
+        num = num / 1000000
+        num = str(round(num,2)) + 'M'
+    elif num > 1000:
+        num = num / 1000
+        num = str(round(num,2)) + 'K'
+    return num
+    
+    
+
 
 def end_of_execute(name):
     print("\n----- filetrace -----")
@@ -256,8 +314,8 @@ def end_of_execute(name):
 
 # Main
 def main():
-    top=5
-    dirLvl=6
+    top=-1
+    dirLvl=5
 
     arguments = sys.argv[1:]
 
