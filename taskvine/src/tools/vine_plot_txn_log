@@ -18,7 +18,7 @@
 # time manager_pid TASK task_id RUNNING worker_id (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}
 # time manager_pid TASK task_id WAITING_RETRIEVAL worker_id
 # time manager_pid TASK task_id (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}
-# time manager_pid DUTY task_id (WAITING|SENT|STARTED|FAILURE) worker_id
+# time manager_pid LIBRARY task_id (WAITING|SENT|STARTED|FAILURE) worker_id
 
 
 from collections import defaultdict
@@ -92,7 +92,7 @@ class Manager:
         except KeyError:
             print(f"No tasks that finished were found in the log for manager pid {self.pid}")
             sys.exit(1)
-
+        
         return self.assign_slots(tasks_df, expand_waiting)
 
 
@@ -134,7 +134,6 @@ class Manager:
             events.append((index, False, row["time_worker_end"]))
 
         events.sort(key=lambda s: s[2])
-
         for (index, start, time) in events:
             if start:
                 ts.loc[index, "slot"] = next_slot(index)
@@ -313,16 +312,21 @@ class ParseTxn:
             (mode, arg) = arg.split(maxsplit=1)
             pass
 
-    def _parse_duty(self, time, manager_pid, task_id, event, arg):
+    def _parse_library(self, time, manager_pid, task_id, event, arg):
+        task_id = int(task_id)
         la = self.cm.task_last_attempt[task_id]
         ca = self.cm.tasks_attempts[task_id][la]
 
-        if event == "WAITING":
-            pass
-        elif event == "SENT":
-            pass
+        if event == "SENT":
+            ca["time_worker_start"] = time
+            ca["time_commit_start"] = time
         elif event == "STARTED":
-            ca["duty"] = time
+            ca["library"] = time
+            ca["RETRIEVED"] = ca["DONE"]
+            ca["time_worker_end"] = time
+            ca["time_commit_end"] = time
+            ca["reason"] = "SUCCESS"
+            ca["exit_code"] = 0
         elif event == "FAILURE":
             pass
 
@@ -348,7 +352,7 @@ class ParseTxn:
             ca["attempt_number"] = attempt_number
             ca["category"] = category
             self.arg_to_resources(ca, "requested_", arg)
-            ca["duty"] = pd.NA   # we do not know if it a duty
+            ca["library"] = pd.NA   # we do not know if it a library
         elif event == "RUNNING":
             (worker_id, allocation, arg) = arg.split()
             self.cm.tasks_on_worker[worker_id][task_id] = la
@@ -385,8 +389,8 @@ class ParseTxn:
                 self._parse_worker(time, manager_pid, target, event, arg)
             elif subject == "CATEGORY":
                 self._parse_category(time, manager_pid, target, event, arg)
-            elif subject == "DUTY":
-                self._parse_duty(time, manager_pid, target, event, arg)
+            elif subject == "LIBRARY":
+                self._parse_library(time, manager_pid, target, event, arg)
             elif subject == "TASK":
                 self._parse_task(time, manager_pid, target, event, arg)
 
@@ -599,7 +603,11 @@ class TxnPlotManager(TxnPlot):
 
 class TxnPlotTasks(TxnPlot):
     def plot(self, fig, manager):
-        manager.tasks.sort_values("time_commit_start", ignore_index=True, inplace=True)
+        library_tasks = manager.tasks.loc[manager.tasks['library'] > 0]
+        regular_tasks = manager.tasks.loc[manager.tasks['library'].isnull()].copy()
+        regular_tasks.sort_values("time_commit_start", ignore_index=True, inplace=True)
+        manager.tasks = pd.concat([regular_tasks, library_tasks])
+        
 
         # divided tasks on whether we have a full report
         at = manager.tasks
