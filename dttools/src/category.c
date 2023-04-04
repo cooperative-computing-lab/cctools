@@ -370,6 +370,9 @@ int64_t category_first_allocation_min_waste(struct histogram *h, int64_t top_res
 	free(times_accum);
 	free(keys);
 
+	/* round up to bucket size */
+	a_1 = histogram_round_up(h, a_1);
+
 	return a_1;
 }
 
@@ -439,6 +442,9 @@ int64_t category_first_allocation_max_throughput(struct histogram *h, int64_t to
 	free(counts_accum);
 	free(times_accum);
 	free(keys);
+
+	/* round up to bucket size */
+	a_1 = histogram_round_up(h, a_1);
 
 	return a_1;
 }
