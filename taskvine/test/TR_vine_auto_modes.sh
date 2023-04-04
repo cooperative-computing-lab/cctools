@@ -6,6 +6,7 @@ set -e
 
 import_config_val CCTOOLS_PYTHON_TEST_EXEC
 import_config_val CCTOOLS_PYTHON_TEST_DIR
+import_config_val CCTOOLS_OPSYS
 
 export PYTHONPATH=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
 export PATH=$(pwd)/../../batch_job/src:$PATH
@@ -16,6 +17,9 @@ STATUS_FILE=vine.status
 check_needed()
 {
     [ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
+
+    # disable on mac because the resource_monitor does not work there
+    [ "${CCTOOLS_OPSYS}" = DARWIN ] && return 1
 }
 
 prepare()
