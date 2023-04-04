@@ -8104,7 +8104,7 @@ const struct rmsummary *task_max_resources(struct work_queue *q, struct work_que
 const struct rmsummary *task_min_resources(struct work_queue *q, struct work_queue_task *t) {
 	struct category *c = work_queue_category_lookup_or_create(q, t->category);
 
-	const struct rmsummary *s = category_task_max_resources(c, t->resources_requested, t->resource_request, t->taskid);
+	const struct rmsummary *s = category_task_min_resources(c, t->resources_requested, t->resource_request, t->taskid);
 
 	if(t->resource_request != CATEGORY_ALLOCATION_FIRST || !q->current_max_worker) {
 		return s;
