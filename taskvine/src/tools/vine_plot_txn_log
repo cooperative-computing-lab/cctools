@@ -745,6 +745,8 @@ class TxnStats(TxnPlot):
         num_minitasks = tasks["size"].count()
         minitasks_size = self.convert_size(tasks["size"].sum()*1e6)
 
+        xfr_avg = urls["wall_time"].sum()/urls["wall_time"].count()
+
         print(f"Number of Workers {num_workers}")
         print(f"Number of Tasks {num_tasks}")
         print(f"Number of File Transfers {num_files}")
@@ -752,7 +754,9 @@ class TxnStats(TxnPlot):
         print(f"Number of URL Transfers {num_urls}")
         print(f"Bytes Transferred {urls_size}")
         print(f"Number of Mini Tasks {num_minitasks}")
-        print(f"Bytes Created {minitasks_size}")     
+        print(f"Bytes Created {minitasks_size}")    
+        
+        print("Average Transfer Time {:.2f}s".format(float(xfr_avg)))
 
 if __name__ == "__main__":
 
