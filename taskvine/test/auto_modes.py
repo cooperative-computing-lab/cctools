@@ -2,6 +2,7 @@
 
 import taskvine as vine
 import sys
+import time
 
 m = vine.Manager(port=0, ssl=True)
 m.enable_monitoring()
@@ -36,6 +37,8 @@ expected_proportions = {
 
 error_found = False
 
+last_returned_time =  time.time()
+
 with factory:
     for (category, mode) in modes.items():
         m.set_category_mode(category, mode)
@@ -56,6 +59,12 @@ with factory:
             t = m.wait(5)
             if t:
                 print(".", end="")
+                last_returned_time = time.time()
+
+            # if no task for 15s, something went wrong with the test
+            if time.time() - last_returned_time > 15:
+                print("\nno task finished recently")
+                sys.exit(1)
 
         rs = "cores memory disk".split()
         mr = {r: getattr(t.resources_measured, r) for r in rs}

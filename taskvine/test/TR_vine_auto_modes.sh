@@ -27,8 +27,7 @@ prepare()
 
 run()
 {
-    ${CCTOOLS_PYTHON_TEST_EXEC} auto_modes.py
-    echo $? > $STATUS_FILE
+    (${CCTOOLS_PYTHON_TEST_EXEC} auto_modes.py; echo $? > $STATUS_FILE) &
 
     wait_for_file_creation $STATUS_FILE 30
 
