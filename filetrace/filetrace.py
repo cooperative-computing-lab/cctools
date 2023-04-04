@@ -12,6 +12,18 @@ pid1_re = re.compile('\[pid [0-9]+\]')
 bytes_re = re.compile('= [0-9]+$')
 
 
+ACTION_PRIORITY = {
+    "?"  : 1,
+    "SU" : 2,
+    "OU" : 3,
+    "M"  : 4,
+    "S"  : 5,
+    "R"  : 6,
+    "W"  : 7,
+    "WR" : 8,
+ }
+
+
 # Classes
 class Properties:
     def __init__(self, path="",action = '?',freq = 0, command = "", read_freq = 0, write_freq = 0, sub_pid = [], read_size = 0, write_size = 0, size = 0):
@@ -46,7 +58,9 @@ def usage():
 def create_trace_file(arg):
     """ Runs strace and redirects its output to <name>.fout1.txt """
     arguments = ' '.join(arg)
-    os.system(f'strace -f -y --trace=file,read,write,mmap {arguments} 2> {arg[0]}.fout1.txt')
+    exit_code = os.system(f'strace -f -y --trace=file,read,write,mmap {arguments} 2> {arg[0]}.fout1.txt')
+    if exit_code:
+        print(f"Program finished with exit code {exit_code} however, filetrace attempted to run")
 
 
 def create_dict(name):
@@ -71,7 +85,7 @@ def create_dict(name):
                         path_dict[path] = Properties(path=path)
 
                 path_dict[path].command = line
-                path_dict[path].action = openat_stat_actions(path_dict, path)
+                path_dict[path].action = openat_stat_actions(path_dict, path, line)
                 path_dict[path].freq += 1
 
                 if line.startswith('[pid '): # checks is it is a subprocess
@@ -97,15 +111,16 @@ def create_dict(name):
     return path_dict, subprocess_dict 
 
 
-def openat_stat_actions(path_dict, path):
+def openat_stat_actions(path_dict, path, line):
     """ Lablels the action for each path:
         A  : read but file not found
         R  : Read only
         W  : Write only
         RW : Read and write
         S  : stat
-    """ 
-    command = path_dict[path].command
+    """
+
+    command = line
 
     if "openat" in command:
         if "ENOENT" in command:
@@ -124,7 +139,10 @@ def openat_stat_actions(path_dict, path):
             action = 'SU'
         else:
             action = 'S'
-
+    
+    old_action = path_dict[path].action
+    if ACTION_PRIORITY[old_action] > ACTION_PRIORITY[action]:
+        action = old_action
     return action
    
 def read_write_actions(path_dict, line):
@@ -166,7 +184,7 @@ def print_summary_2(path_dict, name):
         size = file.size
         path = file.path
     
-        f.write(f"{action:>4}{size:8}{freq:4}  {path}\n")
+        f.write(f"{action:>4}{convert_bytes(size):8}{freq:4}  {path}\n")
 
     f.close()
 
@@ -256,13 +274,13 @@ def find_major_directories(path_dict, subprocess_dict, top, dirLvl, name):
 
     f.write("\nMajor Reads\n\n")
     for index, path in enumerate(reads_dict,1):
-        f.write(f"{reads_dict[path][1]:6} {reads_dict[path][0]:2}  {path}\n")
+        f.write(f"{convert_bytes(reads_dict[path][1]):>8} {reads_dict[path][0]:<5}  {path}\n")
         if index == top:
             break
 
     f.write("\nMajor Writes\n\n")
     for index, path in enumerate(writes_dict,1):
-        f.write(f"{writes_dict[path][1]:6} {writes_dict[path][0]:2}  {path}\n")
+        f.write(f"{convert_bytes(writes_dict[path][1]):>8} {writes_dict[path][0]:<5}  {path}\n")
         if index == top:
             break
 
@@ -304,13 +322,15 @@ def convert_bytes(num):
 def end_of_execute(name):
     print("\n----- filetrace -----")
     print("filetrace completed\n\nCreated summaries:")
-
-    print(f"{name}.fout1.txt : output of strace")
-    print(f"{name}.fout2.txt : the action and frequency performed on each file")
-    print(f"{name}.fout3.txt : summary of all the actions")
-    print(f"{name}.fout4.txt : summary of files accessed by subprocesses")
-    print("\n")
-
+    if os.path.isfile(name + ".fout4.txt"):
+        print(f"{name}.fout1.txt : output of strace")
+        print(f"{name}.fout2.txt : the action and frequency performed on each file")
+        print(f"{name}.fout3.txt : summary of all the actions")
+        print(f"{name}.fout4.txt : summary of files accessed by subprocesses")
+        print("\n")
+    else:
+        print("There was an error created the summary")
+        sys.exit(1)
 
 # Main
 def main():
