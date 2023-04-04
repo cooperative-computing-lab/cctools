@@ -41,7 +41,7 @@ jobs:
       - name: Get sha of tag
         id: vars
         shell: bash
-        run: echo "::set-output name=tag_sha::$(git rev-parse --short HEAD)"
+        run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - name: build
         run: ${GITHUB_WORKSPACE}/packaging/scripts/build.sh
       - name: deploy
@@ -77,7 +77,7 @@ jobs:
       - name: Get sha of tag
         id: vars
         shell: bash
-        run: echo "::set-output name=tag_sha::$(git rev-parse --short HEAD)"
+        run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - name: build
         run: ${GITHUB_WORKSPACE}/packaging/scripts/build.sh
       - name: deploy
