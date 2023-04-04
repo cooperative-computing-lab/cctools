@@ -559,7 +559,7 @@ class TxnPlot:
         if self.opts.output:
             plt.savefig(self.opts.output)
 
-        if self.opts.display or not self.opts.output:
+        if self.opts.display or not self.opts.output and not self.opts.nograph:
             plt.show()
 
     def set_legend(self, fig):
@@ -714,6 +714,45 @@ class TxnPlotWorkers(TxnPlot):
         if not self.opts.expand_waiting:
             del self.legend["tasks waiting at worker"]
 
+class TxnStats(TxnPlot):
+
+   def convert_size(self, size_bytes):
+        if size_bytes == 0:
+            return "0B"
+        size_name = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+        i = int(math.floor(math.log(size_bytes, 1024)))
+        p = math.pow(1024, i)
+        s = round(size_bytes / p, 2)
+        return "%s %s" % (s, size_name[i])
+
+   def plot(self, fig, manager: Manager):
+        num_workers = manager.workers["CONNECTION"].count()
+        num_tasks = manager.tasks["DONE"].count()
+
+        updates = manager.transfers.loc[manager.transfers["direction"] == "CACHE_UPDATE"]
+        app_updates = updates.loc[updates["filetype"] != "CCTOOLS"]
+
+        urls = app_updates.loc[app_updates["filetype"] == "url"]
+        files = app_updates.loc[app_updates["filetype"] == "files"]
+        tasks = app_updates.loc[app_updates["filetype"] == "task"]
+
+        num_urls = urls["size"].count()
+        urls_size = self.convert_size(urls["size"].sum()*1e6)
+
+        num_files = files["size"].count()
+        files_size = self.convert_size(files["size"].sum()*1e6)
+
+        num_tasks = tasks["size"].count()
+        tasks_size = self.convert_size(tasks["size"].sum()*1e6)
+
+        print(f"Number of Workers {num_workers}")
+        print(f"Number of Tasks {num_tasks}")
+        print(f"Number of File Transfers {num_files}")
+        print(f"Bytes Transferred {files_size}")
+        print(f"Number of URL Transfers {num_urls}")
+        print(f"Bytes Transferred {urls_size}")
+        print(f"Number of Task Transfers {num_tasks}")
+        print(f"Bytes Transferred {tasks_size}")     
 
 if __name__ == "__main__":
 
@@ -721,7 +760,7 @@ if __name__ == "__main__":
 
     parser.add_argument('log', help='Path to transaction log file')
     parser.add_argument('output', nargs='?', default=None, help='output name of the plot/csv generated. If not given, assumes --display')
-    parser.add_argument('--mode', choices="workers tasks manager csv".split(), default="workers", help='information to plot. sv. If csv, write dataframes for tasks, workers and transfers to disk instead.')
+    parser.add_argument('--mode', choices="workers tasks manager csv stats".split(), default="workers", help='information to plot. sv. If csv, write dataframes for tasks, workers and transfers to disk instead.')
     parser.add_argument('--title', nargs='?', default='TaskVine', help='Title of the plot')
     parser.add_argument('--origin', nargs='?', help='change plot origin.', choices='dispatched-first-task waiting-first-task connected-first-worker start-manager'.split(), default="connected-first-worker")
     parser.add_argument('--end', nargs='?', help='change plot end time.', choices='done-last-task disconnected-last-worker end-manager'.split(), default="done-last-task")
@@ -735,6 +774,7 @@ if __name__ == "__main__":
     parser.add_argument('--height', nargs='?', type=float, help='height in inches. Default is 2/3 of width', default=None)
     parser.add_argument('--dpi', nargs='?', type=int, help='output image resoulution', default=300)
     parser.add_argument('--tex', action='store_true', help='use tex fonts')
+    parser.add_argument('--nograph', action='store_true', help='do not show a matplotlib window')
     args = parser.parse_args()
 
     p = ParseTxn(args.log, args.expand_waiting, args.tasks_range)
@@ -750,5 +790,8 @@ if __name__ == "__main__":
         TxnPlotTasks(p.managers, args)
     elif args.mode == "manager":
         TxnPlotManager(p.managers, args)
+    elif args.mode == "stats":
+        args.nograph = True
+        TxnStats(p.managers, args)
 
 
