@@ -9,6 +9,7 @@ import_config_val CCTOOLS_PYTHON_TEST_DIR
 
 export PYTHONPATH=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
 export PATH=$(pwd)/../../batch_job/src:$PATH
+export PATH=$(pwd)/../src/worker:$PATH
 
 STATUS_FILE=vine.status
 
