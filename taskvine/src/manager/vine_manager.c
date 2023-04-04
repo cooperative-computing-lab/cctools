@@ -2659,7 +2659,6 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 				m->substitute = vine_file_substitute_url(m->file,peer_source);
 				free(peer_source);
 				found_match = 1;
-				break;
 			}
 		}
 
