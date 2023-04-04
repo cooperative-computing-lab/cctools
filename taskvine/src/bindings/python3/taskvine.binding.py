@@ -972,6 +972,10 @@ class Manager(object):
         if ssl is not True:
             return ssl
 
+        path = Path(run_info_path)
+        if not path.exists():
+            path.mkdir(parents=True, exist_ok=True)
+
         (tmp, key) = tempfile.mkstemp(dir=run_info_path, prefix="key")
         os.close(tmp)
         (tmp, cert) = tempfile.mkstemp(dir=run_info_path, prefix="cert")
