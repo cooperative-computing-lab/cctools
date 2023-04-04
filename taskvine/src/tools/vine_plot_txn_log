@@ -742,8 +742,8 @@ class TxnStats(TxnPlot):
         num_files = files["size"].count()
         files_size = self.convert_size(files["size"].sum()*1e6)
 
-        num_tasks = tasks["size"].count()
-        tasks_size = self.convert_size(tasks["size"].sum()*1e6)
+        num_minitasks = tasks["size"].count()
+        minitasks_size = self.convert_size(tasks["size"].sum()*1e6)
 
         print(f"Number of Workers {num_workers}")
         print(f"Number of Tasks {num_tasks}")
@@ -751,8 +751,8 @@ class TxnStats(TxnPlot):
         print(f"Bytes Transferred {files_size}")
         print(f"Number of URL Transfers {num_urls}")
         print(f"Bytes Transferred {urls_size}")
-        print(f"Number of Task Transfers {num_tasks}")
-        print(f"Bytes Transferred {tasks_size}")     
+        print(f"Number of Mini Tasks {num_minitasks}")
+        print(f"Bytes Created {minitasks_size}")     
 
 if __name__ == "__main__":
 
