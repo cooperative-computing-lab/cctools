@@ -747,16 +747,16 @@ class TxnStats(TxnPlot):
 
         xfr_avg = urls["wall_time"].sum()/urls["wall_time"].count()
 
-        print(f"Number of Workers {num_workers}")
-        print(f"Number of Tasks {num_tasks}")
-        print(f"Number of File Transfers {num_files}")
-        print(f"Bytes Transferred {files_size}")
-        print(f"Number of URL Transfers {num_urls}")
-        print(f"Bytes Transferred {urls_size}")
-        print(f"Number of Mini Tasks {num_minitasks}")
-        print(f"Bytes Created {minitasks_size}")    
+        print(f"Number of workers: {num_workers}")
+        print(f"Number of tasks: {num_tasks}")
+        print(f"Number of file transfers: {num_files}")
+        print(f"Bytes transferred: {files_size}")
+        print(f"Number of URL transfers: {num_urls}")
+        print(f"Bytes transferred: {urls_size}")
+        print(f"Number of mini tasks: {num_minitasks}")
+        print(f"Bytes created: {minitasks_size}")    
         
-        print("Average Transfer Time {:.2f}s".format(float(xfr_avg)))
+        print("Average transfer time: {:.2f}s".format(float(xfr_avg)))
 
 if __name__ == "__main__":
 
