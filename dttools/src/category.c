@@ -912,10 +912,10 @@ const struct rmsummary *category_bucketing_dynamic_task_max_resources(struct cat
     /* load explicit category max values */
     rmsummary_merge_override(internal, c->max_allocation);
 
-    if(category_in_steady_state(c) &&
-            (c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE ||
-            c->allocation_mode ==CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT) &&
-            request == CATEGORY_ALLOCATION_FIRST) {
+    if(category_in_steady_state(c) && request == CATEGORY_ALLOCATION_FIRST &&
+            (c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE    ||
+            c->allocation_mode ==CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT ||
+            c->allocation_mode ==CATEGORY_ALLOCATION_MODE_MAX)) {
 		rmsummary_merge_override(internal, c->first_allocation);
 	}
 
