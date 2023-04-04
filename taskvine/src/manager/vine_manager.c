@@ -4964,13 +4964,13 @@ const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, 
 
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 
-	return category_bucketing_dynamic_task_max_resources(c, t->resources_requested, t->resource_request, t->task_id);
+	return category_task_max_resources(c, t->resources_requested, t->resource_request, t->task_id);
 }
 
 const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, struct vine_task *t) {
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 
-	const struct rmsummary *s = category_dynamic_task_min_resources(c, t->resources_requested, t->resource_request);
+	const struct rmsummary *s = category_task_min_resources(c, t->resources_requested, t->resource_request, t->task_id);
 
 	if(t->resource_request != CATEGORY_ALLOCATION_FIRST || !q->current_max_worker) {
 		return s;
@@ -4989,7 +4989,7 @@ const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, 
 		rmsummary_merge_override(r, q->current_max_worker);
 		rmsummary_merge_override(r, t->resources_requested);
 
-		s = category_dynamic_task_min_resources(c, r, t->resource_request);
+		s = category_task_min_resources(c, r, t->resource_request, t->task_id);
 		rmsummary_delete(r);
 	}
 
