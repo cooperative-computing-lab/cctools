@@ -370,6 +370,9 @@ int64_t category_first_allocation_min_waste(struct histogram *h, int64_t top_res
 	free(times_accum);
 	free(keys);
 
+	/* round up to bucket size */
+	a_1 = histogram_round_up(h, a_1);
+
 	return a_1;
 }
 
@@ -439,6 +442,9 @@ int64_t category_first_allocation_max_throughput(struct histogram *h, int64_t to
 	free(counts_accum);
 	free(times_accum);
 	free(keys);
+
+	/* round up to bucket size */
+	a_1 = histogram_round_up(h, a_1);
 
 	return a_1;
 }
@@ -832,51 +838,9 @@ category_allocation_t category_next_label(struct category *c, category_allocatio
 	return current_label;
 }
 
-const struct rmsummary *category_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request) {
-	/* we keep an internal label so that the caller does not have to worry
-	 * about memory leaks. */
-	static struct rmsummary *internal = NULL;
-
-	if(internal) {
-		rmsummary_delete(internal);
-	}
-
-	internal = rmsummary_create(-1);
-
-    if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED &&
-        c->allocation_mode != CATEGORY_ALLOCATION_MODE_MAX) {
-        if (category_in_steady_state(c) && 
-            (c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE ||
-            c->allocation_mode == CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT))
-        {
-            /* load max seen values, but only if not in fixed or max mode.
-             * In max mode, max seen is the first allocation, and next allocation
-             * is to use whole workers. */
-            rmsummary_merge_override(internal, c->max_resources_seen);
-
-            /* Never go below what first_allocation computer */
-            rmsummary_merge_max(internal, c->first_allocation);
-        }
-    }
-
-    /* load explicit category max values */
-    rmsummary_merge_override(internal, c->max_allocation);
-
-    if(category_in_steady_state(c) &&
-            (c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE ||
-            c->allocation_mode ==CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT) &&
-            request == CATEGORY_ALLOCATION_FIRST) {
-		rmsummary_merge_override(internal, c->first_allocation);
-	}
-
-	/* chip in user values if explicitly given */
-	rmsummary_merge_override(internal, user);
-
-	return internal;
-}
 
 //taskid >=0 means real task needs prediction, -1 means function called for other purposes
-const struct rmsummary *category_bucketing_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request, int taskid) {
+const struct rmsummary *category_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request, int taskid) {
 	/* we keep an internal label so that the caller does not have to worry
 	 * about memory leaks. */
 	static struct rmsummary *internal = NULL;
@@ -898,7 +862,7 @@ const struct rmsummary *category_bucketing_dynamic_task_max_resources(struct cat
              * is to use whole workers. */
             rmsummary_merge_override(internal, c->max_resources_seen);
 
-            /* Never go below what first_allocation computer */
+            /* Never go below what first_allocation computed */
             rmsummary_merge_max(internal, c->first_allocation);
         }
         else if (taskid >= 0 && category_in_bucketing_mode(c))
@@ -912,10 +876,10 @@ const struct rmsummary *category_bucketing_dynamic_task_max_resources(struct cat
     /* load explicit category max values */
     rmsummary_merge_override(internal, c->max_allocation);
 
-    if(category_in_steady_state(c) &&
-            (c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE ||
-            c->allocation_mode ==CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT) &&
-            request == CATEGORY_ALLOCATION_FIRST) {
+    if(category_in_steady_state(c) && request == CATEGORY_ALLOCATION_FIRST &&
+            (c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE    ||
+            c->allocation_mode ==CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT ||
+            c->allocation_mode ==CATEGORY_ALLOCATION_MODE_MAX)) {
 		rmsummary_merge_override(internal, c->first_allocation);
 	}
 
@@ -925,9 +889,9 @@ const struct rmsummary *category_bucketing_dynamic_task_max_resources(struct cat
 	return internal;
 }
 
-const struct rmsummary *category_dynamic_task_min_resources(struct category *c, struct rmsummary *user, category_allocation_t request) {
+const struct rmsummary *category_task_min_resources(struct category *c, struct rmsummary *user, category_allocation_t request, int taskid) {
 	static struct rmsummary *internal = NULL;
-	const struct rmsummary *allocation = category_dynamic_task_max_resources(c, user, request);
+	const struct rmsummary *allocation = category_task_max_resources(c, user, request, taskid);
 
 	if(internal) {
 		rmsummary_delete(internal);

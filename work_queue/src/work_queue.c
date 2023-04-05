@@ -7808,12 +7808,12 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 	buffer_init(&B);
 
 	buffer_printf(&B, "CATEGORY %s MAX ", c->name);
-	rmsummary_print_buffer(&B, category_bucketing_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_MAX, -1), 1);
+	rmsummary_print_buffer(&B, category_task_max_resources(c, NULL, CATEGORY_ALLOCATION_MAX, -1), 1);
 	write_transaction(q, buffer_tostring(&B));
 	buffer_rewind(&B, 0);
 
 	buffer_printf(&B, "CATEGORY %s MIN ", c->name);
-	rmsummary_print_buffer(&B, category_dynamic_task_min_resources(c, NULL, CATEGORY_ALLOCATION_FIRST), 1);
+	rmsummary_print_buffer(&B, category_task_min_resources(c, NULL, CATEGORY_ALLOCATION_FIRST, -1), 1);
 	write_transaction(q, buffer_tostring(&B));
 	buffer_rewind(&B, 0);
 
@@ -7842,7 +7842,7 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 	}
 
 	buffer_printf(&B, "CATEGORY %s FIRST %s ", c->name, mode);
-	rmsummary_print_buffer(&B, category_bucketing_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_FIRST, -1), 1);
+	rmsummary_print_buffer(&B, category_task_max_resources(c, NULL, CATEGORY_ALLOCATION_FIRST, -1), 1);
 	write_transaction(q, buffer_tostring(&B));
 
 	buffer_free(&B);
@@ -8098,13 +8098,13 @@ const struct rmsummary *task_max_resources(struct work_queue *q, struct work_que
 
 	struct category *c = work_queue_category_lookup_or_create(q, t->category);
 
-	return category_bucketing_dynamic_task_max_resources(c, t->resources_requested, t->resource_request, t->taskid);
+	return category_task_max_resources(c, t->resources_requested, t->resource_request, t->taskid);
 }
 
 const struct rmsummary *task_min_resources(struct work_queue *q, struct work_queue_task *t) {
 	struct category *c = work_queue_category_lookup_or_create(q, t->category);
 
-	const struct rmsummary *s = category_dynamic_task_min_resources(c, t->resources_requested, t->resource_request);
+	const struct rmsummary *s = category_task_min_resources(c, t->resources_requested, t->resource_request, t->taskid);
 
 	if(t->resource_request != CATEGORY_ALLOCATION_FIRST || !q->current_max_worker) {
 		return s;
@@ -8123,7 +8123,7 @@ const struct rmsummary *task_min_resources(struct work_queue *q, struct work_que
 		rmsummary_merge_override(r, q->current_max_worker);
 		rmsummary_merge_override(r, t->resources_requested);
 
-		s = category_dynamic_task_min_resources(c, r, t->resource_request);
+		s = category_task_min_resources(c, r, t->resource_request, t->taskid);
 		rmsummary_delete(r);
 	}
 
