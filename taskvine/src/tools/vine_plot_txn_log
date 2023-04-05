@@ -730,11 +730,14 @@ class TxnStats(TxnPlot):
         num_tasks = manager.tasks["DONE"].count()
 
         updates = manager.transfers.loc[manager.transfers["direction"] == "CACHE_UPDATE"]
+        inputs = manager.transfers.loc[manager.transfers["direction"] == "INPUT"]
+        outputs = manager.transfers.loc[manager.transfers["direction"] == "OUTPUT"]
         app_updates = updates.loc[updates["filetype"] != "CCTOOLS"]
 
         urls = app_updates.loc[app_updates["filetype"] == "url"]
-        files = app_updates.loc[app_updates["filetype"] == "files"]
+        files = app_updates.loc[app_updates["filetype"] == "file"]
         tasks = app_updates.loc[app_updates["filetype"] == "task"]
+        temps = app_updates.loc[app_updates["filetype"] == "temp"]
 
         num_urls = urls["size"].count()
         urls_size = self.convert_size(urls["size"].sum()*1e6)
@@ -742,21 +745,42 @@ class TxnStats(TxnPlot):
         num_files = files["size"].count()
         files_size = self.convert_size(files["size"].sum()*1e6)
 
+        num_inputs = inputs["size"].count()
+        inputs_size = self.convert_size(inputs["size"].sum()*1e6)
+
+        num_outputs = outputs["size"].count()
+        outputs_size = self.convert_size(outputs["size"].sum()*1e6)
+
         num_minitasks = tasks["size"].count()
         minitasks_size = self.convert_size(tasks["size"].sum()*1e6)
 
-        xfr_avg = urls["wall_time"].sum()/urls["wall_time"].count()
+        num_temps = temps["size"].count()
+        temps_size = self.convert_size(temps["size"].sum()*1e6)
 
+        if(num_urls > 0):
+            xfr_avg = urls["wall_time"].sum()/urls["wall_time"].count()
+
+        print("-----------------------------------------")
         print(f"Number of workers: {num_workers}")
         print(f"Number of tasks: {num_tasks}")
-        print(f"Number of file transfers: {num_files}")
-        print(f"Bytes transferred: {files_size}")
-        print(f"Number of URL transfers: {num_urls}")
+        print(f"Files created at worker: {num_files}")
+        print(f"Bytes created: {files_size}")
+        print(f"Number of inputs transferred by manager: {num_inputs}")
+        print(f"Bytes transferred: {inputs_size}")
+        print(f"Number of outputs returned: {num_outputs}")
+        print(f"Size of outputs returned: {outputs_size}")
+        print(f"Number of URL/Worker transfers: {num_urls}")
         print(f"Bytes transferred: {urls_size}")
+        if(num_urls > 0):
+            print("Average transfer time: {:.2f}s".format(float(xfr_avg)))
         print(f"Number of mini tasks: {num_minitasks}")
         print(f"Bytes created: {minitasks_size}")    
-        
-        print("Average transfer time: {:.2f}s".format(float(xfr_avg)))
+        print(f"Number of temps: {num_temps}")
+        print(f"Bytes created: {temps_size}")
+        print("-----------------------------------------")
+        print()
+
+
 
 if __name__ == "__main__":
 
