@@ -6,12 +6,12 @@ import re
 import operator
 from collections import defaultdict
     
-path1_regex = re.compile('</.+?>')
-path2_regex = re.compile('<.+?>,')
-pid1_re = re.compile('\[pid [0-9]+\]')
-bytes_re = re.compile('= [0-9]+$')
-command_re = re.compile('\[".+\]')
-process_re = re.compile('strace: Process [0-9]+')
+PATH1_RE = re.compile('</.+?>')
+PATH2_RE = re.compile('<.+?>,')
+PID1_RE = re.compile('\[pid [0-9]+\]')
+BYTES_RE = re.compile('= [0-9]+$')
+COMMAND_RE = re.compile('\[".+\]')
+PROCESS_RE = re.compile('strace: Process [0-9]+')
 
 
 ACTION_PRIORITY = {
@@ -76,7 +76,7 @@ def create_dict(name):
         for line in file: 
             if "openat(" in line or "stat" in line:
                 try: # Try get file path
-                    path = path1_regex.search(line).group(0).strip('<>')
+                    path = PATH1_RE.search(line).group(0).strip('<>')
                 except AttributeError: # AttributeError if file not found
                     try: # find path for ENOENT
                         path = line.split('"')[1]
@@ -92,13 +92,13 @@ def create_dict(name):
                 path_dict[path].freq += 1
 
                 if line.startswith('[pid '): # checks is it is a subprocess
-                    path_dict[path].sub_pid.append(pid1_re.search(line).group(0).strip('[pid ]'))
+                    path_dict[path].sub_pid.append(PID1_RE.search(line).group(0).strip('[pid ]'))
 
             elif "read(" in line or "write(" in line:
                 read_write_actions(path_dict,line)
             elif "mmap(" in line:
                 try:
-                    path = path2_regex.search(line).group(0).strip('<>,')
+                    path = PATH2_RE.search(line).group(0).strip('<>,')
                     path = os.path.realpath(path)
 
                     if path not in path_dict: 
@@ -152,9 +152,9 @@ def openat_stat_actions(path_dict, path, line):
    
 def read_write_actions(path_dict, line):
     try:
-        path = path2_regex.search(line).group(0).strip('<>,')
+        path = PATH2_RE.search(line).group(0).strip('<>,')
         path = os.path.realpath(path)
-        bytes_returned = int(bytes_re.search(line).group(0).replace('= ',''))
+        BYTES_REturned = int(BYTES_RE.search(line).group(0).replace('= ',''))
 
     except (IndexError, AttributeError) as e:
         return 0
@@ -165,14 +165,14 @@ def read_write_actions(path_dict, line):
     if "read(" in line:
         path_dict[path].action = 'R'
         path_dict[path].read_freq += 1
-        path_dict[path].read_size += bytes_returned
+        path_dict[path].read_size += BYTES_REturned
     elif "write(" in line:
         path_dict[path].action = 'W'
         path_dict[path].write_freq += 1
-        path_dict[path].write_size += bytes_returned
+        path_dict[path].write_size += BYTES_REturned
     if (path_dict[path].read_freq > 0) and (path_dict[path].write_freq > 0):
         action = 'WR'
-    path_dict[path].size += bytes_returned
+    path_dict[path].size += BYTES_REturned
     path_dict[path].freq = path_dict[path].read_freq + path_dict[path].write_freq
 
 
@@ -194,18 +194,18 @@ def print_summary_2(path_dict, name):
     f.close()
 
 def find_command(line, subprocess_dict):
-    if pid1_re.search(line): 
-        pid = pid1_re.search(line).group(0).strip('[pid ]')
+    if PID1_RE.search(line): 
+        pid = PID1_RE.search(line).group(0).strip('[pid ]')
         try:
-            command = str(command_re.search(line).group(0)).strip('[]').replace('", "',' ')
+            command = str(COMMAND_RE.search(line).group(0)).strip('[]').replace('", "',' ')
             subprocess_dict[pid] = {"command" : command, "files": set()}
         except AttributeError:
             pass
     return
 
 def find_pid(line, subprocess_dict):
-    if process_re.search(line): 
-        pid = process_re.search(line).group(0).replace('strace: Process ','')
+    if PROCESS_RE.search(line): 
+        pid = PROCESS_RE.search(line).group(0).replace('strace: Process ','')
         subprocess_dict[pid] = {"command" : "", "files": set()} 
 
 def print_subprocess_summary(subprocess_dict, name):
