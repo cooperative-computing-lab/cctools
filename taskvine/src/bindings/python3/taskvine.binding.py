@@ -2380,7 +2380,7 @@ class FunctionCall(Task):
 # cleaned up automatically at the end of the block. You can also make
 # config changes to the factory while it is running. As an example,
 #
-#     # normal WQ setup stuff
+#     # normal vine setup stuff
 #     workers = taskvine.Factory("sge", "myproject")
 #     workers.cores = 4
 #     with workers:
