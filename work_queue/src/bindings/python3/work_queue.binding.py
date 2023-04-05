@@ -60,7 +60,8 @@ else:
 
 def cleanup_staging_directory():
     try:
-        shutil.rmtree(staging_directory)
+        if shutil and os and staging_directory and os.path.exists(staging_directory):
+            shutil.rmtree(staging_directory)
     except Exception as e:
         sys.stderr.write("could not delete {}: {}\n".format(staging_directory, e))
 
