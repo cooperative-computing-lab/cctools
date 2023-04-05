@@ -6,10 +6,12 @@ import re
 import operator
 from collections import defaultdict
     
-path1_regex = re.compile('</.+>')
-path2_regex = re.compile('<.+>,')
+path1_regex = re.compile('</.+?>')
+path2_regex = re.compile('<.+?>,')
 pid1_re = re.compile('\[pid [0-9]+\]')
 bytes_re = re.compile('= [0-9]+$')
+command_re = re.compile('\[".+\]')
+process_re = re.compile('strace: Process [0-9]+')
 
 
 ACTION_PRIORITY = {
@@ -26,11 +28,10 @@ ACTION_PRIORITY = {
 
 # Classes
 class Properties:
-    def __init__(self, path="",action = '?',freq = 0, command = "", read_freq = 0, write_freq = 0, sub_pid = [], read_size = 0, write_size = 0, size = 0):
+    def __init__(self, path="",action = '?',freq = 0, read_freq = 0, write_freq = 0, sub_pid = [], read_size = 0, write_size = 0, size = 0):
         self.path = path
         self.action = action
         self.freq = freq
-        self.command = command
         self.read_freq = read_freq
         self.read_size = read_size
         self.write_freq = write_freq
@@ -68,6 +69,8 @@ def create_dict(name):
     """
     path_dict = {}
     subprocess_dict = {}
+    call_counter = 0
+    print()
 
     with open(name + ".fout1.txt") as file:
         for line in file: 
@@ -106,7 +109,9 @@ def create_dict(name):
             if "strace: Process " in line: # new process created
                 find_pid(line, subprocess_dict)
             if "execve" in line: # finds command associated with process
-                find_command(line,subprocess_dict) 
+                find_command(line,subprocess_dict)
+            call_counter += 1
+            print(f"filetrace: syscalls processed: {call_counter}",end='\r')
 
     return path_dict, subprocess_dict 
 
@@ -184,12 +189,11 @@ def print_summary_2(path_dict, name):
         size = file.size
         path = file.path
     
-        f.write(f"{action:>4}{convert_bytes(size):8}{freq:4}  {path}\n")
+        f.write(f"{action:>4}{convert_bytes(size):>8}{freq:4}  {path}\n")
 
     f.close()
 
 def find_command(line, subprocess_dict):
-    command_re = re.compile('\[".+\]')
     if pid1_re.search(line): 
         pid = pid1_re.search(line).group(0).strip('[pid ]')
         try:
@@ -200,7 +204,6 @@ def find_command(line, subprocess_dict):
     return
 
 def find_pid(line, subprocess_dict):
-    process_re = re.compile('strace: Process [0-9]+')
     if process_re.search(line): 
         pid = process_re.search(line).group(0).replace('strace: Process ','')
         subprocess_dict[pid] = {"command" : "", "files": set()} 
@@ -231,8 +234,8 @@ def find_major_directories(path_dict, subprocess_dict, top, dirLvl, name):
 
     f = open(name + ".fout3.txt", "w")
 
-    common = find_common_path(path_dict.keys(),dirLvl)
-    common.insert(0,'/usr/lib64/')
+    major_paths = find_common_path(path_dict.keys(),dirLvl)
+    major_paths.insert(0,'/usr/lib64/')
 
     for path in path_dict:
         action = path_dict[path].action
@@ -240,9 +243,7 @@ def find_major_directories(path_dict, subprocess_dict, top, dirLvl, name):
         size = path_dict[path].size
         sub_pid = path_dict[path].sub_pid
 
-        # short_path = '/'.join(path.split('/')[0:dirLvl])
-        
-        for short_path in common:
+        for short_path in major_paths:
             if short_path in path:
                 break
         major_dict[short_path][0] += freq
@@ -286,26 +287,25 @@ def find_major_directories(path_dict, subprocess_dict, top, dirLvl, name):
 
     f.close()
 
-def find_common_path(arr,dirLvl):
-    arr = sorted(arr)
-    prefixes = set(['/'.join(path.split('/')[1:dirLvl]) for path in arr])
-    common = []
+def find_common_path(path_list,dirLvl):
+    path_list = sorted(path_list)
+    prefixes = set(['/'.join(path.split('/')[1:dirLvl]) for path in path_list])
+    major_paths = []
     for prefix in prefixes:
-        a = []
-        for index, path in enumerate(arr):
+        common_prefix = []
+        for index, path in enumerate(path_list): 
+            # if path starts with the prefix add to the list and find the common path
             if path.startswith('/'+ prefix):
-                a.append(arr.pop(index))
+                common_prefix.append(path_list.pop(index))
         try:
-            short_path = os.path.commonpath(a)
+            short_path = os.path.commonpath(common_prefix)
         except ValueError:
             short_path = '/'+ prefix
-            common.append(short_path)
-        if short_path == '/':
+        if short_path == '/': # exclude root as path
             continue
-        common.append(short_path)
+        major_paths.append(short_path)
     
-    common = sorted(common, reverse=True)
-    return common
+    return sorted(major_paths, reverse=True)
 
 def convert_bytes(num):
     if num > 1000000:
@@ -329,7 +329,7 @@ def end_of_execute(name):
         print(f"{name}.fout4.txt : summary of files accessed by subprocesses")
         print("\n")
     else:
-        print("There was an error created the summary")
+        print("There was an error creating the summary")
         sys.exit(1)
 
 # Main
