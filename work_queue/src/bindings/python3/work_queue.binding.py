@@ -60,7 +60,8 @@ else:
 
 def cleanup_staging_directory():
     try:
-        shutil.rmtree(staging_directory)
+        if shutil and os and staging_directory and os.path.exists(staging_directory):
+            shutil.rmtree(staging_directory)
     except Exception as e:
         sys.stderr.write("could not delete {}: {}\n".format(staging_directory, e))
 
@@ -1107,6 +1108,7 @@ class WorkQueue(object):
         self._stats_hierarchy = None
         self._task_table = {}
         self._info_widget = None
+        self._using_ssl = False
 
         # if we were given a range ports, rather than a single port to try.
         lower, upper = None, None
@@ -1131,6 +1133,10 @@ class WorkQueue(object):
 
             ssl_key, ssl_cert = self._setup_ssl(ssl)
             self._work_queue = work_queue_ssl_create(port, ssl_key, ssl_cert)
+
+            if ssl_key:
+                self._using_ssl = True
+
             if not self._work_queue:
                 raise Exception("Could not create queue on port {}".format(port))
 
@@ -1216,6 +1222,15 @@ class WorkQueue(object):
     @property
     def port(self):
         return work_queue_port(self._work_queue)
+
+    ##
+    # Whether the manager is using ssl to talk to workers
+    # @code
+    # >>> print(q.using_ssl)
+    # @endcode
+    @property
+    def using_ssl(self):
+        return self._using_ssl
 
     ##
     # Get queue statistics.
@@ -2320,52 +2335,49 @@ class Factory(object):
     ##
     # Create a factory for the given batch_type and manager name.
     #
-    # `manager_name` or, `manager_host_port` should be specified.
+    # One of `manager_name`, `manager_host_port`, or `manager` should be specified.
     # If factory_binary or worker_binary is not
     # specified, $PATH will be searched.
-    def __init__(
-        self,
-        batch_type,
-        manager_name=None,
-        manager_host_port=None,
-        factory_binary=None,
-        worker_binary=None,
-        log_file=os.devnull,
-    ):
+    def __init__(self, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull):
         self._config_file = None
         self._factory_proc = None
         self._log_file = log_file
-
-        (tmp, self._error_file) = tempfile.mkstemp(dir=staging_directory, prefix="wq-factory-err-")
-        os.close(tmp)
+        self._error_file = None
+        self._scratch_safe_to_delete = False
 
         self._opts = {}
 
-        self._set_manager(manager_name, manager_host_port)
+        self._set_manager(batch_type, manager, manager_host_port, manager_name)
+
         self._opts["batch-type"] = batch_type
         self._opts["worker-binary"] = self._find_exe(worker_binary, "work_queue_worker")
+        self._factory_binary = self._find_exe(factory_binary, "work_queue_factory")
         self._opts["scratch-dir"] = None
 
-        self._factory_binary = self._find_exe(factory_binary, "work_queue_factory")
-
-    def _set_manager(self, manager_name, manager_host_port):
-        if not (manager_name or manager_host_port):
-            raise ValueError("Either manager_name or, manager_host_port should be specified.")
-
-        if manager_name and manager_host_port:
-            raise ValueError("Master should be specified by a name, or by a host and port. Not both.")
+    def _set_manager(self, batch_type, manager, manager_host_port, manager_name):
+        if not (manager or manager_host_port or manager_name):
+            raise ValueError("Either manager, manager_host_port, or manager_name or manager should be specified.")
 
         if manager_name:
             self._opts["manager-name"] = manager_name
-            return
+
+        if manager:
+            if batch_type == "local":
+                manager_host_port = f"localhost:{manager.port}"
+            elif manager.name:
+                self._opts["manager-name"] = manager_name
+
+            if manager.using_ssl:
+                self._opts["ssl"] = True
 
         if manager_host_port:
             try:
                 (host, port) = [x for x in manager_host_port.split(":") if x]
                 self._opts["manager-host"] = host
                 self._opts["manager-port"] = port
+                return
             except (TypeError, ValueError):
-                raise ValueError("manager_name is not of the form HOST:PORT")
+                raise ValueError("manager_host_port is not of the form HOST:PORT")
 
     def _find_exe(self, path, default):
         if path is None:
@@ -2455,13 +2467,28 @@ class Factory(object):
     # may be useful to provision workers from inside a Jupyter notebook.
     def start(self):
         if self._factory_proc is not None:
-            raise RuntimeError("Factory was already started")
-        (tmp, self._config_file) = tempfile.mkstemp(dir=staging_directory, prefix="wq-factory-config-", suffix=".json")
+            # if factory already running, just update its config
+            self._write_config()
+            return
 
         if not self.scratch_dir:
-            self.scratch_dir = tempfile.mkdtemp(dir=staging_directory, prefix="wq-factory-scratch-")
+            candidate = os.getcwd()
+            if candidate.startswith("/afs") and self.batch_type == "condor":
+                candidate = os.environ.get("TMPDIR", "/tmp")
+            candidate = os.path.join(candidate, f"wq-factory-{os.getuid()}")
+            if not os.path.exists(candidate):
+                os.makedirs(candidate)
+            self.scratch_dir = candidate
 
-        os.close(tmp)
+        # specialize scratch_dir for this run
+        self.scratch_dir = tempfile.mkdtemp(prefix="wq-factory-", dir=self.scratch_dir)
+        self._scratch_safe_to_delete = True
+
+        atexit.register(lambda: os.path.exists(self.scratch_dir) and shutil.rmtree(self.scratch_dir))
+
+        self._error_file = os.path.join(self.scratch_dir, "error.log")
+        self._config_file = os.path.join(self.scratch_dir, "config.json")
+
         self._write_config()
         logfd = open(self._log_file, "a")
         errfd = open(self._error_file, "w")
@@ -2489,8 +2516,6 @@ class Factory(object):
         self._factory_proc.terminate()
         self._factory_proc.wait()
         self._factory_proc = None
-        os.unlink(self._config_file)
-        os.unlink(self._error_file)
         self._config_file = None
 
     def __enter__(self):
@@ -2502,6 +2527,9 @@ class Factory(object):
     def __del__(self):
         if self._factory_proc is not None:
             self.stop()
+
+        if shutil and self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
+            shutil.rmtree(self.scratch_dir)
 
     def _write_config(self):
         if self._config_file is None:
