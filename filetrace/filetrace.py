@@ -5,6 +5,9 @@ import sys
 import re
 import operator
 from collections import defaultdict
+import json
+from glob import glob
+
     
 PATH1_RE = re.compile('</.+?>')
 PATH2_RE = re.compile('<.+?>,')
@@ -38,6 +41,19 @@ class Properties:
         self.write_size = write_size
         self.sub_pid = sub_pid.copy()
         self.size = size
+    def convert_dict(self,dict):
+        for k, v in dict.items():
+        
+            dict[k] = Properties( path=dict[k]['path'],
+                                action =dict[k]['action'],
+                                freq = dict[k]['freq'],
+                                read_freq = dict[k]['read_freq'],
+                                write_freq = dict[k]['write_freq'],
+                                sub_pid = dict[k]['sub_pid'],
+                                read_size = dict[k]['read_size'],
+                                write_size = dict[k]['write_size'],
+                                size = dict[k]['size'])
+        return dict
 
 # Funtions
 def usage():
@@ -56,10 +72,10 @@ def usage():
     sys.exit(0)
 
 
-def create_trace_file(arg):
+def create_trace_file(name,arg):
     """ Runs strace and redirects its output to <name>.fout1.txt """
     arguments = ' '.join(arg)
-    exit_code = os.system(f'strace -f -y --trace=file,read,write,mmap {arguments} 2> {arg[0]}.fout1.txt')
+    exit_code = os.system(f'strace -f -y --trace=file,read,write,mmap {arguments} 2> {name}.fout1.txt')
     if exit_code:
         print(f"Program finished with exit code {exit_code} however, filetrace attempted to run")
 
@@ -87,7 +103,6 @@ def create_dict(name):
                 if path not in path_dict: 
                         path_dict[path] = Properties(path=path)
 
-                path_dict[path].command = line
                 path_dict[path].action = openat_stat_actions(path_dict, path, line)
                 path_dict[path].freq += 1
 
@@ -154,7 +169,7 @@ def read_write_actions(path_dict, line):
     try:
         path = PATH2_RE.search(line).group(0).strip('<>,')
         path = os.path.realpath(path)
-        BYTES_REturned = int(BYTES_RE.search(line).group(0).replace('= ',''))
+        bytes_returned = int(BYTES_RE.search(line).group(0).replace('= ',''))
 
     except (IndexError, AttributeError) as e:
         return 0
@@ -165,24 +180,24 @@ def read_write_actions(path_dict, line):
     if "read(" in line:
         path_dict[path].action = 'R'
         path_dict[path].read_freq += 1
-        path_dict[path].read_size += BYTES_REturned
+        path_dict[path].read_size += bytes_returned
     elif "write(" in line:
         path_dict[path].action = 'W'
         path_dict[path].write_freq += 1
-        path_dict[path].write_size += BYTES_REturned
+        path_dict[path].write_size += bytes_returned
     if (path_dict[path].read_freq > 0) and (path_dict[path].write_freq > 0):
-        action = 'WR'
-    path_dict[path].size += BYTES_REturned
+        path_dict[path].action = 'WR'
+    path_dict[path].size += bytes_returned
     path_dict[path].freq = path_dict[path].read_freq + path_dict[path].write_freq
 
 
-def print_summary_2(path_dict, name):
+def print_summary_2(path_dict, name, master):
     """ Creates the file <name>.fout2.txt which contains the freqency,
     action, and path of each entry
     """
     f = open(name + ".fout2.txt", "w")
     f.write(f"action bytes freq path\n")
-     
+
     for file in sorted(path_dict.values(), key=operator.attrgetter('action','size','freq') , reverse=True):
         action = file.action
         freq = file.freq
@@ -316,8 +331,6 @@ def convert_bytes(num):
         num = str(round(num,2)) + 'K'
     return num
     
-    
-
 
 def end_of_execute(name):
     print("\n----- filetrace -----")
@@ -332,38 +345,114 @@ def end_of_execute(name):
         print("There was an error creating the summary")
         sys.exit(1)
 
+def create_json(name,path_dict,subprocess_dict):
+    for key, value in path_dict.items():
+        value = vars(value)
+        path_dict[key] = value
+
+    json_data = json.dumps(path_dict)
+    f = open(f"filetrace-path-{name}.json", "w")
+    f.write(json_data)
+    f.close()
+    print(f"\n\ncreated: filetrace-path-{name}.json")
+
+    for key, value in subprocess_dict.items():
+        subprocess_dict[key]['files'] = list(subprocess_dict[key]['files'])
+    
+    json_data = json.dumps(subprocess_dict)
+    f = open(f"filetrace-process-{name}.json", "w")
+    f.write(json_data)
+    f.close()
+    print(f"created: filetrace-process-{name}.json")
+
+
+
+def load_path_json():
+    files = glob('filetrace-path*.json')
+    path_dict = json.load(open(files.pop(),'r'))
+    x = Properties()
+
+    for filename in files:
+        json_dict = json.load(open(filename,'r'))
+        for path, properties in json_dict.items():
+            if path in path_dict:
+                for property, value in properties.items():
+                    if property == 'action' and (ACTION_PRIORITY[path_dict[path][property]] < ACTION_PRIORITY[value]):
+                        path_dict[path][property] = value
+                    elif type(value) is int or type(value) is list:
+                        path_dict[path][property] += value
+            else:
+                path_dict[path] = properties
+    path_dict = x.convert_dict(path_dict)
+    return path_dict
+
+def load_process_json():
+    files = glob('filetrace-process*.json')
+    process_dict = json.load(open(files.pop(),'r'))
+
+    for filename in files:
+        json_dict = json.load(open(filename,'r'))
+        for pid, properties in json_dict.items(): 
+                process_dict[pid] = properties
+
+    return process_dict
+
+def remove_files():
+    files = glob("*fout*.txt") + glob("filetrace-*.json")
+    for file in files:
+        print(f"removed: {file}")
+    os.system(f"rm {' '.join(files)}")
+    print("\ndone ... removed filetrace files")
+
 # Main
 def main():
     top=-1
     dirLvl=5
+    json=0
+    assemble=0
+    name=0
 
     arguments = sys.argv[1:]
 
     while arguments and arguments[0].startswith('-'):
         arg = arguments.pop(0)
         if arg == "--clean":
-            os.system("rm ./*fout*.txt")
-            print("removed ftrace files")
+            remove_files()
+            
             sys.exit(0)
-        elif arg == '--help':
-            usage()
-        elif arg == '-h':
+        elif arg == '-h' or arg == '--help':
             usage()
         elif arg == '-d':
             dirLvl = (int(arguments.pop(0)) + 1)
-        elif arg == '-t': 
+        elif arg == '-t' or arg == '-top': 
             top = int(arguments.pop(0))
+        elif arg == '-j' or arg == '--json':
+            json = 1
+        elif arg == '-a' or arg == '--assemble':
+            assemble=1
+        elif arg == '-n' or arg == '--name':
+            name = arguments.pop(0)
         else:
             continue
 
     if len(arguments) == 0:
         usage()
-                
-    name = arguments[0]
 
-    create_trace_file(arguments[0:])
-    path_dict, subprocess_dict = create_dict(name)
-    print_summary_2(path_dict, name)
+    if not name:
+        name = arguments[0]
+
+    if not assemble:
+        create_trace_file(name,arguments[0:])
+        path_dict, subprocess_dict = create_dict(name)
+    else:
+        path_dict = load_path_json()
+        subprocess_dict = load_process_json()
+    
+    if json:
+        create_json(name,path_dict,subprocess_dict)
+        sys.exit(0)
+           
+    print_summary_2(path_dict, name, assemble)
     find_major_directories(path_dict, subprocess_dict, top, dirLvl, name)
 
     print_subprocess_summary(subprocess_dict, name)
