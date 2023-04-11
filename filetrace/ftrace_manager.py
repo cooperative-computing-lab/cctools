@@ -34,7 +34,8 @@ if __name__ == '__main__':
   for i in range(1, len(sys.argv)):
       infile = "%s" % sys.argv[i]
       outfile = "%s.gz" % sys.argv[i]
-      ftrace_outfile = "filetrace-%d.json" % (i)
+      ftrace_outfile1 = "filetrace-path-%d.json" % (i)
+      ftrace_outfile2 = "filetrace-process-%d.json" % (i)
 
       command = "./filetrace -n %d -j ./gzip < %s > %s" % (i,infile, outfile)
 
@@ -45,7 +46,8 @@ if __name__ == '__main__':
 
       t.specify_file(infile, infile, WORK_QUEUE_INPUT, cache=False)
       t.specify_file(outfile, outfile, WORK_QUEUE_OUTPUT, cache=False)
-      t.specify_file(ftrace_outfile, ftrace_outfile, WORK_QUEUE_OUTPUT, cache=False)
+      t.specify_file(ftrace_outfile1, ftrace_outfile1, WORK_QUEUE_OUTPUT, cache=False)
+      t.specify_file(ftrace_outfile2, ftrace_outfile2, WORK_QUEUE_OUTPUT, cache=False)
 
       taskid = q.submit(t)
       print("submitted task (id# %d): %s" % (taskid, t.command))
