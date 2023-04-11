@@ -91,16 +91,16 @@ def main(number_of_params, max_iterations, min_error, learning_rate, num_tasks):
 
     # specify resources used by Library Task
     t.set_cores(1)
-    t.set_disk(0)
-    t.set_memory(0)
+    t.set_disk(2000)
+    t.set_memory(2000)
 
     # install the Library Task on all workers that will connected to the manager
     m.install_library(t)
 
-    # create our data by sampling 100 points off a sin curve and adding noise
+    # create our data by sampling 1000 points off a sin curve and adding noise
     # can change the function to perform a regression of different functions,
     # or even input other kinds of data
-    x_data = np.linspace(0, 1, 100)
+    x_data = np.linspace(0, 1, 1000)
     t_data = np.sin(x_data*2*np.pi) + np.random.normal(loc=0, scale=0.1, size=x_data.shape)
 
     # split data into training and test data
@@ -127,8 +127,8 @@ def main(number_of_params, max_iterations, min_error, learning_rate, num_tasks):
 
         # specify resources used by FunctionCall
         t.set_cores(1)
-        t.set_disk(1500)
-        t.set_memory(1500)
+        t.set_disk(500)
+        t.set_memory(500)
         m.submit(t)
 
     # keep track of the best set of weights and the lowest error
