@@ -20,6 +20,8 @@ check_needed()
 
     # disable on mac because the resource_monitor does not work there
     [ "${CCTOOLS_OPSYS}" = DARWIN ] && return 1
+
+    return 0
 }
 
 prepare()
