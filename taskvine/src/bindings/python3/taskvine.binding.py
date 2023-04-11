@@ -171,7 +171,7 @@ class Task(object):
             pass
 
     @staticmethod
-    def _determine_mount_flags(watch=False, failure_only=False, success_only=False):
+    def _determine_mount_flags(watch=False, failure_only=False, success_only=False, strict_input=False):
         flags = VINE_TRANSFER_ALWAYS
         if watch:
             flags |= VINE_WATCH
@@ -179,6 +179,8 @@ class Task(object):
             flags |= VINE_FAILURE_ONLY
         if success_only:
             flags |= VINE_SUCCESS_ONLY
+        if strict_input:
+            flags |= VINE_FIXED_LOCATION
         return flags
 
     @staticmethod
@@ -271,8 +273,9 @@ class Task(object):
     # @param self          Reference to the current task object.
     # @param file          A file object of class @ref File, such as from @ref declare_file, @ref declare_buffer, @ref declare_url, etc.
     # @param remote_name   The name of the file at the execution site.
-    # @param cache         Whether the file should be cached at workers (True/False)
-    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs). Default is False.
+    # @param strict_input  Whether the file should be transfered to the worker
+    #                      for execution. If no worker has all the input files already cached marked
+    #                      as strict inputs for the task, the task fails.
     #
     # For example:
     # @code
@@ -280,12 +283,13 @@ class Task(object):
     # >>> f = m.declare_untar(url)
     # >>> task.add_input(f,"data")
     # @endcode
-    def add_input(self, file, remote_name):
+    def add_input(self, file, remote_name, strict_input=False):
         # SWIG expects strings
         if not isinstance(remote_name, str):
             raise TypeError(f"remote_name {remote_name} is not a str")
 
-        flags = Task._determine_mount_flags()
+        flags = Task._determine_mount_flags(strict_input=strict_input)
+
         return vine_task_add_input(self._task, file._file, remote_name, flags)
 
     ##
@@ -968,6 +972,10 @@ class Manager(object):
         if ssl is not True:
             return ssl
 
+        path = Path(run_info_path)
+        if not path.exists():
+            path.mkdir(parents=True, exist_ok=True)
+
         (tmp, key) = tempfile.mkstemp(dir=run_info_path, prefix="key")
         os.close(tmp)
         (tmp, cert) = tempfile.mkstemp(dir=run_info_path, prefix="cert")
@@ -992,7 +1000,7 @@ class Manager(object):
                 self._info_widget.update(self, force)
         except Exception as e:
             # no exception should cause the queue to fail
-            print(f"status display error {e}", file=sys.stderr)
+            print(f"status display error: {e}", file=sys.stderr)
 
     ##
     # Get the project name of the manager.
@@ -1082,7 +1090,7 @@ class Manager(object):
     # tasks_info = q.status("tasks")
     # @endcode
     def status(self, request):
-        info_raw = vine_get_status(self._work_manager, request)
+        info_raw = vine_get_status(self._taskvine, request)
         info_json = json.loads(info_raw)
         del info_raw
         return info_json
@@ -1764,6 +1772,27 @@ class Manager(object):
         return None
 
     ##
+    # Should return a dictionary with information for the status display.
+    # This method is meant to be overriden by custom applications.
+    #
+    # The dictionary should be of the form:
+    #
+    # { "application_info" : {"values" : dict, "units" : dict} }
+    #
+    # where "units" is an optional dictionary that indicates the units of the
+    # corresponding key in "values".
+    #
+    # @param self       Reference to the current work queue object.
+    #
+    # For example:
+    # @code
+    # >>> myapp.application_info()
+    # {'application_info': {'values': {'size_max_output': 0.361962, 'current_chunksize': 65536}, 'units': {'size_max_output': 'MB'}}}
+    # @endcode
+    def application_info(self):
+        return None
+
+    ##
     # Maps a function to elements in a sequence using taskvine
     #
     # Similar to regular map function in python
@@ -2351,7 +2380,7 @@ class FunctionCall(Task):
 # cleaned up automatically at the end of the block. You can also make
 # config changes to the factory while it is running. As an example,
 #
-#     # normal WQ setup stuff
+#     # normal vine setup stuff
 #     workers = taskvine.Factory("sge", "myproject")
 #     workers.cores = 4
 #     with workers:
@@ -2561,7 +2590,9 @@ class Factory(object):
     # may be useful to provision workers from inside a Jupyter notebook.
     def start(self):
         if self._factory_proc is not None:
-            raise RuntimeError("Factory was already started")
+            # if factory already running, just update its config
+            self._write_config()
+            return
 
         if not self.scratch_dir:
             candidate = os.getcwd()

@@ -36,7 +36,9 @@ int debug_file_reopen (void)
 	int rc;
 	if (strlen(file_path)) {
 		int flags;
-		close(file_fd);
+		if(file_fd > 2) {
+			close(file_fd);
+		}
 		CATCHUNIX(file_fd = open(file_path, O_CREAT|O_APPEND|O_WRONLY|O_NOCTTY, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP));
 		CATCHUNIX(flags = fcntl(file_fd, F_GETFD));
 		flags |= FD_CLOEXEC;
@@ -64,6 +66,9 @@ void debug_file_write (INT64_T flags, const char *str)
 	 * new logs. The stat on the filename and inode comparison catches this
 	 * after one lost debug message.
 	 */
+	if(file_fd <= -1) {
+		return;
+	}
 
 	if (file_size_max > 0) {
 		struct stat info;
@@ -110,6 +115,14 @@ void debug_file_rename (const char *suffix)
 		string_nformat(old, sizeof(old), "%s.%s", file_path, suffix);
 		rename(file_path, old);
 		debug_file_reopen();
+	}
+}
+
+void debug_file_close ()
+{
+	if(file_fd > 2) {
+		close(file_fd);
+		file_fd = -1;
 	}
 }
 

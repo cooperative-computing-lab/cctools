@@ -53,7 +53,7 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->resource_request   = CATEGORY_ALLOCATION_FIRST;
 	t->worker_selection_algorithm = VINE_SCHEDULE_UNSET;
 
-	t->state = VINE_TASK_READY;
+	t->state = VINE_TASK_UNKNOWN;
 
 	t->result = VINE_RESULT_UNKNOWN;
 	t->exit_code = -1;
@@ -414,6 +414,8 @@ void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *
 	if(remote_name[0] == '/') {
 		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
 	}
+
+	t->has_fixed_locations |= flags & VINE_FIXED_LOCATION;
 
 	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
 

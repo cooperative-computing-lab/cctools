@@ -31,6 +31,7 @@ extern void debug_file_size (off_t size);
 extern int debug_file_path (const char *path);
 extern void debug_file_rename (const char *suffix);
 extern int debug_file_reopen (void);
+extern int debug_file_close (void);
 
 static void (*debug_write) (int64_t flags, const char *str) = debug_stderr_write;
 static pid_t (*debug_getpid) (void) = getpid;
@@ -334,6 +335,11 @@ void debug_reopen(void)
 {
 	if (debug_file_reopen() == -1)
 		fatal("could not reopen debug log: %s", strerror(errno));
+}
+
+void debug_close(void)
+{
+	debug_file_close();
 }
 
 /* vim: set noexpandtab tabstop=4: */

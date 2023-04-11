@@ -7,9 +7,9 @@ def my_sum(x, y):
     import math
     return x+y
 
-# Create a new queue, listening on port 9123:
-queue = vine.Manager(9123)
-print("listening on port {}".format(queue.port))
+# Create a new manager, listening on port 9123:
+m = vine.Manager(9123)
+print(f"listening on port {m.port}")
 
 # Submit several tasks for execution:
 print("submitting tasks...")

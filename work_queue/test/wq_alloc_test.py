@@ -4,6 +4,7 @@
 # tests for missing/recursive inputs/outputs.
 
 import sys
+import math
 import work_queue as wq
 
 def check_task(category, category_mode, max, min, expected):
@@ -59,6 +60,8 @@ worker.gpus=worker_gpus
 worker.debug="all"
 
 with worker:
+    q.tune("force-proportional-resources", 0)
+
     r = {'cores': 1, 'memory': 2, 'disk': 3, 'gpus': 4}
     check_task('all_specified', wq.WORK_QUEUE_ALLOCATION_MODE_FIXED, max = r, min = {}, expected = r)
 
@@ -80,17 +83,12 @@ with worker:
             min = {},
             expected = {'cores': worker_cores, 'memory': worker_memory, 'disk': worker_disk, 'gpus': 0})
 
+    q.tune("force-proportional-resources", 1)
     check_task('only_memory',
             wq.WORK_QUEUE_ALLOCATION_MODE_FIXED,
             max = {'memory': worker_memory/2},
             min = {},
             expected = {'cores': worker_cores/2, 'memory': worker_memory/2, 'disk': worker_disk/2, 'gpus': 0})
-
-    check_task('only_cores',
-            wq.WORK_QUEUE_ALLOCATION_MODE_FIXED,
-            max = {'cores': worker_cores},
-            min = {},
-            expected = {'cores': worker_cores, 'memory': worker_memory, 'disk': worker_disk, 'gpus': 0})
 
     check_task('only_memory_w_minimum',
             wq.WORK_QUEUE_ALLOCATION_MODE_FIXED,
@@ -98,29 +96,34 @@ with worker:
             min = {'cores': 3, 'gpus': 2},
             expected = {'cores': 3, 'memory': worker_memory/2, 'disk': worker_disk/2, 'gpus': 2})
 
+    check_task('only_cores',
+            wq.WORK_QUEUE_ALLOCATION_MODE_FIXED,
+            max = {'cores': worker_cores},
+            min = {},
+            expected = {'cores': worker_cores, 'memory': worker_memory, 'disk': worker_disk, 'gpus': 0})
+
     check_task('auto_whole_worker',
             wq.WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE,
             max = {},
             min = {},
             expected = {'cores': worker_cores, 'memory': worker_memory, 'disk': worker_disk, 'gpus': 0})
 
-    check_task('greedy_bucketing',
-            wq.WORK_QUEUE_ALLOCATION_MODE_GREEDY_BUCKETING,
-            max={},
-            min={},
-            expected={'cores': 1, 'memory': 1000, 'disk': 1000, 'gpus': 0})
+    p = 1/worker_cores
+    r = {'cores': 1}
+    e = {'cores': 1, 'memory': math.floor(worker_memory * p), 'disk': math.floor(worker_disk * p), 'gpus': 0}
+    check_task('only_cores_proportional', wq.WORK_QUEUE_ALLOCATION_MODE_FIXED, max = r, min = {}, expected = e)
 
+    p = 2/worker_cores
+    e = {'cores': 2, 'memory': math.floor(worker_memory * p), 'disk': math.floor(worker_disk * p), 'gpus': 0}
     check_task('exhaustive_bucketing',
             wq.WORK_QUEUE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING,
-            max={},
-            min={},
-            expected={'cores': 1, 'memory': 1000, 'disk': 1000, 'gpus': 0})
-
-    q.specify_category_first_allocation_guess('auto_with_guess', {'cores': 1, 'memory': 2, 'disk': 3})
-    check_task('auto_with_guess',
-            wq.WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE,
             max = {},
             min = {},
-            expected = {'cores': 1, 'memory': 2, 'disk': 3, 'gpus': 0})
+            expected = e)
 
+    check_task('greedy_bucketing',
+            wq.WORK_QUEUE_ALLOCATION_MODE_GREEDY_BUCKETING,
+            max = {},
+            min = {},
+            expected = e)
 

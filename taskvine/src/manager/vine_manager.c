@@ -981,7 +981,6 @@ static void read_measured_resources(struct vine_manager *q, struct vine_task *t)
 	t->resources_measured = rmsummary_parse_file_single(summary);
 
 	if(t->resources_measured) {
-		t->resources_measured->category = xxstrdup(t->category);
 		t->exit_code = t->resources_measured->exit_status;
 
 		/* cleanup noise in cores value, otherwise small fluctuations trigger new
@@ -1194,6 +1193,34 @@ static int expire_waiting_tasks(struct vine_manager *q)
 	}
 
 	return expired;
+}
+
+/*
+Consider the set of tasks that are waiting with strict inputs
+Terminate those to which no such worker exists.
+*/
+static int enforce_waiting_fixed_locations(struct vine_manager *q)
+{
+	struct vine_task *t;
+	int terminated = 0;
+	int count;
+
+	count = task_state_count(q, NULL, VINE_TASK_READY);
+	while(count > 0)
+	{
+		count--;
+
+		t = list_pop_head(q->ready_list);
+		if(t->has_fixed_locations && !vine_schedule_check_fixed_location(q, t)) {
+			vine_task_set_result(t, VINE_RESULT_FIXED_LOCATION_MISSING);
+			change_task_state(q, t, VINE_TASK_RETRIEVED);
+			terminated++;
+		} else {
+			list_push_tail(q->ready_list, t);
+		}
+	}
+
+	return terminated;
 }
 
 
@@ -2632,7 +2659,6 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 				m->substitute = vine_file_substitute_url(m->file,peer_source);
 				free(peer_source);
 				found_match = 1;
-				break;
 			}
 		}
 
@@ -3228,6 +3254,7 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 	}
 
 	q->monitor_exe = vine_declare_file(q, exe, VINE_CACHE_ALWAYS);
+	free(exe);
 
 	if(series) {
 		char *series_file = vine_get_runtime_path_log(q, "time-series");
@@ -3440,6 +3467,8 @@ void vine_delete(struct vine_manager *q)
 	free(q->stats_measure);
 
 	debug(D_VINE, "manager end\n");
+
+	debug_close();
 
 	free(q);
 }
@@ -3660,6 +3689,9 @@ const char *vine_result_string(vine_result_t result) {
 		case VINE_RESULT_OUTPUT_TRANSFER_ERROR:
 			str = "OUTPUT_TRANSFER_ERROR";
 			break;
+		case VINE_RESULT_FIXED_LOCATION_MISSING:
+			str = "FIXED_LOCATION_MISSING";
+			break;
 	}
 
 	return str;
@@ -3763,6 +3795,10 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	/* Issue warnings if the files are set up strangely. */
 	vine_task_check_consistency(t);
 
+	if(t->has_fixed_locations) {
+		vine_task_set_scheduler(t, VINE_SCHEDULE_FILES);
+	}
+
 	return vine_submit_internal(q, t);
 }
 
@@ -3774,11 +3810,14 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 	q->next_task_id++;
 	t->hostname = xxstrdup(w->hostname);
 	t->addrport = xxstrdup(w->addrport);
+	t->worker = w;
+	change_task_state(q, t, VINE_TASK_READY);
 
 	// send the Library Task to the worker
 	vine_manager_send(q,w, "library %lld %lld\n",  (long long) strlen(name), (long long)t->task_id);
 	link_putlstring(w->link, name, strlen(name), time(0) + q->short_timeout);
 	vine_result_code_t result = start_one_task(q, w, t);
+	change_task_state(q, t, VINE_TASK_RUNNING);
 	
 	// insert the task into the worker's library table to track resource allocations
 	hash_table_insert(w->libraries, name, t);
@@ -3861,6 +3900,16 @@ static void handle_library_update(struct vine_manager *q, struct vine_worker_inf
 		debug(D_VINE, "Library %d started on %s\n", library_id, w->workerid);
 		itable_remove(w->current_tasks_boxes, library_id);
 	}
+
+	char *name;
+	struct vine_task *t;
+
+	HASH_TABLE_ITERATE(w->libraries,name,t) {
+		if (t->task_id == library_id) {
+			change_task_state(q, t, VINE_TASK_DONE);
+			break;
+		}
+	};
 
 	vine_txn_log_write_library_update(q, w, library_id, state);
 }
@@ -4157,10 +4206,11 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 		// expired tasks
 		BEGIN_ACCUM_TIME(q, time_internal);
-		result = expire_waiting_tasks(q);
+		result  = expire_waiting_tasks(q);
+		result |= enforce_waiting_fixed_locations(q);
 		END_ACCUM_TIME(q, time_internal);
 		if(result) {
-			// expired at least one task
+			// expired or ended at least one task
 			events++;
 			compute_manager_load(q, 1);
 			continue;
@@ -4914,13 +4964,13 @@ const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, 
 
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 
-	return category_bucketing_dynamic_task_max_resources(c, t->resources_requested, t->resource_request, t->task_id);
+	return category_task_max_resources(c, t->resources_requested, t->resource_request, t->task_id);
 }
 
 const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, struct vine_task *t) {
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 
-	const struct rmsummary *s = category_dynamic_task_min_resources(c, t->resources_requested, t->resource_request);
+	const struct rmsummary *s = category_task_min_resources(c, t->resources_requested, t->resource_request, t->task_id);
 
 	if(t->resource_request != CATEGORY_ALLOCATION_FIRST || !q->current_max_worker) {
 		return s;
@@ -4939,7 +4989,7 @@ const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, 
 		rmsummary_merge_override(r, q->current_max_worker);
 		rmsummary_merge_override(r, t->resources_requested);
 
-		s = category_dynamic_task_min_resources(c, r, t->resource_request);
+		s = category_task_min_resources(c, r, t->resource_request, t->task_id);
 		rmsummary_delete(r);
 	}
 

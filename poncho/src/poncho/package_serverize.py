@@ -22,13 +22,9 @@ def library_network_code():
     import json
     import os
     import sys
-    import threading
-    import queue
 
     def remote_execute(func):
-        def remote_wrapper(event, q=None):
-            if q:
-                event = json.loads(event)
+        def remote_wrapper(event):
             kwargs = event["fn_kwargs"]
             args = event["fn_args"]
             try:
@@ -37,16 +33,14 @@ def library_network_code():
                     "StatusCode": 200
                 }
             except Exception as e:
-                response = { 
+                response = {
                     "Result": str(e),
-                    "StatusCode": 500 
+                    "StatusCode": 500
                 }
-            if not q:
-                return response
-            q.put(response)
+            return response
         return remote_wrapper
-        
-    read, write = os.pipe() 
+
+    read, write = os.pipe()
 
     def send_configuration(config):
         config_string = json.dumps(config)
@@ -66,39 +60,41 @@ def library_network_code():
                     line = input()
                 # if the worker closed the pipe connected to the input of this process, we should just exit
                 except EOFError:
-                    exit(0)
-                function_name, event_size = line.split(" ")
+                    sys.exit(0)
+                function_name, event_size, function_sandbox = line.split(" ", maxsplit=2)
                 if event_size:
                     # receive the bytes containing the event and turn it into a string
                     event_str = input()
                     if len(event_str) != int(event_size):
                         print(event_str, len(event_str), event_size, file=sys.stderr)
                         print("Size of event does not match what was sent: exiting", file=sys.stderr)
-                        exit(0)
+                        sys.exit(1)
                     # turn the event into a python dictionary
                     event = json.loads(event_str)
                     # see if the user specified an execution method
                     exec_method = event.get("remote_task_exec_method", None)
-                    if exec_method == "thread":
-                        # create a forked process for function handler
-                        q = queue.Queue()
-                        p = threading.Thread(target=globals()[function_name], args=(event_str, q))
-                        p.start()
-                        p.join()
-                        response = json.dumps(q.get())
-                    elif exec_method == "direct":
-                        response = json.dumps(globals()[function_name](event))
+                    if exec_method == "direct":
+                        library_sandbox = os.getcwd()
+                        try:
+                            os.chdir(function_sandbox)
+                            response = json.dumps(globals()[function_name](event))
+                        except Exception as e:
+                            print(f'Library code: Function call failed due to {e}', file=sys.stderr)
+                            sys.exit(1)
+                        finally:
+                            os.chdir(library_sandbox)
                     else:
                         p = os.fork()
                         if p == 0:
-                            response =globals()[function_name](event)
+                            os.chdir(function_sandbox)
+                            response = globals()[function_name](event)
                             os.write(write, json.dumps(response).encode("utf-8"))
                             os._exit(0)
                         elif p < 0:
                             print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)
-                            response = { 
+                            response = {
                                 "Result": "unable to fork",
-                                "StatusCode": 500 
+                                "StatusCode": 500
                             }
                         else:
                             max_read = 65536
@@ -117,12 +113,8 @@ def wq_network_code():
     import json
     import os
     import sys
-    import threading
-    import queue
     def remote_execute(func):
-        def remote_wrapper(event, q=None):
-            if q:
-                event = json.loads(event)
+        def remote_wrapper(event):
             kwargs = event["fn_kwargs"]
             args = event["fn_args"]
             try:
@@ -131,16 +123,14 @@ def wq_network_code():
                     "StatusCode": 200
                 }
             except Exception as e:
-                response = { 
+                response = {
                     "Result": str(e),
-                    "StatusCode": 500 
+                    "StatusCode": 500
                 }
-            if not q:
-                return response
-            q.put(response)
+            return response
         return remote_wrapper
-        
-    read, write = os.pipe() 
+
+    read, write = os.pipe()
     def send_configuration(config):
         config_string = json.dumps(config)
         config_cmd = f"{len(config_string) + 1}\n{config_string}\n"
@@ -154,7 +144,7 @@ def wq_network_code():
         except Exception as e:
             s.close()
             print(e, file=sys.stderr)
-            exit(1)
+            sys.exit(1)
         # information to print to stdout for worker
         config = {
                 "name": name(),
@@ -186,14 +176,7 @@ def wq_network_code():
                         # see if the user specified an execution method
                         exec_method = event.get("remote_task_exec_method", None)
                         os.chdir(f"t.{task_id}")
-                        if exec_method == "thread":
-                            # create a forked process for function handler
-                            q = queue.Queue()
-                            p = threading.Thread(target=globals()[function_name], args=(event_str, q))
-                            p.start()
-                            p.join()
-                            response = json.dumps(q.get()).encode("utf-8")
-                        elif exec_method == "direct":
+                        if exec_method == "direct":
                             response = json.dumps(globals()[function_name](event)).encode("utf-8")
                         else:
                             p = os.fork()
@@ -203,9 +186,9 @@ def wq_network_code():
                                 os._exit(0)
                             elif p < 0:
                                 print(f'Network function: unable to fork to execute {function_name}', file=sys.stderr)
-                                response = { 
+                                response = {
                                     "Result": "unable to fork",
-                                    "StatusCode": 500 
+                                    "StatusCode": 500
                                 }
                             else:
                                 max_read = 65536
@@ -258,7 +241,7 @@ def create_library_code(path, funcs, dest, version):
 					funcs.remove(stmt.name)
 	if name_source_code == "":
 		print("No name function found, defaulting to my_coprocess")
-		name_source_code = default_name_func	
+		name_source_code = default_name_func
 	for func in funcs:
 		print(f"No function found named {func}, skipping")
 	# create output file

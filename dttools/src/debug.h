@@ -251,6 +251,10 @@ void debug_rename(const char *suffix);
 */
 void debug_reopen(void);
 
+/** Close the debug stream (only for disk files, no stderr or stdout).
+*/
+void debug_close(void);
+
 /* LDEBUG likes debug, but also print the code location.
  * NOTE: the caller of this macro must supply at least one argument after the format string.
  */

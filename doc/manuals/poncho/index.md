@@ -15,12 +15,13 @@ analyzes a Python script to determine all its top-level module dependencies and 
 
 Suppose you have a Python program `example.py` like this:
 
-```
+```python
 import os
 import sys
 import pickle
 import matplotlib
 import numpy
+import uproot
 
 
 if __name__ == "__main__":
@@ -29,32 +30,34 @@ if __name__ == "__main__":
 
 To analyze the `example.py` script for its dependencies:
 
-```
+```sh
 poncho_package_analyze example.py package.json
 ```
 
 This will create `package.json` with contents similar to this:
 
 
-```
+```json
 {
-	"conda":{
-		"channels":[
-			"defaults"
-			"conda-forge"
-		]
-		"dependencies":[
-                	"python=3.8.5=h7579374_1"
-	        	"matplotlib=3.3.4=py38h06a4308_0",
-			"pip=20.2.4=py38h06a4308_0",
-			{
-				"pip":[
-					numpy==1.21
-				]
-			}
-		]
-	}
+    "conda": {
+        "channels": [
+            "conda-forge"
+        ],
+        "dependencies": [
+            "matplotlib=3.7.1=py311h38be061_0",
+            "numpy=1.24.2=py311h8e6699e_0",
+            "pip=23.0.1=pyhd8ed1ab_0",
+            "python=3.11.0=he550d4f_1_cpython",
+            {
+                "pip": [
+                    "uproot==5.0.5"
+                ]
+            }
+        ]
+    }
 }
+
+
 ```
 
 Then to create a complete package from the specification:
@@ -101,38 +104,37 @@ or system-specific details where possible.
 
 ### Conda Packages
 
-```
-{
-	"conda":{
-		"channels":[
-			"defaults"
-			"conda-forge"
-		]
-		"dependencies":[
-                	"python=3.8.5=h7579374_1"
-	        	"matplotlib=3.3.4=py38h06a4308_0",
-			"pip=20.2.4=py38h06a4308_0",
-			{
-				"pip":[
-					numpy==1.21
-				]
-			}
-		]
-	}
+```json
 
+{
+    "conda": {
+        "channels": [
+            "conda-forge"
+        ],
+        "dependencies": [
+            "python=3.11.0=he550d4f_1_cpython",
+            "numpy=1.24",
+            "matplotlib",
+            "pip",
+            {
+                "pip": [
+                    "uproot==5.0.5"
+                ]
+            }
+        ]
+    },
+}
 ```
 
 The `"conda"` key, if present, gives a list of channels and packages.
-Each package must be a valid Conda package specification.
+Each package must be a valid Conda package specification, such as:
 
 
-```
-package=version=build
-```
+    - package: e.g., `python`
+    - package and version: e.g., `python=3.11`
+    - package, version, and build: e.g., `python=3.11=he550d4f_1_cpython`
 
-if coming from an existing user install. This is because the
-particular build in use may affect performance and functionality
-(e.g. whether GPU support is available).
+
 Conda supports a fairly rich syntax, documented
 [here](https://docs.conda.io/projects/conda/en/latest/user-guide/concepts/pkg-specs.html#package-match-specifications).
 Implementers should use the `conda.models.match_spec.MatchSpec`
@@ -183,35 +185,9 @@ If a local pip package is listed within the specification, the pip package must 
 into the user's current environment to be included.
 
 
-The previous format of the specifition is accepted to use aswell.
-
-```
-{
-
-"conda": {
-
-        "channels": [
-            "conda-forge"
-        ],
-
-        "packages": [
-            "matplotlib=3.5.1=py310h06a4308_1",
-            "numpy=1.23.1=py310h1794996_0",
-            "pip=22.1.2=py310h06a4308_0",
-            "python=3.10.4=h12debd9_0"
-        ]
-        },
-
-        "pip": [
-            "bs4==0.0.1"
-        ]
-}
-
-```
-
 ### Git Repository
 
-```
+```json
 {
 	"git": {
 		"DATA_DIR": {
@@ -238,7 +214,7 @@ frequently used repositories available for fast access.
 
 ### HTTP Fetch
 
-```
+```json
 {
 	"http": {
 		"REFERENCE_DB": {

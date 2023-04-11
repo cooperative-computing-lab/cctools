@@ -200,13 +200,13 @@ int vine_coprocess_check(struct vine_coprocess *coprocess)
     return 1;
 }
 
-char *vine_coprocess_run(const char *function_name, const char *function_input, struct vine_coprocess *coprocess) {
+char *vine_coprocess_run(const char *function_name, const char *function_input, const char *sandbox, struct vine_coprocess *coprocess) {
 	int timeout = 60000000; // one minute, can be changed
 
 	timestamp_t curr_time = timestamp_get();
 	time_t stoptime = curr_time + timeout;
 
-	int bytes_sent = link_printf(coprocess->write_link, stoptime, "%s %ld\n", function_name, strlen(function_input));
+	int bytes_sent = link_printf(coprocess->write_link, stoptime, "%s %ld %s\n", function_name, strlen(function_input), sandbox);
 	if(bytes_sent < 0) {
 		fatal("could not send input data size: %s", strerror(errno));
 	}
@@ -227,11 +227,11 @@ struct vine_coprocess *vine_coprocess_find_state(struct list *coprocess_list, vi
 	struct vine_coprocess *coprocess;
 	LIST_ITERATE(coprocess_list,coprocess){
 		if (coprocess->state == state && !strcmp(coprocess->name, coprocess_name)) {
-			debug(D_VINE, "Found coprocess with valid state with pid: %d\n", coprocess->pid);
+			debug(D_VINE, "Found coprocess with state %d with pid: %d\n", state, coprocess->pid);
 			return coprocess;
 		}
 	}
-	debug(D_VINE, "Found no valid coprocesses for state\n");
+
 	return NULL;
 }
 

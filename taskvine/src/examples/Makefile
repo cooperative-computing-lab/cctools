@@ -12,8 +12,10 @@ all: $(TARGETS)
 $(PROGRAMS): $(EXTERNALS)
 
 install: all
-	# example programs are built but not installed here.
-	# install to documentation instead?
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/cctools/examples/taskvine/C
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/cctools/examples/taskvine/python
+	cp -r vine_example*.py script_example_for_poncho.py $(CCTOOLS_INSTALL_DIR)/doc/cctools/examples/taskvine/python
+	for p in $(PROGRAMS); do cp $${p} $${p}.c $(CCTOOLS_INSTALL_DIR)/doc/cctools/examples/taskvine/C; done
 
 clean:
 	rm -rf $(PROGRAMS) *.o

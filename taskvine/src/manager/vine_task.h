@@ -87,6 +87,9 @@ struct vine_task {
 	struct rmsummary *resources_allocated;                 /**< Resources allocated to the task its latest attempt. */
 	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task in its latest attempt. */
 	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
+
+	int has_fixed_locations;                               /**< Whether at least one file was added with the VINE_FIXED_LOCATION flag. Task fails immediately if no
+															 worker can satisfy all the strict inputs of the task. */
 };
 
 int  vine_task_set_result(struct vine_task *t, vine_result_t new_result);

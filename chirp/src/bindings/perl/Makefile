@@ -30,6 +30,6 @@ install: all
 	cp $(LIBRARIES)       $(CCTOOLS_PERL_PATH)/
 	cp Chirp/Client.pm $(CCTOOLS_PERL_PATH)/Chirp
 	cp Chirp/Stat.pm   $(CCTOOLS_PERL_PATH)/Chirp
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/cctools/examples/chirp/perl
 	chmod 755 chirp_perl_example.pl
-	cp chirp_perl_example.pl $(CCTOOLS_INSTALL_DIR)/doc/
+	cp chirp_perl_example.pl $(CCTOOLS_INSTALL_DIR)/doc/cctools/examples/chirp/perl

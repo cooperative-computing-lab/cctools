@@ -30,5 +30,3 @@ test:
 install: all
 	mkdir -p $(CCTOOLS_PYTHON2_PATH)
 	cp chirp.py $(CHIRPPYTHONSO) $(CCTOOLS_PYTHON2_PATH)/
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	cp chirp_python_example.py chirp_jobs_python_example.py $(CCTOOLS_INSTALL_DIR)/doc/

@@ -1778,7 +1778,6 @@ void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 	t->resources_measured = rmsummary_parse_file_single(summary);
 
 	if(t->resources_measured) {
-		t->resources_measured->category = xxstrdup(t->category);
 		t->return_status = t->resources_measured->exit_status;
 
 		/* cleanup noise in cores value, otherwise small fluctuations trigger new
@@ -3802,12 +3801,10 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 			/* when cores are unspecified, they are set to 0 if gpus are specified.
 			 * Otherwise they get a proportion according to specified
 			 * resources. Tasks will get at least one core. */
-			if(limits->cores < 0) {
-				if(limits->gpus > 0) {
-					limits->cores = 0;
-				} else {
-					limits->cores = MAX(1, floor(w->resources->cores.largest * max_proportion));
-				}
+			if(limits->cores < 0 && limits->gpus > 0) {
+				limits->cores = 0;
+			} else {
+				limits->cores = MAX(1, MAX(limits->cores, floor(w->resources->cores.largest * max_proportion)));
 			}
 
 			if(limits->gpus < 0) {
@@ -3815,13 +3812,12 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 				limits->gpus = 0;
 			}
 
-			if(limits->memory < 0) {
-				limits->memory = MAX(1, floor(w->resources->memory.largest * max_proportion));
-			}
+			limits->memory = MAX(1, MAX(limits->memory, floor(w->resources->memory.largest * max_proportion)));
 
-			if(limits->disk < 0) {
-				limits->disk = MAX(1, floor(w->resources->disk.largest * max_proportion));
-			}
+			/* worker's disk is shared even among tasks that are not running,
+			 * thus the proportion is modified by the current overcommit
+			 * multiplier */
+			limits->disk = MAX(1, MAX(limits->disk, floor(w->resources->disk.largest * max_proportion / q->resource_submit_multiplier)));
 		}
 	}
 
@@ -7809,12 +7805,12 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 	buffer_init(&B);
 
 	buffer_printf(&B, "CATEGORY %s MAX ", c->name);
-	rmsummary_print_buffer(&B, category_bucketing_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_MAX, -1), 1);
+	rmsummary_print_buffer(&B, category_task_max_resources(c, NULL, CATEGORY_ALLOCATION_MAX, -1), 1);
 	write_transaction(q, buffer_tostring(&B));
 	buffer_rewind(&B, 0);
 
 	buffer_printf(&B, "CATEGORY %s MIN ", c->name);
-	rmsummary_print_buffer(&B, category_dynamic_task_min_resources(c, NULL, CATEGORY_ALLOCATION_FIRST), 1);
+	rmsummary_print_buffer(&B, category_task_min_resources(c, NULL, CATEGORY_ALLOCATION_FIRST, -1), 1);
 	write_transaction(q, buffer_tostring(&B));
 	buffer_rewind(&B, 0);
 
@@ -7843,7 +7839,7 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 	}
 
 	buffer_printf(&B, "CATEGORY %s FIRST %s ", c->name, mode);
-	rmsummary_print_buffer(&B, category_bucketing_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_FIRST, -1), 1);
+	rmsummary_print_buffer(&B, category_task_max_resources(c, NULL, CATEGORY_ALLOCATION_FIRST, -1), 1);
 	write_transaction(q, buffer_tostring(&B));
 
 	buffer_free(&B);
@@ -8099,13 +8095,13 @@ const struct rmsummary *task_max_resources(struct work_queue *q, struct work_que
 
 	struct category *c = work_queue_category_lookup_or_create(q, t->category);
 
-	return category_bucketing_dynamic_task_max_resources(c, t->resources_requested, t->resource_request, t->taskid);
+	return category_task_max_resources(c, t->resources_requested, t->resource_request, t->taskid);
 }
 
 const struct rmsummary *task_min_resources(struct work_queue *q, struct work_queue_task *t) {
 	struct category *c = work_queue_category_lookup_or_create(q, t->category);
 
-	const struct rmsummary *s = category_dynamic_task_min_resources(c, t->resources_requested, t->resource_request);
+	const struct rmsummary *s = category_task_min_resources(c, t->resources_requested, t->resource_request, t->taskid);
 
 	if(t->resource_request != CATEGORY_ALLOCATION_FIRST || !q->current_max_worker) {
 		return s;
@@ -8124,7 +8120,7 @@ const struct rmsummary *task_min_resources(struct work_queue *q, struct work_que
 		rmsummary_merge_override(r, q->current_max_worker);
 		rmsummary_merge_override(r, t->resources_requested);
 
-		s = category_dynamic_task_min_resources(c, r, t->resource_request);
+		s = category_task_min_resources(c, r, t->resource_request, t->taskid);
 		rmsummary_delete(r);
 	}
 

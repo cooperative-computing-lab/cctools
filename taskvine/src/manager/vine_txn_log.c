@@ -160,12 +160,12 @@ void vine_txn_log_write_category(struct vine_manager *q, struct category *c)
 	buffer_init(&B);
 
 	buffer_printf(&B, "CATEGORY %s MAX ", c->name);
-	rmsummary_print_buffer(&B, category_bucketing_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_MAX, -1), 1);
+	rmsummary_print_buffer(&B, category_task_max_resources(c, NULL, CATEGORY_ALLOCATION_MAX, -1), 1);
 	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_rewind(&B, 0);
 
 	buffer_printf(&B, "CATEGORY %s MIN ", c->name);
-	rmsummary_print_buffer(&B, category_dynamic_task_min_resources(c, NULL, CATEGORY_ALLOCATION_FIRST), 1);
+	rmsummary_print_buffer(&B, category_task_min_resources(c, NULL, CATEGORY_ALLOCATION_FIRST, -1), 1);
 	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_rewind(&B, 0);
 
@@ -194,7 +194,7 @@ void vine_txn_log_write_category(struct vine_manager *q, struct category *c)
 	}
 
 	buffer_printf(&B, "CATEGORY %s FIRST %s ", c->name, mode);
-	rmsummary_print_buffer(&B, category_bucketing_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_FIRST, -1), 1);
+	rmsummary_print_buffer(&B, category_task_max_resources(c, NULL, CATEGORY_ALLOCATION_FIRST, -1), 1);
 	vine_txn_log_write(q, buffer_tostring(&B));
 
 	buffer_free(&B);
@@ -202,6 +202,11 @@ void vine_txn_log_write_category(struct vine_manager *q, struct category *c)
 
 void vine_txn_log_write_worker(struct vine_manager *q, struct vine_worker_info *w, int leaving, vine_worker_disconnect_reason_t reason_leaving)
 {
+	if(reason_leaving == VINE_WORKER_DISCONNECT_STATUS_WORKER) {
+		/* status worker should not generate a transaction */
+		return;
+	}
+
 	struct buffer B;
 	buffer_init(&B);
 

@@ -35,8 +35,8 @@ manuals/api/html/chirp_stat_perl.html:
 
 
 install: all
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	cp -r manuals $(CCTOOLS_INSTALL_DIR)/doc/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/cctools
+	cp -a manuals $(CCTOOLS_INSTALL_DIR)/doc/cctools
 	$(MAKE) -C man install
 
 test:
