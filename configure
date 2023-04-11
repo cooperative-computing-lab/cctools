@@ -983,7 +983,7 @@ python3_version=""
 if [ $config_python3_path != no ]
 then
 	python3_avail=yes
-	python3_path=${python_path:-${base_root}}
+	python3_path=${python3_path:-${base_root}}
 
 	if [ "${swig_avail}" = no ]
 	then
@@ -993,6 +993,9 @@ then
 	then
 		echo "*** swig version ${swig_version} is older than 2.0.4, disabling python3 support"
 		python3_avail=no
+	elif [ "${CONDA_BUILD}" = 1 -a -x "${PYTHON}" ]
+	then
+		python3_exe="${PYTHON}"
 	elif [ "${config_python3_path}" = auto ] && search_file_executable python3 python
 	then
 		python3_exe=${executable_search_result}
@@ -1005,7 +1008,12 @@ then
 
 	if [ "${python3_avail}" = yes ]
 	then
-		python3_version=$(${python3_exe} -c 'import sys; print("{}.{}".format(sys.version_info[0],sys.version_info[1]))' 2> /dev/null)
+		if [ "${CONDA_BUILD}" = 1 ]
+		then
+			python3_version="${PY_VER}"
+		else
+			python3_version=$(${python3_exe} -c 'import sys; print("{}.{}".format(sys.version_info[0],sys.version_info[1]))' 2> /dev/null)
+		fi
 
 		if [ -z "${python3_version}" ]
 		then
@@ -1015,6 +1023,8 @@ then
 		then
 			echo "*** ${python3_exe} version ${python3_version} is not a python3"
 			python3_avail=no
+		else
+			echo "python version ${python3_version}"
 		fi
 	fi
 
