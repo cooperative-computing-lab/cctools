@@ -108,8 +108,6 @@ config_ext2fs_path=auto
 config_fuse_path=auto
 config_mysql_path=no
 config_openssl_path=auto
-config_python_path=auto    # for python2 or python3, version automatically detected
-config_python2_path=auto
 config_python3_path=auto
 config_readline_path=auto
 config_swig_path=auto
@@ -229,12 +227,8 @@ do
 			config_perl_path=$(config_X_path ${arg})
 			;;
 		--with-python-path)
-			python_path=${arg}
-			config_python_path=$(config_X_path ${arg})
-			;;
-		--with-python2-path)
-			python2_path=${arg}
-			config_python2_path=$(config_X_path ${arg})
+			python3_path=${arg}
+			config_python3_path=$(config_X_path ${arg})
 			;;
 		--with-python3-path)
 			python3_path=${arg}
@@ -982,116 +976,6 @@ fi
 report_detection perl "${perl_avail}" "${config_perl_path}" "${perl_path}"
 
 
-### This section does not configure python, only determines which version to
-### use (2 or 3) when not specified.
-if [ $config_python_path != no ]
-then
-	python_path=${python_path:-${base_root}}
-	python_exe=""
-
-	if [ "${config_python_path}" = auto ] && search_file_executable python3 python python2 > /dev/null 2>&1
-	then
-		python_exe=${executable_search_result}
-	elif search_file_executable ${python_path} ${python_path}/python3 ${python_path}/python ${python_path}/python2 > /dev/null 2>&1
-	then
-		python_exe=${executable_search_result}
-	fi
-
-	if [ -n "${python_exe}" ]
-	then
-		python_major_version=$(${python_exe} -c 'import sys; print(sys.version_info[0])' 2> /dev/null)
-
-		# only set python*_path if not already explicitely set
-		if [ "${config_python2_path}" != yes -a "${config_python3_path}" = auto -a "${python_major_version}" = 3 ]
-		then
-			python3_path=${python_path}
-			config_python2_path=no
-		elif [ "${config_python2_path}" = auto -a "${config_python3_path}" != yes -a "${python_major_version}" = 2 ]
-		then
-			python2_path=${python_path}
-			config_python3_path=no
-		fi
-	fi
-fi
-
-### configure python2
-python2_avail=no
-python2_exe=""
-python2_version=""
-if [ $config_python2_path != no ]
-then
-	python2_avail=yes
-	python2_path=${python_path:-${base_root}}
-
-	if [ "${swig_avail}" = no ]
-	then
-		echo "*** swig is needed for python2 support"
-		python2_avail=no
-	elif [ $(format_version ${swig_version}) -lt $(format_version 1.3.29) ]
-	then
-		echo "*** swig version ${swig_version} is older than 1.3.29, disabling python2 support"
-		python2_avail=no
-	elif [ "${config_python2_path}" = auto ] && search_file_executable python python2
-	then
-		python2_exe=${executable_search_result}
-	elif search_file_executable ${python2_path} ${python2_path}/bin/python ${python2_path}/bin/python2 ${python2_path}/python ${python2_path}/python2
-	then
-		python2_exe=${executable_search_result}
-	else
-		python2_avail=no
-	fi
-
-	if [ "${python2_avail}" = yes ]
-	then
-		python2_version=$(${python2_exe} -c 'import sys; print("%d.%d" % (sys.version_info[0],sys.version_info[1]))' 2> /dev/null)
-
-		if [ -z "${python2_version}" ]
-		then
-			echo "*** could not find version of python from ${python2_exe}"
-			python2_avail=no
-		elif [ $(format_version ${python2_version}) -lt $(format_version 2.4) ]
-		then
-			echo "*** python ${python2_version} is too old"
-			python2_avail=no
-		elif [ $(format_version ${python2_version}) -ge $(format_version 3.0) ]
-		then
-			echo "*** ${python2_exe} version ${python2_version} is not a python2"
-			python2_avail=no
-		fi
-	fi
-
-	if [ "${python2_avail}" = yes ]
-	then
-		python2_ccflags=$(${python2_exe} -c "import sysconfig as s; print('-I{} {}'.format(s.get_config_var('CONFINCLUDEPY'), s.get_config_var('CPPFLAGS')))")
-		python2_ldflags=$(${python2_exe} -c "import sysconfig as s; print(s.get_config_var('LDFLAGS'))")
-
-		if [ $BUILD_SYS = DARWIN ]
-		then
-			if [ "${CONDA_BUILD}" = 1 ]
-			then
-				python2_ldflags="-undefined dynamic_lookup"
-			else
-				python2_ldflags="$python2_ldflags -undefined dynamic_lookup"
-			fi
-		fi
-
-		if ! check_function Py_MATH_PI Python.h ${python2_ccflags} ${python2_ldflags}
-		then
-			echo "*** could not find python2 development files"
-			python2_avail=no
-		fi
-	fi
-
-	if [ "${python2_avail}" = yes ]
-	then
-		# to change to python2
-		swig_bindings="$swig_bindings python2"
-	fi
-fi
-
-report_detection python2 "${python2_avail}" "${config_python2_path}" "${python2_path}"
-
-
 ### configure python3
 python3_avail=no
 python3_exe=""
@@ -1623,11 +1507,11 @@ CCTOOLS_PERL_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/${perl_install_dir}/\$(CCTOOLS_PER
 CCTOOLS_PYTHON_TEST_EXEC=${python_test_exec}
 CCTOOLS_PYTHON_TEST_DIR=${python_test_dir}
 
-CCTOOLS_PYTHON2_AVAILABLE=${python2_avail}
-CCTOOLS_PYTHON2=${python2_exe}
-CCTOOLS_PYTHON2_CCFLAGS=${python2_ccflags}
-CCTOOLS_PYTHON2_LDFLAGS=${python2_ldflags}
-CCTOOLS_PYTHON2_VERSION=${python2_version}
+CCTOOLS_PYTHON2_AVAILABLE=no
+CCTOOLS_PYTHON2=
+CCTOOLS_PYTHON2_CCFLAGS=
+CCTOOLS_PYTHON2_LDFLAGS=
+CCTOOLS_PYTHON2_VERSION=
 CCTOOLS_PYTHON2_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/python\$(CCTOOLS_PYTHON2_VERSION)/site-packages
 
 CCTOOLS_PYTHON3_AVAILABLE=${python3_avail}
@@ -1715,7 +1599,6 @@ echo ""
 echo "Language support:"
 printf "%-15s %3s\n" swig ${swig_avail}
 printf "%-15s %3s\n" perl ${perl_avail}
-printf "%-15s %3s\n" python2 ${python2_avail}
 printf "%-15s %3s\n" python3 ${python3_avail}
 
 echo ""
