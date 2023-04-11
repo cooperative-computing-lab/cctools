@@ -208,10 +208,6 @@ do
 		--globus-flavor)
 			globus_flavor=${arg}
 			;;
-		--with-golang-path)
-			golang_path=${arg}
-			config_golang_path=$(config_X_path ${arg})
-			;;
 		--with-irods-path)
 			irods_path=${arg}
 			config_irods_path=$(config_X_path ${arg})
@@ -887,7 +883,6 @@ fi
 ### version requirements for swig:
 # at least version 1.3.29 for python 2.4--2.7
 # at least version 2.0.4  for python 3.0--
-# at least version 4.0 for golang 1.5--
 
 swig_avail=no
 swig_exe=""
@@ -1164,53 +1159,12 @@ then
 	if [ "${python3_avail}" = yes ]
 	then
 		swig_bindings="$swig_bindings python3"
+		python_test_exec=${python3_exe}
+		python_test_dir=python3
 	fi
 fi
 
 report_detection python3 "${python3_avail}" "${config_python3_path}" "${python3_path}"
-
-# python_test_exec is the python executable to use in make test
-# preference is given to python3
-python_test_exec=""
-python_test_dir=""
-if [ "${python3_avail}" = yes ]
-then
-	python_test_exec=${python3_exe}
-	python_test_dir=python3
-elif [ "${python2_avail}"  = yes ]
-then
-	python_test_exec=${python2_exe}
-	python_test_dir=python2
-fi
-
-golang_avail=no
-golang_exe=""
-if [ $config_golang_path != no ]
-then
-	golang_avail=yes
-	golang_path=${golang_path:-${base_root}}
-
-	if [ "${swig_avail}" = no ]
-	then
-		echo "*** swig is needed for golang support"
-		golang_avail=no
-	elif [ $(format_version ${swig_version}) -lt $(format_version 4.0) ]
-	then
-		echo "*** swig version ${swig_version} is older than 4.0, disabling golang support"
-		golang_avail=no
-	elif [ "${config_golang_path}" = auto ] && search_file_executable go
-	then
-		golang_exe=${executable_search_result}
-	elif search_file_executable ${golang_path} ${golang_path}/bin/go ${golang_path}/go
-	then
-		golang_exe=${executable_search_result}
-	else
-		golang_avail=no
-	fi
-fi
-
-report_detection golang "${golang_avail}" "${config_golang_path}" "${golang_path}"
-
 
 
 library_search_standard()
@@ -1760,7 +1714,6 @@ printf "%-15s %3s\n" readline ${readline_avail}
 echo ""
 echo "Language support:"
 printf "%-15s %3s\n" swig ${swig_avail}
-printf "%-15s %3s\n" golang ${golang_avail}
 printf "%-15s %3s\n" perl ${perl_avail}
 printf "%-15s %3s\n" python2 ${python2_avail}
 printf "%-15s %3s\n" python3 ${python3_avail}
