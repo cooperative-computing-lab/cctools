@@ -30,6 +30,6 @@ install: all
 	cp $(LIBRARIES)       $(CCTOOLS_PERL_PATH)/
 	cp Work_Queue.pm      $(CCTOOLS_PERL_PATH)
 	cp Work_Queue/Task.pm $(CCTOOLS_PERL_PATH)/Work_Queue
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/cctools/examples/perl
 	chmod 755 work_queue_example.pl
-	cp work_queue_example.pl $(CCTOOLS_INSTALL_DIR)/doc/
+	cp work_queue_example.pl $(CCTOOLS_INSTALL_DIR)/doc/cctools/examples/perl
