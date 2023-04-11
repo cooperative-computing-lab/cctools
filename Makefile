@@ -41,11 +41,11 @@ $(INSTALL_PACKAGES): $(CCTOOLS_PACKAGES)
 install: $(INSTALL_PACKAGES)
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	for file in $(CYGWINLIB) ; do if [ -f /bin/$$file ] ; then cp /bin/$$file $(CCTOOLS_INSTALL_DIR)/bin/ ; fi ; done
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/etc
-	cp config.mk ${CCTOOLS_INSTALL_DIR}/etc/
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc
-	cp COPYING ${CCTOOLS_INSTALL_DIR}/doc/
-	cp README ${CCTOOLS_INSTALL_DIR}/doc/
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/etc/cctools
+	cp config.mk ${CCTOOLS_INSTALL_DIR}/etc/cctools
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc/cctools
+	cp COPYING ${CCTOOLS_INSTALL_DIR}/doc/cctools
+	cp README ${CCTOOLS_INSTALL_DIR}/doc/cctools
 
 test: $(CCTOOLS_PACKAGES)
 	./run_all_tests.sh

@@ -31,6 +31,5 @@ install: all
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)
 	chmod 755 resource_monitor.py
 	cp resource_monitor.py $(TARGETS) $(CCTOOLS_PYTHON3_PATH)/
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
 
 

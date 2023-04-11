@@ -40,7 +40,7 @@ txt/%.txt: man/%.1
 	nroff -man $< > $@
 
 install: all
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/cctools
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/man
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/man/man1
 	if [ -f man/chirp.1.gz ]; then cp man/*.1.gz $(CCTOOLS_INSTALL_DIR)/share/man/man1; fi

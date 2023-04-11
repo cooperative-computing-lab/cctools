@@ -23,8 +23,8 @@ clean:
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	if [ -f umbrella_helper.html ]; then cp umbrella_helper.html $(CCTOOLS_INSTALL_DIR)/doc/; fi
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/cctools/umbrella
+	if [ -f umbrella_helper.html ]; then cp umbrella_helper.html $(CCTOOLS_INSTALL_DIR)/doc/cctools/umbrella; fi
 
 test: all
 
