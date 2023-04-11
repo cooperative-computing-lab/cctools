@@ -98,12 +98,14 @@ to execute, and returns results back to the manager. The manager receives result
 they complete, and may submit further tasks as needed. Commonly used files are cached
 at each worker to speed up execution.
 
-Tasks come in two types:
+Tasks come in three types:
 
 - A **standard task** is a single Unix command line to execute, along with its needed input files.  Upon completion, it will produce one or more output files to be returned to the manager.
 - A **PythonTask** is a single Python function to execute, along with its needed arguments.  Upon completion, it will produce a Python value (or an exception) as a result to return to the master.
+- A **FunctionCall** is a single function to execute in a **Library** running at the workers.
 
-Both types of tasks share a common set of options.  Each task can be labelled with the **resources**
+
+All of the types of tasks share a common set of options.  Each task can be labelled with the **resources**
 (CPU cores, GPU devices, memory, disk space) that it needs to execute.  This allows each worker to pack the appropriate
 number of tasks.  For example, a worker running on a 64-core machine could run 32 dual-core tasks, 16 four-core tasks,
 or any other combination that adds up to 64 cores.  If you don't know the resources needed, you can enable
@@ -115,6 +117,7 @@ the workers to a batch system such as HTCondor, SLURM, or SGE.  If you are using
 cloud, then you can run your workers inside of virtual machines.  We provide a number of
 scripts to facilitate starting workers this way, or you can arrange things yourself to
 simply run the `vine_worker` executable.
+
 
 ## Writing a Manager Program
 
@@ -133,14 +136,15 @@ The basic outline of a manager program is:
 4. Process the outputs of that task.
 5. If more tasks are outstanding, return to step 3.
 
+
 ### Creating a Manager Object
 
-To begin, you must import the TaskVine library, and then create a Manager object.
+To begin, you must import the TaskVine module, and then create a Manager object.
 You may specific a specific port number to listen on like this:
 
 === "Python"
     ```python
-    # Import the taskvine library
+    # Import the taskvine module
     import taskvine as vine
 
     # Create a new manager listening on port 9123
@@ -149,22 +153,22 @@ You may specific a specific port number to listen on like this:
 
 === "C"
     ```
-    /* Import the taskvine library */
+    /* Import the taskvine module */
     #include "taskvine.h"
 
     /* Create a new queue listening on port 9123 */
     struct taskvine *m = vine_create(9123);
     ```
 
-Of course, that specific port might already be in use, and so you may
-specify zero to indicate any available port, and then use `m.port` to
-discover which port was obtained:
+Of course, that specific port might already be in use, and so you may specify
+zero to indicate any available port, and then inquire the manager for the
+selected port:
 
 === "Python"
     ```python
     # Create a new manager listening on any port
     m = vine.Manager(0)
-    print("listening on port {}".format(m.port))
+    print(f"listening on port {m.port}")
     ```
 
 === "C"
@@ -211,66 +215,80 @@ course of the application should be marked as **cacheable**.
 This will allow the worker to keep a single copy of the file and share
 it between multiple tasks that need it.
 
-Here is how to describe the files needed by this task:
-
+Before we can associate the files with the task, the files need to be declare
+to the manager:
 
 === "Python"
     ```python
-    # t.add_input_file("name at manager", "name when copied at execution site", ...)
-
-    t.add_input_file("/usr/bin/gzip", "gzip",       cache = True)
-    t.add_input_file("my-file",       "my-file",    cache = False)
-    t.add_output_file("my-file.gz",   "my-file.gz", cache = False)
-
-    # when the name at manager is the same as the exection site, we can write instead:
-    t.add_input_file("my-file",     cache = False)
-    t.add_output_file("my-file.gz", cache = False)
-
-    # files can also be described when the task is declared:
-    gzip_file = m.declare_file("/usr/bin/gzip")
-    my_file = m.declare_file("my-file")
-    my_gz_file = m.declare_file("my-file.gz")
-
-     t = vine.Task(
-        command = "./gzip < my-file > my-file.gz",
-        input_files = {
-            gzip_file : {
-                remote_name : "gzip", 
-                cache : True
-                }, 
-            my_file : {
-                remote_name : 
-                "my-file", 
-                cache : False
-            }
-        },
-        output_files = {
-            my_gz_file : {
-                remote_name : "my-file.gz", 
-                cache = False
-            }
-        }
-    )
+    my_exec   = m.declare_file("/usr/bin/gzip", cache=True)
+    my_input  = m.declare_file("my-file", cache=False)
+    my_output = m.declare_file("my-file.gz", cache=False)
     ```
 
 === "C"
     ```C
-    # vine_task_add_file(t, "name at manager", "name when copied at execution site", ...)
-
-    vine_task_add_file(t, "/usr/bin/gzip", "gzip",       VINE_INPUT,  VINE_CACHE);
-    vine_task_add_file(t, "my-file",       "my-file",    VINE_INPUT,  VINE_NOCACHE);
-    vine_task_add_file(t, "my-file.gz",    "my-file.gz", VINE_OUTPUT, VINE_NOCACHE);
+    struct vine_file *my_exec   = vine_declare_file(/"usr/bin/gzip", VINE_CACHE);
+    struct vine_file *my_input  = vine_declare_file("my-file", VINE_CACHE_NEVER);
+    struct vine_file *my_output = vine_declare_file("my-file.gz", VINE_CACHE_NEVER);
     ```
 
-When the task actually executes, the worker will create a **sandbox** directory,
+Once the files are declared, they can be added to the task as inputs or
+outputs.  When the task executes, the worker will create a **sandbox** directory,
 which serves as the working directory for the task.  Each of the input files
-and directories will be copied into the sandbox directory.
+and directories will be copied into the sandbox directory with the given remote names.
 The task outputs should be written into the current working directory.
 The path of the sandbox directory is exported to
 the execution environment of each worker through the `VINE_SANDBOX` shell
 environment variable. This shell variable can be used in the execution
 environment of the worker to describe and access the locations of files in the
 sandbox directory.
+
+=== "Python"
+    ```python
+    t.add_input(my_exec, "./gzip")
+    t.add_input(my_input, "my-file")
+    t.add_output(my_output, "my-file.gz")
+    ```
+
+=== "C"
+    ```C
+    vine_task_add_input(my_exec, "./gzip", 0);
+    vine_task_add_input(my_input, "my-file", 0);
+    vine_task_add_output(my_output, "my-file.gz", 0);
+
+    /* The extra 0 means no additional file flags. */
+    ```
+
+!!! warning
+    The remote names given go to the files should match the names in the
+    command line of the task.
+
+In Python you can also fully declare a task as a dictionary:
+
+=== "Python"
+    ```python
+    task_description = {
+        command = "./gzip < my-file > my-file.gz",
+        input_files = {
+            gzip_file: {
+                remote_name : "gzip",
+                cache : True
+                },
+            my_file : {
+                remote_name : "my-file",
+                cache : False
+            }
+        },
+        output_files = {
+            my_gz_file : {
+                remote_name : "my-file.gz",
+                cache = False
+            }
+        }
+
+     t = vine.Task(**task_description)
+    ```
+
 
 ### Describing Tasks
 
@@ -334,13 +352,14 @@ If no task completes within the timeout, it returns null.
     while not m.empty():
         t = m.wait(5)
         if t:
-            print("Task {} has returned!".format(t.id))
+            print(f"Task {t.id} has returned!")
 
-            if t.return_status == 0:
-                print("command exit code:\n{}".format(t.exit_code))
-                print("stdout:\n{}".format(t.output))
+            if t.successful():
+                print(f"stdout:\n{t.std_output})
+            if t.completed():
+                print(f"task complete with error exit code: {t.exit_code}")
             else:
-                print("There was a problem executing the task.")
+                print(f"There was a problem executing the task: {t.result_string}")
     ```
 
 === "C"
@@ -349,11 +368,16 @@ If no task completes within the timeout, it returns null.
         struct vine_task *t = vine_wait(m,5);
         if(t) {
             printf("Task %d has returned!\n", t->taskid);
-            if(t->return_status == 0) {
-                printf("command exit code: %d\n", t->exit_code);
-                printf("stdout: %s\n", t->output);
-            } else {
-                printf("There was a problem executing the task.\n");
+            int result = vine_task_get_result(t);
+            if(result == VINE_RESULT_SUCCESS) {
+                int exit_code = vine_task_get_exit_code(t);
+                if(exit_code == 0) {
+                    printf("stdout: %s\n", vine_task_get_stdout(t));
+                } else {
+                    printf("task complete with error exit code: %d\n", exit_code);
+                } else {
+                    printf("There was a problem executing the task: %s\n", vine_result_string(result));
+                }
             }
         }
     }
@@ -364,7 +388,7 @@ the standard output of the task in `output` and the exit code in
 `exit_status`.
 
 !!! note
-    The size of `output` is limited to 1 GB. Any output beyond 1 GB will be
+    The size of standard output is limited to 1 GB. Any output beyond 1 GB will be
     truncated. So, please redirect the stdout `./my-command > my-stdout` of the
     task to a file and specify the file as an output file of the task as
     described above.
@@ -457,6 +481,341 @@ Donload the example file for the language of your choice:
   * Python: [vine_python_function.py](examples/vine_python_function.py)
   * C: [vine_example_mosaic.c](examples/vine_example_mosaic.c.c)
 
+
+## Declaring Other Types of Files
+
+In the examples above we declared files as inputs to the tasks. TaskVine
+natively understands the following types of inputs and outputs:
+
+### Directories
+
+When declaring files, if the argument is a directory, then the whole directory
+and its contents is transfered. E.g.:
+
+=== "Python"
+    ```python
+    my_input_dir   = m.declare_file("my_data_dir/", cache=True)
+    my_output_dir  = m.declare_file("my_output-dir/", cache=False)
+
+    t.add_input(my_input_dir, "input_dir");
+    t.add_output(my_output_dir, "output_dir");
+    ```
+
+=== "C"
+    ```C
+    struct vine_file *my_input_dir  = vine_declare_file(m, "my_data_dir/", VINE_CACHE);
+    struct vine_file *my_output_dir = vine_declare_file(m, "my_output-dir/", VINE_CACHE_NEVER);
+
+    vine_task_add_input(my_input_dir, "input_dir", 0);
+    vine_task_add_output(my_output_dir, "output_dir", 0);
+    ```
+
+### URLs
+
+Tasks can fetch remote data named by a URL into the worker's cache.
+For example, if you have a large dataset provided by a web server,
+you can declare the url to attach it to a local file at the worker.
+If the file is marked for caching, it will be downloaded once per worker and
+then shared among all tasks that require it:
+
+=== "Python"
+    ```python
+    my_url = m.declare_url("http://somewhere.com/data.tar.gz", cache=True)
+    t.add_input(my_url, "data.tar.gz")
+    ```
+
+=== "C"
+    ```C
+    struct vine_file *my_url = vine_declare_url(m, "http://somewhere.com/data.tar.gz", VINE_CACHE);
+    vine_task_add_input(t, "data.tar.gz", 0);
+    ```
+
+!!! warning
+    URLs can only be used as input for tasks.
+
+
+### Tarballs
+
+A tarball declaration takes as an argument another TaskVine file and expands it
+in the task's sandbox in the given directory. For example, to continue the
+example above:
+
+=== "Python"
+    ```python
+    my_url   = m.declare_url("http://somewhere.com/data.tar.gz", cache=True)
+    my_untar = m.declare_untar(my_url, cache=True)
+    t.add_input(my_untar, "my_tar_expanded")
+    ```
+
+=== "C"
+    ```C
+    struct vine_file *my_url = vine_declare_url(m, "http://somewhere.com/data.tar.gz", VINE_CACHE);
+    struct vine_file *my_untar = vine_declare_untar(m, my_url, VINE_CACHE);
+    vine_task_add_input(t, "my_tar_expanded", 0);
+    ```
+
+
+### Buffers
+
+(to do)
+
+### Chirp
+
+(to do)
+
+### XrootD
+
+(to do)
+
+
+### Fetching Input Data via Command
+
+A task can be used to perform custom fetch operations for input data. TaskVine
+calls these tasks **mini tasks**, and they are defined in the same way as
+regular tasks. Their only differences are that they are not submitted directly
+to the manager, and that their output (either a file or a directory) has to be
+specially declared.
+
+This gives a lot of flexibility, as say for example, say you would like to
+expand a compressed file that TaskVine does not natively support, or you would
+like the input to be the result of a query to a database.
+
+=== "Python"
+    ```python
+    # use cpio to expand archives coming from a url
+    t = Task("cpio -iD output_dir < archive.cpio")
+
+    my_url = m.declare_url("http://somewhere.com/archive.cpio", cache=True)
+    t.add_input(my_url, "archive.cpio")
+    t.set_mini_task_output("output_dir")
+
+    mini_task = m.declare_mini_task(t)
+
+    # regular tasks can use the mini task as input # the output of the mini
+    # task is mounted in the regular task sandbox
+
+    my_other_task = Task("my_cmd output_from_cpio/")
+    my_other_task.add_input(mini_task, "output_from_cpio")
+
+    # we submit to the manager only the regular task
+    m.submit(my_other_task)
+    ```
+
+
+=== "C"
+    ```C
+    // use cpio to expand archives coming from a url
+    struct vine_task *t = vine_task_create("cpio -iD output_dir < archive.cpio")
+
+    struct vine_file *my_url = vine_declare_url("http://somewhere.com/archive.cpio", VINE_CACHE);
+    vine_task_add_input(my_url, "archive.cpio", 0);
+    vine_task_set_mini_task_output(t, "output_dir");
+
+    struct vine_file *mini_task = m.declare_mini_task(t)
+
+    // regular tasks can use the mini task as input
+    // the output of the mini task is mounted in the regular task sandbox
+
+    struct vine_task *my_other_task = vine_task_create("my_cmd output_from_cpio/");
+    vine_task_add_input(mini_task, "output_from_cpio");
+
+    // we submit to the manager only the regular task
+    vine_submit(m, my_other_task);
+    ```
+
+
+
+### Environments
+
+The execution of a task can be wrapped with specially designed files called
+environments. These environments ensure that the software dependencies for the
+task are available in the execution site. TaskVine natively supports two types
+of environments: [poncho](../poncho/index.md), which is based on conda-pack;
+and [starch](../man_pages/starch.md) a lightweight package useful when the
+manager and workers run the same linux version. Mini tasks can be used to
+create environments not natively supported, as we will show later to construct
+environments for Apptainer (i.e., singularity containers).
+
+#### Poncho
+
+A poncho environment is a tarball based on conda-pack useful to deliver
+complete python environments. For example, to create a python environment with
+numpy:
+
+my_poncho_spec.json
+```json
+{
+    "conda": {
+        "channels": [
+            "conda-forge"
+        ],
+        "dependencies": [
+            "python=3.10",
+            "numpy=1.24.2"
+        ]
+    }
+}
+```
+
+In the command line, create the poncho environment from the specification:
+
+```sh
+poncho_package_create my_poncho_spec.json my_env.tar.gz
+```
+
+Attach the environment to the task:
+
+=== "Python"
+    ```python
+    # my task that requires python and numpy
+    t = Task("python my_numpy_script.py")
+
+    s = m.declare_file("my_numpy_script.py", cache=True)
+    t.add_input(s, "my_numpy_script.py")
+
+    # declare the environment and its input file
+    poncho_file = m.declare_file("my_env.tar.gz", cache=True)
+    poncho_env = m.declare_poncho(poncho_file, cache=True)
+
+    # attach the environment to the task
+    t.add_environment(poncho_env)
+
+    m.submit(t)
+    ```
+
+=== "C"
+    ```C
+    // my task that requires python and numpy
+    struct vine_task *t = vine_task_create("python my_numpy_script.py");
+
+    struct vine_file *s = vine_declare_file("my_numpy_script.py", VINE_CACHE);
+    vine_task_add_input(t, "my_numpy_script.py", 0);
+
+    // declare the environment and its input file
+    struct vine_file *poncho_file = vine_declare_file("my_env.tar.gz", cache=True);
+    struct vine_file *poncho_env  = vine_declare_poncho(poncho_file, cache=True)
+
+    # attach the environment to the task
+    vine_task_add_environment(poncho_env);
+
+    vine_submit(m, t);
+    ```
+
+#### Starch
+
+(to do)
+
+#### Custom Environments
+
+TaskVine expects environments to expand to a directory, with this minimal
+structure:
+
+```text
+env
+└── bin
+    └── run_in_env
+```
+
+where `run_in_env` is an executable file (usually a shell script) that takes as
+an argument a command line to execute. In the rest of this section we will show
+how to construct an environment that runs its command line inside an Apptainer
+container.
+
+##### Apptainer Custom Environment
+
+Our script `run_in_env` script simply calls Apptainer with the desired image, and
+mounts the task's sandbox as the home directory:
+
+**run_command_in_apptainer.sh**
+```shell
+--8<-- "taskvine/examples/run_command_in_apptainer.sh"
+```
+
+To start, we can manually construct in the command line the needed directory
+structure as follows. Later will be automate these steps with a mini task.
+
+```sh
+# ensure the right execution permissions for the script
+chmod 755 run_command_in_apptainer.sh
+
+# construct the needed directory structure
+mkdir -p my_env/bin
+
+# copy the apptainer script to the expected run_in_env location
+cp run_command_in_apptainer.sh my_env/bin/run_in_env
+
+# copy the desired image to the environment's directory
+cp path/to/my_image.img my_env/image.img
+```
+
+Now we are ready to declare the environment from its local directory "my_env":
+
+=== "Python"
+    ```python
+    t = Task("/bin/echo from inside apptainer!")
+
+    env = m.declare_file("my_env", cache=True)
+    t.add_environment(env)
+
+    m.submit(t)
+    ```
+
+=== "C"
+    ```C
+    struct vine_task *t = vine_task_create("/bin/echo from inside apptainer!");
+
+    struct vine_file *env = vine_declare_file(m, "my_env", VINE_CACHE);
+    vine_task_add_environment(env);
+
+    vine_submit(t);
+    ```
+
+
+##### Apptainer Custom Environment with a Mini Task
+
+In the previous section we manually built the directory structure needed for
+the environment. This is not very flexible, as we need to create one such
+directory per container image that we would like to use. Instead, we can use a
+mini task to construct the environment structure directly on the workers.
+
+
+=== "Python"
+    ```python
+    # construct the mini task. We only need the mini task for its sandbox to
+    # create the environment structure, thus we use the command ":" as no-op.
+    mt = Task(":")
+
+    runner = m.declare_file("run_command_in_apptainer.sh", cache=True)
+    image  = m.declare_file("path/to/my_image.img", cache=True)
+
+    mt.add_input(runner, "env_dir/bin/run_in_env")
+    mt.add_input(image,  "env_dir/image.img")
+
+    # the output of the mini task is the environment directory
+    mt.add_output(image,  "env_dir")
+
+    # tell the manager that this is a mini task.
+    env = m.declare_mini_task(mt)
+
+    # now we define our regular task, and attach the environment to it.
+    t = Task("/bin/echo from inside apptainer!")
+    t.add_environment(env)
+
+    m.submit(t)
+    ```
+
+You can see the complete example [here](examples/vine_example_apptainer_env.py)
+
+
+
+### Caching Behaviour
+
+(to do)
+never, workflow, always
+
+
+
+
 ### Language Specific Setup
 
 Before running the application, you may need some
@@ -481,7 +840,7 @@ $ export PYTHONPATH=${HOME}/cctools/lib/python${PYVER}/site-packages:${PYTHONPAT
 If you are writing a taskvine application in C, you should compile it into an executable like this:
 
 ```sh
-$ gcc taskvine_example.c -o taskvine_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -ltaskvine -ldttools -lm -lz
+${CC:-gcc} taskvine_example.c -o taskvine_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -ltaskvine -ldttools -lm -lz
 ```
 
 ### Running a Manager Program
@@ -929,7 +1288,7 @@ these limits. You can enable monitoring and enforcement as follows:
     # series are written to the logs directory `vine-logs/time-series`.
     # Use with caution, as time series for long running tasks may be in the
     # order of gigabytes. 
-    vine_enable_monitoring(m,watchdog=False,time_series=True)
+    m.enable_monitoring(m,watchdog=False,time_series=True)
     ```
 
 === "C"
@@ -973,15 +1332,19 @@ returns:
     ```C
     vine_task *t = vine_wait(m,5);
     if(t) {
+        const struct rmsummary *measured  = vine_task_get_resources(t, "measured");
+        const struct rmsummary *requested = vine_task_get_resources(t, "requested");
+        const struct rmsummary *allocated = vine_task_get_resources(t, "allocated");
+
         printf("Task used %f cores, %f MB memory, %f MB disk",
-            t->resources_measured->cores,
-            t->resources_measured->memory,
-            t->resources_measured->disk);
+            measured->cores,
+            measured->memory,
+            measured->disk);
         printf("Task was allocated %f cores, %f MB memory, %f MB disk",
-            t->resources_requested->cores,
-            t->resources_requested->memory,
-            t->resources_requested->disk});
-        if(t->limits_exceeded && t->limits_exceeded->cores > -1) {
+            requested->cores,
+            requested->memory,
+            requested->disk});
+        if(measured->limits_exceeded && measured->limits_exceeded->cores > -1) {
             printf("Task exceeded its cores allocation.")
         }
     }
@@ -1011,7 +1374,7 @@ report format is JSON, as its filename has the form
     struct vine_task *t = vine_task_create(...);
     vine_task_set_monitor_output(t, "my-resources-output");
     ...
-    int taskid = vine_submti(m, t);
+    int taskid = vine_submit(m, t);
     ```
 
 taskvine also measures other resources, such as peak `bandwidth`,
@@ -1217,7 +1580,7 @@ creating the queue:
 
 === "Python"
     ```python
-    # Import the taskvine library
+    # Import the taskvine module
     import taskvine as vine
     m = vine.Manager(port=9123, ssl=('MY_KEY.pem', 'MY_CERT.pem'))
 
@@ -1228,7 +1591,7 @@ creating the queue:
 
 === "C"
     ```
-    /* Import the taskvine library */
+    /* Import the taskvine module */
     #include "taskvine.h"
 
     /* Create a new queue listening on port 9123 */
@@ -1332,47 +1695,6 @@ warranted:
     }
     ```
 
-### Fetching Input Data via URL
-
-Tasks can fetch remote data named by a URL into the worker's cache.
-For example, if you have a large dataset provided by a web server,
-use `add_url` to attach the URL to a local file.  The data
-will be downloaded once per worker and then shared among all
-tasks that require it:
-
-
-=== "Python"
-    ```python
-    t.add_url("http://somewhere.com/data.tar.gz", "data.tar.gz", type=VINE_INPUT, cache=True)
-    ```
-
-=== "C"
-    ```c
-    vine_task_add_url(t,"http://somewhere.com/data.tar.gz", "data.tar.gz", VINE_INPUT, VINE_CACHE)
-    ```
-
-(Note that `add_url` does not currently support output data.)
-
-### Fetching Input Data via Command
-
-Input data for tasks can also be produced at the worker by arbitrary
-shell commands.  The output of these commands can be cached and shared
-among multiple tasks. This is particularly useful for unpacking or
-post-processing downloaded data.  For example, to download `data.tar.gz` from
-a URL and then unpack into the directory `data`:
-
-
-=== "Python"
-    ```python
-    t.add_file_command("curl http://somewhere.com/data.tar.gz | tar cvzf -", "data" , type=VINE_INPUT, cache=True)
-    ```
-
-=== "C"
-    ```c
-    vine_task_add_file_command(t,"curl http://somewhere.com/data.txt | tar cvzf -", "data", VINE_INPUT, VINE_CACHE)
-    ```
-
-(Note that `add_file_command` does not currently support output data.)
 
 ### Watching Output Files
 
@@ -1397,21 +1719,34 @@ part of its output.
 It is sometimes useful to return an output file only in the case of a failed task.
 For example, if your task generates a very large debugging output file `debug.out`,
 then you might not want to keep the file if the task succeeded.  In this case,
-you can add the `VINE_FAILURE_ONLY` flag to indicate that a file should
-only be returned in the event of failure:
+you can mark the file as a "failure-only" output to indicate that it should
+only be returned when the task fails:
 
 === "Python"
     ```python
-    t.add_output_file("debug.out", flags = vine.VINE_FAILURE_ONLY)
+    my_debug = m.declare_file("debug.out", cache=False)
+    t.add_output(my_debug, "debug.out", failure_only=True)
     ```
 
 === "C"
     ```C
-    vine_task_add_file(t, "debug.out", "debug.out", VINE_OUTPUT, VINE_FAILURE_ONLY);
+    struct vine_file *my_debug = vine_declare_file("debug.out", VINE_CACHE_NEVER);
+    vine_task_add_output(t, "debug.out", VINE_FAILURE_ONLY);
     ```
 
-In a similar way, the `VINE_SUCCESS_ONLY` flag indicates that an output file
-should only be returned if the task actually succeeded.
+In a similar way, files can be marked to indicate that they should be returned on success:
+
+=== "Python"
+    ```python
+    my_debug = m.declare_file("debug.out", cache=False)
+    t.add_output(my_debug, "debug.out", success_only=True)
+    ```
+
+=== "C"
+    ```C
+    struct vine_file *my_debug = vine_declare_file("debug.out", VINE_CACHE_NEVER);
+    vine_task_add_output(t, "debug.out", VINE_SUCCESS_ONLY);
+    ```
 
 ### Disconnect slow workers
 
@@ -1439,6 +1774,7 @@ Each retry allows the task to run for longer and longer times until a
 completion is reached. You can set an upper bound in the number of retries with
 [Maximum Retries](#maximum-retries).
 
+
 ### String Interpolation
 
 If you have workers distributed across multiple operating systems (such as
@@ -1450,18 +1786,22 @@ and architecture of each connected worker and transfer the input file
 corresponding to the resolved file name. For example:
 
 === "Python"
-    ```C
-    t.add_input_file("my-executable.$OS.$ARCH", "my-exe")
+    ```python
+    my_exec = m.declare_file("my-executable.$OS.$ARCH",  cache=True)
+    t.add_input_input(my_exec, "my_exe")
     ```
 
 === "C"
     ```C
-    vine_task_add_file(t,"my-executable.$OS.$ARCH","./my-exe",VINE_INPUT,VINE_CACHE);
+    struct vine_file *my_exec = vine_declare_file(m, "my-executable.$OS.$ARCH",  VINE_CACHE);
+    add_input_input(my_exec, "my_exe", 0);
     ```
 
 This will transfer `my-executable.Linux.x86_64` to workers running on a Linux
 system with an x86_64 architecture and `a.Cygwin.i686` to workers on Cygwin
-with an i686 architecture.
+with an i686 architecture. These files will be named "my_exe" in the task's
+sandbox, which means that the command line of the tasks does not need to
+change.
 
 Note this feature is specifically designed for specifying and distingushing
 input file names for different platforms and architectures. Also, this is
@@ -1525,18 +1865,17 @@ either their `taskid` or `tag`. For example:
 ```
 
 
-### Worker Blacklist
+### Blocking workers
 
 You may find that certain hosts are not correctly configured to run your
-tasks. The manager can be directed to ignore certain workers with the blacklist
-feature. For example:
+tasks. The manager can be directed to ignore certain workers, as:
 
 === "Python"
     ```python
     t = m.wait(5)
 
     # if t fails given a worker misconfiguration:
-    m.blacklist(t.hostname)
+    m.block_host(t.hostname)
     ```
 
 === "C"
@@ -1544,7 +1883,7 @@ feature. For example:
     struct vine_task *t = vine_wait(m, t);
 
     //if t fails given a worker misconfiguration:
-    vine_blacklist_add(m, t->{hostname});
+    vine_block_host(m, vine_task_get_hostname(t));
     ```
 
 ### Performance Statistics
@@ -1738,26 +2077,33 @@ vine-run-info/%Y-%m-%dT%H:%M:%S/vine-logs/transactions
 The first few lines of the log document the possible log records:
 
 ```text
-# time manager_pid MANAGER START|END
-# time manager_pid WORKER worker_id host:port CONNECTION
-# time manager_pid WORKER worker_id host:port DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT
+# time manager_pid MANAGER manager_pid START|END time_from_origin
+# time manager_pid WORKER worker_id CONNECTION host:port
+# time manager_pid WORKER worker_id DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT)
 # time manager_pid WORKER worker_id RESOURCES {resources}
+# time manager_pid WORKER worker_id CACHE_UPDATE filename size_in_mb wall_time_us start_time_us
+# time manager_pid WORKER worker_id TRANSFER (INPUT|OUTPUT) filename size_in_mb wall_time_us start_time_us
 # time manager_pid CATEGORY name MAX {resources_max_per_task}
 # time manager_pid CATEGORY name MIN {resources_min_per_task_per_worker}
 # time manager_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}
-# time manager_pid TASK taskid WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}
-# time manager_pid TASK taskid RUNNING worker_address (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}
-# time manager_pid TASK taskid WAITING_RETRIEVAL worker_address
-# time manager_pid TASK taskid (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}
-# time manager_pid TRANSFER (INPUT|OUTPUT) taskid cache_flag sizeinmb walltime filename
+# time manager_pid TASK task_id WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) attempt_number {resources_requested}
+# time manager_pid TASK task_id RUNNING worker_id (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}
+# time manager_pid TASK task_id WAITING_RETRIEVAL worker_id
+# time manager_pid TASK task_id RETRIEVED (SUCCESS|UNKNOWN|INPUT_MISSING|OUTPUT_MISSING|STDOUT_MISSING|SIGNAL|RESOURCE_EXHAUSTION|MAX_RETRIES|MAX_END_TIME|MAX_WALL_TIME|FORSAKEN) {limits_exceeded} {resources_measured}
+# time manager_pid TASK task_id DONE (SUCCESS|UNKNOWN|INPUT_MISSING|OUTPUT_MISSING|STDOUT_MISSING|SIGNAL|RESOURCE_EXHAUSTION|MAX_RETRIES|MAX_END_TIME|MAX_WALL_TIME|FORSAKEN) exit_code
+# time manager_pid LIBRARY library_id (WAITING|SENT|STARTED|FAILURE) worker_id
+
 ```
 
 Lowercase words indicate values, and uppercase indicate constants. A bar (|) inside parentheses indicate a choice of possible constants. Variables encased in braces {} indicate a JSON dictionary. Here is an example of the first few records of a transactions log:
 
 ```
-1599244364466426 16444 MASTER START
-1599244364466668 16444 TASK 1 WAITING default FIRST_RESOURCES {"cores":[1,"cores"],"memory":[800,"MB"],"disk":[500,"MB"]}
-1599244364466754 16444 TASK 2 WAITING default FIRST_RESOURCES {"cores":[1,"cores"],"memory":[800,"MB"],"disk":[500,"MB"]}
+1679929304405580 4107108 MANAGER 4107108 START 0
+1679929315785718 4107108 TASK 1 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
+1679929315789781 4107108 TASK 2 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
+1679929315791349 4107108 TASK 3 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
+1679929315792852 4107108 TASK 4 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
+1679929315794343 4107108 TASK 5 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
 ...
 ```
 
@@ -1853,12 +2199,15 @@ The statistics available are:
 |||
 | manager_load       | In the range of [0,1]. If close to 1, then the manager is at full load <br /> and spends most of its time sending and receiving taks, and thus <br /> cannot accept connections from new workers. If close to 0, the <br /> manager is spending most of its time waiting for something to happen. |
 
-The script `vine_graph_workers` is an interactive visualization tool for
-taskvine transaction logs based on Python `bokeh` package. It can be used to
+
+The script `vine_plot_txn_log` is a visualization tool for
+taskvine transaction logs based on Python's `matplotlib`. It can be used to
 visualize the life time of tasks and workers, as well as diagnosing the effects
-of file transfer time on overall performance. See
-[vine_graph_workers(1)](../man_pages/vine_graph_workers.md) for
-detailed information.
+of file transfer time on overall performance. For example:
+
+```sh
+vine_plot_txn_log vine-run-info/most-recent/vine-logs/transactions
+```
 
 ## Specialized and Experimental Settings
 
