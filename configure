@@ -365,9 +365,9 @@ EOF
 	esac
 done
 
-if [[ -n "$CONDA_PREFIX" ]]
+if [ x"${CONDA_BUILD}" != x1 -a -n "${CONDA_PREFIX}" ]
 then
-	if [[ "$base_root" != "${CONDA_PREFIX}" ]]
+	if [ "${base_root}" = "/usr" ]
 	then
 		echo 'Detected conda. Assuming --with-base-dir "${CONDA_PREFIX}"'
 		base_root="${CONDA_PREFIX}"
