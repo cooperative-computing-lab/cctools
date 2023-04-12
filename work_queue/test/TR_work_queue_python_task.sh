@@ -7,6 +7,7 @@ import_config_val CCTOOLS_PYTHON_TEST_EXEC
 import_config_val CCTOOLS_PYTHON_TEST_DIR
 
 export PYTHONPATH=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
+export PATH=$(dirname "${CCTOOLS_PYTHON_TEST_EXEC}"):$PATH
 
 STATUS_FILE=wq.status
 PORT_FILE=wq.port
