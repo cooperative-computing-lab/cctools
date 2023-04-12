@@ -90,10 +90,10 @@ def usage():
 
 
 def create_trace_file(name, arg):
-    """Runs strace and redirects its output to <name>.fout1.txt"""
+    """Runs strace and redirects its output to <name>.filetrace-1.txt"""
     arguments = " ".join(arg)
     exit_code = os.system(
-        f"strace -f -y --trace=file,read,write,mmap {arguments} 2> {name}.fout1.txt"
+        f"strace -f -y --trace=file,read,write,mmap {arguments} 2> {name}.filetrace-1.txt"
     )
     if exit_code:
         print(
@@ -108,7 +108,7 @@ def create_dict(name):
     call_counter = 0
     print()
 
-    with open(name + ".fout1.txt") as file:
+    with open(name + ".filetrace-1.txt") as file:
         for line in file:
             if "openat(" in line or "stat" in line:
                 try:  # Try get file path
@@ -215,10 +215,10 @@ def read_write_actions(path_dict, line):
 
 
 def print_summary_2(path_dict, name, master):
-    """Creates the file <name>.fout2.txt which contains the freqency,
+    """Creates the file <name>.filetrace-2.txt which contains the freqency,
     action, and path of each entry
     """
-    f = open(name + ".fout2.txt", "w")
+    f = open(name + ".filetrace-2.txt", "w")
     f.write(f"action bytes freq path\n")
 
     for file in sorted(
@@ -256,8 +256,8 @@ def find_pid(line, subprocess_dict):
 
 
 def print_subprocess_summary(subprocess_dict, name):
-    """Creates the file <name>.fout4.txt which contains the details of the subprocesses"""
-    f = open(name + ".fout4.txt", "w")
+    """Creates the file <name>.filetrace-4.txt which contains the details of the subprocesses"""
+    f = open(name + ".filetrace-4.txt", "w")
     f.write(f"Subproccesses: \n\n")
 
     for pid in subprocess_dict:
@@ -273,12 +273,12 @@ def print_subprocess_summary(subprocess_dict, name):
 
 
 def find_major_directories(path_dict, subprocess_dict, top, dirLvl, name):
-    """creates <name>.fout3.txt which summarizes the most frequently accesed paths"""
+    """creates <name>.filetrace-3.txt which summarizes the most frequently accesed paths"""
     major_dict = defaultdict(lambda: [0, 0])
     reads_dict = defaultdict(lambda: [0, 0])
     writes_dict = defaultdict(lambda: [0, 0])
 
-    f = open(name + ".fout3.txt", "w")
+    f = open(name + ".filetrace-3.txt", "w")
 
     major_paths = find_common_path(path_dict.keys(), dirLvl)
     major_paths.insert(0, "/usr/lib64/")
@@ -305,7 +305,10 @@ def find_major_directories(path_dict, subprocess_dict, top, dirLvl, name):
         if sub_pid:
             try:
                 for pid in sub_pid:
-                    subprocess_dict[pid]["files"].add(path_dict[path])
+                    if type(subprocess_dict[pid]["files"]) == set:
+                        subprocess_dict[pid]["files"].add(path_dict[path])
+                    else:
+                        subprocess_dict[pid]["files"].append(path_dict[path])
             except KeyError:
                 pass
 
@@ -374,11 +377,14 @@ def convert_bytes(num):
 def end_of_execute(name):
     print("\n----- filetrace -----")
     print("filetrace completed\n\nCreated summaries:")
-    if os.path.isfile(name + ".fout4.txt"):
-        print(f"{name}.fout1.txt : output of strace")
-        print(f"{name}.fout2.txt : the action and frequency performed on each file")
-        print(f"{name}.fout3.txt : summary of all the actions")
-        print(f"{name}.fout4.txt : summary of files accessed by subprocesses")
+    if os.path.isfile(name + ".filetrace-1.txt"):
+        print(f"{name}.filetrace-1.txt : output of strace")
+    if os.path.isfile(name + ".filetrace-2.txt"):
+        print(f"{name}.filetrace-2.txt : the action and frequency performed on each file")
+    if os.path.isfile(name + ".filetrace-3.txt"):
+        print(f"{name}.filetrace-3.txt : summary of all the actions")
+    if os.path.isfile(name + ".filetrace-4.txt"):
+        print(f"{name}.filetrace-4.txt : summary of files accessed by subprocesses")
         print("\n")
     else:
         print("There was an error creating the summary")
@@ -442,11 +448,16 @@ def load_process_json():
 
 
 def remove_files():
-    files = glob("*fout*.txt") + glob("filetrace-*.json")
+    files = glob("*.filetrace-*.txt") + glob("filetrace-*.json")
+    if not files:
+        print("no files to remove.")
+        return
     for file in files:
         print(f"removed: {file}")
-    os.system(f"rm {' '.join(files)}")
-    print("\ndone ... removed filetrace files")
+    if not os.system(f"rm {' '.join(files)}"):
+        print("\ndone ... removed filetrace files")
+    else:
+        print("error deleting files.")
 
 
 # Main
