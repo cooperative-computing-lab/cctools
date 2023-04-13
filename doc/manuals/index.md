@@ -19,7 +19,7 @@ even in successive workflows.
 - [**Work Queue**](work_queue) is a system and library for creating and
   managing scalable manager-worker style programs that scale up to thousands of
   machines on clusters, clouds, and grids. Work Queue programs are easy to
-Python ([example](work_queue/examples/work_queue_example.py)|[api](api/html/namespaceWorkQueuePython.html))
+Python ([example](work_queue/examples/work_queue_example.py)|[api](api/html/namespacework__queue.html))
 Perl   ([example](work_queue/examples/work_queue_example.pl)|[api](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html)),
 or C   ([example](work_queue/examples/work_queue_example.c)|[api](api/html/work__queue_8h.html))
 .

@@ -122,7 +122,7 @@ A TaskVine application can be written in Python, or C.
 In each language, the underlying principles are the same, but there are some syntactic differences shown below.
 The full API documentation for each language is here:
 
-- [TaskVine Python API](../api/html/namespacetaskvinePython.html)
+- [TaskVine Python API](../api/html/namespacetaskvine.html)
 - [TaskVine C API](../api/html/taskvine_8h.html)
 
 ### Creating a Manager Object
