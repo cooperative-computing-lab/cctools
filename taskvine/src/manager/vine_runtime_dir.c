@@ -55,7 +55,7 @@ void register_staging_dir(const char *path) {
 char *vine_runtime_directory_create() {
     /* runtime directories are created at vine_runtime_info_path, which defaults
      * to "vine-run-info" of the current working directory.
-     * Each workflow run has its own directory of the form: %Y-%m-%dT%H:%M:%S,
+     * Each workflow run has its own directory of the form: %Y-%m-%dT%H%M%S,
      * but this can be changed with VINE_RUNTIME_INFO_DIR.
      *
      * If VINE_RUNTIME_INFO_DIR is not an absolute path, then it is
@@ -75,7 +75,7 @@ char *vine_runtime_directory_create() {
 		char buf[20];
 		time_t now = time(NULL);
 		struct tm *tm_info = localtime(&now);
-		strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", tm_info);
+		strftime(buf, sizeof(buf), "%Y-%m-%dT%H%M%S", tm_info);
 		runtime_dir = xxstrdup(buf);
 
         symlink_most_recent = 1;
