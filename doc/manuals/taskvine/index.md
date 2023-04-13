@@ -1319,6 +1319,9 @@ to make a progress bar or other user-visible information:
 
 ## Python Programming Models
 
+When writing a manager in Python, you have access to several types of tasks
+that wrap around the standard task abstraction:
+
 ### Python Tasks
 
 A `PythonTask` is an extension of a standard task.
@@ -1381,7 +1384,75 @@ conda run -p my-env conda-pack
 
 ### Serverless Computing
 
-(to be completed)
+TaskVine offers a serverless computing model which is
+especially appropriate for invoking functions that have
+a relatively short execution time (10s or less) and have
+substantial startup time due to large numbers of libraries
+or dependent data.
+
+In this model, you first define and install a `LibraryTask`
+that defines a function, and then invoke `FunctionCall` tasks
+that invoke the library by name.
+
+Suppose your main program has two functions `my_sum` and `my_mul`.
+Invoke `create_library_from_functions` to package up these
+function definitions into a library task `libtask`
+
+=== "Python"
+    ```python
+    def my_sum(x, y):
+        return x+y
+
+    def my_mul(x, y):
+        return x*y
+
+    libtask = m.create_library_from_functions("my_library", my_sum, my_mul)
+    ```
+
+The library task can be further described by any of options available
+to normal tasks, such as resources or additional input files:
+
+=== "Python"
+    ```python
+    libtask.set_cores(1)
+    libtask.set_memory(2000)
+    libtask.set_disk(2000)
+    ```
+
+Once complete, the library task must be `installed` in the system:
+
+=== "Python"
+    ```python
+    m.install_library(t)
+    ```
+
+This causes the library task to be dispatched and started at
+available workers, where it remains running.  Immeidately after
+installing the library, you may submit `FunctionCall` tasks
+that invoke the library and functions by name:
+
+=== "Python"
+    ```python
+    t = vine.FunctionCall("my_library","my_mul",20,30);
+    t.set_cores(1)
+    t.set_memory(100)
+    t.set_disk(100)
+    m.submit(t)
+    ```
+
+The function invocation will be dispatched to available workers,
+and when it is returned, the result is present as `t.output`:
+
+=== "Python"
+    ```python
+    t = m.wait(5)
+    if t:
+        print(t.output)
+    ```
+
+Note that both library tasks and function invocations consume
+resources at the worker, and the number of running tasks will be
+constrained by the available resources in the same way as normal tasks.
 
 ### Functional Abstractions
 
