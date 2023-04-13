@@ -428,13 +428,12 @@ Full details of all of the taskvine functions can be found in the [taskvine API]
 
 There are a variety of ways to execute a TaskVine application at scale.
 The examples in this section make use of the example program
-[vine_python_function.py](examples/vine_python_function.py)
+[functions.py](examples/functions.py)
 which you can download an execute like this:
 
 ```
-python3 vine_python_function.py
+python3 functions.py
 ```
-
 
 ### Language Specific Setup
 
