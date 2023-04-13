@@ -664,9 +664,52 @@ with workers:
 
 ### Caching and Sharing
 
-`never`
-`workflow`
-`always`
+Wherever possible, TaskVine retains files (whatever their source) within
+the cluster so that they can be reused by later tasks.  To do this
+consistently, each file is given a **unique cache name** that is computed
+from its contents and metadata.  This ensures that if the external source
+for a file changes, any old cached copies will not be reused.  In addition,
+cached files used concurrently by multiple tasks may be transferred
+between workers to share them efficiently.
+
+If necessary, you can control the caching behavior of files individually.
+
+- A cache value of **never** indicates that the file should be deleted as
+soon as it is consumed by a task.  This is appropriate for input files
+that are specific to one task, and one task only.
+- A cache value of **workflow** (the default) indicates that the file
+should be retained as long as the workflow runs, and then deleted at the end.
+- A cache value of **always** indicates that the file should be retained
+by the worker, even across workflows.  This is appropriate for widely used
+software packages and reference datasets.
+
+=== "Python"
+    ```python
+    f = m.declare_file("myfile.txt",cache="never")
+    f = m.declare_file("myfile.txt",cache="workflow") # (default)
+    f = m.declare_file("myfile.txt",cache="always") # (default)
+    ```
+=== "C"
+    ```
+    vine_declare_file(m,"myfile.txt",VINE_CACHE_NEVER)
+    vine_declare_file(m,"myfile.txt",VINE_CACHE)
+    vine_declare_file(m,"myfile.txt",VINE_CACHE_ALWAYS)
+    ```
+
+TaskVine generally assumes that a file created on one worker can always
+be transferred to another.  It is occasionally the case that a file created
+on a specific worker is truly specialized to that machine and should
+not be transferred.  (For example, if a MiniTask compiled some code specifically for the architecture of a given machine.)  In that case, you should indicate
+that peer transfers are not permitted:
+
+=== "Python"
+    ```python
+    f = m.declare_file("myfile.txt",cache="never",peer_transfer=False)
+    ```
+=== "C"
+    ```
+    vine_declare_file(m,"myfile.txt",VINE_CACHE|VINE_PEER_NOSHARE)
+    ```
 
 ### MiniTasks
 
@@ -722,8 +765,6 @@ like the input to be the result of a query to a database.
     // we submit to the manager only the regular task
     vine_submit(m, my_other_task);
     ```
-
-
 
 ### Environments
 
