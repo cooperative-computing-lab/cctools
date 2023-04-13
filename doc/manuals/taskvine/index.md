@@ -1385,9 +1385,7 @@ conda run -p my-env conda-pack
 
 ### Functional Abstractions
 
-#### Map
-
-The taskvine map abstraction works similar to python map, as it applies a
+The TaskVine **map* abstraction works similar to python map, as it applies a
 a function to every element in a list. This function works by taking in a chunk_size,
 which is the size of an iterable to send to a worker. The worker than maps the given
 function over the iterable and returns it. All the results are then combined from the
@@ -1403,9 +1401,7 @@ def fn(a):
 m.map(fn, arry, chunk_size)
 ```
 
-#### Pair
-
-The taskvine pair function computes all the pairs of 2 sequences, and then uses
+The TaskVine **pair** function computes all the pairs of 2 sequences, and then uses
 them as inputs of a given function. The pairs are generated locally using itertools,
 and then based on the given chunk_size, are sent out to a worker as an iterable of pairs.
 The given function must accept an iterable, as the pair will be sent to the function as
@@ -1420,9 +1416,7 @@ def fn(pair):
 m.pair(fn, seq1, seq2, chunk_size)
 ```
 
-#### Tree Reduce
-
-The taskvine treeReduce fucntion combines an array using a given function by
+The **treeReduce** function combines an array using a given function by
 breaking up the array into chunk_sized chunks, computing the results, and returning
 the results to a new array. It then does the same process on the new array until there
 only one element left and then returns it. The given fucntion must accept an iterable,
