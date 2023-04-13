@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2022- The University of Notre Dame
-# This software is distributed under the GNU General Public License.
-# See the file COPYING for details.
-
 # This example shows some of the data handling features of taskvine.
 # It performs a BLAST search of the "Landmark" model organism database.
 # It works by constructing tasks that download the blast executable
@@ -80,7 +76,7 @@ if __name__ == "__main__":
             if t.successful():
                 print(f"task {t.id} result: {t.std_output}")
             elif t.completed():
-                print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
+                print(f"task {t.id} completed with an execution error, exit code {t.exit_code}")
             else:
                 print(f"task {t.id} failed with status {t.result_string}")
 

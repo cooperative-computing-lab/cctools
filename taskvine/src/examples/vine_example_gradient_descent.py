@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2023- The University of Notre Dame
-# This software is distributed under the GNU General Public License.
-# See the file COPYING for details.
-
 # This shows an example of using Library Tasks and FunctionCall Tasks.
 # Gradient descent is an algorithm used to optimize the weights of machine
 # learning models and regressions.  Running multiple instances of gradient

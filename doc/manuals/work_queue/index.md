@@ -116,7 +116,7 @@ A manager program can be written in Python, Perl, or C.
 In each language, the underlying principles are the same, but there are some syntactic differences shown below.
 The full API documentation for each language is here:
 
-- [Work Queue Python API](../api/html/namespaceWorkQueuePython.html)
+- [Work Queue Python API](../api/html/namespacework__queue.html)
 - [Work Queue Perl API](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueuePerl.html)
 - [Work Queue C API](../api/html/work__queue_8h.html)
 
@@ -409,7 +409,7 @@ is done, delete the queue (only needed for C):
     work_queue_delete(q);
     ```
 
-Full details of all of the Work Queue functions can be found in the [Work Queue API](api/html/work__queue_8h.html).
+Full details of all of the Work Queue functions can be found in the [Work Queue API](../api/html/work__queue_8h.html).
 
 ### Managing Python Tasks
 
@@ -1264,7 +1264,7 @@ cores, memory and disk have modifiers `~` and `>` as follows:
 A variety of advanced features are available for programs with unusual needs
 or very large scales. Each feature is described briefly here, and more details
 may be found in the [Work Queue
-API](api/html/work__queue_8h.html).
+API](../api/html/work__queue_8h.html).
 
 ### Security
 
@@ -1971,7 +1971,7 @@ find failures, bugs, and other errors. To activate debug output:
     
 The `all` flag causes debug messages from every subsystem called by Work Queue
 to be printed. More information about the debug flags are
-[here](api/html/debug_8h.html).
+[here](../api/html/debug_8h.html).
 
 
 To enable debugging at the worker, set the `-d` option:
