@@ -1,9 +1,7 @@
 #!/usr/bin/env python
-# Copyright (C) 2023- The University of Notre Dame
-# This software is distributed under the GNU General Public License.
-# See the file COPYING for details.
 
-# This example program performs a merge sort to show how a task can be executed
+# This example program performs a merge sort
+# to show how a task can be executed
 # where particular files have been cached.
 
 import taskvine as vine

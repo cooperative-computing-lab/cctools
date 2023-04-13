@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2022- The University of Notre Dame
-# This software is distributed under the GNU General Public License.
-# See the file COPYING for details.
-
 # This example program shows the behavior of the watch parameter when adding an
 # output file to a task.
 

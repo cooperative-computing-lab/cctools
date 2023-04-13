@@ -1,10 +1,4 @@
 /*
-Copyright (C) 2022- The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-*/
-
-/*
 This example program shows the behavior of the VINE_WATCH flag.
 
 If a task produces output to a file incrementally as it runs,

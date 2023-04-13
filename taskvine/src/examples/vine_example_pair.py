@@ -1,3 +1,6 @@
+# This example program shows the use of the pair()
+# abstraction to generate all pairs of several values.
+
 import taskvine as vine
 import sys
 

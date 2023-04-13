@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 
-# copyright (C) 2023- The University of Notre Dame
-# This software is distributed under the GNU General Public License.
-# See the file COPYING for details.
-
 # Example on how to execute python code with a taskvine task.
 # The class PythonTask allows users to execute python functions as taskvine
 # commands. Functions and their arguments are pickled to a file and executed

@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2023- The University of Notre Dame
-# This software is distributed under the GNU General Public License.
-# See the file COPYING for details.
-
 # This example shows how to declare an xrootd file so that it can be cached at
 # the workers.
 # It assumes that uproot is installed where workers are executed. If this is
