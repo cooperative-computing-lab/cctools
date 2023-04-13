@@ -422,7 +422,7 @@ is done, delete the queue (only needed for C):
     vine_delete(q);
     ```
 
-Full details of all of the taskvine functions can be found in the [taskvine API](api/html/taskvine_8h.html).
+Full details of all of the taskvine functions can be found in the [taskvine API](../api/html/taskvine_8h.html).
 
 ## Running a TaskVine Application
 
@@ -1012,7 +1012,7 @@ In a similar way, files can be marked to indicate that they should be returned o
 A variety of advanced features are available for programs with unusual needs
 or very large scales. Each feature is described briefly here, and more details
 may be found in the [taskvine
-API](api/html/taskvine_8h.html).
+API](../api/html/taskvine_8h.html).
 
 ### Security
 
