@@ -10,8 +10,9 @@ nav:
         - Installation: 'install/index.md'
         - Getting Help: 'help.md'
     - Software:
-        - Makeflow: 'makeflow/index.md'
+        - TaskVine: 'taskvine/index.md'
         - Work Queue: 'work_queue/index.md' 
+        - Makeflow: 'makeflow/index.md'
         - JX Workflow Language: 'jx-workflow/index.md'
         - Resource Monitor: 'resource_monitor/index.md'
         - Parrot: 'parrot/index.md'
@@ -19,7 +20,6 @@ nav:
         - Catalog Server: 'catalog/index.md'
         - Poncho: 'poncho/index.md'
     - Research Prototypes:
-        - TaskVine: 'taskvine/index.md'
         - AWE: 'awe/index.md'
         - Confuga: 'confuga/index.md'
         - Umbrella: 'umbrella/index.md'
