@@ -4,7 +4,7 @@
 # It performs an all-to-all comparison of twenty (relatively small) documents
 # downloaded from the Gutenberg public archive.
 
-# A small shell script (vine_example_guteberg_task.sh) is used to perform
+# A small shell script (given inline below) is used to perform
 # a simple text comparison of each pair of files.
 
 import taskvine as vine
@@ -39,6 +39,16 @@ urls_sources = [
     "http://www.gutenberg.org/files/1987/1987.txt",
 ]
 
+compare_script="""
+#!/bin/sh
+# Perform a simple comparison of the words counts of each document
+# which are given as the first ($1) and second ($2) command lines.
+cat $1 | tr " " "\n" | sort | uniq -c | sort -rn | head -10l > a.tmp
+cat $2 | tr " " "\n" | sort | uniq -c | sort -rn | head -10l > b.tmp
+diff a.tmp b.tmp
+exit 0
+"""
+
 if __name__ == "__main__":
     m = vine.Manager()
     print("listening on port", m.port)
@@ -47,7 +57,7 @@ if __name__ == "__main__":
     urls = map(lambda u: m.declare_url(u, cache=True), urls_sources)
 
     # script to process the files
-    my_script = m.declare_file("vine_example_gutenberg_script.sh", cache=True)
+    my_script = m.declare_buffer(compare_script, cache=True)
 
     for (i, url_a) in enumerate(urls):
         for (j, url_b) in enumerate(urls):
@@ -57,7 +67,6 @@ if __name__ == "__main__":
 
             t = vine.Task("./my_script file_a.txt file_b.txt")
             t.add_input(my_script, "my_script")
-
             t.add_input(url_a, "file_a.txt")
             t.add_input(url_b, "file_b.txt")
 
