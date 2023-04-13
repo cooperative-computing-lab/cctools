@@ -106,8 +106,15 @@ Task 2 completed with result     536    6314   36667
 All tasks done.
 ```
 
-Congratulations! You have now run a simple manager application that runs tasks on one local worker.
-Read on to learn how to build more complex applications and run large numbers of workers at scale.
+Congratulations! You have now run a simple manager application that runs tasks on one local worker.  If you learn best from examples, then take a look and
+test out the following example applications:
+
+- [BLAST Example](example-blast.md)
+- [Gutenberg Example](example-gutenberg.md)
+- [Mosaic Example](example-mosaic.md)
+- [Gradient Descent Example](example-gradient-descent.md)
+
+Or read on to learn how to build more complex applications and run large numbers of workers at scale.
 
 ## Writing a TaskVine Application
 
@@ -362,7 +369,7 @@ If no task completes within the timeout, it returns null.
             print(f"Task {t.id} has returned!")
 
             if t.successful():
-                print(f"stdout:\n{t.std_output})
+                print(f"stdout:\n{t.std_output}")
             if t.completed():
                 print(f"task complete with error exit code: {t.exit_code}")
             else:
@@ -419,13 +426,15 @@ Full details of all of the taskvine functions can be found in the [taskvine API]
 
 ## Running a TaskVine Application
 
-This section makes use of a simple but complete example of a
-TaskVine application to demonstrate various features.
+There are a variety of ways to execute a TaskVine application at scale.
+The examples in this section make use of the example program
+[vine_python_function.py](examples/vine_python_function.py)
+which you can download an execute like this:
 
-Download the example file for the language of your choice:
+```
+python3 vine_python_function.py
+```
 
-  * Python: [vine_python_function.py](examples/vine_python_function.py)
-  * C: [vine_example_mosaic.c](examples/vine_example_mosaic.c.c)
 
 ### Language Specific Setup
 
@@ -623,7 +632,7 @@ vine_factory -Tcondor --min-workers=2 --max-workers=10 --manager-name myproject
 This arguments can be specified in a file. The factory will periodically
 re-read this file, which allows adjustments to the number of workers desired:
 
-Configuarion file `factory.json`:
+Configuration file `factory.json`:
 ```json
 {
     "manager-name": "myproject",
@@ -1433,7 +1442,7 @@ m.treeReduce(fn, arry, chunk_size)
 Below is an example of all three abstractions, and their expected output:
 
 ```
---8<-- "taskvine/examples/vine_hof.py"
+--8<-- "taskvine/examples/functional.py"
 ```
 
 Run:
