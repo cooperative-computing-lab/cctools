@@ -227,7 +227,7 @@ tasks at once:
 `declare_untar` is an example of a [MiniTask](#MiniTasks), which is explained further below.
 
 
-### Declaring Standard Tasks
+### Declaring Tasks
 
 TaskVine supports several forms of tasks: **Standard Tasks** consist
 of Unix command lines, **Python Tasks** consist of Python functions
@@ -416,66 +416,6 @@ is done, delete the queue (only needed for C):
     ```
 
 Full details of all of the taskvine functions can be found in the [taskvine API](api/html/taskvine_8h.html).
-
-### Managing Python Tasks
-
-A `PythonTask` is an extension of a standard task.
-It is not defined with a command line to execute,
-but with a Python function and its arguments, like this:
-
-=== "Python"
-    ```python
-    def my_sum(x, y):
-        return x+y
-
-    # task to execute x = my_sum(1, 2)
-    t = vine.PythonTask(my_sum, 1, 2)
-    ```
-
-A PythonTask is handled in the same way as a standard task,
-except that its output `t.output` is simply the Python return
-value of the function.  If the function should throw an exception,
-then the output will be the exception object.
-
-You can examine the result of a PythonTask like this:
-
-=== "Python"
-    ```
-    while not m.empty():
-        t = m.wait(5)
-        if t:
-            x = t.output
-            if isinstance(x,Exception):
-                print("Exception: {}".format(x))
-            else:
-                print("Result: {}".format(x))
-    ```
-
-A `PythonTask` is derived from `Task` and so all other methods for
-controlling scheduling, managing resources, and setting performance options
-all apply to `PythonTask` as well.
-
-When running a Python function remotely, it is assumed that the Python interpreter
-and libraries available at the worker correspond to the appropiate python environment for the task.
-If this is not the case, an environment file can be provided with t.set_environment:
-
-=== "Python"
-    ```python
-    t = vine.PythonTask(my_sum, 1, 2)
-    t.set_environment("my-env.tar.gz")
-    ```
-
-The file `my-env.tar.gz` is a
-[conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html)
-environment created with [conda-pack](https://conda.github.io/conda-pack/).  A
-minimal environment can be created a follows:
-
-```sh
-conda create -y -p my-env python=3.8 dill conda
-conda install -y -p my-env -c conda-forge conda-pack
-# conda install -y -p my-env pip and conda install other modules, etc.
-conda run -p my-env conda-pack
-```
 
 ## Running a TaskVine Application
 
@@ -701,10 +641,7 @@ By default, the factory submits as many tasks that are waiting and running up
 to a specified maximum. To run more than one task in a worker, please refer
 to the following section on describing [task resources](#task-resources) and [worker resources](#taskvine-factory-and-resources).
 
-
-#### Using the factory with python
-
-We can create a factory directly in python. Creating a factory object does not
+We can also create a factory directly in python. Creating a factory object does not
 immediately launch it, so this is a good time to configure the resources,
 number of workers, etc. Factory objects function as Python context managers, so
 to indicate that a set of commands should be run with a factory running, wrap
@@ -725,10 +662,11 @@ with workers:
 
 ## Advanced Data Handling
 
-### Caching Behaviour
+### Caching and Sharing
 
-(to do)
-never, workflow, always
+`never`
+`workflow`
+`always`
 
 ### MiniTasks
 
@@ -1038,7 +976,7 @@ password file to provide worker-manager authentication. These features can be
 enabled independet of each other.
 
 
-#### SSL support
+#### SSL Encryption
 
 taskvine can encrypt the communication between manager and workers using SSL.
 For this, you need to set the key and certificate (in PEM format) of your
@@ -1091,8 +1029,7 @@ vine_status --ssl HOST PORT
 condor_submit_workers -E'--ssl' HOST PORT
 ```
 
-
-#### Password Files
+#### Password Authentication
 
 We recommend that you enable a password for your applications. Create a file
 (e.g. ` mypwfile`) that contains any password (or other long phrase) that you
@@ -1331,7 +1268,73 @@ to make a progress bar or other user-visible information:
     printf("%d\n", stats->workers_connected);
     ```
 
-### Python Abstractions
+## Python Programming Models
+
+### Python Tasks
+
+A `PythonTask` is an extension of a standard task.
+It is not defined with a command line to execute,
+but with a Python function and its arguments, like this:
+
+=== "Python"
+    ```python
+    def my_sum(x, y):
+        return x+y
+
+    # task to execute x = my_sum(1, 2)
+    t = vine.PythonTask(my_sum, 1, 2)
+    ```
+
+A PythonTask is handled in the same way as a standard task,
+except that its output `t.output` is simply the Python return
+value of the function.  If the function should throw an exception,
+then the output will be the exception object.
+
+You can examine the result of a PythonTask like this:
+
+=== "Python"
+    ```
+    while not m.empty():
+        t = m.wait(5)
+        if t:
+            x = t.output
+            if isinstance(x,Exception):
+                print("Exception: {}".format(x))
+            else:
+                print("Result: {}".format(x))
+    ```
+
+A `PythonTask` is derived from `Task` and so all other methods for
+controlling scheduling, managing resources, and setting performance options
+all apply to `PythonTask` as well.
+
+When running a Python function remotely, it is assumed that the Python interpreter
+and libraries available at the worker correspond to the appropiate python environment for the task.
+If this is not the case, an environment file can be provided with t.set_environment:
+
+=== "Python"
+    ```python
+    t = vine.PythonTask(my_sum, 1, 2)
+    t.set_environment("my-env.tar.gz")
+    ```
+
+The file `my-env.tar.gz` is a
+[conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html)
+environment created with [conda-pack](https://conda.github.io/conda-pack/).  A
+minimal environment can be created a follows:
+
+```sh
+conda create -y -p my-env python=3.8 dill conda
+conda install -y -p my-env -c conda-forge conda-pack
+# conda install -y -p my-env pip and conda install other modules, etc.
+conda run -p my-env conda-pack
+```
+
+### Serverless Computing
+
+(to be completed)
+
+### Functional Abstractions
 
 #### Map
 
