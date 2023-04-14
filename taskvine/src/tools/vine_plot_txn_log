@@ -784,7 +784,9 @@ class TxnStats(TxnPlot):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='Plot TaskVine workflow information from a transaction log file.')
+    parser = argparse.ArgumentParser(prog="vine_example_blast.py",
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                     description='Plot TaskVine workflow information from a transaction log file.')
 
     parser.add_argument('log', help='Path to transaction log file')
     parser.add_argument('output', nargs='?', default=None, help='output name of the plot/csv generated. If not given, assumes --display')
