@@ -1,1 +1,0 @@
-../../../../taskvine/src/examples/vine_example_mosaic.c

@@ -1,17 +1,13 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2022- The University of Notre Dame
-# This software is distributed under the GNU General Public License.
-# See the file COPYING for details.
-
 # This example program produces a mosaic of images, each one transformed
 # with a different amount of swirl.
 
-# It demonstrates several features of taskvine:
-
+# It demonstrates several features of TaskVine:
+#
 # - Each task consumes remote data accessed via url, cached and shared
 # among all tasks on that machine.
-
+#
 # - Each task uses the "convert" program, which may or may not be installed
 # on remote machines.  To make the tasks portable, the program "/usr/bin/convert"
 # is packaged up into a self-contained archive "convert.sfx" which contains
@@ -19,12 +15,9 @@
 # use of arbitrary workers without regard to their software environment.
 
 import taskvine as vine
-
 import argparse
 import os
 import sys
-
-
 
 # construct a starch environment that ensures convert and montage are available
 # when the task executes at the worker.

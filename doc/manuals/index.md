@@ -10,19 +10,25 @@
 
 ## Software Components
 
+- [**TaskVine**](taskvine) is our third-generation workflow system
+for building data-intensive workflow applications.  TaskVine applications
+consist of many chained tasks that pull in external data into a cluster,
+where computed results can be cached and re-used by later tasks,
+even in successive workflows.
+
+- [**Work Queue**](work_queue) is a system and library for creating and
+  managing scalable manager-worker style programs that scale up to thousands of
+  machines on clusters, clouds, and grids. Work Queue programs are easy to
+Python ([example](work_queue/examples/work_queue_example.py)|[api](api/html/namespacework__queue.html))
+Perl   ([example](work_queue/examples/work_queue_example.pl)|[api](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html)),
+or C   ([example](work_queue/examples/work_queue_example.c)|[api](api/html/work__queue_8h.html))
+.
+
 - [**Makeflow**](makeflow) is a workflow system for parallel and distributed
   computing using either the classic Make syntax or the more advanced
   [JX Workflow Language](jx-workflow).   Using Makeflow, you can
   write simple scripts that easily execute on hundreds or thousands of
   machines. 
-
-- [**Work Queue**](work_queue) is a system and library for creating and
-  managing scalable manager-worker style programs that scale up to thousands of
-  machines on clusters, clouds, and grids. Work Queue programs are easy to
-Python ([example](work_queue/examples/work_queue_example.py)|[api](api/html/namespaceWorkQueuePython.html))
-Perl   ([example](work_queue/examples/work_queue_example.pl)|[api](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html)),
-or C   ([example](work_queue/examples/work_queue_example.c)|[api](api/html/work__queue_8h.html))
-.
 
 - [**Resource Monitor**](resource_monitor) is a tool to monitors the cpu,
   memory, io, and disk usage of applications running in distributed systems,
@@ -45,12 +51,6 @@ or C   ([example](work_queue/examples/work_queue_example.c)|[api](api/html/work_
   and historical data on all components of the CCTools.
 
 ## Research Prototypes
-
-- [**TaskVine**](taskvine) is our third-generation workflow system
-for building data-intensive workflow applications.  TaskVine applications
-consist of many chained tasks that pull in external data into a cluster,
-where computed results can be cached and re-used by later tasks,
-even in successive workflows.
 
 - [**Accelerated Weighted Ensemble**](awe) (AWE) is an ensemble
   molecular dynamics applications that uses Work Queue to scale

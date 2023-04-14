@@ -1,10 +1,4 @@
 /*
-Copyright (C) 2022- The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-*/
-
-/*
 This example shows some of the remote data handling features of taskvine.
 It performs an all-to-all comparison of twenty (relatively small) documents
 downloaded from the Gutenberg public archive.

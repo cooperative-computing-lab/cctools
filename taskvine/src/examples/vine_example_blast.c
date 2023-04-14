@@ -1,10 +1,4 @@
 /*
-Copyright (C) 2022- The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-*/
-
-/*
 This example shows some of the data handling features of taskvine.
 It performs a BLAST search of the "Landmark" model organism database.
 It works by constructing tasks that download the blast executable

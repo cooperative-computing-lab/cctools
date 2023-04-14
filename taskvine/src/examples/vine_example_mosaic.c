@@ -1,10 +1,4 @@
 /*
-Copyright (C) 2022- The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-*/
-
-/*
 This example program produces a mosaic of images, each one transformed
 with a different amount of swirl.
 

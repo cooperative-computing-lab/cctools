@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2022- The University of Notre Dame
-# This software is distributed under the GNU General Public License.
-# See the file COPYING for details.
+# Example program to show use of map() abstraction
+# which generates PythonTasks automatically.
 
 import taskvine as vine
 import sys
@@ -19,7 +18,6 @@ birth_years = [
         1990,1989,1993,1987,1988,
         1980,1975,1978,1983,1977,
 ]
-
 
 if __name__ == "__main__":
     m = vine.Manager()

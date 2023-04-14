@@ -1,11 +1,7 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2023- The University of Notre Dame
-# This software is distributed under the GNU General Public License.
-# See the file COPYING for details.
-
-# This example shows how to declare an chirp file so that it can be cached at
-# the workers.
+# This example shows how to declare an chirp file
+# so that it can be cached at the workers.
 # It assumes that chirp is installed where workers are executed. If this is
 # not the case, a starch recipe to construct this environment is also given.
 #
