@@ -75,7 +75,7 @@ def batch_gradient_descent(train_data, test_data, number_of_params, max_iteratio
     return [w_next.tolist(), calculate_error(w_next).item()]
 
 
-def main(number_of_params, max_iterations, min_error, learning_rate):
+def main(number_of_params, max_iterations, min_error, learning_rate, num_tasks):
     m = vine.Manager()
     print("listening on port", m.port)
 
@@ -87,8 +87,8 @@ def main(number_of_params, max_iterations, min_error, learning_rate):
 
     # specify resources used by Library Task
     t.set_cores(1)
-    t.set_memory(2000)
     t.set_disk(2000)
+    t.set_memory(2000)
 
     # install the Library Task on all workers that will connected to the manager
     m.install_library(t)
@@ -111,7 +111,7 @@ def main(number_of_params, max_iterations, min_error, learning_rate):
             train_data.append(list(data[i]))
 
     # Create FunctionCall Tasks to run the gradient descent operations
-    for i in range(20):
+    for i in range(num_tasks):
         # the name of the function to be called is batch_gradient_descent, and
         # the name of the Library that it lives in is gradient_descent_library
         # arguments are train_data, test_data, and iterations control
@@ -154,6 +154,7 @@ if __name__ == "__main__":
     parser.add_argument('--iterations', nargs='?', type=int, help='maximum number of iterations of weight updates to perform', default=100000000)
     parser.add_argument('--error', nargs='?', type=float, help='stop when the fit error is less than this value', default=1e-02)
     parser.add_argument('--rate', nargs='?', type=float, help='how much to update the weights each iteration', default=0.0005)
+    parser.add_argument('--tasks', nargs='?', type=int, help='number of tasks to run', default=20)
     args = parser.parse_args()
 
-    main(args.params, args.iterations, args.error, args.rate)
+    main(args.params, args.iterations, args.error, args.rate, args.tasks)
