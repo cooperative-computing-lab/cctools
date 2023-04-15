@@ -2144,6 +2144,22 @@ class Manager(object):
         return File(f)
 
     ##
+    # Create a file object representing an empty directory.
+    # This is very occasionally needed for applications that expect
+    # certain directories to exist in the working directory, prior to producing output.
+    # This function does not transfer any data to the task, but just creates
+    # a directory in its working sandbox.  If you want to transfer an entire
+    # directory worth of data to a task, use @ref Task.declare_file and give a
+    # directory name. output of a task, and may be consumed by other tasks.
+    #
+    # @param manager    The manager to register this file
+    # @return A file object to use in @ref Task.add_input or @ref Task.add_output
+    def declare_empty_dir(self):
+        f = vine_declare_empty_dir(self._taskvine)
+        return File(f)
+
+
+    ##
     # Declare a file obtained from a remote URL.
     #
     # @param self    The manager to register this file
