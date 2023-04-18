@@ -117,6 +117,8 @@ The following examples show more complex applications and various features of Ta
 - [Gutenberg Example](example-gutenberg.md)
 - [Mosaic Example](example-mosaic.md)
 - [Gradient Descent Example](example-gradient-descent.md)
+- [Watch Files Example](example-watch.md)
+- [Functional Example](example-functional.md)
 
 Read on to learn how to build applications from scratch and run large numbers of workers at scale.
 
