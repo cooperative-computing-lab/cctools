@@ -106,15 +106,19 @@ Task 2 completed with result     536    6314   36667
 All tasks done.
 ```
 
-Congratulations! You have now run a simple manager application that runs tasks on one local worker.  If you learn best from examples, then take a look and
-test out the following example applications:
+Congratulations! You have now run a simple manager application that runs tasks on one local worker.
+To scale up simply requires running more workers on a cluster or cloud facility.
+
+## Example Applications
+
+The following examples show more complex applications and various features of TaskVine: 
 
 - [BLAST Example](example-blast.md)
 - [Gutenberg Example](example-gutenberg.md)
 - [Mosaic Example](example-mosaic.md)
 - [Gradient Descent Example](example-gradient-descent.md)
 
-Or read on to learn how to build more complex applications and run large numbers of workers at scale.
+Read on to learn how to build applications from scratch and run large numbers of workers at scale.
 
 ## Writing a TaskVine Application
 
