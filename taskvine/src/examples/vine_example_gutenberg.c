@@ -46,6 +46,14 @@ const char *urls[URL_COUNT] =
 "https://www.gutenberg.org/files/1986/1986.txt",
 };
 
+const char *compare_script =
+"#!/bin/sh\n\
+# Perform a simple comparison of the words counts of each document\n\
+# which are given as the first ($1) and second ($2) command lines.\n\
+cat $1 | tr \" \" \"\\n\" | sort | uniq -c | sort -rn | head -10l > a.tmp\n\
+cat $2 | tr \" \" \"\\n\" | sort | uniq -c | sort -rn | head -10l > b.tmp\n\
+diff a.tmp b.tmp\nexit 0\n";
+
 int main(int argc, char *argv[])
 {
 	struct vine_manager *m;
@@ -63,7 +71,7 @@ int main(int argc, char *argv[])
 	printf("listening on port %d...\n", vine_port(m));
 
 	printf("setting up input files...\n");
-	struct vine_file *script = vine_declare_file(m, "vine_example_gutenberg_script.sh", VINE_CACHE);
+	struct vine_file *script = vine_declare_buffer(m, compare_script, strlen(compare_script), VINE_CACHE);
 	struct vine_file *files[URL_COUNT];
 
 	for(i=0;i<URL_COUNT;i++) {

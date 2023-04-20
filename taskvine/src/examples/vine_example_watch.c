@@ -9,7 +9,7 @@ and return it to the manager while each task runs.  When the
 task completes, any remaining output is fetched.
 
 This example runs several instances of the task named
-vine_example_watch_trickle.sh, which gradually produces output
+trickle.sh which gradually produces output
 every few seconds.  While running the manager program, open
 up another terminal, and observe that files output.0, output.1,
 etc are gradually produced throughout the run.
@@ -22,6 +22,8 @@ etc are gradually produced throughout the run.
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+
+const char *script = "#!/bin/sh\nhostname\nfor n in $(seq 1 30)\ndo\nsleep 1\ndate\ndone\necho \"done!\"\n";
 
 int main(int argc, char *argv[])
 {
@@ -38,7 +40,7 @@ int main(int argc, char *argv[])
 	}
 	printf("Listening on port %d...\n", vine_port(m));
 
-	struct vine_file *executable = vine_declare_file(m, "vine_example_watch_trickle.sh", VINE_CACHE);
+	struct vine_file *scriptfile = vine_declare_buffer(m,script,strlen(script), VINE_CACHE);
 
 	int i;
 	for(i=0;i<10;i++) {
@@ -46,8 +48,8 @@ int main(int argc, char *argv[])
 		sprintf(output_name,"output.%d",i);
 		struct vine_file *output_file = vine_declare_file(m, output_name, VINE_CACHE);
 
-		t = vine_task_create("./vine_example_watch_trickle.sh > output");
-		vine_task_add_input(t, executable, "vine_example_watch_trickle.sh", 0);
+		t = vine_task_create("./trickle.sh > output");
+		vine_task_add_input(t, scriptfile, "trickle.sh", 0);
 		vine_task_add_output(t, output_file, "output", VINE_WATCH );
 		vine_task_set_cores(t,1);
 		vine_submit(m, t);
