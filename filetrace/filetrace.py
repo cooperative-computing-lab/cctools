@@ -105,11 +105,12 @@ def create_dict(name):
     """creates path_dict which the key is the file path and the value is its properties:"""
     path_dict = {}
     subprocess_dict = {}
-    call_counter = 0
+    call_counter = -1
     print()
 
     with open(name + ".filetrace-1.txt") as file:
         for line in file:
+            call_counter += 1
             if "openat(" in line or "stat" in line:
                 try:  # Try get file path
                     path = PATH1_RE.search(line).group(0).strip("<>")
@@ -147,8 +148,9 @@ def create_dict(name):
                 find_pid(line, subprocess_dict)
             if "execve" in line:  # finds command associated with process
                 find_command(line, subprocess_dict)
-            call_counter += 1
-            print(f"filetrace: syscalls processed: {call_counter}", end="\r")
+            
+            if call_counter < 1000 or call_counter % 1000 == 0:
+                print(f"filetrace: syscalls processed: {call_counter}", end="\r")
 
     return path_dict, subprocess_dict
 
