@@ -231,7 +231,7 @@ def print_summary_2(path_dict, name, master):
         size = file.size
         path = file.path
 
-        f.write(f"{action:>4}{convert_bytes(size):>8}{freq:4}  {path}\n")
+        f.write(f"{action:>4}{convert_bytes(size):>8} {freq:<5}  {path}\n")
 
     f.close()
 
@@ -365,7 +365,10 @@ def find_common_path(path_list, dirLvl):
 
 
 def convert_bytes(num):
-    if num > 1000000:
+    if num > 1000000000:
+        num = num / 1000000000
+        num = str(round(num, 2)) + "G"
+    elif num > 1000000:
         num = num / 1000000
         num = str(round(num, 2)) + "M"
     elif num > 1000:
