@@ -729,7 +729,6 @@ class Task(object):
 
 try:
     import cloudpickle
-
     pythontask_available = True
 except Exception:
     # Note that the intended exception here is ModuleNotFoundError.
