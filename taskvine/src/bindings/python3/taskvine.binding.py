@@ -728,7 +728,7 @@ class Task(object):
 #
 
 try:
-    import dill
+    import cloudpickle
 
     pythontask_available = True
 except Exception:
@@ -753,7 +753,7 @@ class PythonTask(Task):
     # @param kwargs	keyword arguments used in function to be executed by task
     def __init__(self, func, *args, **kwargs):
         if not pythontask_available:
-            raise RuntimeError("PythonTask is not available. The dill module is missing.")
+            raise RuntimeError("PythonTask is not available. The cloudpickle module is missing.")
 
         self._pp_run = None
         self._output_loaded = False
@@ -797,7 +797,7 @@ class PythonTask(Task):
             if self.successful():
                 try:
                     with open(os.path.join(self._tmpdir, "out_{}.p".format(self._id)), "rb") as f:
-                        self._output = dill.load(f)
+                        self._output = cloudpickle.load(f)
                 except Exception as e:
                     self._output = e
             else:
@@ -816,9 +816,9 @@ class PythonTask(Task):
 
     def _serialize_python_function(self, func, args, kwargs):
         with open(os.path.join(self._tmpdir, self._func_file), "wb") as wf:
-            dill.dump(func, wf, recurse=True)
+            cloudpickle.dump(func, wf)
         with open(os.path.join(self._tmpdir, self._args_file), "wb") as wf:
-            dill.dump([args, kwargs], wf, recurse=True)
+            cloudpickle.dump([args, kwargs], wf)
 
     def _python_function_command(self, remote_env_dir=None):
         if remote_env_dir:
@@ -847,16 +847,16 @@ class PythonTask(Task):
                     """\
                 try:
                     import sys
-                    import dill
+                    import cloudpickle
                 except ImportError:
                     print("Could not execute PythonTask function because a needed module for taskvine was not available.")
                     raise
 
                 (fn, args, out) = sys.argv[1], sys.argv[2], sys.argv[3]
                 with open (fn , 'rb') as f:
-                    exec_function = dill.load(f)
+                    exec_function = cloudpickle.load(f)
                 with open(args, 'rb') as f:
-                    args, kwargs = dill.load(f)
+                    args, kwargs = cloudpickle.load(f)
                 try:
                     exec_out = exec_function(*args, **kwargs)
 
@@ -864,7 +864,7 @@ class PythonTask(Task):
                     exec_out = e
 
                 with open(out, 'wb') as f:
-                    dill.dump(exec_out, f)
+                    cloudpickle.dump(exec_out, f)
 
                 print(exec_out)"""
                 )

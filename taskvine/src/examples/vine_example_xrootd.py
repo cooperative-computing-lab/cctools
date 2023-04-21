@@ -37,7 +37,7 @@ def create_env(env_name):
     env = {
             "conda": {
                 "channels": ["conda-forge"],
-                "dependencies": [f"python={py_version}", "dill", "uproot", "xrootd"]
+                "dependencies": [f"python={py_version}", "cloudpickle", "uproot", "xrootd"]
                 }
             }
 

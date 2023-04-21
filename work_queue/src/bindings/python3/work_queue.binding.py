@@ -920,7 +920,7 @@ class Task(object):
 #
 # this class is used to create a python task
 try:
-    import dill
+    import cloudpickle
 
     pythontask_available = True
 except Exception:
@@ -942,7 +942,7 @@ class PythonTask(Task):
         self._tmpdir = tempfile.mkdtemp(dir=staging_directory)
 
         if not pythontask_available:
-            raise RuntimeError("PythonTask is not available. The dill module is missing.")
+            raise RuntimeError("PythonTask is not available. The cloudpickle module is missing.")
 
         self._func_file = os.path.join(self._tmpdir, "function_{}.p".format(self._id))
         self._args_file = os.path.join(self._tmpdir, "args_{}.p".format(self._id))
@@ -973,7 +973,7 @@ class PythonTask(Task):
             if self.result == WORK_QUEUE_RESULT_SUCCESS:
                 try:
                     with open(os.path.join(self._tmpdir, "out_{}.p".format(self._id)), "rb") as f:
-                        self._output = dill.load(f)
+                        self._output = cloudpickle.load(f)
                 except Exception as e:
                     self._output = e
             else:
@@ -1009,9 +1009,9 @@ class PythonTask(Task):
 
     def _serialize_python_function(self, func, args, kwargs):
         with open(self._func_file, "wb") as wf:
-            dill.dump(func, wf, recurse=True)
+            cloudpickle.dump(func, wf)
         with open(self._args_file, "wb") as wf:
-            dill.dump([args, kwargs], wf, recurse=True)
+            cloudpickle.dump([args, kwargs], wf)
 
     def _python_function_command(self):
         if self._env_file:
@@ -1052,16 +1052,16 @@ class PythonTask(Task):
                     """\
                 try:
                     import sys
-                    import dill
+                    import cloudpickle
                 except ImportError:
                     print("Could not execute PythonTask function because a needed module for Work Queue was not available.")
                     raise
 
                 (fn, args, out) = sys.argv[1], sys.argv[2], sys.argv[3]
                 with open (fn , 'rb') as f:
-                    exec_function = dill.load(f)
+                    exec_function = cloudpickle.load(f)
                 with open(args, 'rb') as f:
-                    args, kwargs = dill.load(f)
+                    args, kwargs = cloudpickle.load(f)
                 try:
                     exec_out = exec_function(*args, **kwargs)
 
@@ -1069,7 +1069,7 @@ class PythonTask(Task):
                     exec_out = e
 
                 with open(out, 'wb') as f:
-                    dill.dump(exec_out, f)
+                    cloudpickle.dump(exec_out, f)
 
                 print(exec_out)"""
                 )

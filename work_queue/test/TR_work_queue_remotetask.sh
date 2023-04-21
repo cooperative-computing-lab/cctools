@@ -15,7 +15,7 @@ PORT_FILE=wq.port
 check_needed()
 {
 	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
-	"${CCTOOLS_PYTHON_TEST_EXEC}" -c "import dill" || return 1
+	"${CCTOOLS_PYTHON_TEST_EXEC}" -c "import cloudpickle" || return 1
 
 	return 0
 }
