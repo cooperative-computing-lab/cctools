@@ -25,11 +25,11 @@
 # appropiate  python environment. If this is not the case, an environment file
 # can be specified with: `t.specify_environment("env.tar.gz")`, in which
 # env.tar.gz is created with the conda-pack module, and has at least a python
-# installation, the dill module, and the conda module.
+# installation, the cloudpickle module, and the conda module.
 #
 # A minimal conda environment 'my-minimal-env.tar.gz' can be created with:
 #
-# conda create -y -p my-minimal-env python=3.8 dill conda
+# conda create -y -p my-minimal-env python=3.8 cloudpickle conda
 # conda install -y -p my-minimal-env -c conda-forge conda-pack
 # conda install -y -p my-minimal-env pip and conda install other modules, etc.
 # conda run -p my-minimal-env conda-pack

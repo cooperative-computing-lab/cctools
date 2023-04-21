@@ -1382,7 +1382,7 @@ environment created with [conda-pack](https://conda.github.io/conda-pack/).  A
 minimal environment can be created a follows:
 
 ```sh
-conda create -y -p my-env python=3.8 dill conda
+conda create -y -p my-env python=3.8 cloudpickle conda
 conda install -y -p my-env -c conda-forge conda-pack
 # conda install -y -p my-env pip and conda install other modules, etc.
 conda run -p my-env conda-pack
