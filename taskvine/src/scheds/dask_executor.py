@@ -258,7 +258,7 @@ class DaskVine(vine.Manager):
                     rs = d.set_result(t.key, t.output)
                     self.submit_calls(rs, **kwargs)
                 else:
-                    raise Exception(f"task for key {t.key} failed: {t.result_string}")
+                    raise Exception(f"task for key {t.key} failed: {t.result}. exit code {t.exit_code}")
 
         results = list(keys)
         for k, ids in indices.items():
