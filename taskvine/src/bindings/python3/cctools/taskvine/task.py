@@ -3,7 +3,7 @@
 # See the file COPYING for details.
 #
 
-import taskvine.cvine as cvine
+import cctools.taskvine.cvine as cvine
 from .file import File
 
 import copy

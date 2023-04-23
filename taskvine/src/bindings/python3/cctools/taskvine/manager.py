@@ -2,7 +2,7 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-import taskvine.cvine as cvine
+import cctools.taskvine.cvine as cvine
 from .display import JupyterDisplay
 from .file import File
 from .task import (
