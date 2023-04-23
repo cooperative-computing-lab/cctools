@@ -7,7 +7,7 @@
 # A small shell script (given inline below) is used to perform
 # a simple text comparison of each pair of files.
 
-import cctools.taskvine as vine
+import ndcctools.taskvine as vine
 import sys
 
 urls_sources = [

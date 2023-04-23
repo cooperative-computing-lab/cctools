@@ -13,7 +13,7 @@ import shutil
 import stat
 import time
 
-import cctools.taskvine as vine
+import ndcctools.taskvine as vine
 
 test_dir = tempfile.mkdtemp(prefix="vine.test", dir=".")
 input_name = "input.file"

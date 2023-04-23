@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import cctools.taskvine as vine
+import ndcctools.taskvine as vine
 import sys
 
 def find_max(nums):

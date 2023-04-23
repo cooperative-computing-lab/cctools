@@ -16,7 +16,7 @@
 # gradient descent for a randomized model.  The manager runs many of these
 # tasks, and returns the set of weights that had the lowest overall error.
 
-import cctools.taskvine as vine
+import ndcctools.taskvine as vine
 import json
 import numpy as np
 import random

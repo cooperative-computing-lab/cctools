@@ -1,8 +1,8 @@
-# Copyright (C) 2022- The University of Notre Dame
+# Copyright (C) 2023- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-import cctools.taskvine.cvine as cvine
+from . import cvine
 
 
 def get_c_constant(constant):

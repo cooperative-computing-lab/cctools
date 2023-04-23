@@ -6,8 +6,8 @@
 
 # This example shows TaskVine executing a dask workflow
 
-import cctools.taskvine as vine
-from cctools.taskvine.scheds.dask_executor import DaskVine
+import ndcctools.taskvine as vine
+from ndcctools.taskvine.scheds.dask_executor import DaskVine
 import argparse
 import getpass
 import sys

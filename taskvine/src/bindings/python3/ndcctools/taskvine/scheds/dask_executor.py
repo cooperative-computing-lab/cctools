@@ -1,9 +1,5 @@
-import cctools.taskvine as vine
-
-import sys
-from cctools.taskvine.scheds.dag import Dag, DagNoResult
-
-from operator import add
+import ndcctools.taskvine as vine
+from ndcctools.taskvine.scheds.dag import Dag
 
 
 class DaskVine(vine.Manager):

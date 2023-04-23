@@ -4,7 +4,7 @@
 # to show how a task can be executed
 # where particular files have been cached.
 
-import cctools.taskvine as vine
+import ndcctools.taskvine as vine
 
 import argparse
 import os

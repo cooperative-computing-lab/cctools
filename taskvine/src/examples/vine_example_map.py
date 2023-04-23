@@ -3,7 +3,7 @@
 # Example program to show use of map() abstraction
 # which generates PythonTasks automatically.
 
-import cctools.taskvine as vine
+import ndcctools.taskvine as vine
 import sys
 
 def calc_age(birth_year):
