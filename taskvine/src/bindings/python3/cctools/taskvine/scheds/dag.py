@@ -32,7 +32,7 @@ class Dag:
           to be executed.
         - Dag.set_result(key, value): Sets the result of key to value.
         - Dag.get_result(key): Get result associated with key. Raises DagNoResult
-          if key does not have a result yet."""
+        - Dag.has_result(key): Whether the key has a computed result. """
 
     @staticmethod
     def symbolp(s):
