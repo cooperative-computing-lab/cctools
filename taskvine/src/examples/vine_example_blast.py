@@ -14,7 +14,7 @@
 # Both the downloads are automatically unpacked, cached, and shared
 # with all the same tasks on the worker.
 
-import taskvine as vine
+import cctools.taskvine as vine
 import random
 import argparse
 import getpass

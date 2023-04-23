@@ -3,7 +3,7 @@
 # taskvine python binding tests
 # tests for missing/recursive inputs/outputs.
 
-import taskvine as vine
+import cctools.taskvine as vine
 
 import sys
 import math

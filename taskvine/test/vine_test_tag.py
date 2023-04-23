@@ -4,7 +4,7 @@
 # tests for missing/recursive inputs/outputs.
 
 import sys
-import taskvine as vine
+import cctools.taskvine as vine
 
 port_file = None
 try:

@@ -16,7 +16,7 @@
 # up another terminal, and observe that files output.0, output.1,
 # etc are gradually produced throughout the run.
 
-import taskvine as vine
+import cctools.taskvine as vine
 import sys
 
 script = """

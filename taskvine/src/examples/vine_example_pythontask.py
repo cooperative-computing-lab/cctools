@@ -37,7 +37,7 @@
 # poncho_package_create spec.json env.tar.gz
 
 
-import taskvine as vine
+import cctools.taskvine as vine
 
 def divide(dividend, divisor):
     import math

@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import taskvine as vine
+import cctools.taskvine as vine
 import sys
 import time
 

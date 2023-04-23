@@ -139,7 +139,7 @@ You may specific a specific port number to listen on like this:
 === "Python"
     ```python
     # Import the taskvine module
-    import taskvine as vine
+    import cctools.taskvine as vine
 
     # Create a new manager listening on port 9123
     m = vine.Manager(9123)
@@ -379,7 +379,7 @@ If no task completes within the timeout, it returns null.
             if t.completed():
                 print(f"task complete with error exit code: {t.exit_code}")
             else:
-                print(f"There was a problem executing the task: {t.result_string}")
+                print(f"There was a problem executing the task: {t.result}")
     ```
 
 === "C"
@@ -964,14 +964,14 @@ You can see the complete example [here](examples/vine_example_apptainer_env.py)
 ### Watching Output Files
 
 If you would like to see the output of a task as it is produced, add
-`VINE_WATCH` to the flags argument of `add_file`. This will
+the watch flag as an argument of `add_file`. This will
 cause the worker to periodically send output appended to that file back to the
 manager. This is useful for a program that produces a log or progress bar as
 part of its output.
 
 === "Python"
     ```python
-    t.add_output_file("my-file", flags = vine.VINE_WATCH)
+    t.add_output_file("my-file", watch=True)
     ```
 
 === "C"
@@ -1053,7 +1053,7 @@ creating the queue:
 === "Python"
     ```python
     # Import the taskvine module
-    import taskvine as vine
+    import cctools.taskvine as vine
     m = vine.Manager(port=9123, ssl=('MY_KEY.pem', 'MY_CERT.pem'))
 
     # Alternatively, you can set ssl=True and let the python API generate
@@ -1143,7 +1143,8 @@ limit on the number of retries:
     ```
 
 When a task cannot be completed in the set number of tries,
-then the task result is set to  `VINE_RESULT_MAX_RETRIES`.
+then the task result is set to `"max retries"` in python and
+`VINE_RESULT_MAX_RETRIES` in C.
 
 ### Pipelined Submission
 
@@ -1945,10 +1946,10 @@ Automatic resource management is enabled per category as follows:
     ```python
     m.enable_monitoring()
     m.set_category_resources_max('my-category-a', {})
-    m.set_category_mode('my-category-a', m.VINE_ALLOCATION_MODE_MAX_THROUGHPUT)
+    m.set_category_mode('my-category-a', "max throughput")
 
     m.set_category_resources_max('my-category-b', {'cores': 2})
-    m.set_category_mode('my-category-b', m.VINE_ALLOCATION_MODE_MAX_THROUGHPUT)
+    m.set_category_mode('my-category-b', "max throughput")
     ```
 
 === "C"
@@ -2181,7 +2182,7 @@ The statistics available are:
 | tasks_submitted            | Total number of tasks submitted to the queue |
 | tasks_dispatched           | Total number of tasks dispatch to workers |
 | tasks_done                 | Total number of tasks completed and returned to user (includes tasks_failed) |
-| tasks_failed               | Total number of tasks completed and returned to user with result other than WQ_RESULT_SUCCESS |
+| tasks_failed               | Total number of tasks completed and returned to user with result other than VINE_RESULT_SUCCESS |
 | tasks_cancelled            | Total number of tasks cancelled |
 | tasks_exhausted_attempts   | Total number of task executions that failed given resource exhaustion |
 |||
@@ -2189,8 +2190,8 @@ The statistics available are:
 | time_when_started  | Absolute time at which the manager started |
 | time_send          | Total time spent in sending tasks to workers (tasks descriptions, and input files) |
 | time_receive       | Total time spent in receiving results from workers (output files) |
-| time_send_good     | Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS |
-| time_receive_good  | Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS |
+| time_send_good     | Total time spent in sending data to workers for tasks with result VINE_RESULT_SUCCESS |
+| time_receive_good  | Total time spent in sending data to workers for tasks with result VINE_RESULT_SUCCESS |
 | time_status_msgs   | Total time spent sending and receiving status messages to and from workers, including workers' standard output, new workers connections, resources updates, etc. |
 | time_internal      | Total time the queue spents in internal processing |
 | time_polling       | Total time blocking waiting for worker communications (i.e., manager idle waiting for a worker message) |
@@ -2198,7 +2199,7 @@ The statistics available are:
 |||
 |       | **Wrokers time statistics (in microseconds)** |
 | time_workers_execute             | Total time workers spent executing done tasks |
-| time_workers_execute_good        | Total time workers spent executing done tasks with result WQ_RESULT_SUCCESS |
+| time_workers_execute_good        | Total time workers spent executing done tasks with result VINE_RESULT_SUCCESS |
 | time_workers_execute_exhaustion  | Total time workers spent executing tasks that exhausted resources |
 |||
 |       | **Transfer statistics** |

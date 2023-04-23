@@ -21,7 +21,7 @@ import uuid
 #
 # TaskVine Task object
 #
-# This class is used to create a task specification to be submitted to a @ref taskvine::Manager.
+# This class is used to create a task specification to be submitted to a @ref cctools::taskvine::Manager.
 class Task(object):
     ##
     # Create a new task specification.
@@ -211,7 +211,7 @@ class Task(object):
     # Add any input object to a task.
     #
     # @param self          Reference to the current task object.
-    # @param file          A file object of class @ref File, such as from @ref declare_file, @ref declare_buffer, @ref declare_url, etc.
+    # @param file          A file object of class @ref cctools::taskvine::File, such as from @ref declare_file, @ref declare_buffer, @ref declare_url, etc.
     # @param remote_name   The name of the file at the execution site.
     # @param strict_input  Whether the file should be transfered to the worker
     #                      for execution. If no worker has all the input files already cached marked
@@ -236,7 +236,7 @@ class Task(object):
     # Add any output object to a task.
     #
     # @param self          Reference to the current task object.
-    # @param file          A file object of class @ref File, such as from @ref declare_file, or @ref declare_buffer
+    # @param file          A file object of class @ref cctools::taskvine::File, such as from @ref declare_file, or @ref declare_buffer
     # @param remote_name   The name of the file at the execution site.
     # @param watch         Watch the output file and send back changes as the task runs.
     # @param cache         Whether the file should be cached at workers (True/False)
