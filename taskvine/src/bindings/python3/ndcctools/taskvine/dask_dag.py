@@ -6,7 +6,7 @@ from uuid import uuid4
 from collections import defaultdict
 
 
-class Dag:
+class DaskVineDag:
     """A directed graph that encodes the steps and state a computation needs.
     Single computations are encoded as s-expressions, therefore it is 'upside-down',
     in the sense that the children of a node are the nodes required to compute it.
@@ -25,14 +25,14 @@ class Dag:
     sexprs, like 'v' above, then a key is automatically computed recursively
     for each computation.
 
-    Computation is done lazily. The Dag is initialized from a task graph, but not
-    computation is decoded. To use the Dag:
-        - Dag.set_targets(keys): Request the computation associated with key to be decoded.
-        - Dag.get_ready(): A list of [key, (fn, *args)] of functions that are ready
+    Computation is done lazily. The DaskVineDag is initialized from a task graph, but not
+    computation is decoded. To use the DaskVineDag:
+        - DaskVineDag.set_targets(keys): Request the computation associated with key to be decoded.
+        - DaskVineDag.get_ready(): A list of [key, (fn, *args)] of functions that are ready
           to be executed.
-        - Dag.set_result(key, value): Sets the result of key to value.
-        - Dag.get_result(key): Get result associated with key. Raises DagNoResult
-        - Dag.has_result(key): Whether the key has a computed result. """
+        - DaskVineDag.set_result(key, value): Sets the result of key to value.
+        - DaskVineDag.get_result(key): Get result associated with key. Raises DagNoResult
+        - DaskVineDag.has_result(key): Whether the key has a computed result. """
 
     @staticmethod
     def symbolp(s):
@@ -55,7 +55,7 @@ class Dag:
         if isinstance(item, list):
             indices.append(0)
             for s in item:
-                keys.update(Dag.find_dask_keys(s, indices))
+                keys.update(DaskVineDag.find_dask_keys(s, indices))
         else:
             last = indices[-1]
             keys[item] = list(indices)
@@ -98,7 +98,7 @@ class Dag:
         self._computing = set()
 
     def graph_keyp(self, s):
-        return Dag.symbolp(s) and s in self._dsk
+        return DaskVineDag.symbolp(s) and s in self._dsk
 
     def flatten(self, key):
         """ Recursively decomposes a sexpr associated with key, so that its arguments, if any
@@ -117,18 +117,18 @@ class Dag:
             # this key has already been considered
             return
 
-        if Dag.symbolp(sexpr):
+        if DaskVineDag.symbolp(sexpr):
             self._flat[key] = sexpr
             self._result_of[key] = sexpr
         else:
             self._missing_of[key] = set()
             nargs = []
-            if Dag.fun_callp(sexpr):
+            if DaskVineDag.fun_callp(sexpr):
                 # if this is a function call, keep the function as is
                 nargs.append(sexpr[0])
                 sexpr = sexpr[1:]
             for a in sexpr:
-                if Dag.symbolp(a) and not self.graph_keyp(a):
+                if DaskVineDag.symbolp(a) and not self.graph_keyp(a):
                     nkey = a
                 else:
                     if self.graph_keyp(a):
@@ -146,12 +146,12 @@ class Dag:
         return key in self._result_of
 
     def get_result(self, key):
-        """ Sets new result and propagates in the Dag. Returns a list of [key, (fn, *args)]
+        """ Sets new result and propagates in the DaskVineDag. Returns a list of [key, (fn, *args)]
         of computations that become ready to be executed """
         try:
             return self._result_of[key]
         except KeyError:
-            raise DagNoResult(key)
+            raise DaskVineNoResult(key)
 
     def fill_seq(self, sexpr):
         lst = []
@@ -167,7 +167,7 @@ class Dag:
         return lst
 
     def set_result(self, key, value):
-        """ Sets new result and propagates in the Dag. Returns a list of [key, (fn, *args)]
+        """ Sets new result and propagates in the DaskVineDag. Returns a list of [key, (fn, *args)]
         of computations that become ready to be executed """
         new_ready = []
         self._result_of[key] = value
@@ -176,7 +176,7 @@ class Dag:
             if self._missing_of[p] or self.has_result(p):
                 continue
             sexpr = self._flat[p]
-            if Dag.fun_callp(sexpr):
+            if DaskVineDag.fun_callp(sexpr):
                 new_ready.append([p, self.fill_call(sexpr)])
             else:
                 new_ready.extend(self.set_result(p, self.fill_seq(sexpr)))
@@ -185,7 +185,7 @@ class Dag:
     def get_ready(self):
         """ List of [key, (fn, *args)] ready for computation.
         This is a potentially expensive call and should be used only for
-        bootstrapping. Further calls should use Dag.set_result to discover
+        bootstrapping. Further calls should use DaskVineDag.set_result to discover
         the new computations that become ready to be executed. """
         rs = []
         for (p, cs) in self._missing_of.items():
@@ -194,7 +194,7 @@ class Dag:
             if cs:
                 continue
             sexpr = self._flat[p]
-            if Dag.fun_callp(sexpr):
+            if DaskVineDag.fun_callp(sexpr):
                 rs.append([p, self.fill_call(sexpr)])
             else:
                 rs.extend(self.set_result(p, self.fill_seq(sexpr)))
@@ -212,6 +212,6 @@ class Dag:
         return self.get_ready()
 
 
-class DagNoResult(Exception):
+class DaskVineNoResult(Exception):
     """Exception raised when asking for a result from a computation that has not been performed."""
     pass

@@ -1,8 +1,13 @@
+##
+# @package ndcctools.taskvine.task
+#
+# This module provides the classes to construct tasks to submit for execution to a
+# TaskVine manager.
+#
+
 # Copyright (C) 2022- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
-#
-
 from . import cvine
 from .file import File
 
@@ -17,11 +22,11 @@ import uuid
 
 
 ##
-# \class Task
+# @class ndcctools.taskvine.task.Task
 #
 # TaskVine Task object
 #
-# This class is used to create a task specification to be submitted to a @ref cctools::taskvine::Manager.
+# This class is used to create a task specification to be submitted to a @ref ndcctools.taskvine.manager.Manager.
 class Task(object):
     ##
     # Create a new task specification.
@@ -148,7 +153,7 @@ class Task(object):
     # Return a copy of this task
     #
     def clone(self):
-        """Return a (deep)copy this task that can also be submitted to the taskvine."""
+        """Return a (deep)copy this task that can also be submitted to the ndcctools.taskvine."""
         new = copy.copy(self)
         new._task = cvine.vine_task_clone(self._task)
         return new
@@ -211,7 +216,7 @@ class Task(object):
     # Add any input object to a task.
     #
     # @param self          Reference to the current task object.
-    # @param file          A file object of class @ref cctools::taskvine::File, such as from @ref declare_file, @ref declare_buffer, @ref declare_url, etc.
+    # @param file          A file object of class @ref ndcctools.taskvine.manager.File, such as from @ref ndcctools.taskvine.manager.Manager.declare_file, @ref ndcctools.taskvine.manager.Manager.declare_buffer, @ref ndcctools.taskvine.manager.Manager.declare_url, etc.
     # @param remote_name   The name of the file at the execution site.
     # @param strict_input  Whether the file should be transfered to the worker
     #                      for execution. If no worker has all the input files already cached marked
@@ -236,10 +241,9 @@ class Task(object):
     # Add any output object to a task.
     #
     # @param self          Reference to the current task object.
-    # @param file          A file object of class @ref cctools::taskvine::File, such as from @ref declare_file, or @ref declare_buffer
+    # @param file          A file object of class @ref ndcctools.taskvine.manager.File, such as from @ref ndcctools.taskvine.manager.Manager.declare_file, or @ref ndcctools.taskvine.manager.Manager.declare_buffer @ref ndcctools.taskvine.task.Task.add_input
     # @param remote_name   The name of the file at the execution site.
     # @param watch         Watch the output file and send back changes as the task runs.
-    # @param cache         Whether the file should be cached at workers (True/False)
     # @param success_only  Whether the file should be retrieved only when the task succeeds. Default is False.
     # @param failure_only  Whether the file should be retrieved only when the task fails (e.g., debug logs). Default is False.
     #
@@ -324,7 +328,7 @@ class Task(object):
     # the task command (e.g. a poncho or a starch file, or any other vine mini_task
     # that creates such a wrapper). If specified multiple times,
     # environments are nested in the order given (i.e. first added is the first applied).
-    # @param t A task object.
+    # @param self Reference to the current task object.
     # @param f The environment file.
     def add_environment(self, f):
         return cvine.vine_task_add_environment(self._task, f._file)
@@ -497,8 +501,8 @@ class Task(object):
     ##
     # Return True if task executed and its command terminated normally.
     # If True, the exit code of the command can be retrieved with @ref
-    # exit_code. If False, the error condition can be retrieved with @ref
-    # result.  It must be called only after the task completes execution.
+    # ndcctools.taskvine.task.Task.exit_code. If False, the error condition can be retrieved with @ref
+    # ndcctools.taskvine.task.Task.result.  It must be called only after the task completes execution.
     # @code
     # >>> # completed tasks with a failed command execution:
     # >>> print(t.completed())
@@ -517,7 +521,7 @@ class Task(object):
     ##
     # Return True if task executed successfully, (i.e. its command terminated
     # normally with exit code 0 and produced all its declared output files).
-    # Differs from @ref completed in that the exit code of the command should
+    # Differs from @ref ndcctools.taskvine.task.Task.completed in that the exit code of the command should
     # be zero.
     # It must be called only after the task completes execution.
     # @code
@@ -630,7 +634,7 @@ class Task(object):
         return self._task.resources_measured
 
     ##
-    # Get the resources the task exceeded. For valid field see @ref resources_measured.
+    # Get the resources the task exceeded. For valid field see @ref ndcctools.taskvine.task.Task.resources_measured.
     #
     @property
     def limits_exceeded(self):
@@ -644,7 +648,7 @@ class Task(object):
 
     ##
     # Get the resources the task requested to run. For valid fields see
-    # @ref resources_measured.
+    # @ref ndcctools.taskvine.task.Task.resources_measured.
     #
     @property
     def resources_requested(self):
@@ -654,7 +658,7 @@ class Task(object):
 
     ##
     # Get the resources allocated to the task in its latest attempt. For valid
-    # fields see @ref resources_measured.
+    # fields @ref ndcctools.taskvine.task.Task.resources_measured.
     #
     @property
     def resources_allocated(self):
@@ -664,7 +668,7 @@ class Task(object):
 
 
 ##
-# \class PythonTask
+# @class ndcctools.taskvine.PythonTask
 #
 # TaskVine PythonTask object
 #
@@ -813,7 +817,7 @@ class PythonTaskNoResult(Exception):
 
 
 ##
-# \class FunctionCall
+# @class ndcctools.taskvine.task.FunctionCall
 #
 # TaskVine FunctionCall object
 #
@@ -825,7 +829,6 @@ class FunctionCall(Task):
     # @param self       Reference to the current FunctionCall object.
     # @param fn         The name of the function to be executed on the coprocess
     # @param coprocess  The name of the coprocess which has the function you wish to execute. The coprocess should have a name() method that returns this
-    # @param command    The shell command line to be exected by the task.
     # @param args       positional arguments used in function to be executed by task. Can be mixed with kwargs
     # @param kwargs	    keyword arguments used in function to be executed by task.
     def __init__(self, fn, coprocess, *args, **kwargs):

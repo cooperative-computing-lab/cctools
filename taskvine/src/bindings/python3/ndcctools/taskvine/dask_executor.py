@@ -1,5 +1,42 @@
+##
+# @package ndcctools.taskvine.dask_executor
+#
+# This module provides a specialized manager @ref ndcctools.taskvine.dask_executor.DaskVine to execute
+# dask workflows.
+
+# Copyright (C) 2023- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+
 import ndcctools.taskvine as vine
-from ndcctools.taskvine.scheds.dag import Dag
+from .dask_dag import DaskVineDag
+
+
+##
+# @class ndcctools.taskvine.dask_executor.DaskVine
+#
+# TaskVine Manager specialized to compute dask graphs.
+#
+# Managers created via DaskVine can be used to execute dask graphs via the method
+# @ref ndcctools.taskvine.dask_executor.DaskVine.dask_execute as follows:
+#
+# @code
+# m = DaskVine(...)
+# # Initialize as any other. @see ndcctools.taskvine.manager.Manager
+# result = v.compute(scheduler= m.dask_execute)
+#
+# # or set by temporarily as the default for dask:
+# with dask.config.set(scheduler=m.dask_execute):
+#     result = v.compute()
+# @endcode
+#
+# Parameters for execution can be set as arguments to the compute function. For
+# example, to set resources per dask function call:
+#
+# @code
+# with dask.config.set(scheduler=m.dask_execute):
+#     result = v.compute(resources={"cores": 1})
+# @endcode
 
 
 class DaskVine(vine.Manager):
@@ -25,8 +62,8 @@ class DaskVine(vine.Manager):
     def dask_execute(self, dsk, keys, **kwargs):
         """Computes the values of the keys in the dask graph dsk"""
 
-        indices = Dag.find_dask_keys(keys)
-        d = Dag(dsk)
+        indices = DaskVineDag.find_dask_keys(keys)
+        d = DaskVineDag(dsk)
         rs = d.set_targets(indices.keys())
         self.submit_calls(rs, **kwargs)
 
@@ -45,7 +82,7 @@ class DaskVine(vine.Manager):
 
         results = list(keys)
         for k, ids in indices.items():
-            Dag.set_dask_result(results, ids, d.get_result(k))
+            DaskVineDag.set_dask_result(results, ids, d.get_result(k))
         return results
 
 

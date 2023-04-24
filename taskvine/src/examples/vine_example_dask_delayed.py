@@ -67,6 +67,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # define a TaskVine manager that has a dask_execute method
     m = DaskVine(port=args.port, ssl=True)
     m.set_name(args.name)
     print(f"Listening for workers at port: {m.port}")
@@ -79,10 +80,10 @@ if __name__ == "__main__":
     f.max_workers = 1
     f.min_workers = 1
     with f:
+        # use the dask_execute method as the scheduler for dask
         with dask.config.set(scheduler=m.dask_execute):
-            result = t.compute(resources={"cores": 1})
+            result = t.compute(resources={"cores": 1})  # resources per function call
             print(f"t = {result}")
         print("Terminating workers...", end="")
 
     print("done!")
-sys.exit(0)

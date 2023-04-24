@@ -2,26 +2,40 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
+##
+# @namespace ndcctools.taskvine.manager
+#
+# This module provides the @ref ndcctools.taskvine.manager.Manager "Manager" class, which is neede in every TaskVine application.
+# It also provides the @ref ndcctools.taskvine.manager.Factory "Factory" class as a wrapper to the program vine_factory to
+# create workers from the python application.
+#
+
 from . import cvine
 from .display import JupyterDisplay
-from .file import File
 from .task import (
     FunctionCall,
     LibraryTask,
     PythonTask,
     Task,
 )
-from .utils import get_c_constant
+from .utils import (
+    set_port_range,
+    get_c_constant,
+)
 
 import atexit
+import distutils.spawn
+import errno
 import itertools
 import json
 import math
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 try:
     from poncho import package_serverize
@@ -31,12 +45,15 @@ except Exception:
 
 
 ##
+# @class ndcctools.taskvine.Manager
+# class ndcctools.taskvine.manager.Manager
+#
 # TaskVine Manager
 #
 # The manager class is the primary object for a TaskVine application.
 # To build an application, create a Manager instance, then create
-# @ref taskvine::Task objects and submit them with @ref taskvine::Manager::submit
-# Call @ref taskvine::Manager::wait to wait for tasks to complete.
+# @ref ndcctools.taskvine.task.Task objects and submit them with @ref ndcctools.taskvine.Manager.submit
+# Call @ref ndcctools.taskvine.manager.Manager.wait to wait for tasks to complete.
 # Run one or more vine_workers to perform work on behalf of the manager object.
 class Manager(object):
     ##
@@ -66,7 +83,7 @@ class Manager(object):
         lower, upper = None, None
         try:
             lower, upper = port
-            self._set_port_range(lower, upper)
+            set_port_range(lower, upper)
             port = 0
         except TypeError:
             # if not a range, ignore
@@ -100,12 +117,6 @@ class Manager(object):
         except Exception:
             sys.stderr.write("Unable to create internal taskvine structure.")
             raise
-
-    def _set_port_range(self, low_port, high_port):
-        if low_port > high_port:
-            raise TypeError("low_port {} should be smaller than high_port {}".format(low_port, high_port))
-        os.environ["TCP_LOW_PORT"] = str(low_port)
-        os.environ["TCP_HIGH_PORT"] = str(high_port)
 
     def _free_manager(self):
         try:
@@ -210,7 +221,7 @@ class Manager(object):
     # @code
     # >>> print(q.stats)
     # @endcode
-    # The fields in @ref stats can also be individually accessed through this call. For example:
+    # The fields in @ref ndcctools.taskvine.manager.Manager.stats can also be individually accessed through this call. For example:
     # @code
     # >>> print(q.stats.workers_busy)
     # @endcode
@@ -229,7 +240,7 @@ class Manager(object):
     # s = q.stats_category("my_category")
     # >>> print(s)
     # @endcode
-    # The fields in @ref vine_stats can also be individually accessed through this call. For example:
+    # The fields in @ref ndcctools.taskvine.manager.Manager.stats can also be individually accessed through this call. For example:
     # @code
     # >>> print(s.tasks_waiting)
     # @endcode
@@ -284,7 +295,7 @@ class Manager(object):
     # Turn on or off first-allocation labeling for a given category. By
     # default, only cores, memory, and disk are labeled, and gpus are unlabeled.
     # NOTE: autolabeling is only meaningfull when task monitoring is enabled
-    # (@ref enable_monitoring). When monitoring is enabled and a task exhausts
+    # (@ref ndcctools.taskvine.manager.Manager.enable_monitoring). When monitoring is enabled and a task exhausts
     # resources in a worker, mode dictates how taskvine handles the
     # exhaustion:
     # @param self Reference to the current manager object.
@@ -294,12 +305,12 @@ class Manager(object):
     #                  - "fixed" Task fails (default).
     #                  - "max" If maximum values are
     #                  specified for cores, memory, disk, and gpus (e.g. via @ref
-    #                  set_category_resources_max or @ref Task.set_memory),
+    #                  ndcctools.taskvine.manager.Manager.set_category_resources_max or @ref ndcctools.taskvine.task.Task.set_memory),
     #                  and one of those resources is exceeded, the task fails.
     #                  Otherwise it is retried until a large enough worker
     #                  connects to the manager, using the maximum values
     #                  specified, and the maximum values so far seen for
-    #                  resources not specified. Use @ref Task.set_retries to
+    #                  resources not specified. Use @ref ndcctools.taskvine.task.Task.set_retries to
     #                  set a limit on the number of times manager attemps
     #                  to complete the task.
     #                  - "min waste" As above, but
@@ -314,7 +325,7 @@ class Manager(object):
     ##
     # Turn on or off first-allocation labeling for a given category and
     # resource. This function should be use to fine-tune the defaults from @ref
-    # set_category_mode.
+    # ndcctools.taskvine.manager.Manager.set_category_mode.
     # @param self   Reference to the current manager object.
     # @param category A category name.
     # @param resource A resource name.
@@ -342,14 +353,11 @@ class Manager(object):
     # for debugging.)
     #
     # Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
-    #
-    # @param self   Reference to the current manager object.
-    # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
     def enable_monitoring(self, watchdog=True, time_series=False):
         return cvine.vine_enable_monitoring(self._taskvine, watchdog, time_series)
 
     ##
-    # As @ref enable_monitoring, but it also generates a time series and a
+    # As @ref ndcctools.taskvine.manager.Manager.enable_monitoring, but it also generates a time series and a
     # debug file.
     # WARNING: Such files may reach gigabyte sizes for long running tasks.
     #
@@ -383,7 +391,7 @@ class Manager(object):
     #
     # @param self       Reference to the current manager object.
     # @param name       Name of the category.
-    # @param multiplier The multiplier of the average task time at which point to disconnect a worker; disabled if less than one (see @ref enable_disconnect_slow_workers)
+    # @param multiplier The multiplier of the average task time at which point to disconnect a worker; disabled if less than one (see @ref ndcctools.taskvine.manager.Manager.enable_disconnect_slow_workers)
     def enable_disconnect_slow_workers_category(self, name, multiplier):
         return cvine.vine_enable_disconnect_slow_workers_category(self._taskvine, name, multiplier)
 
@@ -515,7 +523,7 @@ class Manager(object):
     #
     # Specifies the maximum resources allowed for the default category.
     # @param self      Reference to the current manager object.
-    # @param rmd       Dictionary indicating maximum values. See @ref Task.resources_measured for possible fields.
+    # @param rmd       Dictionary indicating maximum values. See @ref ndcctools.taskvine.task.Task.resources_measured for possible fields.
     # For example:
     # @code
     # >>> # A maximum of 4 cores is found on any worker:
@@ -534,7 +542,7 @@ class Manager(object):
     #
     # Specifies the minimum resources allowed for the default category.
     # @param self      Reference to the current manager object.
-    # @param rmd       Dictionary indicating minimum values. See @ref Task.resources_measured for possible fields.
+    # @param rmd       Dictionary indicating minimum values. See @ref ndcctools.taskvine.task.Task.resources_measured for possible fields.
     # For example:
     # @code
     # >>> # A minimum of 2 cores is found on any worker:
@@ -554,7 +562,7 @@ class Manager(object):
     #
     # @param self      Reference to the current manager object.
     # @param category  Name of the category.
-    # @param rmd       Dictionary indicating maximum values. See @ref Task.resources_measured for possible fields.
+    # @param rmd       Dictionary indicating maximum values. See @ref ndcctools.taskvine.task.Task.resources_measured for possible fields.
     # For example:
     # @code
     # >>> # A maximum of 4 cores may be used by a task in the category:
@@ -574,7 +582,7 @@ class Manager(object):
     #
     # @param self      Reference to the current manager object.
     # @param category  Name of the category.
-    # @param rmd       Dictionary indicating minimum values. See @ref Task.resources_measured for possible fields.
+    # @param rmd       Dictionary indicating minimum values. See @ref ndcctools.taskvine.task.Task.resources_measured for possible fields.
     # For example:
     # @code
     # >>> # A minimum of 2 cores is found on any worker:
@@ -594,7 +602,7 @@ class Manager(object):
     #
     # @param self      Reference to the current manager object.
     # @param category  Name of the category.
-    # @param rmd       Dictionary indicating maximum values. See @ref Task.resources_measured for possible fields.
+    # @param rmd       Dictionary indicating maximum values. See @ref ndcctools.taskvine.task.Task.resources_measured for possible fields.
     # For example:
     # @code
     # >>> # Tasks are first tried with 4 cores:
@@ -613,7 +621,7 @@ class Manager(object):
     # Initialize first value of categories
     #
     # @param self     Reference to the current manager object.
-    # @param rm       Dictionary indicating maximum values. See @ref Task.resources_measured for possible fields.
+    # @param rm       Dictionary indicating maximum values. See @ref ndcctools.taskvine.task.Task.resources_measured for possible fields.
     # @param filename JSON file with resource summaries.
 
     def initialize_categories(self, filename, rm):
@@ -623,7 +631,7 @@ class Manager(object):
     # Cancel task identified by its task_id and remove from the given manager.
     #
     # @param self   Reference to the current manager object.
-    # @param id     The task_id returned from @ref submit.
+    # @param id     The task_id returned from @ref ndcctools.taskvine.manager.Manager.submit.
     def cancel_by_task_id(self, id):
         task = None
         task_pointer = cvine.vine_cancel_by_task_id(self._taskvine, id)
@@ -635,7 +643,7 @@ class Manager(object):
     # Cancel task identified by its tag and remove from the given manager.
     #
     # @param self   Reference to the current manager object.
-    # @param tag    The tag assigned to task using @ref Task.set_tag.
+    # @param tag    The tag assigned to task using @ref ndcctools.taskvine.task.Task.set_tag.
     def cancel_by_task_tag(self, tag):
         task = None
         task_pointer = cvine.vine_cancel_by_task_tag(self._taskvine, tag)
@@ -678,7 +686,7 @@ class Manager(object):
         return cvine.vine_block_host(self._taskvine, host)
 
     ##
-    # Replaced by @ref block_host
+    # Replaced by @ref ndcctools.taskvine.manager.Manager.block_host
     def blacklist(self, host):
         return self.block_host(host)
 
@@ -692,7 +700,7 @@ class Manager(object):
         return cvine.vine_block_host_with_timeout(self._taskvine, host, timeout)
 
     ##
-    # See @ref block_host_with_timeout
+    # See @ref ndcctools.taskvine.manager.Manager.block_host_with_timeout
     def blacklist_with_timeout(self, host, timeout):
         return self.block_host_with_timeout(host, timeout)
 
@@ -707,7 +715,7 @@ class Manager(object):
         return cvine.vine_unblock_host(self._taskvine, host)
 
     ##
-    # See @ref unblock_host
+    # See @ref ndcctools.taskvine.manager.Manager.unblock_host
     def blacklist_clear(self, host=None):
         return self.unblock_host(host)
 
@@ -758,10 +766,10 @@ class Manager(object):
     ##
     # Submit a task to the manager.
     #
-    # It is safe to re-submit a task returned by @ref wait.
+    # It is safe to re-submit a task returned by @ref ndcctools.taskvine.manager.Manager.wait.
     #
     # @param self   Reference to the current manager object.
-    # @param task   A task description created from @ref taskvine::Task.
+    # @param task   A task description created from @ref ndcctools.taskvine.task.Task.
     def submit(self, task):
         task.submit_finalize(self)
         task_id = cvine.vine_submit(self._taskvine, task._task)
@@ -796,7 +804,7 @@ class Manager(object):
     # @param self            Reference to the current manager object.
     # @param name            Name of the Library to be created
     # @param function_list   List of all functions to be included in the library
-    # @returns               A task to be used with @ref Manager.install_library.
+    # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
     def create_library_from_functions(self, name, *function_list):
         # ensure poncho python library is available
         if not poncho_available:
@@ -836,11 +844,12 @@ class Manager(object):
     # Turn Library code created with poncho_package_serverize into a Library Task
     #
     # @param self            Reference to the current manager object.
+    # @param name            Name that identifies this library to the FunctionCalls
     # @param library_path    Filename of the library (i.e., the output of poncho_package_serverize)
     # @param env             Environment to run the library. Either a vine file
-    #                        that expands to an environment (see @ref Task.add_environment), or a path
+    #                        that expands to an environment (see @ref ndcctools.taskvine.task.Task.add_environment), or a path
     #                        to a poncho environment.
-    # @returns               A task to be used with @ref Manager.install_library.
+    # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
     def create_library_from_serverized_files(self, name, library_path, env=None):
         if not poncho_available:
             raise ModuleNotFoundError("The poncho module is not available. Cannot create library.")
@@ -863,9 +872,9 @@ class Manager(object):
     # @param executable_path Filename of the library executable
     # @param name            Name of the library to be created
     # @param env             Environment to run the library. Either a vine file
-    #                        that expands to an environment (see @ref Task.add_environment), or a path
+    #                        that expands to an environment (see @ref ndcctools.taskvine.task.Task.add_environment), or a path
     #                        to a poncho environment.
-    # @returns               A task to be used with @ref Manager.install_library
+    # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library
     def create_library_from_command(self, executable_path, name, env=None):
         t = LibraryTask("./library_exe", name)
         f = self.declare_file(executable_path, cache=True)
@@ -885,7 +894,7 @@ class Manager(object):
     #
     # @param self       Reference to the current manager object.
     # @param timeout    The number of seconds to wait for a completed task
-    #                   before returning.  Use an integer to set the timeout or the constant @ref
+    #                   before returning.  Use an integer to set the timeout or the value
     #                   "wait_forever" to block until a task has completed.
     def wait(self, timeout="wait_forever"):
         if timeout == "wait_forever":
@@ -893,7 +902,7 @@ class Manager(object):
         return self.wait_for_tag(None, timeout)
 
     ##
-    # Similar to @ref wait, but guarantees that the returned task has the
+    # Similar to @ref ndcctools.taskvine.manager.Manager.wait, but guarantees that the returned task has the
     # specified tag.
     #
     # This call will block until the timeout has elapsed.
@@ -919,7 +928,7 @@ class Manager(object):
         return None
 
     ##
-    # Similar to @ref wait, but guarantees that the returned task has the
+    # Similar to @ref ndcctools.taskvine.manager.Manager.wait, but guarantees that the returned task has the
     # specified task_id.
     #
     # This call will block until the timeout has elapsed.
@@ -1283,9 +1292,9 @@ class Manager(object):
     #                until the end of the workflow. If 'always', the file is cache until the
     #                end-of-life of the worker. Default is False (file is not cache).
     # @param peer_transfer   Whether the file can be transfered between workers when
-    #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
+    #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
     # @return
-    # A file object to use in @ref Task.add_input or @ref Task.add_output
+    # A file object to use in @ref ndcctools.taskvine.task.Task.add_input or @ref ndcctools.taskvine.task.Task.add_output
     def declare_file(self, path, cache=False, peer_transfer=True):
         flags = Task._determine_file_flags(cache, peer_transfer)
         f = cvine.vine_declare_file(self._taskvine, path, flags)
@@ -1304,8 +1313,8 @@ class Manager(object):
     # Declare an anonymous file has no initial content, but is created as the
     # output of a task, and may be consumed by other tasks.
     #
-    # @param manager    The manager to register this file
-    # @return A file object to use in @ref Task.add_input or @ref Task.add_output
+    # @param self    The manager to register this file
+    # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input or @ref ndcctools.taskvine.task.Task.add_output
     def declare_temp(self):
         f = cvine.vine_declare_temp(self._taskvine)
         return File(f)
@@ -1316,11 +1325,11 @@ class Manager(object):
     # certain directories to exist in the working directory, prior to producing output.
     # This function does not transfer any data to the task, but just creates
     # a directory in its working sandbox.  If you want to transfer an entire
-    # directory worth of data to a task, use @ref Task.declare_file and give a
+    # directory worth of data to a task, use @ref ndcctools.taskvine.manager.Manager.declare_file and give a
     # directory name. output of a task, and may be consumed by other tasks.
     #
-    # @param manager    The manager to register this file
-    # @return A file object to use in @ref Task.add_input or @ref Task.add_output
+    # @param self    The manager to register this file
+    # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input or @ref ndcctools.taskvine.task.Task.add_output
     def declare_empty_dir(self):
         f = cvine.vine_declare_empty_dir(self._taskvine)
         return File(f)
@@ -1334,8 +1343,8 @@ class Manager(object):
     #                until the end of the workflow. If 'always', the file is cache until the
     #                end-of-life of the worker. Default is False (file is not cache).
     # @param peer_transfer   Whether the file can be transfered between workers when
-    #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
-    # @return A file object to use in @ref Task.add_input
+    #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
+    # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
     def declare_url(self, url, cache=False, peer_transfer=True):
         flags = Task._determine_file_flags(cache, peer_transfer)
 
@@ -1354,8 +1363,8 @@ class Manager(object):
     #                until the end of the workflow. If 'always', the file is cache until the
     #                end-of-life of the worker. Default is False (file is not cache).
     # @param peer_transfer   Whether the file can be transfered between workers when
-    #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
-    # @return A file object to use in @ref Task.add_input
+    #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
+    # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
     #
     # For example:
     # @code
@@ -1378,7 +1387,12 @@ class Manager(object):
     #
     # @param self     The manager to register this file
     # @param minitask The task to execute in order to produce a file
-    # @return A file object to use in @ref Task.add_input
+    # @param cache   If True or 'workflow', cache the file at workers for reuse
+    #                until the end of the workflow. If 'always', the file is cache until the
+    #                end-of-life of the worker. Default is False (file is not cache).
+    # @param peer_transfer   Whether the file can be transfered between workers when
+    #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
+    # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
     def declare_minitask(self, minitask, cache=False, peer_transfer=True):
         flags = Task._determine_file_flags(cache, peer_transfer)
         f = cvine.vine_declare_mini_task(self._taskvine, minitask._task, flags)
@@ -1391,9 +1405,14 @@ class Manager(object):
     ##
     # Declare a file created by by unpacking a tar file.
     #
-    # @param manager    The manager to register this file
+    # @param self      The manager to register this file
     # @param tarball    The file object to un-tar
-    # @return A file object to use in @ref Task.add_input
+    # @param cache   If True or 'workflow', cache the file at workers for reuse
+    #                until the end of the workflow. If 'always', the file is cache until the
+    #                end-of-life of the worker. Default is False (file is not cache).
+    # @param peer_transfer   Whether the file can be transfered between workers when
+    #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
+    # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
     def declare_untar(self, tarball, cache=False, peer_transfer=True):
         flags = Task._determine_file_flags(cache, peer_transfer)
         f = cvine.vine_declare_untar(self._taskvine, tarball._file, flags)
@@ -1405,7 +1424,12 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param package The poncho environment tarball. Either a vine file or a
     #                string representing a local file.
-    # @return A file object to use in @ref Task.add_input
+    # @param cache   If True or 'workflow', cache the file at workers for reuse
+    #                until the end of the workflow. If 'always', the file is cache until the
+    #                end-of-life of the worker. Default is False (file is not cache).
+    # @param peer_transfer   Whether the file can be transfered between workers when
+    #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
+    # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
     def declare_poncho(self, package, cache=False, peer_transfer=True):
         if isinstance(package, str):
             package = self.declare_file(package, cache=True)
@@ -1420,7 +1444,12 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param starch  The startch .sfx file. Either a vine file or a string
     #                representing a local file.
-    # @return A file object to use in @ref Task.add_input
+    # @param cache   If True or 'workflow', cache the file at workers for reuse
+    #                until the end of the workflow. If 'always', the file is cache until the
+    #                end-of-life of the worker. Default is False (file is not cache).
+    # @param peer_transfer   Whether the file can be transfered between workers when
+    #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
+    # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
     def declare_starch(self, starch, cache=False, peer_transfer=True):
         if isinstance(starch, str):
             starch = self.declare_file(starch, cache=True)
@@ -1434,19 +1463,19 @@ class Manager(object):
     #
     # @param self   The manager to register this file.
     # @param source The URL address of the root file in text form as: "root://XROOTSERVER[:port]//path/to/file"
-    # @param proxy  A @ref File of the X509 proxy to use. If None, the
+    # @param proxy  A @ref ndcctools.taskvine.manager.File of the X509 proxy to use. If None, the
     #               environment variable X509_USER_PROXY and the file
     #               "$TMPDIR/$UID" are considered in that order. If no proxy is
     #               present, the transfer is tried without authentication.
-    # @param env    If not None, an environment file (e.g poncho or starch, see Task.add_environment)
+    # @param env    If not None, an environment file (e.g poncho or starch, see ndcctools.taskvine.task.Task.add_environment)
     #               that contains the xrootd executables. Otherwise assume xrootd is available
     #               at the worker.
     # @param cache  If True or 'workflow', cache the file at workers for reuse
     #               until the end of the workflow. If 'always', the file is cache until the
     #               end-of-life of the worker. Default is False (file is not cache).
     # @param peer_transfer   Whether the file can be transfered between workers when
-    #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
-    # @return A file object to use in @ref Task.add_input
+    #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
+    # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
     def declare_xrootd(self, source, proxy=None, env=None, cache=False, peer_transfer=True):
         proxy_c = None
         if proxy:
@@ -1474,8 +1503,8 @@ class Manager(object):
     #                until the end of the workflow. If 'always', the file is cache until the
     #                end-of-life of the worker. Default is False (file is not cache).
     # @param peer_transfer   Whether the file can be transfered between workers when
-    #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
-    # @return A file object to use in @ref Task.add_input
+    #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
+    # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
     def declare_chirp(self, server, source, ticket=None, env=None, cache=False, peer_transfer=True):
         ticket_c = None
         if ticket:
@@ -1490,15 +1519,330 @@ class Manager(object):
         return File(f)
 
 
-def rmsummary_snapshots(self):
-    if self.snapshots_count < 1:
-        return None
+##
+# @class ndcctools.taskvine.manager.File
+#
+# TaskVine File Object
+#
+# The superclass of all TaskVine file types.
+class File(object):
+    def __init__(self, internal_file):
+        self._file = internal_file
 
-    snapshots = []
-    for i in range(0, self.snapshots_count):
-        snapshot = cvine.rmsummary_get_snapshot(self, i)
-        snapshots.append(snapshot)
-    return snapshots
+    def __bool__(self):
+        # We need this because the len of some files is 0, which would evaluate
+        # to false.
+        return True
+
+    ##
+    # Return the contents of a file object as a string.
+    # Typically used to return the contents of an output buffer.
+    #
+    # @param self       A file object.
+    def contents(self):
+        return cvine.vine_file_contents(self._file)
+
+    ##
+    # Return the size of a file object, in bytes.
+    #
+    # @param self       A file object.
+    def __len__(self):
+        return cvine.vine_file_size(self._file)
 
 
-cvine.rmsummary.snapshots = property(rmsummary_snapshots)
+##
+# @class ndcctools.taskvine.manager.Factory
+# Launch a taskvine factory.
+#
+# The command line arguments for `vine_factory` can be set for a
+# factory object (with dashes replaced with underscores). Creating a factory
+# object does not immediately launch it, so this is a good time to configure
+# the resources, number of workers, etc. Factory objects function as Python
+# context managers, so to indicate that a set of commands should be run with
+# a factory running, wrap them in a `with` statement. The factory will be
+# cleaned up automatically at the end of the block. You can also make
+# config changes to the factory while it is running. As an example,
+#
+#     # normal vine setup stuff
+#     workers = ndcctools.taskvine.Factory("sge", "myproject")
+#     workers.cores = 4
+#     with workers:
+#         # submit some tasks
+#         workers.max_workers = 300
+#         # got a pile of tasks, allow more workers
+#     # any additional cleanup steps on the manager
+class Factory(object):
+    _command_line_options = [
+        "amazon-config",
+        "autosize",
+        "batch-options",
+        "batch-type",
+        "capacity",
+        "catalog",
+        "condor-requirements",
+        "config-file",
+        "cores",
+        "debug",
+        "debug-file",
+        "debug-file-size",
+        "disk",
+        "env",
+        "extra-options",
+        "factory-timeout",
+        "foremen-name",
+        "gpus",
+        "k8s-image",
+        "k8s-worker-image",
+        "max-workers",
+        "manager-name",
+        "memory",
+        "mesos-master",
+        "mesos-path",
+        "mesos-preload",
+        "min-workers",
+        "password",
+        "python-env",
+        "python-package",
+        "run-factory-as-manager",
+        "runos",
+        "scratch-dir",
+        "ssl",
+        "tasks-per-worker",
+        "timeout",
+        "worker-binary",
+        "workers-per-cycle",
+        "wrapper",
+        "wrapper-input",
+    ]
+
+    # subset of command line options that can be written to the configuration
+    # file, and therefore they can be changed once the factory is running.
+    _config_file_options = [
+        "autosize",
+        "capacity",
+        "cores",
+        "disk",
+        "factory-timeout",
+        "foremen-name",
+        "manager-name",
+        "max-workers",
+        "memory",
+        "min-workers",
+        "tasks-per-worker",
+        "timeout",
+        "workers-per-cycle",
+        "condor-requirements",
+    ]
+
+    ##
+    # Create a factory for the given batch_type and manager name.
+    #
+    # One of `manager_name`, `manager_host_port`, or `manager` should be specified.
+    # If factory_binary or worker_binary is not
+    # specified, $PATH will be searched.
+    def __init__(self, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull):
+        self._config_file = None
+        self._factory_proc = None
+        self._log_file = log_file
+        self._error_file = None
+        self._scratch_safe_to_delete = False
+
+        self._opts = {}
+
+        self._set_manager(batch_type, manager, manager_host_port, manager_name)
+
+        self._opts["batch-type"] = batch_type
+        self._opts["worker-binary"] = self._find_exe(worker_binary, "vine_worker")
+        self._factory_binary = self._find_exe(factory_binary, "vine_factory")
+
+        self._opts["scratch-dir"] = None
+        if manager:
+            self._opts["scratch-dir"] = manager.staging_directory
+
+    def _set_manager(self, batch_type, manager, manager_host_port, manager_name):
+        if not (manager or manager_host_port or manager_name):
+            raise ValueError("Either manager, manager_host_port, or manager_name or manager should be specified.")
+
+        if manager_name:
+            self._opts["manager-name"] = manager_name
+
+        if manager:
+            if batch_type == "local":
+                manager_host_port = f"localhost:{manager.port}"
+            elif manager.name:
+                self._opts["manager-name"] = manager_name
+
+            if manager.using_ssl:
+                self._opts["ssl"] = True
+
+        if manager_host_port:
+            try:
+                (host, port) = [x for x in manager_host_port.split(":") if x]
+                self._opts["manager-host"] = host
+                self._opts["manager-port"] = port
+                return
+            except (TypeError, ValueError):
+                raise ValueError("manager_host_port is not of the form HOST:PORT")
+
+    def _find_exe(self, path, default):
+        if path is None:
+            out = distutils.spawn.find_executable(default)
+        else:
+            out = path
+        if out is None or not os.access(out, os.F_OK):
+            raise OSError(errno.ENOENT, "Command not found", out or default)
+        if not os.access(out, os.X_OK):
+            raise OSError(errno.EPERM, os.strerror(errno.EPERM), out)
+        return os.path.abspath(out)
+
+    def __getattr__(self, name):
+        if name[0] == "_":
+            # For names that start with '_', immediately return the attribute.
+            # If the name does not start with '_' we assume is a factory option.
+            return object.__getattribute__(self, name)
+
+        # original command line options use - instead of _. _ is required by
+        # the naming conventions of python (otherwise - is taken as 'minus')
+        name_with_hyphens = name.replace("_", "-")
+
+        if name_with_hyphens in Factory._command_line_options:
+            try:
+                return object.__getattribute__(self, "_opts")[name_with_hyphens]
+            except KeyError:
+                raise KeyError("{} is a valid factory attribute, but has not been set yet.".format(name))
+        else:
+            raise AttributeError("{} is not a supported option".format(name))
+
+    def __setattr__(self, name, value):
+        # original command line options use - instead of _. _ is required by
+        # the naming conventions of python (otherwise - is taken as 'minus')
+        name_with_hyphens = name.replace("_", "-")
+
+        if name[0] == "_":
+            # For names that start with '_', immediately set the attribute.
+            # If the name does not start with '_' we assume is a factory option.
+            object.__setattr__(self, name, value)
+        elif self._factory_proc:
+            # if factory is already running, only accept attributes that can
+            # changed dynamically
+            if name_with_hyphens in Factory._config_file_options:
+                self._opts[name_with_hyphens] = value
+                self._write_config()
+            elif name_with_hyphens in Factory._command_line_options:
+                raise AttributeError("{} cannot be changed once the factory is running.".format(name))
+            else:
+                raise AttributeError("{} is not a supported option".format(name))
+        else:
+            if name_with_hyphens in Factory._command_line_options:
+                self._opts[name_with_hyphens] = value
+            else:
+                raise AttributeError("{} is not a supported option".format(name))
+
+    def _construct_command_line(self):
+        # check for environment file
+        args = [self._factory_binary]
+
+        args += ["--parent-death"]
+        args += ["--config-file", self._config_file]
+
+        if self._opts["batch-type"] == "local":
+            self._opts["extra-options"] = self._opts.get("extra-options", "") + " --parent-death"
+
+        for opt in self._opts:
+            if opt not in Factory._command_line_options:
+                continue
+            if opt in Factory._config_file_options:
+                continue
+            if self._opts[opt] is True:
+                args.append("--{}".format(opt))
+            else:
+                args.append("--{}={}".format(opt, self._opts[opt]))
+
+        if "manager-host" in self._opts:
+            args += [self._opts["manager-host"], self._opts["manager-port"]]
+
+        return args
+
+    ##
+    # Start a factory process.
+    #
+    # It's best to use a context manager (`with` statement) to automatically
+    # handle factory startup and tear-down. If another mechanism will ensure
+    # cleanup (e.g. running inside a container), manually starting the factory
+    # may be useful to provision workers from inside a Jupyter notebook.
+    def start(self):
+        if self._factory_proc is not None:
+            # if factory already running, just update its config
+            self._write_config()
+            return
+
+        if not self.scratch_dir:
+            candidate = os.getcwd()
+            if candidate.startswith("/afs") and self.batch_type == "condor":
+                candidate = os.environ.get("TMPDIR", "/tmp")
+            candidate = os.path.join(candidate, f"vine-factory-{os.getuid()}")
+            if not os.path.exists(candidate):
+                os.makedirs(candidate)
+            self.scratch_dir = candidate
+
+        # specialize scratch_dir for this run
+        self.scratch_dir = tempfile.mkdtemp(prefix="vine-factory-", dir=self.scratch_dir)
+        self._scratch_safe_to_delete = True
+
+        atexit.register(lambda: os.path.exists(self.scratch_dir) and shutil.rmtree(self.scratch_dir))
+
+        self._error_file = os.path.join(self.scratch_dir, "error.log")
+        self._config_file = os.path.join(self.scratch_dir, "config.json")
+
+        self._write_config()
+        logfd = open(self._log_file, "a")
+        errfd = open(self._error_file, "w")
+        devnull = open(os.devnull, "w")
+        self._factory_proc = subprocess.Popen(self._construct_command_line(), stdin=devnull, stdout=logfd, stderr=errfd)
+        devnull.close()
+        logfd.close()
+        errfd.close()
+
+        # ugly... give factory time to read configuration file
+        time.sleep(1)
+
+        status = self._factory_proc.poll()
+        if status:
+            with open(self._error_file) as error_f:
+                error_log = error_f.read()
+                raise RuntimeError("Could not execute vine_factory. Exited with status: {}\n{}".format(str(status), error_log))
+        return self
+
+    ##
+    # Stop the factory process.
+    def stop(self):
+        if self._factory_proc is None:
+            raise RuntimeError("Factory not yet started")
+        self._factory_proc.terminate()
+        self._factory_proc.wait()
+        self._factory_proc = None
+        self._config_file = None
+
+    def __enter__(self):
+        return self.start()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.stop()
+
+    def __del__(self):
+        if self._factory_proc is not None:
+            self.stop()
+
+        if shutil and self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
+            shutil.rmtree(self.scratch_dir)
+
+    def _write_config(self):
+        if self._config_file is None:
+            return
+
+        opts_subset = dict([(opt, self._opts[opt]) for opt in self._opts if opt in Factory._config_file_options])
+        with open(self._config_file, "w") as f:
+            json.dump(opts_subset, f, indent=4)
+
+    def set_environment(self, env):
+        self._env_file = env
