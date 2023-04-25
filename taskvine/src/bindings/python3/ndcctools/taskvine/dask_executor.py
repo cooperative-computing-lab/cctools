@@ -8,7 +8,8 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-import ndcctools.taskvine as vine
+from .manager import Manager
+from .task import PythonTask
 from .dask_dag import DaskVineDag
 
 
@@ -39,7 +40,7 @@ from .dask_dag import DaskVineDag
 # @endcode
 
 
-class DaskVine(vine.Manager):
+class DaskVine(Manager):
     def _wrap(self, key, fn):
         # TODO: return backtrace, write result to files, read args from files
         def function(*args):
@@ -86,7 +87,7 @@ class DaskVine(vine.Manager):
         return results
 
 
-class PythonTaskDask(vine.PythonTask):
+class PythonTaskDask(PythonTask):
     def __init__(self, key, fn, *args, **kwargs):
         self._key = key
         super().__init__(fn, *args, **kwargs)
