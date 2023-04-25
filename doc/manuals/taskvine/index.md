@@ -128,7 +128,7 @@ A TaskVine application can be written in Python, or C.
 In each language, the underlying principles are the same, but there are some syntactic differences shown below.
 The full API documentation for each language is here:
 
-- [TaskVine Python API](../api/html/namespacetaskvine.html)
+- [TaskVine Python API](../api/html/namespacendcctools_1_1taskvine.html)
 - [TaskVine C API](../api/html/taskvine_8h.html)
 
 ### Creating a Manager Object
@@ -139,7 +139,7 @@ You may specific a specific port number to listen on like this:
 === "Python"
     ```python
     # Import the taskvine module
-    import cctools.taskvine as vine
+    import ndcctools.taskvine as vine
 
     # Create a new manager listening on port 9123
     m = vine.Manager(9123)
@@ -1053,7 +1053,7 @@ creating the queue:
 === "Python"
     ```python
     # Import the taskvine module
-    import cctools.taskvine as vine
+    import ndcctools.taskvine as vine
     m = vine.Manager(port=9123, ssl=('MY_KEY.pem', 'MY_CERT.pem'))
 
     # Alternatively, you can set ssl=True and let the python API generate
@@ -2243,7 +2243,33 @@ of file transfer time on overall performance. For example:
 vine_plot_txn_log vine-run-info/most-recent/vine-logs/transactions
 ```
 
-## Specialized and Experimental Settings
+### Executing Dask Workflows in Python (experimental)
+
+TaskVine can be used to execute Dask workflows using a manager as Dask
+scheduler. The class `DaskVine` implements a TaskVine manager that has a
+`dask_execute` that can be used as follows:
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+    import dask
+
+    # Create a new manager listening on port 9123
+    m = vine.DaskVine(9123)
+
+    # Define the dask workflow...
+    dask_value = ... 
+
+    # use the manager as the dask scheduler
+    result = dask_value.compute(scheduler=m.dask_execute)
+
+    # or:
+    with dask.config.set(scheduler=m.dask_execute):
+        result = dask_value.compute()
+    ```
+
+
+### Specialized and Experimental Settings
 
 The behaviour of taskvine can be tuned by the following parameters. We advise
 caution when using these parameters, as the standard behaviour may drastically
@@ -2274,11 +2300,11 @@ change.
 
 
 
-## Further Information
+### Further Information
 
 For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
-## Copyright
+### Copyright
 
 CCTools is Copyright (C) 2022 The University of Notre Dame. This software is distributed under the GNU General Public License Version 2. See the file COPYING for
 details.
