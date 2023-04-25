@@ -191,15 +191,6 @@ static vine_result_code_t vine_manager_put_file_or_dir( struct vine_manager *q, 
 		result = VINE_APP_FAILURE;
 	}
 	
-	debug(D_VINE, "Attempting adding file %s to replica table success %d", remotepath, result);
-
-	if(result == VINE_SUCCESS) {
-		struct vine_file_replica *remote_info = vine_file_replica_create(info.st_size,info.st_mtime);
-		remote_info->in_cache = 1;
-		vine_current_transfers_remove_one_manager(q);
-		vine_file_replica_table_insert(w,remotepath,remote_info);
-	}
-
 	return result;
 }
 
@@ -397,6 +388,11 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 	if(result==VINE_SUCCESS) {
 		struct vine_file_replica *remote_info = vine_file_replica_create(info.st_size,info.st_mtime);
 		vine_file_replica_table_insert(w,f->cached_name,remote_info);
+
+		if(f->type == VINE_FILE | f->type == VINE_BUFFER){
+			vine_current_transfers_remove_one_manager(q);
+			remote_info->in_cache = 1;
+		}
 	}
 
 	return result;
