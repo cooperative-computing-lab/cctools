@@ -9,7 +9,6 @@
 # is constructed by dask.
 
 import ndcctools.taskvine as vine
-from ndcctools.taskvine.scheds.dask_executor import DaskVine
 import argparse
 import getpass
 import sys
@@ -57,7 +56,7 @@ is constructed by dask.""")
 
     args = parser.parse_args()
 
-    m = DaskVine(port=args.port, ssl=True)
+    m = vine.DaskVine(port=args.port, ssl=True)
     m.set_name(args.name)
     print(f"Listening for workers at port: {m.port}")
 

@@ -7,7 +7,6 @@
 # This example shows TaskVine executing a dask workflow
 
 import ndcctools.taskvine as vine
-from ndcctools.taskvine.scheds.dask_executor import DaskVine
 import argparse
 import getpass
 import sys
@@ -68,7 +67,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # define a TaskVine manager that has a dask_execute method
-    m = DaskVine(port=args.port, ssl=True)
+    m = vine.DaskVine(port=args.port, ssl=True)
     m.set_name(args.name)
     print(f"Listening for workers at port: {m.port}")
 

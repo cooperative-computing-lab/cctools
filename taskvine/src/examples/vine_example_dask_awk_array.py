@@ -7,7 +7,6 @@
 # This example shows TaskVine executing a dask workflow that uses awkward arrays.
 
 import ndcctools.taskvine as vine
-from ndcctools.taskvine.scheds.dask_executor import DaskVine
 import argparse
 import getpass
 import sys
@@ -84,7 +83,7 @@ if __name__ == "__main__":
 
     distance = array1.distance(array2)
 
-    m = DaskVine(port=args.port, ssl=True)
+    m = vine.DaskVine(port=args.port, ssl=True)
     m.set_name(args.name)
     print(f"Listening for workers at port: {m.port}")
 

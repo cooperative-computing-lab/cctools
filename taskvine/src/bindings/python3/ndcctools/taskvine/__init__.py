@@ -52,6 +52,8 @@ from .task import (
     LibraryTask,
     FunctionCall,
 )
+from .dask_executor import DaskVine
+from .dask_dag import DaskVineNoResult
 
 
 __all__ = [
@@ -63,4 +65,6 @@ __all__ = [
     "Task",
     "PythonTask",
     "PythonTaskNoResult",
+    "DaskVine",
+    "DaskVineNoResult",
 ]
