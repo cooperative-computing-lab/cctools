@@ -190,6 +190,15 @@ static vine_result_code_t vine_manager_put_file_or_dir( struct vine_manager *q, 
 		debug(D_NOTICE, "cannot stat file %s: %s", localpath, strerror(errno));
 		result = VINE_APP_FAILURE;
 	}
+	
+	debug(D_VINE, "Attempting adding file %s to replica table success %d", remotepath, result);
+
+	if(result == VINE_SUCCESS) {
+		struct vine_file_replica *remote_info = vine_file_replica_create(info.st_size,info.st_mtime);
+		remote_info->in_cache = 1;
+		vine_current_transfers_remove_one_manager(q);
+		vine_file_replica_table_insert(w,remotepath,remote_info);
+	}
 
 	return result;
 }

@@ -2634,7 +2634,9 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 
 	LIST_ITERATE(t->input_mounts, m){
 		/* Is the file already present on that worker? */
+		
 		struct vine_file_replica *remote_info;
+		
 		if((remote_info = vine_file_replica_table_lookup(w, m->file->cached_name))) continue;
 
 		struct vine_worker_info *peer;
@@ -2686,7 +2688,11 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 				return 0;
 			}
 		} else {
-			/* keep going */
+			if(vine_current_transfers_source_in_use(q, "manager") >= q->file_source_max_transfers){
+				return 0;
+			} else {
+				vine_current_transfers_add(q, w, "manager");
+			}
 		}
 	}
 
@@ -2715,6 +2721,8 @@ static int send_one_task( struct vine_manager *q )
 
 		// Find the best worker for the task at the head of the list
 		w = vine_schedule_task_to_worker(q,t);
+
+		debug(D_VINE, "worker selected %x", w);
 
 		// If there is no suitable worker, consider the next task.
 		if(!w) continue;
