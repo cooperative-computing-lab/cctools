@@ -2688,11 +2688,7 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 				return 0;
 			}
 		} else {
-			if(vine_current_transfers_source_in_use(q, "manager") >= q->file_source_max_transfers){
-				return 0;
-			} else {
-				vine_current_transfers_add(q, w, "manager");
-			}
+			/* keep going */
 		}
 	}
 
