@@ -3209,7 +3209,9 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->password = 0;
 
-	q->peer_transfers_enabled = 0;
+	// peer transfers enabled by default
+	q->peer_transfers_enabled = 1;
+
 	q->file_source_max_transfers = VINE_FILE_SOURCE_MAX_TRANSFERS;
 	q->worker_source_max_transfers = VINE_WORKER_SOURCE_MAX_TRANSFERS;
 
