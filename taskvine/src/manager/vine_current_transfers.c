@@ -42,7 +42,6 @@ int vine_current_transfers_remove_one_manager(struct vine_manager *q)
 {
     char *id;
     struct vine_transfer_pair *t;
-    int c = 0;
     HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
     {
     	if(strcmp("manager", t->source) == 0)
