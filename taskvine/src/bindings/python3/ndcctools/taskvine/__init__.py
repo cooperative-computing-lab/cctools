@@ -43,8 +43,8 @@
 from .manager import (
     Manager,
     Factory,
-    File,
 )
+from .file import File
 from .task import (
     Task,
     PythonTask,

@@ -12,6 +12,7 @@
 
 from . import cvine
 from .display import JupyterDisplay
+from .file import File
 from .task import (
     FunctionCall,
     LibraryTask,
@@ -1517,37 +1518,6 @@ class Manager(object):
         flags = Task._determine_file_flags(cache, peer_transfer)
         f = cvine.vine_declare_chirp(self._taskvine, server, source, ticket_c, env_c, flags)
         return File(f)
-
-
-##
-# @class ndcctools.taskvine.manager.File
-#
-# TaskVine File Object
-#
-# The superclass of all TaskVine file types.
-class File(object):
-    def __init__(self, internal_file):
-        self._file = internal_file
-
-    def __bool__(self):
-        # We need this because the len of some files is 0, which would evaluate
-        # to false.
-        return True
-
-    ##
-    # Return the contents of a file object as a string.
-    # Typically used to return the contents of an output buffer.
-    #
-    # @param self       A file object.
-    def contents(self):
-        return cvine.vine_file_contents(self._file)
-
-    ##
-    # Return the size of a file object, in bytes.
-    #
-    # @param self       A file object.
-    def __len__(self):
-        return cvine.vine_file_size(self._file)
 
 
 ##
