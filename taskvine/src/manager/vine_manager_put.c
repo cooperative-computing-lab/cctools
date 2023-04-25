@@ -389,7 +389,7 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 		struct vine_file_replica *remote_info = vine_file_replica_create(info.st_size,info.st_mtime);
 		vine_file_replica_table_insert(w,f->cached_name,remote_info);
 
-		if(f->type == VINE_FILE | f->type == VINE_BUFFER){
+		if((f->type == VINE_FILE || f->type == VINE_BUFFER)){
 			vine_current_transfers_remove_one_manager(q);
 			remote_info->in_cache = 1;
 		}
