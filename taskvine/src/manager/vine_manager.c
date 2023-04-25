@@ -2722,8 +2722,6 @@ static int send_one_task( struct vine_manager *q )
 		// Find the best worker for the task at the head of the list
 		w = vine_schedule_task_to_worker(q,t);
 
-		debug(D_VINE, "worker selected %x", w);
-
 		// If there is no suitable worker, consider the next task.
 		if(!w) continue;
 
