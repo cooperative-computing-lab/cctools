@@ -38,6 +38,7 @@ import shutil
 import atexit
 import time
 import math
+import weakref
 
 
 def set_debug_flag(*flags):
@@ -98,13 +99,11 @@ class Task(object):
         if not self._task:
             raise Exception("Unable to create internal Task structure")
 
-    def __del__(self):
-        try:
+        def free():
             if self._task:
                 work_queue_task_delete(self._task)
-        except Exception:
-            # ignore exceptions, in case task has been already collected
-            pass
+
+        self._finalizer = weakref.finalize(self, free)
 
     @staticmethod
     def _determine_file_flags(flags, cache, failure_only):
@@ -973,6 +972,12 @@ class PythonTask(Task):
         super(PythonTask, self).__init__(self._command)
         self._specify_IO_files()
 
+        def free():
+            if self._tmpdir and os.path.exists(self._tmpdir):
+                shutil.rmtree(self._tmpdir)
+        self._finalizer = weakref.finalize(self, free)
+
+
     ##
     # returns the result of a python task as a python variable
     #
@@ -1007,15 +1012,6 @@ class PythonTask(Task):
             self.specify_input_file(self._pp_run, cache=True)
 
     specify_package = specify_environment
-
-    def __del__(self):
-        try:
-            if self._tmpdir and os.path.exists(self._tmpdir):
-                shutil.rmtree(self._tmpdir)
-
-        except Exception as e:
-            if sys:
-                sys.stderr.write("could not delete {}: {}\n".format(self._tmpdir, e))
 
     def _serialize_python_function(self, func, args, kwargs):
         with open(self._func_file, "wb") as wf:
@@ -1159,30 +1155,22 @@ class WorkQueue(object):
                 work_queue_specify_name(self._work_queue, name)
         except Exception as e:
             raise Exception("Unable to create internal Work Queue structure: {}".format(e))
-
+        finally:
+            def free(self):
+                if self._work_queue:
+                    if self._shutdown:
+                        self.shutdown_workers(0)
+                    self._update_status_display(force=True)
+                    work_queue_delete(self._work_queue)
+            self._finalizer = weakref.finalize(self, free)
         self._update_status_display()
-
-    def _free_queue(self):
-        try:
-            if self._work_queue:
-                if self._shutdown:
-                    self.shutdown_workers(0)
-                self._update_status_display(force=True)
-                work_queue_delete(self._work_queue)
-                self._work_queue = None
-        except Exception:
-            # ignore exceptions, as we are going away...
-            pass
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         self._update_status_display(force=True)
-        return self
-
-    def __del__(self):
-        self._free_queue()
+        self._finalizer()
 
     def _setup_ssl(self, ssl):
         if not ssl:
@@ -2362,6 +2350,13 @@ class Factory(object):
         self._factory_binary = self._find_exe(factory_binary, "work_queue_factory")
         self._opts["scratch-dir"] = None
 
+        def free():
+            if self._factory_proc is not None:
+                self.stop()
+            if self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
+                shutil.rmtree(self.scratch_dir)
+        self._finalizer = weakref.finalize(self, free)
+
     def _set_manager(self, batch_type, manager, manager_host_port, manager_name):
         if not (manager or manager_host_port or manager_name):
             raise ValueError("Either manager, manager_host_port, or manager_name or manager should be specified.")
@@ -2531,13 +2526,6 @@ class Factory(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.stop()
-
-    def __del__(self):
-        if self._factory_proc is not None:
-            self.stop()
-
-        if shutil and self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
-            shutil.rmtree(self.scratch_dir)
 
     def _write_config(self):
         if self._config_file is None:
