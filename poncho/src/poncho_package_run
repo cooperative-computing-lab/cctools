@@ -264,7 +264,9 @@ fi
 #activate and unpack the environment
 logmsg activating environment
 unset PYTHONPATH
-source "${UNPACK_TO}/bin/activate"
+
+# force no args to activate, as it wants to consume "$@" which contains the command line
+source "${UNPACK_TO}/bin/activate" ""
 if [[ "$?" != 0 ]]
 then
     errmsg "could not activate environment: ${ENV_NAME}"
