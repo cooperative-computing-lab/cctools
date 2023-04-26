@@ -31,12 +31,18 @@ from .dask_dag import DaskVineDag
 #     result = v.compute()
 # @endcode
 #
-# Parameters for execution can be set as arguments to the compute function. For
-# example, to set resources per dask function call:
+# Parameters for execution can be set as arguments to the compute function. These
+# arguments are applied to each task executed:
 #
 # @code
+#
+# my_env = m.declare_poncho("my_env.tar.gz")
+#
 # with dask.config.set(scheduler=m.dask_execute):
-#     result = v.compute(resources={"cores": 1})
+#     # Each task uses at most 4 cores, they run in the my_env environment, and
+#     # their allocation is set to maximum values seen.
+#     # If resource_mode is different than None, then the resource monitor is activated.
+#     result = v.compute(resources={"cores": 1}, resources_mode="max", environment=my_env)
 # @endcode
 
 
@@ -51,13 +57,24 @@ class DaskVine(Manager):
             return (key, result)
         return function
 
-    def submit_calls(self, rs, resources=None):
+    def submit_calls(self, rs, resources=None, resources_mode=None, environment=None):
+        resources_already_set = set()
         for r in rs:
             k, (fn, *args) = r
             t = PythonTaskDask(k, fn, *args)
 
-            if resources:
-                t.set_cores(resources.get("cores", -1))
+            cat = str(fn)
+            t.set_category(cat)
+
+            if cat not in resources_already_set:
+                if resources_mode:
+                    self.set_category_mode(cat, resources_mode)
+                    self.set_category_resources_max(cat, resources)
+                    self.enable_monitoring()
+
+            if environment:
+                t.add_environment(environment)
+
             self.submit(t)
 
     def dask_execute(self, dsk, keys, **kwargs):
@@ -66,9 +83,10 @@ class DaskVine(Manager):
         indices = DaskVineDag.find_dask_keys(keys)
         d = DaskVineDag(dsk)
         rs = d.set_targets(indices.keys())
-        self.submit_calls(rs, **kwargs)
 
-        verbose = kwargs.get("verbose", False)
+        verbose = kwargs.pop("verbose", False)
+
+        self.submit_calls(rs, **kwargs)
 
         while not self.empty():
             t = self.wait(5)
@@ -79,7 +97,7 @@ class DaskVine(Manager):
                     rs = d.set_result(t.key, t.output)
                     self.submit_calls(rs, **kwargs)
                 else:
-                    raise Exception(f"task for key {t.key} failed: {t.result}. exit code {t.exit_code}")
+                    raise Exception(f"task for key {t.key} failed: {t.result}. exit code {t.exit_code}\n{t.output}")
 
         results = list(keys)
         for k, ids in indices.items():
