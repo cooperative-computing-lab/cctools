@@ -17,7 +17,7 @@ all: $(TARGETS)
 
 rmonitor_wrap.c resource_monitor.py: rmonitor.i resource_monitor.bindings.py
 	@echo "SWIG rmonitor.i (python)"
-	@$(CCTOOLS_SWIG) -o rmonitor_wrap.c -python -py3 -I$(CCTOOLS_HOME)/dttools/src/ rmonitor.i
+	@$(CCTOOLS_SWIG) -o rmonitor_wrap.c -python -I$(CCTOOLS_HOME)/dttools/src/ rmonitor.i
 	@cat resource_monitor.bindings.py >> resource_monitor.py
 
 $(RMPYTHONSO): rmonitor_wrap.o $(EXTERNAL_DEPENDENCIES)
