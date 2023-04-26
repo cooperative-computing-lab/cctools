@@ -45,6 +45,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import weakref
 
 try:
     from poncho import package_serverize
@@ -123,6 +124,7 @@ class Manager(object):
 
             ssl_key, ssl_cert = self._setup_ssl(ssl, run_info_path)
             self._taskvine = cvine.vine_ssl_create(port, ssl_key, ssl_cert)
+            self._finalizer = weakref.finalize(self, Manager._free_manager, self)
 
             if ssl_key:
                 self._using_ssl = True
@@ -132,34 +134,24 @@ class Manager(object):
 
             if name:
                 cvine.vine_set_name(self._taskvine, name)
+
+            try:
+                if init_fn:
+                    init_fn(self)
+            except Exception:
+                sys.stderr.write("Something went wrong with the custom initialization function.")
+                raise
+            self._update_status_display()
         except Exception:
             sys.stderr.write("Unable to create internal taskvine structure.")
             raise
 
-        try:
-            if init_fn:
-                init_fn(self)
-        except Exception:
-            sys.stderr.write("Something went wrong with the custom initialization function.")
-            raise
-
-        self._update_status_display()
-
     def _free_manager(self):
-        try:
-            if self._taskvine:
-                if self._shutdown:
-                    self.shutdown_workers(0)
-                self._update_status_display(force=True)
-                cvine.vine_delete(self._taskvine)
-                self._taskvine = None
-        except Exception:
-            # ignore exceptions, as we are going away...
-            pass
-
-    def __del__(self):
-        self._update_status_display(force=True)
-        self._free_manager()
+        if self._taskvine:
+            if self._shutdown:
+                self.shutdown_workers(0)
+            self._update_status_display(force=True)
+            cvine.vine_delete(self._taskvine)
 
     def _setup_ssl(self, ssl, run_info_path):
         if not ssl:
@@ -197,6 +189,12 @@ class Manager(object):
         except Exception as e:
             # no exception should cause the queue to fail
             print(f"status display error: {e}", file=sys.stderr)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        self._free_manager()
 
     ##
     # Get the project name of the manager.
@@ -1661,6 +1659,13 @@ class Factory(object):
         if manager:
             self._opts["scratch-dir"] = manager.staging_directory
 
+        def free():
+            if self._factory_proc is not None:
+                self.stop()
+            if self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
+                shutil.rmtree(self.scratch_dir)
+        self._finalizer = weakref.finalize(self, free)
+
     def _set_manager(self, batch_type, manager, manager_host_port, manager_name):
         if not (manager or manager_host_port or manager_name):
             raise ValueError("Either manager, manager_host_port, or manager_name or manager should be specified.")
@@ -1830,13 +1835,6 @@ class Factory(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.stop()
-
-    def __del__(self):
-        if self._factory_proc is not None:
-            self.stop()
-
-        if shutil and self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
-            shutil.rmtree(self.scratch_dir)
 
     def _write_config(self):
         if self._config_file is None:
