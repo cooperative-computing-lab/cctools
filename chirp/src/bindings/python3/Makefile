@@ -19,7 +19,7 @@ all: $(TARGETS)
 # in the framework search path emitted by the Python configuration on macOS.
 chirp_wrap.c chirp.py: chirp.i chirp.binding.py
 	@echo "SWIG chirp.i (python)"
-	@$(CCTOOLS_SWIG) -o chirp_wrap.c -python -py3 -I$(CCTOOLS_HOME)/dttools/src/ -I$(CCTOOLS_HOME)/chirp/src chirp.i
+	@$(CCTOOLS_SWIG) -o chirp_wrap.c -python -I$(CCTOOLS_HOME)/dttools/src/ -I$(CCTOOLS_HOME)/chirp/src chirp.i
 	@cat -u chirp.binding.py >> chirp.py
 
 $(CHIRPPYTHONSO): $(OBJECTS) $(EXTERNAL_DEPENDENCIES)
