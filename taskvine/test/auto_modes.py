@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import taskvine as vine
+import ndcctools.taskvine as vine
 import sys
 import time
 
@@ -10,11 +10,7 @@ m.enable_monitoring()
 m.tune("category-steady-n-tasks", 1)
 
 bucket_size = 250
-worker = {
-        "cores": 4,
-        "memory": bucket_size * 4,
-        "disk": bucket_size * 8
-        }
+worker = {"cores": 4, "memory": bucket_size * 4, "disk": bucket_size * 8}
 
 factory = vine.Factory(manager=m)
 factory.max_workers = 1
@@ -24,28 +20,23 @@ factory.memory = worker["memory"]
 factory.disk = worker["disk"]
 
 modes = {
-        "max": vine.VINE_ALLOCATION_MODE_MAX,
-        "thr": vine.VINE_ALLOCATION_MODE_MAX_THROUGHPUT,
-        "wst": vine.VINE_ALLOCATION_MODE_MIN_WASTE,
-        }
+    "max": "max",
+    "thr": "max throughput",
+    "wst": "min waste",
+}
 
-expected_proportions = {
-        "max": 0.5,  # half of the disk, so half of the resources
-        "thr": 1/worker["cores"],
-        "wst": 1/worker["cores"]
-        }
+expected_proportions = {"max": 0.5, "thr": 1 / worker["cores"], "wst": 1 / worker["cores"]}  # half of the disk, so half of the resources
 
 error_found = False
 
-last_returned_time =  time.time()
+last_returned_time = time.time()
 
 with factory:
-    for (category, mode) in modes.items():
+    for category, mode in modes.items():
         m.set_category_mode(category, mode)
 
         # first task needs little less than half of the disk, which should round up to half the disk
-        t = vine.Task(
-            f"dd count=0 bs={int(worker['disk']/2.5)}M seek=1 of=nulls")
+        t = vine.Task(f"dd count=0 bs={int(worker['disk']/2.5)}M seek=1 of=nulls")
         t.set_category(category)
         m.submit(t)
 

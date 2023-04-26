@@ -1,5 +1,5 @@
 /* taskvine.i */
-%module taskvine
+%module cvine
 
 %include carrays.i
 %array_functions(struct rmsummary *, rmsummayArray);

@@ -6,7 +6,7 @@
 # not the case, a starch recipe to construct this environment is also given.
 #
 
-import taskvine as vine
+import ndcctools.taskvine as vine
 
 import argparse
 import os

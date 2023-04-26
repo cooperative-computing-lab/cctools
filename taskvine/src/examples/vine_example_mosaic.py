@@ -14,7 +14,7 @@
 # the executable and all of its dynamic dependencies.  This allows the
 # use of arbitrary workers without regard to their software environment.
 
-import taskvine as vine
+import ndcctools.taskvine as vine
 import argparse
 import os
 import sys

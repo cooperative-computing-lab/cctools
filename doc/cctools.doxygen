@@ -6,7 +6,7 @@ which includes TaskVine, Work Queue, Makeflow, Parrot, Chirp and other software.
 If you are writing a TaskVine application, start here:
 
 - @ref taskvine.h (C Language Interface)
-- @ref taskvine (Python Language Interface)
+- @ref ndcctools.taskvine (Python Language Interface)
 
 If you are writing a Work Queue application, start here:
 
