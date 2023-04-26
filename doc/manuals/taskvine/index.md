@@ -2243,6 +2243,9 @@ of file transfer time on overall performance. For example:
 vine_plot_txn_log vine-run-info/most-recent/vine-logs/transactions
 ```
 
+
+## Specialized and Experimental Settings
+
 ### Executing Dask Workflows in Python (experimental)
 
 TaskVine can be used to execute Dask workflows using a manager as Dask
@@ -2268,8 +2271,16 @@ scheduler. The class `DaskVine` implements a TaskVine manager that has a
         result = dask_value.compute()
     ```
 
+The `compute` call above may receive the following keyword arguments:
 
-### Specialized and Experimental Settings
+| Keyword | Description |
+|------------ |---------|
+| environment | A TaskVine file that provides an [environment](#environments) to execute each task. |
+| resources   | A dictionary to specify [maximum resources](#task-resources), e.g. `{"cores": 1, "memory": 2000"}` |
+| resources\_mode | [Automatic resource management](#automatic-resource-management) to use, e.g., "fixed", "max", or "max throughput"| 
+
+
+### Tunning Specialized Execution Parameters
 
 The behaviour of taskvine can be tuned by the following parameters. We advise
 caution when using these parameters, as the standard behaviour may drastically
