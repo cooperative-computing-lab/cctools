@@ -1,5 +1,5 @@
 ##
-# @package work_queue
+# @package ndcctools.work_queue
 #
 # Python Work Queue bindings.
 #
@@ -9,9 +9,12 @@
 # The SWIG-based Python bindings provide a higher-level interface that
 # revolves around the following objects:
 #
-# - @ref work_queue::WorkQueue
-# - @ref work_queue::Task
-# - @ref work_queue::Factory
+# - @ref ndcctools.work_queue.WorkQueue
+# - @ref ndcctools.work_queue.Task
+# - @ref ndcctools.work_queue.Factory
+
+from .cwork_queue import *
+from .work_queue_display import JupyterDisplay
 
 import itertools
 import copy
