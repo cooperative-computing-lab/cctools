@@ -2,12 +2,15 @@
 
 . ../../dttools/test/test_runner_common.sh
 
-python=${CCTOOLS_PYTHON_TEST_EXEC}
-python_dir=${CCTOOLS_PYTHON_TEST_DIR}
+import_config_val CCTOOLS_PYTHON_TEST_EXEC
+import_config_val CCTOOLS_PYTHON_TEST_DIR
+
+export PATH=$(pwd)/../src:$(pwd)/../../batch_job/src:$PATH
+export PYTHONPATH=$(pwd)/../../test_support/python_modules/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
 
 check_needed()
 {
-		[ -n "${python}" ] || return 1
+		[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
 
 		exit 0
 }
@@ -19,9 +22,8 @@ prepare()
 
 run()
 {
-	base=../src/bindings/${python_dir}
-
-	PYTHONPATH=${base} ${python} ${base}/example_simple_limit.py
+	base=../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}
+	${CCTOOLS_PYTHON_TEST_EXEC} ${base}/example_simple_limit.py
 }
 
 clean()
