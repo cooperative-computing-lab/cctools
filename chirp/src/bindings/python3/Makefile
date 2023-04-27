@@ -31,6 +31,6 @@ test:
 
 install: all
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)/ndcctools
-	cp ndcctools/chirp.py ndcctools/__init__.py ndcctools/cchirp.py ndcctools/$(CHIRPPYTHONSO) $(CCTOOLS_PYTHON3_PATH)/ndcctools
+	cp ndcctools/chirp.py ndcctools/__init__.py $(TARGETS) $(CCTOOLS_PYTHON3_PATH)/ndcctools
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/cctools/examples/chirp/python
 	cp chirp_python_example.py chirp_jobs_python_example.py $(CCTOOLS_INSTALL_DIR)/doc/cctools/examples/chirp/python
