@@ -5,7 +5,7 @@
 
 import sys
 import math
-import work_queue as wq
+import ndcctools.work_queue as wq
 
 def check_task(category, category_mode, max, min, expected):
     q.specify_category_max_resources(category, max)
