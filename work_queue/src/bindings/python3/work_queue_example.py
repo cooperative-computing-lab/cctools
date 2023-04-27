@@ -8,7 +8,7 @@
 # It accepts a list of files on the command line.
 # Each file is compressed with gzip and returned to the user.
 
-from work_queue import *
+from ndcctools.work_queue import *
 
 import os
 import sys

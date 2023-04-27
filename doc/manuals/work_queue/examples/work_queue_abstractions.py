@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Example of how to use work_queue abstractions
-import work_queue as wq
+import ndcctools.work_queue as wq
 
 def main():
     # Set up queue
