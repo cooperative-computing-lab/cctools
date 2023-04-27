@@ -73,7 +73,7 @@ atexit.register(cleanup_staging_directory)
 
 
 ##
-# \class Task
+# \class ndcctools.work_queue.Task
 #
 # Python Task object
 #
@@ -328,14 +328,14 @@ class Task(object):
     ##
     # Add a input file to the task.
     #
-    # This is just a wrapper for @ref specify_file with type set to @ref WORK_QUEUE_INPUT.
+    # This is just a wrapper for @ref ndcctools.work_queue.Task.specify_file with type set to @ref WORK_QUEUE_INPUT.
     def specify_input_file(self, local_name, remote_name=None, flags=None, cache=None):
         return self.specify_file(local_name, remote_name, WORK_QUEUE_INPUT, flags, cache, failure_only=None)
 
     ##
     # Add a output file to the task.
     #
-    # This is just a wrapper for @ref specify_file with type set to @ref WORK_QUEUE_OUTPUT.
+    # This is just a wrapper for @ref ndcctools.work_queue.Task.specify_file with type set to @ref WORK_QUEUE_OUTPUT.
     def specify_output_file(self, local_name, remote_name=None, flags=None, cache=None, failure_only=None):
         return self.specify_file(local_name, remote_name, WORK_QUEUE_OUTPUT, flags, cache, failure_only)
 
@@ -375,7 +375,7 @@ class Task(object):
     # @param self           Reference to the current task object.
     # @param buffer         The contents of the buffer to pass as input.
     # @param remote_name    The name of the remote file to create.
-    # @param flags          May take the same values as @ref specify_file.
+    # @param flags          May take the same values as @ref ndcctools.work_queue.Task.specify_file.
     # @param cache          Whether the file should be cached at workers (True/False)
     def specify_buffer(self, buffer, remote_name, flags=None, cache=None):
         if remote_name:
@@ -492,7 +492,7 @@ class Task(object):
     # Indicate the maximum running time (in microseconds) for a task in a
     # worker (relative to when the task starts to run).  If less than 1, or not
     # specified, no limit is imposed.
-    # Note: It has the same effect that specify_running_time_max, but specified
+    # Note: It has the same effect that ndcctools.work_queue.WorkQueue.specify_running_time_max, but specified
     # in microseconds. Kept for backwards compatibility.
     def specify_running_time(self, useconds):
         return work_queue_task_specify_running_time(self._task, int(useconds))
@@ -883,7 +883,7 @@ class Task(object):
         return self._task.resources_measured
 
     ##
-    # Get the resources the task exceeded. For valid field see @ref resources_measured.
+    # Get the resources the task exceeded. For valid field see @ref ndcctools.work_queue.Task.resources_measured.
     #
     @property
     def limits_exceeded(self):
@@ -897,7 +897,7 @@ class Task(object):
 
     ##
     # Get the resources the task requested to run. For valid fields see
-    # @ref resources_measured.
+    # @ref ndcctools.work_queue.Task.resources_measured.
     #
     @property
     def resources_requested(self):
@@ -907,7 +907,7 @@ class Task(object):
 
     ##
     # Get the resources allocated to the task in its latest attempt. For valid
-    # fields see @ref resources_measured.
+    # fields see @ref ndcctools.work_queue.Task.resources_measured.
     #
     @property
     def resources_allocated(self):
@@ -1086,8 +1086,7 @@ class PythonTaskNoResult(Exception):
 ##
 # Python Work Queue object
 #
-# This class uses a dictionary to map between the task pointer objects and the
-# @ref work_queue::Task.
+# @class WorkQueue
 class WorkQueue(object):
     ##
     # Create a new work queue.
@@ -1240,7 +1239,7 @@ class WorkQueue(object):
     # @code
     # >>> print(q.stats)
     # @endcode
-    # The fields in @ref stats can also be individually accessed through this call. For example:
+    # The fields in @ref ndcctools.work_queue.WorkQueue.stats can also be individually accessed through this call. For example:
     # @code
     # >>> print(q.stats.workers_busy)
     # @endcode
@@ -1254,7 +1253,7 @@ class WorkQueue(object):
     # @code
     # >>> print(q.stats_hierarchy)
     # @endcode
-    # The fields in @ref stats_hierarchy can also be individually accessed through this call. For example:
+    # The fields in @ref ndcctools.work_queue.WorkQueue.stats_hierarchy can also be individually accessed through this call. For example:
     # @code
     # >>> print(q.stats_hierarchy.workers_busy)
     # @endcode
@@ -1336,7 +1335,7 @@ class WorkQueue(object):
     # Turn on or off first-allocation labeling for a given category. By
     # default, only cores, memory, and disk are labeled, and gpus are unlabeled.
     # NOTE: autolabeling is only meaningfull when task monitoring is enabled
-    # (@ref enable_monitoring). When monitoring is enabled and a task exhausts
+    # (@ref ndcctools.work_queue.WorkQueue.enable_monitoring). When monitoring is enabled and a task exhausts
     # resources in a worker, mode dictates how work queue handles the
     # exhaustion:
     # @param self Reference to the current work queue object.
@@ -1346,12 +1345,12 @@ class WorkQueue(object):
     #                  - WORK_QUEUE_ALLOCATION_MODE_FIXED Task fails (default).
     #                  - WORK_QUEUE_ALLOCATION_MODE_MAX If maximum values are
     #                  specified for cores, memory, disk, and gpus (e.g. via @ref
-    #                  specify_category_max_resources or @ref Task.specify_memory),
+    #                  ndcctools.work_queue.WorkQueue.specify_category_max_resources or @ref ndcctools.work_queue.Task.specify_memory),
     #                  and one of those resources is exceeded, the task fails.
     #                  Otherwise it is retried until a large enough worker
     #                  connects to the manager, using the maximum values
     #                  specified, and the maximum values so far seen for
-    #                  resources not specified. Use @ref Task.specify_max_retries to
+    #                  resources not specified. Use @ref ndcctools.work_queue.Task.specify_max_retries to
     #                  set a limit on the number of times work queue attemps
     #                  to complete the task.
     #                  - WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE As above, but
@@ -1364,7 +1363,7 @@ class WorkQueue(object):
     ##
     # Turn on or off first-allocation labeling for a given category and
     # resource. This function should be use to fine-tune the defaults from @ref
-    # specify_category_mode.
+    # ndcctools.work_queue.WorkQueue.specify_category_mode.
     # @param self   Reference to the current work queue object.
     # @param category A category name.
     # @param resource A resource name.
@@ -1395,7 +1394,7 @@ class WorkQueue(object):
         return work_queue_enable_monitoring(self._work_queue, dirname, watchdog)
 
     ##
-    # As @ref enable_monitoring, but it also generates a time series and a debug file.
+    # As @ref ndcctools.work_queue.WorkQueue.enable_monitoring, but it also generates a time series and a debug file.
     # WARNING: Such files may reach gigabyte sizes for long running tasks.
     #
     # Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
@@ -1421,7 +1420,7 @@ class WorkQueue(object):
     #
     # @param self       Reference to the current work queue object.
     # @param name       Name of the category.
-    # @param multiplier The multiplier of the average task time at which point to abort; if zero, deacticate for the category, negative (the default), use the one for the "default" category (see @ref activate_fast_abort)
+    # @param multiplier The multiplier of the average task time at which point to abort; if zero, deacticate for the category, negative (the default), use the one for the "default" category (see @ref ndcctools.work_queue.WorkQueue.activate_fast_abort)
     def activate_fast_abort_category(self, name, multiplier):
         return work_queue_activate_fast_abort_category(self._work_queue, name, multiplier)
 
@@ -1494,7 +1493,7 @@ class WorkQueue(object):
         return work_queue_manager_preferred_connection(self._work_queue, mode)
 
     ##
-    # See specify_manager_preferred_connection
+    # See ndcctools.work_queue.WorkQueue.specify_manager_preferred_connection
     def specify_master_preferred_connection(self, mode):
         return work_queue_manager_preferred_connection(self._work_queue, mode)
 
@@ -1542,7 +1541,7 @@ class WorkQueue(object):
         return work_queue_specify_manager_mode(self._work_queue, mode)
 
     ##
-    # See specify_manager_mode
+    # @see ndcctools.work_queue.WorkQueue.specify_manager_mode
     def specify_master_mode(self, mode):
         return work_queue_specify_manager_mode(self._work_queue, mode)
 
@@ -1592,7 +1591,7 @@ class WorkQueue(object):
     #
     # Specifies the maximum resources allowed for the default category.
     # @param self      Reference to the current work queue object.
-    # @param rmd       Dictionary indicating maximum values. See @ref Task.resources_measured for possible fields.
+    # @param rmd       Dictionary indicating maximum values. See @ref ndcctools.work_queue.Task.resources_measured for possible fields.
     # For example:
     # @code
     # >>> # A maximum of 4 cores is found on any worker:
@@ -1611,7 +1610,7 @@ class WorkQueue(object):
     #
     # Specifies the minimum resources allowed for the default category.
     # @param self      Reference to the current work queue object.
-    # @param rmd       Dictionary indicating minimum values. See @ref Task.resources_measured for possible fields.
+    # @param rmd       Dictionary indicating minimum values. See @ref ndcctools.work_queue.Task.resources_measured for possible fields.
     # For example:
     # @code
     # >>> # A minimum of 2 cores is found on any worker:
@@ -1631,7 +1630,7 @@ class WorkQueue(object):
     #
     # @param self      Reference to the current work queue object.
     # @param category  Name of the category.
-    # @param rmd       Dictionary indicating maximum values. See @ref Task.resources_measured for possible fields.
+    # @param rmd       Dictionary indicating maximum values. See @ref ndcctools.work_queue.Task.resources_measured for possible fields.
     # For example:
     # @code
     # >>> # A maximum of 4 cores may be used by a task in the category:
@@ -1651,7 +1650,7 @@ class WorkQueue(object):
     #
     # @param self      Reference to the current work queue object.
     # @param category  Name of the category.
-    # @param rmd       Dictionary indicating minimum values. See @ref Task.resources_measured for possible fields.
+    # @param rmd       Dictionary indicating minimum values. See @ref ndcctools.work_queue.Task.resources_measured for possible fields.
     # For example:
     # @code
     # >>> # A minimum of 2 cores is found on any worker:
@@ -1671,7 +1670,7 @@ class WorkQueue(object):
     #
     # @param self      Reference to the current work queue object.
     # @param category  Name of the category.
-    # @param rmd       Dictionary indicating maximum values. See @ref Task.resources_measured for possible fields.
+    # @param rmd       Dictionary indicating maximum values. See @ref ndcctools.work_queue.Task.resources_measured for possible fields.
     # For example:
     # @code
     # >>> # Tasks are first tried with 4 cores:
@@ -1690,7 +1689,7 @@ class WorkQueue(object):
     # Initialize first value of categories
     #
     # @param self     Reference to the current work queue object.
-    # @param rm       Dictionary indicating maximum values. See @ref Task.resources_measured for possible fields.
+    # @param rm       Dictionary indicating maximum values. See @ref ndcctools.work_queue.Task.resources_measured for possible fields.
     # @param filename JSON file with resource summaries.
 
     def initialize_categories(self, filename, rm):
@@ -1700,7 +1699,7 @@ class WorkQueue(object):
     # Cancel task identified by its taskid and remove from the given queue.
     #
     # @param self   Reference to the current work queue object.
-    # @param id     The taskid returned from @ref submit.
+    # @param id     The taskid returned from @ref ndcctools.work_queue.WorkQueue.submit.
     def cancel_by_taskid(self, id):
         task = None
         task_pointer = work_queue_cancel_by_taskid(self._work_queue, id)
@@ -1712,7 +1711,7 @@ class WorkQueue(object):
     # Cancel task identified by its tag and remove from the given queue.
     #
     # @param self   Reference to the current work queue object.
-    # @param tag    The tag assigned to task using @ref Task.specify_tag.
+    # @param tag    The tag assigned to task using @ref ndcctools.work_queue.Task.specify_tag.
     def cancel_by_tasktag(self, tag):
         task = None
         task_pointer = work_queue_cancel_by_tasktag(self._work_queue, tag)
@@ -1755,7 +1754,7 @@ class WorkQueue(object):
         return work_queue_block_host(self._work_queue, host)
 
     ##
-    # Replaced by @ref block_host
+    # Replaced by @ref ndcctools.work_queue.WorkQueue.block_host
     def blacklist(self, host):
         return self.block_host(host)
 
@@ -1769,7 +1768,7 @@ class WorkQueue(object):
         return work_queue_block_host_with_timeout(self._work_queue, host, timeout)
 
     ##
-    # See @ref block_host_with_timeout
+    # See @ref ndcctools.work_queue.WorkQueue.block_host_with_timeout
     def blacklist_with_timeout(self, host, timeout):
         return self.block_host_with_timeout(host, timeout)
 
@@ -1784,7 +1783,7 @@ class WorkQueue(object):
         return work_queue_unblock_host(self._work_queue, host)
 
     ##
-    # See @ref unblock_host
+    # See @ref ndcctools.work_queue.WorkQueue.unblock_host
     def blacklist_clear(self, host=None):
         return self.unblock_host(host)
 
@@ -1852,10 +1851,10 @@ class WorkQueue(object):
     ##
     # Submit a task to the queue.
     #
-    # It is safe to re-submit a task returned by @ref wait.
+    # It is safe to re-submit a task returned by @ref ndcctools.work_queue.WorkQueue.wait.
     #
     # @param self   Reference to the current work queue object.
-    # @param task   A task description created from @ref work_queue::Task.
+    # @param task   A task description created from @ref ndcctools.work_queue.Task.
     def submit(self, task):
         if isinstance(task, RemoteTask):
             task.specify_buffer(json.dumps(task._event), "infile")
@@ -1876,7 +1875,7 @@ class WorkQueue(object):
         return self.wait_for_tag(None, timeout)
 
     ##
-    # Similar to @ref wait, but guarantees that the returned task has the
+    # Similar to @ref ndcctools.work_queue.WorkQueue.wait, but guarantees that the returned task has the
     # specified tag.
     #
     # This call will block until the timeout has elapsed.
@@ -2220,9 +2219,8 @@ class RemoteTask(Task):
     #
     # @param self       Reference to the current remote task object.
     # @param fn         The name of the function to be executed on the coprocess
-    # @param coprocess  The name of the coprocess which has the function you wish to execute. The coprocess should have a name() method that returns this
-    # @param
-    # @param command    The shell command line to be exected by the task.
+    # @param coprocess  The name of the coprocess which has the function you wish to execute.
+    #                   The coprocess should have a name() method that returns this
     # @param args       positional arguments used in function to be executed by task. Can be mixed with kwargs
     # @param kwargs	    keyword arguments used in function to be executed by task.
     def __init__(self, fn, coprocess, *args, **kwargs):
