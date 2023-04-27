@@ -18,6 +18,7 @@ check_needed()
 	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
 
 	if [ "${CCTOOLS_OPSYS}" = DARWIN ]
+	then
 		return 1
 	fi
 
