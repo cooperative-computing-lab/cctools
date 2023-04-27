@@ -19,8 +19,10 @@
 	#include "timestamp.h"
 	#include "category_internal.h"
 	#include "category.h"
-	#include "rmonitor_poll.h"
 	#include "rmsummary.h"
+    #ifndef SWIGMAC
+	#include "rmonitor_poll.h"
+    #endif
 %}
 
 %typemap(in) off_t = long long int;

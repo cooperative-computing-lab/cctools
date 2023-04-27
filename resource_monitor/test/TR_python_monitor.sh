@@ -4,15 +4,18 @@
 
 import_config_val CCTOOLS_PYTHON_TEST_EXEC
 import_config_val CCTOOLS_PYTHON_TEST_DIR
+import_config_val CCTOOLS_OPSYS
 
 export PATH=$(pwd)/../src:$(pwd)/../../batch_job/src:$PATH
 export PYTHONPATH=$(pwd)/../../test_support/python_modules/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
 
 check_needed()
 {
-		[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
+	[ "${CCTOOLS_OPSYS}" = LINUX ] || return 1
 
-		exit 0
+	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
+
+	return 0
 }
 
 prepare()
