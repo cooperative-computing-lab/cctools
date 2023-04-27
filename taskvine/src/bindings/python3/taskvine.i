@@ -4,9 +4,6 @@
 %include carrays.i
 %array_functions(struct rmsummary *, rmsummayArray);
 
-/* type is a go keyword. rename it to value_type */
-%rename(value_type) rmsummary_field::type;
-
 %begin %{
 	#define SWIG_PYTHON_2_UNICODE
 %}
@@ -15,7 +12,6 @@
 	#include "int_sizes.h"
 	#include "timestamp.h"
 	#include "taskvine.h"
-	#include "rmsummary.h"
     #include "vine_task.h"
     #include "vine_runtime_dir.h"
 %}
@@ -70,10 +66,6 @@ into a swig function f(data) */
 %include "int_sizes.h"
 %include "timestamp.h"
 %include "taskvine.h"
-%include "rmsummary.h"
-%include "category.h"
 %include "vine_task.h"
 %include "vine_runtime_dir.h"
-
-
 

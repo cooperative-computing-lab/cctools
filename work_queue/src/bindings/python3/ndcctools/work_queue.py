@@ -16,6 +16,13 @@
 from .cwork_queue import *
 from .work_queue_display import JupyterDisplay
 
+from ndcctools.resource_monitor import (
+    rmsummary_delete,
+    rmsummary_create,
+    rmsummaryArray_getitem,
+    delete_rmsummaryArray,
+)
+
 import itertools
 import copy
 import os
@@ -1314,7 +1321,7 @@ class WorkQueue(object):
         count = 0
         workers = []
         while True:
-            s = rmsummayArray_getitem(from_c, count)
+            s = rmsummaryArray_getitem(from_c, count)
             if not s:
                 break
             workers.append(
@@ -1328,7 +1335,7 @@ class WorkQueue(object):
             )
             rmsummary_delete(s)
             count += 1
-        delete_rmsummayArray(from_c)
+        delete_rmsummaryArray(from_c)
         return workers
 
     ##
@@ -2545,16 +2552,3 @@ class Factory(object):
 
     specify_package = specify_environment
 
-
-def rmsummary_snapshots(self):
-    if self.snapshots_count < 1:
-        return None
-
-    snapshots = []
-    for i in range(0, self.snapshots_count):
-        snapshot = rmsummary_get_snapshot(self, i)
-        snapshots.append(snapshot)
-    return snapshots
-
-
-rmsummary.snapshots = property(rmsummary_snapshots)

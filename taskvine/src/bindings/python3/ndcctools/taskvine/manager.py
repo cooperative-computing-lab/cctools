@@ -11,6 +11,14 @@
 #
 
 from . import cvine
+
+from ndcctools.resource_monitor import (
+    rmsummary_delete,
+    rmsummary_create,
+    rmsummaryArray_getitem,
+    delete_rmsummaryArray,
+)
+
 from .display import JupyterDisplay
 from .file import File
 from .task import (
@@ -283,13 +291,13 @@ class Manager(object):
         count = 0
         workers = []
         while True:
-            s = cvine.rmsummayArray_getitem(from_c, count)
+            s = rmsummaryArray_getitem(from_c, count)
             if not s:
                 break
             workers.append({"workers": int(s.workers), "cores": int(s.cores), "gpus": int(s.gpus), "memory": int(s.memory), "disk": int(s.disk)})
-            cvine.rmsummary_delete(s)
+            rmsummary_delete(s)
             count += 1
-        cvine.delete_rmsummayArray(from_c)
+        delete_rmsummaryArray(from_c)
         return workers
 
     ##
@@ -534,7 +542,7 @@ class Manager(object):
     # @endcode
 
     def set_resources_max(self, rmd):
-        rm = cvine.rmsummary_create(-1)
+        rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
         return cvine.vine_set_resources_max(self._taskvine, rm)
@@ -553,7 +561,7 @@ class Manager(object):
     # @endcode
 
     def set_resources_min(self, rmd):
-        rm = cvine.rmsummary_create(-1)
+        rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
         return cvine.vine_set_resources_min(self._taskvine, rm)
@@ -573,7 +581,7 @@ class Manager(object):
     # @endcode
 
     def set_category_resources_max(self, category, rmd):
-        rm = cvine.rmsummary_create(-1)
+        rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
         return cvine.vine_set_category_resources_max(self._taskvine, category, rm)
@@ -593,7 +601,7 @@ class Manager(object):
     # @endcode
 
     def set_category_resources_min(self, category, rmd):
-        rm = cvine.rmsummary_create(-1)
+        rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
         return cvine.vine_set_category_resources_min(self._taskvine, category, rm)
@@ -613,7 +621,7 @@ class Manager(object):
     # @endcode
 
     def set_category_first_allocation_guess(self, category, rmd):
-        rm = cvine.rmsummary_create(-1)
+        rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
         return cvine.vine_set_category_first_allocation_guess(self._taskvine, category, rm)

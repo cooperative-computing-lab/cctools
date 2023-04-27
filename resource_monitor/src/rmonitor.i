@@ -7,6 +7,7 @@
 %module cresource_monitor
 %include carrays.i
 %array_functions(char *, strArray);
+%array_functions(struct rmsummary *, rmsummaryArray);
 
 %begin %{
 	#define SWIG_PYTHON_2_UNICODE

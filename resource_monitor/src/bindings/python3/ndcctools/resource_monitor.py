@@ -47,8 +47,12 @@ from .cresource_monitor import (
     rmonitor_minimonitor,
     rmsummary,
     rmsummary_check_limits,
+    rmsummary_create,
+    rmsummary_delete,
     rmsummary_copy,
     rmsummary_merge_max,
+    rmsummaryArray_getitem,
+    delete_rmsummaryArray,
 )
 
 
@@ -603,3 +607,16 @@ class Category:
 
     def maximum_seen(self):
         return self._cat.max_resources_seen.to_dict()
+
+
+def rmsummary_snapshots(self):
+    if self.snapshots_count < 1:
+        return None
+
+    snapshots = []
+    for i in range(0, self.snapshots_count):
+        snapshot = rmsummary_get_snapshot(self, i)
+        snapshots.append(snapshot)
+    return snapshots
+
+rmsummary.snapshots = property(rmsummary_snapshots)
