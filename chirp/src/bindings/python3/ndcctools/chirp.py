@@ -1,4 +1,5 @@
-## @package chirp
+##
+# @package ndcctools.chirp
 #
 # Python Chirp bindings.
 #
@@ -8,8 +9,8 @@
 # The SWIG-based Python bindings provide a higher-level interface that
 # revolves around:
 #
-# - @ref chirp.Client
-# - @ref chirp.Stat
+# - @ref ndcctools.chirp.Client
+# - @ref ndcctools.chirp.Stat
 import os
 import time
 import json
@@ -17,7 +18,7 @@ import json
 from .cchirp import *
 
 ##
-# \class chirp.Client
+# \class ndcctools.chirp.Client
 # Python Client object
 #
 # This class is used to create a chirp client
@@ -441,6 +442,8 @@ class Client(object):
 
 ##
 # Python Stat object
+#
+# @class ndcctools.chirp.Stat
 #
 # This class is used to record stat information for files/directories of a chirp server.
 class Stat(object):
