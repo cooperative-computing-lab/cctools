@@ -14,6 +14,8 @@ import os
 import time
 import json
 
+from .cchirp import *
+
 ##
 # \class chirp.Client
 # Python Client object
