@@ -4,7 +4,7 @@
  * distributed under the GNU General Public License.  See the file COPYING for
  * details. */
 
-%module resource_monitor
+%module cresource_monitor
 %include carrays.i
 %array_functions(char *, strArray);
 

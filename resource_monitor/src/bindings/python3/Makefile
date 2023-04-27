@@ -8,28 +8,27 @@ LOCAL_CCFLAGS = -fPIC -w $(CCTOOLS_PYTHON3_CCFLAGS)
 LOCAL_LINKAGE = $(CCTOOLS_PYTHON3_LDFLAGS)
 
 EXTERNAL_DEPENDENCIES = $(CCTOOLS_HOME)/dttools/src/libdttools.a
-RMPYTHONSO = _resource_monitor.$(CCTOOLS_DYNAMIC_SUFFIX)
-LIBRARIES = $(RMPYTHONSO) resource_monitor.py
+RMPYTHONSO = ndcctools/_cresource_monitor.$(CCTOOLS_DYNAMIC_SUFFIX)
+LIBRARIES = $(RMPYTHONSO) ndcctools/cresource_monitor.py
 OBJECTS = rmonitor_wrap.o
 TARGETS = $(LIBRARIES)
 
 all: $(TARGETS)
 
-rmonitor_wrap.c resource_monitor.py: rmonitor.i resource_monitor.bindings.py
+rmonitor_wrap.c ndcctools/cresource_monitor.py: rmonitor.i
 	@echo "SWIG rmonitor.i (python)"
 	@$(CCTOOLS_SWIG) -o rmonitor_wrap.c -python -I$(CCTOOLS_HOME)/dttools/src/ rmonitor.i
-	@cat resource_monitor.bindings.py >> resource_monitor.py
+	@mv cresource_monitor.py ndcctools/
 
 $(RMPYTHONSO): rmonitor_wrap.o $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -rf $(TARGETS) $(OBJECTS) rmonitor_wrap.c *.so *.pyc __pycache__
+	rm -rf $(TARGETS) $(OBJECTS) rmonitor_wrap.c *.so *.pyc __pycache__ ndcctools/__pycache__
 
 test:
 
 install: all
-	mkdir -p $(CCTOOLS_PYTHON3_PATH)
-	chmod 755 resource_monitor.py
-	cp resource_monitor.py $(TARGETS) $(CCTOOLS_PYTHON3_PATH)/
+	mkdir -p $(CCTOOLS_PYTHON3_PATH)/ndcctools/
+	cp ndcctools/resource_monitor.py ndcctools/__init__.py $(TARGETS) $(CCTOOLS_PYTHON3_PATH)/ndcctools/
 
 

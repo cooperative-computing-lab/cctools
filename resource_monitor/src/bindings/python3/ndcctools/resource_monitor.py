@@ -2,7 +2,8 @@
 # under the GNU General Public License.
 # See the file COPYING for details.
 #
-## @package resource_monitor
+##
+# @package ndcctools.resource_monitor
 #
 # Python resource_monitor bindings.
 #
@@ -26,9 +27,35 @@ import struct
 import tempfile
 import threading
 
+from .cresource_monitor import (
+    CATEGORY_ALLOCATION_MODE_FIXED,
+    CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT,
+    CATEGORY_ALLOCATION_MODE_MIN_WASTE,
+    D_RMON,
+    MINIMONITOR_ADD_PID,
+    MINIMONITOR_MEASURE,
+    MINIMONITOR_REMOVE_PID,
+    category_accumulate_summary,
+    category_create,
+    category_specify_allocation_mode,
+    category_tune_bucket_size,
+    category_update_first_allocation,
+    cctools_debug,
+    cctools_debug_config,
+    cctools_debug_flags_set,
+    rmonitor_measure_process,
+    rmonitor_minimonitor,
+    rmsummary,
+    rmsummary_check_limits,
+    rmsummary_copy,
+    rmsummary_merge_max,
+)
+
+
 def set_debug_flag(*flags):
     for flag in flags:
         cctools_debug_flags_set(flag)
+
 
 cctools_debug_config('resource_monitor')
 
@@ -129,9 +156,8 @@ class ResourceExhaustion(Exception):
     # @param fn_args             List of positional arguments to function that caused the exhaustion.
     # @param fn_kwargs           Dictionary of keyword arguments to function that caused the exhaustion.
     def __init__(self, resources, function, fn_args=None, fn_kwargs=None):
-        r = resources
-        l = resources['limits_exceeded']
-        ls = ["{limit}: {value}".format(limit=k, value=l[k]) for k in rmsummary.list_resources() if l[k] > -1]
+        limits = resources['limits_exceeded']
+        ls = ["{limit}: {value}".format(limit=k, value=limits[k]) for k in rmsummary.list_resources() if limits[k] > -1]
 
         message = 'Limits broken: {limits}'.format(limits=','.join(ls))
         super(ResourceExhaustion, self).__init__(resources, function, fn_args, fn_kwargs)
@@ -145,8 +171,10 @@ class ResourceExhaustion(Exception):
     def __str__(self):
         return self.message
 
+
 class ResourceInternalError(Exception):
     pass
+
 
 def __measure_update_to_peak(pid, old_summary=None):
     new_summary = rmonitor_measure_process(pid)
@@ -157,8 +185,10 @@ def __measure_update_to_peak(pid, old_summary=None):
     rmsummary_merge_max(old_summary, new_summary)
     return old_summary
 
+
 def __child_handler(child_finished, signum, frame):
     child_finished.set()
+
 
 def _wrap_function(results, fun, args, kwargs):
     def fun_wrapper():
@@ -170,19 +200,20 @@ def _wrap_function(results, fun, args, kwargs):
             start = time.time()
             result = fun(*args, **kwargs)
             __measure_update_to_peak(pid, rm)
-            setattr(rm, 'wall_time', int((time.time() - start)*1e6))
+            setattr(rm, 'wall_time', int((time.time() - start) * 1e6))
             results.put((result, rm))
         except Exception as e:
             results.put((e, None))
     cctools_debug(D_RMON, "function wrapper created")
     return fun_wrapper
 
+
 def __read_pids_file(pids_file):
     fcntl.flock(pids_file, fcntl.LOCK_EX)
     line = bytearray(pids_file.read())
     fcntl.flock(pids_file, fcntl.LOCK_UN)
 
-    n = len(line)/4
+    n = len(line) / 4
     if n > 0:
         ns = struct.unpack('!' + 'i' * int(n), line)
         for pid in ns:
@@ -191,11 +222,12 @@ def __read_pids_file(pids_file):
             else:
                 rmonitor_minimonitor(MINIMONITOR_REMOVE_PID, -pid)
 
+
 def _watchman(results_queue, limits, callback, interval, function, args, kwargs):
     try:
         # child_finished is set when the process running function exits
         child_finished = threading.Event()
-        old_handler = signal.signal(signal.SIGCHLD, functools.partial(__child_handler, child_finished))
+        signal.signal(signal.SIGCHLD, functools.partial(__child_handler, child_finished))
 
         # result of function is eventually push into local_results
         local_results = multiprocessing.Queue()
@@ -278,6 +310,7 @@ def _watchman(results_queue, limits, callback, interval, function, args, kwargs)
         cctools_debug(D_RMON, "error executing function process: {err}".format(err=e))
         results_queue.put({'result': e, 'resources': None, 'resource_exhaustion': False})
 
+
 def _resources_to_dict(resources):
     d = resources.to_dict()
     try:
@@ -286,6 +319,7 @@ def _resources_to_dict(resources):
     except KeyError:
         d['cores_avg'] = -1
     return d
+
 
 def __monitor_function(limits, callback, interval, return_resources, function, *args, **kwargs):
     result_queue = multiprocessing.Queue()
@@ -315,6 +349,7 @@ def __monitor_function(limits, callback, interval, return_resources, function, *
         return (results['result'], results['resources'])
     else:
         return results['result']
+
 
 ##
 # Class to encapsule all the categories in a workflow.
@@ -396,7 +431,6 @@ class Categories:
     #
     def accumulate_summary(self, summary):
         category = summary['category']
-        wall_time = summary['wall_time']
 
         if category == self.all_categories_name:
             raise ValueError("category '" + self.all_categories_name + "' used for individual category.")
@@ -488,14 +522,13 @@ class Category:
         self._cat = category_create(category)
         self.summaries = []
 
-
     def allocation_mode(self, mode):
         if mode == 'fixed':
-            category_specify_allocation_mode(self._cat, WORK_QUEUE_ALLOCATION_MODE_FIXED)
+            category_specify_allocation_mode(self._cat, CATEGORY_ALLOCATION_MODE_FIXED)
         elif mode == 'waste':
-            category_specify_allocation_mode(self._cat, WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE)
+            category_specify_allocation_mode(self._cat, CATEGORY_ALLOCATION_MODE_MIN_WASTE)
         elif mode == 'throughput':
-            category_specify_allocation_mode(self._cat, WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
+            category_specify_allocation_mode(self._cat, CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT)
         else:
             raise ValueError('No such mode')
 
@@ -539,7 +572,7 @@ class Category:
         waste = self.waste(field, allocation)
         usage = self.usage(field)
 
-        return (100.0 * waste)/(waste + usage)
+        return (100.0 * waste) / (waste + usage)
 
     def throughput(self, field, allocation):
         maximum = self.maximum_seen()[field]
@@ -553,11 +586,11 @@ class Category:
 
             if resource > allocation:
                 tasks += 1
-                total_time += 2*wall_time
+                total_time += 2 * wall_time
             else:
-                tasks += maximum/allocation
+                tasks += maximum / allocation
                 total_time += wall_time
-        return tasks/total_time
+        return tasks / total_time
 
     def first_allocation(self, mode):
         self.allocation_mode(mode)
@@ -566,7 +599,7 @@ class Category:
             return self.maximum_seen()
 
         category_update_first_allocation(self._cat, None)
-        return resource_monitor.to_dict(self._cat.first_allocation)
+        return self._cat.first_allocation.to_dict()
 
     def maximum_seen(self):
-        return resource_monitor.to_dict(self._cat.max_resources_seen)
+        return self._cat.max_resources_seen.to_dict()
