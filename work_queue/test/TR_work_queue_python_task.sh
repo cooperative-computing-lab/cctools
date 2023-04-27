@@ -6,7 +6,7 @@ set -e
 import_config_val CCTOOLS_PYTHON_TEST_EXEC
 import_config_val CCTOOLS_PYTHON_TEST_DIR
 
-export PYTHONPATH=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
+export PYTHONPATH=$(pwd)/../../test_support/python_modules/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
 export PATH=$(dirname "${CCTOOLS_PYTHON_TEST_EXEC}"):$PATH
 
 STATUS_FILE=wq.status

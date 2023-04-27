@@ -7,7 +7,7 @@ import_config_val CCTOOLS_PYTHON_TEST_EXEC
 import_config_val CCTOOLS_PYTHON_TEST_DIR
 PONCHO_PACKAGE_SERVERIZE=$(cd "$(dirname "$0")/../../poncho/src/"; pwd)/poncho_package_serverize
 
-export PYTHONPATH=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
+export PYTHONPATH=$(pwd)/../../test_support/python_modules/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
 
 STATUS_FILE=wq.status
 PORT_FILE=wq.port
