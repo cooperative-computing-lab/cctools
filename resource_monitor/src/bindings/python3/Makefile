@@ -31,4 +31,3 @@ install: all
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)/ndcctools/
 	cp ndcctools/resource_monitor.py ndcctools/__init__.py $(TARGETS) $(CCTOOLS_PYTHON3_PATH)/ndcctools/
 
-
