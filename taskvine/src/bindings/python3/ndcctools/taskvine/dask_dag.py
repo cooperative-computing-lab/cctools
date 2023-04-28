@@ -70,7 +70,7 @@ class DaskVineDag:
         inner[indices[-1]] = value
 
     def __init__(self, dsk):
-        self._dsk = dsk
+        self._dsk = dict(dsk)
 
         # those sexpr from dsk that we need to compute, but flatten
         self._flat = {}
