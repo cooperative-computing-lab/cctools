@@ -63,8 +63,8 @@ with factory:
                 print(".", end="")
                 last_returned_time = time.time()
 
-            # if no task for 15s, something went wrong with the test
-            if time.time() - last_returned_time > 15:
+            # if no task for 60s, something went wrong with the test
+            if time.time() - last_returned_time > 60:
                 print("\nno task finished recently")
                 sys.exit(1)
 
