@@ -703,10 +703,15 @@ class PythonTask(Task):
         self._id = str(uuid.uuid4())
         self._func_file = f"function_{self._id}.p"
         self._args_file = f"args_{self._id}.p"
-        self._out_file = f"out_{self._id}.p"
+        self._out_name_file = f"out_{self._id}.p"
         self._stdout_file = f"stdout_{self._id}.p"
         self._wrapper = f"pytask_wrapper_{self._id}.py"
         self._command = self._python_function_command()
+
+        self._tmp_output_enabled = False
+
+        # vine File object that will contain the output of this function
+        self._output_file = None
 
         # we delay any PythonTask initialization until the task is submitted to
         # a manager. This is because we don't know the staging directory where
@@ -718,7 +723,6 @@ class PythonTask(Task):
             if self._tmpdir and os.path.exists(self._tmpdir):
                 shutil.rmtree(self._tmpdir)
         self._finalizer = weakref.finalize(self, free)
-
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -735,15 +739,56 @@ class PythonTask(Task):
         self._add_IO_files(manager)
 
     ##
+    # Marks the output of this task to stay at the worker.
+    # Functions that consume the output of this tasks have to
+    # add self.output_file as an input, and cloudpickle.load() it.
+    #
+    # E.g.:
+    #
+    # @code
+    # ta = PythonTask(fn, ...)
+    # ta.enable_temp_output()
+    # tid = m.submit(ta)
+    #
+    # t = m.wait(...)
+    # if t.id == tid:
+    #   tb = PythonTask(fn_with_tmp, "ta_output.file")
+    #   tb.add_input(ta.output_file, "ta_output.file")
+    #   m.submit(tb)
+    # @code
+    #
+    # where fn_with_tmp may look something like this:
+    #
+    # def fn_with_tmp(filename):
+    #   import cloudpickle
+    #   with open(filename) as f:
+    #     data = cloudpickle.load(f)
+    #
+    # @param self 	Reference to the current python task object
+    # @param manager Manager to which the task was submitted
+    def enable_temp_output(self):
+        self._tmp_output_enabled = True
+
+    ##
+    # Returns the ndcctools.taskvine.manager.File object that
+    # represents the output of this task.
+    @property
+    def output_file(self):
+        return self._output_file
+
+    ##
     # returns the result of a python task as a python variable
     #
     # @param self	reference to the current python task object
     @property
     def output(self):
+        if self._tmp_output_enabled:
+            raise ValueError("temp output was enabled for this task, thus its output is not available locallly.")
+
         if not self._output_loaded:
             if self.successful():
                 try:
-                    with open(os.path.join(self._tmpdir, self._out_file), "rb") as f:
+                    with open(os.path.join(self._tmpdir, self._out_name_file), "rb") as f:
                         self._output = cloudpickle.load(f)
                 except Exception as e:
                     self._output = e
@@ -775,17 +820,22 @@ class PythonTask(Task):
         else:
             py_exec = f"python{sys.version_info[0]}"
 
-        command = f"{py_exec} {self._wrapper} {self._func_file} {self._args_file} {self._out_file} > {self._stdout_file} 2>&1"
+        command = f"{py_exec} {self._wrapper} {self._func_file} {self._args_file} {self._out_name_file} > {self._stdout_file} 2>&1"
         return command
 
     def _add_IO_files(self, manager):
-        def add_files(method, *files):
+        def add_files(method, *files, tmp_output=False):
             for name in files:
                 source = os.path.join(self._tmpdir, name)
-                f = manager.declare_file(source, cache=False)
+                if tmp_output:
+                    f = manager.declare_temp()
+                    self._output_file = f
+                else:
+                    f = manager.declare_file(source, cache=False)
                 method(f, name)
         add_files(self.add_input, self._wrapper, self._func_file, self._args_file)
-        add_files(self.add_output, self._out_file, self._stdout_file)
+        add_files(self.add_output, self._stdout_file)
+        add_files(self.add_output, self._out_name_file, tmp_output=self._tmp_output_enabled)
 
     ##
     # creates the wrapper script which will execute the function. pickles output.
