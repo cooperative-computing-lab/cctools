@@ -68,6 +68,7 @@ class Manager(object):
     # @param staging_path Directory to write temporary files. Defaults to run_info_path if not given.
     # @param ssl        A tuple of filenames (ssl_key, ssl_cert) in pem format, or True.
     #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
+    # @param init_fn    Function applied to the newly created manager at initialization.
     # @param status_display_interval Number of seconds between updates to the jupyter status display. None, or less than 1 disables it.
     #
     # @see vine_create    - For more information about environmental variables that affect the behavior this method.
@@ -78,6 +79,7 @@ class Manager(object):
                  run_info_path="vine-run-info",
                  staging_path=None,
                  ssl=None,
+                 init_fn=None,
                  status_display_interval=None):
         self._shutdown = shutdown
         self._taskvine = None
@@ -122,11 +124,18 @@ class Manager(object):
 
             if name:
                 cvine.vine_set_name(self._taskvine, name)
-
-            self._update_status_display()
         except Exception:
             sys.stderr.write("Unable to create internal taskvine structure.")
             raise
+
+        try:
+            if init_fn:
+                init_fn(self)
+        except Exception:
+            sys.stderr.write("Something went wrong with the custom initialization function.")
+            raise
+
+        self._update_status_display()
 
     def _free_manager(self):
         try:
