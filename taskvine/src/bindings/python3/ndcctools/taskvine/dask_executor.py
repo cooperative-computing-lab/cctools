@@ -77,12 +77,20 @@ class DaskVine(Manager):
 
             self.submit(t)
 
+    def get(self, dsk, keys, **kwargs):
+        return self.dask_execute(dsk, keys, **kwargs)
+
     def dask_execute(self, dsk, keys, **kwargs):
         """Computes the values of the keys in the dask graph dsk"""
 
-        indices = DaskVineDag.find_dask_keys(keys)
+        if isinstance(keys, list):
+            indices = DaskVineDag.find_dask_keys(keys)
+            keys_flatten = indices.keys()
+        else:
+            keys_flatten = [keys]
+
         d = DaskVineDag(dsk)
-        rs = d.set_targets(indices.keys())
+        rs = d.set_targets(keys_flatten)
 
         verbose = kwargs.pop("verbose", False)
 
@@ -99,9 +107,12 @@ class DaskVine(Manager):
                 else:
                     raise Exception(f"task for key {t.key} failed: {t.result}. exit code {t.exit_code}\n{t.output}")
 
-        results = list(keys)
-        for k, ids in indices.items():
-            DaskVineDag.set_dask_result(results, ids, d.get_result(k))
+        if isinstance(keys, list):
+            results = list(keys)
+            for k, ids in indices.items():
+                DaskVineDag.set_dask_result(results, ids, d.get_result(k))
+        else:
+            results = d.get_result(keys)
         return results
 
 
