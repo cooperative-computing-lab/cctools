@@ -194,7 +194,7 @@ class Manager(object):
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
-        self._free_manager()
+        self._finalizer()
 
     ##
     # Get the project name of the manager.
