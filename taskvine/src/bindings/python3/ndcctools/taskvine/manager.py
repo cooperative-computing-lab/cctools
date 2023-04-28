@@ -64,13 +64,23 @@ class Manager(object):
     # @param port       The port number to listen on. If zero, then a random port is chosen. A range of possible ports (low, hight) can be also specified instead of a single integer. Default is 9123
     # @param name       The project name to use.
     # @param shutdown   Automatically shutdown workers when manager is finished. Disabled by default.
-    # @param run_info_path Directory to write log and staging files per run. If None, defaults to "vine-run-info"
+    # @param run_info_path Directory to write log (and staging if staging_path not given) files per run. If None, defaults to "vine-run-info"
+    # @param staging_path Directory to write temporary files. Defaults to run_info_path if not given.
     # @param ssl        A tuple of filenames (ssl_key, ssl_cert) in pem format, or True.
     #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
+    # @param init_fn    Function applied to the newly created manager at initialization.
     # @param status_display_interval Number of seconds between updates to the jupyter status display. None, or less than 1 disables it.
     #
     # @see vine_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=cvine.VINE_DEFAULT_PORT, name=None, shutdown=False, run_info_path="vine-run-info", ssl=None, status_display_interval=None):
+    def __init__(self,
+                 port=cvine.VINE_DEFAULT_PORT,
+                 name=None,
+                 shutdown=False,
+                 run_info_path="vine-run-info",
+                 staging_path=None,
+                 ssl=None,
+                 init_fn=None,
+                 status_display_interval=None):
         self._shutdown = shutdown
         self._taskvine = None
         self._stats = None
@@ -79,6 +89,7 @@ class Manager(object):
         self._library_table = {}
         self._info_widget = None
         self._using_ssl = False
+        self._staging_explicit = staging_path
 
         # if we were given a range ports, rather than a single port to try.
         lower, upper = None, None
@@ -113,11 +124,18 @@ class Manager(object):
 
             if name:
                 cvine.vine_set_name(self._taskvine, name)
-
-            self._update_status_display()
         except Exception:
             sys.stderr.write("Unable to create internal taskvine structure.")
             raise
+
+        try:
+            if init_fn:
+                init_fn(self)
+        except Exception:
+            sys.stderr.write("Something went wrong with the custom initialization function.")
+            raise
+
+        self._update_status_display()
 
     def _free_manager(self):
         try:
@@ -200,7 +218,7 @@ class Manager(object):
         return self._using_ssl
 
     ##
-    # Get the staging directory of the manager
+    # Get the logs directory of the manager
     @property
     def logging_directory(self):
         return cvine.vine_get_runtime_path_log(self._taskvine, None)
@@ -209,7 +227,13 @@ class Manager(object):
     # Get the staging directory of the manager
     @property
     def staging_directory(self):
-        return cvine.vine_get_runtime_path_staging(self._taskvine, None)
+        if self._staging_explicit:
+            if not os.path.exists(self._staging_explicit):
+                path = pathlib.Path(self._staging_explicit)
+                path.mkdir(parents=True, exist_ok=True)
+            return self._staging_explicit
+        else:
+            return cvine.vine_get_runtime_path_staging(self._taskvine, None)
 
     ##
     # Get the caching directory of the manager
