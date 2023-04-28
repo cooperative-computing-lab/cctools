@@ -1,8 +1,17 @@
 #!/bin/sh
+#
+TEST_INPUT=R
 
 . ../../dttools/test/test_runner_common.sh
 
-TEST_INPUT=R
+import_config_val CCTOOLS_OPSYS
+
+check_needed()
+{
+	[ "${CCTOOLS_OPSYS}" = LINUX ] || return 1
+
+	return 0
+}
 
 prepare()
 {

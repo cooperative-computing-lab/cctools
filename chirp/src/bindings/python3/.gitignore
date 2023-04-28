@@ -1,6 +1,5 @@
 *.pyc
 *.so
-CChirp.py
-Chirp.py
-cctools.test.log
+_cchirp.so
+cchirp.py
 chirp_wrap.*

@@ -3,7 +3,7 @@
 import sys
 import os
 
-import chirp
+import ndcctools.chirp as chirp
 
 def write_some_file(filename='bar.txt'):
     message  = '''

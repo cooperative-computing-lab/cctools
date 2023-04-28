@@ -5,9 +5,10 @@ set -e
 
 import_config_val CCTOOLS_PYTHON_TEST_EXEC
 import_config_val CCTOOLS_PYTHON_TEST_DIR
+import_config_val CCTOOLS_OPSYS
 
 export PATH=$(pwd)/../src:$(pwd)/../../batch_job/src:$PATH
-export PYTHONPATH=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
+export PYTHONPATH=$(pwd)/../../test_support/python_modules/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
 
 STATUS_FILE=wq.status
 PORT_FILE=wq.port
@@ -15,6 +16,13 @@ PORT_FILE=wq.port
 check_needed()
 {
 	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
+
+	if [ "${CCTOOLS_OPSYS}" = DARWIN ]
+	then
+		return 1
+	fi
+
+	return 0
 }
 
 prepare()

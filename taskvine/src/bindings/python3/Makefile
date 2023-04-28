@@ -8,23 +8,22 @@ LOCAL_CCFLAGS = -w -fPIC -DNDEBUG $(CCTOOLS_PYTHON3_CCFLAGS) -I ../../manager
 LOCAL_LINKAGE = $(CCTOOLS_PYTHON3_LDFLAGS) -lz $(CCTOOLS_OPENSSL_LDFLAGS) $(CCTOOLS_HOME)/taskvine/src/manager/libtaskvine.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
 
 DSPYTHONSO = ndcctools/taskvine/_cvine.$(CCTOOLS_DYNAMIC_SUFFIX)
-LIBRARIES = $(DSPYTHONSO) ndcctools/taskvine/cvine.py
+LIBRARIES = $(DSPYTHONSO)
 OBJECTS = vine_wrap.o
 TARGETS = $(LIBRARIES)
 
 all: $(TARGETS)
 
-vine_wrap.c ndcctools/taskvine/cvine.py: taskvine.i
+vine_wrap.c: taskvine.i
 	@echo "SWIG taskvine.i (python)"
-	@$(CCTOOLS_SWIG) -o vine_wrap.c -python -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/taskvine/src/manager taskvine.i
-	mv cvine.py ndcctools/taskvine
+	@$(CCTOOLS_SWIG) -o vine_wrap.c -outdir ndcctools/taskvine -python -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/taskvine/src/manager taskvine.i
 
 $(DSPYTHONSO): vine_wrap.o $(EXTERNAL_DEPENDENCIES)
 
 test:
 
 clean:
-	rm -rf $(OBJECTS) $(TARGETS) vine_wrap.c vine_wrap.o *.pyc __pycache__
+	rm -rf $(OBJECTS) $(TARGETS) ndcctools/taskvine/cvine.py vine_wrap.c vine_wrap.o *.pyc __pycache__
 
 install: all
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine

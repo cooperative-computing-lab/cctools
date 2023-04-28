@@ -1,0 +1,5 @@
+The symlinks in this directory mimic the actual installation of python modules.
+Any test scripts that use python should include a line like:
+
+export PYTHONPATH=$(pwd)/../../test_support/python_modules/${CCTOOLS_PYTHON_TEST_DIR}/ndcctools:$PYTHONPATH
+

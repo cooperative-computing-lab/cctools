@@ -136,7 +136,7 @@ You may specific a specific port number to listen on like this:
 === "Python"
     ```python
     # Import the Work Queue library
-    import work_queue as wq
+    import ndcctools.work_queue as wq
 
     # Create a new queue listening on port 9123
     q = wq.WorkQueue(9123)
@@ -1300,7 +1300,7 @@ creating the queue:
 === "Python"
     ```python
     # Import the Work Queue library
-    import work_queue as wq
+    import ndcctools.work_queue as wq
     q = wq.WorkQueue(port=9123, ssl=('MY_KEY.pem', 'MY_CERT.pem'))
 
     # Alternatively, you can set ssl=True and let the python API generate

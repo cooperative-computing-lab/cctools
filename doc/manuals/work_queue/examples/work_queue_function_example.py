@@ -1,7 +1,7 @@
 # Quick Start Example of Work Queue with Python Functions
 
 # Import the Work Queue library.
-import work_queue as wq
+import ndcctools.work_queue as wq
 
 # Define a function to invoke remotely.
 def my_sum(x, y):

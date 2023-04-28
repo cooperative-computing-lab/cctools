@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import work_queue as wq
+import ndcctools.work_queue as wq
 import sys
 import time
 

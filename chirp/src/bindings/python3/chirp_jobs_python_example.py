@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-import chirp
+import ndcctools.chirp as chirp
 
 def make_job(job_number):
     job = { 'executable' : './my_script',

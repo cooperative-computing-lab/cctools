@@ -1,5 +1,4 @@
-#import work_queue
-import work_queue as wq
+import ndcctools.work_queue as wq
 
 # Example funtion for the Map Abstraction
 def dblfunc(x):
