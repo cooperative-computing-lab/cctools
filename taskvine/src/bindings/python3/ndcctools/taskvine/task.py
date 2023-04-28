@@ -707,6 +707,7 @@ class PythonTask(Task):
         self._stdout_file = f"stdout_{self._id}.p"
         self._wrapper = f"pytask_wrapper_{self._id}.py"
         self._command = self._python_function_command()
+        self._serialize_output = True
 
         self._tmp_output_enabled = False
 
@@ -789,7 +790,10 @@ class PythonTask(Task):
             if self.successful():
                 try:
                     with open(os.path.join(self._tmpdir, self._out_name_file), "rb") as f:
-                        self._output = cloudpickle.load(f)
+                        if self._serialize_output:
+                            self._output = cloudpickle.load(f)
+                        else:
+                            self._output = f.read()
                 except Exception as e:
                     self._output = e
             else:
@@ -805,8 +809,17 @@ class PythonTask(Task):
                 with open(os.path.join(self._tmpdir, self._stdout_file), "r") as f:
                     self._stdout = str(f.read())
             return self._stdout
-        except Exception as e:
-            return str(e)
+        except Exception:
+            return None
+
+    ##
+    # Disables serialization of results to disk when writing to a file for transmission.
+    # WARNING: Only do this if the function itself encodes the output in a way amenable
+    # for serialization.
+    #
+    # @param self 	Reference to the current python task object
+    def disable_output_serialization(self):
+        self._serialize_output = False
 
     def _serialize_python_function(self, func, args, kwargs):
         with open(os.path.join(self._tmpdir, self._func_file), "wb") as wf:
@@ -843,12 +856,12 @@ class PythonTask(Task):
         with open(os.path.join(self._tmpdir, self._wrapper), "w") as f:
             f.write(
                 textwrap.dedent(
-                    """\
+                f"""
                 try:
                     import sys
                     import cloudpickle
-                except ImportError:
-                    print("Could not execute PythonTask function because a needed module for taskvine was not available.")
+                except ImportError as e:
+                    print("Could not execute PythonTask function because a module was not available at the worker.")
                     raise
 
                 (fn, args, out) = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -863,7 +876,10 @@ class PythonTask(Task):
                     exec_out = e
 
                 with open(out, 'wb') as f:
-                    cloudpickle.dump(exec_out, f)
+                    if {self._serialize_output}:
+                        cloudpickle.dump(exec_out, f)
+                    else:
+                        f.write(exec_out)
                 """
                 )
             )
