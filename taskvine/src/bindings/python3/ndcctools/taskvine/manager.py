@@ -401,12 +401,79 @@ class Manager(object):
         return cvine.vine_enable_monitoring_full(self._taskvine, dirname, watchdog)
 
     ##
-    # Enable P2P worker transfer functionality. Off by default
+    # Enable P2P worker transfer functionality. On by default
     #
     # @param self Reference to the current manager object.
     def enable_peer_transfers(self):
         return cvine.vine_enable_peer_transfers(self._taskvine)
 
+    ##
+    # Disable P2P worker transfer functionality. On by default
+    #
+    # @param self Reference to the current manager object.
+    def disable_peer_transfers(self):
+        return vine_disable_peer_transfers(self._taskvine)
+
+    ##
+    # Enable disconnect slow workers functionality for a given manager for tasks in
+    # the "default" category, and for task which category does not set an
+    # explicit multiplier.
+    #
+    # @param self       Reference to the current manager object.
+    # @param multiplier The multiplier of the average task time at which point to disconnect a worker; if less than 1, it is disabled (default).
+    def enable_disconnect_slow_workers(self, multiplier):
+        return vine_enable_disconnect_slow_workers(self._taskvine, multiplier)
+
+    ##
+    # Enable disconnect slow workers functionality for a given manager.
+    #
+    # @param self       Reference to the current manager object.
+    # @param name       Name of the category.
+    # @param multiplier The multiplier of the average task time at which point to disconnect a worker; disabled if less than one (see @ref enable_disconnect_slow_workers)
+    def enable_disconnect_slow_workers_category(self, name, multiplier):
+        return vine_enable_disconnect_slow_workers_category(self._taskvine, name, multiplier)
+
+    ##
+    # Turn on or off draining mode for workers at hostname.
+    #
+    # @param self       Reference to the current manager object.
+    # @param hostname   The hostname the host running the workers.
+    # @param drain_mode If True, no new tasks are dispatched to workers at hostname, and empty workers are shutdown. Else, workers works as usual.
+    def set_draining_by_hostname(self, hostname, drain_mode=True):
+        return vine_set_draining_by_hostname(self._taskvine, hostname, drain_mode)
+
+    ##
+    # Determine whether there are any known tasks managerd, running, or waiting to be collected.
+    #
+    # Returns 0 if there are tasks remaining in the system, 1 if the system is "empty".
+    #
+    # @param self       Reference to the current manager object.
+    def empty(self):
+        return vine_empty(self._taskvine)
+
+    ##
+    # Determine whether the manager can support more tasks.
+    #
+    # Returns the number of additional tasks it can support if "hungry" and 0 if "sated".
+    #
+    # @param self       Reference to the current manager object.
+    def hungry(self):
+        return vine_hungry(self._taskvine)
+
+    ##
+    # Set the worker selection scheduler for manager.
+    #
+    # @param self       Reference to the current manager object.
+    # @param scheduler  One of the following schedulers to use in assigning a
+    #                   task to a worker. See @ref vine_schedule_t for
+    #                   possible values.
+    def set_scheduler(self, scheduler):
+        return vine_set_scheduler(self._taskvine, scheduler)
+
+    ##
+    # Change the project name for the given manager.
+    #
+    # @param self   Reference to the current manager object.
     ##
     # Enable disconnect slow workers functionality for a given manager for tasks in
     # the "default" category, and for task which category does not set an

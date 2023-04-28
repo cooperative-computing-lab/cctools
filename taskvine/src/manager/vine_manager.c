@@ -3292,6 +3292,12 @@ int vine_enable_peer_transfers(struct vine_manager *q) {
 	return 1;
 }
 
+int vine_disable_peer_transfers(struct vine_manager *q) {
+	debug(D_VINE, "Peer Transfers disabled");
+	q->peer_transfers_enabled = 0;
+	return 1;
+}
+
 int vine_enable_disconnect_slow_workers_category(struct vine_manager *q, const char *category, double multiplier)
 {
 	struct category *c = vine_category_lookup_or_create(q, category);
