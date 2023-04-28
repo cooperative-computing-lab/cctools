@@ -601,7 +601,6 @@ workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
 */
 struct vine_file * vine_declare_file( struct vine_manager *m, const char *source, vine_file_flags_t flags );
 
-
 /** Declare a file object from a remote URL.
 @param m A manager object
 @param url The URL address of the object in text form.
@@ -903,6 +902,9 @@ int vine_enable_monitoring(struct vine_manager *m, int watchdog, int time_series
 
 /** Enable taskvine peer transfers to be scheduled by the manager **/
 int vine_enable_peer_transfers(struct vine_manager *m);
+
+/** Disable taskvine peer transfers to be scheduled by the manager **/
+int vine_disable_peer_transfers(struct vine_manager *m);
 
 /** Set the minimum task_id of future submitted tasks.
 Further submitted tasks are guaranteed to have a task_id larger or equal to

@@ -724,6 +724,28 @@ that peer transfers are not permitted:
     ```
     vine_declare_file(m,"myfile.txt",VINE_CACHE|VINE_PEER_NOSHARE)
     ```
+Automatic sharing of files between workers, or peer transfers, are enabled by default
+in TaskVine. If communication between workers is not possible or not desired, peer transfers
+may be globally disabled:
+
+=== "Python"
+    ```python
+    m.disable_peer_transfers()
+    ```
+=== "C"
+    ```
+    vine_disable_peer_transfers(m);
+    ```
+If peer transfers have been disabled, they may be re-enabled accordingly:
+
+=== "Python"
+    ```python
+    m.enable_peer_transfers()
+    ```
+=== "C"
+    ```
+    vine_enable_peer_transfers(m);
+    ```
 
 ### MiniTasks
 
