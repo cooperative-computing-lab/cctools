@@ -697,12 +697,14 @@ class PythonTask(Task):
         self._pp_run = None
         self._output_loaded = False
         self._output = None
+        self._stdout = None
         self._tmpdir = None
 
         self._id = str(uuid.uuid4())
         self._func_file = f"function_{self._id}.p"
         self._args_file = f"args_{self._id}.p"
         self._out_file = f"out_{self._id}.p"
+        self._stdout_file = f"stdout_{self._id}.p"
         self._wrapper = f"pytask_wrapper_{self._id}.py"
         self._command = self._python_function_command()
 
@@ -741,7 +743,7 @@ class PythonTask(Task):
         if not self._output_loaded:
             if self.successful():
                 try:
-                    with open(os.path.join(self._tmpdir, "out_{}.p".format(self._id)), "rb") as f:
+                    with open(os.path.join(self._tmpdir, self._out_file), "rb") as f:
                         self._output = cloudpickle.load(f)
                 except Exception as e:
                     self._output = e
@@ -750,6 +752,16 @@ class PythonTask(Task):
                 print(self.std_output)
             self._output_loaded = True
         return self._output
+
+    @property
+    def std_output(self):
+        try:
+            if not self._stdout:
+                with open(os.path.join(self._tmpdir, self._stdout_file), "r") as f:
+                    self._stdout = str(f.read())
+            return self._stdout
+        except Exception as e:
+            return str(e)
 
     def _serialize_python_function(self, func, args, kwargs):
         with open(os.path.join(self._tmpdir, self._func_file), "wb") as wf:
@@ -763,7 +775,7 @@ class PythonTask(Task):
         else:
             py_exec = f"python{sys.version_info[0]}"
 
-        command = f"{py_exec} {self._wrapper} {self._func_file} {self._args_file} {self._out_file}"
+        command = f"{py_exec} {self._wrapper} {self._func_file} {self._args_file} {self._out_file} > {self._stdout_file} 2>&1"
         return command
 
     def _add_IO_files(self, manager):
@@ -773,7 +785,7 @@ class PythonTask(Task):
                 f = manager.declare_file(source, cache=False)
                 method(f, name)
         add_files(self.add_input, self._wrapper, self._func_file, self._args_file)
-        add_files(self.add_output, self._out_file)
+        add_files(self.add_output, self._out_file, self._stdout_file)
 
     ##
     # creates the wrapper script which will execute the function. pickles output.
@@ -802,8 +814,7 @@ class PythonTask(Task):
 
                 with open(out, 'wb') as f:
                     cloudpickle.dump(exec_out, f)
-
-                print(exec_out)"""
+                """
                 )
             )
 
