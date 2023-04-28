@@ -77,6 +77,9 @@ class DaskVine(Manager):
 
             self.submit(t)
 
+    def get(self, dsk, keys, **kwargs):
+        return self.dask_execute(dsk, keys, **kwargs)
+
     def dask_execute(self, dsk, keys, **kwargs):
         """Computes the values of the keys in the dask graph dsk"""
 
