@@ -19,6 +19,7 @@ import sys
 import tempfile
 import textwrap
 import uuid
+import weakref
 
 
 ##
@@ -47,6 +48,13 @@ class Task(object):
         self._task = cvine.vine_task_create(command)
         if not self._task:
             raise Exception("Unable to create internal Task structure")
+
+        def free():
+            if self._manager_will_free:
+                return
+            if self._task:
+                cvine.vine_task_delete(self._task)
+        self._finalizer = weakref.finalize(self, free)
 
         attributes = [
             "coprocess", "scheduler", "tag", "category",
@@ -95,16 +103,6 @@ class Task(object):
         if "env" in task_info:
             for key, value in task_info["env"].items():
                 self.set_env_var(key, value)
-
-    def __del__(self):
-        try:
-            if self._manager_will_free:
-                return
-            if self._task:
-                cvine.vine_task_delete(self._task)
-        except Exception:
-            # ignore exceptions, in case task has been already collected
-            pass
 
     def _set_from_dict(self, task_info, key):
         try:
@@ -714,6 +712,12 @@ class PythonTask(Task):
         self._fn_def = (func, args, kwargs)
         super(PythonTask, self).__init__(self._command)
 
+        def free():
+            if self._tmpdir and os.path.exists(self._tmpdir):
+                shutil.rmtree(self._tmpdir)
+        self._finalizer = weakref.finalize(self, free)
+
+
     ##
     # Finalizes the task definition once the manager that will execute is run.
     # This function is run by the manager before registering the task for
@@ -746,14 +750,6 @@ class PythonTask(Task):
                 print(self.std_output)
             self._output_loaded = True
         return self._output
-
-    def __del__(self):
-        try:
-            if self._tmpdir and os.path.exists(self._tmpdir):
-                shutil.rmtree(self._tmpdir)
-        except Exception as e:
-            if sys:
-                sys.stderr.write("could not delete {}: {}\n".format(self._tmpdir, e))
 
     def _serialize_python_function(self, func, args, kwargs):
         with open(os.path.join(self._tmpdir, self._func_file), "wb") as wf:
