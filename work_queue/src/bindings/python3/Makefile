@@ -9,23 +9,22 @@ LOCAL_LINKAGE = $(CCTOOLS_PYTHON3_LDFLAGS) -lz $(CCTOOLS_OPENSSL_LDFLAGS)
 
 EXTERNAL_DEPENDENCIES = $(CCTOOLS_HOME)/work_queue/src/libwork_queue.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
 WQPYTHONSO = ndcctools/_cwork_queue.$(CCTOOLS_DYNAMIC_SUFFIX)
-LIBRARIES = $(WQPYTHONSO) ndcctools/cwork_queue.py
+LIBRARIES = $(WQPYTHONSO)
 OBJECTS = work_queue_wrap.o
 TARGETS = $(LIBRARIES)
 
 all: $(TARGETS)
 
-work_queue_wrap.c ndcctools/cwork_queue.py: work_queue.i
+work_queue_wrap.c: work_queue.i
 	@echo "SWIG work_queue.i (python)"
-	@$(CCTOOLS_SWIG) -o work_queue_wrap.c -python -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src work_queue.i
-	mv cwork_queue.py ndcctools/
+	@$(CCTOOLS_SWIG) -o work_queue_wrap.c -outdir ndcctools -python -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src work_queue.i
 
 $(WQPYTHONSO): work_queue_wrap.o $(EXTERNAL_DEPENDENCIES)
 
 test:
 
 clean:
-	rm -rf $(OBJECTS) $(TARGETS) work_queue_wrap.c *.pyc __pycache__
+	rm -rf $(OBJECTS) $(TARGETS) ndcctools/cwork_queue.py work_queue_wrap.c *.pyc __pycache__
 
 install: all
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)/ndcctools
