@@ -52,9 +52,16 @@ from .task import (
     LibraryTask,
     FunctionCall,
 )
-from .dask_executor import DaskVine
-from .dask_dag import DaskVineNoResult
 
+try:
+    from .dask_executorx import DaskVine
+except ImportError as e:
+    print(f"DaskVine not available. Couldn't find module: {e.name}")
+    class DaskVine:
+        exception = ImportError()
+        def __init__(*args, **kwargs):
+            raise DaskVine.exception
+    DaskVine.exception = e
 
 __all__ = [
     "Manager",
@@ -66,5 +73,5 @@ __all__ = [
     "PythonTask",
     "PythonTaskNoResult",
     "DaskVine",
-    "DaskVineNoResult",
 ]
+
