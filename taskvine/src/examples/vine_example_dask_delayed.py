@@ -9,7 +9,6 @@
 import ndcctools.taskvine as vine
 import argparse
 import getpass
-import sys
 
 try:
     import dask
@@ -66,7 +65,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # define a TaskVine manager that has a dask_execute method
+    # define a TaskVine manager that has a get method that executes dask task graphs
     m = vine.DaskVine(port=args.port, ssl=True)
     m.set_name(args.name)
     print(f"Listening for workers at port: {m.port}")
@@ -79,8 +78,8 @@ if __name__ == "__main__":
     f.max_workers = 1
     f.min_workers = 1
     with f:
-        # use the dask_execute method as the scheduler for dask
-        with dask.config.set(scheduler=m.dask_execute):
+        # use the get method as the scheduler for dask
+        with dask.config.set(scheduler=m.get):
             result = t.compute(resources={"cores": 1})  # resources per function call
             print(f"t = {result}")
         print("Terminating workers...", end="")

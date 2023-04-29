@@ -27,6 +27,13 @@ class File(object):
         # to false.
         return True
 
+    def source(self):
+        file_type = getattr(self._file, "type")
+        if file_type == cvine.VINE_FILE:
+            return getattr(self._file, "source")
+        else:
+            return None
+
     ##
     # Return the contents of a file object as a string.
     # Typically used to return the contents of an output buffer.
@@ -41,5 +48,3 @@ class File(object):
     # @param self       A file object.
     def __len__(self):
         return cvine.vine_file_size(self._file)
-
-
