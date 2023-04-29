@@ -116,6 +116,28 @@ class DaskVine(Manager):
         return results
 
 
+class DaskVineFile:
+    def __init__(self, file, key, staging_dir):
+        self._file = file
+        assert file
+
+    def load(self):
+        with open(self.staging_path, "rb") as f:
+            return cloudpickle.load(f)
+
+    @property
+    def file(self):
+        return self._file
+
+    @property
+    def staging_path(self):
+        return self._file.source()
+
+    @property
+    def basename(self):
+        return os.path.basename(self.staging_path)
+
+
 class PythonTaskDask(PythonTask):
     def __init__(self, key, fn, *args, **kwargs):
         self._key = key
