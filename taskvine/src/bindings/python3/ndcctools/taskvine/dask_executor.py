@@ -77,7 +77,26 @@ class DaskVine(Manager):
             resources_mode='fixed',
             verbose=False
             ):
+        try:
+            return self.dask_execute(dsk, keys,
+                                     environment=environment,
+                                     extra_files=extra_files,
+                                     lazy_transfer=lazy_transfer,
+                                     resources=resources,
+                                     resources_mode=resources_mode,
+                                     verbose=verbose)
+        except Exception as e:
+            # unhandled exceptions for now
+            raise e
 
+    def dask_execute(self, dsk, keys, *,
+                     environment=None,
+                     extra_files=None,
+                     lazy_transfer=False,
+                     resources=None,
+                     resources_mode='fixed',
+                     verbose=False
+                     ):
         if isinstance(keys, list):
             indices = DaskVineDag.find_dask_keys(keys)
             keys_flatten = indices.keys()
@@ -87,7 +106,9 @@ class DaskVine(Manager):
         dag = DaskVineDag(dsk)
         rs = dag.set_targets(keys_flatten)
 
-        self.submit_calls(dag, rs,
+        tag = f"dag-{id(dag)}"
+
+        self.submit_calls(dag, tag, rs,
                           environment=environment,
                           extra_files=extra_files,
                           lazy_transfer=lazy_transfer,
@@ -95,13 +116,13 @@ class DaskVine(Manager):
                           resources_mode=resources_mode)
 
         while not self.empty():
-            t = self.wait(5)
+            t = self.wait_for_tag(tag, 5)
             if t:
                 if t.successful():
                     if verbose:
                         print(f"{t.key} ran on {t.hostname} with result {t.output}")
                     rs = dag.set_result(t.key, DaskVineFile(t.output_file, t.key, self.staging_directory))
-                    self.submit_calls(dag, rs,
+                    self.submit_calls(dag, tag, rs,
                                       environment=environment,
                                       extra_files=extra_files,
                                       lazy_transfer=lazy_transfer,
@@ -112,7 +133,7 @@ class DaskVine(Manager):
 
         return self._load_results(dag, indices, keys)
 
-    def submit_calls(self, dag, rs, *,
+    def submit_calls(self, dag, tag, rs, *,
                      environment=None,
                      extra_files=None,
                      lazy_transfer=False,
@@ -128,6 +149,8 @@ class DaskVine(Manager):
                                environment=environment,
                                extra_files=extra_files,
                                lazy_transfer=(lazy_transfer and k not in targets))
+
+            t.set_tag(tag)  # tag that identifies this dag
 
             cat = str(fn)
             if cat not in resources_already_set:
