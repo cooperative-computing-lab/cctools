@@ -13,6 +13,8 @@ import argparse
 import getpass
 import sys
 
+import traceback
+
 
 from operator import add  # use add function in the example graph
 dsk_graph = {
@@ -72,9 +74,11 @@ is constructed by dask.""")
         print(f"dask graph example is:\n{dsk_graph}")
         print(f"desired keys are {desired_keys}")
 
-        results = m.dask_execute(dsk_graph, ["t", "w"], resources={"cores": 1})  # 1 core per step
-
-        print({(k, v) for k, v in zip(desired_keys, results)})
+        try:
+            results = m.dask_execute(dsk_graph, ["t", "w"], resources={"cores": 1})  # 1 core per step
+            print({(k, v) for k, v in zip(desired_keys, results)})
+        except Exception:
+            traceback.print_exc()
 
         print("Terminating workers...", end="")
 
