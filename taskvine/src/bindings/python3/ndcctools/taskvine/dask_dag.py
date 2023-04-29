@@ -212,6 +212,9 @@ class DaskVineDag:
             self.flatten(k)
         return self.get_ready()
 
+    def get_targets(self):
+        return self._targets
+
 
 class DaskVineNoResult(Exception):
     """Exception raised when asking for a result from a computation that has not been performed."""

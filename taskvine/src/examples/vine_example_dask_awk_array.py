@@ -95,8 +95,8 @@ if __name__ == "__main__":
     f.max_workers = 1
     f.min_workers = 1
     with f:
-        with dask.config.set(scheduler=m.dask_execute):
-            result = distance.compute(resources={"cores": 1}, resources_mode="max")
+        with dask.config.set(scheduler=m.get):
+            result = distance.compute(resources={"cores": 1}, resources_mode="max", lazy_transfer=True)
             print(f"distance = {result}")
         print("Terminating workers...", end="")
     print("done!")

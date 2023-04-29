@@ -75,7 +75,7 @@ is constructed by dask.""")
         print(f"desired keys are {desired_keys}")
 
         try:
-            results = m.dask_execute(dsk_graph, ["t", "w"], resources={"cores": 1})  # 1 core per step
+            results = m.get(dsk_graph, ["t", "w"], resources={"cores": 1})  # 1 core per step
             print({(k, v) for k, v in zip(desired_keys, results)})
         except Exception:
             traceback.print_exc()
