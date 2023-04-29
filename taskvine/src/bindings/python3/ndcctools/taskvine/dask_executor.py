@@ -50,32 +50,6 @@ from uuid import uuid4
 
 
 class DaskVine(Manager):
-    def submit_calls(self, dag, rs, *,
-                     environment=None,
-                     extra_files=None,
-                     lazy_transfer=False,
-                     resources=None,
-                     resources_mode=None,
-                     ):
-        resources_already_set = set()
-        targets = dag.get_targets()
-        for r in rs:
-            k, (fn, *args) = r
-            t = PythonTaskDask(self,
-                               k, fn, args,  # compute key k from fn(args)
-                               environment=environment,
-                               extra_files=extra_files,
-                               lazy_transfer=(lazy_transfer and k not in targets))
-
-            cat = str(fn)
-            if cat not in resources_already_set:
-                if resources_mode:
-                    self.set_category_mode(cat, resources_mode)
-                    self.set_category_resources_max(cat, resources)
-                    self.enable_monitoring()
-
-            self.submit(t)
-
     ##
     # Execute the task graph dsk and return the results for keys
     # in graph.
@@ -137,6 +111,32 @@ class DaskVine(Manager):
                     raise Exception(f"task for key {t.key} failed: {t.result}. exit code {t.exit_code}\n{t.output}")
 
         return self._load_results(dag, indices, keys)
+
+    def submit_calls(self, dag, rs, *,
+                     environment=None,
+                     extra_files=None,
+                     lazy_transfer=False,
+                     resources=None,
+                     resources_mode=None,
+                     ):
+        resources_already_set = set()
+        targets = dag.get_targets()
+        for r in rs:
+            k, (fn, *args) = r
+            t = PythonTaskDask(self,
+                               k, fn, args,  # compute key k from fn(args)
+                               environment=environment,
+                               extra_files=extra_files,
+                               lazy_transfer=(lazy_transfer and k not in targets))
+
+            cat = str(fn)
+            if cat not in resources_already_set:
+                if resources_mode:
+                    self.set_category_mode(cat, resources_mode)
+                    self.set_category_resources_max(cat, resources)
+                    self.enable_monitoring()
+
+            self.submit(t)
 
     def _load_results(self, dag, indices, keys):
         results = list(keys)
