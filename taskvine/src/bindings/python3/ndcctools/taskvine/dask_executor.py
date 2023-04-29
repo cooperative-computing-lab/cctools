@@ -77,7 +77,26 @@ class DaskVine(Manager):
             resources_mode='fixed',
             verbose=False
             ):
+        try:
+            return self.dask_execute(dsk, keys,
+                                     environment=environment,
+                                     extra_files=extra_files,
+                                     lazy_transfer=lazy_transfer,
+                                     resources=resources,
+                                     resources_mode=resources_mode,
+                                     verbose=verbose)
+        except Exception as e:
+            # unhandled exceptions for now
+            raise e
 
+    def dask_execute(self, dsk, keys, *,
+                     environment=None,
+                     extra_files=None,
+                     lazy_transfer=False,
+                     resources=None,
+                     resources_mode='fixed',
+                     verbose=False
+                     ):
         if isinstance(keys, list):
             indices = DaskVineDag.find_dask_keys(keys)
             keys_flatten = indices.keys()
