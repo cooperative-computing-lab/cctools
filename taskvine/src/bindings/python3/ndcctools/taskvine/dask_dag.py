@@ -123,10 +123,11 @@ class DaskVineDag:
         else:
             self._missing_of[key] = set()
             nargs = []
-            if DaskVineDag.fun_callp(sexpr):
-                # if this is a function call, keep the function as is
-                nargs.append(sexpr[0])
-                sexpr = sexpr[1:]
+            if not DaskVineDag.fun_callp(sexpr):
+                # if this is a list, then make it a function call
+                sexpr = (make_list, *sexpr)
+            nargs.append(sexpr[0])
+            sexpr = sexpr[1:]
             for a in sexpr:
                 if DaskVineDag.symbolp(a) and not self.graph_keyp(a):
                     nkey = a
@@ -215,3 +216,12 @@ class DaskVineDag:
 class DaskVineNoResult(Exception):
     """Exception raised when asking for a result from a computation that has not been performed."""
     pass
+
+
+# aux function to make lists from many arguments, a little silly, but list()
+# wants only one argument and list(sometuple) does not work because we want to
+# flatten the tuple.
+def make_list(*args):
+    return args
+
+
