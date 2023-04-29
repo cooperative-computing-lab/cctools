@@ -54,7 +54,7 @@ from .task import (
 )
 
 try:
-    from .dask_executorx import DaskVine
+    from .dask_executor import DaskVine
 except ImportError as e:
     print(f"DaskVine not available. Couldn't find module: {e.name}")
     class DaskVine:
