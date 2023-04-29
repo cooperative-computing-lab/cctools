@@ -12,6 +12,10 @@ from .manager import Manager
 from .task import PythonTask
 from .dask_dag import DaskVineDag
 
+import os
+import cloudpickle
+from uuid import uuid4
+
 
 ##
 # @class ndcctools.taskvine.dask_executor.DaskVine
@@ -47,21 +51,16 @@ from .dask_dag import DaskVineDag
 
 
 class DaskVine(Manager):
-    def _wrap(self, key, fn):
-        # TODO: return backtrace, write result to files, read args from files
-        def function(*args):
-            try:
-                result = fn(args)
-            except Exception as e:
-                result = e
-            return (key, result)
-        return function
-
-    def submit_calls(self, rs, resources=None, resources_mode=None, environment=None):
+    def submit_calls(self, targets, rs, *,
+                     environment=None,
+                     lazy_transfer=False,
+                     resources=None,
+                     resources_mode=None,
+                     ):
         resources_already_set = set()
         for r in rs:
             k, (fn, *args) = r
-            t = PythonTaskDask(k, fn, *args)
+            t = PythonTaskDask(self, k, fn, args)
 
             cat = str(fn)
             t.set_category(cat)
@@ -72,6 +71,8 @@ class DaskVine(Manager):
                     self.set_category_resources_max(cat, resources)
                     self.enable_monitoring()
 
+            if lazy_transfer and k not in targets:
+                t.enable_temp_output()
             if environment:
                 t.add_environment(environment)
 
@@ -89,12 +90,12 @@ class DaskVine(Manager):
         else:
             keys_flatten = [keys]
 
-        d = DaskVineDag(dsk)
-        rs = d.set_targets(keys_flatten)
+        dag = DaskVineDag(dsk)
+        rs = dag.set_targets(keys_flatten)
 
         verbose = kwargs.pop("verbose", False)
 
-        self.submit_calls(rs, **kwargs)
+        self.submit_calls(keys_flatten, rs, **kwargs)
 
         while not self.empty():
             t = self.wait(5)
@@ -102,17 +103,22 @@ class DaskVine(Manager):
                 if t.successful():
                     if verbose:
                         print(f"{t.key} ran on {t.hostname} with result {t.output}")
-                    rs = d.set_result(t.key, t.output)
-                    self.submit_calls(rs, **kwargs)
+                    rs = dag.set_result(t.key, DaskVineFile(t.output_file, t.key, self.staging_directory))
+                    self.submit_calls(keys, rs, **kwargs)
                 else:
                     raise Exception(f"task for key {t.key} failed: {t.result}. exit code {t.exit_code}\n{t.output}")
 
-        if isinstance(keys, list):
-            results = list(keys)
-            for k, ids in indices.items():
-                DaskVineDag.set_dask_result(results, ids, d.get_result(k))
-        else:
-            results = d.get_result(keys)
+        return self._load_results(dag, indices, keys)
+
+    def _load_results(self, dag, indices, keys):
+        results = list(keys)
+        for k, ids in indices.items():
+            r = dag.get_result(k)
+            if isinstance(r, DaskVineFile):
+                r = r.load()
+            DaskVineDag.set_dask_result(results, ids, r)
+        if not isinstance(keys, list):
+            return results[0]
         return results
 
 
@@ -139,10 +145,35 @@ class DaskVineFile:
 
 
 class PythonTaskDask(PythonTask):
-    def __init__(self, key, fn, *args, **kwargs):
+    def __init__(self, m, key, fn, args):
         self._key = key
-        super().__init__(fn, *args, **kwargs)
+
+        file_indices = []
+        new_args = []
+        for i, a in enumerate(args):
+            if isinstance(a, DaskVineFile):
+                file_indices.append(i)
+                a = str(uuid4())  # choose some random name for the remote name
+            new_args.append(a)
+        super().__init__(wrap_function_load_args, file_indices, fn, new_args)
+
+        for i in file_indices:
+            f = args[i]
+            self.add_input(f.file, new_args[i])
 
     @property
     def key(self):
         return self._key
+
+
+# Most of the arguments are represented by files. We wrap the original call
+# to load the contents of the files to the arguments.
+# file_indices contains the indices of the args list of those arguments
+# that should be loaded.
+def wrap_function_load_args(file_indices, fn, args):
+    import cloudpickle
+    loaded_args = list(args)
+    for i in file_indices:
+        with open(args[i], "rb") as f:
+            loaded_args[i] = cloudpickle.load(f)
+    return fn(*loaded_args)
