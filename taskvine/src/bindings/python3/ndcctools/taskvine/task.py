@@ -824,18 +824,20 @@ class PythonTask(Task):
         return command
 
     def _add_IO_files(self, manager):
-        def add_files(method, *files, tmp_output=False):
-            for name in files:
-                source = os.path.join(self._tmpdir, name)
-                if tmp_output:
-                    f = manager.declare_temp()
-                    self._output_file = f
-                else:
-                    f = manager.declare_file(source, cache=False)
-                method(f, name)
-        add_files(self.add_input, self._wrapper, self._func_file, self._args_file)
-        add_files(self.add_output, self._stdout_file)
-        add_files(self.add_output, self._out_name_file, tmp_output=self._tmp_output_enabled)
+        def source(name):
+            return os.path.join(self._tmpdir, name)
+        for name in [self._wrapper, self._func_file, self._args_file]:
+            f = manager.declare_file(source(name))
+            self.add_input(f, name)
+
+        f = manager.declare_file(source(self._stdout_file))
+        self.add_output(f, self._stdout_file)
+
+        if self._tmp_output_enabled:
+            self._output_file = manager.declare_temp()
+        else:
+            self._output_file = manager.declare_file(source(self._out_name_file))
+        self.add_output(self._output_file, self._out_name_file)
 
     ##
     # creates the wrapper script which will execute the function. pickles output.
