@@ -98,7 +98,10 @@ class Manager(object):
         self._library_table = {}
         self._info_widget = None
         self._using_ssl = False
-        self._staging_explicit = staging_path
+        if staging_path:
+            self._staging_explicit = os.path.join(staging_path, "vine-staging")
+        else:
+            self._staging_explicit = None
 
         # if we were given a range ports, rather than a single port to try.
         lower, upper = None, None
@@ -1658,13 +1661,21 @@ class Factory(object):
 
         self._opts["scratch-dir"] = None
         if manager:
-            self._opts["scratch-dir"] = manager.staging_directory
+            # we really would want to use the staging path of the manager, but
+            # since the manager may cleanup before the factory terminates,
+            # we need to use some other directory.
+            self._opts["scratch-dir"] = os.path.dirname(manager.staging_directory)
 
         def free():
             if self._factory_proc is not None:
                 self.stop()
             if self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
-                shutil.rmtree(self.scratch_dir)
+                try:
+                    shutil.rmtree(self.scratch_dir)
+                except OSError:
+                    # if we could not delete it now because some file is being used,
+                    # we leave it for the atexit function
+                    pass
         self._finalizer = weakref.finalize(self, free)
 
     def _set_manager(self, batch_type, manager, manager_host_port, manager_name):
@@ -1797,7 +1808,7 @@ class Factory(object):
         self.scratch_dir = tempfile.mkdtemp(prefix="vine-factory-", dir=self.scratch_dir)
         self._scratch_safe_to_delete = True
 
-        atexit.register(lambda: os.path.exists(self.scratch_dir) and shutil.rmtree(self.scratch_dir))
+        atexit.register(lambda: shutil.rmtree(self.scratch_dir, ignore_errors=True))
 
         self._error_file = os.path.join(self.scratch_dir, "error.log")
         self._config_file = os.path.join(self.scratch_dir, "config.json")
