@@ -66,7 +66,7 @@ if __name__ == "__main__":
             elif t.completed():
                 print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
             else:
-                print(f"task {t.id} failed with status {t.result_string}")
+                print(f"task {t.id} failed with status {t.result}")
 
         # print to the console the contents of the files being watched
         for i in range(n):
