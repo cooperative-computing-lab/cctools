@@ -1807,7 +1807,7 @@ class Factory(object):
         self.scratch_dir = tempfile.mkdtemp(prefix="vine-factory-", dir=self.scratch_dir)
         self._scratch_safe_to_delete = True
 
-        atexit.register(lambda: os.path.exists(self.scratch_dir) and shutil.rmtree(self.scratch_dir))
+        atexit.register(lambda: shutil.rmtree(self.scratch_dir, ignore_errors=True))
 
         self._error_file = os.path.join(self.scratch_dir, "error.log")
         self._config_file = os.path.join(self.scratch_dir, "config.json")
