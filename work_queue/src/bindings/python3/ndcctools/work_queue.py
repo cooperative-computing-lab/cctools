@@ -102,6 +102,7 @@ class Task(object):
         def free():
             if self._task:
                 work_queue_task_delete(self._task)
+                self._task = None
 
         self._finalizer = weakref.finalize(self, free)
 
@@ -1162,6 +1163,7 @@ class WorkQueue(object):
                         self.shutdown_workers(0)
                     self._update_status_display(force=True)
                     work_queue_delete(self._work_queue)
+                    self._work_queue = None
             self._finalizer = weakref.finalize(self, free)
         self._update_status_display()
 
