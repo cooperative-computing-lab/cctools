@@ -54,6 +54,7 @@ class Task(object):
                 return
             if self._task:
                 cvine.vine_task_delete(self._task)
+                self._task = None
         self._finalizer = weakref.finalize(self, free)
 
         attributes = [

@@ -152,6 +152,7 @@ class Manager(object):
                 self.shutdown_workers(0)
             self._update_status_display(force=True)
             cvine.vine_delete(self._taskvine)
+            self._taskvine = None
 
     def _setup_ssl(self, ssl, run_info_path):
         if not ssl:
