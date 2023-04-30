@@ -1663,7 +1663,12 @@ class Factory(object):
             if self._factory_proc is not None:
                 self.stop()
             if self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
-                shutil.rmtree(self.scratch_dir)
+                try:
+                    shutil.rmtree(self.scratch_dir)
+                except OSError:
+                    # if we could not delete it now because some file is being used,
+                    # we leave it for the atexit function
+                    pass
         self._finalizer = weakref.finalize(self, free)
 
     def _set_manager(self, batch_type, manager, manager_host_port, manager_name):
