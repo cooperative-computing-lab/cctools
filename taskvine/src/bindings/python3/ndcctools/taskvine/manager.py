@@ -98,7 +98,10 @@ class Manager(object):
         self._library_table = {}
         self._info_widget = None
         self._using_ssl = False
-        self._staging_explicit = staging_path
+        if staging_path:
+            self._staging_explicit = os.path.join(staging_path, "vine-staging")
+        else:
+            self._staging_explicit = None
 
         # if we were given a range ports, rather than a single port to try.
         lower, upper = None, None
@@ -1657,7 +1660,10 @@ class Factory(object):
 
         self._opts["scratch-dir"] = None
         if manager:
-            self._opts["scratch-dir"] = manager.staging_directory
+            # we really would want to use the staging path of the manager, but
+            # since the manager may cleanup before the factory terminates,
+            # we need to use some other directory.
+            self._opts["scratch-dir"] = os.path.dirname(manager.staging_directory)
 
         def free():
             if self._factory_proc is not None:
