@@ -47,7 +47,7 @@ def process_result(t):
         elif t.completed():
             print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
         else:
-            print(f"task {t.id} failed with status {t.result_string}")
+            print(f"task {t.id} failed with status {t.result}")
 
 
 if __name__ == "__main__":

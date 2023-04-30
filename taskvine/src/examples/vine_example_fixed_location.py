@@ -45,7 +45,7 @@ if __name__ == "__main__":
             if t.successful():
                 print(f"task {t.id} -unsorted list- done on {t.addrport}")
             else:
-                print(f"task {t.id} -unsorted list- failed with status: {t.result_string}")
+                print(f"task {t.id} -unsorted list- failed with status: {t.result}")
 
     # now we sort the lists generated in the worker that they live
     temporary_sorted_lists = {}
@@ -72,7 +72,7 @@ if __name__ == "__main__":
                 print(f"task sorted list {t.id} done on {t.addrport}")
                 tasks_of_worker[t.addrport].append(t.id)
             else:
-                print(f"task sorted list {t.id} failed with status: {t.result_string}")
+                print(f"task sorted list {t.id} failed with status: {t.result}")
 
     # we are done with the unsorted lists and we remove them from the cluster
     for f in temporary_unsorted_lists.values():
@@ -97,7 +97,7 @@ if __name__ == "__main__":
             if t.successful():
                 print(f"task merge lists {t.id} done on {t.addrport}")
             else:
-                print(f"task merge lists {t.id} failed with status: {t.result_string}")
+                print(f"task merge lists {t.id} failed with status: {t.result}")
 
     # we are done with the sorted lists and we remove them from the cluster
     for f in temporary_sorted_lists.values():
@@ -124,7 +124,7 @@ if __name__ == "__main__":
                 with open("final_output.txt") as f_in:
                     print(f_in.read())
             else:
-                print(f"task final merge {t.id} failed with status: {t.result_string}")
+                print(f"task final merge {t.id} failed with status: {t.result}")
 
     # we are done with the merged lists and we remove them from the cluster
     for f in merge_outputs:
