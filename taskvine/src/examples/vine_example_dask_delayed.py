@@ -47,7 +47,7 @@ if __name__ == "__main__":
         nargs="?",
         type=str,
         help="name to assign to the manager.",
-        default=f"vine-blast-{getpass.getuser()}",
+        default=f"vine-dask-delayed-{getpass.getuser()}",
     )
     parser.add_argument(
         "--port",
