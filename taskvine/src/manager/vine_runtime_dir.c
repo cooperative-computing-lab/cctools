@@ -107,13 +107,13 @@ char *vine_runtime_directory_create() {
 	if(!create_dir(tmp, 0755)) {
         return NULL;
     }
+    register_staging_dir(tmp);
+	free(tmp);
 
 	tmp = string_format("%s/../vine-cache", runtime_dir);
 	if(!create_dir(tmp, 0755)) {
         return NULL;
     }
-
-    register_staging_dir(tmp);
 	free(tmp);
 
     if(symlink_most_recent) {
