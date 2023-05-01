@@ -1045,6 +1045,8 @@ class Manager(object):
                     n += 1
                     break
 
+        results=[elem if isinstance(elem, list) else [elem] for elem in results]
+        
         return [item for elem in results for item in elem]
 
     ##
@@ -1111,6 +1113,8 @@ class Manager(object):
                     n += 1
                     break
 
+        results=[elem if isinstance(elem, list) else [elem] for elem in results]
+        
         return [item for elem in results for item in elem]
 
     ##
@@ -1206,6 +1210,8 @@ class Manager(object):
                     n += 1
                     break
 
+        results=[elem if isinstance(elem, list) else [elem] for elem in results]
+        
         return [item for elem in results for item in elem]
 
     ##
@@ -1263,6 +1269,8 @@ class Manager(object):
                     n += 1
                     break
 
+        results=[elem if isinstance(elem, list) else [elem] for elem in results]
+        
         return [item for elem in results for item in elem]
 
     ##
