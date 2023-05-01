@@ -3745,9 +3745,28 @@ static int task_request_count( struct vine_manager *q, const char *category, cat
 	return count;
 }
 
-static int vine_submit_internal(struct vine_manager *q, struct vine_task *t)
+
+int vine_submit(struct vine_manager *q, struct vine_task *t)
 {
-	itable_insert(q->tasks, t->task_id, t);
+	if(t->task_id > 0) {
+		fatal("TaskVine: Sorry, you cannot submit the same task (%lld) (%s) twice!",t->task_id,t->command_line);
+	}
+
+	/* Assign a unique taskid on submission. */
+	t->task_id = q->next_task_id;
+
+	/* Increment task_id. So we get a unique task_id for every submit. */
+	q->next_task_id++;
+
+	/* Issue warnings if the files are set up strangely. */
+	vine_task_check_consistency(t);
+
+	if(t->has_fixed_locations) {
+		vine_task_set_scheduler(t, VINE_SCHEDULE_FILES);
+	}
+
+	/* Add reference to task when adding it to primary table. */
+	itable_insert(q->tasks, t->task_id, vine_task_clone(t) );
 
 	/* Ensure category structure is created. */
 	vine_category_lookup_or_create(q, t->category);
@@ -3763,27 +3782,6 @@ static int vine_submit_internal(struct vine_manager *q, struct vine_task *t)
 	rmsummary_merge_max(q->max_task_resources_requested, t->resources_requested);
 
 	return (t->task_id);
-}
-
-int vine_submit(struct vine_manager *q, struct vine_task *t)
-{
-	if(t->task_id > 0) {
-		fatal("TaskVine: Sorry, you cannot submit the same task (%lld) (%s) twice!",t->task_id,t->command_line);
-	}
-
-	t->task_id = q->next_task_id;
-
-	//Increment task_id. So we get a unique task_id for every submit.
-	q->next_task_id++;
-
-	/* Issue warnings if the files are set up strangely. */
-	vine_task_check_consistency(t);
-
-	if(t->has_fixed_locations) {
-		vine_task_set_scheduler(t, VINE_SCHEDULE_FILES);
-	}
-
-	return vine_submit_internal(q, t);
 }
 
 static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name) {
