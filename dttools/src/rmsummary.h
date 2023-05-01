@@ -125,6 +125,6 @@ const char *rmsummary_resource_units(const char *resource_name);
 int rmsummary_resource_decimals(const char *resource_name);
 size_t rmsummary_resource_offset(const char *resource_name);
 
-const char *rmsummary_resource_to_str();
+const char *rmsummary_resource_to_str(const char *resource, double value, int include_units);
 
 #endif

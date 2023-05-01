@@ -1370,8 +1370,8 @@ static int enforce_process_limits(struct work_queue_process *p)
 	if(p->sandbox_size > p->task->resources_requested->disk) {
 		debug(D_WQ,"Task %d went over its disk size limit: %s > %s\n",
 				p->task->taskid,
-				rmsummary_resource_to_str(p->sandbox_size, /* with units */ 1),
-				rmsummary_resource_to_str(p->task->resources_requested->disk, 1));
+				rmsummary_resource_to_str("disk", p->sandbox_size, /* with units */ 1),
+				rmsummary_resource_to_str("disk", p->task->resources_requested->disk, 1));
 		return 0;
 	}
 
