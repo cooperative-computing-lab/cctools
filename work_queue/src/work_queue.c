@@ -2337,7 +2337,6 @@ static work_queue_result_code_t get_available_results(struct work_queue *q, stru
 	debug(D_WQ, "Reading result(s) from %s (%s)", w->hostname, w->addrport);
 
 	char line[WORK_QUEUE_LINE_MAX];
-	int i = 0;
 
 	work_queue_result_code_t result = WQ_SUCCESS; //return success unless something fails below.
 
@@ -2352,7 +2351,6 @@ static work_queue_result_code_t get_available_results(struct work_queue *q, stru
 		if(string_prefix_is(line,"result")) {
 			result = get_result(q, w, line);
 			if(result != WQ_SUCCESS) break;
-			i++;
 		} else if(string_prefix_is(line,"update")) {
 			result = get_update(q,w,line);
 			if(result != WQ_SUCCESS) break;

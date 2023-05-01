@@ -347,13 +347,13 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 
 		/* Add resource controls to the sub-workflow, if known. */
 		if(n->resources_requested->cores>0) {
-			buffer_printf(&b, " --local-cores %s", rmsummary_resource_to_str("cores", n->resources_requested->cores));
+			buffer_printf(&b, " --local-cores %s", rmsummary_resource_to_str("cores", n->resources_requested->cores, 0));
 		}
 		if(n->resources_requested->memory>0) {
-			buffer_printf(&b, " --local-memory %s", rmsummary_resource_to_str("memory", n->resources_requested->memory));
+			buffer_printf(&b, " --local-memory %s", rmsummary_resource_to_str("memory", n->resources_requested->memory, 0));
 		}
 		if(n->resources_requested->disk>0) {
-			buffer_printf(&b, " --local-disk %s", rmsummary_resource_to_str("disk", n->resources_requested->disk));
+			buffer_printf(&b, " --local-disk %s", rmsummary_resource_to_str("disk", n->resources_requested->disk, 0));
 		}
 
 		batch_task_add_input_file(task,n->workflow_file,n->workflow_file);

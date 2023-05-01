@@ -305,7 +305,6 @@ workers are actually connected.
 static int count_workers_needed( struct list *managers_list, int only_not_running )
 {
 	int needed_workers=0;
-	int managers=0;
 	struct jx *j;
 
 	if(!managers_list) {
@@ -348,7 +347,6 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 
 		debug(D_VINE,"%s %s:%d %s tasks: %d capacity: %d workers needed: %d tasks running: %d",project,host,port,owner,tw+tl+tr,capacity,need,tr);
 		needed_workers += need;
-		managers++;
 	}
 
 	return needed_workers;

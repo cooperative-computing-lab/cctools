@@ -933,8 +933,8 @@ static int enforce_process_limits(struct vine_process *p)
 	if(p->sandbox_size > p->task->resources_requested->disk) {
 		debug(D_VINE,"Task %d went over its disk size limit: %s > %s\n",
 				p->task->task_id,
-				rmsummary_resource_to_str(p->sandbox_size, /* with units */ 1),
-				rmsummary_resource_to_str(p->task->resources_requested->disk, 1));
+				rmsummary_resource_to_str("disk", p->sandbox_size, /* with units */ 1),
+				rmsummary_resource_to_str("disk", p->task->resources_requested->disk, 1));
 		return 0;
 	}
 

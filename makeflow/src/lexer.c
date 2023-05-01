@@ -469,9 +469,8 @@ struct token *lexer_read_literal_in_expandable_until(struct lexer *lx, char end_
 {
 	const char end_markers[8] = { end_marker, '$', '\\', '"', '\'', '#', 0};
 
-	int count = 0;
 	do {
-		count += lexer_read_until(lx, end_markers);
+		lexer_read_until(lx, end_markers);
 
 		if(lx->eof)
 			break;
@@ -480,7 +479,6 @@ struct token *lexer_read_literal_in_expandable_until(struct lexer *lx, char end_
 		if(c == '\\') {
 			lexer_next_char(lx);	/* Jump the slash */
 			char n = lexer_next_char(lx);
-			count += 2;
 
 			if(lexer_special_escape(n)) {
 					lexer_add_to_lexeme(lx, lexer_special_to_code(n));
@@ -495,7 +493,6 @@ struct token *lexer_read_literal_in_expandable_until(struct lexer *lx, char end_
 				break;
 			} else {
 				// # comment is quoted, so we simply insert it.
-				count++;
 				lexer_add_to_lexeme(lx, lexer_next_char(lx));
 			}
 		} else

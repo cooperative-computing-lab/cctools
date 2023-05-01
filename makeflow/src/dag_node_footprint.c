@@ -241,9 +241,7 @@ void dag_node_footprint_determine_desc_residual_intersect(struct dag_node *n)
 	struct dag_node *node1, *node2;
 
 	int comp = 1;
-	int index = 0;
 	while(comp){
-		index++;
 		node1 = set_next_element(n->footprint->direct_children); // Get first child
 		node1 = list_peek_current(node1->footprint->residual_nodes); // Grab next node in its list
 		while((node2 = set_next_element(n->footprint->direct_children))){ // Loop over remaining children

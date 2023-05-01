@@ -692,8 +692,6 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 	char *label;
 
 	//Dot Details Variables
-	int i;
-	int j;
 	struct file_node *src;
 	struct file_node *tar;
 
@@ -798,12 +796,10 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 
 				//Source Files
 				list_first_item(n->source_files);
-				i = 0;
 				while((f = list_next_item(n->source_files))) {
 					fn = f->filename;
 					e = hash_table_lookup(g, fn);
 					if(e) {
-						i++;
 						printf("\tsrc_%d_%d [label=\"%s\", style=unfilled, color=purple, shape=box];\n", condense_display ? t->id : n->nodeid, e->id, e->name);
 						printf("\tsrc_%d_%d -> N%d;\n", condense_display ? t->id : n->nodeid, e->id, condense_display ? t->id : n->nodeid);
 					}
@@ -811,12 +807,10 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 
 				//Target Files
 				list_first_item(n->target_files);
-				j = 0;
 				while((f = list_next_item(n->target_files))) {
 					fn = f->filename;
 					e = hash_table_lookup(g, fn);
 					if(e) {
-						j++;
 						printf("\ttar_%d_%d [label=\"%s\", style=dotted, color=purple, shape=box];\n", condense_display ? t->id : n->nodeid, e->id, e->name);
 						printf("\tN%d -> tar_%d_%d;\n", condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid, e->id);
 
