@@ -104,7 +104,7 @@ def library_network_code():
                                 chunk = os.read(read, max_read).decode("utf-8")
                                 all_chunks.append(chunk)
                             response = "".join(all_chunks)
-                            os.waitid(os.P_PID, p, os.WEXITED)
+                            os.waitpid(p, 0)
                     print(response, flush=True)
         return 0
 
@@ -198,7 +198,7 @@ def wq_network_code():
                                     chunk = os.read(read, max_read).decode("utf-8")
                                     all_chunks.append(chunk)
                                 response = "".join(all_chunks).encode("utf-8")
-                                os.waitid(os.P_PID, p, os.WEXITED)
+                                os.waitpid(p, 0)
                         response_size = len(response)
                         size_msg = "{}\n".format(response_size)
                         # send the size of response

@@ -4,9 +4,10 @@
  * distributed under the GNU General Public License.  See the file COPYING for
  * details. */
 
-%module resource_monitor
+%module cresource_monitor
 %include carrays.i
 %array_functions(char *, strArray);
+%array_functions(struct rmsummary *, rmsummaryArray);
 
 %begin %{
 	#define SWIG_PYTHON_2_UNICODE
@@ -18,8 +19,10 @@
 	#include "timestamp.h"
 	#include "category_internal.h"
 	#include "category.h"
-	#include "rmonitor_poll.h"
 	#include "rmsummary.h"
+    #ifndef SWIGMAC
+	#include "rmonitor_poll.h"
+    #endif
 %}
 
 %typemap(in) off_t = long long int;

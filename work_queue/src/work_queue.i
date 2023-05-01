@@ -1,11 +1,8 @@
 /* work_queue.i */
-%module work_queue
+%module cwork_queue
 
 %include carrays.i
 %array_functions(struct rmsummary *, rmsummayArray);
-
-/* type is a go keyword. rename it to value_type */
-%rename(value_type) rmsummary_field::type;
 
 %begin %{
 	#define SWIG_PYTHON_2_UNICODE
@@ -16,7 +13,6 @@
 	#include "int_sizes.h"
 	#include "timestamp.h"
 	#include "work_queue.h"
-	#include "rmsummary.h"
 %}
 
 /* We compile with -D__LARGE64_FILES, thus off_t is at least 64bit.
@@ -41,7 +37,4 @@ long long int is guaranteed to be at least 64bit. */
 %include "int_sizes.h"
 %include "timestamp.h"
 %include "work_queue.h"
-%include "rmsummary.h"
-%include "category.h"
-
 

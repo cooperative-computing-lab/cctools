@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 import sys, json
-import work_queue as wq
+import ndcctools.work_queue as wq
 port_file = None
 try:
     port_file = sys.argv[1]

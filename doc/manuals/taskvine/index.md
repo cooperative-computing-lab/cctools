@@ -106,15 +106,21 @@ Task 2 completed with result     536    6314   36667
 All tasks done.
 ```
 
-Congratulations! You have now run a simple manager application that runs tasks on one local worker.  If you learn best from examples, then take a look and
-test out the following example applications:
+Congratulations! You have now run a simple manager application that runs tasks on one local worker.
+To scale up simply requires running more workers on a cluster or cloud facility.
+
+## Example Applications
+
+The following examples show more complex applications and various features of TaskVine: 
 
 - [BLAST Example](example-blast.md)
 - [Gutenberg Example](example-gutenberg.md)
 - [Mosaic Example](example-mosaic.md)
 - [Gradient Descent Example](example-gradient-descent.md)
+- [Watch Files Example](example-watch.md)
+- [Functional Example](example-functional.md)
 
-Or read on to learn how to build more complex applications and run large numbers of workers at scale.
+Read on to learn how to build applications from scratch and run large numbers of workers at scale.
 
 ## Writing a TaskVine Application
 
@@ -122,7 +128,7 @@ A TaskVine application can be written in Python, or C.
 In each language, the underlying principles are the same, but there are some syntactic differences shown below.
 The full API documentation for each language is here:
 
-- [TaskVine Python API](../api/html/namespacetaskvine.html)
+- [TaskVine Python API](../api/html/namespacendcctools_1_1taskvine.html)
 - [TaskVine C API](../api/html/taskvine_8h.html)
 
 ### Creating a Manager Object
@@ -133,7 +139,7 @@ You may specific a specific port number to listen on like this:
 === "Python"
     ```python
     # Import the taskvine module
-    import taskvine as vine
+    import ndcctools.taskvine as vine
 
     # Create a new manager listening on port 9123
     m = vine.Manager(9123)
@@ -373,7 +379,7 @@ If no task completes within the timeout, it returns null.
             if t.completed():
                 print(f"task complete with error exit code: {t.exit_code}")
             else:
-                print(f"There was a problem executing the task: {t.result_string}")
+                print(f"There was a problem executing the task: {t.result}")
     ```
 
 === "C"
@@ -958,14 +964,14 @@ You can see the complete example [here](examples/vine_example_apptainer_env.py)
 ### Watching Output Files
 
 If you would like to see the output of a task as it is produced, add
-`VINE_WATCH` to the flags argument of `add_file`. This will
+the watch flag as an argument of `add_file`. This will
 cause the worker to periodically send output appended to that file back to the
 manager. This is useful for a program that produces a log or progress bar as
 part of its output.
 
 === "Python"
     ```python
-    t.add_output_file("my-file", flags = vine.VINE_WATCH)
+    t.add_output_file("my-file", watch=True)
     ```
 
 === "C"
@@ -1047,7 +1053,7 @@ creating the queue:
 === "Python"
     ```python
     # Import the taskvine module
-    import taskvine as vine
+    import ndcctools.taskvine as vine
     m = vine.Manager(port=9123, ssl=('MY_KEY.pem', 'MY_CERT.pem'))
 
     # Alternatively, you can set ssl=True and let the python API generate
@@ -1137,7 +1143,8 @@ limit on the number of retries:
     ```
 
 When a task cannot be completed in the set number of tries,
-then the task result is set to  `VINE_RESULT_MAX_RETRIES`.
+then the task result is set to `"max retries"` in python and
+`VINE_RESULT_MAX_RETRIES` in C.
 
 ### Pipelined Submission
 
@@ -1376,7 +1383,7 @@ environment created with [conda-pack](https://conda.github.io/conda-pack/).  A
 minimal environment can be created a follows:
 
 ```sh
-conda create -y -p my-env python=3.8 dill conda
+conda create -y -p my-env python=3.8 cloudpickle conda
 conda install -y -p my-env -c conda-forge conda-pack
 # conda install -y -p my-env pip and conda install other modules, etc.
 conda run -p my-env conda-pack
@@ -1939,10 +1946,10 @@ Automatic resource management is enabled per category as follows:
     ```python
     m.enable_monitoring()
     m.set_category_resources_max('my-category-a', {})
-    m.set_category_mode('my-category-a', m.VINE_ALLOCATION_MODE_MAX_THROUGHPUT)
+    m.set_category_mode('my-category-a', "max throughput")
 
     m.set_category_resources_max('my-category-b', {'cores': 2})
-    m.set_category_mode('my-category-b', m.VINE_ALLOCATION_MODE_MAX_THROUGHPUT)
+    m.set_category_mode('my-category-b', "max throughput")
     ```
 
 === "C"
@@ -2175,7 +2182,7 @@ The statistics available are:
 | tasks_submitted            | Total number of tasks submitted to the queue |
 | tasks_dispatched           | Total number of tasks dispatch to workers |
 | tasks_done                 | Total number of tasks completed and returned to user (includes tasks_failed) |
-| tasks_failed               | Total number of tasks completed and returned to user with result other than WQ_RESULT_SUCCESS |
+| tasks_failed               | Total number of tasks completed and returned to user with result other than VINE_RESULT_SUCCESS |
 | tasks_cancelled            | Total number of tasks cancelled |
 | tasks_exhausted_attempts   | Total number of task executions that failed given resource exhaustion |
 |||
@@ -2183,8 +2190,8 @@ The statistics available are:
 | time_when_started  | Absolute time at which the manager started |
 | time_send          | Total time spent in sending tasks to workers (tasks descriptions, and input files) |
 | time_receive       | Total time spent in receiving results from workers (output files) |
-| time_send_good     | Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS |
-| time_receive_good  | Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS |
+| time_send_good     | Total time spent in sending data to workers for tasks with result VINE_RESULT_SUCCESS |
+| time_receive_good  | Total time spent in sending data to workers for tasks with result VINE_RESULT_SUCCESS |
 | time_status_msgs   | Total time spent sending and receiving status messages to and from workers, including workers' standard output, new workers connections, resources updates, etc. |
 | time_internal      | Total time the queue spents in internal processing |
 | time_polling       | Total time blocking waiting for worker communications (i.e., manager idle waiting for a worker message) |
@@ -2192,7 +2199,7 @@ The statistics available are:
 |||
 |       | **Wrokers time statistics (in microseconds)** |
 | time_workers_execute             | Total time workers spent executing done tasks |
-| time_workers_execute_good        | Total time workers spent executing done tasks with result WQ_RESULT_SUCCESS |
+| time_workers_execute_good        | Total time workers spent executing done tasks with result VINE_RESULT_SUCCESS |
 | time_workers_execute_exhaustion  | Total time workers spent executing tasks that exhausted resources |
 |||
 |       | **Transfer statistics** |
@@ -2236,7 +2243,46 @@ of file transfer time on overall performance. For example:
 vine_plot_txn_log vine-run-info/most-recent/vine-logs/transactions
 ```
 
+
 ## Specialized and Experimental Settings
+
+### Executing Dask Workflows in Python (experimental)
+
+TaskVine can be used to execute Dask workflows using a manager as Dask
+scheduler. The class `DaskVine` implements a TaskVine manager that has a
+`get` that can be used as follows:
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+    import dask
+
+    # Create a new manager listening on port 9123
+    m = vine.DaskVine(9123)
+
+    # Define the dask workflow...
+    dask_value = ... 
+
+    # use the manager as the dask scheduler using its get() function
+    result = dask_value.compute(scheduler=m.get)
+
+    # or:
+    with dask.config.set(scheduler=m.get):
+        result = dask_value.compute()
+    ```
+
+The `compute` call above may receive the following keyword arguments:
+
+| Keyword | Description |
+|------------ |---------|
+| environment | A TaskVine file that provides an [environment](#environments) to execute each task. |
+| extra_files | A dictionary of {taskvine.File: "remote_name"} of input files to attach to each task.|
+| lazy_transfer | Whether to bring each result back from the workers (False, default), or keep transient results at workers (True) |
+| resources   | A dictionary to specify [maximum resources](#task-resources), e.g. `{"cores": 1, "memory": 2000"}` |
+| resources\_mode | [Automatic resource management](#automatic-resource-management) to use, e.g., "fixed", "max", or "max throughput"| 
+
+
+### Tunning Specialized Execution Parameters
 
 The behaviour of taskvine can be tuned by the following parameters. We advise
 caution when using these parameters, as the standard behaviour may drastically
@@ -2267,11 +2313,11 @@ change.
 
 
 
-## Further Information
+### Further Information
 
 For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
-## Copyright
+### Copyright
 
 CCTools is Copyright (C) 2022 The University of Notre Dame. This software is distributed under the GNU General Public License Version 2. See the file COPYING for
 details.

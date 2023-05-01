@@ -4,7 +4,7 @@
 # tests for missing/recursive inputs/outputs.
 
 import sys
-import taskvine as vine
+import ndcctools.taskvine as vine
 
 port_file = None
 try:
@@ -18,8 +18,8 @@ alpha_order = sorted(desired_tag_order)
 done_order = []
 
 q = vine.Manager(port=0)
-with open(port_file, 'w') as f:
-    print('Writing port {port} to file {file}'.format(port=q.port, file=port_file))
+with open(port_file, "w") as f:
+    print("Writing port {port} to file {file}".format(port=q.port, file=port_file))
     f.write(str(q.port))
 print(vine.__file__)
 

@@ -1272,10 +1272,8 @@ then
 	if [ -d resource_monitor -a $BUILD_SYS = LINUX ]
 	then
 		echo "resource_monitor IS supported on ${BUILD_SYS}"
-		include_package_resource_monitor="resource_monitor"
 	else
 		echo "resource_monitor is NOT supported on ${BUILD_SYS}"
-		include_package_resource_monitor=""
 	fi
 fi
 

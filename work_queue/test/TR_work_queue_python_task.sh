@@ -6,7 +6,7 @@ set -e
 import_config_val CCTOOLS_PYTHON_TEST_EXEC
 import_config_val CCTOOLS_PYTHON_TEST_DIR
 
-export PYTHONPATH=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
+export PYTHONPATH=$(pwd)/../../test_support/python_modules/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
 export PATH=$(dirname "${CCTOOLS_PYTHON_TEST_EXEC}"):$PATH
 
 STATUS_FILE=wq.status
@@ -16,7 +16,7 @@ PORT_FILE=wq.port
 check_needed()
 {
 	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
-	"${CCTOOLS_PYTHON_TEST_EXEC}" -c "import dill" || return 1
+	"${CCTOOLS_PYTHON_TEST_EXEC}" -c "import cloudpickle" || return 1
 
 	return 0
 }

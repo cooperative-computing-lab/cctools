@@ -406,7 +406,7 @@ static int submit_worker( struct batch_queue *queue )
 	char *worker = string_format("./%s", worker_command);
 	if(using_catalog) {
 		cmd = string_format(
-		"%s -M %s -t %d -C '%s' %s %s %s %s %s %s",
+		"%s --parent-death -M %s -t %d -C '%s' %s %s %s %s %s %s",
 		worker,
 		submission_regex,
 		worker_timeout,
@@ -420,7 +420,7 @@ static int submit_worker( struct batch_queue *queue )
 		);
 	} else {
 		cmd = string_format(
-		"%s %s %d -t %d -C '%s' %s %s %s %s %s",
+		"%s --parent-death %s %d -t %d -C '%s' %s %s %s %s %s",
 		worker,
 		manager_host,
 		manager_port,

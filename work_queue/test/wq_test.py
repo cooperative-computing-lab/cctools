@@ -13,7 +13,7 @@ import shutil
 import stat
 import time
 
-import work_queue as wq
+import ndcctools.work_queue as wq
 
 test_dir    = tempfile.mkdtemp(prefix='wq.test', dir=".")
 input_file  = 'input.file'

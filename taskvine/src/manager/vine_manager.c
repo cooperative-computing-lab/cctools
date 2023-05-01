@@ -3944,13 +3944,13 @@ static void print_password_warning( struct vine_manager *q )
 	}
 
 	if(!q->password && q->name) {
-		fprintf(stderr,"warning: this taskvine manager is visible to the public.\n");
-		fprintf(stderr,"warning: you should set a password with the --password option.\n");
+		debug(D_DEBUG,"warning: this taskvine manager is visible to the public.\n");
+		debug(D_DEBUG,"warning: you should set a password with the --password option.\n");
 	}
 
 	if(!q->ssl_enabled) {
-		fprintf(stderr,"warning: using plain-text when communicating with workers.\n");
-		fprintf(stderr,"warning: use encryption with a key and cert when creating the manager.\n");
+		debug(D_DEBUG,"warning: using plain-text when communicating with workers.\n");
+		debug(D_DEBUG,"warning: use encryption with a key and cert when creating the manager.\n");
 	}
 
 	did_password_warning = 1;

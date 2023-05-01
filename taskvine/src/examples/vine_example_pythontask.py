@@ -21,7 +21,7 @@
 # appropiate  python environment. If this is not the case, an environment file
 # can be specified with: `t.add_environment("env.tar.gz")`, in which
 # env.tar.gz is created with the poncho_package_create tool, and has at least a python
-# installation, with dill.
+# installation, with cloudpickle.
 #
 # A minimal conda environment 'env.tar.gz' can be created with:
 #
@@ -30,14 +30,14 @@
 {
     "conda": {
         "channels": ["conda-forge"],
-        "dependencies": ["python=3.X", "dill"]
+        "dependencies": ["python=3.X", "cloudpickle"]
     }
 }
 """
 # poncho_package_create spec.json env.tar.gz
 
 
-import taskvine as vine
+import ndcctools.taskvine as vine
 
 def divide(dividend, divisor):
     import math

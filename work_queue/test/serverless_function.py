@@ -1,7 +1,6 @@
 #! /usr/bin/env python3
 
 import sys, json
-import work_queue as wq
 import socket
 import json
 import os

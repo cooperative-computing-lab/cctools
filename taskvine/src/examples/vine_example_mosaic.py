@@ -14,7 +14,7 @@
 # the executable and all of its dynamic dependencies.  This allows the
 # use of arbitrary workers without regard to their software environment.
 
-import taskvine as vine
+import ndcctools.taskvine as vine
 import argparse
 import os
 import sys
@@ -47,7 +47,7 @@ def process_result(t):
         elif t.completed():
             print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
         else:
-            print(f"task {t.id} failed with status {t.result_string}")
+            print(f"task {t.id} failed with status {t.result}")
 
 
 if __name__ == "__main__":

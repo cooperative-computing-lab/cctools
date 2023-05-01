@@ -6,13 +6,14 @@ export VALGRIND="valgrind --error-exitcode=1 --leak-check=full"
 
 check_needed()
 {
-	# do not run the test if not on linux.
-	[ -d /proc ] || exit 0
-
 	if ! ${VALGRIND} --version > /dev/null 2>&1
 	then
-		exit 1
+		return 1
 	fi
+
+	[ "${CCTOOLS_OPSYS}" = LINUX ] || return 1
+
+	return 0
 }
 
 prepare()

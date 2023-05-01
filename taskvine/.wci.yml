@@ -1,0 +1,11 @@
+name: TaskVine
+icon: https://ccl.cse.nd.edu/software/taskvine/taskvine-icon.png
+headline: An execution system for large scale data intensive dynamic workflows.
+language: Python
+description:  TaskVine is a system building large scale data intensive dynamic workflows that run on HPC clusters, GPU clusters, and commercial clouds. As tasks access external data sources and produce their own outputs, more and more data is pulled into local storage on workers. This data is used to accelerate future tasks and avoid re-computing exisiting results. Data gradually grows "like a vine" through the cluster.  TaskVine can serve as an execution for other workflow systems such as Parsl and Dask.
+
+documentation:
+  general: https://cctools.readthedocs.io/en/stable/taskvine
+  installation: https://cctools.readthedocs.io/en/stable/install
+  tutorial: https://cctools.readthedocs.io/en/stable/taskvine/#quick-start
+  

@@ -14,7 +14,7 @@
 # Both the downloads are automatically unpacked, cached, and shared
 # with all the same tasks on the worker.
 
-import taskvine as vine
+import ndcctools.taskvine as vine
 import random
 import argparse
 import getpass
@@ -143,6 +143,6 @@ with all the same tasks on the worker.""",
                     f"task {t.id} completed with an executin error, exit code {t.exit_code}"
                 )
             else:
-                print(f"task {t.id} failed with status {t.result_string}")
+                print(f"task {t.id} failed with status {t.result}")
 
     print("all tasks complete!")

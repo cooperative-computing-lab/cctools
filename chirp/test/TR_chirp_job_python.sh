@@ -11,6 +11,8 @@ cr="./root.$PPID"
 import_config_val CCTOOLS_PYTHON_TEST_EXEC
 import_config_val CCTOOLS_PYTHON_TEST_DIR
 
+export PYTHONPATH=$(pwd)/../../test_support/python_modules/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
+
 check_needed()
 {
 	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
@@ -33,7 +35,7 @@ run()
 
 	base=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}
 
-	PYTHONPATH=${base} ${CCTOOLS_PYTHON_TEST_EXEC} ${base}/chirp_jobs_python_example.py $hostport ${base}/my_script.sh
+	${CCTOOLS_PYTHON_TEST_EXEC} ${base}/chirp_jobs_python_example.py $hostport ${base}/my_script.sh
 
 	return 0
 }

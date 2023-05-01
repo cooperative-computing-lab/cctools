@@ -1,6 +1,4 @@
 __pycache__
-_work_queue.so
-work_queue.py
-work_queue.binding.py*
-work_queue_example.py*
+cwork_queue.py
+_cwork_queue.so
 work_queue_wrap.*

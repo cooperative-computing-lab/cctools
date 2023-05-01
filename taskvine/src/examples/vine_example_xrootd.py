@@ -6,7 +6,7 @@
 # not the case, a poncho recipe to construct this environment is also given.
 #
 
-import taskvine as vine
+import ndcctools.taskvine as vine
 
 import argparse
 import os
@@ -37,7 +37,7 @@ def create_env(env_name):
     env = {
             "conda": {
                 "channels": ["conda-forge"],
-                "dependencies": [f"python={py_version}", "dill", "uproot", "xrootd"]
+                "dependencies": [f"python={py_version}", "cloudpickle", "uproot", "xrootd"]
                 }
             }
 
@@ -119,6 +119,6 @@ if __name__ == "__main__":
             elif t.completed():
                 print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
             else:
-                print(f"task {t.id} failed with status {t.result_string}")
+                print(f"task {t.id} failed with status {t.result}")
 
     print("all tasks complete!")

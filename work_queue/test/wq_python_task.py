@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 import sys
-import work_queue as wq
+import ndcctools.work_queue as wq
 
 port_file = None
 try:
