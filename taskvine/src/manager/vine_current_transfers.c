@@ -37,21 +37,6 @@ int vine_current_transfers_remove(struct vine_manager *q, const char *id)
     return 0;
 }
 
-// remove one reference to the manager as a source in the transfer table
-int vine_current_transfers_remove_one_manager(struct vine_manager *q)
-{
-    char *id;
-    struct vine_transfer_pair *t;
-    HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
-    {
-    	if(strcmp("manager", t->source) == 0)
-	{
-		if(hash_table_remove(q->current_transfer_table, id)) return 1;
-	}
-    }
-    return 0;
-}
-
 // count the number transfers coming from a specific source
 int vine_current_transfers_source_in_use(struct vine_manager *q, const char *source)
 {
