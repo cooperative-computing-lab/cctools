@@ -101,8 +101,7 @@ Rotation is separate from addition to prevent recomputation.
 
 /* MD5 initialization. Begins an MD5 operation, writing a new context.
  */
-void md5_init(context)
-	 md5_context_t *context;	/* context */
+void md5_init(md5_context_t *context)
 {
 	context->count[0] = context->count[1] = 0;
 	/* Load magic initialization constants.
@@ -116,10 +115,7 @@ void md5_init(context)
 /* Encodes input (uint32_t) into output (unsigned char). Assumes len is
   a multiple of 4.
  */
-static void Encode(output, input, len)
-	 uint8_t *output;
-	 uint32_t *input;
-	 size_t len;
+static void Encode(uint8_t *output, uint32_t *input, size_t len)
 {
 	size_t i, j;
 
@@ -134,10 +130,7 @@ static void Encode(output, input, len)
 /* Decodes input (unsigned char) into output (uint32_t). Assumes len is
   a multiple of 4.
  */
-static void Decode(output, input, len)
-	 uint32_t *output;
-	 uint8_t *input;
-	 size_t len;
+static void Decode(uint32_t *output, uint8_t *input, size_t len)
 {
 	size_t i, j;
 
@@ -147,9 +140,7 @@ static void Decode(output, input, len)
 
 /* MD5 basic transformation. Transforms state based on block.
  */
-static void MD5Transform(state, block)
-	 uint32_t state[4];
-	 uint8_t block[64];
+static void MD5Transform(uint32_t state[4], uint8_t block[64])
 {
 	uint32_t a = state[0], b = state[1], c = state[2], d = state[3], x[16];
 
@@ -240,11 +231,13 @@ static void MD5Transform(state, block)
 /* MD5 block update operation. Continues an MD5 message-digest
   operation, processing another message block, and updating the
   context.
- */
-void md5_update(context, input, inputLen)
-	 md5_context_t *context;	/* context */
-	 const void *input;	/* input block */
-	 size_t inputLen;	/* length of input block */
+
+*context context
+*input	 input block
+inputLen length of input block
+
+*/
+void md5_update(md5_context_t *context, const void *input, size_t inputLen)
 {
 	size_t i, index, partLen;
 
@@ -279,9 +272,7 @@ void md5_update(context, input, inputLen)
 /* MD5 finalization. Ends an MD5 message-digest operation, writing the
   the message digest and zeroizing the context.
  */
-void md5_final(digest, context)
-	 unsigned char digest[16];	/* message digest */
-	 md5_context_t *context;	/* context */
+void md5_final(unsigned char digest[16], md5_context_t *context)
 {
 	uint8_t bits[8];
 	size_t index, padLen;

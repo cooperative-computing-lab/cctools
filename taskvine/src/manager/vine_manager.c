@@ -1544,7 +1544,6 @@ static vine_result_code_t get_available_results(struct vine_manager *q, struct v
 	debug(D_VINE, "Reading result(s) from %s (%s)", w->hostname, w->addrport);
 
 	char line[VINE_LINE_MAX];
-	int i = 0;
 
 	vine_result_code_t result = VINE_SUCCESS; //return success unless something fails below.
 
@@ -1559,7 +1558,6 @@ static vine_result_code_t get_available_results(struct vine_manager *q, struct v
 		if(string_prefix_is(line,"result")) {
 			result = get_result(q, w, line);
 			if(result != VINE_SUCCESS) break;
-			i++;
 		} else if(string_prefix_is(line,"update")) {
 			result = get_update(q,w,line);
 			if(result != VINE_SUCCESS) break;
