@@ -37,7 +37,7 @@ struct vine_task *vine_task_create(const char *command_line)
 	memset(t, 0, sizeof(*t));
 
 	/* REMEMBER: Any memory allocation done in this function should have a
-	 * corresponding copy in vine_task_clone. Otherwise we get
+	 * corresponding copy in vine_task_copy. Otherwise we get
 	 * double-free segfaults. */
 
 	/* For clarity, put initialization in same order as structure. */
@@ -63,6 +63,8 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->resources_measured  = rmsummary_create(-1);
 	t->resources_allocated = rmsummary_create(-1);
 
+	t->refcount = 0;
+	
 	return t;
 }
 
@@ -111,19 +113,19 @@ void vine_task_clean( struct vine_task *t, int full_clean )
 	t->state = VINE_TASK_READY;
 }
 
-static struct list *vine_task_mount_list_clone(struct list *list)
+static struct list *vine_task_mount_list_copy(struct list *list)
 {
 	struct list *new = list_create();
 	struct vine_mount *old_mount, *new_mount;
 	
 	LIST_ITERATE(list,old_mount) {
-		new_mount = vine_mount_clone(old_mount);
+		new_mount = vine_mount_copy(old_mount);
 		list_push_tail(new, new_mount);
 	}
 	return new;
 }
 
-static struct list *vine_task_string_list_clone(struct list *string_list)
+static struct list *vine_task_string_list_copy(struct list *string_list)
 {
 	struct list *new = list_create();
 	char *var;
@@ -135,8 +137,14 @@ static struct list *vine_task_string_list_clone(struct list *string_list)
 	return new;
 }
 
+struct vine_task *vine_task_clone( struct vine_task *t )
+{
+	if(!t) return 0;
+	t->refcount++;
+	return t;
+}
 
-struct vine_task *vine_task_clone(const struct vine_task *task)
+struct vine_task *vine_task_copy( const struct vine_task *task )
 {
 	if(!task) return 0;
 
@@ -155,10 +163,10 @@ struct vine_task *vine_task_clone(const struct vine_task *task)
 		vine_task_set_snapshot_file(new, task->monitor_snapshot_file);
 	}
 
-	new->input_mounts  = vine_task_mount_list_clone(task->input_mounts);
-	new->output_mounts = vine_task_mount_list_clone(task->output_mounts);
-	new->env_list     = vine_task_string_list_clone(task->env_list);
-	new->feature_list = vine_task_string_list_clone(task->feature_list);
+	new->input_mounts  = vine_task_mount_list_copy(task->input_mounts);
+	new->output_mounts = vine_task_mount_list_copy(task->output_mounts);
+	new->env_list     = vine_task_string_list_copy(task->env_list);
+	new->feature_list = vine_task_string_list_copy(task->feature_list);
 
 	/* Scheduling features of task are copied. */
 	new->resource_request = task->resource_request;
@@ -434,6 +442,8 @@ void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char 
 
 	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
 
+	vine_file_created_by(f,t);
+
 	list_push_tail(t->output_mounts, m);
 }
 
@@ -549,6 +559,9 @@ void vine_task_delete(struct vine_task *t)
 {
 	if(!t) return;
 
+	t->refcount--;
+	if(t->refcount>0) return;
+	
 	free(t->command_line);
 	free(t->coprocess);
 	free(t->tag);

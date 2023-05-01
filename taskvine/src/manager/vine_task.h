@@ -90,7 +90,15 @@ struct vine_task {
 
 	int has_fixed_locations;                               /**< Whether at least one file was added with the VINE_FIXED_LOCATION flag. Task fails immediately if no
 															 worker can satisfy all the strict inputs of the task. */
+
+	int refcount;                                          /**< Number of remaining references to this object. */
 };
+
+/* Add a reference to an existing task object, return the same object. */
+struct vine_task * vine_task_clone( struct vine_task *t );
+
+/* Deep-copy an existing task object, return a pointer to a new object. */
+struct vine_task * vine_task_copy( const struct vine_task *t );
 
 int  vine_task_set_result(struct vine_task *t, vine_result_t new_result);
 void vine_task_set_resources(struct vine_task *t, const struct rmsummary *rm);

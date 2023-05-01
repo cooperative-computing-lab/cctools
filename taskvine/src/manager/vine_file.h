@@ -44,9 +44,12 @@ struct vine_file {
 	struct vine_task *mini_task; // Mini task used to generate the desired output file.
 	int refcount;       // Number of references from a task object, delete when zero.
 	vine_file_flags_t flags; // whether or not to transfer this file between workers.
+	struct vine_task *created_by; // Pointer back to task that created this file.
 };
 
 struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task, vine_file_flags_t flags);
+
+void vine_file_created_by( struct vine_file *f, struct vine_task *t );
 
 struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source );
 

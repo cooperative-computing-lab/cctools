@@ -3813,8 +3813,8 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name) {
 
-	// setup the Library Task by cloning the original and giving it a unique taskid
-	struct vine_task *t = vine_task_clone(hash_table_lookup(q->libraries, name));
+	// setup the Library Task by copying the original and giving it a unique taskid
+	struct vine_task *t = vine_task_copy(hash_table_lookup(q->libraries, name));
 	t->task_id = q->next_task_id;
 	q->next_task_id++;
 	t->hostname = xxstrdup(w->hostname);

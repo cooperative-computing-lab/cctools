@@ -38,7 +38,7 @@ void vine_mount_delete( struct vine_mount *m )
 	free(m);
 }
 
-struct vine_mount * vine_mount_clone( struct vine_mount *m )
+struct vine_mount * vine_mount_copy( struct vine_mount *m )
 {
 	if(!m) return 0;
 	return vine_mount_create(vine_file_clone(m->file),m->remote_name,m->flags,vine_file_clone(m->substitute));

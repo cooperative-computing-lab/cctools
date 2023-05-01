@@ -25,7 +25,7 @@ struct vine_mount {
 };
 
 struct vine_mount * vine_mount_create( struct vine_file *f, const char *remote_name, vine_mount_flags_t flags, struct vine_file *substitute );
-struct vine_mount * vine_mount_clone( struct vine_mount *m );
+struct vine_mount * vine_mount_copy( struct vine_mount *m );
 void vine_mount_delete( struct vine_mount *m );
 
 #endif

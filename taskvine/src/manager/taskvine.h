@@ -238,13 +238,6 @@ vine_task_set_command
 */
 struct vine_task *vine_task_create(const char *full_command);
 
-/** Create a copy of a task
-Create a functionally identical copy of a task that
-can be re-submitted via @ref vine_submit.
-@return A new task object
-*/
-struct vine_task *vine_task_clone(const struct vine_task *task);
-
 /** Delete a task.
 This may be called on tasks after they are returned from @ref vine_wait.
 @param t The task to delete.
