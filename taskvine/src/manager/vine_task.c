@@ -68,7 +68,7 @@ struct vine_task *vine_task_create(const char *command_line)
 	return t;
 }
 
-void vine_task_clean( struct vine_task *t, int full_clean )
+void vine_task_clean( struct vine_task *t )
 {
 	t->time_when_commit_start = 0;
 	t->time_when_commit_end   = 0;
@@ -91,22 +91,6 @@ void vine_task_clean( struct vine_task *t, int full_clean )
 
 	free(t->addrport);
 	t->addrport = NULL;
-
-	if(full_clean) {
-		t->resource_request = CATEGORY_ALLOCATION_FIRST;
-		t->try_count = 0;
-		t->exhausted_attempts = 0;
-		t->workers_slow = 0;
-
-		t->time_workers_execute_all = 0;
-		t->time_workers_execute_exhaustion = 0;
-		t->time_workers_execute_failure = 0;
-
-		rmsummary_delete(t->resources_measured);
-		rmsummary_delete(t->resources_allocated);
-		t->resources_measured  = rmsummary_create(-1);
-		t->resources_allocated = rmsummary_create(-1);
-	}
 
 	/* If result is never updated, then it is mark as a failure. */
 	t->result = VINE_RESULT_UNKNOWN;

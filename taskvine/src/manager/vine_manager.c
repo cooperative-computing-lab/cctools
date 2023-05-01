@@ -749,7 +749,7 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 			t->time_workers_execute_all     += delta_time;
 		}
 
-		vine_task_clean(t, 0);
+		vine_task_clean(t);
 		reap_task_from_worker(q, w, t, VINE_TASK_READY);
 
 		itable_firstkey(w->current_tasks);
@@ -3585,7 +3585,7 @@ static void push_task_to_ready_list( struct vine_manager *q, struct vine_task *t
 	}
 
 	/* If the task has been used before, clear out accumulated state. */
-	vine_task_clean(t,0);
+	vine_task_clean(t);
 }
 
 vine_task_state_t vine_task_state( struct vine_manager *q, int task_id )
@@ -3634,25 +3634,6 @@ static vine_task_state_t change_task_state( struct vine_manager *q, struct vine_
 	vine_txn_log_write_task(q, t);
 
 	return old_state;
-}
-
-static int task_in_terminal_state(struct vine_manager *q, struct vine_task *t)
-{
-	switch(t->state) {
-		case VINE_TASK_READY:
-		case VINE_TASK_RUNNING:
-		case VINE_TASK_WAITING_RETRIEVAL:
-		case VINE_TASK_RETRIEVED:
-			return 0;
-			break;
-		case VINE_TASK_DONE:
-		case VINE_TASK_CANCELED:
-		case VINE_TASK_UNKNOWN:
-			return 1;
-			break;
-	}
-
-	return 0;
 }
 
 const char *vine_result_string(vine_result_t result) {
@@ -3787,13 +3768,7 @@ static int vine_submit_internal(struct vine_manager *q, struct vine_task *t)
 int vine_submit(struct vine_manager *q, struct vine_task *t)
 {
 	if(t->task_id > 0) {
-		if(task_in_terminal_state(q, t)) {
-			/* this task struct has been submitted before. We keep all the
-			 * definitions, but reset all of the stats. */
-			vine_task_clean(t, /* full clean */ 1);
-		} else {
-			fatal("Task %d has been already submitted and is not in any final state.", t->task_id);
-		}
+		fatal("TaskVine: Sorry, you cannot submit the same task (%lld) (%s) twice!",t->task_id,t->command_line);
 	}
 
 	t->task_id = q->next_task_id;

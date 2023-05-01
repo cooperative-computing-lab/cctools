@@ -102,7 +102,7 @@ struct vine_task * vine_task_copy( const struct vine_task *t );
 
 int  vine_task_set_result(struct vine_task *t, vine_result_t new_result);
 void vine_task_set_resources(struct vine_task *t, const struct rmsummary *rm);
-void vine_task_clean( struct vine_task *t, int full_clean );
+void vine_task_clean( struct vine_task *t );
 void vine_task_check_consistency( struct vine_task *t );
 
 const char *vine_task_state_to_string( vine_task_state_t task_state );
