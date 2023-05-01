@@ -5097,19 +5097,17 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 	struct vine_file *previous = vine_manager_lookup_file(m, f->cached_name);
 
 	if(previous) {
-	/* This file has been declared before. We delete the new instance and
-	 * return previous. */
+		/* If declared before, use the previous instance. */
 		vine_file_delete(f);
 		f = previous;
 	} else {
-		hash_table_insert(m->file_table, f->cached_name, f);
-
-		/* This is a new file. Increase refcount to keep track of the reference
-		 * from the manager. */
-		f->refcount += 1;
+		/* Otherwise add it to the table. */
+		hash_table_insert(m->file_table, f->cached_name, f );
 	}
 
-	return f;
+	/* Either way, increase the refcount of the file and return it. */
+	
+	return vine_file_clone(f);
 }
 
 struct vine_file *vine_declare_file( struct vine_manager *m, const char *source, vine_file_flags_t flags)
