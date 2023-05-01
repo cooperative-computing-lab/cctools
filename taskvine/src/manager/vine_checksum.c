@@ -35,7 +35,7 @@ static char *vine_checksum_dir( const char *path, ssize_t *totalsize )
 {
 	char *dirstring=xxstrdup("");
 	char **entries;
-	sort_dir(path, &entries, strcmp);
+	if(!sort_dir(path, &entries, strcmp)) return 0;
 	int i;
 	for(i=0; entries[i]; i++){
 
