@@ -37,7 +37,6 @@ int vine_current_transfers_remove(struct vine_manager *q, const char *id)
     return 0;
 }
 
-
 // count the number transfers coming from a specific source
 int vine_current_transfers_source_in_use(struct vine_manager *q, const char *source)
 {

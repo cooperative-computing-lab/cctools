@@ -2632,7 +2632,9 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 
 	LIST_ITERATE(t->input_mounts, m){
 		/* Is the file already present on that worker? */
+		
 		struct vine_file_replica *remote_info;
+		
 		if((remote_info = vine_file_replica_table_lookup(w, m->file->cached_name))) continue;
 
 		struct vine_worker_info *peer;
@@ -3201,7 +3203,9 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->password = 0;
 
-	q->peer_transfers_enabled = 0;
+	// peer transfers enabled by default
+	q->peer_transfers_enabled = 1;
+
 	q->file_source_max_transfers = VINE_FILE_SOURCE_MAX_TRANSFERS;
 	q->worker_source_max_transfers = VINE_WORKER_SOURCE_MAX_TRANSFERS;
 
@@ -3283,6 +3287,12 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 int vine_enable_peer_transfers(struct vine_manager *q) {
 	debug(D_VINE, "Peer Transfers enabled");
 	q->peer_transfers_enabled = 1;
+	return 1;
+}
+
+int vine_disable_peer_transfers(struct vine_manager *q) {
+	debug(D_VINE, "Peer Transfers disabled");
+	q->peer_transfers_enabled = 0;
 	return 1;
 }
 

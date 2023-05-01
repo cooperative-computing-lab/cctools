@@ -405,12 +405,23 @@ class Manager(object):
         return cvine.vine_enable_monitoring_full(self._taskvine, dirname, watchdog)
 
     ##
-    # Enable P2P worker transfer functionality. Off by default
+    # Enable P2P worker transfer functionality. On by default
     #
     # @param self Reference to the current manager object.
     def enable_peer_transfers(self):
         return cvine.vine_enable_peer_transfers(self._taskvine)
 
+    ##
+    # Disable P2P worker transfer functionality. On by default
+    #
+    # @param self Reference to the current manager object.
+    def disable_peer_transfers(self):
+        return cvine.vine_disable_peer_transfers(self._taskvine)
+
+    ##
+    # Change the project name for the given manager.
+    #
+    # @param self   Reference to the current manager object.
     ##
     # Enable disconnect slow workers functionality for a given manager for tasks in
     # the "default" category, and for task which category does not set an
