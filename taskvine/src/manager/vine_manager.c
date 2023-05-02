@@ -735,7 +735,6 @@ static void update_catalog(struct vine_manager *q, int force_update )
 static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
 	struct vine_task *t;
-	struct rmsummary *r;
 	uint64_t task_id;
 
 	if(!q || !w) return;
@@ -755,15 +754,10 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 		itable_firstkey(w->current_tasks);
 	}
 
-	ITABLE_ITERATE(w->current_tasks_boxes,task_id,r) {
-		rmsummary_delete(r);
-	}
-
-	itable_clear(w->current_tasks);
-	itable_clear(w->current_tasks_boxes);
+	itable_clear(w->current_tasks,0);
+	itable_clear(w->current_tasks_boxes,(void*)rmsummary_delete);
 
 	w->finished_tasks = 0;
-
 
 	char *cached_name = NULL;
 	struct vine_file_replica *info = NULL;
@@ -3430,8 +3424,8 @@ void vine_delete(struct vine_manager *q)
 	hash_table_delete(q->categories);
 
 	list_delete(q->ready_list);
-	itable_delete(q->tasks);
 	hash_table_delete(q->libraries);
+	itable_delete(q->tasks);
 
 	hash_table_delete(q->workers_with_available_results);
 
