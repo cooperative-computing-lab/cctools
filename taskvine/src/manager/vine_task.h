@@ -120,4 +120,6 @@ void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_t
 void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_mount_flags_t flags);
 void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name );
 
+extern int vine_task_next_task_id;
+
 #endif

@@ -3128,8 +3128,6 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	getcwd(q->workingdir,PATH_MAX);
 
-	q->next_task_id = 1;
-
 	q->ready_list = list_create();
 
 	q->tasks          = itable_create(0);
@@ -3747,12 +3745,6 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 		fatal("TaskVine: Sorry, you cannot submit the same task (%lld) (%s) twice!",t->task_id,t->command_line);
 	}
 
-	/* Assign a unique taskid on submission. */
-	t->task_id = q->next_task_id;
-
-	/* Increment task_id. So we get a unique task_id for every submit. */
-	q->next_task_id++;
-
 	/* Issue warnings if the files are set up strangely. */
 	vine_task_check_consistency(t);
 
@@ -3783,8 +3775,6 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 
 	// setup the Library Task by copying the original and giving it a unique taskid
 	struct vine_task *t = vine_task_copy(hash_table_lookup(q->libraries, name));
-	t->task_id = q->next_task_id;
-	q->next_task_id++;
 	t->hostname = xxstrdup(w->hostname);
 	t->addrport = xxstrdup(w->addrport);
 	t->worker = w;
@@ -4986,11 +4976,11 @@ struct category *vine_category_lookup_or_create(struct vine_manager *q, const ch
 
 int vine_set_task_id_min(struct vine_manager *q, int minid) {
 
-	if(minid > q->next_task_id) {
-		q->next_task_id = minid;
+	if(minid > vine_task_next_task_id) {
+		vine_task_next_task_id = minid;
 	}
 
-	return q->next_task_id;
+	return vine_task_next_task_id;
 }
 
 
