@@ -3416,6 +3416,9 @@ void vine_delete(struct vine_manager *q)
 	hash_table_clear(q->file_table,(void*)vine_file_delete);
 	hash_table_delete(q->file_table);
 
+	itable_clear(q->tasks,(void*)vine_task_delete);
+	itable_delete(q->tasks);
+
 	char *key;
 	struct category *c;
 	HASH_TABLE_ITERATE(q->categories,key,c) {
@@ -3425,8 +3428,6 @@ void vine_delete(struct vine_manager *q)
 
 	list_delete(q->ready_list);
 	hash_table_delete(q->libraries);
-	itable_delete(q->tasks);
-
 	hash_table_delete(q->workers_with_available_results);
 
 	list_clear(q->task_info_list,(void*)vine_task_info_delete);
