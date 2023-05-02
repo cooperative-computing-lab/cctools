@@ -2689,6 +2689,30 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 }
 
 /*
+Determine whether the input files needed for this task are available in some form.
+Most file types (FILE, URL, BUFFER) we can materialize on demand.
+But TEMP files must have been created by a prior task.
+If they were lost due to a worker failure, then we cannot run this task.
+XXX This is the point at which we should re-dispatch the creating task.
+*/
+
+int vine_manager_check_inputs_available( struct vine_manager *q, struct vine_task *t )
+{
+	struct vine_mount *m;
+	LIST_ITERATE(t->input_mounts,m) {
+		struct vine_file *f = m->file;
+		if(f->type==VINE_TEMP) {
+			if(!vine_file_replica_table_exists_somewhere(q,f->cached_name)) {
+				notice(D_VINE,"Temporary file %s was lost!  Must rerun task %d to regenerate it.",f->cached_name,f->created_by_task_id);
+				return 0;
+			}
+		}
+		
+	}
+	return 1;
+}
+
+/*
 Advance the state of the system by selecting one task available
 to run, finding the best worker for that task, and then committing
 the task to the worker.
@@ -2707,6 +2731,9 @@ static int send_one_task( struct vine_manager *q )
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
 
+		// Skip task if temp input files have not been materialized.
+		if(!vine_manager_check_inputs_available(q,t)) continue;
+		
 		// Find the best worker for the task at the head of the list
 		w = vine_schedule_task_to_worker(q,t);
 
