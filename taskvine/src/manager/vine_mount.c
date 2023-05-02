@@ -15,7 +15,10 @@ See the file COPYING for details.
 struct vine_mount * vine_mount_create( struct vine_file *file, const char *remote_name, vine_mount_flags_t flags, struct vine_file *substitute )
 {
 	struct vine_mount *m = malloc(sizeof(*m));
-	m->file = file;
+
+	/* Add a reference each time a file is connected. */
+	m->file = vine_file_clone(file);
+
 	if(remote_name) {
 		m->remote_name = xxstrdup(remote_name);
 	} else {
@@ -23,9 +26,6 @@ struct vine_mount * vine_mount_create( struct vine_file *file, const char *remot
 	}
 	m->flags = flags;
 	m->substitute = substitute;
-
-	/* Add a reference each time a file is connected. */
-	m->file->refcount++;
 
 	return m;
 }

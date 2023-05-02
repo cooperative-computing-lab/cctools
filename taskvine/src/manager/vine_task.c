@@ -63,7 +63,7 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->resources_measured  = rmsummary_create(-1);
 	t->resources_allocated = rmsummary_create(-1);
 
-	t->refcount = 0;
+	t->refcount = 1;
 	
 	return t;
 }
@@ -425,8 +425,6 @@ void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char 
 	}
 
 	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
-
-	vine_file_created_by(f,t);
 
 	list_push_tail(t->output_mounts, m);
 }

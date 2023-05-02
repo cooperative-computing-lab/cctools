@@ -5067,15 +5067,13 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 	if(previous) {
 		/* If declared before, use the previous instance. */
 		vine_file_delete(f);
-		f = previous;
+		f = vine_file_clone(previous);
 	} else {
 		/* Otherwise add it to the table. */
 		hash_table_insert(m->file_table, f->cached_name, f );
 	}
 
-	/* Either way, increase the refcount of the file and return it. */
-	
-	return vine_file_clone(f);
+	return f;
 }
 
 struct vine_file *vine_declare_file( struct vine_manager *m, const char *source, vine_file_flags_t flags)

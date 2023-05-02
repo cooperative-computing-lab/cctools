@@ -30,7 +30,6 @@ int vine_file_delete(struct vine_file *f)
 		}
 
 		vine_task_delete(f->mini_task);
-		vine_task_delete(f->created_by);
 		free(f->source);
 		free(f->cached_name);
 		free(f->data);
@@ -89,15 +88,9 @@ struct vine_file *vine_file_create( const char *source, const char *cached_name,
 		}
 	}
 
-	/* file has been created, but it is not referenced by any task, or manager yet. */
-	f->refcount = 0;
+	f->refcount = 1;
 
 	return f;
-}
-
-void vine_file_created_by( struct vine_file *f, struct vine_task *t )
-{
-	f->created_by = vine_task_clone(t);
 }
 
 /* Make a reference counted copy of a file object. */
