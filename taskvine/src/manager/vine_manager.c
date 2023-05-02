@@ -3741,8 +3741,8 @@ static int task_request_count( struct vine_manager *q, const char *category, cat
 
 int vine_submit(struct vine_manager *q, struct vine_task *t)
 {
-	if(t->task_id > 0) {
-		fatal("TaskVine: Sorry, you cannot submit the same task (%lld) (%s) twice!",t->task_id,t->command_line);
+	if(t->state!=VINE_TASK_UNKNOWN) {
+		fatal("TaskVine: Sorry, you cannot submit the same task (%d) (%s) twice!",t->task_id,t->command_line);
 	}
 
 	/* Issue warnings if the files are set up strangely. */
