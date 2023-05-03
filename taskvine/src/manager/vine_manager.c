@@ -3719,8 +3719,9 @@ static vine_task_state_t change_task_state( struct vine_manager *q, struct vine_
 			break;
 		case VINE_TASK_DONE:
 		case VINE_TASK_CANCELED:
-			/* tasks are freed when returned to user, thus we remove them from our local record */
+			/* Task was cloned when entered into our own table, so delete a reference on removal. */
 			itable_remove(q->tasks, t->task_id); 
+			vine_task_delete(t);
 			break;
 		default:
 			/* do nothing */
