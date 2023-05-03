@@ -2689,21 +2689,59 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 }
 
 /*
+Consider whether a given task_id should be restarted, so as to re-generate
+the necessary output files.  This should only happen if the task previously
+ran to completion and is in the DONE state, so as to avoid multiple concurrent re-runs.
+*/
+
+
+static void vine_manager_consider_task_restart( struct vine_manager *q, int task_id )
+{
+	struct vine_task *t = itable_lookup(q->tasks,task_id);
+	if(!t) return;
+
+	switch(t->state) {
+	case VINE_TASK_UNKNOWN:
+		/* The task has not been submitted by the user yet. */
+		break;
+	case VINE_TASK_READY:
+	case VINE_TASK_RUNNING:
+	case VINE_TASK_WAITING_RETRIEVAL:
+	case VINE_TASK_RETRIEVED:
+		/* The task is in the process of running, just wait until it is done. */
+		break;
+	case VINE_TASK_DONE:
+		/* The task previously ran to completion, so it needs to be re-submitted. */
+		notice(D_VINE,"Task %d must be re-run in order to re-create temporary file %s!\n",task_id,"unknown");
+		/* XXX this should be a stronger reset */
+		/* XXX I think we should create a new task with a new ID. */
+		vine_task_clean(t);
+		/* XXX make sure that this task is not returned again via wait */
+		change_task_state(q,t,VINE_TASK_READY);
+		break;
+	case VINE_TASK_CANCELED:
+		/* If the producing task was cancelled, then this one should be too. */
+		/* XXX problem here is that cancelled tasks are not returned by wait() */
+		break;
+	}
+}
+	
+/*
 Determine whether the input files needed for this task are available in some form.
 Most file types (FILE, URL, BUFFER) we can materialize on demand.
 But TEMP files must have been created by a prior task.
-If they were lost due to a worker failure, then we cannot run this task.
-XXX This is the point at which we should re-dispatch the creating task.
+If they were not present, we cannot run this task,
+and should consider re-running the task that created it.
 */
 
-int vine_manager_check_inputs_available( struct vine_manager *q, struct vine_task *t )
+static int vine_manager_check_inputs_available( struct vine_manager *q, struct vine_task *t )
 {
 	struct vine_mount *m;
 	LIST_ITERATE(t->input_mounts,m) {
 		struct vine_file *f = m->file;
 		if(f->type==VINE_TEMP) {
 			if(!vine_file_replica_table_exists_somewhere(q,f->cached_name)) {
-				notice(D_VINE,"Temporary file %s was lost!  Must rerun task %d to regenerate it.",f->cached_name,f->created_by_task_id);
+				vine_manager_consider_task_restart(q,f->created_by_task_id);
 				return 0;
 			}
 		}
