@@ -123,6 +123,7 @@ struct vine_manager {
 
 	/* Internal state modified by the manager */
 
+	int next_task_id;       /* Next integer task_id to be assigned to a created task. */
 	int num_tasks_left;    /* Optional: Number of tasks remaining, if given by user.  @ref vine_set_num_tasks */
 	int busy_waiting_flag; /* Set internally in main loop if no messages were processed -> wait longer. */
 

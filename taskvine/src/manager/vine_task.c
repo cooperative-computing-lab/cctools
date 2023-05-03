@@ -27,8 +27,6 @@ See the file COPYING for details.
 #include <math.h>
 #include "random.h"
 
-int vine_task_next_task_id = 1;
-
 struct vine_task *vine_task_create(const char *command_line)
 {
 	struct vine_task *t = malloc(sizeof(*t));
@@ -38,7 +36,6 @@ struct vine_task *vine_task_create(const char *command_line)
 	}
 	memset(t, 0, sizeof(*t));
 
-	t->task_id = vine_task_next_task_id++;
 	t->type = VINE_TASK_TYPE_STANDARD;
 	
 	/* REMEMBER: Any memory allocation done in this function should have a
@@ -139,7 +136,9 @@ struct vine_task *vine_task_copy( const struct vine_task *task )
 
 	struct vine_task *new = vine_task_create(task->command_line);
 
-	new->task_id = vine_task_next_task_id++;
+	/* Reset the task ID so that this will get a new one at submit time. */
+	new->task_id = 0;
+
 	new->type = task->type;
 	
 	/* Static features of task are copied. */
