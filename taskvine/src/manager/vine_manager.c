@@ -2689,49 +2689,85 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 }
 
 /*
-Consider whether a given task_id should be restarted, so as to re-generate
-the necessary output files.  This should only happen if the task previously
-ran to completion and is in the DONE state, so as to avoid multiple concurrent re-runs.
+If this task produces temporary files, then we must create a recovery task as a copy
+of the original task that can be used to re-create those files if they are lost.
+The recovery task must be a distinct copy of the original, because the original will
+be returned to the user and may be deleted, modified, etc before the recovery task
+even needs to be used.
 */
 
-
-static void vine_manager_consider_task_restart( struct vine_manager *q, int task_id )
+static void vine_manager_create_recovery_tasks( struct vine_manager *q, struct vine_task *t )
 {
-	struct vine_task *t = itable_lookup(q->tasks,task_id);
-	if(!t) return;
+	struct vine_mount *m;
+	struct vine_task *recovery_task = 0;
 
-	switch(t->state) {
+	/* Don't recursively create recovery tasks for recovery tasks! */
+	if(t->type==VINE_TASK_TYPE_RECOVERY) return;
+	
+	LIST_ITERATE(t->output_mounts,m) {
+		if(m->file->type==VINE_TEMP) {
+			if(!recovery_task) {
+				recovery_task = vine_task_copy(t);
+				recovery_task->type = VINE_TASK_TYPE_RECOVERY;
+			}
+			
+			m->file->recovery_task = vine_task_clone(recovery_task);
+			
+		}
+	}
+
+	/*
+	Remove the original reference to the recovery task,
+	so that only the file pointers carry the needed reference.
+	The recovery task does not get entered into the task table
+	unless it is needed for execution.
+	*/
+	
+	vine_task_delete(recovery_task);
+
+}
+
+/*
+Consider whether a given recovery task rt should be submitted, so as to re-generate
+the necessary output files.  This should only happen if the output files have not been
+generated yet.
+*/
+
+static void vine_manager_consider_recovery_task( struct vine_manager *q, struct vine_file *lost_file, struct vine_task *rt )
+{
+	if(!rt) return;
+
+	switch(rt->state) {
 	case VINE_TASK_UNKNOWN:
-		/* The task has not been submitted by the user yet. */
+		/* The recovery task has never been run, so submit it now. */
+		vine_submit(q,rt);
+		notice(D_VINE,"Submitted recovery task %d (%s) to re-create lost temporary file %s.",rt->task_id,rt->command_line,lost_file->cached_name);
 		break;
 	case VINE_TASK_READY:
 	case VINE_TASK_RUNNING:
 	case VINE_TASK_WAITING_RETRIEVAL:
 	case VINE_TASK_RETRIEVED:
-		/* The task is in the process of running, just wait until it is done. */
+		/* The recovery task is in the process of running, just wait until it is done. */
 		break;
 	case VINE_TASK_DONE:
-		/* The task previously ran to completion, so it needs to be re-submitted. */
-		notice(D_VINE,"Task %d must be re-run in order to re-create temporary file %s!\n",task_id,"unknown");
-		/* XXX this should be a stronger reset */
-		/* XXX I think we should create a new task with a new ID. */
-		vine_task_clean(t);
-		/* XXX make sure that this task is not returned again via wait */
-		change_task_state(q,t,VINE_TASK_READY);
+		/* The recovery task previously ran to completion, so it must be reset and resubmitted. */
+		vine_task_clean(rt);
+		vine_submit(q,rt);
 		break;
 	case VINE_TASK_CANCELED:
 		/* If the producing task was cancelled, then this one should be too. */
 		/* XXX problem here is that cancelled tasks are not returned by wait() */
+		fatal("recovery task %d cancelled!\n",rt->task_id);
 		break;
 	}
 }
-	
+
 /*
 Determine whether the input files needed for this task are available in some form.
 Most file types (FILE, URL, BUFFER) we can materialize on demand.
 But TEMP files must have been created by a prior task.
 If they were not present, we cannot run this task,
-and should consider re-running the task that created it.
+and should consider re-creating it via a recovery task.
 */
 
 static int vine_manager_check_inputs_available( struct vine_manager *q, struct vine_task *t )
@@ -2741,7 +2777,8 @@ static int vine_manager_check_inputs_available( struct vine_manager *q, struct v
 		struct vine_file *f = m->file;
 		if(f->type==VINE_TEMP) {
 			if(!vine_file_replica_table_exists_somewhere(q,f->cached_name)) {
-				vine_manager_consider_task_restart(q,f->created_by_task_id);
+				/* XXX we cannot tell between temp that was never run, and one that failed! */
+				vine_manager_consider_recovery_task(q,f,f->recovery_task);
 				return 0;
 			}
 		}
@@ -3680,8 +3717,7 @@ static vine_task_state_t change_task_state( struct vine_manager *q, struct vine_
 		case VINE_TASK_DONE:
 		case VINE_TASK_CANCELED:
 			/* tasks are freed when returned to user, thus we remove them from our local record */
-			/* No longer remove tasks on completion. */
-			/* itable_remove(q->tasks, t->task_id); */
+			itable_remove(q->tasks, t->task_id); 
 			break;
 		default:
 			/* do nothing */
@@ -3816,6 +3852,9 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	if(t->has_fixed_locations) {
 		vine_task_set_scheduler(t, VINE_SCHEDULE_FILES);
 	}
+
+	/* If the task produces temporary files, create recovery tasks for those. */
+	vine_manager_create_recovery_tasks(q,t);
 
 	/* Add reference to task when adding it to primary table. */
 	itable_insert(q->tasks, t->task_id, vine_task_clone(t) );
@@ -4168,12 +4207,21 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 					q->stats->tasks_failed++;
 				}
 
-				// return completed task (t) to the user. We do not return right
-				// away, and instead break out of the loop to correctly update the
-				// manager time statistics.
 				events++;
 				END_ACCUM_TIME(q, time_internal);
-				break;
+
+				/*
+				If this is a standard task type, then breaK out of the loop
+				and return it to the user.  Other task types are deleted silently.
+				*/
+
+				if(t->type==VINE_TASK_TYPE_STANDARD) {
+					break;
+				} else {
+					vine_task_delete(t);
+					t = 0;
+					continue;
+				}				
 			}
 		}
 

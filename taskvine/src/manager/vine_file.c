@@ -30,6 +30,7 @@ int vine_file_delete(struct vine_file *f)
 		}
 
 		vine_task_delete(f->mini_task);
+		vine_task_delete(f->recovery_task);
 		free(f->source);
 		free(f->cached_name);
 		free(f->data);
@@ -56,6 +57,7 @@ struct vine_file *vine_file_create( const char *source, const char *cached_name,
 	f->type = type;
 	f->size = size;
 	f->mini_task = mini_task;
+	f->recovery_task = 0;
 	f->flags = flags;
 
 	if(data) {

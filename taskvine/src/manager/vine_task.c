@@ -39,6 +39,7 @@ struct vine_task *vine_task_create(const char *command_line)
 	memset(t, 0, sizeof(*t));
 
 	t->task_id = vine_task_next_task_id++;
+	t->type = VINE_TASK_TYPE_STANDARD;
 	
 	/* REMEMBER: Any memory allocation done in this function should have a
 	 * corresponding copy in vine_task_copy. Otherwise we get
@@ -139,6 +140,7 @@ struct vine_task *vine_task_copy( const struct vine_task *task )
 	struct vine_task *new = vine_task_create(task->command_line);
 
 	new->task_id = vine_task_next_task_id++;
+	new->type = task->type;
 	
 	/* Static features of task are copied. */
 	if(task->coprocess) vine_task_set_coprocess(new,task->tag);
@@ -432,8 +434,6 @@ void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char 
 
 	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
 
-	m->file->created_by_task_id = t->task_id;
-	
 	list_push_tail(t->output_mounts, m);
 }
 

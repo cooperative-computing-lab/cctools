@@ -21,10 +21,16 @@ End user may only use the API described in taskvine.h
 
 #include <stdint.h>
 
+typedef enum {
+      VINE_TASK_TYPE_STANDARD,    /**< A normal task that should be returned to the user. */
+      VINE_TASK_TYPE_RECOVERY,    /**< A failure recovery task that should not be returned to the user. */
+} vine_task_type_t;
+
 struct vine_task {
         /***** Fixed properties of task at submit time. ******/
 
-        int task_id;                  /**< A unique task id number. */
+        int task_id;                 /**< A unique task id number. */
+	vine_task_type_t type;       /**< The type of the task. */
 	char *command_line;          /**< The program(s) to execute, as a shell command line. */
 	char *coprocess;             /**< The name of the coprocess name in the worker that executes this task. For regular tasks it is NULL. */
 	char *tag;                   /**< An optional user-defined logical name for the task. */
