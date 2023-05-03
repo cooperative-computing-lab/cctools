@@ -96,7 +96,28 @@ void vine_task_clean( struct vine_task *t )
 
 	/* If result is never updated, then it is mark as a failure. */
 	t->result = VINE_RESULT_UNKNOWN;
-	t->state = VINE_TASK_READY;
+}
+
+void vine_task_reset( struct vine_task *t )
+{
+	vine_task_clean(t);
+
+	t->resource_request = CATEGORY_ALLOCATION_FIRST;
+	t->try_count = 0;
+	t->exhausted_attempts = 0;
+	t->workers_slow = 0;
+
+	t->time_workers_execute_all = 0;
+	t->time_workers_execute_exhaustion = 0;
+	t->time_workers_execute_failure = 0;
+
+	rmsummary_delete(t->resources_measured);
+	rmsummary_delete(t->resources_allocated);
+	t->resources_measured  = rmsummary_create(-1);
+	t->resources_allocated = rmsummary_create(-1);
+
+	t->task_id = 0;
+	t->state = VINE_TASK_UNKNOWN;
 }
 
 static struct list *vine_task_mount_list_copy(struct list *list)

@@ -2751,7 +2751,8 @@ static void vine_manager_consider_recovery_task( struct vine_manager *q, struct 
 		break;
 	case VINE_TASK_DONE:
 		/* The recovery task previously ran to completion, so it must be reset and resubmitted. */
-		vine_task_clean(rt);
+		/* Note that the recovery task has already "left" the manager and so we do not manipulate internal state here. */
+		vine_task_reset(rt);
 		vine_submit(q,rt);
 		break;
 	case VINE_TASK_CANCELED:

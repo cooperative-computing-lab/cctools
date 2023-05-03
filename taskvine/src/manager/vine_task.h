@@ -106,9 +106,15 @@ struct vine_task * vine_task_clone( struct vine_task *t );
 /* Deep-copy an existing task object, return a pointer to a new object. */
 struct vine_task * vine_task_copy( const struct vine_task *t );
 
+/* Hard-reset a completed task back to an initial state so that it can be submitted again. */
+void vine_task_reset( struct vine_task *t );
+
+/* Soft-reset a not-yet-completed task so that it can be attempted on a different worker. */
+void vine_task_clean( struct vine_task *t );
+
 int  vine_task_set_result(struct vine_task *t, vine_result_t new_result);
 void vine_task_set_resources(struct vine_task *t, const struct rmsummary *rm);
-void vine_task_clean( struct vine_task *t );
+
 void vine_task_check_consistency( struct vine_task *t );
 
 const char *vine_task_state_to_string( vine_task_state_t task_state );
