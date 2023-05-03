@@ -2750,15 +2750,11 @@ static void vine_manager_consider_recovery_task( struct vine_manager *q, struct 
 		/* The recovery task is in the process of running, just wait until it is done. */
 		break;
 	case VINE_TASK_DONE:
+	case VINE_TASK_CANCELED:
 		/* The recovery task previously ran to completion, so it must be reset and resubmitted. */
 		/* Note that the recovery task has already "left" the manager and so we do not manipulate internal state here. */
 		vine_task_reset(rt);
 		vine_submit(q,rt);
-		break;
-	case VINE_TASK_CANCELED:
-		/* If the producing task was cancelled, then this one should be too. */
-		/* XXX problem here is that cancelled tasks are not returned by wait() */
-		fatal("recovery task %d cancelled!\n",rt->task_id);
 		break;
 	}
 }
