@@ -29,6 +29,11 @@ int vine_file_delete(struct vine_file *f)
 			return f->refcount;
 		}
 
+		if(f->refcount<0) {
+			notice(D_VINE,"vine_file_delete: prevented multiple-free of file");
+			return 0;
+		}
+	
 		vine_task_delete(f->mini_task);
 		vine_task_delete(f->recovery_task);
 		free(f->source);

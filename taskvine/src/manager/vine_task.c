@@ -577,6 +577,11 @@ void vine_task_delete(struct vine_task *t)
 
 	t->refcount--;
 	if(t->refcount>0) return;
+
+	if(t->refcount<0) {
+		notice(D_VINE,"vine_task_delete: prevented multiple-free of task %d",t->task_id);
+		return;
+	}
 	
 	free(t->command_line);
 	free(t->coprocess);
