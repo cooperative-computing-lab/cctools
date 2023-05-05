@@ -57,6 +57,7 @@ static char *vine_checksum_dir( const char *path, ssize_t *totalsize )
 		free(subpath);
 		free(subhash);
 		free(mode);
+		free(meta);
 		free(line);
 	}
 
