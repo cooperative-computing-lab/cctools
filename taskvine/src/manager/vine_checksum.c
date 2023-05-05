@@ -35,20 +35,28 @@ static char *vine_checksum_dir( const char *path, ssize_t *totalsize )
 {
 	char *dirstring=xxstrdup("");
 	char **entries;
+	struct stat info;
 	if(!sort_dir(path, &entries, strcmp)) return 0;
 	int i;
 	for(i=0; entries[i]; i++){
 
 		if(!strcmp(entries[i],".")) continue;
 		if(!strcmp(entries[i],"..")) continue;
+
 		char *subpath = string_format("%s/%s",path,entries[i]);
+		if(stat(subpath, &info)) return 0;
+
+		char *mode = string_format("%o",info.st_mode);
+		char *mtime = ctime(&info.st_mtime);
+		char *meta = string_format("%s:%s",mode,mtime);
 		char *subhash = vine_checksum_any(subpath,totalsize);
-		char *line = string_format("%s:%s\n",entries[i],subhash);
+		char *line = string_format("%s:%s:%s:\n",entries[i],meta,subhash);
 
 		dirstring = string_combine(dirstring,line);
 
 		free(subpath);
 		free(subhash);
+		free(mode);
 		free(line);
 	}
 
