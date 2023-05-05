@@ -35,16 +35,28 @@ class DaskVineDag:
         - DaskVineDag.has_result(key): Whether the key has a computed result. """
 
     @staticmethod
-    def symbolp(s):
-        return not isinstance(s, (tuple, list))
+    def keyp(s):
+        return DaskVineDag.hashable(s) and not DaskVineDag.taskp(s)
 
     @staticmethod
-    def fun_callp(s):
-        if not isinstance(s, tuple):
+    def taskp(s):
+        return isinstance(s, tuple) and len(s) > 0 and callable(s[0])
+
+    @staticmethod
+    def listp(s):
+        return isinstance(s, list)
+
+    @staticmethod
+    def symbolp(s):
+        return not (DaskVineDag.keyp(s) or DaskVineDag.taskp(s) or DaskVineDag.listp(s))
+
+    @staticmethod
+    def hashable(s):
+        try:
+            hash(s)
+            return True
+        except TypeError:
             return False
-        if len(s) < 1:
-            return False
-        return callable(s[0])
 
     @staticmethod
     def find_dask_keys(item, indices=None):
@@ -98,7 +110,9 @@ class DaskVineDag:
         self._computing = set()
 
     def graph_keyp(self, s):
-        return DaskVineDag.symbolp(s) and s in self._dsk
+        if DaskVineDag.keyp(s):
+            return s in self._dsk
+        return False
 
     def flatten(self, key):
         """ Recursively decomposes a sexpr associated with key, so that its arguments, if any
@@ -117,31 +131,38 @@ class DaskVineDag:
             # this key has already been considered
             return
 
-        if DaskVineDag.symbolp(sexpr):
+        self._missing_of[key] = set()
+
+        if self.graph_keyp(sexpr):
+            self._flat[key] = sexpr
+            relate(parent=key, child=sexpr)
+        elif not (DaskVineDag.taskp(sexpr) or DaskVineDag.listp(sexpr)):
             self._flat[key] = sexpr
             self._result_of[key] = sexpr
         else:
-            self._missing_of[key] = set()
             nargs = []
-            if not DaskVineDag.fun_callp(sexpr):
-                # if this is a list, then make it a function call
+            next_flat = []
+
+            if DaskVineDag.listp(sexpr):
                 sexpr = (make_list, *sexpr)
+
             nargs.append(sexpr[0])
             sexpr = sexpr[1:]
-            for a in sexpr:
-                if DaskVineDag.symbolp(a) and not self.graph_keyp(a):
-                    nkey = a
-                else:
-                    if self.graph_keyp(a):
-                        nkey = a
-                        self.flatten_rec(nkey, self._dsk[nkey])
-                    else:
-                        nkey = uuid4()
-                        self.flatten_rec(nkey, a)
-                    relate(parent=key, child=nkey)
-                nargs.append(nkey)
 
-            self._flat[key] = type(sexpr)(nargs)  # reconstruct from generated keys
+            for arg in sexpr:
+                if self.graph_keyp(arg):
+                    nargs.append(arg)
+                    next_flat.append((arg, self._dsk[arg]))
+                elif DaskVineDag.symbolp(arg):
+                    nargs.append(arg)
+                else:
+                    next_key = uuid4()
+                    nargs.append(next_key)
+                    next_flat.append((next_key, arg))
+            self._flat[key] = tuple(nargs)  # reconstruct from generated keys
+            for (n, a) in next_flat:
+                self.flatten_rec(n, a)
+                relate(parent=key, child=n)
 
     def has_result(self, key):
         return key in self._result_of
@@ -157,7 +178,7 @@ class DaskVineDag:
     def fill_seq(self, sexpr):
         lst = []
         for c in sexpr:
-            if c in self._flat:
+            if DaskVineDag.keyp(c) and c in self._flat:
                 lst.append(self.get_result(c))
             else:
                 lst.append(c)
@@ -177,7 +198,7 @@ class DaskVineDag:
             if self._missing_of[p] or self.has_result(p):
                 continue
             sexpr = self._flat[p]
-            if DaskVineDag.fun_callp(sexpr):
+            if DaskVineDag.taskp(sexpr):
                 new_ready.append([p, self.fill_call(sexpr)])
             else:
                 new_ready.extend(self.set_result(p, self.fill_seq(sexpr)))
@@ -195,7 +216,7 @@ class DaskVineDag:
             if cs:
                 continue
             sexpr = self._flat[p]
-            if DaskVineDag.fun_callp(sexpr):
+            if DaskVineDag.taskp(sexpr):
                 rs.append([p, self.fill_call(sexpr)])
             else:
                 rs.extend(self.set_result(p, self.fill_seq(sexpr)))
@@ -226,5 +247,3 @@ class DaskVineNoResult(Exception):
 # flatten the tuple.
 def make_list(*args):
     return args
-
-
