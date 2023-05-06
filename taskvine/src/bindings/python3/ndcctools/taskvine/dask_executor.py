@@ -10,7 +10,7 @@
 
 from .manager import Manager
 from .task import PythonTask
-from .dask_dag import DaskVineDag
+from .dask_dag import DaskVineDag, find_in_lists
 
 import cloudpickle
 from uuid import uuid4
@@ -121,6 +121,7 @@ class DaskVine(Manager):
                 if t.successful():
                     if verbose:
                         print(f"{t.key} ran on {t.hostname} with result {t.output}")
+
                     rs = dag.set_result(t.key, DaskVineFile(t.output_file, t.key, self.staging_directory))
                     self.submit_calls(dag, tag, rs,
                                       environment=environment,
@@ -167,7 +168,7 @@ class DaskVine(Manager):
             r = dag.get_result(k)
             if isinstance(r, DaskVineFile):
                 r = r.load()
-            DaskVineDag.set_dask_result(results, ids, r)
+            set_at_indices(results, ids, r)
         if not isinstance(keys, list):
             return results[0]
         return results
@@ -191,6 +192,15 @@ class DaskVineFile:
         return self._file.source()
 
 
+class DaskVineExecutionError(Exception):
+    def __init__(self, backtrace):
+        self.backtrace = backtrace
+
+    def str(self):
+        print(self.backtrace.format_tb())
+        return "hello"
+
+
 class PythonTaskDask(PythonTask):
     def __init__(self, m, key, fn, args, *,
                  environment=None,
@@ -198,18 +208,17 @@ class PythonTaskDask(PythonTask):
                  lazy_transfer=False):
         self._key = key
 
-        file_indices = []
-        new_args = []
-        for i, a in enumerate(args):
-            if isinstance(a, DaskVineFile):
-                file_indices.append(i)
-                a = str(uuid4())  # choose some random name for the remote name
-            new_args.append(a)
-        super().__init__(wrap_function_load_args, file_indices, fn, new_args)
+        file_indices = find_result_files(args)
+        new_args = list(args)
+        names = []
+        for f, inds in file_indices.items():
+            name = str(uuid4())  # choose some random name for the remote name
+            set_at_indices(new_args, inds, name)
+            names.append((f, name))
+        super().__init__(wrap_function_load_args, file_indices.values(), fn, new_args)
 
-        for i in file_indices:
-            f = args[i]
-            self.add_input(f.file, new_args[i])
+        for f, name in names:
+            self.add_input(f.file, name)
 
         self.set_category(str(fn))
         if lazy_transfer:
@@ -229,10 +238,34 @@ class PythonTaskDask(PythonTask):
 # to load the contents of the files to the arguments.
 # file_indices contains the indices of the args list of those arguments
 # that should be loaded.
-def wrap_function_load_args(file_indices, fn, args):
+def wrap_function_load_args(indices, fn, args):
+    import traceback
     import cloudpickle
     loaded_args = list(args)
-    for i in file_indices:
-        with open(args[i], "rb") as f:
-            loaded_args[i] = cloudpickle.load(f)
-    return fn(*loaded_args)
+
+    for inds in indices:
+        name = get_at_indices(loaded_args, inds)
+        with open(name, "rb") as f:
+            set_at_indices(loaded_args, inds, cloudpickle.load(f))
+    try:
+        return fn(*loaded_args)
+    except Exception:
+        raise DaskVineExecutionError(traceback.extract_stack())
+
+
+def set_at_indices(lst, indices, value):
+    inner = lst
+    for i in indices[:-1]:
+        inner = inner[i]
+    inner[indices[-1]] = value
+
+
+def get_at_indices(lst, indices):
+    inner = lst
+    for i in indices[:-1]:
+        inner = inner[i]
+    return inner[indices[-1]]
+
+
+def find_result_files(lists):
+    return find_in_lists(lists, lambda f: isinstance(f, DaskVineFile))
