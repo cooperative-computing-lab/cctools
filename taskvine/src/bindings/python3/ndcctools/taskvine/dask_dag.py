@@ -71,14 +71,17 @@ class DaskVineDag:
         # child -> parents. I.e., which parents needs the result of child
         self._parents_of = defaultdict(lambda: set())
 
-        # parent->children. I.e., the dependencies of parent
-        self._children_of = defaultdict(lambda: set())
-
         # parent->children still waiting for result. A key is ready to be computed when children left is []
         self._missing_of = {}
 
+        # parent->nchildren get the number of children for parent computation
+        self._children_count_of = defaultdict(lambda: 0)
+
         # key->value of its computation
         self._result_of = {}
+
+        # key->depth. The shallowest level the key is found
+        self._depth_of = defaultdict(lambda: float('inf'))
 
         # target keys that the dag should compute
         self._targets = set()
@@ -90,7 +93,7 @@ class DaskVineDag:
         # set of keys currently being computed.
         self._computing = set()
 
-    def graph_keyp(self, s):
+    def dask_keyp(self, s):
         if DaskVineDag.keyp(s):
             return s in self._dsk
         return False
@@ -100,26 +103,47 @@ class DaskVineDag:
             return s in self._flat
         return False
 
+    def graph_keyp(self, s):
+        return self.dask_keyp(s) or self.flat_keyp(s)
+
+    def depth_of(self, key):
+        return self._depth_of[key]
+
+    def nchildren_of(self, key):
+        return self._children_count_of[key]
+
     def flatten(self, key):
         """ Recursively decomposes a sexpr associated with key, so that its arguments, if any
         are keys. """
         sexpr = self._dsk[key]
-        self.flatten_rec(key, sexpr)
+        self.flatten_rec(key, sexpr, deep=0)
+        self._add_second_targets(key)
 
-    def flatten_rec(self, key, sexpr):
+    def _add_second_targets(self, key):
+        if not DaskVineDag.listp(self._flat[key]):
+            return
+        for c in self._flat[key]:
+            if self.flat_keyp(c):
+                self._targets.add(c)
+                self._add_second_targets(c)
+
+    # if should_return, then the key is added to the set of targets.
+    # if one target is a list, then its components become targets too.
+    def flatten_rec(self, key, sexpr, deep=0):
         def relate(parent, child):
             self._parents_of[child].add(parent)
-            self._children_of[parent].add(child)
+            self._children_count_of[parent] += 1
             if not self.has_result(child):
                 self._missing_of[parent].add(child)
 
+        self._depth_of[key] = min(deep, self._depth_of[key])
+
         if key in self._flat:
-            # this key has already been considered
             return
 
         self._missing_of[key] = set()
 
-        if self.graph_keyp(sexpr):
+        if self.dask_keyp(sexpr):
             self._flat[key] = sexpr
             relate(parent=key, child=sexpr)
         elif DaskVineDag.symbolp(sexpr):
@@ -147,7 +171,7 @@ class DaskVineDag:
 
             self._flat[key] = cons(nargs)  # reconstruct from generated keys
             for (n, a) in next_flat:
-                self.flatten_rec(n, a)
+                self.flatten_rec(n, a, deep + 1)
                 relate(parent=key, child=n)
 
     def has_result(self, key):
@@ -177,6 +201,7 @@ class DaskVineDag:
     def set_result(self, key, value):
         """ Sets new result and propagates in the DaskVineDag. Returns a list of [key, (fn, *args)]
         of computations that become ready to be executed """
+
         new_ready = []
         self._result_of[key] = value
         for p in self._parents_of[key]:
@@ -238,18 +263,17 @@ class DaskVineNoResult(Exception):
 
 
 def find_in_lists(lists, predicate=lambda s: True, indices=None):
+    """ Returns a list of tuples [(k, (i,j,...)] where (i,j,...) are the indices of k in lists. """
     if not indices:
         indices = []
 
-    items = {}
-    if isinstance(lists, list):
+    items = []
+    if predicate(lists):  # e.g., lists aren't lists, but a single element
+        items.append((lists, list(indices)))
+    elif isinstance(lists, list):
         indices.append(0)
         for s in lists:
-            items.update(find_in_lists(s, predicate, indices))
-    else:
-        last = indices[-1]
-        if predicate(lists):  # e.g., lists aren't lists, but a single element
-            items[lists] = list(indices)
-        indices[-1] = last + 1
+            items.extend(find_in_lists(s, predicate, indices))
+            indices[-1] += 1
+        indices.pop()
     return items
-

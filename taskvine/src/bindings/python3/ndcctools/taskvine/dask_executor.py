@@ -63,6 +63,9 @@ class DaskVine(Manager):
     #                      or to bring back each result to the manager (False, default).
     #                      True is more IO efficient, but runs the risk of needing to
     #                      recompute results if workers are lost.
+    # param  checkpoint_fn When using lazy_transfer, a predicate with arguments (dag, key)
+    #                      called before submitting a task. If True, the result is brought back
+    #                      to the manager.
     # @param resources     A dictionary with optional keys of cores, memory and disk (MB)
     #                      to set maximum resource usage per task.
     # @param resources_mode Automatically resize allocation per task. One of 'fixed'
@@ -73,6 +76,7 @@ class DaskVine(Manager):
             environment=None,
             extra_files=None,
             lazy_transfer=False,
+            checkpoint_fn=None,
             resources=None,
             resources_mode='fixed',
             verbose=False
@@ -82,6 +86,7 @@ class DaskVine(Manager):
                                      environment=environment,
                                      extra_files=extra_files,
                                      lazy_transfer=lazy_transfer,
+                                     checkpoint_fn=checkpoint_fn,
                                      resources=resources,
                                      resources_mode=resources_mode,
                                      verbose=verbose)
@@ -93,12 +98,13 @@ class DaskVine(Manager):
                      environment=None,
                      extra_files=None,
                      lazy_transfer=False,
+                     checkpoint_fn=None,
                      resources=None,
                      resources_mode='fixed',
                      verbose=False
                      ):
         if isinstance(keys, list):
-            indices = DaskVineDag.find_dask_keys(keys)
+            indices = {k: inds for (k, inds) in DaskVineDag.find_dask_keys(keys)}
             keys_flatten = indices.keys()
         else:
             keys_flatten = [keys]
@@ -112,21 +118,23 @@ class DaskVine(Manager):
                           environment=environment,
                           extra_files=extra_files,
                           lazy_transfer=lazy_transfer,
+                          checkpoint_fn=checkpoint_fn,
                           resources=resources,
                           resources_mode=resources_mode)
 
         while not self.empty():
             t = self.wait_for_tag(tag, 5)
             if t:
-                if t.successful():
-                    if verbose:
-                        print(f"{t.key} ran on {t.hostname} with result {t.output}")
+                if verbose:
+                    print(f"{t.key} ran on {t.hostname}")
 
+                if t.successful():
                     rs = dag.set_result(t.key, DaskVineFile(t.output_file, t.key, self.staging_directory))
                     self.submit_calls(dag, tag, rs,
                                       environment=environment,
                                       extra_files=extra_files,
                                       lazy_transfer=lazy_transfer,
+                                      checkpoint_fn=checkpoint_fn,
                                       resources=resources,
                                       resources_mode=resources_mode)
                 else:
@@ -138,6 +146,7 @@ class DaskVine(Manager):
                      environment=None,
                      extra_files=None,
                      lazy_transfer=False,
+                     checkpoint_fn=None,
                      resources=None,
                      resources_mode=None,
                      ):
@@ -145,11 +154,16 @@ class DaskVine(Manager):
         targets = dag.get_targets()
         for r in rs:
             k, (fn, *args) = r
+
+            lazy = lazy_transfer and k not in targets
+            if lazy and checkpoint_fn:
+                lazy = checkpoint_fn(dag, k)
+
             t = PythonTaskDask(self,
                                k, fn, args,  # compute key k from fn(args)
                                environment=environment,
                                extra_files=extra_files,
-                               lazy_transfer=(lazy_transfer and k not in targets))
+                               lazy_transfer=lazy)
 
             t.set_tag(tag)  # tag that identifies this dag
 
@@ -162,26 +176,42 @@ class DaskVine(Manager):
 
             self.submit(t)
 
-    def _load_results(self, dag, indices, keys):
+    def _load_results(self, dag, key_indices, keys):
         results = list(keys)
-        for k, ids in indices.items():
-            r = dag.get_result(k)
-            if isinstance(r, DaskVineFile):
-                r = r.load()
+        for k, ids in key_indices.items():
+            r = self._fill_key_result(dag, k)
             set_at_indices(results, ids, r)
         if not isinstance(keys, list):
             return results[0]
         return results
 
+    def _fill_key_result(self, dag, key):
+        raw = dag.get_result(key)
+        if DaskVineDag.listp(raw):
+            result = list(raw)
+            file_indices = find_result_files(raw)
+            for (f, inds) in file_indices:
+                set_at_indices(result, inds, f.load())
+            return result
+        elif isinstance(raw, DaskVineFile):
+            return raw.load()
+        else:
+            return raw
+
 
 class DaskVineFile:
     def __init__(self, file, key, staging_dir):
         self._file = file
+        self._loaded = False
+        self._load = None
         assert file
 
     def load(self):
-        with open(self.staging_path, "rb") as f:
-            return cloudpickle.load(f)
+        if not self._loaded:
+            with open(self.staging_path, "rb") as f:
+                self._load = cloudpickle.load(f)
+                self._loaded = True
+        return self._load
 
     @property
     def file(self):
@@ -208,13 +238,13 @@ class PythonTaskDask(PythonTask):
         self._key = key
 
         file_indices = find_result_files(args)
-        new_args = list(args)
+        new_args = self._mirror_list(args)
         names = []
-        for f, inds in file_indices.items():
-            name = str(uuid4())  # choose some random name for the remote name
+        for (f, inds) in file_indices:
+            name = f"{uuid4()}.p"  # choose some random name for the remote name
             set_at_indices(new_args, inds, name)
             names.append((f, name))
-        super().__init__(wrap_function_load_args, file_indices.values(), fn, new_args)
+        super().__init__(wrap_function_load_args, [inds for (_, inds) in file_indices], fn, new_args)
 
         for f, name in names:
             self.add_input(f.file, name)
@@ -227,6 +257,12 @@ class PythonTaskDask(PythonTask):
         if extra_files:
             for f, name in extra_files.items():
                 self.add_input(f, name)
+
+    def _mirror_list(self, lst):
+        if type(lst) != list:
+            return lst
+        else:
+            return [self._mirror_list(a) for a in lst]
 
     @property
     def key(self):
@@ -256,7 +292,10 @@ def set_at_indices(lst, indices, value):
     inner = lst
     for i in indices[:-1]:
         inner = inner[i]
-    inner[indices[-1]] = value
+    try:
+        inner[indices[-1]] = value
+    except IndexError:
+        raise
 
 
 def get_at_indices(lst, indices):
@@ -268,3 +307,7 @@ def get_at_indices(lst, indices):
 
 def find_result_files(lists):
     return find_in_lists(lists, lambda f: isinstance(f, DaskVineFile))
+
+
+def find_graph_keys(lists, dag):
+    return find_in_lists(lists, predicate=dag.flat_keyp, indices=None)
