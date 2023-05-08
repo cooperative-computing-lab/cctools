@@ -129,12 +129,6 @@ double rmsummary_get_by_offset(const struct rmsummary *s, size_t offset) {
 	return (*((double *) ((char *) s + offset)));
 }
 
-/*
-static inline double rmsummary_get_by_offset_internal(const struct rmsummary *s, size_t offset) {
-	return (*((double *) ((char *) s + offset)));
-}
-*/
-
 void rmsummary_set_by_offset(struct rmsummary *s, size_t offset, double value) {
 	*((double *) ((char *) s + offset)) = value;
 }
