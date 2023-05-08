@@ -129,6 +129,12 @@ double rmsummary_get_by_offset(const struct rmsummary *s, size_t offset) {
 	return (*((double *) ((char *) s + offset)));
 }
 
+/*
+static inline double rmsummary_get_by_offset_internal(const struct rmsummary *s, size_t offset) {
+	return (*((double *) ((char *) s + offset)));
+}
+*/
+
 void rmsummary_set_by_offset(struct rmsummary *s, size_t offset, double value) {
 	*((double *) ((char *) s + offset)) = value;
 }
@@ -699,18 +705,29 @@ void rmsummary_bin_op(struct rmsummary *dest, const struct rmsummary *src, rm_bi
 }
 
 /* Copy the value for all the fields in src > -1 to dest */
-static double override_field(double d, double s)
+static inline double override_field(double d, double s)
 {
 	return (s > -1) ? s : d;
 }
 
+/* This function may be called many times, therefore it is worthwhile to omit/inline
+ * function calls and remove indirect jumps to rmsummary_bin_op */
 void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *src)
 {
 	if(!src) {
 		return;
 	}
 
-	rmsummary_bin_op(dest, src, override_field);
+	size_t i;
+	for(i = 0; i < rmsummary_num_resources(); i++) {
+		const struct resource_info *info = &resources_info[i];
+
+		double dest_value = *((double *) ((char *) dest + info->offset));
+		double src_value = *((double *) ((char *) src + info->offset));
+
+		double result = override_field(dest_value, src_value);
+	    *(double *) ((char *) dest + info->offset) = result;
+	}
 }
 
 struct rmsummary *rmsummary_copy(const struct rmsummary *src, int deep_copy)
