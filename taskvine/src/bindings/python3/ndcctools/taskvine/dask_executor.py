@@ -153,7 +153,7 @@ class DaskVine(Manager):
 
             t.set_tag(tag)  # tag that identifies this dag
 
-            cat = str(fn)
+            cat = str(fn).replace(" ", "_")
             if cat not in resources_already_set:
                 if resources_mode:
                     self.set_category_mode(cat, resources_mode)
@@ -197,8 +197,7 @@ class DaskVineExecutionError(Exception):
         self.backtrace = backtrace
 
     def str(self):
-        print(self.backtrace.format_tb())
-        return "hello"
+        return self.backtrace.format_tb()
 
 
 class PythonTaskDask(PythonTask):
