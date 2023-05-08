@@ -579,6 +579,9 @@ class Manager(object):
     # @endcode
 
     def set_resources_max(self, rmd):
+        if not rmd:
+            return
+
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
@@ -598,6 +601,9 @@ class Manager(object):
     # @endcode
 
     def set_resources_min(self, rmd):
+        if not rmd:
+            return
+
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
@@ -618,6 +624,9 @@ class Manager(object):
     # @endcode
 
     def set_category_resources_max(self, category, rmd):
+        if not rmd:
+            return
+
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
@@ -638,6 +647,9 @@ class Manager(object):
     # @endcode
 
     def set_category_resources_min(self, category, rmd):
+        if not rmd:
+            return
+
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
