@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "vine_checksum.h"
 
 #include "stringtools.h"
+#include "path_disk_size_info.h"
 #include "md5.h"
 #include "debug.h"
 #include "xxmalloc.h"
@@ -18,6 +19,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
+#include <sys/stat.h>
 
 /*
 For a given task and file, generate the name under which the file
@@ -261,7 +263,34 @@ char *make_mini_task_cached_name(const struct vine_file *f)
 
 	return strdup(md5_to_string(digest));
 }
+/*
+Generates a cached name based on meta data for a file object of type VINE_FILE. 
+*/
+char *vine_meta_name(const struct vine_file *f, ssize_t *totalsize ){
 
+	if(f->type != VINE_FILE) return 0;
+
+	struct stat info;
+	unsigned char digest[MD5_DIGEST_LENGTH];
+	int64_t size;
+	int64_t number_of_files;
+
+	if(stat(f->source, &info)) return 0;
+	char *mtime = ctime(&info.st_mtime);
+
+	if(path_disk_size_info_get(f->source, &size, &number_of_files)) return 0;
+
+	char *meta = string_format("%s-%ld-%s", f->source, size, mtime);
+
+	md5_buffer(meta,strlen(meta),digest);
+	char *metahash = strdup(md5_to_string(digest));
+	char *name = string_format("file-meta-%s", metahash);
+
+	free(metahash);
+	free(meta);	
+
+	return name;
+}
 /*
 Generates a random cached name of a file object.
 Returns a string that must be freed with free().

@@ -5091,7 +5091,6 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 	if(!f) {
 		return NULL;
 	}
-
 	assert(f->cached_name);
 	struct vine_file *previous = vine_manager_lookup_file(m, f->cached_name);
 
