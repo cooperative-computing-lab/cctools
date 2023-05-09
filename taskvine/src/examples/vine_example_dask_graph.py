@@ -65,6 +65,13 @@ is constructed by dask.""")
     if not args.disable_peer_transfers:
         m.enable_peer_transfers()
 
+    # checkpoint at even levels when nodes have at least one children
+    def checkpoint(dag, key):
+        if dag.depth_of(key) % 2 == 0 and dag.nchildren_of(key) > 0:
+            print(f"checkpoint for {key}")
+            return True
+        return False
+
     f = vine.Factory(manager=m)
     f.cores = 4
     f.max_workers = 1
@@ -75,8 +82,8 @@ is constructed by dask.""")
         print(f"desired keys are {desired_keys}")
 
         try:
-            results = m.get(dsk_graph, ["t", "w"], resources={"cores": 1})  # 1 core per step
-            print({(k, v) for k, v in zip(desired_keys, results)})
+            results = m.get(dsk_graph, desired_keys, lazy_transfer=True, checkpoint_fn=checkpoint, resources={"cores": 1})  # 1 core per step
+            print({k: v for k, v in zip(desired_keys, results)})
         except Exception:
             traceback.print_exc()
 
