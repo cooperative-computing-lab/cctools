@@ -678,24 +678,16 @@ void rmsummary_read_env_vars(struct rmsummary *s)
 	}
 }
 
-
-typedef double (*rm_bin_op)(double, double);
-void rmsummary_bin_op(struct rmsummary *dest, const struct rmsummary *src, rm_bin_op fn)
-{
-	if(!src || !dest)
-		return;
-
-	size_t i;
-	for(i = 0; i < rmsummary_num_resources(); i++) {
-		const struct resource_info *info = &resources_info[i];
-
-		double dest_value = rmsummary_get_by_offset(dest, info->offset);
-		double src_value  = rmsummary_get_by_offset(src , info->offset);
-
-		// apply fn(dest, src) per resource
-		double result = fn(dest_value, src_value);
-		rmsummary_set_by_offset(dest, info->offset, result);
-	}
+#define RM_BIN_OP(dest, src, fn) { 											\
+	if (!src || !dest) return; 												\
+	size_t i;																\
+	for(i = 0; i < rmsummary_num_resources(); i++) {						\
+		const struct resource_info *info = &resources_info[i];				\
+		double dest_value = *((double *) ((char *) dest + info->offset));	\
+		double src_value = *((double *) ((char *) src + info->offset));		\
+		double result = fn(dest_value, src_value);							\
+	    *(double *) ((char *) dest + info->offset) = result;				\
+	}																		\
 }
 
 /* Copy the value for all the fields in src > -1 to dest */
@@ -704,24 +696,13 @@ static inline double override_field(double d, double s)
 	return (s > -1) ? s : d;
 }
 
-/* This function may be called many times, therefore it is worthwhile to omit/inline
- * function calls and remove indirect jumps to rmsummary_bin_op */
 void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *src)
 {
 	if(!src) {
 		return;
 	}
 
-	size_t i;
-	for(i = 0; i < rmsummary_num_resources(); i++) {
-		const struct resource_info *info = &resources_info[i];
-
-		double dest_value = *((double *) ((char *) dest + info->offset));
-		double src_value = *((double *) ((char *) src + info->offset));
-
-		double result = override_field(dest_value, src_value);
-	    *(double *) ((char *) dest + info->offset) = result;
-	}
+	RM_BIN_OP(dest, src, override_field);
 }
 
 struct rmsummary *rmsummary_copy(const struct rmsummary *src, int deep_copy)
@@ -832,7 +813,7 @@ void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src)
 	if(!dest || !src)
 		return;
 
-	rmsummary_bin_op(dest, src, max_field);
+	RM_BIN_OP(dest, src, max_field);
 	merge_limits(dest, src);
 
 	if(src->peak_times) {
@@ -878,7 +859,7 @@ void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src)
 	if(!dest || !src)
 		return;
 
-	rmsummary_bin_op(dest, src, min_field);
+	RM_BIN_OP(dest, src, min_field);
 	merge_limits(dest, src);
 
 	if(src->peak_times) {
@@ -904,7 +885,7 @@ void rmsummary_add(struct rmsummary *dest, const struct rmsummary *src)
 	if(!dest || !src)
 		return;
 
-	rmsummary_bin_op(dest, src, plus);
+	RM_BIN_OP(dest, src, plus);
 }
 
 void rmsummary_debug_report(const struct rmsummary *s)
