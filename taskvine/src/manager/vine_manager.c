@@ -3255,7 +3255,7 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 		return 0;
 	}
 
-	q->monitor_exe = vine_declare_file(q, exe, VINE_CACHE_ALWAYS);
+	q->monitor_exe = vine_declare_file(q, exe, VINE_CACHE);
 	free(exe);
 
 	if(series) {

@@ -160,24 +160,24 @@ class DaskVine(Manager):
             if lazy and checkpoint_fn:
                 lazy = checkpoint_fn(dag, k)
 
-            t = PythonTaskDask(self,
-                               k, fn, args,  # compute key k from fn(args)
-                               environment=environment,
-                               extra_files=extra_files,
-                               lazy_transfer=lazy)
-
-            t.set_tag(tag)  # tag that identifies this dag
-
             cat = str(fn).replace(" ", "_")
             if cat not in self._categories_known:
+                if resources:
+                    self.set_category_resources_max(cat, resources)
                 if resources_mode:
                     self.set_category_mode(cat, resources_mode)
-                    self.set_category_resources_max(cat, resources)
 
                     if not self._categories_known:
                         self.enable_monitoring()
                 self._categories_known.add(cat)
 
+            t = PythonTaskDask(self,
+                               k, fn, args,  # compute key k from fn(args)
+                               category=cat,
+                               environment=environment,
+                               extra_files=extra_files,
+                               lazy_transfer=lazy)
+            t.set_tag(tag)  # tag that identifies this dag
             self.submit(t)
 
     def _load_results(self, dag, key_indices, keys):
@@ -236,6 +236,7 @@ class DaskVineExecutionError(Exception):
 
 class PythonTaskDask(PythonTask):
     def __init__(self, m, key, fn, args, *,
+                 category=None,
                  environment=None,
                  extra_files=None,
                  lazy_transfer=False):
@@ -253,7 +254,8 @@ class PythonTaskDask(PythonTask):
         for f, name in names:
             self.add_input(f.file, name)
 
-        self.set_category(str(fn))
+        if category:
+            self.set_category(category)
         if lazy_transfer:
             self.enable_temp_output()
         if environment:
