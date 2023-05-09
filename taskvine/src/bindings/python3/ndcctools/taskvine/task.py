@@ -38,6 +38,8 @@ class Task(object):
     def __init__(self, command, **task_info):
         self._task = None
 
+        self._manager = None  # set by submit_finalize
+
         if isinstance(command, dict):
             raise TypeError(f"{command} is not a str. Did you mean **{command}?")
 
@@ -49,13 +51,7 @@ class Task(object):
         if not self._task:
             raise Exception("Unable to create internal Task structure")
 
-        def free():
-            if self._manager_will_free:
-                return
-            if self._task:
-                cvine.vine_task_delete(self._task)
-                self._task = None
-        self._finalizer = weakref.finalize(self, free)
+        self._finalizer = weakref.finalize(self, self._free)
 
         attributes = [
             "coprocess", "scheduler", "tag", "category",
@@ -114,6 +110,17 @@ class Task(object):
         except KeyError:
             pass
 
+    def _free(self):
+        if self._manager_will_free:
+            return
+        if self._manager and self._manager._finalizer.alive and self.id in self._manager._task_table:
+            # interpreter is shutting down. Don't delete task here so that manager
+            # does not get memory errors
+            return
+        if self._task:
+            cvine.vine_task_delete(self._task)
+            self._task = None
+
     @staticmethod
     def _determine_mount_flags(watch=False, failure_only=False, success_only=False, strict_input=False):
         flags = cvine.VINE_TRANSFER_ALWAYS
@@ -146,7 +153,7 @@ class Task(object):
     # @param self 	Reference to the current python task object
     # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
-        pass
+        self._manager = manager
 
     ##
     # Return a copy of this task
@@ -721,10 +728,12 @@ class PythonTask(Task):
         self._fn_def = (func, args, kwargs)
         super(PythonTask, self).__init__(self._command)
 
-        def free():
-            if self._tmpdir and os.path.exists(self._tmpdir):
-                shutil.rmtree(self._tmpdir)
-        self._finalizer = weakref.finalize(self, free)
+        self._finalizer = weakref.finalize(self, self._free)
+
+    def _free(self):
+        if self._tmpdir and os.path.exists(self._tmpdir):
+            shutil.rmtree(self._tmpdir)
+        super()._free()
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -734,6 +743,7 @@ class PythonTask(Task):
     # @param self 	Reference to the current python task object
     # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
+        super().submit_finalize(manager)
         self._tmpdir = tempfile.mkdtemp(dir=manager.staging_directory)
         self._serialize_python_function(*self._fn_def)
         self._fn_def = None  # avoid possible memory leak
@@ -922,6 +932,7 @@ class FunctionCall(Task):
     # @param self 	Reference to the current python task object
     # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
+        super().submit_finalize(manager)
         f = manager.declare_buffer(json.dumps(self._event))
         self.add_input(f, "infile")
 
