@@ -792,13 +792,13 @@ static void merge_limits(struct rmsummary *dest, const struct rmsummary *src)
 }
 
 /* Select the max of the fields */
-static double max_field(double d, double s)
+static inline double max_field(double d, double s)
 {
 	return (d > s) ? d : s;
 }
 
 /* Select the min of the fields, ignoring negative numbers */
-static double min_field(double d, double s)
+static inline double min_field(double d, double s)
 {
 	if(d < 0 || s < 0) {
 		return MAX(-1, MAX(s, d)); /* return at least -1. treat -1 as undefined.*/
