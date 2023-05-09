@@ -82,6 +82,7 @@ class DaskVine(Manager):
             verbose=False
             ):
         try:
+            self._categories_known = set()
             return self.dask_execute(dsk, keys,
                                      environment=environment,
                                      extra_files=extra_files,
@@ -150,7 +151,7 @@ class DaskVine(Manager):
                      resources=None,
                      resources_mode=None,
                      ):
-        resources_already_set = set()
+
         targets = dag.get_targets()
         for r in rs:
             k, (fn, *args) = r
@@ -168,11 +169,14 @@ class DaskVine(Manager):
             t.set_tag(tag)  # tag that identifies this dag
 
             cat = str(fn).replace(" ", "_")
-            if cat not in resources_already_set:
+            if cat not in self._categories_known:
                 if resources_mode:
                     self.set_category_mode(cat, resources_mode)
                     self.set_category_resources_max(cat, resources)
-                    self.enable_monitoring()
+
+                    if not self._categories_known:
+                        self.enable_monitoring()
+                self._categories_known.add(cat)
 
             self.submit(t)
 
