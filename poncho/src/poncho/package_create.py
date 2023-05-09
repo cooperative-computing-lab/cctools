@@ -97,77 +97,82 @@ def _copy_run_in_env(env_dir):
         f.write('exec "${env_dir}"/bin/poncho_package_run -e ${env_dir} "$@"\n')
     os.chmod(f'{env_dir}/env/bin/run_in_env', 0o755)
 
+def pack_env_with_conda_dir(spec, output, ignore_editable_packages=False):
+    # remove trailing slash if present
+    spec = spec[:-1] if spec[-1] == '/' else spec 
+    try:
+        logger.info('packaging the environment...')
+        os.makedirs(f'{spec}/bin/', exist_ok=True)
+        os.makedirs(f'{spec}/env/bin/', exist_ok=True)
+        _copy_run_in_env(spec)
+        os.rename(f'{spec}/env/bin/poncho_package_run', f'{spec}/bin/poncho_package_run')
+        os.rename(f'{spec}/env/bin/run_in_env', f'{spec}/bin/run_in_env')
+        
+        conda_pack.pack(prefix=f'{spec}', output=str(output), force=True, ignore_missing_files=True, ignore_editable_packages=ignore_editable_packages)
+        logger.info('to activate environment run poncho_package_run -e {} <command>'.format(output))
+        return output
+    except Exception as e:
+        raise Exception(f"Error when packing a conda directory.\n{e}")
+    finally:
+        os.remove(f'{spec}/bin/run_in_env')
+        os.remove(f'{spec}/bin/poncho_package_run')
 
-def pack_env(spec, output, conda_executable=None, download_micromamba=None, ignore_editable_packages=None):
+def pack_env_with_spec(spec, output, conda_executable=None, download_micromamba=False, ignore_editable_packages=False):
+    # record packages installed as editable from pip
+    local_pip_pkgs = _find_local_pip()
+
+    with tempfile.TemporaryDirectory(prefix="poncho_env") as env_dir:
+        logger.info('creating temporary environment in {}'.format(env_dir))
+
+        global conda_exec
+        (conda_exec, needs_confirmation) = _find_conda_executable(conda_executable, env_dir, download_micromamba)
+
+        logger.info(f'using conda executable {conda_exec}')
+        # creates conda spec file from poncho spec file
+        logger.info('converting spec file...')
+        conda_spec = create_conda_spec(spec, env_dir, local_pip_pkgs)
+
+        # fetch data via git and https
+        logger.info('fetching git data...')
+        git_data(spec, env_dir)
+
+        logger.info('fetching http data...')
+        http_data(spec, env_dir)
+
+        # create conda environment in temp directory
+        logger.info('populating environment...')
+        _run_conda_command(env_dir, needs_confirmation, 'env create', '--file', env_dir + '/conda_spec.yml')
+
+        logger.info('adding local packages...')
+        for (name, path) in conda_spec['pip_local'].items():
+            _install_local_pip(env_dir, name, path)
+
+        logger.info('copying spec to environment...')
+        shutil.copy(f'{env_dir}/conda_spec.yml', f'{env_dir}/env/conda_spec.yml')
+
+        _copy_run_in_env(env_dir)
+
+        logger.info('generating environment file...')
+
+        # Bug breaks bundling common packages (e.g. python).
+        # ignore_missing_files may be safe to remove in the future.
+        # https://github.com/conda/conda-pack/issues/145
+        if ignore_editable_packages is not True:
+            ignore_editable_packages = False
+        conda_pack.pack(prefix=f'{env_dir}/env', output=str(output), force=True, ignore_missing_files=True, ignore_editable_packages=ignore_editable_packages)
+
+        logger.info('to activate environment run poncho_package_run -e {} <command>'.format(output))
+
+    return output
+
+def pack_env(spec, output, conda_executable=None, download_micromamba=False, ignore_editable_packages=False):
     # pack a conda directory directly
     if not os.path.isfile(spec) and spec != "-":
-        # remove trailing slash if present
-        spec = spec[:-1] if spec[-1] == '/' else spec 
-        try:
-            logger.info('packaging the environment...')
-            _copy_run_in_env(spec)
-            os.makedirs(f'{spec}/bin/', exist_ok=True)
-            os.rename(f'{spec}/env/bin/poncho_package_run', f'{spec}/bin/poncho_package_run')
-            os.rename(f'{spec}/env/bin/run_in_env', f'{spec}/bin/run_in_env')
-            conda_pack.pack(prefix=f'{spec}', output=str(output), force=True, ignore_missing_files=True, ignore_editable_packages=ignore_editable_packages)
-            logger.info('to activate environment run poncho_package_run -e {} <command>'.format(output))
-            return output
-        except Exception as e:
-            raise Exception(f"Error when packing a conda directory.\n{e}")
-        finally:
-            os.remove(f'{spec}/bin/run_in_env')
-            os.remove(f'{spec}/bin/poncho_package_run')
+        pack_env_with_conda_dir(spec, output, ignore_editable_packages)
 
-    # if spec is a file or from stdin
+    # else if spec is a file or from stdin
     else:
-        # record packages installed as editable from pip
-        local_pip_pkgs = _find_local_pip()
-
-        with tempfile.TemporaryDirectory(prefix="poncho_env") as env_dir:
-            logger.info('creating temporary environment in {}'.format(env_dir))
-
-            global conda_exec
-            (conda_exec, needs_confirmation) = _find_conda_executable(conda_executable, env_dir, download_micromamba)
-
-            logger.info(f'using conda executable {conda_exec}')
-            # creates conda spec file from poncho spec file
-            logger.info('converting spec file...')
-            conda_spec = create_conda_spec(spec, env_dir, local_pip_pkgs)
-
-            # fetch data via git and https
-            logger.info('fetching git data...')
-            git_data(spec, env_dir)
-
-            logger.info('fetching http data...')
-            http_data(spec, env_dir)
-
-            # create conda environment in temp directory
-            logger.info('populating environment...')
-            _run_conda_command(env_dir, needs_confirmation, 'env create', '--file', env_dir + '/conda_spec.yml')
-
-            logger.info('adding local packages...')
-            for (name, path) in conda_spec['pip_local'].items():
-                _install_local_pip(env_dir, name, path)
-
-            logger.info('copying spec to environment...')
-            shutil.copy(f'{env_dir}/conda_spec.yml', f'{env_dir}/env/conda_spec.yml')
-
-            _copy_run_in_env(env_dir)
-
-            logger.info('generating environment file...')
-
-            # Bug breaks bundling common packages (e.g. python).
-            # ignore_missing_files may be safe to remove in the future.
-            # https://github.com/conda/conda-pack/issues/145
-            if ignore_editable_packages is not True:
-                ignore_editable_packages = False
-            conda_pack.pack(prefix=f'{env_dir}/env', output=str(output), force=True, ignore_missing_files=True, ignore_editable_packages=ignore_editable_packages)
-
-            logger.info('to activate environment run poncho_package_run -e {} <command>'.format(output))
-
-        return output
-
-
+        pack_env_with_spec(spec, output, conda_executable, download_micromamba, ignore_editable_packages)
 
 def _run_conda_command(environment, needs_confirmation, command, *args):
     all_args = [conda_exec] + command.split()
@@ -182,7 +187,6 @@ def _run_conda_command(environment, needs_confirmation, command, *args):
         logger.warning("error executing: {}".format(' '.join(all_args)))
         print(e.output.decode())
         sys.exit(1)
-
 
 def _find_local_pip():
     edit_raw = subprocess.check_output([sys.executable, '-m' 'pip', 'list', '--editable']).decode()
