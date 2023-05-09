@@ -115,7 +115,6 @@ def pack_env_with_conda_dir(spec, output, ignore_editable_packages=False):
         raise Exception(f"Error when packing a conda directory.\n{e}")
     finally:
         os.remove(f'{spec}/bin/run_in_env')
-        os.remove(f'{spec}/bin/poncho_package_run')
 
 def pack_env_with_spec(spec, output, conda_executable=None, download_micromamba=False, ignore_editable_packages=False):
     # record packages installed as editable from pip
