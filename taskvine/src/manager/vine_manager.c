@@ -2805,14 +2805,10 @@ static int send_one_task( struct vine_manager *q )
 		if(!vine_manager_check_inputs_available(q,t)) continue;
 		
 		// Find the best worker for the task at the head of the list
-		timestamp_t before = timestamp_get();
 		w = vine_schedule_task_to_worker(q,t);
 
 		// If there is no suitable worker, consider the next task.
 		if(!w) continue;
-		timestamp_t after = timestamp_get();
-
-		debug(D_VINE, "SCHED_TIME %lu %lu", before, after);
 
 		// Check if there is transfer capacity available.
 		if(q->peer_transfers_enabled)
