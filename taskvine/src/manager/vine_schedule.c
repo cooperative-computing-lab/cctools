@@ -149,7 +149,7 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 	struct vine_file_replica *remote_info;
 	struct vine_mount *m;
 
-	while( hash_table_nextkey(q->worker_table,&key,(void**)&w) ) {
+	HASH_TABLE_ITERATE(q->worker_table, key, w) {
 		if( check_worker_against_task(q, w, t) ) {
 			task_cached_bytes = 0;
 			has_all_files = 1;
@@ -174,7 +174,6 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 			}
 		}
 	}
-	hash_table_firstkey(q->worker_table);
 	
 	return best_worker;
 }
