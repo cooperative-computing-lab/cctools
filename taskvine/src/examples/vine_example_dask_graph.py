@@ -67,7 +67,7 @@ is constructed by dask.""")
 
     # checkpoint at even levels when nodes have at least one children
     def checkpoint(dag, key):
-        if dag.depth_of(key) % 2 == 0 and dag.nchildren_of(key) > 0:
+        if dag.depth_of(key) % 2 == 0 and len(dag.get_children(key)) > 0:
             print(f"checkpoint for {key}")
             return True
         return False

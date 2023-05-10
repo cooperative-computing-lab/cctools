@@ -10,7 +10,7 @@
 
 from .manager import Manager
 from .task import PythonTask
-from .dask_dag import DaskVineDag, find_in_lists
+from .dask_dag import DaskVineDag
 
 import cloudpickle
 from uuid import uuid4
@@ -63,6 +63,8 @@ class DaskVine(Manager):
     #                      or to bring back each result to the manager (False, default).
     #                      True is more IO efficient, but runs the risk of needing to
     #                      recompute results if workers are lost.
+    # @param low_memory_mode Split graph vertices to reduce memory needed per function call. It
+    #                      removes some of the dask graph optimizations, thus proceed with care.
     # param  checkpoint_fn When using lazy_transfer, a predicate with arguments (dag, key)
     #                      called before submitting a task. If True, the result is brought back
     #                      to the manager.
@@ -76,6 +78,7 @@ class DaskVine(Manager):
             environment=None,
             extra_files=None,
             lazy_transfer=False,
+            low_memory_mode=False,
             checkpoint_fn=None,
             resources=None,
             resources_mode='fixed',
@@ -102,15 +105,16 @@ class DaskVine(Manager):
                      checkpoint_fn=None,
                      resources=None,
                      resources_mode='fixed',
+                     low_memory_mode=False,
                      verbose=False
                      ):
         if isinstance(keys, list):
-            indices = {k: inds for (k, inds) in DaskVineDag.find_dask_keys(keys)}
+            indices = {k: inds for (k, inds) in find_dask_keys(keys)}
             keys_flatten = indices.keys()
         else:
             keys_flatten = [keys]
 
-        dag = DaskVineDag(dsk)
+        dag = DaskVineDag(dsk, low_memory_mode=low_memory_mode)
         rs = dag.set_targets(keys_flatten)
 
         tag = f"dag-{id(dag)}"
@@ -143,6 +147,12 @@ class DaskVine(Manager):
 
         return self._load_results(dag, indices, keys)
 
+    def category_name(self, sexpr):
+        if DaskVineDag.taskp(sexpr):
+            return str(sexpr[0]).replace(" ", "_")
+        else:
+            return "other"
+
     def submit_calls(self, dag, tag, rs, *,
                      environment=None,
                      extra_files=None,
@@ -153,14 +163,12 @@ class DaskVine(Manager):
                      ):
 
         targets = dag.get_targets()
-        for r in rs:
-            k, (fn, *args) = r
-
+        for (k, sexpr) in rs:
             lazy = lazy_transfer and k not in targets
             if lazy and checkpoint_fn:
                 lazy = checkpoint_fn(dag, k)
 
-            cat = str(fn).replace(" ", "_")
+            cat = self.category_name(sexpr)
             if cat not in self._categories_known:
                 if resources:
                     self.set_category_resources_max(cat, resources)
@@ -172,7 +180,7 @@ class DaskVine(Manager):
                 self._categories_known.add(cat)
 
             t = PythonTaskDask(self,
-                               k, fn, args,  # compute key k from fn(args)
+                               dag, k, sexpr,
                                category=cat,
                                environment=environment,
                                extra_files=extra_files,
@@ -235,24 +243,25 @@ class DaskVineExecutionError(Exception):
 
 
 class PythonTaskDask(PythonTask):
-    def __init__(self, m, key, fn, args, *,
+    def __init__(self, m,
+                 dag, key, sexpr, *,
                  category=None,
                  environment=None,
                  extra_files=None,
                  lazy_transfer=False):
         self._key = key
 
-        file_indices = find_result_files(args)
-        new_args = self._mirror_list(args)
-        names = []
-        for (f, inds) in file_indices:
-            name = f"{uuid4()}.p"  # choose some random name for the remote name
-            set_at_indices(new_args, inds, name)
-            names.append((f, name))
-        super().__init__(wrap_function_load_args, [inds for (_, inds) in file_indices], fn, new_args)
+        args_raw = {k: dag.get_result(k) for k in dag.get_children(key)}
+        args = {k: f"{uuid4()}.p" for k, v in args_raw.items() if isinstance(v, DaskVineFile)}
 
-        for f, name in names:
-            self.add_input(f.file, name)
+        keys_of_files = list(args.keys())
+        args = args_raw | args
+
+        super().__init__(execute_graph_vertex, sexpr, args, keys_of_files)
+
+        for k, f in args_raw.items():
+            if isinstance(f, DaskVineFile):
+                self.add_input(f.file, args[k])
 
         if category:
             self.set_category(category)
@@ -264,34 +273,33 @@ class PythonTaskDask(PythonTask):
             for f, name in extra_files.items():
                 self.add_input(f, name)
 
-    def _mirror_list(self, lst):
-        if type(lst) != list:
-            return lst
-        else:
-            return [self._mirror_list(a) for a in lst]
-
     @property
     def key(self):
         return self._key
 
 
-# Most of the arguments are represented by files. We wrap the original call
-# to load the contents of the files to the arguments.
-# file_indices contains the indices of the args list of those arguments
-# that should be loaded.
-def wrap_function_load_args(indices, fn, args):
+def execute_graph_vertex(sexpr, args, keys_of_files):
     import traceback
     import cloudpickle
-    loaded_args = list(args)
 
-    for inds in indices:
-        name = get_at_indices(loaded_args, inds)
-        with open(name, "rb") as f:
-            set_at_indices(loaded_args, inds, cloudpickle.load(f))
+    def rec_call(sexpr):
+        if DaskVineDag.keyp(sexpr) and sexpr in args:
+            return args[sexpr]
+        elif DaskVineDag.taskp(sexpr):
+            return sexpr[0](*[rec_call(a) for a in sexpr[1:]])
+        elif DaskVineDag.listp(sexpr):
+            return [rec_call(a) for a in sexpr]
+        else:
+            return sexpr
+
     try:
-        return fn(*loaded_args)
+        for k in keys_of_files:
+            with open(args[k], "rb") as f:
+                args[k] = cloudpickle.load(f)
+
+        return rec_call(sexpr)
     except Exception:
-        raise DaskVineExecutionError(traceback.extract_stack())
+        return DaskVineExecutionError(traceback.format_exc())
 
 
 def set_at_indices(lst, indices, value):
@@ -304,16 +312,26 @@ def set_at_indices(lst, indices, value):
         raise
 
 
-def get_at_indices(lst, indices):
-    inner = lst
-    for i in indices[:-1]:
-        inner = inner[i]
-    return inner[indices[-1]]
+def find_in_lists(lists, predicate=lambda s: True, indices=None):
+    """ Returns a list of tuples [(k, (i,j,...)] where (i,j,...) are the indices of k in lists. """
+    if not indices:
+        indices = []
+
+    items = []
+    if predicate(lists):  # e.g., lists aren't lists, but a single element
+        items.append((lists, list(indices)))
+    elif isinstance(lists, list):
+        indices.append(0)
+        for s in lists:
+            items.extend(find_in_lists(s, predicate, indices))
+            indices[-1] += 1
+        indices.pop()
+    return items
+
+
+def find_dask_keys(lists):
+    return find_in_lists(lists, DaskVineDag.keyp)
 
 
 def find_result_files(lists):
     return find_in_lists(lists, lambda f: isinstance(f, DaskVineFile))
-
-
-def find_graph_keys(lists, dag):
-    return find_in_lists(lists, predicate=dag.flat_keyp, indices=None)
