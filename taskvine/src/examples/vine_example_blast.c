@@ -18,7 +18,7 @@ with all the same tasks on the worker.
 #include <errno.h>
 #include <unistd.h>
 
-#define BLAST_URL "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz"
+#define BLAST_URL "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.14.0+-x64-linux.tar.gz"
 
 #define LANDMARK_URL "https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz"
 
@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
 	printf("Declaring tasks...");
 	char* query_string;
 	for(i=0;i<TASK_COUNT;i++) {
-		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
+		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.14.0+/bin/blastp -db landmark -query query.file");
 
 		query_string = make_query();
 

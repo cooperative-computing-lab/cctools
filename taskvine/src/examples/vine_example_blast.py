@@ -102,7 +102,7 @@ with all the same tasks on the worker.""",
 
     print("Declaring files...")
     blast_url = m.declare_url(
-        "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz",
+        "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.14.0+-x64-linux.tar.gz",
         cache="always",  # with "always", workers keep this file until they are terminated
     )
     blast = m.declare_untar(blast_url, cache="always")
@@ -117,7 +117,7 @@ with all the same tasks on the worker.""",
     for i in range(args.task_count):
         query = m.declare_buffer(make_query_text(args.query_count))
         t = vine.Task(
-            command="blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file",
+            command="blastdir/ncbi-blast-2.14.0+/bin/blastp -db landmark -query query.file",
             inputs={
                 query: {"remote_name": "query.file"},
                 blast: {"remote_name": "blastdir"},
