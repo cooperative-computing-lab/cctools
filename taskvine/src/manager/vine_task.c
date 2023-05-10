@@ -36,8 +36,10 @@ struct vine_task *vine_task_create(const char *command_line)
 	}
 	memset(t, 0, sizeof(*t));
 
+	t->type = VINE_TASK_TYPE_STANDARD;
+	
 	/* REMEMBER: Any memory allocation done in this function should have a
-	 * corresponding copy in vine_task_clone. Otherwise we get
+	 * corresponding copy in vine_task_copy. Otherwise we get
 	 * double-free segfaults. */
 
 	/* For clarity, put initialization in same order as structure. */
@@ -63,10 +65,12 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->resources_measured  = rmsummary_create(-1);
 	t->resources_allocated = rmsummary_create(-1);
 
+	t->refcount = 1;
+	
 	return t;
 }
 
-void vine_task_clean( struct vine_task *t, int full_clean )
+void vine_task_clean( struct vine_task *t )
 {
 	t->time_when_commit_start = 0;
 	t->time_when_commit_end   = 0;
@@ -90,40 +94,45 @@ void vine_task_clean( struct vine_task *t, int full_clean )
 	free(t->addrport);
 	t->addrport = NULL;
 
-	if(full_clean) {
-		t->resource_request = CATEGORY_ALLOCATION_FIRST;
-		t->try_count = 0;
-		t->exhausted_attempts = 0;
-		t->workers_slow = 0;
-
-		t->time_workers_execute_all = 0;
-		t->time_workers_execute_exhaustion = 0;
-		t->time_workers_execute_failure = 0;
-
-		rmsummary_delete(t->resources_measured);
-		rmsummary_delete(t->resources_allocated);
-		t->resources_measured  = rmsummary_create(-1);
-		t->resources_allocated = rmsummary_create(-1);
-	}
-
 	/* If result is never updated, then it is mark as a failure. */
 	t->result = VINE_RESULT_UNKNOWN;
-	t->state = VINE_TASK_READY;
 }
 
-static struct list *vine_task_mount_list_clone(struct list *list)
+void vine_task_reset( struct vine_task *t )
+{
+	vine_task_clean(t);
+
+	t->resource_request = CATEGORY_ALLOCATION_FIRST;
+	t->try_count = 0;
+	t->exhausted_attempts = 0;
+	t->workers_slow = 0;
+
+	t->time_workers_execute_all = 0;
+	t->time_workers_execute_exhaustion = 0;
+	t->time_workers_execute_failure = 0;
+
+	rmsummary_delete(t->resources_measured);
+	rmsummary_delete(t->resources_allocated);
+	t->resources_measured  = rmsummary_create(-1);
+	t->resources_allocated = rmsummary_create(-1);
+
+	t->task_id = 0;
+	t->state = VINE_TASK_UNKNOWN;
+}
+
+static struct list *vine_task_mount_list_copy(struct list *list)
 {
 	struct list *new = list_create();
 	struct vine_mount *old_mount, *new_mount;
 	
 	LIST_ITERATE(list,old_mount) {
-		new_mount = vine_mount_clone(old_mount);
+		new_mount = vine_mount_copy(old_mount);
 		list_push_tail(new, new_mount);
 	}
 	return new;
 }
 
-static struct list *vine_task_string_list_clone(struct list *string_list)
+static struct list *vine_task_string_list_copy(struct list *string_list)
 {
 	struct list *new = list_create();
 	char *var;
@@ -135,13 +144,24 @@ static struct list *vine_task_string_list_clone(struct list *string_list)
 	return new;
 }
 
+struct vine_task *vine_task_clone( struct vine_task *t )
+{
+	if(!t) return 0;
+	t->refcount++;
+	return t;
+}
 
-struct vine_task *vine_task_clone(const struct vine_task *task)
+struct vine_task *vine_task_copy( const struct vine_task *task )
 {
 	if(!task) return 0;
 
 	struct vine_task *new = vine_task_create(task->command_line);
 
+	/* Reset the task ID so that this will get a new one at submit time. */
+	new->task_id = 0;
+
+	new->type = task->type;
+	
 	/* Static features of task are copied. */
 	if(task->coprocess) vine_task_set_coprocess(new,task->tag);
 	if(task->tag) vine_task_set_tag(new, task->tag);
@@ -155,10 +175,10 @@ struct vine_task *vine_task_clone(const struct vine_task *task)
 		vine_task_set_snapshot_file(new, task->monitor_snapshot_file);
 	}
 
-	new->input_mounts  = vine_task_mount_list_clone(task->input_mounts);
-	new->output_mounts = vine_task_mount_list_clone(task->output_mounts);
-	new->env_list     = vine_task_string_list_clone(task->env_list);
-	new->feature_list = vine_task_string_list_clone(task->feature_list);
+	new->input_mounts  = vine_task_mount_list_copy(task->input_mounts);
+	new->output_mounts = vine_task_mount_list_copy(task->output_mounts);
+	new->env_list     = vine_task_string_list_copy(task->env_list);
+	new->feature_list = vine_task_string_list_copy(task->feature_list);
 
 	/* Scheduling features of task are copied. */
 	new->resource_request = task->resource_request;
@@ -441,30 +461,35 @@ void vine_task_add_input_file(struct vine_task *t, const char *local_name, const
 {
 	struct vine_file *f = vine_file_local(local_name, 0);
 	vine_task_add_input(t,f,remote_name,flags);
+	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
 }
 
 void vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
 {
 	struct vine_file *f = vine_file_local(local_name, 0);
 	vine_task_add_output(t,f,remote_name,flags);
+	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
 }
 
 void vine_task_add_input_url(struct vine_task *t, const char *file_url, const char *remote_name, vine_mount_flags_t flags)
 {
 	struct vine_file *f = vine_file_url(file_url, 0);
 	vine_task_add_input(t,f,remote_name,flags);
+	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
 }
 
 void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name )
 {
 	struct vine_file *f = vine_file_empty_dir();
 	vine_task_add_input(t,f,remote_name,0);
+	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
 }
 
 void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_mount_flags_t flags)
 {
 	struct vine_file *f = vine_file_buffer(data,length,0);
 	vine_task_add_input(t,f,remote_name,flags);
+	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
 }
 
 void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_mount_flags_t flags)
@@ -472,6 +497,7 @@ void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_t
 	/* XXX mini task must have a single output file */
 	struct vine_file *f = vine_file_mini_task(mini_task, 0);
 	vine_task_add_input(t,f,remote_name,flags);
+	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
 }
 
 void vine_task_add_environment(struct vine_task *t, struct vine_file *environment_file) {
@@ -549,6 +575,14 @@ void vine_task_delete(struct vine_task *t)
 {
 	if(!t) return;
 
+	t->refcount--;
+	if(t->refcount>0) return;
+
+	if(t->refcount<0) {
+		notice(D_VINE,"vine_task_delete: prevented multiple-free of task %d",t->task_id);
+		return;
+	}
+	
 	free(t->command_line);
 	free(t->coprocess);
 	free(t->tag);

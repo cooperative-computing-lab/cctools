@@ -21,10 +21,16 @@ End user may only use the API described in taskvine.h
 
 #include <stdint.h>
 
+typedef enum {
+      VINE_TASK_TYPE_STANDARD,    /**< A normal task that should be returned to the user. */
+      VINE_TASK_TYPE_RECOVERY,    /**< A failure recovery task that should not be returned to the user. */
+} vine_task_type_t;
+
 struct vine_task {
         /***** Fixed properties of task at submit time. ******/
 
-        int task_id;                  /**< A unique task id number. */
+        int task_id;                 /**< A unique task id number. */
+	vine_task_type_t type;       /**< The type of the task. */
 	char *command_line;          /**< The program(s) to execute, as a shell command line. */
 	char *coprocess;             /**< The name of the coprocess name in the worker that executes this task. For regular tasks it is NULL. */
 	char *tag;                   /**< An optional user-defined logical name for the task. */
@@ -90,11 +96,25 @@ struct vine_task {
 
 	int has_fixed_locations;                               /**< Whether at least one file was added with the VINE_FIXED_LOCATION flag. Task fails immediately if no
 															 worker can satisfy all the strict inputs of the task. */
+
+	int refcount;                                          /**< Number of remaining references to this object. */
 };
+
+/* Add a reference to an existing task object, return the same object. */
+struct vine_task * vine_task_clone( struct vine_task *t );
+
+/* Deep-copy an existing task object, return a pointer to a new object. */
+struct vine_task * vine_task_copy( const struct vine_task *t );
+
+/* Hard-reset a completed task back to an initial state so that it can be submitted again. */
+void vine_task_reset( struct vine_task *t );
+
+/* Soft-reset a not-yet-completed task so that it can be attempted on a different worker. */
+void vine_task_clean( struct vine_task *t );
 
 int  vine_task_set_result(struct vine_task *t, vine_result_t new_result);
 void vine_task_set_resources(struct vine_task *t, const struct rmsummary *rm);
-void vine_task_clean( struct vine_task *t, int full_clean );
+
 void vine_task_check_consistency( struct vine_task *t );
 
 const char *vine_task_state_to_string( vine_task_state_t task_state );

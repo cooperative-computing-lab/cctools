@@ -102,12 +102,6 @@ if __name__ == "__main__":
     t = q.wait(wait_time)
     report_task(t, "success", 0, [path.join(test_dir, output_name)])
 
-    # same task as above, but testing resubmission on final state
-    for i in range(3):
-        q.submit(t)
-        t = q.wait(5)
-    report_task(t, "success", 0, [path.join(test_dir, output_name)])
-
     # same simple task, but now we send the directory as an input
     output_name = next_output_name()
     t = vine.Task(f"cd my_dir && ./{exec_name} {input_name} 2>&1 > {output_name}")

@@ -24,6 +24,13 @@ the cluster.
 
 <img src=images/architecture.svg>
 
+The TaskVine system is naturally robust.  While an application is running,
+workers may be added or removed as computing resources become available.
+Newly added workers will gradually accumulate data within the cluster.
+Removed (or failed) workers are handled gracefully, and tasks will be
+retried elsewhere as needed.  If a worker failure results in the loss
+of files, tasks will be re-executed as necessary to re-create them.
+
 TaskVine manager applications can be written in Python or C
 on Linux or OSX platforms.  Individual tasks can be simple
 Python functions, complex Unix applications, or serverless function
@@ -47,8 +54,7 @@ Tasks share a common set of options.  Each task can be labelled with the resourc
 (CPU cores, GPU devices, memory, disk space) that it needs to execute.  This allows each worker to pack the appropriate
 number of tasks.  For example, a worker running on a 64-core machine could run 32 dual-core tasks, 16 four-core tasks,
 or any other combination that adds up to 64 cores.  If you don't know the resources needed, you can enable
-Automatic 
-a resource monitor to track and report what each task uses.
+an automatic resource monitor to track and report what each task uses.
 
 TaskVine is easy to deploy on existing HPC and cloud facilities.
 The worker processes are self-contained executables, and TaskVine
@@ -219,6 +225,8 @@ visible within the manager application.
 used to capture the output of a task, and then serve as the input
 of a later task.  Temporary files exist only within the cluster
 for the duration of a workflow, and are deleted when no longer needed.
+If a temporary file is unexpectedly lost due to the crash or failure
+of a worker, then the task that created it will be re-executed.
 
 If it is necessary to unpack a file before it is used,
 use the `declare_untar` transformation to wrap the file definition.
