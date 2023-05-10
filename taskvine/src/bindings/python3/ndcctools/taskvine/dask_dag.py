@@ -108,7 +108,7 @@ class DaskVineDag:
         dependencies = set()
         if self.graph_keyp(sexpr):
             dependencies.add(sexpr)
-            self._depth_of[sexpr] = min(depth, self._depth_of)
+            self._depth_of[sexpr] = min(depth, self._depth_of[sexpr])
         elif not DaskVineDag.symbolp(sexpr):
             for sub in sexpr:
                 dependencies.update(self.find_dependencies(sub, depth + 1))
