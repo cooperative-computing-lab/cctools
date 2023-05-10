@@ -127,7 +127,7 @@ class Manager(object):
 
             ssl_key, ssl_cert = self._setup_ssl(ssl, run_info_path)
             self._taskvine = cvine.vine_ssl_create(port, ssl_key, ssl_cert)
-            self._finalizer = weakref.finalize(self, Manager._free_manager, self)
+            self._finalizer = weakref.finalize(self, self._free)
 
             if ssl_key:
                 self._using_ssl = True
@@ -149,7 +149,7 @@ class Manager(object):
             sys.stderr.write("Unable to create internal taskvine structure.")
             raise
 
-    def _free_manager(self):
+    def _free(self):
         if self._taskvine:
             if self._shutdown:
                 self.shutdown_workers(0)
@@ -1697,17 +1697,18 @@ class Factory(object):
             # we need to use some other directory.
             self._opts["scratch-dir"] = os.path.dirname(manager.staging_directory)
 
-        def free():
-            if self._factory_proc is not None:
-                self.stop()
-            if self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
-                try:
-                    shutil.rmtree(self.scratch_dir)
-                except OSError:
-                    # if we could not delete it now because some file is being used,
-                    # we leave it for the atexit function
-                    pass
-        self._finalizer = weakref.finalize(self, free)
+        self._finalizer = weakref.finalize(self, self._free)
+
+    def _free(self):
+        if self._factory_proc is not None:
+            self.stop()
+        if self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
+            try:
+                shutil.rmtree(self.scratch_dir)
+            except OSError:
+                # if we could not delete it now because some file is being used,
+                # we leave it for the atexit function
+                pass
 
     def _set_manager(self, batch_type, manager, manager_host_port, manager_name):
         if not (manager or manager_host_port or manager_name):

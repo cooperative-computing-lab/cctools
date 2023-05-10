@@ -95,16 +95,23 @@ class Task(object):
     def __init__(self, command):
         self._task = None
 
+        self._manager = None  # set on submission
+
         self._task = work_queue_task_create(command)
         if not self._task:
             raise Exception("Unable to create internal Task structure")
 
-        def free():
-            if self._task:
-                work_queue_task_delete(self._task)
-                self._task = None
+        self._finalizer = weakref.finalize(self, self._free)
 
-        self._finalizer = weakref.finalize(self, free)
+    def _free(self):
+        if not self._task:
+            return
+        if self._manager and self._manager._finalizer.alive and self.id in self._manager._task_table:
+            # interpreter is shutting down. Don't delete task here so that manager
+            # does not get memory errors
+            return
+        work_queue_task_delete(self._task)
+        self._task = None
 
     @staticmethod
     def _determine_file_flags(flags, cache, failure_only):
@@ -973,11 +980,12 @@ class PythonTask(Task):
         super(PythonTask, self).__init__(self._command)
         self._specify_IO_files()
 
-        def free():
-            if self._tmpdir and os.path.exists(self._tmpdir):
-                shutil.rmtree(self._tmpdir)
-        self._finalizer = weakref.finalize(self, free)
+        self._finalizer = weakref.finalize(self, self._free)
 
+    def _free(self):
+        if self._tmpdir and os.path.exists(self._tmpdir):
+            shutil.rmtree(self._tmpdir)
+        super()._free()
 
     ##
     # returns the result of a python task as a python variable
@@ -1157,15 +1165,16 @@ class WorkQueue(object):
         except Exception as e:
             raise Exception("Unable to create internal Work Queue structure: {}".format(e))
         finally:
-            def free(self):
-                if self._work_queue:
-                    if self._shutdown:
-                        self.shutdown_workers(0)
-                    self._update_status_display(force=True)
-                    work_queue_delete(self._work_queue)
-                    self._work_queue = None
-            self._finalizer = weakref.finalize(self, free)
+            self._finalizer = weakref.finalize(self, self._free)
         self._update_status_display()
+
+    def _free(self):
+        if self._work_queue:
+            if self._shutdown:
+                self.shutdown_workers(0)
+            self._update_status_display(force=True)
+            work_queue_delete(self._work_queue)
+            self._work_queue = None
 
     def __enter__(self):
         return self
@@ -1857,6 +1866,7 @@ class WorkQueue(object):
             task.specify_buffer(json.dumps(task._event), "infile")
         taskid = work_queue_submit(self._work_queue, task._task)
         self._task_table[taskid] = task
+        task._manager = self
         return taskid
 
     ##
