@@ -102,7 +102,7 @@ with all the same tasks on the worker.""",
 
     print("Declaring files...")
     blast_url = m.declare_url(
-        "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz",
+        "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.13.0/ncbi-blast-2.13.0+-x64-linux.tar.gz",
         cache="always",  # with "always", workers keep this file until they are terminated
     )
     blast = m.declare_untar(blast_url, cache="always")
