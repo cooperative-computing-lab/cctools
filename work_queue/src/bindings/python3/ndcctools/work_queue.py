@@ -104,13 +104,14 @@ class Task(object):
         self._finalizer = weakref.finalize(self, self._free)
 
     def _free(self):
+        if not self._task:
+            return
         if self._manager and self._manager._finalizer.alive and self.id in self._manager._task_table:
             # interpreter is shutting down. Don't delete task here so that manager
             # does not get memory errors
             return
-        if self._task:
-            work_queue_task_delete(self._task)
-            self._task = None
+        work_queue_task_delete(self._task)
+        self._task = None
 
     @staticmethod
     def _determine_file_flags(flags, cache, failure_only):
