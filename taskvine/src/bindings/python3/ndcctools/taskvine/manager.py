@@ -392,19 +392,6 @@ class Manager(object):
         return cvine.vine_enable_monitoring(self._taskvine, watchdog, time_series)
 
     ##
-    # As @ref ndcctools.taskvine.manager.Manager.enable_monitoring, but it also generates a time series and a
-    # debug file.
-    # WARNING: Such files may reach gigabyte sizes for long running tasks.
-    #
-    # Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
-    #
-    # @param self   Reference to the current manager object.
-    # @param dirname    Directory name for the monitor output.
-    # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
-    def enable_monitoring_full(self, dirname=None, watchdog=True):
-        return cvine.vine_enable_monitoring_full(self._taskvine, dirname, watchdog)
-
-    ##
     # Enable P2P worker transfer functionality. On by default
     #
     # @param self Reference to the current manager object.
