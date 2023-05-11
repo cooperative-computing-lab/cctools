@@ -690,6 +690,20 @@ void rmsummary_read_env_vars(struct rmsummary *s)
 	}																		\
 }
 
+
+/* Only operate on the fields that TaskVine actually uses;
+ * cores, gpu, memory, disk. */
+#define RM_BIN_OP_VINE(dest, src, fn) { 									\
+	if (!src || !dest) return; 												\
+	size_t i;																\
+	double *dest_resource = (double*)dest; 									\
+	double *src_resource = (double*)src;									\
+	for (i=0; i<4; i++) {													\
+		dest_resource[i] = fn(dest_resource[i], src_resource[i]);			\
+	}																		\
+																			\
+}
+
 /* Copy the value for all the fields in src > -1 to dest */
 static inline double override_field(double d, double s)
 {
@@ -703,6 +717,15 @@ void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *sr
 	}
 
 	RM_BIN_OP(dest, src, override_field);
+}
+
+void rmsummary_merge_override_vine(struct rmsummary *dest, const struct rmsummary *src)
+{
+	if(!src) {
+		return;
+	}
+
+	RM_BIN_OP_VINE(dest, src, override_field);
 }
 
 struct rmsummary *rmsummary_copy(const struct rmsummary *src, int deep_copy)
