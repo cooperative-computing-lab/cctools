@@ -260,21 +260,18 @@ $preinstall_for{almalinux}{9} = [
 ];
 
 $postinstall_for{almalinux}{default} = [
+	'ln -s /usr/bin/python3 /usr/bin/python',
 	@{$builder},
 	@{$fuse},
 	@{$e2fsprogs},
+	@{$mysql}, # does not compile in alma9
 	'dnf -y install cvmfs-devel',
 	'dnf -y clean all',
 ];
 
-$postinstall_for{almalinux}{8} = [
-	@{$mysql}, # does not compile anymore in alma9
-];
-
 $package_for{almalinux}{default}{python3}  = ['python3-devel', 'python3-setuptools', 'python3-pip'];
 $package_for{almalinux}{default}{swig}     = ['swig'];
-$extras_for{almalinux}{default} = ['glibc-devel'];
-$extras_for{almalinux}{default} = ['libuuid-devel'];
+$extras_for{almalinux}{default} = ['glibc-devel', 'libuuid-devel', 'diffutils'];
 
 $package_for{almalinux}{9}{lsb_release} = []; # there is no redhat-lsb package for redhat9
 $package_for{almalinux}{9}{curl} = []; # curl already in base image and there is a conflict if we try to update it
