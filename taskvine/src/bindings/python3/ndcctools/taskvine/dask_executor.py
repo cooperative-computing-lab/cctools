@@ -299,7 +299,8 @@ def execute_graph_vertex(sexpr, args, keys_of_files):
 
         return rec_call(sexpr)
     except Exception:
-        return DaskVineExecutionError(traceback.format_exc())
+        print(traceback.format_exc())
+        raise
 
 
 def set_at_indices(lst, indices, value):
