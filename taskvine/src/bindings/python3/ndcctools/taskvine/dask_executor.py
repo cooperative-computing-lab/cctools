@@ -143,7 +143,7 @@ class DaskVine(Manager):
                                       resources=resources,
                                       resources_mode=resources_mode)
                 else:
-                    Exception(f"task for key {t.key} failed. exit code {t.exit_code}\n{t.std_output}")
+                    raise Exception(f"task for key {t.key} failed. exit code {t.exit_code}\n{t.std_output}")
 
         return self._load_results(dag, indices, keys)
 
