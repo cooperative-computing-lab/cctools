@@ -59,13 +59,13 @@ class DaskVine(Manager):
     # @param environment   A taskvine file representing an environment to run the tasks.
     # @param extra_files   A dictionary of {taskvine.File: "remote_name"} to add to each
     #                      task.
-    # @param lazy_transfer Whether to keep intermediate results only at workers (True)
+    # @param lazy_transfers Whether to keep intermediate results only at workers (True)
     #                      or to bring back each result to the manager (False, default).
     #                      True is more IO efficient, but runs the risk of needing to
     #                      recompute results if workers are lost.
     # @param low_memory_mode Split graph vertices to reduce memory needed per function call. It
     #                      removes some of the dask graph optimizations, thus proceed with care.
-    # param  checkpoint_fn When using lazy_transfer, a predicate with arguments (dag, key)
+    # param  checkpoint_fn When using lazy_transfers, a predicate with arguments (dag, key)
     #                      called before submitting a task. If True, the result is brought back
     #                      to the manager.
     # @param resources     A dictionary with optional keys of cores, memory and disk (MB)
@@ -77,7 +77,7 @@ class DaskVine(Manager):
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
-            lazy_transfer=False,
+            lazy_transfers=False,
             low_memory_mode=False,
             checkpoint_fn=None,
             resources=None,
@@ -89,7 +89,7 @@ class DaskVine(Manager):
             return self.dask_execute(dsk, keys,
                                      environment=environment,
                                      extra_files=extra_files,
-                                     lazy_transfer=lazy_transfer,
+                                     lazy_transfers=lazy_transfers,
                                      checkpoint_fn=checkpoint_fn,
                                      resources=resources,
                                      resources_mode=resources_mode,
@@ -101,7 +101,7 @@ class DaskVine(Manager):
     def dask_execute(self, dsk, keys, *,
                      environment=None,
                      extra_files=None,
-                     lazy_transfer=False,
+                     lazy_transfers=False,
                      checkpoint_fn=None,
                      resources=None,
                      resources_mode='fixed',
@@ -122,7 +122,7 @@ class DaskVine(Manager):
         self.submit_calls(dag, tag, rs,
                           environment=environment,
                           extra_files=extra_files,
-                          lazy_transfer=lazy_transfer,
+                          lazy_transfers=lazy_transfers,
                           checkpoint_fn=checkpoint_fn,
                           resources=resources,
                           resources_mode=resources_mode)
@@ -138,12 +138,12 @@ class DaskVine(Manager):
                     self.submit_calls(dag, tag, rs,
                                       environment=environment,
                                       extra_files=extra_files,
-                                      lazy_transfer=lazy_transfer,
+                                      lazy_transfers=lazy_transfers,
                                       checkpoint_fn=checkpoint_fn,
                                       resources=resources,
                                       resources_mode=resources_mode)
                 else:
-                    raise Exception(f"task for key {t.key} failed: {t.result}. exit code {t.exit_code}\n{t.output}")
+                    Exception(f"task for key {t.key} failed. exit code {t.exit_code}\n{t.std_output}")
 
         return self._load_results(dag, indices, keys)
 
@@ -156,7 +156,7 @@ class DaskVine(Manager):
     def submit_calls(self, dag, tag, rs, *,
                      environment=None,
                      extra_files=None,
-                     lazy_transfer=False,
+                     lazy_transfers=False,
                      checkpoint_fn=None,
                      resources=None,
                      resources_mode=None,
@@ -164,7 +164,7 @@ class DaskVine(Manager):
 
         targets = dag.get_targets()
         for (k, sexpr) in rs:
-            lazy = lazy_transfer and k not in targets
+            lazy = lazy_transfers and k not in targets
             if lazy and checkpoint_fn:
                 lazy = checkpoint_fn(dag, k)
 
@@ -184,7 +184,7 @@ class DaskVine(Manager):
                                category=cat,
                                environment=environment,
                                extra_files=extra_files,
-                               lazy_transfer=lazy)
+                               lazy_transfers=lazy)
             t.set_tag(tag)  # tag that identifies this dag
             self.submit(t)
 
@@ -248,7 +248,7 @@ class PythonTaskDask(PythonTask):
                  category=None,
                  environment=None,
                  extra_files=None,
-                 lazy_transfer=False):
+                 lazy_transfers=False):
         self._key = key
 
         args_raw = {k: dag.get_result(k) for k in dag.get_children(key)}
@@ -265,7 +265,7 @@ class PythonTaskDask(PythonTask):
 
         if category:
             self.set_category(category)
-        if lazy_transfer:
+        if lazy_transfers:
             self.enable_temp_output()
         if environment:
             self.add_environment(environment)
@@ -299,7 +299,8 @@ def execute_graph_vertex(sexpr, args, keys_of_files):
 
         return rec_call(sexpr)
     except Exception:
-        return DaskVineExecutionError(traceback.format_exc())
+        print(traceback.format_exc())
+        raise
 
 
 def set_at_indices(lst, indices, value):
