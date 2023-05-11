@@ -695,12 +695,10 @@ void rmsummary_read_env_vars(struct rmsummary *s)
  * cores, gpu, memory, disk. */
 #define RM_BIN_OP_VINE(dest, src, fn) { 									\
 	if (!src || !dest) return; 												\
-	size_t i;																\
-	double *dest_resource = (double*)dest; 									\
-	double *src_resource = (double*)src;									\
-	for (i=0; i<4; i++) {													\
-		dest_resource[i] = fn(dest_resource[i], src_resource[i]);			\
-	}																		\
+	dest->cores = fn(dest->cores, src->cores);								\
+	dest->gpus = fn(dest->gpus, src->gpus);									\
+	dest->memory = fn(dest->memory, src->memory);							\
+	dest->disk = fn(dest->disk, src->disk);									\
 																			\
 }
 
