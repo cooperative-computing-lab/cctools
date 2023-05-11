@@ -883,17 +883,21 @@ class PythonTask(Task):
                     exec_function = cloudpickle.load(f)
                 with open(args, 'rb') as f:
                     args, kwargs = cloudpickle.load(f)
+
+                status = 0
                 try:
                     exec_out = exec_function(*args, **kwargs)
-
                 except Exception as e:
                     exec_out = e
+                    status = 1
 
                 with open(out, 'wb') as f:
                     if {self._serialize_output}:
                         cloudpickle.dump(exec_out, f)
                     else:
                         f.write(exec_out)
+
+                sys.exit(status)
                 """
                 )
             )

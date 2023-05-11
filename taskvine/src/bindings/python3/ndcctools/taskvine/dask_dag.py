@@ -149,12 +149,12 @@ class DaskVineDag:
         for p in self._parents_of[key]:
             self._missing_of[p].discard(key)
 
-            if self._missing_of[p] or self.has_result(p):
+            if self._missing_of[p]:
                 continue
 
             sexpr = self._working_graph[p]
             if self.graph_keyp(sexpr):
-                rs.extend(self.set_result(p, value))  # case e.g, "x": "y", and we just set the value of "y"
+                rs.extend(self.set_result(key, self.get_result(sexpr)))  # case e.g, "x": "y", and we just set the value of "y"
             elif self.symbolp(sexpr):
                 rs.extend(self.set_result(p, sexpr))
             else:
@@ -166,7 +166,6 @@ class DaskVineDag:
         are keys. """
         for key in list(self._working_graph.keys()):
             self.flatten_rec(key, self._working_graph[key], toplevel=True)
-        print(self._working_graph)
 
     def _add_second_targets(self, key):
         if not DaskVineDag.listp(self._working_graph[key]):
@@ -203,8 +202,6 @@ class DaskVineDag:
         return key in self._result_of
 
     def get_result(self, key):
-        """ Sets new result and propagates in the DaskVineDag. Returns a list of [key, (fn, *args)]
-        of computations that become ready to be executed """
         try:
             return self._result_of[key]
         except KeyError:
