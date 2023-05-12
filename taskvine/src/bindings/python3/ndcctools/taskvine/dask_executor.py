@@ -246,6 +246,7 @@ class PythonTaskDask(PythonTask):
         args = args_raw | args
 
         super().__init__(execute_graph_vertex, sexpr, args, keys_of_files)
+        self.set_output_cache(cache=True)
 
         for k, f in args_raw.items():
             if isinstance(f, DaskVineFile):

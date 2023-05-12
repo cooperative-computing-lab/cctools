@@ -719,6 +719,7 @@ class PythonTask(Task):
         self._serialize_output = True
 
         self._tmp_output_enabled = False
+        self._cache_output = False
 
         # vine File object that will contain the output of this function
         self._output_file = None
@@ -781,6 +782,14 @@ class PythonTask(Task):
     # @param manager Manager to which the task was submitted
     def enable_temp_output(self):
         self._tmp_output_enabled = True
+
+    ##
+    # Set the cache behavior for the output of the task.
+    # @param cache   If True or 'workflow', cache the file at workers for reuse
+    #                until the end of the workflow. If 'always', the file is cache until the
+    #                end-of-life of the worker. Default is False (file is not cache).
+    def set_output_cache(self, cache=False):
+        self._cache_output = cache
 
     ##
     # Returns the ndcctools.taskvine.manager.File object that
@@ -861,7 +870,7 @@ class PythonTask(Task):
         if self._tmp_output_enabled:
             self._output_file = manager.declare_temp()
         else:
-            self._output_file = manager.declare_file(source(self._out_name_file))
+            self._output_file = manager.declare_file(source(self._out_name_file), cache=self._cache_output)
         self.add_output(self._output_file, self._out_name_file)
 
     ##
