@@ -156,14 +156,16 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 
 			LIST_ITERATE(t->input_mounts,m) {
 				remote_info = hash_table_lookup(w->current_files, m->file->cached_name);
+
 				if(remote_info && m->file->type == VINE_FILE) {
 					task_cached_bytes += remote_info->size;
 				}
-				else {
+				else if((m->file->flags & (VINE_CACHE | VINE_CACHE_ALWAYS))){
 					has_all_files = 0;
 				}
 			}
 			
+			/* Return the worker if it was in possession of all cacheable files */
 			if(has_all_files) {
 				return w;
 			}
