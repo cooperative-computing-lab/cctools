@@ -74,6 +74,7 @@ class DaskVine(Manager):
     #                       (use the value of 'resources' above), 'max througput',
     #                       'max' (for maximum values seen), 'min_waste', 'greedy bucketing'
     #                       or 'exhaustive bucketing'. This is done per function type in dsk.
+    # @param retries       Number of times to attempt a task. Default is 5.
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
@@ -82,69 +83,59 @@ class DaskVine(Manager):
             checkpoint_fn=None,
             resources=None,
             resources_mode='fixed',
+            retries=5,
             verbose=False
             ):
         try:
+            if retries and retries < 1:
+                raise ValueError("retries should be larger than 0")
+
+            self.environment = environment
+            self.extra_files = extra_files
+            self.lazy_transfers = lazy_transfers
+            self.low_memory_mode = low_memory_mode
+            self.checkpoint_fn = checkpoint_fn
+            self.resources = resources
+            self.resources_mode = resources_mode
+            self.retries = retries
+            self.verbose = verbose
+
             self._categories_known = set()
-            return self.dask_execute(dsk, keys,
-                                     environment=environment,
-                                     extra_files=extra_files,
-                                     lazy_transfers=lazy_transfers,
-                                     checkpoint_fn=checkpoint_fn,
-                                     resources=resources,
-                                     resources_mode=resources_mode,
-                                     verbose=verbose)
+
+            return self._dask_execute(dsk, keys)
         except Exception as e:
             # unhandled exceptions for now
             raise e
 
-    def dask_execute(self, dsk, keys, *,
-                     environment=None,
-                     extra_files=None,
-                     lazy_transfers=False,
-                     checkpoint_fn=None,
-                     resources=None,
-                     resources_mode='fixed',
-                     low_memory_mode=False,
-                     verbose=False
-                     ):
+    def _dask_execute(self, dsk, keys):
         if isinstance(keys, list):
             indices = {k: inds for (k, inds) in find_dask_keys(keys)}
             keys_flatten = indices.keys()
         else:
             keys_flatten = [keys]
 
-        dag = DaskVineDag(dsk, low_memory_mode=low_memory_mode)
-        rs = dag.set_targets(keys_flatten)
-
+        dag = DaskVineDag(dsk, low_memory_mode=self.low_memory_mode)
         tag = f"dag-{id(dag)}"
 
-        self.submit_calls(dag, tag, rs,
-                          environment=environment,
-                          extra_files=extra_files,
-                          lazy_transfers=lazy_transfers,
-                          checkpoint_fn=checkpoint_fn,
-                          resources=resources,
-                          resources_mode=resources_mode)
+        rs = dag.set_targets(keys_flatten)
+        self._submit_calls(dag, tag, rs)
 
         while not self.empty():
             t = self.wait_for_tag(tag, 5)
             if t:
-                if verbose:
+                if self.verbose:
                     print(f"{t.key} ran on {t.hostname}")
 
                 if t.successful():
                     rs = dag.set_result(t.key, DaskVineFile(t.output_file, t.key, self.staging_directory))
-                    self.submit_calls(dag, tag, rs,
-                                      environment=environment,
-                                      extra_files=extra_files,
-                                      lazy_transfers=lazy_transfers,
-                                      checkpoint_fn=checkpoint_fn,
-                                      resources=resources,
-                                      resources_mode=resources_mode)
+                    self._submit_calls(dag, tag, rs)
                 else:
-                    raise Exception(f"task for key {t.key} failed. exit code {t.exit_code}\n{t.std_output}")
-
+                    retries_left = t.decrement_retry()
+                    print(f"task id {t.id} key {t.key} failed. {retries_left} attempts left.\n{t.std_output}")
+                    if retries_left > 0:
+                        self._submit_calls(dag, tag, [(t.key, t.sexpr)])
+                    else:
+                        raise Exception(f"tasks for key {t.key} failed permanently")
         return self._load_results(dag, indices, keys)
 
     def category_name(self, sexpr):
@@ -153,27 +144,19 @@ class DaskVine(Manager):
         else:
             return "other"
 
-    def submit_calls(self, dag, tag, rs, *,
-                     environment=None,
-                     extra_files=None,
-                     lazy_transfers=False,
-                     checkpoint_fn=None,
-                     resources=None,
-                     resources_mode=None,
-                     ):
-
+    def _submit_calls(self, dag, tag, rs):
         targets = dag.get_targets()
         for (k, sexpr) in rs:
-            lazy = lazy_transfers and k not in targets
-            if lazy and checkpoint_fn:
-                lazy = checkpoint_fn(dag, k)
+            lazy = self.lazy_transfers and k not in targets
+            if lazy and self.checkpoint_fn:
+                lazy = self.checkpoint_fn(dag, k)
 
             cat = self.category_name(sexpr)
             if cat not in self._categories_known:
-                if resources:
-                    self.set_category_resources_max(cat, resources)
-                if resources_mode:
-                    self.set_category_mode(cat, resources_mode)
+                if self.resources:
+                    self.set_category_resources_max(cat, self.resources)
+                if self.resources_mode:
+                    self.set_category_mode(cat, self.resources_mode)
 
                     if not self._categories_known:
                         self.enable_monitoring()
@@ -182,8 +165,9 @@ class DaskVine(Manager):
             t = PythonTaskDask(self,
                                dag, k, sexpr,
                                category=cat,
-                               environment=environment,
-                               extra_files=extra_files,
+                               environment=self.environment,
+                               extra_files=self.extra_files,
+                               retries=self.retries,
                                lazy_transfers=lazy)
             t.set_tag(tag)  # tag that identifies this dag
             self.submit(t)
@@ -248,8 +232,12 @@ class PythonTaskDask(PythonTask):
                  category=None,
                  environment=None,
                  extra_files=None,
+                 retries=5,
                  lazy_transfers=False):
         self._key = key
+        self._sexpr = sexpr
+
+        self._retries_left = retries
 
         args_raw = {k: dag.get_result(k) for k in dag.get_children(key)}
         args = {k: f"{uuid4()}.p" for k, v in args_raw.items() if isinstance(v, DaskVineFile)}
@@ -277,6 +265,14 @@ class PythonTaskDask(PythonTask):
     def key(self):
         return self._key
 
+    @property
+    def sexpr(self):
+        return self._sexpr
+
+    def decrement_retry(self):
+        self._retries_left -= 1
+        return self._retries_left
+
 
 def execute_graph_vertex(sexpr, args, keys_of_files):
     import traceback
@@ -292,11 +288,15 @@ def execute_graph_vertex(sexpr, args, keys_of_files):
         else:
             return sexpr
 
-    try:
-        for k in keys_of_files:
+    for k in keys_of_files:
+        try:
             with open(args[k], "rb") as f:
                 args[k] = cloudpickle.load(f)
+        except Exception as e:
+            print(f"Could not read input file {args[k]} for key {k}: {e}")
+            raise
 
+    try:
         return rec_call(sexpr)
     except Exception:
         print(traceback.format_exc())
