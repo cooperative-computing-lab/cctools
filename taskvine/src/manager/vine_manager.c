@@ -2626,7 +2626,6 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 
 	LIST_ITERATE(t->input_mounts, m){
 		/* Is the file already present on that worker? */
-		
 		struct vine_file_replica *remote_info;
 		
 		if((remote_info = vine_file_replica_table_lookup(w, m->file->cached_name))) continue;
@@ -2643,9 +2642,8 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		vine_file_delete(m->substitute);
 		m->substitute = NULL;
 
-		/* If not, then search for an available peer to provide it. */
 		/* Provide a substitute file object to describe the peer. */
-		if(!(m->file->flags & VINE_PEER_NOSHARE))
+		if(!(m->file->flags & VINE_PEER_NOSHARE) && (m->file->flags & (VINE_CACHE | VINE_CACHE_ALWAYS)))
 		{
 			if((peer = vine_file_replica_table_find_worker(q, m->file->cached_name)))
 			{
