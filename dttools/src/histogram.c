@@ -47,22 +47,14 @@ struct histogram *histogram_create(double bucket_size) {
 	return h;
 }
 
-void histogram_clear(struct histogram *h) {
-
-	uint64_t key;
-	struct box_count *box;
-
-	itable_firstkey(h->buckets);
-	while(itable_nextkey(h->buckets, &key, (void **) &box)) {
-		free(box);
-	}
+void histogram_clear(struct histogram *h)
+{
+	itable_clear(h->buckets,free);
 
 	h->total_count = 0;
 	h->max_value   = 0;
 	h->min_value   = 0;
 	h->mode        = 0;
-
-	itable_clear(h->buckets);
 }
 
 void histogram_delete(struct histogram *h) {

@@ -136,8 +136,11 @@ my %preinstall_for;
 # list of shell commands to execute post installation.
 my %postinstall_for;
 
-$versions_of{centos} = [ qw{ 8 7 } ];
+$versions_of{centos} = [ qw{ 7 } ];
 $command_for{centos} = 'yum install -y';
+
+$versions_of{almalinux} = [ qw{ 8 9 } ];
+$command_for{almalinux} = 'dnf install -y';
 
 $versions_of{fedora} = [ qw{ 30  } ];
 $command_for{fedora} = 'dnf install -y';
@@ -171,7 +174,7 @@ gtar                     => 'tar',
 image_magick             => 'ImageMagick',
 libattr                  => 'libattr-devel',
 libffi                   => 'libffi',
-lsb_release              => 'redhat-lsb-core',
+lsb_release              => [],
 m4                       => 'm4',
 musl					 => [],             # from builder
 mysql                    => [],             # from builder
@@ -199,9 +202,11 @@ zlib                     => 'zlib-devel',
 #$package_for{centos}{6}{python3} = ['python34-devel', 'python34-setuptools'];  centos6 end-of-life
 $package_for{centos}{7}{python}   = ['python', 'python-devel', 'python-setuptools', 'python-tools'];
 $package_for{centos}{7}{python3}  = ['python36-devel', 'python36-setuptools', 'python36-pip'];
+$package_for{centos}{7}{lsb_release} = ['redhat-lsb-core'];
 
 $package_for{centos}{8}{python3}  = ['python39-devel', 'python39-setuptools', 'python39-pip'];
 $package_for{centos}{8}{swig}     = ['swig'];
+$package_for{centos}{8}{lsb_release} = ['redhat-lsb-core'];
 
 $extras_for{centos}{6} = ['libc-devel'];
 $extras_for{centos}{7} = ['libc-devel'];
@@ -218,15 +223,6 @@ $preinstall_for{centos}{7} = [
 	'yum -y install https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm'
 ];
 
-$preinstall_for{centos}{8} = [
-	"sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*",
-	"sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*",
-	'dnf install -y "dnf-command(config-manager)"',
-	'dnf config-manager -y --set-enabled powertools',  # for doxygen, and groff
-	'dnf install -y epel-release',
-	'dnf install -y https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm'
-];
-
 $postinstall_for{centos}{7} = [
 	@{$builder},
 	@{$fuse},
@@ -240,23 +236,45 @@ $postinstall_for{centos}{7} = [
 	'yum -y clean all',
 ];
 
-$postinstall_for{centos}{8} = [
-	'ln -s /usr/bin/python3 /usr/bin/python',
-	@{$builder},
-	@{$fuse},
-	@{$e2fsprogs},
-	@{$mysql},
-	@{$uuid},
-	'yum -y install cvmfs-devel',
-	'yum -y clean all',
-];
-
 # end-of-life
 #$postinstall_for{centos}{6} = [
 #	'ln -sf /usr/bin/python3.4 /usr/bin/python3',
 #	'ln -sf /usr/bin/python3.4-config /usr/bin/python3-config'
 #];
 
+########## almalinux ##########
+$package_for{almalinux}{default}     = { %{$package_for{centos}{default}} };
+
+$preinstall_for{almalinux}{default} = [
+	'dnf install -y "dnf-command(config-manager)"',
+	'dnf install -y epel-release',
+	'dnf install -y https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm'
+];
+
+$preinstall_for{almalinux}{8} = [
+	'dnf config-manager -y --set-enabled powertools',  # for doxygen, and groff
+];
+
+$preinstall_for{almalinux}{9} = [
+	'dnf config-manager -y --set-enabled crb',  # for doxygen, and groff
+];
+
+$postinstall_for{almalinux}{default} = [
+	'ln -s /usr/bin/python3 /usr/bin/python',
+	@{$builder},
+	@{$fuse},
+	@{$e2fsprogs},
+	@{$mysql}, # does not compile in alma9
+	'dnf -y install cvmfs-devel',
+	'dnf -y clean all',
+];
+
+$package_for{almalinux}{default}{python3}  = ['python3-devel', 'python3-setuptools', 'python3-pip'];
+$package_for{almalinux}{default}{swig}     = ['swig'];
+$extras_for{almalinux}{default} = ['glibc-devel', 'libuuid-devel', 'diffutils'];
+
+$package_for{almalinux}{9}{lsb_release} = []; # there is no redhat-lsb package for redhat9
+$package_for{almalinux}{9}{curl} = []; # curl already in base image and there is a conflict if we try to update it
 
 ########## FEDORA ##########
 $package_for{fedora}{default}     = { %{$package_for{centos}{default}} };

@@ -1184,7 +1184,6 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 {
 	char *key, *value;
 	struct work_queue_task *t;
-	struct rmsummary *r;
 	uint64_t taskid;
 
 	if(!q || !w) return;
@@ -1210,13 +1209,10 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		itable_firstkey(w->current_tasks);
 	}
 
-	itable_firstkey(w->current_tasks_boxes);
-	while(itable_nextkey(w->current_tasks_boxes, &taskid, (void **) &r)) {
-		rmsummary_delete(r);
-	}
+	itable_clear(w->current_tasks,0);
 
-	itable_clear(w->current_tasks);
-	itable_clear(w->current_tasks_boxes);
+	itable_clear(w->current_tasks_boxes,(void*)rmsummary_delete);
+
 	w->finished_tasks = 0;
 }
 

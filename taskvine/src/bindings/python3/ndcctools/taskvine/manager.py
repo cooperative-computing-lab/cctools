@@ -127,7 +127,7 @@ class Manager(object):
 
             ssl_key, ssl_cert = self._setup_ssl(ssl, run_info_path)
             self._taskvine = cvine.vine_ssl_create(port, ssl_key, ssl_cert)
-            self._finalizer = weakref.finalize(self, Manager._free_manager, self)
+            self._finalizer = weakref.finalize(self, self._free)
 
             if ssl_key:
                 self._using_ssl = True
@@ -149,7 +149,7 @@ class Manager(object):
             sys.stderr.write("Unable to create internal taskvine structure.")
             raise
 
-    def _free_manager(self):
+    def _free(self):
         if self._taskvine:
             if self._shutdown:
                 self.shutdown_workers(0)
@@ -392,25 +392,23 @@ class Manager(object):
         return cvine.vine_enable_monitoring(self._taskvine, watchdog, time_series)
 
     ##
-    # As @ref ndcctools.taskvine.manager.Manager.enable_monitoring, but it also generates a time series and a
-    # debug file.
-    # WARNING: Such files may reach gigabyte sizes for long running tasks.
-    #
-    # Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
-    #
-    # @param self   Reference to the current manager object.
-    # @param dirname    Directory name for the monitor output.
-    # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
-    def enable_monitoring_full(self, dirname=None, watchdog=True):
-        return cvine.vine_enable_monitoring_full(self._taskvine, dirname, watchdog)
-
-    ##
-    # Enable P2P worker transfer functionality. Off by default
+    # Enable P2P worker transfer functionality. On by default
     #
     # @param self Reference to the current manager object.
     def enable_peer_transfers(self):
         return cvine.vine_enable_peer_transfers(self._taskvine)
 
+    ##
+    # Disable P2P worker transfer functionality. On by default
+    #
+    # @param self Reference to the current manager object.
+    def disable_peer_transfers(self):
+        return cvine.vine_disable_peer_transfers(self._taskvine)
+
+    ##
+    # Change the project name for the given manager.
+    #
+    # @param self   Reference to the current manager object.
     ##
     # Enable disconnect slow workers functionality for a given manager for tasks in
     # the "default" category, and for task which category does not set an
@@ -568,6 +566,9 @@ class Manager(object):
     # @endcode
 
     def set_resources_max(self, rmd):
+        if not rmd:
+            return
+
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
@@ -587,6 +588,9 @@ class Manager(object):
     # @endcode
 
     def set_resources_min(self, rmd):
+        if not rmd:
+            return
+
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
@@ -607,6 +611,9 @@ class Manager(object):
     # @endcode
 
     def set_category_resources_max(self, category, rmd):
+        if not rmd:
+            return
+
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
@@ -627,6 +634,9 @@ class Manager(object):
     # @endcode
 
     def set_category_resources_min(self, category, rmd):
+        if not rmd:
+            return
+
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
@@ -1674,17 +1684,18 @@ class Factory(object):
             # we need to use some other directory.
             self._opts["scratch-dir"] = os.path.dirname(manager.staging_directory)
 
-        def free():
-            if self._factory_proc is not None:
-                self.stop()
-            if self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
-                try:
-                    shutil.rmtree(self.scratch_dir)
-                except OSError:
-                    # if we could not delete it now because some file is being used,
-                    # we leave it for the atexit function
-                    pass
-        self._finalizer = weakref.finalize(self, free)
+        self._finalizer = weakref.finalize(self, self._free)
+
+    def _free(self):
+        if self._factory_proc is not None:
+            self.stop()
+        if self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
+            try:
+                shutil.rmtree(self.scratch_dir)
+            except OSError:
+                # if we could not delete it now because some file is being used,
+                # we leave it for the atexit function
+                pass
 
     def _set_manager(self, batch_type, manager, manager_host_port, manager_name):
         if not (manager or manager_host_port or manager_name):

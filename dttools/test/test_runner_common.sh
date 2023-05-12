@@ -116,7 +116,7 @@ run_wq_worker()
 	return 0
 }
 
-run_ds_worker()
+run_taskvine_worker()
 {
 	local port_file=$1
 	shift

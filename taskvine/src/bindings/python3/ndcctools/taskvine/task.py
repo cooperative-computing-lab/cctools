@@ -38,6 +38,8 @@ class Task(object):
     def __init__(self, command, **task_info):
         self._task = None
 
+        self._manager = None  # set by submit_finalize
+
         if isinstance(command, dict):
             raise TypeError(f"{command} is not a str. Did you mean **{command}?")
 
@@ -49,13 +51,7 @@ class Task(object):
         if not self._task:
             raise Exception("Unable to create internal Task structure")
 
-        def free():
-            if self._manager_will_free:
-                return
-            if self._task:
-                cvine.vine_task_delete(self._task)
-                self._task = None
-        self._finalizer = weakref.finalize(self, free)
+        self._finalizer = weakref.finalize(self, self._free)
 
         attributes = [
             "coprocess", "scheduler", "tag", "category",
@@ -114,6 +110,18 @@ class Task(object):
         except KeyError:
             pass
 
+    def _free(self):
+        if not self._task:
+            return
+        if self._manager_will_free:
+            return
+        if self._manager and self._manager._finalizer.alive and self.id in self._manager._task_table:
+            # interpreter is shutting down. Don't delete task here so that manager
+            # does not get memory errors
+            return
+        cvine.vine_task_delete(self._task)
+        self._task = None
+
     @staticmethod
     def _determine_mount_flags(watch=False, failure_only=False, success_only=False, strict_input=False):
         flags = cvine.VINE_TRANSFER_ALWAYS
@@ -146,7 +154,7 @@ class Task(object):
     # @param self 	Reference to the current python task object
     # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
-        pass
+        self._manager = manager
 
     ##
     # Return a copy of this task
@@ -711,6 +719,7 @@ class PythonTask(Task):
         self._serialize_output = True
 
         self._tmp_output_enabled = False
+        self._cache_output = False
 
         # vine File object that will contain the output of this function
         self._output_file = None
@@ -721,10 +730,12 @@ class PythonTask(Task):
         self._fn_def = (func, args, kwargs)
         super(PythonTask, self).__init__(self._command)
 
-        def free():
-            if self._tmpdir and os.path.exists(self._tmpdir):
-                shutil.rmtree(self._tmpdir)
-        self._finalizer = weakref.finalize(self, free)
+        self._finalizer = weakref.finalize(self, self._free)
+
+    def _free(self):
+        if self._tmpdir and os.path.exists(self._tmpdir):
+            shutil.rmtree(self._tmpdir)
+        super()._free()
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -734,6 +745,7 @@ class PythonTask(Task):
     # @param self 	Reference to the current python task object
     # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
+        super().submit_finalize(manager)
         self._tmpdir = tempfile.mkdtemp(dir=manager.staging_directory)
         self._serialize_python_function(*self._fn_def)
         self._fn_def = None  # avoid possible memory leak
@@ -770,6 +782,14 @@ class PythonTask(Task):
     # @param manager Manager to which the task was submitted
     def enable_temp_output(self):
         self._tmp_output_enabled = True
+
+    ##
+    # Set the cache behavior for the output of the task.
+    # @param cache   If True or 'workflow', cache the file at workers for reuse
+    #                until the end of the workflow. If 'always', the file is cache until the
+    #                end-of-life of the worker. Default is False (file is not cache).
+    def set_output_cache(self, cache=False):
+        self._cache_output = cache
 
     ##
     # Returns the ndcctools.taskvine.manager.File object that
@@ -850,7 +870,7 @@ class PythonTask(Task):
         if self._tmp_output_enabled:
             self._output_file = manager.declare_temp()
         else:
-            self._output_file = manager.declare_file(source(self._out_name_file))
+            self._output_file = manager.declare_file(source(self._out_name_file), cache=self._cache_output)
         self.add_output(self._output_file, self._out_name_file)
 
     ##
@@ -872,17 +892,21 @@ class PythonTask(Task):
                     exec_function = cloudpickle.load(f)
                 with open(args, 'rb') as f:
                     args, kwargs = cloudpickle.load(f)
+
+                status = 0
                 try:
                     exec_out = exec_function(*args, **kwargs)
-
                 except Exception as e:
                     exec_out = e
+                    status = 1
 
                 with open(out, 'wb') as f:
                     if {self._serialize_output}:
                         cloudpickle.dump(exec_out, f)
                     else:
                         f.write(exec_out)
+
+                sys.exit(status)
                 """
                 )
             )
@@ -922,6 +946,7 @@ class FunctionCall(Task):
     # @param self 	Reference to the current python task object
     # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
+        super().submit_finalize(manager)
         f = manager.declare_buffer(json.dumps(self._event))
         self.add_input(f, "infile")
 

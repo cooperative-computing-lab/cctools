@@ -22,13 +22,13 @@ class DaskVineDag:
     'z' has as children 'x' and 'y'.
 
     Each node is referenced by its key. When the value of a key is list of
-    sexprs, like 'v' above, then a key is automatically computed recursively
+    sexprs, like 'v' above, and low_memory_mode is True, then a key is automatically computed recursively
     for each computation.
 
     Computation is done lazily. The DaskVineDag is initialized from a task graph, but not
     computation is decoded. To use the DaskVineDag:
         - DaskVineDag.set_targets(keys): Request the computation associated with key to be decoded.
-        - DaskVineDag.get_ready(): A list of [key, (fn, *args)] of functions that are ready
+        - DaskVineDag.get_ready(): A list of [key, sexpr] of expressions that are ready
           to be executed.
         - DaskVineDag.set_result(key, value): Sets the result of key to value.
         - DaskVineDag.get_result(key): Get result associated with key. Raises DagNoResult
@@ -48,7 +48,7 @@ class DaskVineDag:
 
     @staticmethod
     def symbolp(s):
-        return not (DaskVineDag.keyp(s) or DaskVineDag.taskp(s) or DaskVineDag.listp(s))
+        return not (DaskVineDag.taskp(s) or DaskVineDag.listp(s))
 
     @staticmethod
     def hashable(s):
@@ -58,46 +58,23 @@ class DaskVineDag:
         except TypeError:
             return False
 
-    @staticmethod
-    def find_dask_keys(item, indices=None):
-        if not indices:
-            indices = []
-
-        keys = {}
-        if isinstance(item, list):
-            indices.append(0)
-            for s in item:
-                keys.update(DaskVineDag.find_dask_keys(s, indices))
-        else:
-            last = indices[-1]
-            keys[item] = list(indices)
-            indices[-1] = last + 1
-        return keys
-
-    @staticmethod
-    def set_dask_result(lst, indices, value):
-        inner = lst
-        for i in indices[:-1]:
-            inner = inner[i]
-        inner[indices[-1]] = value
-
-    def __init__(self, dsk):
-        self._dsk = dict(dsk)
-
-        # those sexpr from dsk that we need to compute, but flatten
-        self._flat = {}
+    def __init__(self, dsk, low_memory_mode=False):
+        self._dsk = dsk
 
         # child -> parents. I.e., which parents needs the result of child
         self._parents_of = defaultdict(lambda: set())
 
-        # parent->children. I.e., the dependencies of parent
-        self._children_of = defaultdict(lambda: set())
-
         # parent->children still waiting for result. A key is ready to be computed when children left is []
         self._missing_of = {}
 
+        # parent->nchildren get the number of children for parent computation
+        self._children_of = {}
+
         # key->value of its computation
         self._result_of = {}
+
+        # key->depth. The shallowest level the key is found
+        self._depth_of = defaultdict(lambda: float('inf'))
 
         # target keys that the dag should compute
         self._targets = set()
@@ -109,128 +86,140 @@ class DaskVineDag:
         # set of keys currently being computed.
         self._computing = set()
 
+        self._working_graph = dict(dsk)
+        if low_memory_mode:
+            self._flatten_graph()
+
+        self.initialize_graph()
+
     def graph_keyp(self, s):
         if DaskVineDag.keyp(s):
-            return s in self._dsk
+            return s in self._working_graph
         return False
 
-    def flatten(self, key):
+    def depth_of(self, key):
+        return self._depth_of[key]
+
+    def initialize_graph(self):
+        for key, sexpr in self._working_graph.items():
+            self.set_relations(key, sexpr)
+
+    def find_dependencies(self, sexpr, depth=0):
+        dependencies = set()
+        if self.graph_keyp(sexpr):
+            dependencies.add(sexpr)
+            self._depth_of[sexpr] = min(depth, self._depth_of[sexpr])
+        elif not DaskVineDag.symbolp(sexpr):
+            for sub in sexpr:
+                dependencies.update(self.find_dependencies(sub, depth + 1))
+        return dependencies
+
+    def set_relations(self, key, sexpr):
+        sexpr = self._working_graph[key]
+        self._children_of[key] = self.find_dependencies(sexpr)
+        self._missing_of[key] = set(self._children_of[key])
+
+        for c in self._children_of[key]:
+            self._parents_of[c].add(key)
+
+    def get_ready(self):
+        """ List of [(key, sexpr),...] ready for computation.
+        This call should be used only for
+        bootstrapping. Further calls should use DaskVineDag.set_result to discover
+        the new computations that become ready to be executed. """
+        rs = []
+        for (key, cs) in self._missing_of.items():
+            if self.has_result(key) or cs:
+                continue
+            sexpr = self._working_graph[key]
+            if self.graph_keyp(sexpr):
+                rs.extend(self.set_result(key, self.get_result(sexpr)))
+            elif self.symbolp(sexpr):
+                rs.extend(self.set_result(key, sexpr))
+            else:
+                rs.append((key, sexpr))
+        return rs
+
+    def set_result(self, key, value):
+        """ Sets new result and propagates in the DaskVineDag. Returns a list of [(key, sexpr),...]
+        of computations that become ready to be executed """
+
+        rs = []
+        self._result_of[key] = value
+        for p in self._parents_of[key]:
+            self._missing_of[p].discard(key)
+
+            if self._missing_of[p]:
+                continue
+
+            sexpr = self._working_graph[p]
+            if self.graph_keyp(sexpr):
+                rs.extend(self.set_result(key, self.get_result(sexpr)))  # case e.g, "x": "y", and we just set the value of "y"
+            elif self.symbolp(sexpr):
+                rs.extend(self.set_result(p, sexpr))
+            else:
+                rs.append((p, sexpr))
+        return rs
+
+    def _flatten_graph(self):
         """ Recursively decomposes a sexpr associated with key, so that its arguments, if any
         are keys. """
-        sexpr = self._dsk[key]
-        self.flatten_rec(key, sexpr)
+        for key in list(self._working_graph.keys()):
+            self.flatten_rec(key, self._working_graph[key], toplevel=True)
 
-    def flatten_rec(self, key, sexpr):
-        def relate(parent, child):
-            self._parents_of[child].add(parent)
-            self._children_of[parent].add(child)
-            if not self.has_result(child):
-                self._missing_of[parent].add(child)
+    def _add_second_targets(self, key):
+        if not DaskVineDag.listp(self._working_graph[key]):
+            return
+        for c in self._working_graph[key]:
+            if self.graph_keyp(c):
+                self._targets.add(c)
+                self._add_second_targets(c)
 
-        if key in self._flat:
-            # this key has already been considered
+    def flatten_rec(self, key, sexpr, toplevel=False):
+        if key in self._working_graph and not toplevel:
+            return
+        if DaskVineDag.symbolp(sexpr):
             return
 
-        self._missing_of[key] = set()
+        nargs = []
+        next_flat = []
+        cons = type(sexpr)
 
-        if self.graph_keyp(sexpr):
-            self._flat[key] = sexpr
-            relate(parent=key, child=sexpr)
-        elif not (DaskVineDag.taskp(sexpr) or DaskVineDag.listp(sexpr)):
-            self._flat[key] = sexpr
-            self._result_of[key] = sexpr
-        else:
-            nargs = []
-            next_flat = []
+        for arg in sexpr:
+            print(arg)
+            if DaskVineDag.symbolp(arg):
+                nargs.append(arg)
+            else:
+                next_key = uuid4()
+                nargs.append(next_key)
+                next_flat.append((next_key, arg))
 
-            if DaskVineDag.listp(sexpr):
-                sexpr = (make_list, *sexpr)
-
-            nargs.append(sexpr[0])
-            sexpr = sexpr[1:]
-
-            for arg in sexpr:
-                if self.graph_keyp(arg):
-                    nargs.append(arg)
-                    next_flat.append((arg, self._dsk[arg]))
-                elif DaskVineDag.symbolp(arg):
-                    nargs.append(arg)
-                else:
-                    next_key = uuid4()
-                    nargs.append(next_key)
-                    next_flat.append((next_key, arg))
-            self._flat[key] = tuple(nargs)  # reconstruct from generated keys
-            for (n, a) in next_flat:
-                self.flatten_rec(n, a)
-                relate(parent=key, child=n)
+        self._working_graph[key] = cons(nargs)
+        for (n, a) in next_flat:
+            self.flatten_rec(n, a)
 
     def has_result(self, key):
         return key in self._result_of
 
     def get_result(self, key):
-        """ Sets new result and propagates in the DaskVineDag. Returns a list of [key, (fn, *args)]
-        of computations that become ready to be executed """
         try:
             return self._result_of[key]
         except KeyError:
             raise DaskVineNoResult(key)
 
-    def fill_seq(self, sexpr):
-        lst = []
-        for c in sexpr:
-            if DaskVineDag.keyp(c) and c in self._flat:
-                lst.append(self.get_result(c))
-            else:
-                lst.append(c)
-        return type(sexpr)(lst)
-
-    def fill_call(self, sexpr):
-        lst = (sexpr[0], *self.fill_seq(sexpr[1:]))
-        return lst
-
-    def set_result(self, key, value):
+    def get_children(self, key):
         """ Sets new result and propagates in the DaskVineDag. Returns a list of [key, (fn, *args)]
         of computations that become ready to be executed """
-        new_ready = []
-        self._result_of[key] = value
-        for p in self._parents_of[key]:
-            self._missing_of[p].discard(key)
-            if self._missing_of[p] or self.has_result(p):
-                continue
-            sexpr = self._flat[p]
-            if DaskVineDag.taskp(sexpr):
-                new_ready.append([p, self.fill_call(sexpr)])
-            else:
-                new_ready.extend(self.set_result(p, self.fill_seq(sexpr)))
-        return new_ready
-
-    def get_ready(self):
-        """ List of [key, (fn, *args)] ready for computation.
-        This is a potentially expensive call and should be used only for
-        bootstrapping. Further calls should use DaskVineDag.set_result to discover
-        the new computations that become ready to be executed. """
-        rs = []
-        for (p, cs) in self._missing_of.items():
-            if self.has_result(p):
-                continue
-            if cs:
-                continue
-            sexpr = self._flat[p]
-            if DaskVineDag.taskp(sexpr):
-                rs.append([p, self.fill_call(sexpr)])
-            else:
-                rs.extend(self.set_result(p, self.fill_seq(sexpr)))
-        return rs
+        try:
+            return self._children_of[key]
+        except KeyError:
+            raise DaskVineNoResult(key)
 
     def set_targets(self, keys):
         """ Values of keys that need to be computed. """
         self._targets.update(keys)
-
         for k in keys:
-            if k in self._flat:
-                # this key has already been considered
-                continue
-            self.flatten(k)
+            self._add_second_targets(k)
         return self.get_ready()
 
     def get_targets(self):
@@ -240,10 +229,3 @@ class DaskVineDag:
 class DaskVineNoResult(Exception):
     """Exception raised when asking for a result from a computation that has not been performed."""
     pass
-
-
-# aux function to make lists from many arguments, a little silly, but list()
-# wants only one argument and list(sometuple) does not work because we want to
-# flatten the tuple.
-def make_list(*args):
-    return args

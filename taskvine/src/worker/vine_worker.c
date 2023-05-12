@@ -102,7 +102,7 @@ int active_timeout = 3600;
 static int init_backoff_interval = 1;
 
 // Maximum value for backoff interval (in seconds) when worker fails to connect to a manager.
-static int max_backoff_interval = 60;
+static int max_backoff_interval = 8;
 
 // Absolute end time (in useconds) for worker, worker is killed after this point.
 static timestamp_t end_time = 0;

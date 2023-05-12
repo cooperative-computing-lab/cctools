@@ -59,128 +59,155 @@ class DaskVine(Manager):
     # @param environment   A taskvine file representing an environment to run the tasks.
     # @param extra_files   A dictionary of {taskvine.File: "remote_name"} to add to each
     #                      task.
-    # @param lazy_transfer Whether to keep intermediate results only at workers (True)
+    # @param lazy_transfers Whether to keep intermediate results only at workers (True)
     #                      or to bring back each result to the manager (False, default).
     #                      True is more IO efficient, but runs the risk of needing to
     #                      recompute results if workers are lost.
+    # @param low_memory_mode Split graph vertices to reduce memory needed per function call. It
+    #                      removes some of the dask graph optimizations, thus proceed with care.
+    # param  checkpoint_fn When using lazy_transfers, a predicate with arguments (dag, key)
+    #                      called before submitting a task. If True, the result is brought back
+    #                      to the manager.
     # @param resources     A dictionary with optional keys of cores, memory and disk (MB)
     #                      to set maximum resource usage per task.
     # @param resources_mode Automatically resize allocation per task. One of 'fixed'
     #                       (use the value of 'resources' above), 'max througput',
     #                       'max' (for maximum values seen), 'min_waste', 'greedy bucketing'
     #                       or 'exhaustive bucketing'. This is done per function type in dsk.
+    # @param retries       Number of times to attempt a task. Default is 5.
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
-            lazy_transfer=False,
+            lazy_transfers=False,
+            low_memory_mode=False,
+            checkpoint_fn=None,
             resources=None,
             resources_mode='fixed',
+            retries=5,
             verbose=False
             ):
         try:
-            return self.dask_execute(dsk, keys,
-                                     environment=environment,
-                                     extra_files=extra_files,
-                                     lazy_transfer=lazy_transfer,
-                                     resources=resources,
-                                     resources_mode=resources_mode,
-                                     verbose=verbose)
+            if retries and retries < 1:
+                raise ValueError("retries should be larger than 0")
+
+            self.environment = environment
+            self.extra_files = extra_files
+            self.lazy_transfers = lazy_transfers
+            self.low_memory_mode = low_memory_mode
+            self.checkpoint_fn = checkpoint_fn
+            self.resources = resources
+            self.resources_mode = resources_mode
+            self.retries = retries
+            self.verbose = verbose
+
+            self._categories_known = set()
+
+            return self._dask_execute(dsk, keys)
         except Exception as e:
             # unhandled exceptions for now
             raise e
 
-    def dask_execute(self, dsk, keys, *,
-                     environment=None,
-                     extra_files=None,
-                     lazy_transfer=False,
-                     resources=None,
-                     resources_mode='fixed',
-                     verbose=False
-                     ):
+    def _dask_execute(self, dsk, keys):
         if isinstance(keys, list):
-            indices = DaskVineDag.find_dask_keys(keys)
+            indices = {k: inds for (k, inds) in find_dask_keys(keys)}
             keys_flatten = indices.keys()
         else:
             keys_flatten = [keys]
 
-        dag = DaskVineDag(dsk)
-        rs = dag.set_targets(keys_flatten)
-
+        dag = DaskVineDag(dsk, low_memory_mode=self.low_memory_mode)
         tag = f"dag-{id(dag)}"
 
-        self.submit_calls(dag, tag, rs,
-                          environment=environment,
-                          extra_files=extra_files,
-                          lazy_transfer=lazy_transfer,
-                          resources=resources,
-                          resources_mode=resources_mode)
+        rs = dag.set_targets(keys_flatten)
+        self._submit_calls(dag, tag, rs)
 
         while not self.empty():
             t = self.wait_for_tag(tag, 5)
             if t:
-                if t.successful():
-                    if verbose:
-                        print(f"{t.key} ran on {t.hostname} with result {t.output}")
-                    rs = dag.set_result(t.key, DaskVineFile(t.output_file, t.key, self.staging_directory))
-                    self.submit_calls(dag, tag, rs,
-                                      environment=environment,
-                                      extra_files=extra_files,
-                                      lazy_transfer=lazy_transfer,
-                                      resources=resources,
-                                      resources_mode=resources_mode)
-                else:
-                    raise Exception(f"task for key {t.key} failed: {t.result}. exit code {t.exit_code}\n{t.output}")
+                if self.verbose:
+                    print(f"{t.key} ran on {t.hostname}")
 
+                if t.successful():
+                    rs = dag.set_result(t.key, DaskVineFile(t.output_file, t.key, self.staging_directory))
+                    self._submit_calls(dag, tag, rs)
+                else:
+                    retries_left = t.decrement_retry()
+                    print(f"task id {t.id} key {t.key} failed. {retries_left} attempts left.\n{t.std_output}")
+                    if retries_left > 0:
+                        self._submit_calls(dag, tag, [(t.key, t.sexpr)])
+                    else:
+                        raise Exception(f"tasks for key {t.key} failed permanently")
         return self._load_results(dag, indices, keys)
 
-    def submit_calls(self, dag, tag, rs, *,
-                     environment=None,
-                     extra_files=None,
-                     lazy_transfer=False,
-                     resources=None,
-                     resources_mode=None,
-                     ):
-        resources_already_set = set()
+    def category_name(self, sexpr):
+        if DaskVineDag.taskp(sexpr):
+            return str(sexpr[0]).replace(" ", "_")
+        else:
+            return "other"
+
+    def _submit_calls(self, dag, tag, rs):
         targets = dag.get_targets()
-        for r in rs:
-            k, (fn, *args) = r
+        for (k, sexpr) in rs:
+            lazy = self.lazy_transfers and k not in targets
+            if lazy and self.checkpoint_fn:
+                lazy = self.checkpoint_fn(dag, k)
+
+            cat = self.category_name(sexpr)
+            if cat not in self._categories_known:
+                if self.resources:
+                    self.set_category_resources_max(cat, self.resources)
+                if self.resources_mode:
+                    self.set_category_mode(cat, self.resources_mode)
+
+                    if not self._categories_known:
+                        self.enable_monitoring()
+                self._categories_known.add(cat)
+
             t = PythonTaskDask(self,
-                               k, fn, args,  # compute key k from fn(args)
-                               environment=environment,
-                               extra_files=extra_files,
-                               lazy_transfer=(lazy_transfer and k not in targets))
-
+                               dag, k, sexpr,
+                               category=cat,
+                               environment=self.environment,
+                               extra_files=self.extra_files,
+                               retries=self.retries,
+                               lazy_transfers=lazy)
             t.set_tag(tag)  # tag that identifies this dag
-
-            cat = str(fn)
-            if cat not in resources_already_set:
-                if resources_mode:
-                    self.set_category_mode(cat, resources_mode)
-                    self.set_category_resources_max(cat, resources)
-                    self.enable_monitoring()
-
             self.submit(t)
 
-    def _load_results(self, dag, indices, keys):
+    def _load_results(self, dag, key_indices, keys):
         results = list(keys)
-        for k, ids in indices.items():
-            r = dag.get_result(k)
-            if isinstance(r, DaskVineFile):
-                r = r.load()
-            DaskVineDag.set_dask_result(results, ids, r)
+        for k, ids in key_indices.items():
+            r = self._fill_key_result(dag, k)
+            set_at_indices(results, ids, r)
         if not isinstance(keys, list):
             return results[0]
         return results
+
+    def _fill_key_result(self, dag, key):
+        raw = dag.get_result(key)
+        if DaskVineDag.listp(raw):
+            result = list(raw)
+            file_indices = find_result_files(raw)
+            for (f, inds) in file_indices:
+                set_at_indices(result, inds, f.load())
+            return result
+        elif isinstance(raw, DaskVineFile):
+            return raw.load()
+        else:
+            return raw
 
 
 class DaskVineFile:
     def __init__(self, file, key, staging_dir):
         self._file = file
+        self._loaded = False
+        self._load = None
         assert file
 
     def load(self):
-        with open(self.staging_path, "rb") as f:
-            return cloudpickle.load(f)
+        if not self._loaded:
+            with open(self.staging_path, "rb") as f:
+                self._load = cloudpickle.load(f)
+                self._loaded = True
+        return self._load
 
     @property
     def file(self):
@@ -191,28 +218,43 @@ class DaskVineFile:
         return self._file.source()
 
 
+class DaskVineExecutionError(Exception):
+    def __init__(self, backtrace):
+        self.backtrace = backtrace
+
+    def str(self):
+        return self.backtrace.format_tb()
+
+
 class PythonTaskDask(PythonTask):
-    def __init__(self, m, key, fn, args, *,
+    def __init__(self, m,
+                 dag, key, sexpr, *,
+                 category=None,
                  environment=None,
                  extra_files=None,
-                 lazy_transfer=False):
+                 retries=5,
+                 lazy_transfers=False):
         self._key = key
+        self._sexpr = sexpr
 
-        file_indices = []
-        new_args = []
-        for i, a in enumerate(args):
-            if isinstance(a, DaskVineFile):
-                file_indices.append(i)
-                a = str(uuid4())  # choose some random name for the remote name
-            new_args.append(a)
-        super().__init__(wrap_function_load_args, file_indices, fn, new_args)
+        self._retries_left = retries
 
-        for i in file_indices:
-            f = args[i]
-            self.add_input(f.file, new_args[i])
+        args_raw = {k: dag.get_result(k) for k in dag.get_children(key)}
+        args = {k: f"{uuid4()}.p" for k, v in args_raw.items() if isinstance(v, DaskVineFile)}
 
-        self.set_category(str(fn))
-        if lazy_transfer:
+        keys_of_files = list(args.keys())
+        args = args_raw | args
+
+        super().__init__(execute_graph_vertex, sexpr, args, keys_of_files)
+        self.set_output_cache(cache=True)
+
+        for k, f in args_raw.items():
+            if isinstance(f, DaskVineFile):
+                self.add_input(f.file, args[k])
+
+        if category:
+            self.set_category(category)
+        if lazy_transfers:
             self.enable_temp_output()
         if environment:
             self.add_environment(environment)
@@ -224,15 +266,74 @@ class PythonTaskDask(PythonTask):
     def key(self):
         return self._key
 
+    @property
+    def sexpr(self):
+        return self._sexpr
 
-# Most of the arguments are represented by files. We wrap the original call
-# to load the contents of the files to the arguments.
-# file_indices contains the indices of the args list of those arguments
-# that should be loaded.
-def wrap_function_load_args(file_indices, fn, args):
+    def decrement_retry(self):
+        self._retries_left -= 1
+        return self._retries_left
+
+
+def execute_graph_vertex(sexpr, args, keys_of_files):
+    import traceback
     import cloudpickle
-    loaded_args = list(args)
-    for i in file_indices:
-        with open(args[i], "rb") as f:
-            loaded_args[i] = cloudpickle.load(f)
-    return fn(*loaded_args)
+
+    def rec_call(sexpr):
+        if DaskVineDag.keyp(sexpr) and sexpr in args:
+            return args[sexpr]
+        elif DaskVineDag.taskp(sexpr):
+            return sexpr[0](*[rec_call(a) for a in sexpr[1:]])
+        elif DaskVineDag.listp(sexpr):
+            return [rec_call(a) for a in sexpr]
+        else:
+            return sexpr
+
+    for k in keys_of_files:
+        try:
+            with open(args[k], "rb") as f:
+                args[k] = cloudpickle.load(f)
+        except Exception as e:
+            print(f"Could not read input file {args[k]} for key {k}: {e}")
+            raise
+
+    try:
+        return rec_call(sexpr)
+    except Exception:
+        print(traceback.format_exc())
+        raise
+
+
+def set_at_indices(lst, indices, value):
+    inner = lst
+    for i in indices[:-1]:
+        inner = inner[i]
+    try:
+        inner[indices[-1]] = value
+    except IndexError:
+        raise
+
+
+def find_in_lists(lists, predicate=lambda s: True, indices=None):
+    """ Returns a list of tuples [(k, (i,j,...)] where (i,j,...) are the indices of k in lists. """
+    if not indices:
+        indices = []
+
+    items = []
+    if predicate(lists):  # e.g., lists aren't lists, but a single element
+        items.append((lists, list(indices)))
+    elif isinstance(lists, list):
+        indices.append(0)
+        for s in lists:
+            items.extend(find_in_lists(s, predicate, indices))
+            indices[-1] += 1
+        indices.pop()
+    return items
+
+
+def find_dask_keys(lists):
+    return find_in_lists(lists, DaskVineDag.keyp)
+
+
+def find_result_files(lists):
+    return find_in_lists(lists, lambda f: isinstance(f, DaskVineFile))

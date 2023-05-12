@@ -735,7 +735,6 @@ static void update_catalog(struct vine_manager *q, int force_update )
 static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
 	struct vine_task *t;
-	struct rmsummary *r;
 	uint64_t task_id;
 
 	if(!q || !w) return;
@@ -749,21 +748,16 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 			t->time_workers_execute_all     += delta_time;
 		}
 
-		vine_task_clean(t, 0);
+		vine_task_clean(t);
 		reap_task_from_worker(q, w, t, VINE_TASK_READY);
 
 		itable_firstkey(w->current_tasks);
 	}
 
-	ITABLE_ITERATE(w->current_tasks_boxes,task_id,r) {
-		rmsummary_delete(r);
-	}
-
-	itable_clear(w->current_tasks);
-	itable_clear(w->current_tasks_boxes);
+	itable_clear(w->current_tasks,0);
+	itable_clear(w->current_tasks_boxes,(void*)rmsummary_delete);
 
 	w->finished_tasks = 0;
-
 
 	char *cached_name = NULL;
 	struct vine_file_replica *info = NULL;
@@ -2633,6 +2627,7 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 	LIST_ITERATE(t->input_mounts, m){
 		/* Is the file already present on that worker? */
 		struct vine_file_replica *remote_info;
+		
 		if((remote_info = vine_file_replica_table_lookup(w, m->file->cached_name))) continue;
 
 		struct vine_worker_info *peer;
@@ -2647,9 +2642,8 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		vine_file_delete(m->substitute);
 		m->substitute = NULL;
 
-		/* If not, then search for an available peer to provide it. */
 		/* Provide a substitute file object to describe the peer. */
-		if(!(m->file->flags & VINE_PEER_NOSHARE))
+		if(!(m->file->flags & VINE_PEER_NOSHARE) && (m->file->flags & (VINE_CACHE | VINE_CACHE_ALWAYS)))
 		{
 			if((peer = vine_file_replica_table_find_worker(q, m->file->cached_name)))
 			{
@@ -2693,6 +2687,102 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 }
 
 /*
+If this task produces temporary files, then we must create a recovery task as a copy
+of the original task that can be used to re-create those files if they are lost.
+The recovery task must be a distinct copy of the original, because the original will
+be returned to the user and may be deleted, modified, etc before the recovery task
+even needs to be used.
+*/
+
+static void vine_manager_create_recovery_tasks( struct vine_manager *q, struct vine_task *t )
+{
+	struct vine_mount *m;
+	struct vine_task *recovery_task = 0;
+
+	/* Don't recursively create recovery tasks for recovery tasks! */
+	if(t->type==VINE_TASK_TYPE_RECOVERY) return;
+	
+	LIST_ITERATE(t->output_mounts,m) {
+		if(m->file->type==VINE_TEMP) {
+			if(!recovery_task) {
+				recovery_task = vine_task_copy(t);
+				recovery_task->type = VINE_TASK_TYPE_RECOVERY;
+			}
+			
+			m->file->recovery_task = vine_task_clone(recovery_task);
+			
+		}
+	}
+
+	/*
+	Remove the original reference to the recovery task,
+	so that only the file pointers carry the needed reference.
+	The recovery task does not get entered into the task table
+	unless it is needed for execution.
+	*/
+	
+	vine_task_delete(recovery_task);
+
+}
+
+/*
+Consider whether a given recovery task rt should be submitted, so as to re-generate
+the necessary output files.  This should only happen if the output files have not been
+generated yet.
+*/
+
+static void vine_manager_consider_recovery_task( struct vine_manager *q, struct vine_file *lost_file, struct vine_task *rt )
+{
+	if(!rt) return;
+
+	switch(rt->state) {
+	case VINE_TASK_UNKNOWN:
+		/* The recovery task has never been run, so submit it now. */
+		vine_submit(q,rt);
+		notice(D_VINE,"Submitted recovery task %d (%s) to re-create lost temporary file %s.",rt->task_id,rt->command_line,lost_file->cached_name);
+		break;
+	case VINE_TASK_READY:
+	case VINE_TASK_RUNNING:
+	case VINE_TASK_WAITING_RETRIEVAL:
+	case VINE_TASK_RETRIEVED:
+		/* The recovery task is in the process of running, just wait until it is done. */
+		break;
+	case VINE_TASK_DONE:
+	case VINE_TASK_CANCELED:
+		/* The recovery task previously ran to completion, so it must be reset and resubmitted. */
+		/* Note that the recovery task has already "left" the manager and so we do not manipulate internal state here. */
+		vine_task_reset(rt);
+		vine_submit(q,rt);
+		break;
+	}
+}
+
+/*
+Determine whether the input files needed for this task are available in some form.
+Most file types (FILE, URL, BUFFER) we can materialize on demand.
+But TEMP files must have been created by a prior task.
+If they were not present, we cannot run this task,
+and should consider re-creating it via a recovery task.
+*/
+
+static int vine_manager_check_inputs_available( struct vine_manager *q, struct vine_task *t )
+{
+	struct vine_mount *m;
+	LIST_ITERATE(t->input_mounts,m) {
+		struct vine_file *f = m->file;
+		if(f->type==VINE_TEMP) {
+			if(!vine_file_replica_table_exists_somewhere(q,f->cached_name)) {
+				/* XXX we cannot tell between temp that was never run, and one that failed! */
+				vine_manager_consider_recovery_task(q,f,f->recovery_task);
+				return 0;
+			}
+		}
+		
+	}
+	return 1;
+}
+
+/*
 Advance the state of the system by selecting one task available
 to run, finding the best worker for that task, and then committing
 the task to the worker.
@@ -2711,6 +2801,9 @@ static int send_one_task( struct vine_manager *q )
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
 
+		// Skip task if temp input files have not been materialized.
+		if(!vine_manager_check_inputs_available(q,t)) continue;
+		
 		// Find the best worker for the task at the head of the list
 		w = vine_schedule_task_to_worker(q,t);
 
@@ -3133,7 +3226,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	getcwd(q->workingdir,PATH_MAX);
 
 	q->next_task_id = 1;
-
+	
 	q->ready_list = list_create();
 
 	q->tasks          = itable_create(0);
@@ -3201,7 +3294,9 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->password = 0;
 
-	q->peer_transfers_enabled = 0;
+	// peer transfers enabled by default
+	q->peer_transfers_enabled = 1;
+
 	q->file_source_max_transfers = VINE_FILE_SOURCE_MAX_TRANSFERS;
 	q->worker_source_max_transfers = VINE_WORKER_SOURCE_MAX_TRANSFERS;
 
@@ -3251,7 +3346,7 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 		return 0;
 	}
 
-	q->monitor_exe = vine_declare_file(q, exe, VINE_CACHE_ALWAYS);
+	q->monitor_exe = vine_declare_file(q, exe, VINE_CACHE);
 	free(exe);
 
 	if(series) {
@@ -3283,6 +3378,12 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 int vine_enable_peer_transfers(struct vine_manager *q) {
 	debug(D_VINE, "Peer Transfers enabled");
 	q->peer_transfers_enabled = 1;
+	return 1;
+}
+
+int vine_disable_peer_transfers(struct vine_manager *q) {
+	debug(D_VINE, "Peer Transfers disabled");
+	q->peer_transfers_enabled = 0;
 	return 1;
 }
 
@@ -3412,6 +3513,9 @@ void vine_delete(struct vine_manager *q)
 	hash_table_clear(q->file_table,(void*)vine_file_delete);
 	hash_table_delete(q->file_table);
 
+	itable_clear(q->tasks,(void*)vine_task_delete);
+	itable_delete(q->tasks);
+
 	char *key;
 	struct category *c;
 	HASH_TABLE_ITERATE(q->categories,key,c) {
@@ -3420,9 +3524,7 @@ void vine_delete(struct vine_manager *q)
 	hash_table_delete(q->categories);
 
 	list_delete(q->ready_list);
-	itable_delete(q->tasks);
 	hash_table_delete(q->libraries);
-
 	hash_table_delete(q->workers_with_available_results);
 
 	list_clear(q->task_info_list,(void*)vine_task_info_delete);
@@ -3575,7 +3677,7 @@ static void push_task_to_ready_list( struct vine_manager *q, struct vine_task *t
 	}
 
 	/* If the task has been used before, clear out accumulated state. */
-	vine_task_clean(t,0);
+	vine_task_clean(t);
 }
 
 vine_task_state_t vine_task_state( struct vine_manager *q, int task_id )
@@ -3611,8 +3713,9 @@ static vine_task_state_t change_task_state( struct vine_manager *q, struct vine_
 			break;
 		case VINE_TASK_DONE:
 		case VINE_TASK_CANCELED:
-			/* tasks are freed when returned to user, thus we remove them from our local record */
-			itable_remove(q->tasks, t->task_id);
+			/* Task was cloned when entered into our own table, so delete a reference on removal. */
+			itable_remove(q->tasks, t->task_id); 
+			vine_task_delete(t);
 			break;
 		default:
 			/* do nothing */
@@ -3623,25 +3726,6 @@ static vine_task_state_t change_task_state( struct vine_manager *q, struct vine_
 	vine_txn_log_write_task(q, t);
 
 	return old_state;
-}
-
-static int task_in_terminal_state(struct vine_manager *q, struct vine_task *t)
-{
-	switch(t->state) {
-		case VINE_TASK_READY:
-		case VINE_TASK_RUNNING:
-		case VINE_TASK_WAITING_RETRIEVAL:
-		case VINE_TASK_RETRIEVED:
-			return 0;
-			break;
-		case VINE_TASK_DONE:
-		case VINE_TASK_CANCELED:
-		case VINE_TASK_UNKNOWN:
-			return 1;
-			break;
-	}
-
-	return 0;
 }
 
 const char *vine_result_string(vine_result_t result) {
@@ -3753,9 +3837,28 @@ static int task_request_count( struct vine_manager *q, const char *category, cat
 	return count;
 }
 
-static int vine_submit_internal(struct vine_manager *q, struct vine_task *t)
+
+int vine_submit(struct vine_manager *q, struct vine_task *t)
 {
-	itable_insert(q->tasks, t->task_id, t);
+	if(t->state!=VINE_TASK_UNKNOWN) {
+		fatal("TaskVine: Sorry, you cannot submit the same task (%d) (%s) twice!",t->task_id,t->command_line);
+	}
+
+	/* Assign a unique ID to each task only when submitted. */
+	t->task_id = q->next_task_id++;
+	
+	/* Issue warnings if the files are set up strangely. */
+	vine_task_check_consistency(t);
+
+	if(t->has_fixed_locations) {
+		vine_task_set_scheduler(t, VINE_SCHEDULE_FILES);
+	}
+
+	/* If the task produces temporary files, create recovery tasks for those. */
+	vine_manager_create_recovery_tasks(q,t);
+
+	/* Add reference to task when adding it to primary table. */
+	itable_insert(q->tasks, t->task_id, vine_task_clone(t) );
 
 	/* Ensure category structure is created. */
 	vine_category_lookup_or_create(q, t->category);
@@ -3773,39 +3876,11 @@ static int vine_submit_internal(struct vine_manager *q, struct vine_task *t)
 	return (t->task_id);
 }
 
-int vine_submit(struct vine_manager *q, struct vine_task *t)
-{
-	if(t->task_id > 0) {
-		if(task_in_terminal_state(q, t)) {
-			/* this task struct has been submitted before. We keep all the
-			 * definitions, but reset all of the stats. */
-			vine_task_clean(t, /* full clean */ 1);
-		} else {
-			fatal("Task %d has been already submitted and is not in any final state.", t->task_id);
-		}
-	}
-
-	t->task_id = q->next_task_id;
-
-	//Increment task_id. So we get a unique task_id for every submit.
-	q->next_task_id++;
-
-	/* Issue warnings if the files are set up strangely. */
-	vine_task_check_consistency(t);
-
-	if(t->has_fixed_locations) {
-		vine_task_set_scheduler(t, VINE_SCHEDULE_FILES);
-	}
-
-	return vine_submit_internal(q, t);
-}
-
 static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name) {
 
-	// setup the Library Task by cloning the original and giving it a unique taskid
-	struct vine_task *t = vine_task_clone(hash_table_lookup(q->libraries, name));
-	t->task_id = q->next_task_id;
-	q->next_task_id++;
+	// setup the Library Task by copying the original and giving it a unique taskid
+	struct vine_task *t = vine_task_copy(hash_table_lookup(q->libraries, name));
+	t->task_id = q->next_task_id++;
 	t->hostname = xxstrdup(w->hostname);
 	t->addrport = xxstrdup(w->addrport);
 	t->worker = w;
@@ -4134,12 +4209,21 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 					q->stats->tasks_failed++;
 				}
 
-				// return completed task (t) to the user. We do not return right
-				// away, and instead break out of the loop to correctly update the
-				// manager time statistics.
 				events++;
 				END_ACCUM_TIME(q, time_internal);
-				break;
+
+				/*
+				If this is a standard task type, then breaK out of the loop
+				and return it to the user.  Other task types are deleted silently.
+				*/
+
+				if(t->type==VINE_TASK_TYPE_STANDARD) {
+					break;
+				} else {
+					vine_task_delete(t);
+					t = 0;
+					continue;
+				}				
 			}
 		}
 
@@ -5086,16 +5170,12 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 	struct vine_file *previous = vine_manager_lookup_file(m, f->cached_name);
 
 	if(previous) {
-	/* This file has been declared before. We delete the new instance and
-	 * return previous. */
+		/* If declared before, use the previous instance. */
 		vine_file_delete(f);
-		f = previous;
+		f = vine_file_clone(previous);
 	} else {
-		hash_table_insert(m->file_table, f->cached_name, f);
-
-		/* This is a new file. Increase refcount to keep track of the reference
-		 * from the manager. */
-		f->refcount += 1;
+		/* Otherwise add it to the table. */
+		hash_table_insert(m->file_table, f->cached_name, f );
 	}
 
 	return f;

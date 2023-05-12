@@ -7,6 +7,8 @@ See the file COPYING for details.
 #include "vine_checksum.h"
 
 #include "stringtools.h"
+#include "string_array.h"
+#include "sort_dir.h"
 #include "md5.h"
 #include "xxmalloc.h"
 
@@ -31,19 +33,17 @@ XXX For consistency, this should sort the directory entries before hashing.
 
 static char *vine_checksum_dir( const char *path, ssize_t *totalsize )
 {
-	DIR * dir = opendir(path);
-	if(!dir) return 0;
-
 	char *dirstring=xxstrdup("");
-	
-	struct dirent *d;
-	while((d=readdir(dir))){
-		if(!strcmp(d->d_name,".")) continue;
-		if(!strcmp(d->d_name,"..")) continue;
+	char **entries;
+	if(!sort_dir(path, &entries, strcmp)) return 0;
+	int i;
+	for(i=0; entries[i]; i++){
 
-		char *subpath = string_format("%s/%s",path,d->d_name);
+		if(!strcmp(entries[i],".")) continue;
+		if(!strcmp(entries[i],"..")) continue;
+		char *subpath = string_format("%s/%s",path,entries[i]);
 		char *subhash = vine_checksum_any(subpath,totalsize);
-		char *line = string_format("%s:%s\n",d->d_name,subhash);
+		char *line = string_format("%s:%s\n",entries[i],subhash);
 
 		dirstring = string_combine(dirstring,line);
 
@@ -52,8 +52,7 @@ static char *vine_checksum_dir( const char *path, ssize_t *totalsize )
 		free(line);
 	}
 
-	closedir(dir);
-
+	sort_dir_free(entries);
 	char *result = md5_of_string(dirstring);
 
 	free(dirstring);

@@ -238,13 +238,6 @@ vine_task_set_command
 */
 struct vine_task *vine_task_create(const char *full_command);
 
-/** Create a copy of a task
-Create a functionally identical copy of a task that
-can be re-submitted via @ref vine_submit.
-@return A new task object
-*/
-struct vine_task *vine_task_clone(const struct vine_task *task);
-
 /** Delete a task.
 This may be called on tasks after they are returned from @ref vine_wait.
 @param t The task to delete.
@@ -601,7 +594,6 @@ workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
 */
 struct vine_file * vine_declare_file( struct vine_manager *m, const char *source, vine_file_flags_t flags );
 
-
 /** Declare a file object from a remote URL.
 @param m A manager object
 @param url The URL address of the object in text form.
@@ -903,6 +895,9 @@ int vine_enable_monitoring(struct vine_manager *m, int watchdog, int time_series
 
 /** Enable taskvine peer transfers to be scheduled by the manager **/
 int vine_enable_peer_transfers(struct vine_manager *m);
+
+/** Disable taskvine peer transfers to be scheduled by the manager **/
+int vine_disable_peer_transfers(struct vine_manager *m);
 
 /** Set the minimum task_id of future submitted tasks.
 Further submitted tasks are guaranteed to have a task_id larger or equal to

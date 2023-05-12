@@ -29,7 +29,13 @@ int vine_file_delete(struct vine_file *f)
 			return f->refcount;
 		}
 
+		if(f->refcount<0) {
+			notice(D_VINE,"vine_file_delete: prevented multiple-free of file");
+			return 0;
+		}
+	
 		vine_task_delete(f->mini_task);
+		vine_task_delete(f->recovery_task);
 		free(f->source);
 		free(f->cached_name);
 		free(f->data);
@@ -56,6 +62,7 @@ struct vine_file *vine_file_create( const char *source, const char *cached_name,
 	f->type = type;
 	f->size = size;
 	f->mini_task = mini_task;
+	f->recovery_task = 0;
 	f->flags = flags;
 
 	if(data) {
@@ -88,8 +95,7 @@ struct vine_file *vine_file_create( const char *source, const char *cached_name,
 		}
 	}
 
-	/* file has been created, but it is not referenced by any task, or manager yet. */
-	f->refcount = 0;
+	f->refcount = 1;
 
 	return f;
 }
