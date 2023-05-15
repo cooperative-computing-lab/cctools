@@ -795,9 +795,9 @@ performance and resource details that do not affect the output.
 
 char * vine_task_to_json(struct vine_task *t)
 {
-	char * buffer;
-	char * file_buffer;
-
+	char *buffer;
+	char *file_buffer;
+	char *env_name; 
 	struct vine_mount *m;
 
 	buffer = string_format("{\ncmd = \"%s\"\n", t->command_line);
@@ -816,6 +816,16 @@ char * vine_task_to_json(struct vine_task *t)
 		buffer = string_combine(buffer, "outputs = ");
 		LIST_ITERATE(t->output_mounts,m) {
 			file_buffer = string_format("{ name: \"%s\" }, ", m->remote_name);
+			buffer = string_combine(buffer, file_buffer);
+			free(file_buffer);
+		}
+		buffer = string_combine(buffer, "\n");
+	}
+
+	if(t->env_list){
+		buffer = string_combine(buffer, "environment = ");
+		LIST_ITERATE(t->env_list, env_name) {
+			file_buffer = string_format("{ name: \"%s\" }, ", env_name);
 			buffer = string_combine(buffer, file_buffer);
 			free(file_buffer);
 		}
