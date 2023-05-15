@@ -25,11 +25,6 @@ COPYING for details.
 
 struct rmsummary
 {
-	double gpus;
-	double cores;
-	double memory;
-	double disk;
-	
 	char    *category;
 	char    *command;
 	char    *taskid;
@@ -42,14 +37,18 @@ struct rmsummary
 	double start;
 	double end;
 
+	double cores;
 	double cores_avg;
+	double gpus;
 
 	double wall_time;
 	double cpu_time;
 
+	double memory;
 	double virtual_memory;
 	double swap_memory;
 
+	double disk;
 	double bytes_read;
 	double bytes_written;
 
@@ -67,7 +66,7 @@ struct rmsummary
 	double total_files;
 	double fs_nodes;
 
-    	double workers;
+    double workers;
 
 	struct rmsummary *limits_exceeded;
 	struct rmsummary *peak_times; /* from start, in usecs */
