@@ -279,7 +279,7 @@ char *vine_meta_name(const struct vine_file *f, ssize_t *totalsize ){
 
 	if(path_disk_size_info_get(f->source, &size, &number_of_files)) return 0;
 
-	char *meta = string_format("%s-%ld-%s", f->source, size, mtime);
+	char *meta = string_format("%s-%"PRIu64"-%s", f->source, size, mtime);
 
 	char *metahash = md5_of_string(meta);
 	
