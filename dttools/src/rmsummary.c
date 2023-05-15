@@ -717,6 +717,8 @@ void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *sr
 	RM_BIN_OP(dest, src, override_field);
 }
 
+/* Only operate on the fields that TaskVine actually uses;
+ * cores, gpu, memory, disk. */
 void rmsummary_merge_override_vine(struct rmsummary *dest, const struct rmsummary *src)
 {
 	if(!src) {
