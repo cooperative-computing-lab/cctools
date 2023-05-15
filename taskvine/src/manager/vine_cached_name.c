@@ -271,7 +271,6 @@ char *vine_meta_name(const struct vine_file *f, ssize_t *totalsize ){
 	if(f->type != VINE_FILE) return 0;
 
 	struct stat info;
-	unsigned char digest[MD5_DIGEST_LENGTH];
 	int64_t size;
 	int64_t number_of_files;
 
@@ -282,8 +281,8 @@ char *vine_meta_name(const struct vine_file *f, ssize_t *totalsize ){
 
 	char *meta = string_format("%s-%ld-%s", f->source, size, mtime);
 
-	md5_buffer(meta,strlen(meta),digest);
-	char *metahash = strdup(md5_to_string(digest));
+	char *metahash = md5_of_string(meta);
+	
 	char *name = string_format("file-meta-%s", metahash);
 
 	free(metahash);
