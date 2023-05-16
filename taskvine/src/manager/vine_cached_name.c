@@ -10,7 +10,6 @@ See the file COPYING for details.
 #include "vine_checksum.h"
 
 #include "stringtools.h"
-#include "path_disk_size_info.h"
 #include "md5.h"
 #include "debug.h"
 #include "xxmalloc.h"
@@ -271,18 +270,11 @@ char *vine_meta_name(const struct vine_file *f, ssize_t *totalsize ){
 	if(f->type != VINE_FILE) return 0;
 
 	struct stat info;
-	int64_t size;
-	int64_t number_of_files;
 
 	if(stat(f->source, &info)) return 0;
 	char *mtime = ctime(&info.st_mtime);
-
-	if(path_disk_size_info_get(f->source, &size, &number_of_files)) return 0;
-
-	char *meta = string_format("%s-%"PRIu64"-%s", f->source, size, mtime);
-
+	char *meta = string_format("%s-%ld-%s", f->source, info.st_size, mtime);
 	char *metahash = md5_of_string(meta);
-	
 	char *name = string_format("file-meta-%s", metahash);
 
 	free(metahash);
