@@ -723,7 +723,7 @@ void rmsummary_merge_override_vine(struct rmsummary *dest, const struct rmsummar
 		return;
 	}
 
-	RM_BIN_OP(dest, src, override_field);
+	RM_BIN_OP_VINE(dest, src, override_field);
 }
 
 struct rmsummary *rmsummary_copy(const struct rmsummary *src, int deep_copy)
