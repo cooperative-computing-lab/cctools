@@ -765,7 +765,7 @@ struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t )
 		const struct rmsummary *max = vine_manager_task_resources_max(q, t);
 
 		struct rmsummary *limits = rmsummary_create(-1);
-		rmsummary_merge_override_vine(limits, max);
+		rmsummary_merge_override_basic(limits, max);
 		rmsummary_merge_max(limits, min);
 
 		jx_insert_integer(j,"cores",limits->cores);
