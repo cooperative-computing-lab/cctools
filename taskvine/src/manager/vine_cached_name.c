@@ -273,7 +273,7 @@ char *vine_meta_name(const struct vine_file *f, ssize_t *totalsize ){
 
 	if(stat(f->source, &info)) return 0;
 	char *mtime = ctime(&info.st_mtime);
-	char *meta = string_format("%s-%ld-%s", f->source, info.st_size, mtime);
+	char *meta = string_format("%s-%"PRIu64"-%s", f->source, info.st_size, mtime);
 	char *metahash = md5_of_string(meta);
 	char *name = string_format("file-meta-%s", metahash);
 
