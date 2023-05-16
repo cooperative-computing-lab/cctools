@@ -24,6 +24,20 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(mess
 
 conda_exec = 'conda'
 
+def create_env_from_dict(spec, conda_executable=None, download_micromamba=False, ignore_editable_packages=False):
+        outfile = ""
+        md5= hashlib.md5()
+        md5.update(str(spec).encode('utf-8'))
+        outfile = "env-md5-" + md5.hexdigest() + ".tar.gz"
+        with tempfile.NamedTemporaryFile() as poncho_spec:
+            with open(poncho_spec.name, "w") as f:
+                if isinstance(spec, dict):
+                    json.dump(spec, f, indent=4)
+                else:
+                    json.dumps(spec, f, indent=4)
+            pack_env(poncho_spec.name, outfile, conda_executable, download_micromamba, ignore_editable_packages)
+        return outfile
+
 def _find_conda_executable(conda_executable, env_dir, download_micromamba=True):
     if conda_executable:
         return conda_executable
