@@ -693,7 +693,7 @@ void rmsummary_read_env_vars(struct rmsummary *s)
 
 /* Only operate on the fields that TaskVine actually uses;
  * cores, gpu, memory, disk. */
-#define RM_BIN_OP_VINE(dest, src, fn) { 									\
+#define RM_BIN_OP_BASIC(dest, src, fn) { 									\
 	if (!src || !dest) return; 												\
 	dest->cores = fn(dest->cores, src->cores);								\
 	dest->gpus = fn(dest->gpus, src->gpus);									\
@@ -717,13 +717,13 @@ void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *sr
 	RM_BIN_OP(dest, src, override_field);
 }
 
-void rmsummary_merge_override_vine(struct rmsummary *dest, const struct rmsummary *src)
+void rmsummary_merge_override_basic(struct rmsummary *dest, const struct rmsummary *src)
 {
 	if(!src) {
 		return;
 	}
 
-	RM_BIN_OP_VINE(dest, src, override_field);
+	RM_BIN_OP_BASIC(dest, src, override_field);
 }
 
 struct rmsummary *rmsummary_copy(const struct rmsummary *src, int deep_copy)
