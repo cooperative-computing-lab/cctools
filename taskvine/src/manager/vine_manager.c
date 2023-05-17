@@ -1898,6 +1898,7 @@ static struct jx * manager_to_jx( struct vine_manager *q )
 	jx_insert_integer(j,"time_internal",info.time_internal);
 	jx_insert_integer(j,"time_polling",info.time_polling);
 	jx_insert_integer(j,"time_application",info.time_application);
+	jx_insert_integer(j,"time_scheduling", info.time_scheduling);
 
 	jx_insert_integer(j,"time_workers_execute",info.time_workers_execute);
 	jx_insert_integer(j,"time_workers_execute_good",info.time_workers_execute_good);
@@ -2805,10 +2806,15 @@ static int send_one_task( struct vine_manager *q )
 		if(!vine_manager_check_inputs_available(q,t)) continue;
 		
 		// Find the best worker for the task at the head of the list
+		
+		q->stats_measure->time_scheduling = timestamp_get();
+		
 		w = vine_schedule_task_to_worker(q,t);
 
 		// If there is no suitable worker, consider the next task.
 		if(!w) continue;
+
+		q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
 
 		// Check if there is transfer capacity available.
 		if(q->peer_transfers_enabled)

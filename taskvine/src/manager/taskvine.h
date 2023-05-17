@@ -176,6 +176,7 @@ struct vine_stats {
 	timestamp_t time_internal;     /**< Total time the manager spents in internal processing. */
 	timestamp_t time_polling;      /**< Total time blocking waiting for worker communications (i.e., manager idle waiting for a worker message). */
 	timestamp_t time_application;  /**< Total time spent outside vine_wait. */
+	timestamp_t time_scheduling;   /**< Total time spend matching tasks to workers. */
 
 	/* Workers time statistics: */
 	timestamp_t time_workers_execute;            /**< Total time workers spent executing done tasks. */
