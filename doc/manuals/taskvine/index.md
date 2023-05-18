@@ -1056,9 +1056,48 @@ so any workers will be able to connect to your manager, and vice versa. This
 may be fine for a short running anonymous application, but is not safe for a
 long running application with a public name.
 
-Currently, taskvine uses SSL to provide communication encryption, and a
-password file to provide manager-worker and worker-worker authentication.
+We recommend that, at a minimum, you enable an application password to provide
+authentication between managers and workers.  And, consider enabling SSL
+to provide communication encryption.
 These features can be enabled independently.
+
+#### Password Authentication
+
+We recommend that you enable a password for your TaskVine applications.
+Create a file `vine.password` that contains a long string of random data like this:
+
+```
+openssl rand -hex 32 > vine.password
+```
+
+This password will be particular to your application, and only managers and
+workers with the same password will be able to interoperator.
+Then, modify your manager program to use the password:
+
+=== "Python"
+    ```python
+    m.set_password_file("vine.password")
+    ```
+
+=== "C"
+    ```C
+    vine_set_password_file(m,"vine.password");
+    ```
+
+
+And give the `--password` option to give the same password file to your
+workers:
+
+```sh
+$ vine_worker --password vine.password -M myproject
+```
+
+With this option enabled, both the manager and the workers will verify that the
+other has the matching password before proceeding.  Likewise, when workers perform
+peer-to-peer transfers, the password will be verified.
+
+Note that the password is **not** sent in the clear, but is securely verified
+through a SHA1-based mutual challenge-response protocol.
 
 #### SSL Encryption
 
@@ -1112,42 +1151,6 @@ vine_factory (... other args ...) --ssl HOST PORT
 vine_status --ssl HOST PORT
 condor_submit_workers -E'--ssl' HOST PORT
 ```
-
-#### Password Authentication
-
-We recommend that you enable a password for your applications.
-Create a file `vine.password` that contains a long string of random data like this:
-
-```
-openssl rand -hex 32 > vine.password
-```
-
-This password will be particular to your application, and only managers and
-workers with the same password will be able to interoperator.
-Then, modify your manager program to use the password:
-
-=== "Python"
-    ```python
-    m.set_password_file("vine.password")
-    ```
-
-=== "C"
-    ```C
-    vine_set_password_file(m,"vine.password");
-    ```
-
-
-And give the `--password` option to give the same password file to your
-workers:
-
-```sh
-$ vine_worker --password vine.password -M myproject
-```
-
-With this option enabled, both the manager and the workers will verify that the
-other has the matching password before proceeding.  Likewise, when workers perform
-peer-to-peer transfers, the password will be verified.  Note that the password is
-**not** sent in the clear, but is securely verified through a SHA1-based challenge-response protocol.
 
 ### Maximum Retries
 
