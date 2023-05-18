@@ -1057,9 +1057,8 @@ may be fine for a short running anonymous application, but is not safe for a
 long running application with a public name.
 
 Currently, taskvine uses SSL to provide communication encryption, and a
-password file to provide worker-manager authentication. These features can be
-enabled independet of each other.
-
+password file to provide manager-worker and worker-worker authentication.
+These features can be enabled independently.
 
 #### SSL Encryption
 
@@ -1116,24 +1115,25 @@ condor_submit_workers -E'--ssl' HOST PORT
 
 #### Password Authentication
 
-We recommend that you enable a password for your applications. Create a file
-(e.g. ` mypwfile`) that contains any password (or other long phrase) that you
-like (e.g. `This is my password`). The password will be particular to your
-application and should not match any other passwords that you own. Note that
-the contents of the file are taken verbatim as the password; this means that
-any new line character at the end of the phrase will be considered as part of
-the password.
+We recommend that you enable a password for your applications.
+Create a file `vine.password` that contains a long string of random data like this:
 
+```
+openssl rand -hex 32 > vine.password
+```
+
+This password will be particular to your application, and only managers and
+workers with the same password will be able to interoperator.
 Then, modify your manager program to use the password:
 
 === "Python"
     ```python
-    m.set_password_file("mypwfile")
+    m.set_password_file("vine.password")
     ```
 
 === "C"
     ```C
-    vine_set_password_file(m,"mypwfile");
+    vine_set_password_file(m,"vine.password");
     ```
 
 
@@ -1141,13 +1141,13 @@ And give the `--password` option to give the same password file to your
 workers:
 
 ```sh
-$ vine_worker --password mypwfile -M myproject
+$ vine_worker --password vine.password -M myproject
 ```
 
 With this option enabled, both the manager and the workers will verify that the
-other has the matching password before proceeding. The password is not sent in
-the clear, but is securely verified through a SHA1-based challenge-response
-protocol.
+other has the matching password before proceeding.  Likewise, when workers perform
+peer-to-peer transfers, the password will be verified.  Note that the password is
+**not** sent in the clear, but is securely verified through a SHA1-based challenge-response protocol.
 
 ### Maximum Retries
 
