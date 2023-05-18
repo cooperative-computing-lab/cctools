@@ -321,7 +321,7 @@ In Python you may find it more conventient to declare a task as a dictionary.
     ```
 
 In addition to describing the input and output files, you may optionally
-specify additional details about the task that will assist taskvine in
+specify additional details about the task that will assist TaskVine in
 making good scheduling decisions.
 
 If you are able, describe the resources needed by each task (cores, gpus,
@@ -436,7 +436,7 @@ is done, delete the queue (only needed for C):
     vine_delete(q);
     ```
 
-Full details of all of the taskvine functions can be found in the [taskvine API](../api/html/taskvine_8h.html).
+Full details of all of the TaskVine functions can be found in the [taskvine API](../api/html/taskvine_8h.html).
 
 ## Running a TaskVine Application
 
@@ -470,7 +470,7 @@ $ export PYTHONPATH=${HOME}/cctools/lib/python${PYVER}/site-packages:${PYTHONPAT
 
 #### C Language Setup
 
-If you are writing a taskvine application in C, you should compile it into an executable like this:
+If you are writing a TaskVine application in C, you should compile it into an executable like this:
 
 ```sh
 ${CC:-gcc} taskvine_example.c -o taskvine_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -ltaskvine -ldttools -lm -lz
@@ -504,7 +504,7 @@ submitted task: /usr/bin/gzip < c > c.gz
 waiting for tasks to complete...
 ```
 
-The taskvine manager is now waiting for workers to connect and begin
+The TaskVine manager is now waiting for workers to connect and begin
 requesting work. (Without any workers, it will wait forever.) You can start
 one worker on the same machine by opening a new shell and running:
 
@@ -515,7 +515,7 @@ $ vine_worker MACHINENAME 9123
 ```
 
 If you have access to other machines, you can simply `ssh` there and run workers as well. In general, the more you start, the faster the work gets done. If a
-worker should fail, the taskvine infrastructure will retry the work
+worker should fail, the TaskVine infrastructure will retry the work
 elsewhere, so it is safe to submit many workers to an unreliable system.
 
 ### Submitting Workers to a Batch System
@@ -554,18 +554,18 @@ option to `worker`.)
 ### Project Names and the Catalog Server
 
 Keeping track of the manager's hostname and port can get cumbersome, especially
-if there are multiple managers. To help with this, a **project name** can be used to identify a taskvine manager with a human-readable name.
-taskvine workers can then be started for their managers by providing
+if there are multiple managers. To help with this, a **project name** can be used to identify a TaskVine manager with a human-readable name.
+TaskVine workers can then be started for their managers by providing
 the project name instead of a host an port number.
 
 The project name feature uses the [Catalog Server](../catalog) to maintain and track the
 project names of managers and their respective locations. It works as follows:
 the manager advertises its project name along with its hostname and port to the
-catalog server. taskvine workers that are provided with the manager's project
+catalog server. TaskVine workers that are provided with the manager's project
 name query the catalog server to find the hostname and port of the manager with
 the given project name.
 
-For example, to have a taskvine manager advertise its project name as
+For example, to have a TaskVine manager advertise its project name as
 `myproject`, add the following code snippet after creating the queue:
 
 === "Python"
@@ -657,7 +657,7 @@ Configuration file `factory.json`:
 vine_factory -Tcondor -Cfactory.json
 ```
 
-For further options, please refer to the taskvine factory [manual](../man_pages/vine_factory.md).
+For further options, please refer to the TaskVine factory [manual](../man_pages/vine_factory.md).
 
 By default, the factory submits as many tasks that are waiting and running up
 to a specified maximum. To run more than one task in a worker, please refer
@@ -1051,7 +1051,7 @@ API](../api/html/taskvine_8h.html).
 
 ### Security
 
-By default, taskvine does **not** perform any encryption or authentication,
+By default, TaskVine does **not** perform any encryption or authentication,
 so any workers will be able to connect to your manager, and vice versa. This
 may be fine for a short running anonymous application, but is not safe for a
 long running application with a public name.
@@ -1101,7 +1101,7 @@ through a SHA1-based mutual challenge-response protocol.
 
 #### SSL Encryption
 
-taskvine can encrypt the communication between manager and workers using SSL.
+TaskVine can encrypt the communication between manager and workers using SSL.
 For this, you need to set the key and certificate (in PEM format) of your
 server when creating the queue.
 
@@ -1233,7 +1233,7 @@ If you have workers distributed across multiple operating systems (such as
 Linux, Cygwin, Solaris) and/or architectures (such as i686, x86_64) and have
 files specific to each of these systems, this feature will help. The strings
 $OS and $ARCH are available for use in the specification of input file names.
-taskvine will automatically resolve these strings to the operating system
+TaskVine will automatically resolve these strings to the operating system
 and architecture of each connected worker and transfer the input file
 corresponding to the resolved file name. For example:
 
@@ -1266,7 +1266,7 @@ environment.
 
 This feature is useful in workflows where there are redundant tasks or tasks
 that become obsolete as other tasks finish. Tasks that have been submitted can
-be cancelled and immediately retrieved without waiting for taskvine to
+be cancelled and immediately retrieved without waiting for TaskVine to
 return them in `vine_wait`. The tasks to cancel can be identified by
 either their `taskid` or `tag`. For example:
 
@@ -1563,7 +1563,7 @@ Tree: 8
 
 ## Managing Resources
 
-Unless otherwise specified, taskvine assumes that a single task runs on a
+Unless otherwise specified, TaskVine assumes that a single task runs on a
 single worker at a time, and a single worker occupies an entire machine.
 
 However, if the resources at a machine are larger than what you know a task
@@ -1612,9 +1612,9 @@ as in the following example:
     vine_task_set_run_time_min(t,10)     # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
     ```
 
-When the maximum running time is specified, taskvine will kill any task that
+When the maximum running time is specified, TaskVine will kill any task that
 exceeds its maximum running time. The minimum running time, if specified, helps
-taskvine decide which worker best fits which task.  Specifying tasks' running
+TaskVine decide which worker best fits which task.  Specifying tasks' running
 time is especially helpful in clusters where workers may have a hard threshold
 of their running time.
 
@@ -1673,12 +1673,12 @@ Consider now that the task requires 1 cores, 6GB of memory, and 27 GB of disk:
     underlying available resources, and leads to very few resource exhaustion
     failures while still using worker resources efficiently.
 
-The current taskvine implementation only accepts whole integers for its
+The current TaskVine implementation only accepts whole integers for its
 resources, which means that no worker can concurrently execute more tasks than
 its number of cores. (This will likely change in the future.)
 
 When you would like to run several tasks in a worker, but you are not sure
-about the resources each task needs, taskvine can automatically find values
+about the resources each task needs, TaskVine can automatically find values
 of resources that maximize throughput, or minimize waste. This is discussed in
 the section [below](#grouping-tasks-with-similar-resources-needs).
 
@@ -1774,8 +1774,8 @@ Both memory and disk are set in `MB`.
 
 ### Monitoring and Enforcement
 
-So far we have used resources values simply as hints to taskvine to schedule
-concurrent tasks at workers. By default, taskvine does not monitor or enforce
+So far we have used resources values simply as hints to TaskVine to schedule
+concurrent tasks at workers. By default, TaskVine does not monitor or enforce
 these limits. You can enable monitoring and enforcement as follows:
 
 === "Python"
@@ -1882,7 +1882,7 @@ report format is JSON, as its filename has the form
     int taskid = vine_submit(m, t);
     ```
 
-taskvine also measures other resources, such as peak `bandwidth`,
+TaskVine also measures other resources, such as peak `bandwidth`,
 `bytes_read`, `bytes_written`, `bytes_sent`, `bytes_received`,
 `total_files`, `cpu_time`, and `wall_time`.
 
@@ -1890,7 +1890,7 @@ taskvine also measures other resources, such as peak `bandwidth`,
 ### Grouping Tasks with Similar Resource Needs
 
 Several tasks usually share the same resource description, and to this end,
-taskvine allows you to tasks into groups called **categories**. You can
+TaskVine allows you to tasks into groups called **categories**. You can
 attach resource descriptions to each category, and then label a task to set it
 as part of a category.
 
@@ -1923,7 +1923,7 @@ We can create some categories with their resource description as follows:
     ```
 
 In the previous examples, we created three categories. Note that it is not
-necessary to set all the resources, as taskvine can be directed to
+necessary to set all the resources, as TaskVine can be directed to
 compute some efficient defaults. To assign a task to a category:
 
 === "Python"
@@ -1941,7 +1941,7 @@ compute some efficient defaults. To assign a task to a category:
     ```C
     vine_task_set_category(t,"my-category-a")
     ```
-When a category leaves some resource unspecified, then taskvine tries to find
+When a category leaves some resource unspecified, then TaskVine tries to find
 some reasonable defaults in the same way described before in the section
 (Specifying Task Resources)[#setting-task-resources].
 
@@ -1951,21 +1951,21 @@ some reasonable defaults in the same way described before in the section
     directly set take precedence over the category declaration for that
     task
 
-When the resources used by a task are unknown, taskvine can measure and
+When the resources used by a task are unknown, TaskVine can measure and
 compute efficient resource values to maximize throughput or minimize waste, as
 we explain in the following sections.
 
 ### Automatic Resource Management
 
-If the resources a category uses are unknown, then taskvine can be directed
+If the resources a category uses are unknown, then TaskVine can be directed
 to find efficient resource values to maximize throughput or minimize resources
 wasted. In these modes, if a value for a resource is set with
 `set_resources_max`, then it is used as a theoretical maximum.
 
 When automatically computing resources, if any of cores, memory or disk are
-left unspecified in `set_resources_max`, then taskvine will run some
+left unspecified in `set_resources_max`, then TaskVine will run some
 tasks using whole workers to collect some resource usage statistics. If all
-cores, memory, and disk are set, then taskvine uses these maximum
+cores, memory, and disk are set, then TaskVine uses these maximum
 values instead of using whole workers. As before, unspecified gpus default to 0.
 
 Once some statistics are available, further tasks may run with smaller
@@ -2048,7 +2048,7 @@ cores, memory and disk have modifiers `~` and `>` as follows:
 
 ## Logging and Plotting Facilities
 
-A taskvine manager produces three logs: `debug`, `performance`, and
+A TaskVine manager produces three logs: `debug`, `performance`, and
 `transactions`. These logs are always enabled, and appear in the current
 working directory in the sudirectories:
 
@@ -2129,7 +2129,7 @@ $ ... my.stats.log.tasks.png my.stats.log.tasks-log.png my.stats.log.time.png my
 ```
 
 We find it very helpful to plot these statistics when diagnosing a problem with
-taskvine applications.
+TaskVine applications.
 
 ### Transactions Log
 
@@ -2268,7 +2268,7 @@ The statistics available are:
 
 
 The script `vine_plot_txn_log` is a visualization tool for
-taskvine transaction logs based on Python's `matplotlib`. It can be used to
+TaskVine transaction logs based on Python's `matplotlib`. It can be used to
 visualize the life time of tasks and workers, as well as diagnosing the effects
 of file transfer time on overall performance. For example:
 
@@ -2317,7 +2317,7 @@ The `compute` call above may receive the following keyword arguments:
 
 ### Tunning Specialized Execution Parameters
 
-The behaviour of taskvine can be tuned by the following parameters. We advise
+The behaviour of TaskVine can be tuned by the following parameters. We advise
 caution when using these parameters, as the standard behaviour may drastically
 change.
 
