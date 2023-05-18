@@ -4,16 +4,16 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-
 #include "vine_transfer_server.h"
 #include "vine_protocol.h"
 #include "vine_transfer.h"
+#include "vine_worker.h"
 
 #include "link.h"
+#include "link_auth.h"
 #include "process.h"
 #include "url_encode.h"
 #include "debug.h"
-
 
 #include <errno.h>
 #include <unistd.h>
@@ -30,7 +30,6 @@ static int transfer_timeout = 3600;
 static struct link *transfer_link = 0;
 
 /* Pid of process handling peer transfers. */
-
 pid_t transfer_server_pid = 0;
 
 /* Handle a single request for a transfer request from a peer. */
@@ -41,6 +40,13 @@ static void vine_transfer_handler( struct link *lnk, struct vine_cache *cache )
 	char filename_encoded[VINE_LINE_MAX];
 	char filename[VINE_LINE_MAX];
 
+	if(vine_worker_password) {
+		if(!link_auth_password(lnk,vine_worker_password,time(0)+command_timeout)) {
+			debug(D_VINE,"transfer server: could not authenticate peer worker via password!");
+			return;
+		}
+	}
+	
 	if(link_readline(lnk,line,sizeof(line),time(0)+command_timeout)) {
 		if(sscanf(line,"get %s",filename_encoded)==1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
