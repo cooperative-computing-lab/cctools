@@ -32,17 +32,30 @@ if __name__ == "__main__":
     f.seek(0)
 
     last_dispatch = 0
+    num_fill = 0
     for line in f:
         if line[0] == "#":
             continue
         items = line.strip("\n\r\t ").split()
         dispatch = int(items[dispatch_offset])
 
+        # The performance log may have multiple entries between task dispatches, or a few
+        # dispatches may occur between two entries. Approximate the missing values.
         if dispatch > last_dispatch:
+            if num_fill > 0 and len(sched_time_accum) > 1:
+                # figure time gaps as a linear progression
+                d = (int(items[sched_offset]) - sched_time_accum[-1]) / num_fill
+                for i in range(num_fill):
+                    sched_time_accum.append(sched_time_accum[-1])
+                    sched_time_diffs.append(d)
+            num_fill = 0
+
             last_dispatch = dispatch
             sched_time_accum.append(int(items[sched_offset]))
             if len(sched_time_accum) > 1:
                 sched_time_diffs.append(int(items[sched_offset]) - sched_time_accum[-2])
+        else:
+            num_fill += 1
 
     f1 = plt.subplot(1, 2, 1)
     plt.xlabel("Tasks Scheduled")
