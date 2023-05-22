@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "trash.h"
 #include "link.h"
+#include "link_auth.h"
 #include "timestamp.h"
 #include "copy_stream.h"
 #include "path_disk_size_info.h"
@@ -309,12 +310,21 @@ static int do_worker_transfer( struct vine_cache *c, const char *source_url, con
 	stoptime = time(0) + 15;
 	worker_link = link_connect(addr, port_num, stoptime);
 
-	if(worker_link == NULL)
-	{
+	if(worker_link==NULL) {
 		*error_message = string_format("Could not establish connection with worker at: %s:%d", addr, port_num);
 		return 0;
 	}
 
+	if(vine_worker_password) {
+		if(!link_auth_password(worker_link,vine_worker_password,time(0)+5)) {
+			*error_message = string_format("Could not authenticate to peer worker at %s:%d", addr, port_num);
+			link_close(worker_link);
+			return 0;
+		}
+	}
+	
+	/* XXX A fixed timeout of 120 certainly can't be right! */
+	
 	if(!vine_transfer_get_any(worker_link, c, path, time(0) + 120))
 	{
 		*error_message = string_format("Could not transfer file %s from worker %s:%d", path, addr, port_num);
