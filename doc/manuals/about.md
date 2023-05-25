@@ -26,7 +26,7 @@ astronomy, economics, digital humanities, and more.  We have an active
 mailing list and issue tracker, and we regularly interact with our users
 at annual meetings.  It is production-ready: we have
 a regular engineering process, automated builds, and distribution through
-packaging channels such as Conda and Spack.
+packaging channels such as Conda.
 
 CCTools is published by the [Cooperative Computing Lab](http://ccl.cse.nd.edu) at the [University of Notre Dame](http://www.nd.edu/~dthain).
 We are a research group funded by the National Science Foundation and
