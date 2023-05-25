@@ -6,6 +6,8 @@ There are several ways to install:
 
 - [Install From Conda](#install-from-conda) is **best for most users** on laptops or clusters.
 - [Install From Github](#install-from-github) is recommended for developers or those trying out the latest features.
+- [Install From Binary Tarball](#install-from-binary-tarball)
+is recommended for use on specific supported platforms.
 
 ## Install From Conda
 
@@ -42,9 +44,10 @@ $ conda update -y -c conda-forge ndcctools
 
 And that's it! You can test your setup following the instructions [here](#testing-your-installation).
 
-!!! warning
-    On Mac, the available from conda **CCTools** does not work with `Python 2.7` or with `perl`. For such case, please compile **CCTools** from [source](#install-from-github).
-
+!!! note
+    Parrot is not included as part of the Conda installation.
+    You should instead install from Github or source tarball instead.
+    
 ## Install From Github
 
 If you wish to install the latest version of **CCTools** to
