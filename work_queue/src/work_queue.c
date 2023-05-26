@@ -2965,7 +2965,7 @@ struct jx * task_to_jx( struct work_queue *q, struct work_queue_task *t, const c
 		const struct rmsummary *max = task_max_resources(q, t);
 		struct rmsummary *limits = rmsummary_create(-1);
 
-		rmsummary_merge_override(limits, max);
+		rmsummary_merge_override_basic(limits, max);
 		rmsummary_merge_max(limits, min);
 
 		jx_insert_integer(j,"cores",limits->cores);
@@ -3755,7 +3755,7 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 
 	struct rmsummary *limits = rmsummary_create(-1);
 
-	rmsummary_merge_override(limits, max);
+	rmsummary_merge_override_basic(limits, max);
 
 	int use_whole_worker = 1;
 	if(q->proportional_resources) {
@@ -3908,7 +3908,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	}
 
 	itable_insert(w->current_tasks_boxes, t->taskid, limits);
-	rmsummary_merge_override(t->resources_allocated, limits);
+	rmsummary_merge_override_basic(t->resources_allocated, limits);
 
 	/* Note that even when environment variables after resources, values for
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
@@ -8111,8 +8111,8 @@ const struct rmsummary *task_min_resources(struct work_queue *q, struct work_que
 
 		struct rmsummary *r = rmsummary_create(-1);
 
-		rmsummary_merge_override(r, q->current_max_worker);
-		rmsummary_merge_override(r, t->resources_requested);
+		rmsummary_merge_override_basic(r, q->current_max_worker);
+		rmsummary_merge_override_basic(r, t->resources_requested);
 
 		s = category_task_min_resources(c, r, t->resource_request, t->taskid);
 		rmsummary_delete(r);
