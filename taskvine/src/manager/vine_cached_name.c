@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
+#include <sys/stat.h>
 
 /*
 For a given task and file, generate the name under which the file
@@ -261,7 +262,26 @@ char *make_mini_task_cached_name(const struct vine_file *f)
 
 	return strdup(md5_to_string(digest));
 }
+/*
+Generates a cached name based on meta data for a file object of type VINE_FILE. 
+*/
+char *vine_meta_name(const struct vine_file *f, ssize_t *totalsize ){
 
+	if(f->type != VINE_FILE) return 0;
+
+	struct stat info;
+
+	if(stat(f->source, &info)) return 0;
+	char *mtime = ctime(&info.st_mtime);
+	char *meta = string_format("%s-%"PRIu64"-%s", f->source, info.st_size, mtime);
+	char *metahash = md5_of_string(meta);
+	char *name = string_format("file-meta-%s", metahash);
+
+	free(metahash);
+	free(meta);	
+
+	return name;
+}
 /*
 Generates a random cached name of a file object.
 Returns a string that must be freed with free().
