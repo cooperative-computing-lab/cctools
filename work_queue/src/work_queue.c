@@ -6347,6 +6347,10 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 		buffer_printf(&b, " --measure-only");
 	}
 
+	if (q->monitor_interval > 0) {
+		buffer_printf(%b, " --interval %d", q->monitor_interval);
+	}
+
 	int extra_files = (q->monitor_mode & MON_FULL);
 
 	char *monitor_cmd = resource_monitor_write_command("./" RESOURCE_MONITOR_REMOTE_NAME, RESOURCE_MONITOR_REMOTE_NAME, limits, /* extra options */ buffer_tostring(&b), /* debug */ extra_files, /* series */ extra_files, /* inotify */ 0, /* measure_dir */ NULL);
@@ -7396,7 +7400,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "force-proportional-resources-whole-tasks") || !strcmp(name, "proportional-whole-tasks")) {
 		q->proportional_whole_tasks = MAX(0, (int)value);
-
+	} else if (!strcmp(name, "monitor-interval")) {
+		/* 0 means use monitor's default */
+		q->monitor_interval = MAX(0, (int)value);
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
