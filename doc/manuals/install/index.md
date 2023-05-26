@@ -5,10 +5,9 @@ whether laptops, desktops, or large high performance clusters.
 There are several ways to install:
 
 - [Install From Conda](#install-from-conda) is **best for most users** on laptops or clusters.
-- [Install From Spack](#install-from-spack) is recommended for high performance
-clusters already using Spack.
-- [Install From Github](#install-from-github) is recommended for developers
-or those trying out the latest features.
+- [Install From Github](#install-from-github) is recommended for developers or those trying out the latest features.
+- [Install From Binary Tarball](#install-from-binary-tarball)
+is recommended for use on specific supported platforms.
 
 ## Install From Conda
 
@@ -45,42 +44,10 @@ $ conda update -y -c conda-forge ndcctools
 
 And that's it! You can test your setup following the instructions [here](#testing-your-installation).
 
-!!! warning
-    On Mac, the available from conda **CCTools** does not work with `Python 2.7` or with `perl`. For such case, please compile **CCTools** from [source](#install-from-github).
-
-## Install From Spack
-
-Alternatively, you can install **CCTools** using the [spack.io](https://spack.io)
-package manager. Spack will compile **CCTools** for you, and it is recommended
-for HPC sites for which a conda installation is not available, or which have
-special software stack requirements (such as specially compiled python versions).
-
-First you need to check that the `spack` command is available. In a terminal type:
-
-```sh
-$ spack help
-```
-
-If this command fails, then please install spack following the instructions [here.](https://spack.io)
-
-Once spack is installed, install **CCTools** with:
-
-```sh
-$ spack install cctools
-```
-
-To use **CCTools**, you need to load it into the spack environment with:
-
-```sh
-$ spack load cctools
-```
-
-You only need to do `spack install` once, but you will need `spack load
-cctools` everytime you want to use **CCTools**.
-
-Once this command finished, you can test your installation following the
-instructions [here](#testing-your-installation).
-
+!!! note
+    Parrot is not included as part of the Conda installation.
+    You should instead install from Github or source tarball instead.
+    
 ## Install From Github
 
 If you wish to install the latest version of **CCTools** to
@@ -211,7 +178,7 @@ make sure that your PYTHONPATH is unset.
     Remember that for installations from source you need [swig](http://www.swig.org) at compile time, and to set
     the environment variables `PATH`, `PYTHONPATH` and `PERL5LIB` appropriately, as explained [here.](#setting-your-environment)
 
-    For **conda** and **spack** installation you should not need to manually
+    For **conda** installation you should not need to manually
     set any of these variables, and in fact setting them may produce errors.
 
 
