@@ -217,6 +217,7 @@ struct work_queue {
 
 	int monitor_mode;
 	FILE *monitor_file;
+	int monitor_interval;
 
 	char *monitor_output_directory;
 	char *monitor_summary_filename;
@@ -6348,7 +6349,7 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 	}
 
 	if (q->monitor_interval > 0) {
-		buffer_printf(%b, " --interval %d", q->monitor_interval);
+		buffer_printf(&b, " --interval %d", q->monitor_interval);
 	}
 
 	int extra_files = (q->monitor_mode & MON_FULL);
