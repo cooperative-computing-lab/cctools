@@ -819,8 +819,11 @@ class Manager(object):
     def submit(self, task):
         task.submit_finalize(self)
         task_id = cvine.vine_submit(self._taskvine, task._task)
-        self._task_table[task_id] = task
-        return task_id
+        if(task_id==0):
+            raise ValueError("invalid task description")
+        else:   
+            self._task_table[task_id] = task
+            return task_id
 
     ##
     # Submit a library to install on all connected workers

@@ -242,7 +242,8 @@ class Task(object):
 
         flags = Task._determine_mount_flags(strict_input=strict_input)
 
-        return cvine.vine_task_add_input(self._task, file._file, remote_name, flags)
+        if cvine.vine_task_add_input(self._task, file._file, remote_name, flags)==0:
+            raise ValueError("invalid file description")
 
     ##
     # Add any output object to a task.
@@ -265,7 +266,8 @@ class Task(object):
             raise TypeError(f"remote_name {remote_name} is not a str")
 
         flags = Task._determine_mount_flags(watch, failure_only, success_only)
-        return cvine.vine_task_add_output(self._task, file._file, remote_name, flags)
+        if cvine.vine_task_add_output(self._task, file._file, remote_name, flags)==0:
+            raise ValueError("invalid file description")
 
     ##
     # When monitoring, indicates a json-encoded file that instructs the monitor
