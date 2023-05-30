@@ -1848,7 +1848,7 @@ class WorkQueue(object):
     # - "hungry-minimum" Mimimum number of tasks to consider queue not hungry. (default=10)
     # - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
     # - "wait_retrieve_many" Parameter to alter how work_queue_wait works. If set to 0, work_queue_wait breaks out of the while loop whenever a task changes to WORK_QUEUE_TASK_DONE (wait_retrieve_one mode). If set to 1, work_queue_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
-    # - "monitor-interval" Parameter to change how frequently the resource monitor records resource consumption of a task in a times series, if this feature is enabled. See @enable_monitoring_full.
+    # - "monitor-interval" Parameter to change how frequently the resource monitor records resource consumption of a task in a times series, if this feature is enabled. See @ref enable_monitoring_full.
     # @param value The value to set the parameter to.
     # @return 0 on succes, -1 on failure.
     #

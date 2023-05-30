@@ -109,7 +109,7 @@ void *itable_remove(struct itable *h, UINT64_T key);
 @return One object removed from the table.
 */
 
-void * itable_pop( struct itable *t );
+void * itable_pop( struct itable *h );
 
 /** Begin iteration over all keys.
 This function begins a new iteration over an integer table,

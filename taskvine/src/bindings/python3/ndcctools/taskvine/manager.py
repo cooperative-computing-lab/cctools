@@ -802,7 +802,7 @@ class Manager(object):
     # - monitor-interval Maximum number of seconds between resource monitor measurements. If less than 1, use default (5s).
     # - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
     # - "wait_retrieve_many" Parameter to alter how vine_wait works. If set to 0, cvine.vine_wait breaks out of the while loop whenever a task changes to "task_done" (wait_retrieve_one mode). If set to 1, vine_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
-    # - "monitor-interval" Parameter to change how frequently the resource monitor records resource consumption of a task in a times series, if this feature is enabled. See @enable_monitoring.
+    # - "monitor-interval" Parameter to change how frequently the resource monitor records resource consumption of a task in a times series, if this feature is enabled. See @ref enable_monitoring.
     # @param value The value to set the parameter to.
     # @return 0 on succes, -1 on failure.
     #
@@ -1517,7 +1517,7 @@ class Manager(object):
     #
     # @param self   The manager to register this file.
     # @param source The URL address of the root file in text form as: "root://XROOTSERVER[:port]//path/to/file"
-    # @param proxy  A @ref ndcctools.taskvine.manager.File of the X509 proxy to use. If None, the
+    # @param proxy  A @ref ndcctools.taskvine.file.File of the X509 proxy to use. If None, the
     #               environment variable X509_USER_PROXY and the file
     #               "$TMPDIR/$UID" are considered in that order. If no proxy is
     #               present, the transfer is tried without authentication.

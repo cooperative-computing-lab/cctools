@@ -41,4 +41,10 @@ int sort_dir(const char *dirname, char ***list, int (*sort) (const char *a, cons
 	return 1;
 }
 
+void sort_dir_free( char **list )
+{
+	free(list);
+}
+
+
 /* vim: set noexpandtab tabstop=4: */

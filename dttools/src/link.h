@@ -130,12 +130,12 @@ struct link *link_accept(struct link *parent, time_t stoptime);
 
 /** Wrap an accepted link with an ssl context.
 If successful, the connection is now encrypted.
-@param parent A link returned from @ref link_accept
+@param lnk A link returned from @ref link_accept
 @param key   The ssl key of the server.
 @param cert  The ssl cert of the server.
 @return 0 on failure, 1 on success
 */
-int link_ssl_wrap_accept(struct link *l, const char *key, const char *cert);
+int link_ssl_wrap_accept(struct link *lnk, const char *key, const char *cert);
 
 
 /** Read data from a connection.
