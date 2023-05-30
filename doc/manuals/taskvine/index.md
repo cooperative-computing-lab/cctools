@@ -4,7 +4,7 @@
 
 ## Overview
 
-TaskVine is an framework for building large scale data
+TaskVine is a framework for building large scale data
 intensive dynamic workflows that run on high performance computing (HPC)
 clusters, GPU clusters, cloud service providers, and other distributed computing systems.
 A workflow is a collection of programs and files that are
@@ -42,11 +42,11 @@ and runs a Task to search for the string "needle", producing
 the file `output.txt`:
 
 ```
-f = m.declare_url("https://www.gutenberg.org/cache/epub/2600/pg2600.txt");
-g = m.declare_file("myoutput.txt");
+f = m.declare_url("https://www.gutenberg.org/cache/epub/2600/pg2600.txt")
+g = m.declare_file("myoutput.txt")
 
 t = Task("grep needle warandpeace.txt > output.txt")
-t.add_input(f,"warandpeace.txt");
+t.add_input(f,"warandpeace.txt")
 t.add_output(g,"outfile.txt")
 ```
 
@@ -54,7 +54,7 @@ Tasks share a common set of options.  Each task can be labelled with the resourc
 (CPU cores, GPU devices, memory, disk space) that it needs to execute.  This allows each worker to pack the appropriate
 number of tasks.  For example, a worker running on a 64-core machine could run 32 dual-core tasks, 16 four-core tasks,
 or any other combination that adds up to 64 cores.  If you don't know the resources needed, you can enable
-an automatic resource monitor to track and report what each task uses.
+a resource monitor to automatically track, report, and allocate what each task uses.
 
 TaskVine is easy to deploy on existing HPC and cloud facilities.
 The worker processes are self-contained executables, and TaskVine
@@ -113,7 +113,7 @@ All tasks done.
 ```
 
 Congratulations! You have now run a simple manager application that runs tasks on one local worker.
-To scale up simply requires running more workers on a cluster or cloud facility.
+To scale up, simply run more workers on a cluster or cloud facility.
 
 ## Example Applications
 
@@ -140,7 +140,7 @@ The full API documentation for each language is here:
 ### Creating a Manager Object
 
 To begin, you must import the TaskVine module, and then create a Manager object.
-You may specific a specific port number to listen on like this:
+You may specify a specific port number to listen on like this:
 
 === "Python"
     ```python
@@ -299,7 +299,7 @@ sandbox directory.
     The remote names given go to the files should match the names in the
     command line of the task.
 
-In Python you may find it more conventient to declare a task as a dictionary.
+In Python you may find it more convenient to declare a task as a dictionary.
 
 === "Python"
     ```python
@@ -328,7 +328,7 @@ If you are able, describe the resources needed by each task (cores, gpus,
 memory, disk) so that the worker can pack as many concurrent tasks.
 This is described in greater detail under [Managing Resources](#managing-resources).
 
-You may also attach a `tag` to a task, which is just an user-defined string
+You may also attach a `tag` to a task, which is just a user-defined string
 that describes the purpose of the task.  The tag is available as `t.tag`
 when the task is complete.
 
@@ -356,7 +356,7 @@ when the task is complete.
 
 ### Managing Tasks
 
-Once a task has been fully specified, it can be submitted to the queue.
+Once a task has been fully specified, it can be submitted to the manager.
 `submit` returns a unique taskid that can be helpful when later referring
 to a task:
 
@@ -428,22 +428,22 @@ When you are done with the task, delete it (only needed for C):
     ```
 
 Continue submitting and waiting for tasks until all work is complete. You may
-check to make sure that the queue is empty with `vine_empty`. When all
-is done, delete the queue (only needed for C):
+check to make sure that the manager is empty with `vine_empty`. When all
+is done, delete the manager (only needed for C):
 
 === "C"
     ```C
-    vine_delete(q);
+    vine_delete(m);
     ```
 
-Full details of all of the TaskVine functions can be found in the [taskvine API](../api/html/taskvine_8h.html).
+Full details of all of the TaskVine functions can be found in the [TaskVine API](../api/html/taskvine_8h.html).
 
 ## Running a TaskVine Application
 
 There are a variety of ways to execute a TaskVine application at scale.
 The examples in this section make use of the example program
 [functions.py](examples/functions.py)
-which you can download an execute like this:
+which you can download to execute like this:
 
 ```
 python3 functions.py
@@ -514,8 +514,8 @@ one worker on the same machine by opening a new shell and running:
 $ vine_worker MACHINENAME 9123
 ```
 
-If you have access to other machines, you can simply `ssh` there and run workers as well. In general, the more you start, the faster the work gets done. If a
-worker should fail, the TaskVine infrastructure will retry the work
+If you have access to other machines, you can simply `ssh` there and run workers as well. In general, the more workers you start, the faster the work gets done. If a
+worker fails, the TaskVine infrastructure will retry the work
 elsewhere, so it is safe to submit many workers to an unreliable system.
 
 ### Submitting Workers to a Batch System
@@ -609,7 +609,7 @@ Your job 153099 ("worker.sh") has been submitted
 ### TaskVine Online Status Display
 
 An additional benefit of using a project name is that you can
-now use the [taskvine_status](../man_pages/taskvine_status) command
+now use the [TaskVine_status](../man_pages/taskvine_status) command
 to display the progress of your application.  This shows the name,
 location, and statistics of each application that reports itself to the
 catalog server.  (Note that this information is updated about once
@@ -1046,7 +1046,7 @@ In a similar way, files can be marked to indicate that they should be returned o
 
 A variety of advanced features are available for programs with unusual needs
 or very large scales. Each feature is described briefly here, and more details
-may be found in the [taskvine
+may be found in the [TaskVine
 API](../api/html/taskvine_8h.html).
 
 ### Security
