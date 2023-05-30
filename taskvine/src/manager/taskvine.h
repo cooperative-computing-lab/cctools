@@ -793,7 +793,7 @@ control and should not be inspected until returned via @ref vine_wait.
 Once returned, it is safe to re-submit the same take object via @ref vine_submit.
 @param m A manager object
 @param t A task object returned from @ref vine_task_create.
-@return An integer task_id assigned to the submitted task.
+@return An integer task_id assigned to the submitted task.  Zero indicates a failure to submit due to an invalid task description.
 */
 int vine_submit(struct vine_manager *m, struct vine_task *t);
 

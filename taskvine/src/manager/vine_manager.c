@@ -3341,8 +3341,16 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 {
-	if(!q) {
-		return 0;
+	if(!q) return 0;
+
+
+	if(series) {
+		char *series_file = vine_get_runtime_path_log(q, "time-series");
+		if(!create_dir(series_file, 0777)) {
+			warn(D_VINE,"could not create monitor output directory - %s (%s)", series_file, strerror(errno));
+			return 0;
+		}
+		free(series_file);
 	}
 
 	q->monitor_mode = VINE_MON_DISABLED;
@@ -3354,14 +3362,6 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 
 	q->monitor_exe = vine_declare_file(q, exe, VINE_CACHE);
 	free(exe);
-
-	if(series) {
-		char *series_file = vine_get_runtime_path_log(q, "time-series");
-		if(!create_dir(series_file, 0777)) {
-			fatal("Could not create monitor output directory - %s (%s)", series_file, strerror(errno));
-		}
-		free(series_file);
-	}
 
 	if(q->measured_local_resources) {
 		rmsummary_delete(q->measured_local_resources);
@@ -3847,7 +3847,8 @@ static int task_request_count( struct vine_manager *q, const char *category, cat
 int vine_submit(struct vine_manager *q, struct vine_task *t)
 {
 	if(t->state!=VINE_TASK_UNKNOWN) {
-		fatal("TaskVine: Sorry, you cannot submit the same task (%d) (%s) twice!",t->task_id,t->command_line);
+		notice(D_VINE,"vine_submit: you cannot submit the same task (%d) (%s) twice!",t->task_id,t->command_line);
+		return 0;
 	}
 
 	/* Assign a unique ID to each task only when submitted. */
