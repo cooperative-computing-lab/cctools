@@ -268,18 +268,20 @@ void vine_task_set_coprocess( struct vine_task *t, const char *name );
 @param f A file object, created by @ref vine_declare_file, @ref vine_declare_url, @ref vine_declare_buffer, @ref vine_declare_mini_task.
 @param remote_name The name of the file as it should appear in the task's sandbox.
 @param flags May be zero or more @ref vine_mount_flags_t or'd together. See @ref vine_task_add_input.
+@return True on success, false on failure.
 */
 
-void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_mount_flags_t flags );
+int vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_mount_flags_t flags );
 
 /** Add a general file object as a output of a task.
 @param t A task object.
 @param f A file object, created by @ref vine_declare_file or @ref vine_declare_buffer.
 @param remote_name The name of the file as it will appear in the task's sandbox.
 @param flags May be zero or more @ref vine_mount_flags_t or'd together. See @ref vine_task_add_input.
+@return True on success, false on failure.
 */
 
-void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_mount_flags_t flags );
+int vine_task_add_output( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_mount_flags_t flags );
 
 /** Specify the number of times this task is retried on worker errors. If less than one, the task is retried indefinitely (this the default). A task that did not succeed after the given number of retries is returned with result VINE_RESULT_MAX_RETRIES.
 @param t A task object.
@@ -397,9 +399,10 @@ void vine_task_set_scheduler(struct vine_task *t, vine_schedule_t algorithm);
 /** Specify a custom name for the monitoring summary. If @ref vine_enable_monitoring is also enabled, the summary is also written to that directory.
 @param t A task object.
 @param monitor_output Resource summary file.
+@return True on success, false on failure.
 */
 
-void vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output);
+int vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output);
 
 /** Get the command line of the task.
 @param t A task object.
@@ -552,7 +555,7 @@ For more information, consult the manual of the resource_monitor.
 @param monitor_snapshot_file A filename.
 */
 
-void vine_task_set_snapshot_file(struct vine_task *t, struct vine_file *monitor_snapshot_file);
+int vine_task_set_snapshot_file(struct vine_task *t, struct vine_file *monitor_snapshot_file);
 
 
 /** Adds an execution environment to the task. The environment file specified
@@ -564,7 +567,7 @@ nested in the order given (i.e. first added is the first applied).
 @param f The environment file.
 */
 
-void vine_task_add_environment(struct vine_task *t, struct vine_file *f);
+int vine_task_add_environment(struct vine_task *t, struct vine_file *f);
 
 
 //@}
@@ -794,7 +797,7 @@ control and should not be inspected until returned via @ref vine_wait.
 Once returned, it is safe to re-submit the same take object via @ref vine_submit.
 @param m A manager object
 @param t A task object returned from @ref vine_task_create.
-@return An integer task_id assigned to the submitted task.
+@return An integer task_id assigned to the submitted task.  Zero indicates a failure to submit due to an invalid task description.
 */
 int vine_submit(struct vine_manager *m, struct vine_task *t);
 

@@ -143,7 +143,11 @@ static vine_url_cache_t get_url_properties( const char *url, char *tag )
 	FILE *stream = popen(command, "r");
 
 	/* If curl itself cannot be executed, then a lot of things won't work. */
-	if(!stream) fatal("could not execute \"%s\" : %s",command,strerror(errno));
+	if(!stream) {
+		debug(D_NOTICE|D_VINE,"could not execute \"%s\" : %s",command,strerror(errno));
+		free(command);
+		return VINE_FOUND_NONE;
+	}
 
 	while(fgets(line, sizeof(line), stream)) {
 		if(sscanf(line, "Content-MD5: %s",tag)){
