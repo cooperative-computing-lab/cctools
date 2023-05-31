@@ -7,6 +7,7 @@ See the file COPYING for details.
 
 #include <string.h>
 #include <errno.h>
+#include <sys/wait.h>
 
 #include "catalog_query.h"
 #include "http_query.h"
@@ -352,22 +353,34 @@ static int catalog_update_tcp( const char *host, const char *address, int port, 
 
 /*
 Send a catalog update via a tcp connection in the background.
-This forks a process to perform an update, so that the main
-program can continue blissfully.
+This uses the double-fork technique to ensure that the update
+process runs completely independently from the main process,
+and that the main process will not have to handle an asynchronous
+"child completed" message at any later point.
 */
 
 static int catalog_update_tcp_background( const char *host, const char *address, int port, const char *text )
 {
 	pid_t pid = fork();
 	if(pid==0) {
-		/* release all cloned fds so that we don't interfere with the parent. */
-		fd_nonstd_close();
-		/* then do the update normally. */
-		catalog_update_tcp(host,address,port,text);
-		/* force normal exit without flushing anything */
-		_exit(0);
+		pid_t grandpid = fork();
+		if(grandpid==0) {
+			/* release all cloned fds so that we don't interfere with the parent. */
+			fd_nonstd_close();
+			/* then do the update normally. */
+			catalog_update_tcp(host,address,port,text);
+			/* grandchild process exits after sending update. */
+			_exit(0);
+		} else {
+			/* child process exits right away. */
+			_exit(0);
+		}
 	} else if(pid>0) {
 		debug(D_DEBUG, "sending update via tcp to %s(%s):%d (background pid %d)", host, address, port, (int)pid);
+		pid_t result = waitpid(pid,0,0);
+		if(result!=pid) {
+			debug(D_DEBUG,"unable to wait for child process %d! (%s)",pid,strerror(errno));
+		}
 		return 1;
 	} else {
 		debug(D_DEBUG, "unable to fork update process: %s",strerror(errno));
