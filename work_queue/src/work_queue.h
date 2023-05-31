@@ -30,10 +30,14 @@ See the file COPYING for details.
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 120  /**< Default value for Work Queue keepalive interval in seconds. */
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT  30   /**< Default value for Work Queue keepalive timeout in seconds. */
 
+/** The input/output type of files used by @ref work_queue_task_specify_file and similar. */
+
 typedef enum {
 	WORK_QUEUE_INPUT  = 0,                         /**< Specify an input object. */
 	WORK_QUEUE_OUTPUT = 1                          /**< Specify an output object. */
 } work_queue_file_type_t;
+
+/** File handling flags used by @ref work_queue_task_specify_file and similar. */
 
 typedef enum {
 	WORK_QUEUE_NOCACHE  = 0, /**< Do not cache file at execution site. */
@@ -46,6 +50,8 @@ typedef enum {
 	WORK_QUEUE_PREEXIST = 4 /**< If the filename already exists on the host, use it in place. (Warning: Internal work queue use only.) */
 } work_queue_file_flags_t;
 
+/** Task scheduling modes used by @ref work_queue_specify_algorithm and @ref work_queue_task_specify_algorithm. */
+
 typedef enum {
 	WORK_QUEUE_SCHEDULE_UNSET = 0,
 	WORK_QUEUE_SCHEDULE_FCFS,      /**< Select worker on a first-come-first-serve basis. */
@@ -55,6 +61,7 @@ typedef enum {
 	WORK_QUEUE_SCHEDULE_WORST      /**< Select the worst fit worker (the worker with more unused resources). */
 } work_queue_schedule_t;
 
+/** Task result types set when a task is complete. */
 
 typedef enum {
 	WORK_QUEUE_RESULT_SUCCESS             = 0,      /**< The task ran successfully **/
@@ -73,6 +80,8 @@ typedef enum {
 	WORK_QUEUE_RESULT_OUTPUT_TRANSFER_ERROR = 10 << 3  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
 } work_queue_result_t;
 
+/** State of a task throughout its lifetime. */
+
 typedef enum {
 	WORK_QUEUE_TASK_UNKNOWN = 0,       /**< There is no such task **/
 	WORK_QUEUE_TASK_READY,             /**< Task is ready to be run, waiting in queue **/
@@ -82,6 +91,8 @@ typedef enum {
 	WORK_QUEUE_TASK_DONE,              /**< Task is done, and returned through work_queue_wait >**/
 	WORK_QUEUE_TASK_CANCELED,           /**< Task was canceled before completion **/
 } work_queue_task_state_t;
+
+/** Types of files that can be attached to a task. */
 
 typedef enum {
 	WORK_QUEUE_FILE = 1,              /**< File-spec is a regular file **/
