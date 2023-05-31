@@ -217,7 +217,11 @@ static void update_all_catalogs()
 	char *text = jx_print_string(j);
 	jx_delete(j);
 
-	list_iterate(outgoing_host_list, (list_op_t) catalog_query_send_update, text);
+	const char *host;
+	LIST_ITERATE(outgoing_host_list,host) {
+		catalog_query_send_update(host,text,CATALOG_UPDATE_BACKGROUND);
+	}
+
 	free(text);
 }
 

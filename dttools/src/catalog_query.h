@@ -20,6 +20,15 @@ Query the global catalog server for server descriptions.
 #define CATALOG_HOST (getenv("CATALOG_HOST") ? getenv("CATALOG_HOST") : CATALOG_HOST_DEFAULT )
 #define CATALOG_PORT (getenv("CATALOG_PORT") ? atoi(getenv("CATALOG_PORT")) : CATALOG_PORT_DEFAULT )
 
+/** Catalog update control flags.
+These control the behavior of @ref catalog_query_send_updates
+*/
+
+typedef enum {
+      CATALOG_UPDATE_BACKGROUND=1,  /**< Send update via a background process if TCP is selected. */
+      CATALOG_UPDATE_CONDITIONAL=2, /**< Fail if UDP is selected and update is too large to send. */
+} catalog_update_flags_t;
+
 /** Create a catalog query.
 Connects to a catalog server, issues a query, and waits for the results.
 The caller may specify a specific catalog host and port.
@@ -53,16 +62,9 @@ void catalog_query_delete(struct catalog_query *q);
 hosts is a comma delimited list of hosts, each of which can be host or host:port
 @param hosts A list of hosts to which to send updates
 @param text String to send
+@param flags Any combination of CATALOG_UPDATE
 @return The number of updates successfully sent, 
 */
-int catalog_query_send_update(const char *hosts, const char *text);
-
-/** Send update text to the given hosts, but fail if the update text
-cannot be compressed to a suitable size.
-@param hosts A list of hosts to which to send updates
-@param text String to send
-@return The number of updates successfully sent, 
-*/
-int catalog_query_send_update_conditional(const char *hosts, const char *text);
+int catalog_query_send_update(const char *hosts, const char *text, catalog_update_flags_t flags );
 
 #endif
