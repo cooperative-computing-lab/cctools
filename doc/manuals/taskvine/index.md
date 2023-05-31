@@ -524,7 +524,7 @@ If you have access to a HTCondor pool, you can use this shortcut to submit ten
 workers at once via HTCondor:
 
 ```sh
-$ condor_submit_workers MACHINENAME 9123 10
+$ vine_condor_submit_workers MACHINENAME 9123 10
 
 Submitting job(s)..........
 Logging submit event(s)..........
@@ -538,10 +538,10 @@ and port number, and begin to service the manager application.
 Similar scripts are available for other common batch systems:
 
 ```sh
-$ slurm_submit_workers MACHINENAME 9123 10
-$ sge_submit_workers MACHINENAME 9123 10
-$ pbs_submit_workers MACHINENAME 9123 10
-$ torque_submit_workers MACHINENAME 9123 10
+$ vine_slurm_submit_workers MACHINENAME 9123 10
+$ vine_sge_submit_workers MACHINENAME 9123 10
+$ vine_pbs_submit_workers MACHINENAME 9123 10
+$ vine_torque_submit_workers MACHINENAME 9123 10
 ```
 
 When the manager completes, if the workers were not otherwise shut down,
@@ -566,7 +566,7 @@ name query the catalog server to find the hostname and port of the manager with
 the given project name.
 
 For example, to have a TaskVine manager advertise its project name as
-`myproject`, add the following code snippet after creating the queue:
+`myproject`, add the following code snippet after creating the manager:
 
 === "Python"
     ```python
@@ -587,19 +587,19 @@ $ vine_worker -M myproject
 
 
 You can start ten workers for this manager on Condor using
-`condor_submit_workers` by providing the same option arguments.:
+`vine_condor_submit_workers` by providing the same option arguments.:
 
 ```sh
-$ condor_submit_workers -M myproject 10
+$ vine_condor_submit_workers -M myproject 10
 Submitting job(s)..........
 Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
 ```
 
-Or similarly on SGE using `sge_submit_workers` as:
+Or similarly on SGE using `vine_sge_submit_workers` as:
 
 ```sh
-$ sge_submit_workers -M myproject 10
+$ vine_sge_submit_workers -M myproject 10
 Your job 153097 ("worker.sh") has been submitted
 Your job 153098 ("worker.sh") has been submitted
 Your job 153099 ("worker.sh") has been submitted
@@ -609,7 +609,7 @@ Your job 153099 ("worker.sh") has been submitted
 ### TaskVine Online Status Display
 
 An additional benefit of using a project name is that you can
-now use the [TaskVine_status](../man_pages/taskvine_status) command
+now use the [vine_status](../man_pages/taskvine_status) command
 to display the progress of your application.  This shows the name,
 location, and statistics of each application that reports itself to the
 catalog server.  (Note that this information is updated about once
@@ -671,7 +671,7 @@ them in a with statement. The factory will be cleaned up automtically at the
 end of the block. As an example:
 
 ```python
-workers = taskvine.Factory("condor", "myproject")
+workers = vine.Factory("condor", "myproject")
 workers.cores = 4
 workers.memory = 4000
 workers.disk = 5000
@@ -686,7 +686,7 @@ with workers:
 
 ### Caching and Sharing
 
-Wherever possible, TaskVine retains files (whatever their source) within
+Wherever possible, TaskVine retains files (whatever their sources) within
 the cluster so that they can be reused by later tasks.  To do this
 consistently, each file is given a **unique cache name** that is computed
 from its contents and metadata.  This ensures that if the external source
@@ -707,9 +707,9 @@ software packages and reference datasets.
 
 === "Python"
     ```python
-    f = m.declare_file("myfile.txt",cache="never")
-    f = m.declare_file("myfile.txt",cache="workflow") # (default)
-    f = m.declare_file("myfile.txt",cache="always") # (default)
+    f = m.declare_file("myfile.txt",cache="never") # (default)
+    f = m.declare_file("myfile.txt",cache="workflow") 
+    f = m.declare_file("myfile.txt",cache="always")
     ```
 === "C"
     ```
@@ -815,19 +815,19 @@ like the input to be the result of a query to a database.
 The execution of a task can be wrapped with specially designed files called
 environments. These environments ensure that the software dependencies for the
 task are available in the execution site. TaskVine natively supports two types
-of environments: [poncho](../poncho/index.md), which is based on conda-pack;
-and [starch](../man_pages/starch.md) a lightweight package useful when the
+of environments: [poncho](../poncho/index.md), which is based on `conda-pack`;
+and [starch](../man_pages/starch.md), a lightweight package useful when the
 manager and workers run the same linux version. Mini tasks can be used to
 create environments not natively supported, as we will show later to construct
 environments for Apptainer (i.e., singularity containers).
 
 #### Poncho
 
-A Poncho environment is a tarball based on conda-pack useful to deliver
+A Poncho environment is a tarball based on `conda-pack`, and is useful to deliver
 complete python environments. For example, to create a python environment with
-numpy:
+`numpy`:
 
-my_poncho_spec.json
+`my_poncho_spec.json`
 ```json
 {
     "conda": {
