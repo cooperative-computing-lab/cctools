@@ -1,27 +1,247 @@
 #!/bin/sh
 
-SUBMIT_COMMON=$(which vine_submit_common)
-if [ -z "$SUBMIT_COMMON" ];
-then
-    echo "Please add 'vine_submit_common' to your PATH." 1>&2
-    exit 1
-else
-    . $SUBMIT_COMMON
-fi
+# GLOBAL STATES
+
+script_name=$0
+submit_dir=${USER}-workers
+use_manager_name=0
+pwfile=""
+arguments=""
+
+host=
+port=
+count=1
+
+cores=
+memory=
+disk=
+
+specified_resources=0
 
 batch_option=""
 
-detect_batch_wrapper()
+# HELP
+
+condor_show_help()
 {
+    echo "Condor:"
+    echo "  -r,--requirements <reqs>  Condor requirements expression."
+    echo "  --class-ad <ad>           Extra condor class ad. May be specified multiple times."
+    echo "  --autosize                Condor will automatically size the worker to the slot."
+    echo "  --docker-universe <image> Run worker inside <image> using condor's docker universe."
+    echo ""
+}
+
+slurm_show_help()
+{
+    echo "SLURM:"
+    echo "  -j                       Use job array to submit workers."
+    echo "  -p <parameters>          SLURM sbatch parameters."
+    echo ""
+}
+
+sge_show_help()
+{
+    echo "SGE:"
+    echo "  -j                       Use job array to submit workers."
+    echo "  -p <parameters>          SGE qsub parameters."
+    echo ""
+}
+
+show_help()
+{
+	echo "Use: $script_name [batch options] [worker options] [batch specific options] <servername> <port> <num-workers>"
+	echo "         or"
+	echo "     $script_name [batch options] [worker options] --manager-name <name> [batch specific options] <num-workers>"
+
+    echo " "
+    echo "batch options:"
+    echo "  -T, --batch-type <batch>  Name of the batch system to submit workers. Out of (condor, slurm, sge)."
+    echo ""
+
+	echo "worker options:"
+
+	echo "  -M,--manager-name <name>  Name of the preferred master for worker."
+	echo "  -N,--name <name>          Same as -M (backwards compatibility)."
+	echo "  -C,--catalog <catalog>    Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
+	echo "  -t,--timeout <time>       Abort after this amount of idle time. (default=900s)."
+	echo "  -d,--debug <subsystem>    Enable debugging on worker for this subsystem (try -d all to start)."
+	echo "  -w,--tcp-window-size <size>  Set TCP window size."
+	echo "  -i,--min-backoff <time>   Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)"
+	echo "  -b,--max-backoff <time>   Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)"
+	echo "  -z,--disk-threshold <size >   Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)"
+	echo "  -A,--arch <arch>          Set architecture string for the worker to report to manager instead of the value in uname."
+	echo "  -O,--os <os>              Set operating system string for the worker to report to manager instead of the value in uname."
+	echo "  -s,--workdir <path>       Set the location for creating the working directory of the worker."
+	echo "  -P,--password <pwfile>    Password file to authenticate workers to manager."
+	echo "  --ssl                     Use ssl to communicate with manager."
+	echo "  --cores <num>             Set the number of cores each worker should use (0=auto). (default=1)"
+	echo "  --memory <size>           Manually set the amonut of memory (in MB) reported by this worker."
+	echo "  --disk <size>             Manually set the amount of disk (in MB) reported by this worker."
+	echo "  --scratch-dir             Set the scratch directory location created on the local machine (default=/tmp/USER-workers)." 
+	echo "  -E,--worker-options <str> Extra options passed to vine_worker."
+	echo "  -h,--help                 Show this help message."
+	echo ""
+	echo "batch specific options:"
+    condor_show_help
+    slurm_show_help
+    sge_show_help
+	exit 0
+}
+
+# Condor specific
+
+condor_setup()
+{
+    requirements=""
+    class_ads=""
+    transfer_input_files="vine_worker, cctools_gpu_autodetect"
+    submit_dir=/tmp/${USER}-workers
+}
+
+condor_parse_arguments()
+{
+    # set default values:
+    cores=${cores:-1}
+    memory=${memory:-512}   # MB, e.g. 0.5 GB
+    disk=${disk:-1024}      # MB, e.g. 1   GB
+
+    # convert disk to kB to make what follows easier, as condor want disk in kB
+    disk=$((disk*1024))
+
+    original_count=$#
+
     while [ $# -gt 0 ]
     do
-        case $1 in 
-            -T | --batch-type)
+        case $1 in
+            -r|--requirements)
             shift
-            batch_option=$1
+            requirements="$requirements $1"
             ;;
-            -h | --help)
-            show_help_common
+
+            --class-ad)
+            shift
+            class_ads="$class_ads\n$1"
+            ;;
+
+            --autosize)
+                cores="ifThenElse($cores > TotalSlotCpus, $cores, TotalSlotCpus)"
+                memory="ifThenElse($memory > TotalSlotMemory, $memory, TotalSlotMemory)"
+                disk="ifThenElse($disk > TotalSlotDisk, $disk, TotalSlotDisk)"
+            ;;
+
+            --docker-universe)
+            shift
+            docker_universe="$1"
+            ;;
+
+            *)
+            break
+            ;;
+        esac
+        shift
+    done
+
+    current_count=$#
+    consumed=$((original_count - current_count))
+
+    return $consumed	
+}
+
+condor_set_up_password_file()
+{
+    transfer_input_files="${transfer_input_files}, $pwfile"
+}
+
+condor_submit_workers_command()
+{
+    # check if host is localhost - if so then notify the user of an error
+    if [ "$host" = "localhost" ]
+    then
+        echo "Using localhost with condor workers may lead to unintended consequences, please specify the IP address instead" 1>&2
+        exit 1
+    fi
+
+    # rewrite cores, memory, disk with size of given slot. (sometimes the slot
+    # given is larger than the minimum requested).
+    arguments="--cores \$\$([TARGET.Cpus]) --memory \$\$([TARGET.Memory]) --disk \$\$([TARGET.Disk/1024]) $arguments"
+
+    if [ -n "${docker_universe}" ]
+    then
+        cat > condor_submit_file <<EOF
+universe = docker
+docker_image = ${docker_universe}
+EOF
+    else
+        cat > condor_submit_file <<EOF
+universe = vanilla
+EOF
+    fi
+
+    cat >> condor_submit_file <<EOF
+executable = vine_worker
+arguments = $arguments $host $port
+transfer_input_files = ${transfer_input_files}
+should_transfer_files = yes
+when_to_transfer_output = on_exit
+output = worker.\$(PROCESS).output
+error = worker.\$(PROCESS).error
+log = workers.log
++JobMaxSuspendTime = 0
+$(printf "%b" "${class_ads}" 2> /dev/null)
+
+# Some programs assume some variables are set, like HOME, so we export the
+# environment variables with the job.  Comment the next line if you do not want
+# the environment exported.
+getenv = true
+EOF
+
+    if [ ! -z "$requirements" ]; then
+        echo "requirements = ${requirements}" >> condor_submit_file
+    fi
+
+    echo "request_cpus = ${cores}" >> condor_submit_file
+
+    #Memory in megabytes
+    echo "request_memory = ${memory}" >> condor_submit_file
+
+    #Disk in kilobytes
+    echo "request_disk = ${disk}" >> condor_submit_file
+
+
+    echo "queue $count" >> condor_submit_file
+
+    condor_submit condor_submit_file
+}
+
+# SLURM specific
+
+slurm_setup()
+{
+    use_jobarray=0
+    slurm_parameters=""
+}
+
+slurm_parse_arguments()
+{
+    if [ -z "$cores" -o "$cores" = 0 ]
+    then
+        slurm_parameters="$slurm_parameters --exclusive"
+    else
+        slurm_parameters="$slurm_parameters --cpus-per-task $cores"
+    fi
+
+    original_count=$#
+    
+    while [ $# -gt 0 ]
+    do
+        case $1 in
+            -j)
+            use_jobarray=1
+            ;;
+            -p)
+            shift
+            slurm_parameters="$slurm_parameters $1"
             ;;
             *)
             break
@@ -29,39 +249,373 @@ detect_batch_wrapper()
         esac
         shift
     done
-    redirect_batch_wrapper "$@"
+    
+    current_count=$#
+    consumed=$((original_count - current_count))
+    
+    return $consumed
 }
 
-redirect_batch_wrapper()
+slurm_submit_workers_command()
 {
-    case ${batch_option} in
+    sbatch=`which sbatch 2>/dev/null`
+    if [ $? != 0 ]
+    then
+        echo "$0: please add 'sbatch' to your PATH."
+        exit 1
+    fi
+
+    to_submit=$count
+    while [[ "$to_submit" -gt 0 ]]
+    do
+        to_submit=$((to_submit-1))
+        sbatch --job-name vineWorker --ntasks=1 --nodes=1 $slurm_parameters <<EOF
+#!/bin/sh
+vine_worker $arguments $host $port
+EOF
+    done
+
+}
+
+# SGE specific
+
+sge_setup()
+{
+    SGE_WARNING=1
+    use_jobarray=0
+    sge_parameters=""
+}
+
+sge_parse_arguments()
+{
+    if [ -z "$cores" -o "$cores" = 0 ]
+    then
+        cores=1
+    fi
+
+    while [ $# -gt 0 ]
+    do
+        case $1 in
+            -j)
+            use_jobarray=1
+            ;;
+            -p)
+            shift
+            sge_parameters="$sge_parameters $1"
+            ;;
+            *)
+            break
+            ;;
+        esac
+        shift
+    done
+}
+
+sge_submit_workers_command()
+{
+    qsub=`which qsub 2>/dev/null`
+    if [ $? != 0 ]
+    then
+        echo "$0: please add 'qsub' to your PATH."
+        exit 1
+    fi
+
+    cat >worker.sh <<EOF
+#!/bin/sh
+
+../worker/vine_worker $arguments $host $port
+EOF
+
+    chmod 755 worker.sh
+
+    if [ $use_jobarray = 1 ]
+    then
+        qsub -t 1-$count:1 -cwd $sge_parameters worker.sh
+    else
+        for n in `seq 1 $count`
+        do
+            qsub -cwd $sge_parameters worker.sh
+        done
+    fi
+}
+
+parse_arguments()
+{
+    while [ $# -gt 0 ]
+    do
+        case $1 in
+            -T | --batch-type)
+            shift
+            batch_option=$1
+            ;;
+            -h | --help)
+            show_help
+            ;;
+            *)
+            break
+            ;;
+        esac
+    done
+    shift
+    
+    case $batch_option in 
         "condor")
-        SUBMIT_BATCH=$(which vine_condor_submit_workers)
+        condor_setup
         ;;
         "slurm")
-        SUBMIT_BATCH=$(which vine_slurm_submit_workers)
+        slurm_setup
         ;;
         "sge")
-        SUBMIT_BATCH=$(which vine_sge_submit_workers)
-        ;;
-        "pbs")
-        SUBMIT_BATCH=$(which vine_pbs_submit_workers)
-        ;;       
-        "torque")
-        SUBMIT_BATCH=$(which vine_torque_submit_workers)
-        ;;
-        *)
-        echo "Batch option ${batch_option} not supported."
-        show_help_common
+        sge_setup
         ;;
     esac
 
-    if [ -z "$SUBMIT_BATCH" ];
-    then
-        echo "Please add 'vine_${batch_option}_submit_workers' to your PATH." 1>&2
-        exit 1
-    else
-        . $SUBMIT_BATCH "$@"
-    fi
+    parse_arguments_common "$@"
 }
-detect_batch_wrapper "$@"
+
+parse_arguments_common()
+{
+	# Used options (as in the getopts format):  M:N:C:t:d:w:i:b:z:A:O:s:r:P:h
+	while [ $# -gt 0 ]
+	do
+		case $1 in
+			-a | --advertise)
+			# Leave here for backwards compatibility
+			arguments="$arguments -a"
+			use_manager_name=1
+			;;
+			-M | --manager-name | --master-name)
+			shift
+			arguments="$arguments -M $1"
+			use_manager_name=1
+			;;
+			-N | --name)
+			shift
+			arguments="$arguments -M $1"
+			use_manager_name=1
+			;;
+			-C | --catalog)
+			shift
+			arguments="$arguments -C $1"
+			;;
+			-t | --timeout)
+			shift
+			arguments="$arguments -t $1"
+			;;
+			-d | --debug)
+			shift
+			arguments="$arguments -d $1"
+			;;
+			-w | --tcp-window-size)
+			shift
+			arguments="$arguments -w $1"
+			;;
+			-i | --min-backoff)
+			shift
+			arguments="$arguments -i $1"
+			;;
+			-b | --max-backoff)
+			shift
+			arguments="$arguments -b $1"
+			;;
+			-z | --disk-threshold)
+			shift
+			arguments="$arguments -z $1"
+			;;
+			-A | --arch)
+			shift
+			arguments="$arguments -A $1"
+			;;
+			-O | --os)
+			shift
+			arguments="$arguments -O $1"
+			;;
+			-s | --workdir)
+			shift
+			arguments="$arguments -s $1"
+			;;
+			--scratch-dir)
+			shift
+			submit_dir="$1/${USER}-workers"
+			;;
+			-P | --password)
+			shift
+			pwfile=$1
+			arguments="$arguments -P $pwfile"
+			;;
+            --ssl)
+			arguments="$arguments --ssl"
+			;;
+			--cores)
+			shift
+			arguments="$arguments --cores $1"
+			cores="$1"
+			specified_resources=1
+			;;
+			--memory)
+			shift
+			arguments="$arguments --memory $1"
+			memory="$1"
+			specified_resources=1
+			;;
+			--disk)
+			shift
+			arguments="$arguments --disk $1"
+			disk="$1"
+			specified_resources=1
+			;;
+			-r)
+			shift
+			requirements="$requirements $1"
+			;;
+			-E | --worker-options)
+			shift
+			arguments="$arguments $1"
+			;;
+			-h | --help)
+			show_help
+			;;
+			*)
+			break
+			;;
+		esac
+		shift
+	done
+
+    case $batch_option in
+        "condor")
+        condor_parse_arguments "$@"
+        ;;
+        "slurm")
+        slurm_parse_arguments "$@"
+        ;;
+        "sge")
+        sge_parse_arguments "$@"
+        ;;
+        *)
+        echo "Batch option \"$batch_option\" is not supported."
+        show_help
+        ;;
+    esac
+    
+    consumed=$?
+
+    shift $consumed
+
+	set_up_manager_address $1 $2 $3 $4
+
+	if [ $specified_resources = 1 -a -n "$SGE_WARNING" ]
+	then
+		echo "Worker resources were manually specified. Remember to also describe your resources according to your local qsub system (e.g., -p '-pe smp 4'. See also the --sge-parameter option in the configure script when manually compiling CCTools.)" 1>&2
+	fi
+}
+
+
+set_up_manager_address()
+{
+	if [ $use_manager_name = 0 ]; then
+		if [ $# -ne 3 ] ; then
+			echo "3 arguments (<servername> <port> <num-workers>), but found $#: \"$@\"." 1>&2
+			echo "To view the help message, type: $script_name -h" 1>&2
+			exit 1
+		fi
+		host=$1
+		port=$2
+		count=$3
+	else
+		if [ $# -ne 1 ]
+		then
+			echo "1 argument (<num-workers>) is expected, but found $#: \"$@\"." 1>&2
+			echo "To view the help message, type: $script_name -h" 1>&2
+			exit 1
+		fi
+		host=
+		port=
+		count=$1
+	fi
+}
+
+set_up_working_directory()
+{
+	# Set up a local temporary directory to manage the log files.
+	# home directories on shared filesystems are often not accessible
+
+	echo "Creating worker submit scripts in ${submit_dir}..."
+	mkdir -p ${submit_dir}
+
+	# Copy the worker executable into the temporary directory,
+	# for similar reasons.
+
+	worker=`which vine_worker 2>/dev/null`
+	if [ $? != 0 ]
+	then
+		echo "$0: please add 'vine_worker' to your PATH." 1>&2
+		exit 1
+	fi
+
+	gpu_detection=`which cctools_gpu_autodetect 2>/dev/null`
+	if [ $? != 0 ]
+	then
+		echo "$0: could not find cctools_gpu_autodetect in PATH. gpus will not be automatically detected." 1>&2
+	else
+		cp $gpu_detection ${submit_dir}
+	fi
+
+    cp $worker ${submit_dir}
+	set_up_password_file
+
+	cd ${submit_dir}
+}
+
+set_up_password_file()
+{
+	# If a password file has been selected, check for existence,
+	# copy it into the submission directory, then add it to
+	# the transfer input files list.
+
+	if [ X${pwfile} != X ]
+	then
+		if [ ! -f $pwfile ]
+		then
+			echo "$script_name password file $pwfile not found" 1>&2
+			exit 1
+		fi
+
+		cp $pwfile ${submit_dir}
+
+        if [ $batch_option -eq "condor" ]
+        then
+		    condor_set_up_password_file
+        fi
+	fi
+}
+
+submit_workers_command()
+{
+    case $batch_option in
+        "condor")
+        condor_submit_workers_command "$@"
+        ;;
+        "slurm")
+        slurm_submit_workers_command "$@"
+        ;;
+        "sge")
+        sge_submit_workers_command "$@"
+        ;;
+        *)
+        echo "Batch option \"$batch_option\" is not supported."
+        show_help
+        ;;
+    esac
+}
+
+submit_workers()
+{
+	parse_arguments "$@"
+	set_up_working_directory
+	submit_workers_command
+
+	exit $?
+}
+
+submit_workers "$@"
