@@ -1,0 +1,67 @@
+#!/bin/sh
+
+SUBMIT_COMMON=$(which vine_submit_common)
+if [ -z "$SUBMIT_COMMON" ];
+then
+    echo "Please add 'vine_submit_common' to your PATH." 1>&2
+    exit 1
+else
+    . $SUBMIT_COMMON
+fi
+
+batch_option=""
+
+detect_batch_wrapper()
+{
+    while [ $# -gt 0 ]
+    do
+        case $1 in 
+            -T | --batch-type)
+            shift
+            batch_option=$1
+            ;;
+            -h | --help)
+            show_help_common
+            ;;
+            *)
+            break
+            ;;
+        esac
+        shift
+    done
+    redirect_batch_wrapper "$@"
+}
+
+redirect_batch_wrapper()
+{
+    case ${batch_option} in
+        "condor")
+        SUBMIT_BATCH=$(which vine_condor_submit_workers)
+        ;;
+        "slurm")
+        SUBMIT_BATCH=$(which vine_slurm_submit_workers)
+        ;;
+        "sge")
+        SUBMIT_BATCH=$(which vine_sge_submit_workers)
+        ;;
+        "pbs")
+        SUBMIT_BATCH=$(which vine_pbs_submit_workers)
+        ;;       
+        "torque")
+        SUBMIT_BATCH=$(which vine_torque_submit_workers)
+        ;;
+        *)
+        echo "Batch option ${batch_option} not supported."
+        show_help_common
+        ;;
+    esac
+
+    if [ -z "$SUBMIT_BATCH" ];
+    then
+        echo "Please add 'vine_${batch_option}_submit_workers' to your PATH." 1>&2
+        exit 1
+    else
+        . $SUBMIT_BATCH "$@"
+    fi
+}
+detect_batch_wrapper "$@"
