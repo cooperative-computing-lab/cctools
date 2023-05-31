@@ -24,9 +24,12 @@ show_help()
 
 show_help_common()
 {
-	echo "Use: $script_name [worker options] [batch specific options] <servername> <port> <num-workers>"
+	echo "Use: $script_name [batch options] [worker options] [batch specific options] <servername> <port> <num-workers>"
 	echo "         or"
-	echo "     $script_name [worker options] --manager-name <name> [batch specific options] <num-workers>"
+	echo "     $script_name [batch options] [worker options] --manager-name <name> [batch specific options] <num-workers>"
+
+    echo "batch options:"
+    echo "  -T, --batch-type <batch>  Name of the batch system to submit workers. Out of (condor, slurm, sge, pbs, torque)"
 
 	echo "worker options:"
 
