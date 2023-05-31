@@ -11,7 +11,7 @@ If you are writing a TaskVine application, start here:
 If you are writing a Work Queue application, start here:
 
 - @ref work_queue.h (C Language Interface)
-- @ref work_queue (Python Language Interface)
+- @ref ndcctools.work_queue (Python Language Interface)
 
 
 If you are writing a program to submit jobs to arbitrary batch systems,

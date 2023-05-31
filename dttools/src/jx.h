@@ -151,11 +151,17 @@ struct jx * jx_string_nocopy( char *string_value );
 /** Create a JX string value using prinf style formatting.  @param fmt A printf-style format string, followed by matching arguments.  @return A JX string value. */
 struct jx * jx_format( const char *fmt, ... );
 
-/** Create a JX symbol. Note that symbols are an extension to the JSON standard. A symbol is a reference to an external variable, which can be resolved by using @ref jx_eval. @param symbol_name A C string. @return A JX expression.
+/** Create a JX symbol.
+Note that symbols are an extension to the JSON standard. A symbol is a reference to an external variable, which can be resolved by using @ref jx_eval
+@param symbol_name A C string.
+@return A JX expression.
 */
 struct jx * jx_symbol( const char *symbol_name );
 
-/** Create a JX_ERROR. @param err The associated data for the error. This should be a string description of the error. @return A JX error value. */
+/** Create a JX_ERROR.
+@param err The associated data for the error. This should be a string description of the error.
+@return A JX error value.
+*/
 struct jx * jx_error( struct jx *err );
 
 /** Create a JX array.  @param items A linked list of @ref jx_item values.  @return A JX array. */

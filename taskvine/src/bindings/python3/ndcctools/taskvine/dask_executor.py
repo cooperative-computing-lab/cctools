@@ -15,7 +15,6 @@ from .dask_dag import DaskVineDag
 import cloudpickle
 from uuid import uuid4
 
-
 ##
 # @class ndcctools.taskvine.dask_executor.DaskVine
 #
@@ -65,7 +64,7 @@ class DaskVine(Manager):
     #                      recompute results if workers are lost.
     # @param low_memory_mode Split graph vertices to reduce memory needed per function call. It
     #                      removes some of the dask graph optimizations, thus proceed with care.
-    # param  checkpoint_fn When using lazy_transfers, a predicate with arguments (dag, key)
+    # @param  checkpoint_fn When using lazy_transfers, a predicate with arguments (dag, key)
     #                      called before submitting a task. If True, the result is brought back
     #                      to the manager.
     # @param resources     A dictionary with optional keys of cores, memory and disk (MB)
@@ -75,6 +74,8 @@ class DaskVine(Manager):
     #                       'max' (for maximum values seen), 'min_waste', 'greedy bucketing'
     #                       or 'exhaustive bucketing'. This is done per function type in dsk.
     # @param retries       Number of times to attempt a task. Default is 5.
+    # @param verbose       if true, emit additional debugging information.
+    
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
@@ -194,6 +195,12 @@ class DaskVine(Manager):
         else:
             return raw
 
+##
+# @class ndcctools.taskvine.dask_executor.DaskVineFile
+#
+# Internal class used to represent Python data persisted
+# as a file in the filesystem.
+#
 
 class DaskVineFile:
     def __init__(self, file, key, staging_dir):
@@ -218,6 +225,11 @@ class DaskVineFile:
         return self._file.source()
 
 
+##
+# @class ndcctools.taskvine.dask_executor.DaskVineExecutionError
+#
+# Internal class representing an execution error in a TaskVine workflow.
+
 class DaskVineExecutionError(Exception):
     def __init__(self, backtrace):
         self.backtrace = backtrace
@@ -226,7 +238,29 @@ class DaskVineExecutionError(Exception):
         return self.backtrace.format_tb()
 
 
+##
+# @class ndcctools.taskvine.dask_executor.PythonTaskDask
+#
+# Internal class representing a Dask task to be executed,
+# materialized as a special case of a TaskVine PythonTask.
+#
+
 class PythonTaskDask(PythonTask):
+    ##
+    # Create a new PythonTaskDask.
+    #
+    # @param self  This task object.
+    # @param m     TaskVine manager object.
+    # @param dag   Dask graph object.
+    # @param key   Key of task in graph.
+    # @param sexpr          Positional arguments to function.
+    # @param category       TaskVine category name.
+    # @param environment    TaskVine execution environment.
+    # @param extra_files    Additional files to provide to the task.
+    # @param retries        Number of times to retry failed task.
+    # @param lazy_transfers If true, do not return outputs to manager until required.
+    #
+    
     def __init__(self, m,
                  dag, key, sexpr, *,
                  category=None,
@@ -314,8 +348,9 @@ def set_at_indices(lst, indices, value):
         raise
 
 
+# Returns a list of tuples [(k, (i,j,...)] where (i,j,...) are the indices of k in lists.
+
 def find_in_lists(lists, predicate=lambda s: True, indices=None):
-    """ Returns a list of tuples [(k, (i,j,...)] where (i,j,...) are the indices of k in lists. """
     if not indices:
         indices = []
 

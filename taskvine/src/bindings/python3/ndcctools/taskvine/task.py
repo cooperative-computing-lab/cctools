@@ -223,7 +223,7 @@ class Task(object):
     # Add any input object to a task.
     #
     # @param self          Reference to the current task object.
-    # @param file          A file object of class @ref ndcctools.taskvine.manager.File, such as from @ref ndcctools.taskvine.manager.Manager.declare_file, @ref ndcctools.taskvine.manager.Manager.declare_buffer, @ref ndcctools.taskvine.manager.Manager.declare_url, etc.
+    # @param file          A file object of class @ref ndcctools.taskvine.file.File, such as from @ref ndcctools.taskvine.manager.Manager.declare_file, @ref ndcctools.taskvine.manager.Manager.declare_buffer, @ref ndcctools.taskvine.manager.Manager.declare_url, etc.
     # @param remote_name   The name of the file at the execution site.
     # @param strict_input  Whether the file should be transfered to the worker
     #                      for execution. If no worker has all the input files already cached marked
@@ -249,7 +249,7 @@ class Task(object):
     # Add any output object to a task.
     #
     # @param self          Reference to the current task object.
-    # @param file          A file object of class @ref ndcctools.taskvine.manager.File, such as from @ref ndcctools.taskvine.manager.Manager.declare_file, or @ref ndcctools.taskvine.manager.Manager.declare_buffer @ref ndcctools.taskvine.task.Task.add_input
+    # @param file          A file object of class @ref ndcctools.taskvine.file.File, such as from @ref ndcctools.taskvine.manager.Manager.declare_file, or @ref ndcctools.taskvine.manager.Manager.declare_buffer @ref ndcctools.taskvine.task.Task.add_input
     # @param remote_name   The name of the file at the execution site.
     # @param watch         Watch the output file and send back changes as the task runs.
     # @param success_only  Whether the file should be retrieved only when the task succeeds. Default is False.
@@ -509,9 +509,9 @@ class Task(object):
 
     ##
     # Return True if task executed and its command terminated normally.
-    # If True, the exit code of the command can be retrieved with @ref
-    # ndcctools.taskvine.task.Task.exit_code. If False, the error condition can be retrieved with @ref
-    # ndcctools.taskvine.task.Task.result.  It must be called only after the task completes execution.
+    # If True, the exit code of the command can be retrieved with @ref exit_code.
+    # If False, the error condition can be retrieved with @ref result.
+    # It must be called only after the task completes execution.
     # @code
     # >>> # completed tasks with a failed command execution:
     # >>> print(t.completed())
@@ -771,17 +771,18 @@ class PythonTask(Task):
     #   tb = PythonTask(fn_with_tmp, "ta_output.file")
     #   tb.add_input(ta.output_file, "ta_output.file")
     #   m.submit(tb)
-    # @code
+    # @endcode
     #
     # where fn_with_tmp may look something like this:
     #
+    # @code
     # def fn_with_tmp(filename):
     #   import cloudpickle
     #   with open(filename) as f:
     #     data = cloudpickle.load(f)
+    # @endcode
     #
     # @param self 	Reference to the current python task object
-    # @param manager Manager to which the task was submitted
     def enable_temp_output(self):
         self._tmp_output_enabled = True
 
@@ -794,7 +795,7 @@ class PythonTask(Task):
         self._cache_output = cache
 
     ##
-    # Returns the ndcctools.taskvine.manager.File object that
+    # Returns the ndcctools.taskvine.file.File object that
     # represents the output of this task.
     @property
     def output_file(self):
