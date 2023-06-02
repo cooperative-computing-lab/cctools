@@ -1,8 +1,12 @@
 ##
-# @package ndcctools.work_queue
+# @namespace ndcctools.work_queue
 #
-# Python Work Queue bindings.
+# Work Queue distributed task execution framework - Python interface.
 #
+# The Work Queue system provides a distributed task execution framework
+# for high throughput applications consisting of millions of tasks running
+# on thousands of workers.  This Python interface allows for the creation
+# of manager applications that define, submit, monitor, and collect tasks.
 # The objects and methods provided by this package correspond to the native
 # C API in @ref work_queue.h.
 #
