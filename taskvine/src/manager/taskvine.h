@@ -1094,6 +1094,28 @@ struct vine_task *vine_cancel_by_task_tag(struct vine_manager *m, const char *ta
 */
 struct list * vine_tasks_cancel(struct vine_manager *m);
 
+/** Turn on the debugging log output and send to the named file.
+ * (Note it does not need the vine_manager structure, as it is enabled before
+ * the manager is created.)
+@param logfile The filename.
+@return 1 if logfile was opened, 0 otherwise.
+*/
+int vine_enable_debug_log( const char *logfile );
+
+/** Add a performance log file that records cummulative statistics of the connected workers and submitted tasks.
+@param m A manager object
+@param logfile The filename.
+@return 1 if logfile was opened, 0 otherwise.
+*/
+int vine_enable_perf_log(struct vine_manager *m, const char *logfile);
+
+/** Add a log file that records the states of the connected workers and tasks.
+@param m A manager object
+@param logfile The filename.
+@return 1 if logfile was opened, 0 otherwise.
+*/
+int vine_enable_transactions_log(struct vine_manager *m, const char *logfile);
+
 /** Shut down workers connected to the manager. Gives a best effort and then returns the number of workers given the shut down order.
 @param m A manager object
 @param n The number to shut down. All workers if given "0".
