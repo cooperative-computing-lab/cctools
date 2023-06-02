@@ -133,19 +133,16 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 void batch_queue_delete(struct batch_queue *q)
 {
 	if(q) {
-		char *key;
-		char *value;
-
 		debug(D_BATCH, "deleting queue %p", q);
 
 		q->module->free(q);
 
-		for (hash_table_firstkey(q->options); hash_table_nextkey(q->options, &key, (void **) &value); free(value))
-			;
+		hash_table_clear(q->options,free);
 		hash_table_delete(q->options);
-		for (hash_table_firstkey(q->features); hash_table_nextkey(q->features, &key, (void **) &value); free(value))
-			;
+
+		hash_table_clear(q->features,free);
 		hash_table_delete(q->features);
+
 		itable_delete(q->job_table);
 		free(q);
 	}
