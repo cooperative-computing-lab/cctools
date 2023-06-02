@@ -32,6 +32,7 @@ SOURCES = \
 	batch_job_work_queue.c\
 	batch_job_lambda.c \
 	batch_job_work_queue.c \
+	batch_job_vine.c \
 	batch_job_mesos.c \
 	batch_job_k8s.c \
 	batch_job_mpi.c \
@@ -45,8 +46,8 @@ all: $(LIBRARIES) $(PROGRAMS)
 
 libbatch_job.a: $(OBJECTS)
 
-work_queue_factory: work_queue_factory.o libbatch_job.a $(WQ_LIB) $(EXTERNAL_LIBRARIES)
-vine_factory: vine_factory.o libbatch_job.a $(VINE_LIB) $(WQ_LIB) $(EXTERNAL_LIBRARIES)
+work_queue_factory: work_queue_factory.o libbatch_job.a $(WQ_LIB) $(VINE_LIB) $(EXTERNAL_LIBRARIES)
+vine_factory: vine_factory.o libbatch_job.a $(WQ_LIB) $(VINE_LIB) $(EXTERNAL_LIBRARIES)
 
 # Note that work_queue_pool is the same as work_queue_factory, for backwards compatibility.
 work_queue_pool: work_queue_factory

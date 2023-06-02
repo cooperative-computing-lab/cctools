@@ -50,7 +50,8 @@ typedef enum {
 	BATCH_QUEUE_TYPE_MESOS,               /**< Batch jobs will be sent to Mesos. */
 	BATCH_QUEUE_TYPE_K8S,                 /**< Batch jobs will be sent to kubernetes. */
 	BATCH_QUEUE_TYPE_DRYRUN,              /**< Batch jobs will not actually run. */
-        BATCH_QUEUE_TYPE_MPI,
+        BATCH_QUEUE_TYPE_MPI,                 /**< Batch jobs distributed within an MPI program. */
+	BATCH_QUEUE_TYPE_VINE,                /**< Batch jobs executed via TaskVine. */
 	BATCH_QUEUE_TYPE_UNKNOWN = -1         /**< An invalid batch queue type. */
 } batch_queue_type_t;
 
