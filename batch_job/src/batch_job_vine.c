@@ -19,24 +19,40 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 
-static void specify_files( struct vine_manager *m, struct vine_task *t, const char *input_files, const char *output_files, vine_file_flags_t flags )
+static struct vine_file * declare_once( struct batch_queue *q, const char *name, vine_file_flags_t flags )
+{
+	struct vine_file *f;
+
+	if(!q->file_table) q->file_table = hash_table_create(0,0);
+
+	f = hash_table_lookup(q->file_table,name);
+	if(!f) {
+		f = vine_declare_file(q->data,name,flags);
+		hash_table_insert(q->file_table,name,f);
+	}
+	return f;
+}
+
+static void specify_files( struct batch_queue *q, struct vine_task *t, const char *input_files, const char *output_files, vine_file_flags_t flags )
 {
 	char *files;       // Copy of string list of files.
 	char *local_name;  // Name of file at manager.
 	char *remote_name; // Name of file in task sandbox.
+
+	struct vine_file *f;
 	
 	if(input_files) {
 		files = strdup(input_files);
 		local_name = strtok(files, " \t,");
 		while(local_name) {
-			struct vine_file *f = vine_declare_file(m,local_name,flags);
-
 			remote_name = strchr(local_name, '=');
 			if(remote_name) {
 				*remote_name = 0;
+				f = declare_once(q,local_name,flags);
 				vine_task_add_input(t,f,remote_name+1,0);
 				*remote_name = '=';
 			} else {
+				f = declare_once(q,local_name,flags);
 				vine_task_add_input(t,f,local_name,0);
 			}
 			local_name = strtok(0, " \t,");
@@ -48,14 +64,14 @@ static void specify_files( struct vine_manager *m, struct vine_task *t, const ch
 		files = strdup(output_files);
 		local_name = strtok(files, " \t,");
 		while(local_name) {
-			struct vine_file *f = vine_declare_file(m,local_name,flags);
-
 			remote_name = strchr(local_name, '=');
 			if(remote_name) {
 				*remote_name = 0;
+				f = declare_once(q,local_name,flags);
 				vine_task_add_output(t,f,remote_name+1,0);
 				*remote_name = '=';
 			} else {
+				f = declare_once(q,local_name,flags);
 				vine_task_add_output(t,f,local_name,0);
 			}
 			local_name = strtok(0, " \t,");
@@ -191,17 +207,22 @@ static int batch_queue_vine_create (struct batch_queue *q)
 	vine_manager_enable_process_shortcut(q->data);
 	batch_queue_set_feature(q, "absolute_path", NULL);
 	batch_queue_set_feature(q, "remote_rename", "%s=%s");
-	batch_queue_set_feature(q, "batch_log_name", "%s.wqlog");
+	batch_queue_set_feature(q, "batch_log_name", "%s.vine.log");
 	batch_queue_set_feature(q, "batch_log_transactions", "%s.tr");
 	return 0;
 }
 
 static int batch_queue_vine_free (struct batch_queue *q)
 {
+	if (q->file_table) {
+		hash_table_delete(q->file_table);
+	}
+	
 	if (q->data) {
 		vine_delete(q->data);
 		q->data = NULL;
 	}
+
 	return 0;
 }
 
