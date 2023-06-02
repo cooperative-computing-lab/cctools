@@ -91,7 +91,7 @@ than invoking Unix I/O directly.  This is because some batch systems
 (Hadoop, Confuga, etc) also include the storage where the files to be
 accessed are located.
 
-- APIs like work_queue_* should be indirectly accessed by setting options
+- APIs like work_queue_* and vine_* should be indirectly accessed by setting options
 in Batch Job using batch_queue_set_option. See batch_job_work_queue.c for
 an example.
 */
@@ -1244,18 +1244,18 @@ static void show_help_run(const char *cmd)
 	printf("    --wait-for-files-upto=<n>   Wait up to <n> seconds for files to be created.\n");
 	printf(" -z,--zero-length-error         Consider zero-length files to be erroneous.\n");
 	        /********************************************************************************/
-	printf("\nWork Queue Options:\n");
+	printf("\nTaskVine and Work Queue Options:\n");
 	printf(" -C,--catalog-server=<hst:port> Select alternate catalog server.\n");
 	printf("    --password                  Password file for authenticating workers.\n");
 	printf(" -p,--port=<port>               Port number to use with Work Queue.\n");
 	printf(" -Z,--port-file=<file>          Select port at random and write it to this file.\n");
 	printf(" -P,--priority=<integer>        Priority. Higher the value, higher the priority.\n");
 	printf(" -N,--project-name=<project>    Set the Work Queue project name.\n");
-	printf(" -F,--wq-fast-abort=<#>         Set the Work Queue fast abort multiplier.\n");
-	printf(" -t,--wq-keepalive-timeout=<#>  Work Queue keepalive timeout. (default: 30s)\n");
-	printf(" -u,--wq-keepalive-interval=<#> Work Queue keepalive interval. (default: 120s)\n");
-	printf(" -W,--wq-schedule=<mode>        Work Queue scheduling algor. (time|files|fcfs)\n");
-	printf(" --work-queue-preferred-connection    Preferred connection: by_ip | by_hostname\n");
+	printf(" -F,--fast-abort=<#>            Set the Work Queue fast abort multiplier.\n");
+	printf(" -t,--keepalive-timeout=<#>     Work Queue keepalive timeout. (default: 30s)\n");
+	printf(" -u,--keepalive-interval=<#>    Work Queue keepalive interval. (default: 120s)\n");
+	printf(" -W,--schedule=<mode>           Work Queue scheduling algor. (time|files|fcfs)\n");
+	printf(" --preferred-connection         Preferred connection: by_ip | by_hostname\n");
 	        /********************************************************************************/
 	printf("\nBatch System Options:\n");
 	printf("    --amazon-config=<file>      Amazon EC2 config from makeflow_ec2_setup.\n");
@@ -1343,22 +1343,23 @@ int main(int argc, char *argv[])
 	timestamp_t runtime = 0;
 	int disable_afs_check = 0;
 	timestamp_t time_completed = 0;
-	const char *work_queue_keepalive_interval = NULL;
-	const char *work_queue_keepalive_timeout = NULL;
-	const char *work_queue_manager_mode = "standalone";
-	const char *work_queue_port_file = NULL;
-	double wq_option_fast_abort_multiplier = -1.0;
+	const char *option_scheduler = NULL;
+	const char *option_keepalive_interval = NULL;
+	const char *option_keepalive_timeout = NULL;
+	const char *option_manager_mode = "standalone";
+	const char *option_port_file = NULL;
+	double option_fast_abort_multiplier = -1.0;
 	const char *amazon_config = NULL;
 	const char *lambda_config = NULL;
 	const char *amazon_batch_img = NULL;
 	const char *amazon_batch_cfg = NULL;
 	const char *priority = NULL;
-	char *work_queue_password = NULL;
-	char *wq_wait_queue_size = 0;
+	char *option_password = NULL;
+	char *option_wait_queue_size = 0;
 	int did_explicit_auth = 0;
 	char *chirp_tickets = NULL;
 	char *working_dir = NULL;
-	char *work_queue_preferred_connection = NULL;
+	char *option_preferred_connection = NULL;
 	char *write_summary_to = NULL;
 	char *s;
 	int safe_submit = 0;
@@ -1424,7 +1425,7 @@ int main(int argc, char *argv[])
 
 	s = getenv("WORK_QUEUE_MANAGER_MODE") ? getenv("WORK_QUEUE_MANAGER_MODE") : getenv("WORK_QUEUE_MASTER_MODE");
 	if(s) {
-		work_queue_manager_mode = s;
+		option_manager_mode = s;
 	}
 
 	s = getenv("WORK_QUEUE_NAME");
@@ -1433,7 +1434,7 @@ int main(int argc, char *argv[])
 	}
 	s = getenv("WORK_QUEUE_FAST_ABORT_MULTIPLIER");
 	if(s) {
-		wq_option_fast_abort_multiplier = atof(s);
+		option_fast_abort_multiplier = atof(s);
 	}
 
 	enum {
@@ -1475,7 +1476,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_LOG_VERBOSE_MODE,
 		LONG_OPT_WORKING_DIR,
 		LONG_OPT_PREFERRED_CONNECTION,
-		LONG_OPT_WQ_WAIT_FOR_WORKERS,
+		LONG_OPT_WAIT_FOR_WORKERS,
 		LONG_OPT_WRAPPER,
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WRAPPER_OUTPUT,
@@ -1599,12 +1600,11 @@ int main(int argc, char *argv[])
 		{"umbrella-mode", required_argument, 0, LONG_OPT_UMBRELLA_MODE},
 		{"umbrella-spec", required_argument, 0, LONG_OPT_UMBRELLA_SPEC},
 		{"work-queue-preferred-connection", required_argument, 0, LONG_OPT_PREFERRED_CONNECTION},
-		{"wq-estimate-capacity", no_argument, 0, 'E'}, // Deprecated
-		{"wq-fast-abort", required_argument, 0, 'F'},
-		{"wq-keepalive-interval", required_argument, 0, 'u'},
-		{"wq-keepalive-timeout", required_argument, 0, 't'},
-		{"wq-schedule", required_argument, 0, 'W'},
-		{"wq-wait-queue-size", required_argument, 0, LONG_OPT_WQ_WAIT_FOR_WORKERS}, // Not advertised
+		{"fast-abort", required_argument, 0, 'F'},
+		{"keepalive-interval", required_argument, 0, 'u'},
+		{"keepalive-timeout", required_argument, 0, 't'},
+		{"schedule", required_argument, 0, 'W'},
+		{"wait-queue-size", required_argument, 0, LONG_OPT_WAIT_FOR_WORKERS}, // Not advertised
 		{"wrapper", required_argument, 0, LONG_OPT_WRAPPER},
 		{"wrapper-input", required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 		{"wrapper-output", required_argument, 0, LONG_OPT_WRAPPER_OUTPUT},
@@ -1656,7 +1656,7 @@ int main(int argc, char *argv[])
 	while((c = jx_getopt(argc, argv, option_string_run, long_options_run, NULL)) >= 0) {
 		switch (c) {
 			case 'a':
-				work_queue_manager_mode = "catalog";
+				option_manager_mode = "catalog";
 				break;
 			case 'A':
 				disable_afs_check = 1;
@@ -1685,9 +1685,6 @@ int main(int argc, char *argv[])
 			case 'd':
 				debug_flags_set(optarg);
 				break;
-			case 'E':
-				// This option is deprecated. Capacity estimation is now on by default.
-				break;
 			case LONG_OPT_AUTH:
 				if (!auth_register_byname(optarg))
 					fatal("could not register authentication method `%s': %s", optarg, strerror(errno));
@@ -1700,7 +1697,7 @@ int main(int argc, char *argv[])
 				write_summary_to = xxstrdup(optarg);
 				break;
 			case 'F':
-				wq_option_fast_abort_multiplier = atof(optarg);
+				option_fast_abort_multiplier = atof(optarg);
 				break;
 			case 'g':
 				if(strcasecmp(optarg, "none") == 0) {
@@ -1815,7 +1812,7 @@ int main(int argc, char *argv[])
 			case 'N':
 				free(project);
 				project = xxstrdup(optarg);
-				work_queue_manager_mode = "catalog";
+				option_manager_mode = "catalog";
 				catalog_reporting_on = 1; //set to true
 				break;
 			case 'o':
@@ -1840,7 +1837,7 @@ int main(int argc, char *argv[])
 				makeflow_submit_timeout = atoi(optarg);
 				break;
 			case 't':
-				work_queue_keepalive_timeout = optarg;
+				option_keepalive_timeout = optarg;
 				break;
 			case 'T':
 				batch_queue_type = batch_queue_type_from_string(optarg);
@@ -1850,22 +1847,13 @@ int main(int argc, char *argv[])
 				}
 				break;
 			case 'u':
-				work_queue_keepalive_interval = optarg;
+				option_keepalive_interval = optarg;
 				break;
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
 				return 0;
 			case 'W':
-				if(!strcmp(optarg, "files")) {
-					wq_option_scheduler = WORK_QUEUE_SCHEDULE_FILES;
-				} else if(!strcmp(optarg, "time")) {
-					wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
-				} else if(!strcmp(optarg, "fcfs")) {
-					wq_option_scheduler = WORK_QUEUE_SCHEDULE_FCFS;
-				} else {
-					fprintf(stderr, "makeflow: unknown scheduling mode %s\n", optarg);
-					return 1;
-				}
+				option_scheduler = optarg;
 				break;
 			case 'X':
 				change_dir = optarg;
@@ -1874,12 +1862,12 @@ int main(int argc, char *argv[])
 				output_len_check = 1;
 				break;
 			case 'Z':
-				work_queue_port_file = optarg;
+				option_port_file = optarg;
 				port = 0;
 				port_set = 1;	//WQ is going to set the port, so we continue as if already set.
 				break;
 			case LONG_OPT_PASSWORD:
-				if(copy_file_to_buffer(optarg, &work_queue_password, NULL) < 0) {
+				if(copy_file_to_buffer(optarg, &option_password, NULL) < 0) {
 					fprintf(stderr, "makeflow: couldn't open %s: %s\n", optarg, strerror(errno));
 					return 1;
 				}
@@ -1894,16 +1882,16 @@ int main(int argc, char *argv[])
 				if (makeflow_hook_register(&makeflow_hook_example, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 					goto EXIT_WITH_FAILURE;
 				break;
-			case LONG_OPT_WQ_WAIT_FOR_WORKERS:
-				wq_wait_queue_size = optarg;
+			case LONG_OPT_WAIT_FOR_WORKERS:
+				option_wait_queue_size = optarg;
 				break;
 			case LONG_OPT_WORKING_DIR:
 				free(working_dir);
 				working_dir = xxstrdup(optarg);
 				break;
 			case LONG_OPT_PREFERRED_CONNECTION:
-				free(work_queue_preferred_connection);
-				work_queue_preferred_connection = xxstrdup(optarg);
+				free(option_preferred_connection);
+				option_preferred_connection = xxstrdup(optarg);
 				break;
 			case LONG_OPT_DEBUG_ROTATE_MAX:
 				debug_config_file_size(string_metric_parse(optarg));
@@ -2247,8 +2235,8 @@ int main(int argc, char *argv[])
 		dagfile = xxstrdup("./Makeflow");
 	}
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		if(strcmp(work_queue_manager_mode, "catalog") == 0 && project == NULL) {
+	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE || batch_queue_type == BATCH_QUEUE_TYPE_VINE ) {
+		if(strcmp(option_manager_mode, "catalog") == 0 && project == NULL) {
 			fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
 			fprintf(stderr, "makeflow: Run \"makeflow -h\" for help with options.\n");
 			return 1;
@@ -2256,7 +2244,7 @@ int main(int argc, char *argv[])
 		// Use Work Queue default port in standalone mode when port is not
 		// specified with -p option. In Work Queue catalog mode, Work Queue
 		// would choose an arbitrary port when port is not explicitly specified.
-		if(!port_set && strcmp(work_queue_manager_mode, "standalone") == 0) {
+		if(!port_set && strcmp(option_manager_mode, "standalone") == 0) {
 			port_set = 1;
 			port = WORK_QUEUE_DEFAULT_PORT;
 		}
@@ -2265,6 +2253,7 @@ int main(int argc, char *argv[])
 			char *value;
 			value = string_format("%d", port);
 			setenv("WORK_QUEUE_PORT", value, 1);
+			setenv("VINE_PORT", value, 1);
 			free(value);
 		}
 	}
@@ -2336,6 +2325,8 @@ int main(int argc, char *argv[])
 		} else {
 			if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 				remote_jobs_max = 10 * MAX_REMOTE_JOBS_DEFAULT;
+			} else if(batch_queue_type == BATCH_QUEUE_TYPE_VINE) {
+				remote_jobs_max = 10 * MAX_REMOTE_JOBS_DEFAULT;
 			} else {
 				remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 			}
@@ -2390,28 +2381,29 @@ int main(int argc, char *argv[])
 
 	batch_queue_set_logfile(remote_queue, batchlogfilename);
 	batch_queue_set_option(remote_queue, "batch-options", batch_submit_options);
-	batch_queue_set_option(remote_queue, "password", work_queue_password);
-	batch_queue_set_option(remote_queue, "manager-mode", work_queue_manager_mode);
+	batch_queue_set_option(remote_queue, "password", option_password);
+	batch_queue_set_option(remote_queue, "manager-mode", option_manager_mode);
 	batch_queue_set_option(remote_queue, "name", project);
 	batch_queue_set_option(remote_queue, "debug", debug_file_name);
 	batch_queue_set_option(remote_queue, "priority", priority);
-	batch_queue_set_option(remote_queue, "keepalive-interval", work_queue_keepalive_interval);
-	batch_queue_set_option(remote_queue, "keepalive-timeout", work_queue_keepalive_timeout);
+	batch_queue_set_option(remote_queue, "keepalive-interval", option_keepalive_interval);
+	batch_queue_set_option(remote_queue, "keepalive-timeout", option_keepalive_timeout);
 	batch_queue_set_option(remote_queue, "caching", cache_mode ? "yes" : "no");
-	batch_queue_set_option(remote_queue, "wait-queue-size", wq_wait_queue_size);
+	batch_queue_set_option(remote_queue, "wait-queue-size", option_wait_queue_size);
 	batch_queue_set_option(remote_queue, "amazon-config", amazon_config);
 	batch_queue_set_option(remote_queue, "lambda-config", lambda_config);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
-	batch_queue_set_option(remote_queue, "manager-preferred-connection", work_queue_preferred_connection);
+	batch_queue_set_option(remote_queue, "manager-preferred-connection", option_preferred_connection);
 	batch_queue_set_option(remote_queue, "amazon-batch-config",amazon_batch_cfg);
 	batch_queue_set_option(remote_queue, "amazon-batch-img", amazon_batch_img);
 	batch_queue_set_option(remote_queue, "safe-submit-mode", safe_submit ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "ignore-mem-spec", ignore_mem_spec ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "mem-type", batch_mem_type);
 	batch_queue_set_option(remote_queue, "keep-wrapper-stdout", keep_wrapper_stdout ? "yes" : "no" );
+	if(option_scheduler) batch_queue_set_option(remote_queue, "scheduler", option_scheduler );
 	batch_queue_set_int_option(remote_queue, "tlq-port", tlq_port);
 
-	char *fa_multiplier = string_format("%f", wq_option_fast_abort_multiplier);
+	char *fa_multiplier = string_format("%f", option_fast_abort_multiplier);
 	batch_queue_set_option(remote_queue, "fast-abort", fa_multiplier);
 	free(fa_multiplier);
 
@@ -2550,8 +2542,8 @@ int main(int argc, char *argv[])
 	}
 
 	port = batch_queue_port(remote_queue);
-	if(work_queue_port_file)
-		opts_write_port_file(work_queue_port_file, port);
+	if(option_port_file)
+		opts_write_port_file(option_port_file, port);
 	if(port > 0)
 		printf("listening for workers on port %d.\n", port);
 
