@@ -524,7 +524,7 @@ If you have access to a HTCondor pool, you can use this shortcut to submit ten
 workers at once via HTCondor:
 
 ```sh
-$ vine_condor_submit_workers MACHINENAME 9123 10
+$ vine_submit_workers -T condor MACHINENAME 9123 10
 
 Submitting job(s)..........
 Logging submit event(s)..........
@@ -538,10 +538,8 @@ and port number, and begin to service the manager application.
 Similar scripts are available for other common batch systems:
 
 ```sh
-$ vine_slurm_submit_workers MACHINENAME 9123 10
-$ vine_sge_submit_workers MACHINENAME 9123 10
-$ vine_pbs_submit_workers MACHINENAME 9123 10
-$ vine_torque_submit_workers MACHINENAME 9123 10
+$ vine_submit_workers -T slurm MACHINENAME 9123 10
+$ vine_submit_workers _T sge MACHINENAME 9123 10
 ```
 
 When the manager completes, if the workers were not otherwise shut down,
@@ -587,19 +585,19 @@ $ vine_worker -M myproject
 
 
 You can start ten workers for this manager on Condor using
-`vine_condor_submit_workers` by providing the same option arguments.:
+`vine_submit_workers` by providing the same option arguments.:
 
 ```sh
-$ vine_condor_submit_workers -M myproject 10
+$ vine_submit_workers -T condor -M myproject 10
 Submitting job(s)..........
 Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
 ```
 
-Or similarly on SGE using `vine_sge_submit_workers` as:
+Or similarly on SGE using `vine_submit_workers` as:
 
 ```sh
-$ vine_sge_submit_workers -M myproject 10
+$ vine_submit_workers -T sge -M myproject 10
 Your job 153097 ("worker.sh") has been submitted
 Your job 153098 ("worker.sh") has been submitted
 Your job 153099 ("worker.sh") has been submitted
@@ -1149,7 +1147,7 @@ address of the manager when launching the workers, then you need to add the
 vine_worker (... other args ...) --ssl HOST PORT
 vine_factory (... other args ...) --ssl HOST PORT
 vine_status --ssl HOST PORT
-condor_submit_workers -E'--ssl' HOST PORT
+vine_submit_workers -T condor -E'--ssl' HOST PORT
 ```
 
 ### Maximum Retries
@@ -1716,13 +1714,12 @@ In combination with the worker option `--wall-time`, tasks can request a
 minimum time to execute with `set_time_min`, as explained (below)[#setting-task-resources].
 
 You may also use the same `--cores`, `--memory`, `--disk`, and `--gpus` options when using
-batch submission scripts such as `condor_submit_workers` or
-`slurm_submit_workers`, and the script will correctly ask the batch system for
-a node of the desired size.
+batch submission script `vine_submit_workers`, and the script will correctly ask the right 
+batch system for a node of the desired size.
 
-The only caveat is when using `sge_submit_workers`, as there are many
+The only caveat is when using `vine_submit_workers -T sge`, as there are many
 differences across systems that the script cannot manage. For `
-sge_submit_workers ` you have to set **both** the resources used by the
+vine_submit_workers -T sge` you have to set **both** the resources used by the
 worker (i.e., with `--cores`, etc.) and the appropiate computing node with the `
 -p ` option.
 
@@ -1731,7 +1728,7 @@ number of cores with the switch ` -pe smp ` , and you want workers with 4
 cores:
 
 ```sh
-$ sge_submit_workers --cores 4 -p "-pe smp 4" MACHINENAME 9123
+$ vine_submit_workers -T sge --cores 4 -p "-pe smp 4" MACHINENAME 9123
 ```
 
 If you find that there are options that are needed everytime, you can compile
@@ -1746,7 +1743,7 @@ $ ./configure  --sge-parameter '-pe smp $cores'
 So that we can simply call:
 
 ```sh
-$ sge_submit_workers --cores 4 MACHINENAME 9123
+$ vine_submit_workers -T sge --cores 4 MACHINENAME 9123
 ```
 
 The variables `$cores `, `$memory `, and `$disk `, have the values of the
