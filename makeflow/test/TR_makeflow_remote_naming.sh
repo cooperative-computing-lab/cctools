@@ -13,8 +13,6 @@ STATUS_FILE="makeflow.status"
 
 prepare()
 {
-	clean
-
 cat > input.txt <<EOF
 hello
 EOF
