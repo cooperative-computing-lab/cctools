@@ -1,8 +1,11 @@
 ##
-# @package ndcctools.chirp
+# @namespace ndcctools.chirp
 #
-# Python Chirp bindings.
+# Chirp distributed filesystem client - Python interface.
 #
+# The Chirp distributed filesystem is a user-level service
+# to enable easy deployment of data across distributed systems.
+# This interface permits clients to connect to and interact with servers.
 # The objects and methods provided by this package correspond to the native
 # C API in @ref chirp_reli.h and chirp_swig_wrap.h
 #

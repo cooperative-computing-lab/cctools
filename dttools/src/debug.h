@@ -114,6 +114,8 @@ than change all of our code, we simply insert these defines to transparently
 modify the linker namespace we are using.
 */
 
+#ifndef DOXYGEN
+
 #define debug                  cctools_debug
 #define fatal                  cctools_fatal
 #define notice                 cctools_notice
@@ -129,6 +131,8 @@ modify the linker namespace we are using.
 #define debug_flags_restore    cctools_debug_flags_restore
 #define debug_set_flag_name    cctools_debug_set_flag_name
 #define debug_rename           cctools_debug_rename
+
+#endif
 
 /** Emit a debugging message.
 Logs a debugging message, if the given flags are active.

@@ -360,7 +360,7 @@ int mq_send_fd(struct mq *mq, int fd, size_t maxlen);
 /** Store the next message in the given buffer.
  *
  * This function allows the caller to provide the storage space for the next
- * message to be received. @ref buf must already be initialized. Any existing
+ * message to be received. The parameter buf must already be initialized. Any existing
  * contents will be overwritten. Callers MUST NOT inspect/modify/free buf until
  * a successful call to @ref mq_recv indicates completed receipt of a message.
  * It is undefined behavior to call this if a message has already been

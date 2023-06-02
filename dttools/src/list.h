@@ -46,6 +46,8 @@ all of our code, we simply insert these defines to
 transparently modify the linker namespace we are using.
 */
 
+#ifndef DOXYGEN
+
 #define list_create			cctools_list_create
 #define list_destroy			cctools_list_destroy
 #define list_length			cctools_list_length
@@ -81,6 +83,8 @@ transparently modify the linker namespace we are using.
 #define list_iterate_reverse		cctools_list_iterate_reverse
 #define list_first_item			cctools_list_first_item
 #define list_next_item			cctools_list_next_item
+
+#endif
 
 /** Create an empty linked list.
  * @returns A pointer to the newly created list.
