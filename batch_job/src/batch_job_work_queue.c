@@ -250,6 +250,18 @@ static void batch_queue_wq_option_update (struct batch_queue *q, const char *wha
 		} else {
 			debug(D_NOTICE, "Could no parse '%s' as a summary of resorces encoded in JSON\n", value);
 		}
+        } else if(strcmp(what,"scheduler")) {
+		if(!strcmp(value,"files")) {	
+			work_queue_specify_algorithm(q->data,WORK_QUEUE_SCHEDULE_FILES);
+		} else if(!strcmp(value,"time")) {
+			work_queue_specify_algorithm(q->data,WORK_QUEUE_SCHEDULE_TIME);
+		} else if(!strcmp(value,"fcfs")) {
+			work_queue_specify_algorithm(q->data,WORK_QUEUE_SCHEDULE_FCFS);
+		} else if(!strcmp(value,"random")) {
+			work_queue_specify_algorithm(q->data,WORK_QUEUE_SCHEDULE_RAND);
+		} else {
+			debug(D_NOTICE|D_BATCH,"unknown scheduling mode %s\n",optarg);
+		}
 	}
 }
 

@@ -257,7 +257,21 @@ static void batch_queue_vine_option_update (struct batch_queue *q, const char *w
 			vine_set_category_resources_max(q->data, s->category, s);
 			rmsummary_delete(s);
 		} else {
-			debug(D_NOTICE, "Could no parse '%s' as a summary of resorces encoded in JSON\n", value);
+			debug(D_NOTICE, "Could not parse '%s' as a summary of resorces encoded in JSON\n", value);
+		}
+        } else if(strcmp(what,"scheduler")) {
+		if(!strcmp(value,"files")) {	
+			vine_set_scheduler(q->data,VINE_SCHEDULE_FILES);
+		} else if(!strcmp(value,"time")) {
+			vine_set_scheduler(q->data,VINE_SCHEDULE_TIME);
+		} else if(!strcmp(value,"fcfs")) {
+			vine_set_scheduler(q->data,VINE_SCHEDULE_FCFS);
+		} else if(!strcmp(value,"random")) {
+			vine_set_scheduler(q->data,VINE_SCHEDULE_RAND);
+		} else if(!strcmp(value,"random")) {
+			vine_set_scheduler(q->data,VINE_SCHEDULE_WORST);
+		} else {
+			debug(D_NOTICE|D_BATCH,"unknown scheduling mode %s\n",optarg);
 		}
 	}
 }
