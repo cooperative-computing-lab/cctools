@@ -61,7 +61,7 @@ show_help()
 
 	echo "worker options:"
 
-	echo "  -M,--manager-name <name>  Name of the preferred master for worker."
+	echo "  -M,--manager-name <name>  Name of the preferred manager for worker."
 	echo "  -N,--name <name>          Same as -M (backwards compatibility)."
 	echo "  -C,--catalog <catalog>    Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
 	echo "  -t,--timeout <time>       Abort after this amount of idle time. (default=900s)."
