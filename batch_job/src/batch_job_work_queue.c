@@ -250,7 +250,7 @@ static void batch_queue_wq_option_update (struct batch_queue *q, const char *wha
 		} else {
 			debug(D_NOTICE, "Could no parse '%s' as a summary of resorces encoded in JSON\n", value);
 		}
-        } else if(strcmp(what,"scheduler")) {
+        } else if(!strcmp(what,"scheduler")) {
 		if(!strcmp(value,"files")) {	
 			work_queue_specify_algorithm(q->data,WORK_QUEUE_SCHEDULE_FILES);
 		} else if(!strcmp(value,"time")) {

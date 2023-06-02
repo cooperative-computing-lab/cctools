@@ -104,7 +104,7 @@ static batch_job_id_t batch_job_vine_submit (struct batch_queue * q, const char 
 
 	t = vine_task_create(cmd);
 
-	specify_files(q->data, t, extra_input_files, extra_output_files, caching_flag);
+	specify_files(q, t, extra_input_files, extra_output_files, caching_flag);
 	specify_envlist(t,envlist);
 
 	if(envlist) {
@@ -259,7 +259,7 @@ static void batch_queue_vine_option_update (struct batch_queue *q, const char *w
 		} else {
 			debug(D_NOTICE, "Could not parse '%s' as a summary of resorces encoded in JSON\n", value);
 		}
-        } else if(strcmp(what,"scheduler")) {
+        } else if(!strcmp(what,"scheduler")) {
 		if(!strcmp(value,"files")) {	
 			vine_set_scheduler(q->data,VINE_SCHEDULE_FILES);
 		} else if(!strcmp(value,"time")) {
@@ -268,7 +268,7 @@ static void batch_queue_vine_option_update (struct batch_queue *q, const char *w
 			vine_set_scheduler(q->data,VINE_SCHEDULE_FCFS);
 		} else if(!strcmp(value,"random")) {
 			vine_set_scheduler(q->data,VINE_SCHEDULE_RAND);
-		} else if(!strcmp(value,"random")) {
+		} else if(!strcmp(value,"worst")) {
 			vine_set_scheduler(q->data,VINE_SCHEDULE_WORST);
 		} else {
 			debug(D_NOTICE|D_BATCH,"unknown scheduling mode %s\n",optarg);
