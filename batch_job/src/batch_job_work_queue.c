@@ -151,16 +151,6 @@ static batch_job_id_t batch_job_wq_wait (struct batch_queue * q, struct batch_jo
 			}
 		}
 
-		char *outfile = itable_remove(q->output_table, t->taskid);
-		if(outfile) {
-			FILE *file = fopen(outfile, "w");
-			if(file) {
-				fwrite(t->output, strlen(t->output), 1, file);
-				fclose(file);
-			}
-			free(outfile);
-		}
-
 		taskid = t->taskid;
 		work_queue_task_delete(t);
 	}

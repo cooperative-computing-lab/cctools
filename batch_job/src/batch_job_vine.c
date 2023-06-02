@@ -169,18 +169,8 @@ static batch_job_id_t batch_job_vine_wait (struct batch_queue * q, struct batch_
 			printf("%s\n",s);
 		}
 
-		char *outfile = itable_remove(q->output_table, vine_task_get_id(t));
-		if(outfile) {
-			FILE *file = fopen(outfile, "w");
-			if(file) {
-				fwrite(s, strlen(s), 1, file);
-				fclose(file);
-			}
-			free(outfile);
-		}
-
 		taskid = vine_task_get_id(t);
-				vine_task_delete(t);
+		vine_task_delete(t);
 	}
 
 	if(taskid >= 0) {

@@ -55,7 +55,6 @@ struct batch_queue {
 	struct hash_table *features;
 	struct hash_table *file_table;
 	struct itable *job_table;
-	struct itable *output_table;
 	void *data; /* module user data */
 	const struct batch_queue_module *module;
 };

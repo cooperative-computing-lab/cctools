@@ -103,7 +103,6 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 	q->options = hash_table_create(0, NULL);
 	q->features = hash_table_create(0, NULL);
 	q->job_table = itable_create(0);
-	q->output_table = itable_create(0);
 	q->data = NULL;
 
 	batch_queue_set_feature(q, "local_job_queue", "yes");
@@ -148,7 +147,6 @@ void batch_queue_delete(struct batch_queue *q)
 			;
 		hash_table_delete(q->features);
 		itable_delete(q->job_table);
-		itable_delete(q->output_table);
 		free(q);
 	}
 }
