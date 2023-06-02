@@ -491,7 +491,19 @@ const char * vine_task_get_hostname( struct vine_task *t );
 
 /** Get a performance metric of a completed task.
 @param t A task object.
-@param name The name of a performance metric.
+@param name The name of an integer performance metric:
+- "time_when_submitted"
+- "time_when_done"
+- "time_when_commit_start"
+- "time_when_commit_end"
+- "time_when_retrieval"
+- "time_workers_execute_last"
+- "time_workers_execute_all"
+- "time_workers_execute_exhaustion"
+- "time_workers_execute_failure"
+- "bytes_received"
+- "bytes_sent"
+- "bytes_transferred"
 @return The metric value, or zero if an invalid name is given.
 */
 
