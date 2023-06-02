@@ -97,7 +97,7 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *c
 		work_queue_task_specify_resources(t, resources);
 	}
 
-	work_queue_submit(q->data, t);
+	work_queue_submit(q->wq_manager, t);
 
 	return t->taskid;
 }
@@ -110,14 +110,14 @@ static batch_job_id_t batch_job_wq_wait (struct batch_queue * q, struct batch_jo
 	if(!try_open_log)
 	{
 		try_open_log = 1;
-		if(!work_queue_specify_log(q->data, q->logfile))
+		if(!work_queue_specify_log(q->wq_manager, q->logfile))
 		{
 			return -1;
 		}
 
 		const char *transactions = batch_queue_get_option(q, "batch_log_transactions_name");
 		if(transactions) {
-			work_queue_specify_transactions_log(q->data, transactions);
+			work_queue_specify_transactions_log(q->wq_manager, transactions);
 		}
 	}
 
@@ -127,7 +127,7 @@ static batch_job_id_t batch_job_wq_wait (struct batch_queue * q, struct batch_jo
 		timeout = MAX(0, stoptime - time(0));
 	}
 
-	struct work_queue_task *t = work_queue_wait(q->data, timeout);
+	struct work_queue_task *t = work_queue_wait(q->wq_manager, timeout);
 	if(t) {
 		info->submitted = t->time_when_submitted / 1000000;
 		info->started   = t->time_when_commit_end / 1000000;
@@ -159,7 +159,7 @@ static batch_job_id_t batch_job_wq_wait (struct batch_queue * q, struct batch_jo
 		return taskid;
 	}
 
-	if(work_queue_empty(q->data)) {
+	if(work_queue_empty(q->wq_manager)) {
 		return 0;
 	} else {
 		return -1;
@@ -174,9 +174,9 @@ static int batch_job_wq_remove (struct batch_queue *q, batch_job_id_t jobid)
 static int batch_queue_wq_create (struct batch_queue *q)
 {
 	strncpy(q->logfile, "wq.log", sizeof(q->logfile));
-	if ((q->data = work_queue_create(0)) == NULL)
+	if ((q->wq_manager = work_queue_create(0)) == NULL)
 		return -1;
-	work_queue_enable_process_module(q->data);
+	work_queue_enable_process_module(q->wq_manager);
 	batch_queue_set_feature(q, "absolute_path", NULL);
 	batch_queue_set_feature(q, "remote_rename", "%s=%s");
 	batch_queue_set_feature(q, "batch_log_name", "%s.wqlog");
@@ -186,79 +186,79 @@ static int batch_queue_wq_create (struct batch_queue *q)
 
 static int batch_queue_wq_free (struct batch_queue *q)
 {
-	if (q->data) {
-		work_queue_delete(q->data);
-		q->data = NULL;
+	if (q->wq_manager) {
+		work_queue_delete(q->wq_manager);
+		q->wq_manager = NULL;
 	}
 	return 0;
 }
 
 static int batch_queue_wq_port (struct batch_queue *q)
 {
-	return work_queue_port(q->data);
+	return work_queue_port(q->wq_manager);
 }
 
 static void batch_queue_wq_option_update (struct batch_queue *q, const char *what, const char *value)
 {
 	if(strcmp(what, "password") == 0) {
 		if(value)
-			work_queue_specify_password(q->data, value);
+			work_queue_specify_password(q->wq_manager, value);
 	} else if(strcmp(what, "manager-mode") == 0) {
 		if(strcmp(value, "catalog") == 0)
-			work_queue_specify_manager_mode(q->data, WORK_QUEUE_MANAGER_MODE_CATALOG);
+			work_queue_specify_manager_mode(q->wq_manager, WORK_QUEUE_MANAGER_MODE_CATALOG);
 		else if(strcmp(value, "standalone") == 0)
-			work_queue_specify_manager_mode(q->data, WORK_QUEUE_MANAGER_MODE_STANDALONE);
+			work_queue_specify_manager_mode(q->wq_manager, WORK_QUEUE_MANAGER_MODE_STANDALONE);
 	} else if(strcmp(what, "name") == 0) {
 		if(value)
-			work_queue_specify_name(q->data, value);
+			work_queue_specify_name(q->wq_manager, value);
 	} else if(strcmp(what, "debug") == 0) {
 		if(value)
-			work_queue_specify_debug_path(q->data, value);
+			work_queue_specify_debug_path(q->wq_manager, value);
 	} else if(strcmp(what, "tlq-port") == 0) {
 		if(value)
-			work_queue_specify_tlq_port(q->data, atoi(value));
+			work_queue_specify_tlq_port(q->wq_manager, atoi(value));
 	} else if(strcmp(what, "priority") == 0) {
 		if(value)
-			work_queue_specify_priority(q->data, atoi(value));
+			work_queue_specify_priority(q->wq_manager, atoi(value));
 		else
-			work_queue_specify_priority(q->data, 0);
+			work_queue_specify_priority(q->wq_manager, 0);
 	} else if(strcmp(what, "fast-abort") == 0) {
 		if(value)
-			work_queue_activate_fast_abort(q->data, atof(value));
+			work_queue_activate_fast_abort(q->wq_manager, atof(value));
 	} else if(strcmp(what, "estimate-capacity") == 0) {
-		work_queue_specify_estimate_capacity_on(q->data, string_istrue(value));
+		work_queue_specify_estimate_capacity_on(q->wq_manager, string_istrue(value));
 	} else if(strcmp(what, "keepalive-interval") == 0) {
 		if(value)
-			work_queue_specify_keepalive_interval(q->data, atoi(value));
+			work_queue_specify_keepalive_interval(q->wq_manager, atoi(value));
 		else
-			work_queue_specify_keepalive_interval(q->data, WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
+			work_queue_specify_keepalive_interval(q->wq_manager, WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
 	} else if(strcmp(what, "keepalive-timeout") == 0) {
 		if(value)
-			work_queue_specify_keepalive_timeout(q->data, atoi(value));
+			work_queue_specify_keepalive_timeout(q->wq_manager, atoi(value));
 		else
-			work_queue_specify_keepalive_timeout(q->data, WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT);
+			work_queue_specify_keepalive_timeout(q->wq_manager, WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT);
 	} else if(strcmp(what, "manager-preferred-connection") == 0) {
 		if(value)
-			work_queue_manager_preferred_connection(q->data, value);
+			work_queue_manager_preferred_connection(q->wq_manager, value);
 		else
-			work_queue_manager_preferred_connection(q->data, "by_ip");
+			work_queue_manager_preferred_connection(q->wq_manager, "by_ip");
 	} else if(strcmp(what, "category-limits") == 0) {
 		struct rmsummary *s = rmsummary_parse_string(value);
 		if(s) {
-			work_queue_specify_category_max_resources(q->data, s->category, s);
+			work_queue_specify_category_max_resources(q->wq_manager, s->category, s);
 			rmsummary_delete(s);
 		} else {
 			debug(D_NOTICE, "Could no parse '%s' as a summary of resorces encoded in JSON\n", value);
 		}
         } else if(!strcmp(what,"scheduler")) {
 		if(!strcmp(value,"files")) {	
-			work_queue_specify_algorithm(q->data,WORK_QUEUE_SCHEDULE_FILES);
+			work_queue_specify_algorithm(q->wq_manager,WORK_QUEUE_SCHEDULE_FILES);
 		} else if(!strcmp(value,"time")) {
-			work_queue_specify_algorithm(q->data,WORK_QUEUE_SCHEDULE_TIME);
+			work_queue_specify_algorithm(q->wq_manager,WORK_QUEUE_SCHEDULE_TIME);
 		} else if(!strcmp(value,"fcfs")) {
-			work_queue_specify_algorithm(q->data,WORK_QUEUE_SCHEDULE_FCFS);
+			work_queue_specify_algorithm(q->wq_manager,WORK_QUEUE_SCHEDULE_FCFS);
 		} else if(!strcmp(value,"random")) {
-			work_queue_specify_algorithm(q->data,WORK_QUEUE_SCHEDULE_RAND);
+			work_queue_specify_algorithm(q->wq_manager,WORK_QUEUE_SCHEDULE_RAND);
 		} else {
 			debug(D_NOTICE|D_BATCH,"unknown scheduling mode %s\n",optarg);
 		}

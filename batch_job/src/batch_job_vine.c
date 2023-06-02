@@ -27,7 +27,7 @@ static struct vine_file * declare_once( struct batch_queue *q, const char *name,
 
 	f = hash_table_lookup(q->file_table,name);
 	if(!f) {
-		f = vine_declare_file(q->data,name,flags);
+		f = vine_declare_file(q->tv_manager,name,flags);
 		hash_table_insert(q->file_table,name,f);
 	}
 	return f;
@@ -119,7 +119,7 @@ static batch_job_id_t batch_job_vine_submit (struct batch_queue * q, const char 
 		vine_task_set_resources(t, resources);
 	}
 
-	return vine_submit(q->data, t);
+	return vine_submit(q->tv_manager, t);
 }
 
 static batch_job_id_t batch_job_vine_wait (struct batch_queue * q, struct batch_job_info * info, time_t stoptime)
@@ -130,14 +130,14 @@ static batch_job_id_t batch_job_vine_wait (struct batch_queue * q, struct batch_
 	if(!try_open_log)
 	{
 		try_open_log = 1;
-		if(!vine_enable_perf_log(q->data, q->logfile))
+		if(!vine_enable_perf_log(q->tv_manager, q->logfile))
 		{
 			return -1;
 		}
 
 		const char *transactions = batch_queue_get_option(q, "batch_log_transactions_name");
 		if(transactions) {
-			vine_enable_transactions_log(q->data, transactions);
+			vine_enable_transactions_log(q->tv_manager, transactions);
 		}
 	}
 
@@ -147,7 +147,7 @@ static batch_job_id_t batch_job_vine_wait (struct batch_queue * q, struct batch_
 		timeout = MAX(0, stoptime - time(0));
 	}
 
-	struct vine_task *t = vine_wait(q->data, timeout);
+	struct vine_task *t = vine_wait(q->tv_manager, timeout);
 	if(t) {
 		info->submitted = vine_task_get_metric(t,"time_when_submitted") / 1000000;
 		info->started   = vine_task_get_metric(t,"time_when_commit_end") / 1000000;
@@ -177,7 +177,7 @@ static batch_job_id_t batch_job_vine_wait (struct batch_queue * q, struct batch_
 		return taskid;
 	}
 
-	if(vine_empty(q->data)) {
+	if(vine_empty(q->tv_manager)) {
 		return 0;
 	} else {
 		return -1;
@@ -192,9 +192,9 @@ static int batch_job_vine_remove (struct batch_queue *q, batch_job_id_t jobid)
 static int batch_queue_vine_create (struct batch_queue *q)
 {
 	strncpy(q->logfile, "vine.log", sizeof(q->logfile));
-	if ((q->data = vine_create(0)) == NULL)
+	if ((q->tv_manager = vine_create(0)) == NULL)
 		return -1;
-	vine_manager_enable_process_shortcut(q->data);
+	vine_manager_enable_process_shortcut(q->tv_manager);
 	batch_queue_set_feature(q, "absolute_path", NULL);
 	batch_queue_set_feature(q, "remote_rename", "%s=%s");
 	batch_queue_set_feature(q, "batch_log_name", "%s.vine.log");
@@ -208,9 +208,9 @@ static int batch_queue_vine_free (struct batch_queue *q)
 		hash_table_delete(q->file_table);
 	}
 	
-	if (q->data) {
-		vine_delete(q->data);
-		q->data = NULL;
+	if (q->tv_manager) {
+		vine_delete(q->tv_manager);
+		q->tv_manager = NULL;
 	}
 
 	return 0;
@@ -218,58 +218,58 @@ static int batch_queue_vine_free (struct batch_queue *q)
 
 static int batch_queue_vine_port (struct batch_queue *q)
 {
-	return vine_port(q->data);
+	return vine_port(q->tv_manager);
 }
 
 static void batch_queue_vine_option_update (struct batch_queue *q, const char *what, const char *value)
 {
 	if(strcmp(what, "password") == 0) {
 		if(value)
-			vine_set_password(q->data, value);
+			vine_set_password(q->tv_manager, value);
 	} else if(strcmp(what, "name") == 0) {
 		if(value)
-			vine_set_name(q->data, value);
+			vine_set_name(q->tv_manager, value);
 	} else if(strcmp(what, "debug") == 0) {
 		if(value)
 			vine_enable_debug_log(value);
 	} else if(strcmp(what, "priority") == 0) {
 		if(value)
-			vine_set_priority(q->data, atoi(value));
+			vine_set_priority(q->tv_manager, atoi(value));
 		else
-			vine_set_priority(q->data, 0);
+			vine_set_priority(q->tv_manager, 0);
 	} else if(strcmp(what, "fast-abort") == 0 || strcmp(what,"disconnect-slow-workers")==0 ) {
 		if(value)
-			vine_enable_disconnect_slow_workers(q->data, atof(value));
+			vine_enable_disconnect_slow_workers(q->tv_manager, atof(value));
 	} else if(strcmp(what, "keepalive-interval") == 0) {
 		if(value)
-			vine_tune(q->data, "keepalive-interval",atoi(value));
+			vine_tune(q->tv_manager, "keepalive-interval",atoi(value));
 	} else if(strcmp(what, "keepalive-timeout") == 0) {
 		if(value)
-			vine_tune(q->data, "keepalive-timeout",atoi(value));
+			vine_tune(q->tv_manager, "keepalive-timeout",atoi(value));
 	} else if(strcmp(what, "manager-preferred-connection") == 0) {
 		if(value)
-			vine_set_manager_preferred_connection(q->data, value);
+			vine_set_manager_preferred_connection(q->tv_manager, value);
 		else
-			vine_set_manager_preferred_connection(q->data, "by_ip");
+			vine_set_manager_preferred_connection(q->tv_manager, "by_ip");
 	} else if(strcmp(what, "category-limits") == 0) {
 		struct rmsummary *s = rmsummary_parse_string(value);
 		if(s) {
-			vine_set_category_resources_max(q->data, s->category, s);
+			vine_set_category_resources_max(q->tv_manager, s->category, s);
 			rmsummary_delete(s);
 		} else {
 			debug(D_NOTICE, "Could not parse '%s' as a summary of resorces encoded in JSON\n", value);
 		}
         } else if(!strcmp(what,"scheduler")) {
 		if(!strcmp(value,"files")) {	
-			vine_set_scheduler(q->data,VINE_SCHEDULE_FILES);
+			vine_set_scheduler(q->tv_manager,VINE_SCHEDULE_FILES);
 		} else if(!strcmp(value,"time")) {
-			vine_set_scheduler(q->data,VINE_SCHEDULE_TIME);
+			vine_set_scheduler(q->tv_manager,VINE_SCHEDULE_TIME);
 		} else if(!strcmp(value,"fcfs")) {
-			vine_set_scheduler(q->data,VINE_SCHEDULE_FCFS);
+			vine_set_scheduler(q->tv_manager,VINE_SCHEDULE_FCFS);
 		} else if(!strcmp(value,"random")) {
-			vine_set_scheduler(q->data,VINE_SCHEDULE_RAND);
+			vine_set_scheduler(q->tv_manager,VINE_SCHEDULE_RAND);
 		} else if(!strcmp(value,"worst")) {
-			vine_set_scheduler(q->data,VINE_SCHEDULE_WORST);
+			vine_set_scheduler(q->tv_manager,VINE_SCHEDULE_WORST);
 		} else {
 			debug(D_NOTICE|D_BATCH,"unknown scheduling mode %s\n",optarg);
 		}

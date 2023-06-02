@@ -103,8 +103,9 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 	q->options = hash_table_create(0, NULL);
 	q->features = hash_table_create(0, NULL);
 	q->job_table = itable_create(0);
-	q->data = NULL;
-
+	q->tv_manager = 0;
+	q->wq_manager = 0;
+	
 	batch_queue_set_feature(q, "local_job_queue", "yes");
 	batch_queue_set_feature(q, "absolute_path", "yes");
 	batch_queue_set_feature(q, "output_directories", "yes");
