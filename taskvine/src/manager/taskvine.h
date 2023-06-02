@@ -509,6 +509,12 @@ const char * vine_task_get_hostname( struct vine_task *t );
 
 int64_t vine_task_get_metric( struct vine_task *t, const char *name );
 
+/** Set the expected resource consumption of a task before execution.
+@param t A task object.
+@param rm A resource summary object.
+*/
+
+void vine_task_set_resources(struct vine_task *t, const struct rmsummary *rm );
 
 /** Get resource information (e.g., cores, memory, and disk) of a completed task.
 @param t A task object.

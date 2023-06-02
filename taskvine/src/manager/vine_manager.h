@@ -211,6 +211,9 @@ int vine_manager_transfer_time( struct vine_manager *q, struct vine_worker_info 
 const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, struct vine_task *t);
 const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, struct vine_task *t);
 
+/* Internal: Enable shortcut of main loop upon child process completion. Needed for Makeflow to interleave local and remote execution. */
+void vine_manager_enable_process_shortcut(struct vine_manager *q);
+
 struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t );
 
 int64_t overcommitted_resource_total(struct vine_manager *q, int64_t total);

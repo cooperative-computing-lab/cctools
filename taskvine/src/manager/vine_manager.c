@@ -4719,7 +4719,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	return 0;
 }
 
-void vine_enable_process_module(struct vine_manager *q)
+void vine_manager_enable_process_shortcut(struct vine_manager *q)
 {
 	q->process_pending_check = 1;
 }
