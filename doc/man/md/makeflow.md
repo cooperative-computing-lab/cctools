@@ -116,7 +116,7 @@ OPTION_END
 - **--verbose**<br />Display runtime progress on stdout.
 
 
-### WorkQueue Options
+### TaskVine and Work Queue Options
 
 - **-C**,**--catalog-server=_&lt;catalog&gt;_**<br />Set catalog server to _&lt;catalog&gt;_. Format: HOSTNAME:PORT
 - **-F**,**--wq-fast-abort=_&lt;#&gt;_**<br />WorkQueue fast abort multiplier. (default is deactivated)
@@ -124,12 +124,12 @@ OPTION_END
 - **-p**,**--port=_&lt;port&gt;_**<br />Port number to use with WorkQueue. (default is 9123, 0=arbitrary)
 - **-Z**,**--port-file=_&lt;file&gt;_**<br />Select port at random and write it to this file.  (default is disabled)
 - **-P**,**--priority=_&lt;integer&gt;_**<br />Priority. Higher the value, higher the priority.
-- **-t**,**--wq-keepalive-timeout=_&lt;#&gt;_**<br />Work Queue keepalive timeout (default: 30s)
-- **-u**,**--wq-keepalive-interval=_&lt;#&gt;_**<br />Work Queue keepalive interval (default: 120s)
-- **-W**,**--wq-schedule=_&lt;mode&gt;_**<br />WorkQueue scheduling algorithm. (time|files|fcfs)
+- **-t**,**--keepalive-timeout=_&lt;#&gt;_**<br />Work Queue keepalive timeout (default: 30s)
+- **-u**,**--keepalive-interval=_&lt;#&gt;_**<br />Work Queue keepalive interval (default: 120s)
+- **-W**,**--schedule=_&lt;mode&gt;_**<br />WorkQueue scheduling algorithm. (time|files|fcfs)
 - **--password=_&lt;pwfile&gt;_**<br />Password file for authenticating workers.
-- **--disable-cache**<br />Disable file caching (currently only Work Queue, default is false)
-- **--work-queue-preferred-connection=_&lt;connection&gt;_**<br />Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
+- **--cache-mode**<br /> Control worker caching mode. (never|workflow|forever)
+- **--preferred-connection=_&lt;connection&gt;_**<br />Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
 
 
 ### Monitor Options
