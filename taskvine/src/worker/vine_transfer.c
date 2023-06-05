@@ -76,15 +76,15 @@ static int vine_transfer_put_internal( struct link *lnk, const char *full_name, 
 	int64_t actual, length;
 	int mode;
 
+	/* URL encode filename to handle spaces and unprintable characters. */
+	char relative_name_encoded[VINE_LINE_MAX];
+	url_encode(relative_name,relative_name_encoded,sizeof(relative_name_encoded));
+
 	if(stat(full_name, &info) != 0) {
 		goto access_failure;
 	}
 
 	mode = info.st_mode & 0777;
-
-	/* URL encode filename to handle spaces and unprintable characters. */
-	char relative_name_encoded[VINE_LINE_MAX];
-	url_encode(relative_name,relative_name_encoded,sizeof(relative_name_encoded));
 
 	if(S_ISREG(info.st_mode)) {
 		int fd = open(full_name, O_RDONLY, 0);
