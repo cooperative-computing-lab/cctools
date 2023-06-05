@@ -82,11 +82,15 @@ static int vine_transfer_put_internal( struct link *lnk, const char *full_name, 
 
 	mode = info.st_mode & 0777;
 
+	/* URL encode filename to handle spaces and unprintable characters. */
+	char relative_name_encoded[VINE_LINE_MAX];
+	url_encode(relative_name,relative_name_encoded,sizeof(relative_name_encoded));
+
 	if(S_ISREG(info.st_mode)) {
 		int fd = open(full_name, O_RDONLY, 0);
 		if(fd >= 0) {
 			length = info.st_size;
-			send_message(lnk, "file %s %"PRId64" 0%o\n", relative_name, length, mode );
+			send_message(lnk, "file %s %"PRId64" 0%o\n", relative_name_encoded, length, mode );
 			actual = link_stream_from_fd(lnk, fd, length, stoptime);
 			close(fd);
 			if(actual != length) goto send_failure;
@@ -108,7 +112,7 @@ static int vine_transfer_put_internal( struct link *lnk, const char *full_name, 
 		DIR *dir = opendir(full_name);
 		if(!dir) goto access_failure;
 
-		send_message(lnk, "dir %s 0\n",relative_name);
+		send_message(lnk, "dir %s 0\n",relative_name_encoded);
 
 		struct dirent *dent;
 		while((dent = readdir(dir))) {
@@ -129,7 +133,7 @@ static int vine_transfer_put_internal( struct link *lnk, const char *full_name, 
 		char link_target[VINE_LINE_MAX];
 		int result = readlink(full_name,link_target,sizeof(link_target));
 		if(result>0) {
-			send_message(lnk, "symlink %s %d\n",relative_name,result);
+			send_message(lnk, "symlink %s %d\n",relative_name_encoded,result);
 			link_write(lnk,link_target,result,stoptime);
 		} else {
 			goto access_failure;
@@ -142,7 +146,7 @@ static int vine_transfer_put_internal( struct link *lnk, const char *full_name, 
 
 access_failure:
 	// An error here is not a failure from our perspective, keep going.
-	send_message(lnk, "error %s %d\n", relative_name, errno);
+	send_message(lnk, "error %s %d\n", relative_name_encoded, errno);
 	return 1;
 
 send_failure:
