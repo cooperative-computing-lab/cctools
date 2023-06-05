@@ -96,10 +96,15 @@ static batch_job_id_t batch_job_vine_submit (struct batch_queue * q, const char 
 
 	int caching_flag = VINE_CACHE;
 
-	if(string_istrue(hash_table_lookup(q->options, "caching"))) {
-		caching_flag = VINE_CACHE;
-	} else {
+	const char *caching_option = hash_table_lookup(q->options,"caching");
+	if(!strcmp(caching_option,"never")) {
 		caching_flag = VINE_CACHE_NEVER;
+	} else if(!strcmp(caching_option,"workflow")) {
+		caching_flag = VINE_CACHE;
+	} else if(!strcmp(caching_option,"forever")) {
+		caching_flag = VINE_CACHE_ALWAYS;
+	} else {
+		caching_flag = VINE_CACHE;
 	}
 
 	t = vine_task_create(cmd);

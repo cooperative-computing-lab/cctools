@@ -189,11 +189,11 @@ before starting the dag, instead proceed under optimistic assumptions.
 static int skip_file_check = 0;
 
 /*
-Enable caching within the underlying batch system.
-In the case of Work Queue, this caches immutable files on the workers.
+Control caching within the underlying batch system, if supported.
+May be "never", "worklow", or "forever".
 */
 
-static int cache_mode = 1;
+static const char *cache_mode = "workflow";
 
 /*
 Hack: Enable batch job feature to pass detailed name to batch system.
@@ -1251,11 +1251,12 @@ static void show_help_run(const char *cmd)
 	printf(" -Z,--port-file=<file>          Select port at random and write it to this file.\n");
 	printf(" -P,--priority=<integer>        Priority. Higher the value, higher the priority.\n");
 	printf(" -N,--project-name=<project>    Set the Work Queue project name.\n");
+	printf("    --cache-mode=never|workflow|forever   Change caching control.\n");
 	printf(" -F,--fast-abort=<#>            Set the Work Queue fast abort multiplier.\n");
 	printf(" -t,--keepalive-timeout=<#>     Work Queue keepalive timeout. (default: 30s)\n");
 	printf(" -u,--keepalive-interval=<#>    Work Queue keepalive interval. (default: 120s)\n");
 	printf(" -W,--schedule=<mode>           Work Queue scheduling algor. (time|files|fcfs)\n");
-	printf(" --preferred-connection         Preferred connection: by_ip | by_hostname\n");
+	printf("    --preferred-connection      Preferred connection: by_ip | by_hostname\n");
 	        /********************************************************************************/
 	printf("\nBatch System Options:\n");
 	printf("    --amazon-config=<file>      Amazon EC2 config from makeflow_ec2_setup.\n");
@@ -1263,7 +1264,6 @@ static void show_help_run(const char *cmd)
 	printf("    --amazon-batch-config=<file>Batch config from makeflow_amazon_batch_setup.\n");
 	printf("    --amazon-batch-img=<img>    Specify Amazon ECS Image(Used for amazon-batch)\n");
 	printf(" -B,--batch-options=<options>   Add these options to all batch submit files.\n");
-	printf("    --disable-cache             Disable batch system caching.\n");
 	printf("    --disable-heartbeat         Disable job heartbeat check.\n");
 	printf("    --local-cores=#             Max number of local cores to use.\n");
 	printf("    --local-memory=#            Max amount of local memory (MB) to use.\n");
@@ -1441,6 +1441,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_AUTH = UCHAR_MAX+1,
 		LONG_OPT_ARGV,
 		LONG_OPT_CACHE,
+		LONG_OPT_CACHE_MODE,
 		LONG_OPT_DEBUG_ROTATE_MAX,
 		LONG_OPT_DISABLE_BATCH_CACHE,
 		LONG_OPT_DOT_CONDENSE,
@@ -1536,6 +1537,7 @@ int main(int argc, char *argv[])
 		{"batch-options", required_argument, 0, 'B'},
 		{"batch-type", required_argument, 0, 'T'},
 		{"cache", required_argument, 0, LONG_OPT_CACHE},
+		{"cache-mode", required_argument, 0, LONG_OPT_CACHE_MODE},
 		{"catalog-server", required_argument, 0, 'C'},
 		{"clean", optional_argument, 0, 'c'},
 		{"debug", required_argument, 0, 'd'},
@@ -1872,8 +1874,11 @@ int main(int argc, char *argv[])
 					return 1;
 				}
 				break;
+			case LONG_OPT_CACHE_MODE:
+				cache_mode = optarg;
+				break;
 			case LONG_OPT_DISABLE_BATCH_CACHE:
-				cache_mode = 0;
+				cache_mode = "never";
 				break;
 			case LONG_OPT_DISABLE_HEARTBEAT:
 				batch_job_disable_heartbeat = 1;
@@ -2388,7 +2393,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "priority", priority);
 	batch_queue_set_option(remote_queue, "keepalive-interval", option_keepalive_interval);
 	batch_queue_set_option(remote_queue, "keepalive-timeout", option_keepalive_timeout);
-	batch_queue_set_option(remote_queue, "caching", cache_mode ? "yes" : "no");
+	batch_queue_set_option(remote_queue, "caching", cache_mode);
 	batch_queue_set_option(remote_queue, "wait-queue-size", option_wait_queue_size);
 	batch_queue_set_option(remote_queue, "amazon-config", amazon_config);
 	batch_queue_set_option(remote_queue, "lambda-config", lambda_config);

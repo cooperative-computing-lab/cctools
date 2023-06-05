@@ -74,10 +74,11 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *c
 
 	int caching_flag = WORK_QUEUE_CACHE;
 
-	if(string_istrue(hash_table_lookup(q->options, "caching"))) {
-		caching_flag = WORK_QUEUE_CACHE;
-	} else {
+	const char *caching_option = hash_table_lookup(q->options,"caching");
+	if(!strcmp(caching_option,"never")) {
 		caching_flag = WORK_QUEUE_NOCACHE;
+	} else {
+		caching_flag = WORK_QUEUE_CACHE;
 	}
 
 	t = work_queue_task_create(cmd);
