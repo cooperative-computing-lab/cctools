@@ -129,22 +129,7 @@ static batch_job_id_t batch_job_vine_submit (struct batch_queue * q, const char 
 
 static batch_job_id_t batch_job_vine_wait (struct batch_queue * q, struct batch_job_info * info, time_t stoptime)
 {
-	static int try_open_log = 0;
 	int timeout, taskid = -1;
-
-	if(!try_open_log)
-	{
-		try_open_log = 1;
-		if(!vine_enable_perf_log(q->tv_manager, q->logfile))
-		{
-			return -1;
-		}
-
-		const char *transactions = batch_queue_get_option(q, "batch_log_transactions_name");
-		if(transactions) {
-			vine_enable_transactions_log(q->tv_manager, transactions);
-		}
-	}
 
 	if(stoptime == 0) {
 		timeout = VINE_WAIT_FOREVER;
