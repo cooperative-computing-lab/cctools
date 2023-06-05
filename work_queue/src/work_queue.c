@@ -4569,11 +4569,12 @@ static int send_one_task( struct work_queue *q )
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 
+	int tasks_considered = 0;
 	timestamp_t now = timestamp_get();
 
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
-	while( (t = list_next_item(q->ready_list))) {
+	while( (t = list_next_item(q->ready_list)) && tasks_considered < 100) {
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
 
@@ -4581,7 +4582,10 @@ static int send_one_task( struct work_queue *q )
 		w = find_best_worker(q,t);
 
 		// If there is no suitable worker, consider the next task.
-		if(!w) continue;
+		if(!w) {
+			tasks_considered++; 
+			continue;
+		}
 		// Otherwise, remove it from the ready list and start it:
 		commit_task_to_worker(q,w,t);
 
@@ -4590,7 +4594,6 @@ static int send_one_task( struct work_queue *q )
 
 	return 0;
 }
-
 
 static void print_large_tasks_warning(struct work_queue *q)
 {
