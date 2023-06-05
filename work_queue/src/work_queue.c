@@ -134,8 +134,6 @@ typedef enum {
 // Threshold for available disk space (MB) beyond which files are not received from worker.
 static uint64_t disk_avail_threshold = 100;
 
-int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
-
 /* default timeout for slow workers to come back to the pool */
 double wq_option_blocklist_slow_workers_timeout = 900;
 
@@ -5870,7 +5868,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	// (and resized) as needed by build_poll_table.
 	q->poll_table_size = 8;
 
-	q->worker_selection_algorithm = wq_option_scheduler;
+	q->worker_selection_algorithm = WORK_QUEUE_SCHEDULE_TIME;
 	q->process_pending_check = 0;
 
 	q->short_timeout = 5;

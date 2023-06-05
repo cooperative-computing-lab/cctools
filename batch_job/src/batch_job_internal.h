@@ -54,8 +54,9 @@ struct batch_queue {
 	struct hash_table *options;
 	struct hash_table *features;
 	struct itable *job_table;
-	struct itable *output_table;
-	void *data; /* module user data */
+	struct hash_table   *tv_file_table;
+	struct vine_manager *tv_manager;
+	struct work_queue   *wq_manager;
 	const struct batch_queue_module *module;
 };
 

@@ -33,6 +33,7 @@ extern const struct batch_queue_module batch_queue_torque;
 extern const struct batch_queue_module batch_queue_blue_waters;
 extern const struct batch_queue_module batch_queue_slurm;
 extern const struct batch_queue_module batch_queue_wq;
+extern const struct batch_queue_module batch_queue_vine;
 extern const struct batch_queue_module batch_queue_mesos;
 extern const struct batch_queue_module batch_queue_k8s;
 extern const struct batch_queue_module batch_queue_dryrun;
@@ -50,7 +51,7 @@ static struct batch_queue_module batch_queue_unknown = {
 	{NULL, NULL, NULL, NULL, NULL, NULL, NULL},
 };
 
-#define BATCH_JOB_SYSTEMS "local, wq, condor, sge, pbs, lsf, torque, moab, mpi, slurm, chirp, amazon, amazon-batch, lambda, mesos, k8s, dryrun"
+#define BATCH_JOB_SYSTEMS "local, vine, wq, condor, sge, pbs, lsf, torque, moab, mpi, slurm, chirp, amazon, amazon-batch, lambda, mesos, k8s, dryrun"
 
 const struct batch_queue_module * const batch_queue_modules[] = {
 	&batch_queue_amazon,
@@ -73,6 +74,7 @@ const struct batch_queue_module * const batch_queue_modules[] = {
 	&batch_queue_blue_waters,
 	&batch_queue_slurm,
 	&batch_queue_wq,
+	&batch_queue_vine,
 	&batch_queue_mesos,
 	&batch_queue_k8s,
 	&batch_queue_dryrun,
@@ -101,9 +103,10 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 	q->options = hash_table_create(0, NULL);
 	q->features = hash_table_create(0, NULL);
 	q->job_table = itable_create(0);
-	q->output_table = itable_create(0);
-	q->data = NULL;
-
+	q->tv_file_table = 0;
+	q->tv_manager = 0;
+	q->wq_manager = 0;
+	
 	batch_queue_set_feature(q, "local_job_queue", "yes");
 	batch_queue_set_feature(q, "absolute_path", "yes");
 	batch_queue_set_feature(q, "output_directories", "yes");
@@ -132,21 +135,17 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 void batch_queue_delete(struct batch_queue *q)
 {
 	if(q) {
-		char *key;
-		char *value;
-
 		debug(D_BATCH, "deleting queue %p", q);
 
 		q->module->free(q);
 
-		for (hash_table_firstkey(q->options); hash_table_nextkey(q->options, &key, (void **) &value); free(value))
-			;
+		hash_table_clear(q->options,free);
 		hash_table_delete(q->options);
-		for (hash_table_firstkey(q->features); hash_table_nextkey(q->features, &key, (void **) &value); free(value))
-			;
+
+		hash_table_clear(q->features,free);
 		hash_table_delete(q->features);
+
 		itable_delete(q->job_table);
-		itable_delete(q->output_table);
 		free(q);
 	}
 }

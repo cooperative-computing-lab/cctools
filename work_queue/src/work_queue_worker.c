@@ -557,8 +557,16 @@ The manager will not start sending tasks until this message is recevied.
 
 static void report_worker_ready( struct link *manager )
 {
-	char hostname[DOMAIN_NAME_MAX];
-	domain_name_cache_guess(hostname);
+    /* 
+    The hostname is useful for troubleshooting purposes, but not required.
+    If there are naming problems, just use "unknown".
+    */
+
+    char hostname[DOMAIN_NAME_MAX];
+    if(!domain_name_cache_guess(hostname)) {
+        strcpy(hostname,"unknown");
+    }
+
 	send_manager_message(manager,"workqueue %d %s %s %s %d.%d.%d\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_manager_message(manager, "info worker-id %s\n", worker_id);
 	send_features(manager);

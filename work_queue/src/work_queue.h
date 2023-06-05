@@ -128,12 +128,6 @@ typedef enum {
 } work_queue_category_mode_t;
 
 
-extern int wq_option_scheduler;	               /**< Initial setting for algorithm to assign tasks to
-												 workers upon creating queue . Change prior to
-												 calling work_queue_create, after queue is created
-												 this variable is not considered and changes must be
-												 made through the API calls.   */
-
 /** A task description.  This structure should only be created with @ref
  * work_queue_task_create and delete with @ref work_queue_task_delete.  You may
  * examine (but not modify) this structure once a task has completed.

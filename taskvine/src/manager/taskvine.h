@@ -491,12 +491,30 @@ const char * vine_task_get_hostname( struct vine_task *t );
 
 /** Get a performance metric of a completed task.
 @param t A task object.
-@param name The name of a performance metric.
+@param name The name of an integer performance metric:
+- "time_when_submitted"
+- "time_when_done"
+- "time_when_commit_start"
+- "time_when_commit_end"
+- "time_when_retrieval"
+- "time_workers_execute_last"
+- "time_workers_execute_all"
+- "time_workers_execute_exhaustion"
+- "time_workers_execute_failure"
+- "bytes_received"
+- "bytes_sent"
+- "bytes_transferred"
 @return The metric value, or zero if an invalid name is given.
 */
 
 int64_t vine_task_get_metric( struct vine_task *t, const char *name );
 
+/** Set the expected resource consumption of a task before execution.
+@param t A task object.
+@param rm A resource summary object.
+*/
+
+void vine_task_set_resources(struct vine_task *t, const struct rmsummary *rm );
 
 /** Get resource information (e.g., cores, memory, and disk) of a completed task.
 @param t A task object.
@@ -1093,6 +1111,28 @@ struct vine_task *vine_cancel_by_task_tag(struct vine_manager *m, const char *ta
 @return A struct list of all of the tasks canceled.  Each task must be deleted with @ref vine_task_delete or resubmitted with @ref vine_submit.
 */
 struct list * vine_tasks_cancel(struct vine_manager *m);
+
+/** Turn on the debugging log output and send to the named file.
+ * (Note it does not need the vine_manager structure, as it is enabled before
+ * the manager is created.)
+@param logfile The filename.
+@return 1 if logfile was opened, 0 otherwise.
+*/
+int vine_enable_debug_log( const char *logfile );
+
+/** Add a performance log file that records cummulative statistics of the connected workers and submitted tasks.
+@param m A manager object
+@param logfile The filename.
+@return 1 if logfile was opened, 0 otherwise.
+*/
+int vine_enable_perf_log(struct vine_manager *m, const char *logfile);
+
+/** Add a log file that records the states of the connected workers and tasks.
+@param m A manager object
+@param logfile The filename.
+@return 1 if logfile was opened, 0 otherwise.
+*/
+int vine_enable_transactions_log(struct vine_manager *m, const char *logfile);
 
 /** Shut down workers connected to the manager. Gives a best effort and then returns the number of workers given the shut down order.
 @param m A manager object
