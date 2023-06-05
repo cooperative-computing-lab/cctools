@@ -23,12 +23,12 @@ static struct vine_file * declare_once( struct batch_queue *q, const char *name,
 {
 	struct vine_file *f;
 
-	if(!q->file_table) q->file_table = hash_table_create(0,0);
+	if(!q->tv_file_table) q->tv_file_table = hash_table_create(0,0);
 
-	f = hash_table_lookup(q->file_table,name);
+	f = hash_table_lookup(q->tv_file_table,name);
 	if(!f) {
 		f = vine_declare_file(q->tv_manager,name,flags);
-		hash_table_insert(q->file_table,name,f);
+		hash_table_insert(q->tv_file_table,name,f);
 	}
 	return f;
 }
@@ -209,8 +209,8 @@ static int batch_queue_vine_create (struct batch_queue *q)
 
 static int batch_queue_vine_free (struct batch_queue *q)
 {
-	if (q->file_table) {
-		hash_table_delete(q->file_table);
+	if (q->tv_file_table) {
+		hash_table_delete(q->tv_file_table);
 	}
 	
 	if (q->tv_manager) {

@@ -103,6 +103,7 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 	q->options = hash_table_create(0, NULL);
 	q->features = hash_table_create(0, NULL);
 	q->job_table = itable_create(0);
+	q->tv_file_table = 0;
 	q->tv_manager = 0;
 	q->wq_manager = 0;
 	

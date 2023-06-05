@@ -53,8 +53,8 @@ struct batch_queue {
 	char logfile[PATH_MAX];
 	struct hash_table *options;
 	struct hash_table *features;
-	struct hash_table *file_table;
 	struct itable *job_table;
+	struct hash_table   *tv_file_table;
 	struct vine_manager *tv_manager;
 	struct work_queue   *wq_manager;
 	const struct batch_queue_module *module;
