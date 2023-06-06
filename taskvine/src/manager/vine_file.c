@@ -48,17 +48,10 @@ int vine_file_delete(struct vine_file *f)
 /* Create a new file object with the given properties. */
 struct vine_file *vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task, vine_file_flags_t flags)
 {
-	struct vine_file *f;
-
-	f = xxmalloc(sizeof(*f));
-
+	struct vine_file *f = xxmalloc(sizeof(*f));
 	memset(f, 0, sizeof(*f));
 
-	if(!source) {
-		fatal("%s: invalid null source argument",__func__);
-	}
-
-	f->source = xxstrdup(source);
+	f->source = source ? xxstrdup(source) : 0;
 	f->type = type;
 	f->size = size;
 	f->mini_task = mini_task;
@@ -86,9 +79,16 @@ struct vine_file *vine_file_create( const char *source, const char *cached_name,
 		ssize_t totalsize = 0;
 		if((f->flags & VINE_CACHE_ALWAYS) == VINE_CACHE_ALWAYS){
 			f->cached_name = vine_cached_name(f,&totalsize);
-		}
-		else{
-			f->cached_name = vine_random_name(f,&totalsize);
+		} else {
+			if(f->type == VINE_FILE){
+				f->cached_name = vine_meta_name(f,&totalsize);
+				/* if this is a pending file give it a random name */
+				if(!f->cached_name){
+					f->cached_name = vine_random_name(f,&totalsize);
+				}
+			}else{
+				f->cached_name = vine_random_name(f,&totalsize);
+			}
 		}
 		if(size==0) {
 			f->size = totalsize;

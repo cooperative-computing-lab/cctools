@@ -10,6 +10,9 @@ See the file COPYING for details.
 #include <stdint.h>
 #include <stdlib.h>
 
+/* Functions named md5_X are commonly used in a number of libraries.  Protect the namespace by renaming our functions to cctools_md5_X */
+
+#ifndef DOXYGEN
 #define md5_init cctools_md5_init
 #define md5_update cctools_md5_update
 #define md5_final cctools_md5_final
@@ -17,6 +20,7 @@ See the file COPYING for details.
 #define md5_file cctools_md5_file
 #define md5_to_string cctools_md5_to_string
 #define md5_of_string cctools_md5_of_string
+#endif
 
 /** @file md5.h
 Routines for computing MD5 checksums.

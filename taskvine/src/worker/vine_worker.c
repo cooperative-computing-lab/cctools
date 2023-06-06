@@ -118,7 +118,7 @@ static int abort_signal_received = 0;
 static int sigchld_received_flag = 0;
 
 // Password shared between manager and worker.
-char *password = 0;
+char *vine_worker_password = 0;
 
 // Allow worker to use symlinks when link() fails.  Enabled by default.
 int vine_worker_symlinks_enabled = 1;
@@ -460,8 +460,16 @@ The manager will not start sending tasks until this message is recevied.
 
 static void report_worker_ready( struct link *manager )
 {
+	/*
+	The hostname is useful for troubleshooting purposes, but not required.
+	If there are naming problems, just use "unknown".
+	*/
+
 	char hostname[DOMAIN_NAME_MAX];
-	domain_name_cache_guess(hostname);
+	if(!domain_name_cache_guess(hostname)) {
+		strcpy(hostname,"unknown");
+	}
+
 	send_message(manager,"taskvine %d %s %s %s %d.%d.%d\n",VINE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_message(manager, "info worker-id %s\n", worker_id);
 	vine_cache_scan(global_cache, manager);
@@ -1581,9 +1589,9 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	printf("connected to manager %s:%d via local address %s:%d\n", host, port, local_addr, local_port);
 	debug(D_VINE, "connected to manager %s:%d via local address %s:%d", host, port, local_addr, local_port);
 
-	if(password) {
+	if(vine_worker_password) {
 		debug(D_VINE,"authenticating to manager");
-		if(!link_auth_password(manager,password,idle_stoptime)) {
+		if(!link_auth_password(manager,vine_worker_password,idle_stoptime)) {
 			fprintf(stderr,"vine_worker: wrong password for manager %s:%d\n",host,port);
 			link_close(manager);
 			return 0;
@@ -2048,7 +2056,7 @@ int main(int argc, char *argv[])
 			exit(EXIT_SUCCESS);
 			break;
 		case 'P':
-			if(copy_file_to_buffer(optarg, &password, NULL) < 0) {
+			if(copy_file_to_buffer(optarg, &vine_worker_password, NULL) < 0) {
 				fprintf(stderr,"vine_worker: couldn't load password from %s: %s\n",optarg,strerror(errno));
 				exit(EXIT_FAILURE);
 			}

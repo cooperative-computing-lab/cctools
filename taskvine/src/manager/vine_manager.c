@@ -686,12 +686,12 @@ static void update_write_catalog(struct vine_manager *q )
 
 	// Send the buffer.
 	debug(D_VINE, "Advertising manager status to the catalog server(s) at %s ...", q->catalog_hosts);
-	if(!catalog_query_send_update_conditional(q->catalog_hosts, str)) {
+	if(!catalog_query_send_update(q->catalog_hosts, str, CATALOG_UPDATE_BACKGROUND|CATALOG_UPDATE_CONDITIONAL)) {
 
 		// If the send failed b/c the buffer is too big, send the lean version instead.
 		struct jx *lj = manager_lean_to_jx(q);
 		char *lstr = jx_print_string(lj);
-		catalog_query_send_update(q->catalog_hosts,lstr);
+		catalog_query_send_update(q->catalog_hosts,lstr,CATALOG_UPDATE_BACKGROUND);
 		free(lstr);
 		jx_delete(lj);
 	}
@@ -1898,6 +1898,7 @@ static struct jx * manager_to_jx( struct vine_manager *q )
 	jx_insert_integer(j,"time_internal",info.time_internal);
 	jx_insert_integer(j,"time_polling",info.time_polling);
 	jx_insert_integer(j,"time_application",info.time_application);
+	jx_insert_integer(j,"time_scheduling", info.time_scheduling);
 
 	jx_insert_integer(j,"time_workers_execute",info.time_workers_execute);
 	jx_insert_integer(j,"time_workers_execute_good",info.time_workers_execute_good);
@@ -2331,7 +2332,7 @@ struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q
 
 	struct rmsummary *limits = rmsummary_create(-1);
 
-	rmsummary_merge_override(limits, max);
+	rmsummary_merge_override_basic(limits, max);
 
 	int use_whole_worker = 1;
 	if(q->proportional_resources) {
@@ -2456,7 +2457,7 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 
 	if(result==VINE_SUCCESS) {
 		itable_insert(w->current_tasks_boxes, t->task_id, limits);
-		rmsummary_merge_override(t->resources_allocated, limits);
+		rmsummary_merge_override_basic(t->resources_allocated, limits);
 		debug(D_VINE, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
 	} else {
 		rmsummary_delete(limits);
@@ -2805,10 +2806,15 @@ static int send_one_task( struct vine_manager *q )
 		if(!vine_manager_check_inputs_available(q,t)) continue;
 		
 		// Find the best worker for the task at the head of the list
+		
+		q->stats_measure->time_scheduling = timestamp_get();
+		
 		w = vine_schedule_task_to_worker(q,t);
 
 		// If there is no suitable worker, consider the next task.
 		if(!w) continue;
+
+		q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
 
 		// Check if there is transfer capacity available.
 		if(q->peer_transfers_enabled)
@@ -3335,8 +3341,16 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 {
-	if(!q) {
-		return 0;
+	if(!q) return 0;
+
+
+	if(series) {
+		char *series_file = vine_get_runtime_path_log(q, "time-series");
+		if(!create_dir(series_file, 0777)) {
+			warn(D_VINE,"could not create monitor output directory - %s (%s)", series_file, strerror(errno));
+			return 0;
+		}
+		free(series_file);
 	}
 
 	q->monitor_mode = VINE_MON_DISABLED;
@@ -3348,14 +3362,6 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 
 	q->monitor_exe = vine_declare_file(q, exe, VINE_CACHE);
 	free(exe);
-
-	if(series) {
-		char *series_file = vine_get_runtime_path_log(q, "time-series");
-		if(!create_dir(series_file, 0777)) {
-			fatal("Could not create monitor output directory - %s (%s)", series_file, strerror(errno));
-		}
-		free(series_file);
-	}
 
 	if(q->measured_local_resources) {
 		rmsummary_delete(q->measured_local_resources);
@@ -3841,7 +3847,8 @@ static int task_request_count( struct vine_manager *q, const char *category, cat
 int vine_submit(struct vine_manager *q, struct vine_task *t)
 {
 	if(t->state!=VINE_TASK_UNKNOWN) {
-		fatal("TaskVine: Sorry, you cannot submit the same task (%d) (%s) twice!",t->task_id,t->command_line);
+		notice(D_VINE,"vine_submit: you cannot submit the same task (%d) (%s) twice!",t->task_id,t->command_line);
+		return 0;
 	}
 
 	/* Assign a unique ID to each task only when submitted. */
@@ -4712,7 +4719,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	return 0;
 }
 
-void vine_enable_process_module(struct vine_manager *q)
+void vine_manager_enable_process_shortcut(struct vine_manager *q)
 {
 	q->process_pending_check = 1;
 }
@@ -5068,8 +5075,8 @@ const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, 
 
 		struct rmsummary *r = rmsummary_create(-1);
 
-		rmsummary_merge_override(r, q->current_max_worker);
-		rmsummary_merge_override(r, t->resources_requested);
+		rmsummary_merge_override_basic(r, q->current_max_worker);
+		rmsummary_merge_override_basic(r, t->resources_requested);
 
 		s = category_task_min_resources(c, r, t->resource_request, t->task_id);
 		rmsummary_delete(r);
@@ -5165,7 +5172,6 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 	if(!f) {
 		return NULL;
 	}
-
 	assert(f->cached_name);
 	struct vine_file *previous = vine_manager_lookup_file(m, f->cached_name);
 

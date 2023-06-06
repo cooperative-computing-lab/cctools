@@ -16,12 +16,12 @@ print("submitting tasks...")
 for value in range(1,100):
     task = vine.PythonTask(my_sum, value, value)
     task.set_cores(1)
-    queue.submit(task)
+    m.submit(task)
 
 # As they complete, display the results:
 print("waiting for tasks to complete...")
-while not queue.empty():
-    task = queue.wait(5)
+while not m.empty():
+    task = m.wait(5)
     if task:
         print("task {} completed with result {}".format(task.id,task.output))
 

@@ -3,10 +3,15 @@
 # See the file COPYING for details.
 #
 ##
-# @package ndcctools.resource_monitor
+# @namespace ndcctools.resource_monitor
 #
-# Python resource_monitor bindings.
+# Resource monitoring tool for complex applications - Python interface.
 #
+# The resource_monitor provides an unprivileged way for systems
+# to monitor the consumption of key resources (cores, memory, disk)
+# of applications ranging from simple Python functions up to complex
+# multi-process trees.  It provides measurement, logging, enforcement,
+# and triggers upon various conditions.
 # The objects and methods provided by this package correspond to the native
 # C API in @ref category.h, rmonitor_poll.h, and rmsummary.h
 #

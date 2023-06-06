@@ -122,7 +122,7 @@ int main(int argc, char *argv[]) {
 
 	char *text = jx_print_string(merged);
 
-	if(catalog_query_send_update(host, text) < 1) {
+	if(catalog_query_send_update(host, text, 0) < 1) {
 		fprintf(stderr, "Unable to send update");
 	}
 

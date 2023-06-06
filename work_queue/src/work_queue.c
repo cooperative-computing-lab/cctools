@@ -134,8 +134,6 @@ typedef enum {
 // Threshold for available disk space (MB) beyond which files are not received from worker.
 static uint64_t disk_avail_threshold = 100;
 
-int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
-
 /* default timeout for slow workers to come back to the pool */
 double wq_option_blocklist_slow_workers_timeout = 900;
 
@@ -217,6 +215,7 @@ struct work_queue {
 
 	int monitor_mode;
 	FILE *monitor_file;
+	int monitor_interval;
 
 	char *monitor_output_directory;
 	char *monitor_summary_filename;
@@ -1092,12 +1091,12 @@ void update_write_catalog(struct work_queue *q, struct link *foreman_uplink)
 
 	// Send the buffer.
 	debug(D_WQ, "Advertising manager status to the catalog server(s) at %s ...", q->catalog_hosts);
-	if(!catalog_query_send_update_conditional(q->catalog_hosts, str)) {
+	if(!catalog_query_send_update(q->catalog_hosts, str, CATALOG_UPDATE_BACKGROUND|CATALOG_UPDATE_CONDITIONAL)) {
 
 		// If the send failed b/c the buffer is too big, send the lean version instead.
 		struct jx *lj = queue_lean_to_jx(q,foreman_uplink);
 		char *lstr = jx_print_string(lj);
-		catalog_query_send_update(q->catalog_hosts,lstr);
+		catalog_query_send_update(q->catalog_hosts,lstr,CATALOG_UPDATE_BACKGROUND);
 		free(lstr);
 		jx_delete(lj);
 	}
@@ -2965,7 +2964,7 @@ struct jx * task_to_jx( struct work_queue *q, struct work_queue_task *t, const c
 		const struct rmsummary *max = task_max_resources(q, t);
 		struct rmsummary *limits = rmsummary_create(-1);
 
-		rmsummary_merge_override(limits, max);
+		rmsummary_merge_override_basic(limits, max);
 		rmsummary_merge_max(limits, min);
 
 		jx_insert_integer(j,"cores",limits->cores);
@@ -3755,7 +3754,7 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 
 	struct rmsummary *limits = rmsummary_create(-1);
 
-	rmsummary_merge_override(limits, max);
+	rmsummary_merge_override_basic(limits, max);
 
 	int use_whole_worker = 1;
 	if(q->proportional_resources) {
@@ -3908,7 +3907,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	}
 
 	itable_insert(w->current_tasks_boxes, t->taskid, limits);
-	rmsummary_merge_override(t->resources_allocated, limits);
+	rmsummary_merge_override_basic(t->resources_allocated, limits);
 
 	/* Note that even when environment variables after resources, values for
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
@@ -5869,7 +5868,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	// (and resized) as needed by build_poll_table.
 	q->poll_table_size = 8;
 
-	q->worker_selection_algorithm = wq_option_scheduler;
+	q->worker_selection_algorithm = WORK_QUEUE_SCHEDULE_TIME;
 	q->process_pending_check = 0;
 
 	q->short_timeout = 5;
@@ -6345,6 +6344,10 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 
 	if(!(q->monitor_mode & MON_WATCHDOG)) {
 		buffer_printf(&b, " --measure-only");
+	}
+
+	if (q->monitor_interval > 0) {
+		buffer_printf(&b, " --interval %d", q->monitor_interval);
 	}
 
 	int extra_files = (q->monitor_mode & MON_FULL);
@@ -7396,7 +7399,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "force-proportional-resources-whole-tasks") || !strcmp(name, "proportional-whole-tasks")) {
 		q->proportional_whole_tasks = MAX(0, (int)value);
-
+	} else if (!strcmp(name, "monitor-interval")) {
+		/* 0 means use monitor's default */
+		q->monitor_interval = MAX(0, (int)value);
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
@@ -8111,8 +8116,8 @@ const struct rmsummary *task_min_resources(struct work_queue *q, struct work_que
 
 		struct rmsummary *r = rmsummary_create(-1);
 
-		rmsummary_merge_override(r, q->current_max_worker);
-		rmsummary_merge_override(r, t->resources_requested);
+		rmsummary_merge_override_basic(r, q->current_max_worker);
+		rmsummary_merge_override_basic(r, t->resources_requested);
 
 		s = category_task_min_resources(c, r, t->resource_request, t->taskid);
 		rmsummary_delete(r);

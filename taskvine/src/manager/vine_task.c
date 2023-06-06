@@ -22,7 +22,6 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <assert.h>
 #include <string.h>
 #include <math.h>
 #include "random.h"
@@ -425,14 +424,16 @@ void vine_task_check_consistency( struct vine_task *t )
 	hash_table_delete(table);
 }
 
-void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_mount_flags_t flags )
+int vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_mount_flags_t flags )
 {
 	if(!t || !f || !f->source || !remote_name) {
-		fatal("%s: invalid null argument.",__func__);
+		debug(D_NOTICE|D_VINE,"%s: invalid null argument.",__func__);
+		return 0;
 	}
 
 	if(remote_name[0] == '/') {
-		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
+		debug(D_NOTICE|D_VINE,"%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
+		return 0;
 	}
 
 	t->has_fixed_locations |= flags & VINE_FIXED_LOCATION;
@@ -440,87 +441,107 @@ void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *
 	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
 
 	list_push_tail(t->input_mounts, m);
+
+	return 1;
 }
 
-void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_mount_flags_t flags )
+int vine_task_add_output( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_mount_flags_t flags )
 {
 	if(!t || !f || !f->source || !remote_name) {
-		fatal("%s: invalid null argument.",__func__);
+		debug(D_NOTICE|D_VINE,"%s: invalid null argument.",__func__);
+		return 0;
 	}
 
 	if(remote_name[0] == '/') {
-		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
+		debug(D_NOTICE|D_VINE,"%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
+		return 0;
 	}
 
 	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
 
 	list_push_tail(t->output_mounts, m);
+
+	return 1;
 }
 
-void vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
+int vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
 {
 	struct vine_file *f = vine_file_local(local_name, 0);
-	vine_task_add_input(t,f,remote_name,flags);
+	int r = vine_task_add_input(t,f,remote_name,flags);
 	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
+	return r;
 }
 
-void vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
+int vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
 {
 	struct vine_file *f = vine_file_local(local_name, 0);
-	vine_task_add_output(t,f,remote_name,flags);
+	int r = vine_task_add_output(t,f,remote_name,flags);
 	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
+	return r;
 }
 
-void vine_task_add_input_url(struct vine_task *t, const char *file_url, const char *remote_name, vine_mount_flags_t flags)
+int vine_task_add_input_url(struct vine_task *t, const char *file_url, const char *remote_name, vine_mount_flags_t flags)
 {
 	struct vine_file *f = vine_file_url(file_url, 0);
-	vine_task_add_input(t,f,remote_name,flags);
+	int r = vine_task_add_input(t,f,remote_name,flags);
 	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
+	return r;
 }
 
-void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name )
+int vine_task_add_empty_dir( struct vine_task *t, const char *remote_name )
 {
 	struct vine_file *f = vine_file_empty_dir();
-	vine_task_add_input(t,f,remote_name,0);
+	int r = vine_task_add_input(t,f,remote_name,0);
 	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
+	return r;
 }
 
-void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_mount_flags_t flags)
+int vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_mount_flags_t flags)
 {
 	struct vine_file *f = vine_file_buffer(data,length,0);
-	vine_task_add_input(t,f,remote_name,flags);
+	int r = vine_task_add_input(t,f,remote_name,flags);
 	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
+	return r;
 }
 
-void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_mount_flags_t flags)
+int vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_mount_flags_t flags)
 {
 	/* XXX mini task must have a single output file */
 	struct vine_file *f = vine_file_mini_task(mini_task, 0);
-	vine_task_add_input(t,f,remote_name,flags);
+	int r = vine_task_add_input(t,f,remote_name,flags);
 	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
+	return r;
 }
 
-void vine_task_add_environment(struct vine_task *t, struct vine_file *environment_file) {
-
-	assert(environment_file);
-
+int vine_task_add_environment(struct vine_task *t, struct vine_file *environment_file)
+{
+	if(!environment_file) {
+		debug(D_NOTICE|D_VINE,"%s: environment_file cannot be null",__func__);
+		return 0;
+	}
+	
 	char *env_name = string_format("__vine_env_%s", environment_file->cached_name);
-
 	vine_task_add_input(t, environment_file, env_name, 0);
 
 	char *new_cmd = string_format("%s/bin/run_in_env %s", env_name, t->command_line);
 	vine_task_set_command(t, new_cmd);
 
 	free(env_name);
+
+	return 1;
 }
 
-
-void vine_task_set_snapshot_file(struct vine_task *t, struct vine_file *monitor_snapshot_file) {
-
-	assert(monitor_snapshot_file);
-
+int vine_task_set_snapshot_file(struct vine_task *t, struct vine_file *monitor_snapshot_file)
+{
+	if(!monitor_snapshot_file) {
+		debug(D_NOTICE|D_VINE,"%s: monitor_snapshot_file cannot be null",__func__);
+		return 0;
+	}
+	
 	t->monitor_snapshot_file = monitor_snapshot_file;
 	vine_task_add_input(t, monitor_snapshot_file, RESOURCE_MONITOR_REMOTE_NAME_EVENTS, 0);
+
+	return 1;
 }
 
 void vine_task_set_scheduler(struct vine_task *t, vine_schedule_t algorithm)
@@ -533,10 +554,11 @@ void vine_task_set_priority( struct vine_task *t, double priority )
 	t->priority = priority;
 }
 
-void vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output_directory) {
+int vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output_directory) {
 
 	if(!monitor_output_directory) {
-		fatal("Error: no monitor_output_file was specified.");
+		debug(D_NOTICE|D_VINE,"Error: no monitor_output_file was specified.");
+		return 0;
 	}
 
 	if(t->monitor_output_directory) {
@@ -544,6 +566,8 @@ void vine_task_set_monitor_output(struct vine_task *t, const char *monitor_outpu
 	}
 
 	t->monitor_output_directory = xxstrdup(monitor_output_directory);
+
+	return 1;
 }
 
 int vine_task_set_result(struct vine_task *t, vine_result_t new_result)
@@ -765,7 +789,7 @@ struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t )
 		const struct rmsummary *max = vine_manager_task_resources_max(q, t);
 
 		struct rmsummary *limits = rmsummary_create(-1);
-		rmsummary_merge_override(limits, max);
+		rmsummary_merge_override_basic(limits, max);
 		rmsummary_merge_max(limits, min);
 
 		jx_insert_integer(j,"cores",limits->cores);

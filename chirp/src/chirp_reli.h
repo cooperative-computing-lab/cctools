@@ -87,7 +87,6 @@ INT64_T chirp_reli_pread(struct chirp_file *file, void *buffer, INT64_T length, 
 @param offset Beginning offset in file.
 @param stoptime The absolute time at which to abort.
 @return On success, returns the number of bytes actually written, which may be less than requested.  On failure, <0 and sets errno.
-@param stoptime The absolute time at which to abort.
 @see chirp_reli_open, chirp_reli_swrite
 */
 
@@ -127,7 +126,6 @@ up to a maximum of <tt>length</tt> bytes read.
 @param offset Beginning offset in file.
 @param stoptime The absolute time at which to abort.
 @return On success, returns the number of bytes actually read, which may be less than requested.  On failure, <0 and sets errno.
-@param stoptime The absolute time at which to abort.
 @see chirp_reli_open, chirp_reli_pread, chirp_reli_pwrite, chirp_reli_sread, chirp_reli_swrite
 */
 
@@ -143,7 +141,6 @@ up to a maximum of <tt>length</tt> bytes written.
 @param offset Beginning offset in file.
 @param stoptime The absolute time at which to abort.
 @return On success, returns the number of bytes actually written, which may be less than requested.  On failure, <0 and sets errno.
-@param stoptime The absolute time at which to abort.
 @see chirp_reli_open, chirp_reli_pread, chirp_reli_pwrite, chirp_reli_sread, chirp_reli_swrite
 */
 
