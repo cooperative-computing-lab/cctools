@@ -4567,6 +4567,8 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 
 static int send_one_task( struct work_queue *q )
 {
+	static int last_task = 0;
+
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 
@@ -4575,6 +4577,12 @@ static int send_one_task( struct work_queue *q )
 
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
+	
+	int i;
+	if((i = last_task)) {
+		while(i--) list_next_item(q->ready_list);
+	}
+
 	while( (t = list_next_item(q->ready_list)) && tasks_considered < q->attempt_schedule_depth ) {
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
@@ -4589,10 +4597,15 @@ static int send_one_task( struct work_queue *q )
 		}
 		// Otherwise, remove it from the ready list and start it:
 		commit_task_to_worker(q,w,t);
-
+		last_task = 0;
 		return 1;
 	}
-
+	
+	if(t) {
+		last_task += tasks_considered;
+	} else {
+		last_task = 0;
+	}
 	return 0;
 }
 
