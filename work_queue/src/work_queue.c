@@ -4567,48 +4567,39 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 
 static int send_one_task( struct work_queue *q )
 {
-	static int last_task = 0;
-
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 
 	int tasks_considered = 0;
 	timestamp_t now = timestamp_get();
 
-	list_first_item(q->ready_list);
-	
-	// return to the point we left off last
-	int i;
-	if((i = last_task)) {
-		while(i--) list_next_item(q->ready_list);
-	}
-
-	while( (t = list_next_item(q->ready_list)) ) {
-		// If we cannot schedule within the certain amound of tasks, exit
+	while( (t = list_pop_head(q->ready_list)) ) {
 		if(tasks_considered > q->attempt_schedule_depth) {
-			last_task += tasks_considered;
+			list_push_tail(q->ready_list, t);
 			return 0;
-		} 
+		}
 
 		// Skip task if min requested start time not met.
-		if(t->resources_requested->start > now) continue;
+		if(t->resources_requested->start > now) {
+			list_push_tail(q->ready_list, t);
+			continue;
+		}
 
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
 
-		// If there is no suitable worker, consider the next task.
 		if(!w) {
 			tasks_considered++; 
+			list_push_tail(q->ready_list, t);
 			continue;
 		}
+
 		// Otherwise, remove it from the ready list and start it:
 		commit_task_to_worker(q,w,t);
-		last_task = 0;
 		return 1;
 	}
 
 	// if we made it here we reached the end of the list
-	last_task = 0;
 	return 0;
 }
 
@@ -6451,12 +6442,6 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 
 	work_queue_task_state_t old_state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
 	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
-	// remove from current tables:
-
-	if( old_state == WORK_QUEUE_TASK_READY ) {
-		// Treat WORK_QUEUE_TASK_READY specially, as it has the order of the tasks
-		list_remove(q->ready_list, t);
-	}
 
 	// insert to corresponding table
 	debug(D_WQ, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, task_state_str(old_state), old_state, task_state_str(new_state), new_state);
