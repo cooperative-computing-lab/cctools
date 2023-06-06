@@ -33,7 +33,6 @@ from .utils import (
 )
 
 import atexit
-import distutils.spawn
 import errno
 import itertools
 import json
@@ -1728,7 +1727,7 @@ class Factory(object):
 
     def _find_exe(self, path, default):
         if path is None:
-            out = distutils.spawn.find_executable(default)
+            out = shutil.which(default)
         else:
             out = path
         if out is None or not os.access(out, os.F_OK):
