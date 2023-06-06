@@ -2793,41 +2793,53 @@ static int send_one_task( struct vine_manager *q )
 {
 	struct vine_task *t;
 	struct vine_worker_info *w = NULL;
-
+	
+	int tasks_considered = 0;
 	timestamp_t now = timestamp_get();
 
-	// Consider each task in the order of priority:
-	LIST_ITERATE(q->ready_list,t) {
+	while ( (t=list_pop_head(q->ready_list)) ) {
+		if(tasks_considered > q->attempt_schedule_depth) {
+			list_push_tail(q->ready_list, t);
+			return 0;
+		}
 
 		// Skip task if min requested start time not met.
-		if(t->resources_requested->start > now) continue;
+		if(t->resources_requested->start > now) {
+			list_push_tail(q->ready_list, t);
+			continue;
+		}
 
 		// Skip task if temp input files have not been materialized.
-		if(!vine_manager_check_inputs_available(q,t)) continue;
-		
-		// Find the best worker for the task at the head of the list
-		
+		if(!vine_manager_check_inputs_available(q,t)) {
+			list_push_tail(q->ready_list, t);
+			continue;
+		}
+
 		q->stats_measure->time_scheduling = timestamp_get();
-		
+
+		// Find the best worker for the task at the head of the list
 		w = vine_schedule_task_to_worker(q,t);
 
-		// If there is no suitable worker, consider the next task.
-		if(!w) continue;
+		if(!w) {
+			tasks_considered++;
+			list_push_tail(q->ready_list, t);
+			continue;
+		}
 
 		q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
 
 		// Check if there is transfer capacity available.
-		if(q->peer_transfers_enabled)
-		{
+		if(q->peer_transfers_enabled) {
 			if(!vine_manager_transfer_capacity_available(q,w,t)) continue;
 		}
 
+
 		// Otherwise, remove it from the ready list and start it:
 		commit_task_to_worker(q,w,t);
-
 		return 1;
 	}
 
+	// if we made it here we reached the end of the list
 	return 0;
 }
 
@@ -3284,6 +3296,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->hungry_minimum = 10;
 
 	q->wait_for_workers = 0;
+	q->attempt_schedule_depth = 100;
 
 	q->max_retrievals = 1;
 	q->worker_retrievals = 1;
@@ -3703,12 +3716,7 @@ static vine_task_state_t change_task_state( struct vine_manager *q, struct vine_
 	vine_task_state_t old_state = t->state;
 
 	t->state = new_state;
-
-	if( old_state == VINE_TASK_READY ) {
-		// Treat VINE_TASK_READY specially, as it has the order of the tasks
-		list_remove(q->ready_list, t);
-	}
-
+	
 	// insert to corresponding table
 	debug(D_VINE, "Task %d state change: %s (%d) to %s (%d)\n", t->task_id, vine_task_state_to_string(old_state), old_state, vine_task_state_to_string(new_state), new_state);
 
@@ -4690,6 +4698,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
 
+	} else if(!strcmp(name, "attempt-schedule-depth")) {
+		q->attempt_schedule_depth = MAX(1, (int)value);
+		
 	} else if(!strcmp(name, "max-retrievals")) {
 		q->max_retrievals = MAX(-1, (int)value);
 
