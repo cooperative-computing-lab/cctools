@@ -819,42 +819,40 @@ performance and resource details that do not affect the output.
 
 char * vine_task_to_json(struct vine_task *t)
 {
-	char *buffer;
-	char *file_buffer;
 	char *env_name; 
 	struct vine_mount *m;
 
-	buffer = string_format("{\ncmd = \"%s\"\n", t->command_line);
+	buffer_t b;
+	buffer_init(&b);
+
+	buffer_putfstring(&b, "{\ncmd = \"%s\"\n", t->command_line);
 
 	if(t->input_mounts){
-		buffer = string_combine(buffer, "inputs = ");
+		buffer_putfstring(&b, "inputs = ");
 		LIST_ITERATE(t->input_mounts,m) {
-			file_buffer = string_format("{ name: \"%s\", content: \"%s\"}, ", m->remote_name, m->file->cached_name);
-			buffer = string_combine(buffer, file_buffer);
-			free(file_buffer);
+			buffer_putfstring(&b, "{ name: \"%s\", content: \"%s\"}, ", m->remote_name, m->file->cached_name);
 		}
-		buffer = string_combine(buffer, "\n");
+		buffer_putfstring(&b, "\n");
 	}
 
 	if(t->output_mounts){
-		buffer = string_combine(buffer, "outputs = ");
+		buffer_putfstring(&b, "outputs = ");
 		LIST_ITERATE(t->output_mounts,m) {
-			file_buffer = string_format("{ name: \"%s\" }, ", m->remote_name);
-			buffer = string_combine(buffer, file_buffer);
-			free(file_buffer);
+			buffer_putfstring(&b, "{ name: \"%s\" }, ", m->remote_name);
 		}
-		buffer = string_combine(buffer, "\n");
+		buffer_putfstring(&b, "\n");
 	}
 
 	if(t->env_list){
-		buffer = string_combine(buffer, "environment = ");
+		buffer_putfstring(&b, "environment = ");
 		LIST_ITERATE(t->env_list, env_name) {
-			file_buffer = string_format("{ name: \"%s\" }, ", env_name);
-			buffer = string_combine(buffer, file_buffer);
-			free(file_buffer);
+			buffer_putfstring(&b, "{ name: \"%s\" }, ", env_name);
 		}
-		buffer = string_combine(buffer, "\n");
+		buffer_putfstring(&b, "\n");
 	}
-	return buffer;
+
+	char * json = xxstrdup(buffer_tostring(&b));	
+	buffer_free(&b);
+	return json;
 }
 
