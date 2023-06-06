@@ -4575,15 +4575,21 @@ static int send_one_task( struct work_queue *q )
 	int tasks_considered = 0;
 	timestamp_t now = timestamp_get();
 
-	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
 	
+	// return to the point we left off last
 	int i;
 	if((i = last_task)) {
 		while(i--) list_next_item(q->ready_list);
 	}
 
-	while( (t = list_next_item(q->ready_list)) && tasks_considered < q->attempt_schedule_depth ) {
+	while( (t = list_next_item(q->ready_list)) ) {
+		// If we cannot schedule within the certain amound of tasks, exit
+		if(tasks_considered > q->attempt_schedule_depth) {
+			last_task += tasks_considered;
+			return 0;
+		} 
+
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
 
@@ -4600,12 +4606,9 @@ static int send_one_task( struct work_queue *q )
 		last_task = 0;
 		return 1;
 	}
-	
-	if(t) {
-		last_task += tasks_considered;
-	} else {
-		last_task = 0;
-	}
+
+	// if we made it here we reached the end of the list
+	last_task = 0;
 	return 0;
 }
 
