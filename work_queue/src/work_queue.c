@@ -202,6 +202,7 @@ struct work_queue {
 	int hungry_minimum;               /* minimum number of waiting tasks to consider queue not hungry. */;
 
 	int wait_for_workers;             /* wait for these many workers before dispatching tasks at start of execution. */
+	int attempt_schedule_depth;		  /* number of submitted tasks to attempt scheduling before we continue to retrievals */
 
 	work_queue_category_mode_t allocation_default_mode;
 
@@ -4574,7 +4575,7 @@ static int send_one_task( struct work_queue *q )
 
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
-	while( (t = list_next_item(q->ready_list)) && tasks_considered < 100) {
+	while( (t = list_next_item(q->ready_list)) && tasks_considered < q->attempt_schedule_depth ) {
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
 
@@ -5894,6 +5895,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->hungry_minimum = 10;
 
 	q->wait_for_workers = 0;
+	q->attempt_schedule_depth = 100;
 
 	q->proportional_resources = 1;
 	q->proportional_whole_tasks = 1;
@@ -7393,6 +7395,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
+
+	} else if(!strcmp(name, "attempt-schedule-depth")) {
+		q->attempt_schedule_depth = MAX(1, (int)value);
 
 	} else if(!strcmp(name, "wait-retrieve-many")){
 		q->wait_retrieve_many = MAX(0, (int)value);
