@@ -44,10 +44,15 @@ from .manager import (
     Manager,
     Factory,
 )
+from .future_lib import (
+    VineFuture,
+)
 from .file import File
 from .task import (
     Task,
     PythonTask,
+    FutureTask,
+    FutureFile,
     PythonTaskNoResult,
     LibraryTask,
     FunctionCall,
@@ -69,6 +74,9 @@ __all__ = [
     "Factory",
     "LibraryTask",
     "FunctionCall",
+    "VineFuture",
+    "FutureTask",
+    "Futurefile",
     "Task",
     "PythonTask",
     "PythonTaskNoResult",

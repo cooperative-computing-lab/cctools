@@ -32,6 +32,8 @@ from .utils import (
     get_c_constant,
 )
 
+from coccurent.futures import Executor
+
 import atexit
 import distutils.spawn
 import errno
@@ -1877,3 +1879,27 @@ class Factory(object):
 
     def set_environment(self, env):
         self._env_file = env
+
+'''
+class Future(Executor):
+    def __init__(self):
+        self._manager = Manager()
+
+    def submit(fn, /, *args, **kwargs):
+        future = task.FutureTask(fn, self._manager, *args, **kwargs)
+        self._manager.submit(future)
+        return future
+
+    def map(func, *iterables, timeout=None, chunksize=1):
+        pass
+
+    def shutdown(wait=True, *, cancel_futures=False):
+        pass
+
+    def future_function(fn, options):
+        pass
+
+    def library_function(fn, options):
+        pass
+
+'''

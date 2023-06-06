@@ -782,6 +782,8 @@ class PythonTask(Task):
     # @param manager Manager to which the task was submitted
     def enable_temp_output(self):
         self._tmp_output_enabled = True
+    def disable_temp_output(self):
+        self._tmp_output_enabled = False
 
     ##
     # Set the cache behavior for the output of the task.
@@ -972,7 +974,6 @@ class FunctionCall(Task):
             remote_task_exec_method = "fork"
         self._event["remote_task_exec_method"] = remote_task_exec_method
 
-
 ##
 # \class LibraryTask
 #
@@ -989,3 +990,128 @@ class LibraryTask(Task):
     def __init__(self, fn, name):
         Task.__init__(self, fn)
         self.library_name = "library_coprocess:" + name
+
+class FutureFile():
+    def __init__(self, future):
+        self.file = str('outfile-' + str(future.id))
+
+class FutureTask(PythonTask):
+    ##
+    # Creates a new Future Task
+    #
+    # @param self 
+    # @param func
+    # @param args
+    # @param kwargs
+    def __init__(self, manager, func, *args, **kwargs):
+        super(FutureTask, self).__init__(func, *args, **kwargs)
+        self.enable_temp_output()
+        self._module_manager = manager
+        self._submitted = False
+        self._future_resolved = False
+
+    @property
+    def output(self, timeout="wait_forever"):
+        self.disable_temp_output()
+        if not self._submitted:
+            self.submit()
+        if not self._future_resolved:
+            self._module_manager.wait_for_task_id(self.id, timeout=timeout)
+            self._future_resolved = True
+        if self._tmp_output_enabled:
+            raise ValueError("temp output was enabled for this task, thus its output is not available locallly.")
+
+        if not self._output_loaded:
+            if self.successful():
+                try:
+                    with open(os.path.join(self._tmpdir, self._out_name_file), "rb") as f:
+                        if self._serialize_output:
+                            self._output = cloudpickle.load(f)
+                        else:
+                            self._output = f.read()
+                except Exception as e:
+                    self._output = e
+            else:
+                self._output = PythonTaskNoResult()
+            self._output_loaded = True
+        return self._output
+
+    def add_future_dep(self, arg):
+        self.add_input(arg._output_file, str('outfile-' + str(arg.id)))
+
+    def submit(self):
+        if not self._submitted:
+            self._module_manager.submit(self)
+            self._submitted = True
+
+    def submit_finalize(self, manager):
+        self._manager = manager
+        func, args, kwargs = self._fn_def
+
+        '''
+        # OPTION 1 ##############################
+        args = [arg.output if isinstance(arg, FutureTask) else arg for arg in args]
+        self._fn_def = (func, args, kwargs)
+        ########################################
+        '''
+
+        # OPTION 2 #############################
+        for arg in args:
+            if isinstance(arg, FutureTask):
+                arg.enable_temp_output()
+                arg.submit()
+                self.add_future_dep(arg)
+        args = [FutureFile(arg) if isinstance(arg, FutureTask) else arg for arg in args]
+        self._fn_def = (func, args, kwargs)
+        #########################################
+
+        self._tmpdir = tempfile.mkdtemp(dir=manager.staging_directory)
+        self._serialize_python_function(*self._fn_def)
+        self._fn_def = None  # avoid possible memory leak
+        self._create_wrapper()
+        self._add_IO_files(manager)
+
+    def _create_wrapper(self):
+        with open(os.path.join(self._tmpdir, self._wrapper), "w") as f:
+            f.write(
+                textwrap.dedent(
+                f"""
+
+                try:
+                    import sys
+                    import cloudpickle
+                    import ndcctools.taskvine as vine
+                except ImportError as e:
+                    print("Could not execute PythonTask function because a module was not available at the worker.")
+                    raise
+
+                def vineLoadArg(arg):
+                    with open (arg.file , 'rb') as f:
+                        return cloudpickle.load(f)
+
+                (fn, args, out) = sys.argv[1], sys.argv[2], sys.argv[3]
+                with open (fn , 'rb') as f:
+                    exec_function = cloudpickle.load(f)
+                with open(args, 'rb') as f:
+                    args, kwargs = cloudpickle.load(f)
+                
+
+                args = [vineLoadArg(arg) if isinstance(arg, vine.FutureFile) else arg for arg in args]
+                status = 0 
+                try:
+                    exec_out = exec_function(*args, **kwargs)
+                except Exception as e:
+                    exec_out = e
+                    status = 1
+
+                with open(out, 'wb') as f:
+                    if {self._serialize_output}:
+                        cloudpickle.dump(exec_out, f)
+                    else:
+                        f.write(exec_out)
+
+                sys.exit(status)
+                """
+                )
+            )
+
