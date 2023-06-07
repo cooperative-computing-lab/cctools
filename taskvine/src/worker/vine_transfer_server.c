@@ -32,6 +32,9 @@ static struct link *transfer_link = 0;
 /* Pid of process handling peer transfers. */
 pid_t transfer_server_pid = 0;
 
+/* Specific port for the transfer server to listen on.  Zero means choose any available. */
+int vine_transfer_server_port = 0;
+
 /* Handle a single request for a transfer request from a peer. */
 
 static void vine_transfer_handler( struct link *lnk, struct vine_cache *cache )
@@ -102,7 +105,7 @@ static void vine_transfer_process( struct vine_cache *cache )
 
 void vine_transfer_server_start( struct vine_cache *cache )
 {
-	transfer_link = link_serve(0);
+	transfer_link = link_serve(vine_transfer_server_port);
 
 	if(!transfer_link) {
 		fatal("unable to find a port to start a transfer server.");
