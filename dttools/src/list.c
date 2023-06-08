@@ -437,34 +437,29 @@ void *list_rotate(struct list *l) {
 	list_seek(cur, 0);
 	head = cur->target; 
 
-	if(!head){
-		list_cursor_destroy(cur);
-		return NULL;
-	} 
-	
-	if(list_next(cur)){
-			heir = cur->target;
-	} else {
-		list_cursor_destroy(cur);
-		return head->data;
-	}
+	if(!head) goto DONE;
 
+	if(!list_next(cur)) goto DONE;
+	heir = cur->target;
+	
 	list_seek(cur, -1);
 	tail = cur->target;
-
 	head->prev = tail;
 	head->next = NULL;
-
 	heir->prev = NULL;
-
 	tail->next = head;
-
 	cur->list->head = heir;
 	cur->list->tail = head;
 
+	DONE:
 	list_cursor_destroy(cur);
+	
+	if(head){
+		return head->data;
+	} else {
+		return NULL;
+	}
 
-	return head->data;
 }
 
 void *list_peek_head(struct list *l) {
