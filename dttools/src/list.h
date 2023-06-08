@@ -315,6 +315,12 @@ int list_push_tail(struct list *list, void *item);
 */
 void *list_pop_tail(struct list *list);
 
+/** Move the list head to the tail
+@param list The list to rotate
+@return The old list head, new tail
+*/
+void *list_rotate(struct list *list);
+
 /** Peek at the list tail.
 @param list The list to peek.
 @return The item at the list tail, or null if list is empty.

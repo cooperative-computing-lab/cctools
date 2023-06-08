@@ -202,6 +202,7 @@ struct work_queue {
 	int hungry_minimum;               /* minimum number of waiting tasks to consider queue not hungry. */;
 
 	int wait_for_workers;             /* wait for these many workers before dispatching tasks at start of execution. */
+	int attempt_schedule_depth;		  /* number of submitted tasks to attempt scheduling before we continue to retrievals */
 
 	work_queue_category_mode_t allocation_default_mode;
 
@@ -4569,28 +4570,36 @@ static int send_one_task( struct work_queue *q )
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 
+	int tasks_considered = 0;
 	timestamp_t now = timestamp_get();
 
-	// Consider each task in the order of priority:
-	list_first_item(q->ready_list);
-	while( (t = list_next_item(q->ready_list))) {
+	while( (t = list_rotate(q->ready_list)) ) {
+		if(tasks_considered > q->attempt_schedule_depth) {
+			return 0;
+		}
+
 		// Skip task if min requested start time not met.
-		if(t->resources_requested->start > now) continue;
+		if(t->resources_requested->start > now) {
+			continue;
+		}
 
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
 
-		// If there is no suitable worker, consider the next task.
-		if(!w) continue;
-		// Otherwise, remove it from the ready list and start it:
-		commit_task_to_worker(q,w,t);
+		if(!w) {
+			tasks_considered++; 
+			continue;
+		}
 
+		// Otherwise, remove it from the ready list and start it:
+		list_pop_tail(q->ready_list);
+		commit_task_to_worker(q,w,t);
 		return 1;
 	}
 
+	// if we made it here we reached the end of the list
 	return 0;
 }
-
 
 static void print_large_tasks_warning(struct work_queue *q)
 {
@@ -5891,6 +5900,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->hungry_minimum = 10;
 
 	q->wait_for_workers = 0;
+	q->attempt_schedule_depth = 100;
 
 	q->proportional_resources = 1;
 	q->proportional_whole_tasks = 1;
@@ -6430,12 +6440,6 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 
 	work_queue_task_state_t old_state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
 	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
-	// remove from current tables:
-
-	if( old_state == WORK_QUEUE_TASK_READY ) {
-		// Treat WORK_QUEUE_TASK_READY specially, as it has the order of the tasks
-		list_remove(q->ready_list, t);
-	}
 
 	// insert to corresponding table
 	debug(D_WQ, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, task_state_str(old_state), old_state, task_state_str(new_state), new_state);
@@ -7390,6 +7394,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
+
+	} else if(!strcmp(name, "attempt-schedule-depth")) {
+		q->attempt_schedule_depth = MAX(1, (int)value);
 
 	} else if(!strcmp(name, "wait-retrieve-many")){
 		q->wait_retrieve_many = MAX(0, (int)value);
