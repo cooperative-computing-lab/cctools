@@ -427,6 +427,46 @@ void *list_pop_tail(struct list *l) {
 	return item;
 }
 
+void *list_rotate(struct list *l) {
+	struct list_item *head = NULL;
+	struct list_item *heir = NULL;
+	struct list_item *tail = NULL;
+		
+	struct list_cursor *cur = list_cursor_create(l);
+	
+	list_seek(cur, 0);
+	head = cur->target; 
+
+	if(!head){
+		list_cursor_destroy(cur);
+		return NULL;
+	} 
+	
+	if(list_next(cur)){
+			heir = cur->target;
+	} else {
+		list_cursor_destroy(cur);
+		return head->data;
+	}
+
+	list_seek(cur, -1);
+	tail = cur->target;
+
+	head->prev = tail;
+	head->next = NULL;
+
+	heir->prev = NULL;
+
+	tail->next = head;
+
+	cur->list->head = heir;
+	cur->list->tail = head;
+
+	list_cursor_destroy(cur);
+
+	return head->data;
+}
+
 void *list_peek_head(struct list *l) {
 	void *item = NULL;
 
