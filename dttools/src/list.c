@@ -434,26 +434,32 @@ void *list_rotate(struct list *l) {
 		
 	struct list_cursor *cur = list_cursor_create(l);
 	
+	// get the head of the list
 	list_seek(cur, 0);
 	head = cur->target; 
 
-	if(!head) goto DONE;
+	// exit if the list is empty, or only one item.
+	if(!head || !list_next(cur)) goto DONE;
 
-	if(!list_next(cur)) goto DONE;
-	heir = cur->target;
+	// the next item in the list is the new head 
+	heir = cur->target;	
 	
+	// get the last item
 	list_seek(cur, -1);
 	tail = cur->target;
+	
+	// move head to tail
 	head->prev = tail;
 	head->next = NULL;
 	heir->prev = NULL;
 	tail->next = head;
+
+	// set new head/tail
 	cur->list->head = heir;
 	cur->list->tail = head;
 
 	DONE:
 	list_cursor_destroy(cur);
-	
 	if(head){
 		return head->data;
 	} else {
