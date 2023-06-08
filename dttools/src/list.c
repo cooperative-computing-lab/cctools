@@ -460,12 +460,7 @@ void *list_rotate(struct list *l) {
 
 	DONE:
 	list_cursor_destroy(cur);
-	if(head){
-		return head->data;
-	} else {
-		return NULL;
-	}
-
+	return head ? head->data : NULL;
 }
 
 void *list_peek_head(struct list *l) {

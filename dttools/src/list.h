@@ -315,7 +315,7 @@ int list_push_tail(struct list *list, void *item);
 */
 void *list_pop_tail(struct list *list);
 
-/** Rotate the list head and tail
+/** Move the list head to the tail
 @param list The list to rotate
 @return The old list head, new tail
 */
