@@ -2797,21 +2797,18 @@ static int send_one_task( struct vine_manager *q )
 	int tasks_considered = 0;
 	timestamp_t now = timestamp_get();
 
-	while ( (t=list_pop_head(q->ready_list)) ) {
+	while ( (t=list_rotate(q->ready_list)) ) {
 		if(tasks_considered > q->attempt_schedule_depth) {
-			list_push_tail(q->ready_list, t);
 			return 0;
 		}
 
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) {
-			list_push_tail(q->ready_list, t);
 			continue;
 		}
 
 		// Skip task if temp input files have not been materialized.
 		if(!vine_manager_check_inputs_available(q,t)) {
-			list_push_tail(q->ready_list, t);
 			continue;
 		}
 
@@ -2822,7 +2819,6 @@ static int send_one_task( struct vine_manager *q )
 
 		if(!w) {
 			tasks_considered++;
-			list_push_tail(q->ready_list, t);
 			continue;
 		}
 
@@ -2835,6 +2831,7 @@ static int send_one_task( struct vine_manager *q )
 
 
 		// Otherwise, remove it from the ready list and start it:
+		list_pop_tail(q->ready_list);
 		commit_task_to_worker(q,w,t);
 		return 1;
 	}
