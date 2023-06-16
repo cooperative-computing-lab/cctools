@@ -1994,31 +1994,26 @@ static int expire_waiting_tasks(struct work_queue *q)
 {
 	struct work_queue_task *t;
 	int expired = 0;
-	int count;
 
+	int tasks_considered = 0;
 	double current_time = timestamp_get() / ONE_SECOND;
-	count = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
-
-	while(count > 0)
-	{
-		count--;
-
-		t = list_pop_head(q->ready_list);
-
-		if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time)
-		{
+	while( (t = list_rotate(q->ready_list)) ) {
+		if(tasks_considered > q->attempt_schedule_depth) {
+			return expired;
+		}
+		if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
 			update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
 			change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
 			expired++;
+			list_pop_tail(q->ready_list);
 		} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
 			update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
 			change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
 			expired++;
-		} else {
-			list_push_tail(q->ready_list, t);
+			list_pop_tail(q->ready_list);
 		}
+		tasks_considered++;
 	}
-
 	return expired;
 }
 
@@ -4688,7 +4683,6 @@ static int receive_one_task( struct work_queue *q )
 			return 1;
 		}
 	}
-
 	return 0;
 }
 
@@ -6762,7 +6756,7 @@ static void print_password_warning( struct work_queue *q )
 		fprintf(stdout,"warning: you should set a password with the --password option.\n");
 	}
 
-	if(!q->ssl_enabled) {
+	if(!q->	ssl_enabled) {
 		fprintf(stdout,"warning: using plain-text when communicating with workers.\n");
 		fprintf(stdout,"warning: use encryption with a key and cert when creating the manager.\n");
 	}
@@ -7065,7 +7059,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// in this wait.
 		if(events > 0) {
 			BEGIN_ACCUM_TIME(q, time_internal);
-			int done = !task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink);
+			int done = !(task_state_any(q, WORK_QUEUE_TASK_RUNNING) || task_state_any(q, WORK_QUEUE_TASK_READY) || task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) || (foreman_uplink));
 			END_ACCUM_TIME(q, time_internal);
 
 			if(done) {
