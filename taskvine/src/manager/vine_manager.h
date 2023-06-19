@@ -174,6 +174,7 @@ struct vine_manager {
 	int keepalive_timeout;	      /* Keepalive response must be received within this time, otherwise worker disconnected. */
 	int hungry_minimum;           /* Minimum number of waiting tasks to consider queue not hungry. */
 	int wait_for_workers;         /* Wait for these many workers to connect before dispatching tasks at start of execution. */
+	int attempt_schedule_depth;   /* number of submitted tasks to attempt scheduling before we continue to retrievals */
     int max_retrievals;           /* Do at most this number of task retrievals of either receive_one_task or receive_all_tasks_from_worker. If less
                                      than 1, prefer to receive all completed tasks before submitting new tasks. */
 	int worker_retrievals;        /* retrieve all completed tasks from a worker as opposed to recieving one of any completed task*/
@@ -211,31 +212,12 @@ int vine_manager_transfer_time( struct vine_manager *q, struct vine_worker_info 
 const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, struct vine_task *t);
 const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, struct vine_task *t);
 
+/* Internal: Enable shortcut of main loop upon child process completion. Needed for Makeflow to interleave local and remote execution. */
+void vine_manager_enable_process_shortcut(struct vine_manager *q);
+
 struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t );
 
 int64_t overcommitted_resource_total(struct vine_manager *q, int64_t total);
-
-/** Turn on the debugging log output and send to the named file.
- * (Note it does not need the vine_manager structure, as it is enabled before
- * the manager is created.)
-@param logfile The filename.
-@return 1 if logfile was opened, 0 otherwise.
-*/
-int vine_enable_debug_log( const char *logfile );
-
-/** Add a performance log file that records cummulative statistics of the connected workers and submitted tasks.
-@param m A manager object
-@param logfile The filename.
-@return 1 if logfile was opened, 0 otherwise.
-*/
-int vine_enable_perf_log(struct vine_manager *m, const char *logfile);
-
-/** Add a log file that records the states of the connected workers and tasks.
-@param m A manager object
-@param logfile The filename.
-@return 1 if logfile was opened, 0 otherwise.
-*/
-int vine_enable_transactions_log(struct vine_manager *m, const char *logfile);
 
 
 /* The expected format of files created by the resource monitor.*/

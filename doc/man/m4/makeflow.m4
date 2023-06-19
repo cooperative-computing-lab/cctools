@@ -94,7 +94,7 @@ OPTION_ARG_LONG(debug-rotate-max, byte)Rotate debug file once it reaches this si
 OPTION_FLAG_LONG(verbose)Display runtime progress on stdout.
 OPTIONS_END
 
-SUBSECTION(WorkQueue Options)
+SUBSECTION(TaskVine and Work Queue Options)
 OPTIONS_BEGIN
 OPTION_ARG(C, catalog-server, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
 OPTION_ARG(F, wq-fast-abort, #)WorkQueue fast abort multiplier. (default is deactivated)
@@ -102,12 +102,12 @@ OPTION_ARG(M, project-name, project)Set the project name to PARAM(project).
 OPTION_ARG(p, port, port)Port number to use with WorkQueue. (default is 9123, 0=arbitrary)
 OPTION_ARG(Z, port-file, file)Select port at random and write it to this file.  (default is disabled)
 OPTION_ARG(P, priority, integer)Priority. Higher the value, higher the priority.
-OPTION_ARG(t, wq-keepalive-timeout, #)Work Queue keepalive timeout (default: 30s)
-OPTION_ARG(u, wq-keepalive-interval, #)Work Queue keepalive interval (default: 120s)
-OPTION_ARG(W, wq-schedule, mode)WorkQueue scheduling algorithm. (time|files|fcfs)
+OPTION_ARG(t, keepalive-timeout, #)Work Queue keepalive timeout (default: 30s)
+OPTION_ARG(u, keepalive-interval, #)Work Queue keepalive interval (default: 120s)
+OPTION_ARG(W, schedule, mode)WorkQueue scheduling algorithm. (time|files|fcfs)
 OPTION_ARG_LONG(password, pwfile)Password file for authenticating workers.
-OPTION_FLAG_LONG(disable-cache)Disable file caching (currently only Work Queue, default is false)
-OPTION_ARG_LONG(work-queue-preferred-connection,connection)Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
+OPTION_FLAG_LONG(cache-mode) Control worker caching mode. (never|workflow|forever)
+OPTION_ARG_LONG(preferred-connection,connection)Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
 OPTIONS_END
 
 SUBSECTION(Monitor Options)

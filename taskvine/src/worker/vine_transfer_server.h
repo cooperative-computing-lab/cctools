@@ -16,4 +16,6 @@ void vine_transfer_server_start( struct vine_cache *cache );
 void vine_transfer_server_stop();
 void vine_transfer_server_address( char *addr, int *port );
 
+extern int vine_transfer_server_port;
+
 #endif

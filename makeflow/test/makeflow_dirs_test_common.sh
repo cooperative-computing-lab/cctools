@@ -20,12 +20,12 @@ prepare()
 run()
 {
 	# send makeflow to the background, saving its exit status.
-	(../src/makeflow -d all -T wq -Z $PORT_FILE  $MAKE_FILE; echo $? > $STATUS_FILE) &
+	(../src/makeflow -d all -T vine -Z $PORT_FILE  $MAKE_FILE; echo $? > $STATUS_FILE) &
 
 	# wait at most 5 seconds for makeflow to find a port.
 	wait_for_file_creation $PORT_FILE 5
 
-	run_wq_worker $PORT_FILE worker.log
+	run_taskvine_worker $PORT_FILE worker.log
 
 	# wait for makeflow to exit.
 	wait_for_file_creation $STATUS_FILE 10

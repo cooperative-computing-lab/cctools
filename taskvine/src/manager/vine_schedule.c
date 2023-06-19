@@ -145,17 +145,29 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 	struct vine_worker_info *best_worker = 0;
 	int64_t most_task_cached_bytes = 0;
 	int64_t task_cached_bytes;
+	uint8_t has_all_files;
 	struct vine_file_replica *remote_info;
 	struct vine_mount *m;
 
-	HASH_TABLE_ITERATE(q->worker_table,key,w) {
+	HASH_TABLE_ITERATE(q->worker_table, key, w) {
 		if( check_worker_against_task(q, w, t) ) {
 			task_cached_bytes = 0;
+			has_all_files = 1;
+
 			LIST_ITERATE(t->input_mounts,m) {
 				remote_info = hash_table_lookup(w->current_files, m->file->cached_name);
+
 				if(remote_info && m->file->type == VINE_FILE) {
-						task_cached_bytes += remote_info->size;
+					task_cached_bytes += remote_info->size;
 				}
+				else if((m->file->flags & (VINE_CACHE | VINE_CACHE_ALWAYS))){
+					has_all_files = 0;
+				}
+			}
+			
+			/* Return the worker if it was in possession of all cacheable files */
+			if(has_all_files) {
+				return w;
 			}
 
 			if(!best_worker || task_cached_bytes > most_task_cached_bytes) {
@@ -164,7 +176,7 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 			}
 		}
 	}
-
+	
 	return best_worker;
 }
 

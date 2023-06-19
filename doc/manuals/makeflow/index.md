@@ -15,8 +15,8 @@ Makeflow.
 Makeflow makes it easy to move a large amount of work from one facility to
 another. After writing a workflow, you can test it out on your local laptop,
 then run it at your university computing center, move it over to a national
-computing facility like [XSEDE](http://www.xsede.org), and then again to a
-commercial cloud system. Using the (bundled) Work Queue system, you can even
+computing facility like [ACCESS](http://www.access-ci.org), and then again to a
+commercial cloud system. Using the (bundled) TaskVine system, you can even
 run across multiple systems simultaneously. No matter where you run your
 tasks, the workflow language stays the same.
 
@@ -26,7 +26,8 @@ geography, and high energy physics all use Makeflow to compose workflows from
 existing applications.
 
 Makeflow can send your jobs to a wide variety of services, such as batch
-systems (HTCondor, SGE, PBS, LSF, Torque), cluster managers (Mesos and Kubernetes),
+systems (HTCondor, SGE, PBS, LSF, Torque), task executors (TaskVine, Work Queue),
+cluster managers (Mesos and Kubernetes),
 cloud services (Amazon EC2 or Lambda) and container environments like Docker
 and Singularity. Details for each of those systems are given in the Batch
 System Support section.
@@ -125,7 +126,7 @@ Support section](#batch-system-support).
 
 
 !!! warning
-    You may have to slightly adapt the makeflow workflow file to work across different batch systems. This is because different batch systems have different expectations on whether the underlying filesystem is shared (e.g., slurm and torque), or not (e.g., condor and work queue). 
+    You may have to slightly adapt the makeflow workflow file to work across different batch systems. This is because different batch systems have different expectations on whether the underlying filesystem is shared (e.g., Slurm and Torque), or not (e.g., HTCondor, TaskVine, and Work Queue). 
 
 ### JX Workflow Language
 
@@ -204,7 +205,7 @@ your currently running workloads, like this:
 ```sh
 OWNER      PROJECT              JOBS   WAIT    RUN   COMP   ABRT   FAIL   TYPE
 alfred     simulation           2263   2258      1      4      0      0 condor
-betty      analysis             2260      1      1   2258      0      0     wq
+betty      analysis             2260      1      1   2258      0      0   vine
 ```
     
 ### General Advice
@@ -628,7 +629,7 @@ $ makeflow_lambda_cleanup my.config
 ### Generic Cluster Submission
 
 For clusters that are not directly supported by Makeflow we strongly suggest
-using the [Work Queue](http://ccl.cse.nd.edu/software/workqueue) system and
+using the [TaskVine](../taskvine) system and
 submitting workers via the cluster's normal submission mechanism.
 
 However, if you have a system similar to Torque, SGE, or PBS which submits
@@ -654,7 +655,7 @@ The wrapper script is a shell script that reads the command to be run as an
 argument and handles bookkeeping operations necessary for Makeflow.
 
 
-## Using Work Queue
+## Using TaskVine
 
 ### Overview
 
@@ -666,8 +667,8 @@ take 30 seconds or more for the batch system to start an individual job. If
 common files are needed by each job, they may end up being transferred to the
 same node multiple times.
 
-To get around these limitations, we provide the [Work
-Queue](../work_queue) system. The basic idea is
+To get around these limitations, we provide the [TaskVine](../taskvine) system.
+The basic idea is
 to submit a number of persistent "worker" processes to an existing batch
 system. Makeflow communicates directly with the workers to quickly dispatch
 jobs and cache data, rather than interacting with the underlying batch system.
@@ -675,16 +676,16 @@ This accelerates short jobs and exploits common data dependencies between
 jobs.
 
 To begin, let's assume that you are logged into the head node of your cluster,
-called `head.cluster.edu` Run Makeflow in Work Queue mode like this:
+called `head.cluster.edu` Run Makeflow in TaskVine mode like this:
 
 ```sh
-$ makeflow -T wq example.makeflow
+$ makeflow -T vine example.makeflow
 ```
 
 Then, submit 10 worker processes to Condor like this:
 
 ```sh
-$ condor_submit_workers head.cluster.edu 9123 10
+$ vine_submit_workers -T condor head.cluster.edu 9123 10
 
 10 Submitting job(s)..........
 Logging submit event(s)..........
@@ -694,27 +695,27 @@ Logging submit event(s)..........
 Or, submit 10 worker processes to SGE like this:
 
 ```sh
-$ sge_submit_workers head.cluster.edu 9123 10
+$ vine_submit_workers -T sge head.cluster.edu 9123 10
 ```
 
 Or, you can start workers manually on any other machine you can log into:
 
 ```sh
-$ work_queue_worker head.cluster.edu 9123
+$ vine_worker head.cluster.edu 9123
 ```
 
 Once the workers begin running, Makeflow will dispatch multiple tasks to each
 one very quickly. If a worker should fail, Makeflow will retry the work
 elsewhere, so it is safe to submit many workers to an unreliable system.
 
-When the Makeflow completes, your workers will still be available, so you can
+When the workflow completes, your workers will still be available, so you can
 either run another Makeflow with the same workers, remove them from the batch
 system, or wait for them to expire. If you do nothing for 15 minutes, they
 will automatically exit.
 
-Note that `condor_submit_workers` and `sge_submit_workers`, are simple shell
-scripts, so you can edit them directly if you would like to change batch
-options or other details. Please refer to [Work Queue manual ](../work_queue) for more details.
+Note that `vine_submit_workers` is a simple shell script,
+so you can edit it directly if you would like to change batch
+options or other details. Please refer to the [TaskVine manual ](../taskvine) for more details.
 
 ### Port Numbers
 
@@ -725,7 +726,7 @@ For example, if you want the manager to listen on port 9567 by default, you can
 run the following command:
 
 ```sh
-$ makeflow -T wq -p 9567 example.makeflow
+$ makeflow -T vine -p 9567 example.makeflow
 ```
 
 ### Project Names
@@ -735,7 +736,7 @@ managers is to use a project name. You can give each manager a project name with
 the -N option.
 
 ```sh
-$ makeflow -T wq -N MyProject example.makeflow
+$ makeflow -T vine -N MyProject example.makeflow
 ```
 
 The -N option gives the manager a project name called `MyProject`, and will
@@ -747,7 +748,7 @@ To start a worker that automatically finds the manager named __MyProject__ via t
 catalog server:
 
 ```sh
-$ work_queue_worker -N MyProject
+$ vine_worker -N MyProject
 ```
 
 You can also give multiple `-N` options to a worker. The worker will find out
@@ -758,7 +759,7 @@ being stopped and given the different hostname and port of the manager. An examp
 of specifying multiple projects:
 
 ```sh
-$ work_queue_worker -N proj1 -N proj2 -N proj3
+$ vine_worker -N proj1 -N proj2 -N proj3
 ```
 
 In addition to creating a project name using the -N option, this will also
@@ -779,7 +780,7 @@ file:
 
 ```sh
 $ makeflow --password mypwfile ...
-$ work_queue_worker **--password** mypwfile ...
+$ vine_worker --password mypwfile ...
 ```
 
 ## Container Environments
@@ -839,10 +840,10 @@ $ makeflow --umbrella-binary
 $ $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
 ```
 
-To test makeflow with umbrella using wq execution engine:
+To test makeflow with umbrella using vine execution engine:
 
 ```sh
-$ makeflow -T wq --umbrella-binary
+$ makeflow -T vine --umbrella-binary
 $ $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
 ```
 
@@ -1317,8 +1318,8 @@ export USER
 
 When the underlying batch system supports it, Makeflow supports "Remote
 Renaming" where the name of a file in the execution sandbox is different than
-the name of the same file in the DAG. This is currently supported by the Work
-Queue, Condor, and Amazon batch system.
+the name of the same file in the DAG. This is currently supported by the
+TaskVine, Work Queue, HTCondor, and Amazon batch system.
 
 For example, `local_name->remote_name` indicates that the file `local_name` is
 called `remote_name` in the remote system. Consider the following example:
@@ -1351,10 +1352,9 @@ working directory is assumed.
 ### Resources and Categories
 
 Makeflow has the capability of automatically setting the cores, memory, and
-disk space requirements to the underlying batch system (currently this only
-works with Work Queue and Condor). Jobs are grouped into _job categories_ ,
-and jobs in the same category have the same cores, memory, and disk
-requirements.
+disk space requirements to the underlying batch system.
+(This works with TaskVine, WorkQueue, and HTCondor.)
+Jobs are grouped into _job categories_ , and jobs in the same category have the same cores, memory, and disk requirements.
 
 Job categories and resources are specified with variables. Jobs are assigned
 to the category named in the value of the variable `CATEGORY`. Likewise, the

@@ -19,7 +19,7 @@ See the file COPYING for details.
 
 /** @file batch_job.h Batch job submission.
 This module implements batch job submission to multiple systems,
-including local processes, HTCondor, Work Queue, SGE, PBS, Amazon EC2, and others.
+including local processes, HTCondor, TaskVine, Work Queue, SGE, PBS, Amazon EC2, and others.
 This simplifies the construction
 of parallel abstractions that need a simple form of parallel process execution.
 */
@@ -50,7 +50,8 @@ typedef enum {
 	BATCH_QUEUE_TYPE_MESOS,               /**< Batch jobs will be sent to Mesos. */
 	BATCH_QUEUE_TYPE_K8S,                 /**< Batch jobs will be sent to kubernetes. */
 	BATCH_QUEUE_TYPE_DRYRUN,              /**< Batch jobs will not actually run. */
-        BATCH_QUEUE_TYPE_MPI,
+        BATCH_QUEUE_TYPE_MPI,                 /**< Batch jobs distributed within an MPI program. */
+	BATCH_QUEUE_TYPE_VINE,                /**< Batch jobs executed via TaskVine. */
 	BATCH_QUEUE_TYPE_UNKNOWN = -1         /**< An invalid batch queue type. */
 } batch_queue_type_t;
 

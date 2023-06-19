@@ -2,28 +2,30 @@
 
 This is the API reference manual for the CCTools package,
 which includes TaskVine, Work Queue, Makeflow, Parrot, Chirp and other software.
+This provides detailed documentation of programming the libraries
+in Python and C.
+For a more general introduction to the software and how to use it
+from the command line, please see the [CCTools Manual](http://cctools.readthedocs.io)
 
 If you are writing a TaskVine application, start here:
 
-- @ref taskvine.h (C Language Interface)
-- @ref ndcctools.taskvine (Python Language Interface)
+- @ref ndcctools.taskvine (TaskVine Python Interface)
+- @ref taskvine.h (TaskVine C Interface)
 
 If you are writing a Work Queue application, start here:
 
-- @ref work_queue.h (C Language Interface)
-- @ref work_queue (Python Language Interface)
+- @ref ndcctools.work_queue (Work Queue Python Interface)
+- @ref work_queue.h (Work Queue C Interface)
 
+If you are writing a programs to access the Chirp filesystem, start here:
+
+- @ref ndcctools.chirp (Chirp Python Interface)
+- @ref chirp_reli.h    (Chirp C Interface)
 
 If you are writing a program to submit jobs to arbitrary batch systems,
 including Work Queue, HTCondor, Amazon EC2, etc. start here:
 
 - @ref batch_job.h
-
-If you are writing a programs to access the Chirp filesystem, start here:
-
-- @ref chirp_reli.h
-- @ref chirp_recursive.h
-- @ref chirp_stream.h
 
 Throughout the CCTools packages, there are a number of other support modules that implement debugging, communication, and data structures.  The most commonly used are:
 
@@ -46,11 +48,16 @@ Throughout the CCTools packages, there are a number of other support modules tha
 
 Or, you can browse all documented modules in the package:
 
-- <b><a href="files.html">See All Modules</a></b>
+- [See All C Files](files.html)
+- [See All Python Namespaces](namespaces.html)
+*/
 
-For more information about using and installing CCTools:
+/*
+Note this docstring goes here to provide a common
+landing page for all the ndcctools namespaces.
+*/
 
-- <a href="http://ccl.cse.nd.edu/software">CCTools Software</a>
-- <a href="http://ccl.cse.nd.edu/software/manuals">CCTools User Manuals</a>
-
+/** @namespace ndcctools
+Python interfaces to the Cooperative Computing Tools (CCTools)
+from the University of Notre Dame.
 */

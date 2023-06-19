@@ -285,7 +285,9 @@ header is received.
 static vine_result_code_t vine_manager_get_dir_contents( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *dirname, int64_t *totalsize )
 {
 	int result = mkdir(dirname,0777);
-	if(result<0) {
+
+	/* If the directory exists, no error, keep going. */
+	if(result<0 && errno!=EEXIST) {
 		debug(D_VINE,"unable to create %s: %s",dirname,strerror(errno));
 		return VINE_APP_FAILURE;
 	}
