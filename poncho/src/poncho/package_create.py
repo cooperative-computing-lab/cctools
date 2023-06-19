@@ -114,7 +114,7 @@ def pack_env_with_conda_dir(spec, output, ignore_editable_packages=False):
     except Exception as e:
         raise Exception(f"Error when packing a conda directory.\n{e}")
 
-def dict_to_env(spec, conda_executable=None, download_micromamba=False, ignore_editable_packages=False)
+def dict_to_env(spec, conda_executable=None, download_micromamba=False, ignore_editable_packages=False):
     outfile = ""
     md5 = hashlib.md5()
     md5.update(str(spec).encode('utf-8'))
@@ -181,7 +181,7 @@ def pack_env(spec, output, conda_executable=None, download_micromamba=False, ign
     else:
         f = open(spec, 'r')
         poncho_spec = json.load(f)
-        packe_env_from_dict(poncho_spec, output, conda_executable, download_micromamba, ignore_editable_packages)
+        pack_env_from_dict(poncho_spec, output, conda_executable, download_micromamba, ignore_editable_packages)
 
 def _run_conda_command(environment, needs_confirmation, command, *args):
     all_args = [conda_exec] + command.split()
