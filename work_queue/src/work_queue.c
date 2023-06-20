@@ -7087,7 +7087,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// in this wait.
 		if(events > 0) {
 			BEGIN_ACCUM_TIME(q, time_internal);
-			int done = !(list_size(q->ready_list)) || !(task_state_any(q, WORK_QUEUE_TASK_READY) || task_state_any(q, WORK_QUEUE_TASK_RUNNING) || task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) || (foreman_uplink));
+			int done = !(task_state_any(q, WORK_QUEUE_TASK_READY) || task_state_any(q, WORK_QUEUE_TASK_RUNNING) || task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) || (foreman_uplink));
 			END_ACCUM_TIME(q, time_internal);
 
 			if(done) {
