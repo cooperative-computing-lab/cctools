@@ -362,9 +362,8 @@ and that the main process will not have to handle an asynchronous
 static int catalog_update_tcp_background( const char *host, const char *address, int port, const char *text )
 {
 	pid_t pid = fork();
-	pid_t grandpid;
 	if(pid==0) {
-		grandpid = fork();
+		pid_t grandpid = fork();
 		if(grandpid==0) {
 			/* grandchild sends catalog update. */
 			catalog_update_tcp(host,address,port,text);
@@ -375,8 +374,7 @@ static int catalog_update_tcp_background( const char *host, const char *address,
 			_exit(0);
 		}
 	} else if(pid>0) {
-		debug(D_DEBUG, "sending update via tcp to %s(%s):%d (background pid %d)", host, address, port, (int)grandpid);
-		/* wait for child, not for grandchild. */
+		debug(D_DEBUG, "sending update via tcp to %s(%s):%d (background pid %d)", host, address, port, (int)pid);
 		pid_t result = waitpid(pid,0,0);
 		if(result!=pid) {
 			debug(D_DEBUG,"unable to wait for child process %d! (%s)",pid,strerror(errno));
