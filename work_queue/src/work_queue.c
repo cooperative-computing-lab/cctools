@@ -160,6 +160,8 @@ struct work_queue {
 	struct itable *tasks;           // taskid -> task
 	struct itable *task_state_map;  // taskid -> state
 	struct list   *ready_list;      // ready to be sent to a worker
+	struct work_queue_task *last_waiting_task;
+	struct work_queue_task *last_retrieved_task;
 
 	struct hash_table *worker_table;
 	struct hash_table *worker_blocklist;
@@ -1911,6 +1913,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	// At this point, a task is completed.
 	reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_RETRIEVED);
+	q->last_retrieved_task = t;
 
 	w->finished_tasks--;
 	w->total_tasks_complete++;
@@ -2316,7 +2319,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	}
 
 	change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-
+	q->last_waiting_task = t;
 	return WQ_SUCCESS;
 }
 
@@ -4665,6 +4668,24 @@ static int receive_one_task( struct work_queue *q )
 	struct work_queue_worker *w;
 	uint64_t taskid;
 
+	if((t = q->last_waiting_task)) {
+		w = itable_lookup(q->worker_task_map, t->taskid);
+		fetch_output_from_worker(q, w, t->taskid);
+
+		if( w->factory_name ) {
+			struct work_queue_factory_info *f;
+			f = hash_table_lookup(q->factory_table, w->factory_name);
+			if ( f && f->connected_workers > f->max_workers &&
+					itable_size(w->current_tasks) < 1 ) {
+				debug(D_WQ, "Final task received from worker %s, shutting down.", w->hostname);
+				shut_down_worker(q, w);
+			}
+		}
+		q->last_waiting_task = 0;
+		return 1;
+	}
+
+
 	itable_firstkey(q->tasks);
 	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
 		if( task_state_is(q, taskid, WORK_QUEUE_TASK_WAITING_RETRIEVAL) ) {
@@ -5847,6 +5868,8 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->ready_list = list_create();
 
 	q->tasks          = itable_create(0);
+	q->last_waiting_task = NULL;
+	q->last_retrieved_task = NULL;
 
 	q->task_state_map = itable_create(0);
 
@@ -6756,7 +6779,7 @@ static void print_password_warning( struct work_queue *q )
 		fprintf(stdout,"warning: you should set a password with the --password option.\n");
 	}
 
-	if(!q->	ssl_enabled) {
+	if(!q->ssl_enabled) {
 		fprintf(stdout,"warning: using plain-text when communicating with workers.\n");
 		fprintf(stdout,"warning: use encryption with a key and cert when creating the manager.\n");
 	}
@@ -6923,11 +6946,16 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	while( (stoptime == 0) || (time(0) < stoptime) ) {
 
 		BEGIN_ACCUM_TIME(q, time_internal);
+
 		// task completed?
 		if (t == NULL)
 		{
 			if(tag) {
 				t = task_state_any_with_tag(q, WORK_QUEUE_TASK_RETRIEVED, tag);
+			} else if(q->last_retrieved_task) {
+				t = q->last_retrieved_task;
+				q->last_retrieved_task = NULL;
+
 			} else {
 				t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
 			}
@@ -7059,7 +7087,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// in this wait.
 		if(events > 0) {
 			BEGIN_ACCUM_TIME(q, time_internal);
-			int done = !(task_state_any(q, WORK_QUEUE_TASK_RUNNING) || task_state_any(q, WORK_QUEUE_TASK_READY) || task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) || (foreman_uplink));
+			int done = !(list_size(q->ready_list)) || !(task_state_any(q, WORK_QUEUE_TASK_READY) || task_state_any(q, WORK_QUEUE_TASK_RUNNING) || task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) || (foreman_uplink));
 			END_ACCUM_TIME(q, time_internal);
 
 			if(done) {
