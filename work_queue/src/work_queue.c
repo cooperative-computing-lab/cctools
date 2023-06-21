@@ -488,7 +488,7 @@ static void log_queue_stats(struct work_queue *q, int force)
 	struct work_queue_stats s;
 
 	timestamp_t now = timestamp_get();
-	if(!force && (now - q->time_last_log_stats < ONE_SECOND)) {
+	if(!force && (now - q->time_last_log_stats < (ONE_SECOND*5))) {
 		return;
 	}
 
@@ -5951,7 +5951,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 	//
 
-	log_queue_stats(q, 1);
+	log_queue_stats(q, 0);
 
 	q->time_last_wait = timestamp_get();
 
@@ -7109,8 +7109,9 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	}
 
 	if(events > 0) {
-		log_queue_stats(q, 1);
+		log_queue_stats(q, 0);
 	}
+
 
 	q->time_last_wait = timestamp_get();
 
@@ -7522,9 +7523,35 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	// s->workers_able computed below.
 
 	//info about tasks
-	s->tasks_waiting      = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
-	s->tasks_with_results = task_state_count(q, NULL, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-	s->tasks_on_workers   = task_state_count(q, NULL, WORK_QUEUE_TASK_RUNNING) + s->tasks_with_results;
+	struct work_queue_task *t;
+	uint64_t taskid;
+
+	int ready_tasks = 0;
+	int waiting_tasks = 0;
+	int running_tasks = 0;
+
+	itable_firstkey(q->tasks);
+	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+		int state = (long)itable_lookup(q->task_state_map, taskid);
+		switch (state)
+		{
+			case WORK_QUEUE_TASK_READY:
+				ready_tasks++;
+				break;
+			case WORK_QUEUE_TASK_WAITING_RETRIEVAL:
+				waiting_tasks++;
+				break;
+			case WORK_QUEUE_TASK_RUNNING:
+				running_tasks++;
+				break;
+			default:
+				break;
+		}
+	}
+
+	s->tasks_waiting      = ready_tasks;
+	s->tasks_with_results = waiting_tasks;
+	s->tasks_on_workers   = running_tasks + s->tasks_with_results;
 
 	{
 		//accumulate tasks running, from workers:
