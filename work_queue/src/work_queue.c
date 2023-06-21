@@ -4682,8 +4682,7 @@ static int receive_one_task( struct work_queue *q )
 
 	int found = 0;
 	if(!t) {
-		itable_firstkey(q->tasks);
-		while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+		ITABLE_ITERATE(q->tasks, taskid, t) {
 			if( task_state_is(q, taskid, WORK_QUEUE_TASK_WAITING_RETRIEVAL) ) {
 				found = 1;
 				break;
