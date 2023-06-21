@@ -4661,50 +4661,43 @@ static void print_large_tasks_warning(struct work_queue *q)
 	rmsummary_delete(largest_unfit_task);
 }
 
-static int receive_one_task( struct work_queue *q )
+static void trim_factory( struct work_queue *q, struct work_queue_worker *w )
 {
-	struct work_queue_task *t;
-
-	struct work_queue_worker *w;
-	uint64_t taskid;
-
-	if((t = q->last_waiting_task)) {
-		w = itable_lookup(q->worker_task_map, t->taskid);
-		fetch_output_from_worker(q, w, t->taskid);
-
-		if( w->factory_name ) {
-			struct work_queue_factory_info *f;
+	struct work_queue_factory_info *f;
 			f = hash_table_lookup(q->factory_table, w->factory_name);
 			if ( f && f->connected_workers > f->max_workers &&
 					itable_size(w->current_tasks) < 1 ) {
 				debug(D_WQ, "Final task received from worker %s, shutting down.", w->hostname);
 				shut_down_worker(q, w);
 			}
-		}
-		q->last_waiting_task = 0;
-		return 1;
-	}
+}
 
+static int receive_one_task( struct work_queue *q )
+{
+	struct work_queue_task *t;
+	struct work_queue_worker *w;
+	uint64_t taskid;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
-		if( task_state_is(q, taskid, WORK_QUEUE_TASK_WAITING_RETRIEVAL) ) {
-			w = itable_lookup(q->worker_task_map, taskid);
-			fetch_output_from_worker(q, w, taskid);
-			// Shutdown worker if appropriate.
-			if ( w->factory_name ) {
-				struct work_queue_factory_info *f;
-				f = hash_table_lookup(q->factory_table, w->factory_name);
-				if ( f && f->connected_workers > f->max_workers &&
-						itable_size(w->current_tasks) < 1 ) {
-					debug(D_WQ, "Final task received from worker %s, shutting down.", w->hostname);
-					shut_down_worker(q, w);
-				}
+	if(!(t = q->last_waiting_task)) {
+		itable_firstkey(q->tasks);
+		while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+			if( task_state_is(q, taskid, WORK_QUEUE_TASK_WAITING_RETRIEVAL) ) {
+				break;
 			}
-			return 1;
 		}
+		// we could not find a task waiting retrieval
+		return 0;
 	}
-	return 0;
+
+	w = itable_lookup(q->worker_task_map, t->taskid);
+	fetch_output_from_worker(q, w, t->taskid);
+
+	if ( w->factory_name ) {
+		trim_factory(q, w);
+	}
+
+	q->last_waiting_task = 0;
+	return 1;
 }
 
 //Sends keepalives to check if connected workers are responsive, and ask for updates If not, removes those workers.
