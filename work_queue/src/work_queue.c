@@ -4678,15 +4678,18 @@ static int receive_one_task( struct work_queue *q )
 	struct work_queue_worker *w;
 	uint64_t taskid;
 
-	if(!(t = q->last_waiting_task)) {
+	t = q->last_waiting_task;
+
+	int found = 0;
+	if(!t) {
 		itable_firstkey(q->tasks);
 		while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
 			if( task_state_is(q, taskid, WORK_QUEUE_TASK_WAITING_RETRIEVAL) ) {
+				found = 1;
 				break;
 			}
 		}
-		// we could not find a task waiting retrieval
-		return 0;
+		if(!found) return 0;
 	}
 
 	w = itable_lookup(q->worker_task_map, t->taskid);
