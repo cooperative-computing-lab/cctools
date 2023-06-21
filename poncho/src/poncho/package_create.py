@@ -22,7 +22,7 @@ from packaging import version
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
 handler = logging.StreamHandler(stream=sys.stdout)
-formatter = logging.Formatter(fmt='%(asctime)s:%(levelname)s:%(message)s'))
+formatter = logging.Formatter(fmt='%(asctime)s:%(levelname)s:%(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
