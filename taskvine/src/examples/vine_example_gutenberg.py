@@ -8,6 +8,7 @@
 # a simple text comparison of each pair of files.
 
 import ndcctools.taskvine as vine
+import argparse
 import sys
 
 urls_sources = [
@@ -50,8 +51,25 @@ exit 0
 """
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog="vine_example_gutenberg.py",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    parser.add_argument(
+        "--disable-peer-transfers",
+        action="store_true",
+        help="disable transfers among workers.",
+        default=False,
+    )
+
     m = vine.Manager()
     print("listening on port", m.port)
+
+    args = parser.parse_args()
+
+    if args.disable_peer_transfers:
+        m.disable_peer_transfers()
 
     # declare all urls in the manager:
     urls = map(lambda u: m.declare_url(u, cache=True), urls_sources)
