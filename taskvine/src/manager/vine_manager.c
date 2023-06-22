@@ -5261,5 +5261,44 @@ struct vine_file * vine_declare_chirp( struct vine_manager *m, const char *serve
 	return vine_manager_declare_file(m, t);
 }
 
+const char * vine_fetch_file( struct vine_manager *m, struct vine_file *f )
+{
+	/* If the data has already been loaded, just return it. */
+	if(f->data) return f->data;
+	
+	switch(f->type) {
+	case VINE_FILE:
+		/* If it is on the local filesystem, load it. */
+		uint64_t length;
+		if(copy_file_to_buffer(f->source,&f->data,&length)) {
+			return f->data;
+		} else {
+			return 0;
+		}
+		break;
+	case VINE_BUFFER:
+		/* Buffer files will already have their contents in memory, if available. */
+		return f->data;
+		break;
+	case VINE_TEMP:
+	case VINE_URL:
+	case VINE_MINI_TASK:
+		/* If the file has been materialized remotely, go get it from a worker. */
+		{
+		struct vine_worker_info *w = vine_file_replica_table_find_worker(m,f->cached_name);
+		if(w) vine_manager_get_single_file(m,w,f);
+		/* If that succeeded, then f->data is now set, null otherwise. */
+		return f->data;
+		}
+		break;
+	case VINE_EMPTY_DIR:
+		/* Never anything to get. */
+		return 0;
+		break;
+	}
+
+	return 0;
+}
+
 
 /* vim: set noexpandtab tabstop=4: */
