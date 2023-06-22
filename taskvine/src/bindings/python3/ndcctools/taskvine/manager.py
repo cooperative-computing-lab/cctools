@@ -1358,6 +1358,16 @@ class Manager(object):
         return File(f)
 
     ##
+    # Fetch file contents from the cluster or local disk.
+    #
+    # @param self    The manager to register this file
+    # @param file    The file object
+    # @return The contents of the file as a strong.
+    
+    def fetch_file(self, file):
+        return cvine.vine_fetch_file(self._taskvine, file._file)
+
+    ##
     # Remove file from workers, undeclare it at the manager.
     # Note that this does not remove the file's local copy at the manager, if any.
     #

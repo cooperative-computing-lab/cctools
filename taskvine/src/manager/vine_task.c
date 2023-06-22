@@ -585,6 +585,8 @@ int vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output
 
 int vine_task_set_result(struct vine_task *t, vine_result_t new_result)
 {
+	if(!t) return 0;
+	
 	if(new_result & ~(0x7)) {
 		/* Upper bits are set, so this is not related to old-style result for
 		 * inputs, outputs, or stdout, so we simply make an update. */
