@@ -5270,7 +5270,7 @@ const char * vine_fetch_file( struct vine_manager *m, struct vine_file *f )
 	case VINE_FILE:
 		/* If it is on the local filesystem, load it. */
 		{
-		uint64_t length;
+		size_t length;
 		if(copy_file_to_buffer(f->source,&f->data,&length)) {
 			return f->data;
 		} else {
