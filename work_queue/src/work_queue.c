@@ -160,8 +160,6 @@ struct work_queue {
 	struct itable *tasks;           // taskid -> task
 	struct itable *task_state_map;  // taskid -> state
 	struct list   *ready_list;      // ready to be sent to a worker
-	struct work_queue_task *last_waiting_task;
-	struct work_queue_task *last_retrieved_task;
 
 	struct hash_table *worker_table;
 	struct hash_table *worker_blocklist;
@@ -1913,7 +1911,6 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	// At this point, a task is completed.
 	reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_RETRIEVED);
-	q->last_retrieved_task = t;
 
 	w->finished_tasks--;
 	w->total_tasks_complete++;
@@ -2319,7 +2316,6 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	}
 
 	change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-	q->last_waiting_task = t;
 	return WQ_SUCCESS;
 }
 
@@ -4678,19 +4674,15 @@ static int receive_one_task( struct work_queue *q )
 	struct work_queue_worker *w;
 	uint64_t taskid;
 
-	t = q->last_waiting_task;
-
 	int found = 0;
-	if(!t) {
-		ITABLE_ITERATE(q->tasks, taskid, t) {
-			if( task_state_is(q, taskid, WORK_QUEUE_TASK_WAITING_RETRIEVAL) ) {
-				found = 1;
-				break;
-			}
+	ITABLE_ITERATE(q->tasks, taskid, t) {
+		if( task_state_is(q, taskid, WORK_QUEUE_TASK_WAITING_RETRIEVAL) ) {
+			found = 1;
+			break;
 		}
-		if(!found) return 0;
 	}
-
+	if(!found) return 0;
+	
 	w = itable_lookup(q->worker_task_map, t->taskid);
 	fetch_output_from_worker(q, w, t->taskid);
 
@@ -4698,7 +4690,6 @@ static int receive_one_task( struct work_queue *q )
 		trim_factory(q, w);
 	}
 
-	q->last_waiting_task = 0;
 	return 1;
 }
 
@@ -5863,9 +5854,6 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->ready_list = list_create();
 
 	q->tasks          = itable_create(0);
-	q->last_waiting_task = NULL;
-	q->last_retrieved_task = NULL;
-
 	q->task_state_map = itable_create(0);
 
 	q->worker_table = hash_table_create(0, 0);
@@ -6947,10 +6935,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		{
 			if(tag) {
 				t = task_state_any_with_tag(q, WORK_QUEUE_TASK_RETRIEVED, tag);
-			} else if(q->last_retrieved_task) {
-				t = q->last_retrieved_task;
-				q->last_retrieved_task = NULL;
-
 			} else {
 				t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
 			}
