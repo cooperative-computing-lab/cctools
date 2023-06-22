@@ -602,7 +602,7 @@ has previously been called on this object.
 @param f A file object created by @ref vine_declare_buffer.
 @return A constant pointer to the buffer contents, or null if not available.
 */
-const char * vine_file_contents( struct vine_manager *m, struct vine_file *f );
+const char * vine_file_contents( struct vine_file *f );
 
 /** Get the length of a vine file.
 @param f A file object.

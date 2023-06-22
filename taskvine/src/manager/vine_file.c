@@ -112,7 +112,7 @@ struct vine_file *vine_file_clone( struct vine_file *f )
 
 /* Return the contents of the file, if available. */
 
-const char * vine_file_contents( struct vine_manager *m, struct vine_file *f )
+const char * vine_file_contents( struct vine_file *f )
 {
 	return f->data;
 }
