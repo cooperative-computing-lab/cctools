@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "stringtools.h"
 #include "path.h"
+#include "copy_stream.h"
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -109,11 +110,39 @@ struct vine_file *vine_file_clone( struct vine_file *f )
 	return f;
 }
 
-/* Return the contents of a buffer file, or null. */
+/* Return the contents of a file in memory, or null if not available. */
 
 const char * vine_file_contents( struct vine_file *f )
 {
-	return f->data;
+	/* If the data has already been matieralized in memory, return that. */
+	if(f->data) return f->data;
+	
+	switch(f->type) {
+	case VINE_FILE:
+		/* If the file has been created and returned, load the local data. */
+		if(copy_file_to_buffer(f->source,&f->data,&f->size)) {
+			return f->data;
+		} else {
+			return 0;
+		}
+		break;
+	case VINE_BUFFER:
+		/* Whether an input or output buffer, provide the data directly. */
+		return f->data;
+		break;
+	case VINE_TEMP:
+	case VINE_URL:
+	case VINE_MINI_TASK:
+		/* If the file has been materialized remotely, go get it from a worker. */
+		return 0;
+		break;
+	case VINE_EMPTY_DIR:
+		/* Never anything to get. */
+		return 0;
+		break;
+	}
+
+	return 0;
 }
 
 /* Return the size of any kind of file. */
