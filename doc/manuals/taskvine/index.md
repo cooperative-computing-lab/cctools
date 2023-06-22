@@ -225,8 +225,11 @@ visible within the manager application.
 used to capture the output of a task, and then serve as the input
 of a later task.  Temporary files exist only within the cluster
 for the duration of a workflow, and are deleted when no longer needed.
+This accelerates a workflow by avoiding the step of returning the
+data to the manager.
 If a temporary file is unexpectedly lost due to the crash or failure
 of a worker, then the task that created it will be re-executed.
+The contents of a temporary file can be obtained with `fetch_file`
 
 If it is necessary to unpack a file before it is used,
 use the `declare_untar` transformation to wrap the file definition.
