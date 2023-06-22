@@ -57,7 +57,7 @@ static vine_result_code_t vine_manager_get_buffer( struct vine_manager *q, struc
 
 		f->data = malloc(size+1);
 		if(f->data) {
-			time_t stoptime = time(0) + vine_manager_transfer_time(q, w, t, f->size);
+			time_t stoptime = time(0) + vine_manager_transfer_time(q, w, f->size);
 
 			ssize_t actual = link_read(w->link,f->data,f->size,stoptime);
 			if(actual >= 0 && (size_t)actual == f->size) {
@@ -101,7 +101,7 @@ static vine_result_code_t vine_manager_get_file_contents( struct vine_manager *q
 	}
 
 	// Choose the actual stoptime.
-	time_t stoptime = time(0) + vine_manager_transfer_time(q, w, t, length);
+	time_t stoptime = time(0) + vine_manager_transfer_time(q, w, length);
 
 	// If necessary, create parent directories of the file.
 	char dirname[VINE_LINE_MAX];
@@ -305,6 +305,17 @@ static vine_result_code_t vine_manager_get_dir_contents( struct vine_manager *q,
 			return r;
 		}
 	}
+}
+
+/*
+Get a single output file from a worker, independently of any task.
+*/
+
+vine_result_code_t vine_manager_get_single_file( struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f )
+{
+	int64_t total_bytes;
+	vine_manager_send(q,w, "getfile %s\n",f->cached_name);
+	return vine_manager_get_buffer(q, w, 0, f, &total_bytes );
 }
 
 /*
