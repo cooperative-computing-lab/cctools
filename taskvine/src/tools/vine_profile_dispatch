@@ -4,6 +4,8 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
+# Plot the time spent matching tasks to workers through the information in the performance log
+
 import sys
 import matplotlib.pyplot as plt
 

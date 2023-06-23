@@ -4787,9 +4787,35 @@ void vine_get_stats(struct vine_manager *q, struct vine_stats *s)
 	// s->workers_able computed below.
 
 	//info about tasks
-	s->tasks_waiting      = task_state_count(q, NULL, VINE_TASK_READY);
-	s->tasks_with_results = task_state_count(q, NULL, VINE_TASK_WAITING_RETRIEVAL);
-	s->tasks_on_workers   = task_state_count(q, NULL, VINE_TASK_RUNNING) + s->tasks_with_results;
+	struct vine_task *t;
+	uint64_t taskid;
+
+	int ready_tasks = 0;
+	int waiting_tasks = 0;
+	int running_tasks = 0;
+
+	itable_firstkey(q->tasks);
+	while(itable_nextkey(q->tasks, &taskid, ( void **) &t )) {
+		int state = t->state;
+		switch(state)
+		{
+			case VINE_TASK_READY:
+				ready_tasks++;
+				break;
+			case VINE_TASK_WAITING_RETRIEVAL:
+				waiting_tasks++;
+				break;
+			case VINE_TASK_RUNNING:
+				running_tasks++;
+				break;
+			default:
+				break;
+		}
+	}
+
+	s->tasks_waiting = ready_tasks;
+	s->tasks_with_results = waiting_tasks;
+	s->tasks_on_workers = running_tasks + s->tasks_with_results;
 
 	{
 		//accumulate tasks running, from workers:
