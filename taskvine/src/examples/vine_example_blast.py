@@ -96,8 +96,10 @@ with all the same tasks on the worker.""",
     m = vine.Manager(port=args.port)
     m.set_name(args.name)
 
-    if not args.disable_peer_transfers:
-        m.enable_peer_transfers()
+    if args.disable_peer_transfers:
+        m.disable_peer_transfers()
+    
+    if args.max_concurrent_transfers:
         m.tune("worker-source-max-transfers", args.max_concurrent_transfers)
 
     print("Declaring files...")
