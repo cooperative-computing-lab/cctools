@@ -3552,6 +3552,8 @@ void vine_delete(struct vine_manager *q)
 	hash_table_delete(q->categories);
 
 	list_delete(q->ready_list);
+	list_delete(q->waiting_list);
+	list_delete(q->retrieved_list);
 	hash_table_delete(q->libraries);
 	hash_table_delete(q->workers_with_available_results);
 
