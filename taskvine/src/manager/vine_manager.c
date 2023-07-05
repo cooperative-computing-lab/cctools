@@ -3743,12 +3743,14 @@ static vine_task_state_t change_task_state( struct vine_manager *q, struct vine_
 			list_push_head(q->waiting_list, t);
 			break;
 		case VINE_TASK_RETRIEVED:
+		{
 			struct vine_task *tmp = NULL;
 			while((tmp = list_rotate(q->waiting_list))){
 				if((t = tmp)) list_pop_tail(q->waiting_list);
 			}
 			list_push_head(q->retrieved_list, t);
 			break;
+		}
 		case VINE_TASK_DONE:
 		case VINE_TASK_CANCELED:
 			/* Task was cloned when entered into our own table, so delete a reference on removal. */
