@@ -457,6 +457,19 @@ int vine_task_add_output( struct vine_task *t, struct vine_file *f, const char *
 		return 0;
 	}
 
+	switch(f->type) {
+	case VINE_FILE:
+	case VINE_BUFFER:
+	case VINE_TEMP:
+		/* keep going */
+		break;
+	case VINE_URL:
+	case VINE_MINI_TASK:
+	case VINE_EMPTY_DIR:
+		debug(D_NOTICE|D_VINE,"%s: unsupported output file type",__func__);
+		return 0;
+	}
+	
 	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
 
 	list_push_tail(t->output_mounts, m);
@@ -572,6 +585,8 @@ int vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output
 
 int vine_task_set_result(struct vine_task *t, vine_result_t new_result)
 {
+	if(!t) return 0;
+	
 	if(new_result & ~(0x7)) {
 		/* Upper bits are set, so this is not related to old-style result for
 		 * inputs, outputs, or stdout, so we simply make an update. */
@@ -819,32 +834,40 @@ performance and resource details that do not affect the output.
 
 char * vine_task_to_json(struct vine_task *t)
 {
-	char * buffer;
-	char * file_buffer;
-
+	char *env_name; 
 	struct vine_mount *m;
 
-	buffer = string_format("{\ncmd = \"%s\"\n", t->command_line);
+	buffer_t b;
+	buffer_init(&b);
+
+	buffer_putfstring(&b, "{\ncmd = \"%s\"\n", t->command_line);
 
 	if(t->input_mounts){
-		buffer = string_combine(buffer, "inputs = ");
+		buffer_putfstring(&b, "inputs = ");
 		LIST_ITERATE(t->input_mounts,m) {
-			file_buffer = string_format("{ name: \"%s\", content: \"%s\"}, ", m->remote_name, m->file->cached_name);
-			buffer = string_combine(buffer, file_buffer);
-			free(file_buffer);
+			buffer_putfstring(&b, "{ name: \"%s\", content: \"%s\"}, ", m->remote_name, m->file->cached_name);
 		}
-		buffer = string_combine(buffer, "\n");
+		buffer_putfstring(&b, "\n");
 	}
 
 	if(t->output_mounts){
-		buffer = string_combine(buffer, "outputs = ");
+		buffer_putfstring(&b, "outputs = ");
 		LIST_ITERATE(t->output_mounts,m) {
-			file_buffer = string_format("{ name: \"%s\" }, ", m->remote_name);
-			buffer = string_combine(buffer, file_buffer);
-			free(file_buffer);
+			buffer_putfstring(&b, "{ name: \"%s\" }, ", m->remote_name);
 		}
-		buffer = string_combine(buffer, "\n");
+		buffer_putfstring(&b, "\n");
 	}
-	return buffer;
+
+	if(t->env_list){
+		buffer_putfstring(&b, "environment = ");
+		LIST_ITERATE(t->env_list, env_name) {
+			buffer_putfstring(&b, "{ name: \"%s\" }, ", env_name);
+		}
+		buffer_putfstring(&b, "\n");
+	}
+
+	char * json = xxstrdup(buffer_tostring(&b));	
+	buffer_free(&b);
+	return json;
 }
 

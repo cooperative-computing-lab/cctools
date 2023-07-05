@@ -156,7 +156,7 @@ You may specify a specific port number to listen on like this:
     /* Import the taskvine module */
     #include "taskvine.h"
 
-    /* Create a new queue listening on port 9123 */
+    /* Create a new manager listening on port 9123 */
     struct taskvine *m = vine_create(9123);
     ```
 
@@ -225,8 +225,11 @@ visible within the manager application.
 used to capture the output of a task, and then serve as the input
 of a later task.  Temporary files exist only within the cluster
 for the duration of a workflow, and are deleted when no longer needed.
+This accelerates a workflow by avoiding the step of returning the
+data to the manager.
 If a temporary file is unexpectedly lost due to the crash or failure
 of a worker, then the task that created it will be re-executed.
+The contents of a temporary file can be obtained with `fetch_file`
 
 If it is necessary to unpack a file before it is used,
 use the `declare_untar` transformation to wrap the file definition.
@@ -524,7 +527,7 @@ If you have access to a HTCondor pool, you can use this shortcut to submit ten
 workers at once via HTCondor:
 
 ```sh
-$ condor_submit_workers MACHINENAME 9123 10
+$ vine_submit_workers -T condor MACHINENAME 9123 10
 
 Submitting job(s)..........
 Logging submit event(s)..........
@@ -538,10 +541,8 @@ and port number, and begin to service the manager application.
 Similar scripts are available for other common batch systems:
 
 ```sh
-$ slurm_submit_workers MACHINENAME 9123 10
-$ sge_submit_workers MACHINENAME 9123 10
-$ pbs_submit_workers MACHINENAME 9123 10
-$ torque_submit_workers MACHINENAME 9123 10
+$ vine_submit_workers -T slurm MACHINENAME 9123 10
+$ vine_submit_workers _T sge MACHINENAME 9123 10
 ```
 
 When the manager completes, if the workers were not otherwise shut down,
@@ -566,7 +567,7 @@ name query the catalog server to find the hostname and port of the manager with
 the given project name.
 
 For example, to have a TaskVine manager advertise its project name as
-`myproject`, add the following code snippet after creating the queue:
+`myproject`, add the following code snippet after creating the manager:
 
 === "Python"
     ```python
@@ -587,19 +588,19 @@ $ vine_worker -M myproject
 
 
 You can start ten workers for this manager on Condor using
-`condor_submit_workers` by providing the same option arguments.:
+`vine_submit_workers` by providing the same option arguments.:
 
 ```sh
-$ condor_submit_workers -M myproject 10
+$ vine_submit_workers -T condor -M myproject 10
 Submitting job(s)..........
 Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
 ```
 
-Or similarly on SGE using `sge_submit_workers` as:
+Or similarly on SGE using `vine_submit_workers` as:
 
 ```sh
-$ sge_submit_workers -M myproject 10
+$ vine_submit_workers -T sge -M myproject 10
 Your job 153097 ("worker.sh") has been submitted
 Your job 153098 ("worker.sh") has been submitted
 Your job 153099 ("worker.sh") has been submitted
@@ -609,7 +610,7 @@ Your job 153099 ("worker.sh") has been submitted
 ### TaskVine Online Status Display
 
 An additional benefit of using a project name is that you can
-now use the [TaskVine_status](../man_pages/taskvine_status) command
+now use the [vine_status](../man_pages/taskvine_status) command
 to display the progress of your application.  This shows the name,
 location, and statistics of each application that reports itself to the
 catalog server.  (Note that this information is updated about once
@@ -671,7 +672,7 @@ them in a with statement. The factory will be cleaned up automtically at the
 end of the block. As an example:
 
 ```python
-workers = taskvine.Factory("condor", "myproject")
+workers = vine.Factory("condor", "myproject")
 workers.cores = 4
 workers.memory = 4000
 workers.disk = 5000
@@ -686,7 +687,7 @@ with workers:
 
 ### Caching and Sharing
 
-Wherever possible, TaskVine retains files (whatever their source) within
+Wherever possible, TaskVine retains files (whatever their sources) within
 the cluster so that they can be reused by later tasks.  To do this
 consistently, each file is given a **unique cache name** that is computed
 from its contents and metadata.  This ensures that if the external source
@@ -707,9 +708,9 @@ software packages and reference datasets.
 
 === "Python"
     ```python
-    f = m.declare_file("myfile.txt",cache="never")
-    f = m.declare_file("myfile.txt",cache="workflow") # (default)
-    f = m.declare_file("myfile.txt",cache="always") # (default)
+    f = m.declare_file("myfile.txt",cache="never") # (default)
+    f = m.declare_file("myfile.txt",cache="workflow") 
+    f = m.declare_file("myfile.txt",cache="always")
     ```
 === "C"
     ```
@@ -815,19 +816,19 @@ like the input to be the result of a query to a database.
 The execution of a task can be wrapped with specially designed files called
 environments. These environments ensure that the software dependencies for the
 task are available in the execution site. TaskVine natively supports two types
-of environments: [poncho](../poncho/index.md), which is based on conda-pack;
-and [starch](../man_pages/starch.md) a lightweight package useful when the
+of environments: [poncho](../poncho/index.md), which is based on `conda-pack`;
+and [starch](../man_pages/starch.md), a lightweight package useful when the
 manager and workers run the same linux version. Mini tasks can be used to
 create environments not natively supported, as we will show later to construct
 environments for Apptainer (i.e., singularity containers).
 
 #### Poncho
 
-A Poncho environment is a tarball based on conda-pack useful to deliver
+A Poncho environment is a tarball based on `conda-pack`, and is useful to deliver
 complete python environments. For example, to create a python environment with
-numpy:
+`numpy`:
 
-my_poncho_spec.json
+`my_poncho_spec.json`
 ```json
 {
     "conda": {
@@ -989,7 +990,7 @@ mini task to construct the environment structure directly on the workers.
     m.submit(t)
     ```
 
-You can see the complete example [here](examples/vine_example_apptainer_env.py)
+You can see the complete example [here](examples/vine_example_apptainer_env.py).
 
 ### Watching Output Files
 
@@ -1103,7 +1104,7 @@ through a SHA1-based mutual challenge-response protocol.
 
 TaskVine can encrypt the communication between manager and workers using SSL.
 For this, you need to set the key and certificate (in PEM format) of your
-server when creating the queue.
+server when creating the manager.
 
 If you do not have a key and certificate at hand, but you want the
 communications to be encrypted, you can create your own key and certificate:
@@ -1116,7 +1117,7 @@ openssl req -x509 -newkey rsa:4096 -keyout MY_KEY.pem -out MY_CERT.pem -sha256 -
 ```
 
 To activate SSL encryption, indicate the paths to the key and certificate when
-creating the queue:
+creating the manager:
 
 === "Python"
     ```python
@@ -1125,7 +1126,7 @@ creating the queue:
     m = vine.Manager(port=9123, ssl=('MY_KEY.pem', 'MY_CERT.pem'))
 
     # Alternatively, you can set ssl=True and let the python API generate
-    # temporary ssl credentials for the queue:
+    # temporary ssl credentials for the manager:
     m = vine.Manager(port=9123, ssl=True)
     ```
 
@@ -1134,13 +1135,13 @@ creating the queue:
     /* Import the taskvine module */
     #include "taskvine.h"
 
-    /* Create a new queue listening on port 9123 */
+    /* Create a new manager listening on port 9123 */
     struct taskvine *m = vine_ssl_create(9123, 'MY_KEY.pem', 'MY_CERT.pem');
     ```
 
 
 If you are using a (project name)[#project-names-and-the-catalog-server] for
-your queue, then the workers will be aware that the manager is using SSL and
+your manager, then the workers will be aware that the manager is using SSL and
 communicate accordingly automatically. However, you are directly specifying the
 address of the manager when launching the workers, then you need to add the
 `--ssl` flag to the command line, as:
@@ -1149,12 +1150,12 @@ address of the manager when launching the workers, then you need to add the
 vine_worker (... other args ...) --ssl HOST PORT
 vine_factory (... other args ...) --ssl HOST PORT
 vine_status --ssl HOST PORT
-condor_submit_workers -E'--ssl' HOST PORT
+vine_submit_workers -T condor -E'--ssl' HOST PORT
 ```
 
 ### Maximum Retries
 
-When a task cannot be completed because a worker disconnection or because it
+When a task cannot be completed because a worker disconnects or because it
 exhausted some intermediate resource allocation, it is automatically retried.
 By default, there is no limit on the number of retries. However, you can set a
 limit on the number of retries:
@@ -1184,7 +1185,7 @@ then the task result is set to `"max retries"` in python and
 If you have a **very** large number of tasks to run, it may not be possible to
 submit all of the tasks, and then wait for all of them. Instead, submit a
 small number of tasks, then alternate waiting and submitting to keep a constant
-number in the queue. The `hungry` will tell you if more submission are
+number in the manager. The `hungry` will tell you if more submissions are
 warranted:
 
 === "Python"
@@ -1205,7 +1206,7 @@ warranted:
 A large computation can often be slowed down by stragglers. If you have a
 large number of small tasks that take a short amount of time, then
 automatically disconnecting slow workers can help. With this feature enabled,
-statistics are kept on tasks execution times and statistical outlier are
+statistics are kept on tasks execution times and statistical outliers are
 terminated. If two different tasks are canceled in the same worker, then the
 worker is disconnected and blacklisted.
 
@@ -1222,7 +1223,7 @@ worker is disconnected and blacklisted.
     ```
 
 Tasks terminated this way are automatically retried in some other worker.
-Each retry allows the task to run for longer and longer times until a
+Each retry allows the task to run for longer times until a
 completion is reached. You can set an upper bound in the number of retries with
 [Maximum Retries](#maximum-retries).
 
@@ -1340,7 +1341,7 @@ tasks. The manager can be directed to ignore certain workers, as:
 
 ### Performance Statistics
 
-The queue tracks a fair number of statistics that count the number of tasks,
+The manager tracks a fair number of statistics that count the number of tasks,
 number of workers, number of failures, and so forth. This information is useful
 to make a progress bar or other user-visible information:
 
@@ -1716,13 +1717,12 @@ In combination with the worker option `--wall-time`, tasks can request a
 minimum time to execute with `set_time_min`, as explained (below)[#setting-task-resources].
 
 You may also use the same `--cores`, `--memory`, `--disk`, and `--gpus` options when using
-batch submission scripts such as `condor_submit_workers` or
-`slurm_submit_workers`, and the script will correctly ask the batch system for
-a node of the desired size.
+batch submission script `vine_submit_workers`, and the script will correctly ask the right 
+batch system for a node of the desired size.
 
-The only caveat is when using `sge_submit_workers`, as there are many
+The only caveat is when using `vine_submit_workers -T sge`, as there are many
 differences across systems that the script cannot manage. For `
-sge_submit_workers ` you have to set **both** the resources used by the
+vine_submit_workers -T sge` you have to set **both** the resources used by the
 worker (i.e., with `--cores`, etc.) and the appropiate computing node with the `
 -p ` option.
 
@@ -1731,7 +1731,7 @@ number of cores with the switch ` -pe smp ` , and you want workers with 4
 cores:
 
 ```sh
-$ sge_submit_workers --cores 4 -p "-pe smp 4" MACHINENAME 9123
+$ vine_submit_workers -T sge --cores 4 -p "-pe smp 4" MACHINENAME 9123
 ```
 
 If you find that there are options that are needed everytime, you can compile
@@ -1746,7 +1746,7 @@ $ ./configure  --sge-parameter '-pe smp $cores'
 So that we can simply call:
 
 ```sh
-$ sge_submit_workers --cores 4 MACHINENAME 9123
+$ vine_submit_workers -T sge --cores 4 MACHINENAME 9123
 ```
 
 The variables `$cores `, `$memory `, and `$disk `, have the values of the
@@ -2082,7 +2082,7 @@ relative to the current logging prefix (i.e. `vine-run-info/` by default).
 
 ### Debug Log
 
-The debug log prints unstructured messages as the queue transfers files and
+The debug log prints unstructured messages as the manager transfers files and
 tasks, workers connect and report resources, etc. This is specially useful to
 find failures, bugs, and other errors. It is located by default at:
 
@@ -2212,7 +2212,7 @@ The statistics available are:
 | tasks_with_results    | Number of tasks with retrieved results and waiting to be returned to user |
 |||
 |       | **Cumulative stats for tasks** |
-| tasks_submitted            | Total number of tasks submitted to the queue |
+| tasks_submitted            | Total number of tasks submitted to the manager |
 | tasks_dispatched           | Total number of tasks dispatch to workers |
 | tasks_done                 | Total number of tasks completed and returned to user (includes tasks_failed) |
 | tasks_failed               | Total number of tasks completed and returned to user with result other than VINE_RESULT_SUCCESS |
@@ -2226,7 +2226,7 @@ The statistics available are:
 | time_send_good     | Total time spent in sending data to workers for tasks with result VINE_RESULT_SUCCESS |
 | time_receive_good  | Total time spent in sending data to workers for tasks with result VINE_RESULT_SUCCESS |
 | time_status_msgs   | Total time spent sending and receiving status messages to and from workers, including workers' standard output, new workers connections, resources updates, etc. |
-| time_internal      | Total time the queue spents in internal processing |
+| time_internal      | Total time the manager spents in internal processing |
 | time_polling       | Total time blocking waiting for worker communications (i.e., manager idle waiting for a worker message) |
 | time_application   | Total time spent outside vine_wait |
 |||
@@ -2326,7 +2326,7 @@ change.
 | category-steady-n-tasks | Minimum number of successful tasks to use a sample for automatic resource allocation modes<br>after encountering a new resource maximum. | 25 |
 | proportional-resources | If set to 0, do not assign resources proportionally to tasks. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
 | proportional-whole-tasks | Round up resource proportions such that only an integer number of tasks could be fit in the worker. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
-| hungry-minimum          | Smallest number of waiting tasks in the queue before declaring it hungry | 10 |
+| hungry-minimum          | Smallest number of waiting tasks in the manager before declaring it hungry | 10 |
 | monitor-interval        | Maximum number of seconds between resource monitor measurements. If less than 1, use default. | 5 |
 | resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |

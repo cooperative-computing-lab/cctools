@@ -134,8 +134,6 @@ typedef enum {
 // Threshold for available disk space (MB) beyond which files are not received from worker.
 static uint64_t disk_avail_threshold = 100;
 
-int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
-
 /* default timeout for slow workers to come back to the pool */
 double wq_option_blocklist_slow_workers_timeout = 900;
 
@@ -204,6 +202,7 @@ struct work_queue {
 	int hungry_minimum;               /* minimum number of waiting tasks to consider queue not hungry. */;
 
 	int wait_for_workers;             /* wait for these many workers before dispatching tasks at start of execution. */
+	int attempt_schedule_depth;		  /* number of submitted tasks to attempt scheduling before we continue to retrievals */
 
 	work_queue_category_mode_t allocation_default_mode;
 
@@ -487,7 +486,7 @@ static void log_queue_stats(struct work_queue *q, int force)
 	struct work_queue_stats s;
 
 	timestamp_t now = timestamp_get();
-	if(!force && (now - q->time_last_log_stats < ONE_SECOND)) {
+	if(!force && (now - q->time_last_log_stats < (ONE_SECOND*5))) {
 		return;
 	}
 
@@ -1995,31 +1994,26 @@ static int expire_waiting_tasks(struct work_queue *q)
 {
 	struct work_queue_task *t;
 	int expired = 0;
-	int count;
 
+	int tasks_considered = 0;
 	double current_time = timestamp_get() / ONE_SECOND;
-	count = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
-
-	while(count > 0)
-	{
-		count--;
-
-		t = list_pop_head(q->ready_list);
-
-		if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time)
-		{
+	while( (t = list_rotate(q->ready_list)) ) {
+		if(tasks_considered > q->attempt_schedule_depth) {
+			return expired;
+		}
+		if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
 			update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
 			change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
 			expired++;
+			list_pop_tail(q->ready_list);
 		} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
 			update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
 			change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
 			expired++;
-		} else {
-			list_push_tail(q->ready_list, t);
+			list_pop_tail(q->ready_list);
 		}
+		tasks_considered++;
 	}
-
 	return expired;
 }
 
@@ -2322,7 +2316,6 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	}
 
 	change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-
 	return WQ_SUCCESS;
 }
 
@@ -4571,28 +4564,36 @@ static int send_one_task( struct work_queue *q )
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 
+	int tasks_considered = 0;
 	timestamp_t now = timestamp_get();
 
-	// Consider each task in the order of priority:
-	list_first_item(q->ready_list);
-	while( (t = list_next_item(q->ready_list))) {
+	while( (t = list_rotate(q->ready_list)) ) {
+		if(tasks_considered > q->attempt_schedule_depth) {
+			return 0;
+		}
+
 		// Skip task if min requested start time not met.
-		if(t->resources_requested->start > now) continue;
+		if(t->resources_requested->start > now) {
+			continue;
+		}
 
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
 
-		// If there is no suitable worker, consider the next task.
-		if(!w) continue;
-		// Otherwise, remove it from the ready list and start it:
-		commit_task_to_worker(q,w,t);
+		if(!w) {
+			tasks_considered++; 
+			continue;
+		}
 
+		// Otherwise, remove it from the ready list and start it:
+		list_pop_tail(q->ready_list);
+		commit_task_to_worker(q,w,t);
 		return 1;
 	}
 
+	// if we made it here we reached the end of the list
 	return 0;
 }
-
 
 static void print_large_tasks_warning(struct work_queue *q)
 {
@@ -4656,33 +4657,40 @@ static void print_large_tasks_warning(struct work_queue *q)
 	rmsummary_delete(largest_unfit_task);
 }
 
+static void trim_factory( struct work_queue *q, struct work_queue_worker *w )
+{
+	struct work_queue_factory_info *f;
+			f = hash_table_lookup(q->factory_table, w->factory_name);
+			if ( f && f->connected_workers > f->max_workers &&
+					itable_size(w->current_tasks) < 1 ) {
+				debug(D_WQ, "Final task received from worker %s, shutting down.", w->hostname);
+				shut_down_worker(q, w);
+			}
+}
+
 static int receive_one_task( struct work_queue *q )
 {
 	struct work_queue_task *t;
-
 	struct work_queue_worker *w;
 	uint64_t taskid;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	int found = 0;
+	ITABLE_ITERATE(q->tasks, taskid, t) {
 		if( task_state_is(q, taskid, WORK_QUEUE_TASK_WAITING_RETRIEVAL) ) {
-			w = itable_lookup(q->worker_task_map, taskid);
-			fetch_output_from_worker(q, w, taskid);
-			// Shutdown worker if appropriate.
-			if ( w->factory_name ) {
-				struct work_queue_factory_info *f;
-				f = hash_table_lookup(q->factory_table, w->factory_name);
-				if ( f && f->connected_workers > f->max_workers &&
-						itable_size(w->current_tasks) < 1 ) {
-					debug(D_WQ, "Final task received from worker %s, shutting down.", w->hostname);
-					shut_down_worker(q, w);
-				}
-			}
-			return 1;
+			found = 1;
+			break;
 		}
 	}
+	if(!found) return 0;
+	
+	w = itable_lookup(q->worker_task_map, t->taskid);
+	fetch_output_from_worker(q, w, t->taskid);
 
-	return 0;
+	if ( w->factory_name ) {
+		trim_factory(q, w);
+	}
+
+	return 1;
 }
 
 //Sends keepalives to check if connected workers are responsive, and ask for updates If not, removes those workers.
@@ -5846,7 +5854,6 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->ready_list = list_create();
 
 	q->tasks          = itable_create(0);
-
 	q->task_state_map = itable_create(0);
 
 	q->worker_table = hash_table_create(0, 0);
@@ -5870,7 +5877,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	// (and resized) as needed by build_poll_table.
 	q->poll_table_size = 8;
 
-	q->worker_selection_algorithm = wq_option_scheduler;
+	q->worker_selection_algorithm = WORK_QUEUE_SCHEDULE_TIME;
 	q->process_pending_check = 0;
 
 	q->short_timeout = 5;
@@ -5893,6 +5900,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->hungry_minimum = 10;
 
 	q->wait_for_workers = 0;
+	q->attempt_schedule_depth = 100;
 
 	q->proportional_resources = 1;
 	q->proportional_whole_tasks = 1;
@@ -5926,7 +5934,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 	//
 
-	log_queue_stats(q, 1);
+	log_queue_stats(q, 0);
 
 	q->time_last_wait = timestamp_get();
 
@@ -6432,12 +6440,6 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 
 	work_queue_task_state_t old_state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
 	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
-	// remove from current tables:
-
-	if( old_state == WORK_QUEUE_TASK_READY ) {
-		// Treat WORK_QUEUE_TASK_READY specially, as it has the order of the tasks
-		list_remove(q->ready_list, t);
-	}
 
 	// insert to corresponding table
 	debug(D_WQ, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, task_state_str(old_state), old_state, task_state_str(new_state), new_state);
@@ -6927,6 +6929,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	while( (stoptime == 0) || (time(0) < stoptime) ) {
 
 		BEGIN_ACCUM_TIME(q, time_internal);
+
 		// task completed?
 		if (t == NULL)
 		{
@@ -7063,7 +7066,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// in this wait.
 		if(events > 0) {
 			BEGIN_ACCUM_TIME(q, time_internal);
-			int done = !task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink);
+			int done = !(task_state_any(q, WORK_QUEUE_TASK_READY) || task_state_any(q, WORK_QUEUE_TASK_RUNNING) || task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) || (foreman_uplink));
 			END_ACCUM_TIME(q, time_internal);
 
 			if(done) {
@@ -7085,8 +7088,9 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	}
 
 	if(events > 0) {
-		log_queue_stats(q, 1);
+		log_queue_stats(q, 0);
 	}
+
 
 	q->time_last_wait = timestamp_get();
 
@@ -7393,6 +7397,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
 
+	} else if(!strcmp(name, "attempt-schedule-depth")) {
+		q->attempt_schedule_depth = MAX(1, (int)value);
+
 	} else if(!strcmp(name, "wait-retrieve-many")){
 		q->wait_retrieve_many = MAX(0, (int)value);
 
@@ -7495,9 +7502,35 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	// s->workers_able computed below.
 
 	//info about tasks
-	s->tasks_waiting      = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
-	s->tasks_with_results = task_state_count(q, NULL, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-	s->tasks_on_workers   = task_state_count(q, NULL, WORK_QUEUE_TASK_RUNNING) + s->tasks_with_results;
+	struct work_queue_task *t;
+	uint64_t taskid;
+
+	int ready_tasks = 0;
+	int waiting_tasks = 0;
+	int running_tasks = 0;
+
+	itable_firstkey(q->tasks);
+	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+		int state = (long)itable_lookup(q->task_state_map, taskid);
+		switch (state)
+		{
+			case WORK_QUEUE_TASK_READY:
+				ready_tasks++;
+				break;
+			case WORK_QUEUE_TASK_WAITING_RETRIEVAL:
+				waiting_tasks++;
+				break;
+			case WORK_QUEUE_TASK_RUNNING:
+				running_tasks++;
+				break;
+			default:
+				break;
+		}
+	}
+
+	s->tasks_waiting      = ready_tasks;
+	s->tasks_with_results = waiting_tasks;
+	s->tasks_on_workers   = running_tasks + s->tasks_with_results;
 
 	{
 		//accumulate tasks running, from workers:

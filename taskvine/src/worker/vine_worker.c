@@ -460,8 +460,16 @@ The manager will not start sending tasks until this message is recevied.
 
 static void report_worker_ready( struct link *manager )
 {
+	/*
+	The hostname is useful for troubleshooting purposes, but not required.
+	If there are naming problems, just use "unknown".
+	*/
+
 	char hostname[DOMAIN_NAME_MAX];
-	domain_name_cache_guess(hostname);
+	if(!domain_name_cache_guess(hostname)) {
+		strcpy(hostname,"unknown");
+	}
+
 	send_message(manager,"taskvine %d %s %s %s %d.%d.%d\n",VINE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_message(manager, "info worker-id %s\n", worker_id);
 	vine_cache_scan(global_cache, manager);
@@ -1911,7 +1919,8 @@ static void show_help(const char *cmd)
 	printf( " %-30s One of by_ip, by_hostname, or by_apparent_ip. Default is set by manager.\n", "");
 
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
-	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
+	printf( " %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
+	printf( " %-30s Listening port for worker-worker transfers. (default: any)\n","--transfer-port");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_BANDWIDTH,
@@ -1920,7 +1929,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME,
 	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
-	  LONG_OPT_USE_SSL, LONG_OPT_PYTHON_FUNCTION, LONG_OPT_FROM_FACTORY};
+          LONG_OPT_USE_SSL, LONG_OPT_PYTHON_FUNCTION, LONG_OPT_FROM_FACTORY, LONG_OPT_TRANSFER_PORT};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1957,6 +1966,7 @@ static const struct option long_options[] = {
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
 	{"from-factory",        required_argument,  0,  LONG_OPT_FROM_FACTORY},
+	{"transfer-port",       required_argument,  0,  LONG_OPT_TRANSFER_PORT},
 	{0,0,0,0}
 };
 
@@ -2129,6 +2139,9 @@ int main(int argc, char *argv[])
 		case LONG_OPT_FROM_FACTORY:
 			if (factory_name) free(factory_name);
 			factory_name = xxstrdup(optarg);
+			break;
+		case LONG_OPT_TRANSFER_PORT:
+			vine_transfer_server_port = atoi(optarg);
 			break;
 		default:
 			show_help(argv[0]);

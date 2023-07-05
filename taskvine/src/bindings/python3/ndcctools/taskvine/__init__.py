@@ -5,7 +5,7 @@
 ##
 # @namespace ndcctools.taskvine
 #
-# Python API for the TaskVine workflow framework.
+# TaskVine data intensive workflow framework - Python Interface
 #
 # TaskVine is a framework for building large scale distributed data intensive
 # applications that run on clusters, clouds, grids, and similar distributed systems.
@@ -13,7 +13,6 @@
 # and then submits Task objects that use File objects representing data sources.
 # The manager distributes tasks across available workers and returns results to
 # the main application.
-#
 #
 # See the <a href=http://cctools.readthedocs.io/en/latest/taskvine>TaskVine Manual</a> for complete documentation.
 #
@@ -57,6 +56,8 @@ try:
     from .dask_executor import DaskVine
 except ImportError as e:
     print(f"DaskVine not available. Couldn't find module: {e.name}")
+    ## DaskVine compatibility class.
+    # See @ref dask_executor.DaskVine
     class DaskVine:
         exception = ImportError()
         def __init__(*args, **kwargs):

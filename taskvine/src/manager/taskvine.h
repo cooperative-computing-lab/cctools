@@ -491,12 +491,30 @@ const char * vine_task_get_hostname( struct vine_task *t );
 
 /** Get a performance metric of a completed task.
 @param t A task object.
-@param name The name of a performance metric.
+@param name The name of an integer performance metric:
+- "time_when_submitted"
+- "time_when_done"
+- "time_when_commit_start"
+- "time_when_commit_end"
+- "time_when_retrieval"
+- "time_workers_execute_last"
+- "time_workers_execute_all"
+- "time_workers_execute_exhaustion"
+- "time_workers_execute_failure"
+- "bytes_received"
+- "bytes_sent"
+- "bytes_transferred"
 @return The metric value, or zero if an invalid name is given.
 */
 
 int64_t vine_task_get_metric( struct vine_task *t, const char *name );
 
+/** Set the expected resource consumption of a task before execution.
+@param t A task object.
+@param rm A resource summary object.
+*/
+
+void vine_task_set_resources(struct vine_task *t, const struct rmsummary *rm );
 
 /** Get resource information (e.g., cores, memory, and disk) of a completed task.
 @param t A task object.
@@ -578,6 +596,9 @@ int vine_task_add_environment(struct vine_task *t, struct vine_file *f);
 
 /** Get the contents of a vine file.
 Typically used to examine an output buffer returned from a file.
+Note that the vfile contents may not be available unless @ref vine_fetch_file
+has previously been called on this object.
+@param m A manager object
 @param f A file object created by @ref vine_declare_buffer.
 @return A constant pointer to the buffer contents, or null if not available.
 */
@@ -740,6 +761,17 @@ transferred among workers.
 @return A file object to use in @ref vine_task_add_input
 */
 struct vine_file * vine_declare_starch( struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags );
+
+/** Fetch the contents of a file.
+The contents of the given file will be loaded from disk or pulled back from the cluster
+and loaded into manager memory.  This is particularly useful for temporary files and mini-tasks
+whose contents are not returned to the manager by default.
+@param m A manager object
+@param f A file object.
+@return A pointer to the contents of the file.  This will be freed with the file object.
+*/
+
+const char * vine_fetch_file( struct vine_manager *m, struct vine_file *f );
 
 /** Remove a file that is no longer needed.
 The given file or directory object is deleted from all worker's caches,
@@ -1094,6 +1126,28 @@ struct vine_task *vine_cancel_by_task_tag(struct vine_manager *m, const char *ta
 */
 struct list * vine_tasks_cancel(struct vine_manager *m);
 
+/** Turn on the debugging log output and send to the named file.
+ * (Note it does not need the vine_manager structure, as it is enabled before
+ * the manager is created.)
+@param logfile The filename.
+@return 1 if logfile was opened, 0 otherwise.
+*/
+int vine_enable_debug_log( const char *logfile );
+
+/** Add a performance log file that records cummulative statistics of the connected workers and submitted tasks.
+@param m A manager object
+@param logfile The filename.
+@return 1 if logfile was opened, 0 otherwise.
+*/
+int vine_enable_perf_log(struct vine_manager *m, const char *logfile);
+
+/** Add a log file that records the states of the connected workers and tasks.
+@param m A manager object
+@param logfile The filename.
+@return 1 if logfile was opened, 0 otherwise.
+*/
+int vine_enable_transactions_log(struct vine_manager *m, const char *logfile);
+
 /** Shut down workers connected to the manager. Gives a best effort and then returns the number of workers given the shut down order.
 @param m A manager object
 @param n The number to shut down. All workers if given "0".
@@ -1150,6 +1204,7 @@ void vine_set_manager_preferred_connection(struct vine_manager *m, const char *p
  - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
  - "hungry-minimum" Mimimum number of tasks to consider manager not hungry. (default=10)
  - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
+ - "attempt-schedule-depth" The amount of tasks to attempt scheduling on each pass of send_one_task in the main loop. (default=100)
  - "wait_retrieve_many" Parameter to alter how vine_wait works. If set to 0, vine_wait breaks out of the while loop whenever a task changes to VINE_TASK_DONE (wait_retrieve_one mode). If set to 1, vine_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
  - "monitor-interval" Parameter to change how frequently the resource monitor records resource consumption of a task in a times series, if this feature is enabled. See @ref vine_enable_monitoring.
 @param value The value to set the parameter to.

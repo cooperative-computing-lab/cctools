@@ -365,9 +365,7 @@ static int catalog_update_tcp_background( const char *host, const char *address,
 	if(pid==0) {
 		pid_t grandpid = fork();
 		if(grandpid==0) {
-			/* release all cloned fds so that we don't interfere with the parent. */
-			fd_nonstd_close();
-			/* then do the update normally. */
+			/* grandchild sends catalog update. */
 			catalog_update_tcp(host,address,port,text);
 			/* grandchild process exits after sending update. */
 			_exit(0);

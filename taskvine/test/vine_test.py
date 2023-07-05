@@ -261,6 +261,21 @@ if __name__ == "__main__":
     t = q.wait(wait_time)
     report_task(t, "input missing", 1)
 
+    # create a temporary output file, and then fetch its contents manually.
+    t = vine.Task("echo howdy > output")
+    temp = q.declare_temp()
+    t.add_output(temp,"output")
+    q.submit(t)
+    t = q.wait(wait_time)
+    report_task(t, "success", 0)
+
+    data = q.fetch_file(temp)
+    if(data == "howdy\n"):
+        print("correct data returned from temp file")
+    else:
+        print("INCORRECT data returned from temp file: {}".format(data))
+        error = True
+    
     if error:
         sys.exit(1)
 

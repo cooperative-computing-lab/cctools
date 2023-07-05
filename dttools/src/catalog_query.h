@@ -21,7 +21,7 @@ Query the global catalog server for server descriptions.
 #define CATALOG_PORT (getenv("CATALOG_PORT") ? atoi(getenv("CATALOG_PORT")) : CATALOG_PORT_DEFAULT )
 
 /** Catalog update control flags.
-These control the behavior of @ref catalog_query_send_updates
+These control the behavior of @ref catalog_query_send_update
 */
 
 typedef enum {

@@ -62,8 +62,8 @@ is constructed by dask.""")
     m.set_name(args.name)
     print(f"Listening for workers at port: {m.port}")
 
-    if not args.disable_peer_transfers:
-        m.enable_peer_transfers()
+    if args.disable_peer_transfers:
+        m.disable_peer_transfers()
 
     # checkpoint at even levels when nodes have at least one children
     def checkpoint(dag, key):
