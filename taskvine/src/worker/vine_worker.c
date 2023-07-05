@@ -621,6 +621,7 @@ static void expire_procs_running()
 	}
 }
 
+
 /*
 Scan over all of the processes known by the worker,
 and if they have exited, move them into the procs_complete table
@@ -1281,6 +1282,7 @@ static void work_for_manager( struct link *manager )
 		expire_procs_running();
 
 		ok &= handle_completed_tasks(manager);
+		ok &= vine_cache_wait(global_cache);
 
 		measure_worker_resources();
 
@@ -1325,8 +1327,13 @@ static void work_for_manager( struct link *manager )
 						p->coprocess = ready_coprocess;
 						ready_coprocess->state = VINE_COPROCESS_RUNNING;
 					}
-					start_process(p,manager);
-					task_event++;
+					int result = vine_sandbox_ensure(p,global_cache,manager);
+					if(result==-1){
+						list_push_tail(procs_waiting, p);
+					} else {
+						start_process(p,manager);
+						task_event++;
+					}
 				} else if(task_resources_fit_eventually(p->task)) {
 					list_push_tail(procs_waiting, p);
 				} else {

@@ -25,6 +25,7 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/fcntl.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,6 +38,7 @@ struct vine_cache {
 
 struct cache_file {
 	vine_cache_type_t type;
+	pid_t pid;
 	char *source;
 	int64_t actual_size;
 	int mode;
@@ -51,6 +53,7 @@ struct cache_file * cache_file_create( vine_cache_type_t type, const char *sourc
 	f->source = xxstrdup(source);
 	f->actual_size = actual_size;
 	f->mode = mode;
+	f->pid = 0;
 	f->complete = 0;
 	f->mini_task = mini_task;
 	return f;
@@ -376,6 +379,46 @@ static int do_transfer( struct vine_cache *c, const char *source_url, const char
 	return result;
 }
 
+/* 
+scan through transfer processes and mark them as completed as they finish.
+*/
+
+int vine_cache_wait(struct vine_cache *c)
+{
+	int status;
+	int exit_code;
+	struct cache_file *f;
+    	char * cachename;
+	HASH_TABLE_ITERATE(c->table, cachename, f){
+		if(f->pid && !f->complete){
+			int result = waitpid(f->pid, &status, WNOHANG);
+			if(result==0){
+				// pid is still going
+			}
+			else if(result<0){
+				debug(D_VINE, "wait4 on pid %d returned an error: %s",(int)f->pid,strerror(errno));	
+			}
+			else if(result>0){
+				if(!WIFEXITED(status)){
+					exit_code = WTERMSIG(status);
+					debug(D_VINE, "transfer process (pid %d) exited abnormally with signal %d",f->pid, exit_code);
+					f->complete = -1;
+				} else {
+					exit_code = WEXITSTATUS(status);
+					debug(D_VINE, "transfer process for %s (pid %d) exited normally with exit code %d", cachename, f->pid, exit_code );
+					if(exit_code==1){	
+						debug(D_VINE, "transfer process for %s completed", cachename);
+						f->complete = 1;
+					} else {
+						debug(D_VINE, "transfer process for %s failed", cachename);
+						f->complete = -1;
+					}
+				}
+			}
+		}	
+	}
+	return 1;
+}
 
 /*
 Ensure that a given cached entry is fully materialized in the cache,
@@ -395,15 +438,30 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 		debug(D_VINE,"cache: %s is unknown, perhaps it failed to transfer earlier?",cachename);
 		return 0;
 	}
-
 	if(f->complete) {
+		/* transfer process completed and failed. */
+		if(f->complete==-1) return 0;
 		/* File is already present in the cache. */
 		return 1;
+	}
+	if(f->pid && !f->complete){
+		/* transfer process running. */
+		return -1;
+	}
+
+	pid_t pid = fork();
+
+	if(pid == -1) {
+		debug(D_VINE,"failed to fork transfer process");
+		return 0;
+	}
+	if(pid > 0){
+		f->pid = pid;
+		return -1;
 	}
 
 	char *error_message = 0;
 	char *cache_path = vine_cache_full_path(c,cachename);
-
 	int result = 0;
 
 	timestamp_t transfer_start = timestamp_get();
@@ -417,6 +475,7 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 		case VINE_CACHE_TRANSFER:
 			debug(D_VINE,"cache: transferring %s to %s",f->source,cachename);
 			result = do_transfer(c,f->source,cache_path,&error_message);
+		
 			break;
 
 		case VINE_CACHE_MINI_TASK:
@@ -469,6 +528,6 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 
 	if(error_message) free(error_message);
 	free(cache_path);
-	return result;
+	exit(result);
 }
 

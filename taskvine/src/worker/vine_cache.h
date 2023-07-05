@@ -42,5 +42,6 @@ int vine_cache_queue_command( struct vine_cache *c, struct vine_task *minitask, 
 int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager );
 int vine_cache_remove( struct vine_cache *c, const char *cachename );
 int vine_cache_contains( struct vine_cache *c, const char *cachename );
+int vine_cache_wait( struct vine_cache *c );
 
 #endif

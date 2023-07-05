@@ -60,6 +60,29 @@ static int ensure_input_file( struct vine_process *p, struct vine_mount *m, stru
 }
 
 /*
+Ensures that each input file is present.
+Returns 1 when all files are present.
+Returns 0 on failure.
+Returns -1 when transfer process is executing.
+*/
+
+int vine_sandbox_ensure(struct vine_process *p, struct vine_cache *cache, struct link *manager)
+{	
+	struct vine_task *t = p->task;
+	int result=1;
+	
+	if(t->input_mounts) {
+		struct vine_mount *m;
+		LIST_ITERATE(t->input_mounts,m) {
+			result = vine_cache_ensure(cache,m->file->cached_name,manager);
+			if(result==0) break;
+			if(result==-1) break;
+		}
+	}
+	return result;
+}
+
+/*
 For each input file specified by the process,
 transfer it into the sandbox directory.
 */
