@@ -4413,7 +4413,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		if(events > 0) {
 			if(task_state_any(q, VINE_TASK_RETRIEVED) && t == NULL) continue;
 			BEGIN_ACCUM_TIME(q, time_internal);
-			int done = !task_state_any(q, VINE_TASK_READY) && !task_state_any(q, VINE_TASK_RUNNING) && !task_state_any(q, VINE_TASK_WAITING_RETRIEVAL);
+			int done = !task_state_any(q, VINE_TASK_READY) && !task_state_any(q, VINE_TASK_WAITING_RETRIEVAL) && !task_state_any(q, VINE_TASK_RUNNING);
 			END_ACCUM_TIME(q, time_internal);
 
 			if(done) {
