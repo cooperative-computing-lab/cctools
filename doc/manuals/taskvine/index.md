@@ -2310,8 +2310,9 @@ Save this file as `parsl_vine_example.py`. Running
 `python parsl_vine_example.py`
 will automatically spawn a local worker to execute the function call.
 
-For more details on how to configure Parsl+TaskVine to use resources of 
-local clusters with various performancee optimizations, please refer to 
+For more details on how to configure Parsl+TaskVine to scale applications 
+with compute resources of 
+local clusters and various performance optimizations, please refer to 
 the [Parsl documentation](https://parsl.readthedocs.io/en/stable/userguide/configuring.html).
 
 ### Dask
