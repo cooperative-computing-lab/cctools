@@ -2277,9 +2277,44 @@ vine_plot_txn_log vine-run-info/most-recent/vine-logs/transactions
 ```
 
 
-## Specialized and Experimental Settings
+## Workflow Integration
 
-### Executing Dask Workflows in Python (experimental)
+### Parsl
+TaskVine can be used as a workflow execution engine for Parsl workflows.
+To install Parsl along with TaskVine, create a `conda` environment and
+install `parsl` and `ndcctools` packages:
+
+```sh
+conda install ndcctools parsl
+```
+Using Parsl with TaskVine is as easy as loading the TaskVineExecutor
+configuration and running the workflow as usual. For example,
+below is a simple Parsl application executing a function remotely.
+
+=== "Python"
+    ```python
+    import parsl
+    from parsl import python_app
+    from parsl.configs.vineex_local import config
+
+    parsl.load(config)
+
+    @python_app
+    def double(x):
+    return x*2
+
+    future = double(1)
+    assert future.result() == 2
+    ```
+Save this file as `parsl_vine_example.py`. Running 
+`python parsl_vine_example.py`
+will automatically spawn a local worker to execute the function call.
+
+For more details on how to configure Parsl+TaskVine to use resources of 
+local clusters with various performancee optimizations, please refer to 
+the [Parsl documentation](https://parsl.readthedocs.io/en/stable/userguide/configuring.html).
+
+### Dask
 
 TaskVine can be used to execute Dask workflows using a manager as Dask
 scheduler. The class `DaskVine` implements a TaskVine manager that has a
