@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include "vine_worker.h"
 #include "vine_cache.h"
 #include "vine_process.h"
+#include "vine_mount.h"
 
 #include "vine_transfer.h"
 #include "vine_protocol.h"
@@ -440,14 +441,32 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 	}
 	if(f->complete) {
 		/* transfer process completed and failed. */
-		if(f->complete==-1) return 0;
+		if(f->complete==-1){
+			return 0;
+		} else {
 		/* File is already present in the cache. */
 		return 1;
+		}
 	}
 	if(f->pid && !f->complete){
 		/* transfer process running. */
 		return -1;
 	}
+	
+	if(f->type == VINE_CACHE_MINI_TASK){
+		if(f->mini_task->input_mounts) {
+                	struct vine_mount *m;
+			int result = 0;
+                	LIST_ITERATE(f->mini_task->input_mounts,m) {
+                        	result = vine_cache_ensure(c,m->file->cached_name,manager);
+                        	if(result!=1) return result;
+                	}
+        	}
+	}
+	
+
+
+	debug(D_VINE,"forking transfer process to create %s", cachename);
 
 	pid_t pid = fork();
 
