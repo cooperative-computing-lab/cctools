@@ -432,34 +432,34 @@ but it is needed in order to send back the necessary update/invalid messages.
 
 int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager )
 {
-	if(!strcmp(cachename,"0")) return 1;
+	if(!strcmp(cachename,"0")) return VINE_FILE_READY;
 
 	struct cache_file *f = hash_table_lookup(c->table,cachename);
 	if(!f) {
 		debug(D_VINE,"cache: %s is unknown, perhaps it failed to transfer earlier?",cachename);
-		return 0;
+		return VINE_FILE_FAILED;
 	}
 	if(f->complete) {
 		/* transfer process completed and failed. */
 		if(f->complete==-1){
-			return 0;
+			return VINE_FILE_FAILED;
 		} else {
 		/* File is already present in the cache. */
-		return 1;
+		return VINE_FILE_READY;
 		}
 	}
 	if(f->pid && !f->complete){
 		/* transfer process running. */
-		return -1;
+		return VINE_FILE_PROCESSING;
 	}
 	
 	if(f->type == VINE_CACHE_MINI_TASK){
 		if(f->mini_task->input_mounts) {
                 	struct vine_mount *m;
-			int result = 0;
+			vine_file_status_type_t result;
                 	LIST_ITERATE(f->mini_task->input_mounts,m) {
                         	result = vine_cache_ensure(c,m->file->cached_name,manager);
-                        	if(result!=1) return result;
+                        	if(result!=VINE_FILE_READY) return result;
                 	}
         	}
 	}
@@ -472,11 +472,11 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 
 	if(pid == -1) {
 		debug(D_VINE,"failed to fork transfer process");
-		return 0;
+		return VINE_FILE_FAILED;
 	}
 	if(pid > 0){
 		f->pid = pid;
-		return -1;
+		return VINE_FILE_PROCESSING;
 	}
 
 	char *error_message = 0;

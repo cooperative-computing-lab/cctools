@@ -29,6 +29,12 @@ typedef enum {
 	VINE_CACHE_MINI_TASK,
 } vine_cache_type_t;
 
+typedef enum {
+	VINE_FILE_READY,
+	VINE_FILE_FAILED,
+	VINE_FILE_PROCESSING,
+} vine_file_status_type_t;
+
 struct vine_cache * vine_cache_create( const char *cachedir );
 void vine_cache_delete( struct vine_cache *c );
 void vine_cache_load( struct vine_cache *c );

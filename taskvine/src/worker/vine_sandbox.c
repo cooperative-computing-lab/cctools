@@ -45,7 +45,7 @@ static int ensure_input_file( struct vine_process *p, struct vine_mount *m, stru
 		result = create_dir(sandbox_path, 0700);
 		if(!result) debug(D_VINE,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
 
-	} else if(vine_cache_ensure(cache,f->cached_name,manager)==1) {
+	} else if(vine_cache_ensure(cache,f->cached_name,manager)==VINE_FILE_READY) {
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_path,0777);
 		debug(D_VINE,"input: link %s -> %s",cache_path,sandbox_path);
@@ -61,24 +61,23 @@ static int ensure_input_file( struct vine_process *p, struct vine_mount *m, stru
 
 /*
 Ensures that each input file is present.
-Returns 1 when all files are present.
-Returns 0 on failure.
-Returns -1 when transfer process is executing.
 */
 
 int vine_sandbox_ensure(struct vine_process *p, struct vine_cache *cache, struct link *manager)
 {	
 	struct vine_task *t = p->task;
-	int result=1;
+	vine_file_status_type_t result = VINE_FILE_READY;
+	int processing=0;
 	
 	if(t->input_mounts) {
 		struct vine_mount *m;
 		LIST_ITERATE(t->input_mounts,m) {
 			result = vine_cache_ensure(cache,m->file->cached_name,manager);
-			if(result==0) break;
-			if(result==-1) break;
+			if(result==VINE_FILE_PROCESSING) processing=1;
+			if(result==VINE_FILE_FAILED) break;
 		}
 	}
+	if(processing) result = VINE_FILE_PROCESSING;
 	return result;
 }
 
