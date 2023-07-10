@@ -408,6 +408,8 @@ static int handle_transfer_address( struct vine_manager *q, struct vine_worker_i
 	}
 }
 
+static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_info *w, const char *line);
+
 /*
 This function receives a message from worker and records the time a message is successfully
 received. This timestamp is used in keepalive timeout computations.
@@ -435,6 +437,13 @@ static vine_msg_code_t vine_manager_recv_no_retry(struct vine_manager *q, struct
 		result = VINE_MSG_PROCESSED;
 	} else if(string_prefix_is(line, "taskvine")) {
 		result = handle_taskvine(q, w, line);
+	} else if(string_prefix_is(line, "result")) {
+		result = get_result(q, w, line);
+		if(result==VINE_SUCCESS) {
+			result = VINE_MSG_PROCESSED;
+		} else {
+			result = VINE_WORKER_FAILURE;
+		}
 	} else if (string_prefix_is(line,"manager_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status") || string_prefix_is(line, "wable_status") || string_prefix_is(line, "resources_status")) {
 		result = handle_manager_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "available_results")) {

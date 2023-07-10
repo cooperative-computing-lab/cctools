@@ -202,7 +202,7 @@ static struct hash_table *current_transfers = NULL;
 //User specified features this worker provides.
 static struct hash_table *features = NULL;
 
-static int results_to_be_sent_msg = 0;
+static int watched_output_pending_msg = 0;
 
 static timestamp_t total_task_execution_time = 0;
 static int total_tasks_executed = 0;
@@ -584,28 +584,33 @@ static void report_task_complete( struct link *manager, struct vine_process *p )
 
 	total_task_execution_time += (p->execution_end - p->execution_start);
 	total_tasks_executed++;
-
-	send_stats_update(manager);
 }
 
 /*
 For every unreported complete task and watched file,
-send the results to the manager.
+send the results to the manager and remove from the complete table.
+Note that there are several ways to get completed/failed tasks
+into this table.
 */
 
 static void report_tasks_complete( struct link *manager )
 {
-	struct vine_process *p;
+	if(itable_size(procs_complete)==0) return;
 
+	struct vine_process *p;
 	while((p=itable_pop(procs_complete))) {
 		report_task_complete(manager,p);
 	}
+	send_stats_update(manager);
+}
 
+/* Send pending watched file output on request. */
+
+static void report_watched_output( struct link * manager)
+{
 	vine_watcher_send_changes(watcher,manager,time(0)+active_timeout);
-
 	send_message(manager, "end\n");
-
-	results_to_be_sent_msg = 0;
+	watched_output_pending_msg = 0;
 }
 
 /*
@@ -1104,7 +1109,7 @@ static int handle_manager(struct link *manager)
 			fprintf(stderr,"vine_worker: this manager requires a password. (use the -P option)\n");
 			r = 0;
 		} else if(sscanf(line, "send_results %d", &n) == 1) {
-			report_tasks_complete(manager);
+			report_watched_output(manager);
 			r = 1;
 		} else if(sscanf(line,"library %" SCNd64 " %" SCNd64,&length, &task_id)==2) {
 			char *library_name = malloc(length+1);
@@ -1290,6 +1295,8 @@ static void work_for_manager( struct link *manager )
 
 		ok &= handle_completed_tasks(manager);
 
+		report_tasks_complete(manager);
+		
 		measure_worker_resources();
 
 		if(!enforce_worker_promises(manager)) {
@@ -1348,10 +1355,10 @@ static void work_for_manager( struct link *manager )
 			send_stats_update(manager);
 		}
 
-		if(ok && !results_to_be_sent_msg) {
+		if(ok && !watched_output_pending_msg) {
 			if(vine_watcher_check(watcher) || itable_size(procs_complete) > 0) {
 				send_message(manager, "available_results\n");
-				results_to_be_sent_msg = 1;
+				watched_output_pending_msg = 1;
 			}
 		}
 
@@ -1629,7 +1636,7 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	}
 
 	last_task_received     = 0;
-	results_to_be_sent_msg = 0;
+	watched_output_pending_msg = 0;
 
 	disconnect_manager(manager);
 	printf("disconnected from manager %s:%d\n", host, port );

@@ -89,6 +89,7 @@ int main(int argc, char *argv[])
 	//Enable monitoring of tasks. (0 is no, 1 is yes)
 	vine_enable_monitoring(m, /* terminate tasks that exhaust their resources */ 1, /* extra debug info */ 0);
 
+	vine_enable_debug_log("/dev/stdout");
 	//For cached files that are used by several tasks, allow workers to copy
 	//these files among themselves. If peer transfers are not enabled, files
 	//may originate only from the manager or their respective mini tasks (e.g.
