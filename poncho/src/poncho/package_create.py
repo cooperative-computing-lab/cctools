@@ -118,14 +118,28 @@ def _pack_env_with_conda_dir(spec, output, ignore_editable_packages=False):
     except Exception as e:
         raise Exception(f"Error when packing a conda directory.\n{e}")
 
-def dict_to_env(spec, conda_executable=None, download_micromamba=False, ignore_editable_packages=False):
-    outfile = ""
+def sort_spec(spec):
+    spec = dict(sorted(spec.items()))
+    for key in spec:
+        if isinstance(spec[key], dict):
+            spec[key] = sort_spec(spec)
+        elif isinstance(spec[key], list):
+            spec[key].sort
+    return spec
+def dict_to_env(spec, conda_executable=None, download_micromamba=False, ignore_editable_packages=False, cache=True, cache_path=None, force=False):
+    if not isinstance(spec, dict):
+        spec = json.loads(spec)
+    spec = sort_spec(spec)
     md5 = hashlib.md5()
     md5.update(str(spec).encode('utf-8'))
     output = "env-md5-" + md5.hexdigest() + ".tar.gz"
-    if not isinstance(spec, dict):
-        spec = json.loads(spec)
+    if not cache_path:
+        cache_path = '.poncho_cache}'
+    if not force and os.path.isfile(f'{cache_path}/{output}'):
+        return f'{cache_path}/{output}'
     pack_env_from_dict(spec, output, conda_executable, download_micromamba, ignore_editable_packages)
+    if cache:
+        shutil.copy(output,f'{cache_path}/{output}')
     return output
 
 def pack_env_from_dict(spec, output, conda_executable=None, download_micromamba=False, ignore_editable_packages=False):
