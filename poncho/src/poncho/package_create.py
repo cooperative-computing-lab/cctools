@@ -124,7 +124,7 @@ def sort_spec(spec):
         if isinstance(spec[key], dict):
             spec[key] = sort_spec(spec[key])
         elif isinstance(spec[key], list):
-            spec[key].sort
+            spec[key].sort()
     return spec
 def dict_to_env(spec, conda_executable=None, download_micromamba=False, ignore_editable_packages=False, cache=True, cache_path=None, force=False):
     if not isinstance(spec, dict):
