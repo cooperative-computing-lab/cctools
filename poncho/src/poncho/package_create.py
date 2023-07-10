@@ -136,9 +136,11 @@ def dict_to_env(spec, conda_executable=None, download_micromamba=False, ignore_e
     if not cache_path:
         cache_path = '.poncho_cache'
     if not force and os.path.isfile(f'{cache_path}/{output}'):
+        logger.info('Matching env found in cache...') 
         return f'{cache_path}/{output}'
     pack_env_from_dict(spec, output, conda_executable, download_micromamba, ignore_editable_packages)
     if cache:
+        logger.info(f'copying env into cache at {cache_path}/{output}...') 
         if not os.path.exists(cache_path):
             os.makedirs(cache_path)
         shutil.copy(output,f'{cache_path}/{output}')
