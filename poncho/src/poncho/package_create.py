@@ -22,7 +22,7 @@ from packaging import version
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
 handler = logging.StreamHandler(stream=sys.stdout)
-formatter = logging.Formatter(fmt='%(asctime)s:%(levelname)s:%(message)s'))
+formatter = logging.Formatter(fmt='%(asctime)s:%(levelname)s:%(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
@@ -122,7 +122,7 @@ def sort_spec(spec):
     spec = dict(sorted(spec.items()))
     for key in spec:
         if isinstance(spec[key], dict):
-            spec[key] = sort_spec(spec)
+            spec[key] = sort_spec(spec[key])
         elif isinstance(spec[key], list):
             spec[key].sort
     return spec
@@ -134,11 +134,13 @@ def dict_to_env(spec, conda_executable=None, download_micromamba=False, ignore_e
     md5.update(str(spec).encode('utf-8'))
     output = "env-md5-" + md5.hexdigest() + ".tar.gz"
     if not cache_path:
-        cache_path = '.poncho_cache}'
+        cache_path = '.poncho_cache'
     if not force and os.path.isfile(f'{cache_path}/{output}'):
         return f'{cache_path}/{output}'
     pack_env_from_dict(spec, output, conda_executable, download_micromamba, ignore_editable_packages)
     if cache:
+        if not os.path.exists(cache_path):
+            os.makedirs(cache_path)
         shutil.copy(output,f'{cache_path}/{output}')
     return output
 
