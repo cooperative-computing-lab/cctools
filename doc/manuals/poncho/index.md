@@ -244,7 +244,7 @@ directory (`tar -C`). The path to this directory will be stored
 in the corresponding enviornment variable. If "compression" is
 specified, the file will be decompressed.
 
-## Creating Poncho Packages from Existing Conda Environments
+## Creating Poncho Packages From Existing Conda Environments
 
 If the input to poncho\_package\_create is the path to a conda env directory, poncho\_package\_run
 will package that directory as a poncho package. If the input is neither a file or directory poncho\_package\_run 
@@ -261,13 +261,13 @@ Poncho packages can either be created by dicitionary or string representations o
 The function `dict_to_env` creates the corresponding environment and returns the path to the environment.
 The function contains various options to facilitate environment creation:
 	
-	- cache(default=True): caches the environment in the directory set by `cache\_path` 
-	- cache\_path(default=None): Path to cache and retrieve generated environments.
-	- force(default=False): forces poncho\_package\_create to recreate the environment.
+	- cache(default=True): caches the environment in the directory set by `cache_path` 
+	- cache_path(default=None): Path to cache and retrieve generated environments.
+	- force(default=False): forces poncho_package_create to recreate the environment.
 
-if no cache path is specified cached  environments will be stored in the directory `.poncho_cache`.
-When force is not set to True the if the environment corresponding to the specification is present in the cache
-The path to the cached environment will be returned.
+If no cache path is specified, cached environments will be stored in the directory `.poncho_cache`.
+When force is not set to True and the environment corresponding to the specification is present in the cache,
+the path to the cached environment will be returned.
 
 ```python
 
