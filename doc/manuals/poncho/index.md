@@ -243,3 +243,37 @@ file will be passed through `tar` and extracted into a temporary
 directory (`tar -C`). The path to this directory will be stored
 in the corresponding enviornment variable. If "compression" is
 specified, the file will be decompressed.
+
+## Creating Poncho Packages from Existing Conda Environments
+
+If the input to poncho\_package\_create is the path to a conda env directory, poncho\_package\_run
+will package that directory as a poncho package. If the input is neither a file or directory poncho\_package\_run 
+will attempt to pack an environment of the same name from the users local conda environments.
+
+
+## Creating Poncho Packages Within Python
+
+The poncho module allows users to create poncho packages within python itself.
+
+### createing packages with a specification
+
+Poncho packages can either be created by dicitionary or string representations of a poncho specification.
+The function `dict_to_env` creates the corresponding environment and returns the path to the environment.
+The function contains various options to facilitate environment creation:
+	
+	- cache(default=True): caches the environment in the directory set by `cache\_path` 
+	- cache\_path(default=None): Path to cache and retrieve generated environments.
+	- force(default=False): forces poncho\_package\_create to recreate the environment.
+
+if no cache path is specified cached  environments will be stored in the directory `.poncho_cache`.
+When force is not set to True the if the environment corresponding to the specification is present in the cache
+The path to the cached environment will be returned.
+
+```python
+
+	from poncho import package_create
+
+	spec1 = {"conda": {"channels": ["conda-forge"],"packages": ["python","pip","conda","conda-pack","dill","xrootd"]},"pip": ["matplotlib"]}
+	env = package_create.dict_to_env(spec, cache=True, cache_path='my_cache', force=False)
+```
+
