@@ -225,8 +225,11 @@ visible within the manager application.
 used to capture the output of a task, and then serve as the input
 of a later task.  Temporary files exist only within the cluster
 for the duration of a workflow, and are deleted when no longer needed.
+This accelerates a workflow by avoiding the step of returning the
+data to the manager.
 If a temporary file is unexpectedly lost due to the crash or failure
 of a worker, then the task that created it will be re-executed.
+The contents of a temporary file can be obtained with `fetch_file`
 
 If it is necessary to unpack a file before it is used,
 use the `declare_untar` transformation to wrap the file definition.
@@ -2274,9 +2277,45 @@ vine_plot_txn_log vine-run-info/most-recent/vine-logs/transactions
 ```
 
 
-## Specialized and Experimental Settings
+## Workflow Integration
 
-### Executing Dask Workflows in Python (experimental)
+### Parsl
+TaskVine can be used as a workflow execution engine for Parsl workflows.
+To install Parsl along with TaskVine, create a `conda` environment and
+install `parsl` and `ndcctools` packages:
+
+```sh
+conda install ndcctools parsl
+```
+Using Parsl with TaskVine is as easy as loading the TaskVineExecutor
+configuration and running the workflow as usual. For example,
+below is a simple Parsl application executing a function remotely.
+
+=== "Python"
+    ```python
+    import parsl
+    from parsl import python_app
+    from parsl.configs.vineex_local import config
+
+    parsl.load(config)
+
+    @python_app
+    def double(x):
+    return x*2
+
+    future = double(1)
+    assert future.result() == 2
+    ```
+Save this file as `parsl_vine_example.py`. Running 
+`python parsl_vine_example.py`
+will automatically spawn a local worker to execute the function call.
+
+For more details on how to configure Parsl+TaskVine to scale applications 
+with compute resources of 
+local clusters and various performance optimizations, please refer to 
+the [Parsl documentation](https://parsl.readthedocs.io/en/stable/userguide/configuring.html).
+
+### Dask
 
 TaskVine can be used to execute Dask workflows using a manager as Dask
 scheduler. The class `DaskVine` implements a TaskVine manager that has a

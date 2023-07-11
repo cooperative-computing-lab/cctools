@@ -524,7 +524,7 @@ Two exceptions are made:
 - The transfer time cannot be below a configurable minimum time.
 */
 
-int vine_manager_transfer_time(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t length)
+int vine_manager_transfer_time(struct vine_manager *q, struct vine_worker_info *w, int64_t length)
 {
 	double avg_transfer_rate; // bytes per second
 	char *data_source;
@@ -1342,12 +1342,12 @@ static vine_result_code_t get_update( struct vine_manager *q, struct vine_worker
 	struct vine_task *t = itable_lookup(w->current_tasks,task_id);
 	if(!t) {
 		debug(D_VINE,"worker %s (%s) sent output for unassigned task %"PRId64, w->hostname, w->addrport, task_id);
-		link_soak(w->link,length,time(0)+vine_manager_transfer_time(q,w,0,length));
+		link_soak(w->link,length,time(0)+vine_manager_transfer_time(q,w,length));
 		return VINE_SUCCESS;
 	}
 
 
-	time_t stoptime = time(0) + vine_manager_transfer_time(q,w,t,length);
+	time_t stoptime = time(0) + vine_manager_transfer_time(q,w,length);
 
 	struct vine_mount *m;
 	const char *local_name = 0;
@@ -1421,7 +1421,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	t = itable_lookup(w->current_tasks, task_id);
 	if(!t) {
 		debug(D_VINE, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, task_id);
-		stoptime = time(0) + vine_manager_transfer_time(q, w, 0, output_length);
+		stoptime = time(0) + vine_manager_transfer_time(q, w, output_length);
 		link_soak(w->link, output_length, stoptime);
 		return VINE_SUCCESS;
 	}
@@ -1460,7 +1460,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	if(t->output == NULL) {
 		fprintf(stderr, "error: allocating memory of size %"PRId64" bytes failed for storing stdout of task %"PRId64".\n", retrieved_output_length, task_id);
 		//drop the entire length of stdout on the link
-		stoptime = time(0) + vine_manager_transfer_time(q, w, t, output_length);
+		stoptime = time(0) + vine_manager_transfer_time(q, w, output_length);
 		link_soak(w->link, output_length, stoptime);
 		retrieved_output_length = 0;
 		vine_task_set_result(t, VINE_RESULT_STDOUT_MISSING);
@@ -1470,7 +1470,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		debug(D_VINE, "Receiving stdout of task %"PRId64" (size: %"PRId64" bytes) from %s (%s) ...", task_id, retrieved_output_length, w->addrport, w->hostname);
 
 		//First read the bytes we keep.
-		stoptime = time(0) + vine_manager_transfer_time(q, w, t, retrieved_output_length);
+		stoptime = time(0) + vine_manager_transfer_time(q, w, retrieved_output_length);
 		actual = link_read(w->link, t->output, retrieved_output_length, stoptime);
 		if(actual != retrieved_output_length) {
 			debug(D_VINE, "Failure: actual received stdout size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", actual, retrieved_output_length);
@@ -1482,7 +1482,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		//Then read the bytes we need to throw away.
 		if(output_length > retrieved_output_length) {
 			debug(D_VINE, "Dropping the remaining %"PRId64" bytes of the stdout of task %"PRId64" since stdout length is limited to %d bytes.\n", (output_length-MAX_TASK_STDOUT_STORAGE), task_id, MAX_TASK_STDOUT_STORAGE);
-			stoptime = time(0) + vine_manager_transfer_time(q, w, t, (output_length-retrieved_output_length));
+			stoptime = time(0) + vine_manager_transfer_time(q, w, (output_length-retrieved_output_length));
 			link_soak(w->link, (output_length-retrieved_output_length), stoptime);
 
 			//overwrite the last few bytes of buffer to signal truncated stdout.
@@ -5259,6 +5259,47 @@ struct vine_file * vine_declare_chirp( struct vine_manager *m, const char *serve
 {
 	struct vine_file *t = vine_file_chirp(server, source, ticket, env, flags);
 	return vine_manager_declare_file(m, t);
+}
+
+const char * vine_fetch_file( struct vine_manager *m, struct vine_file *f )
+{
+	/* If the data has already been loaded, just return it. */
+	if(f->data) return f->data;
+	
+	switch(f->type) {
+	case VINE_FILE:
+		/* If it is on the local filesystem, load it. */
+		{
+		size_t length;
+		if(copy_file_to_buffer(f->source,&f->data,&length)) {
+			return f->data;
+		} else {
+			return 0;
+		}
+		}
+		break;
+	case VINE_BUFFER:
+		/* Buffer files will already have their contents in memory, if available. */
+		return f->data;
+		break;
+	case VINE_TEMP:
+	case VINE_URL:
+	case VINE_MINI_TASK:
+		/* If the file has been materialized remotely, go get it from a worker. */
+		{
+		struct vine_worker_info *w = vine_file_replica_table_find_worker(m,f->cached_name);
+		if(w) vine_manager_get_single_file(m,w,f);
+		/* If that succeeded, then f->data is now set, null otherwise. */
+		return f->data;
+		}
+		break;
+	case VINE_EMPTY_DIR:
+		/* Never anything to get. */
+		return 0;
+		break;
+	}
+
+	return 0;
 }
 
 

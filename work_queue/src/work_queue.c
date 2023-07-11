@@ -486,7 +486,7 @@ static void log_queue_stats(struct work_queue *q, int force)
 	struct work_queue_stats s;
 
 	timestamp_t now = timestamp_get();
-	if(!force && (now - q->time_last_log_stats < ONE_SECOND)) {
+	if(!force && (now - q->time_last_log_stats < (ONE_SECOND*5))) {
 		return;
 	}
 
@@ -1994,31 +1994,26 @@ static int expire_waiting_tasks(struct work_queue *q)
 {
 	struct work_queue_task *t;
 	int expired = 0;
-	int count;
 
+	int tasks_considered = 0;
 	double current_time = timestamp_get() / ONE_SECOND;
-	count = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
-
-	while(count > 0)
-	{
-		count--;
-
-		t = list_pop_head(q->ready_list);
-
-		if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time)
-		{
+	while( (t = list_rotate(q->ready_list)) ) {
+		if(tasks_considered > q->attempt_schedule_depth) {
+			return expired;
+		}
+		if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
 			update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
 			change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
 			expired++;
+			list_pop_tail(q->ready_list);
 		} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
 			update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
 			change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
 			expired++;
-		} else {
-			list_push_tail(q->ready_list, t);
+			list_pop_tail(q->ready_list);
 		}
+		tasks_considered++;
 	}
-
 	return expired;
 }
 
@@ -2321,7 +2316,6 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	}
 
 	change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-
 	return WQ_SUCCESS;
 }
 
@@ -4663,33 +4657,40 @@ static void print_large_tasks_warning(struct work_queue *q)
 	rmsummary_delete(largest_unfit_task);
 }
 
+static void trim_factory( struct work_queue *q, struct work_queue_worker *w )
+{
+	struct work_queue_factory_info *f;
+			f = hash_table_lookup(q->factory_table, w->factory_name);
+			if ( f && f->connected_workers > f->max_workers &&
+					itable_size(w->current_tasks) < 1 ) {
+				debug(D_WQ, "Final task received from worker %s, shutting down.", w->hostname);
+				shut_down_worker(q, w);
+			}
+}
+
 static int receive_one_task( struct work_queue *q )
 {
 	struct work_queue_task *t;
-
 	struct work_queue_worker *w;
 	uint64_t taskid;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	int found = 0;
+	ITABLE_ITERATE(q->tasks, taskid, t) {
 		if( task_state_is(q, taskid, WORK_QUEUE_TASK_WAITING_RETRIEVAL) ) {
-			w = itable_lookup(q->worker_task_map, taskid);
-			fetch_output_from_worker(q, w, taskid);
-			// Shutdown worker if appropriate.
-			if ( w->factory_name ) {
-				struct work_queue_factory_info *f;
-				f = hash_table_lookup(q->factory_table, w->factory_name);
-				if ( f && f->connected_workers > f->max_workers &&
-						itable_size(w->current_tasks) < 1 ) {
-					debug(D_WQ, "Final task received from worker %s, shutting down.", w->hostname);
-					shut_down_worker(q, w);
-				}
-			}
-			return 1;
+			found = 1;
+			break;
 		}
 	}
+	if(!found) return 0;
+	
+	w = itable_lookup(q->worker_task_map, t->taskid);
+	fetch_output_from_worker(q, w, t->taskid);
 
-	return 0;
+	if ( w->factory_name ) {
+		trim_factory(q, w);
+	}
+
+	return 1;
 }
 
 //Sends keepalives to check if connected workers are responsive, and ask for updates If not, removes those workers.
@@ -5853,7 +5854,6 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->ready_list = list_create();
 
 	q->tasks          = itable_create(0);
-
 	q->task_state_map = itable_create(0);
 
 	q->worker_table = hash_table_create(0, 0);
@@ -5934,7 +5934,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 	//
 
-	log_queue_stats(q, 1);
+	log_queue_stats(q, 0);
 
 	q->time_last_wait = timestamp_get();
 
@@ -6929,6 +6929,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	while( (stoptime == 0) || (time(0) < stoptime) ) {
 
 		BEGIN_ACCUM_TIME(q, time_internal);
+
 		// task completed?
 		if (t == NULL)
 		{
@@ -7065,7 +7066,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// in this wait.
 		if(events > 0) {
 			BEGIN_ACCUM_TIME(q, time_internal);
-			int done = !task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink);
+			int done = !(task_state_any(q, WORK_QUEUE_TASK_READY) || task_state_any(q, WORK_QUEUE_TASK_RUNNING) || task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) || (foreman_uplink));
 			END_ACCUM_TIME(q, time_internal);
 
 			if(done) {
@@ -7087,8 +7088,9 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	}
 
 	if(events > 0) {
-		log_queue_stats(q, 1);
+		log_queue_stats(q, 0);
 	}
+
 
 	q->time_last_wait = timestamp_get();
 
@@ -7500,9 +7502,35 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	// s->workers_able computed below.
 
 	//info about tasks
-	s->tasks_waiting      = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
-	s->tasks_with_results = task_state_count(q, NULL, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-	s->tasks_on_workers   = task_state_count(q, NULL, WORK_QUEUE_TASK_RUNNING) + s->tasks_with_results;
+	struct work_queue_task *t;
+	uint64_t taskid;
+
+	int ready_tasks = 0;
+	int waiting_tasks = 0;
+	int running_tasks = 0;
+
+	itable_firstkey(q->tasks);
+	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+		int state = (long)itable_lookup(q->task_state_map, taskid);
+		switch (state)
+		{
+			case WORK_QUEUE_TASK_READY:
+				ready_tasks++;
+				break;
+			case WORK_QUEUE_TASK_WAITING_RETRIEVAL:
+				waiting_tasks++;
+				break;
+			case WORK_QUEUE_TASK_RUNNING:
+				running_tasks++;
+				break;
+			default:
+				break;
+		}
+	}
+
+	s->tasks_waiting      = ready_tasks;
+	s->tasks_with_results = waiting_tasks;
+	s->tasks_on_workers   = running_tasks + s->tasks_with_results;
 
 	{
 		//accumulate tasks running, from workers:

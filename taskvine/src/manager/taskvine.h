@@ -596,6 +596,9 @@ int vine_task_add_environment(struct vine_task *t, struct vine_file *f);
 
 /** Get the contents of a vine file.
 Typically used to examine an output buffer returned from a file.
+Note that the vfile contents may not be available unless @ref vine_fetch_file
+has previously been called on this object.
+@param m A manager object
 @param f A file object created by @ref vine_declare_buffer.
 @return A constant pointer to the buffer contents, or null if not available.
 */
@@ -758,6 +761,17 @@ transferred among workers.
 @return A file object to use in @ref vine_task_add_input
 */
 struct vine_file * vine_declare_starch( struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags );
+
+/** Fetch the contents of a file.
+The contents of the given file will be loaded from disk or pulled back from the cluster
+and loaded into manager memory.  This is particularly useful for temporary files and mini-tasks
+whose contents are not returned to the manager by default.
+@param m A manager object
+@param f A file object.
+@return A pointer to the contents of the file.  This will be freed with the file object.
+*/
+
+const char * vine_fetch_file( struct vine_manager *m, struct vine_file *f );
 
 /** Remove a file that is no longer needed.
 The given file or directory object is deleted from all worker's caches,

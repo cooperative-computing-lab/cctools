@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "stringtools.h"
 #include "path.h"
+#include "copy_stream.h"
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -109,7 +110,7 @@ struct vine_file *vine_file_clone( struct vine_file *f )
 	return f;
 }
 
-/* Return the contents of a buffer file, or null. */
+/* Return the contents of the file, if available. */
 
 const char * vine_file_contents( struct vine_file *f )
 {

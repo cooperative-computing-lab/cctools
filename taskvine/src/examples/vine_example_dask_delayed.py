@@ -70,8 +70,8 @@ if __name__ == "__main__":
     m.set_name(args.name)
     print(f"Listening for workers at port: {m.port}")
 
-    if not args.disable_peer_transfers:
-        m.enable_peer_transfers()
+    if args.disable_peer_transfers:
+        m.disable_peer_transfers()
 
     f = vine.Factory(manager=m)
     f.cores = 4

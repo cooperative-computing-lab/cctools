@@ -196,14 +196,33 @@ def pack_env_from_dict(spec, output, conda_executable=None, download_micromamba=
 
 def pack_env(spec, output, conda_executable=None, download_micromamba=False, ignore_editable_packages=False):
     # pack a conda directory directly
-    if not os.path.isfile(spec) and spec != "-":
+    if os.path.isdir(spec):
         _pack_env_with_conda_dir(spec, output, ignore_editable_packages)
 
     # else if spec is a file or from stdin
-    else:
+    elif os.path.isfile(spec) or spec == '-':
         f = open(spec, 'r')
         poncho_spec = json.load(f)
         pack_env_from_dict(poncho_spec, output, conda_executable, download_micromamba, ignore_editable_packages)
+
+    # else pack from a conda environment name
+    # this thus assumes conda executable is in the current shell executable path
+    else:
+        conda_env_dir = _get_conda_env_dir_by_name(spec)
+        _pack_env_with_conda_dir(conda_env_dir, output, ignore_editable_packages)
+
+def _get_conda_env_dir_by_name(env_name):
+    command = f"conda env list --json"
+    result = subprocess.run(command, capture_output=True, text=True, shell=True)
+    
+    if result.returncode == 0:
+        env_list = json.loads(result.stdout.strip())
+        for env in env_list["envs"]:
+            path = env.strip()
+            name = path.split("/")[-1]
+            if name == env_name:
+                return path
+    raise Exception(f'Cannot find the conda environment named {env_name}. Try checking the spelling or if conda is in your path.')
 
 def _run_conda_command(environment, needs_confirmation, command, *args):
     all_args = [conda_exec] + command.split()

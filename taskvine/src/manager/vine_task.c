@@ -457,6 +457,19 @@ int vine_task_add_output( struct vine_task *t, struct vine_file *f, const char *
 		return 0;
 	}
 
+	switch(f->type) {
+	case VINE_FILE:
+	case VINE_BUFFER:
+	case VINE_TEMP:
+		/* keep going */
+		break;
+	case VINE_URL:
+	case VINE_MINI_TASK:
+	case VINE_EMPTY_DIR:
+		debug(D_NOTICE|D_VINE,"%s: unsupported output file type",__func__);
+		return 0;
+	}
+	
 	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
 
 	list_push_tail(t->output_mounts, m);
@@ -572,6 +585,8 @@ int vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output
 
 int vine_task_set_result(struct vine_task *t, vine_result_t new_result)
 {
+	if(!t) return 0;
+	
 	if(new_result & ~(0x7)) {
 		/* Upper bits are set, so this is not related to old-style result for
 		 * inputs, outputs, or stdout, so we simply make an update. */
