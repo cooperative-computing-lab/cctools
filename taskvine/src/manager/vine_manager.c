@@ -3335,7 +3335,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	vine_enable_perf_log(q, "performance");
 	vine_enable_transactions_log(q, "transactions");
-	vine_enable_taskgraph_log(q, "taskgraph.dot");
+	vine_enable_taskgraph_log(q, "taskgraph");
 	
 	vine_perf_log_write_update(q, 1);
 
