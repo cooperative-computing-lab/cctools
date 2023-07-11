@@ -3581,6 +3581,7 @@ void vine_delete(struct vine_manager *q)
 
 	if(q->graph_logfile) {
 		vine_graph_log_write_footer(q);
+		fclose(q->graph_logfile);
 	}
 	
 	free(q->runtime_directory);
@@ -3731,6 +3732,7 @@ static vine_task_state_t change_task_state( struct vine_manager *q, struct vine_
 		case VINE_TASK_DONE:
 		case VINE_TASK_CANCELED:
 			/* Task was cloned when entered into our own table, so delete a reference on removal. */
+			vine_graph_log_write_task(q,t);
 			itable_remove(q->tasks, t->task_id); 
 			vine_task_delete(t);
 			break;
@@ -3891,8 +3893,6 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 	rmsummary_merge_max(q->max_task_resources_requested, t->resources_requested);
 
-	vine_graph_log_write_task(q,t);
-	
 	return (t->task_id);
 }
 
