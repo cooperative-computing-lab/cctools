@@ -1148,12 +1148,12 @@ int vine_enable_perf_log(struct vine_manager *m, const char *logfile);
 */
 int vine_enable_transactions_log(struct vine_manager *m, const char *logfile);
 
-/** Add an output log that graphs the state of tasks and files in Grapvhiz Dot format.
+/** Add an output log that produces the taskgraph in Grapvhiz Dot format.
 @param m A manager object
 @param logfile The filename.
 @return 1 if logfile was opened, 0 otherwise.
 */
-int vine_enable_graph_log(struct vine_manager *m, const char *logfile);
+int vine_enable_taskgraph_log(struct vine_manager *m, const char *logfile);
 
 /** Shut down workers connected to the manager. Gives a best effort and then returns the number of workers given the shut down order.
 @param m A manager object
