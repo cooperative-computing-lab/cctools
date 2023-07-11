@@ -67,9 +67,6 @@ int main(int argc, char *argv[])
 	struct vine_task *t;
 	int i;
 
-	//Logs and other runtime information will be written to this directory.
-	vine_set_runtime_info_path("runtime_info");
-
 	//Create the manager. All tasks and files will be declared with respect to
 	//this manager.
 	m = vine_create(VINE_DEFAULT_PORT);
