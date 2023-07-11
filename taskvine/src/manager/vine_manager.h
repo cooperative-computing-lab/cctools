@@ -147,7 +147,8 @@ struct vine_manager {
     char *runtime_directory;
 	FILE *perf_logfile;        /* Performance logfile for tracking metrics by time. */
 	FILE *txn_logfile;         /* Transaction logfile for recording every event of interest. */
-
+	FILE *graph_logfile;       /* Graph logfile for visualizing application structure. */
+	
 	/* Resource monitoring configuration. */
 
 	vine_monitoring_mode_t monitor_mode;
