@@ -2048,8 +2048,8 @@ cores, memory and disk have modifiers `~` and `>` as follows:
 
 ## Logging and Plotting Facilities
 
-A TaskVine manager produces three logs: `debug`, `performance`, and
-`transactions`. These logs are always enabled, and appear in the current
+A TaskVine manager produces several logs: `debug`, `taskgraph`, `performance`,
+and `transactions`. These logs are always enabled, and appear in the current
 working directory in the sudirectories:
 
 ```sh
@@ -2095,6 +2095,28 @@ To enable debugging at the worker, set the `-d` option:
 ```sh
 $ vine_worker -d all -o worker.debug -M myproject
 ```
+
+## Task Graph Log
+
+The complete graph of tasks and files is recorded in `taskgraph`
+using the [Graphviz](https://graphviz.org) Dot file format.  With the `dot` tool installed, you
+can visualize the task graph as follows:
+
+```sh
+dot -Tpng vine-run-info/most-recent/vine-logs/taskgraph > taskgraph.png
+```
+
+This can produce results like this:
+
+![Example Task Graph](images/taskgraph.png)
+
+Note that very large task graphs may be impractical to graph at this level of detail.
+
+!!! note
+    You may need to install Graphviz Dot separately like this:
+    ```
+    conda install -c conda-forge graphviz
+    ```
 
 ### Performance Log
 
