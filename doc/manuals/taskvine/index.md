@@ -2046,7 +2046,7 @@ cores, memory and disk have modifiers `~` and `>` as follows:
     modified when more efficient values are found.
 
 
-## Logging and Plotting Facilities
+## Logging, Plotting, and Tuning
 
 A TaskVine manager produces several logs: `debug`, `taskgraph`, `performance`,
 and `transactions`. These logs are always enabled, and appear in the current
@@ -2096,7 +2096,7 @@ To enable debugging at the worker, set the `-d` option:
 $ vine_worker -d all -o worker.debug -M myproject
 ```
 
-## Task Graph Log
+### Task Graph Log
 
 The complete graph of tasks and files is recorded in `taskgraph`
 using the [Graphviz](https://graphviz.org) Dot file format.  With the `dot` tool installed, you
@@ -2298,6 +2298,34 @@ of file transfer time on overall performance. For example:
 vine_plot_txn_log vine-run-info/most-recent/vine-logs/transactions
 ```
 
+### Tuning Specialized Execution Parameters
+
+The behaviour of TaskVine can be tuned by the following parameters. We advise
+caution when using these parameters, as the standard behaviour may drastically
+change.
+
+| Parameter | Description | Default Value |
+|-----------|-------------|---------------|
+| category-steady-n-tasks | Minimum number of successful tasks to use a sample for automatic resource allocation modes<br>after encountering a new resource maximum. | 25 |
+| proportional-resources | If set to 0, do not assign resources proportionally to tasks. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
+| proportional-whole-tasks | Round up resource proportions such that only an integer number of tasks could be fit in the worker. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
+| hungry-minimum          | Smallest number of waiting tasks in the manager before declaring it hungry | 10 |
+| monitor-interval        | Maximum number of seconds between resource monitor measurements. If less than 1, use default. | 5 |
+| resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
+| wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
+| max-retrievals | Sets the max number of tasks to retrievals per manager wait(). If less than 1, the manager prefers to retrievals all completed tasks before dispatching new tasks to workers. | 1 |
+| worker-retrievals | If 1, retrievals all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |
+
+
+=== "Python"
+    ```python
+    m.tune("hungry-minumum", 20)
+    ```
+
+=== "C"
+    ```
+    vine_tune(m, "hungry-minumum", 20)
+    ```
 
 ## Workflow Integration
 
@@ -2371,37 +2399,6 @@ The `compute` call above may receive the following keyword arguments:
 | lazy_transfer | Whether to bring each result back from the workers (False, default), or keep transient results at workers (True) |
 | resources   | A dictionary to specify [maximum resources](#task-resources), e.g. `{"cores": 1, "memory": 2000"}` |
 | resources\_mode | [Automatic resource management](#automatic-resource-management) to use, e.g., "fixed", "max", or "max throughput"| 
-
-
-### Tunning Specialized Execution Parameters
-
-The behaviour of TaskVine can be tuned by the following parameters. We advise
-caution when using these parameters, as the standard behaviour may drastically
-change.
-
-| Parameter | Description | Default Value |
-|-----------|-------------|---------------|
-| category-steady-n-tasks | Minimum number of successful tasks to use a sample for automatic resource allocation modes<br>after encountering a new resource maximum. | 25 |
-| proportional-resources | If set to 0, do not assign resources proportionally to tasks. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
-| proportional-whole-tasks | Round up resource proportions such that only an integer number of tasks could be fit in the worker. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
-| hungry-minimum          | Smallest number of waiting tasks in the manager before declaring it hungry | 10 |
-| monitor-interval        | Maximum number of seconds between resource monitor measurements. If less than 1, use default. | 5 |
-| resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
-| wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
-| max-retrievals | Sets the max number of tasks to retrievals per manager wait(). If less than 1, the manager prefers to retrievals all completed tasks before dispatching new tasks to workers. | 1 |
-| worker-retrievals | If 1, retrievals all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |
-
-
-=== "Python"
-    ```python
-    m.tune("hungry-minumum", 20)
-    ```
-
-=== "C"
-    ```
-    vine_tune(m, "hungry-minumum", 20)
-    ```
-
 
 
 ### Further Information
