@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "vine_blocklist.h"
 #include "vine_txn_log.h"
 #include "vine_perf_log.h"
+#include "vine_graph_log.h"
 #include "vine_current_transfers.h"
 #include "vine_runtime_dir.h"
 #include "vine_file_replica_table.h"
@@ -3334,7 +3335,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	vine_enable_perf_log(q, "performance");
 	vine_enable_transactions_log(q, "transactions");
-
+	vine_enable_graph_log(q, "graph");
+	
 	vine_perf_log_write_update(q, 1);
 
 	q->time_last_wait = timestamp_get();
@@ -3577,6 +3579,10 @@ void vine_delete(struct vine_manager *q)
 		}
 	}
 
+	if(q->graph_logfile) {
+		vine_graph_log_write_footer(q);
+	}
+	
 	free(q->runtime_directory);
 	free(q->stats);
 	free(q->stats_disconnected_workers);
@@ -3885,6 +3891,8 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 	rmsummary_merge_max(q->max_task_resources_requested, t->resources_requested);
 
+	vine_graph_log_write_task(q,t);
+	
 	return (t->task_id);
 }
 
@@ -4917,6 +4925,22 @@ int vine_enable_transactions_log(struct vine_manager *q, const char *filename)
 	}
 }
 
+int vine_enable_graph_log(struct vine_manager *q, const char *filename)
+{
+	char *logpath = vine_get_runtime_path_log(q, filename);
+	q->graph_logfile = fopen(logpath, "w");
+	free(logpath);
+
+	if(q->graph_logfile) {
+		debug(D_VINE, "graph log enabled and is being written to %s\n", filename);
+		vine_graph_log_write_header(q);
+		return 1;
+	} else {
+		debug(D_NOTICE | D_VINE, "couldn't open graph logfile %s: %s\n", filename, strerror(errno));
+		return 0;
+	}
+}
+
 void vine_accumulate_task(struct vine_manager *q, struct vine_task *t) {
 	const char *name   = t->category ? t->category : "default";
 	struct category *c = vine_category_lookup_or_create(q, name);
@@ -5192,6 +5216,8 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 		hash_table_insert(m->file_table, f->cached_name, f );
 	}
 
+	vine_graph_log_write_file(m,f);
+	
 	return f;
 }
 
