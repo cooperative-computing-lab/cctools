@@ -90,7 +90,7 @@ static int vine_manager_put_file( struct vine_manager *q, struct vine_worker_inf
 	char remotename_encoded[VINE_LINE_MAX];
 	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
 
-	stoptime = time(0) + vine_manager_transfer_time(q, w, t, length);
+	stoptime = time(0) + vine_manager_transfer_time(q, w, length);
 	vine_manager_send(q,w, "file %s %"PRId64" 0%o\n",remotename_encoded, length, mode );
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
@@ -210,7 +210,6 @@ static vine_result_code_t vine_manager_put_url( struct vine_manager *q, struct v
 	url_encode(f->cached_name,cached_name_encoded,sizeof(cached_name_encoded));
 
 	char *transfer_id = vine_current_transfers_add(q, w, f->source);
-	vine_current_transfers_print_table(q);
 	vine_manager_send(q,w,"puturl %s %s %lld %o %s\n",source_encoded, cached_name_encoded, (long long)f->size, 0777, transfer_id);
 
 	return VINE_SUCCESS;
@@ -220,7 +219,7 @@ static vine_result_code_t vine_manager_put_url( struct vine_manager *q, struct v
 
 vine_result_code_t vine_manager_put_buffer( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f, int64_t *total_bytes )
 {
-	time_t stoptime = time(0) + vine_manager_transfer_time(q, w, t, f->size);
+	time_t stoptime = time(0) + vine_manager_transfer_time(q, w, f->size);
 	vine_manager_send(q,w, "file %s %lld %o\n",f->cached_name, (long long)f->size, 0777 );
 	int64_t actual = link_putlstring(w->link, f->data, f->size, stoptime);
 	if(actual >= 0 && (size_t)actual ==f->size) {

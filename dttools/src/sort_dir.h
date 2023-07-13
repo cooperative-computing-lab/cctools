@@ -36,6 +36,6 @@ int sort_dir(const char *dirname, char ***list, int (*sort) (const char *a, cons
 /** Free a sorted directory listing.
 @param list The list to be freed.
 */
-#define sort_dir_free free
+void sort_dir_free( char **list );
 
 #endif

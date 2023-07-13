@@ -30,10 +30,14 @@ See the file COPYING for details.
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 120  /**< Default value for Work Queue keepalive interval in seconds. */
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT  30   /**< Default value for Work Queue keepalive timeout in seconds. */
 
+/** The input/output type of files used by @ref work_queue_task_specify_file and similar. */
+
 typedef enum {
 	WORK_QUEUE_INPUT  = 0,                         /**< Specify an input object. */
 	WORK_QUEUE_OUTPUT = 1                          /**< Specify an output object. */
 } work_queue_file_type_t;
+
+/** File handling flags used by @ref work_queue_task_specify_file and similar. */
 
 typedef enum {
 	WORK_QUEUE_NOCACHE  = 0, /**< Do not cache file at execution site. */
@@ -46,6 +50,8 @@ typedef enum {
 	WORK_QUEUE_PREEXIST = 4 /**< If the filename already exists on the host, use it in place. (Warning: Internal work queue use only.) */
 } work_queue_file_flags_t;
 
+/** Task scheduling modes used by @ref work_queue_specify_algorithm and @ref work_queue_task_specify_algorithm. */
+
 typedef enum {
 	WORK_QUEUE_SCHEDULE_UNSET = 0,
 	WORK_QUEUE_SCHEDULE_FCFS,      /**< Select worker on a first-come-first-serve basis. */
@@ -55,6 +61,7 @@ typedef enum {
 	WORK_QUEUE_SCHEDULE_WORST      /**< Select the worst fit worker (the worker with more unused resources). */
 } work_queue_schedule_t;
 
+/** Task result types set when a task is complete. */
 
 typedef enum {
 	WORK_QUEUE_RESULT_SUCCESS             = 0,      /**< The task ran successfully **/
@@ -73,6 +80,8 @@ typedef enum {
 	WORK_QUEUE_RESULT_OUTPUT_TRANSFER_ERROR = 10 << 3  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
 } work_queue_result_t;
 
+/** State of a task throughout its lifetime. */
+
 typedef enum {
 	WORK_QUEUE_TASK_UNKNOWN = 0,       /**< There is no such task **/
 	WORK_QUEUE_TASK_READY,             /**< Task is ready to be run, waiting in queue **/
@@ -82,6 +91,8 @@ typedef enum {
 	WORK_QUEUE_TASK_DONE,              /**< Task is done, and returned through work_queue_wait >**/
 	WORK_QUEUE_TASK_CANCELED,           /**< Task was canceled before completion **/
 } work_queue_task_state_t;
+
+/** Types of files that can be attached to a task. */
 
 typedef enum {
 	WORK_QUEUE_FILE = 1,              /**< File-spec is a regular file **/
@@ -116,12 +127,6 @@ typedef enum {
     WORK_QUEUE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING /**< Use the exhaustive bucketing algorithm to label resources */
 } work_queue_category_mode_t;
 
-
-extern int wq_option_scheduler;	               /**< Initial setting for algorithm to assign tasks to
-												 workers upon creating queue . Change prior to
-												 calling work_queue_create, after queue is created
-												 this variable is not considered and changes must be
-												 made through the API calls.   */
 
 /** A task description.  This structure should only be created with @ref
  * work_queue_task_create and delete with @ref work_queue_task_delete.  You may
@@ -334,8 +339,8 @@ struct work_queue_stats {
 
 	double capacity; /**< @deprecated Use capacity_cores. */
 
-	double efficiency;      /**< @deprecated. broken. */
-	double idle_percentage; /**< @deprecated. */
+	double efficiency;      /**< @deprecated broken. */
+	double idle_percentage; /**< @deprecated */
 
 	int64_t total_gpus;       /**< @deprecated: broken. */
 	int64_t committed_gpus;   /**< @deprecated: broken. */
@@ -1117,7 +1122,9 @@ void work_queue_manager_preferred_connection(struct work_queue *q, const char *p
  - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
  - "hungry-minimum" Mimimum number of tasks to consider queue not hungry. (default=10)
  - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
+ - "attempt-schedule-depth" The amount of tasks to attempt scheduling on each pass of send_one_task in the main loop. (default=100)
  - "wait_retrieve_many" Parameter to alter how work_queue_wait works. If set to 0, work_queue_wait breaks out of the while loop whenever a task changes to WORK_QUEUE_TASK_DONE (wait_retrieve_one mode). If set to 1, work_queue_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
+ - "monitor-interval" Parameter to change how frequently the resource monitor records resource consumption of a task in a times series, if this feature is enabled. See @ref work_queue_enable_monitoring_full.
 @param value The value to set the parameter to.
 @return 0 on succes, -1 on failure.
 */

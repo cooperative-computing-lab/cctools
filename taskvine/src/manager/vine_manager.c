@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "vine_blocklist.h"
 #include "vine_txn_log.h"
 #include "vine_perf_log.h"
+#include "vine_taskgraph_log.h"
 #include "vine_current_transfers.h"
 #include "vine_runtime_dir.h"
 #include "vine_file_replica_table.h"
@@ -524,7 +525,7 @@ Two exceptions are made:
 - The transfer time cannot be below a configurable minimum time.
 */
 
-int vine_manager_transfer_time(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t length)
+int vine_manager_transfer_time(struct vine_manager *q, struct vine_worker_info *w, int64_t length)
 {
 	double avg_transfer_rate; // bytes per second
 	char *data_source;
@@ -686,12 +687,12 @@ static void update_write_catalog(struct vine_manager *q )
 
 	// Send the buffer.
 	debug(D_VINE, "Advertising manager status to the catalog server(s) at %s ...", q->catalog_hosts);
-	if(!catalog_query_send_update_conditional(q->catalog_hosts, str)) {
+	if(!catalog_query_send_update(q->catalog_hosts, str, CATALOG_UPDATE_BACKGROUND|CATALOG_UPDATE_CONDITIONAL)) {
 
 		// If the send failed b/c the buffer is too big, send the lean version instead.
 		struct jx *lj = manager_lean_to_jx(q);
 		char *lstr = jx_print_string(lj);
-		catalog_query_send_update(q->catalog_hosts,lstr);
+		catalog_query_send_update(q->catalog_hosts,lstr,CATALOG_UPDATE_BACKGROUND);
 		free(lstr);
 		jx_delete(lj);
 	}
@@ -1342,12 +1343,12 @@ static vine_result_code_t get_update( struct vine_manager *q, struct vine_worker
 	struct vine_task *t = itable_lookup(w->current_tasks,task_id);
 	if(!t) {
 		debug(D_VINE,"worker %s (%s) sent output for unassigned task %"PRId64, w->hostname, w->addrport, task_id);
-		link_soak(w->link,length,time(0)+vine_manager_transfer_time(q,w,0,length));
+		link_soak(w->link,length,time(0)+vine_manager_transfer_time(q,w,length));
 		return VINE_SUCCESS;
 	}
 
 
-	time_t stoptime = time(0) + vine_manager_transfer_time(q,w,t,length);
+	time_t stoptime = time(0) + vine_manager_transfer_time(q,w,length);
 
 	struct vine_mount *m;
 	const char *local_name = 0;
@@ -1421,7 +1422,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	t = itable_lookup(w->current_tasks, task_id);
 	if(!t) {
 		debug(D_VINE, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, task_id);
-		stoptime = time(0) + vine_manager_transfer_time(q, w, 0, output_length);
+		stoptime = time(0) + vine_manager_transfer_time(q, w, output_length);
 		link_soak(w->link, output_length, stoptime);
 		return VINE_SUCCESS;
 	}
@@ -1460,7 +1461,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	if(t->output == NULL) {
 		fprintf(stderr, "error: allocating memory of size %"PRId64" bytes failed for storing stdout of task %"PRId64".\n", retrieved_output_length, task_id);
 		//drop the entire length of stdout on the link
-		stoptime = time(0) + vine_manager_transfer_time(q, w, t, output_length);
+		stoptime = time(0) + vine_manager_transfer_time(q, w, output_length);
 		link_soak(w->link, output_length, stoptime);
 		retrieved_output_length = 0;
 		vine_task_set_result(t, VINE_RESULT_STDOUT_MISSING);
@@ -1470,7 +1471,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		debug(D_VINE, "Receiving stdout of task %"PRId64" (size: %"PRId64" bytes) from %s (%s) ...", task_id, retrieved_output_length, w->addrport, w->hostname);
 
 		//First read the bytes we keep.
-		stoptime = time(0) + vine_manager_transfer_time(q, w, t, retrieved_output_length);
+		stoptime = time(0) + vine_manager_transfer_time(q, w, retrieved_output_length);
 		actual = link_read(w->link, t->output, retrieved_output_length, stoptime);
 		if(actual != retrieved_output_length) {
 			debug(D_VINE, "Failure: actual received stdout size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", actual, retrieved_output_length);
@@ -1482,7 +1483,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		//Then read the bytes we need to throw away.
 		if(output_length > retrieved_output_length) {
 			debug(D_VINE, "Dropping the remaining %"PRId64" bytes of the stdout of task %"PRId64" since stdout length is limited to %d bytes.\n", (output_length-MAX_TASK_STDOUT_STORAGE), task_id, MAX_TASK_STDOUT_STORAGE);
-			stoptime = time(0) + vine_manager_transfer_time(q, w, t, (output_length-retrieved_output_length));
+			stoptime = time(0) + vine_manager_transfer_time(q, w, (output_length-retrieved_output_length));
 			link_soak(w->link, (output_length-retrieved_output_length), stoptime);
 
 			//overwrite the last few bytes of buffer to signal truncated stdout.
@@ -1898,6 +1899,7 @@ static struct jx * manager_to_jx( struct vine_manager *q )
 	jx_insert_integer(j,"time_internal",info.time_internal);
 	jx_insert_integer(j,"time_polling",info.time_polling);
 	jx_insert_integer(j,"time_application",info.time_application);
+	jx_insert_integer(j,"time_scheduling", info.time_scheduling);
 
 	jx_insert_integer(j,"time_workers_execute",info.time_workers_execute);
 	jx_insert_integer(j,"time_workers_execute_good",info.time_workers_execute_good);
@@ -2331,7 +2333,7 @@ struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q
 
 	struct rmsummary *limits = rmsummary_create(-1);
 
-	rmsummary_merge_override(limits, max);
+	rmsummary_merge_override_basic(limits, max);
 
 	int use_whole_worker = 1;
 	if(q->proportional_resources) {
@@ -2456,7 +2458,7 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 
 	if(result==VINE_SUCCESS) {
 		itable_insert(w->current_tasks_boxes, t->task_id, limits);
-		rmsummary_merge_override(t->resources_allocated, limits);
+		rmsummary_merge_override_basic(t->resources_allocated, limits);
 		debug(D_VINE, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
 	} else {
 		rmsummary_delete(limits);
@@ -2792,36 +2794,50 @@ static int send_one_task( struct vine_manager *q )
 {
 	struct vine_task *t;
 	struct vine_worker_info *w = NULL;
-
+	
+	int tasks_considered = 0;
 	timestamp_t now = timestamp_get();
 
-	// Consider each task in the order of priority:
-	LIST_ITERATE(q->ready_list,t) {
+	while ( (t=list_rotate(q->ready_list)) ) {
+		if(tasks_considered > q->attempt_schedule_depth) {
+			return 0;
+		}
 
 		// Skip task if min requested start time not met.
-		if(t->resources_requested->start > now) continue;
+		if(t->resources_requested->start > now) {
+			continue;
+		}
 
 		// Skip task if temp input files have not been materialized.
-		if(!vine_manager_check_inputs_available(q,t)) continue;
-		
+		if(!vine_manager_check_inputs_available(q,t)) {
+			continue;
+		}
+
+		q->stats_measure->time_scheduling = timestamp_get();
+
 		// Find the best worker for the task at the head of the list
 		w = vine_schedule_task_to_worker(q,t);
 
-		// If there is no suitable worker, consider the next task.
-		if(!w) continue;
+		if(!w) {
+			tasks_considered++;
+			continue;
+		}
+
+		q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
 
 		// Check if there is transfer capacity available.
-		if(q->peer_transfers_enabled)
-		{
+		if(q->peer_transfers_enabled) {
 			if(!vine_manager_transfer_capacity_available(q,w,t)) continue;
 		}
 
-		// Otherwise, remove it from the ready list and start it:
-		commit_task_to_worker(q,w,t);
 
+		// Otherwise, remove it from the ready list and start it:
+		list_pop_tail(q->ready_list);
+		commit_task_to_worker(q,w,t);
 		return 1;
 	}
 
+	// if we made it here we reached the end of the list
 	return 0;
 }
 
@@ -3278,6 +3294,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->hungry_minimum = 10;
 
 	q->wait_for_workers = 0;
+	q->attempt_schedule_depth = 100;
 
 	q->max_retrievals = 1;
 	q->worker_retrievals = 1;
@@ -3318,7 +3335,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	vine_enable_perf_log(q, "performance");
 	vine_enable_transactions_log(q, "transactions");
-
+	vine_enable_taskgraph_log(q, "taskgraph");
+	
 	vine_perf_log_write_update(q, 1);
 
 	q->time_last_wait = timestamp_get();
@@ -3335,8 +3353,16 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 {
-	if(!q) {
-		return 0;
+	if(!q) return 0;
+
+
+	if(series) {
+		char *series_file = vine_get_runtime_path_log(q, "time-series");
+		if(!create_dir(series_file, 0777)) {
+			warn(D_VINE,"could not create monitor output directory - %s (%s)", series_file, strerror(errno));
+			return 0;
+		}
+		free(series_file);
 	}
 
 	q->monitor_mode = VINE_MON_DISABLED;
@@ -3348,14 +3374,6 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 
 	q->monitor_exe = vine_declare_file(q, exe, VINE_CACHE);
 	free(exe);
-
-	if(series) {
-		char *series_file = vine_get_runtime_path_log(q, "time-series");
-		if(!create_dir(series_file, 0777)) {
-			fatal("Could not create monitor output directory - %s (%s)", series_file, strerror(errno));
-		}
-		free(series_file);
-	}
 
 	if(q->measured_local_resources) {
 		rmsummary_delete(q->measured_local_resources);
@@ -3561,6 +3579,11 @@ void vine_delete(struct vine_manager *q)
 		}
 	}
 
+	if(q->graph_logfile) {
+		vine_taskgraph_log_write_footer(q);
+		fclose(q->graph_logfile);
+	}
+	
 	free(q->runtime_directory);
 	free(q->stats);
 	free(q->stats_disconnected_workers);
@@ -3697,12 +3720,7 @@ static vine_task_state_t change_task_state( struct vine_manager *q, struct vine_
 	vine_task_state_t old_state = t->state;
 
 	t->state = new_state;
-
-	if( old_state == VINE_TASK_READY ) {
-		// Treat VINE_TASK_READY specially, as it has the order of the tasks
-		list_remove(q->ready_list, t);
-	}
-
+	
 	// insert to corresponding table
 	debug(D_VINE, "Task %d state change: %s (%d) to %s (%d)\n", t->task_id, vine_task_state_to_string(old_state), old_state, vine_task_state_to_string(new_state), new_state);
 
@@ -3714,6 +3732,7 @@ static vine_task_state_t change_task_state( struct vine_manager *q, struct vine_
 		case VINE_TASK_DONE:
 		case VINE_TASK_CANCELED:
 			/* Task was cloned when entered into our own table, so delete a reference on removal. */
+			vine_taskgraph_log_write_task(q,t);
 			itable_remove(q->tasks, t->task_id); 
 			vine_task_delete(t);
 			break;
@@ -3841,7 +3860,8 @@ static int task_request_count( struct vine_manager *q, const char *category, cat
 int vine_submit(struct vine_manager *q, struct vine_task *t)
 {
 	if(t->state!=VINE_TASK_UNKNOWN) {
-		fatal("TaskVine: Sorry, you cannot submit the same task (%d) (%s) twice!",t->task_id,t->command_line);
+		notice(D_VINE,"vine_submit: you cannot submit the same task (%d) (%s) twice!",t->task_id,t->command_line);
+		return 0;
 	}
 
 	/* Assign a unique ID to each task only when submitted. */
@@ -4683,6 +4703,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
 
+	} else if(!strcmp(name, "attempt-schedule-depth")) {
+		q->attempt_schedule_depth = MAX(1, (int)value);
+		
 	} else if(!strcmp(name, "max-retrievals")) {
 		q->max_retrievals = MAX(-1, (int)value);
 
@@ -4712,7 +4735,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	return 0;
 }
 
-void vine_enable_process_module(struct vine_manager *q)
+void vine_manager_enable_process_shortcut(struct vine_manager *q)
 {
 	q->process_pending_check = 1;
 }
@@ -4902,6 +4925,22 @@ int vine_enable_transactions_log(struct vine_manager *q, const char *filename)
 	}
 }
 
+int vine_enable_taskgraph_log(struct vine_manager *q, const char *filename)
+{
+	char *logpath = vine_get_runtime_path_log(q, filename);
+	q->graph_logfile = fopen(logpath, "w");
+	free(logpath);
+
+	if(q->graph_logfile) {
+		debug(D_VINE, "graph log enabled and is being written to %s\n", filename);
+		vine_taskgraph_log_write_header(q);
+		return 1;
+	} else {
+		debug(D_NOTICE | D_VINE, "couldn't open graph logfile %s: %s\n", filename, strerror(errno));
+		return 0;
+	}
+}
+
 void vine_accumulate_task(struct vine_manager *q, struct vine_task *t) {
 	const char *name   = t->category ? t->category : "default";
 	struct category *c = vine_category_lookup_or_create(q, name);
@@ -5068,8 +5107,8 @@ const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, 
 
 		struct rmsummary *r = rmsummary_create(-1);
 
-		rmsummary_merge_override(r, q->current_max_worker);
-		rmsummary_merge_override(r, t->resources_requested);
+		rmsummary_merge_override_basic(r, q->current_max_worker);
+		rmsummary_merge_override_basic(r, t->resources_requested);
 
 		s = category_task_min_resources(c, r, t->resource_request, t->task_id);
 		rmsummary_delete(r);
@@ -5165,7 +5204,6 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 	if(!f) {
 		return NULL;
 	}
-
 	assert(f->cached_name);
 	struct vine_file *previous = vine_manager_lookup_file(m, f->cached_name);
 
@@ -5178,6 +5216,8 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 		hash_table_insert(m->file_table, f->cached_name, f );
 	}
 
+	vine_taskgraph_log_write_file(m,f);
+	
 	return f;
 }
 
@@ -5245,6 +5285,47 @@ struct vine_file * vine_declare_chirp( struct vine_manager *m, const char *serve
 {
 	struct vine_file *t = vine_file_chirp(server, source, ticket, env, flags);
 	return vine_manager_declare_file(m, t);
+}
+
+const char * vine_fetch_file( struct vine_manager *m, struct vine_file *f )
+{
+	/* If the data has already been loaded, just return it. */
+	if(f->data) return f->data;
+	
+	switch(f->type) {
+	case VINE_FILE:
+		/* If it is on the local filesystem, load it. */
+		{
+		size_t length;
+		if(copy_file_to_buffer(f->source,&f->data,&length)) {
+			return f->data;
+		} else {
+			return 0;
+		}
+		}
+		break;
+	case VINE_BUFFER:
+		/* Buffer files will already have their contents in memory, if available. */
+		return f->data;
+		break;
+	case VINE_TEMP:
+	case VINE_URL:
+	case VINE_MINI_TASK:
+		/* If the file has been materialized remotely, go get it from a worker. */
+		{
+		struct vine_worker_info *w = vine_file_replica_table_find_worker(m,f->cached_name);
+		if(w) vine_manager_get_single_file(m,w,f);
+		/* If that succeeded, then f->data is now set, null otherwise. */
+		return f->data;
+		}
+		break;
+	case VINE_EMPTY_DIR:
+		/* Never anything to get. */
+		return 0;
+		break;
+	}
+
+	return 0;
 }
 
 

@@ -43,7 +43,6 @@ SOURCES = \
 	dpopen.c \
 	elfheader.c \
 	envtools.c \
-	env_replace.c \
 	fast_popen.c \
 	fd.c \
 	file_cache.c \

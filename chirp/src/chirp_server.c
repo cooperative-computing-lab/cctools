@@ -245,7 +245,10 @@ static int update_all_catalogs(const char *url)
 
 	char *message = jx_print_string(j);
 
-	list_iterate(catalog_host_list, (list_op_t) catalog_query_send_update, message);
+	const char *host;
+	LIST_ITERATE(catalog_host_list,host) {
+		catalog_query_send_update(host,message,CATALOG_UPDATE_BACKGROUND);
+	}
 
 	free(message);
 	jx_delete(j);

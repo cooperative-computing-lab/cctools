@@ -2,9 +2,3 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-##
-# @package ndcctools
-#
-# Package to encompass the python API of all CCTools.
-# See the <a href=http://cctools.readthedocs.io/en/latest>Manual</a> for complete documentation.
-#

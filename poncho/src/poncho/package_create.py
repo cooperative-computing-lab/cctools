@@ -19,8 +19,12 @@ import re
 from platform import uname
 from packaging import version
 
-logger = logging.getLogger()
-logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
+logger = logging.getLogger(__name__)
+logger.setLevel(level=logging.INFO)
+handler = logging.StreamHandler(stream=sys.stdout)
+formatter = logging.Formatter(fmt='%(asctime)s:%(levelname)s:%(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 conda_exec = 'conda'
 
@@ -97,7 +101,7 @@ def _copy_run_in_env(env_dir):
         f.write('exec "${env_dir}"/bin/poncho_package_run -e ${env_dir} "$@"\n')
     os.chmod(f'{env_dir}/env/bin/run_in_env', 0o755)
 
-def pack_env_with_conda_dir(spec, output, ignore_editable_packages=False):
+def _pack_env_with_conda_dir(spec, output, ignore_editable_packages=False):
     # remove trailing slash if present
     spec = spec[:-1] if spec[-1] == '/' else spec 
     try:
@@ -114,7 +118,7 @@ def pack_env_with_conda_dir(spec, output, ignore_editable_packages=False):
     except Exception as e:
         raise Exception(f"Error when packing a conda directory.\n{e}")
 
-def pack_env_with_spec(spec, output, conda_executable=None, download_micromamba=False, ignore_editable_packages=False):
+def _pack_env_with_spec(spec, output, conda_executable=None, download_micromamba=False, ignore_editable_packages=False):
     # record packages installed as editable from pip
     local_pip_pkgs = _find_local_pip()
 
@@ -164,12 +168,31 @@ def pack_env_with_spec(spec, output, conda_executable=None, download_micromamba=
 
 def pack_env(spec, output, conda_executable=None, download_micromamba=False, ignore_editable_packages=False):
     # pack a conda directory directly
-    if not os.path.isfile(spec) and spec != "-":
-        pack_env_with_conda_dir(spec, output, ignore_editable_packages)
+    if os.path.isdir(spec):
+        _pack_env_with_conda_dir(spec, output, ignore_editable_packages)
 
     # else if spec is a file or from stdin
+    elif os.path.isfile(spec) or spec == '-':
+        _pack_env_with_spec(spec, output, conda_executable, download_micromamba, ignore_editable_packages)
+
+    # else pack from a conda environment name
+    # this thus assumes conda executable is in the current shell executable path
     else:
-        pack_env_with_spec(spec, output, conda_executable, download_micromamba, ignore_editable_packages)
+        conda_env_dir = _get_conda_env_dir_by_name(spec)
+        _pack_env_with_conda_dir(conda_env_dir, output, ignore_editable_packages)
+
+def _get_conda_env_dir_by_name(env_name):
+    command = f"conda env list --json"
+    result = subprocess.run(command, capture_output=True, text=True, shell=True)
+    
+    if result.returncode == 0:
+        env_list = json.loads(result.stdout.strip())
+        for env in env_list["envs"]:
+            path = env.strip()
+            name = path.split("/")[-1]
+            if name == env_name:
+                return path
+    raise Exception(f'Cannot find the conda environment named {env_name}. Try checking the spelling or if conda is in your path.')
 
 def _run_conda_command(environment, needs_confirmation, command, *args):
     all_args = [conda_exec] + command.split()

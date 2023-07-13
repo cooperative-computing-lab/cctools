@@ -79,7 +79,7 @@ int	makeflow_catalog_summary (struct dag *d, char *name, batch_queue_type_t type
   	//creates memory
   	char *text = jx_print_string (j);
 
-  	int resp = catalog_query_send_update (host, text);
+  	int resp = catalog_query_send_update(host,text,CATALOG_UPDATE_BACKGROUND);
 
   	free (text);
   	free (timestring);

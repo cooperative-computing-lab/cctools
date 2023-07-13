@@ -1,8 +1,7 @@
 #!/bin/sh
 
-# This test exercises the remote naming feature, in which a file
-# can have a different name in the execution sandbox than it does
-# in the makeflow working directory.
+# A simple test of makeflow-taskvine integration, based off
+# of the makeflow_remote_naming test.
 
 . ../../dttools/test/test_runner_common.sh
 
@@ -13,8 +12,6 @@ STATUS_FILE="makeflow.status"
 
 prepare()
 {
-	clean
-
 cat > input.txt <<EOF
 hello
 EOF
@@ -41,9 +38,9 @@ EOF
 
 run()
 {
-	../src/makeflow -d all -T wq -Z "$PORT_FILE" "$MAKE_FILE" &
+	../src/makeflow -d all -T vine -Z "$PORT_FILE" "$MAKE_FILE" &
 
-	run_wq_worker "$PORT_FILE" "$WORKER_LOG"
+	run_taskvine_worker "$PORT_FILE" "$WORKER_LOG"
 
 	require_identical_files out.actual out.expected
 }

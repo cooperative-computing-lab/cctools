@@ -7,6 +7,7 @@ See the file COPYING for details.
 
 #include <string.h>
 #include <errno.h>
+#include <sys/wait.h>
 
 #include "catalog_query.h"
 #include "http_query.h"
@@ -26,6 +27,7 @@ See the file COPYING for details.
 #include "zlib.h"
 #include "macros.h"
 #include "b64.h"
+#include "fd.h"
 
 struct catalog_query {
 	struct jx *data;
@@ -312,6 +314,11 @@ static int catalog_update_protocol()
 	}
 }
 
+/*
+Send a catalog update via a single udp message.
+This is inherently a non-blocking action.
+*/
+
 static void catalog_update_udp( const char *host, const char *address, int port, const char *text )
 {
 	debug(D_DEBUG, "sending update via udp to %s(%s):%d", host, address, port);
@@ -322,6 +329,11 @@ static void catalog_update_udp( const char *host, const char *address, int port,
 	datagram_delete(d);
 }
 
+/*
+Send a catalog update via a tcp connection.
+This is inherently a blocking action and could
+take some time under non-ideal conditions.
+*/
 
 static int catalog_update_tcp( const char *host, const char *address, int port, const char *text )
 {
@@ -339,7 +351,42 @@ static int catalog_update_tcp( const char *host, const char *address, int port, 
 	return 1;
 }
 
-static int catalog_query_send_update_internal( const char *hosts, const char *text, int fail_if_too_big )
+/*
+Send a catalog update via a tcp connection in the background.
+This uses the double-fork technique to ensure that the update
+process runs completely independently from the main process,
+and that the main process will not have to handle an asynchronous
+"child completed" message at any later point.
+*/
+
+static int catalog_update_tcp_background( const char *host, const char *address, int port, const char *text )
+{
+	pid_t pid = fork();
+	if(pid==0) {
+		pid_t grandpid = fork();
+		if(grandpid==0) {
+			/* grandchild sends catalog update. */
+			catalog_update_tcp(host,address,port,text);
+			/* grandchild process exits after sending update. */
+			_exit(0);
+		} else {
+			/* child process exits right away. */
+			_exit(0);
+		}
+	} else if(pid>0) {
+		debug(D_DEBUG, "sending update via tcp to %s(%s):%d (background pid %d)", host, address, port, (int)pid);
+		pid_t result = waitpid(pid,0,0);
+		if(result!=pid) {
+			debug(D_DEBUG,"unable to wait for child process %d! (%s)",pid,strerror(errno));
+		}
+		return 1;
+	} else {
+		debug(D_DEBUG, "unable to fork update process: %s",strerror(errno));
+		return 0;
+	}
+}
+
+int catalog_query_send_update( const char *hosts, const char *text, catalog_update_flags_t flags )
 {
 	size_t compress_limit = 1200;
 	const char *compress_limit_str = getenv("CATALOG_UPDATE_LIMIT");
@@ -362,7 +409,7 @@ static int catalog_query_send_update_internal( const char *hosts, const char *te
 
 		debug(D_DEBUG,"compressed update message from %d to %d bytes",(int)strlen(text),(int)data_length);
 
-		if(data_length>compress_limit && fail_if_too_big && !use_udp) {
+		if(data_length>compress_limit && (flags&CATALOG_UPDATE_CONDITIONAL) && !use_udp) {
 			debug(D_DEBUG,"compressed update message exceeds limit of %d bytes (CATALOG_UPDATE_LIMIT)",(int)compress_limit);
 			return 0;
 		}
@@ -383,7 +430,11 @@ static int catalog_query_send_update_internal( const char *hosts, const char *te
 				catalog_update_udp( host, address, port, text );
 				sent++;
 			} else {
-				sent += catalog_update_tcp( host, address, port+1, text );
+				if(flags&CATALOG_UPDATE_BACKGROUND) {
+					sent += catalog_update_tcp_background( host, address, port+1, text );
+				} else {
+					sent += catalog_update_tcp( host, address, port+1, text );
+				}
 			}
 		} else {
 			debug(D_DEBUG, "unable to lookup address of host: %s", host);
@@ -392,16 +443,6 @@ static int catalog_query_send_update_internal( const char *hosts, const char *te
 
 	free(update_data);
 	return sent;
-}
-
-int catalog_query_send_update(const char *hosts, const char *text)
-{
-	return catalog_query_send_update_internal(hosts,text,0);
-}
-
-int catalog_query_send_update_conditional(const char *hosts, const char *text)
-{
-	return catalog_query_send_update_internal(hosts,text,1);
 }
 
 /* vim: set noexpandtab tabstop=4: */

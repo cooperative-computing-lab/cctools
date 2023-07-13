@@ -38,14 +38,31 @@
 
 
 import ndcctools.taskvine as vine
+import argparse
 
 def divide(dividend, divisor):
     import math
     return dividend/math.sqrt(divisor)
 
 def main():
+    parser = argparse.ArgumentParser(
+        prog="vine_example_blast.py",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    parser.add_argument(
+        "--disable-peer-transfers",
+        action="store_true",
+        help="disable transfers among workers.",
+        default=False,
+    )
+
     q = vine.Manager(9123)
 
+    args = parser.parse_args()
+
+    if args.disable_peer_transfers:
+        q.disable_peer_transfers()
 
     env_file = None
     # if python environment is missing, create an environment as explained
