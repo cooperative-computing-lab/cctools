@@ -32,8 +32,7 @@ from .utils import (
     get_c_constant,
 )
 
-from coccurent.futures import Executor
-
+from concurrent.futures import Executor
 import atexit
 import distutils.spawn
 import errno
@@ -1882,20 +1881,21 @@ class Factory(object):
 
 
 class Executor(Executor):
-    def __init__(self, **kwargs):
+    def __init__(self, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull):
         self._manager = Manager()
-
+        self._factory = Factory(batch_type="local", manager=self._manager, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull)
+        self._factory.start
 
     def submit(fn, /, *args, **kwargs):
-        f_task = task.FutureTask(fn, self._manager, *args, **kwargs)
-        self._manager.submit(f_task)
-        return f_task.future
+        future_task = task.FutureTask(fn, self._manager, *args, **kwargs)
+        self._manager.submit(future_task)
+        return future_task.future
 
     def map(func, *iterables, timeout=None, chunksize=1):
         pass
 
     def shutdown(wait=True, *, cancel_futures=False):
-        pass
+        self._factory.stop()
 
     def future_function(fn, options):
         pass

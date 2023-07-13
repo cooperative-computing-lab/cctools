@@ -10,6 +10,7 @@
 # See the file COPYING for details.
 from . import cvine
 from .file import File
+from concurrent.futures import Future
 
 import copy
 import json
@@ -1107,7 +1108,7 @@ class FutureTask(PythonTask):
                     args, kwargs = cloudpickle.load(f)
                 
 
-                args = [vineLoadArg(arg) if isinstance(arg, vine.FutureFile) else arg for arg in args]
+                args = [vineLoadArg(arg) if isinstance(arg, FutureFile) else arg for arg in args]
                 status = 0 
                 try:
                     exec_out = exec_function(*args, **kwargs)
