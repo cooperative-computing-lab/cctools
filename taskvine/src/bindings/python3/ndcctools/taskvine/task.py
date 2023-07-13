@@ -993,7 +993,30 @@ class LibraryTask(Task):
 
 class FutureFile():
     def __init__(self, future):
-        self.file = str('outfile-' + str(future.id))
+        self.file = str('outfile-' + str(future._task.id))
+
+class VineFuture(Future):
+    def __init__(self, task):
+        self._task = task
+        self._callback_fns = []
+    def cacnel():
+        self._task._module_manager.cancel_by_task_id(self._task.id)
+    def cancelled():
+        self._task._module_manager.task_state(self._task.id)
+        # if cancelled return true
+    def running():
+        self._task._module_manager.task_state(self._task.id)
+        # if running return true
+    def done():
+        self._task._module_manager.task_state(self._task.id)
+        # if done return true
+    def result(timeout="wait_forever"):
+        return self._task.output
+    def add_done_callback(fn):
+        self.callback_fns.append(fn)
+
+def retrieve_output(arg):
+    return arg
 
 class FutureTask(PythonTask):
     ##
@@ -1003,68 +1026,56 @@ class FutureTask(PythonTask):
     # @param func
     # @param args
     # @param kwargs
-    def __init__(self, manager, func, *args, **kwargs):
+    def __init__(self, manager, rf, func, *args, **kwargs):
         super(FutureTask, self).__init__(func, *args, **kwargs)
         self.enable_temp_output()
         self._module_manager = manager
-        self._submitted = False
+        self._future = VineFuture(self)
         self._future_resolved = False
+        self._retrieval_future = rf
+        self._retrieval_task = None
 
     @property
     def output(self, timeout="wait_forever"):
-        self.disable_temp_output()
-        if not self._submitted:
-            self.submit()
-        if not self._future_resolved:
-            self._module_manager.wait_for_task_id(self.id, timeout=timeout)
-            self._future_resolved = True
-        if self._tmp_output_enabled:
-            raise ValueError("temp output was enabled for this task, thus its output is not available locallly.")
+        if not self._retrieval_future and not self._retrieval_task:
+            self._retrieval_task = FutureTask(retrieve_output, self._module_manager, True, self._future)
+            self._retrieval_task.disable_temp_output()
+            self._module_manager.submit(self._retrieval_task)
 
-        if not self._output_loaded:
-            if self.successful():
-                try:
-                    with open(os.path.join(self._tmpdir, self._out_name_file), "rb") as f:
-                        if self._serialize_output:
-                            self._output = cloudpickle.load(f)
-                        else:
-                            self._output = f.read()
-                except Exception as e:
-                    self._output = e
-            else:
-                self._output = PythonTaskNoResult()
-            self._output_loaded = True
-        return self._output
+        if not self._retrieval_future:
+            return  self._retrieval_task.output(timeout=timeout)
+    
+        else:
+            if not self._future_resolved:
+                result = self._module_manager.wait_for_task_id(self.id, timeout=timeout)
+                if result:
+                    self._future_resolved = True
+            if not self._output_loaded and self._future_resolved:
+                if self.successful():
+                    try:
+                        with open(os.path.join(self._tmpdir, self._out_name_file), "rb") as f:
+                            if self._serialize_output:
+                                self._output = cloudpickle.load(f)
+                            else:
+                                self._output = f.read()
+                    except Exception as e:
+                        self._output = e
+                else:
+                    self._output = PythonTaskNoResult()
+                self._output_loaded = True
+            return self._output
 
     def add_future_dep(self, arg):
-        self.add_input(arg._output_file, str('outfile-' + str(arg.id)))
-
-    def submit(self):
-        if not self._submitted:
-            self._module_manager.submit(self)
-            self._submitted = True
+        self.add_input(arg._task._output_file, str('outfile-' + str(arg._task.id)))
 
     def submit_finalize(self, manager):
         self._manager = manager
         func, args, kwargs = self._fn_def
-
-        '''
-        # OPTION 1 ##############################
-        args = [arg.output if isinstance(arg, FutureTask) else arg for arg in args]
-        self._fn_def = (func, args, kwargs)
-        ########################################
-        '''
-
-        # OPTION 2 #############################
         for arg in args:
-            if isinstance(arg, FutureTask):
-                arg.enable_temp_output()
-                arg.submit()
+            if isinstance(arg, VineFuture):
                 self.add_future_dep(arg)
-        args = [FutureFile(arg) if isinstance(arg, FutureTask) else arg for arg in args]
+        args = [FutureFile(arg) if isinstance(arg, VineFuture) else arg for arg in args]
         self._fn_def = (func, args, kwargs)
-        #########################################
-
         self._tmpdir = tempfile.mkdtemp(dir=manager.staging_directory)
         self._serialize_python_function(*self._fn_def)
         self._fn_def = None  # avoid possible memory leak

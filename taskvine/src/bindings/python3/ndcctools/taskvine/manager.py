@@ -1880,15 +1880,16 @@ class Factory(object):
     def set_environment(self, env):
         self._env_file = env
 
-'''
-class Future(Executor):
-    def __init__(self):
+
+class Executor(Executor):
+    def __init__(self, **kwargs):
         self._manager = Manager()
 
+
     def submit(fn, /, *args, **kwargs):
-        future = task.FutureTask(fn, self._manager, *args, **kwargs)
-        self._manager.submit(future)
-        return future
+        f_task = task.FutureTask(fn, self._manager, *args, **kwargs)
+        self._manager.submit(f_task)
+        return f_task.future
 
     def map(func, *iterables, timeout=None, chunksize=1):
         pass
@@ -1902,4 +1903,4 @@ class Future(Executor):
     def library_function(fn, options):
         pass
 
-'''
+
