@@ -1003,20 +1003,20 @@ class VineFuture(Future):
     def __init__(self, task):
         self._task = task
         self._callback_fns = []
-    def cacnel():
+    def cacnel(self):
         self._task._module_manager.cancel_by_task_id(self._task.id)
-    def cancelled():
+    def cancelled(self):
         self._task._module_manager.task_state(self._task.id)
         # if cancelled return true
-    def running():
+    def running(self):
         self._task._module_manager.task_state(self._task.id)
         # if running return true
-    def done():
+    def done(self):
         self._task._module_manager.task_state(self._task.id)
         # if done return true
-    def result(timeout="wait_forever"):
+    def result(self, timeout="wait_forever"):
         return self._task.output
-    def add_done_callback(fn):
+    def add_done_callback(self, fn):
         self.callback_fns.append(fn)
 
 def retrieve_output(arg):
@@ -1042,7 +1042,7 @@ class FutureTask(PythonTask):
     @property
     def output(self, timeout="wait_forever"):
         if not self._retrieval_future and not self._retrieval_task:
-            self._retrieval_task = FutureTask(retrieve_output, self._module_manager, True, self._future)
+            self._retrieval_task = FutureTask(self._module_manager, True, retrieve_output, self._future)
             self._retrieval_task.disable_temp_output()
             self._module_manager.submit(self._retrieval_task)
 

@@ -24,6 +24,7 @@ from .file import File
 from .task import (
     FunctionCall,
     LibraryTask,
+    FutureTask,
     PythonTask,
     Task,
 )
@@ -1895,26 +1896,27 @@ class Factory(object):
 
 
 class Executor(Executor):
-    def __init__(self, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull):
-        self._manager = Manager()
+    def __init__(self, port=9123, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull):
+        self._manager = Manager(port=port)
         self._factory = Factory(batch_type="local", manager=self._manager, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull)
-        self._factory.start
+        self._factory.__setattr__('min-workers', 5)
+        self._factory.start()
 
-    def submit(fn, /, *args, **kwargs):
-        future_task = task.FutureTask(fn, self._manager, *args, **kwargs)
+    def submit(self, fn, /, *args, **kwargs):
+        future_task = FutureTask(self._manager, False, fn, *args, **kwargs)
         self._manager.submit(future_task)
-        return future_task.future
+        return future_task._future
 
-    def map(func, *iterables, timeout=None, chunksize=1):
+    def map(self, func, *iterables, timeout=None, chunksize=1):
         pass
 
-    def shutdown(wait=True, *, cancel_futures=False):
+    def shutdown(self, wait=True, *, cancel_futures=False):
         self._factory.stop()
 
-    def future_function(fn, options):
+    def future_function(self, fn, options):
         pass
 
-    def library_function(fn, options):
+    def library_function(self, fn, options):
         pass
 
 
