@@ -398,6 +398,7 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 			case VINE_MINI_TASK:
 			case VINE_BUFFER:
 				remote_info->in_cache = 1;
+				f->created = 1;
 		}
 	}
 

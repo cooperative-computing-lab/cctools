@@ -330,6 +330,8 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 		remote_info->size = size;
 		remote_info->transfer_time = transfer_time;
 		remote_info->in_cache = 1;
+		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
+		if(f) f->created = 1;
 
 		vine_current_transfers_remove(q, id);
 
@@ -2773,7 +2775,7 @@ static int vine_manager_check_inputs_available( struct vine_manager *q, struct v
 	LIST_ITERATE(t->input_mounts,m) {
 		struct vine_file *f = m->file;
 		if(f->type==VINE_TEMP) {
-			if(!vine_file_replica_table_exists_somewhere(q,f->cached_name)) {
+			if(!vine_file_replica_table_exists_somewhere(q,f->cached_name) &&  f->created) {
 				/* XXX we cannot tell between temp that was never run, and one that failed! */
 				vine_manager_consider_recovery_task(q,f,f->recovery_task);
 				return 0;
