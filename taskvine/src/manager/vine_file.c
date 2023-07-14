@@ -157,11 +157,10 @@ struct vine_file * vine_file_empty_dir()
 	return vine_file_create("unnamed",0,0,0,VINE_EMPTY_DIR,0,0);
 }
 
-struct vine_file * vine_file_mini_task( struct vine_task *t, vine_file_flags_t flags )
+struct vine_file * vine_file_mini_task( struct vine_task *t, const char *name, vine_file_flags_t flags )
 {
 	flags |= VINE_PEER_NOSHARE; //we don't know how to share mini tasks yet.
-
-	return vine_file_create(t->command_line,0,0,0,VINE_MINI_TASK,t,flags);
+	return vine_file_create(name,0,0,0,VINE_MINI_TASK,t,flags);
 }
 
 struct vine_file * vine_file_untar( struct vine_file *f, vine_file_flags_t flags )
@@ -169,8 +168,8 @@ struct vine_file * vine_file_untar( struct vine_file *f, vine_file_flags_t flags
 	struct vine_task *t = vine_task_create("mkdir output && tar xf input -C output");
 	vine_task_add_input(t,f,"input",0);
 	vine_task_add_output(t,vine_file_local("output", flags),"output",0);
-	return vine_file_mini_task(t, flags);
-}
+	return vine_file_mini_task(t, "untar", flags);
+	}
 
 struct vine_file * vine_file_poncho( struct vine_file *f, vine_file_flags_t flags )
 {
@@ -180,17 +179,16 @@ struct vine_file * vine_file_poncho( struct vine_file *f, vine_file_flags_t flag
 
 	vine_task_add_input(t, f, "package.tar.gz", 0);
 	vine_task_add_output(t, vine_file_local("output", flags), "output", 0);
-	return vine_file_mini_task(t, flags);
-}
+	return vine_file_mini_task(t, "poncho", flags );
+	}
 
 struct vine_file * vine_file_starch( struct vine_file *f, vine_file_flags_t flags )
 {
 	struct vine_task *t = vine_task_create("SFX_DIR=output SFX_EXTRACT_ONLY=1 ./package.sfx");
 	vine_task_add_input(t,f,"package.sfx",0);
 	vine_task_add_output(t,vine_file_local("output", flags),"output",0);
-	return vine_file_mini_task(t, flags);
+	return vine_file_mini_task(t, "starch", flags );
 }
-
 
 static char * find_x509_proxy()
 {
@@ -240,7 +238,7 @@ struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy
 
 	free(command);
 
-	return vine_file_mini_task(t, flags);
+	return vine_file_mini_task(t, "xrootd", flags);
 }
 
 
@@ -266,7 +264,7 @@ struct vine_file * vine_file_chirp( const char *server, const char *source, stru
 
 	free(command);
 
-	return vine_file_mini_task(t, flags);
+	return vine_file_mini_task(t, "chirp", flags);
 }
 
 
