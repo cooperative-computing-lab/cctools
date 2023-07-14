@@ -1462,9 +1462,9 @@ class Manager(object):
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
     # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
-    def declare_minitask(self, minitask, cache=False, peer_transfer=True):
+    def declare_minitask(self, minitask, name="minitask", cache=False, peer_transfer=True):
         flags = Task._determine_file_flags(cache, peer_transfer)
-        f = cvine.vine_declare_mini_task(self._taskvine, minitask._task, flags)
+        f = cvine.vine_declare_mini_task(self._taskvine, minitask._task, name, flags)
 
         # minitasks are freed when the manager frees its related file structure
         minitask._manager_will_free = True
