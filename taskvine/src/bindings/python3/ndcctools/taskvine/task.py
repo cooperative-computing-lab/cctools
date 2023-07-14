@@ -1015,7 +1015,7 @@ class VineFuture(Future):
         self._task._module_manager.task_state(self._task.id)
         # if done return true
     def result(self, timeout="wait_forever"):
-        return self._task.output
+        return self._task.output(timeout=timeout)
     def add_done_callback(self, fn):
         self.callback_fns.append(fn)
 
@@ -1039,7 +1039,6 @@ class FutureTask(PythonTask):
         self._retrieval_future = rf
         self._retrieval_task = None
 
-    @property
     def output(self, timeout="wait_forever"):
         if not self._retrieval_future and not self._retrieval_task:
             self._retrieval_task = FutureTask(self._module_manager, True, retrieve_output, self._future)
@@ -1047,7 +1046,9 @@ class FutureTask(PythonTask):
             self._module_manager.submit(self._retrieval_task)
 
         if not self._retrieval_future:
-            return  self._retrieval_task.output(timeout=timeout)
+            if not self._output_loaded:
+                self._output = self._retrieval_task._future.result(timeout=timeout)
+            return self._output
     
         else:
             if not self._future_resolved:
@@ -1078,7 +1079,7 @@ class FutureTask(PythonTask):
         for arg in args:
             if isinstance(arg, VineFuture):
                 self.add_future_dep(arg)
-        args = [FutureFile(arg) if isinstance(arg, VineFuture) else arg for arg in args]
+        args = [{"VineFutureFile": str('outfile-' + str(arg._task.id))} if isinstance(arg, VineFuture) else arg for arg in args]
         self._fn_def = (func, args, kwargs)
         self._tmpdir = tempfile.mkdtemp(dir=manager.staging_directory)
         self._serialize_python_function(*self._fn_def)
@@ -1095,13 +1096,12 @@ class FutureTask(PythonTask):
                 try:
                     import sys
                     import cloudpickle
-                    import ndcctools.taskvine as vine
                 except ImportError as e:
                     print("Could not execute PythonTask function because a module was not available at the worker.")
                     raise
 
                 def vineLoadArg(arg):
-                    with open (arg.file , 'rb') as f:
+                    with open (arg["VineFutureFile"] , 'rb') as f:
                         return cloudpickle.load(f)
 
                 (fn, args, out) = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -1111,7 +1111,7 @@ class FutureTask(PythonTask):
                     args, kwargs = cloudpickle.load(f)
                 
 
-                args = [vineLoadArg(arg) if isinstance(arg, FutureFile) else arg for arg in args]
+                args = [vineLoadArg(arg) if isinstance(arg, dict) and "VineFutureFile" in arg else arg for arg in args]
                 status = 0 
                 try:
                     exec_out = exec_function(*args, **kwargs)

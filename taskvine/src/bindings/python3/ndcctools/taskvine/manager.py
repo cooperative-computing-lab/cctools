@@ -1898,9 +1898,9 @@ class Factory(object):
 class Executor(Executor):
     def __init__(self, port=9123, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull):
         self._manager = Manager(port=port)
-        self._factory = Factory(batch_type="local", manager=self._manager, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull)
-        self._factory.__setattr__('min-workers', 5)
-        self._factory.start()
+        #self._factory = Factory(batch_type="local", manager=self._manager, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull)
+        #self._factory.__setattr__('min-workers', 5)
+        #self._factory.start()
 
     def submit(self, fn, /, *args, **kwargs):
         future_task = FutureTask(self._manager, False, fn, *args, **kwargs)
@@ -1911,7 +1911,8 @@ class Executor(Executor):
         pass
 
     def shutdown(self, wait=True, *, cancel_futures=False):
-        self._factory.stop()
+  #      self._factory.stop()
+        pass
 
     def future_function(self, fn, options):
         pass
