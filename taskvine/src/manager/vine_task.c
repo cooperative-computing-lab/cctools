@@ -520,7 +520,7 @@ int vine_task_add_input_buffer(struct vine_task *t, const char *data, int length
 int vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_mount_flags_t flags)
 {
 	/* XXX mini task must have a single output file */
-	struct vine_file *f = vine_file_mini_task(mini_task, 0);
+	struct vine_file *f = vine_file_mini_task(mini_task, "minitask", 0);
 	int r = vine_task_add_input(t,f,remote_name,flags);
 	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
 	return r;
