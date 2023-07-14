@@ -18,7 +18,7 @@ try:
     import numpy as np
 except ImportError:
     print("You need dask, awkward, and numpy installed")
-    print("(e.g. conda install -c conda-forge dask dask_awkward numpy) to run this example.")
+    print("(e.g. conda install -c conda-forge dask dask-awkward numpy) to run this example.")
 
 
 behavior: dict = {}
@@ -90,14 +90,14 @@ if __name__ == "__main__":
     if args.disable_peer_transfers:
         m.disable_peer_transfers()
 
-    f = vine.Factory(manager=m)
-    f.cores = 4
-    f.max_workers = 1
-    f.min_workers = 1
-    with f:
-        with dask.config.set(scheduler=m.get):
-            result = distance.compute(resources={"cores": 1}, resources_mode="max", lazy_transfer=True)
-            print(f"distance = {result}")
-        print("Terminating workers...", end="")
+    #f = vine.Factory(manager=m)
+    #f.cores = 4
+    #f.max_workers = 1
+    #f.min_workers = 1
+    #with f:
+    with dask.config.set(scheduler=m.get):
+        result = distance.compute(resources={"cores": 1}, resources_mode="max")
+        print(f"distance = {result}")
+    print("Terminating workers...", end="")
     print("done!")
-sys.exit(0)
+    sys.exit(0)
