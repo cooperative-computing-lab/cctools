@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <inttypes.h>
 
+static int show_names = 0;
+
 void vine_taskgraph_log_write_header( struct vine_manager *q )
 {
 	fprintf(q->graph_logfile,"digraph \"taskvine\" {\n");
@@ -24,7 +26,7 @@ void vine_taskgraph_log_write_task( struct vine_manager *q, struct vine_task *t 
 	char *p = strchr(name,' ');
 	if(p) *p = 0;
 	
-	fprintf(q->graph_logfile,"\"task-%d\" [color=green,label=\"%s\"];\n",id,path_basename(name));
+	fprintf(q->graph_logfile,"\"task-%d\" [color=green,label=\"%s\"];\n",id,show_names ? path_basename(name) : "" );
 
 	free(name);
 	
@@ -50,7 +52,7 @@ void vine_taskgraph_log_write_mini_task( struct vine_manager *q, struct vine_tas
 	char *p = strchr(name,' ');
 	if(p) *p = 0;
 	
-	fprintf(q->graph_logfile,"\"task-%d\" [color=green,label=\"%s\"];\n",id,task_name);
+	fprintf(q->graph_logfile,"\"task-%d\" [color=green,label=\"%s\"];\n",id,show_names ? task_name : "");
 
 	free(name);
 	
@@ -68,7 +70,7 @@ void vine_taskgraph_log_write_file( struct vine_manager *q, struct vine_file *f 
 {
 	if(!f) return;
 
-	fprintf(q->graph_logfile,"\"file-%s\" [shape=rect,color=blue,label=\"%s\"];\n",f->cached_name,f->source ? path_basename(f->source) : "");
+	fprintf(q->graph_logfile,"\"file-%s\" [shape=rect,color=blue,label=\"%s\"];\n",f->cached_name,(show_names && f->source) ? path_basename(f->source) : "");
 	vine_taskgraph_log_write_mini_task( q, f->mini_task, f->source, f->cached_name );
 }
 
