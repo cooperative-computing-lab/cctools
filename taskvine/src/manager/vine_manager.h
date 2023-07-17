@@ -150,6 +150,7 @@ struct vine_manager {
 	FILE *perf_logfile;        /* Performance logfile for tracking metrics by time. */
 	FILE *txn_logfile;         /* Transaction logfile for recording every event of interest. */
 	FILE *graph_logfile;       /* Graph logfile for visualizing application structure. */
+	int perf_log_interval;	   /* Minimum interval for performance log entries in seconds. */
 	
 	/* Resource monitoring configuration. */
 

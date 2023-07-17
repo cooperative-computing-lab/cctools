@@ -3326,6 +3326,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->file_source_max_transfers = VINE_FILE_SOURCE_MAX_TRANSFERS;
 	q->worker_source_max_transfers = VINE_WORKER_SOURCE_MAX_TRANSFERS;
+	q->perf_log_interval = VINE_PERF_LOG_INTERVAL;
 
 	q->resource_submit_multiplier = 1.0;
 
@@ -4748,6 +4749,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if(!strcmp(name, "worker-source-max-transfers")){
 		q->worker_source_max_transfers = MAX(1, (int)value);
+
+	} else if(!strcmp(name, "perf-log-interval")){
+		q->perf_log_interval = MAX(1, (int)value);
 
 	} else if(!strcmp(name, "monitor-interval")) {
 		/* 0 means use monitor's default */

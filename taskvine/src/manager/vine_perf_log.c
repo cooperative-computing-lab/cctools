@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "vine_manager.h"
 
+#include "vine_perf_log.h"
 #include "timestamp.h"
 #include "buffer.h"
 #include "debug.h"
@@ -52,7 +53,7 @@ void vine_perf_log_write_update( struct vine_manager *q, int force )
 	struct vine_stats s;
 
 	timestamp_t now = timestamp_get();
-	if(!force && (now - q->time_last_log_stats < (ONE_SECOND*5))) {
+	if(!force && (now - q->time_last_log_stats < (ONE_SECOND*VINE_PERF_LOG_INTERVAL))) {
 		return;
 	}
 
