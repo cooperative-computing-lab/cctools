@@ -255,14 +255,14 @@ will attempt to pack an environment of the same name from the users local conda 
 
 The poncho module allows users to create poncho packages within python itself.
 
-### createing packages with a specification
+### creating packages with a specification
 
 Poncho packages can either be created by dicitionary or string representations of a poncho specification.
 The function `dict_to_env` creates the corresponding environment and returns the path to the environment.
 The function contains various options to facilitate environment creation:
 	
 	- cache(default=True): caches the environment in the directory set by `cache_path` 
-	- cache_path(default=None): Path to cache and retrieve generated environments.
+	- cache_path(default='.poncho_cache'): Path to cache and retrieve generated environments.
 	- force(default=False): forces poncho_package_create to recreate the environment.
 
 If no cache path is specified, cached environments will be stored in the directory `.poncho_cache`.
