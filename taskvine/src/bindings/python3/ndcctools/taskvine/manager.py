@@ -1898,26 +1898,42 @@ class Factory(object):
 class Executor(Executor):
     def __init__(self, port=9123, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull):
         self._manager = Manager(port=port)
-        #self._factory = Factory(batch_type="local", manager=self._manager, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull)
-        #self._factory.__setattr__('min-workers', 5)
-        #self._factory.start()
+        if manager_name:
+            self._manager.set_name(manager_name)
+        self._factory = Factory(batch_type=batch_type, manager=manager, manager_host_port=manager_host_port, manager_name=manager_name, 
+                factory_binary=factory_binary, worker_binary=worker_binary, log_file=os.devnull)
+        self.set('min-workers', 5)
+        self._factory.start()
 
     def submit(self, fn, /, *args, **kwargs):
+        if isinstance(fn, FutureTask):
+            self._manager.submit(fn)
+            return fn._future
         future_task = FutureTask(self._manager, False, fn, *args, **kwargs)
         self._manager.submit(future_task)
         return future_task._future
 
+    def task(fn, /, *args, **kwargs):
+        return FutureTask(self._manager, False, fn, *args, **kwargs)
+
     def map(self, func, *iterables, timeout=None, chunksize=1):
+        # TODO implement
         pass
 
     def shutdown(self, wait=True, *, cancel_futures=False):
-  #      self._factory.stop()
-        pass
+        # TODO IMPLEMENT ARGS PROPERLY
+        self._factory.stop()
 
     def future_function(self, fn, options):
         pass
 
     def library_function(self, fn, options):
         pass
+
+    def set(self, name, value):
+        return self._factory.__setattr__(name, value)
+
+    def get(self):
+        return self._factory.__getattr__(name)
 
 
