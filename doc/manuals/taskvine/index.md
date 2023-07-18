@@ -1468,13 +1468,13 @@ Once complete, the library task must be `installed` in the system:
     ```
 
 This causes the library task to be dispatched and started at
-available workers, where it remains running.  Immeidately after
+available workers, where it remains running.  Immediately after
 installing the library, you may submit `FunctionCall` tasks
 that invoke the library and functions by name:
 
 === "Python"
     ```python
-    t = vine.FunctionCall("my_library","my_mul",20,30);
+    t = vine.FunctionCall("my_mul","my_library",20,30);
     t.set_cores(1)
     t.set_memory(100)
     t.set_disk(100)
