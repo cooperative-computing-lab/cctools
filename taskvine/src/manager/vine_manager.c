@@ -3904,7 +3904,6 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 	t->hostname = xxstrdup(w->hostname);
 	t->addrport = xxstrdup(w->addrport);
 	t->worker = w;
-	change_task_state(q, t, VINE_TASK_READY);
 
 	// send the Library Task to the worker
 	vine_manager_send(q,w, "library %lld %lld\n",  (long long) strlen(name), (long long)t->task_id);
