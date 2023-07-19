@@ -35,10 +35,10 @@ def main():
     function_lib = q.create_library_from_functions('test-library', divide, double)
     q.install_library(function_lib)
 
-    s_task = vine.FunctionCall('divide', 'test-library', 2, 2**2)
+    s_task = vine.FunctionCall('test_library', 'divide', 2, 2**2)
     q.submit(s_task)
     
-    s_task = vine.FunctionCall('double', 'test-library', 3)
+    s_task = vine.FunctionCall('test_library', 'double', 3)
     q.submit(s_task)
 
     total_sum = 0
