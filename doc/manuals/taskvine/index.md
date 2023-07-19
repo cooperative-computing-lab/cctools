@@ -1474,7 +1474,7 @@ that invoke the library and functions by name:
 
 === "Python"
     ```python
-    t = vine.FunctionCall("my_mul","my_library",20,30);
+    t = vine.FunctionCall("my_library","my_mul",20,30);
     t.set_cores(1)
     t.set_memory(100)
     t.set_disk(100)
