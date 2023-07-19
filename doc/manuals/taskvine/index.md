@@ -1468,7 +1468,7 @@ Once complete, the library task must be `installed` in the system:
     ```
 
 This causes the library task to be dispatched and started at
-available workers, where it remains running.  Immeidately after
+available workers, where it remains running.  Immediately after
 installing the library, you may submit `FunctionCall` tasks
 that invoke the library and functions by name:
 
