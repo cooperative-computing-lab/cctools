@@ -459,7 +459,7 @@ class Task(object):
     # @endcode
     @property
     def output(self):
-        if (type(self).__name__) == 'FunctionCall':
+        if (isinstance(self, FunctionCall)):
             return json.loads(cvine.vine_task_get_stdout(self._task))['Result']
         return cvine.vine_task_get_stdout(self._task)
 
