@@ -118,7 +118,35 @@ def _pack_env_with_conda_dir(spec, output, ignore_editable_packages=False):
     except Exception as e:
         raise Exception(f"Error when packing a conda directory.\n{e}")
 
-def _pack_env_with_spec(spec, output, conda_executable=None, download_micromamba=False, ignore_editable_packages=False):
+def sort_spec(spec):
+    spec = dict(sorted(spec.items()))
+    for key in spec:
+        if isinstance(spec[key], dict):
+            spec[key] = sort_spec(spec[key])
+        elif isinstance(spec[key], list):
+            spec[key].sort()
+    return spec
+def dict_to_env(spec, conda_executable=None, download_micromamba=False, ignore_editable_packages=False, cache=True, cache_path=None, force=False):
+    if not isinstance(spec, dict):
+        spec = json.loads(spec)
+    spec = sort_spec(spec)
+    md5 = hashlib.md5()
+    md5.update(str(spec).encode('utf-8'))
+    output = "env-md5-" + md5.hexdigest() + ".tar.gz"
+    if not cache_path:
+        cache_path = '.poncho_cache'
+    if not force and os.path.isfile(f'{cache_path}/{output}'):
+        logger.info('Matching env found in cache...') 
+        return f'{cache_path}/{output}'
+    pack_env_from_dict(spec, output, conda_executable, download_micromamba, ignore_editable_packages)
+    if cache:
+        logger.info(f'copying env into cache at {cache_path}/{output}...') 
+        if not os.path.exists(cache_path):
+            os.makedirs(cache_path)
+        shutil.copy(output,f'{cache_path}/{output}')
+    return output
+
+def pack_env_from_dict(spec, output, conda_executable=None, download_micromamba=False, ignore_editable_packages=False):
     # record packages installed as editable from pip
     local_pip_pkgs = _find_local_pip()
 
@@ -173,7 +201,9 @@ def pack_env(spec, output, conda_executable=None, download_micromamba=False, ign
 
     # else if spec is a file or from stdin
     elif os.path.isfile(spec) or spec == '-':
-        _pack_env_with_spec(spec, output, conda_executable, download_micromamba, ignore_editable_packages)
+        f = open(spec, 'r')
+        poncho_spec = json.load(f)
+        pack_env_from_dict(poncho_spec, output, conda_executable, download_micromamba, ignore_editable_packages)
 
     # else pack from a conda environment name
     # this thus assumes conda executable is in the current shell executable path
@@ -226,9 +256,7 @@ def _find_local_pip():
     return path_of
 
 
-def git_data(spec, out_dir):
-    f = open(spec, 'r')
-    data = json.load(f)
+def git_data(data, out_dir):
 
     if 'git' in data:
         for git_dir in data['git']:
@@ -269,9 +297,7 @@ def _install_local_pip(env_dir, pip_name, pip_path):
         _run_conda_command(env_dir, False, 'run', 'pip', 'install', pip_path)
 
 
-def http_data(spec, out_dir):
-    f = open(spec, 'r')
-    data = json.load(f)
+def http_data(data, out_dir):
 
     if 'http' in data:
         for filename in data['http']:
@@ -318,9 +344,7 @@ def http_data(spec, out_dir):
                     f.write(gd)
 
 
-def create_conda_spec(spec_file, out_dir, local_pip_pkgs):
-    f = open(spec_file, 'r')
-    poncho_spec = json.load(f)
+def create_conda_spec(poncho_spec, out_dir, local_pip_pkgs):
 
     conda_spec = {}
     conda_spec['channels'] = []

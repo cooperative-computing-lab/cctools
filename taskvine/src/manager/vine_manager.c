@@ -2801,7 +2801,7 @@ static int send_one_task( struct vine_manager *q )
 	timestamp_t now = timestamp_get();
 
 	while ( (t=list_rotate(q->ready_list)) ) {
-		if(tasks_considered > q->attempt_schedule_depth) {
+		if(tasks_considered++ > q->attempt_schedule_depth) {
 			return 0;
 		}
 
@@ -2821,7 +2821,6 @@ static int send_one_task( struct vine_manager *q )
 		w = vine_schedule_task_to_worker(q,t);
 
 		if(!w) {
-			tasks_considered++;
 			continue;
 		}
 
@@ -3906,7 +3905,6 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 	t->hostname = xxstrdup(w->hostname);
 	t->addrport = xxstrdup(w->addrport);
 	t->worker = w;
-	change_task_state(q, t, VINE_TASK_READY);
 
 	// send the Library Task to the worker
 	vine_manager_send(q,w, "library %lld %lld\n",  (long long) strlen(name), (long long)t->task_id);
