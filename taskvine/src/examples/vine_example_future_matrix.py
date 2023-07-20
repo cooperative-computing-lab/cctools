@@ -19,6 +19,7 @@
 
 import ndcctools.taskvine as vine
 import cloudpickle
+import poncho
 import random
 
 def generate_random_matrix(n):
@@ -60,15 +61,20 @@ def matrix_multiply(a, b):
     return result
 
 futures = []
+
 levels = 3
 count = 0
 n = 400
 matricies = [generate_random_matrix(n) for x in range(2**levels)]
-print(len(matricies))
 print('Generated Matricies...')
 
 executor = vine.Executor(manager_name='vine_matrix_example', batch_type='condor')
 executor.manager.enable_peer_transfers()
+executor.set("memory", 8000)
+executor.set("disk", 8000)
+env_spec = {"conda": {"channels": ["conda-forge"],"packages": ["python","pip","conda","conda-pack","cloudpickle", "ndcctools"]}}
+env_tarball = poncho.package_create.dict_to_env(env_spec, cache=True)
+env_file = executor.manager.declare_poncho(env_tarball, cache=True)
 
 for level in range(levels):
     print(level)
@@ -76,20 +82,25 @@ for level in range(levels):
         if level == 0:
             t = executor.task(matrix_multiply, matricies[x*2], matricies[x*2+1])
             t.set_cores(1)
+            t.add_environment(env_file)
+            # the future can be created ommiting the task specifications above like so: f = executor.submit(matrix_multiply, matricies[x*2], matricies[x*2+1])
             f = executor.submit(t)
             futures.append(f)
 
         else:
             t = executor.task(matrix_multiply, futures[count], futures[count + 1])
             t.set_cores(1)
+            t.add_environment(env_file)
             f = executor.submit(t)
             futures.append(f)
             count += 2
 
 
-print("waiting for result")
+print("waiting for result...")
 f = futures[-1]
-print(f.result())
+print("RESULT:", f.result())
+print("OUT1:", f._task.std_output)
+print("OUT2:", f._task._retrieval_task.std_output)
 
 
 

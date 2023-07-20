@@ -1028,8 +1028,6 @@ class VineFuture(Future):
     def add_done_callback(self, fn):
         self.callback_fns.append(fn)
 
-def retrieve_output(arg):
-    return arg
 
 class FutureTask(PythonTask):
     ##
@@ -1044,14 +1042,19 @@ class FutureTask(PythonTask):
         self.enable_temp_output()
         self._module_manager = manager
         self._future = VineFuture(self)
+        self._envs = []
         self._future_resolved = False
         self._ran_functions = False
         self._retrieval_future = rf
         self._retrieval_task = None
 
     def output(self, timeout="wait_forever"):
+        def retrieve_output(arg):
+            return arg
         if not self._retrieval_future and not self._retrieval_task:
             self._retrieval_task = FutureTask(self._module_manager, True, retrieve_output, self._future)
+            for env in self._envs:
+                self._retrieval_task.add_environment(env)
             self._retrieval_task.disable_temp_output()
             self._module_manager.submit(self._retrieval_task)
 
@@ -1101,6 +1104,10 @@ class FutureTask(PythonTask):
         self._fn_def = None  # avoid possible memory leak
         self._create_wrapper()
         self._add_IO_files(manager)
+
+    def add_environment(self, f):
+        self._envs.append(f)
+        return cvine.vine_task_add_environment(self._task, f._file)
 
     def _create_wrapper(self):
         with open(os.path.join(self._tmpdir, self._wrapper), "w") as f:
