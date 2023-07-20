@@ -453,11 +453,15 @@ class Task(object):
     ##
     # Get the standard output of the task. (Same as t.std_output for regular
     # taskvine tasks) Must be called only after the task completes execution.
+    # If this task is a FunctionCall task then we apply some transformations
+    # as FunctionCall returns a specifically formatted result.
     # @code
     # >>> print(t.output)
     # @endcode
     @property
     def output(self):
+        if (isinstance(self, FunctionCall)):
+            return json.loads(cvine.vine_task_get_stdout(self._task))['Result']
         return cvine.vine_task_get_stdout(self._task)
 
     ##
