@@ -72,7 +72,7 @@ executor = vine.Executor(manager_name='vine_matrix_example', batch_type='condor'
 executor.manager.enable_peer_transfers()
 executor.set("memory", 8000)
 executor.set("disk", 8000)
-env_spec = {"conda": {"channels": ["conda-forge"],"packages": ["python","pip","conda","conda-pack","cloudpickle", "ndcctools"]}}
+env_spec = {"conda": {"channels": ["conda-forge"],"packages": ["python","pip","conda","conda-pack","cloudpickle"]}}
 env_tarball = poncho.package_create.dict_to_env(env_spec, cache=True)
 env_file = executor.manager.declare_poncho(env_tarball, cache=True)
 

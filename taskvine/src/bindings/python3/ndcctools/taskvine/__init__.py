@@ -42,14 +42,16 @@
 from .manager import (
     Manager,
     Factory,
+)
+from .futures import (
     Executor,
+    FutureTask,
+    VineFuture,
 )
 from .file import File
 from .task import (
     Task,
     PythonTask,
-    FutureTask,
-    VineFuture,
     PythonTaskNoResult,
     LibraryTask,
     FunctionCall,

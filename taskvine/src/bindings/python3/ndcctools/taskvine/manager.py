@@ -24,7 +24,6 @@ from .file import File
 from .task import (
     FunctionCall,
     LibraryTask,
-    FutureTask,
     PythonTask,
     Task,
 )
@@ -33,7 +32,6 @@ from .utils import (
     get_c_constant,
 )
 
-from concurrent.futures import Executor
 import atexit
 import errno
 import itertools
@@ -1893,47 +1891,4 @@ class Factory(object):
 
     def set_environment(self, env):
         self._env_file = env
-
-
-class Executor(Executor):
-    def __init__(self, port=9123, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull):
-        self.manager = Manager(port=port)
-        if manager_name:
-            self.manager.set_name(manager_name)
-        self.factory = Factory(batch_type=batch_type, manager=manager, manager_host_port=manager_host_port, manager_name=manager_name, 
-                factory_binary=factory_binary, worker_binary=worker_binary, log_file=os.devnull)
-        self.set('min-workers', 5)
-        self.factory.start()
-
-    def submit(self, fn, *args, **kwargs):
-        if isinstance(fn, FutureTask):
-            self.manager.submit(fn)
-            return fn._future
-        future_task = FutureTask(self.manager, False, fn, *args, **kwargs)
-        self.manager.submit(future_task)
-        return future_task._future
-
-    def task(self, fn, *args, **kwargs):
-        return FutureTask(self.manager, False, fn, *args, **kwargs)
-
-    def map(self, func, *iterables, timeout=None, chunksize=1):
-        # TODO implement
-        pass
-
-    def shutdown(self, wait=True, *, cancel_futures=False):
-        # TODO IMPLEMENT ARGS PROPERLY
-        self._factory.stop()
-
-    def future_function(self, fn, options):
-        pass
-
-    def library_function(self, fn, options):
-        pass
-
-    def set(self, name, value):
-        return self.factory.__setattr__(name, value)
-
-    def get(self):
-        return self.factory.__getattr__(name)
-
 
