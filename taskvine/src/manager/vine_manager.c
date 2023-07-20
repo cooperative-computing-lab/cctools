@@ -2776,7 +2776,6 @@ static int vine_manager_check_inputs_available( struct vine_manager *q, struct v
 		struct vine_file *f = m->file;
 		if(f->type==VINE_TEMP) {
 			if(!vine_file_replica_table_exists_somewhere(q,f->cached_name) &&  f->created) {
-				/* XXX we cannot tell between temp that was never run, and one that failed! */
 				vine_manager_consider_recovery_task(q,f,f->recovery_task);
 				return 0;
 			}

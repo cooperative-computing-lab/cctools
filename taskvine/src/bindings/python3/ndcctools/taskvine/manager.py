@@ -1897,24 +1897,24 @@ class Factory(object):
 
 class Executor(Executor):
     def __init__(self, port=9123, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull):
-        self._manager = Manager(port=port)
+        self.manager = Manager(port=port)
         if manager_name:
-            self._manager.set_name(manager_name)
-        self._factory = Factory(batch_type=batch_type, manager=manager, manager_host_port=manager_host_port, manager_name=manager_name, 
+            self.manager.set_name(manager_name)
+        self.factory = Factory(batch_type=batch_type, manager=manager, manager_host_port=manager_host_port, manager_name=manager_name, 
                 factory_binary=factory_binary, worker_binary=worker_binary, log_file=os.devnull)
         self.set('min-workers', 5)
-        self._factory.start()
+        self.factory.start()
 
-    def submit(self, fn, /, *args, **kwargs):
+    def submit(self, fn, *args, **kwargs):
         if isinstance(fn, FutureTask):
-            self._manager.submit(fn)
+            self.manager.submit(fn)
             return fn._future
-        future_task = FutureTask(self._manager, False, fn, *args, **kwargs)
-        self._manager.submit(future_task)
+        future_task = FutureTask(self.manager, False, fn, *args, **kwargs)
+        self.manager.submit(future_task)
         return future_task._future
 
-    def task(fn, /, *args, **kwargs):
-        return FutureTask(self._manager, False, fn, *args, **kwargs)
+    def task(self, fn, *args, **kwargs):
+        return FutureTask(self.manager, False, fn, *args, **kwargs)
 
     def map(self, func, *iterables, timeout=None, chunksize=1):
         # TODO implement
@@ -1931,9 +1931,9 @@ class Executor(Executor):
         pass
 
     def set(self, name, value):
-        return self._factory.__setattr__(name, value)
+        return self.factory.__setattr__(name, value)
 
     def get(self):
-        return self._factory.__getattr__(name)
+        return self.factory.__getattr__(name)
 
 

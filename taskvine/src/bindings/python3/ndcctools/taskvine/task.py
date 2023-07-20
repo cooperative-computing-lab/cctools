@@ -995,25 +995,30 @@ class LibraryTask(Task):
         Task.__init__(self, fn)
         self.library_name = "library_coprocess:" + name
 
-class FutureFile():
-    def __init__(self, future):
-        self.file = str('outfile-' + str(future._task.id))
-
 class VineFuture(Future):
     def __init__(self, task):
         self._task = task
         self._callback_fns = []
-    def cacnel(self):
+    def cancel(self):
         self._task._module_manager.cancel_by_task_id(self._task.id)
     def cancelled(self):
-        self._task._module_manager.task_state(self._task.id)
-        # if cancelled return true
+        state = self._task._module_manager.task_state(self._task.id)
+        if state == cvine.VINE_TASK_CANCELED:
+            return True
+        else:
+            return False
     def running(self):
-        self._task._module_manager.task_state(self._task.id)
-        # if running return true
+        state = self._task._module_manager.task_state(self._task.id)
+        if state == cvine.VINE_TASK_RUNNING:
+            return True
+        else:
+            return False
     def done(self):
-        self._task._module_manager.task_state(self._task.id)
-        # if done return true
+        state = self._task._module_manager.task_state(self._task.id)
+        if state == cvine.VINE_TASK_DONE:
+            return True
+        else:
+            return False
     def result(self, timeout="wait_forever"):
         return self._task.output(timeout=timeout)
     def add_done_callback(self, fn):
@@ -1036,6 +1041,7 @@ class FutureTask(PythonTask):
         self._module_manager = manager
         self._future = VineFuture(self)
         self._future_resolved = False
+        self._ran_functions = False
         self._retrieval_future = rf
         self._retrieval_task = None
 
@@ -1048,6 +1054,11 @@ class FutureTask(PythonTask):
         if not self._retrieval_future:
             if not self._output_loaded:
                 self._output = self._retrieval_task._future.result(timeout=timeout)
+                self._output_loaded = True
+            if not self._ran_functions:
+                for fn in self._future._callback_fns:
+                    fn(self._output)
+                self._ran_functions = True
             return self._output
     
         else:
