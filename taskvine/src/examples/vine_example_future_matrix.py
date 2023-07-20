@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2022- The University of Notre Dame
+# Copyright (C) 2023- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
@@ -8,12 +8,12 @@
 # It performs matrix multiplications on multiple matricies
 # creating a tree of matrix multiplication operations.
 
-# FutureTasks are created by calling s.submit(func, *args, **kwargs)
+# FutureTasks are created by calling executor.submit(func, *args, **kwargs)
 # The task's result can then be retrieved by calling f.result() from 
 # the returned future. futures themselves can be passed as arguments to other 
 # future tasks. 
 
-# Future tasks can also be created by calling s.task(func, *args, **kwargs)
+# Future tasks can also be created by calling executor.task(func, *args, **kwargs)
 # Here, modifications can me made to the task such as setting resource allocations
 # and adding input and output files.
 
@@ -77,7 +77,6 @@ env_tarball = poncho.package_create.dict_to_env(env_spec, cache=True)
 env_file = executor.manager.declare_poncho(env_tarball, cache=True)
 
 for level in range(levels):
-    print(level)
     for x in range(2**(levels - level - 1)):
         if level == 0:
             t = executor.task(matrix_multiply, matricies[x*2], matricies[x*2+1])
@@ -99,8 +98,6 @@ for level in range(levels):
 print("waiting for result...")
 f = futures[-1]
 print("RESULT:", f.result())
-print("OUT1:", f._task.std_output)
-print("OUT2:", f._task._retrieval_task.std_output)
 
 
 
