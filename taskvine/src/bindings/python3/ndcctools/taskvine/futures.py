@@ -57,14 +57,17 @@ except Exception:
 # This class acts as an interface for the creation of Futures
 
 class Executor(Executor):
-    def __init__(self, port=9123, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull):
+    def __init__(self, port=9123, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull, factory=True):
         self.manager = Manager(port=port)
         if manager_name:
             self.manager.set_name(manager_name)
-        self.factory = Factory(batch_type=batch_type, manager=manager, manager_host_port=manager_host_port, manager_name=manager_name, 
-                factory_binary=factory_binary, worker_binary=worker_binary, log_file=os.devnull)
-        self.set('min-workers', 5)
-        self.factory.start()
+        if factory:
+            self.factory = Factory(batch_type=batch_type, manager=manager, manager_host_port=manager_host_port, manager_name=manager_name, 
+                    factory_binary=factory_binary, worker_binary=worker_binary, log_file=os.devnull)
+            self.set('min-workers', 5)
+            self.factory.start()
+        else: 
+            self.factory = None
 
     def submit(self, fn, *args, **kwargs):
         if isinstance(fn, FutureTask):
@@ -78,10 +81,12 @@ class Executor(Executor):
         return FutureTask(self.manager, False, fn, *args, **kwargs)
 
     def set(self, name, value):
-        return self.factory.__setattr__(name, value)
+        if self.factory:
+            return self.factory.__setattr__(name, value)
 
     def get(self):
-        return self.factory.__getattr__(name)
+        if self.factory:
+            return self.factory.__getattr__(name)
 ##
 # \class Vinefuture
 #
@@ -149,6 +154,7 @@ class FutureTask(PythonTask):
             return arg
         if not self._retrieval_future and not self._retrieval_task:
             self._retrieval_task = FutureTask(self._module_manager, True, retrieve_output, self._future)
+            self._retrieval_task.set_cores(1)
             for env in self._envs:
                 self._retrieval_task.add_environment(env)
             self._retrieval_task.disable_temp_output()

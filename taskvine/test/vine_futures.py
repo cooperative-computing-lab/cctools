@@ -23,7 +23,7 @@ def my_sum(x, y, negate=False):
 
 
 # Create Executor
-executor = vine.Executor(port=9123, manager_name='vine_matrtix_build_test')
+executor = vine.Executor(port=9123, manager_name='vine_matrtix_build_test', factory=False)
 print("listening on port {}".format(executor.manager.port))
 with open(port_file, "w") as f:
     f.write(str(executor.manager.port))
@@ -41,5 +41,6 @@ b = executor.submit(t2)
 t3 = executor.task(my_sum, a, b)
 t3.set_cores(1)
 c = executor.submit(t3)
-
+# Get result
+print("waiting for result...")
 assert c.result() == 14
