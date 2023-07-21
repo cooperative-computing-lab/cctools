@@ -713,6 +713,7 @@ renaming, or unpacking to be useful.  A mini-task should be a short-running
 activity with minimal resource consumption.
 @param m A manager object
 @param mini_task The task which produces the file
+@param name A descriptive name for the mini-task.
 @param flags Whether to never cache the output of the mini task at the workers (VINE_CACHE_NEVER,
 the default), to cache it only for the current manager (VINE_CACHE), or to
 cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be
@@ -720,7 +721,7 @@ or'ed (|) with VINE_PEER_NOSHARE if the file should not be transfered among
 workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *mini_task, vine_file_flags_t flags);
+struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *mini_task, const char *name, vine_file_flags_t flags);
 
 
 /** Create a file object by unpacking a tar archive.
@@ -1147,6 +1148,13 @@ int vine_enable_perf_log(struct vine_manager *m, const char *logfile);
 @return 1 if logfile was opened, 0 otherwise.
 */
 int vine_enable_transactions_log(struct vine_manager *m, const char *logfile);
+
+/** Add an output log that produces the taskgraph in Grapvhiz Dot format.
+@param m A manager object
+@param logfile The filename.
+@return 1 if logfile was opened, 0 otherwise.
+*/
+int vine_enable_taskgraph_log(struct vine_manager *m, const char *logfile);
 
 /** Shut down workers connected to the manager. Gives a best effort and then returns the number of workers given the shut down order.
 @param m A manager object

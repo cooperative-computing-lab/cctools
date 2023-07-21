@@ -1468,7 +1468,7 @@ Once complete, the library task must be `installed` in the system:
     ```
 
 This causes the library task to be dispatched and started at
-available workers, where it remains running.  Immeidately after
+available workers, where it remains running.  Immediately after
 installing the library, you may submit `FunctionCall` tasks
 that invoke the library and functions by name:
 
@@ -2046,10 +2046,10 @@ cores, memory and disk have modifiers `~` and `>` as follows:
     modified when more efficient values are found.
 
 
-## Logging and Plotting Facilities
+## Logging, Plotting, and Tuning
 
-A TaskVine manager produces three logs: `debug`, `performance`, and
-`transactions`. These logs are always enabled, and appear in the current
+A TaskVine manager produces several logs: `debug`, `taskgraph`, `performance`,
+and `transactions`. These logs are always enabled, and appear in the current
 working directory in the sudirectories:
 
 ```sh
@@ -2095,6 +2095,28 @@ To enable debugging at the worker, set the `-d` option:
 ```sh
 $ vine_worker -d all -o worker.debug -M myproject
 ```
+
+### Task Graph Log
+
+The complete graph of tasks and files is recorded in `taskgraph`
+using the [Graphviz](https://graphviz.org) Dot file format.  With the `dot` tool installed, you
+can visualize the task graph as follows:
+
+```sh
+dot -Tpng vine-run-info/most-recent/vine-logs/taskgraph > taskgraph.png
+```
+
+This can produce results like this:
+
+![Example Task Graph](images/taskgraph.png)
+
+Note that very large task graphs may be impractical to graph at this level of detail.
+
+!!! note
+    You may need to install Graphviz Dot separately like this:
+    ```
+    conda install -c conda-forge graphviz
+    ```
 
 ### Performance Log
 
@@ -2276,10 +2298,74 @@ of file transfer time on overall performance. For example:
 vine_plot_txn_log vine-run-info/most-recent/vine-logs/transactions
 ```
 
+### Tuning Specialized Execution Parameters
 
-## Specialized and Experimental Settings
+The behaviour of TaskVine can be tuned by the following parameters. We advise
+caution when using these parameters, as the standard behaviour may drastically
+change.
 
-### Executing Dask Workflows in Python (experimental)
+| Parameter | Description | Default Value |
+|-----------|-------------|---------------|
+| category-steady-n-tasks | Minimum number of successful tasks to use a sample for automatic resource allocation modes<br>after encountering a new resource maximum. | 25 |
+| proportional-resources | If set to 0, do not assign resources proportionally to tasks. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
+| proportional-whole-tasks | Round up resource proportions such that only an integer number of tasks could be fit in the worker. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
+| hungry-minimum          | Smallest number of waiting tasks in the manager before declaring it hungry | 10 |
+| monitor-interval        | Maximum number of seconds between resource monitor measurements. If less than 1, use default. | 5 |
+| resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
+| wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
+| max-retrievals | Sets the max number of tasks to retrievals per manager wait(). If less than 1, the manager prefers to retrievals all completed tasks before dispatching new tasks to workers. | 1 |
+| worker-retrievals | If 1, retrievals all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |
+
+
+=== "Python"
+    ```python
+    m.tune("hungry-minumum", 20)
+    ```
+
+=== "C"
+    ```
+    vine_tune(m, "hungry-minumum", 20)
+    ```
+
+## Workflow Integration
+
+### Parsl
+TaskVine can be used as a workflow execution engine for Parsl workflows.
+To install Parsl along with TaskVine, create a `conda` environment and
+install `parsl` and `ndcctools` packages:
+
+```sh
+conda install ndcctools parsl
+```
+Using Parsl with TaskVine is as easy as loading the TaskVineExecutor
+configuration and running the workflow as usual. For example,
+below is a simple Parsl application executing a function remotely.
+
+=== "Python"
+    ```python
+    import parsl
+    from parsl import python_app
+    from parsl.configs.vineex_local import config
+
+    parsl.load(config)
+
+    @python_app
+    def double(x):
+    return x*2
+
+    future = double(1)
+    assert future.result() == 2
+    ```
+Save this file as `parsl_vine_example.py`. Running 
+`python parsl_vine_example.py`
+will automatically spawn a local worker to execute the function call.
+
+For more details on how to configure Parsl+TaskVine to scale applications 
+with compute resources of 
+local clusters and various performance optimizations, please refer to 
+the [Parsl documentation](https://parsl.readthedocs.io/en/stable/userguide/configuring.html).
+
+### Dask
 
 TaskVine can be used to execute Dask workflows using a manager as Dask
 scheduler. The class `DaskVine` implements a TaskVine manager that has a
@@ -2313,37 +2399,6 @@ The `compute` call above may receive the following keyword arguments:
 | lazy_transfer | Whether to bring each result back from the workers (False, default), or keep transient results at workers (True) |
 | resources   | A dictionary to specify [maximum resources](#task-resources), e.g. `{"cores": 1, "memory": 2000"}` |
 | resources\_mode | [Automatic resource management](#automatic-resource-management) to use, e.g., "fixed", "max", or "max throughput"| 
-
-
-### Tunning Specialized Execution Parameters
-
-The behaviour of TaskVine can be tuned by the following parameters. We advise
-caution when using these parameters, as the standard behaviour may drastically
-change.
-
-| Parameter | Description | Default Value |
-|-----------|-------------|---------------|
-| category-steady-n-tasks | Minimum number of successful tasks to use a sample for automatic resource allocation modes<br>after encountering a new resource maximum. | 25 |
-| proportional-resources | If set to 0, do not assign resources proportionally to tasks. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
-| proportional-whole-tasks | Round up resource proportions such that only an integer number of tasks could be fit in the worker. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
-| hungry-minimum          | Smallest number of waiting tasks in the manager before declaring it hungry | 10 |
-| monitor-interval        | Maximum number of seconds between resource monitor measurements. If less than 1, use default. | 5 |
-| resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
-| wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
-| max-retrievals | Sets the max number of tasks to retrievals per manager wait(). If less than 1, the manager prefers to retrievals all completed tasks before dispatching new tasks to workers. | 1 |
-| worker-retrievals | If 1, retrievals all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |
-
-
-=== "Python"
-    ```python
-    m.tune("hungry-minumum", 20)
-    ```
-
-=== "C"
-    ```
-    vine_tune(m, "hungry-minumum", 20)
-    ```
-
 
 
 ### Further Information

@@ -4568,7 +4568,7 @@ static int send_one_task( struct work_queue *q )
 	timestamp_t now = timestamp_get();
 
 	while( (t = list_rotate(q->ready_list)) ) {
-		if(tasks_considered > q->attempt_schedule_depth) {
+		if(tasks_considered++ > q->attempt_schedule_depth) {
 			return 0;
 		}
 
@@ -4581,7 +4581,6 @@ static int send_one_task( struct work_queue *q )
 		w = find_best_worker(q,t);
 
 		if(!w) {
-			tasks_considered++; 
 			continue;
 		}
 

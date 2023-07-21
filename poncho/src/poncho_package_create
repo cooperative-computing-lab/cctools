@@ -2,8 +2,8 @@
 from poncho import package_create as create
 import argparse
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Create a packed environment from a spec or a conda directory.')
-    parser.add_argument('spec', help='Read in a spec file, a conda directory, or - for stdin.')
+    parser = argparse.ArgumentParser(description='Create a packed environment from a spec, a conda environment name, or a conda directory.')
+    parser.add_argument('spec', help='Read in a spec file, a conda environment name, a conda directory, or - for stdin.')
     parser.add_argument('output', help='Write output from conda-pack to the given file.')
     parser.add_argument('--conda-executable', action='store_true', help='Path to conda executable to use. Default are, in this order: mamba, $CONDA_EXE, conda')
 

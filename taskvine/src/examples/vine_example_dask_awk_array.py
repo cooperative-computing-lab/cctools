@@ -18,7 +18,7 @@ try:
     import numpy as np
 except ImportError:
     print("You need dask, awkward, and numpy installed")
-    print("(e.g. conda install -c conda-forge dask dask_awkward numpy) to run this example.")
+    print("(e.g. conda install -c conda-forge dask dask-awkward numpy) to run this example.")
 
 
 behavior: dict = {}
