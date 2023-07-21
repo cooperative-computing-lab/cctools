@@ -348,7 +348,7 @@ def create_conda_spec(poncho_spec, out_dir, local_pip_pkgs):
 
     conda_spec = {}
     conda_spec['channels'] = []
-    conda_spec['dependencies'] = set()
+    conda_spec['dependencies'] = {}
     conda_spec['name'] = 'base'
 
     # packages in the spec that are installed in the current environment with
