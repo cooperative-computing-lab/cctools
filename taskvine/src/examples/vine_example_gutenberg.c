@@ -60,9 +60,6 @@ int main(int argc, char *argv[])
 	struct vine_task *t;
 	int i,j ;
 
-	//runtime logs will be written to vine_example_gutenberg_info/%Y-%m-%dT%H:%M:%S
-	vine_set_runtime_info_path("vine_example_gutenberg_info");
-
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
 		printf("couldn't create manager: %s\n", strerror(errno));

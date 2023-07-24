@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "vine_blocklist.h"
 #include "vine_txn_log.h"
 #include "vine_perf_log.h"
+#include "vine_taskgraph_log.h"
 #include "vine_current_transfers.h"
 #include "vine_runtime_dir.h"
 #include "vine_file_replica_table.h"
@@ -2798,7 +2799,7 @@ static int send_one_task( struct vine_manager *q )
 	timestamp_t now = timestamp_get();
 
 	while ( (t=list_rotate(q->ready_list)) ) {
-		if(tasks_considered > q->attempt_schedule_depth) {
+		if(tasks_considered++ > q->attempt_schedule_depth) {
 			return 0;
 		}
 
@@ -2818,7 +2819,6 @@ static int send_one_task( struct vine_manager *q )
 		w = vine_schedule_task_to_worker(q,t);
 
 		if(!w) {
-			tasks_considered++;
 			continue;
 		}
 
@@ -3334,7 +3334,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	vine_enable_perf_log(q, "performance");
 	vine_enable_transactions_log(q, "transactions");
-
+	vine_enable_taskgraph_log(q, "taskgraph");
+	
 	vine_perf_log_write_update(q, 1);
 
 	q->time_last_wait = timestamp_get();
@@ -3577,6 +3578,11 @@ void vine_delete(struct vine_manager *q)
 		}
 	}
 
+	if(q->graph_logfile) {
+		vine_taskgraph_log_write_footer(q);
+		fclose(q->graph_logfile);
+	}
+	
 	free(q->runtime_directory);
 	free(q->stats);
 	free(q->stats_disconnected_workers);
@@ -3725,6 +3731,7 @@ static vine_task_state_t change_task_state( struct vine_manager *q, struct vine_
 		case VINE_TASK_DONE:
 		case VINE_TASK_CANCELED:
 			/* Task was cloned when entered into our own table, so delete a reference on removal. */
+			vine_taskgraph_log_write_task(q,t);
 			itable_remove(q->tasks, t->task_id); 
 			vine_task_delete(t);
 			break;
@@ -3896,7 +3903,6 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 	t->hostname = xxstrdup(w->hostname);
 	t->addrport = xxstrdup(w->addrport);
 	t->worker = w;
-	change_task_state(q, t, VINE_TASK_READY);
 
 	// send the Library Task to the worker
 	vine_manager_send(q,w, "library %lld %lld\n",  (long long) strlen(name), (long long)t->task_id);
@@ -4917,6 +4923,22 @@ int vine_enable_transactions_log(struct vine_manager *q, const char *filename)
 	}
 }
 
+int vine_enable_taskgraph_log(struct vine_manager *q, const char *filename)
+{
+	char *logpath = vine_get_runtime_path_log(q, filename);
+	q->graph_logfile = fopen(logpath, "w");
+	free(logpath);
+
+	if(q->graph_logfile) {
+		debug(D_VINE, "graph log enabled and is being written to %s\n", filename);
+		vine_taskgraph_log_write_header(q);
+		return 1;
+	} else {
+		debug(D_NOTICE | D_VINE, "couldn't open graph logfile %s: %s\n", filename, strerror(errno));
+		return 0;
+	}
+}
+
 void vine_accumulate_task(struct vine_manager *q, struct vine_task *t) {
 	const char *name   = t->category ? t->category : "default";
 	struct category *c = vine_category_lookup_or_create(q, name);
@@ -5192,6 +5214,8 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 		hash_table_insert(m->file_table, f->cached_name, f );
 	}
 
+	vine_taskgraph_log_write_file(m,f);
+	
 	return f;
 }
 
@@ -5225,9 +5249,9 @@ struct vine_file *vine_declare_empty_dir( struct vine_manager *m)
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *t, vine_file_flags_t flags)
+struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *t, const char *name, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_mini_task(t, flags);
+	struct vine_file *f = vine_file_mini_task(t, name, flags );
 	return vine_manager_declare_file(m, f);
 }
 

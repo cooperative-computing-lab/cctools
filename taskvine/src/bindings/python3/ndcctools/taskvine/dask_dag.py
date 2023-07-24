@@ -154,7 +154,9 @@ class DaskVineDag:
 
             sexpr = self._working_graph[p]
             if self.graph_keyp(sexpr):
-                rs.extend(self.set_result(key, self.get_result(sexpr)))  # case e.g, "x": "y", and we just set the value of "y"
+                rs.extend(
+                    self.set_result(p, self.get_result(sexpr))
+                )  # case e.g, "x": "y", and we just set the value of "y"
             elif self.symbolp(sexpr):
                 rs.extend(self.set_result(p, sexpr))
             else:
