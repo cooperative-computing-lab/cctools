@@ -57,7 +57,7 @@ except Exception:
 # This class acts as an interface for the creation of Futures
 
 class Executor(Executor):
-    def __init__(self, port=9123, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull, factory=True):
+    def __init__(self, port=9123, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull, factory=True, opts={}):
         self.manager = Manager(port=port)
         if manager_name:
             self.manager.set_name(manager_name)
@@ -65,6 +65,8 @@ class Executor(Executor):
             self.factory = Factory(batch_type=batch_type, manager=manager, manager_host_port=manager_host_port, manager_name=manager_name, 
                     factory_binary=factory_binary, worker_binary=worker_binary, log_file=os.devnull)
             self.set('min-workers', 5)
+            for opt in opts:
+                self.set(opt, opts[opt])
             self.factory.start()
         else: 
             self.factory = None
