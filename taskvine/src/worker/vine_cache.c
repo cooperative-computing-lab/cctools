@@ -282,7 +282,7 @@ This will be double-checked below.
 
 static int do_mini_task( struct vine_cache *c, struct vine_task *mini_task, struct link *manager, char **error_message )
 {
-	if(vine_process_execute_and_wait(mini_task,c,manager)) {
+	if(vine_process_execute_and_wait(mini_task,c,manager, 1)) {
 		*error_message = 0;
 		return 1;
 	} else {

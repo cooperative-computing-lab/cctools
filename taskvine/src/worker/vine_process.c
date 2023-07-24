@@ -55,15 +55,26 @@ extern char * workspace;
 extern struct list *library_list;
 extern struct hash_table *library_ids;
 
-static int create_sandbox_dir( struct vine_process *p )
+static int create_sandbox_dir( struct vine_process *p, int mini_task)
 {
 	p->cache_dir = string_format("%s/cache",workspace);
-  	p->sandbox = string_format("%s/t.%d", workspace,p->task->task_id);
+
+	if(!mini_task){
+  		p->sandbox = string_format("%s/t.%d", workspace,p->task->task_id);
+	} else {
+  		p->sandbox = string_format("%s/m.%d", workspace,p->task->task_id);
+	}
 
 	if(!create_dir(p->sandbox, 0777)) return 0;
 
 	char tmpdir_template[1024];
-	string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->task_id);
+
+	if(!mini_task){
+		string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->task_id);
+	} else {
+		string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-m.%d.XXXXXX", p->sandbox, p->task->task_id);
+	}
+
 	if(mkdtemp(tmpdir_template) == NULL) {
 		return 0;
 	}
@@ -81,13 +92,13 @@ Create a vine_process and all of the information necessary for invocation.
 However, do not allocate substantial resources at this point.
 */
 
-struct vine_process *vine_process_create(struct vine_task *vine_task )
+struct vine_process *vine_process_create(struct vine_task *vine_task, int mini_task)
 {
 	struct vine_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
 	p->task = vine_task;
 	p->coprocess = NULL;
-	if(!create_sandbox_dir(p)) {
+	if(!create_sandbox_dir(p, mini_task)) {
 		vine_process_delete(p);
 		return 0;
 	}
@@ -229,9 +240,9 @@ void vine_process_set_exit_status( struct vine_process *p, int status )
 Execute a task synchronously and return true on success.
 */
 
-int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *cache, struct link *manager )
+int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *cache, struct link *manager, int mini_task)
 {
-	struct vine_process *p = vine_process_create(task);
+	struct vine_process *p = vine_process_create(task, mini_task);
 
 	vine_sandbox_stagein(p,cache,manager);
 	

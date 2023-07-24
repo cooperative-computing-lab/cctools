@@ -123,6 +123,8 @@ char *vine_worker_password = 0;
 // Allow worker to use symlinks when link() fails.  Enabled by default.
 int vine_worker_symlinks_enabled = 1;
 
+int mini_task_id = 0;
+
 // Worker id. A unique id for this worker instance.
 static char *worker_id;
 
@@ -781,7 +783,7 @@ static int do_task( struct link *manager, int task_id, time_t stoptime )
 	
 	last_task_received = task->task_id;
 
-	struct vine_process *p = vine_process_create(task);
+	struct vine_process *p = vine_process_create(task, 0);
 	if(!p) return 0;
 
 	itable_insert(procs_table,task_id,p);
@@ -809,7 +811,8 @@ Accept a mini_task that is executed on demand to produce a specific file.
 
 static int do_put_mini_task( struct link *manager, time_t stoptime, const char *cache_name, int64_t size, int mode, const char *source )
 {
-	struct vine_task *mini_task = do_task_body(manager,0,stoptime);
+	mini_task_id++;
+	struct vine_task *mini_task = do_task_body(manager,mini_task_id,stoptime);
 	if(!mini_task) return 0;
 
 	/* XXX hacky hack -- the single output of the task must have the target cachename */
@@ -1335,8 +1338,8 @@ static void work_for_manager( struct link *manager )
 						p->coprocess = ready_coprocess;
 						ready_coprocess->state = VINE_COPROCESS_RUNNING;
 					}
-					int result = vine_sandbox_ensure(p,global_cache,manager);
-					if(result==-1){
+					vine_file_status_type_t result = vine_sandbox_ensure(p,global_cache,manager);
+					if(result==VINE_FILE_PROCESSING){
 						list_push_tail(procs_waiting, p);
 					} else {
 						start_process(p,manager);
