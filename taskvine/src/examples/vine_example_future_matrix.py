@@ -5,12 +5,12 @@
 # See the file COPYING for details.
 
 # This example shows usage of TaskVine's future Executor
-# It performs matrix multiplications on multiple matricies
+# It performs matrix multiplications on multiple matrices
 # creating a tree of matrix multiplication operations.
 
 # FutureTasks are created by calling executor.submit(func, *args, **kwargs)
 # The task's result can then be retrieved by calling f.result() from 
-# the returned future. futures themselves can be passed as arguments to other 
+# the returned future. Futures themselves can be passed as arguments to other 
 # future tasks. 
 
 # Future tasks can also be created by calling executor.task(func, *args, **kwargs)
@@ -22,6 +22,9 @@ import cloudpickle
 import poncho
 import random
 
+futures = []
+count = 0
+
 def generate_random_matrix(n):
     matrix = []
     for i in range(n):
@@ -31,18 +34,18 @@ def generate_random_matrix(n):
         matrix.append(row)
     return matrix
 
-def load_matricies(levels):
-    matricies = []
+def load_matrices(levels):
+    matrices = []
     for x in range(2**(levels+1)):
-        with open('matricies/matrix-{}'.format(x), 'rb') as f:
+        with open('matrices/matrix-{}'.format(x), 'rb') as f:
             matrix = cloudpickle.load(f)
-            matricies.append(matrix)
-    return matricies
+            matrices.append(matrix)
+    return matrices
 
-def write_matricies(levels, n):
+def write_matrices(levels, n):
     for x in range(2**(levels+1)):
         matrix = generateRandomMatrix(n)
-        with open('matricies/matrix-{}'.format(x), 'wb') as f:
+        with open('matrices/matrix-{}'.format(x), 'wb') as f:
             cloudpickle.dump(matrix, f)
 
 def matrix_multiply(a, b):
@@ -60,18 +63,17 @@ def matrix_multiply(a, b):
                 result[i][j] += a[i][k] * b[k][j]
     return result
 
-futures = []
-
-levels = 3
-count = 0
+levels = 5
 n = 400
-matricies = [generate_random_matrix(n) for x in range(2**levels)]
-print('Generated Matricies...')
+matrices = [generate_random_matrix(n) for x in range(2**levels)]
+print('Generated Matrices...')
 
-executor = vine.Executor(manager_name='vine_matrix_example', batch_type='condor')
+# Here we provide sprecifications for the workers
+executor_opts = {"memory": 8000, "disk":8000, "cores":4, "min-workers":5}
+executor = vine.Executor(manager_name='vine_matrix_example', batch_type='condor', opts=executor_opts)
 executor.manager.enable_peer_transfers()
-executor.set("memory", 8000)
-executor.set("disk", 8000)
+
+# Genereate an environment that can be attached to each task. The task will run inside the provided environment.
 env_spec = {"conda": {"channels": ["conda-forge"],"packages": ["python","pip","conda","conda-pack","cloudpickle"]}}
 env_tarball = poncho.package_create.dict_to_env(env_spec, cache=True)
 env_file = executor.manager.declare_poncho(env_tarball, cache=True)
@@ -79,10 +81,11 @@ env_file = executor.manager.declare_poncho(env_tarball, cache=True)
 for level in range(levels):
     for x in range(2**(levels - level - 1)):
         if level == 0:
-            t = executor.task(matrix_multiply, matricies[x*2], matricies[x*2+1])
+            t = executor.task(matrix_multiply, matrices[x*2], matrices[x*2+1])
             t.set_cores(1)
             t.add_environment(env_file)
-            # the future can be created ommiting the task specifications above like so: f = executor.submit(matrix_multiply, matricies[x*2], matricies[x*2+1])
+            # the future can be created ommiting the task specifications above like so: 
+            # f = executor.submit(matrix_multiply, matrices[x*2], matrices[x*2+1])
             f = executor.submit(t)
             futures.append(f)
 
@@ -95,8 +98,8 @@ for level in range(levels):
             count += 2
 
 
-print("waiting for result...")
 f = futures[-1]
+print("waiting for result...")
 print("RESULT:", f.result())
 
 

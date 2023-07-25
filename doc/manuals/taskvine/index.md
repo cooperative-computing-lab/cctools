@@ -1426,13 +1426,13 @@ conda run -p my-env conda-pack
 ### Futures
 
 TaskVine provides a futures executor model which is a subclass
-of pythons concurrent futures executor. A function along with its
+of Python's concurrent futures executor. A function along with its
 arguments are submitted to the executor to be executed. A future is 
 returned whose value will be resolved at some later point.
 
-To create a future, an Executor object must first be created. Calling
-tasks can then be submitted through the `submit` function. This will return 
-a Future object. The result of the task can re retrieved by calling `future.result()`
+To create a future, an Executor object must first be created. Tasks can 
+then be submitted through the `submit` function. This will return 
+a Future object. The result of the task can retrieved by calling `future.result()`
 
 === "Python"
     ```python
@@ -1446,8 +1446,8 @@ a Future object. The result of the task can re retrieved by calling `future.resu
     print(f.result())
     ```
 
-Futures themselves can be passed as arguments to other 
-tasks using the Future Executor. In this case, relevant files
+Futures can be passed as arguments to other 
+tasks using the executor. In this case, relevant files
 will be transported between workers when necessary.
 
 === "Python"
@@ -1464,7 +1464,7 @@ will be transported between workers when necessary.
     print(c.result())
     ```
 
-Users can interaface with Future tasks themselves by calling
+Users can interaface with future tasks themselves by calling
 the `task` function from the future executor. This returns a
 FutureTask which can also be submitted to the future executor.
 The benefit of doing this is allowing users to add additional input 
