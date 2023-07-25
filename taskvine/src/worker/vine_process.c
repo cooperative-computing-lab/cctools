@@ -57,23 +57,17 @@ extern struct hash_table *library_ids;
 
 static int create_sandbox_dir( struct vine_process *p, int mini_task)
 {
+	const char *type = mini_task ? "m" : "t";
+
 	p->cache_dir = string_format("%s/cache",workspace);
 
-	if(!mini_task){
-  		p->sandbox = string_format("%s/t.%d", workspace,p->task->task_id);
-	} else {
-  		p->sandbox = string_format("%s/m.%d", workspace,p->task->task_id);
-	}
+  	p->sandbox = string_format("%s/%s.%d", workspace,type,p->task->task_id);
 
 	if(!create_dir(p->sandbox, 0777)) return 0;
 
 	char tmpdir_template[1024];
 
-	if(!mini_task){
-		string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->task_id);
-	} else {
-		string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-m.%d.XXXXXX", p->sandbox, p->task->task_id);
-	}
+	string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-%s.%d.XXXXXX", p->sandbox, type, p->task->task_id);
 
 	if(mkdtemp(tmpdir_template) == NULL) {
 		return 0;

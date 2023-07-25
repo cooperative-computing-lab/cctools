@@ -55,7 +55,7 @@ struct cache_file * cache_file_create( vine_cache_type_t type, const char *sourc
 	f->actual_size = actual_size;
 	f->mode = mode;
 	f->pid = 0;
-	f->complete = 0;
+	f->complete = VINE_FILE_UNKNOWN;
 	f->mini_task = mini_task;
 	return f;
 }
@@ -165,7 +165,7 @@ int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char
 		hash_table_insert(c->table,cachename,f);
 	}
 
-	f->complete = 1;
+	f->complete = VINE_FILE_READY;
 	return 1;
 }
 
@@ -391,7 +391,7 @@ int vine_cache_wait(struct vine_cache *c)
 	struct cache_file *f;
     	char * cachename;
 	HASH_TABLE_ITERATE(c->table, cachename, f){
-		if(f->pid && !f->complete){
+		if(f->pid && f->complete==VINE_FILE_PROCESSING){
 			int result = waitpid(f->pid, &status, WNOHANG);
 			if(result==0){
 				// pid is still going
@@ -403,16 +403,16 @@ int vine_cache_wait(struct vine_cache *c)
 				if(!WIFEXITED(status)){
 					exit_code = WTERMSIG(status);
 					debug(D_VINE, "transfer process (pid %d) exited abnormally with signal %d",f->pid, exit_code);
-					f->complete = -1;
+					f->complete = VINE_FILE_FAILED;
 				} else {
 					exit_code = WEXITSTATUS(status);
 					debug(D_VINE, "transfer process for %s (pid %d) exited normally with exit code %d", cachename, f->pid, exit_code );
 					if(exit_code==1){	
 						debug(D_VINE, "transfer process for %s completed", cachename);
-						f->complete = 1;
+						f->complete = VINE_FILE_READY;
 					} else {
 						debug(D_VINE, "transfer process for %s failed", cachename);
-						f->complete = -1;
+						f->complete = VINE_FILE_FAILED;
 					}
 				}
 			}
@@ -430,7 +430,7 @@ It is a little odd that the manager link is passed as an argument here,
 but it is needed in order to send back the necessary update/invalid messages.
 */
 
-int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager )
+vine_file_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager )
 {
 	if(!strcmp(cachename,"0")) return VINE_FILE_READY;
 
@@ -439,20 +439,14 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 		debug(D_VINE,"cache: %s is unknown, perhaps it failed to transfer earlier?",cachename);
 		return VINE_FILE_FAILED;
 	}
-	if(f->complete) {
-		/* transfer process completed and failed. */
-		if(f->complete==-1){
-			return VINE_FILE_FAILED;
-		} else {
-		/* File is already present in the cache. */
-		return VINE_FILE_READY;
-		}
-	}
-	if(f->pid && !f->complete){
-		/* transfer process running. */
-		return VINE_FILE_PROCESSING;
-	}
-	
+
+	/* File is already present in the cache. */
+	if(f->complete==VINE_FILE_READY)  return VINE_FILE_READY;
+	/* transfer process completed and failed. */
+	if(f->complete==VINE_FILE_FAILED) return VINE_FILE_FAILED;
+	/* transfer process running. */
+	if(f->complete==VINE_FILE_PROCESSING) return VINE_FILE_PROCESSING;
+
 	if(f->type == VINE_CACHE_MINI_TASK){
 		if(f->mini_task->input_mounts) {
                 	struct vine_mount *m;
@@ -464,8 +458,6 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
         	}
 	}
 	
-
-
 	debug(D_VINE,"forking transfer process to create %s", cachename);
 
 	pid_t pid = fork();
@@ -476,6 +468,7 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 	}
 	if(pid > 0){
 		f->pid = pid;
+		f->complete = VINE_FILE_PROCESSING;
 		return VINE_FILE_PROCESSING;
 	}
 
@@ -519,7 +512,7 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 		int64_t nbytes, nfiles;
 		if(path_disk_size_info_get(cache_path,&nbytes,&nfiles)==0) {
 			f->actual_size = nbytes;
-			f->complete = 1;
+			f->complete = VINE_FILE_READY;
 			debug(D_VINE,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->actual_size,(long long)transfer_time);
 			vine_worker_send_cache_update(manager,cachename,f->actual_size,transfer_time,transfer_start);
 			result = 1;

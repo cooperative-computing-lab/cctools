@@ -63,22 +63,24 @@ static int ensure_input_file( struct vine_process *p, struct vine_mount *m, stru
 Ensures that each input file is present.
 */
 
-int vine_sandbox_ensure(struct vine_process *p, struct vine_cache *cache, struct link *manager)
+vine_inputs_status_type_t vine_sandbox_ensure(struct vine_process *p, struct vine_cache *cache, struct link *manager)
 {	
-	struct vine_task *t = p->task;
-	vine_file_status_type_t result = VINE_FILE_READY;
 	int processing=0;
-	
+	struct vine_task *t = p->task;
+	vine_file_status_type_t file_status = VINE_FILE_READY;
+
 	if(t->input_mounts) {
 		struct vine_mount *m;
 		LIST_ITERATE(t->input_mounts,m) {
-			result = vine_cache_ensure(cache,m->file->cached_name,manager);
-			if(result==VINE_FILE_PROCESSING) processing=1;
-			if(result==VINE_FILE_FAILED) break;
+			file_status = vine_cache_ensure(cache,m->file->cached_name,manager);
+			if(file_status == VINE_FILE_PROCESSING) processing=1;
+			if(file_status == VINE_FILE_FAILED) break;
+
 		}
 	}
-	if(processing) result = VINE_FILE_PROCESSING;
-	return result;
+	if(file_status==VINE_FILE_FAILED) return VINE_INPUTS_FAILED;
+	if(processing) return VINE_INPUTS_PROCESSING;
+	return VINE_INPUTS_READY;
 }
 
 /*
