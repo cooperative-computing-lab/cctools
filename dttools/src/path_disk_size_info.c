@@ -119,6 +119,7 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 					debug(D_DEBUG, "error reading disk usage on '%s', errno %s.\n", path, strerror(errno));
 					result = -1;
 				}
+				free(composed_path);
 				continue;
 			}
 
@@ -132,6 +133,8 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 				/* do nothing, avoiding infinite loops. */
 			}
 
+			free(composed_path);
+			
 			if((max_secs > -1) && (time(0) - start_time >= max_secs)) {
 				timeout = 1;
 				break;
