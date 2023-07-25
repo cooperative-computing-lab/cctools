@@ -105,11 +105,11 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 			if( strcmp(".", entry->d_name) == 0 || strcmp("..", entry->d_name) == 0)
 				continue;
 
-			char composed_path[PATH_MAX];
+			char* composed_path;
 			if(entry->d_name[0] == '/') {	// absolute path
-				strncpy(composed_path, entry->d_name, PATH_MAX);
+				composed_path = string_format("%s", entry->d_name);
 			} else {						// relative path
-				snprintf(composed_path, PATH_MAX, "%s/%s", tail_name, entry->d_name);
+				composed_path = string_format("%s/%s", tail_name, entry->d_name);
 			}
 
 			if(lstat(composed_path, &file_info) < 0) {
@@ -132,7 +132,7 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 				/* do nothing, avoiding infinite loops. */
 			}
 
-			if(max_secs > -1 && time(0) - start_time >= max_secs) {
+			if((max_secs > -1) && (time(0) - start_time >= max_secs)) {
 				timeout = 1;
 				break;
 			}
@@ -172,11 +172,7 @@ void path_disk_size_info_delete_state(struct path_disk_size_info *state) {
 		return;
 
 	if(state->current_dirs) {
-		char* tail_name;
-		while((tail_name = list_pop_tail(state->current_dirs))) {
-			if(tail_name)
-				free(tail_name);
-		}
+		list_clear(state->current_dirs, free);
 		list_delete(state->current_dirs);
 	}
 
