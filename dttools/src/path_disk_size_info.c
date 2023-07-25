@@ -18,11 +18,6 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 
-struct DIR_with_name {
-	DIR *dir;
-	char *name;
-};
-
 
 int path_disk_size_info_get(const char *path, int64_t *measured_size, int64_t *number_of_files) {
 
@@ -47,102 +42,112 @@ int path_disk_size_info_get(const char *path, int64_t *measured_size, int64_t *n
 }
 
 int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_disk_size_info **state) {
-	int64_t start_time = time(0);
-	int result = 0;
 
 	if(!*state) {
 		/* if state is null, there is no state, and path is the root of the measurement. */
 		*state = calloc(1, sizeof(struct path_disk_size_info));
 	}
-
 	struct path_disk_size_info *s = *state;     /* shortcut for *state, so we do not need to type (*state)->... */
 
+	int64_t start_time = time(0);
+	int result = 0;
+	
 	/* if no current_dirs, we begin a new measurement. */
 	if(!s->current_dirs) {
 		s->complete_measurement = 0;
-
-		struct DIR_with_name *here = malloc(sizeof(struct DIR_with_name));
-
-		if((here->dir = opendir(path))) {
-			here->name = xxstrdup(path);
-			s->current_dirs = list_create();
-			s->size_so_far  = 0;
-			s->count_so_far = 1;                     /* count the root directory */
-			list_push_tail(s->current_dirs, here);
-		} else {
-			debug(D_DEBUG, "error reading disk usage on directory: %s.\n", path);
-			s->size_so_far  = -1;
-			s->count_so_far = -1;
-			s->complete_measurement = 1;
-			result       = -1;
-
-			free(here);
-			goto timeout;
-		}
+		s->current_dirs 		= list_create();
+		s->size_so_far 			= 0;
+		s->count_so_far 		= 0;
+		list_push_tail(s->current_dirs, (void*) xxstrdup(path));
 	}
 
-	struct DIR_with_name *tail;
-	while((tail = list_peek_tail(s->current_dirs))) {
-		struct dirent *entry;
-		struct stat   file_info;
-		while((entry = readdir(tail->dir))) {
+	/* Start processing unseen directories.
+	 * Each loop counts the current directory and all files immediately except 
+	 * files that are directories. Directory entries are added to a list to be 
+	 * counted later.
+	 */
+	char* tail_name;
+	struct dirent *entry;
+	struct stat file_info;
+	DIR* tail_dir;
+	int timeout = 0;
+	while((tail_name = list_pop_tail(s->current_dirs))) {
+		tail_dir = opendir(tail_name);
+		if (!tail_dir) {
+			if (errno == ENOENT) {
+				/* Directory might have been removed so we ignore this. */
+			}
+			else {
+				debug(D_DEBUG, "error opening directory '%s': (errno) %s\n", tail_name, strerror(errno));
+				result = -1;
+			}
+			continue;
+		}
+
+		/* Add current dir to stats */
+		if(lstat(tail_name, &file_info) < 0) {
+			if(errno == ENOENT) {
+				/* Directory might have been removed so we ignore this. */
+			} else {
+				debug(D_DEBUG, "error reading disk usage on '%s'. errno: %s\n", path, strerror(errno));
+				result = -1;
+			}
+			closedir(tail_dir);
+			continue;
+		}
+		s->size_so_far += file_info.st_size;
+		s->count_so_far += 1;
+
+		/* Read entries of opened directory */
+		while((entry = readdir(tail_dir))) {
 			if( strcmp(".", entry->d_name) == 0 || strcmp("..", entry->d_name) == 0)
 				continue;
 
 			char composed_path[PATH_MAX];
-			if(entry->d_name[0] == '/') {
+			if(entry->d_name[0] == '/') {	// absolute path
 				strncpy(composed_path, entry->d_name, PATH_MAX);
-			} else {
-				snprintf(composed_path, PATH_MAX, "%s/%s", tail->name, entry->d_name);
+			} else {						// relative path
+				snprintf(composed_path, PATH_MAX, "%s/%s", tail_name, entry->d_name);
 			}
 
 			if(lstat(composed_path, &file_info) < 0) {
 				if(errno == ENOENT) {
 					/* our DIR structure is stale, and a file went away. We simply do nothing. */
 				} else {
-					debug(D_DEBUG, "error reading disk usage on '%s'.\n", path);
+					debug(D_DEBUG, "error reading disk usage on '%s', errno %s.\n", path, strerror(errno));
 					result = -1;
 				}
 				continue;
 			}
 
-			s->count_so_far++;
 			if(S_ISREG(file_info.st_mode)) {
 				s->size_so_far += file_info.st_size;
+				s->count_so_far++;
 			} else if(S_ISDIR(file_info.st_mode)) {
-				struct DIR_with_name *branch = malloc(sizeof(struct DIR_with_name));
-				if((branch->dir = opendir(composed_path))) {
-					/* future while we'll read from the branch */
-					branch->name = xxstrdup(composed_path);
-					list_push_head(s->current_dirs, branch);
-				} else {
-					free(branch);
-					result = -1;
-					continue;
-				}
+				/* save to process later */
+				list_push_head(s->current_dirs, xxstrdup(composed_path));
 			} else if(S_ISLNK(file_info.st_mode)) {
 				/* do nothing, avoiding infinite loops. */
 			}
 
-			if(max_secs > -1) {
-				if( time(0) - start_time >= max_secs ) {
-					goto timeout;
-				}
+			if(max_secs > -1 && time(0) - start_time >= max_secs) {
+				timeout = 1;
+				break;
 			}
 		}
-
+		
 		/* we are done reading a complete directory, and we go to the next in the queue */
-		tail = list_pop_tail(s->current_dirs);
-		closedir(tail->dir);
-		free(tail->name);
-		free(tail);
+		closedir(tail_dir);
+		free(tail_name);
+		if (timeout) {
+			break;
+		}
 	}
 
 	list_delete(s->current_dirs);
 	s->current_dirs = NULL;       /* signal that a new measurement is needed, if state structure is reused. */
 	s->complete_measurement = 1;
 
-timeout:
 	if(s->complete_measurement) {
 		/* if a complete measurement has been done, then update
 		 * for the found value */
@@ -165,15 +170,10 @@ void path_disk_size_info_delete_state(struct path_disk_size_info *state) {
 		return;
 
 	if(state->current_dirs) {
-		struct DIR_with_name *tail;
-		while((tail = list_pop_tail(state->current_dirs))) {
-			if(tail->dir)
-				closedir(tail->dir);
-
-			if(tail->name)
-				free(tail->name);
-
-			free(tail);
+		char* tail_name;
+		while((tail_name = list_pop_tail(state->current_dirs))) {
+			if(tail_name)
+				free(tail_name);
 		}
 		list_delete(state->current_dirs);
 	}
