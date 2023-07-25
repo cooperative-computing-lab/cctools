@@ -81,6 +81,7 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 				debug(D_DEBUG, "error opening directory '%s': (errno) %s\n", tail_name, strerror(errno));
 				result = -1;
 			}
+			free(tail_name);
 			continue;
 		}
 
@@ -93,6 +94,7 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 				result = -1;
 			}
 			closedir(tail_dir);
+			free(tail_name);
 			continue;
 		}
 		s->size_so_far += file_info.st_size;
