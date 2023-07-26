@@ -10,6 +10,7 @@
 # See the file COPYING for details.
 from . import cvine
 from .file import File
+from concurrent.futures import Future
 
 import copy
 import json
@@ -789,6 +790,8 @@ class PythonTask(Task):
     # @param self 	Reference to the current python task object
     def enable_temp_output(self):
         self._tmp_output_enabled = True
+    def disable_temp_output(self):
+        self._tmp_output_enabled = False
 
     ##
     # Set the cache behavior for the output of the task.
@@ -979,7 +982,6 @@ class FunctionCall(Task):
             remote_task_exec_method = "fork"
         self._event["remote_task_exec_method"] = remote_task_exec_method
 
-
 ##
 # \class LibraryTask
 #
@@ -996,3 +998,5 @@ class LibraryTask(Task):
     def __init__(self, fn, name):
         Task.__init__(self, fn)
         self.library_name = "library_coprocess:" + name
+
+

@@ -114,7 +114,7 @@ struct vine_manager {
 
 	/* Primary data structures for tracking files. */
 
-    struct hash_table *file_table;      /* Maps fileid -> struct vine_file.* */
+    	struct hash_table *file_table;      /* Maps fileid -> struct vine_file.* */
 
 	/* Primary scheduling controls. */
 

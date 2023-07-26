@@ -1891,3 +1891,4 @@ class Factory(object):
 
     def set_environment(self, env):
         self._env_file = env
+
