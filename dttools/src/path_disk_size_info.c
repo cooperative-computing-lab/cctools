@@ -145,8 +145,9 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 		}
 		/* we are done reading a complete directory, and we go to the next in the queue */
 		tail = list_pop_tail(s->current_dirs);
-		if (tail->dir)
+		if (tail->dir) {
 			closedir(tail->dir);
+		}
 		free(tail->name);
 		free(tail);
 	}
