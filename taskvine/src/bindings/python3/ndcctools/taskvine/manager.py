@@ -854,7 +854,7 @@ class Manager(object):
     # @param name            Name of the Library to be created
     # @param function_list   List of all functions to be included in the library
     # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
-    def create_library_from_functions(self, name, *function_list):
+    def create_library_from_functions(self, name, *function_list, poncho_env=None):
         # ensure poncho python library is available
         if not poncho_available:
             raise ModuleNotFoundError("The poncho module is not available. Cannot create Library.")
@@ -865,7 +865,10 @@ class Manager(object):
         # create path for caching library code and environment based on function hash
         library_cache_path = f"{self.cache_directory}/vine-library-cache/{functions_hash}"
         library_code_path = f"{library_cache_path}/library_code.py"
-        library_env_path = f"{library_cache_path}/library_env.tar.gz"
+        if poncho_env:
+            library_env_path = poncho_env
+        else:
+            library_env_path = f"{library_cache_path}/library_env.tar.gz"
 
         # library cache folder doesn't exist, create it
         pathlib.Path(library_cache_path).mkdir(mode=0o755, parents=True, exist_ok=True)
