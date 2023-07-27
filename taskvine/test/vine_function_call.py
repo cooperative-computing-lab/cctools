@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import ndcctools.taskvine as vine
 import json
-import argparse
+import sys
 
 def divide(dividend, divisor):
     import math
@@ -11,26 +11,16 @@ def double(x):
     return x*2
 
 def main():
-    parser = argparse.ArgumentParser(
-        prog="vine_example_function_call.py",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
+    q = vine.Manager([9123, 9130])
 
-    parser.add_argument(
-        "--disable-peer-transfers",
-        action="store_true",
-        help="disable transfers among workers.",
-        default=False,
-    )
-
-    q = vine.Manager(9123)
-
-    args = parser.parse_args()
-
-    if args.disable_peer_transfers:
-        q.disable_peer_transfers()
-    else:
-        q.enable_peer_transfers()
+    port_file = None
+    try:
+        port_file = sys.argv[1]
+    except IndexError:
+        sys.stderr.write("Usage: {} PORTFILE\n".format(sys.argv[0]))
+        raise
+    with open(port_file, 'w') as f:
+        f.write(str(q.port))
 
     function_lib = q.create_library_from_functions('test-library', divide, double)
     q.install_library(function_lib)
@@ -46,7 +36,7 @@ def main():
     while not q.empty():
         t = q.wait(5)
         if t:
-            x = t.output 
+            x = t.output
         total_sum += x
     assert total_sum == divide(2, 2**2) + double(3)
 
