@@ -937,11 +937,11 @@ class FunctionCall(Task):
     # Create a new FunctionCall specification.
     #
     # @param self       Reference to the current FunctionCall object.
-    # @param fn         The name of the function to be executed on the coprocess
     # @param coprocess  The name of the coprocess which has the function you wish to execute. The coprocess should have a name() method that returns this
+    # @param fn         The name of the function to be executed on the coprocess
     # @param args       positional arguments used in function to be executed by task. Can be mixed with kwargs
     # @param kwargs	    keyword arguments used in function to be executed by task.
-    def __init__(self, fn, coprocess, *args, **kwargs):
+    def __init__(self, coprocess, fn, *args, **kwargs):
         Task.__init__(self, fn)
         self._event = {}
         self._event["fn_kwargs"] = kwargs
