@@ -499,7 +499,7 @@ static int start_process( struct vine_process *p, struct link *manager )
 
 	struct vine_task *t = p->task;
 
-	if(!vine_sandbox_stagein(p,global_cache,manager)) {
+	if(!vine_sandbox_stagein(p,global_cache)) {
 		p->execution_start = p->execution_end = timestamp_get();
 		p->result = VINE_RESULT_INPUT_MISSING;
 		p->exit_code = 1;
@@ -1293,7 +1293,7 @@ static void work_for_manager( struct link *manager )
 		expire_procs_running();
 
 		ok &= handle_completed_tasks(manager);
-		ok &= vine_cache_wait(global_cache);
+		ok &= vine_cache_wait(global_cache, manager);
 
 		measure_worker_resources();
 
@@ -1338,8 +1338,8 @@ static void work_for_manager( struct link *manager )
 						p->coprocess = ready_coprocess;
 						ready_coprocess->state = VINE_COPROCESS_RUNNING;
 					}
-					vine_inputs_status_type_t result = vine_sandbox_ensure(p,global_cache,manager);
-					if(result==VINE_INPUTS_PROCESSING){
+					vine_file_status_type_t result = vine_sandbox_ensure(p,global_cache,manager);
+					if(result==VINE_FILE_STATUS_PROCESSING){
 						list_push_tail(procs_waiting, p);
 					} else {
 						start_process(p,manager);

@@ -37,16 +37,6 @@ struct vine_cache {
 	char *cache_dir;
 };
 
-struct cache_file {
-	vine_cache_type_t type;
-	pid_t pid;
-	char *source;
-	int64_t actual_size;
-	int mode;
-	int complete;
-	struct vine_task *mini_task;
-};
-
 struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t actual_size, int mode, struct vine_task *mini_task )
 {
 	struct cache_file *f = malloc(sizeof(*f));
@@ -55,8 +45,10 @@ struct cache_file * cache_file_create( vine_cache_type_t type, const char *sourc
 	f->actual_size = actual_size;
 	f->mode = mode;
 	f->pid = 0;
-	f->complete = VINE_FILE_UNKNOWN;
+	f->status = VINE_FILE_STATUS_UNKNOWN;
 	f->mini_task = mini_task;
+	f->start_time = 0;
+	f->stop_time = 0;
 	return f;
 }
 
@@ -165,7 +157,7 @@ int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char
 		hash_table_insert(c->table,cachename,f);
 	}
 
-	f->complete = VINE_FILE_READY;
+	f->status = VINE_FILE_STATUS_READY;
 	return 1;
 }
 
@@ -280,9 +272,9 @@ which should result in the desired file being placed into the cache.
 This will be double-checked below.
 */
 
-static int do_mini_task( struct vine_cache *c, struct vine_task *mini_task, struct link *manager, char **error_message )
+static int do_mini_task( struct vine_cache *c, struct vine_task *mini_task, char **error_message )
 {
-	if(vine_process_execute_and_wait(mini_task,c,manager, 1)) {
+	if(vine_process_execute_and_wait(mini_task,c,1)) {
 		*error_message = 0;
 		return 1;
 	} else {
@@ -384,14 +376,14 @@ static int do_transfer( struct vine_cache *c, const char *source_url, const char
 scan through transfer processes and mark them as completed as they finish.
 */
 
-int vine_cache_wait(struct vine_cache *c)
+int vine_cache_wait(struct vine_cache *c, struct link *manager)
 {
 	int status;
 	int exit_code;
 	struct cache_file *f;
     	char * cachename;
 	HASH_TABLE_ITERATE(c->table, cachename, f){
-		if(f->pid && f->complete==VINE_FILE_PROCESSING){
+		if(f->pid && f->status==VINE_FILE_STATUS_PROCESSING){
 			int result = waitpid(f->pid, &status, WNOHANG);
 			if(result==0){
 				// pid is still going
@@ -403,17 +395,36 @@ int vine_cache_wait(struct vine_cache *c)
 				if(!WIFEXITED(status)){
 					exit_code = WTERMSIG(status);
 					debug(D_VINE, "transfer process (pid %d) exited abnormally with signal %d",f->pid, exit_code);
-					f->complete = VINE_FILE_FAILED;
+					f->status = VINE_FILE_STATUS_FAILED;
 				} else {
 					exit_code = WEXITSTATUS(status);
 					debug(D_VINE, "transfer process for %s (pid %d) exited normally with exit code %d", cachename, f->pid, exit_code );
 					if(exit_code==1){	
 						debug(D_VINE, "transfer process for %s completed", cachename);
-						f->complete = VINE_FILE_READY;
+						f->status = VINE_FILE_STATUS_READY;
 					} else {
 						debug(D_VINE, "transfer process for %s failed", cachename);
-						f->complete = VINE_FILE_FAILED;
+						f->status = VINE_FILE_STATUS_FAILED;
 					}
+				}
+				if(f->status==VINE_FILE_STATUS_READY){
+					int64_t nbytes, nfiles;
+					char *cache_path = vine_cache_full_path(c,cachename);
+					f->stop_time = timestamp_get();
+					timestamp_t transfer_time = f->stop_time - f->start_time;
+					chmod(cache_path,f->mode);
+					if(path_disk_size_info_get(cache_path,&nbytes,&nfiles)==0) {
+						f->actual_size = nbytes;
+						debug(D_VINE,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->actual_size,(long long)transfer_time);
+						vine_worker_send_cache_update(manager,cachename,f->actual_size,transfer_time,f->start_time);
+						f->status = VINE_FILE_STATUS_READY;
+					} else {
+						debug(D_VINE,"cache: command succeeded but did not create %s",cachename);
+						f->status = VINE_FILE_STATUS_FAILED;
+					}
+
+				} else {
+					debug(D_VINE,"cache: unable to create %s",cachename);
 				}
 			}
 		}	
@@ -430,114 +441,75 @@ It is a little odd that the manager link is passed as an argument here,
 but it is needed in order to send back the necessary update/invalid messages.
 */
 
-vine_file_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager )
+vine_file_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cachename)
 {
-	if(!strcmp(cachename,"0")) return VINE_FILE_READY;
+	if(!strcmp(cachename,"0")) return VINE_FILE_STATUS_READY;
 
 	struct cache_file *f = hash_table_lookup(c->table,cachename);
 	if(!f) {
 		debug(D_VINE,"cache: %s is unknown, perhaps it failed to transfer earlier?",cachename);
-		return VINE_FILE_FAILED;
+		return VINE_FILE_STATUS_FAILED;
 	}
 
 	/* File is already present in the cache. */
-	if(f->complete==VINE_FILE_READY)  return VINE_FILE_READY;
+	if(f->status==VINE_FILE_STATUS_READY)  return VINE_FILE_STATUS_READY;
 	/* transfer process completed and failed. */
-	if(f->complete==VINE_FILE_FAILED) return VINE_FILE_FAILED;
+	if(f->status==VINE_FILE_STATUS_FAILED) return VINE_FILE_STATUS_FAILED;
 	/* transfer process running. */
-	if(f->complete==VINE_FILE_PROCESSING) return VINE_FILE_PROCESSING;
+	if(f->status==VINE_FILE_STATUS_PROCESSING) return VINE_FILE_STATUS_PROCESSING;
 
 	if(f->type == VINE_CACHE_MINI_TASK){
 		if(f->mini_task->input_mounts) {
                 	struct vine_mount *m;
 			vine_file_status_type_t result;
                 	LIST_ITERATE(f->mini_task->input_mounts,m) {
-                        	result = vine_cache_ensure(c,m->file->cached_name,manager);
-                        	if(result!=VINE_FILE_READY) return result;
+                        	result = vine_cache_ensure(c,m->file->cached_name);
+                        	if(result!=VINE_FILE_STATUS_READY) return result;
                 	}
         	}
 	}
 	
+	f->start_time = timestamp_get();
+
 	debug(D_VINE,"forking transfer process to create %s", cachename);
 
 	pid_t pid = fork();
 
 	if(pid == -1) {
 		debug(D_VINE,"failed to fork transfer process");
-		return VINE_FILE_FAILED;
+		return VINE_FILE_STATUS_FAILED;
 	}
 	if(pid > 0){
 		f->pid = pid;
-		f->complete = VINE_FILE_PROCESSING;
-		return VINE_FILE_PROCESSING;
+		f->status = VINE_FILE_STATUS_PROCESSING;
+		if(f->type==VINE_CACHE_TRANSFER) debug(D_VINE,"cache: transferring %s to %s",f->source,cachename);
+		if(f->type==VINE_CACHE_MINI_TASK) debug(D_VINE,"cache: creating %s via mini task",cachename);
+		return VINE_FILE_STATUS_PROCESSING;
 	}
+
+	vine_cache_get_file(f, c, cachename);
+	exit(1);
+
+}
+
+void vine_cache_get_file(struct cache_file *f, struct vine_cache *c, const char *cachename){
 
 	char *error_message = 0;
 	char *cache_path = vine_cache_full_path(c,cachename);
 	int result = 0;
 
-	timestamp_t transfer_start = timestamp_get();
-
 	switch(f->type) {
 		case VINE_CACHE_FILE:
-			debug(D_VINE,"cache: manager already delivered %s",cachename);
 			result = 1;
 			break;
-
 		case VINE_CACHE_TRANSFER:
-			debug(D_VINE,"cache: transferring %s to %s",f->source,cachename);
 			result = do_transfer(c,f->source,cache_path,&error_message);
-		
 			break;
 
 		case VINE_CACHE_MINI_TASK:
-			debug(D_VINE,"cache: creating %s via mini task",cachename);
-			result = do_mini_task(c,f->mini_task,manager,&error_message);
+			result = do_mini_task(c,f->mini_task,&error_message);
 			break;
 	}
-
-	chmod(cache_path,f->mode);
-
-	// Set the permissions as originally indicated.
-
-	timestamp_t transfer_end = timestamp_get();
-	timestamp_t transfer_time = transfer_end - transfer_start;
-
-	/*
-	Although the prior command may have succeeded, check the actual desired
-	file in the cache to make sure that it is complete.
-	*/
-
-	if(result) {
-		int64_t nbytes, nfiles;
-		if(path_disk_size_info_get(cache_path,&nbytes,&nfiles)==0) {
-			f->actual_size = nbytes;
-			f->complete = VINE_FILE_READY;
-			debug(D_VINE,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->actual_size,(long long)transfer_time);
-			vine_worker_send_cache_update(manager,cachename,f->actual_size,transfer_time,transfer_start);
-			result = 1;
-		} else {
-			debug(D_VINE,"cache: command succeeded but did not create %s",cachename);
-			result = 0;
-		}
-	} else {
-		debug(D_VINE,"cache: unable to create %s",cachename);
-		result = 0;
-	}
-
-	/*
-	If we failed to create the cached file for any reason,
-	then destroy any partial remaining file, and inform
-	the manager that the cached object is invalid.
-	This task will fail in the sandbox setup stage.
-	*/
-
-	if(!result) {
-		if(!error_message) error_message = strdup("unknown");
-		vine_worker_send_cache_invalid(manager,cachename,error_message);
-		vine_cache_remove(c,cachename);
-	}
-
 	if(error_message) free(error_message);
 	free(cache_path);
 	exit(result);

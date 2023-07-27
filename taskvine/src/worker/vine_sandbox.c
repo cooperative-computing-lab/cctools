@@ -33,7 +33,7 @@ Ensure that a given input file/dir/object is present in the cache,
 and then link it into the sandbox at the desired location.
 */
 
-static int ensure_input_file( struct vine_process *p, struct vine_mount *m, struct vine_file *f, struct vine_cache *cache, struct link *manager )
+static int ensure_input_file( struct vine_process *p, struct vine_mount *m, struct vine_file *f, struct vine_cache *cache)
 {
 	char *cache_path = vine_cache_full_path(cache,f->cached_name);
 	char *sandbox_path = vine_sandbox_full_path(p,m->remote_name);
@@ -45,7 +45,7 @@ static int ensure_input_file( struct vine_process *p, struct vine_mount *m, stru
 		result = create_dir(sandbox_path, 0700);
 		if(!result) debug(D_VINE,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
 
-	} else if(vine_cache_ensure(cache,f->cached_name,manager)==VINE_FILE_READY) {
+	} else if(vine_cache_ensure(cache,f->cached_name)==VINE_FILE_STATUS_READY) {
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_path,0777);
 		debug(D_VINE,"input: link %s -> %s",cache_path,sandbox_path);
@@ -63,24 +63,24 @@ static int ensure_input_file( struct vine_process *p, struct vine_mount *m, stru
 Ensures that each input file is present.
 */
 
-vine_inputs_status_type_t vine_sandbox_ensure(struct vine_process *p, struct vine_cache *cache, struct link *manager)
+vine_file_status_type_t vine_sandbox_ensure(struct vine_process *p, struct vine_cache *cache, struct link *manager)
 {	
 	int processing=0;
 	struct vine_task *t = p->task;
-	vine_file_status_type_t file_status = VINE_FILE_READY;
+	vine_file_status_type_t file_status = VINE_FILE_STATUS_READY;
 
 	if(t->input_mounts) {
 		struct vine_mount *m;
 		LIST_ITERATE(t->input_mounts,m) {
-			file_status = vine_cache_ensure(cache,m->file->cached_name,manager);
-			if(file_status == VINE_FILE_PROCESSING) processing=1;
-			if(file_status == VINE_FILE_FAILED) break;
+			file_status = vine_cache_ensure(cache,m->file->cached_name);
+			if(file_status == VINE_FILE_STATUS_PROCESSING) processing=1;
+			if(file_status == VINE_FILE_STATUS_FAILED) break;
 
 		}
 	}
-	if(file_status==VINE_FILE_FAILED) return VINE_INPUTS_FAILED;
-	if(processing) return VINE_INPUTS_PROCESSING;
-	return VINE_INPUTS_READY;
+	if(file_status==VINE_FILE_STATUS_FAILED) return VINE_FILE_STATUS_FAILED;
+	if(processing) return VINE_FILE_STATUS_PROCESSING;
+	return VINE_FILE_STATUS_READY;
 }
 
 /*
@@ -88,7 +88,7 @@ For each input file specified by the process,
 transfer it into the sandbox directory.
 */
 
-int vine_sandbox_stagein( struct vine_process *p, struct vine_cache *cache, struct link *manager )
+int vine_sandbox_stagein( struct vine_process *p, struct vine_cache *cache)
 {
 	struct vine_task *t = p->task;
 	int result=1;
@@ -96,7 +96,7 @@ int vine_sandbox_stagein( struct vine_process *p, struct vine_cache *cache, stru
 	if(t->input_mounts) {
 		struct vine_mount *m;
 		LIST_ITERATE(t->input_mounts,m) {
-			result = ensure_input_file(p,m,m->file,cache,manager);
+			result = ensure_input_file(p,m,m->file,cache);
 			if(!result) break;
 		}
 	}
@@ -136,7 +136,7 @@ static int transfer_output_file( struct vine_process *p, struct vine_mount *m, s
 		struct stat info;
 		if(stat(cache_path,&info)==0) {
 			vine_cache_addfile(cache,info.st_size,info.st_mode,f->cached_name);
-			vine_worker_send_cache_update(manager,f->cached_name,info.st_size,0,0);
+			if(manager) vine_worker_send_cache_update(manager,f->cached_name,info.st_size,0,0);
 		} else {
 			// This seems implausible given that the rename/copy succeded, but we still have to check...
 			debug(D_VINE,"output: failed to stat %s: %s",cache_path,strerror(errno));
