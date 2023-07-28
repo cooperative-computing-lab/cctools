@@ -66,6 +66,6 @@ void  vine_process_compute_disk_needed( struct vine_process *p );
 int vine_process_measure_disk(struct vine_process *p, int max_time_on_measurement);
 char *vine_process_get_library_name(struct vine_process *p);
 
-int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *cache, int mini_task );
+int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *cache, struct link *manager, int mini_task );
 
 #endif

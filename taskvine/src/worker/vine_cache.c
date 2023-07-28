@@ -274,7 +274,7 @@ This will be double-checked below.
 
 static int do_mini_task( struct vine_cache *c, struct vine_task *mini_task, char **error_message )
 {
-	if(vine_process_execute_and_wait(mini_task,c,1)) {
+	if(vine_process_execute_and_wait(mini_task,c,0,1)) {
 		*error_message = 0;
 		return 1;
 	} else {
@@ -435,10 +435,9 @@ int vine_cache_wait(struct vine_cache *c, struct link *manager)
 /*
 Ensure that a given cached entry is fully materialized in the cache,
 downloading files or executing commands as needed.  If complete, return
-true, otherwise return false.
+VINE_FILE_STATUS_READY, If downloading return VINE_FILE_STATUS_PROCESSING.
+On failure return VINE_FILE_STATUS_FAILED.
 
-It is a little odd that the manager link is passed as an argument here,
-but it is needed in order to send back the necessary update/invalid messages.
 */
 
 vine_file_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cachename)
@@ -491,6 +490,10 @@ vine_file_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cac
 	exit(1);
 
 }
+/*
+Child Process that materializes the proper file.
+
+*/
 
 void vine_cache_get_file(struct cache_file *f, struct vine_cache *c, const char *cachename){
 
