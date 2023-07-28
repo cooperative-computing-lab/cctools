@@ -12,8 +12,6 @@
 
 from . import cvine
 
-from ndcctools.poncho import package_serverize
-
 from ndcctools.resource_monitor import (
     rmsummary_delete,
     rmsummary_create,
@@ -851,6 +849,10 @@ class Manager(object):
     # @param function_list   List of all functions to be included in the library
     # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
     def create_library_from_functions(self, name, *function_list):
+
+        # Delay loading of poncho until here, to avoid bringing in conda-pack etc unless needed.
+        from ndcctools.poncho import package_serverize
+
         # positional arguments are the list of functions to include in the library
         # create a unique hash of a combination of function names and bodies
         functions_hash = package_serverize.generate_functions_hash(function_list)
@@ -893,6 +895,9 @@ class Manager(object):
     #                        to a poncho environment.
     # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
     def create_library_from_serverized_files(self, name, library_path, env=None):
+        # Delay loading of poncho until here, to avoid bringing in conda-pack etc unless needed.
+        from ndcctools.poncho import package_serverize
+
         t = LibraryTask("python ./library_code.py", name)
         if env:
             if isinstance(env, str):
