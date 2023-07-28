@@ -234,12 +234,9 @@ void vine_process_set_exit_status( struct vine_process *p, int status )
 Execute a task synchronously and return true on success.
 */
 
-int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *cache, struct link *manager, int mini_task)
+int vine_process_execute_and_wait( struct vine_process *p, struct vine_cache *cache)
 {
-	struct vine_process *p = vine_process_create(task, mini_task);
 
-	vine_sandbox_stagein(p,cache);
-	
 	pid_t pid = vine_process_execute(p);
 	if(pid>0) {
 		int result, status;
@@ -251,15 +248,6 @@ int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *ca
 	} else {
 		p->exit_code = 1;
 	}
-	
-	if(mini_task) vine_sandbox_stageout(p,cache,manager);
-	else 
-
-	/* Remove the task from the process so it is not deleted */
-	p->task = 0;
-
-	vine_process_delete(p);
-	
 	return 1;
 }
 

@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "vine_cache.h"
 #include "vine_process.h"
 #include "vine_mount.h"
+#include "vine_sandbox.h"
 
 #include "vine_transfer.h"
 #include "vine_protocol.h"
@@ -47,6 +48,7 @@ struct cache_file * cache_file_create( vine_cache_type_t type, const char *sourc
 	f->pid = 0;
 	f->status = VINE_FILE_STATUS_UNKNOWN;
 	f->mini_task = mini_task;
+	f->process = 0;
 	f->start_time = 0;
 	f->stop_time = 0;
 	return f;
@@ -272,13 +274,13 @@ which should result in the desired file being placed into the cache.
 This will be double-checked below.
 */
 
-static int do_mini_task( struct vine_cache *c, struct vine_task *mini_task, char **error_message )
+static int do_mini_task( struct vine_cache *c, struct cache_file *f, char **error_message )
 {
-	if(vine_process_execute_and_wait(mini_task,c,0,1)) {
+	if(vine_process_execute_and_wait(f->process,c)) {
 		*error_message = 0;
 		return 1;
 	} else {
-		const char *str = vine_task_get_stdout(mini_task);
+		const char *str = vine_task_get_stdout(f->mini_task);
 		if(str) {
 			*error_message = xxstrdup(str);
 		} else {
@@ -390,8 +392,18 @@ int vine_cache_wait(struct vine_cache *c, struct link *manager)
 			}
 			else if(result<0){
 				debug(D_VINE, "wait4 on pid %d returned an error: %s",(int)f->pid,strerror(errno));	
+				if(f->type==VINE_CACHE_MINI_TASK){
+					vine_sandbox_stageout(f->process, c, manager);
+					f->process->task = 0;
+					vine_process_delete(f->process);
+				}
 			}
 			else if(result>0){
+				if(f->type==VINE_CACHE_MINI_TASK){
+					vine_sandbox_stageout(f->process, c, manager);
+					f->process->task = 0;
+					vine_process_delete(f->process);
+				}
 				if(!WIFEXITED(status)){
 					exit_code = WTERMSIG(status);
 					debug(D_VINE, "transfer process (pid %d) exited abnormally with signal %d",f->pid, exit_code);
@@ -472,6 +484,12 @@ vine_file_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cac
 
 	debug(D_VINE,"forking transfer process to create %s", cachename);
 
+	struct vine_process *p;
+	if(f->type == VINE_CACHE_MINI_TASK){
+		p = vine_process_create(f->mini_task, 1);
+		vine_sandbox_stagein(p, c);
+		f->process = p;
+	}
 	pid_t pid = fork();
 
 	if(pid == -1) {
@@ -510,7 +528,7 @@ void vine_cache_get_file(struct cache_file *f, struct vine_cache *c, const char 
 			break;
 
 		case VINE_CACHE_MINI_TASK:
-			result = do_mini_task(c,f->mini_task,&error_message);
+			result = do_mini_task(c,f,&error_message);
 			break;
 	}
 	if(error_message) free(error_message);

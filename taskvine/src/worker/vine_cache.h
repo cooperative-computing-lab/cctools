@@ -46,6 +46,7 @@ struct cache_file {
         int mode;
         int status;
         struct vine_task *mini_task;
+	struct vine_process *process;
 };
 
 
