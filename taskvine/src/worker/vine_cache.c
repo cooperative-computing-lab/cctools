@@ -387,23 +387,18 @@ int vine_cache_wait(struct vine_cache *c, struct link *manager)
 	HASH_TABLE_ITERATE(c->table, cachename, f){
 		if(f->pid && f->status==VINE_FILE_STATUS_PROCESSING){
 			int result = waitpid(f->pid, &status, WNOHANG);
+			if(result !=0 && f->type==VINE_CACHE_MINI_TASK){
+				vine_sandbox_stageout(f->process, c, manager);
+				f->process->task = 0;
+				vine_process_delete(f->process);
+			}
 			if(result==0){
 				// pid is still going
 			}
 			else if(result<0){
 				debug(D_VINE, "wait4 on pid %d returned an error: %s",(int)f->pid,strerror(errno));	
-				if(f->type==VINE_CACHE_MINI_TASK){
-					vine_sandbox_stageout(f->process, c, manager);
-					f->process->task = 0;
-					vine_process_delete(f->process);
-				}
 			}
 			else if(result>0){
-				if(f->type==VINE_CACHE_MINI_TASK){
-					vine_sandbox_stageout(f->process, c, manager);
-					f->process->task = 0;
-					vine_process_delete(f->process);
-				}
 				if(!WIFEXITED(status)){
 					exit_code = WTERMSIG(status);
 					debug(D_VINE, "transfer process (pid %d) exited abnormally with signal %d",f->pid, exit_code);
