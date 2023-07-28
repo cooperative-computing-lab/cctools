@@ -15,7 +15,6 @@ PORT_FILE=vine.port
 check_needed()
 {
 	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
-	"${CCTOOLS_PYTHON_TEST_EXEC}" -c "import poncho" || return 1
 	return 0
 }
 
