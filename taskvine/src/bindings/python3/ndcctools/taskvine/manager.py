@@ -12,6 +12,8 @@
 
 from . import cvine
 
+from ndcctools.poncho import package_serverize
+
 from ndcctools.resource_monitor import (
     rmsummary_delete,
     rmsummary_create,
@@ -46,7 +48,6 @@ import tempfile
 import time
 import weakref
 
-from poncho import package_serverize
 
 ##
 # @class ndcctools.taskvine.Manager
