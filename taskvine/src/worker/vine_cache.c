@@ -38,6 +38,19 @@ struct vine_cache {
 	char *cache_dir;
 };
 
+struct cache_file {
+        vine_cache_type_t type;
+        timestamp_t start_time;
+        timestamp_t stop_time;
+        pid_t pid;
+        char *source;
+        int64_t actual_size;
+        int mode;
+        int status;
+        struct vine_task *mini_task;
+	struct vine_process *process;
+};
+
 struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t actual_size, int mode, struct vine_task *mini_task )
 {
 	struct cache_file *f = malloc(sizeof(*f));
@@ -387,11 +400,6 @@ int vine_cache_wait(struct vine_cache *c, struct link *manager)
 	HASH_TABLE_ITERATE(c->table, cachename, f){
 		if(f->pid && f->status==VINE_FILE_STATUS_PROCESSING){
 			int result = waitpid(f->pid, &status, WNOHANG);
-			if(result !=0 && f->type==VINE_CACHE_MINI_TASK){
-				vine_sandbox_stageout(f->process, c, manager);
-				f->process->task = 0;
-				vine_process_delete(f->process);
-			}
 			if(result==0){
 				// pid is still going
 			}
@@ -399,6 +407,11 @@ int vine_cache_wait(struct vine_cache *c, struct link *manager)
 				debug(D_VINE, "wait4 on pid %d returned an error: %s",(int)f->pid,strerror(errno));	
 			}
 			else if(result>0){
+				if(f->type==VINE_CACHE_MINI_TASK){
+					vine_sandbox_stageout(f->process, c, manager);
+					f->process->task = 0;
+					vine_process_delete(f->process);
+				}
 				if(!WIFEXITED(status)){
 					exit_code = WTERMSIG(status);
 					debug(D_VINE, "transfer process (pid %d) exited abnormally with signal %d",f->pid, exit_code);
@@ -526,7 +539,10 @@ void vine_cache_get_file(struct cache_file *f, struct vine_cache *c, const char 
 			result = do_mini_task(c,f,&error_message);
 			break;
 	}
-	if(error_message) free(error_message);
+	if(error_message){ 
+		debug(D_VINE,"An error occured when creating %s via mini task: %s", cachename, error_message);
+		free(error_message);
+	}
 	free(cache_path);
 	exit(result);
 }

@@ -22,6 +22,7 @@ for file transfers to occur asynchronously of the manager.
 #include "vine_file.h"
 
 struct link;
+struct cache_file;
 
 typedef enum {
 	VINE_CACHE_FILE,
@@ -36,18 +37,6 @@ typedef enum {
 	VINE_FILE_STATUS_PROCESSING,
 } vine_file_status_type_t;
 
-struct cache_file {
-        vine_cache_type_t type;
-        timestamp_t start_time;
-        timestamp_t stop_time;
-        pid_t pid;
-        char *source;
-        int64_t actual_size;
-        int mode;
-        int status;
-        struct vine_task *mini_task;
-	struct vine_process *process;
-};
 
 
 struct vine_cache * vine_cache_create( const char *cachedir );
