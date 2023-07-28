@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from poncho import package_create as create
+from ndcctools.poncho import package_create as create
 import argparse
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Create a packed environment from a spec, a conda environment name, or a conda directory.')
