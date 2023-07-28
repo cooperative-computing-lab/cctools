@@ -23,7 +23,7 @@ check_needed()
 
 	# In some limited build circumstances (e.g. macos build on github),
 	# poncho doesn't work due to lack of conda-pack
-    "${CCTOOLS_PYTHON_TEST_EXEC}" -c "import ndcctools.poncho" || return 1
+    "${CCTOOLS_PYTHON_TEST_EXEC}" -c "import conda_pack" || return 1
 
 	return 0
 }
