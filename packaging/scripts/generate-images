@@ -139,17 +139,17 @@ my %postinstall_for;
 $versions_of{centos} = [ qw{ 7 } ];
 $command_for{centos} = 'yum install -y';
 
-$versions_of{almalinux} = [ qw{ 8 9 } ];
+$versions_of{almalinux} = [ qw{ 8 } ];
 $command_for{almalinux} = 'dnf install -y';
 
-$versions_of{fedora} = [ qw{ 30  } ];
-$command_for{fedora} = 'dnf install -y';
+#$versions_of{fedora} = [ qw{ 30  } ];
+#$command_for{fedora} = 'dnf install -y';
 
-$versions_of{debian} = [ qw{ 9.9 } ];
-$command_for{debian} = 'apt-get install -y';
+#$versions_of{debian} = [ qw{ 9.9 } ];
+#$command_for{debian} = 'apt-get install -y';
 
 $versions_of{ubuntu} = [ qw{ 16.04 20.04 } ];
-$command_for{ubuntu} = $command_for{debian};
+$command_for{ubuntu} = 'apt-get install -y';
 
 # e.g., $package_for{distro}{version}{dependency} == 'package'
 my %package_for;
@@ -373,7 +373,7 @@ $postinstall_for{ubuntu}{default} = $postinstall_for{debian}{default};
 
 # finishing installation steps for all:
 my $epilogue = [
-	'python3 -m pip install cloudpickle'
+	'python3 -m pip install cloudpickle conda-pack packaging'
 ];
 
 
