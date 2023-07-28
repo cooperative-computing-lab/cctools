@@ -46,12 +46,6 @@ import tempfile
 import time
 import weakref
 
-try:
-    from poncho import package_serverize
-    poncho_available = True
-except Exception:
-    poncho_available = False
-
 
 ##
 # @class ndcctools.taskvine.Manager
@@ -855,9 +849,10 @@ class Manager(object):
     # @param function_list   List of all functions to be included in the library
     # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
     def create_library_from_functions(self, name, *function_list):
-        # ensure poncho python library is available
-        if not poncho_available:
-            raise ModuleNotFoundError("The poncho module is not available. Cannot create Library.")
+
+        # Delay loading of poncho until here, to avoid bringing in conda-pack etc unless needed.
+        from ndcctools.poncho import package_serverize
+
         # positional arguments are the list of functions to include in the library
         # create a unique hash of a combination of function names and bodies
         functions_hash = package_serverize.generate_functions_hash(function_list)
@@ -900,8 +895,9 @@ class Manager(object):
     #                        to a poncho environment.
     # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
     def create_library_from_serverized_files(self, name, library_path, env=None):
-        if not poncho_available:
-            raise ModuleNotFoundError("The poncho module is not available. Cannot create library.")
+        # Delay loading of poncho until here, to avoid bringing in conda-pack etc unless needed.
+        from ndcctools.poncho import package_serverize
+
         t = LibraryTask("python ./library_code.py", name)
         if env:
             if isinstance(env, str):

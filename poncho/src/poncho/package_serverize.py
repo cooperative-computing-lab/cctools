@@ -5,8 +5,9 @@
 # See the file COPYING for details.
 
 
-from poncho import package_analyze as analyze
-from poncho import package_create as create
+from ndcctools.poncho import package_analyze as analyze
+from ndcctools.poncho import package_create as create
+
 import argparse
 import json
 import os
