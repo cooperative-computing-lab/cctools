@@ -38,7 +38,7 @@ prepare()
 
 run()
 {
-	# send makeflow to the background, saving its exit status.
+	# send taskvine to the background, saving its exit status.
 	( ${CCTOOLS_PYTHON_TEST_EXEC} vine_function_call.py $PORT_FILE; echo $? > $STATUS_FILE) &
 
 	# wait at most 5 seconds for vine to find a port.
@@ -49,7 +49,7 @@ run()
 	# wait for vine to exit.
 	wait_for_file_creation $STATUS_FILE 5
 
-	# retrieve makeflow exit status
+	# retrieve taskvine exit status
 	status=$(cat $STATUS_FILE)
 	if [ $status -ne 0 ]
 	then
