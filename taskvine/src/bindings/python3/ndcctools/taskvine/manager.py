@@ -855,8 +855,9 @@ class Manager(object):
     # @param function_list   List of all functions to be included in the library
     # @param poncho_env      Name of an already prepared poncho environment
     # @param init_command    A string describing a shell command to execute before the library task is run
+    # @param add_env         Whether to automatically create and/or add environment to the library
     # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
-    def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None):
+    def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True):
         # ensure poncho python library is available
         if not poncho_available:
             raise ModuleNotFoundError("The poncho module is not available. Cannot create Library.")
@@ -884,7 +885,7 @@ class Manager(object):
             print("No cached Library code and environment found, regenerating...")
             # create library code and environment
             need_pack=True
-            if poncho_env:
+            if poncho_env or not add_env:
                 need_pack=False
             package_serverize.serverize_library_from_code(library_cache_path, function_list, name, need_pack=need_pack)
             # enable correct permissions for library code
@@ -892,12 +893,15 @@ class Manager(object):
 
         # create Task to execute the Library
         if init_command:
-            t = LibraryTask(f"{init_command}; python ./library_code.py", name)
+            t = LibraryTask(f"{init_command} python ./library_code.py", name)
         else:
             t = LibraryTask(f"python ./library_code.py", name)
+
         # declare the environment
-        f = self.declare_poncho(library_env_path, cache=True)
-        t.add_environment(f)
+        if add_env:
+            f = self.declare_poncho(library_env_path, cache=True)
+            t.add_environment(f)
+    
         # declare the library code as an input
         f = self.declare_file(library_code_path, cache=True)
         t.add_input(f, "library_code.py")
