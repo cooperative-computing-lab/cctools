@@ -33,7 +33,7 @@ run()
 	disk=2000
 	gpus=8
 
-	# send makeflow to the background, saving its exit status.
+	# send taskvine to the background, saving its exit status.
 	${CCTOOLS_PYTHON_TEST_EXEC} vine_alloc_test.py $PORT_FILE $cores $memory $disk $gpus; echo $? > $STATUS_FILE
 
 	# retrieve wq script exit status

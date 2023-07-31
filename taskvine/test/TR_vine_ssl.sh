@@ -59,7 +59,7 @@ run()
 	# wait for command to exit.
 	wait_for_file_creation $STATUS_FILE 15
 
-	# retrieve makeflow exit status
+	# retrieve taskvine exit status
 	status=$(cat $STATUS_FILE)
 	if [ $status -ne 0 ]
 	then
