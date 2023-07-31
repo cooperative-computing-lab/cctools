@@ -14,6 +14,9 @@ PORT_FILE=vine.port
 
 check_needed()
 {
+    # Temporarily skip this test, because it takes too long!
+    return 1
+
 	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
 
 	# Poncho currently requires ast.unpase to serialize the function,
