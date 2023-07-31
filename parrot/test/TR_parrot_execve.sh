@@ -16,6 +16,7 @@ prepare()
 {
 	chirp_start local
 	cp ${exe} ${root}/hello
+	${root}/hello > expected.txt
 
 	echo "$hostport" > config.txt
 
@@ -29,7 +30,7 @@ run()
 
 	parrot --no-chirp-catalog --timeout=5 --work-dir="/chirp/${hostport}/" ./hello > output.txt
 
-	if [ "$(cat output.txt)" == "Hello, world!" ]
+	if diff output.txt expected.txt
 	then
 		return 0
 	else

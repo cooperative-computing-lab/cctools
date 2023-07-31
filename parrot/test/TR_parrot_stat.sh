@@ -27,7 +27,7 @@ run()
 	set -e
 
 	stat --format "$FORMAT" $file $link 2>/dev/null > $expected
-	parrot_run -- stat --format "$FORMAT" $file $link > $from_parrot
+	parrot -- stat --format "$FORMAT" $file $link > $from_parrot
 	
 	diff $expected $from_parrot
 
