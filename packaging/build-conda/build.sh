@@ -27,7 +27,7 @@ conda create -y -n cctools-dev -c conda-forge --strict-channel-priority python=3
 conda activate cctools-dev
 
 # Configure and build in the normal way:
-./configure --debug --strict "$@"
+./configure --strict "$@"
 [[ -f config.mk ]] && make clean
 echo === Contents of config.mk ===
 cat config.mk
