@@ -41,8 +41,8 @@ run()
 	# send taskvine to the background, saving its exit status.
 	( ${CCTOOLS_PYTHON_TEST_EXEC} vine_function_call.py $PORT_FILE; echo $? > $STATUS_FILE) &
 
-	# wait at most 5 seconds for vine to find a port.
-	# wait_for_file_creation $PORT_FILE 5
+	# wait at most 300 seconds for vine to complete function call construction and find a port.
+	wait_for_file_creation $PORT_FILE 300
 
 	run_taskvine_worker $PORT_FILE worker.log
 
