@@ -321,15 +321,19 @@ def generate_functions_hash(functions):
     source_code = "".join([inspect.getsource(fnc) for fnc in functions]) + "".join([fnc.__name__ for fnc in functions])
     return hashlib.md5(source_code.encode("utf-8")).hexdigest()
 
-def serverize_library_from_code(path, functions, name):
+def serverize_library_from_code(path, functions, name, need_pack=True):
     tmp_library_path = f"{path}/tmp_library.py"
+
     # write out functions into a temporary python file
     with open(tmp_library_path, "w") as temp_source_file:
         temp_source_file.write("".join([inspect.getsource(fnc) for fnc in functions]))
         temp_source_file.write(f"def name():\n\treturn '{name}'")
     print("Creating Library code from input functions")
+
     # create the final library code from that temporary file
     create_library_code(tmp_library_path, [fnc.__name__ for fnc in functions], path + "/library_code.py", "taskvine")
     print("Running poncho_package_create to pack Library environment into a tarball")
-    # and pack it into an environment
-    pack_library_code(path + "/library_code.py", path + "/library_env.tar.gz")
+
+    # and pack it into an environment, if needed
+    if need_pack:
+        pack_library_code(path + "/library_code.py", path + "/library_env.tar.gz")
