@@ -13,6 +13,12 @@ def double(x):
 def main():
     q = vine.Manager([9123, 9130])
 
+    # Generate the library from a function.  This could be slow!
+    function_lib = q.create_library_from_functions('test-library', divide, double)
+    q.install_library(function_lib)
+
+    # Write the port file out after creating the function.
+    # This is the signal to the parent process that the function creation is done.
     port_file = None
     try:
         port_file = sys.argv[1]
@@ -21,9 +27,6 @@ def main():
         raise
     with open(port_file, 'w') as f:
         f.write(str(q.port))
-
-    function_lib = q.create_library_from_functions('test-library', divide, double)
-    q.install_library(function_lib)
 
     s_task = vine.FunctionCall('test-library', 'divide', 2, 2**2)
     q.submit(s_task)

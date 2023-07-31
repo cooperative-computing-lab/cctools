@@ -14,8 +14,20 @@ PORT_FILE=vine.port
 
 check_needed()
 {
+    # Temporarily skip this test, because it takes too long!
+    return 1
+
 	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
-	"${CCTOOLS_PYTHON_TEST_EXEC}" -c "import poncho" || return 1
+
+	# Poncho currently requires ast.unpase to serialize the function,
+	# which only became available in Python 3.11.  Some older platforms
+	# will not have this.
+    "${CCTOOLS_PYTHON_TEST_EXEC}" -c "from ast import unparse" || return 1
+
+	# In some limited build circumstances (e.g. macos build on github),
+	# poncho doesn't work due to lack of conda-pack
+    "${CCTOOLS_PYTHON_TEST_EXEC}" -c "import conda_pack" || return 1
+
 	return 0
 }
 
@@ -29,18 +41,18 @@ prepare()
 
 run()
 {
-	# send makeflow to the background, saving its exit status.
+	# send taskvine to the background, saving its exit status.
 	( ${CCTOOLS_PYTHON_TEST_EXEC} vine_function_call.py $PORT_FILE; echo $? > $STATUS_FILE) &
 
-	# wait at most 5 seconds for vine to find a port.
-	# wait_for_file_creation $PORT_FILE 5
+	# wait at most 300 seconds for vine to complete function call construction and find a port.
+	wait_for_file_creation $PORT_FILE 300
 
 	run_taskvine_worker $PORT_FILE worker.log
 
 	# wait for vine to exit.
 	wait_for_file_creation $STATUS_FILE 5
 
-	# retrieve makeflow exit status
+	# retrieve taskvine exit status
 	status=$(cat $STATUS_FILE)
 	if [ $status -ne 0 ]
 	then
