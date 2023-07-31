@@ -882,7 +882,6 @@ class Manager(object):
         if os.path.isfile(library_code_path) and os.path.isfile(library_env_path):
             pass
         else:
-            print("No cached Library code and environment found, regenerating...")
             # create library code and environment
             need_pack=True
             if poncho_env or not add_env:
