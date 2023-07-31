@@ -26,8 +26,12 @@ CONDA_BASE=$(conda info --base)
 conda create -y -n cctools-dev -c conda-forge --strict-channel-priority python=3 gcc_linux-64 gxx_linux-64 gdb m4 perl swig make zlib libopenssl-static openssl conda-pack cloudpickle packaging
 conda activate cctools-dev
 
-# Configure and build in the normal way:
-./configure --strict "$@"
+# Leave out some items that are research prototypes.
+DISABLED_SYS=$(echo --without-system-{parrot,prune,umbrella,weaver})
+DISABLED_LIB=$(echo --with-{readline,fuse,perl}-path\ no)
+
+# Now build and configure in the normal way.
+./configure --strict ${DISABLED_SYS} ${DISABLED_LIB} "$@"
 [[ -f config.mk ]] && make clean
 echo === Contents of config.mk ===
 cat config.mk
