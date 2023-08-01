@@ -13,8 +13,8 @@ test:
 install:
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	cp $(PROGRAMS) $(ALIASES) $(CCTOOLS_INSTALL_DIR)/bin/
-	mkdir -p $(CCTOOLS_PYTHON3_PATH)/poncho
-	cp -a poncho $(CCTOOLS_PYTHON3_PATH)/
+	mkdir -p $(CCTOOLS_PYTHON3_PATH)/ndcctools/poncho
+	cp -a poncho $(CCTOOLS_PYTHON3_PATH)/ndcctools
 
 
 .PHONY: all clean install test
