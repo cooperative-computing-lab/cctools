@@ -18,8 +18,6 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/resource.h>
 
-#define MAX_BUFFER_SIZE 4096
-
 /*
 vine_process is a running instance of a vine_task.
 This object is private to the vine_worker.
