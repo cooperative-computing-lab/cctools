@@ -27,9 +27,39 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 
+struct vine_coprocess {
+    char *command;
+    char *name;
+    int port;
+    int pid;
+    vine_coprocess_state_t state;
+    int pipe_in[2];
+    int pipe_out[2];
+    struct link *read_link;
+    struct link *write_link;
+    struct link *network_link;
+    int num_restart_attempts;
+    struct vine_resources *coprocess_resources;
+};
+
 extern struct vine_resources *total_resources;
 
 static int coprocess_max_timeout = 1000 * 60 * 5; // set max timeout to 5 minutes
+
+vine_coprocess_state_t vine_coprocess_state( struct vine_coprocess *c )
+{
+	return c->state;
+}
+
+void vine_coprocess_state_set( struct vine_coprocess *c, vine_coprocess_state_t state )
+{
+	c->state = state;
+}
+
+const char * vine_coprocess_name( struct vine_coprocess *c )
+{
+	return c->name;
+}
 
 int vine_coprocess_write_to_link(char *buffer, int len, int timeout, struct link* link)
 {

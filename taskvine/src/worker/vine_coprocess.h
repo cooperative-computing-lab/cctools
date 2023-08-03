@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 #include "list.h"
 #include "taskvine.h"
+
 typedef enum {
 	VINE_COPROCESS_UNINITIALIZED, /**< worker has not yet created coprocess instance **/
 	VINE_COPROCESS_READY,         /**< coprocess is ready to receive and run a RemoteTask **/
@@ -12,20 +13,11 @@ typedef enum {
 	VINE_COPROCESS_DEAD           /**< coprocess has died and needs to be restarted **/
 } vine_coprocess_state_t;
 
-struct vine_coprocess {
-    char *command;
-    char *name;
-    int port;
-    int pid;
-    vine_coprocess_state_t state;
-    int pipe_in[2];
-    int pipe_out[2];
-    struct link *read_link;
-    struct link *write_link;
-    struct link *network_link;
-    int num_restart_attempts;
-    struct vine_resources *coprocess_resources;
-};
+struct vine_coprocess;
+
+vine_coprocess_state_t vine_coprocess_state( struct vine_coprocess *c );
+void vine_coprocess_state_set( struct vine_coprocess *c, vine_coprocess_state_t state );
+const char * vine_coprocess_name( struct vine_coprocess *c );
 
 int vine_coprocess_start(struct vine_coprocess *coprocess, char *sandbox);
 void vine_coprocess_terminate(struct vine_coprocess *coprocess);

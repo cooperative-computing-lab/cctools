@@ -651,9 +651,8 @@ static int handle_completed_tasks(struct link *manager)
 			/* Translate the unix status into the process structure. */
 			vine_process_set_exit_status(p,status);
 
-			if (p->coprocess != NULL) {
-				p->coprocess->state = VINE_COPROCESS_READY;
-			}
+			/* If a coprocess, then put it back to ready state to start over. */
+			vine_coprocess_state_set(p->coprocess,VINE_COPROCESS_READY);
 
 			/* collect the resources associated with the process */
 			reap_process(p,manager);
@@ -863,10 +862,10 @@ static int do_kill(int task_id)
 
 	if(itable_remove(procs_running, p->pid)) {
 		if (p->coprocess) {
-			hash_table_remove(features, p->coprocess->name);
+			hash_table_remove(features, vine_coprocess_name(p->coprocess) );
 			list_remove(coprocess_list, p->coprocess);
-			list_remove(library_list, p->coprocess->name);
-			hash_table_remove(library_ids, p->coprocess->name);			
+			list_remove(library_list, vine_coprocess_name(p->coprocess));
+			hash_table_remove(library_ids, vine_coprocess_name(p->coprocess));			
 		}
 		vine_process_kill(p);
 		cores_allocated -= p->task->resources_requested->cores;
@@ -1331,7 +1330,7 @@ static void work_for_manager( struct link *manager )
 							continue;
 						}
 						p->coprocess = ready_coprocess;
-						ready_coprocess->state = VINE_COPROCESS_RUNNING;
+						vine_coprocess_state_set(p->coprocess,VINE_COPROCESS_RUNNING);
 					}
 					start_process(p,manager);
 					task_event++;
