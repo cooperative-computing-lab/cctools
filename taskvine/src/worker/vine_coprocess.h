@@ -29,4 +29,4 @@ void vine_coprocess_specify_resources(struct vine_coprocess *coprocess);
 void vine_coprocess_shutdown_all_coprocesses(struct list *coprocess_list);
 void vine_coprocess_measure_resources(struct list *coprocess_list);
 int vine_coprocess_enforce_limit(struct vine_coprocess *coprocess);
-void vine_coprocess_update_state(struct list *coprocess_list);
+
