@@ -780,7 +780,7 @@ static int do_task( struct link *manager, int task_id, time_t stoptime )
 	
 	last_task_received = task->task_id;
 
-	struct vine_process *p = vine_process_create(task);
+	struct vine_process *p = vine_process_create(VINE_PROCESS_TYPE_TASK,task);
 	if(!p) return 0;
 
 	itable_insert(procs_table,task_id,p);

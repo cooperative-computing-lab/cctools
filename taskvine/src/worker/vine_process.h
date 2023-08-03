@@ -18,12 +18,19 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/resource.h>
 
+typedef enum {
+      VINE_PROCESS_TYPE_TASK,
+      VINE_PROCESS_TYPE_MINI_TASK,
+      VINE_PROCESS_TYPE_LIBRARY,
+} vine_process_type_t;
+
 /*
 vine_process is a running instance of a vine_task.
 This object is private to the vine_worker.
 */
 
 struct vine_process {
+	vine_process_type_t type;
 	pid_t pid;
 	vine_result_t result;                // Any of VINE_RESULT_*
 	int exit_code;                 // Exit code, or signal number to task process.
@@ -54,7 +61,7 @@ struct vine_process {
 	struct vine_coprocess *coprocess;
 };
 
-struct vine_process * vine_process_create( struct vine_task *task );
+struct vine_process * vine_process_create( vine_process_type_t, struct vine_task *task );
 pid_t vine_process_execute( struct vine_process *p );
 void  vine_process_set_exit_status( struct vine_process *p, int status );
 void  vine_process_kill( struct vine_process *p );

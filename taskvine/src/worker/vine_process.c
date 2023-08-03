@@ -81,10 +81,11 @@ Create a vine_process and all of the information necessary for invocation.
 However, do not allocate substantial resources at this point.
 */
 
-struct vine_process *vine_process_create(struct vine_task *vine_task )
+struct vine_process *vine_process_create( vine_process_type_t type, struct vine_task *vine_task )
 {
 	struct vine_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
+	p->type = type;
 	p->task = vine_task;
 	p->coprocess = NULL;
 	if(!create_sandbox_dir(p)) {
@@ -231,7 +232,7 @@ Execute a task synchronously and return true on success.
 
 int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *cache, struct link *manager )
 {
-	struct vine_process *p = vine_process_create(task);
+	struct vine_process *p = vine_process_create(VINE_PROCESS_TYPE_MINI_TASK,task);
 
 	vine_sandbox_stagein(p,cache,manager);
 	
