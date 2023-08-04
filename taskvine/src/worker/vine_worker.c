@@ -54,6 +54,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "trash.h"
 #include "process.h"
+#include "change_process_title.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -1953,6 +1954,9 @@ static const struct option long_options[] = {
 
 int main(int argc, char *argv[])
 {
+	/* This must come first in main, allows us to change process titles in ps later. */
+	change_process_title_init(argv);
+	
 	int c;
 	int w;
 	struct utsname uname_data;

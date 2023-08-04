@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "process.h"
 #include "url_encode.h"
 #include "debug.h"
+#include "change_process_title.h"
 
 #include <errno.h>
 #include <unistd.h>
@@ -42,6 +43,8 @@ static void vine_transfer_handler( struct link *lnk, struct vine_cache *cache )
 	char line[VINE_LINE_MAX];
 	char filename_encoded[VINE_LINE_MAX];
 	char filename[VINE_LINE_MAX];
+
+	change_process_title("vine_worker [transfer]");
 
 	if(vine_worker_password) {
 		if(!link_auth_password(lnk,vine_worker_password,time(0)+command_timeout)) {
@@ -114,6 +117,7 @@ void vine_transfer_server_start( struct vine_cache *cache )
 	transfer_server_pid = fork();
 	if(transfer_server_pid==0) {
 		// consider closing additional resources here?
+		change_process_title("vine_worker [transfer server]");
 		vine_transfer_process(cache);
 		_exit(0);
 	} else if(transfer_server_pid>0) {

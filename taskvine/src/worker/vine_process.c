@@ -28,6 +28,7 @@ See the file COPYING for details.
 #include "full_io.h"
 #include "hash_table.h"
 #include "list.h"
+#include "change_process_title.h"
 
 #include "jx.h"
 #include "jx_parse.h"
@@ -362,6 +363,8 @@ pid_t vine_process_execute(struct vine_process *p )
 		/* In the special case of a function-call-task, just load data, communicate with the library, and exit. */
 		
 		if(p->task->needs_library) {
+			change_process_title("vine_worker [function]");
+
 			// load data from input file
 			char *input = load_input_file(p->task);
 
