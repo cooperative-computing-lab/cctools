@@ -1048,7 +1048,8 @@ static int handle_manager(struct link *manager)
 	char transfer_id[VINE_LINE_MAX];
 	int64_t length;
 	int64_t task_id = 0;
-	int mode, r, n;
+	int mode, n;
+	int r = 0;
 
 	if(recv_message(manager, line, sizeof(line), idle_stoptime )) {
 		if(sscanf(line,"task %" SCNd64, &task_id)==1) {
