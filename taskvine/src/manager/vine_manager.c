@@ -3954,6 +3954,7 @@ static void vine_manager_send_libraries_to_workers(struct vine_manager *q, time_
 
 void vine_manager_install_library( struct vine_manager *q, struct vine_task *t, const char *name ) {
 	t->task_id = -1;
+	vine_task_provides_library(t,name);
 	hash_table_insert(q->libraries, name, t);
 	t->time_when_submitted = timestamp_get();
 }

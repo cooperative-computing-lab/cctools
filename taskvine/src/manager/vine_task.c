@@ -163,7 +163,7 @@ struct vine_task *vine_task_copy( const struct vine_task *task )
 	
 	/* Static features of task are copied. */
 	if(task->needs_library) vine_task_needs_library(new,task->needs_library);
-	if(task->provides_library) vine_task_needs_library(new,task->provides_library);
+	if(task->provides_library) vine_task_provides_library(new,task->provides_library);
 	if(task->tag) vine_task_set_tag(new, task->tag);
 	if(task->category) vine_task_set_category(new, task->category);
 

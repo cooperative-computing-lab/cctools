@@ -55,7 +55,8 @@ class Task(object):
         self._finalizer = weakref.finalize(self, self._free)
 
         attributes = [
-            "coprocess", "scheduler", "tag", "category",
+            "needs_library", "provides_library",
+            "scheduler", "tag", "category",
             "snapshot_file", "retries", "cores", "memory",
             "disk", "gpus", "priority", "time_end",
             "time_start", "time_max", "time_min", "monitor_output"
@@ -181,6 +182,7 @@ class Task(object):
     # @param self Reference to the current task object.
     # @param library_name The name of the library
     def needs_library(self, library_name):
+        self.needs_library = library_name
         return cvine.vine_task_needs_library(self._task, library_name)
     
     ##
@@ -190,6 +192,7 @@ class Task(object):
     # @param self Reference to the current task object.
     # @param library_name The name of the library.
     def provides_library(self, library_name):
+        self.provides_library = library_name
         return cvine.vine_task_provides_library(self._task, library_name)
     
     ##

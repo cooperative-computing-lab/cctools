@@ -828,8 +828,8 @@ class Manager(object):
     def install_library(self, task):
         if not isinstance(task, LibraryTask):
             raise TypeError("Please provide a LibraryTask as the task argument")
-        self._library_table[task.library_name] = task
-        cvine.vine_manager_install_library(self._taskvine, task._task, task.library_name)
+        self._library_table[task.provides_library] = task
+        cvine.vine_manager_install_library(self._taskvine, task._task, task.provides_library)
 
     ##
     # Remove a library from all connected workers
