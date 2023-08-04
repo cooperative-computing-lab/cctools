@@ -52,8 +52,9 @@ Create temporary directories inside as well.
 
 extern char * workspace;
 
+/* XXX These structures should be passed as params rather than externed. */
 extern struct list *library_list;
-extern struct hash_table *library_ids;
+extern struct hash_table *library_task_ids;
 
 static int create_sandbox_dir( struct vine_process *p )
 {
@@ -428,9 +429,9 @@ int vine_process_measure_disk(struct vine_process *p, int max_time_on_measuremen
 
 char * vine_process_get_library_name( struct vine_process *p) {
 	char *library_name;
-	int library_id;
-	HASH_TABLE_ITERATE(library_ids,library_name,library_id) {
-		if (library_id == p->task->task_id) {
+	int *library_task_id;
+	HASH_TABLE_ITERATE(library_task_ids,library_name,library_task_id) {
+		if (*library_task_id == p->task->task_id) {
 			return library_name;
 		}
 	}
