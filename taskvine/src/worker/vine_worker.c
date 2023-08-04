@@ -14,7 +14,6 @@ See the file COPYING for details.
 #include "vine_file.h"
 #include "vine_mount.h"
 #include "vine_cache.h"
-#include "vine_coprocess.h"
 #include "vine_sandbox.h"
 #include "vine_transfer.h"
 #include "vine_transfer_server.h"
@@ -212,12 +211,7 @@ static int released_by_manager = 0;
 
 static char *catalog_hosts = NULL;
 
-struct list *coprocess_list = NULL;
-
 static char *factory_name = NULL;
-
-struct list *library_list = NULL;
-struct hash_table *library_ids = NULL;
 
 struct vine_cache *global_cache = 0;
 
@@ -335,10 +329,6 @@ static void measure_worker_resources()
 	memcpy(total_resources, r, sizeof(struct vine_resources));
 
 	vine_gpus_init(r->gpus.total);
-
-	if (list_size(coprocess_list) != 0) {
-		vine_coprocess_measure_resources(coprocess_list);
-	}
 
 	last_resources_measurement = time(0);
 }
@@ -497,6 +487,7 @@ static int start_process( struct vine_process *p, struct link *manager )
 
 	struct vine_task *t = p->task;
 
+	/* Create the sandbox environment for the task. */
 	if(!vine_sandbox_stagein(p,global_cache,manager)) {
 		p->execution_start = p->execution_end = timestamp_get();
 		p->result = VINE_RESULT_INPUT_MISSING;
@@ -504,35 +495,26 @@ static int start_process( struct vine_process *p, struct link *manager )
 		itable_insert(procs_complete,p->task->task_id,p);
 		return 0;
 	}
+	
+	/* Mark the resources claimed by this task as in use. */
 	cores_allocated += t->resources_requested->cores;
 	memory_allocated += t->resources_requested->memory;
 	disk_allocated += t->resources_requested->disk;
 	gpus_allocated += t->resources_requested->gpus;
-
-
 	if(t->resources_requested->gpus>0) {
 		vine_gpus_allocate(t->resources_requested->gpus,t->task_id);
 	}
 
+	/* Now start the actual process. */		
 	pid = vine_process_execute(p);
 	if(pid<0) fatal("unable to fork process for task_id %d!",p->task->task_id);
-	if (p->coprocess) {
-		char *library_name = NULL;
-		int library_id = -1, iterate_id;
 
-		HASH_TABLE_ITERATE(library_ids,library_name,iterate_id) {
-			if (iterate_id == p->task->task_id){
-				library_id = iterate_id;
-				break;
-			}
-		}
-		if (library_id > 0) {
-			list_push_tail(coprocess_list, p->coprocess);
-			hash_table_insert(features, library_name, (void **) 1);
-			send_features(manager);
-			send_message(manager, "info library-update %d %d\n", p->task->task_id, VINE_LIBRARY_STARTED);
-			send_resource_update(manager);
-		}
+	/* If this process represents a library, notify the manager of that feature. */
+	if (p->task->provides_library) {
+		hash_table_insert(features, p->task->provides_library, (void **) 1);
+		send_features(manager);
+		send_message(manager, "info library-update %d %d\n", p->task->task_id, VINE_LIBRARY_STARTED);
+		send_resource_update(manager);
 	}
 
 	itable_insert(procs_running,p->pid,p);
@@ -651,9 +633,6 @@ static int handle_completed_tasks(struct link *manager)
 			/* Translate the unix status into the process structure. */
 			vine_process_set_exit_status(p,status);
 
-			/* If a coprocess, then put it back to ready state to start over. */
-			vine_coprocess_state_set(p->coprocess,VINE_COPROCESS_READY);
-
 			/* collect the resources associated with the process */
 			reap_process(p,manager);
 
@@ -701,6 +680,7 @@ static struct vine_task * do_task_body( struct link *manager, int task_id, time_
 	char localname[VINE_LINE_MAX];
 	char taskname[VINE_LINE_MAX];
 	char taskname_encoded[VINE_LINE_MAX];
+	char library_name[VINE_LINE_MAX];
 	char category[VINE_LINE_MAX];
 	int flags, length;
 	int64_t n;
@@ -722,13 +702,10 @@ static struct vine_task * do_task_body( struct link *manager, int task_id, time_
 			vine_task_set_command(task,cmd);
 			debug(D_VINE,"rx: %s",cmd);
 			free(cmd);
-		} else if(sscanf(line,"coprocess %d",&length)==1) {
-			char *cmd = malloc(length+1);
-			link_read(manager,cmd,length,stoptime);
-			cmd[length] = 0;
-			vine_task_set_coprocess(task,cmd);
-			debug(D_VINE,"rx: %s",cmd);
-			free(cmd);
+		} else if(sscanf(line,"needs_library %s",library_name)==1) {
+			vine_task_needs_library(task,library_name);
+		} else if(sscanf(line,"provides_library %s",library_name)==1) {
+			vine_task_provides_library(task,library_name);
 		} else if(sscanf(line,"infile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			vine_hack_do_not_compute_cached_name = 1;
@@ -861,18 +838,16 @@ static int do_kill(int task_id)
 	}
 
 	if(itable_remove(procs_running, p->pid)) {
-		if (p->coprocess) {
-			hash_table_remove(features, vine_coprocess_name(p->coprocess) );
-			list_remove(coprocess_list, p->coprocess);
-			list_remove(library_list, vine_coprocess_name(p->coprocess));
-			hash_table_remove(library_ids, vine_coprocess_name(p->coprocess));			
-		}
 		vine_process_kill(p);
 		cores_allocated -= p->task->resources_requested->cores;
 		memory_allocated -= p->task->resources_requested->memory;
 		disk_allocated -= p->task->resources_requested->disk;
 		gpus_allocated -= p->task->resources_requested->gpus;
 		vine_gpus_free(task_id);
+		if (p->task->provides_library) {
+			hash_table_remove(features,p->task->provides_library);
+			/* XXX how to tell the manager that feature is gone? */
+		}
 	}
 
 	itable_remove(procs_complete, p->task->task_id);
@@ -961,7 +936,7 @@ static int enforce_processes_limits()
 	if((time(0) - last_check_time) < check_resources_interval ) return 1;
 
 	ITABLE_ITERATE(procs_running,pid,p) {
-		if(!enforce_process_limits(p) || !vine_coprocess_enforce_limit(p->coprocess)) {
+		if(!enforce_process_limits(p)) {
 			finish_running_task(p, VINE_RESULT_RESOURCE_EXHAUSTION);
 			trash_file(p->sandbox);
 
@@ -1080,18 +1055,6 @@ static int handle_manager(struct link *manager)
 				kill_all_tasks();
 				r = 1;
 			}
-		} else if(sscanf(line, "kill_library %" SCNd64, &length) == 1) {
-			char *library_name = malloc(length+1);
-			link_read(manager,library_name,length,time(0)+active_timeout);
-			library_name[length] = 0;
-			task_id = (long int)hash_table_lookup(library_ids, library_name);
-			debug(D_VINE,"rx: killing library %s %" SCNd64, library_name, task_id);
-			kill(((struct vine_process *)itable_lookup(procs_table, task_id))->pid, SIGKILL);
-			list_remove(library_list, library_name);
-			hash_table_remove(features, library_name);
-			hash_table_remove(library_ids, library_name);
-			list_remove(coprocess_list, ((struct vine_process *)itable_lookup(procs_table, task_id))->coprocess);
-			r = do_kill(task_id);
 		} else if(!strncmp(line, "release", 8)) {
 			r = do_release();
 		} else if(!strncmp(line, "exit", 5)) {
@@ -1104,14 +1067,6 @@ static int handle_manager(struct link *manager)
 			r = 0;
 		} else if(sscanf(line, "send_results %d", &n) == 1) {
 			report_tasks_complete(manager);
-			r = 1;
-		} else if(sscanf(line,"library %" SCNd64 " %" SCNd64,&length, &task_id)==2) {
-			char *library_name = malloc(length+1);
-			link_read(manager,library_name,length,time(0)+active_timeout);
-			library_name[length] = 0;
-			debug(D_VINE,"rx: library %s, id %" SCNd64, library_name, task_id);
-			list_push_tail(library_list, library_name);
-			hash_table_insert(library_ids, library_name, (void **)task_id);
 			r = 1;
 		} else {
 			debug(D_VINE, "Unrecognized manager message: %s.\n", line);
@@ -1159,6 +1114,50 @@ static int task_resources_fit_eventually(struct vine_task *t)
 		(t->resources_requested->disk   <= r->disk.largest) &&
 		(t->resources_requested->gpus   <= r->gpus.largest);
 }
+
+/*
+Find a suitable library process that provides the given library name and is ready to be invoked
+XXX need to check on coprocess status -- is it already running something ?
+*/
+
+struct vine_process * find_process_by_library_name( const char *library_name )
+{
+	uint64_t pid;
+	struct vine_process *p;
+
+	ITABLE_ITERATE(procs_running,pid,p) {
+		if(!strcmp(p->task->provides_library,library_name)) {
+			return p;
+		}
+	}
+	return 0;
+}
+
+/*
+Return true if this process is ready to run at this moment, and match to a library process if needed.
+*/
+
+static int process_ready_to_run_now( struct vine_process *p )
+{
+	if(!task_resources_fit_now(p->task)) return 0;
+
+	if(p->task->needs_library) {
+		p->library_process = find_process_by_library_name(p->task->needs_library);
+		if(!p->library_process) return 0;
+	}
+
+	return 1;
+}
+
+/*
+Return true if this process can run eventually, supposing that other processes will complete.
+*/
+
+static int process_can_run_eventually( struct vine_process *p )
+{
+	return task_resources_fit_eventually(p->task);
+}
+
 
 void forsake_waiting_process(struct link *manager, struct vine_process *p)
 {
@@ -1321,20 +1320,10 @@ static void work_for_manager( struct link *manager )
 				p = list_pop_head(procs_waiting);
 				if(!p) {
 					break;
-				} else if(task_resources_fit_now(p->task)) {
-					// attach the function name, port, and type to process, if applicable
-					if (p->task->coprocess) {
-						struct vine_coprocess *ready_coprocess = vine_coprocess_find_state(coprocess_list, VINE_COPROCESS_READY, p->task->coprocess);
-						if (ready_coprocess == NULL) {
-							list_push_tail(procs_waiting, p);
-							continue;
-						}
-						p->coprocess = ready_coprocess;
-						vine_coprocess_state_set(p->coprocess,VINE_COPROCESS_RUNNING);
-					}
+				} else if(process_ready_to_run_now(p)) {
 					start_process(p,manager);
 					task_event++;
-				} else if(task_resources_fit_eventually(p->task)) {
+				} else if(process_can_run_eventually(p)) {
 					list_push_tail(procs_waiting, p);
 				} else {
 					forsake_waiting_process(manager, p);
@@ -1342,7 +1331,7 @@ static void work_for_manager( struct link *manager )
 				}
 			}
 		}
-
+		
 		if(task_event > 0) {
 			send_stats_update(manager);
 		}
@@ -2198,9 +2187,6 @@ int main(int argc, char *argv[])
 	procs_table    = itable_create(0);
 	procs_waiting  = list_create();
 	procs_complete = itable_create(0);
-	coprocess_list = list_create();
-	library_list = list_create();
-	library_ids = hash_table_create(0, 0);
 
 	watcher = vine_watcher_create();
 
@@ -2275,11 +2261,6 @@ int main(int argc, char *argv[])
 		}
 
 		sleep(backoff_interval);
-	}
-
-	if (list_size(coprocess_list) > 0) {
-		vine_coprocess_shutdown_all_coprocesses(coprocess_list);
-		list_delete(coprocess_list);
 	}
 
 	workspace_delete();

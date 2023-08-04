@@ -162,7 +162,8 @@ struct vine_task *vine_task_copy( const struct vine_task *task )
 	new->type = task->type;
 	
 	/* Static features of task are copied. */
-	if(task->coprocess) vine_task_set_coprocess(new,task->tag);
+	if(task->needs_library) vine_task_needs_library(new,task->needs_library);
+	if(task->provides_library) vine_task_needs_library(new,task->provides_library);
 	if(task->tag) vine_task_set_tag(new, task->tag);
 	if(task->category) vine_task_set_category(new, task->category);
 
@@ -222,17 +223,29 @@ static void delete_feature(struct vine_task *t, const char *name)
 	list_cursor_destroy(c);
 }
 
-void vine_task_set_coprocess( struct vine_task *t, const char *coprocess )
+void vine_task_needs_library( struct vine_task *t, const char *library_name )
 {
-	if(t->coprocess) {
-		delete_feature(t, t->coprocess);
-		free(t->coprocess);
-		t->coprocess = NULL;
+	if(t->needs_library) {
+		delete_feature(t, t->needs_library);
+		free(t->needs_library);
+		t->needs_library = NULL;
 	}
 
-	if(coprocess) {
-		t->coprocess = xxstrdup(coprocess);
-		vine_task_add_feature(t, t->coprocess);
+	if(library_name) {
+		t->needs_library = xxstrdup(library_name);
+		vine_task_add_feature(t, t->needs_library);
+	}
+}
+
+void vine_task_provides_library( struct vine_task *t, const char *library_name )
+{
+	if(t->provides_library) {
+		free(t->provides_library);
+		t->provides_library = NULL;
+	}
+
+	if(library_name) {
+		t->provides_library = xxstrdup(library_name);
 	}
 }
 
@@ -623,9 +636,11 @@ void vine_task_delete(struct vine_task *t)
 	}
 	
 	free(t->command_line);
-	free(t->coprocess);
 	free(t->tag);
 	free(t->category);
+
+	free(t->needs_library);
+	free(t->provides_library);
 
 	free(t->monitor_output_directory);
 
@@ -790,7 +805,8 @@ struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t )
 	if(t->tag) jx_insert_string(j,"tag",t->tag);
 	if(t->category) jx_insert_string(j,"category",t->category);
 	jx_insert_string(j,"command",t->command_line);
-	if(t->coprocess) jx_insert_string(j,"coprocess",t->coprocess);
+	if(t->needs_library) jx_insert_string(j,"needs_library",t->needs_library);
+	if(t->provides_library) jx_insert_string(j,"provides_library",t->provides_library);
 	if(t->worker) {
 		jx_insert_string(j, "addrport", t->worker->addrport);
 		jx_insert_string(j,"host",t->worker->hostname);

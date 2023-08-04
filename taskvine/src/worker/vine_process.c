@@ -30,6 +30,9 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "list.h"
 
+#include "jx.h"
+#include "jx_parse.h"
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,9 +54,6 @@ Create temporary directories inside as well.
 */
 
 extern char * workspace;
-
-extern struct list *library_list;
-extern struct hash_table *library_ids;
 
 static int create_sandbox_dir( struct vine_process *p )
 {
@@ -87,7 +87,9 @@ struct vine_process *vine_process_create( vine_process_type_t type, struct vine_
 	memset(p, 0, sizeof(*p));
 	p->type = type;
 	p->task = vine_task;
-	p->coprocess = NULL;
+	p->input_fd = -1;
+	p->output_fd = -1;
+	p->error_fd = -1;
 	if(!create_sandbox_dir(p)) {
 		vine_process_delete(p);
 		return 0;
@@ -101,8 +103,16 @@ void vine_process_delete(struct vine_process *p)
 	if(p->task)
 		vine_task_delete(p->task);
 
-	if(p->output_fd) {
+	if(p->input_fd>=0) {
+		close(p->input_fd);
+	}
+
+	if(p->output_fd>=0) {
 		close(p->output_fd);
+	}
+
+	if(p->error_fd>=0) {
+		close(p->error_fd);
 	}
 
 	if(p->output_file_name) {
@@ -110,6 +120,9 @@ void vine_process_delete(struct vine_process *p)
 		free(p->output_file_name);
 	}
 
+	if(p->library_read_link) link_close(p->library_read_link);
+	if(p->library_write_link) link_close(p->library_write_link);
+	
 	if(p->sandbox) {
 		trash_file(p->sandbox);
 		free(p->sandbox);
@@ -189,8 +202,6 @@ static void set_resources_vars(struct vine_process *p) {
 	}
 }
 
-static const char task_output_template[] = "./worker.stdout.XXXXXX";
-
 static char * load_input_file(struct vine_task *t) {
 	FILE *fp = fopen("infile", "r");
 	if(!fp) {
@@ -258,28 +269,50 @@ int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *ca
 	return 1;
 }
 
+static const char task_output_template[] = "./worker.stdout.XXXXXX";
+
 pid_t vine_process_execute(struct vine_process *p )
 {
-	// make warning
-	fflush(NULL);		/* why is this necessary? */
+	/* Flushing pending stdio buffers prior to forking process */
+	fflush(NULL);
 
+	int pipe_in[2] = {-1,-1};
+	int pipe_out[2] = {-1,-1};
+
+	/* Generate a unique file name for the standard output file */
 	p->output_file_name = strdup(task_output_template);
-	p->output_fd = mkstemp(p->output_file_name);
-	if(p->output_fd == -1) {
-		debug(D_VINE, "Could not open worker stdout: %s", strerror(errno));
-		return 0;
+
+	if(p->task->provides_library) {
+		/* If starting a library, create the pipes for parent-child communication. */
+
+		if(pipe(pipe_in)<0) fatal("couldn't create library pipes: %s\n",strerror(errno));
+		if(pipe(pipe_out)<0) fatal("couldn't create library pipes: %s\n",strerror(errno));
+
+		p->input_fd = pipe_in[0];
+		p->output_fd = pipe_out[1];
+
+		/* Standard error of library goes to output file name for return to manager. */
+		p->error_fd = mkstemp(p->output_file_name);
+		if(p->output_fd == -1) {
+			debug(D_VINE, "Could not open worker stdout: %s", strerror(errno));
+			return 0;
+		}
+	} else {
+		/* For other task types, read input from null and send output to assigned file. */
+		
+		p->input_fd = open("/dev/null",O_RDONLY);
+		p->output_fd = mkstemp(p->output_file_name);
+		if(p->output_fd == -1) {
+			debug(D_VINE, "Could not open worker stdout: %s", strerror(errno));
+			return 0;
+		}
+		p->error_fd = p->output_fd;		
 	}
 
+	/* Start the performance clock just prior to forking the task. */
 	p->execution_start = timestamp_get();
 
-	if (!vine_process_get_library_name(p)) {
-		p->pid = fork();
-	} else {
-		p->coprocess = vine_coprocess_initialize_coprocess(p->task->command_line);
-		vine_coprocess_specify_resources(p->coprocess);
-		p->pid = vine_coprocess_start(p->coprocess, p->sandbox);
-	}
-
+	p->pid = fork();
 	if(p->pid > 0) {
 		// Make child process the leader of its own process group. This allows
 		// signals to also be delivered to processes forked by the child process.
@@ -287,6 +320,31 @@ pid_t vine_process_execute(struct vine_process *p )
 		setpgid(p->pid, 0);
 
 		debug(D_VINE, "started process %d: %s", p->pid, p->task->command_line);
+
+		/* If we just started a library, then retain links to communicate with it. */
+		if(p->task->provides_library) {
+
+			debug(D_VINE, "waiting for library startup message from pid %d\n", p->pid );
+
+			p->library_read_link = link_attach_to_fd(pipe_out[0]);
+			p->library_write_link = link_attach_to_fd(pipe_in[1]);
+
+			/* Close the ends of the pipes that the parent process won't use. */
+			close(pipe_in[0]);
+			close(pipe_out[1]);
+
+			/* Wait up to 60 seconds for library startup.  This should be asynchronous. */
+			time_t stoptime = time(0)+60;
+			
+			/* Now read back the initialization message so we know it is ready. */
+			if (vine_process_wait_for_library_startup(p,stoptime)) {
+				fatal("Unable to setup coprocess");
+				/* XXX need better plan for library that fails to start. */
+			}
+
+		}
+
+		/* XXX should we close unused descriptors here? */
 		return p->pid;
 
 	} else if(p->pid < 0) {
@@ -302,49 +360,118 @@ pid_t vine_process_execute(struct vine_process *p )
 			fatal("could not change directory into %s: %s", p->sandbox, strerror(errno));
 		}
 
-		int fd = open("/dev/null", O_RDONLY);
-		if(fd == -1)
-			fatal("could not open /dev/null: %s", strerror(errno));
-		int result = dup2(fd, STDIN_FILENO);
-		if(result == -1)
-			fatal("could not dup /dev/null to stdin: %s", strerror(errno));
-
-		if (p->coprocess == NULL) {
-			result = dup2(p->output_fd, STDOUT_FILENO);
-			if(result == -1)
-				fatal("could not dup pipe to stdout: %s", strerror(errno));
-
-			result = dup2(p->output_fd, STDERR_FILENO);
-			if(result == -1)
-				fatal("could not dup pipe to stderr: %s", strerror(errno));
-			}
-		else {
+		/* In the special case of a function-call-task, just load data, communicate with the library, and exit. */
+		
+		if(p->task->needs_library) {
 			// load data from input file
 			char *input = load_input_file(p->task);
 
-			// call invoke_coprocess_function
-		 	char *output = vine_coprocess_run(p->task->command_line, input, p->sandbox, p->coprocess);
+			// communicate with library to invoke the function
+		 	char *output = vine_process_invoke_function(p->library_process,p->task->command_line,input,p->sandbox);
 
 			// write data to output file
 			full_write(p->output_fd, output, strlen(output));
 
-			exit(0);
+			_exit(0);
 		}
 
-		close(p->output_fd);
+		/* Otherwise for a normal task or a library, set up file desciptors and execute the command. */
 
+		int result = dup2(p->input_fd, STDIN_FILENO);
+		if(result<0) fatal("could not dup input to stdin: %s", strerror(errno));
+
+		result = dup2(p->output_fd, STDOUT_FILENO);
+		if(result<0) fatal("could not dup output to stdout: %s", strerror(errno));
+
+		result = dup2(p->error_fd, STDERR_FILENO);
+		if(result<0) fatal("could not dup error to stderr: %s", strerror(errno));
+
+		close(p->input_fd);
+		close(p->output_fd);
+		close(p->error_fd);
+
+		/* For a library task, close the unused sides of the pipes. */
+		if(p->task->provides_library) {
+			close(pipe_in[1]);
+			close(pipe_out[0]);
+		}
+
+		/* Remove undesired things from the environment. */
 		clear_environment();
 
-		/* overwrite CORES, MEMORY, or DISK variables, if the task used set_* */
+		/* Overwrite CORES, MEMORY, or DISK variables, if the task used set_* */
 		set_resources_vars(p);
 
+		/* Finally, add things that were explicitly given in the task description. */
 		export_environment(p);
 
 		execl("/bin/sh", "sh", "-c", p->task->command_line, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 
 	}
+
 	return 0;
+}
+
+/*
+Given a freshly started process, wait for it to initialize and send
+back the library startup message with JSON containing the name of
+the library, which should match the task's provides_library label.
+*/
+
+int vine_process_wait_for_library_startup( struct vine_process *p, time_t stoptime )
+{
+	char buffer[VINE_LINE_MAX];
+	int length = 0;
+	
+	/* Read a line that gives the length of the response message. */
+	link_readline(p->library_read_link, buffer, VINE_LINE_MAX, stoptime);
+	sscanf(buffer, "%d", &length);
+
+	/* Now read that length of message and null-terminate it. */
+	link_read(p->library_read_link,buffer,VINE_LINE_MAX,stoptime);
+	buffer[length+1] = 0;
+
+	/* Check that the response is JX and contains the expected name. */
+	struct jx * response = jx_parse_string(buffer);
+
+	const char *name = jx_lookup_string(response,"name");
+
+	if(!strcmp(name,p->task->provides_library)) {
+		return 1;
+	}
+
+	return 0;
+}
+
+/*
+Invoke a function against a library by sending the invocation message,
+and then reading back the result from the necessary pipe.
+*/
+
+char *vine_process_invoke_function( struct vine_process *library_process, const char *function_name, const char *function_input, const char *sandbox_path )
+{
+	/* Set a five minute timeout.  XXX This should be changeable. */
+	time_t stoptime = time(0)+300;
+
+	/* This assumes function input is a text string, reconsider? */
+	int length = strlen(function_input);
+
+	/* Send the function name, length of data, and sandbox directory. */
+	link_printf(library_process->library_write_link, stoptime, "%s %d %s\n", function_name, length, sandbox_path);
+
+	/* Then send the function data itself. */
+	link_write(library_process->library_write_link, function_input, length, stoptime );
+
+	/* XXX The response should be returned as a variable-length buffer, not a line. */
+	
+	/* Now read back the response as a single line and give it back. */
+	char line[VINE_LINE_MAX];
+	if(link_readline(library_process->library_read_link, line, VINE_LINE_MAX, stoptime)) {
+		return strdup(line);
+	} else {
+		return 0;
+	}
 }
 
 void vine_process_kill(struct vine_process *p)
@@ -425,17 +552,6 @@ int vine_process_measure_disk(struct vine_process *p, int max_time_on_measuremen
 	p->sandbox_file_count = state->last_file_count_complete;
 
 	return result;
-}
-
-char * vine_process_get_library_name( struct vine_process *p) {
-	char *library_name;
-	int library_id;
-	HASH_TABLE_ITERATE(library_ids,library_name,library_id) {
-		if (library_id == p->task->task_id) {
-			return library_name;
-		}
-	}
-	return 0;
 }
 
 /* vim: set noexpandtab tabstop=4: */

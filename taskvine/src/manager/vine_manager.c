@@ -2448,7 +2448,7 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 
 	char *command_line;
 
-	if(q->monitor_mode && !t->coprocess) {
+	if(q->monitor_mode && !t->needs_library) {
 		command_line = vine_monitor_wrap(q, w, t, limits);
 	} else {
 		command_line = xxstrdup(t->command_line);
@@ -3906,8 +3906,6 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 	t->worker = w;
 
 	// send the Library Task to the worker
-	vine_manager_send(q,w, "library %lld %lld\n",  (long long) strlen(name), (long long)t->task_id);
-	link_putlstring(w->link, name, strlen(name), time(0) + q->short_timeout);
 	vine_result_code_t result = start_one_task(q, w, t);
 	change_task_state(q, t, VINE_TASK_RUNNING);
 	

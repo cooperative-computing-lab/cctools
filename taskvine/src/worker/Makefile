@@ -10,7 +10,6 @@ SOURCES = \
 	vine_transfer.c \
 	vine_transfer_server.c \
 	vine_process.c \
-	vine_coprocess.c \
 	vine_watcher.c \
 	vine_gpus.c
 

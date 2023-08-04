@@ -43,9 +43,19 @@ struct vine_process {
 	char *sandbox;
 	char *tmpdir;                   // TMPDIR per task, expected to be a subdir of sandbox.
 	char *output_file_name;
+	int input_fd;
 	int output_fd;
+	int error_fd;
 
+	/* The details of the task to execute. */
 	struct vine_task *task;
+
+	/* If a function-call task, this is the specific library process to invoke. */
+	struct vine_process *library_process;
+	
+	/* If this is a library process, the links to communicate with the library. */
+	struct link *library_read_link;
+	struct link *library_write_link;
 
 	/* expected disk usage by the process. If no cache is used, it is the same as in task. */
 	int64_t disk;
@@ -56,9 +66,6 @@ struct vine_process {
 
 	/* state between complete disk measurements. */
 	struct path_disk_size_info *disk_measurement_state;
-
-	/* variables for coprocess funciton calls */
-	struct vine_coprocess *coprocess;
 };
 
 struct vine_process * vine_process_create( vine_process_type_t, struct vine_task *task );
@@ -72,5 +79,8 @@ int vine_process_measure_disk(struct vine_process *p, int max_time_on_measuremen
 char *vine_process_get_library_name(struct vine_process *p);
 
 int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *cache, struct link *manager );
+
+int vine_process_wait_for_library_startup( struct vine_process *p, time_t stoptime );
+char *vine_process_invoke_function( struct vine_process *library_process, const char *function_name, const char *function_input, const char *sandbox_path );
 
 #endif

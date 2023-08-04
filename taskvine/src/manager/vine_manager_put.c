@@ -447,12 +447,14 @@ vine_result_code_t vine_manager_put_task(struct vine_manager *q, struct vine_wor
 	link_putlstring(w->link, command_line, cmd_len, time(0) + q->short_timeout);
 	debug(D_VINE, "%s\n", command_line);
 
-	if(t->coprocess) {
-		cmd_len = strlen(t->coprocess);
-		vine_manager_send(q,w, "coprocess %lld\n", (long long) cmd_len);
-		link_putlstring(w->link, t->coprocess, cmd_len, /* stoptime */ time(0) + q->short_timeout);
+	if(t->needs_library) {
+		vine_manager_send(q,w,"needs_library %s\n",t->needs_library);
 	}
 
+	if(t->provides_library) {
+		vine_manager_send(q,w,"provides_library %s\n",t->provides_library);
+	}
+	
 	vine_manager_send(q,w, "category %s\n", t->category);
 
 	if(limits) {

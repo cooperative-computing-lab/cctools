@@ -255,12 +255,17 @@ void vine_task_delete(struct vine_task *t);
 */
 void vine_task_set_command( struct vine_task *t, const char *cmd );
 
-/** Indicate the command to be executed.
+/** Set the library name required by this task.
 @param t A task object.
-@param name The coprocess name that will execute the command at the worker. The task
-will only be sent to workers running the coprocess.
+@param name The name of the library coprocess name that will be used by this task.
 */
-void vine_task_set_coprocess( struct vine_task *t, const char *name );
+void vine_task_needs_library( struct vine_task *t, const char *name );
+
+/** Set the library name provided by this task.
+@param t A task object.
+@param name The name of the library coprocess that this task implements.
+*/
+void vine_task_provides_library( struct vine_task *t, const char *name );
 
 
 /** Add a general file object as a input to a task.
