@@ -199,8 +199,13 @@ static struct itable *procs_complete = NULL;
 // Table of current transfers and their id
 static struct hash_table *current_transfers = NULL;
 
-//User specified features this worker provides.
+/*
+Table of user-specified features.
+The key represents the name of the feature.
+The corresponding value is just a pointer to feature_dummy and can be ignored.
+*/
 static struct hash_table *features = NULL;
+static const char *feature_dummy = "dummy";
 
 static int results_to_be_sent_msg = 0;
 
@@ -532,7 +537,7 @@ static int start_process( struct vine_process *p, struct link *manager )
 		HASH_TABLE_ITERATE(library_task_ids,library_name,library_task_id) {
 			if (*library_task_id == p->task->task_id){
 				list_push_tail(coprocess_list, p->coprocess);
-				hash_table_insert(features, library_name, (void **) 1);
+				hash_table_insert(features, library_name, feature_dummy);
 				send_features(manager);
 				send_message(manager, "info library-update %d %d\n", p->task->task_id, VINE_LIBRARY_STARTED);
 				send_resource_update(manager);
@@ -2132,7 +2137,7 @@ int main(int argc, char *argv[])
 			show_help(argv[0]);
 			return 0;
 		case LONG_OPT_FEATURE:
-			hash_table_insert(features, optarg, (void **) 1);
+			hash_table_insert(features, optarg, feature_dummy);
 			break;
 		case LONG_OPT_PARENT_DEATH:
 			initial_ppid = getppid();
@@ -2179,7 +2184,7 @@ int main(int argc, char *argv[])
 
 	char *gpu_name = gpu_name_get();
 	if(gpu_name) {
-		hash_table_insert(features, gpu_name, (void **) 1);
+		hash_table_insert(features, gpu_name, feature_dummy);
 		free(gpu_name);
 	}
 
