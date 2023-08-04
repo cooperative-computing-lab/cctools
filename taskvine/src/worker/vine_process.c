@@ -8,7 +8,6 @@ See the file COPYING for details.
 #include "vine_manager.h"
 #include "vine_gpus.h"
 #include "vine_protocol.h"
-#include "vine_coprocess.h"
 #include "vine_sandbox.h"
 
 #include "vine_file.h"
