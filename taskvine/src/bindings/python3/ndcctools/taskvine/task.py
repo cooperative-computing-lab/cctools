@@ -55,7 +55,8 @@ class Task(object):
         self._finalizer = weakref.finalize(self, self._free)
 
         attributes = [
-            "needs_library", "provides_library",
+            "needs_library_name",
+            "provides_library_name",
             "scheduler", "tag", "category",
             "snapshot_file", "retries", "cores", "memory",
             "disk", "gpus", "priority", "time_end",
@@ -182,7 +183,7 @@ class Task(object):
     # @param self Reference to the current task object.
     # @param library_name The name of the library
     def needs_library(self, library_name):
-        self.needs_library = library_name
+        self.needs_library_name = library_name
         return cvine.vine_task_needs_library(self._task, library_name)
     
     ##
@@ -192,7 +193,7 @@ class Task(object):
     # @param self Reference to the current task object.
     # @param library_name The name of the library.
     def provides_library(self, library_name):
-        self.provides_library = library_name
+        self.provides_library_name = library_name
         return cvine.vine_task_provides_library(self._task, library_name)
     
     ##
@@ -958,7 +959,7 @@ class FunctionCall(Task):
         self._event = {}
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
-        Task.needs_library(self,library_name)
+        self.needs_library(library_name)
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
