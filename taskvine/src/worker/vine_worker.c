@@ -1101,18 +1101,7 @@ static int handle_manager(struct link *manager)
 			int * library_task_id = hash_table_lookup(library_task_ids, library_name);
 			if(library_task_id) {
 				debug(D_VINE,"rx: killing library %s %d", library_name, *library_task_id);
-				struct vine_process *p = itable_lookup(procs_table,*library_task_id);
-				if(p) {
-					kill(p->pid,SIGKILL);
-					/* Note that the process will still be waited for. */
-				}
-				list_remove(library_list, library_name);
-				hash_table_remove(features, library_name);
-				hash_table_remove(library_task_ids, library_name);
-				list_remove(coprocess_list,p->coprocess);
-				/* XXX I think do_kill duplicates the above work. */
 				r = do_kill(*library_task_id);
-				free(library_task_id);
 			}			
 		} else if(!strncmp(line, "release", 8)) {
 			r = do_release();
