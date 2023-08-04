@@ -337,7 +337,7 @@ pid_t vine_process_execute(struct vine_process *p )
 			time_t stoptime = time(0)+60;
 			
 			/* Now read back the initialization message so we know it is ready. */
-			if (vine_process_wait_for_library_startup(p,stoptime)) {
+			if (!vine_process_wait_for_library_startup(p,stoptime)) {
 				fatal("Unable to setup coprocess");
 				/* XXX need better plan for library that fails to start. */
 			}
@@ -431,7 +431,7 @@ int vine_process_wait_for_library_startup( struct vine_process *p, time_t stopti
 	sscanf(buffer, "%d", &length);
 
 	/* Now read that length of message and null-terminate it. */
-	link_read(p->library_read_link,buffer,VINE_LINE_MAX,stoptime);
+	link_read(p->library_read_link,buffer,length,stoptime);
 	buffer[length+1] = 0;
 
 	/* Check that the response is JX and contains the expected name. */
@@ -463,9 +463,11 @@ char *vine_process_invoke_function( struct vine_process *library_process, const 
 	link_printf(library_process->library_write_link, stoptime, "%s %d %s\n", function_name, length, sandbox_path);
 
 	/* Then send the function data itself. */
+	/* XXX the library code expects a newline after this, yikes. */
 	link_write(library_process->library_write_link, function_input, length, stoptime );
-
-	/* XXX The response should be returned as a variable-length buffer, not a line. */
+	link_write(library_process->library_write_link, "\n", 1, stoptime );
+	
+	/* XXX The response should be returned as a variable-length buffer, not a line! */
 	
 	/* Now read back the response as a single line and give it back. */
 	char line[VINE_LINE_MAX];

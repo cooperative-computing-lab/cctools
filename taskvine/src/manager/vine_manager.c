@@ -3901,16 +3901,11 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 	// setup the Library Task by copying the original and giving it a unique taskid
 	struct vine_task *original = hash_table_lookup(q->libraries,name);
 	
-	printf("ORIGINAL: %s %s\n",original->needs_library,original->provides_library);
-
 	struct vine_task *t = vine_task_copy(original);
 	t->task_id = q->next_task_id++;
 	t->hostname = xxstrdup(w->hostname);
 	t->addrport = xxstrdup(w->addrport);
 	t->worker = w;
-
-	printf("ORIGINAL: %s %s\n",original->needs_library,original->provides_library);
-	printf("COPY:     %s %s\n",original->needs_library,original->provides_library);
 
 	// send the Library Task to the worker
 	vine_result_code_t result = start_one_task(q, w, t);
