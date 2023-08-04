@@ -189,7 +189,7 @@ class Task(object):
     #
     # @param self Reference to the current task object.
     # @param library_name The name of the library.
-        def provides_library(self, library_name):
+    def provides_library(self, library_name):
         return cvine.vine_task_provides_library(self._task, library_name)
     
     ##
