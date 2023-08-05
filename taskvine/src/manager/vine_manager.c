@@ -3961,19 +3961,16 @@ void vine_manager_install_library( struct vine_manager *q, struct vine_task *t, 
 	t->time_when_submitted = timestamp_get();
 }
 
-void vine_manager_remove_library( struct vine_manager *q, const char *name ) {
+void vine_manager_remove_library( struct vine_manager *q, const char *name )
+{
 	char *worker_key;
 	struct vine_worker_info *w;
 
 	HASH_TABLE_ITERATE(q->worker_table,worker_key,w) {
-		if(w->features) {
-			vine_manager_send(q,w,"kill_library %ld\n", strlen(name));
-			vine_manager_send(q,w,"%s", name);
-			struct vine_task *library = hash_table_lookup(w->libraries, name);
+		struct vine_task *t = hash_table_remove(w->libraries, name);
+		if(t) {
+			cancel_task_on_worker(q,t,VINE_TASK_CANCELLED);
 			hash_table_remove(w->features, name);
-			hash_table_remove(w->libraries, name);
-			rmsummary_delete(itable_lookup(w->current_tasks_boxes, library->task_id));
-			itable_remove(w->current_tasks_boxes, library->task_id);
 		}
 	}
 	hash_table_remove(q->libraries, name);
