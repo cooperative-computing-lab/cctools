@@ -199,8 +199,13 @@ static struct itable *procs_complete = NULL;
 // Table of current transfers and their id
 static struct hash_table *current_transfers = NULL;
 
-//User specified features this worker provides.
+/*
+Table of user-specified features.
+The key represents the name of the feature.
+The corresponding value is just a pointer to feature_dummy and can be ignored.
+*/
 static struct hash_table *features = NULL;
+static const char *feature_dummy = "dummy";
 
 static int results_to_be_sent_msg = 0;
 
@@ -512,7 +517,7 @@ static int start_process( struct vine_process *p, struct link *manager )
 
 	/* If this process represents a library, notify the manager of that feature. */
 	if (p->task->provides_library) {
-		hash_table_insert(features, p->task->provides_library, (void **) 1);
+		hash_table_insert(features, p->task->provides_library, feature_dummy);
 		send_features(manager);
 		send_message(manager, "info library-update %d %d\n", p->task->task_id, VINE_LIBRARY_STARTED);
 		send_resource_update(manager);
@@ -839,6 +844,16 @@ static int do_kill(int task_id)
 	}
 
 	if(itable_remove(procs_running, p->pid)) {
+<<<<<<< HEAD
+=======
+		if (p->coprocess) {
+			hash_table_remove(features, p->coprocess->name);
+			list_remove(coprocess_list, p->coprocess);
+			list_remove(library_list, p->coprocess->name);
+			int *library_task_id = hash_table_remove(library_task_ids, p->coprocess->name);
+			free(library_task_id);
+		}
+>>>>>>> master
 		vine_process_kill(p);
 		cores_allocated -= p->task->resources_requested->cores;
 		memory_allocated -= p->task->resources_requested->memory;
@@ -1016,7 +1031,8 @@ static int handle_manager(struct link *manager)
 	char transfer_id[VINE_LINE_MAX];
 	int64_t length;
 	int64_t task_id = 0;
-	int mode, r, n;
+	int mode, n;
+	int r = 0;
 
 	if(recv_message(manager, line, sizeof(line), idle_stoptime )) {
 		if(sscanf(line,"task %" SCNd64, &task_id)==1) {
@@ -1056,6 +1072,18 @@ static int handle_manager(struct link *manager)
 				kill_all_tasks();
 				r = 1;
 			}
+<<<<<<< HEAD
+=======
+		} else if(sscanf(line, "kill_library %" SCNd64, &length) == 1) {
+			char *library_name = malloc(length+1);
+			link_read(manager,library_name,length,time(0)+active_timeout);
+			library_name[length] = 0;
+			int * library_task_id = hash_table_lookup(library_task_ids, library_name);
+			if(library_task_id) {
+				debug(D_VINE,"rx: killing library %s %d", library_name, *library_task_id);
+				r = do_kill(*library_task_id);
+			}			
+>>>>>>> master
 		} else if(!strncmp(line, "release", 8)) {
 			r = do_release();
 		} else if(!strncmp(line, "exit", 5)) {
@@ -1069,6 +1097,19 @@ static int handle_manager(struct link *manager)
 		} else if(sscanf(line, "send_results %d", &n) == 1) {
 			report_tasks_complete(manager);
 			r = 1;
+<<<<<<< HEAD
+=======
+		} else if(sscanf(line,"library %" SCNd64 " %" SCNd64,&length, &task_id)==2) {
+			char *library_name = malloc(length+1);
+			link_read(manager,library_name,length,time(0)+active_timeout);
+			library_name[length] = 0;
+			debug(D_VINE,"rx: library %s, id %" SCNd64, library_name, task_id);
+			list_push_tail(library_list, library_name);
+			int *library_task_id = malloc(sizeof(int));
+			*library_task_id = task_id;
+			hash_table_insert(library_task_ids,library_name,library_task_id);
+			r = 1;
+>>>>>>> master
 		} else {
 			debug(D_VINE, "Unrecognized manager message: %s.\n", line);
 			r = 0;
@@ -2106,7 +2147,7 @@ int main(int argc, char *argv[])
 			show_help(argv[0]);
 			return 0;
 		case LONG_OPT_FEATURE:
-			hash_table_insert(features, optarg, (void **) 1);
+			hash_table_insert(features, optarg, feature_dummy);
 			break;
 		case LONG_OPT_PARENT_DEATH:
 			initial_ppid = getppid();
@@ -2153,7 +2194,7 @@ int main(int argc, char *argv[])
 
 	char *gpu_name = gpu_name_get();
 	if(gpu_name) {
-		hash_table_insert(features, gpu_name, (void **) 1);
+		hash_table_insert(features, gpu_name, feature_dummy);
 		free(gpu_name);
 	}
 
@@ -2191,6 +2232,12 @@ int main(int argc, char *argv[])
 	procs_table    = itable_create(0);
 	procs_waiting  = list_create();
 	procs_complete = itable_create(0);
+<<<<<<< HEAD
+=======
+	coprocess_list = list_create();
+	library_list = list_create();
+	library_task_ids = hash_table_create(0, 0);
+>>>>>>> master
 
 	watcher = vine_watcher_create();
 
