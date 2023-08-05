@@ -844,22 +844,14 @@ static int do_kill(int task_id)
 	}
 
 	if(itable_remove(procs_running, p->pid)) {
-<<<<<<< HEAD
-=======
-		if (p->coprocess) {
-			hash_table_remove(features, p->coprocess->name);
-			list_remove(coprocess_list, p->coprocess);
-			list_remove(library_list, p->coprocess->name);
-			int *library_task_id = hash_table_remove(library_task_ids, p->coprocess->name);
-			free(library_task_id);
-		}
->>>>>>> master
 		vine_process_kill(p);
+
 		cores_allocated -= p->task->resources_requested->cores;
 		memory_allocated -= p->task->resources_requested->memory;
 		disk_allocated -= p->task->resources_requested->disk;
 		gpus_allocated -= p->task->resources_requested->gpus;
 		vine_gpus_free(task_id);
+
 		if (p->task->provides_library) {
 			hash_table_remove(features,p->task->provides_library);
 			/* XXX how to tell the manager that feature is gone? */
@@ -1072,18 +1064,6 @@ static int handle_manager(struct link *manager)
 				kill_all_tasks();
 				r = 1;
 			}
-<<<<<<< HEAD
-=======
-		} else if(sscanf(line, "kill_library %" SCNd64, &length) == 1) {
-			char *library_name = malloc(length+1);
-			link_read(manager,library_name,length,time(0)+active_timeout);
-			library_name[length] = 0;
-			int * library_task_id = hash_table_lookup(library_task_ids, library_name);
-			if(library_task_id) {
-				debug(D_VINE,"rx: killing library %s %d", library_name, *library_task_id);
-				r = do_kill(*library_task_id);
-			}			
->>>>>>> master
 		} else if(!strncmp(line, "release", 8)) {
 			r = do_release();
 		} else if(!strncmp(line, "exit", 5)) {
@@ -1097,19 +1077,6 @@ static int handle_manager(struct link *manager)
 		} else if(sscanf(line, "send_results %d", &n) == 1) {
 			report_tasks_complete(manager);
 			r = 1;
-<<<<<<< HEAD
-=======
-		} else if(sscanf(line,"library %" SCNd64 " %" SCNd64,&length, &task_id)==2) {
-			char *library_name = malloc(length+1);
-			link_read(manager,library_name,length,time(0)+active_timeout);
-			library_name[length] = 0;
-			debug(D_VINE,"rx: library %s, id %" SCNd64, library_name, task_id);
-			list_push_tail(library_list, library_name);
-			int *library_task_id = malloc(sizeof(int));
-			*library_task_id = task_id;
-			hash_table_insert(library_task_ids,library_name,library_task_id);
-			r = 1;
->>>>>>> master
 		} else {
 			debug(D_VINE, "Unrecognized manager message: %s.\n", line);
 			r = 0;
@@ -2232,12 +2199,6 @@ int main(int argc, char *argv[])
 	procs_table    = itable_create(0);
 	procs_waiting  = list_create();
 	procs_complete = itable_create(0);
-<<<<<<< HEAD
-=======
-	coprocess_list = list_create();
-	library_list = list_create();
-	library_task_ids = hash_table_create(0, 0);
->>>>>>> master
 
 	watcher = vine_watcher_create();
 
