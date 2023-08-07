@@ -1020,9 +1020,13 @@ static void resource_monitor_compress_logs(struct vine_manager *q, struct vine_t
 	free(command);
 }
 
-/* Get all the relevant output data from a completed task, then clean up unneeded items. */
+/*
+Get all the relevant output data from a completed task, then clean up unneeded items.
+Return true if task was retrieved from worker (regardless of whether the task is successful.)
+Return false if the worker failed.
+*/
 
-static void fetch_output_from_worker(struct vine_manager *q, struct vine_worker_info *w, int task_id)
+static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_info *w, int task_id)
 {
 	struct vine_task *t;
 	vine_result_code_t result = VINE_SUCCESS;
@@ -1031,7 +1035,7 @@ static void fetch_output_from_worker(struct vine_manager *q, struct vine_worker_
 	if(!t) {
 		debug(D_VINE, "Failed to find task %d at worker %s (%s).", task_id, w->hostname, w->addrport);
 		handle_failure(q, w, t, VINE_WORKER_FAILURE);
-		return;
+		return 0;
 	}
 
 	// Start receiving output...
@@ -1049,10 +1053,8 @@ static void fetch_output_from_worker(struct vine_manager *q, struct vine_worker_
 	}
 
 	if(result == VINE_WORKER_FAILURE) {
-		// Finish receiving output:
 		t->time_when_done = timestamp_get();
-
-		return;
+		return 0;
 	}
 
 	delete_uncacheable_files(q,w,t);
@@ -1113,7 +1115,7 @@ static void fetch_output_from_worker(struct vine_manager *q, struct vine_worker_
 			debug(D_VINE, "Task %d resubmitted using new resource allocation.\n", t->task_id);
 			t->resource_request = next;
 			change_task_state(q, t, VINE_TASK_READY);
-			return;
+			return 1;
 		}
 	}
 
@@ -1151,7 +1153,7 @@ static void fetch_output_from_worker(struct vine_manager *q, struct vine_worker_
 			(long long) w->total_tasks_complete,
 			w->total_task_time / w->total_tasks_complete / 1000000.0);
 
-	return;
+	return 1;
 }
 
 /*
@@ -1535,7 +1537,6 @@ on watched output files.  Process those results as they come back.
 
 static vine_result_code_t get_available_results(struct vine_manager *q, struct vine_worker_info *w)
 {
-
 	//max_count == -1, tells the worker to send all available results.
 	vine_manager_send(q, w, "send_results %d\n", -1);
 	debug(D_VINE, "Reading result(s) from %s (%s)", w->hostname, w->addrport);
@@ -1566,10 +1567,6 @@ static vine_result_code_t get_available_results(struct vine_manager *q, struct v
 			result = VINE_WORKER_FAILURE;
 			break;
 		}
-	}
-
-	if(result != VINE_SUCCESS) {
-		handle_worker_failure(q, w);
 	}
 
 	return result;
@@ -2862,8 +2859,8 @@ of those tasks. Returns the number of tasks received.
 */
 static int receive_tasks_from_worker( struct vine_manager *q, struct vine_worker_info *w, int count_received_so_far )
 {
-    struct vine_task *t;
-    uint64_t task_id;
+	struct vine_task *t;
+	uint64_t task_id;
 
 	int tasks_received = 0;
 
@@ -2875,25 +2872,40 @@ static int receive_tasks_from_worker( struct vine_manager *q, struct vine_worker
 		max_to_receive = itable_size(w->current_tasks);
 	}
 
-	get_available_results(q, w);
+	/* get available results from the worker, bail out if that also fails. */
+	vine_result_code_t r = get_available_results(q, w);
+	if(r != VINE_SUCCESS) {
+		handle_worker_failure(q, w);
+		return 0;
+	}
+
+	/* Reset the available results table now that the worker is removed */
 	hash_table_remove(q->workers_with_available_results, w->hashkey);
 	hash_table_firstkey(q->workers_with_available_results);
 
-    ITABLE_ITERATE(w->current_tasks,task_id,t) {
-        if( t->state==VINE_TASK_WAITING_RETRIEVAL) {
-            fetch_output_from_worker(q, w, task_id);
-			compute_manager_load(q, 1);
-			tasks_received++;
+	/* Now consider all tasks assigned to that worker .*/
+	ITABLE_ITERATE(w->current_tasks,task_id,t) {
+		/* If the task is waiting to be retrieved... */
+		if( t->state==VINE_TASK_WAITING_RETRIEVAL) {
+			/* Attempt to fetch it. */
+			if(fetch_output_from_worker(q, w, task_id)) {
+				/* If it was fetched, update stats and keep going. */
+				compute_manager_load(q, 1);
+				tasks_received++;
 
-			if(tasks_received >= max_to_receive) {
-				break;
+				if(tasks_received >= max_to_receive) {
+					break;
+				}
+			} else {
+				/* But if the fetch failed, the worker is no longer vaild, bail out. */
+				return tasks_received;
 			}
 		}
 	}
 
 	prune_worker(q, w);
 
-    return tasks_received;
+	return tasks_received;
 }
 
 
@@ -2911,10 +2923,15 @@ static int receive_one_task( struct vine_manager *q )
 	ITABLE_ITERATE(q->tasks,task_id,t) {
 		if( t->state==VINE_TASK_WAITING_RETRIEVAL ) {
 			struct vine_worker_info *w = t->worker;
-			fetch_output_from_worker(q, w, task_id);
-			prune_worker(q, w);
 
-			return 1;
+			/* Attempt to fetch from this worker. */
+			if(fetch_output_from_worker(q, w, task_id)) {
+				/* If we got one, then we are done. */
+				prune_worker(q, w);
+				return 1;
+			} else {
+				/* But if not, the worker pointer is no longer valid. */
+			}
 		}
 	}
 
