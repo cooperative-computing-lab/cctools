@@ -55,42 +55,31 @@ Create temporary directories inside as well.
 
 extern char * workspace;
 
-static int create_sandbox_dir( struct vine_process *p )
-{
-	p->cache_dir = string_format("%s/cache",workspace);
-  	p->sandbox = string_format("%s/t.%d", workspace,p->task->task_id);
-
-	if(!create_dir(p->sandbox, 0777)) return 0;
-
-	char tmpdir_template[1024];
-	string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->task_id);
-	if(mkdtemp(tmpdir_template) == NULL) {
-		return 0;
-	}
-
-	p->tmpdir  = xxstrdup(tmpdir_template);
-	if(chmod(p->tmpdir, 0777) != 0) {
-		return 0;
-	}
-
-	return 1;
-}
-
 /*
 Create a vine_process and all of the information necessary for invocation.
 However, do not allocate substantial resources at this point.
 */
 
-struct vine_process *vine_process_create( vine_process_type_t type, struct vine_task *vine_task )
+struct vine_process *vine_process_create( vine_process_type_t type, struct vine_task *task )
 {
 	struct vine_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
+
 	p->type = type;
-	p->task = vine_task;
-	if(!create_sandbox_dir(p)) {
+	p->task = task;
+
+	p->cache_dir = string_format("%s/cache",workspace);
+	p->sandbox = string_format("%s/t.%d", workspace,p->task->task_id);
+	p->tmpdir = string_format("%s/.taskvine.tmp",p->sandbox);
+	p->output_file_name = string_format("%s/.taskvine.stdout",p->sandbox);
+
+	/* Note that create_dir recursively creates parents, so a single one is sufficient. */
+
+	if(!create_dir(p->tmpdir,0777)) {
 		vine_process_delete(p);
 		return 0;
 	}
+
 	return p;
 }
 
@@ -265,9 +254,6 @@ pid_t vine_process_execute(struct vine_process *p )
 	int output_fd = -1;
 	int error_fd = -1;
 	
-	/* Generate a unique file name for the standard output file */
-	p->output_file_name = string_format("%s/.taskvine.stdout",p->sandbox);
-
 	if(p->task->provides_library) {
 		/* If starting a library, create the pipes for parent-child communication. */
 
