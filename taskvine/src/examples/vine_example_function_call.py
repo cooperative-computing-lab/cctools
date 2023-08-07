@@ -35,9 +35,6 @@ def main():
     function_lib = q.create_library_from_functions('test-library', divide, double)
     q.install_library(function_lib)
 
-    print(function_lib.needs_library);
-    print(function_lib.provides_library_name);
-
     for i in range(1,100): 
         s_task = vine.FunctionCall('test-library', 'divide', 2, 2**2)
         q.submit(s_task)
