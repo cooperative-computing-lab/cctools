@@ -87,9 +87,6 @@ struct vine_process *vine_process_create( vine_process_type_t type, struct vine_
 	memset(p, 0, sizeof(*p));
 	p->type = type;
 	p->task = vine_task;
-	p->input_fd = -1;
-	p->output_fd = -1;
-	p->error_fd = -1;
 	if(!create_sandbox_dir(p)) {
 		vine_process_delete(p);
 		return 0;
@@ -102,21 +99,8 @@ void vine_process_delete(struct vine_process *p)
 {
 	if(p->task)
 		vine_task_delete(p->task);
-
-	if(p->input_fd>=0) {
-		close(p->input_fd);
-	}
-
-	if(p->output_fd>=0) {
-		close(p->output_fd);
-	}
-
-	if(p->error_fd>=0) {
-		close(p->error_fd);
-	}
-
+	
 	if(p->output_file_name) {
-		trash_file(p->output_file_name);
 		free(p->output_file_name);
 	}
 
@@ -269,18 +253,20 @@ int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *ca
 	return 1;
 }
 
-static const char task_output_template[] = "./worker.stdout.XXXXXX";
-
 pid_t vine_process_execute(struct vine_process *p )
 {
-	/* Flushing pending stdio buffers prior to forking process */
+	/* Flush pending stdio buffers prior to forking process, to avoid stale output in child. */
 	fflush(NULL);
 
+	/* Various file descriptors for communication between parent and child */
 	int pipe_in[2] = {-1,-1};
 	int pipe_out[2] = {-1,-1};
-
+	int input_fd = -1;
+	int output_fd = -1;
+	int error_fd = -1;
+	
 	/* Generate a unique file name for the standard output file */
-	p->output_file_name = strdup(task_output_template);
+	p->output_file_name = string_format("%s/.taskvine.stdout",p->sandbox);
 
 	if(p->task->provides_library) {
 		/* If starting a library, create the pipes for parent-child communication. */
@@ -288,25 +274,25 @@ pid_t vine_process_execute(struct vine_process *p )
 		if(pipe(pipe_in)<0) fatal("couldn't create library pipes: %s\n",strerror(errno));
 		if(pipe(pipe_out)<0) fatal("couldn't create library pipes: %s\n",strerror(errno));
 
-		p->input_fd = pipe_in[0];
-		p->output_fd = pipe_out[1];
+		input_fd = pipe_in[0];
+		output_fd = pipe_out[1];
 
 		/* Standard error of library goes to output file name for return to manager. */
-		p->error_fd = mkstemp(p->output_file_name);
-		if(p->output_fd == -1) {
+		error_fd = open(p->output_file_name,O_WRONLY|O_TRUNC|O_CREAT,0777);
+		if(output_fd == -1) {
 			debug(D_VINE, "Could not open worker stdout: %s", strerror(errno));
 			return 0;
 		}
 	} else {
 		/* For other task types, read input from null and send output to assigned file. */
 		
-		p->input_fd = open("/dev/null",O_RDONLY);
-		p->output_fd = mkstemp(p->output_file_name);
-		if(p->output_fd == -1) {
+		input_fd = open("/dev/null",O_RDONLY);
+		output_fd = open(p->output_file_name,O_WRONLY|O_TRUNC|O_CREAT,0777);
+		if(output_fd<0) {
 			debug(D_VINE, "Could not open worker stdout: %s", strerror(errno));
 			return 0;
 		}
-		p->error_fd = p->output_fd;		
+		error_fd = output_fd;		
 	}
 
 	/* Start the performance clock just prior to forking the task. */
@@ -333,6 +319,9 @@ pid_t vine_process_execute(struct vine_process *p )
 			close(pipe_in[0]);
 			close(pipe_out[1]);
 
+			/* Close the error stream that the parent won't use. */
+			close(error_fd);
+
 			/* Wait up to 60 seconds for library startup.  This should be asynchronous. */
 			time_t stoptime = time(0)+60;
 			
@@ -342,17 +331,28 @@ pid_t vine_process_execute(struct vine_process *p )
 				/* XXX need better plan for library that fails to start. */
 			}
 
+		} else {
+			/* For any other task type, drop the fds unused by the parent. */
+			close(input_fd);
+			close(output_fd);
+			close(error_fd);
 		}
-
-		/* XXX should we close unused descriptors here? */
+		
 		return p->pid;
 
 	} else if(p->pid < 0) {
 
 		debug(D_VINE, "couldn't create new process: %s\n", strerror(errno));
-		unlink(p->output_file_name);
-		close(p->output_fd);
-		return p->pid;
+
+		close(pipe_in[0]);
+		close(pipe_in[1]);
+		close(pipe_out[0]);
+		close(pipe_out[1]);
+		close(input_fd);
+		close(output_fd);
+		close(error_fd);
+
+		return -1;
 
 	} else {
 		if(chdir(p->sandbox)) {
@@ -372,25 +372,25 @@ pid_t vine_process_execute(struct vine_process *p )
 		 	char *output = vine_process_invoke_function(p->library_process,p->task->command_line,input,p->sandbox);
 
 			// write data to output file
-			full_write(p->output_fd, output, strlen(output));
+			full_write(output_fd, output, strlen(output));
 
 			_exit(0);
 		}
 
 		/* Otherwise for a normal task or a library, set up file desciptors and execute the command. */
 
-		int result = dup2(p->input_fd, STDIN_FILENO);
+		int result = dup2(input_fd, STDIN_FILENO);
 		if(result<0) fatal("could not dup input to stdin: %s", strerror(errno));
 
-		result = dup2(p->output_fd, STDOUT_FILENO);
+		result = dup2(output_fd, STDOUT_FILENO);
 		if(result<0) fatal("could not dup output to stdout: %s", strerror(errno));
 
-		result = dup2(p->error_fd, STDERR_FILENO);
+		result = dup2(error_fd, STDERR_FILENO);
 		if(result<0) fatal("could not dup error to stderr: %s", strerror(errno));
 
-		close(p->input_fd);
-		close(p->output_fd);
-		close(p->error_fd);
+		close(input_fd);
+		close(output_fd);
+		close(error_fd);
 
 		/* For a library task, close the unused sides of the pipes. */
 		if(p->task->provides_library) {

@@ -43,9 +43,6 @@ struct vine_process {
 	char *sandbox;
 	char *tmpdir;                   // TMPDIR per task, expected to be a subdir of sandbox.
 	char *output_file_name;
-	int input_fd;
-	int output_fd;
-	int error_fd;
 
 	/* The details of the task to execute. */
 	struct vine_task *task;
