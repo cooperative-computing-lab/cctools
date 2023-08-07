@@ -3982,6 +3982,7 @@ static void vine_manager_send_libraries_to_workers(struct vine_manager *q, time_
 
 void vine_manager_install_library( struct vine_manager *q, struct vine_task *t, const char *name )
 {
+	t->type = VINE_TASK_TYPE_LIBRARY;
 	t->task_id = -1;
 	vine_task_provides_library(t,name);
 	hash_table_insert(q->libraries, name, t);
@@ -4245,15 +4246,24 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				/*
 				If this is a standard task type, then breaK out of the loop
 				and return it to the user.  Other task types are deleted silently.
+				/*
+
+				/*
+				(Yes, the use of goto is a bit gross here, but a switch is
+				the right way to deal with the enumeration, and so "break"
+				doesn't have the usual meaning.
 				*/
 
-				if(t->type==VINE_TASK_TYPE_STANDARD) {
-					break;
-				} else {
-					vine_task_delete(t);
-					t = 0;
-					continue;
-				}				
+				switch(t->type) {
+					case VINE_TASK_TYPE_STANDARD:
+						goto end_of_loop;
+						break;
+					case VINE_TASK_TYPE_RECOVERY:
+					case VINE_TASK_TYPE_LIBRARY:
+						vine_task_delete(t);
+						t = 0;
+						continue;
+				}
 			}
 		}
 
@@ -4417,6 +4427,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// the next time around.
 		q->busy_waiting_flag = 1;
 	}
+
+	end_of_loop:
 
 	if(events > 0) {
 		vine_perf_log_write_update(q, 1);
