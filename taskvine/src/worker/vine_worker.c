@@ -585,11 +585,17 @@ If a local worker, stream the output from disk.
 static void report_task_complete( struct link *manager, struct vine_process *p )
 {
 	int64_t output_length;
-	struct stat st;
 
-	fstat(p->output_fd, &st);
-	output_length = st.st_size;
-	lseek(p->output_fd, 0, SEEK_SET);
+	/* If the output file was opened, measure it.  Otherwise, output length is zero. */
+	if(p->output_fd>=0) {
+		struct stat st;
+		fstat(p->output_fd, &st);
+		output_length = st.st_size;
+		lseek(p->output_fd, 0, SEEK_SET);
+	} else {
+		output_length = 0;
+	}
+	
 	send_message(manager, "result %d %d %lld %llu %llu %d\n", p->result, p->exit_code, (long long) output_length, (unsigned long long) p->execution_start, (unsigned long long) p->execution_end, p->task->task_id);
 	link_stream_from_fd(manager, p->output_fd, output_length, time(0)+active_timeout);
 
