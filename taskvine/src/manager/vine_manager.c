@@ -4246,7 +4246,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				/*
 				If this is a standard task type, then breaK out of the loop
 				and return it to the user.  Other task types are deleted silently.
-				/*
+				*/
 
 				/*
 				(Yes, the use of goto is a bit gross here, but a switch is
