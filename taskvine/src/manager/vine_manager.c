@@ -3896,54 +3896,63 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	return (t->task_id);
 }
 
-static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name) {
+/*
+Send a given library by name to the target worker.
+This involves duplicating the prototype task in q->libraries
+and then sending the copy as a (mostly) normal task.
+*/
 
-	// setup the Library Task by copying the original and giving it a unique taskid
+static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name)
+{
+	/* Find the original prototype library task by name, if it exists. */
 	struct vine_task *original = hash_table_lookup(q->libraries,name);
+	if(!original) return 0;
 	
+	/* Duplicate the original task and give it a unique taskid */
 	struct vine_task *t = vine_task_copy(original);
 	t->task_id = q->next_task_id++;
-	t->hostname = xxstrdup(w->hostname);
-	t->addrport = xxstrdup(w->addrport);
-	t->worker = w;
 
-	// send the Library Task to the worker
-	vine_result_code_t result = start_one_task(q, w, t);
-	change_task_state(q, t, VINE_TASK_RUNNING);
-	
-	// insert the task into the worker's library table to track resource allocations
-	hash_table_insert(w->libraries, name, t);
+	/* Send the task to the worker in the usual way. */
+	commit_task_to_worker(q,w,t);
 
+	/* Make the special log recordings for the library */
 	vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
 
-	return result;
+	return 1;
 }
 
-static void vine_manager_send_library_to_workers(struct vine_manager *q, const char *name, time_t stoptime) {
+static struct vine_task * vine_manager_find_library_on_worker( struct vine_manager *q, struct vine_worker_info *w, const char *library_name )
+{
+	uint64_t task_id;
+	struct vine_task *task;
+	
+	ITABLE_ITERATE(w->current_tasks,task_id,task) {
+		if(task->provides_library && !strcmp(task->provides_library,library_name)) {
+			return task;
+		}
+	}
+
+	return 0;
+}
+
+static void vine_manager_send_library_to_workers(struct vine_manager *q, const char *name, time_t stoptime)
+{
 	char *worker_key;
 	struct vine_worker_info *w;
 
 	HASH_TABLE_ITERATE(q->worker_table,worker_key,w) {
-		if (stoptime < time(0)) {
-			return;
-		}
-		if (!w->workerid) {
-			continue;
-		}
-		
-		if(!w->features) {
-			w->features = hash_table_create(4,0);
-			continue;
-		}
-		if(!hash_table_lookup(w->features, name)) {
+		if(stoptime < time(0)) return;
+		/* XXX I think this is testing something about worker validity. */
+		if(!w->workerid) continue;
+		if(!vine_manager_find_library_on_worker(q,w,name)) {
 			debug(D_VINE, "Sending library %s to worker %s\n", name, w->workerid);
 			vine_manager_send_library_to_worker(q, w, name);
-			hash_table_insert(w->features, name, (void **) 1);
 		}
 	}
 }
 
-static void vine_manager_send_libraries_to_workers(struct vine_manager *q, time_t stoptime) {
+static void vine_manager_send_libraries_to_workers(struct vine_manager *q, time_t stoptime)
+{
 	char *library;
 	struct vine_task *t;
 	HASH_TABLE_ITERATE(q->libraries,library,t) {
@@ -3954,7 +3963,8 @@ static void vine_manager_send_libraries_to_workers(struct vine_manager *q, time_
 
 }
 
-void vine_manager_install_library( struct vine_manager *q, struct vine_task *t, const char *name ) {
+void vine_manager_install_library( struct vine_manager *q, struct vine_task *t, const char *name )
+{
 	t->task_id = -1;
 	vine_task_provides_library(t,name);
 	hash_table_insert(q->libraries, name, t);
@@ -3967,16 +3977,18 @@ void vine_manager_remove_library( struct vine_manager *q, const char *name )
 	struct vine_worker_info *w;
 
 	HASH_TABLE_ITERATE(q->worker_table,worker_key,w) {
-		struct vine_task *t = hash_table_remove(w->libraries, name);
+		struct vine_task *t = vine_manager_find_library_on_worker(q,w,name);
 		if(t) {
-			cancel_task_on_worker(q,t,VINE_TASK_CANCELLED);
+			cancel_task_on_worker(q,t,VINE_TASK_CANCELED);
+			/* XXX shouldn't the worker declare the feature gone? */
 			hash_table_remove(w->features, name);
 		}
 	}
 	hash_table_remove(q->libraries, name);
 }
 
-static void handle_library_update(struct vine_manager *q, struct vine_worker_info *w, const char *line) {
+static void handle_library_update(struct vine_manager *q, struct vine_worker_info *w, const char *line)
+{
 	int library_id = 0;
 	vine_library_state_t state;
 
@@ -3986,24 +3998,8 @@ static void handle_library_update(struct vine_manager *q, struct vine_worker_inf
 		return;
 	}
 
-	if(state == VINE_LIBRARY_STARTED) {
-		debug(D_VINE, "Library %d started on %s\n", library_id, w->workerid);
-		itable_remove(w->current_tasks_boxes, library_id);
-	}
-
-	char *name;
-	struct vine_task *t;
-
-	HASH_TABLE_ITERATE(w->libraries,name,t) {
-		if (t->task_id == library_id) {
-			change_task_state(q, t, VINE_TASK_DONE);
-			break;
-		}
-	};
-
 	vine_txn_log_write_library_update(q, w, library_id, state);
 }
-
 
 void vine_block_host_with_timeout(struct vine_manager *q, const char *hostname, time_t timeout)
 {
