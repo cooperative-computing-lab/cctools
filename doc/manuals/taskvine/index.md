@@ -1140,7 +1140,7 @@ creating the manager:
     ```
 
 
-If you are using a (project name)[#project-names-and-the-catalog-server] for
+If you are using a [project name](#project-names-and-the-catalog-server) for
 your manager, then the workers will be aware that the manager is using SSL and
 communicate accordingly automatically. However, you are directly specifying the
 address of the manager when launching the workers, then you need to add the
