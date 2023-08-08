@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Example of how to use taskvine high order functions
-import taskvine as vine
+import ndcctools.taskvine as vine
 
 def main():
     # Set up queue
