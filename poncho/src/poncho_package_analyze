@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from poncho import package_analyze as analyze
+from ndcctools.poncho import package_analyze as analyze
 import argparse
 import ast
 import json

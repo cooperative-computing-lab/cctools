@@ -5,6 +5,17 @@
 
 exe="mmap.test"
 
+check_needed()
+{
+	# Do not run this test in github actions b/c ptrace operations are *very* slow there.
+	if [ -n "$GITHUB_ACTION" ]
+    then
+        return 1
+    else
+        return 0
+    fi
+}
+
 prepare()
 {
 	gcc -I../src/ -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none -lm <<EOF

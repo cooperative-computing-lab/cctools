@@ -20,26 +20,28 @@ prepare()
 	return 0
 }
 
+FORMAT="%a %b %g %h %i %s %u %W %X %Y %Z"
+
 run()
 {
 	set -e
 
-	stat $file $link 2>/dev/null > $expected
-	parrot -- stat $file $link > $from_parrot
+	stat --format "$FORMAT" $file $link 2>/dev/null > $expected
+	parrot -- stat --format "$FORMAT" $file $link > $from_parrot
 	
 	diff $expected $from_parrot
 
-	if ! parrot --check-driver cvmfs
+	if ! parrot_run --check-driver cvmfs
 	then
 		return 0
 	fi
 
 	# check that symlinks are correctly detected
 	cvmfs_symlink=/cvmfs/cms.cern.ch/bin/scramv1
-	parrot -t${tmp_dir} -- sh -c "[ -L ${cvmfs_symlink} ]";
+	parrot_run -t${tmp_dir} -- sh -c "[ -L ${cvmfs_symlink} ]";
 
 	target=$(parrot -t${tmp_dir} -- realpath $cvmfs_symlink | tail -n1)
-	parrot -t${tmp_dir}  /bin/sh -c "[ -f $target ]";
+	parrot_run -t${tmp_dir}  /bin/sh -c "[ -f $target ]";
 
 	return 0
 }
