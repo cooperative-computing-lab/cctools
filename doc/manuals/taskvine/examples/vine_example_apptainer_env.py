@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import taskvine as vine
+import ndcctools.taskvine as vine
 
 import subprocess
 import argparse

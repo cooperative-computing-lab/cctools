@@ -1,10 +1,10 @@
 # Quick start example of taskvine with python functions
 
 # Import the taskvine library.
-import taskvine as vine
+import ndcctools.taskvine as vine
 
-# Create a new manager, listening on port 9123.
-m = vine.Manager(9123)
+# Create a new manager
+m = vine.Manager([9123,9129])
 print(f"Listening on port {m.port}")
 
 # Declare a common input file to be shared by multiple tasks.
