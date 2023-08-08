@@ -323,9 +323,9 @@ static int do_worker_transfer( struct vine_cache *c, const char *source_url, con
 		}
 	}
 	
-	/* XXX A fixed timeout of 300 certainly can't be right! */
+	/* XXX A fixed timeout of 900 certainly can't be right! */
 	
-	if(!vine_transfer_get_any(worker_link, c, path, time(0) + 300))
+	if(!vine_transfer_get_any(worker_link, c, path, time(0) + 900))
 	{
 		*error_message = string_format("Could not transfer file %s from worker %s:%d", path, addr, port_num);
 		link_close(worker_link);
