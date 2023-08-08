@@ -471,11 +471,17 @@ vine_file_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cac
 	}
 
 	/* File is already present in the cache. */
-	if(f->status==VINE_FILE_STATUS_READY)  return VINE_FILE_STATUS_READY;
-	/* transfer process completed and failed. */
-	if(f->status==VINE_FILE_STATUS_FAILED) return VINE_FILE_STATUS_FAILED;
-	/* transfer process running. */
-	if(f->status==VINE_FILE_STATUS_PROCESSING) return VINE_FILE_STATUS_PROCESSING;
+	switch(f->status) {
+		case VINE_FILE_STATUS_READY:
+			return VINE_FILE_STATUS_READY;
+		case VINE_FILE_STATUS_FAILED:
+			return VINE_FILE_STATUS_FAILED;
+		case VINE_FILE_STATUS_PROCESSING:
+			return VINE_FILE_STATUS_PROCESSING;
+		case VINE_FILE_STATUS_UNKNOWN:
+			break;
+
+	}
 
 	if(f->type == VINE_CACHE_MINI_TASK){
 		if(f->mini_task->input_mounts) {
