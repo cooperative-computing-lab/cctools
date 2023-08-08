@@ -218,9 +218,32 @@ static int vine_transfer_get_file_internal( struct link *lnk, const char *filena
 	}
 
 	int64_t actual = link_stream_to_fd(lnk, fd, length, stoptime);
-	close(fd);
-	if(actual!=length) {
+
+    int transferred_file_invalid = 0;
+
+    /* sync file */
+    if (fsync(fd)) {
+        debug(D_VINE, "Failed to fsync file - %s (%s)\n", filename, strerror(errno));
+        transferred_file_invalid = 1;
+    }
+
+    if (close(fd)) {
+        debug(D_VINE, "Failed to close file - %s (%s)\n", filename, strerror(errno));
+        transferred_file_invalid = 1;
+    }
+
+    if (transferred_file_invalid) {
+        if (remove(filename)) {
+            debug(D_VINE, "Failed to remove file - %s (%s)\n", filename, strerror(errno));
+        }
+        return 0;
+    }
+
+    if(actual!=length) {
 		debug(D_VINE, "Failed to put file - %s (%s)\n", filename, strerror(errno));
+        if (remove(filename)) {
+            debug(D_VINE, "Failed to remove file - %s (%s)\n", filename, strerror(errno));
+        }
 		return 0;
 	}
 
