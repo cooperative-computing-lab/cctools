@@ -2913,6 +2913,7 @@ and mark it as done.
 static int receive_one_task( struct vine_manager *q )
 {
 	struct vine_task *t;
+	uint64_t task_id = 0;
 
 	if((t = list_peek_head(q->waiting_list))) {
 		struct vine_worker_info *w = t->worker;
@@ -4800,9 +4801,6 @@ void vine_get_stats(struct vine_manager *q, struct vine_stats *s)
 	// s->workers_able computed below.
 
 	//info about tasks
-	struct vine_task *t;
-	uint64_t taskid;
-
 	int ready_tasks = list_size(q->ready_list);
 	int waiting_tasks = list_size(q->waiting_list);
 	int running_tasks = task_state_count(q, NULL, VINE_TASK_RUNNING);

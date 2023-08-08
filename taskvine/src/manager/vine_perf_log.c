@@ -53,7 +53,7 @@ void vine_perf_log_write_update( struct vine_manager *q, int force )
 	struct vine_stats s;
 
 	timestamp_t now = timestamp_get();
-	if(!force && (now - q->time_last_log_stats < (ONE_SECOND*q->perf_log_interval))) {
+	if(!force && ((now - q->time_last_log_stats) < (long unsigned int)(ONE_SECOND*q->perf_log_interval))) {
 		return;
 	}
 
