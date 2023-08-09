@@ -1518,7 +1518,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
 		}
 	}
-
+	
 	change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
 
 	return VINE_SUCCESS;
@@ -2823,8 +2823,7 @@ static int send_one_task( struct vine_manager *q )
 		}
 
 
-		// Otherwise, remove it from the ready list and start it:
-		list_pop_tail(q->ready_list);
+		// Otherwise, start it:
 		commit_task_to_worker(q,w,t);
 		return 1;
 	}
@@ -2913,12 +2912,11 @@ and mark it as done.
 static int receive_one_task( struct vine_manager *q )
 {
 	struct vine_task *t;
-	uint64_t task_id = 0;
 
-	if((t = list_peek_head(q->waiting_list))) {
+	if((t = list_peek_head(q->waiting_retrieval_list))) {
 		struct vine_worker_info *w = t->worker;
 		/* Attempt to fetch from this worker. */
-		if(fetch_output_from_worker(q, w, task_id)) {
+		if(fetch_output_from_worker(q, w, t->task_id)) {
 			/* If we got one, then we are done. */
 			prune_worker(q, w);
 			return 1;
@@ -3253,7 +3251,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->next_task_id = 1;
 	
 	q->ready_list = list_create();
-	q->waiting_list = list_create();
+	q->running_list = list_create();
+	q->waiting_retrieval_list = list_create();
 	q->retrieved_list = list_create();
 
 	q->tasks          = itable_create(0);
@@ -3554,7 +3553,7 @@ void vine_delete(struct vine_manager *q)
 	hash_table_delete(q->categories);
 
 	list_delete(q->ready_list);
-	list_delete(q->waiting_list);
+	list_delete(q->waiting_retrieval_list);
 	list_delete(q->retrieved_list);
 	hash_table_delete(q->libraries);
 	hash_table_delete(q->workers_with_available_results);
@@ -3743,18 +3742,18 @@ static vine_task_state_t change_task_state( struct vine_manager *q, struct vine_
 			vine_task_set_result(t, VINE_RESULT_UNKNOWN);
 			push_task_to_ready_list(q, t);
 			break;
+		case VINE_TASK_RUNNING:
+			list_pop_tail(q->ready_list); // the task was positioned at the tail during send_one_task.
+			list_push_head(q->running_list, t);
+			break;
 		case VINE_TASK_WAITING_RETRIEVAL:
-			list_push_head(q->waiting_list, t);
+			list_remove(q->running_list, t);
+			list_push_head(q->waiting_retrieval_list, t);
 			break;
 		case VINE_TASK_RETRIEVED:
-		{
-			struct vine_task *tmp = NULL;
-			while((tmp = list_rotate(q->waiting_list))){
-				if((t = tmp)) list_pop_tail(q->waiting_list);
-			}
+			list_remove(q->waiting_retrieval_list, t);
 			list_push_head(q->retrieved_list, t);
 			break;
-		}
 		case VINE_TASK_DONE:
 		case VINE_TASK_CANCELED:
 			/* Task was cloned when entered into our own table, so delete a reference on removal. */
@@ -4244,8 +4243,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				}
 			} else if((t = list_peek_head(q->retrieved_list))) {
 				list_pop_head(q->retrieved_list);
-			} else {
-				t = task_state_any(q, VINE_TASK_RETRIEVED);
 			}
 
 			if(t) {
@@ -4415,7 +4412,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		if(events > 0) {
 			if(task_state_any(q, VINE_TASK_RETRIEVED) && t == NULL) continue;
 			BEGIN_ACCUM_TIME(q, time_internal);
-			int done = !task_state_any(q, VINE_TASK_READY) && !task_state_any(q, VINE_TASK_WAITING_RETRIEVAL) && !task_state_any(q, VINE_TASK_RUNNING);
+			int done = !list_size(q->ready_list) && !list_size(q->waiting_retrieval_list) && !list_size(q->running_list);
 			END_ACCUM_TIME(q, time_internal);
 
 			if(done) {
@@ -4802,8 +4799,8 @@ void vine_get_stats(struct vine_manager *q, struct vine_stats *s)
 
 	//info about tasks
 	int ready_tasks = list_size(q->ready_list);
-	int waiting_tasks = list_size(q->waiting_list);
-	int running_tasks = task_state_count(q, NULL, VINE_TASK_RUNNING);
+	int waiting_tasks = list_size(q->waiting_retrieval_list);
+	int running_tasks = list_size(q->running_list);
 
 	s->tasks_waiting = ready_tasks;
 	s->tasks_with_results = waiting_tasks;
