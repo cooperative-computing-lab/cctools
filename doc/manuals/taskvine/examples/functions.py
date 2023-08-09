@@ -1,6 +1,6 @@
 # Quick start example of taskvine with python functions
 
-import taskvine as vine
+import ndcctools.taskvine as vine
 
 # Define a function to invoke remotely.
 def my_sum(x, y):
