@@ -59,7 +59,7 @@ struct cache_file * cache_file_create( vine_cache_type_t type, const char *sourc
 	f->actual_size = actual_size;
 	f->mode = mode;
 	f->pid = 0;
-	f->status = VINE_FILE_STATUS_UNKNOWN;
+	f->status = VINE_FILE_STATUS_NOT_PRESENT;
 	f->mini_task = mini_task;
 	f->process = 0;
 	f->start_time = 0;
@@ -440,6 +440,7 @@ void vine_cache_check_outputs(struct cache_file *f, char *cachename, struct vine
 	} else {
 		debug(D_VINE,"cache: unable to create %s",cachename);
 	}
+	free(cache_path);
 }
 
 void vine_cache_handle_exit_status(int status, char *cachename, struct cache_file *f, struct link *manager){	
@@ -489,7 +490,7 @@ vine_file_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cac
 			return VINE_FILE_STATUS_FAILED;
 		case VINE_FILE_STATUS_PROCESSING:
 			return VINE_FILE_STATUS_PROCESSING;
-		case VINE_FILE_STATUS_UNKNOWN:
+		case VINE_FILE_STATUS_NOT_PRESENT:
 			break;
 
 	}
@@ -525,8 +526,17 @@ vine_file_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cac
 	if(pid > 0){
 		f->pid = pid;
 		f->status = VINE_FILE_STATUS_PROCESSING;
-		if(f->type==VINE_CACHE_TRANSFER) debug(D_VINE,"cache: transferring %s to %s",f->source,cachename);
-		if(f->type==VINE_CACHE_MINI_TASK) debug(D_VINE,"cache: creating %s via mini task",cachename);
+		switch(f->type){
+			case (VINE_CACHE_TRANSFER):
+				debug(D_VINE,"cache: transferring %s to %s",f->source,cachename);
+				break;
+			case (VINE_CACHE_MINI_TASK): 
+				debug(D_VINE,"cache: creating %s via mini task",cachename);
+				break;
+			case (VINE_CACHE_FILE):
+				debug(D_VINE,"cache: checking if %s is present in cache",cachename);
+				break;
+		}
 		return VINE_FILE_STATUS_PROCESSING;
 	}
 
