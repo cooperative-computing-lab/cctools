@@ -1177,10 +1177,12 @@ static int expire_waiting_tasks(struct vine_manager *q)
 		if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time)
 		{
 			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
+			list_remove(q->ready_list, t);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			expired++;
 		} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
 			vine_task_set_result(t, VINE_RESULT_MAX_RETRIES);
+			list_remove(q->ready_list, t);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			expired++;
 		} 
@@ -1207,6 +1209,7 @@ static int enforce_waiting_fixed_locations(struct vine_manager *q)
 		t = list_pop_head(q->ready_list);
 		if(t->has_fixed_locations && !vine_schedule_check_fixed_location(q, t)) {
 			vine_task_set_result(t, VINE_RESULT_FIXED_LOCATION_MISSING);
+			list_remove(q->ready_list, t);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			terminated++;
 		} else {
@@ -1519,6 +1522,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		}
 	}
 	
+	list_remove(q->running_list, t);
 	change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
 
 	return VINE_SUCCESS;
@@ -2604,6 +2608,18 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 
 	t->worker = 0;
 
+	switch(t->state)
+	{
+		case VINE_TASK_RUNNING:
+			list_remove(q->running_list, t);
+			break;
+		case VINE_TASK_WAITING_RETRIEVAL:
+			list_remove(q->waiting_retrieval_list, t);
+			break;
+		default:
+			break;
+	}
+	
 	change_task_state(q, t, new_state);
 
 	count_worker_resources(q, w);
@@ -2823,7 +2839,8 @@ static int send_one_task( struct vine_manager *q )
 		}
 
 
-		// Otherwise, start it:
+		// Otherwise, remove it from the ready list and start it:
+		list_pop_tail(q->ready_list); 
 		commit_task_to_worker(q,w,t);
 		return 1;
 	}
@@ -3744,15 +3761,12 @@ static vine_task_state_t change_task_state( struct vine_manager *q, struct vine_
 			push_task_to_ready_list(q, t);
 			break;
 		case VINE_TASK_RUNNING:
-			list_pop_tail(q->ready_list); // the task was positioned at the tail during send_one_task.
 			list_push_head(q->running_list, t);
 			break;
 		case VINE_TASK_WAITING_RETRIEVAL:
-			list_remove(q->running_list, t);
 			list_push_head(q->waiting_retrieval_list, t);
 			break;
 		case VINE_TASK_RETRIEVED:
-			list_remove(q->waiting_retrieval_list, t);
 			list_push_head(q->retrieved_list, t);
 			break;
 		case VINE_TASK_DONE:
