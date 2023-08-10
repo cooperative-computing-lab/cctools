@@ -408,43 +408,23 @@ void vine_cache_process_entry(struct cache_file *f, char *cachename, struct vine
 		} else if(result<0) {
 			debug(D_VINE, "wait4 on pid %d returned an error: %s",(int)f->pid,strerror(errno));	
 		} else if(result>0) {
-			vine_cache_extract_outputs(f,c,manager);
-			vine_cache_handle_exit_status(status,cachename,f,c,manager);
+			vine_cache_handle_exit_status(status,cachename,f,manager);
+			vine_cache_check_outputs(f,cachename,c,manager);
 		}
 	}
 }
 
-void vine_cache_extract_outputs(struct cache_file *f, struct vine_cache *c, struct link *manager)
+void vine_cache_check_outputs(struct cache_file *f, char *cachename, struct vine_cache *c, struct link *manager)
 {
+	int64_t nbytes, nfiles;
+	char *cache_path = vine_cache_full_path(c,cachename);
+	timestamp_t transfer_time = f->stop_time - f->start_time;
 	if(f->type==VINE_CACHE_MINI_TASK){
 		vine_sandbox_stageout(f->process, c, manager);
 		f->process->task = 0;
 		vine_process_delete(f->process);
 	}
-}
-
-void vine_cache_handle_exit_status(int status, char *cachename, struct cache_file *f, struct vine_cache *c, struct link *manager){	
-	int exit_code;
-	if(!WIFEXITED(status)){
-		exit_code = WTERMSIG(status);
-		debug(D_VINE, "transfer process (pid %d) exited abnormally with signal %d",f->pid, exit_code);
-		f->status = VINE_FILE_STATUS_FAILED;
-	} else {
-		exit_code = WEXITSTATUS(status);
-		debug(D_VINE, "transfer process for %s (pid %d) exited normally with exit code %d", cachename, f->pid, exit_code );
-		if(exit_code==1){	
-			debug(D_VINE, "transfer process for %s completed", cachename);
-			f->status = VINE_FILE_STATUS_READY;
-		} else {
-			debug(D_VINE, "transfer process for %s failed", cachename);
-			f->status = VINE_FILE_STATUS_FAILED;
-		}
-	}
 	if(f->status==VINE_FILE_STATUS_READY){
-		int64_t nbytes, nfiles;
-		char *cache_path = vine_cache_full_path(c,cachename);
-		f->stop_time = timestamp_get();
-		timestamp_t transfer_time = f->stop_time - f->start_time;
 		chmod(cache_path,f->mode);
 		if(path_disk_size_info_get(cache_path,&nbytes,&nfiles)==0) {
 			f->actual_size = nbytes;
@@ -458,6 +438,27 @@ void vine_cache_handle_exit_status(int status, char *cachename, struct cache_fil
 
 	} else {
 		debug(D_VINE,"cache: unable to create %s",cachename);
+	}
+}
+
+void vine_cache_handle_exit_status(int status, char *cachename, struct cache_file *f, struct link *manager){	
+	int exit_code;
+	f->stop_time = timestamp_get();
+	if(!WIFEXITED(status)){
+		exit_code = WTERMSIG(status);
+		debug(D_VINE, "transfer process (pid %d) exited abnormally with signal %d",f->pid, exit_code);
+		f->status = VINE_FILE_STATUS_FAILED;
+
+	} else {
+		exit_code = WEXITSTATUS(status);
+		debug(D_VINE, "transfer process for %s (pid %d) exited normally with exit code %d", cachename, f->pid, exit_code );
+		if(exit_code==1){	
+			debug(D_VINE, "transfer process for %s completed", cachename);
+			f->status = VINE_FILE_STATUS_READY;
+		} else {
+			debug(D_VINE, "transfer process for %s failed", cachename);
+			f->status = VINE_FILE_STATUS_FAILED;
+		}
 	}
 }
 

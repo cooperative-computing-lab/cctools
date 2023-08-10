@@ -55,7 +55,7 @@ int vine_cache_remove( struct vine_cache *c, const char *cachename );
 int vine_cache_contains( struct vine_cache *c, const char *cachename );
 int vine_cache_wait( struct vine_cache *c, struct link *manager );
 void vine_cache_process_entry(struct cache_file *f, char *cachename, struct vine_cache *c, struct link *manager);
-void vine_cache_extract_outputs(struct cache_file *f, struct vine_cache *c, struct link *manager);
-void vine_cache_handle_exit_status(int status, char *cachename, struct cache_file *f, struct vine_cache *c, struct link *manager);
+void vine_cache_check_outputs(struct cache_file *f, char *cachename, struct vine_cache *c, struct link *manager);
+void vine_cache_handle_exit_status(int status, char *cachename, struct cache_file *f, struct link *manager);
 
 #endif
