@@ -420,7 +420,8 @@ void vine_cache_check_outputs(struct cache_file *f, char *cachename, struct vine
 	char *cache_path = vine_cache_full_path(c,cachename);
 	timestamp_t transfer_time = f->stop_time - f->start_time;
 	if(f->type==VINE_CACHE_MINI_TASK){
-		vine_sandbox_stageout(f->process, c, manager);
+		// stageout only if process succeeded 
+		if(f->status==VINE_FILE_STATUS_READY) vine_sandbox_stageout(f->process, c, manager);
 		f->process->task = 0;
 		vine_process_delete(f->process);
 	}
