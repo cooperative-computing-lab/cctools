@@ -238,7 +238,7 @@ Execute a task synchronously and return true on success.
 int vine_process_execute_and_wait( struct vine_process *p, struct vine_cache *cache)
 {
 
-	if (!vine_sandbox_stagein(p,cache,manager)) {
+	if (!vine_sandbox_stagein(p,cache)) {
 		debug(D_VINE, "Can't stage input files for task %d.", p->task->task_id);
 		p->task = 0;
 		vine_process_delete(p);
