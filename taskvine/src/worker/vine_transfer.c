@@ -225,21 +225,11 @@ static int vine_transfer_get_file_internal( struct link *lnk, const char *filena
 		close(fd);
 		return 0;
 	}
-	
-    int fsync_invalid = 0;
-    if (fsync(fd)<0) {
-        debug(D_VINE, "Failed to fsync file - %s (%s)\n", filename, strerror(errno));
-        fsync_invalid = 1;
-    }
 
 	if(close(fd)<0) {
 		debug(D_VINE, "Failed to close file - %s (%s)\n", filename, strerror(errno));
 		return 0;
 	}
-
-    if (fsync_invalid) {
-        return 0;
-    }
 
 	chmod(filename,mode);
 
