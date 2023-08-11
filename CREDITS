@@ -2,171 +2,123 @@
 This package is developed primarily by member of the
 Cooperative Computing Lab at the University of Notre Dame.
 
-Many people have contributed features, bug fixes, documentation,
-and other items.  In alphabetical order:
-
-	Michael Albrecht
-	University of Notre Dame
-	Created the Parrot-S3 module and contributed to Work Queue and Makeflow.
-
-	Chris Bauschka
-	Purdue University
-	Contributed to Work Queue and the Sweeper abstraction.
-
-	John Bent
-	University of Wisconsin
-	Debugged early versions of parrot on many applications with NeST.
-
-	Dan Bradley
-	University of Wisconsin
-	Contributed the Parrot-CVMFS module and a variety of bug fixes.
-
-	Christophe Blanchet
-	IBCP
-	Developed new support for Parrot to work with the EGEE software and bioinformatics applications.
-
-	Brian Bockelman
-	University of Nebraska-Lincoln
-	Contributed the Parrot "Paranoid" shutdown mode.
-
-	Hoang Bui
-	University of Notre Dame
-	Created the chirp_distribute and chirp_matrix modules.
-
-	Peter Bui
-	University of Notre Dame
-	Created the Parrot-HDFS module and many improvements to Makeflow and Work Queue.
-
-	Benjamin Couturier
-	CERN
-	Provided patches to work with the CASTOR name space.
-
-	Patrick Donnelly
-	University of Notre Dame
-	Contributed to Chirp, Parrot, HDFS Support, and ticket authentication.
-
-	Iheanyi Ekechukwu
-	University of Notre Dame
-	Contributed to Work Queue and the Sweeper abstraction.
-
-	Michael Ernst, Patrick Fuhrmann, and Tigran Mkrtchyan
-	Fermi National Labs and DESY
-	Provided invaluable help installing, configuring, and using dcache
-	for use with Parrot.
-
-	Jamie Frey
-	University of Wisconsin
-	Debugged and deployed ftp_lite.
-
-	Nicholas Hazekamp
-	University of Notre Dame
-	Contributed to the development of resource management in Makeflow
-
-	Jeffrey Hemmes
-	University of Notre Dame
-	Developed support for distributed access control lists.
-
-	Peter Ivie
-	University of Notre Dame
-	Created the DeltaDB system for catalog queries and the Prune preservation system.
-
-	Miron Livny
-	University of Wisconsin
-	Provided excellent strategic and technical advice as my Ph.D. advisor.
-
-	Haiyan Meng
-	University of Notre Dame
-	Created the Umbrella environment specification system.
-
-	Zach Miller
-	University of Wisconsin
-	Tested and deployed parrot with BLAST.
-
-	Chris Moretti
-	University of Notre Dame
-	Contributed extensively to the implementation of Chirp,
-	abstractions for distributed computing, and the SAND assembler.
-
-	Kevin Partington
-	University of Notre Dame
-	Contributed features to Makeflow and Work Queue.
-
-	Francesco Prelz
-	INFN Milan
-	Contributed numerous bug fixes and performance improvements to Parrot.
-
-	Dinesh Rajan
-	University of Notre Dame
-	Contributed to Work Queue and multiple elastic applications.
-
-	Sander Klous
-	NIKHEF
-	Tested and deployed parrot with BaBar and Objectivity.
-
-	Csaba Kos
-	Contributed bug fixes to Parrot and Chirp.
-
-    Nathaniel Kremer-Herman
-    University of Notre Dame
-    Contributed features to Makeflow and Work Queue.
-    Created the TLQ distributed system troubleshooting architecture.
-
-	Peter Kunszt
-	CERN
-	Patches to run on variations of Linux
-	Glite-IO module.
-
-	Paul Madrid
-	University of Notre Dame
-	Implemented the reservation ACL feature.
-
-	Michael Olson
-	University of Notre Dame
-	Contributed to the design and implementation of SAND.
-
-	Kevin Partington
-	University of Notre Dame
-	Contributed to features in Makeflow.
-
-	Casey Robinson
-	University of Notre Dame
-	Implemented the Makeflow linker, and monitor visualizer.
-
-	Alain Roy
-	University of Wisconsin
-	Tested and deployed ftsh with the Virtual Data Toolkit.
-
-	Hugh Sasse
-	De Montfort University, U.K.
-	Contributed to the Fault Tolerant Shell
-
-	Ulrich Schwickerath
-	FZH Hamburg
-	Contributed RFIO driver and Infiniband support for Parrot.
-
-	Tim Shaffer
-	University of Notre Dame
-	Contributed to Parrot, catalog redundancy, and the JX language.
-
-	Igor Sfiligoi, Aureliano Rama, Simone Pagan Griso, Donatella Lucchesi
-	INFN Padova and Fermi National Laboratory
-	Contributed to the Design and implementation of the GROW filesystem.
-
-	Andrew Thrasher
-	University of Notre Dame
-	Contributed to SAND and several Work Queue applications.
-
-	Benjamin Tovar
-	University of Notre Dame
-	Contributed to Makeflow, Work Queue, Parrot, Chirp, and resource monitoring.
-
-	Li Yu
-	University of Notre Dame
-	Contributed to work queue, makeflow, all-pairs, and SAND.
-
-	Charles Zheng
-	University of Notre Dame
-	Contributed to container integration in Work Queue and Makeflow.
-
-
-Thanks to one and all!
+We are thankful for all the people who have contributed
+features, bug fixes, documentation, and many other items.
+In alphabetical order:
+ 
+Peter Ainsworth
+Michael Albrecht
+Ngoc An Huynh
+DeVonte Applewhite
+Chris Bauschka
+John Bent
+Carl Beyer
+Vincent Birch
+Christophe Blanchet
+Brian Bockelman
+Dan Bradley
+Patrick Braga-Henebry
+Lydia Brothers
+Hoang Bui
+Peter Bui
+Jared Bulosan
+Haipeng Cai
+Anthony Canino
+Matt Carbonaro
+Rory Carmichael
+Benjamin Couturier
+TJ Dasso
+Jachob Dolak
+Patrick Donnelly
+Joe Duggan
+Brian Dusell
+James Ehlinger
+Iheanyi Ekechukwu
+Michael Ernst
+Joseph Fetsch
+James Fitzgerald
+Jamie Frey
+Patrick Fuhrmann
+Daniel Galvao
+Caitlin Guccione
+Nicholas Hazekamp
+Nick Hazekamp
+Jeffrey Hemmes
+Andrew Hennessee
+Samuel Huang
+Peter Ivie
+Nicholas Jaeger
+Ryan Jansen
+Mike Kelly
+Sander Klous
+Brenden Kokoszka
+Csaba Kos
+Nathaniel Kremer-Herman
+Peter Kunszt
+Andrew Litteken
+Eamon Lopez
+Donatella Lucchesi
+Christopher Lyon
+Ben Lyons
+Daniel Mack
+Paul Madrid
+William McComis
+Ryker McIntyre
+Brendan McNutt
+Haiyan Meng
+Zach Miller
+Tigran Mkrtchyan
+Chris Moretti
+Christopher Moretti
+Kyle Mulholland
+Zachary Musgrave
+Gerhard Niederwieser
+Michael Olson
+Simone Pagan
+Kevin Partington
+Mark Pasquier
+Thanh Phung
+Thomas Potthast
+Nicholas Pottiger
+Carlo Preciado
+Francesco Prelz
+John Quinn
+Dinesh Rajan
+Aureliano Rama
+Brandon Rich
+Joey Rich
+Casey Robinson
+Alain Roy
+Jack Rundle
+Hugh Sasse
+Francis Schickel
+Ulrich Schwickerath
+Taylor Seale
+Peter Sempolinski
+Igor Sfiligoi
+Tim Shaffer
+David Simonetti
+Barry Sly-Delgado
+Doug Smith
+Phil Snowberger
+Kameron Srimoungchach
+Emily Strout
+Brian Sullivan
+Zoe Surma
+Kyle Sweeney
+James Sweet
+Colin Thomas
+Andrew Thrasher
+Herman Tong
+Benjamin Tovar
+Jessica Vallejo
+Kevin Wern
+Kyle Wheeler
+Ryan Wigglesworth
+Robert Wirthman
+Brett Wiseman
+Rachel Witty
+Li Yu
+Yifan Yu
+Qimin Zhang
+Charles Zheng
