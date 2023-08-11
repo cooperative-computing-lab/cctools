@@ -133,9 +133,7 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
 			if(state == VINE_TASK_RUNNING) {
 				const char *allocation = (t->resource_request == CATEGORY_ALLOCATION_FIRST ? "FIRST_RESOURCES" : "MAX_RESOURCES");
 				buffer_printf(&B, " %s ", allocation);
-				const struct rmsummary *box = itable_lookup(w->current_tasks_boxes, t->task_id);
-
-				struct jx *m = resources_with_io_report(t, box);
+				struct jx *m = resources_with_io_report(t,t->current_resource_box);
 				jx_print_buffer(m, &B);
 				jx_delete(m);
 			} else if(state == VINE_TASK_WAITING_RETRIEVAL) {

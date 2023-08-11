@@ -758,7 +758,6 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	}
 
 	itable_clear(w->current_tasks,0);
-	itable_clear(w->current_tasks_boxes,(void*)rmsummary_delete);
 
 	w->finished_tasks = 0;
 
@@ -2456,7 +2455,7 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	free(command_line);
 
 	if(result==VINE_SUCCESS) {
-		itable_insert(w->current_tasks_boxes, t->task_id, limits);
+		t->current_resource_box = limits;
 		rmsummary_merge_override_basic(t->resources_allocated, limits);
 		debug(D_VINE, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
 	} else {
@@ -2483,9 +2482,6 @@ static void compute_manager_load(struct vine_manager *q, int task_activity) {
 
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
-	struct rmsummary *box;
-	uint64_t task_id;
-
 	w->resources->cores.inuse  = 0;
 	w->resources->memory.inuse = 0;
 	w->resources->disk.inuse   = 0;
@@ -2498,7 +2494,12 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 		return;
 	}
 
-	ITABLE_ITERATE(w->current_tasks_boxes,task_id,box) {
+	uint64_t task_id;
+	struct vine_task *task;
+
+	ITABLE_ITERATE(w->current_tasks,task_id,task) {
+		struct rmsummary *box = task->current_resource_box;
+		if(!box) continue;
 		w->resources->cores.inuse     += box->cores;
 		w->resources->memory.inuse    += box->memory;
 		w->resources->disk.inuse      += box->disk;
@@ -2591,20 +2592,14 @@ and change the task state.
 
 static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, vine_task_state_t new_state)
 {
-	struct vine_worker_info *wr = t->worker;
-	if(wr != w)
-	{
-		/* XXX this seems like a bug, should we return quickly here? */
-		debug(D_VINE, "Cannot reap task %d from worker. It is not being run by %s (%s)\n", t->task_id, w->hostname, w->addrport);
-	} else {
-		w->total_task_time += t->time_workers_execute_last;
-	}
+	/* Make sure the task and worker agree before changing anything. */
+	assert(t->worker==w);
 
-	struct rmsummary *task_box = itable_lookup(w->current_tasks_boxes, t->task_id);
-	if(task_box)
-		rmsummary_delete(task_box);
+	w->total_task_time += t->time_workers_execute_last;
 
-	itable_remove(w->current_tasks_boxes, t->task_id);
+	rmsummary_delete(t->current_resource_box);
+	t->current_resource_box = 0;
+
 	itable_remove(w->current_tasks, t->task_id);
 
 	t->worker = 0;

@@ -61,7 +61,6 @@ struct vine_worker_info {
 	/* Current files and tasks that have been transfered to this worker */
 	struct hash_table   *current_files;
 	struct itable       *current_tasks;
-	struct itable       *current_tasks_boxes;
 
 	/* Accumulated stats about tasks about this worker. */
 	int         finished_tasks;

@@ -63,7 +63,8 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->resources_requested = rmsummary_create(-1);
 	t->resources_measured  = rmsummary_create(-1);
 	t->resources_allocated = rmsummary_create(-1);
-
+	t->current_resource_box = 0;
+	
 	t->refcount = 1;
 	
 	return t;
@@ -95,6 +96,9 @@ void vine_task_clean( struct vine_task *t )
 
 	/* If result is never updated, then it is mark as a failure. */
 	t->result = VINE_RESULT_UNKNOWN;
+
+	rmsummary_delete(t->current_resource_box);
+	t->current_resource_box = 0;
 }
 
 void vine_task_reset( struct vine_task *t )
@@ -115,6 +119,9 @@ void vine_task_reset( struct vine_task *t )
 	t->resources_measured  = rmsummary_create(-1);
 	t->resources_allocated = rmsummary_create(-1);
 
+	rmsummary_delete(t->current_resource_box);
+	t->current_resource_box = 0;
+	
 	t->task_id = 0;
 	t->state = VINE_TASK_UNKNOWN;
 }
@@ -663,6 +670,7 @@ void vine_task_delete(struct vine_task *t)
 	rmsummary_delete(t->resources_requested);
 	rmsummary_delete(t->resources_measured);
 	rmsummary_delete(t->resources_allocated);
+	rmsummary_delete(t->current_resource_box);
 
 	free(t);
 }
