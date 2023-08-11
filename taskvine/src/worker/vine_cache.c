@@ -513,7 +513,13 @@ vine_file_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cac
 	struct vine_process *p;
 	if(f->type == VINE_CACHE_MINI_TASK){
 		p = vine_process_create(f->mini_task, 1);
-		vine_sandbox_stagein(p, c);
+		if(!vine_sandbox_stagein(p,c)) {
+			debug(D_VINE, "Can't stage input files for task %d.", p->task->task_id);
+			p->task = 0;
+			vine_process_delete(p);
+			f->status = VINE_FILE_STATUS_FAILED;
+			return VINE_FILE_STATUS_FAILED;
+		}
 		f->process = p;
 	}
 
