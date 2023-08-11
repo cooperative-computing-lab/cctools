@@ -64,21 +64,17 @@ case "$BUILD_CPU" in
 	;;
 esac
 
-include_package_apps="apps"
 include_package_chirp="chirp"
 include_package_deltadb="deltadb"
 include_package_doc="doc"
-include_package_taskvine="taskvine"
 include_package_ftplite="ftp_lite"
 include_package_grow="grow"
 include_package_makeflow="makeflow"
 include_package_parrot="parrot"
+include_package_poncho="poncho"
 include_package_resource_monitor="resource_monitor"
-include_package_tlq="tlq"
-
-include_package_umbrella=
-include_package_weaver=
-include_package_prune=
+include_package_taskvine="taskvine"
+include_package_work_queue="work_queue"
 
 swig_bindings=""
 
@@ -163,7 +159,7 @@ do
 			optsanitize=1
 			;;
 		--static)
-			# example: CFLAGS=-D__MUSL__ CC=musl-gcc ./configure --without-system-{doc,apps} --with-readline-path=no --static
+			# example: CFLAGS=-D__MUSL__ CC=musl-gcc ./configure --without-system-doc --with-readline-path=no --static
 			optstatic=1
 			;;
 		--build-label)
@@ -258,9 +254,6 @@ do
 				exit 1
 			fi
 			;;
-		--without-system-apps)
-			include_package_apps=""
-			;;
 		--without-system-makeflow)
 			include_package_makeflow=""
 			;;
@@ -273,27 +266,26 @@ do
 		--without-system-grow)
 			include_package_grow=""
 			;;
-		--without-system-umbrella)
-			include_package_umbrella=""
-			;;
 		--without-system-parrot)
 			include_package_parrot=""
 			;;
+		--without-system-poncho)
+            include_package_poncho=""
+            ;;
 		--without-system-resource_monitor)
 			include_package_resource_monitor=""
-			;;
-		--without-system-weaver)
-			include_package_weaver=""
 			;;
 		--without-system-doc)
 			include_package_doc=""
 			;;
-		--without-system-prune)
-			include_package_prune=""
-			;;
 		--without-system-taskvine)
 			include_package_taskvine=""
 			;;
+        --without-system-work_queue)
+            include_package_workqueue=""
+            ;;
+        --without-system-apps | --without-system-weaver | --without-system-mufasa | --without-system-umbrella | --without-system-prune )
+            ;;
 		--with-*-path)
 			echo "ignoring unknown package ${arg}"
 			;;
@@ -348,13 +340,15 @@ Where PACKAGE may be:
 
 And SYSTEM may be:
 	chirp
-	taskvine
 	doc
 	ftp-lite
+    grow
 	makeflow
 	parrot
+    poncho
 	resource_monitor
-	umbrella
+	taskvine
+    work_queue
 EOF
 			exit 0
 			;;
@@ -1308,7 +1302,7 @@ then
 	fi
 fi
 
-potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_ftplite} ${include_package_taskvine} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_tlq} ${include_package_doc} poncho"
+potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} ${include_package_work_queue} ${include_package_ftplite} ${include_package_taskvine} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_deltadb} ${include_package_doc} ${include_package_poncho}"
 
 echo "checking for all the things I know how to build..."
 for p in $potential_packages
