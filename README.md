@@ -1,41 +1,50 @@
+# The Cooperative Computing Tools
+
+## About
 
 The Cooperative Computing Tools (cctools) is a software
 package for enabling large scale distributed computing
 on clusters, clouds, and grids.  It is used primarily for
 attacking large scale problems in science and engineering.
 
-You can read more about this software at:
-   http://ccl.cse.nd.edu/software
+You can read more about this software at [ReadTheDocs](https://cctools.readthedocs.io)
+It is developed by members of the [Cooperative Computing Lab](https://ccl.cse.nd.edu)
+at the [University of Notre Dame](https://www.nd.edu),
+led by [Prof. Douglas Thain](https://dthain.github.io).
+The file [CREDITS](CREDITS) lists the many people that have contributed to the software over the years.
 
-The software is developed by members of the Cooperative
-Computing Lab at the University of Notre Dame, led by
-Prof. Douglas Thain.  The file CREDITS lists the many
-people that have contributed to the software over the years.
+## Quick Install Via Miniconda
 
-For complete instructions on how to use the software, see here:
-   https://cctools.readthedocs.io/en/latest/
+The easiest way to install the binaries is via [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
 
-CCTools can be installed via Conda with:
+```
+conda install -y -c conda-forge ndcctools
+```
 
-    conda install -y -c conda-forge ndcctools
+## Build From Source
 
-You can also install via Spack or build from source.
-Full installation instructions are available here:
-   https://cctools.readthedocs.io/en/latest/install/
+To build from source and install in your home directory:
 
-If you are impatient, the following commands will build
-and install the software in your home directory:
+```
+./configure --prefix ${HOME}/cctools
+make
+make install
+```
 
-   ./configure --prefix ${HOME}/cctools
-   make clean
-   make install
-   export PATH=${PATH}:${HOME}/cctools/bin
-   chirp_status
+Then run the executables out of your home directory like this:
+```
+export PATH=$HOME/cctools/bin:$PATH
+makeflow -v
+vine_status
+```
 
+## Copyright and License Notices
+
+```
 ------------------------------------------------------------
 This software package is
 Copyright (c) 2003-2004 Douglas Thain
-Copyright (c) 2005-2019 The University of Notre Dame
+Copyright (c) 2005-2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 ------------------------------------------------------------
@@ -53,5 +62,6 @@ and A. M. Kutchman.
 This product includes the source code for the MT19937-64
 Mersenne Twister pseudorandom number generator, written by 
 Makoto Matsumoto and Takuji Nishimura.
+```
 
 
