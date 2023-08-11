@@ -234,7 +234,12 @@ int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *ca
 {
 	struct vine_process *p = vine_process_create(task);
 
-	vine_sandbox_stagein(p,cache,manager);
+	if (!vine_sandbox_stagein(p,cache,manager)) {
+		debug(D_VINE, "Can't stage input files for task %d.", p->task->task_id);
+		p->task = 0;
+		vine_process_delete(p);
+		return 0;
+	}
 	
 	pid_t pid = vine_process_execute(p);
 	if(pid>0) {
