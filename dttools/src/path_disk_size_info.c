@@ -61,7 +61,7 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 	if(!s->current_dirs) {
 		s->complete_measurement = 0;
 
-		struct DIR_with_name *here = malloc(sizeof(struct DIR_with_name));
+		struct DIR_with_name *here = calloc(1, sizeof(struct DIR_with_name));
 
 		if((here->dir = opendir(path))) {
 			here->name = xxstrdup(path);
@@ -85,6 +85,25 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 	while((tail = list_peek_tail(s->current_dirs))) {
 		struct dirent *entry;
 		struct stat   file_info;
+		
+		if (!tail->dir) {	// only open dir when it's being processed
+			tail->dir = opendir(tail->name);
+			if (!tail->dir) {
+				if (errno == ENOENT) {
+					/* Do nothing as a directory might go away. */
+					tail = list_pop_tail(s->current_dirs);
+					free(tail->name);
+					free(tail);
+					continue;
+				}
+				else {
+					debug(D_DEBUG, "error opening directory '%s', errno: %s.\n", tail->name, strerror(errno));
+					result = -1;
+					goto timeout;
+				}
+			}
+		}
+		/* Read out entries from the dir stream. */
 		while((entry = readdir(tail->dir))) {
 			if( strcmp(".", entry->d_name) == 0 || strcmp("..", entry->d_name) == 0)
 				continue;
@@ -110,16 +129,10 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 			if(S_ISREG(file_info.st_mode)) {
 				s->size_so_far += file_info.st_size;
 			} else if(S_ISDIR(file_info.st_mode)) {
-				struct DIR_with_name *branch = malloc(sizeof(struct DIR_with_name));
-				if((branch->dir = opendir(composed_path))) {
-					/* future while we'll read from the branch */
-					branch->name = xxstrdup(composed_path);
-					list_push_head(s->current_dirs, branch);
-				} else {
-					free(branch);
-					result = -1;
-					continue;
-				}
+				/* Only add name of directory, will only open it to read when it's its turn. */
+				struct DIR_with_name *branch = calloc(1, sizeof(struct DIR_with_name));
+				branch->name = xxstrdup(composed_path);
+				list_push_head(s->current_dirs, branch);
 			} else if(S_ISLNK(file_info.st_mode)) {
 				/* do nothing, avoiding infinite loops. */
 			}
@@ -130,10 +143,11 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 				}
 			}
 		}
-
 		/* we are done reading a complete directory, and we go to the next in the queue */
 		tail = list_pop_tail(s->current_dirs);
-		closedir(tail->dir);
+		if (tail->dir) {
+			closedir(tail->dir);
+		}
 		free(tail->name);
 		free(tail);
 	}

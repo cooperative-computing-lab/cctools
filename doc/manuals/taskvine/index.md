@@ -1140,7 +1140,7 @@ creating the manager:
     ```
 
 
-If you are using a (project name)[#project-names-and-the-catalog-server] for
+If you are using a [project name](#project-names-and-the-catalog-server) for
 your manager, then the workers will be aware that the manager is using SSL and
 communicate accordingly automatically. However, you are directly specifying the
 address of the manager when launching the workers, then you need to add the
@@ -1422,6 +1422,68 @@ conda install -y -p my-env -c conda-forge conda-pack
 # conda install -y -p my-env pip and conda install other modules, etc.
 conda run -p my-env conda-pack
 ```
+
+### Futures
+
+TaskVine provides a futures executor model which is a subclass
+of Python's concurrent futures executor. A function along with its
+arguments are submitted to the executor to be executed. A future is 
+returned whose value will be resolved at some later point.
+
+To create a future, an Executor object must first be created. Tasks can 
+then be submitted through the `submit` function. This will return 
+a Future object. The result of the task can retrieved by calling `future.result()`
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+
+    def my_sum(x, y):
+	return x + y
+
+    s = vine.Executor(manager_name='my_manager')
+    f = s.submit(my_sum, 3, 4)
+    print(f.result())
+    ```
+
+Futures can be passed as arguments to other 
+tasks using the executor. In this case, relevant files
+will be transported between workers when necessary.
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+
+    def my_sum(x, y):
+        return x + y
+
+    s = vine.Executor(manager_name='my_manager')
+    a = s.submit(my_sum, 3, 4)
+    b = s.submit(my_sum, 5, 2)
+    c = s.submit(my_sum, a, b)
+    print(c.result())
+    ```
+
+Users can interaface with future tasks themselves by calling
+the `task` function from the future executor. This returns a
+FutureTask which can also be submitted to the future executor.
+The benefit of doing this is allowing users to add additional input 
+files and task specifications before submission.
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+
+    def my_sum(x, y):
+        return x + y
+
+    s = vine.Executor(manager_name='my_manager')
+    t = s.task(my_sum, 3, 4)
+    t.set_cores(1)
+    f = s.submit(t)
+    print(f.result())
+    ```
+
 
 ### Serverless Computing
 

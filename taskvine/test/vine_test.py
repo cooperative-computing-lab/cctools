@@ -211,7 +211,7 @@ if __name__ == "__main__":
 
     # Pull down data from a url and unpack it via a minitask.
     # Note that we use a local file url of a small tarball to test the mechanism without placing a load on the network.
-    f = q.declare_untar(q.declare_url("file://{}/dummy.tar.gz".format(os.getcwd())))
+    f = q.declare_untar(q.declare_url("http://ccl.cse.nd.edu/software/files/cctools-1.0.0-src.tar.gz"))
     t = vine.Task("ls -lR cctools | wc -l")
     t.add_input(f, "cctools")
     q.submit(t)
