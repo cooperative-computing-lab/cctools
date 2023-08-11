@@ -1,5 +1,5 @@
-include ../../config.mk
-include ../../rules.mk
+include ../../../config.mk
+include ../../../rules.mk
 
 all: prune_worker #prune_server
 
