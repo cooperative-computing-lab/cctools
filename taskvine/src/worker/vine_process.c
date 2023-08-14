@@ -60,15 +60,17 @@ Create a vine_process and all of the information necessary for invocation.
 However, do not allocate substantial resources at this point.
 */
 
-struct vine_process *vine_process_create( struct vine_task *task )
+struct vine_process *vine_process_create( struct vine_task *task, int mini_task )
 {
 	struct vine_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
 
+	const char *type = mini_task ? "m" : "t";
+
 	p->task = task;
 
 	p->cache_dir = string_format("%s/cache",workspace);
-	p->sandbox = string_format("%s/t.%d", workspace,p->task->task_id);
+	p->sandbox = string_format("%s/%s.%d", workspace,type,p->task->task_id);
 	p->tmpdir = string_format("%s/.taskvine.tmp",p->sandbox);
 	p->output_file_name = string_format("%s/.taskvine.stdout",p->sandbox);
 
@@ -213,12 +215,9 @@ void vine_process_set_exit_status( struct vine_process *p, int status )
 Execute a task synchronously and return true on success.
 */
 
-int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *cache, struct link *manager )
+int vine_process_execute_and_wait( struct vine_process *p, struct vine_cache *cache)
 {
-	struct vine_process *p = vine_process_create(task);
 
-	vine_sandbox_stagein(p,cache,manager);
-	
 	pid_t pid = vine_process_execute(p);
 	if(pid>0) {
 		int result, status;
@@ -230,14 +229,6 @@ int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *ca
 	} else {
 		p->exit_code = 1;
 	}
-	
-	vine_sandbox_stageout(p,cache,manager);
-
-	/* Remove the task from the process so it is not deleted */
-	p->task = 0;
-
-	vine_process_delete(p);
-	
 	return 1;
 }
 

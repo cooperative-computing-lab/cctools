@@ -22,12 +22,20 @@ for file transfers to occur asynchronously of the manager.
 #include "vine_file.h"
 
 struct link;
+struct vine_cache_file;
 
 typedef enum {
 	VINE_CACHE_FILE,
 	VINE_CACHE_TRANSFER,
 	VINE_CACHE_MINI_TASK,
 } vine_cache_type_t;
+
+typedef enum {
+	VINE_CACHE_STATUS_NOT_PRESENT,
+	VINE_CACHE_STATUS_PROCESSING,
+	VINE_CACHE_STATUS_READY,
+	VINE_CACHE_STATUS_FAILED,       
+} vine_cache_status_type_t;
 
 struct vine_cache * vine_cache_create( const char *cachedir );
 void vine_cache_delete( struct vine_cache *c );
@@ -39,8 +47,9 @@ char *vine_cache_full_path( struct vine_cache *c, const char *cachename );
 int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char *cachename );
 int vine_cache_queue_transfer( struct vine_cache *c, const char *source, const char *cachename, int64_t size, int mode );
 int vine_cache_queue_command( struct vine_cache *c, struct vine_task *minitask, const char *cachename, int64_t size, int mode );
-int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager );
+vine_cache_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cachename);
 int vine_cache_remove( struct vine_cache *c, const char *cachename );
 int vine_cache_contains( struct vine_cache *c, const char *cachename );
+int vine_cache_wait( struct vine_cache *c, struct link *manager );
 
 #endif
