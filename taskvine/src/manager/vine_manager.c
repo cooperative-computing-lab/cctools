@@ -2614,8 +2614,23 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 			assert(t->state > VINE_TASK_READY);
 			break;
 	}
+
+	/*
+	When a normal task or recovery task leaves a worker, it goes back
+	into the proper queue.  But a library task was generated just for
+	that worker, so it always goes into the DONE state and gets deleted.
+	*/
 	
-	change_task_state(q, t, new_state);
+	switch(t->type) {
+		case VINE_TASK_TYPE_STANDARD:
+		case VINE_TASK_TYPE_RECOVERY:
+			change_task_state(q, t, new_state);
+			break;
+		case VINE_TASK_TYPE_LIBRARY:
+			change_task_state(q, t, VINE_TASK_DONE);
+			break;
+			return;
+	}
 
 	count_worker_resources(q, w);
 }
