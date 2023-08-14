@@ -56,15 +56,20 @@ extern char * workspace;
 extern struct list *library_list;
 extern struct hash_table *library_task_ids;
 
-static int create_sandbox_dir( struct vine_process *p )
+static int create_sandbox_dir( struct vine_process *p, int mini_task)
 {
+	const char *type = mini_task ? "m" : "t";
+
 	p->cache_dir = string_format("%s/cache",workspace);
-  	p->sandbox = string_format("%s/t.%d", workspace,p->task->task_id);
+
+  	p->sandbox = string_format("%s/%s.%d", workspace,type,p->task->task_id);
 
 	if(!create_dir(p->sandbox, 0777)) return 0;
 
 	char tmpdir_template[1024];
-	string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->task_id);
+
+	string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-%s.%d.XXXXXX", p->sandbox, type, p->task->task_id);
+
 	if(mkdtemp(tmpdir_template) == NULL) {
 		return 0;
 	}
@@ -82,13 +87,13 @@ Create a vine_process and all of the information necessary for invocation.
 However, do not allocate substantial resources at this point.
 */
 
-struct vine_process *vine_process_create(struct vine_task *vine_task )
+struct vine_process *vine_process_create(struct vine_task *vine_task, int mini_task)
 {
 	struct vine_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
 	p->task = vine_task;
 	p->coprocess = NULL;
-	if(!create_sandbox_dir(p)) {
+	if(!create_sandbox_dir(p, mini_task)) {
 		vine_process_delete(p);
 		return 0;
 	}
@@ -230,17 +235,9 @@ void vine_process_set_exit_status( struct vine_process *p, int status )
 Execute a task synchronously and return true on success.
 */
 
-int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *cache, struct link *manager )
+int vine_process_execute_and_wait( struct vine_process *p, struct vine_cache *cache)
 {
-	struct vine_process *p = vine_process_create(task);
 
-	if (!vine_sandbox_stagein(p,cache,manager)) {
-		debug(D_VINE, "Can't stage input files for task %d.", p->task->task_id);
-		p->task = 0;
-		vine_process_delete(p);
-		return 0;
-	}
-	
 	pid_t pid = vine_process_execute(p);
 	if(pid>0) {
 		int result, status;
@@ -252,14 +249,6 @@ int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *ca
 	} else {
 		p->exit_code = 1;
 	}
-	
-	vine_sandbox_stageout(p,cache,manager);
-
-	/* Remove the task from the process so it is not deleted */
-	p->task = 0;
-
-	vine_process_delete(p);
-	
 	return 1;
 }
 

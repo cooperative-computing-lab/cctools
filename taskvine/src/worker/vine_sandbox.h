@@ -11,7 +11,8 @@ See the file COPYING for details.
 #include "vine_cache.h"
 #include "link.h"
 
-int vine_sandbox_stagein( struct vine_process *p, struct vine_cache *c, struct link *manager );
+vine_cache_status_type_t vine_sandbox_ensure( struct vine_process *p, struct vine_cache *c, struct link *manager );
+int vine_sandbox_stagein( struct vine_process *p, struct vine_cache *c);
 int vine_sandbox_stageout( struct vine_process *p, struct vine_cache *c, struct link *manager );
 
 #endif

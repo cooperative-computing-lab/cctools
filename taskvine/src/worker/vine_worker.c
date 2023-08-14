@@ -123,6 +123,8 @@ char *vine_worker_password = 0;
 // Allow worker to use symlinks when link() fails.  Enabled by default.
 int vine_worker_symlinks_enabled = 1;
 
+int mini_task_id = 0;
+
 // Worker id. A unique id for this worker instance.
 static char *worker_id;
 
@@ -508,7 +510,7 @@ static int start_process( struct vine_process *p, struct link *manager )
 
 	struct vine_task *t = p->task;
 
-	if(!vine_sandbox_stagein(p,global_cache,manager)) {
+	if(!vine_sandbox_stagein(p,global_cache)) {
 		p->execution_start = p->execution_end = timestamp_get();
 		p->result = VINE_RESULT_INPUT_MISSING;
 		p->exit_code = 1;
@@ -645,6 +647,7 @@ static void expire_procs_running()
 		}
 	}
 }
+
 
 /*
 Scan over all of the processes known by the worker,
@@ -797,7 +800,7 @@ static int do_task( struct link *manager, int task_id, time_t stoptime )
 	
 	last_task_received = task->task_id;
 
-	struct vine_process *p = vine_process_create(task);
+	struct vine_process *p = vine_process_create(task, 0);
 	if(!p) return 0;
 
 	itable_insert(procs_table,task_id,p);
@@ -825,7 +828,8 @@ Accept a mini_task that is executed on demand to produce a specific file.
 
 static int do_put_mini_task( struct link *manager, time_t stoptime, const char *cache_name, int64_t size, int mode, const char *source )
 {
-	struct vine_task *mini_task = do_task_body(manager,0,stoptime);
+	mini_task_id++;
+	struct vine_task *mini_task = do_task_body(manager,mini_task_id,stoptime);
 	if(!mini_task) return 0;
 
 	/* XXX hacky hack -- the single output of the task must have the target cachename */
@@ -1307,6 +1311,7 @@ static void work_for_manager( struct link *manager )
 		expire_procs_running();
 
 		ok &= handle_completed_tasks(manager);
+		ok &= vine_cache_wait(global_cache, manager);
 
 		measure_worker_resources();
 
@@ -1351,8 +1356,13 @@ static void work_for_manager( struct link *manager )
 						p->coprocess = ready_coprocess;
 						ready_coprocess->state = VINE_COPROCESS_RUNNING;
 					}
-					start_process(p,manager);
-					task_event++;
+					vine_cache_status_type_t result = vine_sandbox_ensure(p,global_cache,manager);
+					if(result==VINE_CACHE_STATUS_PROCESSING){
+						list_push_tail(procs_waiting, p);
+					} else {
+						start_process(p,manager);
+						task_event++;
+					}
 				} else if(task_resources_fit_eventually(p->task)) {
 					list_push_tail(procs_waiting, p);
 				} else {
