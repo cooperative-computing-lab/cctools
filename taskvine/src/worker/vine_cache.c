@@ -513,14 +513,16 @@ static void vine_cache_check_outputs( struct vine_cache *c, struct cache_file *f
 	timestamp_t transfer_time = f->stop_time - f->start_time;
 
 	/* If this was produced by a mini task, first move the output in the cache directory. */
-
 	if(f->type==VINE_CACHE_MINI_TASK){
-		if(vine_sandbox_stageout(f->process, c, manager)) {
-			f->status = VINE_CACHE_STATUS_READY;
-		} else {
-			f->status = VINE_CACHE_STATUS_FAILED;
-		}
 
+		if(f->status==VINE_CACHE_STATUS_READY) {
+			if(vine_sandbox_stageout(f->process, c, manager)) {
+				f->status = VINE_CACHE_STATUS_READY;
+			} else {
+				f->status = VINE_CACHE_STATUS_FAILED;
+			}
+		}
+		
 		/* Clean up the minitask process, but keep the defining task. */
 		
 		f->process->task = 0;
@@ -536,7 +538,6 @@ static void vine_cache_check_outputs( struct vine_cache *c, struct cache_file *f
 		if(path_disk_size_info_get(cache_path,&nbytes,&nfiles)==0) {
 			f->actual_size = nbytes;
 			debug(D_VINE,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->actual_size,(long long)transfer_time);
-			vine_worker_send_cache_update(manager,cachename,f->actual_size,transfer_time,f->start_time);
 		} else {
 			debug(D_VINE,"cache: command succeeded but did not create %s",cachename);
 			f->status = VINE_CACHE_STATUS_FAILED;
@@ -546,6 +547,15 @@ static void vine_cache_check_outputs( struct vine_cache *c, struct cache_file *f
 		debug(D_VINE,"cache: unable to create %s",cachename);
 	}
 
+	/* Finally send a cache update message one way or the other. */
+	
+	if(f->status==VINE_CACHE_STATUS_READY) {
+		vine_worker_send_cache_update(manager,cachename,f->actual_size,transfer_time,f->start_time);
+	} else {
+		/* XXX need to extract the output of the process for a better error message. */
+		vine_worker_send_cache_invalid(manager,cachename,"unable to fetch or create file");
+	}
+	
 	free(cache_path);
 }
 
@@ -567,7 +577,6 @@ static void vine_cache_handle_exit_status( struct vine_cache *c, struct cache_fi
 		if(exit_code==0) {	
 			debug(D_VINE, "transfer process for %s completed", cachename);
 			f->status = VINE_CACHE_STATUS_READY;
-			vine_cache_check_outputs(c,f,cachename,manager);
 		} else {
 			debug(D_VINE, "transfer process for %s failed", cachename);
 			f->status = VINE_CACHE_STATUS_FAILED;
@@ -593,6 +602,7 @@ static void vine_cache_process_entry( struct vine_cache *c, struct cache_file *f
 			debug(D_VINE, "wait4 on pid %d returned an error: %s",(int)f->pid,strerror(errno));	
 		} else if(result>0) {
 			vine_cache_handle_exit_status(c,f,cachename,status,manager);
+			vine_cache_check_outputs(c,f,cachename,manager);
 		}
 	}
 }
