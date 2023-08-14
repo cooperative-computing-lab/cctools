@@ -513,15 +513,13 @@ vine_cache_status_type_t vine_cache_ensure( struct vine_cache *c, const char *ca
 		return VINE_CACHE_STATUS_FAILED;
 	}
 
-	/* File is already present in the cache. */
 	switch(f->status) {
 		case VINE_CACHE_STATUS_READY:
-			return VINE_CACHE_STATUS_READY;
 		case VINE_CACHE_STATUS_FAILED:
-			return VINE_CACHE_STATUS_FAILED;
 		case VINE_CACHE_STATUS_PROCESSING:
-			return VINE_CACHE_STATUS_PROCESSING;
+			return f->status;
 		case VINE_CACHE_STATUS_NOT_PRESENT:
+			/* keep going */
 			break;
 
 	}
@@ -541,27 +539,25 @@ vine_cache_status_type_t vine_cache_ensure( struct vine_cache *c, const char *ca
 
 	debug(D_VINE,"forking transfer process to create %s", cachename);
 
-	struct vine_process *p;
 	if(f->type == VINE_CACHE_MINI_TASK){
-		p = vine_process_create(f->mini_task, 1);
+		struct vine_process *p = vine_process_create(f->mini_task, 1);
 		if(!vine_sandbox_stagein(p,c)) {
 			debug(D_VINE, "Can't stage input files for task %d.", p->task->task_id);
 			p->task = 0;
 			vine_process_delete(p);
 			f->status = VINE_CACHE_STATUS_FAILED;
-			return VINE_CACHE_STATUS_FAILED;
+			return f->status;
 		}
 		f->process = p;
 	}
 
-	pid_t pid = fork();
+	f->pid = fork();
 
-	if(pid == -1) {
+	if(f->pid<0) {
 		debug(D_VINE,"failed to fork transfer process");
-		return VINE_CACHE_STATUS_FAILED;
-	}
-	if(pid > 0){
-		f->pid = pid;
+		f->status = VINE_CACHE_STATUS_FAILED;
+		return f->status;
+	} else if(f->pid>0) {
 		f->status = VINE_CACHE_STATUS_PROCESSING;
 		switch(f->type){
 			case (VINE_CACHE_TRANSFER):
@@ -574,12 +570,11 @@ vine_cache_status_type_t vine_cache_ensure( struct vine_cache *c, const char *ca
 				debug(D_VINE,"cache: checking if %s is present in cache",cachename);
 				break;
 		}
-		return VINE_CACHE_STATUS_PROCESSING;
+		return f->status;
+	} else {
+		vine_cache_get_file(f, c, cachename);
+		_exit(1);
 	}
-
-	vine_cache_get_file(f, c, cachename);
-	exit(1);
-
 }
 /*
 Child Process that materializes the proper file.
