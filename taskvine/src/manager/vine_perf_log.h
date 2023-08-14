@@ -15,6 +15,8 @@ This module is private to the manager and should not be invoked by the end user.
 
 #include "vine_manager.h"
 
+#define VINE_PERF_LOG_INTERVAL 5
+
 void vine_perf_log_write_header( struct vine_manager *q );
 void vine_perf_log_write_update( struct vine_manager *q, int force );
 

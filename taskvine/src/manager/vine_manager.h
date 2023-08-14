@@ -100,6 +100,9 @@ struct vine_manager {
 
 	struct itable *tasks;           /* Maps task_id -> vine_task of all tasks in any state. */
 	struct list   *ready_list;      /* List of vine_task that are waiting to execute. */
+	struct itable   *running_table;      /* Table of vine_task that are running at workers. */
+	struct list   *waiting_retrieval_list;      /* List of vine_task that are waiting to be retrieved. */
+	struct list   *retrieved_list;      /* List of vine_task that have been retrieved. */
 	struct list   *task_info_list;  /* List of last N vine_task_infos for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */
 	struct hash_table *libraries;      /* Maps library name -> vine_task of library with that name. */
@@ -148,6 +151,7 @@ struct vine_manager {
 	FILE *perf_logfile;        /* Performance logfile for tracking metrics by time. */
 	FILE *txn_logfile;         /* Transaction logfile for recording every event of interest. */
 	FILE *graph_logfile;       /* Graph logfile for visualizing application structure. */
+	int perf_log_interval;	   /* Minimum interval for performance log entries in seconds. */
 	
 	/* Resource monitoring configuration. */
 
