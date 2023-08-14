@@ -486,13 +486,13 @@ vine_cache_status_type_t vine_cache_ensure( struct vine_cache *c, const char *ca
 	} else if(f->pid>0) {
 		f->status = VINE_CACHE_STATUS_PROCESSING;
 		switch(f->type){
-			case (VINE_CACHE_TRANSFER):
+			case VINE_CACHE_TRANSFER:
 				debug(D_VINE,"cache: transferring %s to %s",f->source,cachename);
 				break;
-			case (VINE_CACHE_MINI_TASK): 
+			case VINE_CACHE_MINI_TASK: 
 				debug(D_VINE,"cache: creating %s via mini task",cachename);
 				break;
-			case (VINE_CACHE_FILE):
+			case VINE_CACHE_FILE:
 				debug(D_VINE,"cache: checking if %s is present in cache",cachename);
 				break;
 		}
@@ -521,6 +521,8 @@ static void vine_cache_check_outputs( struct vine_cache *c, struct cache_file *f
 			f->status = VINE_CACHE_STATUS_FAILED;
 		}
 
+		/* Clean up the minitask process, but keep the defining task. */
+		
 		f->process->task = 0;
 		vine_process_delete(f->process);
 		f->process = 0;
@@ -543,6 +545,7 @@ static void vine_cache_check_outputs( struct vine_cache *c, struct cache_file *f
 	} else {
 		debug(D_VINE,"cache: unable to create %s",cachename);
 	}
+
 	free(cache_path);
 }
 
@@ -585,7 +588,7 @@ static void vine_cache_process_entry( struct vine_cache *c, struct cache_file *f
 	if(f->status==VINE_CACHE_STATUS_PROCESSING){
 		int result = waitpid(f->pid, &status, WNOHANG);
 		if(result==0){
-			// process stil executing
+			// process still executing
 		} else if(result<0) {
 			debug(D_VINE, "wait4 on pid %d returned an error: %s",(int)f->pid,strerror(errno));	
 		} else if(result>0) {
