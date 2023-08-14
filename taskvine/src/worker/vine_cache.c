@@ -72,7 +72,9 @@ void cache_file_delete( struct cache_file *f )
 	if(f->mini_task) {
 		vine_task_delete(f->mini_task);
 	}
-
+	if(f->process) {
+		vine_process_delete(f->process);
+	}
 	free(f->source);
 	free(f);
 }
@@ -387,44 +389,38 @@ static int do_transfer( struct vine_cache *c, const char *source_url, const char
 	return result;
 }
 
-static void vine_cache_handle_exit_status(int status, char *cachename, struct cache_file *f, struct link *manager){	
-	int exit_code;
-	f->stop_time = timestamp_get();
-	if(!WIFEXITED(status)){
-		exit_code = WTERMSIG(status);
-		debug(D_VINE, "transfer process (pid %d) exited abnormally with signal %d",f->pid, exit_code);
-		f->status = VINE_CACHE_STATUS_FAILED;
-	} else {
-		exit_code = WEXITSTATUS(status);
-		debug(D_VINE, "transfer process for %s (pid %d) exited normally with exit code %d", cachename, f->pid, exit_code );
-		if(exit_code==1){	
-			debug(D_VINE, "transfer process for %s completed", cachename);
-			f->status = VINE_CACHE_STATUS_READY;
-		} else {
-			debug(D_VINE, "transfer process for %s failed", cachename);
-			f->status = VINE_CACHE_STATUS_FAILED;
-		}
-	}
-}
+/*
+Check the outputs of a transfer process to make sure they are valid.
+*/
 
-static void vine_cache_check_outputs(struct cache_file *f, char *cachename, struct vine_cache *c, struct link *manager)
+static void vine_cache_check_outputs( struct vine_cache *c, struct cache_file *f, char *cachename, struct link *manager)
 {
-	int64_t nbytes, nfiles;
 	char *cache_path = vine_cache_full_path(c,cachename);
 	timestamp_t transfer_time = f->stop_time - f->start_time;
+
+	/* If this was produced by a mini task, first move the output in the cache directory. */
+
 	if(f->type==VINE_CACHE_MINI_TASK){
-		// stageout only if process succeeded 
-		if(f->status==VINE_CACHE_STATUS_READY) vine_sandbox_stageout(f->process, c, manager);
+		if(vine_sandbox_stageout(f->process, c, manager)) {
+			f->status = VINE_CACHE_STATUS_READY;
+		} else {
+			f->status = VINE_CACHE_STATUS_FAILED;
+		}
+
 		f->process->task = 0;
 		vine_process_delete(f->process);
+		f->process = 0;
 	}
+
+	/* If the transfer was good, now evaluate the existence and size of the output. */
+	
 	if(f->status==VINE_CACHE_STATUS_READY){
+		int64_t nbytes, nfiles;
 		chmod(cache_path,f->mode);
 		if(path_disk_size_info_get(cache_path,&nbytes,&nfiles)==0) {
 			f->actual_size = nbytes;
 			debug(D_VINE,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->actual_size,(long long)transfer_time);
 			vine_worker_send_cache_update(manager,cachename,f->actual_size,transfer_time,f->start_time);
-			f->status = VINE_CACHE_STATUS_READY;
 		} else {
 			debug(D_VINE,"cache: command succeeded but did not create %s",cachename);
 			f->status = VINE_CACHE_STATUS_FAILED;
@@ -436,7 +432,40 @@ static void vine_cache_check_outputs(struct cache_file *f, char *cachename, stru
 	free(cache_path);
 }
 
-static void vine_cache_process_entry(struct cache_file *f, char *cachename, struct vine_cache *c, struct link *manager)
+/*
+Evaluate the exit status of a transfer process to determine if it succeeded.
+*/
+
+static void vine_cache_handle_exit_status( struct vine_cache *c, struct cache_file *f, char *cachename, int status, struct link *manager)
+{
+	f->stop_time = timestamp_get();
+
+	if(!WIFEXITED(status)){
+		int sig = WTERMSIG(status);
+		debug(D_VINE, "transfer process (pid %d) exited abnormally with signal %d",f->pid,sig);
+		f->status = VINE_CACHE_STATUS_FAILED;
+	} else {
+		int exit_code = WEXITSTATUS(status);
+		debug(D_VINE, "transfer process for %s (pid %d) exited normally with exit code %d", cachename, f->pid, exit_code );
+		if(exit_code==0) {	
+			debug(D_VINE, "transfer process for %s completed", cachename);
+			f->status = VINE_CACHE_STATUS_READY;
+			vine_cache_check_outputs(c,f,cachename,manager);
+		} else {
+			debug(D_VINE, "transfer process for %s failed", cachename);
+			f->status = VINE_CACHE_STATUS_FAILED;
+		}
+	}
+
+	/* Reset pid so we know to stop scanning this entry. */
+	f->pid = 0;
+}
+
+/*
+Consider one cache table entry to determine if the transfer process has completed.
+*/
+
+static void vine_cache_process_entry( struct vine_cache *c, struct cache_file *f, char *cachename, struct link *manager)
 {
 	int status;
 	if(f->status==VINE_CACHE_STATUS_PROCESSING){
@@ -446,18 +475,21 @@ static void vine_cache_process_entry(struct cache_file *f, char *cachename, stru
 		} else if(result<0) {
 			debug(D_VINE, "wait4 on pid %d returned an error: %s",(int)f->pid,strerror(errno));	
 		} else if(result>0) {
-			vine_cache_handle_exit_status(status,cachename,f,manager);
-			vine_cache_check_outputs(f,cachename,c,manager);
+			vine_cache_handle_exit_status(c,f,cachename,status,manager);
 		}
 	}
 }
+
+/*
+Search the cache table to determine if any transfer processes have completed.
+*/
 
 int vine_cache_wait(struct vine_cache *c, struct link *manager)
 {
 	struct cache_file *f;
     	char *cachename;
 	HASH_TABLE_ITERATE(c->table, cachename, f){
-		vine_cache_process_entry(f,cachename,c,manager);
+		vine_cache_process_entry(c,f,cachename,manager);
 	}
 	return 1;
 
@@ -551,7 +583,6 @@ vine_cache_status_type_t vine_cache_ensure( struct vine_cache *c, const char *ca
 }
 /*
 Child Process that materializes the proper file.
-
 */
 
 void vine_cache_get_file(struct cache_file *f, struct vine_cache *c, const char *cachename){
