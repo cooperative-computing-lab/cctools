@@ -51,7 +51,7 @@ struct vine_cache_file {
 	struct vine_process *process;
 };
 
-static void vine_cache_process_entry( struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager);
+static void vine_cache_wait_for_file( struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager);
 
 struct vine_cache_file * vine_cache_file_create( vine_cache_type_t type, const char *source, int64_t actual_size, int mode, struct vine_task *mini_task )
 {
@@ -143,10 +143,35 @@ void vine_cache_scan(struct vine_cache *c, struct link *manager)
 }
 
 /*
+Kill off any process associated with this file object.
+Used by both vine_cache_remove and vine_cache_delete.
+*/
+
+static void vine_cache_kill( struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager )
+{		
+	while(f->status==VINE_CACHE_STATUS_PROCESSING) {
+		debug(D_VINE,"killing pending transfer process %d...",f->pid);
+		kill(f->pid,SIGKILL);
+		vine_cache_wait_for_file(c,f,cachename,manager);
+		if(f->status==VINE_CACHE_STATUS_PROCESSING) {
+			debug(D_VINE,"still not killed, trying again!");
+			sleep(1);
+		}
+	}
+}
+
+/*
 Delete the cache manager structure, though not the underlying files.
 */
 void vine_cache_delete( struct vine_cache *c )
 {
+	/* Ensure that all child processes are killed off. */
+	char *cachename;
+	struct vine_cache_file *file;
+	HASH_TABLE_ITERATE(c->table,cachename,file) {
+		vine_cache_kill(c,file,cachename,0);
+	}
+	
 	hash_table_clear(c->table,(void*)vine_cache_file_delete);
 	hash_table_delete(c->table);
 	free(c->cache_dir);
@@ -222,20 +247,15 @@ int vine_cache_remove( struct vine_cache *c, const char *cachename, struct link 
 	struct vine_cache_file *f = hash_table_remove(c->table,cachename);
 	if(!f) return 0;
 
-	while(f->status==VINE_CACHE_STATUS_PROCESSING) {
-		debug(D_VINE,"killing pending transfer process %d...",f->pid);
-		kill(f->pid,SIGKILL);
-		vine_cache_process_entry(c,f,cachename,manager);
-		if(f->status==VINE_CACHE_STATUS_PROCESSING) {
-			debug(D_VINE,"still not killed, trying again!");
-			sleep(1);
-		}
-	}
-	
+	/* Ensure that any child process associated with the entry is stopped. */
+	vine_cache_kill(c,f,cachename,manager);
+
+	/* Then remove the disk state associated with the file. */
 	char *cache_path = vine_cache_full_path(c,cachename);
 	trash_file(cache_path);
 	free(cache_path);
 
+	/* Now we can remove the data structure. */
 	vine_cache_file_delete(f);
 
 	return 1;
@@ -560,12 +580,15 @@ static void vine_cache_check_outputs( struct vine_cache *c, struct vine_cache_fi
 	}
 
 	/* Finally send a cache update message one way or the other. */
+	/* Note that manager could be null if we are in a shutdown situation. */
 	
-	if(f->status==VINE_CACHE_STATUS_READY) {
-		vine_worker_send_cache_update(manager,cachename,f->actual_size,transfer_time,f->start_time);
-	} else {
-		/* XXX need to extract the output of the process for a better error message. */
-		vine_worker_send_cache_invalid(manager,cachename,"unable to fetch or create file");
+	if(manager) {
+		if(f->status==VINE_CACHE_STATUS_READY) {
+			vine_worker_send_cache_update(manager,cachename,f->actual_size,transfer_time,f->start_time);
+		} else {
+			/* XXX need to extract the output of the process for a better error message. */
+			vine_worker_send_cache_invalid(manager,cachename,"unable to fetch or create file");
+		}
 	}
 	
 	free(cache_path);
@@ -603,7 +626,7 @@ static void vine_cache_handle_exit_status( struct vine_cache *c, struct vine_cac
 Consider one cache table entry to determine if the transfer process has completed.
 */
 
-static void vine_cache_process_entry( struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager)
+static void vine_cache_wait_for_file( struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager)
 {
 	int status;
 	if(f->status==VINE_CACHE_STATUS_PROCESSING){
@@ -628,7 +651,7 @@ int vine_cache_wait(struct vine_cache *c, struct link *manager)
 	struct vine_cache_file *f;
     	char *cachename;
 	HASH_TABLE_ITERATE(c->table, cachename, f){
-		vine_cache_process_entry(c,f,cachename,manager);
+		vine_cache_wait_for_file(c,f,cachename,manager);
 	}
 	return 1;
 }
