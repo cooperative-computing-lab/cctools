@@ -461,7 +461,7 @@ VINE_CACHE_STATUS_READY, If downloading return VINE_CACHE_STATUS_PROCESSING.
 On failure return VINE_CACHE_STATUS_FAILED.
 */
 
-vine_cache_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cachename)
+vine_cache_status_t vine_cache_ensure( struct vine_cache *c, const char *cachename)
 {
 	if(!strcmp(cachename,"0")) return VINE_CACHE_STATUS_READY;
 
@@ -485,7 +485,7 @@ vine_cache_status_type_t vine_cache_ensure( struct vine_cache *c, const char *ca
 	if(f->type == VINE_CACHE_MINI_TASK){
 		if(f->mini_task->input_mounts) {
                 	struct vine_mount *m;
-			vine_cache_status_type_t result;
+			vine_cache_status_t result;
                 	LIST_ITERATE(f->mini_task->input_mounts,m) {
                         	result = vine_cache_ensure(c,m->file->cached_name);
                         	if(result!=VINE_CACHE_STATUS_READY) return result;

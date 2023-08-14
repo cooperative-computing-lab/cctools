@@ -1158,7 +1158,7 @@ struct vine_process * find_process_by_library_name( const char *library_name )
 Return true if this process is ready to run at this moment, and match to a library process if needed.
 */
 
-static int process_ready_to_run_now( struct vine_process *p )
+static int process_ready_to_run_now( struct vine_process *p, struct vine_cache *cache, struct link *manager )
 {
 	if(!task_resources_fit_now(p->task)) return 0;
 
@@ -1167,6 +1167,9 @@ static int process_ready_to_run_now( struct vine_process *p )
 		if(!p->library_process) return 0;
 	}
 
+	vine_cache_status_t status = vine_sandbox_ensure(p,cache,manager);
+	if(status==VINE_CACHE_STATUS_PROCESSING) return 0;
+	
 	return 1;
 }
 
@@ -1342,7 +1345,7 @@ static void work_for_manager( struct link *manager )
 				p = list_pop_head(procs_waiting);
 				if(!p) {
 					break;
-				} else if(process_ready_to_run_now(p)) {
+				} else if(process_ready_to_run_now(p,global_cache,manager)) {
 					start_process(p,manager);
 					task_event++;
 				} else if(process_can_run_eventually(p)) {
