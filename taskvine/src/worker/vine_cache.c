@@ -51,6 +51,8 @@ struct vine_cache_file {
 	struct vine_process *process;
 };
 
+static void vine_cache_process_entry( struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager);
+
 struct vine_cache_file * vine_cache_file_create( vine_cache_type_t type, const char *source, int64_t actual_size, int mode, struct vine_task *mini_task )
 {
 	struct vine_cache_file *f = malloc(sizeof(*f));
@@ -215,11 +217,21 @@ int vine_cache_queue_command( struct vine_cache *c, struct vine_task *mini_task,
 Remove a named item from the cache, regardless of its type.
 */
 
-int vine_cache_remove( struct vine_cache *c, const char *cachename )
+int vine_cache_remove( struct vine_cache *c, const char *cachename, struct link *manager )
 {
 	struct vine_cache_file *f = hash_table_remove(c->table,cachename);
 	if(!f) return 0;
 
+	while(f->status==VINE_CACHE_STATUS_PROCESSING) {
+		debug(D_VINE,"killing pending transfer process %d...",f->pid);
+		kill(f->pid,SIGKILL);
+		vine_cache_process_entry(c,f,cachename,manager);
+		if(f->status==VINE_CACHE_STATUS_PROCESSING) {
+			debug(D_VINE,"still not killed, trying again!");
+			sleep(1);
+		}
+	}
+	
 	char *cache_path = vine_cache_full_path(c,cachename);
 	trash_file(cache_path);
 	free(cache_path);
@@ -507,7 +519,7 @@ vine_cache_status_type_t vine_cache_ensure( struct vine_cache *c, const char *ca
 Check the outputs of a transfer process to make sure they are valid.
 */
 
-static void vine_cache_check_outputs( struct vine_cache *c, struct vine_cache_file *f, char *cachename, struct link *manager)
+static void vine_cache_check_outputs( struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager)
 {
 	char *cache_path = vine_cache_full_path(c,cachename);
 	timestamp_t transfer_time = f->stop_time - f->start_time;
@@ -563,7 +575,7 @@ static void vine_cache_check_outputs( struct vine_cache *c, struct vine_cache_fi
 Evaluate the exit status of a transfer process to determine if it succeeded.
 */
 
-static void vine_cache_handle_exit_status( struct vine_cache *c, struct vine_cache_file *f, char *cachename, int status, struct link *manager)
+static void vine_cache_handle_exit_status( struct vine_cache *c, struct vine_cache_file *f, const char *cachename, int status, struct link *manager)
 {
 	f->stop_time = timestamp_get();
 
@@ -591,7 +603,7 @@ static void vine_cache_handle_exit_status( struct vine_cache *c, struct vine_cac
 Consider one cache table entry to determine if the transfer process has completed.
 */
 
-static void vine_cache_process_entry( struct vine_cache *c, struct vine_cache_file *f, char *cachename, struct link *manager)
+static void vine_cache_process_entry( struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager)
 {
 	int status;
 	if(f->status==VINE_CACHE_STATUS_PROCESSING){

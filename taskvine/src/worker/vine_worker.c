@@ -819,14 +819,14 @@ directory.  If the request is valid, then move the file to the
 trash and deal with it there.
 */
 
-static int do_unlink(const char *path)
+static int do_unlink( struct link *manager, const char *path )
 {
 	char *cached_path = vine_cache_full_path(global_cache,path);
   
 	int result = 0;
 	
 	if(path_within_dir(cached_path, workspace)) {
-		vine_cache_remove(global_cache,path);
+		vine_cache_remove(global_cache,path,manager);
 		result = 1;
 	} else {
 		debug(D_VINE, "%s is not within workspace %s",cached_path,workspace);
@@ -1062,7 +1062,7 @@ static int handle_manager(struct link *manager)
 			reset_idle_timer();
 		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = do_unlink(filename);
+			r = do_unlink(manager,filename);
 		} else if(sscanf(line, "getfile %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = vine_transfer_put_any(manager,global_cache,filename,VINE_TRANSFER_MODE_FILE_ONLY,time(0)+active_timeout);
