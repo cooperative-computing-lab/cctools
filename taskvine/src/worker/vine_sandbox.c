@@ -28,38 +28,6 @@ char * vine_sandbox_full_path( struct vine_process *p, const char *sandbox_name 
 }
 
 /*
-Ensure that a given input file/dir/object is present in the cache,
-(which may result in a transfer)
-and then link it into the sandbox at the desired location.
-*/
-
-static int ensure_input_file( struct vine_process *p, struct vine_mount *m, struct vine_file *f, struct vine_cache *cache)
-{
-	char *cache_path = vine_cache_full_path(cache,f->cached_name);
-	char *sandbox_path = vine_sandbox_full_path(p,m->remote_name);
-	
-	int result = 0;
-
-	if(f->type==VINE_EMPTY_DIR) {
-		/* Special case: empty directories are not cached objects, just create in sandbox */
-		result = create_dir(sandbox_path, 0700);
-		if(!result) debug(D_VINE,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
-
-	} else if(vine_cache_ensure(cache,f->cached_name)==VINE_CACHE_STATUS_READY) {
-		/* All other types, link the cached object into the sandbox */
-	    	create_dir_parents(sandbox_path,0777);
-		debug(D_VINE,"input: link %s -> %s",cache_path,sandbox_path);
-		result = file_link_recursive(cache_path,sandbox_path,vine_worker_symlinks_enabled);
-		if(!result) debug(D_VINE,"couldn't link %s into sandbox as %s: %s",cache_path,sandbox_path,strerror(errno));
-	}
-	
-	free(cache_path);
-	free(sandbox_path);
-	
-	return result;
-}
-
-/*
 Ensures that each input file is present.
 */
 
@@ -84,8 +52,47 @@ vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cach
 }
 
 /*
+Ensure that a given input file/dir/object is present in the cache,
+(which should have occurred from a prior transfer)
+and then link it into the sandbox at the desired location.
+*/
+
+static int stage_input_file( struct vine_process *p, struct vine_mount *m, struct vine_file *f, struct vine_cache *cache)
+{
+	char *cache_path = vine_cache_full_path(cache,f->cached_name);
+	char *sandbox_path = vine_sandbox_full_path(p,m->remote_name);
+	
+	int result = 0;
+
+	if(f->type==VINE_EMPTY_DIR) {
+		/* Special case: empty directories are not cached objects, just create in sandbox */
+		result = create_dir(sandbox_path, 0700);
+		if(!result) debug(D_VINE,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
+
+	} else {
+		/* All other types, link the cached object into the sandbox */
+		vine_cache_status_t status;
+		status = vine_cache_ensure(cache,f->cached_name);
+		if(status==VINE_CACHE_STATUS_READY) {
+			create_dir_parents(sandbox_path,0777);
+			debug(D_VINE,"input: link %s -> %s",cache_path,sandbox_path);
+			result = file_link_recursive(cache_path,sandbox_path,vine_worker_symlinks_enabled);
+			if(!result) debug(D_VINE,"couldn't link %s into sandbox as %s: %s",cache_path,sandbox_path,strerror(errno));
+		} else {
+			debug(D_VINE,"input: %s is not ready in the cache!",f->cached_name);
+			result = 0;
+		}
+	}
+	
+	free(cache_path);
+	free(sandbox_path);
+	
+	return result;
+}
+
+/*
 For each input file specified by the process,
-transfer it into the sandbox directory.
+stage it into the sandbox directory from the cache.
 */
 
 int vine_sandbox_stagein( struct vine_process *p, struct vine_cache *cache)
@@ -96,7 +103,7 @@ int vine_sandbox_stagein( struct vine_process *p, struct vine_cache *cache)
 	if(t->input_mounts) {
 		struct vine_mount *m;
 		LIST_ITERATE(t->input_mounts,m) {
-			result = ensure_input_file(p,m,m->file,cache);
+			result = stage_input_file(p,m,m->file,cache);
 			if(!result) break;
 		}
 	}
@@ -112,7 +119,7 @@ then attempt a recursive copy.
 Inform the cache of the added file.
 */
 
-static int transfer_output_file( struct vine_process *p, struct vine_mount *m, struct vine_file *f, struct vine_cache *cache, struct link *manager )
+static int stage_output_file( struct vine_process *p, struct vine_mount *m, struct vine_file *f, struct vine_cache *cache, struct link *manager )
 {
 	char *cache_path = vine_cache_full_path(cache,f->cached_name);
 	char *sandbox_path = vine_sandbox_full_path(p,m->remote_name);
@@ -161,7 +168,7 @@ int vine_sandbox_stageout( struct vine_process *p, struct vine_cache *cache, str
 {
 	struct vine_mount *m;
 	LIST_ITERATE(p->task->output_mounts,m) {
-		transfer_output_file(p,m,m->file,cache,manager);
+		stage_output_file(p,m,m->file,cache,manager);
 	}
 
 	return 1;
