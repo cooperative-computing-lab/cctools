@@ -22,7 +22,7 @@ for file transfers to occur asynchronously of the manager.
 #include "vine_file.h"
 
 struct link;
-struct cache_file;
+struct vine_cache_file;
 
 typedef enum {
 	VINE_CACHE_FILE,

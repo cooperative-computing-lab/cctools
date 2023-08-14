@@ -38,7 +38,7 @@ struct vine_cache {
 	char *cache_dir;
 };
 
-struct cache_file {
+struct vine_cache_file {
         vine_cache_type_t type;
         timestamp_t start_time;
         timestamp_t stop_time;
@@ -51,9 +51,9 @@ struct cache_file {
 	struct vine_process *process;
 };
 
-struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t actual_size, int mode, struct vine_task *mini_task )
+struct vine_cache_file * vine_cache_file_create( vine_cache_type_t type, const char *source, int64_t actual_size, int mode, struct vine_task *mini_task )
 {
-	struct cache_file *f = malloc(sizeof(*f));
+	struct vine_cache_file *f = malloc(sizeof(*f));
 	f->type = type;
 	f->source = xxstrdup(source);
 	f->actual_size = actual_size;
@@ -67,7 +67,7 @@ struct cache_file * cache_file_create( vine_cache_type_t type, const char *sourc
 	return f;
 }
 
-void cache_file_delete( struct cache_file *f )
+void vine_cache_file_delete( struct vine_cache_file *f )
 {
 	if(f->mini_task) {
 		vine_task_delete(f->mini_task);
@@ -132,7 +132,7 @@ send cache updates to manager from existing cache_directory
 
 void vine_cache_scan(struct vine_cache *c, struct link *manager)
 {
-	struct cache_file *f;
+	struct vine_cache_file *f;
 	char * cachename;
 	HASH_TABLE_ITERATE(c->table, cachename, f){
 		/* XXX the worker doesn't know how long it took to transfer. */
@@ -145,7 +145,7 @@ Delete the cache manager structure, though not the underlying files.
 */
 void vine_cache_delete( struct vine_cache *c )
 {
-	hash_table_clear(c->table,(void*)cache_file_delete);
+	hash_table_clear(c->table,(void*)vine_cache_file_delete);
 	hash_table_delete(c->table);
 	free(c->cache_dir);
 	free(c);
@@ -168,9 +168,9 @@ Add a file to the cache manager (already created in the proper place) and note i
 
 int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char *cachename )
 {
-	struct cache_file *f = hash_table_lookup(c->table,cachename);
+	struct vine_cache_file *f = hash_table_lookup(c->table,cachename);
 	if(!f) {
-		f = cache_file_create(VINE_CACHE_FILE,"manager",size,mode,0);
+		f = vine_cache_file_create(VINE_CACHE_FILE,"manager",size,mode,0);
 		hash_table_insert(c->table,cachename,f);
 	}
 
@@ -194,7 +194,7 @@ This entry will be materialized later in vine_cache_ensure.
 
 int vine_cache_queue_transfer( struct vine_cache *c, const char *source, const char *cachename, int64_t size, int mode )
 {
-	struct cache_file *f = cache_file_create(VINE_CACHE_TRANSFER,source,size,mode,0);
+	struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_TRANSFER,source,size,mode,0);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -206,7 +206,7 @@ This entry will be materialized later in vine_cache_ensure.
 
 int vine_cache_queue_command( struct vine_cache *c, struct vine_task *mini_task, const char *cachename, int64_t size, int mode )
 {
-	struct cache_file *f = cache_file_create(VINE_CACHE_MINI_TASK,"task",size,mode,mini_task);
+	struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_MINI_TASK,"task",size,mode,mini_task);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -217,14 +217,14 @@ Remove a named item from the cache, regardless of its type.
 
 int vine_cache_remove( struct vine_cache *c, const char *cachename )
 {
-	struct cache_file *f = hash_table_remove(c->table,cachename);
+	struct vine_cache_file *f = hash_table_remove(c->table,cachename);
 	if(!f) return 0;
 
 	char *cache_path = vine_cache_full_path(c,cachename);
 	trash_file(cache_path);
 	free(cache_path);
 
-	cache_file_delete(f);
+	vine_cache_file_delete(f);
 
 	return 1;
 
@@ -289,7 +289,7 @@ which should result in the desired file being placed into the cache.
 This will be double-checked below.
 */
 
-static int do_mini_task( struct vine_cache *c, struct cache_file *f, char **error_message )
+static int do_mini_task( struct vine_cache *c, struct vine_cache_file *f, char **error_message )
 {
 	if(vine_process_execute_and_wait(f->process,c)) {
 		*error_message = 0;
@@ -393,7 +393,7 @@ static int do_transfer( struct vine_cache *c, const char *source_url, const char
 Child process that materializes the proper file.
 */
 
-static void vine_cache_worker_process(struct cache_file *f, struct vine_cache *c, const char *cachename)
+static void vine_cache_worker_process(struct vine_cache_file *f, struct vine_cache *c, const char *cachename)
 {
 	char *error_message = 0;
 	char *cache_path = vine_cache_full_path(c,cachename);
@@ -433,7 +433,7 @@ vine_cache_status_type_t vine_cache_ensure( struct vine_cache *c, const char *ca
 {
 	if(!strcmp(cachename,"0")) return VINE_CACHE_STATUS_READY;
 
-	struct cache_file *f = hash_table_lookup(c->table,cachename);
+	struct vine_cache_file *f = hash_table_lookup(c->table,cachename);
 	if(!f) {
 		debug(D_VINE,"cache: %s is unknown, perhaps it failed to transfer earlier?",cachename);
 		return VINE_CACHE_STATUS_FAILED;
@@ -507,7 +507,7 @@ vine_cache_status_type_t vine_cache_ensure( struct vine_cache *c, const char *ca
 Check the outputs of a transfer process to make sure they are valid.
 */
 
-static void vine_cache_check_outputs( struct vine_cache *c, struct cache_file *f, char *cachename, struct link *manager)
+static void vine_cache_check_outputs( struct vine_cache *c, struct vine_cache_file *f, char *cachename, struct link *manager)
 {
 	char *cache_path = vine_cache_full_path(c,cachename);
 	timestamp_t transfer_time = f->stop_time - f->start_time;
@@ -563,7 +563,7 @@ static void vine_cache_check_outputs( struct vine_cache *c, struct cache_file *f
 Evaluate the exit status of a transfer process to determine if it succeeded.
 */
 
-static void vine_cache_handle_exit_status( struct vine_cache *c, struct cache_file *f, char *cachename, int status, struct link *manager)
+static void vine_cache_handle_exit_status( struct vine_cache *c, struct vine_cache_file *f, char *cachename, int status, struct link *manager)
 {
 	f->stop_time = timestamp_get();
 
@@ -591,7 +591,7 @@ static void vine_cache_handle_exit_status( struct vine_cache *c, struct cache_fi
 Consider one cache table entry to determine if the transfer process has completed.
 */
 
-static void vine_cache_process_entry( struct vine_cache *c, struct cache_file *f, char *cachename, struct link *manager)
+static void vine_cache_process_entry( struct vine_cache *c, struct vine_cache_file *f, char *cachename, struct link *manager)
 {
 	int status;
 	if(f->status==VINE_CACHE_STATUS_PROCESSING){
@@ -613,7 +613,7 @@ Search the cache table to determine if any transfer processes have completed.
 
 int vine_cache_wait(struct vine_cache *c, struct link *manager)
 {
-	struct cache_file *f;
+	struct vine_cache_file *f;
     	char *cachename;
 	HASH_TABLE_ITERATE(c->table, cachename, f){
 		vine_cache_process_entry(c,f,cachename,manager);
