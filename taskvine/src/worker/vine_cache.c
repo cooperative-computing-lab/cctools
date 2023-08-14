@@ -387,34 +387,27 @@ static int do_transfer( struct vine_cache *c, const char *source_url, const char
 	return result;
 }
 
-int vine_cache_wait(struct vine_cache *c, struct link *manager)
-{
-	struct cache_file *f;
-    	char *cachename;
-	HASH_TABLE_ITERATE(c->table, cachename, f){
-		vine_cache_process_entry(f,cachename,c,manager);
-	}
-	return 1;
-
-}
-
-void vine_cache_process_entry(struct cache_file *f, char *cachename, struct vine_cache *c, struct link *manager)
-{
-	int status;
-	if(f->status==VINE_CACHE_STATUS_PROCESSING){
-		int result = waitpid(f->pid, &status, WNOHANG);
-		if(result==0){
-			// process stil executing
-		} else if(result<0) {
-			debug(D_VINE, "wait4 on pid %d returned an error: %s",(int)f->pid,strerror(errno));	
-		} else if(result>0) {
-			vine_cache_handle_exit_status(status,cachename,f,manager);
-			vine_cache_check_outputs(f,cachename,c,manager);
+static void vine_cache_handle_exit_status(int status, char *cachename, struct cache_file *f, struct link *manager){	
+	int exit_code;
+	f->stop_time = timestamp_get();
+	if(!WIFEXITED(status)){
+		exit_code = WTERMSIG(status);
+		debug(D_VINE, "transfer process (pid %d) exited abnormally with signal %d",f->pid, exit_code);
+		f->status = VINE_CACHE_STATUS_FAILED;
+	} else {
+		exit_code = WEXITSTATUS(status);
+		debug(D_VINE, "transfer process for %s (pid %d) exited normally with exit code %d", cachename, f->pid, exit_code );
+		if(exit_code==1){	
+			debug(D_VINE, "transfer process for %s completed", cachename);
+			f->status = VINE_CACHE_STATUS_READY;
+		} else {
+			debug(D_VINE, "transfer process for %s failed", cachename);
+			f->status = VINE_CACHE_STATUS_FAILED;
 		}
 	}
 }
 
-void vine_cache_check_outputs(struct cache_file *f, char *cachename, struct vine_cache *c, struct link *manager)
+static void vine_cache_check_outputs(struct cache_file *f, char *cachename, struct vine_cache *c, struct link *manager)
 {
 	int64_t nbytes, nfiles;
 	char *cache_path = vine_cache_full_path(c,cachename);
@@ -443,25 +436,31 @@ void vine_cache_check_outputs(struct cache_file *f, char *cachename, struct vine
 	free(cache_path);
 }
 
-void vine_cache_handle_exit_status(int status, char *cachename, struct cache_file *f, struct link *manager){	
-	int exit_code;
-	f->stop_time = timestamp_get();
-	if(!WIFEXITED(status)){
-		exit_code = WTERMSIG(status);
-		debug(D_VINE, "transfer process (pid %d) exited abnormally with signal %d",f->pid, exit_code);
-		f->status = VINE_CACHE_STATUS_FAILED;
-
-	} else {
-		exit_code = WEXITSTATUS(status);
-		debug(D_VINE, "transfer process for %s (pid %d) exited normally with exit code %d", cachename, f->pid, exit_code );
-		if(exit_code==1){	
-			debug(D_VINE, "transfer process for %s completed", cachename);
-			f->status = VINE_CACHE_STATUS_READY;
-		} else {
-			debug(D_VINE, "transfer process for %s failed", cachename);
-			f->status = VINE_CACHE_STATUS_FAILED;
+static void vine_cache_process_entry(struct cache_file *f, char *cachename, struct vine_cache *c, struct link *manager)
+{
+	int status;
+	if(f->status==VINE_CACHE_STATUS_PROCESSING){
+		int result = waitpid(f->pid, &status, WNOHANG);
+		if(result==0){
+			// process stil executing
+		} else if(result<0) {
+			debug(D_VINE, "wait4 on pid %d returned an error: %s",(int)f->pid,strerror(errno));	
+		} else if(result>0) {
+			vine_cache_handle_exit_status(status,cachename,f,manager);
+			vine_cache_check_outputs(f,cachename,c,manager);
 		}
 	}
+}
+
+int vine_cache_wait(struct vine_cache *c, struct link *manager)
+{
+	struct cache_file *f;
+    	char *cachename;
+	HASH_TABLE_ITERATE(c->table, cachename, f){
+		vine_cache_process_entry(f,cachename,c,manager);
+	}
+	return 1;
+
 }
 
 /*

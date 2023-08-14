@@ -32,9 +32,9 @@ typedef enum {
 
 typedef enum {
 	VINE_CACHE_STATUS_NOT_PRESENT,
-	VINE_CACHE_STATUS_READY,
 	VINE_CACHE_STATUS_PROCESSING,
-	VINE_CACHE_STATUS_FAILED,
+	VINE_CACHE_STATUS_READY,
+	VINE_CACHE_STATUS_FAILED,       
 } vine_cache_status_type_t;
 
 struct vine_cache * vine_cache_create( const char *cachedir );
@@ -52,8 +52,5 @@ vine_cache_status_type_t vine_cache_ensure( struct vine_cache *c, const char *ca
 int vine_cache_remove( struct vine_cache *c, const char *cachename );
 int vine_cache_contains( struct vine_cache *c, const char *cachename );
 int vine_cache_wait( struct vine_cache *c, struct link *manager );
-void vine_cache_process_entry(struct cache_file *f, char *cachename, struct vine_cache *c, struct link *manager);
-void vine_cache_check_outputs(struct cache_file *f, char *cachename, struct vine_cache *c, struct link *manager);
-void vine_cache_handle_exit_status(int status, char *cachename, struct cache_file *f, struct link *manager);
 
 #endif
