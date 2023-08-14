@@ -390,6 +390,120 @@ static int do_transfer( struct vine_cache *c, const char *source_url, const char
 }
 
 /*
+Child process that materializes the proper file.
+*/
+
+static void vine_cache_worker_process(struct cache_file *f, struct vine_cache *c, const char *cachename)
+{
+	char *error_message = 0;
+	char *cache_path = vine_cache_full_path(c,cachename);
+	int result = 0;
+
+	switch(f->type) {
+		case VINE_CACHE_FILE:
+			result = 1;
+			break;
+		case VINE_CACHE_TRANSFER:
+			result = do_transfer(c,f->source,cache_path,&error_message);
+			break;
+		case VINE_CACHE_MINI_TASK:
+			result = do_mini_task(c,f,&error_message);
+			break;
+	}
+
+	if(error_message){ 
+		debug(D_VINE,"An error occured when creating %s via mini task: %s", cachename, error_message);
+		free(error_message);
+	}
+
+	free(cache_path);
+
+	/* Exit status should be zero on success. */
+	exit(result==0);
+}
+
+/*
+Ensure that a given cached entry is fully materialized in the cache,
+downloading files or executing commands as needed.  If complete, return
+VINE_CACHE_STATUS_READY, If downloading return VINE_CACHE_STATUS_PROCESSING.
+On failure return VINE_CACHE_STATUS_FAILED.
+*/
+
+vine_cache_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cachename)
+{
+	if(!strcmp(cachename,"0")) return VINE_CACHE_STATUS_READY;
+
+	struct cache_file *f = hash_table_lookup(c->table,cachename);
+	if(!f) {
+		debug(D_VINE,"cache: %s is unknown, perhaps it failed to transfer earlier?",cachename);
+		return VINE_CACHE_STATUS_FAILED;
+	}
+
+	switch(f->status) {
+		case VINE_CACHE_STATUS_READY:
+		case VINE_CACHE_STATUS_FAILED:
+		case VINE_CACHE_STATUS_PROCESSING:
+			return f->status;
+		case VINE_CACHE_STATUS_NOT_PRESENT:
+			/* keep going */
+			break;
+
+	}
+
+	if(f->type == VINE_CACHE_MINI_TASK){
+		if(f->mini_task->input_mounts) {
+                	struct vine_mount *m;
+			vine_cache_status_type_t result;
+                	LIST_ITERATE(f->mini_task->input_mounts,m) {
+                        	result = vine_cache_ensure(c,m->file->cached_name);
+                        	if(result!=VINE_CACHE_STATUS_READY) return result;
+                	}
+        	}
+	}
+	
+	f->start_time = timestamp_get();
+
+	debug(D_VINE,"forking transfer process to create %s", cachename);
+
+	if(f->type == VINE_CACHE_MINI_TASK){
+		struct vine_process *p = vine_process_create(f->mini_task, 1);
+		if(!vine_sandbox_stagein(p,c)) {
+			debug(D_VINE, "Can't stage input files for task %d.", p->task->task_id);
+			p->task = 0;
+			vine_process_delete(p);
+			f->status = VINE_CACHE_STATUS_FAILED;
+			return f->status;
+		}
+		f->process = p;
+	}
+
+	f->pid = fork();
+
+	if(f->pid<0) {
+		debug(D_VINE,"failed to fork transfer process");
+		f->status = VINE_CACHE_STATUS_FAILED;
+		return f->status;
+	} else if(f->pid>0) {
+		f->status = VINE_CACHE_STATUS_PROCESSING;
+		switch(f->type){
+			case (VINE_CACHE_TRANSFER):
+				debug(D_VINE,"cache: transferring %s to %s",f->source,cachename);
+				break;
+			case (VINE_CACHE_MINI_TASK): 
+				debug(D_VINE,"cache: creating %s via mini task",cachename);
+				break;
+			case (VINE_CACHE_FILE):
+				debug(D_VINE,"cache: checking if %s is present in cache",cachename);
+				break;
+		}
+		return f->status;
+	} else {
+		vine_cache_worker_process(f, c, cachename);
+		_exit(1);
+	}
+}
+
+/*
 Check the outputs of a transfer process to make sure they are valid.
 */
 
@@ -492,117 +606,5 @@ int vine_cache_wait(struct vine_cache *c, struct link *manager)
 		vine_cache_process_entry(c,f,cachename,manager);
 	}
 	return 1;
-
-}
-
-/*
-Ensure that a given cached entry is fully materialized in the cache,
-downloading files or executing commands as needed.  If complete, return
-VINE_CACHE_STATUS_READY, If downloading return VINE_CACHE_STATUS_PROCESSING.
-On failure return VINE_CACHE_STATUS_FAILED.
-
-*/
-
-vine_cache_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cachename)
-{
-	if(!strcmp(cachename,"0")) return VINE_CACHE_STATUS_READY;
-
-	struct cache_file *f = hash_table_lookup(c->table,cachename);
-	if(!f) {
-		debug(D_VINE,"cache: %s is unknown, perhaps it failed to transfer earlier?",cachename);
-		return VINE_CACHE_STATUS_FAILED;
-	}
-
-	switch(f->status) {
-		case VINE_CACHE_STATUS_READY:
-		case VINE_CACHE_STATUS_FAILED:
-		case VINE_CACHE_STATUS_PROCESSING:
-			return f->status;
-		case VINE_CACHE_STATUS_NOT_PRESENT:
-			/* keep going */
-			break;
-
-	}
-
-	if(f->type == VINE_CACHE_MINI_TASK){
-		if(f->mini_task->input_mounts) {
-                	struct vine_mount *m;
-			vine_cache_status_type_t result;
-                	LIST_ITERATE(f->mini_task->input_mounts,m) {
-                        	result = vine_cache_ensure(c,m->file->cached_name);
-                        	if(result!=VINE_CACHE_STATUS_READY) return result;
-                	}
-        	}
-	}
-	
-	f->start_time = timestamp_get();
-
-	debug(D_VINE,"forking transfer process to create %s", cachename);
-
-	if(f->type == VINE_CACHE_MINI_TASK){
-		struct vine_process *p = vine_process_create(f->mini_task, 1);
-		if(!vine_sandbox_stagein(p,c)) {
-			debug(D_VINE, "Can't stage input files for task %d.", p->task->task_id);
-			p->task = 0;
-			vine_process_delete(p);
-			f->status = VINE_CACHE_STATUS_FAILED;
-			return f->status;
-		}
-		f->process = p;
-	}
-
-	f->pid = fork();
-
-	if(f->pid<0) {
-		debug(D_VINE,"failed to fork transfer process");
-		f->status = VINE_CACHE_STATUS_FAILED;
-		return f->status;
-	} else if(f->pid>0) {
-		f->status = VINE_CACHE_STATUS_PROCESSING;
-		switch(f->type){
-			case (VINE_CACHE_TRANSFER):
-				debug(D_VINE,"cache: transferring %s to %s",f->source,cachename);
-				break;
-			case (VINE_CACHE_MINI_TASK): 
-				debug(D_VINE,"cache: creating %s via mini task",cachename);
-				break;
-			case (VINE_CACHE_FILE):
-				debug(D_VINE,"cache: checking if %s is present in cache",cachename);
-				break;
-		}
-		return f->status;
-	} else {
-		vine_cache_get_file(f, c, cachename);
-		_exit(1);
-	}
-}
-/*
-Child Process that materializes the proper file.
-*/
-
-void vine_cache_get_file(struct cache_file *f, struct vine_cache *c, const char *cachename){
-
-	char *error_message = 0;
-	char *cache_path = vine_cache_full_path(c,cachename);
-	int result = 0;
-
-	switch(f->type) {
-		case VINE_CACHE_FILE:
-			result = 1;
-			break;
-		case VINE_CACHE_TRANSFER:
-			result = do_transfer(c,f->source,cache_path,&error_message);
-			break;
-
-		case VINE_CACHE_MINI_TASK:
-			result = do_mini_task(c,f,&error_message);
-			break;
-	}
-	if(error_message){ 
-		debug(D_VINE,"An error occured when creating %s via mini task: %s", cachename, error_message);
-		free(error_message);
-	}
-	free(cache_path);
-	exit(result);
 }
 
