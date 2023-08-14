@@ -229,14 +229,6 @@ set_up_working_directory()
 		exit 1
 	fi
 
-	gpu_detection=`which cctools_gpu_autodetect 2>/dev/null`
-	if [ $? != 0 ]
-	then
-		echo "$0: could not find cctools_gpu_autodetect in PATH. gpus will not be automatically detected." 1>&2
-	else
-		cp $gpu_detection ${submit_dir}
-	fi
-
     cp $worker ${submit_dir}
 	set_up_password_file_common
 
