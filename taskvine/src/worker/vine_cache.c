@@ -59,7 +59,7 @@ struct cache_file * cache_file_create( vine_cache_type_t type, const char *sourc
 	f->actual_size = actual_size;
 	f->mode = mode;
 	f->pid = 0;
-	f->status = VINE_FILE_STATUS_NOT_PRESENT;
+	f->status = VINE_CACHE_STATUS_NOT_PRESENT;
 	f->mini_task = mini_task;
 	f->process = 0;
 	f->start_time = 0;
@@ -172,7 +172,7 @@ int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char
 		hash_table_insert(c->table,cachename,f);
 	}
 
-	f->status = VINE_FILE_STATUS_READY;
+	f->status = VINE_CACHE_STATUS_READY;
 	return 1;
 }
 
@@ -401,7 +401,7 @@ int vine_cache_wait(struct vine_cache *c, struct link *manager)
 void vine_cache_process_entry(struct cache_file *f, char *cachename, struct vine_cache *c, struct link *manager)
 {
 	int status;
-	if(f->status==VINE_FILE_STATUS_PROCESSING){
+	if(f->status==VINE_CACHE_STATUS_PROCESSING){
 		int result = waitpid(f->pid, &status, WNOHANG);
 		if(result==0){
 			// process stil executing
@@ -421,20 +421,20 @@ void vine_cache_check_outputs(struct cache_file *f, char *cachename, struct vine
 	timestamp_t transfer_time = f->stop_time - f->start_time;
 	if(f->type==VINE_CACHE_MINI_TASK){
 		// stageout only if process succeeded 
-		if(f->status==VINE_FILE_STATUS_READY) vine_sandbox_stageout(f->process, c, manager);
+		if(f->status==VINE_CACHE_STATUS_READY) vine_sandbox_stageout(f->process, c, manager);
 		f->process->task = 0;
 		vine_process_delete(f->process);
 	}
-	if(f->status==VINE_FILE_STATUS_READY){
+	if(f->status==VINE_CACHE_STATUS_READY){
 		chmod(cache_path,f->mode);
 		if(path_disk_size_info_get(cache_path,&nbytes,&nfiles)==0) {
 			f->actual_size = nbytes;
 			debug(D_VINE,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->actual_size,(long long)transfer_time);
 			vine_worker_send_cache_update(manager,cachename,f->actual_size,transfer_time,f->start_time);
-			f->status = VINE_FILE_STATUS_READY;
+			f->status = VINE_CACHE_STATUS_READY;
 		} else {
 			debug(D_VINE,"cache: command succeeded but did not create %s",cachename);
-			f->status = VINE_FILE_STATUS_FAILED;
+			f->status = VINE_CACHE_STATUS_FAILED;
 		}
 
 	} else {
@@ -449,17 +449,17 @@ void vine_cache_handle_exit_status(int status, char *cachename, struct cache_fil
 	if(!WIFEXITED(status)){
 		exit_code = WTERMSIG(status);
 		debug(D_VINE, "transfer process (pid %d) exited abnormally with signal %d",f->pid, exit_code);
-		f->status = VINE_FILE_STATUS_FAILED;
+		f->status = VINE_CACHE_STATUS_FAILED;
 
 	} else {
 		exit_code = WEXITSTATUS(status);
 		debug(D_VINE, "transfer process for %s (pid %d) exited normally with exit code %d", cachename, f->pid, exit_code );
 		if(exit_code==1){	
 			debug(D_VINE, "transfer process for %s completed", cachename);
-			f->status = VINE_FILE_STATUS_READY;
+			f->status = VINE_CACHE_STATUS_READY;
 		} else {
 			debug(D_VINE, "transfer process for %s failed", cachename);
-			f->status = VINE_FILE_STATUS_FAILED;
+			f->status = VINE_CACHE_STATUS_FAILED;
 		}
 	}
 }
@@ -467,30 +467,30 @@ void vine_cache_handle_exit_status(int status, char *cachename, struct cache_fil
 /*
 Ensure that a given cached entry is fully materialized in the cache,
 downloading files or executing commands as needed.  If complete, return
-VINE_FILE_STATUS_READY, If downloading return VINE_FILE_STATUS_PROCESSING.
-On failure return VINE_FILE_STATUS_FAILED.
+VINE_CACHE_STATUS_READY, If downloading return VINE_CACHE_STATUS_PROCESSING.
+On failure return VINE_CACHE_STATUS_FAILED.
 
 */
 
-vine_file_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cachename)
+vine_cache_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cachename)
 {
-	if(!strcmp(cachename,"0")) return VINE_FILE_STATUS_READY;
+	if(!strcmp(cachename,"0")) return VINE_CACHE_STATUS_READY;
 
 	struct cache_file *f = hash_table_lookup(c->table,cachename);
 	if(!f) {
 		debug(D_VINE,"cache: %s is unknown, perhaps it failed to transfer earlier?",cachename);
-		return VINE_FILE_STATUS_FAILED;
+		return VINE_CACHE_STATUS_FAILED;
 	}
 
 	/* File is already present in the cache. */
 	switch(f->status) {
-		case VINE_FILE_STATUS_READY:
-			return VINE_FILE_STATUS_READY;
-		case VINE_FILE_STATUS_FAILED:
-			return VINE_FILE_STATUS_FAILED;
-		case VINE_FILE_STATUS_PROCESSING:
-			return VINE_FILE_STATUS_PROCESSING;
-		case VINE_FILE_STATUS_NOT_PRESENT:
+		case VINE_CACHE_STATUS_READY:
+			return VINE_CACHE_STATUS_READY;
+		case VINE_CACHE_STATUS_FAILED:
+			return VINE_CACHE_STATUS_FAILED;
+		case VINE_CACHE_STATUS_PROCESSING:
+			return VINE_CACHE_STATUS_PROCESSING;
+		case VINE_CACHE_STATUS_NOT_PRESENT:
 			break;
 
 	}
@@ -498,10 +498,10 @@ vine_file_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cac
 	if(f->type == VINE_CACHE_MINI_TASK){
 		if(f->mini_task->input_mounts) {
                 	struct vine_mount *m;
-			vine_file_status_type_t result;
+			vine_cache_status_type_t result;
                 	LIST_ITERATE(f->mini_task->input_mounts,m) {
                         	result = vine_cache_ensure(c,m->file->cached_name);
-                        	if(result!=VINE_FILE_STATUS_READY) return result;
+                        	if(result!=VINE_CACHE_STATUS_READY) return result;
                 	}
         	}
 	}
@@ -517,8 +517,8 @@ vine_file_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cac
 			debug(D_VINE, "Can't stage input files for task %d.", p->task->task_id);
 			p->task = 0;
 			vine_process_delete(p);
-			f->status = VINE_FILE_STATUS_FAILED;
-			return VINE_FILE_STATUS_FAILED;
+			f->status = VINE_CACHE_STATUS_FAILED;
+			return VINE_CACHE_STATUS_FAILED;
 		}
 		f->process = p;
 	}
@@ -527,11 +527,11 @@ vine_file_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cac
 
 	if(pid == -1) {
 		debug(D_VINE,"failed to fork transfer process");
-		return VINE_FILE_STATUS_FAILED;
+		return VINE_CACHE_STATUS_FAILED;
 	}
 	if(pid > 0){
 		f->pid = pid;
-		f->status = VINE_FILE_STATUS_PROCESSING;
+		f->status = VINE_CACHE_STATUS_PROCESSING;
 		switch(f->type){
 			case (VINE_CACHE_TRANSFER):
 				debug(D_VINE,"cache: transferring %s to %s",f->source,cachename);
@@ -543,7 +543,7 @@ vine_file_status_type_t vine_cache_ensure( struct vine_cache *c, const char *cac
 				debug(D_VINE,"cache: checking if %s is present in cache",cachename);
 				break;
 		}
-		return VINE_FILE_STATUS_PROCESSING;
+		return VINE_CACHE_STATUS_PROCESSING;
 	}
 
 	vine_cache_get_file(f, c, cachename);

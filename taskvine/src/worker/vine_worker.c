@@ -1356,8 +1356,8 @@ static void work_for_manager( struct link *manager )
 						p->coprocess = ready_coprocess;
 						ready_coprocess->state = VINE_COPROCESS_RUNNING;
 					}
-					vine_file_status_type_t result = vine_sandbox_ensure(p,global_cache,manager);
-					if(result==VINE_FILE_STATUS_PROCESSING){
+					vine_cache_status_type_t result = vine_sandbox_ensure(p,global_cache,manager);
+					if(result==VINE_CACHE_STATUS_PROCESSING){
 						list_push_tail(procs_waiting, p);
 					} else {
 						start_process(p,manager);

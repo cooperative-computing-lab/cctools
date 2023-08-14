@@ -45,7 +45,7 @@ static int ensure_input_file( struct vine_process *p, struct vine_mount *m, stru
 		result = create_dir(sandbox_path, 0700);
 		if(!result) debug(D_VINE,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
 
-	} else if(vine_cache_ensure(cache,f->cached_name)==VINE_FILE_STATUS_READY) {
+	} else if(vine_cache_ensure(cache,f->cached_name)==VINE_CACHE_STATUS_READY) {
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_path,0777);
 		debug(D_VINE,"input: link %s -> %s",cache_path,sandbox_path);
@@ -63,24 +63,24 @@ static int ensure_input_file( struct vine_process *p, struct vine_mount *m, stru
 Ensures that each input file is present.
 */
 
-vine_file_status_type_t vine_sandbox_ensure(struct vine_process *p, struct vine_cache *cache, struct link *manager)
+vine_cache_status_type_t vine_sandbox_ensure(struct vine_process *p, struct vine_cache *cache, struct link *manager)
 {	
 	int processing=0;
 	struct vine_task *t = p->task;
-	vine_file_status_type_t file_status = VINE_FILE_STATUS_READY;
+	vine_cache_status_type_t cache_status = VINE_CACHE_STATUS_READY;
 
 	if(t->input_mounts) {
 		struct vine_mount *m;
 		LIST_ITERATE(t->input_mounts,m) {
-			file_status = vine_cache_ensure(cache,m->file->cached_name);
-			if(file_status == VINE_FILE_STATUS_PROCESSING) processing=1;
-			if(file_status == VINE_FILE_STATUS_FAILED) break;
+			cache_status = vine_cache_ensure(cache,m->file->cached_name);
+			if(cache_status == VINE_CACHE_STATUS_PROCESSING) processing=1;
+			if(cache_status == VINE_CACHE_STATUS_FAILED) break;
 
 		}
 	}
-	if(file_status==VINE_FILE_STATUS_FAILED) return VINE_FILE_STATUS_FAILED;
-	if(processing) return VINE_FILE_STATUS_PROCESSING;
-	return VINE_FILE_STATUS_READY;
+	if(cache_status==VINE_CACHE_STATUS_FAILED) return VINE_CACHE_STATUS_FAILED;
+	if(processing) return VINE_CACHE_STATUS_PROCESSING;
+	return VINE_CACHE_STATUS_READY;
 }
 
 /*
