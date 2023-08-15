@@ -1136,17 +1136,18 @@ static int task_resources_fit_eventually(struct vine_task *t)
 
 /*
 Find a suitable library process that provides the given library name and is ready to be invoked
-XXX need to check on coprocess status -- is it already running something ?
 */
 
-struct vine_process * find_process_by_library_name( const char *library_name )
+struct vine_process * find_library_for_function( const char *library_name )
 {
 	uint64_t task_id;
 	struct vine_process *p;
 
 	ITABLE_ITERATE(procs_running,task_id,p) {
 		if(!strcmp(p->task->provides_library,library_name)) {
-			return p;
+			if(p->functions_running<p->max_functions_running) {
+				return p;
+			}
 		}
 	}
 	return 0;
@@ -1161,7 +1162,7 @@ static int process_ready_to_run_now( struct vine_process *p, struct vine_cache *
 	if(!task_resources_fit_now(p->task)) return 0;
 
 	if(p->task->needs_library) {
-		p->library_process = find_process_by_library_name(p->task->needs_library);
+		p->library_process = find_library_for_function(p->task->needs_library);
 		if(!p->library_process) return 0;
 	}
 
