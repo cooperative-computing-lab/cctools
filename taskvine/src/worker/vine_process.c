@@ -67,6 +67,9 @@ static const char * vine_process_sandbox_code( vine_process_type_t type )
 		case VINE_PROCESS_TYPE_FUNCTION:	return "func";
 		case VINE_PROCESS_TYPE_TRANSFER:	return "tran";
 	}
+
+	/* Odd return here is used to silence compiler while still retaining typedef check above. */
+	return "task";
 }
 
 /*
