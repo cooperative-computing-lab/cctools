@@ -91,6 +91,10 @@ struct vine_process *vine_process_create( struct vine_task *task, vine_process_t
 	p->tmpdir = string_format("%s/.taskvine.tmp",p->sandbox);
 	p->output_file_name = string_format("%s/.taskvine.stdout",p->sandbox);
 
+	/* Until told otherwise, no more than one function per library. */
+	p->functions_running = 0;
+	p->max_functions_running = 1;
+	
 	/* Note that create_dir recursively creates parents, so a single one is sufficient. */
 
 	if(!create_dir(p->tmpdir,0777)) {
@@ -214,14 +218,16 @@ static char * load_input_file(struct vine_task *t)
 		fatal("error reading file: %s", strerror(errno));
 	}
 
+	fclose(fp);
+	
 	return buf;
 }
 
 /*
-Given a unix status returned by wait(), set the process exit code appropriately.
+After a process exit has been observed, record the completion in the process structure.
 */
 
-void vine_process_set_exit_status( struct vine_process *p, int status )
+static void vine_process_complete( struct vine_process *p, int status )
 {
 	if (!WIFEXITED(status)){
 		p->exit_code = WTERMSIG(status);
@@ -229,6 +235,12 @@ void vine_process_set_exit_status( struct vine_process *p, int status )
 	} else {
 		p->exit_code = WEXITSTATUS(status);
 		debug(D_VINE, "task %d (pid %d) exited normally with exit code %d",p->task->task_id,p->pid,p->exit_code );
+	}
+
+	/* If this is a completed function, then decrease the number of funcs on that library. */
+	
+	if(p->type==VINE_PROCESS_TYPE_FUNCTION) {
+		p->library_process->functions_running--;
 	}
 }
 
@@ -238,19 +250,14 @@ Execute a task synchronously and return true on success.
 
 int vine_process_execute_and_wait( struct vine_process *p )
 {
-
 	pid_t pid = vine_process_execute(p);
 	if(pid>0) {
-		int result, status;
-		do {
-			result = waitpid(pid,&status,0);
-		} while(result!=pid);
-
-		vine_process_set_exit_status(p,status);
+		vine_process_wait(p);
+		return 1;
 	} else {
 		p->exit_code = 1;
+		return 0;
 	}
-	return 1;
 }
 
 /*
@@ -309,6 +316,11 @@ pid_t vine_process_execute(struct vine_process *p )
 
 		debug(D_VINE, "started process %d: %s", p->pid, p->task->command_line);
 
+		/* If we just started a function, increase the number assigned to this library. */
+		if(p->type==VINE_PROCESS_TYPE_FUNCTION) {
+			p->library_process->functions_running++;
+		}
+					
 		/* If we just started a library, then retain links to communicate with it. */
 		if(p->type==VINE_PROCESS_TYPE_LIBRARY) {
 
@@ -329,10 +341,9 @@ pid_t vine_process_execute(struct vine_process *p )
 			
 			/* Now read back the initialization message so we know it is ready. */
 			if (!vine_process_wait_for_library_startup(p,stoptime)) {
-				fatal("Unable to setup coprocess");
-				/* XXX need better plan for library that fails to start. */
+				/* If it did not, then send kill signal and reap library in main loop. */
+				vine_process_kill(p);
 			}
-
 		} else {
 			/* For any other task type, drop the fds unused by the parent. */
 			close(input_fd);
@@ -482,7 +493,47 @@ static char *vine_process_invoke_function( struct vine_process *library_process,
 }
 
 /*
-Kill a running process and reap the final process state.
+Non-blocking check to see if a process has completed.
+Returns true if complete, false otherwise.
+*/ 
+
+int vine_process_is_complete( struct vine_process *p )
+{
+	int status;
+	int result = wait4(p->pid, &status, WNOHANG, &p->rusage);
+	if(result==p->pid) {
+		vine_process_complete(p,status);
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+/*
+Wait indefinitely for a process to exit and collect its final disposition.
+Return true if the process was found, false otherwise,
+*/ 
+	
+int vine_process_wait( struct vine_process *p )
+{
+	while(1) {
+		int status;
+		pid_t pid = waitpid(p->pid,&status,0);
+		if(pid==p->pid) {
+			vine_process_complete(p,status);
+			return 1;
+		} else if(pid<0 && errno==EINTR) {
+			continue;
+		} else {
+			return 0;
+		}
+	}
+	
+}
+
+/*
+Send a kill signal to a running process.
+Note that the process must still be waited-for to collect its final disposition.
 */
 
 void vine_process_kill(struct vine_process *p)
@@ -499,9 +550,16 @@ void vine_process_kill(struct vine_process *p)
 	// Send signal to process group of child which is denoted by -ve value of child pid.
 	// This is done to ensure delivery of signal to processes forked by the child.
 	kill((-1 * p->pid), SIGKILL);
+}
 
-	// Reap the child process to avoid zombies.
-	waitpid(p->pid, NULL, 0);
+/*
+Send a kill signal to a running process, and then wait for it to exit.
+*/
+
+int vine_process_kill_and_wait( struct vine_process *p )
+{
+	vine_process_kill(p);
+	return vine_process_wait(p);
 }
 
 /* The disk needed by a task is shared between the cache and the process

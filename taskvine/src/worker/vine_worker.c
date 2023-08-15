@@ -69,7 +69,6 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 
-#include <poll.h>
 #include <signal.h>
 
 #include <sys/mman.h>
@@ -77,7 +76,6 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
-#include <sys/wait.h>
 
 // In single shot mode, immediately quit when disconnected.
 // Useful for accelerating the test suite.
@@ -186,7 +184,7 @@ static int max_time_on_measurement  = 3;
 // Processes should be created/deleted when added/removed from this table.
 static struct itable *procs_table = NULL;
 
-// Table of all processes currently running, indexed by pid.
+// Table of all processes currently running, indexed by task_id.
 // These are additional pointers into procs_table.
 static struct itable *procs_running = NULL;
 
@@ -525,7 +523,7 @@ static int start_process( struct vine_process *p, struct link *manager )
 		send_resource_update(manager);
 	}
 
-	itable_insert(procs_running,p->pid,p);
+	itable_insert(procs_running,p->task->task_id,p);
 
 	return 1;
 }
@@ -552,7 +550,7 @@ static void reap_process( struct vine_process *p, struct link *manager )
 		p->exit_code = 1;
 	}
 
-	itable_remove(procs_running, p->pid);
+	itable_remove(procs_running, p->task->task_id);
 	itable_insert(procs_complete, p->task->task_id, p);
 }
 
@@ -614,15 +612,15 @@ and send a kill signal.  The actual exit of the process will be detected at a la
 static void expire_procs_running()
 {
 	struct vine_process *p;
-	uint64_t pid;
+	uint64_t task_id;
 
 	double current_time = timestamp_get() / USECOND;
 
-	ITABLE_ITERATE(procs_running,pid,p) {
+	ITABLE_ITERATE(procs_running,task_id,p) {
 		if(p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end)
 		{
 			p->result = VINE_RESULT_MAX_END_TIME;
-			kill(pid, SIGKILL);
+			vine_process_kill(p);
 		}
 	}
 }
@@ -637,26 +635,16 @@ for later processing.
 static int handle_completed_tasks(struct link *manager)
 {
 	struct vine_process *p;
-	uint64_t pid;
-	int status;
+	uint64_t task_id;
 
-	ITABLE_ITERATE(procs_running,pid,p) {
-		int result = wait4(pid, &status, WNOHANG, &p->rusage);
-		if(result==0) {
-			// pid is still going
-		} else if(result<0) {
-			debug(D_VINE, "wait4 on pid %d returned an error: %s",(int)pid,strerror(errno));
-		} else if(result>0) {
-			/* Translate the unix status into the process structure. */
-			vine_process_set_exit_status(p,status);
-
+	ITABLE_ITERATE(procs_running,task_id,p) {
+		if(vine_process_is_complete(p)) {
 			/* collect the resources associated with the process */
 			reap_process(p,manager);
 
 			/* must reset the table iterator because an item was removed. */
 			itable_firstkey(procs_running);
 		}
-
 	}
 	return 1;
 }
@@ -865,8 +853,8 @@ static int do_kill(int task_id)
 		return 1;
 	}
 
-	if(itable_remove(procs_running, p->pid)) {
-		vine_process_kill(p);
+	if(itable_remove(procs_running,task_id)) {
+		vine_process_kill_and_wait(p);
 
 		cores_allocated -= p->task->resources_requested->cores;
 		memory_allocated -= p->task->resources_requested->memory;
@@ -922,15 +910,15 @@ static void kill_all_tasks()
 static void finish_running_task(struct vine_process *p, vine_result_t result)
 {
 	p->result |= result;
-	kill(p->pid, SIGKILL);
+	vine_process_kill(p);
 }
 
 static void finish_running_tasks(vine_result_t result)
 {
 	struct vine_process *p;
-	uint64_t pid;
+	uint64_t task_id;
 
-	ITABLE_ITERATE(procs_running,pid,p) {
+	ITABLE_ITERATE(procs_running,task_id,p) {
 		finish_running_task(p, result);
 	}
 }
@@ -958,14 +946,14 @@ static int enforce_processes_limits()
 	static time_t last_check_time = 0;
 
 	struct vine_process *p;
-	uint64_t pid;
+	uint64_t task_id;
 
 	int ok = 1;
 
 	/* Do not check too often, as it is expensive (particularly disk) */
 	if((time(0) - last_check_time) < check_resources_interval ) return 1;
 
-	ITABLE_ITERATE(procs_running,pid,p) {
+	ITABLE_ITERATE(procs_running,task_id,p) {
 		if(!enforce_process_limits(p)) {
 			finish_running_task(p, VINE_RESULT_RESOURCE_EXHAUSTION);
 			trash_file(p->sandbox);
@@ -987,11 +975,11 @@ as other running tasks should not be affected by a task timeout.
 static void enforce_processes_max_running_time()
 {
 	struct vine_process *p;
-	uint64_t pid;
+	uint64_t task_id;
 
 	timestamp_t now = timestamp_get();
 
-	ITABLE_ITERATE(procs_running,pid,p) {
+	ITABLE_ITERATE(procs_running,task_id,p) {
 
 		/* If the task did not set wall_time, return right away. */
 		if(p->task->resources_requested->wall_time < 1)
@@ -1003,7 +991,7 @@ static void enforce_processes_max_running_time()
 					rmsummary_resource_to_str("wall_time", (now - p->execution_start)/1e6, 1),
 					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
 			p->result = VINE_RESULT_MAX_WALL_TIME;
-			kill(pid, SIGKILL);
+			vine_process_kill(p);
 		}
 	}
 
@@ -1148,17 +1136,18 @@ static int task_resources_fit_eventually(struct vine_task *t)
 
 /*
 Find a suitable library process that provides the given library name and is ready to be invoked
-XXX need to check on coprocess status -- is it already running something ?
 */
 
-struct vine_process * find_process_by_library_name( const char *library_name )
+struct vine_process * find_library_for_function( const char *library_name )
 {
-	uint64_t pid;
+	uint64_t task_id;
 	struct vine_process *p;
 
-	ITABLE_ITERATE(procs_running,pid,p) {
+	ITABLE_ITERATE(procs_running,task_id,p) {
 		if(!strcmp(p->task->provides_library,library_name)) {
-			return p;
+			if(p->functions_running<p->max_functions_running) {
+				return p;
+			}
 		}
 	}
 	return 0;
@@ -1173,7 +1162,7 @@ static int process_ready_to_run_now( struct vine_process *p, struct vine_cache *
 	if(!task_resources_fit_now(p->task)) return 0;
 
 	if(p->task->needs_library) {
-		p->library_process = find_process_by_library_name(p->task->needs_library);
+		p->library_process = find_library_for_function(p->task->needs_library);
 		if(!p->library_process) return 0;
 	}
 
