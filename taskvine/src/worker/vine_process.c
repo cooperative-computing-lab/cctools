@@ -238,19 +238,14 @@ Execute a task synchronously and return true on success.
 
 int vine_process_execute_and_wait( struct vine_process *p )
 {
-
 	pid_t pid = vine_process_execute(p);
 	if(pid>0) {
-		int result, status;
-		do {
-			result = waitpid(pid,&status,0);
-		} while(result!=pid);
-
-		vine_process_set_exit_status(p,status);
+		vine_process_wait(p);
+		return 1;
 	} else {
 		p->exit_code = 1;
+		return 0;
 	}
-	return 1;
 }
 
 /*
@@ -482,7 +477,47 @@ static char *vine_process_invoke_function( struct vine_process *library_process,
 }
 
 /*
-Kill a running process and reap the final process state.
+Non-blocking check to see if a process has completed.
+Returns true if complete, false otherwise.
+*/ 
+
+int vine_process_is_complete( struct vine_process *p )
+{
+	int status;
+	int result = wait4(p->pid, &status, WNOHANG, &p->rusage);
+	if(result==p->pid) {
+		vine_process_set_exit_status(p,status);
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+/*
+Wait indefinitely for a process to exit and collect its final disposition.
+Return true if the process was found, false otherwise,
+*/ 
+	
+int vine_process_wait( struct vine_process *p )
+{
+	while(1) {
+		int status;
+		pid_t pid = waitpid(p->pid,&status,0);
+		if(pid==p->pid) {
+			vine_process_set_exit_status(p,status);
+			return 1;
+		} else if(pid<0 && errno==EINTR) {
+			continue;
+		} else {
+			return 0;
+		}
+	}
+	
+}
+
+/*
+Send a kill signal to a running process.
+Note that the process must still be waited-for to collect its final disposition.
 */
 
 void vine_process_kill(struct vine_process *p)
@@ -499,9 +534,16 @@ void vine_process_kill(struct vine_process *p)
 	// Send signal to process group of child which is denoted by -ve value of child pid.
 	// This is done to ensure delivery of signal to processes forked by the child.
 	kill((-1 * p->pid), SIGKILL);
+}
 
-	// Reap the child process to avoid zombies.
-	waitpid(p->pid, NULL, 0);
+/*
+Send a kill signal to a running process, and then wait for it to exit.
+*/
+
+int vine_process_kill_and_wait( struct vine_process *p )
+{
+	vine_process_kill(p);
+	return vine_process_wait(p);
 }
 
 /* The disk needed by a task is shared between the cache and the process

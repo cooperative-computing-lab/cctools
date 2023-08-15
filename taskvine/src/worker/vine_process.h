@@ -69,7 +69,10 @@ struct vine_process {
 struct vine_process * vine_process_create( struct vine_task *task, vine_process_type_t type );
 pid_t vine_process_execute( struct vine_process *p );
 void  vine_process_set_exit_status( struct vine_process *p, int status );
+int   vine_process_is_complete( struct vine_process *p );
+int   vine_process_wait( struct vine_process *p );
 void  vine_process_kill( struct vine_process *p );
+int   vine_process_kill_and_wait( struct vine_process *p );
 void  vine_process_delete( struct vine_process *p );
 
 int   vine_process_execute_and_wait( struct vine_process *p );

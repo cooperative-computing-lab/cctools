@@ -69,7 +69,6 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 
-#include <poll.h>
 #include <signal.h>
 
 #include <sys/mman.h>
@@ -77,7 +76,6 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
-#include <sys/wait.h>
 
 // In single shot mode, immediately quit when disconnected.
 // Useful for accelerating the test suite.
@@ -622,7 +620,7 @@ static void expire_procs_running()
 		if(p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end)
 		{
 			p->result = VINE_RESULT_MAX_END_TIME;
-			kill(p->pid, SIGKILL);
+			vine_process_kill(p);
 		}
 	}
 }
@@ -638,25 +636,15 @@ static int handle_completed_tasks(struct link *manager)
 {
 	struct vine_process *p;
 	uint64_t task_id;
-	int status;
 
 	ITABLE_ITERATE(procs_running,task_id,p) {
-		int result = wait4(p->pid, &status, WNOHANG, &p->rusage);
-		if(result==0) {
-			// pid is still going
-		} else if(result<0) {
-			debug(D_VINE, "wait4 on pid %d returned an error: %s",(int)p->pid,strerror(errno));
-		} else if(result>0) {
-			/* Translate the unix status into the process structure. */
-			vine_process_set_exit_status(p,status);
-
+		if(vine_process_is_complete(p)) {
 			/* collect the resources associated with the process */
 			reap_process(p,manager);
 
 			/* must reset the table iterator because an item was removed. */
 			itable_firstkey(procs_running);
 		}
-
 	}
 	return 1;
 }
@@ -866,7 +854,7 @@ static int do_kill(int task_id)
 	}
 
 	if(itable_remove(procs_running,task_id)) {
-		vine_process_kill(p);
+		vine_process_kill_and_wait(p);
 
 		cores_allocated -= p->task->resources_requested->cores;
 		memory_allocated -= p->task->resources_requested->memory;
@@ -922,7 +910,7 @@ static void kill_all_tasks()
 static void finish_running_task(struct vine_process *p, vine_result_t result)
 {
 	p->result |= result;
-	kill(p->pid, SIGKILL);
+	vine_process_kill(p);
 }
 
 static void finish_running_tasks(vine_result_t result)
@@ -1003,7 +991,7 @@ static void enforce_processes_max_running_time()
 					rmsummary_resource_to_str("wall_time", (now - p->execution_start)/1e6, 1),
 					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
 			p->result = VINE_RESULT_MAX_WALL_TIME;
-			kill(p->pid, SIGKILL);
+			vine_process_kill(p);
 		}
 	}
 
