@@ -55,9 +55,6 @@ struct vine_process {
 	struct link *library_read_link;
 	struct link *library_write_link;
 
-	/* If this is a transfer process, the source url to transfer in. */
-	char *source;
-
 	/* expected disk usage by the process. If no cache is used, it is the same as in task. */
 	int64_t disk;
 
