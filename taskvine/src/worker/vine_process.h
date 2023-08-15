@@ -55,6 +55,10 @@ struct vine_process {
 	struct link *library_read_link;
 	struct link *library_write_link;
 
+	/* If this is a library process, the number of functions it is currently running. */
+	int functions_running;
+	int max_functions_running;
+	
 	/* expected disk usage by the process. If no cache is used, it is the same as in task. */
 	int64_t disk;
 
@@ -68,7 +72,6 @@ struct vine_process {
 
 struct vine_process * vine_process_create( struct vine_task *task, vine_process_type_t type );
 pid_t vine_process_execute( struct vine_process *p );
-void  vine_process_set_exit_status( struct vine_process *p, int status );
 int   vine_process_is_complete( struct vine_process *p );
 int   vine_process_wait( struct vine_process *p );
 void  vine_process_kill( struct vine_process *p );
