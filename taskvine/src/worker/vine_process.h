@@ -75,14 +75,10 @@ pid_t vine_process_execute( struct vine_process *p );
 void  vine_process_set_exit_status( struct vine_process *p, int status );
 void  vine_process_kill( struct vine_process *p );
 void  vine_process_delete( struct vine_process *p );
+
+int   vine_process_execute_and_wait( struct vine_process *p, struct vine_cache *cache);
+
 void  vine_process_compute_disk_needed( struct vine_process *p );
-
-int vine_process_measure_disk(struct vine_process *p, int max_time_on_measurement);
-char *vine_process_get_library_name(struct vine_process *p);
-
-int vine_process_execute_and_wait( struct vine_process *p, struct vine_cache *cache);
-
-int vine_process_wait_for_library_startup( struct vine_process *p, time_t stoptime );
-char *vine_process_invoke_function( struct vine_process *library_process, const char *function_name, const char *function_input, const char *sandbox_path );
+int   vine_process_measure_disk(struct vine_process *p, int max_time_on_measurement);
 
 #endif
