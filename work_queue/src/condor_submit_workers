@@ -24,7 +24,7 @@ show_help()
 
 requirements=""
 class_ads=""
-transfer_input_files="work_queue_worker, cctools_gpu_autodetect"
+transfer_input_files="work_queue_worker"
 submit_dir=/tmp/${USER}-workers
 parse_arguments()
 {

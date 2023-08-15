@@ -23,7 +23,8 @@ End user may only use the API described in taskvine.h
 
 typedef enum {
       VINE_TASK_TYPE_STANDARD,    /**< A normal task that should be returned to the user. */
-      VINE_TASK_TYPE_RECOVERY,    /**< A failure recovery task that should not be returned to the user. */
+      VINE_TASK_TYPE_RECOVERY,    /**< An internally-created recovery task that should not be returned to the user. */
+      VINE_TASK_TYPE_LIBRARY,     /**< An internally-created library task that should not be returned to the user. */
 } vine_task_type_t;
 
 struct vine_task {
@@ -32,12 +33,14 @@ struct vine_task {
         int task_id;                 /**< A unique task id number. */
 	vine_task_type_t type;       /**< The type of the task. */
 	char *command_line;          /**< The program(s) to execute, as a shell command line. */
-	char *coprocess;             /**< The name of the coprocess name in the worker that executes this task. For regular tasks it is NULL. */
 	char *tag;                   /**< An optional user-defined logical name for the task. */
 	char *category;              /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref vine_task_set_category. If no explicit category is given, the label "default" is used. **/
 
 	char *monitor_output_directory;	     /**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref vine_enable_monitoring */
 	struct vine_file *monitor_snapshot_file;  /**< Filename the monitor checks to produce snapshots. */
+
+	char *needs_library;         /**< If this is a FunctionTask, the name of the library used */
+	char *provides_library;      /**< If this is a LibraryTask, the name of the library provided. */
 
 	struct list *input_mounts;    /**< The mounted files expected as inputs. */
 	struct list *output_mounts;   /**< The mounted files expected as outputs. */
@@ -93,7 +96,8 @@ struct vine_task {
 	struct rmsummary *resources_allocated;                 /**< Resources allocated to the task its latest attempt. */
 	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task in its latest attempt. */
 	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
-
+	struct rmsummary *current_resource_box;                /**< Resources allocated to the task on this specific worker. */
+		
 	int has_fixed_locations;                               /**< Whether at least one file was added with the VINE_FIXED_LOCATION flag. Task fails immediately if no
 															 worker can satisfy all the strict inputs of the task. */
 

@@ -55,7 +55,9 @@ class Task(object):
         self._finalizer = weakref.finalize(self, self._free)
 
         attributes = [
-            "coprocess", "scheduler", "tag", "category",
+            "needs_library_name",
+            "provides_library_name",
+            "scheduler", "tag", "category",
             "snapshot_file", "retries", "cores", "memory",
             "disk", "gpus", "priority", "time_end",
             "time_start", "time_max", "time_min", "monitor_output"
@@ -175,14 +177,25 @@ class Task(object):
         return cvine.vine_task_set_command(self._task, command)
 
     ##
-    # Set the coprocess at the worker that should execute the task's command.
+    # Set the name of the library at the worker that should execute the task's command.
     # This is not needed for regular tasks.
     #
-    # @param self       Reference to the current task object.
-    # @param coprocess  The name of the coprocess.
-    def set_coprocess(self, coprocess):
-        return cvine.vine_task_set_coprocess(self._task, coprocess)
-
+    # @param self Reference to the current task object.
+    # @param library_name The name of the library
+    def needs_library(self, library_name):
+        self.needs_library_name = library_name
+        return cvine.vine_task_needs_library(self._task, library_name)
+    
+    ##
+    # Set the library name provided by this task.
+    # This is not needed for regular tasks.
+    #
+    # @param self Reference to the current task object.
+    # @param library_name The name of the library.
+    def provides_library(self, library_name):
+        self.provides_library_name = library_name
+        return cvine.vine_task_provides_library(self._task, library_name)
+    
     ##
     # Set the worker selection scheduler for task.
     #
@@ -937,16 +950,16 @@ class FunctionCall(Task):
     # Create a new FunctionCall specification.
     #
     # @param self       Reference to the current FunctionCall object.
-    # @param coprocess  The name of the coprocess which has the function you wish to execute. The coprocess should have a name() method that returns this
-    # @param fn         The name of the function to be executed on the coprocess
+    # @param library_name The name of the library which has the function you wish to execute.
+    # @param fn         The name of the function to be executed on the library.
     # @param args       positional arguments used in function to be executed by task. Can be mixed with kwargs
-    # @param kwargs	    keyword arguments used in function to be executed by task.
-    def __init__(self, coprocess, fn, *args, **kwargs):
+    # @param kwargs	keyword arguments used in function to be executed by task.
+    def __init__(self, library_name, fn, *args, **kwargs):
         Task.__init__(self, fn)
         self._event = {}
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
-        Task.set_coprocess(self, "library_coprocess:" + coprocess)
+        self.needs_library(library_name)
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -987,7 +1000,7 @@ class FunctionCall(Task):
 #
 # TaskVine LibraryTask object
 #
-# This class represents a task specialized to running a coprocess that contains Python functions at the worker
+# This class represents a task that contains persistent Python functions at the worker
 class LibraryTask(Task):
     ##
     # Create a new LibraryTask task specification.
@@ -997,6 +1010,6 @@ class LibraryTask(Task):
     # @param name       The name of this Library.
     def __init__(self, fn, name):
         Task.__init__(self, fn)
-        self.library_name = "library_coprocess:" + name
+        self.provides_library(name)
 
 
