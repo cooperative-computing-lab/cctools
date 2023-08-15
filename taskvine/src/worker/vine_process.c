@@ -326,10 +326,9 @@ pid_t vine_process_execute(struct vine_process *p )
 			
 			/* Now read back the initialization message so we know it is ready. */
 			if (!vine_process_wait_for_library_startup(p,stoptime)) {
-				fatal("Unable to setup coprocess");
-				/* XXX need better plan for library that fails to start. */
+				/* If it did not, then send kill signal and reap library in main loop. */
+				vine_process_kill(p);
 			}
-
 		} else {
 			/* For any other task type, drop the fds unused by the parent. */
 			close(input_fd);
