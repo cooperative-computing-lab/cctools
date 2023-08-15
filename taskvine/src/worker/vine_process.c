@@ -214,6 +214,8 @@ static char * load_input_file(struct vine_task *t)
 		fatal("error reading file: %s", strerror(errno));
 	}
 
+	fclose(fp);
+	
 	return buf;
 }
 
