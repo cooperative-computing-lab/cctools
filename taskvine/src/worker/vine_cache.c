@@ -323,7 +323,7 @@ This will be double-checked below.
 
 static int do_mini_task( struct vine_cache *c, struct vine_cache_file *f, char **error_message )
 {
-	if(vine_process_execute_and_wait(f->process,c)) {
+	if(vine_process_execute_and_wait(f->process)) {
 		*error_message = 0;
 		return 1;
 	} else {

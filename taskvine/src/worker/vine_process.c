@@ -233,7 +233,7 @@ void vine_process_set_exit_status( struct vine_process *p, int status )
 Execute a task synchronously and return true on success.
 */
 
-int vine_process_execute_and_wait( struct vine_process *p, struct vine_cache *cache)
+int vine_process_execute_and_wait( struct vine_process *p )
 {
 
 	pid_t pid = vine_process_execute(p);

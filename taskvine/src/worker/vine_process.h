@@ -9,7 +9,6 @@ See the file COPYING for details.
 
 #include "vine_manager.h"
 #include "vine_task.h"
-#include "vine_cache.h"
 
 #include "timestamp.h"
 #include "path_disk_size_info.h"
@@ -76,7 +75,7 @@ void  vine_process_set_exit_status( struct vine_process *p, int status );
 void  vine_process_kill( struct vine_process *p );
 void  vine_process_delete( struct vine_process *p );
 
-int   vine_process_execute_and_wait( struct vine_process *p, struct vine_cache *cache);
+int   vine_process_execute_and_wait( struct vine_process *p );
 
 void  vine_process_compute_disk_needed( struct vine_process *p );
 int   vine_process_measure_disk(struct vine_process *p, int max_time_on_measurement);
