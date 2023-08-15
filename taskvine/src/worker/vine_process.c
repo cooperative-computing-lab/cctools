@@ -60,17 +60,29 @@ Create a vine_process and all of the information necessary for invocation.
 However, do not allocate substantial resources at this point.
 */
 
-struct vine_process *vine_process_create( struct vine_task *task, int mini_task )
+struct vine_process *vine_process_create( struct vine_task *task, vine_process_type_t type )
 {
 	struct vine_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
 
-	const char *type = mini_task ? "m" : "t";
+	const char * dirtype;
+
+	switch(type) {
+		case VINE_PROCESS_TYPE_TASK:
+			dirtype = "t";
+			break;
+		case VINE_PROCESS_TYPE_MINI_TASK:
+			dirtype = "m";
+			break;
+		case VINE_PROCESS_TYPE_TRANSFER:
+			dirtype = "x";
+			break;
+	}
 
 	p->task = task;
 
 	p->cache_dir = string_format("%s/cache",workspace);
-	p->sandbox = string_format("%s/%s.%d", workspace,type,p->task->task_id);
+	p->sandbox = string_format("%s/%s.%d", workspace,dirtype,p->task->task_id);
 	p->tmpdir = string_format("%s/.taskvine.tmp",p->sandbox);
 	p->output_file_name = string_format("%s/.taskvine.stdout",p->sandbox);
 
