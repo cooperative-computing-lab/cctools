@@ -773,7 +773,17 @@ static int do_task( struct link *manager, int task_id, time_t stoptime )
 	
 	last_task_received = task->task_id;
 
-	struct vine_process *p = vine_process_create(task, 0);
+	vine_process_type_t type = VINE_PROCESS_TYPE_STANDARD;
+	
+	if(task->needs_library) {
+		type = VINE_PROCESS_TYPE_FUNCTION;
+	} else if(task->provides_library) {
+		type = VINE_PROCESS_TYPE_LIBRARY;
+	} else {
+		type = VINE_PROCESS_TYPE_STANDARD;
+	}
+	
+	struct vine_process *p = vine_process_create(task,type);
 	if(!p) return 0;
 
 	itable_insert(procs_table,task_id,p);

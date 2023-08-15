@@ -48,29 +48,46 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/types.h>
 
+extern char * workspace;
+
+static int vine_process_wait_for_library_startup( struct vine_process *p, time_t stoptime );
+static char *vine_process_invoke_function( struct vine_process *library_process, const char *function_name, const char *function_input, const char *sandbox_path );
+
+
 /*
-Create the task sandbox directory.
-Create temporary directories inside as well.
+Give the letter code used for the process sandbox dir.
 */
 
-extern char * workspace;
+static const char * vine_process_sandbox_code( vine_process_type_t type )
+{
+	switch(type) {
+		case VINE_PROCESS_TYPE_STANDARD:	return "task";
+		case VINE_PROCESS_TYPE_MINI_TASK:	return "mini";
+		case VINE_PROCESS_TYPE_LIBRARY:		return "libr";
+		case VINE_PROCESS_TYPE_FUNCTION:	return "func";
+		case VINE_PROCESS_TYPE_TRANSFER:	return "tran";
+	}
+
+	/* Odd return here is used to silence compiler while still retaining typedef check above. */
+	return "task";
+}
 
 /*
 Create a vine_process and all of the information necessary for invocation.
 However, do not allocate substantial resources at this point.
 */
 
-struct vine_process *vine_process_create( struct vine_task *task, int mini_task )
+struct vine_process *vine_process_create( struct vine_task *task, vine_process_type_t type )
 {
 	struct vine_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
 
-	const char *type = mini_task ? "m" : "t";
+	const char *dirtype = vine_process_sandbox_code(p->type);
 
 	p->task = task;
 
 	p->cache_dir = string_format("%s/cache",workspace);
-	p->sandbox = string_format("%s/%s.%d", workspace,type,p->task->task_id);
+	p->sandbox = string_format("%s/%s.%d", workspace,dirtype,p->task->task_id);
 	p->tmpdir = string_format("%s/.taskvine.tmp",p->sandbox);
 	p->output_file_name = string_format("%s/.taskvine.stdout",p->sandbox);
 
@@ -111,7 +128,8 @@ void vine_process_delete(struct vine_process *p)
 	free(p);
 }
 
-static void clear_environment() {
+static void clear_environment()
+{
 	/* Clear variables that we really want the user to set explicitly.
 	 * Ideally, we would start with a clean environment, but certain variables,
 	 * such as HOME are seldom set explicitly, and some executables rely on them.
@@ -148,13 +166,15 @@ static void export_environment( struct vine_process *p )
 	}
 }
 
-static void set_integer_env_var( struct vine_process *p, const char *name, int64_t value) {
+static void set_integer_env_var( struct vine_process *p, const char *name, int64_t value)
+{
 	char *value_str = string_format("%" PRId64, value);
 	vine_task_set_env_var(p->task, name, value_str);
 	free(value_str);
 }
 
-static void set_resources_vars(struct vine_process *p) {
+static void set_resources_vars(struct vine_process *p)
+{
 	if(p->task->resources_requested->cores > 0) {
 		set_integer_env_var(p, "CORES", p->task->resources_requested->cores);
 		set_integer_env_var(p, "OMP_NUM_THREADS", p->task->resources_requested->cores);
@@ -176,7 +196,8 @@ static void set_resources_vars(struct vine_process *p) {
 	}
 }
 
-static char * load_input_file(struct vine_task *t) {
+static char * load_input_file(struct vine_task *t)
+{
 	FILE *fp = fopen("infile", "r");
 	if(!fp) {
 		fatal("coprocess could not open file 'infile' for reading: %s", strerror(errno));
@@ -215,7 +236,7 @@ void vine_process_set_exit_status( struct vine_process *p, int status )
 Execute a task synchronously and return true on success.
 */
 
-int vine_process_execute_and_wait( struct vine_process *p, struct vine_cache *cache)
+int vine_process_execute_and_wait( struct vine_process *p )
 {
 
 	pid_t pid = vine_process_execute(p);
@@ -232,6 +253,11 @@ int vine_process_execute_and_wait( struct vine_process *p, struct vine_cache *ca
 	return 1;
 }
 
+/*
+Start a process executing and if successful, return its Unix pid.
+On failure, return negative value.
+*/
+
 pid_t vine_process_execute(struct vine_process *p )
 {
 	/* Flush pending stdio buffers prior to forking process, to avoid stale output in child. */
@@ -244,7 +270,7 @@ pid_t vine_process_execute(struct vine_process *p )
 	int output_fd = -1;
 	int error_fd = -1;
 	
-	if(p->task->provides_library) {
+	if(p->type==VINE_PROCESS_TYPE_LIBRARY) {
 		/* If starting a library, create the pipes for parent-child communication. */
 
 		if(pipe(pipe_in)<0) fatal("couldn't create library pipes: %s\n",strerror(errno));
@@ -284,7 +310,7 @@ pid_t vine_process_execute(struct vine_process *p )
 		debug(D_VINE, "started process %d: %s", p->pid, p->task->command_line);
 
 		/* If we just started a library, then retain links to communicate with it. */
-		if(p->task->provides_library) {
+		if(p->type==VINE_PROCESS_TYPE_LIBRARY) {
 
 			debug(D_VINE, "waiting for library startup message from pid %d\n", p->pid );
 
@@ -338,7 +364,8 @@ pid_t vine_process_execute(struct vine_process *p )
 
 		/* In the special case of a function-call-task, just load data, communicate with the library, and exit. */
 		
-		if(p->task->needs_library) {
+		if(p->type==VINE_PROCESS_TYPE_FUNCTION) {
+
 			change_process_title("vine_worker [function]");
 
 			// load data from input file
@@ -353,7 +380,7 @@ pid_t vine_process_execute(struct vine_process *p )
 			_exit(0);
 		}
 
-		/* Otherwise for a normal task or a library, set up file desciptors and execute the command. */
+		/* Otherwise for other process types, set up file desciptors and execute the command. */
 
 		int result = dup2(input_fd, STDIN_FILENO);
 		if(result<0) fatal("could not dup input to stdin: %s", strerror(errno));
@@ -369,7 +396,7 @@ pid_t vine_process_execute(struct vine_process *p )
 		close(error_fd);
 
 		/* For a library task, close the unused sides of the pipes. */
-		if(p->task->provides_library) {
+		if(p->type==VINE_PROCESS_TYPE_LIBRARY) {
 			close(pipe_in[1]);
 			close(pipe_out[0]);
 		}
@@ -397,7 +424,7 @@ back the library startup message with JSON containing the name of
 the library, which should match the task's provides_library label.
 */
 
-int vine_process_wait_for_library_startup( struct vine_process *p, time_t stoptime )
+static int vine_process_wait_for_library_startup( struct vine_process *p, time_t stoptime )
 {
 	char buffer[VINE_LINE_MAX];
 	int length = 0;
@@ -427,7 +454,7 @@ Invoke a function against a library by sending the invocation message,
 and then reading back the result from the necessary pipe.
 */
 
-char *vine_process_invoke_function( struct vine_process *library_process, const char *function_name, const char *function_input, const char *sandbox_path )
+static char *vine_process_invoke_function( struct vine_process *library_process, const char *function_name, const char *function_input, const char *sandbox_path )
 {
 	/* Set a five minute timeout.  XXX This should be changeable. */
 	time_t stoptime = time(0)+300;
@@ -453,6 +480,10 @@ char *vine_process_invoke_function( struct vine_process *library_process, const 
 		return 0;
 	}
 }
+
+/*
+Kill a running process and reap the final process state.
+*/
 
 void vine_process_kill(struct vine_process *p)
 {
@@ -512,7 +543,8 @@ void vine_process_compute_disk_needed( struct vine_process *p )
 
 }
 
-int vine_process_measure_disk(struct vine_process *p, int max_time_on_measurement) {
+int vine_process_measure_disk(struct vine_process *p, int max_time_on_measurement)
+{
 	/* we can't have pointers to struct members, thus we create temp variables here */
 
 	struct path_disk_size_info *state = p->disk_measurement_state;

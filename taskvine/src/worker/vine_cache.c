@@ -323,7 +323,7 @@ This will be double-checked below.
 
 static int do_mini_task( struct vine_cache *c, struct vine_cache_file *f, char **error_message )
 {
-	if(vine_process_execute_and_wait(f->process,c)) {
+	if(vine_process_execute_and_wait(f->process)) {
 		*error_message = 0;
 		return 1;
 	} else {
@@ -498,7 +498,7 @@ vine_cache_status_t vine_cache_ensure( struct vine_cache *c, const char *cachena
 	debug(D_VINE,"forking transfer process to create %s", cachename);
 
 	if(f->type == VINE_CACHE_MINI_TASK){
-		struct vine_process *p = vine_process_create(f->mini_task, 1);
+		struct vine_process *p = vine_process_create(f->mini_task,VINE_PROCESS_TYPE_MINI_TASK);
 		if(!vine_sandbox_stagein(p,c)) {
 			debug(D_VINE, "Can't stage input files for task %d.", p->task->task_id);
 			p->task = 0;
