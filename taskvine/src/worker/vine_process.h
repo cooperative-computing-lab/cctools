@@ -19,9 +19,11 @@ See the file COPYING for details.
 #include <sys/resource.h>
 
 typedef enum {
-	VINE_PROCESS_TYPE_TASK,
-	VINE_PROCESS_TYPE_MINI_TASK,
-	VINE_PROCESS_TYPE_TRANSFER,
+	VINE_PROCESS_TYPE_STANDARD,   // standard task with command line
+	VINE_PROCESS_TYPE_LIBRARY,   // task providing serverless library
+	VINE_PROCESS_TYPE_FUNCTION,  // task invoking serverless library
+	VINE_PROCESS_TYPE_MINI_TASK, // internal task used to create file
+	VINE_PROCESS_TYPE_TRANSFER,  // internal task used to transfer file
 } vine_process_type_t;
 
 /*
@@ -44,7 +46,7 @@ struct vine_process {
 	char *tmpdir;                   // TMPDIR per task, expected to be a subdir of sandbox.
 	char *output_file_name;
 
-	/* The details of the task to execute. */
+	/* If a normal task, the details of the task to execute. */
 	struct vine_task *task;
 
 	/* If a function-call task, this is the specific library process to invoke. */
@@ -53,6 +55,9 @@ struct vine_process {
 	/* If this is a library process, the links to communicate with the library. */
 	struct link *library_read_link;
 	struct link *library_write_link;
+
+	/* If this is a transfer process, the source url to transfer in. */
+	char *source;
 
 	/* expected disk usage by the process. If no cache is used, it is the same as in task. */
 	int64_t disk;

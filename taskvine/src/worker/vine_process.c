@@ -48,12 +48,22 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/types.h>
 
+extern char * workspace;
+
 /*
-Create the task sandbox directory.
-Create temporary directories inside as well.
+Give the letter code used for the process sandbox dir.
 */
 
-extern char * workspace;
+static const char * vine_process_sandbox_code( vine_process_type_t type )
+{
+	switch(type) {
+		case VINE_PROCESS_TYPE_STANDARD:	return "task";
+		case VINE_PROCESS_TYPE_MINI_TASK:	return "mini";
+		case VINE_PROCESS_TYPE_LIBRARY:		return "libr";
+		case VINE_PROCESS_TYPE_FUNCTION:	return "func";
+		case VINE_PROCESS_TYPE_TRANSFER:	return "tran";
+	}
+}
 
 /*
 Create a vine_process and all of the information necessary for invocation.
@@ -65,19 +75,7 @@ struct vine_process *vine_process_create( struct vine_task *task, vine_process_t
 	struct vine_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
 
-	const char * dirtype;
-
-	switch(type) {
-		case VINE_PROCESS_TYPE_TASK:
-			dirtype = "t";
-			break;
-		case VINE_PROCESS_TYPE_MINI_TASK:
-			dirtype = "m";
-			break;
-		case VINE_PROCESS_TYPE_TRANSFER:
-			dirtype = "x";
-			break;
-	}
+	const char *dirtype = vine_process_sandbox_code(p->type);
 
 	p->task = task;
 
