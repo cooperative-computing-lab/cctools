@@ -315,7 +315,7 @@ pid_t vine_process_execute(struct vine_process *p )
 		// This is currently used by kill_task().
 		setpgid(p->pid, 0);
 
-		debug(D_VINE, "started process %d: %s", p->pid, p->task->command_line);
+		debug(D_VINE, "started task %d pid %d: %s", p->task->task_id, p->pid, p->task->command_line);
 
 		/* If we just started a function, increase the number assigned to this library. */
 		if(p->type==VINE_PROCESS_TYPE_FUNCTION) {
