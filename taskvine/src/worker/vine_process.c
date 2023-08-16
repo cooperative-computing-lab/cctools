@@ -82,9 +82,10 @@ struct vine_process *vine_process_create( struct vine_task *task, vine_process_t
 	struct vine_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
 
-	const char *dirtype = vine_process_sandbox_code(p->type);
-
 	p->task = task;
+	p->type = type;
+
+	const char *dirtype = vine_process_sandbox_code(p->type);
 
 	p->cache_dir = string_format("%s/cache",workspace);
 	p->sandbox = string_format("%s/%s.%d", workspace,dirtype,p->task->task_id);
