@@ -22,4 +22,4 @@ int vine_current_transfers_wipe_worker(struct vine_manager *q, struct vine_worke
 
 void vine_current_transfers_print_table(struct vine_manager *q);
 
-void vine_current_transfers_delete( struct vine_manager *q );
+void vine_current_transfers_clear( struct vine_manager *q );

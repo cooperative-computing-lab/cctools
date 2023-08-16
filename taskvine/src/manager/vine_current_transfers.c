@@ -112,7 +112,7 @@ void vine_current_transfers_print_table(struct vine_manager *q)
 }
 
 
-void vine_current_transfers_delete( struct vine_manager *q )
+void vine_current_transfers_clear( struct vine_manager *q )
 {
 	hash_table_clear(q->current_transfer_table,(void*)vine_transfer_pair_delete);
 }

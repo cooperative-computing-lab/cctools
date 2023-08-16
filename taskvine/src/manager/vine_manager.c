@@ -3563,7 +3563,7 @@ void vine_delete(struct vine_manager *q)
 	hash_table_clear(q->worker_blocklist,(void*)vine_blocklist_info_delete);
 	hash_table_delete(q->worker_blocklist);
 
-	vine_current_transfers_delete(q);
+	vine_current_transfers_clear(q);
 	hash_table_delete(q->current_transfer_table);
 
 	hash_table_clear(q->file_table,(void*)vine_file_delete);
