@@ -631,4 +631,4 @@ void list_push_priority(struct list *list, list_priority_t p, void *item) {
 		list_cursor_destroy(cur);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

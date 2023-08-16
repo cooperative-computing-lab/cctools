@@ -2175,4 +2175,4 @@ INT64_T chirp_client_job_reap (struct chirp_client *c, const char *json, time_t 
 	return get_result(c, stoptime);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

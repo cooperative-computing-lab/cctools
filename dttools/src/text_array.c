@@ -124,4 +124,4 @@ int text_array_save_range(struct text_array *t, const char *filename, int x, int
 	return count;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

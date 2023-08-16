@@ -69,4 +69,4 @@ int chirp_acl_whoami(const char *subject, char **esubject);
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

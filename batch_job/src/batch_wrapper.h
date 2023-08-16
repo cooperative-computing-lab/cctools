@@ -88,4 +88,4 @@ char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *t);
 char *batch_wrapper_expand(struct batch_task *t, struct jx *spec);
 
 #endif
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

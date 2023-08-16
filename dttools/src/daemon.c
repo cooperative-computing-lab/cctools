@@ -78,4 +78,4 @@ void daemonize (int cdroot, const char *pidfile)
 	debug_reopen();
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

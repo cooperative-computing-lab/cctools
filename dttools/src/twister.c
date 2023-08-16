@@ -165,4 +165,4 @@ double twister_genrand64_real3(void)
 	return ((twister_genrand64_int64() >> 12) + 0.5) * (1.0/4503599627370496.0);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -171,4 +171,4 @@ int cctools_utimensat (int dirfd, const char *path, const struct timespec times[
 
 #endif /* !defined(HAS_OPENAT) || !defined(HAS_UTIMENSAT) */
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

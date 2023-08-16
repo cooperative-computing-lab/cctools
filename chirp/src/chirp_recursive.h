@@ -40,4 +40,4 @@ INT64_T chirp_recursive_get(const char *hostport, const char *sourcepath, const 
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

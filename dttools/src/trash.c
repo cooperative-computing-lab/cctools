@@ -69,4 +69,4 @@ void trash_empty()
 	}
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

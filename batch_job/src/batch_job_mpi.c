@@ -732,4 +732,4 @@ void batch_job_mpi_setup( const char *debug_file_name, int manual_cores, int man
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

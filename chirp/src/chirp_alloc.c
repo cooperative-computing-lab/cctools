@@ -527,4 +527,4 @@ INT64_T chirp_alloc_mkalloc(const char *path, INT64_T size, INT64_T mode)
 	return result;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -15,4 +15,4 @@ int chirp_fs_local_resolve (const char *path, int *dirfd, char basename[CHIRP_PA
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -473,4 +473,4 @@ int chirp_matrix_delete(const char *host, const char *path, time_t stoptime)
 	return chirp_reli_unlink(host, path, stoptime);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

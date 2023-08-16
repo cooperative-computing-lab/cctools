@@ -1598,4 +1598,4 @@ pfs_service *pfs_service_cvmfs = &pfs_service_cvmfs_instance;
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

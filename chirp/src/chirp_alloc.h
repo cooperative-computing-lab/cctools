@@ -28,4 +28,4 @@ INT64_T chirp_alloc_fstatfs(int fd, struct chirp_statfs *buf);
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

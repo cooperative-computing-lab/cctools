@@ -85,4 +85,4 @@ void timer_print_summary(int print_all)
 			printf("%s = average(%2.6lf), total(%2.6lf), runs(%d)\n", TimerStrings[i], timer_average_time(i), ElapsedTime[i], TimedRuns[i]);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

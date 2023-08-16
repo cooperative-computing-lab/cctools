@@ -66,4 +66,4 @@ void timestamp_sleep(timestamp_t interval)
 	select(0, 0, 0, 0, &t);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

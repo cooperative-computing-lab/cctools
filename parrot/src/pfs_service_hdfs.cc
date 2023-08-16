@@ -509,4 +509,4 @@ public:
 static pfs_service_hdfs pfs_service_hdfs_instance;
 pfs_service *pfs_service_hdfs = &pfs_service_hdfs_instance;
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -1031,4 +1031,4 @@ void chirp_reli_cleanup_before_fork()
 	}
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

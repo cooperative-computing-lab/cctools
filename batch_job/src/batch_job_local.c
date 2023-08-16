@@ -165,4 +165,4 @@ const struct batch_queue_module batch_queue_local = {
 	},
 };
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

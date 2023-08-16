@@ -628,4 +628,4 @@ int pfs_process_setgroups(struct pfs_process *p, size_t size, const gid_t *list)
 	return 0;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

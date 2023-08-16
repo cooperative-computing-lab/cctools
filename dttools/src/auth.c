@@ -239,4 +239,4 @@ void auth_free (struct auth_state *as)
 	}
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

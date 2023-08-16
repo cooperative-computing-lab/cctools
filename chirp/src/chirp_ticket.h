@@ -36,4 +36,4 @@ const char *chirp_ticket_digest(const char *pk);
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

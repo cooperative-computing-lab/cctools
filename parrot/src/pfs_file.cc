@@ -174,4 +174,4 @@ int pfs_file::is_seekable()
 	return name.service->is_seekable();
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

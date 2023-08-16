@@ -342,4 +342,4 @@ void debug_close(void)
 	debug_file_close();
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

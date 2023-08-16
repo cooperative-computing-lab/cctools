@@ -269,4 +269,4 @@ struct vine_file * vine_file_chirp( const char *server, const char *source, stru
 }
 
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

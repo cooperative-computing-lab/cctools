@@ -223,4 +223,4 @@ typedef int64_t chirp_jobid_t;
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -866,4 +866,4 @@ int pfs_fremovexattr (int fd, const char *name)
 	END
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

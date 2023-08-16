@@ -1202,4 +1202,4 @@ int jx_parse_cmd_define(struct jx *jx_args, char *define_stmt) {
 	return 1;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

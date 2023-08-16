@@ -126,4 +126,4 @@ const char *system_tmp_dir(const char *override_tmp_dir)
 	}
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

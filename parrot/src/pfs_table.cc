@@ -2678,4 +2678,4 @@ int pfs_table::mmap_delete( uintptr_t logical_addr, size_t length )
 	return 0;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

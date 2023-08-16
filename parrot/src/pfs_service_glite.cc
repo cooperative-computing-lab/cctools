@@ -560,4 +560,4 @@ pfs_service *pfs_service_glite = &pfs_service_glite_instance;
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

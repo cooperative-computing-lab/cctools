@@ -63,4 +63,4 @@ int password_cache_full(struct password_cache *c)
 		return 0;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

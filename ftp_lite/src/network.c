@@ -471,4 +471,4 @@ int network_string_get( char *str )
 }
 
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

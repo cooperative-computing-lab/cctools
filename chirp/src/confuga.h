@@ -172,4 +172,4 @@ CONFUGA_API int confuga_job_dbinit (confuga *C, sqlite3 *db);
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

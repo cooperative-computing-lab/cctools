@@ -47,4 +47,4 @@ void sort_dir_free( char **list )
 }
 
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

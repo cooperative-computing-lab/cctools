@@ -447,4 +447,4 @@ const char *sha1_string(unsigned char digest[20])
 	return str;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

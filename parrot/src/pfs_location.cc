@@ -64,4 +64,4 @@ void add_to_loc( const char *name, void *buf)
 	loc->append(name);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

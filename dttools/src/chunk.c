@@ -198,4 +198,4 @@ int chunk_concat(const char *new_name, const char * const *filenames, int num_fi
 	return 1;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

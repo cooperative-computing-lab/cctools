@@ -1077,4 +1077,4 @@ INT64_T chirp_global_lremovexattr(const char *host, const char *path, const char
 	}
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -22,4 +22,4 @@ void debug_stdout_write (INT64_T flags, const char *str)
 	full_write(STDOUT_FILENO, str, strlen(str));
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

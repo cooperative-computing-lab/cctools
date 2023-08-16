@@ -274,4 +274,4 @@ int pfs_paranoia_payload(void)
 	return 0;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

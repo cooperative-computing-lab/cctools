@@ -23,4 +23,4 @@ char *gpu_name_get();
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

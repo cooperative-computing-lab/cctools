@@ -5391,4 +5391,4 @@ const char * vine_fetch_file( struct vine_manager *m, struct vine_file *f )
 }
 
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -13,4 +13,4 @@ int shellcode (const char *cmd, const char * const env[], const char *in, size_t
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

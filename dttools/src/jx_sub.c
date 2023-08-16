@@ -280,4 +280,4 @@ struct jx * jx_sub( struct jx *j, struct jx *context )
 	return result;
 }
 
-/*vim: set noexpandtab tabstop=4: */
+/*vim: set noexpandtab tabstop=8: */

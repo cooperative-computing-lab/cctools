@@ -123,4 +123,4 @@ void chirp_stats_report(int pipefd, const char *addr, const char *subject, int i
 	}
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

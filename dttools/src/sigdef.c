@@ -137,4 +137,4 @@ int sigdefint (const char *def)
 	return -1;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

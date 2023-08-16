@@ -207,4 +207,4 @@ int chirp_matrix_delete(const char *host, const char *path, time_t stoptime);
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

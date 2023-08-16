@@ -202,4 +202,4 @@ int buffer_dupl(buffer_t *b, char **buf, size_t *l)
 	return 0;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

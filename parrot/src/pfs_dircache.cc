@@ -96,4 +96,4 @@ int pfs_dircache::lookup( const char *path, struct pfs_stat *buf )
 	return (result);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -35,4 +35,4 @@ void debug_syslog_config (const char *name)
 }
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -89,4 +89,4 @@ CONFUGA_IAPI int confugaJ_schedule (confuga *C);
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

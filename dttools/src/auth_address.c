@@ -70,4 +70,4 @@ int auth_address_register(void)
 	return auth_register("address", auth_address_assert, auth_address_accept);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

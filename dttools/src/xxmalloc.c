@@ -57,4 +57,4 @@ void *xxcalloc(size_t nmemb, size_t size) {
 	}
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

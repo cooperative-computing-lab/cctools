@@ -102,4 +102,4 @@ struct list *vine_catalog_query_cached( const char *catalog_host, int catalog_po
 	return managers_list;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

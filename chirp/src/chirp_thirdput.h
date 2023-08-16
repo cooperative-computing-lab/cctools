@@ -14,4 +14,4 @@ INT64_T chirp_thirdput(const char *subject, const char *lpath, const char *hostn
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

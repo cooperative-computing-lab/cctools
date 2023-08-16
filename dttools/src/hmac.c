@@ -73,4 +73,4 @@ int hmac_sha1(const void *text, size_t text_len, const void *in_key, size_t in_k
 	return hmac(text, text_len, in_key, in_key_len, digest, SHA1_DIGEST_LENGTH, SHA1_BLOCK_SIZE, &sha1_buffer);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

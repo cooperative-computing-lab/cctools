@@ -31,4 +31,4 @@ void debug_journal_write (INT64_T flags, const char *str)
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

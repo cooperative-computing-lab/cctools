@@ -100,4 +100,4 @@ void text_list_set(struct text_list *t, const char *str, int i)
 	t->items[i] = tmp_str;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

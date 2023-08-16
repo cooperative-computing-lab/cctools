@@ -721,4 +721,4 @@ const struct batch_queue_module batch_queue_k8s = {
 	},
 };
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

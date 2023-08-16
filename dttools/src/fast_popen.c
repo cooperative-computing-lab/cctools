@@ -99,4 +99,4 @@ int fast_pclose(FILE * file)
 	return -1;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

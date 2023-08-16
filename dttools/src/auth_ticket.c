@@ -342,4 +342,4 @@ void auth_ticket_load(const char *tickets)
 	}
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

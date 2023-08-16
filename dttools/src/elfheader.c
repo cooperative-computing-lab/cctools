@@ -239,4 +239,4 @@ int elf_set_interp(int fd, const char *interp)
 	return elf_interp(fd, 1, path);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

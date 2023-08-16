@@ -216,4 +216,4 @@ char * batch_task_generate_id(struct batch_task *t) {
 	return xxstrdup(t->hash);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

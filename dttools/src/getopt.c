@@ -1175,4 +1175,4 @@ main (int argc, char **argv)
 
 #endif /* ! CCTOOLS_OPSYS_DARWIN */
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

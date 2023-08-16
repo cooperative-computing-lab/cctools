@@ -298,4 +298,4 @@ int pfs_cache_invalidate( pfs_name *name )
 	}
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -157,4 +157,4 @@ int address_parse_hostport( const char *hostport, char *host, int *port, int def
 	}
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

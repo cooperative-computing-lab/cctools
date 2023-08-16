@@ -164,4 +164,4 @@ extern char   chirp_url[CHIRP_PATH_MAX];
 
 #endif /* CHIRP_FILESYSTEM_H */
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */
