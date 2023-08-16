@@ -148,3 +148,4 @@ with all the same tasks on the worker.""",
                 print(f"task {t.id} failed with status {t.result}")
 
     print("all tasks complete!")
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

@@ -36,4 +36,4 @@ int chirp_job_schedule (void);
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

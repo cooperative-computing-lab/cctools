@@ -55,4 +55,4 @@ int ftp_lite_error( int r )
 	}
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

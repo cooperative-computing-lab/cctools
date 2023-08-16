@@ -445,4 +445,4 @@ int catalog_query_send_update( const char *hosts, const char *text, catalog_upda
 	return sent;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -48,4 +48,4 @@ char **string_array_append (char **oarray, const char *str)
 	return narray;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

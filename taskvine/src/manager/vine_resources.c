@@ -146,4 +146,4 @@ void vine_resources_add_to_jx( struct vine_resources *r, struct jx *nv )
 }
 
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

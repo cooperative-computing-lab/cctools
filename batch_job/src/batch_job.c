@@ -307,4 +307,4 @@ int batch_fs_unlink (struct batch_queue *q, const char *path)
 	return q->module->fs.unlink(q, path);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

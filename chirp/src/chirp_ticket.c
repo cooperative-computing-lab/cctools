@@ -235,4 +235,4 @@ const char *chirp_ticket_digest(const char *pk)
 	return md5_to_string(digest);	/* static memory */
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

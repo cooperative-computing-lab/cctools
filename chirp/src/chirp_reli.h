@@ -792,4 +792,4 @@ void chirp_reli_disconnect( const char *host );
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -77,4 +77,4 @@ ptrdiff_t pattern_match (const char *str, const char *patt, ...)
 	return rc;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

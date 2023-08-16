@@ -780,4 +780,4 @@ int pfs_file_bxgrid::fstat( struct pfs_stat *buf ) {
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

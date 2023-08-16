@@ -21,3 +21,4 @@ if __name__ == "__main__":
 
     print(f"maximum number is {max_number}")
 
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

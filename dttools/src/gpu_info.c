@@ -55,4 +55,4 @@ char *gpu_name_get()
 	return gpu_name;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

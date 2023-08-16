@@ -709,4 +709,4 @@ int bitmap_save_jpeg(struct bitmap *m, const char *path)
 
 #endif /*  */
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

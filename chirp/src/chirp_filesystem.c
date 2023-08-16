@@ -917,4 +917,4 @@ int cfs_stub_job_schedule(sqlite3 * db)
 	return ENOSYS;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

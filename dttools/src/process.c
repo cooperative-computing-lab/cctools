@@ -139,4 +139,4 @@ int process_pending()
 	return process_work(0);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

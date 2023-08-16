@@ -195,4 +195,4 @@ void path_disk_size_info_delete_state(struct path_disk_size_info *state) {
 	free(state);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

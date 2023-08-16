@@ -44,3 +44,4 @@ c = executor.submit(t3)
 # Get result
 print("waiting for result...")
 assert c.result() == 14
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

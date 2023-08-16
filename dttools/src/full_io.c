@@ -97,4 +97,4 @@ ssize_t full_fwrite(FILE * file, const void *buf, size_t count)
 	FULL_FIO(fwrite(buf, 1, count, file));
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -81,4 +81,4 @@ pfs_off_t pfs_pointer::tell()
 	return offset;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

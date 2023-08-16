@@ -601,4 +601,4 @@ int path_is_dir(char *file_name){
 
 	return 0;
 }
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

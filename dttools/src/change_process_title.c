@@ -99,4 +99,4 @@ void change_process_title(char *fmt, ...)
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -280,3 +280,4 @@ if __name__ == "__main__":
         sys.exit(1)
 
     sys.exit(0)
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

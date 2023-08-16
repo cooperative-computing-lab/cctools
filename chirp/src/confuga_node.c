@@ -814,4 +814,4 @@ out:
 	return rc;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

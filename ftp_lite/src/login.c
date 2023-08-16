@@ -85,4 +85,4 @@ int ftp_lite_login( const char *service, char *name, int namelen, char *pass, in
 	return result;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

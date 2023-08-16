@@ -101,5 +101,5 @@ main()\n\
 }\n\
 \n\
 main\n\
-# vim: set noexpandtab tabstop=4:\n\
+# vim: set noexpandtab tabstop=8:\n\
 ";

@@ -249,4 +249,4 @@ int itable_nextkey(struct itable *h, UINT64_T * key, void **value)
 	}
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

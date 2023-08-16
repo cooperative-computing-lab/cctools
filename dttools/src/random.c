@@ -79,4 +79,4 @@ void random_hex (char *str, size_t len)
 	} while (i < len);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

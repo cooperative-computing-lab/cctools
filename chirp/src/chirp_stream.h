@@ -98,4 +98,4 @@ int chirp_stream_close(struct chirp_stream *stream, time_t stoptime);
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

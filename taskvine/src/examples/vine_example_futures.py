@@ -55,3 +55,4 @@ for t in tasks_with_errors:
     except FutureTaskError as e:
         print('task {} finished: {}'.format(e.task.id, e))
 
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

@@ -43,4 +43,4 @@ int cctools_version_cmp (const char *v1, const char *v2)
 	return rc;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

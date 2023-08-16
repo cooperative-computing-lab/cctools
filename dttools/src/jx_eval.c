@@ -757,4 +757,4 @@ void jx_eval_enable_external( int enable )
 	__jx_eval_external_functions_flag = enable;
 }
 
-/*vim: set noexpandtab tabstop=4: */
+/*vim: set noexpandtab tabstop=8: */

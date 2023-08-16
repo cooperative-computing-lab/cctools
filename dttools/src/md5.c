@@ -369,4 +369,4 @@ char *md5_of_string(const char *s)
 	return strdup(md5_to_string(digest));
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

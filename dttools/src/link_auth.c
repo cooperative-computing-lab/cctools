@@ -109,4 +109,4 @@ int link_auth_password( struct link *link, const char *password, time_t stoptime
 }
 
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -229,4 +229,4 @@ int auth_kerberos_register(void)
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

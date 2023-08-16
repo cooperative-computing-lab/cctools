@@ -223,4 +223,4 @@ int64_t copy_stream_to_fd(FILE *input, int fd)
 	return total;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

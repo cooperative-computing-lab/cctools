@@ -943,4 +943,4 @@ CONFUGA_IAPI int confugaN_init (confuga *C, const char *root)
 	PROLOGUE
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

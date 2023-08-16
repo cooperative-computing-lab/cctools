@@ -784,4 +784,4 @@ struct pfs_file * pfs_file_bootstrap( int fd, const char *path )
 	return new pfs_file_local(&name,fd);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

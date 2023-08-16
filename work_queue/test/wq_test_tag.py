@@ -41,3 +41,4 @@ print("returned order: {}".format(done_order))
 correct_order = all(map(lambda pair: pair[0] == pair[1], zip(desired_tag_order, done_order)))
 if not correct_order or (len(done_order) != len(desired_tag_order)):
     raise Exception("Incorrect order")
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

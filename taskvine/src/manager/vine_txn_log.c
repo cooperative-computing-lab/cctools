@@ -341,4 +341,4 @@ void vine_txn_log_write_library_update(struct vine_manager *q, struct vine_worke
 	buffer_free(&B);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

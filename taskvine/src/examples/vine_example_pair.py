@@ -27,3 +27,4 @@ if __name__ == "__main__":
         # some error in execution...
         pass
 
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

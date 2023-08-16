@@ -52,4 +52,4 @@ int check_disk_space_for_filesize(char *path, int64_t file_size, uint64_t disk_a
 	return 1;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

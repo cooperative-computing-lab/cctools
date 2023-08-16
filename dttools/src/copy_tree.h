@@ -64,4 +64,4 @@ int is_subdir(const char *source, const char *target);
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -631,4 +631,4 @@ public:
 static pfs_service_chirp pfs_service_chirp_instance;
 pfs_service *pfs_service_chirp = &pfs_service_chirp_instance;
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

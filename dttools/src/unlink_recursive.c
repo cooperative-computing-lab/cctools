@@ -96,4 +96,4 @@ int unlink_dir_contents (const char *path)
 	return -1;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

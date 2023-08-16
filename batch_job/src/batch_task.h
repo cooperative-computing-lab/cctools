@@ -121,4 +121,4 @@ void batch_task_set_info(struct batch_task *t, struct batch_job_info *info);
 char * batch_task_generate_id(struct batch_task *t);
 
 #endif
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

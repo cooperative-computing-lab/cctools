@@ -329,3 +329,4 @@ class JupyterDisplay(StatusDisplay):
                 pass
         cells = map(lambda v: fmt(v), cells_info)
         return JupyterDisplay.row_fmt.substitute(cells=" ".join(cells))
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

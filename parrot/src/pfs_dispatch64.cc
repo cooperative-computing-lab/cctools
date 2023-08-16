@@ -3336,4 +3336,4 @@ void pfs_dispatch64( struct pfs_process *p )
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

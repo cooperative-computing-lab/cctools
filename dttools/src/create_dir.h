@@ -30,4 +30,4 @@ int create_dir_parents (const char *path, mode_t mode);
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

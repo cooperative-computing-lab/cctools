@@ -1027,4 +1027,4 @@ const char *rmsummary_resource_to_str(const char *resource, double value, int in
 }
 
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

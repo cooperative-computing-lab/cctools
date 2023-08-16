@@ -45,4 +45,4 @@ void cctools_uuid_loadhex (cctools_uuid_t *uuid, const char *hex)
 	setuuid(uuid, bytes);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

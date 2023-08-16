@@ -82,3 +82,4 @@ with factory:
             print(f"{r} measured {mr[r]}, allocated {ar[r]} {sign}= {expected}")
 
     sys.exit(error_found)
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

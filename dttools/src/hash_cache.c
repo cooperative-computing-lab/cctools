@@ -134,4 +134,4 @@ int hash_cache_nextkey(struct hash_cache *cache, char **key, void **item)
 	return 0;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

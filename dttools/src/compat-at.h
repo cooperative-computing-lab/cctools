@@ -61,4 +61,4 @@ See the file COPYING for details.
 
 #endif /* COMPAT_AT_H */
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

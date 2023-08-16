@@ -142,4 +142,4 @@ char *chirp_wrap_job_wait  (const char *host, chirp_jobid_t id, int64_t timeout,
 }
 
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -156,4 +156,4 @@ int main(int argc, char **argv) {
 	jx_delete(j);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

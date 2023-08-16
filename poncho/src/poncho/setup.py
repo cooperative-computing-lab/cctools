@@ -7,4 +7,4 @@ setup(
         packages=['poncho'],
         install_requires=['dill']
 
-)
+)# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

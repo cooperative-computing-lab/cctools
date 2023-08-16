@@ -234,4 +234,4 @@ pfs_service *pfs_service_irods = &pfs_service_irods_instance;
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

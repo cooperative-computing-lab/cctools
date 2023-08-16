@@ -770,4 +770,4 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	cfs_stub_job_schedule,
 };
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

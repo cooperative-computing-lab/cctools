@@ -308,4 +308,4 @@ void *set_next_element(struct set *s)
 	}
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -130,4 +130,4 @@ public:
 static pfs_service_http pfs_service_http_instance;
 pfs_service *pfs_service_http = &pfs_service_http_instance;
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -102,4 +102,4 @@ used by both the client and server implementations of the protocol.
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -101,3 +101,4 @@ print wq.stats.total_tasks_dispatched, wq.stats.total_tasks_complete, \
       wq.stats.total_workers_joined, wq.stats.total_workers_removed
 
 # vim: sts=4 sw=4 ts=8 ft=python
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

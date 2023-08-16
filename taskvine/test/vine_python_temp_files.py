@@ -55,3 +55,4 @@ m.remove_file(t_a.output_file)
 print(f"final output: {t_b.output}")
 
 assert t_b.output == "hello world!"
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

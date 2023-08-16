@@ -231,4 +231,4 @@ int auth_unix_register(void)
 	return auth_register("unix", auth_unix_assert, auth_unix_accept);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

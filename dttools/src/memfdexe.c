@@ -75,4 +75,4 @@ int memfdexe (const char *name, const char *extradir)
 	return fd;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

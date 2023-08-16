@@ -138,4 +138,4 @@ int pfs_dir::append (const char *name)
 	return pfs_dir::append(&d);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

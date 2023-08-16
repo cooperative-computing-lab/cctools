@@ -123,7 +123,7 @@ void mainloop( struct vine_manager *q )
 	}
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */
 
 
 void show_help( const char *cmd )

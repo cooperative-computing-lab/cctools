@@ -308,4 +308,4 @@ int file_cache_commit(struct file_cache *f, const char *path, const char *txn)
 	return result;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

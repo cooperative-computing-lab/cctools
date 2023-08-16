@@ -48,3 +48,4 @@ class File(object):
     # @param self       A file object.
     def __len__(self):
         return cvine.vine_file_size(self._file)
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

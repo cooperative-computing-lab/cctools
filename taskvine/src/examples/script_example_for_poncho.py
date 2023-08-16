@@ -20,3 +20,4 @@ plt.savefig('fig.png')
 
 print("done")
 
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

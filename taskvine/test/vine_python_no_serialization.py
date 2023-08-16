@@ -37,3 +37,4 @@ while not m.empty():
             assert t.output == "look ma no serialization".encode('utf8')
         else:
             print(f"Something went wrong with the task: {t.result}\nstdout: {t.std_output}")
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

@@ -1097,4 +1097,4 @@ struct rmsummary *rmonitor_minimonitor(minimonitor_op op, uint64_t pid) {
 	return result;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

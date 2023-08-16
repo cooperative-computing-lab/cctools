@@ -473,3 +473,4 @@ class FutureTaskError(Exception):
     def _state_to_str(self):
         return FutureTaskError._state_to_msg.get(self.state, None)
 
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

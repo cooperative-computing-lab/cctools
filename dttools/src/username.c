@@ -71,4 +71,4 @@ int username_set(const char *name)
 	return 1;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

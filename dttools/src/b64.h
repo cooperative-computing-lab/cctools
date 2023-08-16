@@ -53,4 +53,4 @@ int b64_decode(const char *b64, buffer_t *blob);
 
 #endif /* B64_H */
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

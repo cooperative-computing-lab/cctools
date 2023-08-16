@@ -48,4 +48,4 @@ ssize_t pwrite(int fd, const void *data, size_t length, off_t offset)
 
 #endif /*  */
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -28,4 +28,4 @@ void sleep_for(time_t interval)
 	sleep_until(time(0) + interval);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

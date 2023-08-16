@@ -135,4 +135,4 @@ do {\
 int chirp_sqlite3_column_jsonify(sqlite3_stmt *stmt, int n, buffer_t *B);
 int chirp_sqlite3_row_jsonify(sqlite3_stmt *stmt, buffer_t *B);
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

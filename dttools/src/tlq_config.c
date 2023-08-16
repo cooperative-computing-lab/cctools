@@ -25,4 +25,4 @@ char *tlq_config_url( int port, const char *log_path, time_t stoptime ) {
 	return xxstrdup(buffer);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

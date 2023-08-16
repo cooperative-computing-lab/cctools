@@ -208,4 +208,4 @@ void auth_globus_use_delegated_credential(int yesno)
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

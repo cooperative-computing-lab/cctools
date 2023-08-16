@@ -159,3 +159,4 @@ def create_spec(filename, out=None, toplevel=False, function=None, pkg_mapping=[
 
     return env  
 
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

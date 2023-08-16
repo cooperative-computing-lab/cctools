@@ -75,4 +75,4 @@ struct batch_queue {
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

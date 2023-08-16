@@ -88,4 +88,4 @@ int mkdir_recursive_parents (const char *path, mode_t mode)
 	return mkdirat_recursive_parents(AT_FDCWD, path, mode);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

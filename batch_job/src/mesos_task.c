@@ -40,4 +40,4 @@ void mesos_task_delete(struct mesos_task *mt)
 	free(mt);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

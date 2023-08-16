@@ -110,3 +110,4 @@ assert(multiply_sum == 285)
 assert(kwargs_sum == 63)
 assert(no_arguments_errors == 9)
 assert(num_exceptions == 9)
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

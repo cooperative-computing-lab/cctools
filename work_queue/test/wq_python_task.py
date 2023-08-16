@@ -59,3 +59,4 @@ while not queue.empty():
 
 assert(positive_sum == (-1 * negative_sum))
 
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

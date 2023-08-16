@@ -75,4 +75,4 @@ void chirp_global_inhibit_catalog(int onoff);
 
 #endif
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

@@ -156,4 +156,4 @@ int main(int argc, char *argv[])
 	return (EXIT_SUCCESS);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */

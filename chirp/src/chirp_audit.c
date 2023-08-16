@@ -155,4 +155,4 @@ void chirp_audit_delete(struct hash_table *table)
 	hash_table_delete(table);
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=8: */
