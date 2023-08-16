@@ -33,14 +33,14 @@ static void vine_transfer_pair_delete( struct vine_transfer_pair *p )
 // add a current transaction to the transfer table
 char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info *to, const char *source)
 {
-    cctools_uuid_t uuid;
-    cctools_uuid_create(&uuid);
+	cctools_uuid_t uuid;
+	cctools_uuid_create(&uuid);
 
-    char *transfer_id = strdup(uuid.str);  
-    struct vine_transfer_pair *t = vine_transfer_pair_create(to, source);
+	char *transfer_id = strdup(uuid.str);  
+	struct vine_transfer_pair *t = vine_transfer_pair_create(to, source);
 
-    hash_table_insert(q->current_transfer_table, transfer_id, t);
-    return transfer_id;
+	hash_table_insert(q->current_transfer_table, transfer_id, t);
+	return transfer_id;
 }
 
 // remove a completed transaction from the transfer table - i.e. open the source to an additional transfer
@@ -59,14 +59,13 @@ int vine_current_transfers_remove(struct vine_manager *q, const char *id)
 // count the number transfers coming from a specific source
 int vine_current_transfers_source_in_use(struct vine_manager *q, const char *source)
 {
-    char *id;
-    struct vine_transfer_pair *t;
-    int c = 0;
-    HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
-    {
-    	if(strcmp(source, t->source) == 0) c++;
-    }
-    return c;
+	char *id;
+	struct vine_transfer_pair *t;
+	int c = 0;
+	HASH_TABLE_ITERATE(q->current_transfer_table, id, t) {
+			if(strcmp(source, t->source) == 0) c++;
+	}
+	return c;
 }
 
 int vine_current_transfers_worker_in_use(struct vine_manager *q, const char *peer_addr)
@@ -75,8 +74,7 @@ int vine_current_transfers_worker_in_use(struct vine_manager *q, const char *pee
 	struct vine_transfer_pair *t;
 	int c = 0;
 
-	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
-	{
+	HASH_TABLE_ITERATE(q->current_transfer_table, id, t) {
 			
 		if(strstr(t->source, peer_addr)) c++;
 	}	
@@ -86,29 +84,26 @@ int vine_current_transfers_worker_in_use(struct vine_manager *q, const char *pee
 // remove all transactions involving a worker from the transfer table - if a worker failed or is being deleted intentionally
 int vine_current_transfers_wipe_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
-    char *id;
-    struct vine_transfer_pair *t;
-    debug(D_VINE, "Removing instances of worker from transfer table");
-    HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
-    {
-    	if(t->to == w)
-	{
-		vine_current_transfers_remove(q, id);
+	char *id;
+	struct vine_transfer_pair *t;
+	debug(D_VINE, "Removing instances of worker from transfer table");
+	HASH_TABLE_ITERATE(q->current_transfer_table, id, t) {
+		if(t->to == w) {
+			vine_current_transfers_remove(q, id);
+		}
 	}
-    }
-    return 1;
+	return 1;
 }
 
 void vine_current_transfers_print_table(struct vine_manager *q)
 { 
-    char *id;
-    struct vine_transfer_pair *t;
-    debug(D_VINE, "-----------------TRANSFER-TABLE--------------------");
-    HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
-    {	    	
-    	debug(D_VINE, "%s : source=%s", id, t->source);
-    }
-    debug(D_VINE, "-----------------END-------------------------------");
+	char *id;
+	struct vine_transfer_pair *t;
+	debug(D_VINE, "-----------------TRANSFER-TABLE--------------------");
+	HASH_TABLE_ITERATE(q->current_transfer_table, id, t) {	    	
+		debug(D_VINE, "%s : source=%s", id, t->source);
+	}
+	debug(D_VINE, "-----------------END-------------------------------");
 }
 
 
