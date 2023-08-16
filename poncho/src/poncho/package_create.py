@@ -415,3 +415,4 @@ def create_conda_spec(poncho_spec, out_dir, local_pip_pkgs):
     conda_spec['pip_local'] = {name:local_pip_pkgs[name] for name in local_reqs}
 
     return conda_spec
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

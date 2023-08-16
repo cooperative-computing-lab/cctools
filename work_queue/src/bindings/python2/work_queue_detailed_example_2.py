@@ -70,3 +70,4 @@ while not wq.empty():
     print wq.stats.capacity
     print wq.stats.avg_capacity
     print wq.stats.total_workers_connected
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

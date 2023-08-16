@@ -372,3 +372,4 @@ def find_dask_keys(lists):
 
 def find_result_files(lists):
     return find_in_lists(lists, lambda f: isinstance(f, DaskVineFile))
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

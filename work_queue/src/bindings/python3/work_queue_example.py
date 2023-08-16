@@ -85,3 +85,5 @@ if __name__ == '__main__':
 
   #work queue object will be garbage collected by Python automatically when it goes out of scope
   sys.exit(0)
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

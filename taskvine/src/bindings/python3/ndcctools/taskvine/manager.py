@@ -1908,3 +1908,4 @@ class Factory(object):
     def set_environment(self, env):
         self._env_file = env
 
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

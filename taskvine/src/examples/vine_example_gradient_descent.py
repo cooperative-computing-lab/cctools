@@ -167,3 +167,4 @@ Gradient descent is an algorithm used to optimize the weights of machine learnin
     args = parser.parse_args()
 
     main(args.name, args.port, args.params, args.iterations, args.error, args.rate, args.tasks)
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

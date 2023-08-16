@@ -231,3 +231,4 @@ class DaskVineDag:
 class DaskVineNoResult(Exception):
     """Exception raised when asking for a result from a computation that has not been performed."""
     pass
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:

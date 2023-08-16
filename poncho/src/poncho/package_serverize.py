@@ -336,3 +336,4 @@ def serverize_library_from_code(path, functions, name, need_pack=True):
     # and pack it into an environment, if needed
     if need_pack:
         pack_library_code(path + "/library_code.py", path + "/library_env.tar.gz")
+# vim: set sts=4 sw=4 ts=4 expandtab ft=python:
