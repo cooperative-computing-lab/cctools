@@ -11,7 +11,6 @@
 from . import cvine
 from .file import File
 
-import time
 import copy
 import json
 import os
