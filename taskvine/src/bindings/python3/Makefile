@@ -1,5 +1,5 @@
 include ../../../../config.mk
-include $(CCTOOLS_HOME)/rules.mk
+include ../../../../rules.mk
 
 # Python always uses 'so' for its modules (even on Darwin)
 CCTOOLS_DYNAMIC_SUFFIX = so
@@ -25,6 +25,8 @@ vine_wrap.c: taskvine.i
 $(DSPYTHONSO): vine_wrap.o $(EXTERNAL_DEPENDENCIES)
 
 test:
+
+lint:
 	flake8 --ignore=${NDCCTOOLS_FLAKE8_IGNORE_ERRORS} --exclude=${NDCCTOOLS_FLAKE8_IGNORE_FILES} ndcctools/taskvine/
 
 clean:
