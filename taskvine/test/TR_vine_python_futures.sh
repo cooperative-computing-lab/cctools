@@ -31,7 +31,7 @@ prepare()
 run()
 {
 	# send taskvine to the background, saving its exit status.
-	( ${CCTOOLS_PYTHON_TEST_EXEC} vine_futures.py $PORT_FILE; echo $? > $STATUS_FILE) &
+	( ${CCTOOLS_PYTHON_TEST_EXEC} vine_python_futures.py $PORT_FILE; echo $? > $STATUS_FILE) &
 
 	# wait at most 5 seconds for vine to find a port.
 	wait_for_file_creation $PORT_FILE 5
