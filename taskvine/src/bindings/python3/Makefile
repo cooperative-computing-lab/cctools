@@ -25,7 +25,7 @@ vine_wrap.c: taskvine.i
 $(DSPYTHONSO): vine_wrap.o $(EXTERNAL_DEPENDENCIES)
 
 test:
-	flake8 --ignore=${NDCCTOOLS_FLAKE8_IGNORE_ERRORS} --exclude=${NDCCTOOLS_FLAKE8_IGNORE_FILES} --count ndcctools/taskvine/
+	flake8 --ignore=${NDCCTOOLS_FLAKE8_IGNORE_ERRORS} --exclude=${NDCCTOOLS_FLAKE8_IGNORE_FILES} ndcctools/taskvine/
 
 clean:
 	rm -rf $(OBJECTS) $(TARGETS) ndcctools/taskvine/cvine.py vine_wrap.c vine_wrap.o *.pyc __pycache__

@@ -10,7 +10,6 @@
 # See the file COPYING for details.
 from . import cvine
 from .file import File
-import time
 
 import copy
 import json
