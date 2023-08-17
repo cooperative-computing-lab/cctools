@@ -40,7 +40,7 @@ prepare()
 
 run()
 {
-	( ${CCTOOLS_PYTHON_TEST_EXEC} vine_test.py $PORT_FILE; echo $? > $STATUS_FILE ) &
+	( ${CCTOOLS_PYTHON_TEST_EXEC} vine_python.py $PORT_FILE; echo $? > $STATUS_FILE ) &
 
 	# wait at most 15 seconds for vine to find a port.
 	wait_for_file_creation $PORT_FILE 15
