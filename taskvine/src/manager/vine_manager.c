@@ -3848,17 +3848,6 @@ const char *vine_result_string(vine_result_t result) {
 	return str;
 }
 
-static struct vine_task *task_state_any(struct vine_manager *q, vine_task_state_t state)
-{
-	struct vine_task *t;
-	uint64_t task_id;
-	ITABLE_ITERATE(q->tasks,task_id,t) {
-		if( t->state==state ) return t;
-	}
-
-	return NULL;
-}
-
 static struct vine_task *task_state_any_with_tag(struct vine_manager *q, vine_task_state_t state, const char *tag)
 {
 	struct vine_task *t;
@@ -4326,7 +4315,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// are retrieved. (this is the default)
 		// otherwise, retrieve at most q->max_retrievals (default is 1)
 		int received = 0;
-		int no_ready_tasks = !task_state_any(q, VINE_TASK_READY);
+		int no_ready_tasks = list_size(q->ready_list);
 		BEGIN_ACCUM_TIME(q, time_receive);
 		do {
 			int received_at_least_one = 0;
@@ -4439,7 +4428,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// return if manager is empty and something interesting already happened
 		// in this wait.
 		if(events > 0) {
-			if(task_state_any(q, VINE_TASK_RETRIEVED) && t == NULL) continue;
+			if(list_size(q->retrieved_list) && t == NULL) continue;
 			BEGIN_ACCUM_TIME(q, time_internal);
 			int done = !list_size(q->ready_list) && !list_size(q->waiting_retrieval_list) && !itable_size(q->running_table);
 			END_ACCUM_TIME(q, time_internal);
