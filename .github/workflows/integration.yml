@@ -114,8 +114,16 @@ jobs:
         id: vars
         shell: bash
         run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: setup
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/setup.sh
+      - name: configure
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/configure.sh
       - name: build
         run: ${GITHUB_WORKSPACE}/packaging/build-conda/build.sh
+      - name: install
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/install.sh
+      - name: test
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/test.sh
       - name: deploy
         uses: ncipollo/release-action@v1
         if: github.event_name == 'workflow_dispatch'

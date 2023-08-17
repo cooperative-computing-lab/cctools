@@ -11,4 +11,4 @@ CONDA_BASE=$(conda info --base)
 
 conda activate cctools-dev
 
-make
+make install

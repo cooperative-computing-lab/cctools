@@ -9,6 +9,5 @@ export PYTHONPATH=
 CONDA_BASE=$(conda info --base)
 . $CONDA_BASE/etc/profile.d/conda.sh
 
-conda activate cctools-dev
-
-make
+# Install conda developer dependencies first:
+conda create -y -n cctools-dev -c conda-forge --strict-channel-priority python=3 gcc_linux-64 gxx_linux-64 gdb m4 perl swig make zlib libopenssl-static openssl conda-pack cloudpickle packaging
