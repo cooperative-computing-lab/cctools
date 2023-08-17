@@ -15,32 +15,29 @@ PORT_FILE=vine.port
 check_needed()
 {
 	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
+
+	# Poncho currently requires ast.unpase to serialize the function,
+	# which only became available in Python 3.11.  Some older platforms
+	# (e.g. almalinux8) will not have this natively.
+	"${CCTOOLS_PYTHON_TEST_EXEC}" -c "from ast import unparse" || return 1
+
+	# In some limited build circumstances (e.g. macos build on github),
+	# poncho doesn't work due to lack of conda-pack
+	"${CCTOOLS_PYTHON_TEST_EXEC}" -c "import conda_pack" || return 1
+
+        return 0
 }
 
 prepare()
 {
 	rm -f $STATUS_FILE
 	rm -f $PORT_FILE
-
-	rm -rf input.file
-	rm -rf output.file
-	rm -rf executable.file
-
-	/bin/echo hello world > input.file
-	/bin/cp /bin/echo executable.file
-
-	# Make a small tarball for testing url downloads.
-	tar czf dummy.tar.gz TR*.sh
-
-	mkdir -p testdir
-	cp input.file executable.file testdir
-
 	return 0
 }
 
 run()
 {
-	( ${CCTOOLS_PYTHON_TEST_EXEC} vine_python.py $PORT_FILE; echo $? > $STATUS_FILE ) &
+	( ${CCTOOLS_PYTHON_TEST_EXEC} vine_python_serverless.py $PORT_FILE; echo $? > $STATUS_FILE ) &
 
 	# wait at most 15 seconds for vine to find a port.
 	wait_for_file_creation $PORT_FILE 15
@@ -55,11 +52,11 @@ run()
 	if [ $status -ne 0 ]
 	then
 		# display log files in case of failure.
-        logfile=$(latest_vine_debug_log)
+		logfile=$(latest_vine_debug_log)
 		if [ -f ${logfile}  ]
 		then
 			echo "master log:"
-            cat ${logfile}
+			cat ${logfile}
 		fi
 
 		if [ -f worker.log  ]
@@ -78,15 +75,7 @@ clean()
 {
 	rm -f $STATUS_FILE
 	rm -f $PORT_FILE
-
-	rm -rf input.file
-	rm -rf output.file
-	rm -rf executable.file
-	rm -rf testdir
-	rm -rf dummy.tar.gz
-
 	rm -rf vine-run-info
-
 	exit 0
 }
 
