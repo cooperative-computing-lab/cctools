@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -xe
-
 # Fix for local environment at ND: unset PYTHONPATH to ignore existing python installs.
 export PYTHONPATH=
 
