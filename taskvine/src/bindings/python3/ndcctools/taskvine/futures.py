@@ -2,44 +2,18 @@
 from . import cvine
 from concurrent.futures import Executor
 from concurrent.futures import Future
-from ndcctools.resource_monitor import (
-    rmsummary_delete,
-    rmsummary_create,
-    rmsummaryArray_getitem,
-    delete_rmsummaryArray,
-)
-
-from .display import JupyterDisplay
-from .file import File
 from .task import (
-    FunctionCall,
-    LibraryTask,
     PythonTask,
-    Task,
+    PythonTaskNoResult,
 )
 from .manager import (
     Factory,
     Manager,
 )
-from .utils import (
-    set_port_range,
-    get_c_constant,
-)
 
-import atexit
-import errno
-import itertools
-import json
-import math
 import os
-import pathlib
-import shutil
-import subprocess
-import sys
 import textwrap
 import tempfile
-import time
-import weakref
 
 try:
     import cloudpickle
@@ -86,7 +60,7 @@ class Executor(Executor):
         if self.factory:
             return self.factory.__setattr__(name, value)
 
-    def get(self):
+    def get(self, name):
         if self.factory:
             return self.factory.__getattr__(name)
 ##

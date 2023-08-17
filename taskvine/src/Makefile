@@ -19,4 +19,7 @@ install:
 clean:
 	for d in $(TARGETS); do $(MAKE) -C $$d clean; done
 
+test:
+	for d in $(TARGETS); do $(MAKE) -C $$d test; done
+
 .PHONY: all clean install test $(TARGETS)

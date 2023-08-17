@@ -10,7 +10,7 @@
 # See the file COPYING for details.
 from . import cvine
 from .file import File
-from concurrent.futures import Future
+import time
 
 import copy
 import json

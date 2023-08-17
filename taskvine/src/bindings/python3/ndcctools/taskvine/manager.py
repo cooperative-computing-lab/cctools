@@ -856,7 +856,7 @@ class Manager(object):
         # ensure poncho python library is available
         try:
             from ndcctools.poncho import package_serverize
-        except:
+        except ImportError:
             raise ModuleNotFoundError("The poncho module is not available. Cannot create Library.")
 
         # positional arguments are the list of functions to include in the library
@@ -892,7 +892,7 @@ class Manager(object):
         if init_command:
             t = LibraryTask(f"{init_command} python ./library_code.py", name)
         else:
-            t = LibraryTask(f"python ./library_code.py", name)
+            t = LibraryTask("python ./library_code.py", name)
 
         # declare the environment
         if add_env:
@@ -915,9 +915,6 @@ class Manager(object):
     #                        to a poncho environment.
     # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
     def create_library_from_serverized_files(self, name, library_path, env=None):
-        # Delay loading of poncho until here, to avoid bringing in conda-pack etc unless needed.
-        from ndcctools.poncho import package_serverize
-
         t = LibraryTask("python ./library_code.py", name)
         if env:
             if isinstance(env, str):
