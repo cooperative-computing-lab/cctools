@@ -56,4 +56,4 @@ lint:
 format:
 	clang-format -i $(SOURCES)
 
-.PHONY: all clean install test lint 
+.PHONY: all clean install test lint format

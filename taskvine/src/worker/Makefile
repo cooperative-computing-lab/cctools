@@ -30,7 +30,11 @@ clean:
 
 test: all
 
-lint: 
-	clang-format -Werror --dry-run --style='file:../../../.clang-format' $(SOURCES)
+lint:
+	(clang-format -Werror --dry-run --style='file:../../../.clang-format' $(SOURCES)) || \
+        (printf "========================================================\nNOTICE: Run \"make format\" to format your latest changes.\n========================================================\n")
 
-.PHONY: all clean install test lint
+format:
+	clang-format -i $(SOURCES)
+
+.PHONY: all clean install test lint format
