@@ -30,6 +30,7 @@ clean:
 
 test: all
 
-lint:
+lint: 
+	clang-format -Werror --dry-run --style='file:../../../.clang-format' $(SOURCES)
 
 .PHONY: all clean install test lint
