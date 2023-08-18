@@ -49,7 +49,10 @@ install: $(INSTALL_PACKAGES)
 test: $(CCTOOLS_PACKAGES)
 	./run_all_tests.sh
 
+lint: config.mk
+	@$(MAKE) -C taskvine lint
+
 rpm:
 	./packaging/rpm/rpm_creator.sh $(RPM_VERSION) $(RPM_RELEASE)
 
-.PHONY: $(CCTOOLS_PACKAGES) $(INSTALL_PACKAGES) $(CLEAN_PACKAGES) all clean install test rpm
+.PHONY: $(CCTOOLS_PACKAGES) $(INSTALL_PACKAGES) $(CLEAN_PACKAGES) all clean install test lint rpm

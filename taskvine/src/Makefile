@@ -11,7 +11,7 @@ tools: manager
 examples: manager worker tools bindings
 
 $(TARGETS): %:
-	$(MAKE) -C $@
+	$(MAKE) -C $@ $(MAKECMDGOALS)
 
 install:
 	for d in $(TARGETS); do $(MAKE) -C $$d install; done
@@ -19,4 +19,6 @@ install:
 clean:
 	for d in $(TARGETS); do $(MAKE) -C $$d clean; done
 
-.PHONY: all clean install test $(TARGETS)
+lint: $(TARGETS)
+
+.PHONY: all clean install test lint $(TARGETS)

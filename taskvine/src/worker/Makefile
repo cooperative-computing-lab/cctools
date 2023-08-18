@@ -30,4 +30,6 @@ clean:
 
 test: all
 
-.PHONY: all clean install test
+lint:
+
+.PHONY: all clean install test lint
