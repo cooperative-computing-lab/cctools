@@ -4,13 +4,13 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "vine_manager.h"
 #include "vine_factory_info.h"
+#include "vine_manager.h"
 
-#include "xxmalloc.h"
 #include "debug.h"
+#include "xxmalloc.h"
 
-struct vine_factory_info *vine_factory_info_create( const char *name )
+struct vine_factory_info *vine_factory_info_create(const char *name)
 {
 	struct vine_factory_info *f;
 	f = malloc(sizeof(*f));
@@ -21,7 +21,7 @@ struct vine_factory_info *vine_factory_info_create( const char *name )
 	return f;
 }
 
-void vine_factory_info_delete( struct vine_factory_info *f )
+void vine_factory_info_delete(struct vine_factory_info *f)
 {
 	if (f) {
 		free(f->name);
@@ -32,14 +32,15 @@ void vine_factory_info_delete( struct vine_factory_info *f )
 struct vine_factory_info *vine_factory_info_lookup(struct vine_manager *q, const char *name)
 {
 	struct vine_factory_info *f = hash_table_lookup(q->factory_table, name);
-	if(f) return f;
+	if (f)
+		return f;
 
 	f = vine_factory_info_create(name);
 	hash_table_insert(q->factory_table, name, f);
 	return f;
 }
 
-void vine_factory_info_remove( struct vine_manager *q, const char *name )
+void vine_factory_info_remove(struct vine_manager *q, const char *name)
 {
 	struct vine_factory_info *f = hash_table_remove(q->factory_table, name);
 	if (f) {
@@ -48,4 +49,3 @@ void vine_factory_info_remove( struct vine_manager *q, const char *name )
 		debug(D_VINE, "Failed to remove unrecorded factory %s", name);
 	}
 }
-

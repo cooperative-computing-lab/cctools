@@ -51,6 +51,9 @@ test: all
 
 lint:
 	(clang-format -Werror --dry-run --style='file:../../../.clang-format' $(SOURCES)) || \
-		(printf "=======================================================\nNOTICE: Did you run clang-format on the latest changes?\n=======================================================\n")
+		(printf "========================================================\nNOTICE: Run \"make format\" to format your latest changes.\n========================================================\n")
+
+format:
+	clang-format -i $(SOURCES)
 
 .PHONY: all clean install test lint 
