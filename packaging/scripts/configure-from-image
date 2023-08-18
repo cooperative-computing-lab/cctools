@@ -57,7 +57,7 @@ fi
 
 
 # compile everything
-./configure --debug --strict $DEP_ARGS ${perl_option} ${python_option} ${cvmfs_option} "$@"
+./configure --strict $DEP_ARGS ${perl_option} ${python_option} ${cvmfs_option} "$@"
 [[ -f config.mk ]] && make clean
 echo === Contents of config.mk ===
 cat config.mk

@@ -37,7 +37,7 @@ that serve as our extended "standard library".  Use them instead of rolling your
 - Data Structures:
 [set](https://cctools.readthedocs.io/en/stable/api/html/set_8h.html)
 [list](https://cctools.readthedocs.io/en/stable/api/html/list_8h.html)
-[hash_table]((https://cctools.readthedocs.io/en/stable/api/html/hash_table_8h.html)
+[hash_table](https://cctools.readthedocs.io/en/stable/api/html/hash_table_8h.html)
 [itable](https://cctools.readthedocs.io/en/stable/api/html/itable_8h.html)
 - Network Access:
 [link (TCP)](https://cctools.readthedocs.io/en/stable/api/html/link_8h.html)

@@ -229,7 +229,8 @@ static vine_result_code_t vine_manager_put_url(
 			(long long)f->size,
 			0777,
 			transfer_id);
-
+	
+    free(transfer_id);
 	return VINE_SUCCESS;
 }
 

@@ -27,14 +27,13 @@ prepare()
 
 run()
 {
-	# worker resources (used by worker in factory in wq_alloc_test.py):
 	cores=4
 	memory=2000
 	disk=2000
 	gpus=8
 
 	# send taskvine to the background, saving its exit status.
-	${CCTOOLS_PYTHON_TEST_EXEC} vine_alloc_test.py $PORT_FILE $cores $memory $disk $gpus; echo $? > $STATUS_FILE
+	${CCTOOLS_PYTHON_TEST_EXEC} vine_allocations.py $PORT_FILE $cores $memory $disk $gpus; echo $? > $STATUS_FILE
 
 	# retrieve wq script exit status
 	status=$(cat $STATUS_FILE)
