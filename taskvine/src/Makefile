@@ -21,4 +21,6 @@ clean:
 
 lint: $(TARGETS)
 
-.PHONY: all clean install test lint $(TARGETS)
+format: $(TARGETS)
+
+.PHONY: all clean install test lint format $(TARGETS)

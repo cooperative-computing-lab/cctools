@@ -27,4 +27,7 @@ test: $(TEST_TARGETS)
 lint:
 	@$(MAKE) -C src lint
 
-.PHONY: $(PHONY_TARGETS) $(CLEAN_TARGETS) $(INSTALL_TARGETS) $(TEST_TARGETS) all clean install test lint
+format:
+	@$(MAKE) -C src format
+
+.PHONY: $(PHONY_TARGETS) $(CLEAN_TARGETS) $(INSTALL_TARGETS) $(TEST_TARGETS) all clean install test lint format

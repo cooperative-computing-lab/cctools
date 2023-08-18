@@ -52,6 +52,9 @@ test: $(CCTOOLS_PACKAGES)
 lint: config.mk
 	@$(MAKE) -C taskvine lint
 
+format: config.mk
+	@$(MAKE) -C taskvine format
+
 rpm:
 	./packaging/rpm/rpm_creator.sh $(RPM_VERSION) $(RPM_RELEASE)
 
