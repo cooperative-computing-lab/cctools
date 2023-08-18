@@ -105,10 +105,10 @@ jobs:
       CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-linux-conda.tar.gz', github.event.inputs.version) }}
     needs: lint
     steps:
-      - name: checkout CCTools from branch head
+      - name: Checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
         uses: actions/checkout@v3
-      - name: checkout CCTools from tag
+      - name: Checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v3
         with:
@@ -117,9 +117,17 @@ jobs:
         id: vars
         shell: bash
         run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-      - name: build
+      - name: Conda-Setup
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/setup.sh
+      - name: Configure
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/configure.sh
+      - name: Build
         run: ${GITHUB_WORKSPACE}/packaging/build-conda/build.sh
-      - name: deploy
+      - name: Install
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/install.sh
+      - name: Test
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/test.sh
+      - name: Deploy
         uses: ncipollo/release-action@v1
         if: github.event_name == 'workflow_dispatch'
         with:
