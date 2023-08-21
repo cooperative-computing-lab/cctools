@@ -2618,7 +2618,8 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 	/*
 	When a normal task or recovery task leaves a worker, it goes back
 	into the proper queue.  But a library task was generated just for
-	that worker, so it always goes into the DONE state and gets deleted.
+	that worker, so it always goes into the RETRIEVED state because it
+	is not going back.
 	*/
 	
 	switch(t->type) {
@@ -2627,7 +2628,7 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 			change_task_state(q, t, new_state);
 			break;
 		case VINE_TASK_TYPE_LIBRARY:
-			change_task_state(q, t, VINE_TASK_DONE);
+			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			break;
 			return;
 	}
@@ -3950,6 +3951,9 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 	/* Duplicate the original task and give it a unique taskid */
 	struct vine_task *t = vine_task_copy(original);
 	t->task_id = q->next_task_id++;
+
+	/* Add reference to task when adding it to primary table. */
+	itable_insert(q->tasks, t->task_id, vine_task_clone(t) );
 
 	/* Send the task to the worker in the usual way. */
 	commit_task_to_worker(q,w,t);
