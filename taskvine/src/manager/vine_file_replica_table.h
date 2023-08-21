@@ -14,6 +14,8 @@ See the file COPYING for details.
 #define VINE_FILE_REPLICA_TABLE_H
 
 #include "taskvine.h"
+#include "vine_file_replica.h"
+#include "vine_worker_info.h"
 
 int vine_file_replica_table_insert(struct vine_worker_info *w, const char *cachename, struct vine_file_replica *remote_info);
 
