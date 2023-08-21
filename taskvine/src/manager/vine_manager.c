@@ -2782,16 +2782,17 @@ static void reap_task_from_worker(
 	/*
 	When a normal task or recovery task leaves a worker, it goes back
 	into the proper queue.  But a library task was generated just for
-	that worker, so it always goes into the DONE state and gets deleted.
+	that worker, so it always goes into the RETRIEVED state because it
+	is not going back.
 	*/
 
-	switch (t->type) {
+  switch (t->type) {
 	case VINE_TASK_TYPE_STANDARD:
 	case VINE_TASK_TYPE_RECOVERY:
 		change_task_state(q, t, new_state);
 		break;
 	case VINE_TASK_TYPE_LIBRARY:
-		change_task_state(q, t, VINE_TASK_DONE);
+		change_task_state(q, t, VINE_TASK_RETRIEVED);
 		break;
 		return;
 	}
@@ -4189,6 +4190,9 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 	struct vine_task *t = vine_task_copy(original);
 	t->task_id = q->next_task_id++;
 
+	/* Add reference to task when adding it to primary table. */
+	itable_insert(q->tasks, t->task_id, vine_task_clone(t) );
+
 	/* Send the task to the worker in the usual way. */
 	commit_task_to_worker(q, w, t);
 
@@ -4912,23 +4916,20 @@ static void release_all_workers(struct vine_manager *q)
 	}
 }
 
+/*
+If there are any standard tasks (those submitted by the user)
+known to the manager, then the system is not empty, and the caller
+should wait some more.
+XXX This is a linear-time operation, perhaps there is a more efficient way to do it.
+*/
+
 int vine_empty(struct vine_manager *q)
 {
 	struct vine_task *t;
 	uint64_t task_id;
 
-	ITABLE_ITERATE(q->tasks, task_id, t)
-	{
-		int state = vine_task_state(q, task_id);
-
-		if (state == VINE_TASK_READY)
-			return 0;
-		if (state == VINE_TASK_RUNNING)
-			return 0;
-		if (state == VINE_TASK_WAITING_RETRIEVAL)
-			return 0;
-		if (state == VINE_TASK_RETRIEVED)
-			return 0;
+  ITABLE_ITERATE(q->tasks,task_id,t) {
+		if(t->type==VINE_TASK_TYPE_STANDARD) return 0;
 	}
 
 	return 1;
