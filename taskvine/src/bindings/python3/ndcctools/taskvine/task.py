@@ -1011,5 +1011,32 @@ class LibraryTask(Task):
         Task.__init__(self, fn)
         self.provides_library(name)
 
+        # Default resource values to assign to this Library Task.
+        # These numbers are needed to prevent a LibraryTask taking over all
+        # resources of a worker (which prevents actual tasks from being executed), 
+        # since a task with no resources specified takes over
+        # a whole worker by default.
+        # These numbers are arbitrary and should be changed if needed.
+        self._default_cores = 1
+        self._default_memory = 1000
+        self._default_disk = 1000
+        self._default_gpus = 0
+        self.set_resources(cores=self._default_cores,
+                           memory=self._default_memory,
+                           disk=self._default_disk,
+                           gpus=self._default_gpus)
+
+    ##
+    # Set resources to this LibraryTask.
+    # @param self       Reference to the current remote task object.
+    # @param cores      The maximum number of cores this task can use.
+    # @param memory     The maximum amount of memory (MBs) this task can use.
+    # @param disk       The maximum amount of disk space (MBs) this task can use.
+    # @param cores      The maximum number of gpus this task can use.
+    def set_resources(self, cores: float, memory: int, disk: int, gpus: float):
+        self.set_cores(cores)
+        self.set_memory(memory)
+        self.set_disk(disk)
+        self.set_gpus(gpus)
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
