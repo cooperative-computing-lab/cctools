@@ -4673,18 +4673,20 @@ static void release_all_workers(struct vine_manager *q) {
 	}
 }
 
+/*
+If there are any standard tasks (those submitted by the user)
+known to the manager, then the system is not empty, and the caller
+should wait some more.
+XXX This is a linear-time operation, perhaps there is s more efficient way to do it.
+*/
+
 int vine_empty(struct vine_manager *q)
 {
 	struct vine_task *t;
 	uint64_t task_id;
 
 	ITABLE_ITERATE(q->tasks,task_id,t) {
-		int state = vine_task_state(q, task_id);
-
-		if( state == VINE_TASK_READY   )           return 0;
-		if( state == VINE_TASK_RUNNING )           return 0;
-		if( state == VINE_TASK_WAITING_RETRIEVAL ) return 0;
-		if( state == VINE_TASK_RETRIEVED )         return 0;
+		if(t->type==VINE_TASK_TYPE_STANDARD) return 0;
 	}
 
 	return 1;
