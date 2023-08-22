@@ -1434,6 +1434,17 @@ then
 	fi
 fi
 
+# If debug flag is on, turn on compiler optimization for debugging experience.
+# Appending "-Og" to various compiler flags ensures that.
+# Only applied to base cctools flags.
+# "-O0" is a common but suboptimal choice.
+if [ "$optdebug" = 1 ]; then
+	ccflags+=" -Og "
+	internal_ccflags+=" -Og "
+	c_only_flags+=" -Og "
+	
+fi
+
 cat <<EOF >>config.mk
 # Generated at `date` by $USER@`uname -n`
 
