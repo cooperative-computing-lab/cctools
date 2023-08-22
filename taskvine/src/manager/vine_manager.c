@@ -2786,7 +2786,7 @@ static void reap_task_from_worker(
 	is not going back.
 	*/
 
-  switch (t->type) {
+	switch (t->type) {
 	case VINE_TASK_TYPE_STANDARD:
 	case VINE_TASK_TYPE_RECOVERY:
 		change_task_state(q, t, new_state);
@@ -4191,7 +4191,7 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 	t->task_id = q->next_task_id++;
 
 	/* Add reference to task when adding it to primary table. */
-	itable_insert(q->tasks, t->task_id, vine_task_clone(t) );
+	itable_insert(q->tasks, t->task_id, vine_task_clone(t));
 
 	/* Send the task to the worker in the usual way. */
 	commit_task_to_worker(q, w, t);
@@ -4928,8 +4928,10 @@ int vine_empty(struct vine_manager *q)
 	struct vine_task *t;
 	uint64_t task_id;
 
-  ITABLE_ITERATE(q->tasks,task_id,t) {
-		if(t->type==VINE_TASK_TYPE_STANDARD) return 0;
+	ITABLE_ITERATE(q->tasks, task_id, t)
+	{
+		if (t->type == VINE_TASK_TYPE_STANDARD)
+			return 0;
 	}
 
 	return 1;

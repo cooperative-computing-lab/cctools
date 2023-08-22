@@ -243,6 +243,10 @@ static char *make_url_cached_name(const struct vine_file *f)
 		method = "md5-content";
 		hash = tag;
 		break;
+	default:
+		method = "invalid-method";
+		hash = "invalid-hash";
+		debug(D_VINE, "invalid URL properties %d for url %s", val, f->source);
 	}
 
 	debug(D_VINE, "using checksum method %s for url %s", method, f->source);
