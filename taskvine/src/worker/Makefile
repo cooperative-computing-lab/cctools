@@ -31,9 +31,12 @@ clean:
 test: all
 
 lint:
-	if ( ! clang-format -Werror --dry-run --style='file:../../../.clang-format' $(SOURCES)); then \
-        (printf "========================================================\nNOTICE: Run \"make format\" to format your latest changes.\n========================================================\n"); \
-	fi
+	if ( ! clang-format -Werror --dry-run --style='file:../../../.clang-format' $(SOURCES));\
+	then\
+        echo  "==========================================================";\
+        echo  "NOTICE: Run \"make format\" to format your latest changes.";\
+        echo  "==========================================================";\
+    fi
 
 format:
 	clang-format -i $(SOURCES)
