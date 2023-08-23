@@ -23,7 +23,7 @@ CONDA_BASE=$(conda info --base)
 . $CONDA_BASE/etc/profile.d/conda.sh
 
 # Install only necessary dependencies for linting purpose:
-conda create -y -n cctools-lint -c conda-forge --strict-channel-priority make flake8
+conda create -y -n cctools-lint -c conda-forge --strict-channel-priority make flake8 clang-format
 conda activate cctools-lint
 
 # Leave out some items that are research prototypes.
