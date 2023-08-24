@@ -1011,5 +1011,14 @@ class LibraryTask(Task):
         Task.__init__(self, fn)
         self.provides_library(name)
 
+        # Set some default resources to a library task so it doesn't consume whole worker.
+        # Values below are arbitrary and should be changed as appropriate.
+        self._default_cores = 1
+        self._default_memory = 1000
+        self._default_disk = 1000
+
+        self.set_cores(self._default_cores)
+        self.set_memory(self._default_memory)
+        self.set_disk(self._default_disk)
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
