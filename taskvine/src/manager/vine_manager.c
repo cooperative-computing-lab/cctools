@@ -4186,8 +4186,15 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 	if (!original)
 		return 0;
 
-	/* Duplicate the original task and give it a unique taskid */
+	/* Duplicate the original task */
 	struct vine_task *t = vine_task_copy(original);
+
+	if (!check_worker_against_task(q, w, t)) {
+		vine_task_delete(t);
+		return 0;
+	}
+
+	/* Give it a unique taskid if library fits the worker*/
 	t->task_id = q->next_task_id++;
 
 	/* Add reference to task when adding it to primary table. */
@@ -4231,8 +4238,13 @@ static void vine_manager_send_library_to_workers(struct vine_manager *q, const c
 		if (!w->workerid)
 			continue;
 		if (!vine_manager_find_library_on_worker(q, w, name)) {
-			debug(D_VINE, "Sending library %s to worker %s\n", name, w->workerid);
-			vine_manager_send_library_to_worker(q, w, name);
+			if (vine_manager_send_library_to_worker(q, w, name)) {
+				debug(D_VINE, "Sending library %s to worker %s\n", name, w->workerid);
+			}
+			else {
+				debug(D_VINE, "Failed to send library %s to worker %s\n", name, w->workerid);
+			}
+			
 		}
 	}
 }
