@@ -49,7 +49,7 @@ resources availability, features, blocklist, and all other relevant factors.
 Used by all scheduling methods for basic compatibility.
 */
 
-static int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	/* worker has not reported any resources yet */
 	if (w->resources->tag < 0)
