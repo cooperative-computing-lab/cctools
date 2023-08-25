@@ -2478,7 +2478,7 @@ static int build_poll_table(struct vine_manager *q)
  * @param w The worker info structure.
  * @param t The task structure.
  * @return A pointer to a struct rmsummary describing the chosen resources for the given task.
-*/
+ */
 
 struct rmsummary *vine_manager_choose_resources_for_task(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
@@ -2519,8 +2519,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 		 * run on any available worker. */
 		if (max_proportion > 1) {
 			use_whole_worker = 1;
-		} 
-		else if (max_proportion > 0) {
+		} else if (max_proportion > 0) {
 			use_whole_worker = 0;
 
 			/* when cores are unspecified, they are set to 0 if gpus are specified.
@@ -2533,7 +2532,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 						MAX(limits->cores,
 								floor(w->resources->cores.largest * max_proportion)));
 			}
-			
+
 			/* unspecified gpus are always 0 */
 			if (limits->gpus < 0) {
 				limits->gpus = 0;
@@ -4182,7 +4181,7 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
  * @param w The worker info structure.
  * @param name The name of the library to be sent.
  * @return 1 if the operation succeeds, 0 otherwise.
-*/
+ */
 
 static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name)
 {
@@ -4245,7 +4244,7 @@ static void vine_manager_send_library_to_workers(struct vine_manager *q, const c
 		if (stoptime < time(0)) {
 			return;
 		}
-		
+
 		/* If the worker id is not 0, then it is ready to receive work from the manager.
 		 * See @report_worker_ready in ../worker/vine_worker.c */
 		if (!w->workerid) {
@@ -4256,11 +4255,9 @@ static void vine_manager_send_library_to_workers(struct vine_manager *q, const c
 		if (!vine_manager_find_library_on_worker(q, w, name)) {
 			if (vine_manager_send_library_to_worker(q, w, name)) {
 				debug(D_VINE, "Sending library %s to worker %s\n", name, w->workerid);
-			}
-			else {
+			} else {
 				debug(D_VINE, "Failed to send library %s to worker %s\n", name, w->workerid);
 			}
-			
 		}
 	}
 }

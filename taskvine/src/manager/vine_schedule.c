@@ -50,39 +50,39 @@ int check_fixed_location_worker(struct vine_manager *m, struct vine_worker_info 
  * @param w The worker info structure.
  * @param t The task structure.
  * @return 0 if the task is not compatible with the worker, 1 otherwise.
-*/
+ */
 
 int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	/* worker has not reported any resources yet */
 	if (w->resources->tag < 0 || w->resources->workers.total < 1) {
 		return 0;
-    }
-	
-    /* Don't send tasks to this worker if it is in draining mode (no more tasks). */
-    if (w->draining) {
+	}
+
+	/* Don't send tasks to this worker if it is in draining mode (no more tasks). */
+	if (w->draining) {
 		return 0;
 	}
 
-    /* Don't send tasks if the factory is used and has too many connected workers. */
+	/* Don't send tasks if the factory is used and has too many connected workers. */
 	if (w->factory_name) {
 		struct vine_factory_info *f = vine_factory_info_lookup(q, w->factory_name);
 		if (f && f->connected_workers > f->max_workers)
 			return 0;
 	}
 
-    /* Check if worker is blocked from the manager. */
+	/* Check if worker is blocked from the manager. */
 	if (vine_blocklist_is_blocked(q, w->hostname)) {
 		return 0;
 	}
 
-    /* Compute the resources to allocate to this task. */
+	/* Compute the resources to allocate to this task. */
 	struct rmsummary *l = vine_manager_choose_resources_for_task(q, w, t);
 
 	struct vine_resources *r = w->resources;
 	int ok = 1;
 
-    /* Make sure worker has available resources to run this task. */
+	/* Make sure worker has available resources to run this task. */
 	if (r->disk.inuse + l->disk > r->disk.total) { /* No overcommit disk */
 		ok = 0;
 	}
@@ -119,12 +119,12 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		}
 	}
 
-    /* If the worker is not the one the task wants. */
+	/* If the worker is not the one the task wants. */
 	if (t->has_fixed_locations && !check_fixed_location_worker(q, w, t)) {
 		ok = 0;
 	}
 
-    /* If the worker doesn't have the features the task requires. */
+	/* If the worker doesn't have the features the task requires. */
 	if (t->feature_list) {
 		if (!w->features) {
 			ok = 0;
