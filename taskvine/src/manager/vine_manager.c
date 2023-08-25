@@ -2473,22 +2473,29 @@ static int build_poll_table(struct vine_manager *q)
 }
 
 /*
-Determine the resources to allocate for a given task when assigned to a specific worker.
+ * Determine the resources to allocate for a given task when assigned to a specific worker.
+ * @param q The manager structure.
+ * @param w The worker info structure.
+ * @param t The task structure.
+ * @return A pointer to a struct rmsummary describing the chosen resources for the given task.
 */
 
 struct rmsummary *vine_manager_choose_resources_for_task(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-
+	/* Compute the minimum and maximum resources for this task. */
 	const struct rmsummary *min = vine_manager_task_resources_min(q, t);
 	const struct rmsummary *max = vine_manager_task_resources_max(q, t);
 
 	struct rmsummary *limits = rmsummary_create(-1);
-
 	rmsummary_merge_override_basic(limits, max);
 
 	int use_whole_worker = 1;
+
+	/* Proportionally assign the worker's resources to the task if configured. */
 	if (q->proportional_resources) {
+
+		/* Compute the proportion of the worker the task shall have across resource types. */
 		double max_proportion = -1;
 		if (w->resources->cores.largest > 0) {
 			max_proportion = MAX(max_proportion, limits->cores / w->resources->cores.largest);
@@ -2506,13 +2513,14 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 			max_proportion = MAX(max_proportion, limits->gpus / w->resources->gpus.largest);
 		}
 
-		// if max_proportion > 1, then the task does not fit the worker for the
-		// specified resources. For the unspecified resources we use the whole
-		// worker as not to trigger a warning when checking for tasks that can't
-		// run on any available worker.
+		/* If max_proportion > 1, then the task does not fit the worker for the
+		 * specified resources. For the unspecified resources we use the whole
+		 * worker as not to trigger a warning when checking for tasks that can't
+		 * run on any available worker. */
 		if (max_proportion > 1) {
 			use_whole_worker = 1;
-		} else if (max_proportion > 0) {
+		} 
+		else if (max_proportion > 0) {
 			use_whole_worker = 0;
 
 			/* when cores are unspecified, they are set to 0 if gpus are specified.
@@ -2525,9 +2533,9 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 						MAX(limits->cores,
 								floor(w->resources->cores.largest * max_proportion)));
 			}
-
+			
+			/* unspecified gpus are always 0 */
 			if (limits->gpus < 0) {
-				/* unspecified gpus are always 0 */
 				limits->gpus = 0;
 			}
 
@@ -2544,17 +2552,17 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 		}
 	}
 
+	/* If no resource was specified, using whole worker. */
 	if (limits->cores < 1 && limits->gpus < 1 && limits->memory < 1 && limits->disk < 1) {
-		/* no resource was specified, using whole worker */
 		use_whole_worker = 1;
 	}
-
+	/* At least one specified resource would use the whole worker, thus
+	 * using whole worker for all unspecified resources. */
 	if ((limits->cores > 0 && limits->cores >= w->resources->cores.largest) ||
 			(limits->gpus > 0 && limits->gpus >= w->resources->gpus.largest) ||
 			(limits->memory > 0 && limits->memory >= w->resources->memory.largest) ||
 			(limits->disk > 0 && limits->disk >= w->resources->disk.largest)) {
-		/* at least one specified resource would use the whole worker, thus
-		 * using whole worker for all unspecified resources. */
+
 		use_whole_worker = 1;
 	}
 
@@ -4167,10 +4175,13 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	return (t->task_id);
 }
 
-/*
-Send a given library by name to the target worker.
-This involves duplicating the prototype task in q->libraries
-and then sending the copy as a (mostly) normal task.
+/* Send a given library by name to the target worker.
+ * This involves duplicating the prototype task in q->libraries
+ * and then sending the copy as a (mostly) normal task.
+ * @param q The manager structure.
+ * @param w The worker info structure.
+ * @param name The name of the library to be sent.
+ * @return 1 if the operation succeeds, 0 otherwise.
 */
 
 static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name)
@@ -4183,12 +4194,13 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 	/* Duplicate the original task */
 	struct vine_task *t = vine_task_copy(original);
 
+	/* Check if this library task can fit in this worker. */
 	if (!check_worker_against_task(q, w, t)) {
 		vine_task_delete(t);
 		return 0;
 	}
 
-	/* Give it a unique taskid if library fits the worker*/
+	/* Give it a unique taskid if library fits the worker. */
 	t->task_id = q->next_task_id++;
 
 	/* Add reference to task when adding it to primary table. */
@@ -4197,7 +4209,7 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 	/* Send the task to the worker in the usual way. */
 	commit_task_to_worker(q, w, t);
 
-	/* Make the special log recordings for the library */
+	/* Make the special log recordings for the library. */
 	vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
 
 	return 1;
@@ -4219,6 +4231,10 @@ static struct vine_task *vine_manager_find_library_on_worker(
 	return 0;
 }
 
+/* Send the library task to all known workers.
+ * @param q 		The manager structure.
+ * @param name 		The name of the library task.
+ * @param stoptime 	When to stop sending libraries to workers. */
 static void vine_manager_send_library_to_workers(struct vine_manager *q, const char *name, time_t stoptime)
 {
 	char *worker_key;
@@ -4226,11 +4242,17 @@ static void vine_manager_send_library_to_workers(struct vine_manager *q, const c
 
 	HASH_TABLE_ITERATE(q->worker_table, worker_key, w)
 	{
-		if (stoptime < time(0))
+		if (stoptime < time(0)) {
 			return;
-		/* XXX I think this is testing something about worker validity. */
-		if (!w->workerid)
+		}
+		
+		/* If the worker id is not 0, then it is ready to receive work from the manager.
+		 * See @report_worker_ready in ../worker/vine_worker.c */
+		if (!w->workerid) {
 			continue;
+		}
+
+		/* Send the library task to the worker if possible. */
 		if (!vine_manager_find_library_on_worker(q, w, name)) {
 			if (vine_manager_send_library_to_worker(q, w, name)) {
 				debug(D_VINE, "Sending library %s to worker %s\n", name, w->workerid);
