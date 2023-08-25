@@ -16,8 +16,8 @@ check_needed()
 {
 	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
 
-	# Poncho currently requires ast.unpase to serialize the function,
-	# which only became available in Python 3.11.  Some older platforms
+	# Poncho currently requires ast.unparse to serialize the function,
+	# which only became available in Python 3.9.  Some older platforms
 	# (e.g. almalinux8) will not have this natively.
 	"${CCTOOLS_PYTHON_TEST_EXEC}" -c "from ast import unparse" || return 1
 
