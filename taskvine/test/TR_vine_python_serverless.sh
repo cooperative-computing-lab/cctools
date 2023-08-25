@@ -42,7 +42,7 @@ run()
 	# wait at most 15 seconds for vine to find a port.
 	wait_for_file_creation $PORT_FILE 15
 
-	run_taskvine_worker $PORT_FILE worker.log
+	run_taskvine_worker $PORT_FILE worker.log --cores 2 --memory 2000 --disk 2000
 
 	# wait for vine to exit.
 	wait_for_file_creation $STATUS_FILE 15
