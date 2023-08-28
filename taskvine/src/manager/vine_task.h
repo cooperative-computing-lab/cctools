@@ -104,6 +104,7 @@ struct vine_task {
 	int refcount;                                          /**< Number of remaining references to this object. */
 };
 
+void vine_task_delete(struct vine_task *t);
 /* Add a reference to an existing task object, return the same object. */
 struct vine_task * vine_task_clone( struct vine_task *t );
 
