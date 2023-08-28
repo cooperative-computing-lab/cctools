@@ -2521,10 +2521,10 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 			use_whole_worker = 1;
 		} else if (max_proportion > 0) {
 			use_whole_worker = 0;
-			
+
 			// adjust max_proportion so that an integer number of tasks fit the worker.
 			if (q->proportional_whole_tasks) {
-			    max_proportion = 1.0 / (floor(1.0 / max_proportion));
+				max_proportion = 1.0 / (floor(1.0 / max_proportion));
 			}
 
 			/* when cores are unspecified, they are set to 0 if gpus are specified.
@@ -3553,8 +3553,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->worker_retrievals = 1;
 
 	q->proportional_resources = 1;
-	
-	/* This option assumes all tasks have similar resource needs. 
+
+	/* This option assumes all tasks have similar resource needs.
 	 * Turn off by default. */
 	q->proportional_whole_tasks = 0;
 
