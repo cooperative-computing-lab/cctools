@@ -28,6 +28,10 @@ def main():
     print("Creating library from functions...")
 
     libtask = q.create_library_from_functions('test-library', divide, double, add_env=False)
+    libtask.set_cores(1)
+    libtask.set_memory(1000)
+    libtask.set_disk(1000)
+
     q.install_library(libtask)
 
     print("Submitting function call tasks...")
