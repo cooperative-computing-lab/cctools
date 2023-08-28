@@ -4202,7 +4202,7 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 	return 1;
 }
 
-static struct vine_task *vine_manager_find_library_on_worker(
+struct vine_task *vine_manager_find_library_on_worker(
 		struct vine_manager *q, struct vine_worker_info *w, const char *library_name)
 {
 	uint64_t task_id;
@@ -4268,8 +4268,6 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 		struct vine_task *t = vine_manager_find_library_on_worker(q, w, name);
 		if (t) {
 			cancel_task_on_worker(q, t, VINE_TASK_CANCELED);
-			/* XXX shouldn't the worker declare the feature gone? */
-			hash_table_remove(w->features, name);
 		}
 	}
 	hash_table_remove(q->libraries, name);
