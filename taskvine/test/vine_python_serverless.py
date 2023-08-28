@@ -28,6 +28,10 @@ def main():
     print("Creating library from functions...")
 
     libtask = q.create_library_from_functions('test-library', divide, double, add_env=False)
+    libtask.set_cores(1)
+    libtask.set_memory(1000)
+    libtask.set_disk(1000)
+
     q.install_library(libtask)
 
     print("Submitting function call tasks...")
@@ -36,9 +40,15 @@ def main():
 
     for i in range(0,tasks): 
         s_task = vine.FunctionCall('test-library', 'divide', 2, 2**2)
+        s_task.set_cores(1)
+        s_task.set_memory(1000)
+        s_task.set_disk(1000)
         q.submit(s_task)
     
         s_task = vine.FunctionCall('test-library', 'double', 3)
+        s_task.set_cores(1)
+        s_task.set_memory(1000)
+        s_task.set_disk(1000)
         q.submit(s_task)
 
     print("Waiting for results...")

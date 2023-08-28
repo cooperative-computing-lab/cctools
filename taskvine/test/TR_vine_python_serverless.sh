@@ -16,8 +16,8 @@ check_needed()
 {
 	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
 
-	# Poncho currently requires ast.unpase to serialize the function,
-	# which only became available in Python 3.11.  Some older platforms
+	# Poncho currently requires ast.unparse to serialize the function,
+	# which only became available in Python 3.9.  Some older platforms
 	# (e.g. almalinux8) will not have this natively.
 	"${CCTOOLS_PYTHON_TEST_EXEC}" -c "from ast import unparse" || return 1
 
@@ -42,7 +42,7 @@ run()
 	# wait at most 15 seconds for vine to find a port.
 	wait_for_file_creation $PORT_FILE 15
 
-	run_taskvine_worker $PORT_FILE worker.log
+	run_taskvine_worker $PORT_FILE worker.log --cores 2 --memory 2000 --disk 2000
 
 	# wait for vine to exit.
 	wait_for_file_creation $STATUS_FILE 15

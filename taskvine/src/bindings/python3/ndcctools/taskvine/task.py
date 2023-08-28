@@ -1011,5 +1011,4 @@ class LibraryTask(Task):
         Task.__init__(self, fn)
         self.provides_library(name)
 
-
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
