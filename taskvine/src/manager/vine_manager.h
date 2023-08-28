@@ -217,6 +217,9 @@ int vine_manager_transfer_time( struct vine_manager *q, struct vine_worker_info 
 const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, struct vine_task *t);
 const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, struct vine_task *t);
 
+/* Internal: Find a library task running on a specific worker by name. */
+struct vine_task *vine_manager_find_library_on_worker( struct vine_manager *q, struct vine_worker_info *w, const char *library_name);
+
 /* Internal: Enable shortcut of main loop upon child process completion. Needed for Makeflow to interleave local and remote execution. */
 void vine_manager_enable_process_shortcut(struct vine_manager *q);
 

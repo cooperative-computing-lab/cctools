@@ -530,12 +530,9 @@ static int start_process(struct vine_process *p, struct link *manager)
 	if (pid < 0)
 		fatal("unable to fork process for task_id %d!", p->task->task_id);
 
-	/* If this process represents a library, notify the manager of that feature. */
+	/* If this process represents a library, notify the manager that it is running. */
 	if (p->task->provides_library) {
-		hash_table_insert(features, p->task->provides_library, feature_dummy);
-		send_features(manager);
 		send_message(manager, "info library-update %d %d\n", p->task->task_id, VINE_LIBRARY_STARTED);
-		send_resource_update(manager);
 	}
 
 	itable_insert(procs_running, p->task->task_id, p);
@@ -888,11 +885,6 @@ static int do_kill(int task_id)
 		disk_allocated -= p->task->resources_requested->disk;
 		gpus_allocated -= p->task->resources_requested->gpus;
 		vine_gpus_free(task_id);
-
-		if (p->task->provides_library) {
-			hash_table_remove(features, p->task->provides_library);
-			/* XXX how to tell the manager that feature is gone? */
-		}
 	}
 
 	itable_remove(procs_complete, p->task->task_id);

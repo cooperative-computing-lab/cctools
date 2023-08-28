@@ -76,6 +76,17 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		return 0;
 	}
 
+	/* If this is a function task needing a library, see if a library is available. */
+	/* XXX Note that we are not yet counting the number of invocations per worker. */
+
+	if (t->needs_library) {
+		if (vine_manager_find_library_on_worker(q, w, t->needs_library)) {
+			/* keep going */
+		} else {
+			return 0;
+		}
+	}
+
 	/* Compute the resources to allocate to this task. */
 	struct rmsummary *l = vine_manager_choose_resources_for_task(q, w, t);
 

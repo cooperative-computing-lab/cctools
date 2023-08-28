@@ -221,31 +221,15 @@ void vine_task_set_command(struct vine_task *t, const char *cmd)
 	t->command_line = xxstrdup(cmd);
 }
 
-static void delete_feature(struct vine_task *t, const char *name)
-{
-	struct list_cursor *c = list_cursor_create(t->feature_list);
-
-	char *feature;
-	for (list_seek(c, 0); list_get(c, (void **)&feature); list_next(c)) {
-		if (name && feature && (strcmp(name, feature) == 0)) {
-			list_drop(c);
-		}
-	}
-
-	list_cursor_destroy(c);
-}
-
 void vine_task_needs_library(struct vine_task *t, const char *library_name)
 {
 	if (t->needs_library) {
-		delete_feature(t, t->needs_library);
 		free(t->needs_library);
 		t->needs_library = NULL;
 	}
 
 	if (library_name) {
 		t->needs_library = xxstrdup(library_name);
-		vine_task_add_feature(t, t->needs_library);
 	}
 }
 
