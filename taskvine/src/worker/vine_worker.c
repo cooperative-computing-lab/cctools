@@ -731,6 +731,8 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 			vine_task_needs_library(task, library_name);
 		} else if (sscanf(line, "provides_library %s", library_name) == 1) {
 			vine_task_provides_library(task, library_name);
+		} else if (sscanf(line, "function_slots %" PRId64, &n) == 1) {
+			vine_task_set_function_slots(task, n);
 		} else if (sscanf(line, "infile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			vine_hack_do_not_compute_cached_name = 1;
