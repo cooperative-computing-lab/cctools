@@ -268,6 +268,13 @@ void vine_task_needs_library( struct vine_task *t, const char *name );
 void vine_task_provides_library( struct vine_task *t, const char *name );
 
 
+/** Set the number of concurrent functions a library can run.
+@param t A task object.
+@param nslots The maximum number of concurrent functions this library can run.
+*/
+void vine_task_set_function_slots( struct vine_task *t, int nslots );
+
+
 /** Add a general file object as a input to a task.
 @param t A task object.
 @param f A file object, created by @ref vine_declare_file, @ref vine_declare_url, @ref vine_declare_buffer, @ref vine_declare_mini_task.

@@ -791,8 +791,9 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 			t->time_workers_execute_all += delta_time;
 		}
 
-		vine_task_clean(t);
 		reap_task_from_worker(q, w, t, VINE_TASK_READY);
+
+		vine_task_clean(t);
 
 		itable_firstkey(w->current_tasks);
 	}
@@ -2741,6 +2742,19 @@ static void commit_task_to_worker(struct vine_manager *q, struct vine_worker_inf
 
 	change_task_state(q, t, VINE_TASK_RUNNING);
 
+	/*
+	If this is a function call assigned to a library,
+	then increase the count of functions assigned.
+	t->library_task was assigned in the scheduler.
+	*/
+
+	if (t->library_task) {
+		/* Add a reference to the library, mirror in reap_task_from_worker */
+		/* Needed in case the library fails or is removed before this task. */
+		vine_task_clone(t->library_task);
+		t->library_task->function_slots_inuse++;
+	}
+
 	t->try_count += 1;
 	q->stats->tasks_dispatched += 1;
 
@@ -2770,6 +2784,19 @@ static void reap_task_from_worker(
 	t->current_resource_box = 0;
 
 	itable_remove(w->current_tasks, t->task_id);
+
+	/*
+	If this was a function call assigned to a library,
+	then decrease the count of functions assigned,
+	and disassociate the task from the library.
+	*/
+
+	if (t->library_task) {
+		t->library_task->function_slots_inuse--;
+		/* Remove a reference to the library, mirror in reap_task_from_worker */
+		vine_task_delete(t->library_task);
+		t->library_task = 0;
+	}
 
 	t->worker = 0;
 
