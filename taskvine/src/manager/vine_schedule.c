@@ -79,11 +79,10 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	/* If this is a function task needing a library, see if a library is available. */
 
 	if (t->needs_library) {
-		/* Find a library on that worker. */
 		struct vine_task *lt = vine_manager_find_library_on_worker(q, w, t->needs_library);
-		/* Does that library have available slots? */
 		if(lt && lt->function_slots > lt->function_slots_inuse) {
-			/* keep going */
+			/* Record the matched library. */
+			t->library_task = lt;
 		} else {
 			/* Function cannot run here at all. */
 			return 0;
