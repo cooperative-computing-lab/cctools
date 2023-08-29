@@ -80,7 +80,7 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 
 	if (t->needs_library) {
 		struct vine_task *lt = vine_manager_find_library_on_worker(q, w, t->needs_library);
-		if(lt && lt->function_slots > lt->function_slots_inuse) {
+		if (lt && lt->function_slots > lt->function_slots_inuse) {
 			/* Record the matched library. */
 			t->library_task = lt;
 		} else {

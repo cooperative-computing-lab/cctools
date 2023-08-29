@@ -2748,7 +2748,7 @@ static void commit_task_to_worker(struct vine_manager *q, struct vine_worker_inf
 	t->library_task was assigned in the scheduler.
 	*/
 
-	if(t->library_task) {
+	if (t->library_task) {
 		/* Add a reference to the library, mirror in reap_task_from_worker */
 		/* Needed in case the library fails or is removed before this task. */
 		vine_task_clone(t->library_task);
@@ -2791,7 +2791,7 @@ static void reap_task_from_worker(
 	and disassociate the task from the library.
 	*/
 
-	if(t->library_task) {
+	if (t->library_task) {
 		t->library_task->function_slots_inuse--;
 		/* Remove a reference to the library, mirror in reap_task_from_worker */
 		vine_task_delete(t->library_task);

@@ -57,7 +57,7 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->state = VINE_TASK_UNKNOWN;
 	t->function_slots = 1;
 	t->function_slots_inuse = 0;
-	
+
 	t->result = VINE_RESULT_UNKNOWN;
 	t->exit_code = -1;
 
@@ -197,7 +197,7 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 	new->env_list = vine_task_string_list_copy(task->env_list);
 	new->feature_list = vine_task_string_list_copy(task->feature_list);
 	new->function_slots = task->function_slots;
-	
+
 	/* Scheduling features of task are copied. */
 	new->resource_request = task->resource_request;
 	vine_task_set_scheduler(new, task->worker_selection_algorithm);
@@ -251,10 +251,7 @@ void vine_task_provides_library(struct vine_task *t, const char *library_name)
 	}
 }
 
-void vine_task_set_function_slots( struct vine_task *t, int nslots )
-{
-	t->function_slots = nslots;
-}
+void vine_task_set_function_slots(struct vine_task *t, int nslots) { t->function_slots = nslots; }
 
 void vine_task_set_env_var(struct vine_task *t, const char *name, const char *value)
 {
