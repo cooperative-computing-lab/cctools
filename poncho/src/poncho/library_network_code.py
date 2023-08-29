@@ -9,6 +9,7 @@ def library_network_code():
     import json
     import os
     import sys
+    import argparse
 
     def remote_execute(func):
         def remote_wrapper(event):
@@ -29,37 +30,54 @@ def library_network_code():
 
     read, write = os.pipe()
 
-    def send_configuration(config):
+    def send_configuration(config, out_pipe):
         config_string = json.dumps(config)
         config_cmd = f"{len(config_string) + 1}\n{config_string}\n"
-        sys.stdout.write(config_cmd)
-        sys.stdout.flush()
+        out_pipe.write(config_cmd)
+        out_pipe.flush()
 
     def main():
+        parser = argparse.ArgumentParser('Parse input and output file descriptors this process should use. The relevant fds should already be prepared by the vine_worker.')
+        parser.add_argument('--input-fd', required=True, type=int, help='input fd to receive messages from the vine_worker via a pipe')
+        parser.add_argument('--output-fd', required=True, type=int, help='output fd to send messages to the vine_worker via a pipe')
+        args = parser.parse_args()
+
+        # Open communication pipes to vine_worker.
+        # The file descriptors should already be open for reads and writes.
+        # Below lines only convert file descriptors into native Python file objects.
+        in_pipe = os.fdopen(args.input_fd)
+        out_pipe = os.fdopen(args.output_fd)
+
         config = {
             "name": name(),
         }
         send_configuration(config)
+
         while True:
             while True:
                 # wait for message from worker about what function to execute
                 try:
-                    line = input()
+                    line = in_pipe.readline()
                 # if the worker closed the pipe connected to the input of this process, we should just exit
-                except EOFError:
-                    sys.exit(0)
+                except Exception as e:
+                    print("Cannot read message from the manager, exiting. ", e, file=sys.stderr)
+                    sys.exit(1)
+
                 function_name, event_size, function_sandbox = line.split(" ", maxsplit=2)
                 if event_size:
                     # receive the bytes containing the event and turn it into a string
-                    event_str = input()
+                    event_str = in_pipe.readline()
                     if len(event_str) != int(event_size):
                         print(event_str, len(event_str), event_size, file=sys.stderr)
                         print("Size of event does not match what was sent: exiting", file=sys.stderr)
                         sys.exit(1)
+
                     # turn the event into a python dictionary
                     event = json.loads(event_str)
+
                     # see if the user specified an execution method
                     exec_method = event.get("remote_task_exec_method", None)
+
                     if exec_method == "direct":
                         library_sandbox = os.getcwd()
                         try:
@@ -92,5 +110,5 @@ def library_network_code():
                                 all_chunks.append(chunk)
                             response = "".join(all_chunks)
                             os.waitpid(p, 0)
-                    print(response, flush=True)
+                    out_pipe.write(response+'\n', flush=True)
         return 0

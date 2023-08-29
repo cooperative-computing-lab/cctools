@@ -405,24 +405,30 @@ pid_t vine_process_execute(struct vine_process *p)
 
 			_exit(0);
 		}
+		/* For process types other than library, set up input/output file desciptors. 
+		 * The library will use the input_fd and output_fd to talk to the manager instead. */
+		int result;
+		if (p->type != VINE_PROCESS_TYPE_LIBRARY) {
+			result = dup2(input_fd, STDIN_FILENO);
+			if (result < 0)
+				fatal("could not dup input to stdin: %s", strerror(errno));
 
-		/* Otherwise for other process types, set up file desciptors and execute the command. */
+			result = dup2(output_fd, STDOUT_FILENO);
+			if (result < 0)
+				fatal("could not dup output to stdout: %s", strerror(errno));
 
-		int result = dup2(input_fd, STDIN_FILENO);
-		if (result < 0)
-			fatal("could not dup input to stdin: %s", strerror(errno));
+		
+			/* Close redundant file descriptors. */
+			close(input_fd);
+			close(output_fd);
+		}
 
-		result = dup2(output_fd, STDOUT_FILENO);
-		if (result < 0)
-			fatal("could not dup output to stdout: %s", strerror(errno));
-
+		/* Setup for stderr is the same for all task types. */
 		result = dup2(error_fd, STDERR_FILENO);
 		if (result < 0)
 			fatal("could not dup error to stderr: %s", strerror(errno));
-
-		close(input_fd);
-		close(output_fd);
 		close(error_fd);
+		
 
 		/* For a library task, close the unused sides of the pipes. */
 		if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
@@ -439,7 +445,17 @@ pid_t vine_process_execute(struct vine_process *p)
 		/* Finally, add things that were explicitly given in the task description. */
 		export_environment(p);
 
-		execl("/bin/sh", "sh", "-c", p->task->command_line, (char *)0);
+		/* Library task passes the file descriptors to talk to the manager via
+		 * the command line so it requires a special execl. */
+		if (p->type != VINE_PROCESS_TYPE_LIBRARY) {
+			execl("/bin/sh", "sh", "-c", p->task->command_line, (char *)0);
+		}
+		else {
+			char input_fd_str[VINE_LINE_MAX], output_fd_str[VINE_LINE_MAX];
+			sprintf(input_fd_str, "%d", input_fd);
+			sprintf(output_fd_str, "%d", output_fd);
+			execl("/bin/sh", "sh", "-c", p->task->command_line, "--input-fd", input_fd_str, "--output-fd", output_fd_str, (char *)0);
+		}
 		_exit(127); // Failed to execute the cmd.
 	}
 
