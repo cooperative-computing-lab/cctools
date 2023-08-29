@@ -41,7 +41,8 @@ struct vine_task {
 
 	char *needs_library;         /**< If this is a FunctionTask, the name of the library used */
 	char *provides_library;      /**< If this is a LibraryTask, the name of the library provided. */
-
+	int   function_slots;        /**< If this is a LibraryTask, the max concurrent functions. */
+	
 	struct list *input_mounts;    /**< The mounted files expected as inputs. */
 	struct list *output_mounts;   /**< The mounted files expected as outputs. */
 	struct list *env_list;       /**< Environment variables applied to the task. */
@@ -60,7 +61,8 @@ struct vine_task {
 	int try_count;               /**< The number of times the task has been dispatched to a worker. If larger than max_retries, the task failes with @ref VINE_RESULT_MAX_RETRIES. */
 	int exhausted_attempts;      /**< Number of times the task failed given exhausted resources. */
 	int workers_slow;            /**< Number of times this task has been terminated for running too long. */
-
+	int function_slots_inuse;    /**< If a library, the number of functions currently running. */
+		
 	/***** Results of task once it has reached completion. *****/
 
 	vine_result_t result;          /**< The result of the task (see @ref vine_result_t */
