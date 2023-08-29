@@ -96,9 +96,7 @@ struct vine_process *vine_process_create(struct vine_task *task, vine_process_ty
 	p->tmpdir = string_format("%s/.taskvine.tmp", p->sandbox);
 	p->output_file_name = string_format("%s/.taskvine.stdout", p->sandbox);
 
-	/* Until told otherwise, no more than one function per library. */
 	p->functions_running = 0;
-	p->max_functions_running = 1;
 
 	/* Note that create_dir recursively creates parents, so a single one is sufficient. */
 

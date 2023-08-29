@@ -43,6 +43,25 @@ int check_fixed_location_worker(struct vine_manager *m, struct vine_worker_info 
 	return all_present;
 }
 
+/* Find a library task running on a specific worker that has an available slot. */
+
+static struct vine_task *find_library_on_worker_for_task(
+		struct vine_manager *q, struct vine_worker_info *w, const char *library_name)
+{
+	uint64_t task_id;
+	struct vine_task *task;
+
+	ITABLE_ITERATE(w->current_tasks, task_id, task)
+	{
+		if (task->provides_library && !strcmp(task->provides_library, library_name) &&
+				task->function_slots_inuse < task->function_slots) {
+			return task;
+		}
+	}
+
+	return 0;
+}
+
 /* Check if this task is compatible with this given worker by considering
  * resources availability, features, blocklist, and all other relevant factors.
  * Used by all scheduling methods for basic compatibility.
@@ -77,12 +96,13 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	}
 
 	/* If this is a function task needing a library, see if a library is available. */
-	/* XXX Note that we are not yet counting the number of invocations per worker. */
 
 	if (t->needs_library) {
-		if (vine_manager_find_library_on_worker(q, w, t->needs_library)) {
-			/* keep going */
+		t->library_task = find_library_on_worker_for_task(q, w, t->needs_library);
+		if (t->library_task) {
+			/* Found it, keep going. */
 		} else {
+			/* Function cannot run here at all. */
 			return 0;
 		}
 	}
