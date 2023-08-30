@@ -45,19 +45,20 @@ def library_network_code():
         # Open communication pipes to vine_worker.
         # The file descriptors should already be open for reads and writes.
         # Below lines only convert file descriptors into native Python file objects.
-        in_pipe = os.fdopen(args.input_fd)
-        out_pipe = os.fdopen(args.output_fd)
+        in_pipe = os.fdopen(args.input_fd, 'r')
+        out_pipe = os.fdopen(args.output_fd, 'w')
 
         config = {
             "name": name(),
         }
-        send_configuration(config)
+        send_configuration(config, out_pipe)
 
         while True:
             while True:
                 # wait for message from worker about what function to execute
                 try:
-                    line = in_pipe.readline()
+                    # remove trailing \n
+                    line = in_pipe.readline()[:-1]
                 # if the worker closed the pipe connected to the input of this process, we should just exit
                 except Exception as e:
                     print("Cannot read message from the manager, exiting. ", e, file=sys.stderr)
@@ -66,7 +67,7 @@ def library_network_code():
                 function_name, event_size, function_sandbox = line.split(" ", maxsplit=2)
                 if event_size:
                     # receive the bytes containing the event and turn it into a string
-                    event_str = in_pipe.readline()
+                    event_str = in_pipe.readline()[:-1]
                     if len(event_str) != int(event_size):
                         print(event_str, len(event_str), event_size, file=sys.stderr)
                         print("Size of event does not match what was sent: exiting", file=sys.stderr)
@@ -110,5 +111,6 @@ def library_network_code():
                                 all_chunks.append(chunk)
                             response = "".join(all_chunks)
                             os.waitpid(p, 0)
-                    out_pipe.write(response+'\n', flush=True)
+                    out_pipe.write(response+'\n')
+                    out_pipe.flush()
         return 0
