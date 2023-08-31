@@ -842,7 +842,8 @@ class Manager(object):
         cvine.vine_manager_remove_library(self._taskvine, name)
 
     ##
-    # Turn a list of python functions into a Library
+    # Turn a list of python functions into a Library Task.
+    # This Library Task will be run on a worker as a regular task.
     #
     # @param self            Reference to the current manager object.
     # @param name            Name of the Library to be created
@@ -853,53 +854,57 @@ class Manager(object):
     # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
     def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True):
         # Delay loading of poncho until here, to avoid bringing in conda-pack etc unless needed.
-        # ensure poncho python library is available
+        # Ensure poncho python library is available.
         try:
             from ndcctools.poncho import package_serverize
         except ImportError:
             raise ModuleNotFoundError("The poncho module is not available. Cannot create Library.")
 
-        # positional arguments are the list of functions to include in the library
-        # create a unique hash of a combination of function names and bodies
+        # Positional arguments are the list of functions to include in the library.
+        # Create a unique hash of a combination of function names and bodies.
         functions_hash = package_serverize.generate_functions_hash(function_list)
 
-        # create path for caching library code and environment based on function hash
+        # Create path for caching library code and environment based on function hash.
         library_cache_path = f"{self.cache_directory}/vine-library-cache/{functions_hash}"
         library_code_path = f"{library_cache_path}/library_code.py"
 
-        # don't create a custom poncho environment if it's already given.
+        # Don't create a custom poncho environment if it's already given.
         if poncho_env:
             library_env_path = poncho_env
         else:
             library_env_path = f"{library_cache_path}/library_env.tar.gz"
 
-        # library cache folder doesn't exist, create it
+        # If library cache directory doesn't exist, create it.
         pathlib.Path(library_cache_path).mkdir(mode=0o755, parents=True, exist_ok=True)
         
-        # if the library code and environment exist, move on to creating the Library Task
+        # If the library code and environment exist, move on to creating the Library Task.
         if os.path.isfile(library_code_path) and os.path.isfile(library_env_path):
             pass
         else:
-            # create library code and environment
+            # Don't create a new poncho environment tarball is one is already provided or
+            # user explicitly tells not to via `add_env`.
             need_pack=True
             if poncho_env or not add_env:
                 need_pack=False
+            
+            # create library code and environment, if appropriate
             package_serverize.serverize_library_from_code(library_cache_path, function_list, name, need_pack=need_pack)
+
             # enable correct permissions for library code
             os.chmod(library_code_path, 0o775)
 
-        # create Task to execute the Library
+        # Create Task to execute the Library and prepend it with some setup code if needed.
         if init_command:
             t = LibraryTask(f"{init_command} python ./library_code.py", name)
         else:
             t = LibraryTask("python ./library_code.py", name)
 
-        # declare the environment
+        # Declare the environment.
         if add_env:
             f = self.declare_poncho(library_env_path, cache=True)
             t.add_environment(f)
     
-        # declare the library code as an input
+        # Declare the library code as an input.
         f = self.declare_file(library_code_path, cache=True)
         t.add_input(f, "library_code.py")
         return t

@@ -7,6 +7,8 @@
 
 from ndcctools.poncho import package_analyze as analyze
 from ndcctools.poncho import package_create as create
+from ndcctools.poncho.wq_network_code import wq_network_code
+from ndcctools.poncho.library_network_code import library_network_code
 
 import argparse
 import json
@@ -18,199 +20,6 @@ import hashlib
 import inspect
 
 shebang = "#! /usr/bin/env python3\n\n"
-
-def library_network_code():
-    import json
-    import os
-    import sys
-
-    def remote_execute(func):
-        def remote_wrapper(event):
-            kwargs = event["fn_kwargs"]
-            args = event["fn_args"]
-            try:
-                response = {
-                    "Result": func(*args, **kwargs),
-                    "StatusCode": 200
-                }
-            except Exception as e:
-                response = {
-                    "Result": str(e),
-                    "StatusCode": 500
-                }
-            return response
-        return remote_wrapper
-
-    read, write = os.pipe()
-
-    def send_configuration(config):
-        config_string = json.dumps(config)
-        config_cmd = f"{len(config_string) + 1}\n{config_string}\n"
-        sys.stdout.write(config_cmd)
-        sys.stdout.flush()
-
-    def main():
-        config = {
-            "name": name(),
-        }
-        send_configuration(config)
-        while True:
-            while True:
-                # wait for message from worker about what function to execute
-                try:
-                    line = input()
-                # if the worker closed the pipe connected to the input of this process, we should just exit
-                except EOFError:
-                    sys.exit(0)
-                function_name, event_size, function_sandbox = line.split(" ", maxsplit=2)
-                if event_size:
-                    # receive the bytes containing the event and turn it into a string
-                    event_str = input()
-                    if len(event_str) != int(event_size):
-                        print(event_str, len(event_str), event_size, file=sys.stderr)
-                        print("Size of event does not match what was sent: exiting", file=sys.stderr)
-                        sys.exit(1)
-                    # turn the event into a python dictionary
-                    event = json.loads(event_str)
-                    # see if the user specified an execution method
-                    exec_method = event.get("remote_task_exec_method", None)
-                    if exec_method == "direct":
-                        library_sandbox = os.getcwd()
-                        try:
-                            os.chdir(function_sandbox)
-                            response = json.dumps(globals()[function_name](event))
-                        except Exception as e:
-                            print(f'Library code: Function call failed due to {e}', file=sys.stderr)
-                            sys.exit(1)
-                        finally:
-                            os.chdir(library_sandbox)
-                    else:
-                        p = os.fork()
-                        if p == 0:
-                            os.chdir(function_sandbox)
-                            response = globals()[function_name](event)
-                            os.write(write, json.dumps(response).encode("utf-8"))
-                            os._exit(0)
-                        elif p < 0:
-                            print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)
-                            response = {
-                                "Result": "unable to fork",
-                                "StatusCode": 500
-                            }
-                        else:
-                            max_read = 65536
-                            chunk = os.read(read, max_read).decode("utf-8")
-                            all_chunks = [chunk]
-                            while (len(chunk) >= max_read):
-                                chunk = os.read(read, max_read).decode("utf-8")
-                                all_chunks.append(chunk)
-                            response = "".join(all_chunks)
-                            os.waitpid(p, 0)
-                    print(response, flush=True)
-        return 0
-
-def wq_network_code():
-    import socket
-    import json
-    import os
-    import sys
-    def remote_execute(func):
-        def remote_wrapper(event):
-            kwargs = event["fn_kwargs"]
-            args = event["fn_args"]
-            try:
-                response = {
-                    "Result": func(*args, **kwargs),
-                    "StatusCode": 200
-                }
-            except Exception as e:
-                response = {
-                    "Result": str(e),
-                    "StatusCode": 500
-                }
-            return response
-        return remote_wrapper
-
-    read, write = os.pipe()
-    def send_configuration(config):
-        config_string = json.dumps(config)
-        config_cmd = f"{len(config_string) + 1}\n{config_string}\n"
-        sys.stdout.write(config_cmd)
-        sys.stdout.flush()
-    def main():
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            # modify the port argument to be 0 to listen on an arbitrary port
-            s.bind(('localhost', 0))
-        except Exception as e:
-            s.close()
-            print(e, file=sys.stderr)
-            sys.exit(1)
-        # information to print to stdout for worker
-        config = {
-                "name": name(),
-                "port": s.getsockname()[1],
-                }
-        send_configuration(config)
-        while True:
-            s.listen()
-            conn, addr = s.accept()
-            print('Network function: connection from {}'.format(addr), file=sys.stderr)
-            while True:
-                # peek at message to find newline to get the size
-                event_size = None
-                line = conn.recv(100, socket.MSG_PEEK)
-                eol = line.find(b'\n')
-                if eol >= 0:
-                    size = eol+1
-                    # actually read the size of the event
-                    input_spec = conn.recv(size).decode('utf-8').split()
-                    function_name = input_spec[0]
-                    task_id = int(input_spec[1])
-                    event_size = int(input_spec[2])
-                try:
-                    if event_size:
-                        # receive the bytes containing the event and turn it into a string
-                        event_str = conn.recv(event_size).decode("utf-8")
-                        # turn the event into a python dictionary
-                        event = json.loads(event_str)
-                        # see if the user specified an execution method
-                        exec_method = event.get("remote_task_exec_method", None)
-                        os.chdir(f"t.{task_id}")
-                        if exec_method == "direct":
-                            response = json.dumps(globals()[function_name](event)).encode("utf-8")
-                        else:
-                            p = os.fork()
-                            if p == 0:
-                                response =globals()[function_name](event)
-                                os.write(write, json.dumps(response).encode("utf-8"))
-                                os._exit(0)
-                            elif p < 0:
-                                print(f'Network function: unable to fork to execute {function_name}', file=sys.stderr)
-                                response = {
-                                    "Result": "unable to fork",
-                                    "StatusCode": 500
-                                }
-                            else:
-                                max_read = 65536
-                                chunk = os.read(read, max_read).decode("utf-8")
-                                all_chunks = [chunk]
-                                while (len(chunk) >= max_read):
-                                    chunk = os.read(read, max_read).decode("utf-8")
-                                    all_chunks.append(chunk)
-                                response = "".join(all_chunks).encode("utf-8")
-                                os.waitpid(p, 0)
-                        response_size = len(response)
-                        size_msg = "{}\n".format(response_size)
-                        # send the size of response
-                        conn.sendall(size_msg.encode('utf-8'))
-                        # send response
-                        conn.sendall(response)
-                        os.chdir("..")
-                        break
-                except Exception as e:
-                    print("Network function encountered exception ", str(e), file=sys.stderr)
-        return 0
 
 default_name_func = \
 '''def name():
@@ -317,11 +126,26 @@ def pack_library_code(path, envpath):
         print("Cached package is out of date, rebuilding")
         create.pack_env("/tmp/tmp.json", envpath)
 
-def generate_functions_hash(functions):
-    # combine function names and function bodies to create a unique hash of the functions
-    source_code = "".join([inspect.getsource(fnc) for fnc in functions]) + "".join([fnc.__name__ for fnc in functions])
+# Combine function names and function bodies to create a unique hash of the functions.
+# Note that these functions must have source code, so dynamic functions generated from
+# Python's exec or Jupyter Notebooks won't work here.
+# @param functions  A list of functions to generate the hash value from.
+# @return           a string of hex characters resulted from hashing the contents and names of functions.
+def generate_functions_hash(functions: list) -> str:
+    source_code = ""
+    for fnc in functions:
+        try:
+            source_code += fnc.__name__
+            source_code += inspect.getsource(fnc)
+        except OSError as e:
+            print(f"Can't retrieve source code of function {fnc.__name__}.")
+            raise
     return hashlib.md5(source_code.encode("utf-8")).hexdigest()
 
+# Create a library file and a poncho environment tarball from a list of functions as needed.
+# The functions in the list must have source code for this code to work.
+# @param path       path to directory to create the library python file and the environment tarball.
+# @param functions  list of functions to include in the 
 def serverize_library_from_code(path, functions, name, need_pack=True):
     tmp_library_path = f"{path}/tmp_library.py"
 
@@ -332,6 +156,9 @@ def serverize_library_from_code(path, functions, name, need_pack=True):
 
     # create the final library code from that temporary file
     create_library_code(tmp_library_path, [fnc.__name__ for fnc in functions], path + "/library_code.py", "taskvine")
+
+    # remove the temp library file
+    os.remove(tmp_library_path)
 
     # and pack it into an environment, if needed
     if need_pack:
