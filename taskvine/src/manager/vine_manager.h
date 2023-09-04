@@ -189,6 +189,16 @@ struct vine_manager {
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
 	int disk_avail_threshold; /* Ensure this minimum amount of available disk space. (in MB) */
+
+	int update_interval;			/* Seconds between updates to the catalog. */
+	int resource_management_interval;	/* Seconds between measurement of manager local resources. */
+
+	/*todo: confirm datatype. int or int64*/
+	int max_task_stdout_storage;	/* Maximum size of standard output from task.  (If larger, send to a separate file.) */
+	int max_new_workers;			/* Maximum number of workers to add in a single cycle before dealing with other matters. */
+
+	timestamp_t large_task_check_interval;	/* How frequently to check for tasks that do not fit any worker. */
+	double option_blocklist_slow_workers_timeout;	/* Default timeout for slow workers to come back to the pool, can be set prior to creating a manager. */
 };
 
 /*
