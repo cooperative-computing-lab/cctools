@@ -32,7 +32,7 @@ def library_network_code():
 
     def send_configuration(config, out_pipe):
         config_string = json.dumps(config)
-        config_cmd = f"{len(config_string) + 1}\n{config_string}\n"
+        config_cmd = f"{len(config_string)}\n{config_string}"
         out_pipe.write(config_cmd)
         out_pipe.flush()
 

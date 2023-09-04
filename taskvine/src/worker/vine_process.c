@@ -349,7 +349,7 @@ pid_t vine_process_execute(struct vine_process *p)
 			/* Close the error stream that the parent won't use. */
 			close(error_fd);
 
-			/* Wait up to 60 seconds for library startup.  This should be asynchronous. */
+			/* TODO: Wait up to 60 seconds for library startup.  This should be asynchronous. */
 			time_t stoptime = time(0) + 60;
 
 			/* Now read back the initialization message so we know it is ready. */
@@ -469,16 +469,17 @@ the library, which should match the task's provides_library label.
 
 static int vine_process_wait_for_library_startup(struct vine_process *p, time_t stoptime)
 {
-	char buffer[VINE_LINE_MAX];
+	char buffer_len[VINE_LINE_MAX];
 	int length = 0;
 
 	/* Read a line that gives the length of the response message. */
-	link_readline(p->library_read_link, buffer, VINE_LINE_MAX, stoptime);
-	sscanf(buffer, "%d", &length);
+	link_readline(p->library_read_link, buffer_len, VINE_LINE_MAX, stoptime);
+	sscanf(buffer_len, "%d", &length);
 
 	/* Now read that length of message and null-terminate it. */
+	char buffer[length+1];
 	link_read(p->library_read_link, buffer, length, stoptime);
-	buffer[length + 1] = 0;
+	buffer[length] = 0;
 
 	/* Check that the response is JX and contains the expected name. */
 	struct jx *response = jx_parse_string(buffer);
@@ -488,7 +489,6 @@ static int vine_process_wait_for_library_startup(struct vine_process *p, time_t 
 	if (!strcmp(name, p->task->provides_library)) {
 		return 1;
 	}
-
 	return 0;
 }
 
