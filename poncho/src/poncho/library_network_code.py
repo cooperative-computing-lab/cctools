@@ -57,12 +57,16 @@ def library_network_code():
             while True:
                 # wait for message from worker about what function to execute
                 try:
+                    # get length of first buffer
                     # remove trailing \n
-                    line = in_pipe.readline()[:-1]
+                    buffer_len = int(in_pipe.readline()[:-1])
                 # if the worker closed the pipe connected to the input of this process, we should just exit
                 except Exception as e:
                     print("Cannot read message from the manager, exiting. ", e, file=sys.stderr)
                     sys.exit(1)
+
+                # read first buffer
+                line = in_pipe.read(buffer_len)
 
                 function_name, event_size, function_sandbox = line.split(" ", maxsplit=2)
                 if event_size:

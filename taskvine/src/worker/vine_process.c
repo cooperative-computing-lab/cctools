@@ -213,8 +213,9 @@ static char *load_input_file(struct vine_task *t)
 	fseek(fp, 0L, SEEK_END);
 	size_t fsize = ftell(fp);
 	fseek(fp, 0L, SEEK_SET);
-	// using calloc solves problem of garbage appended to buffer
-	char *buf = calloc(fsize + 1, sizeof(*buf));
+
+	char *buf = malloc(fsize + 1);
+	buf[fsize] = 0;
 
 	int bytes_read = full_fread(fp, buf, fsize);
 	if (bytes_read < 0) {
@@ -500,14 +501,17 @@ and then reading back the result from the necessary pipe.
 static char *vine_process_invoke_function(struct vine_process *library_process, const char *function_name,
 		const char *function_input, const char *sandbox_path)
 {
-	/* Set a five minute timeout.  XXX This should be changeable. */
+	/* TODO: Set a five minute timeout.  XXX This should be changeable. */
 	time_t stoptime = time(0) + 300;
 
-	/* This assumes function input is a text string, reconsider? */
 	int length = strlen(function_input);
 
-	/* Send the function name, length of data, and sandbox directory. */
-	link_printf(library_process->library_write_link, stoptime, "%s %d %s\n", function_name, length, sandbox_path);
+	/* Send the function name, length of data, and sandbox directory. 
+	 * The length of the buffer goes first (marked by `\n`) then followed
+	 * by the buffer. */
+	char* buffer = string_format("%s %d %s", function_name, length, sandbox_path);
+	int buffer_len = strlen(buffer);
+	link_printf(library_process->library_write_link, stoptime, "%d\n%s", buffer_len, buffer);
 
 	/* Then send the function data itself. */
 	/* XXX the library code expects a newline after this, yikes. */
