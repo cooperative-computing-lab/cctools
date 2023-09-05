@@ -10,6 +10,7 @@ def library_network_code():
     import os
     import sys
     import argparse
+    import cloudpickle
 
     def remote_execute(func):
         def remote_wrapper(event):
@@ -74,8 +75,8 @@ def library_network_code():
                     # receive the bytes containing the event and turn it into a string
                     event_str = in_pipe.read(event_size)
 
-                    # turn the event into a python dictionary
-                    event = json.loads(event_str)
+                    # load the event into a Python object
+                    event = cloudpickle.loads(event_str)
 
                     # see if the user specified an execution method
                     exec_method = event.get("remote_task_exec_method", None)
@@ -84,7 +85,7 @@ def library_network_code():
                         library_sandbox = os.getcwd()
                         try:
                             os.chdir(function_sandbox)
-                            response = json.dumps(globals()[function_name](event))
+                            response = cloudpickle.dumps(globals()[function_name](event))
                         except Exception as e:
                             print(f'Library code: Function call failed due to {e}', file=sys.stderr)
                             sys.exit(1)
@@ -95,7 +96,7 @@ def library_network_code():
                         if p == 0:
                             os.chdir(function_sandbox)
                             response = globals()[function_name](event)
-                            os.write(write, json.dumps(response).encode("utf-8"))
+                            os.write(write, cloudpickle.dumps(response).encode("utf-8"))
                             os._exit(0)
                         elif p < 0:
                             print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)

@@ -20,6 +20,7 @@ import tempfile
 import textwrap
 import uuid
 import weakref
+import cloudpickle
 
 
 ##
@@ -482,7 +483,7 @@ class Task(object):
     @property
     def output(self):
         if (isinstance(self, FunctionCall)):
-            return json.loads(cvine.vine_task_get_stdout(self._task))['Result']
+            return cloudpickle.loads(cvine.vine_task_get_stdout(self._task))['Result']
         return cvine.vine_task_get_stdout(self._task)
 
     ##
@@ -978,7 +979,7 @@ class FunctionCall(Task):
     # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
         super().submit_finalize(manager)
-        f = manager.declare_buffer(json.dumps(self._event))
+        f = manager.declare_buffer(cloudpickle.dumps(self._event))
         self.add_input(f, "infile")
 
     ##
