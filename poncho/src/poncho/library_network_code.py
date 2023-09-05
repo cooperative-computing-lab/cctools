@@ -70,12 +70,9 @@ def library_network_code():
 
                 function_name, event_size, function_sandbox = line.split(" ", maxsplit=2)
                 if event_size:
+                    event_size = int(event_size)
                     # receive the bytes containing the event and turn it into a string
-                    event_str = in_pipe.readline()[:-1]
-                    if len(event_str) != int(event_size):
-                        print(event_str, len(event_str), event_size, file=sys.stderr)
-                        print("Size of event does not match what was sent: exiting", file=sys.stderr)
-                        sys.exit(1)
+                    event_str = in_pipe.read(event_size)
 
                     # turn the event into a python dictionary
                     event = json.loads(event_str)

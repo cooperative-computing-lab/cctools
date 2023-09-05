@@ -514,9 +514,7 @@ static char *vine_process_invoke_function(struct vine_process *library_process, 
 	link_printf(library_process->library_write_link, stoptime, "%d\n%s", buffer_len, buffer);
 
 	/* Then send the function data itself. */
-	/* XXX the library code expects a newline after this, yikes. */
 	link_write(library_process->library_write_link, function_input, length, stoptime);
-	link_write(library_process->library_write_link, "\n", 1, stoptime);
 
 	/* XXX The response should be returned as a variable-length buffer, not a line! */
 
