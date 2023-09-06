@@ -1227,6 +1227,12 @@ void vine_set_manager_preferred_connection(struct vine_manager *m, const char *p
  - "attempt-schedule-depth" The amount of tasks to attempt scheduling on each pass of send_one_task in the main loop. (default=100)
  - "wait_retrieve_many" Parameter to alter how vine_wait works. If set to 0, vine_wait breaks out of the while loop whenever a task changes to VINE_TASK_DONE (wait_retrieve_one mode). If set to 1, vine_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
  - "monitor-interval" Parameter to change how frequently the resource monitor records resource consumption of a task in a times series, if this feature is enabled. See @ref vine_enable_monitoring.
+ - "update_interval"  Seconds between updates to the catalog. (default=60)
+ - "resource_management_interval" Seconds between measurement of manager local resources. (default=30)
+ - "max_task_stdout_storage" Maximum size of standard output from task.  (If larger, send to a separate file.) (default=1*GIGABYTE)
+ - "max_new_workers" Maximum number of workers to add in a single cycle before dealing with other matters. (default=10)
+ - "large_task_check_interval" How frequently to check for tasks that do not fit any worker. (default=180000000)
+ - "option_blocklist_slow_workers_timeout" Timeout for slow workers to come back to the pool. (default=900)
 @param value The value to set the parameter to.
 @return 0 on succes, -1 on failure.
 */

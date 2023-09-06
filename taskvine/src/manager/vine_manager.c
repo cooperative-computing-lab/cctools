@@ -76,10 +76,10 @@ See the file COPYING for details.
 #include <time.h>
 #include <unistd.h>
 
-/* Seconds between updates to the catalog. */
+/* Default value for seconds between updates to the catalog. */
 #define VINE_UPDATE_INTERVAL 60
 
-/* Seconds between measurement of manager local resources. */
+/* Default value for seconds between measurement of manager local resources. */
 #define VINE_RESOURCE_MEASUREMENT_INTERVAL 30
 
 /* Default value for keepalive interval in seconds. */
@@ -88,13 +88,13 @@ See the file COPYING for details.
 /* Default value for keepalive timeout in seconds. */
 #define VINE_DEFAULT_KEEPALIVE_TIMEOUT 900
 
-/* Maximum size of standard output from task.  (If larger, send to a separate file.) */
+/* Default value for maximum size of standard output from task.  (If larger, send to a separate file.) */
 #define MAX_TASK_STDOUT_STORAGE (1 * GIGABYTE)
 
-/* Maximum number of workers to add in a single cycle before dealing with other matters. */
+/* Default value for maximum number of workers to add in a single cycle before dealing with other matters. */
 #define MAX_NEW_WORKERS 10
 
-/* How frequently to check for tasks that do not fit any worker. */
+/* Default value for how frequently to check for tasks that do not fit any worker. */
 #define VINE_LARGE_TASK_CHECK_INTERVAL 180000000 // 3 minutes in usecs
 
 /* Default timeout for slow workers to come back to the pool, can be set prior to creating a manager. */
@@ -757,7 +757,7 @@ static void update_read_catalog(struct vine_manager *q)
 static void update_catalog(struct vine_manager *q, int force_update)
 {
 	// Only update every last_update_time seconds.
-	if (!force_update && (time(0) - q->catalog_last_update_time) < VINE_UPDATE_INTERVAL)
+	if (!force_update && (time(0) - q->catalog_last_update_time) < q->update_interval)
 		return;
 
 	// If host and port are not set, pick defaults.
@@ -1543,17 +1543,17 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		effective_stoptime = (output_length / q->bandwidth_limit) * 1000000 + timestamp_get();
 	}
 
-	if (output_length <= MAX_TASK_STDOUT_STORAGE) {
+	if (output_length <= q->max_task_stdout_storage) {
 		retrieved_output_length = output_length;
 	} else {
-		retrieved_output_length = MAX_TASK_STDOUT_STORAGE;
+		retrieved_output_length = q->max_task_stdout_storage;
 		fprintf(stderr,
 				"warning: stdout of task %" PRId64
 				" requires %2.2lf GB of storage. This exceeds maximum supported size of %d GB. Only %d GB will be retrieved.\n",
 				task_id,
-				((double)output_length) / MAX_TASK_STDOUT_STORAGE,
-				MAX_TASK_STDOUT_STORAGE / GIGABYTE,
-				MAX_TASK_STDOUT_STORAGE / GIGABYTE);
+				((double)output_length) / q->max_task_stdout_storage,
+				q->max_task_stdout_storage / GIGABYTE,
+				q->max_task_stdout_storage / GIGABYTE);
 		vine_task_set_result(t, VINE_RESULT_STDOUT_MISSING);
 	}
 
@@ -1598,9 +1598,9 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 			debug(D_VINE,
 					"Dropping the remaining %" PRId64 " bytes of the stdout of task %" PRId64
 					" since stdout length is limited to %d bytes.\n",
-					(output_length - MAX_TASK_STDOUT_STORAGE),
+					(output_length - q->max_task_stdout_storage),
 					task_id,
-					MAX_TASK_STDOUT_STORAGE);
+					q->max_task_stdout_storage);
 			stoptime = time(0) +
 				   vine_manager_transfer_time(q, w, (output_length - retrieved_output_length));
 			link_soak(w->link, (output_length - retrieved_output_length), stoptime);
@@ -1609,12 +1609,12 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 			char *truncate_msg = string_format(
 					"\n>>>>>> STDOUT TRUNCATED AFTER THIS POINT.\n>>>>>> MAXIMUM OF %d BYTES REACHED, %" PRId64
 					" BYTES TRUNCATED.",
-					MAX_TASK_STDOUT_STORAGE,
+					q->max_task_stdout_storage,
 					output_length - retrieved_output_length);
-			memcpy(t->output + MAX_TASK_STDOUT_STORAGE - strlen(truncate_msg) - 1,
+			memcpy(t->output + q->max_task_stdout_storage - strlen(truncate_msg) - 1,
 					truncate_msg,
 					strlen(truncate_msg));
-			*(t->output + MAX_TASK_STDOUT_STORAGE - 1) = '\0';
+			*(t->output + q->max_task_stdout_storage - 1) = '\0';
 			free(truncate_msg);
 		}
 
@@ -3334,7 +3334,7 @@ static int disconnect_slow_workers(struct vine_manager *q)
 							runtime / 1000000.0,
 							average_task_time / 1000000.0);
 					vine_block_host_with_timeout(
-							q, w->hostname, vine_option_blocklist_slow_workers_timeout);
+							q, w->hostname, q->option_blocklist_slow_workers_timeout);
 					remove_worker(q, w, VINE_WORKER_DISCONNECT_FAST_ABORT);
 
 					q->stats->workers_slow++;
@@ -3607,6 +3607,13 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->transfer_outlier_factor = 10;
 	q->default_transfer_rate = 1 * MEGABYTE;
 	q->disk_avail_threshold = 100;
+
+	q->update_interval = VINE_UPDATE_INTERVAL;
+	q->resource_management_interval = VINE_RESOURCE_MEASUREMENT_INTERVAL;
+	q->max_task_stdout_storage = MAX_TASK_STDOUT_STORAGE;
+	q->max_new_workers = MAX_NEW_WORKERS;
+	q->large_task_check_interval = VINE_LARGE_TASK_CHECK_INTERVAL;
+	q->option_blocklist_slow_workers_timeout = vine_option_blocklist_slow_workers_timeout;
 
 	q->manager_preferred_connection = xxstrdup("by_ip");
 
@@ -3882,7 +3889,7 @@ void vine_delete(struct vine_manager *q)
 static void update_resource_report(struct vine_manager *q)
 {
 	// Only measure every few seconds.
-	if ((time(0) - q->resources_last_update_time) < VINE_RESOURCE_MEASUREMENT_INTERVAL)
+	if ((time(0) - q->resources_last_update_time) < q->resource_management_interval)
 		return;
 
 	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid());
@@ -4693,7 +4700,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 		// if new workers, connect n of them
 		BEGIN_ACCUM_TIME(q, time_status_msgs);
-		result = connect_new_workers(q, stoptime, MAX(q->wait_for_workers, MAX_NEW_WORKERS));
+		result = connect_new_workers(q, stoptime, MAX(q->wait_for_workers, q->max_new_workers));
 		END_ACCUM_TIME(q, time_status_msgs);
 		if (result) {
 			// accepted at least one worker
@@ -4734,7 +4741,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		}
 
 		timestamp_t current_time = timestamp_get();
-		if (current_time - q->time_last_large_tasks_check >= VINE_LARGE_TASK_CHECK_INTERVAL) {
+		if (current_time - q->time_last_large_tasks_check >= q->large_task_check_interval) {
 			q->time_last_large_tasks_check = current_time;
 			vine_schedule_check_for_large_tasks(q);
 		}
@@ -5079,6 +5086,25 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "monitor-interval")) {
 		/* 0 means use monitor's default */
 		q->monitor_interval = MAX(0, (int)value);
+
+	} else if (!strcmp(name, "update_interval")) {
+		q->update_interval = MAX(1, (int)value);
+
+	} else if (!strcmp(name, "resource_management_interval")) {
+		q->resource_management_interval = MAX(1, (int)value);
+
+	} else if (!strcmp(name, "max_task_stdout_storage")) {
+		q->max_task_stdout_storage = MAX(1, (int)value);
+
+	} else if (!strcmp(name, "max_new_workers")) {
+		q->max_new_workers = MAX(0, (int)value); /*todo: confirm 0 or 1*/
+
+	} else if (!strcmp(name, "large_task_check_interval")) {
+		q->large_task_check_interval = MAX(1, (timestamp_t)value);
+
+	} else if (!strcmp(name, "option_blocklist_slow_workers_timeout")) {
+		q->option_blocklist_slow_workers_timeout = MAX(0, value); /*todo: confirm 0 or 1*/
+
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
