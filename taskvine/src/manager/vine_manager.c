@@ -4311,7 +4311,7 @@ static void vine_manager_send_library_to_workers(struct vine_manager *q, const c
 			if (vine_manager_send_library_to_worker(q, w, name)) {
 				debug(D_VINE, "Sending library %s to worker %s\n", name, w->workerid);
 			} else {
-				debug(D_VINE, "Failed to send library %s to worker %s\n", name, w->workerid);
+				/* No error here, library might not match the worker. */
 			}
 		}
 	}
