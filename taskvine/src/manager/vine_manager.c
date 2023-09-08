@@ -2304,7 +2304,7 @@ static vine_msg_code_t handle_resource(struct vine_manager *q, struct vine_worke
 {
 	char resource_name[VINE_LINE_MAX];
 	int64_t total;
-	
+
 	int n = sscanf(line, "resource %s %" PRId64, resource_name, &total);
 
 	if (n == 2) {
