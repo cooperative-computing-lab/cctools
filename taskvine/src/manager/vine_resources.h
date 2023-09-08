@@ -13,8 +13,6 @@ See the file COPYING for details.
 struct vine_resource {
 	int64_t inuse;
 	int64_t total;
-	int64_t smallest;
-	int64_t largest;
 };
 
 struct vine_resources {

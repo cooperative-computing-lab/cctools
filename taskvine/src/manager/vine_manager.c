@@ -1771,13 +1771,13 @@ static int check_worker_fit(struct vine_worker_info *w, const struct rmsummary *
 	if (!s)
 		return w->resources->workers.total;
 
-	if (s->cores > w->resources->cores.largest)
+	if (s->cores > w->resources->cores.total)
 		return 0;
-	if (s->memory > w->resources->memory.largest)
+	if (s->memory > w->resources->memory.total)
 		return 0;
-	if (s->disk > w->resources->disk.largest)
+	if (s->disk > w->resources->disk.total)
 		return 0;
-	if (s->gpus > w->resources->gpus.largest)
+	if (s->gpus > w->resources->gpus.total)
 		return 0;
 
 	return w->resources->workers.total;
@@ -1843,10 +1843,10 @@ static struct rmsummary *category_alloc_info(struct vine_manager *q, struct cate
 
 	struct vine_worker_info *w = malloc(sizeof(*w));
 	w->resources = vine_resources_create();
-	w->resources->cores.largest = q->current_max_worker->cores;
-	w->resources->memory.largest = q->current_max_worker->memory;
-	w->resources->disk.largest = q->current_max_worker->disk;
-	w->resources->gpus.largest = q->current_max_worker->gpus;
+	w->resources->cores.total = q->current_max_worker->cores;
+	w->resources->memory.total = q->current_max_worker->memory;
+	w->resources->disk.total = q->current_max_worker->disk;
+	w->resources->gpus.total = q->current_max_worker->gpus;
 
 	struct rmsummary *allocation = vine_manager_choose_resources_for_task(q, w, t);
 
@@ -2306,16 +2306,11 @@ static vine_msg_code_t handle_resource(struct vine_manager *q, struct vine_worke
 	struct vine_resource r;
 
 	int n = sscanf(line,
-			"resource %s %" PRId64 " %" PRId64 " %" PRId64,
+			"resource %s %" PRId64,
 			resource_name,
-			&r.total,
-			&r.smallest,
-			&r.largest);
+		        &r.total);
 
-	if (n == 2 && !strcmp(resource_name, "tag")) {
-		/* Shortcut, total has the tag, as "resources tag" only sends one value */
-		w->resources->tag = r.total;
-	} else if (n == 4) {
+	if (n == 2) {
 
 		/* inuse is computed by the manager, so we save it here */
 		int64_t inuse;
@@ -2340,6 +2335,8 @@ static vine_msg_code_t handle_resource(struct vine_manager *q, struct vine_worke
 			inuse = w->resources->workers.inuse;
 			w->resources->workers = r;
 			w->resources->workers.inuse = inuse;
+		} else if(!strcmp(resource_name, "tag")) {
+			w->resources->tag = r.total;
 		}
 	} else {
 		return VINE_MSG_FAILURE;
@@ -2498,20 +2495,20 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 
 		/* Compute the proportion of the worker the task shall have across resource types. */
 		double max_proportion = -1;
-		if (w->resources->cores.largest > 0) {
-			max_proportion = MAX(max_proportion, limits->cores / w->resources->cores.largest);
+		if (w->resources->cores.total > 0) {
+			max_proportion = MAX(max_proportion, limits->cores / w->resources->cores.total);
 		}
 
-		if (w->resources->memory.largest > 0) {
-			max_proportion = MAX(max_proportion, limits->memory / w->resources->memory.largest);
+		if (w->resources->memory.total > 0) {
+			max_proportion = MAX(max_proportion, limits->memory / w->resources->memory.total);
 		}
 
-		if (w->resources->disk.largest > 0) {
-			max_proportion = MAX(max_proportion, limits->disk / w->resources->disk.largest);
+		if (w->resources->disk.total > 0) {
+			max_proportion = MAX(max_proportion, limits->disk / w->resources->disk.total);
 		}
 
-		if (w->resources->gpus.largest > 0) {
-			max_proportion = MAX(max_proportion, limits->gpus / w->resources->gpus.largest);
+		if (w->resources->gpus.total > 0) {
+			max_proportion = MAX(max_proportion, limits->gpus / w->resources->gpus.total);
 		}
 
 		/* If max_proportion > 1, then the task does not fit the worker for the
@@ -2536,7 +2533,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 			} else {
 				limits->cores = MAX(1,
 						MAX(limits->cores,
-								floor(w->resources->cores.largest * max_proportion)));
+								floor(w->resources->cores.total * max_proportion)));
 			}
 
 			/* unspecified gpus are always 0 */
@@ -2545,14 +2542,14 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 			}
 
 			limits->memory = MAX(
-					1, MAX(limits->memory, floor(w->resources->memory.largest * max_proportion)));
+					1, MAX(limits->memory, floor(w->resources->memory.total * max_proportion)));
 
 			/* worker's disk is shared even among tasks that are not running,
 			 * thus the proportion is modified by the current overcommit
 			 * multiplier */
 			limits->disk = MAX(1,
 					MAX(limits->disk,
-							floor(w->resources->disk.largest * max_proportion /
+							floor(w->resources->disk.total * max_proportion /
 									q->resource_submit_multiplier)));
 		}
 	}
@@ -2563,10 +2560,10 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 	}
 	/* At least one specified resource would use the whole worker, thus
 	 * using whole worker for all unspecified resources. */
-	if ((limits->cores > 0 && limits->cores >= w->resources->cores.largest) ||
-			(limits->gpus > 0 && limits->gpus >= w->resources->gpus.largest) ||
-			(limits->memory > 0 && limits->memory >= w->resources->memory.largest) ||
-			(limits->disk > 0 && limits->disk >= w->resources->disk.largest)) {
+	if ((limits->cores > 0 && limits->cores >= w->resources->cores.total) ||
+			(limits->gpus > 0 && limits->gpus >= w->resources->gpus.total) ||
+			(limits->memory > 0 && limits->memory >= w->resources->memory.total) ||
+			(limits->disk > 0 && limits->disk >= w->resources->disk.total)) {
 
 		use_whole_worker = 1;
 	}
@@ -2574,7 +2571,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 	if (use_whole_worker) {
 		/* default cores for tasks that define gpus is 0 */
 		if (limits->cores <= 0) {
-			limits->cores = limits->gpus > 0 ? 0 : w->resources->cores.largest;
+			limits->cores = limits->gpus > 0 ? 0 : w->resources->cores.total;
 		}
 
 		/* default gpus is 0 */
@@ -2583,11 +2580,11 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 		}
 
 		if (limits->memory <= 0) {
-			limits->memory = w->resources->memory.largest;
+			limits->memory = w->resources->memory.total;
 		}
 
 		if (limits->disk <= 0) {
-			limits->disk = w->resources->disk.largest;
+			limits->disk = w->resources->disk.total;
 		}
 	} else if (vine_schedule_in_ramp_down(q)) {
 		/* if in ramp down, use all the free space of that worker. note that we don't use
@@ -2696,20 +2693,20 @@ static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w
 		return;
 	}
 
-	if (q->current_max_worker->cores < w->resources->cores.largest) {
-		q->current_max_worker->cores = w->resources->cores.largest;
+	if (q->current_max_worker->cores < w->resources->cores.total) {
+		q->current_max_worker->cores = w->resources->cores.total;
 	}
 
-	if (q->current_max_worker->memory < w->resources->memory.largest) {
-		q->current_max_worker->memory = w->resources->memory.largest;
+	if (q->current_max_worker->memory < w->resources->memory.total) {
+		q->current_max_worker->memory = w->resources->memory.total;
 	}
 
-	if (q->current_max_worker->disk < w->resources->disk.largest) {
-		q->current_max_worker->disk = w->resources->disk.largest;
+	if (q->current_max_worker->disk < w->resources->disk.total) {
+		q->current_max_worker->disk = w->resources->disk.total;
 	}
 
-	if (q->current_max_worker->gpus < w->resources->gpus.largest) {
-		q->current_max_worker->gpus = w->resources->gpus.largest;
+	if (q->current_max_worker->gpus < w->resources->gpus.total) {
+		q->current_max_worker->gpus = w->resources->gpus.total;
 	}
 }
 
@@ -5201,14 +5198,14 @@ void vine_get_stats(struct vine_manager *q, struct vine_stats *s)
 	s->committed_disk = r.disk.inuse;
 	s->committed_gpus = r.gpus.inuse;
 
-	s->min_cores = r.cores.smallest;
-	s->max_cores = r.cores.largest;
-	s->min_memory = r.memory.smallest;
-	s->max_memory = r.memory.largest;
-	s->min_disk = r.disk.smallest;
-	s->max_disk = r.disk.largest;
-	s->min_gpus = r.gpus.smallest;
-	s->max_gpus = r.gpus.largest;
+	s->min_cores = r.cores.total;
+	s->max_cores = r.cores.total;
+	s->min_memory = r.memory.total;
+	s->max_memory = r.memory.total;
+	s->min_disk = r.disk.total;
+	s->max_disk = r.disk.total;
+	s->min_gpus = r.gpus.total;
+	s->max_gpus = r.gpus.total;
 
 	s->workers_able = count_workers_for_waiting_tasks(q, largest_seen_resources(q, NULL));
 }

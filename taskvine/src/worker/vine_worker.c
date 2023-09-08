@@ -322,11 +322,6 @@ static void measure_worker_resources()
 		r->disk.total = MIN(r->disk.total, manual_disk_option);
 	}
 
-	r->cores.smallest = r->cores.largest = r->cores.total;
-	r->memory.smallest = r->memory.largest = r->memory.total;
-	r->disk.smallest = r->disk.largest = r->disk.total;
-	r->gpus.smallest = r->gpus.largest = r->gpus.total;
-
 	r->disk.inuse = measure_worker_disk();
 	r->tag = last_task_received;
 
@@ -362,13 +357,10 @@ static void send_resource_update(struct link *manager)
 {
 	time_t stoptime = time(0) + active_timeout;
 
+	// assume that cores.total doesn't change
+	// assume that gpus.total doesn't change.
 	total_resources->memory.total = MAX(0, local_resources->memory.total);
-	total_resources->memory.largest = MAX(0, local_resources->memory.largest);
-	total_resources->memory.smallest = MAX(0, local_resources->memory.smallest);
-
 	total_resources->disk.total = MAX(0, local_resources->disk.total);
-	total_resources->disk.largest = MAX(0, local_resources->disk.largest);
-	total_resources->disk.smallest = MAX(0, local_resources->disk.smallest);
 
 	// if workers are set to expire in some time, send the expiration time to manager
 	if (manual_wall_time_option > 0) {
@@ -1168,9 +1160,9 @@ static int task_resources_fit_eventually(struct vine_task *t)
 
 	r = local_resources;
 
-	return (t->resources_requested->cores <= r->cores.largest) &&
-	       (t->resources_requested->memory <= r->memory.largest) &&
-	       (t->resources_requested->disk <= r->disk.largest) && (t->resources_requested->gpus <= r->gpus.largest);
+	return (t->resources_requested->cores <= r->cores.total) &&
+	       (t->resources_requested->memory <= r->memory.total) &&
+	       (t->resources_requested->disk <= r->disk.total) && (t->resources_requested->gpus <= r->gpus.total);
 }
 
 /*
