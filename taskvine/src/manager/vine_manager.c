@@ -2303,37 +2303,23 @@ Handle a resource update message from the worker by updating local structures.
 static vine_msg_code_t handle_resource(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
 	char resource_name[VINE_LINE_MAX];
-	struct vine_resource r;
-
-	int n = sscanf(line, "resource %s %" PRId64, resource_name, &r.total);
+	int64_t total;
+	
+	int n = sscanf(line, "resource %s %" PRId64, resource_name, &total);
 
 	if (n == 2) {
-
-		/* inuse is computed by the manager, so we save it here */
-		int64_t inuse;
-
 		if (!strcmp(resource_name, "cores")) {
-			inuse = w->resources->cores.inuse;
-			w->resources->cores = r;
-			w->resources->cores.inuse = inuse;
+			w->resources->cores.total = total;
 		} else if (!strcmp(resource_name, "memory")) {
-			inuse = w->resources->memory.inuse;
-			w->resources->memory = r;
-			w->resources->memory.inuse = inuse;
+			w->resources->memory.total = total;
 		} else if (!strcmp(resource_name, "disk")) {
-			inuse = w->resources->disk.inuse;
-			w->resources->disk = r;
-			w->resources->disk.inuse = inuse;
+			w->resources->disk.total = total;
 		} else if (!strcmp(resource_name, "gpus")) {
-			inuse = w->resources->gpus.inuse;
-			w->resources->gpus = r;
-			w->resources->gpus.inuse = inuse;
+			w->resources->gpus.total = total;
 		} else if (!strcmp(resource_name, "workers")) {
-			inuse = w->resources->workers.inuse;
-			w->resources->workers = r;
-			w->resources->workers.inuse = inuse;
+			w->resources->workers.total = total;
 		} else if (!strcmp(resource_name, "tag")) {
-			w->resources->tag = r.total;
+			w->resources->tag = total;
 		}
 	} else {
 		return VINE_MSG_FAILURE;
