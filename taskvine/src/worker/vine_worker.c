@@ -1161,8 +1161,8 @@ static int task_resources_fit_eventually(struct vine_task *t)
 	r = local_resources;
 
 	return (t->resources_requested->cores <= r->cores.total) &&
-	       (t->resources_requested->memory <= r->memory.total) &&
-	       (t->resources_requested->disk <= r->disk.total) && (t->resources_requested->gpus <= r->gpus.total);
+	       (t->resources_requested->memory <= r->memory.total) && (t->resources_requested->disk <= r->disk.total) &&
+	       (t->resources_requested->gpus <= r->gpus.total);
 }
 
 /*

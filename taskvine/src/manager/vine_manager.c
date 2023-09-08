@@ -2305,10 +2305,7 @@ static vine_msg_code_t handle_resource(struct vine_manager *q, struct vine_worke
 	char resource_name[VINE_LINE_MAX];
 	struct vine_resource r;
 
-	int n = sscanf(line,
-			"resource %s %" PRId64,
-			resource_name,
-		        &r.total);
+	int n = sscanf(line, "resource %s %" PRId64, resource_name, &r.total);
 
 	if (n == 2) {
 
@@ -2335,7 +2332,7 @@ static vine_msg_code_t handle_resource(struct vine_manager *q, struct vine_worke
 			inuse = w->resources->workers.inuse;
 			w->resources->workers = r;
 			w->resources->workers.inuse = inuse;
-		} else if(!strcmp(resource_name, "tag")) {
+		} else if (!strcmp(resource_name, "tag")) {
 			w->resources->tag = r.total;
 		}
 	} else {
@@ -2532,8 +2529,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 				limits->cores = 0;
 			} else {
 				limits->cores = MAX(1,
-						MAX(limits->cores,
-								floor(w->resources->cores.total * max_proportion)));
+						MAX(limits->cores, floor(w->resources->cores.total * max_proportion)));
 			}
 
 			/* unspecified gpus are always 0 */
@@ -2541,8 +2537,8 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 				limits->gpus = 0;
 			}
 
-			limits->memory = MAX(
-					1, MAX(limits->memory, floor(w->resources->memory.total * max_proportion)));
+			limits->memory =
+					MAX(1, MAX(limits->memory, floor(w->resources->memory.total * max_proportion)));
 
 			/* worker's disk is shared even among tasks that are not running,
 			 * thus the proportion is modified by the current overcommit

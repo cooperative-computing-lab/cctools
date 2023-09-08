@@ -57,21 +57,13 @@ void vine_resources_measure_locally(struct vine_resources *r, const char *disk_p
 
 static void vine_resource_debug(struct vine_resource *r, const char *name)
 {
-	debug(D_VINE,
-			"%8s %6" PRId64 " inuse %6" PRId64 " total",
-			name,
-			r->inuse,
-			r->total);
+	debug(D_VINE, "%8s %6" PRId64 " inuse %6" PRId64 " total", name, r->inuse, r->total);
 }
 
 static void vine_resource_send(struct link *manager, struct vine_resource *r, const char *name, time_t stoptime)
 {
 	vine_resource_debug(r, name);
-	link_printf(manager,
-			stoptime,
-			"resource %s %" PRId64 "\n",
-			name,
-			r->total);
+	link_printf(manager, stoptime, "resource %s %" PRId64 "\n", name, r->total);
 }
 
 void vine_resources_send(struct link *manager, struct vine_resources *r, time_t stoptime)
