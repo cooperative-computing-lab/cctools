@@ -96,6 +96,18 @@ static void vine_resource_add(struct vine_resource *total, struct vine_resource 
 	total->total += r->total;
 }
 
+static void vine_resource_min(struct vine_resource *total, struct vine_resource *r)
+{
+	total->inuse = MIN(total->inuse, r->inuse);
+	total->total = MIN(total->total, r->total);
+}
+
+static void vine_resource_max(struct vine_resource *total, struct vine_resource *r)
+{
+	total->inuse = MAX(total->inuse, r->inuse);
+	total->total = MAX(total->total, r->total);
+}
+
 void vine_resources_add(struct vine_resources *total, struct vine_resources *r)
 {
 	vine_resource_add(&total->workers, &r->workers);
@@ -103,6 +115,24 @@ void vine_resources_add(struct vine_resources *total, struct vine_resources *r)
 	vine_resource_add(&total->disk, &r->disk);
 	vine_resource_add(&total->gpus, &r->gpus);
 	vine_resource_add(&total->cores, &r->cores);
+}
+
+void vine_resources_min(struct vine_resources *total, struct vine_resources *r)
+{
+	vine_resource_min(&total->workers, &r->workers);
+	vine_resource_min(&total->memory, &r->memory);
+	vine_resource_min(&total->disk, &r->disk);
+	vine_resource_min(&total->gpus, &r->gpus);
+	vine_resource_min(&total->cores, &r->cores);
+}
+
+void vine_resources_max(struct vine_resources *total, struct vine_resources *r)
+{
+	vine_resource_max(&total->workers, &r->workers);
+	vine_resource_max(&total->memory, &r->memory);
+	vine_resource_max(&total->disk, &r->disk);
+	vine_resource_max(&total->gpus, &r->gpus);
+	vine_resource_max(&total->cores, &r->cores);
 }
 
 void vine_resources_add_to_jx(struct vine_resources *r, struct jx *nv)
