@@ -13,8 +13,6 @@ See the file COPYING for details.
 struct vine_resource {
 	int64_t inuse;
 	int64_t total;
-	int64_t smallest;
-	int64_t largest;
 };
 
 struct vine_resources {
@@ -31,9 +29,10 @@ void vine_resources_delete( struct vine_resources *r );
 void vine_resources_debug( struct vine_resources *r );
 void vine_resources_measure_locally( struct vine_resources *r, const char *workspace );
 void vine_resources_send( struct link *manager, struct vine_resources *r, time_t stoptime );
-void vine_coprocess_resources_send( struct link *manager, struct vine_resources *r, time_t stoptime );
 void vine_resources_clear( struct vine_resources *r );
 void vine_resources_add( struct vine_resources *total, struct vine_resources *r );
+void vine_resources_min( struct vine_resources *total, struct vine_resources *r );
+void vine_resources_max( struct vine_resources *total, struct vine_resources *r );
 void vine_resources_add_to_jx( struct vine_resources *r, struct jx *j );
 
 #endif
