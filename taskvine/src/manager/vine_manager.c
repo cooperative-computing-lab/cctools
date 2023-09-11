@@ -2484,11 +2484,23 @@ static int build_poll_table(struct vine_manager *q)
 struct rmsummary *vine_manager_choose_resources_for_task(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
+	struct rmsummary *limits = rmsummary_create(-1);
+
+	/* Special case: A function-call task consumes no resources. */
+	/* Return early, otherwise these zeroes are expanded to use the whole worker. */
+
+	if(t->needs_library) {
+		limits->cores = 0;
+		limits->memory = 0;
+		limits->disk = 0;
+		limits->gpus = 0;
+		return limits;
+	}
+	
 	/* Compute the minimum and maximum resources for this task. */
 	const struct rmsummary *min = vine_manager_task_resources_min(q, t);
 	const struct rmsummary *max = vine_manager_task_resources_max(q, t);
 
-	struct rmsummary *limits = rmsummary_create(-1);
 	rmsummary_merge_override_basic(limits, max);
 
 	int use_whole_worker = 1;

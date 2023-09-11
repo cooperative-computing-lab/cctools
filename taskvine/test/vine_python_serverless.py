@@ -40,15 +40,9 @@ def main():
 
     for i in range(0,tasks): 
         s_task = vine.FunctionCall('test-library', 'divide', 2, 2**2)
-        s_task.set_cores(1)
-        s_task.set_memory(1000)
-        s_task.set_disk(1000)
         q.submit(s_task)
     
         s_task = vine.FunctionCall('test-library', 'double', 3)
-        s_task.set_cores(1)
-        s_task.set_memory(1000)
-        s_task.set_disk(1000)
         q.submit(s_task)
 
     print("Waiting for results...")
