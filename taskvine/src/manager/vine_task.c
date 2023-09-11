@@ -240,11 +240,11 @@ void vine_task_needs_library(struct vine_task *t, const char *library_name)
 
 	/* A function-call task does not consume any resources. */
 	/* It relies upon the resources allocated by its library task. */
-	
-	vine_task_set_cores(t,0);
-	vine_task_set_memory(t,0);
-	vine_task_set_disk(t,0);
-	vine_task_set_gpus(t,0);
+
+	vine_task_set_cores(t, 0);
+	vine_task_set_memory(t, 0);
+	vine_task_set_disk(t, 0);
+	vine_task_set_gpus(t, 0);
 }
 
 void vine_task_provides_library(struct vine_task *t, const char *library_name)
