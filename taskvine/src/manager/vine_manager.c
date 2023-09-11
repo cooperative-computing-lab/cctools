@@ -2589,6 +2589,18 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 		if (limits->disk <= 0) {
 			limits->disk = w->resources->disk.largest;
 		}
+	} else if (vine_schedule_in_ramp_down(q)) {
+		/* if in ramp down, use all the free space of that worker. note that we don't use
+		 * resource_submit_multiplier, as by definition in ramp down there are more workers than tasks. */
+		limits->cores = limits->gpus > 0 ? 0 : (w->resources->cores.largest - w->resources->cores.inuse);
+
+		/* default gpus is 0 */
+		if (limits->gpus <= 0) {
+			limits->gpus = 0;
+		}
+
+		limits->memory = w->resources->memory.largest - w->resources->memory.inuse;
+		limits->disk = w->resources->disk.largest - w->resources->disk.inuse;
 	}
 
 	/* never go below specified min resources. */
@@ -3572,6 +3584,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->monitor_mode = VINE_MON_DISABLED;
 
 	q->hungry_minimum = 10;
+	q->hungry_minimum_factor = 2;
 
 	q->wait_for_workers = 0;
 	q->attempt_schedule_depth = 100;
@@ -4763,8 +4776,8 @@ end_of_loop:
 	return t;
 }
 
-// check if workers' resources are available to execute more tasks
-// manager should have at least q->hungry_minimum ready tasks
+// check if workers' resources are available to execute more tasks queue should
+// have at least MAX(hungry_minimum, hungry_minimum_factor * number of workers) ready tasks
 //@param: 	struct vine_manager* - pointer to manager
 //@return: 	1 if hungry, 0 otherwise
 int vine_hungry(struct vine_manager *q)
@@ -4778,8 +4791,9 @@ int vine_hungry(struct vine_manager *q)
 	struct vine_stats qstats;
 	vine_get_stats(q, &qstats);
 
-	// if number of ready tasks is less than q->hungry_minimum, then manager is hungry
-	if (qstats.tasks_waiting < q->hungry_minimum) {
+	// if number of ready tasks is less than minimum, then queue is hungry
+	if (qstats.tasks_waiting <
+			MAX(q->hungry_minimum, q->hungry_minimum_factor * hash_table_size(q->worker_table))) {
 		return 1;
 	}
 
@@ -5055,6 +5069,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "hungry-minimum")) {
 		q->hungry_minimum = MAX(1, (int)value);
 
+	} else if (!strcmp(name, "hungry-minimum-factor")) {
+		q->hungry_minimum_factor = MAX(1, (int)value);
+
 	} else if (!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
 
@@ -5073,6 +5090,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "force-proportional-resources-whole-tasks") ||
 			!strcmp(name, "proportional-whole-tasks")) {
 		q->proportional_whole_tasks = MAX(0, (int)value);
+
+	} else if (!strcmp(name, "ramp-down-heuristic")) {
+		q->ramp_down_heuristic = MAX(0, (int)value);
 
 	} else if (!strcmp(name, "file-source-max-transfers")) {
 		q->file_source_max_transfers = MAX(1, (int)value);

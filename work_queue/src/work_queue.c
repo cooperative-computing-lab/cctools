@@ -201,6 +201,8 @@ struct work_queue {
 
 	int hungry_minimum;               /* minimum number of waiting tasks to consider queue not hungry. */;
 
+	int hungry_minimum_factor;       /* queue is hungry if number of waiting tasks is less than hungry_minimum_factor * number of connected workers. */
+
 	int wait_for_workers;             /* wait for these many workers before dispatching tasks at start of execution. */
 	int attempt_schedule_depth;		  /* number of submitted tasks to attempt scheduling before we continue to retrievals */
 
@@ -242,6 +244,7 @@ struct work_queue {
 	int wait_retrieve_many;
 	int proportional_resources;
 	int proportional_whole_tasks;
+	int ramp_down_heuristic;
 };
 
 struct work_queue_worker {
@@ -3742,6 +3745,23 @@ static work_queue_result_code_t send_input_files( struct work_queue *q, struct w
 	return WQ_SUCCESS;
 }
 
+int in_ramp_down(struct work_queue *q) {
+	if(!(q->monitor_mode & MON_WATCHDOG)) {
+		/* if monitoring is not terminating tasks because of resources, ramp down heuristic does not have any effect. */
+		return 0;
+	}
+
+	if(!q->ramp_down_heuristic) {
+		return 0;
+	}
+
+	if(hash_table_size(q->worker_table) > list_size(q->ready_list)) {
+		return 1;
+	}
+
+	return 0;
+}
+
 static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 
 	const struct rmsummary *min = task_min_resources(q, t);
@@ -3841,6 +3861,18 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 		if(limits->disk <= 0) {
 			limits->disk = w->resources->disk.largest;
 		}
+	} else if(in_ramp_down(q)) {
+		/* if in ramp down, use all the free space of that worker. note that we don't use
+		 * resource_submit_multiplier, as by definition in ramp down there are more workers than tasks. */
+		limits->cores = limits->gpus > 0 ? 0 : (w->resources->cores.largest - w->resources->cores.inuse);
+
+		/* default gpus is 0 */
+		if(limits->gpus <= 0) {
+			limits->gpus = 0;
+		}
+
+		limits->memory = w->resources->memory.largest - w->resources->memory.inuse;
+		limits->disk = w->resources->disk.largest - w->resources->disk.inuse;
 	}
 
 	/* never go below specified min resources. */
@@ -4171,6 +4203,40 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	return ok;
 }
 
+// 0 if current_best has more free resources than candidate, 1 else.
+static int candidate_has_worse_fit(struct work_queue_worker *current_best, struct work_queue_worker *candidate)
+{
+	struct work_queue_resources *b = current_best->resources;
+	struct work_queue_resources *o = candidate->resources;
+
+	//Total worker order: free cores > free memory > free disk > free gpus
+	int free_delta = (b->cores.total - b->cores.inuse) - (o->cores.total - o->cores.inuse);
+	if(free_delta > 0) {
+		return 1;
+	} else if(free_delta < 0) {
+		return 0;
+	}
+
+	//Same number of free cores...
+	free_delta = (b->memory.total - b->memory.inuse) - (o->memory.total - o->memory.inuse);
+	if(free_delta > 0) {
+		return 1;
+	} else if(free_delta < 0) {
+		return 0;
+	}
+
+	//Same number of free disk...
+	free_delta = (b->disk.total - b->disk.inuse) - (o->disk.total - o->disk.inuse);
+	if(free_delta > 0) {
+		return 1;
+	} else if(free_delta < 0) {
+		return 0;
+	}
+
+	//Number of free resources are the same.
+	return 0;
+}
+
 static struct work_queue_worker *find_worker_by_files(struct work_queue *q, struct work_queue_task *t)
 {
 	char *key;
@@ -4194,7 +4260,8 @@ static struct work_queue_worker *find_worker_by_files(struct work_queue *q, stru
 				}
 			}
 
-			if(!best_worker || task_cached_bytes > most_task_cached_bytes) {
+			if (!best_worker || task_cached_bytes > most_task_cached_bytes ||
+					(in_ramp_down(q) && task_cached_bytes == most_task_cached_bytes && candidate_has_worse_fit(best_worker, w))) {
 				best_worker = w;
 				most_task_cached_bytes = task_cached_bytes;
 			}
@@ -4245,67 +4312,18 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q, str
 	return w;
 }
 
-// 1 if a < b, 0 if a >= b
-static int compare_worst_fit(struct work_queue_resources *a, struct work_queue_resources *b)
-{
-	//Total worker order: free cores > free memory > free disk > free gpus
-	if((a->cores.total < b->cores.total))
-		return 1;
-
-	if((a->cores.total > b->cores.total))
-		return 0;
-
-	//Same number of free cores...
-	if((a->memory.total < b->memory.total))
-		return 1;
-
-	if((a->memory.total > b->memory.total))
-		return 0;
-
-	//Same number of free memory...
-	if((a->disk.total < b->disk.total))
-		return 1;
-
-	if((a->disk.total > b->disk.total))
-		return 0;
-
-	//Same number of free disk...
-	if((a->gpus.total < b->gpus.total))
-		return 1;
-
-	if((a->gpus.total > b->gpus.total))
-		return 0;
-
-	//Number of free resources are the same.
-	return 0;
-}
-
 static struct work_queue_worker *find_worker_by_worst_fit(struct work_queue *q, struct work_queue_task *t)
 {
 	char *key;
 	struct work_queue_worker *w;
 	struct work_queue_worker *best_worker = NULL;
 
-	struct work_queue_resources bres;
-	struct work_queue_resources wres;
-
-	memset(&bres, 0, sizeof(struct work_queue_resources));
-	memset(&wres, 0, sizeof(struct work_queue_resources));
-
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
 		if( check_hand_against_task(q, w, t) ) {
-
-			//Use total field on bres, wres to indicate free resources.
-			wres.cores.total   = w->resources->cores.total   - w->resources->cores.inuse;
-			wres.memory.total  = w->resources->memory.total  - w->resources->memory.inuse;
-			wres.disk.total    = w->resources->disk.total    - w->resources->disk.inuse;
-			wres.gpus.total    = w->resources->gpus.total    - w->resources->gpus.inuse;
-
-			if(!best_worker || compare_worst_fit(&bres, &wres))
+			if(!best_worker || candidate_has_worse_fit(best_worker, w))
 			{
 				best_worker = w;
-				memcpy(&bres, &wres, sizeof(struct work_queue_resources));
 			}
 		}
 	}
@@ -4325,7 +4343,7 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struc
 		if(check_hand_against_task(q, w, t)) {
 			if(w->total_tasks_complete > 0) {
 				double t = (w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
-				if(!best_worker || t < best_time) {
+				if(!best_worker || t < best_time || (t == best_time && in_ramp_down(q) && candidate_has_worse_fit(best_worker, w))) {
 					best_worker = w;
 					best_time = t;
 				}
@@ -4335,6 +4353,8 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struc
 
 	if(best_worker) {
 		return best_worker;
+	} else if(in_ramp_down(q)) {
+		return find_worker_by_worst_fit(q, t);
 	} else {
 		return find_worker_by_fcfs(q, t);
 	}
@@ -5897,6 +5917,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->monitor_mode = MON_DISABLED;
 
 	q->hungry_minimum = 10;
+	q->hungry_minimum_factor = 2;
 
 	q->wait_for_workers = 0;
 	q->attempt_schedule_depth = 100;
@@ -7096,8 +7117,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	return t;
 }
 
-//check if workers' resources are available to execute more tasks
-//queue should have at least q->hungry_minimum ready tasks
+//check if workers' resources are available to execute more tasks queue should
+//have at least MAX(hungry_minimum, hungry_minimum_factor * number of workers) ready tasks
 //@param: 	struct work_queue* - pointer to queue
 //@return: 	1 if hungry, 0 otherwise
 int work_queue_hungry(struct work_queue *q)
@@ -7111,8 +7132,8 @@ int work_queue_hungry(struct work_queue *q)
 	struct work_queue_stats qstats;
 	work_queue_get_stats(q, &qstats);
 
-	//if number of ready tasks is less than q->hungry_minimum, then queue is hungry
-	if (qstats.tasks_waiting < q->hungry_minimum){
+	//if number of ready tasks is less than minimum, then queue is hungry
+	if (qstats.tasks_waiting < MAX(q->hungry_minimum, q->hungry_minimum_factor * hash_table_size(q->worker_table))){
 		return 1;
 	}
 
@@ -7393,6 +7414,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 	} else if(!strcmp(name, "hungry-minimum")) {
 		q->hungry_minimum = MAX(1, (int)value);
 
+	} else if(!strcmp(name, "hungry-minimum-factor")) {
+		q->hungry_minimum_factor = MAX(1, (int)value);
+
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
 
@@ -7407,9 +7431,10 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "force-proportional-resources-whole-tasks") || !strcmp(name, "proportional-whole-tasks")) {
 		q->proportional_whole_tasks = MAX(0, (int)value);
-	} else if (!strcmp(name, "monitor-interval")) {
-		/* 0 means use monitor's default */
-		q->monitor_interval = MAX(0, (int)value);
+
+	} else if (!strcmp(name, "ramp-down-heuristic")) {
+		q->ramp_down_heuristic = MAX(0, (int)value);
+
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
