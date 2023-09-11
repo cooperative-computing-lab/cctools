@@ -51,7 +51,7 @@ extern char *workspace;
 
 static int vine_process_wait_for_library_startup(struct vine_process *p, time_t stoptime);
 static char *vine_process_invoke_function(struct vine_process *library_process, const char *function_name,
-		const char *function_input, const char *sandbox_path);
+		const char *function_input, const int function_input_length, const char *sandbox_path, int* function_output_len);
 
 /*
 Give the letter code used for the process sandbox dir.
@@ -203,7 +203,7 @@ static void set_resources_vars(struct vine_process *p)
 	}
 }
 
-static char *load_input_file(struct vine_task *t)
+static char *load_input_file(struct vine_task *t, int* len)
 {
 	FILE *fp = fopen("infile", "r");
 	if (!fp) {
@@ -214,8 +214,7 @@ static char *load_input_file(struct vine_task *t)
 	size_t fsize = ftell(fp);
 	fseek(fp, 0L, SEEK_SET);
 
-	char *buf = malloc(fsize + 1);
-	buf[fsize] = 0;
+	char *buf = malloc(fsize);
 
 	int bytes_read = full_fread(fp, buf, fsize);
 	if (bytes_read < 0) {
@@ -223,7 +222,7 @@ static char *load_input_file(struct vine_task *t)
 	}
 
 	fclose(fp);
-
+	*len = fsize;
 	return buf;
 }
 
@@ -308,14 +307,21 @@ pid_t vine_process_execute(struct vine_process *p)
 		}
 	} else {
 		/* For other task types, read input from null and send output to assigned file. */
-
 		input_fd = open("/dev/null", O_RDONLY);
-		output_fd = open(p->output_file_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
-		if (output_fd < 0) {
-			debug(D_VINE, "Could not open worker stdout: %s", strerror(errno));
-			return 0;
+		if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
+			char* output_file = string_format("%s/outfile", p->sandbox);
+			output_fd = open(output_file, O_WRONLY | O_TRUNC | O_CREAT, 0777);
+			error_fd = open(p->output_file_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
+			free(output_file);
 		}
-		error_fd = output_fd;
+		else {
+			output_fd = open(p->output_file_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
+			if (output_fd < 0) {
+				debug(D_VINE, "Could not open worker stdout: %s", strerror(errno));
+				return 0;
+			}
+			error_fd = output_fd;
+		}
 	}
 
 	/* Start the performance clock just prior to forking the task. */
@@ -395,14 +401,17 @@ pid_t vine_process_execute(struct vine_process *p)
 			change_process_title("vine_worker [function]");
 
 			// load data from input file
-			char *input = load_input_file(p->task);
+			int input_len = 0;
+			char *input = load_input_file(p->task, &input_len);
+	
+			int output_len = 0;
 
 			// communicate with library to invoke the function
 			char *output = vine_process_invoke_function(
-					p->library_process, p->task->command_line, input, p->sandbox);
+					p->library_process, p->task->command_line, input, input_len, p->sandbox, &output_len);
 
 			// write data to output file
-			full_write(output_fd, output, strlen(output));
+			full_write(output_fd, output, output_len);
 
 			_exit(0);
 		}
@@ -499,12 +508,12 @@ and then reading back the result from the necessary pipe.
 */
 
 static char *vine_process_invoke_function(struct vine_process *library_process, const char *function_name,
-		const char *function_input, const char *sandbox_path)
+		const char *function_input, const int function_input_len, const char *sandbox_path, int* function_output_len)
 {
 	/* TODO: Set a five minute timeout.  XXX This should be changeable. */
 	time_t stoptime = time(0) + 300;
 
-	int length = strlen(function_input);
+	int length = function_input_len;
 
 	/* Send the function name, length of data, and sandbox directory. 
 	 * The length of the buffer goes first (marked by `\n`) then followed
@@ -519,10 +528,15 @@ static char *vine_process_invoke_function(struct vine_process *library_process, 
 	/* XXX The response should be returned as a variable-length buffer, not a line! */
 
 	/* Now read back the response as a single line and give it back. */
-	char line[VINE_LINE_MAX];
-	if (link_readline(library_process->library_read_link, line, VINE_LINE_MAX, stoptime)) {
-		return strdup(line);
+	char response_len_str[VINE_LINE_MAX];
+	link_readline(library_process->library_read_link, response_len_str, VINE_LINE_MAX, stoptime);
+	int response_len = atoi(response_len_str);
+	char* line = malloc(sizeof(char) * response_len);
+	if (link_read(library_process->library_read_link, line, response_len, stoptime)) {
+		*function_output_len = response_len;
+		return line;
 	} else {
+		*function_output_len = 0;
 		return 0;
 	}
 }

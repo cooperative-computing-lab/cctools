@@ -482,8 +482,6 @@ class Task(object):
     # @endcode
     @property
     def output(self):
-        if (isinstance(self, FunctionCall)):
-            return cloudpickle.loads(cvine.vine_task_get_stdout(self._task))['Result']
         return cvine.vine_task_get_stdout(self._task)
 
     ##
@@ -969,6 +967,7 @@ class FunctionCall(Task):
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
         self.needs_library(library_name)
+        self.output_buffer = None
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -981,6 +980,8 @@ class FunctionCall(Task):
         super().submit_finalize(manager)
         f = manager.declare_buffer(cloudpickle.dumps(self._event))
         self.add_input(f, "infile")
+        self.output_buffer = manager.declare_buffer(cache=False, peer_transfer=False)
+        self.add_output(self.output_buffer, "outfile")
 
     ##
     # Specify function arguments. Accepts arrays and dictionaries. This
@@ -1003,6 +1004,12 @@ class FunctionCall(Task):
             print("Error, vine_exec_method must either be fork or direct, choosing fork by default")
             remote_task_exec_method = "fork"
         self._event["remote_task_exec_method"] = remote_task_exec_method
+
+    @property
+    def output(self):
+        return cloudpickle.loads(self.output_buffer.contents())['Result']
+
+
 
 ##
 # \class LibraryTask

@@ -34,7 +34,7 @@ def library_network_code():
     def send_configuration(config, out_pipe):
         config_string = json.dumps(config)
         config_cmd = f"{len(config_string)}\n{config_string}"
-        out_pipe.write(config_cmd)
+        out_pipe.write(bytes(config_cmd, 'utf-8'))
         out_pipe.flush()
 
     def main():
@@ -46,8 +46,8 @@ def library_network_code():
         # Open communication pipes to vine_worker.
         # The file descriptors should already be open for reads and writes.
         # Below lines only convert file descriptors into native Python file objects.
-        in_pipe = os.fdopen(args.input_fd, 'r')
-        out_pipe = os.fdopen(args.output_fd, 'w')
+        in_pipe = os.fdopen(args.input_fd, 'rb')
+        out_pipe = os.fdopen(args.output_fd, 'wb')
 
         config = {
             "name": name(),
@@ -67,12 +67,11 @@ def library_network_code():
                     sys.exit(1)
 
                 # read first buffer
-                line = in_pipe.read(buffer_len)
+                line = str(in_pipe.read(buffer_len), encoding='utf-8')
 
                 function_name, event_size, function_sandbox = line.split(" ", maxsplit=2)
                 if event_size:
                     event_size = int(event_size)
-                    # receive the bytes containing the event and turn it into a string
                     event_str = in_pipe.read(event_size)
 
                     # load the event into a Python object
@@ -96,7 +95,7 @@ def library_network_code():
                         if p == 0:
                             os.chdir(function_sandbox)
                             response = globals()[function_name](event)
-                            os.write(write, cloudpickle.dumps(response).encode("utf-8"))
+                            os.write(write, cloudpickle.dumps(response))
                             os._exit(0)
                         elif p < 0:
                             print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)
@@ -106,13 +105,13 @@ def library_network_code():
                             }
                         else:
                             max_read = 65536
-                            chunk = os.read(read, max_read).decode("utf-8")
-                            all_chunks = [chunk]
+                            chunk = os.read(read, max_read)
+                            all_chunks = chunk
                             while (len(chunk) >= max_read):
-                                chunk = os.read(read, max_read).decode("utf-8")
-                                all_chunks.append(chunk)
-                            response = "".join(all_chunks)
+                                chunk = os.read(read, max_read)
+                                all_chunks += chunk
+                            response = all_chunks
                             os.waitpid(p, 0)
-                    out_pipe.write(response+'\n')
+                    out_pipe.write(bytes(str(len(response)), encoding='utf-8')+b'\n'+response)
                     out_pipe.flush()
         return 0
