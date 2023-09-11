@@ -4058,8 +4058,7 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 	case VINE_TASK_DONE:
 	case VINE_TASK_CANCELED:
 		/* Task was cloned when entered into our own table, so delete a reference on removal. */
-		if(t->has_fixed_locations)
-		{
+		if (t->has_fixed_locations) {
 			q->fixed_location_in_queue--;
 		}
 		vine_taskgraph_log_write_task(q, t);
@@ -4657,12 +4656,12 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// expired tasks
 		BEGIN_ACCUM_TIME(q, time_internal);
 		result = expire_waiting_tasks(q);
-		
+
 		// only check for fixed location if any are present (high overhead)
-		if(q->fixed_location_in_queue) {
+		if (q->fixed_location_in_queue) {
 			result |= enforce_waiting_fixed_locations(q);
 		}
-		
+
 		END_ACCUM_TIME(q, time_internal);
 		if (result) {
 			// expired or ended at least one task
