@@ -2589,6 +2589,18 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 		if (limits->disk <= 0) {
 			limits->disk = w->resources->disk.largest;
 		}
+	} else if (vine_schedule_in_ramp_down(q)) {
+		/* if in ramp down, use all the free space of that worker. note that we don't use
+		 * resource_submit_multiplier, as by definition in ramp down there are more workers than tasks. */
+		limits->cores = limits->gpus > 0 ? 0 : (w->resources->cores.largest - w->resources->cores.inuse);
+
+		/* default gpus is 0 */
+		if (limits->gpus <= 0) {
+			limits->gpus = 0;
+		}
+
+		limits->memory = w->resources->memory.largest - w->resources->memory.inuse;
+		limits->disk = w->resources->disk.largest - w->resources->disk.inuse;
 	}
 
 	/* never go below specified min resources. */
@@ -5078,6 +5090,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "force-proportional-resources-whole-tasks") ||
 			!strcmp(name, "proportional-whole-tasks")) {
 		q->proportional_whole_tasks = MAX(0, (int)value);
+
+	} else if (!strcmp(name, "ramp-down-heuristic")) {
+		q->ramp_down_heuristic = MAX(0, (int)value);
 
 	} else if (!strcmp(name, "file-source-max-transfers")) {
 		q->file_source_max_transfers = MAX(1, (int)value);
