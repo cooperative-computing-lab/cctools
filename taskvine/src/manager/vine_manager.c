@@ -2571,15 +2571,15 @@ struct rmsummary *vine_manager_choose_resources_for_task(
 	} else if (vine_schedule_in_ramp_down(q)) {
 		/* if in ramp down, use all the free space of that worker. note that we don't use
 		 * resource_submit_multiplier, as by definition in ramp down there are more workers than tasks. */
-		limits->cores = limits->gpus > 0 ? 0 : (w->resources->cores.largest - w->resources->cores.inuse);
+		limits->cores = limits->gpus > 0 ? 0 : (w->resources->cores.total - w->resources->cores.inuse);
 
 		/* default gpus is 0 */
 		if (limits->gpus <= 0) {
 			limits->gpus = 0;
 		}
 
-		limits->memory = w->resources->memory.largest - w->resources->memory.inuse;
-		limits->disk = w->resources->disk.largest - w->resources->disk.inuse;
+		limits->memory = w->resources->memory.total - w->resources->memory.inuse;
+		limits->disk = w->resources->disk.total - w->resources->disk.inuse;
 	}
 
 	/* never go below specified min resources. */
