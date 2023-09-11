@@ -178,6 +178,7 @@ struct vine_manager {
 	int keepalive_interval;	      /* Time between keepalive request transmissions. */
 	int keepalive_timeout;	      /* Keepalive response must be received within this time, otherwise worker disconnected. */
 	int hungry_minimum;           /* Minimum number of waiting tasks to consider queue not hungry. */
+	int hungry_minimum_factor;    /* queue is hungry if number of waiting tasks is less than hungry_minimum_factor * number of connected workers. */
 	int wait_for_workers;         /* Wait for these many workers to connect before dispatching tasks at start of execution. */
 	int attempt_schedule_depth;   /* number of submitted tasks to attempt scheduling before we continue to retrievals */
     int max_retrievals;           /* Do at most this number of task retrievals of either receive_one_task or receive_all_tasks_from_worker. If less
