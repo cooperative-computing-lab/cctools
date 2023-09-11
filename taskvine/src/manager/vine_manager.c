@@ -3519,6 +3519,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	getcwd(q->workingdir, PATH_MAX);
 
 	q->next_task_id = 1;
+	q->fixed_location_in_queue = 0;
 
 	q->ready_list = list_create();
 	q->running_table = itable_create(0);
@@ -4057,6 +4058,10 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 	case VINE_TASK_DONE:
 	case VINE_TASK_CANCELED:
 		/* Task was cloned when entered into our own table, so delete a reference on removal. */
+		if(t->has_fixed_locations)
+		{
+			q->fixed_location_in_queue--;
+		}
 		vine_taskgraph_log_write_task(q, t);
 		itable_remove(q->tasks, t->task_id);
 		vine_task_delete(t);
@@ -4191,6 +4196,7 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	vine_task_check_consistency(t);
 
 	if (t->has_fixed_locations) {
+		q->fixed_location_in_queue++;
 		vine_task_set_scheduler(t, VINE_SCHEDULE_FILES);
 	}
 
@@ -4651,7 +4657,12 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// expired tasks
 		BEGIN_ACCUM_TIME(q, time_internal);
 		result = expire_waiting_tasks(q);
-		result |= enforce_waiting_fixed_locations(q);
+		
+		// only check for fixed location if any are present (high overhead)
+		if(q->fixed_location_in_queue) {
+			result |= enforce_waiting_fixed_locations(q);
+		}
+		
 		END_ACCUM_TIME(q, time_internal);
 		if (result) {
 			// expired or ended at least one task
