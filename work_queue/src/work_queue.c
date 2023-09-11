@@ -201,6 +201,8 @@ struct work_queue {
 
 	int hungry_minimum;               /* minimum number of waiting tasks to consider queue not hungry. */;
 
+	int hungry_minimum_factor;       /* queue is hungry if number of waiting tasks is less than hungry_minimum_factor * number of connected workers. */
+
 	int wait_for_workers;             /* wait for these many workers before dispatching tasks at start of execution. */
 	int attempt_schedule_depth;		  /* number of submitted tasks to attempt scheduling before we continue to retrievals */
 
@@ -5897,6 +5899,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->monitor_mode = MON_DISABLED;
 
 	q->hungry_minimum = 10;
+	q->hungry_minimum_factor = 2;
 
 	q->wait_for_workers = 0;
 	q->attempt_schedule_depth = 100;
@@ -7096,8 +7099,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	return t;
 }
 
-//check if workers' resources are available to execute more tasks
-//queue should have at least q->hungry_minimum ready tasks
+//check if workers' resources are available to execute more tasks queue should
+//have at least MAX(hungry_minimum, hungry_minimum_factor * number of workers) ready tasks
 //@param: 	struct work_queue* - pointer to queue
 //@return: 	1 if hungry, 0 otherwise
 int work_queue_hungry(struct work_queue *q)
@@ -7111,8 +7114,8 @@ int work_queue_hungry(struct work_queue *q)
 	struct work_queue_stats qstats;
 	work_queue_get_stats(q, &qstats);
 
-	//if number of ready tasks is less than q->hungry_minimum, then queue is hungry
-	if (qstats.tasks_waiting < q->hungry_minimum){
+	//if number of ready tasks is less than minimum, then queue is hungry
+	if (qstats.tasks_waiting < MAX(q->hungry_minimum, q->hungry_minimum_factor * hash_table_size(q->worker_table))){
 		return 1;
 	}
 
@@ -7392,6 +7395,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "hungry-minimum")) {
 		q->hungry_minimum = MAX(1, (int)value);
+
+	} else if(!strcmp(name, "hungry-minimum-factor")) {
+		q->hungry_minimum_factor = MAX(1, (int)value);
 
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
