@@ -196,6 +196,15 @@ class Task(object):
         return cvine.vine_task_provides_library(self._task, library_name)
     
     ##
+    # Set the number of concurrent functions a library can run.
+    # This is not needed for regular tasks.
+    #
+    # @param self Reference to the current task object.
+    # @param nslots The maximum number of concurrent functions this library can run.
+    def set_function_slots(self, nslots):
+        return cvine.vine_task_set_function_slots(self._task, nslots)
+        
+    ##
     # Set the worker selection scheduler for task.
     #
     # @param self       Reference to the current task object.

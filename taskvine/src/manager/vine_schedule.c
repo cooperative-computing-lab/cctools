@@ -43,6 +43,49 @@ int check_fixed_location_worker(struct vine_manager *m, struct vine_worker_info 
 	return all_present;
 }
 
+/* Find a library task running on a specific worker that has an available slot. */
+
+static struct vine_task *find_library_on_worker_for_task(
+		struct vine_manager *q, struct vine_worker_info *w, const char *library_name)
+{
+	uint64_t task_id;
+	struct vine_task *task;
+
+	ITABLE_ITERATE(w->current_tasks, task_id, task)
+	{
+		if (task->provides_library && !strcmp(task->provides_library, library_name) &&
+				task->function_slots_inuse < task->function_slots) {
+			return task;
+		}
+	}
+
+	return 0;
+}
+
+/* Check if queue has entered ramp_down mode (more workers than waiting tasks).
+ * @param q The manager structure.
+ * @return 1 if in ramp down mode, 0 otherwise.
+ */
+
+int vine_schedule_in_ramp_down(struct vine_manager *q)
+{
+	if (!(q->monitor_mode & VINE_MON_WATCHDOG)) {
+		/* if monitoring is not terminating tasks because of resources, ramp down heuristic does not have any
+		 * effect. */
+		return 0;
+	}
+
+	if (!q->ramp_down_heuristic) {
+		return 0;
+	}
+
+	if (hash_table_size(q->worker_table) > list_size(q->ready_list)) {
+		return 1;
+	}
+
+	return 0;
+}
+
 /* Check if this task is compatible with this given worker by considering
  * resources availability, features, blocklist, and all other relevant factors.
  * Used by all scheduling methods for basic compatibility.
@@ -77,12 +120,13 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	}
 
 	/* If this is a function task needing a library, see if a library is available. */
-	/* XXX Note that we are not yet counting the number of invocations per worker. */
 
 	if (t->needs_library) {
-		if (vine_manager_find_library_on_worker(q, w, t->needs_library)) {
-			/* keep going */
+		t->library_task = find_library_on_worker_for_task(q, w, t->needs_library);
+		if (t->library_task) {
+			/* Found it, keep going. */
 		} else {
+			/* Function cannot run here at all. */
 			return 0;
 		}
 	}
@@ -154,6 +198,40 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	return ok;
 }
 
+// 0 if current_best has more free resources than candidate, 1 else.
+static int candidate_has_worse_fit(struct vine_worker_info *current_best, struct vine_worker_info *candidate)
+{
+	struct vine_resources *b = current_best->resources;
+	struct vine_resources *o = candidate->resources;
+
+	// Total worker order: free cores > free memory > free disk > free gpus
+	int free_delta = (b->cores.total - b->cores.inuse) - (o->cores.total - o->cores.inuse);
+	if (free_delta > 0) {
+		return 1;
+	} else if (free_delta < 0) {
+		return 0;
+	}
+
+	// Same number of free cores...
+	free_delta = (b->memory.total - b->memory.inuse) - (o->memory.total - o->memory.inuse);
+	if (free_delta > 0) {
+		return 1;
+	} else if (free_delta < 0) {
+		return 0;
+	}
+
+	// Same number of free disk...
+	free_delta = (b->disk.total - b->disk.inuse) - (o->disk.total - o->disk.inuse);
+	if (free_delta > 0) {
+		return 1;
+	} else if (free_delta < 0) {
+		return 0;
+	}
+
+	// Number of free resources are the same.
+	return 0;
+}
+
 /*
 Find the worker that has the largest quantity of cached data needed
 by this task, so as to minimize transfer work that must be done
@@ -170,6 +248,8 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 	uint8_t has_all_files;
 	struct vine_file_replica *remote_info;
 	struct vine_mount *m;
+
+	int ramp_down = vine_schedule_in_ramp_down(q);
 
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
@@ -189,11 +269,13 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 			}
 
 			/* Return the worker if it was in possession of all cacheable files */
-			if (has_all_files) {
+			if (has_all_files && !ramp_down) {
 				return w;
 			}
 
-			if (!best_worker || task_cached_bytes > most_task_cached_bytes) {
+			if (!best_worker || task_cached_bytes > most_task_cached_bytes ||
+					(ramp_down && task_cached_bytes == most_task_cached_bytes &&
+							candidate_has_worse_fit(best_worker, w))) {
 				best_worker = w;
 				most_task_cached_bytes = task_cached_bytes;
 			}
@@ -256,41 +338,6 @@ static struct vine_worker_info *find_worker_by_random(struct vine_manager *q, st
 	return w;
 }
 
-// 1 if a < b, 0 if a >= b
-static int compare_worst_fit(struct vine_resources *a, struct vine_resources *b)
-{
-	// Total worker order: free cores > free memory > free disk > free gpus
-	if ((a->cores.total < b->cores.total))
-		return 1;
-
-	if ((a->cores.total > b->cores.total))
-		return 0;
-
-	// Same number of free cores...
-	if ((a->memory.total < b->memory.total))
-		return 1;
-
-	if ((a->memory.total > b->memory.total))
-		return 0;
-
-	// Same number of free memory...
-	if ((a->disk.total < b->disk.total))
-		return 1;
-
-	if ((a->disk.total > b->disk.total))
-		return 0;
-
-	// Same number of free disk...
-	if ((a->gpus.total < b->gpus.total))
-		return 1;
-
-	if ((a->gpus.total > b->gpus.total))
-		return 0;
-
-	// Number of free resources are the same.
-	return 0;
-}
-
 /*
 Find the worker that is the "worst fit" for this task,
 meaning the worker that will have the most resources
@@ -303,26 +350,12 @@ static struct vine_worker_info *find_worker_by_worst_fit(struct vine_manager *q,
 	struct vine_worker_info *w;
 	struct vine_worker_info *best_worker = NULL;
 
-	struct vine_resources bres;
-	struct vine_resources wres;
-
-	memset(&bres, 0, sizeof(struct vine_resources));
-	memset(&wres, 0, sizeof(struct vine_resources));
-
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
 
 		if (check_worker_against_task(q, w, t)) {
-
-			// Use total field on bres, wres to indicate free resources.
-			wres.cores.total = w->resources->cores.total - w->resources->cores.inuse;
-			wres.memory.total = w->resources->memory.total - w->resources->memory.inuse;
-			wres.disk.total = w->resources->disk.total - w->resources->disk.inuse;
-			wres.gpus.total = w->resources->gpus.total - w->resources->gpus.inuse;
-
-			if (!best_worker || compare_worst_fit(&bres, &wres)) {
+			if (!best_worker || candidate_has_worse_fit(best_worker, w)) {
 				best_worker = w;
-				memcpy(&bres, &wres, sizeof(struct vine_resources));
 			}
 		}
 	}
@@ -348,7 +381,9 @@ static struct vine_worker_info *find_worker_by_time(struct vine_manager *q, stru
 		if (check_worker_against_task(q, w, t)) {
 			if (w->total_tasks_complete > 0) {
 				double t = (w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
-				if (!best_worker || t < best_time) {
+				if (!best_worker || t < best_time ||
+						(t == best_time && vine_schedule_in_ramp_down(q) &&
+								candidate_has_worse_fit(best_worker, w))) {
 					best_worker = w;
 					best_time = t;
 				}
@@ -358,6 +393,8 @@ static struct vine_worker_info *find_worker_by_time(struct vine_manager *q, stru
 
 	if (best_worker) {
 		return best_worker;
+	} else if (vine_schedule_in_ramp_down(q)) {
+		return find_worker_by_worst_fit(q, t);
 	} else {
 		return find_worker_by_fcfs(q, t);
 	}

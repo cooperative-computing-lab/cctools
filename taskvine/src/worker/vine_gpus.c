@@ -7,12 +7,12 @@ See the file COPYING for details.
 #include "vine_gpus.h"
 #include "buffer.h"
 #include "debug.h"
-#include "vine_resources.h"
-
-extern struct vine_resources *total_resources;
 
 /* Array tracks which task is assigned to each GPU. */
 static int *gpu_to_task = 0;
+
+/* Total number of initialized gpus */
+static int gpu_count = 0;
 
 /*
 Initialize the GPU tracking state.
@@ -22,8 +22,10 @@ but should only initialized once.
 
 void vine_gpus_init(int ngpus)
 {
-	if (!gpu_to_task)
+	if (!gpu_to_task) {
 		gpu_to_task = calloc(ngpus, sizeof(int));
+		gpu_count = ngpus;
+	}
 }
 
 /*
@@ -36,7 +38,7 @@ void vine_gpus_debug()
 	buffer_init(&b);
 	buffer_putfstring(&b, "GPUs Assigned to Tasks: [ ");
 	int i;
-	for (i = 0; i < total_resources->gpus.total; i++) {
+	for (i = 0; i < gpu_count; i++) {
 		buffer_putfstring(&b, "%d ", gpu_to_task[i]);
 	}
 	buffer_putfstring(&b, " ]");
@@ -51,7 +53,7 @@ Free all of the GPUs associated with this task_id.
 void vine_gpus_free(int task_id)
 {
 	int i;
-	for (i = 0; i < total_resources->gpus.total; i++) {
+	for (i = 0; i < gpu_count; i++) {
 		if (gpu_to_task[i] == task_id) {
 			gpu_to_task[i] = 0;
 		}
@@ -68,7 +70,7 @@ if not enough are available.
 void vine_gpus_allocate(int n, int task)
 {
 	int i;
-	for (i = 0; i < total_resources->gpus.total && n > 0; i++) {
+	for (i = 0; i < gpu_count && n > 0; i++) {
 		if (gpu_to_task[i] == 0) {
 			gpu_to_task[i] = task;
 			n--;
@@ -93,7 +95,7 @@ char *vine_gpus_to_string(int task_id)
 	int first = 1;
 	buffer_t b;
 	buffer_init(&b);
-	for (i = 0; i < total_resources->gpus.total; i++) {
+	for (i = 0; i < gpu_count; i++) {
 		if (gpu_to_task[i] == task_id) {
 			if (first) {
 				first = 0;

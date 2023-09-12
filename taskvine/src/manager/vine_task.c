@@ -55,6 +55,8 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->worker_selection_algorithm = VINE_SCHEDULE_UNSET;
 
 	t->state = VINE_TASK_UNKNOWN;
+	t->function_slots = 1;
+	t->function_slots_inuse = 0;
 
 	t->result = VINE_RESULT_UNKNOWN;
 	t->exit_code = -1;
@@ -84,6 +86,9 @@ void vine_task_clean(struct vine_task *t)
 	t->bytes_sent = 0;
 	t->bytes_received = 0;
 	t->bytes_transferred = 0;
+
+	t->library_task = 0;
+	t->function_slots_inuse = 0;
 
 	free(t->output);
 	t->output = NULL;
@@ -191,6 +196,7 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 	new->output_mounts = vine_task_mount_list_copy(task->output_mounts);
 	new->env_list = vine_task_string_list_copy(task->env_list);
 	new->feature_list = vine_task_string_list_copy(task->feature_list);
+	new->function_slots = task->function_slots;
 
 	/* Scheduling features of task are copied. */
 	new->resource_request = task->resource_request;
@@ -231,6 +237,14 @@ void vine_task_needs_library(struct vine_task *t, const char *library_name)
 	if (library_name) {
 		t->needs_library = xxstrdup(library_name);
 	}
+
+	/* A function-call task does not consume any resources. */
+	/* It relies upon the resources allocated by its library task. */
+
+	vine_task_set_cores(t, 0);
+	vine_task_set_memory(t, 0);
+	vine_task_set_disk(t, 0);
+	vine_task_set_gpus(t, 0);
 }
 
 void vine_task_provides_library(struct vine_task *t, const char *library_name)
@@ -244,6 +258,8 @@ void vine_task_provides_library(struct vine_task *t, const char *library_name)
 		t->provides_library = xxstrdup(library_name);
 	}
 }
+
+void vine_task_set_function_slots(struct vine_task *t, int nslots) { t->function_slots = nslots; }
 
 void vine_task_set_env_var(struct vine_task *t, const char *name, const char *value)
 {
