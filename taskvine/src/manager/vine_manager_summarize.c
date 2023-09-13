@@ -16,9 +16,9 @@ See the file COPYING for details.
 #include <stddef.h>
 #include <stdlib.h>
 
-size_t sort_ds_worker_summary_offset = 0;
+static size_t sort_worker_summary_offset = 0;
 
-static int sort_ds_worker_cmp(const void *a, const void *b)
+static int sort_worker_cmp(const void *a, const void *b)
 {
 	const struct rmsummary *x = *((const struct rmsummary **)a);
 	const struct rmsummary *y = *((const struct rmsummary **)b);
@@ -26,8 +26,8 @@ static int sort_ds_worker_cmp(const void *a, const void *b)
 	double count_x = x->workers;
 	double count_y = y->workers;
 
-	double res_x = rmsummary_get_by_offset(x, sort_ds_worker_summary_offset);
-	double res_y = rmsummary_get_by_offset(y, sort_ds_worker_summary_offset);
+	double res_x = rmsummary_get_by_offset(x, sort_worker_summary_offset);
+	double res_y = rmsummary_get_by_offset(y, sort_worker_summary_offset);
 
 	if (res_x == res_y) {
 		return count_y - count_x;
@@ -37,24 +37,24 @@ static int sort_ds_worker_cmp(const void *a, const void *b)
 }
 
 // function used by other functions
-static void sort_ds_worker_summary(struct rmsummary **worker_data, int count, const char *sortby)
+static void sort_worker_summary(struct rmsummary **worker_data, int count, const char *sortby)
 {
 	if (!strcmp(sortby, "cores")) {
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, cores);
+		sort_worker_summary_offset = offsetof(struct rmsummary, cores);
 	} else if (!strcmp(sortby, "memory")) {
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, memory);
+		sort_worker_summary_offset = offsetof(struct rmsummary, memory);
 	} else if (!strcmp(sortby, "disk")) {
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, disk);
+		sort_worker_summary_offset = offsetof(struct rmsummary, disk);
 	} else if (!strcmp(sortby, "gpus")) {
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, gpus);
+		sort_worker_summary_offset = offsetof(struct rmsummary, gpus);
 	} else if (!strcmp(sortby, "workers")) {
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, workers);
+		sort_worker_summary_offset = offsetof(struct rmsummary, workers);
 	} else {
 		debug(D_NOTICE, "Invalid field to sort worker summaries. Valid fields are: cores, memory, disk, gpus, and workers.");
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, memory);
+		sort_worker_summary_offset = offsetof(struct rmsummary, memory);
 	}
 
-	qsort(&worker_data[0], count, sizeof(struct rmsummary *), sort_ds_worker_cmp);
+	qsort(&worker_data[0], count, sizeof(struct rmsummary *), sort_worker_cmp);
 }
 
 // round to powers of two log scale with 1/n divisions
@@ -125,11 +125,11 @@ struct rmsummary **vine_manager_summarize_workers(struct vine_manager *q)
 
 	hash_table_delete(workers_count);
 
-	sort_ds_worker_summary(worker_data, count, "disk");
-	sort_ds_worker_summary(worker_data, count, "memory");
-	sort_ds_worker_summary(worker_data, count, "gpus");
-	sort_ds_worker_summary(worker_data, count, "cores");
-	sort_ds_worker_summary(worker_data, count, "workers");
+	sort_worker_summary(worker_data, count, "disk");
+	sort_worker_summary(worker_data, count, "memory");
+	sort_worker_summary(worker_data, count, "gpus");
+	sort_worker_summary(worker_data, count, "cores");
+	sort_worker_summary(worker_data, count, "workers");
 
 	return worker_data;
 }

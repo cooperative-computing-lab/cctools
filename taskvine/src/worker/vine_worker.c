@@ -154,9 +154,8 @@ static timestamp_t worker_start_time = 0;
 
 static struct vine_watcher *watcher = 0;
 
-static struct vine_resources *local_resources = 0;
-struct vine_resources *total_resources = 0;
-struct vine_resources *total_resources_last = 0;
+/* The resources measured and available at this worker. */
+static struct vine_resources *total_resources = 0;
 
 static int64_t last_task_received = 0;
 
@@ -169,6 +168,7 @@ static time_t manual_wall_time_option = 0;
 /* -1 means not given as a command line option. */
 static int64_t manual_gpus_option = -1;
 
+/* The resources currently allocated to running tasks. */
 static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
@@ -296,8 +296,8 @@ static int64_t measure_worker_disk()
 }
 
 /*
-Measure only the resources associated with this particular node
-and apply any operations that override.
+Measure the resources associated with this worker
+and apply any local options that override it.
 */
 
 static void measure_worker_resources()
@@ -307,7 +307,7 @@ static void measure_worker_resources()
 		return;
 	}
 
-	struct vine_resources *r = local_resources;
+	struct vine_resources *r = total_resources;
 
 	vine_resources_measure_locally(r, workspace);
 
@@ -322,15 +322,8 @@ static void measure_worker_resources()
 		r->disk.total = MIN(r->disk.total, manual_disk_option);
 	}
 
-	r->cores.smallest = r->cores.largest = r->cores.total;
-	r->memory.smallest = r->memory.largest = r->memory.total;
-	r->disk.smallest = r->disk.largest = r->disk.total;
-	r->gpus.smallest = r->gpus.largest = r->gpus.total;
-
 	r->disk.inuse = measure_worker_disk();
 	r->tag = last_task_received;
-
-	memcpy(total_resources, r, sizeof(struct vine_resources));
 
 	vine_gpus_init(r->gpus.total);
 
@@ -361,14 +354,6 @@ Send a message to the manager with my current resources.
 static void send_resource_update(struct link *manager)
 {
 	time_t stoptime = time(0) + active_timeout;
-
-	total_resources->memory.total = MAX(0, local_resources->memory.total);
-	total_resources->memory.largest = MAX(0, local_resources->memory.largest);
-	total_resources->memory.smallest = MAX(0, local_resources->memory.smallest);
-
-	total_resources->disk.total = MAX(0, local_resources->disk.total);
-	total_resources->disk.largest = MAX(0, local_resources->disk.largest);
-	total_resources->disk.smallest = MAX(0, local_resources->disk.smallest);
 
 	// if workers are set to expire in some time, send the expiration time to manager
 	if (manual_wall_time_option > 0) {
@@ -680,10 +665,10 @@ static void normalize_resources(struct vine_process *p)
 
 	if (t->resources_requested->cores < 0 && t->resources_requested->memory < 0 &&
 			t->resources_requested->disk < 0 && t->resources_requested->gpus < 0) {
-		t->resources_requested->cores = local_resources->cores.total;
-		t->resources_requested->memory = local_resources->memory.total;
-		t->resources_requested->disk = local_resources->disk.total;
-		t->resources_requested->gpus = local_resources->gpus.total;
+		t->resources_requested->cores = total_resources->cores.total;
+		t->resources_requested->memory = total_resources->memory.total;
+		t->resources_requested->disk = total_resources->disk.total;
+		t->resources_requested->gpus = total_resources->gpus.total;
 	} else {
 		t->resources_requested->cores = MAX(t->resources_requested->cores, 0);
 		t->resources_requested->memory = MAX(t->resources_requested->memory, 0);
@@ -1149,10 +1134,10 @@ static int task_resources_fit_now(struct vine_task *t)
 {
 	/* XXX removed disk space check due to problems running workers locally or multiple workers on a single node
 	 * since default tasks request the entire reported disk space. questionable if this check useful in practice.*/
-	return (cores_allocated + t->resources_requested->cores <= local_resources->cores.total) &&
-	       (memory_allocated + t->resources_requested->memory <= local_resources->memory.total) &&
-	       (1) && // disk_allocated   + t->resources_requested->disk   <= local_resources->disk.total) &&
-	       (gpus_allocated + t->resources_requested->gpus <= local_resources->gpus.total);
+	return (cores_allocated + t->resources_requested->cores <= total_resources->cores.total) &&
+	       (memory_allocated + t->resources_requested->memory <= total_resources->memory.total) &&
+	       (1) && // disk_allocated   + t->resources_requested->disk   <= total_resources->disk.total) &&
+	       (gpus_allocated + t->resources_requested->gpus <= total_resources->gpus.total);
 }
 
 /*
@@ -1166,11 +1151,11 @@ static int task_resources_fit_eventually(struct vine_task *t)
 {
 	struct vine_resources *r;
 
-	r = local_resources;
+	r = total_resources;
 
-	return (t->resources_requested->cores <= r->cores.largest) &&
-	       (t->resources_requested->memory <= r->memory.largest) &&
-	       (t->resources_requested->disk <= r->disk.largest) && (t->resources_requested->gpus <= r->gpus.largest);
+	return (t->resources_requested->cores <= r->cores.total) &&
+	       (t->resources_requested->memory <= r->memory.total) && (t->resources_requested->disk <= r->disk.total) &&
+	       (t->resources_requested->gpus <= r->gpus.total);
 }
 
 /*
@@ -1239,30 +1224,30 @@ If 0, the worker is using more resources than promised. 1 if resource usage hold
 
 static int enforce_worker_limits(struct link *manager)
 {
-	if (manual_disk_option > 0 && local_resources->disk.inuse > manual_disk_option) {
+	if (manual_disk_option > 0 && total_resources->disk.inuse > manual_disk_option) {
 		fprintf(stderr,
 				"vine_worker: %s used more than declared disk space (--disk - < disk used) %" PRIu64
 				" < %" PRIu64 " MB\n",
 				workspace,
 				manual_disk_option,
-				local_resources->disk.inuse);
+				total_resources->disk.inuse);
 
 		if (manager) {
-			send_message(manager, "info disk_exhausted %lld\n", (long long)local_resources->disk.inuse);
+			send_message(manager, "info disk_exhausted %lld\n", (long long)total_resources->disk.inuse);
 		}
 
 		return 0;
 	}
 
-	if (manual_memory_option > 0 && local_resources->memory.inuse > manual_memory_option) {
+	if (manual_memory_option > 0 && total_resources->memory.inuse > manual_memory_option) {
 		fprintf(stderr,
 				"vine_worker: used more than declared memory (--memory < memory used) %" PRIu64
 				" < %" PRIu64 " MB\n",
 				manual_memory_option,
-				local_resources->memory.inuse);
+				total_resources->memory.inuse);
 
 		if (manager) {
-			send_message(manager, "info memory_exhausted %lld\n", (long long)local_resources->memory.inuse);
+			send_message(manager, "info memory_exhausted %lld\n", (long long)total_resources->memory.inuse);
 		}
 
 		return 0;
@@ -1289,15 +1274,15 @@ static int enforce_worker_promises(struct link *manager)
 		return 0;
 	}
 
-	if (manual_disk_option > 0 && local_resources->disk.total < manual_disk_option) {
+	if (manual_disk_option > 0 && total_resources->disk.total < manual_disk_option) {
 		fprintf(stderr,
 				"vine_worker: has less than the promised disk space (--disk > disk total) %" PRIu64
 				" < %" PRIu64 " MB\n",
 				manual_disk_option,
-				local_resources->disk.total);
+				total_resources->disk.total);
 
 		if (manager) {
-			send_message(manager, "info disk_error %lld\n", (long long)local_resources->disk.total);
+			send_message(manager, "info disk_error %lld\n", (long long)total_resources->disk.total);
 		}
 
 		return 0;
@@ -2345,9 +2330,7 @@ int main(int argc, char *argv[])
 
 	watcher = vine_watcher_create();
 
-	local_resources = vine_resources_create();
 	total_resources = vine_resources_create();
-	total_resources_last = vine_resources_create();
 
 	if (manual_cores_option < 1) {
 		manual_cores_option = load_average_get_cpus();
