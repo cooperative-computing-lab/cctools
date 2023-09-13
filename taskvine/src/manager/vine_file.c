@@ -116,6 +116,14 @@ struct vine_file *vine_file_clone(struct vine_file *f)
 /* Return the contents of the file, if available. */
 
 const char *vine_file_contents(struct vine_file *f) { return f->data; }
+void* vine_file_contents_binary(struct vine_file *f, size_t* size) { 
+    *size = vine_file_size(f);
+    return f->data; 
+}
+
+void vine_file_contents_binary_swig(void** data, size_t* size, struct vine_file *f) { 
+    *data = vine_file_contents_binary(f, size);
+}
 
 /* Return the size of any kind of file. */
 

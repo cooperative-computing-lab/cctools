@@ -2,6 +2,7 @@
 %module cvine
 
 %include carrays.i
+%include cstring.i
 %array_functions(struct rmsummary *, rmsummayArray);
 
 %begin %{
@@ -62,6 +63,9 @@ into a swig function f(data) */
     }
 }
 %typemap(doc) const char *data, int length "$1_name: a readable buffer (e.g. a bytes object)"
+
+/* return string with length as python bytes  */
+%cstring_output_allocate_size(void** data, size_t* size, 0);
 
 %include "stdint.i"
 %include "int_sizes.h"
