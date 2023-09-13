@@ -40,7 +40,7 @@ class File(object):
     #
     # @param self       A file object.
     def contents(self):
-        return cvine.vine_file_contents_binary_swig(self._file)
+        return cvine.vine_file_contents_as_bytes(self._file)
 
     ##
     # Return the size of a file object, in bytes.
