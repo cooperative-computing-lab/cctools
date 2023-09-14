@@ -50,8 +50,7 @@ See the file COPYING for details.
 extern char *workspace;
 
 static int vine_process_wait_for_library_startup(struct vine_process *p, time_t stoptime);
-static char *vine_process_invoke_function(struct vine_process *library_process, const char *function_name,
-		const char *function_input, const int function_input_length, const char *sandbox_path, int* function_output_len);
+static char *vine_process_invoke_function(struct vine_process *library_process, const char *function_name, const char *function_input, const int function_input_length, const char *sandbox_path, int* function_output_len);
 
 /*
 Give the letter code used for the process sandbox dir.
@@ -524,8 +523,6 @@ static char *vine_process_invoke_function(struct vine_process *library_process, 
 
 	/* Then send the function data itself. */
 	link_write(library_process->library_write_link, function_input, length, stoptime);
-
-	/* XXX The response should be returned as a variable-length buffer, not a line! */
 
 	/* Now read back the response as a single line and give it back. */
 	char response_len_str[VINE_LINE_MAX];

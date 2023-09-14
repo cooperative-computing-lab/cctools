@@ -2,7 +2,6 @@
 %module cvine
 
 %include carrays.i
-%include cstring.i
 %array_functions(struct rmsummary *, rmsummayArray);
 
 %begin %{
@@ -69,9 +68,6 @@ into a swig function f(data) */
         return PyBytes_FromStringAndSize(vine_file_contents(f), vine_file_size(f));
     }
 %}
-
-/* return string with length as python bytes  */
-%cstring_output_allocate_size(void** data, size_t* size, 0);
 
 %include "stdint.i"
 %include "int_sizes.h"

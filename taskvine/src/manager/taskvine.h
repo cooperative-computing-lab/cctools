@@ -615,8 +615,6 @@ has previously been called on this object.
 @return A constant pointer to the buffer contents, or null if not available.
 */
 const char * vine_file_contents( struct vine_file *f );
-void* vine_file_contents_binary( struct vine_file *f , size_t* raw_size);
-void vine_file_contents_binary_swig(void** data, size_t* size, struct vine_file *f);
 
 /** Get the length of a vine file.
 @param f A file object.

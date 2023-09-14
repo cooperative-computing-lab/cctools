@@ -53,8 +53,7 @@ def library_network_code():
             return LibraryResponse(result, success, reason).generate()
         return remote_wrapper
 
-    read, write = os.pipe()
-
+    # Self-identifying message to send back to the worker, including the name of this library.
     def send_configuration(config, out_pipe):
         config_string = json.dumps(config)
         config_cmd = f"{len(config_string)}\n{config_string}"
@@ -68,7 +67,8 @@ def library_network_code():
         args = parser.parse_args()
 
         # Open communication pipes to vine_worker.
-        # The file descriptors should already be open for reads and writes.
+        # The file descriptors are inherited from the vine_worker parent process 
+        # and should already be open for reads and writes.
         # Below lines only convert file descriptors into native Python file objects.
         in_pipe = os.fdopen(args.input_fd, 'rb')
         out_pipe = os.fdopen(args.output_fd, 'wb')
@@ -77,6 +77,9 @@ def library_network_code():
             "name": name(),
         }
         send_configuration(config, out_pipe)
+        
+        # A pair of pipes to communicate with the child process if needed.
+        read, write = os.pipe()
 
         while True:
             while True:
@@ -86,14 +89,15 @@ def library_network_code():
                     # remove trailing \n
                     buffer_len = int(in_pipe.readline()[:-1])
                 # if the worker closed the pipe connected to the input of this process, we should just exit
+                # stderr is already dup2'ed to send error messages to an output file that can be brought back for further analysis.
                 except Exception as e:
                     print("Cannot read message from the manager, exiting. ", e, file=sys.stderr)
                     sys.exit(1)
 
-                # read first buffer
+                # read first buffer, this buffer should contain only utf-8 chars.
                 line = str(in_pipe.read(buffer_len), encoding='utf-8')
-
                 function_name, event_size, function_sandbox = line.split(" ", maxsplit=2)
+                
                 if event_size:
                     event_size = int(event_size)
                     event_str = in_pipe.read(event_size)
@@ -104,6 +108,7 @@ def library_network_code():
                     # see if the user specified an execution method
                     exec_method = event.get("remote_task_exec_method", None)
 
+                    # library either directly executes or forks to do so.
                     if exec_method == "direct":
                         library_sandbox = os.getcwd()
                         try:
@@ -116,26 +121,34 @@ def library_network_code():
                             os.chdir(library_sandbox)
                     else:
                         p = os.fork()
+
+                        # child executes and pipes result back to parent.
                         if p == 0:
                             os.chdir(function_sandbox)
-                            response = globals()[function_name](event)
-                            os.write(write, cloudpickle.dumps(response))
+                            response = cloudpickle.dumps(globals()[function_name](event))
+                            written = 0
+                            while written < len(response):
+                                written += os.write(write, response[written:])
                             os._exit(0)
                         elif p < 0:
                             print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)
-                            response = {
-                                "Result": "unable to fork",
-                                "StatusCode": 500
-                            }
+                            result = None
+                            success = False
+                            reason = f'unable to fork-exec function {function_name}'
+                            response = LibraryResponse(result, success, reason).generate()
+
+                        # parent collects result and waits for child to exit.
                         else:
-                            max_read = 65536
-                            chunk = os.read(read, max_read)
-                            all_chunks = chunk
-                            while (len(chunk) >= max_read):
+                            response = b''
+                            max_read = 65536    # arbitrary number, change if needed.
+                            while True:
                                 chunk = os.read(read, max_read)
-                                all_chunks += chunk
-                            response = all_chunks
+                                if chunk = b'':
+                                    break
+                                response += chunk
                             os.waitpid(p, 0)
-                    out_pipe.write(bytes(str(len(response)), encoding='utf-8')+b'\n'+response)
+                    
+                    #out_pipe.write(bytes(str(len(response)), encoding='utf-8')+b'\n'+response)
+                    out_pipe.write(len(response).to_bytes(8, sys.byteorder)+b'\n'+response)
                     out_pipe.flush()
         return 0
