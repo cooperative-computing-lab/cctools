@@ -5,28 +5,52 @@
 # See the file COPYING for details.
 
 
+# This function serves as the template for Python Library Task.
+# A Python Library Task's script will be extracted as the body of this
+# function and run on a worker as a pilot task. Upcoming Python
+# Function Calls will be executed by this pilot task.
 def library_network_code():
+
+    # import relevant libraries.
     import json
     import os
     import sys
     import argparse
+    import traceback
     import cloudpickle
 
+    
+    # This class captures how results from FunctionCalls are conveyed from 
+    # the library to the manager. 
+    # For now, all communication details should use this class to generate responses.
+    # In the future, this common protocol should be listed someplace else
+    # so library tasks from other languages can use.
+    class LibraryResponse:
+        def __init__(self, result=None, success=None, reason=None):
+            self.result = result
+            self.success = success
+            self.reason = reason
+
+        def generate(self):
+            return {'Result': self.result,
+                    'Success': self.success,
+                    'Reason': self.reason}
+
+    
+    # A wrapper around functions in library to extract arguments and formulate responses.
     def remote_execute(func):
         def remote_wrapper(event):
-            kwargs = event["fn_kwargs"]
-            args = event["fn_args"]
+            args = event.get("fn_args", [])
+            kwargs = event.get("fn_kwargs", {})
             try:
-                response = {
-                    "Result": func(*args, **kwargs),
-                    "StatusCode": 200
-                }
+                result = func(*args, **kwargs)
+                success = True
+                reason = None
             except Exception as e:
-                response = {
-                    "Result": str(e),
-                    "StatusCode": 500
-                }
-            return response
+                result = None
+                success = False
+                reason = traceback.format_exc()
+            return LibraryResponse(result, success, reason).generate()
         return remote_wrapper
 
     read, write = os.pipe()
