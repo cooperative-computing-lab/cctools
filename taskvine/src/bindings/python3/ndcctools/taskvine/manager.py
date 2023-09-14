@@ -1456,7 +1456,7 @@ class Manager(object):
     # @code
     # >>> s = "hello pirate ♆"
     # >>> f = m.declare_buffer(bytes(s, "utf-8"))
-    # >>> print(f.contents())
+    # >>> print(bytes.decode(f.contents(), "utf-8"))
     # >>> "hello pirate ♆"
     # @endcode
     def declare_buffer(self, buffer=None, cache=False, peer_transfer=True):

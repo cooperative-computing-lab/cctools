@@ -63,7 +63,7 @@ into a swig function f(data) */
 }
 %typemap(doc) const char *data, int length "$1_name: a readable buffer (e.g. a bytes object)"
 
-/* Convert a C array of binary data to a Python bytes. */
+/* Convert a C array of binary data to Python bytes. */
 %inline %{
     PyObject *vine_file_contents_as_bytes(struct vine_file *f) {
         return PyBytes_FromStringAndSize(vine_file_contents(f), vine_file_size(f));
