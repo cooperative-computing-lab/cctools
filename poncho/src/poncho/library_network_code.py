@@ -127,8 +127,9 @@ def library_network_code():
                             os.chdir(function_sandbox)
                             response = cloudpickle.dumps(globals()[function_name](event))
                             written = 0
-                            while written < len(response):
-                                written += os.write(write, response[written:])
+                            buff = len(response).to_bytes(8, sys.byteorder)+response
+                            while written < len(buff):
+                                written += os.write(write, buff[written:])
                             os._exit(0)
                         elif p < 0:
                             print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)
@@ -139,16 +140,15 @@ def library_network_code():
 
                         # parent collects result and waits for child to exit.
                         else:
+                            response_len = b''
+                            while len(response_len) < 8:
+                                response_len += os.read(read, 8-len(response_len))
+                            response_len = int.from_bytes(response_len, sys.byteorder)
                             response = b''
-                            max_read = 65536    # arbitrary number, change if needed.
-                            while True:
-                                chunk = os.read(read, max_read)
-                                if chunk = b'':
-                                    break
-                                response += chunk
+                            while len(response) < response_len:
+                                response += os.read(read, response_len-len(response))
                             os.waitpid(p, 0)
                     
-                    #out_pipe.write(bytes(str(len(response)), encoding='utf-8')+b'\n'+response)
-                    out_pipe.write(len(response).to_bytes(8, sys.byteorder)+b'\n'+response)
+                    out_pipe.write(bytes(str(len(response)), 'utf-8')+b'\n'+response)
                     out_pipe.flush()
         return 0
