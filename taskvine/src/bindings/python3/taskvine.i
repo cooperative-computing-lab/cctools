@@ -63,6 +63,12 @@ into a swig function f(data) */
 }
 %typemap(doc) const char *data, int length "$1_name: a readable buffer (e.g. a bytes object)"
 
+%inline %{
+    PyObject *vine_file_contents_as_bytes(struct vine_file *f) {
+        return PyBytes_FromStringAndSize(vine_file_contents(f), vine_file_size(f));
+    }
+%}
+
 %include "stdint.i"
 %include "int_sizes.h"
 %include "timestamp.h"
