@@ -22,9 +22,7 @@ import weakref
 try:
     import cloudpickle
     pythontask_available = True
-except Exception:
-    # Note that the intended exception here is ModuleNotFoundError.
-    # However, that type does not exist in Python 2
+except ModuleNotFoundError:
     pythontask_available = False
 
 ##
