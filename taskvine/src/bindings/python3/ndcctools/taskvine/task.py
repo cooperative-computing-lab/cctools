@@ -12,7 +12,6 @@ from . import cvine
 from .file import File
 
 import copy
-import json
 import os
 import shutil
 import sys
@@ -20,8 +19,13 @@ import tempfile
 import textwrap
 import uuid
 import weakref
-import cloudpickle
-
+try:
+    import cloudpickle
+    pythontask_available = True
+except Exception:
+    # Note that the intended exception here is ModuleNotFoundError.
+    # However, that type does not exist in Python 2
+    pythontask_available = False
 
 ##
 # @class ndcctools.taskvine.task.Task
@@ -709,13 +713,7 @@ class Task(object):
 # The class represents a Task specialized to execute remote Python code.
 #
 
-try:
-    import cloudpickle
-    pythontask_available = True
-except Exception:
-    # Note that the intended exception here is ModuleNotFoundError.
-    # However, that type does not exist in Python 2
-    pythontask_available = False
+
 
 
 class PythonTask(Task):
