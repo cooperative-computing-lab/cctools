@@ -198,6 +198,10 @@ static struct itable *procs_complete = NULL;
 // Table of current transfers and their id
 static struct hash_table *current_transfers = NULL;
 
+// Table of all library processes.
+// Libraries should be created/deleted when added/removed from this table.
+static struct itable *libraries_table = NULL;
+
 /*
 Table of user-specified features.
 The key represents the name of the feature.
@@ -785,6 +789,11 @@ static int do_task(struct link *manager, int task_id, time_t stoptime)
 
 	itable_insert(procs_table, task_id, p);
 
+	/* Add library to table if it is a library. */
+	if (task->provides_library) {
+		itable_insert(libraries_table, task_id, p);
+	}
+
 	normalize_resources(p);
 
 	list_push_tail(procs_waiting, p);
@@ -859,6 +868,9 @@ static int do_kill(int task_id)
 	struct vine_process *p;
 
 	p = itable_remove(procs_table, task_id);
+	if (itable_lookup(libraries_table, task_id)) {
+		itable_remove(libraries_table, task_id);
+	}
 	if (!p) {
 		debug(D_VINE, "manager requested kill of task %d which does not exist!", task_id);
 		return 1;
@@ -900,6 +912,7 @@ static void kill_all_tasks()
 	ITABLE_ITERATE(procs_table, task_id, p) { do_kill(task_id); }
 
 	assert(itable_size(procs_table) == 0);
+	assert(itable_size(libraries_table) == 0);
 	assert(itable_size(procs_running) == 0);
 	assert(itable_size(procs_complete) == 0);
 	assert(list_size(procs_waiting) == 0);
@@ -1191,6 +1204,8 @@ static int process_ready_to_run_now(struct vine_process *p, struct vine_cache *c
 		p->library_process = find_library_for_function(p->task->needs_library);
 		if (!p->library_process)
 			return 0;
+		if (!p->library_process->library_ready)
+			return 0;
 	}
 
 	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager);
@@ -1291,6 +1306,85 @@ static int enforce_worker_promises(struct link *manager)
 	return 1;
 }
 
+/*
+Given a freshly started process, wait for it to initialize and send
+back the library startup message with JSON containing the name of
+the library, which should match the task's provides_library label.
+*/
+
+static int check_library_startup(struct vine_process *p) {
+    char buffer_len[VINE_LINE_MAX];
+    int length = 0;
+	
+	
+
+    /* Read a line that gives the length of the response message. */
+    if (!link_readline(p->library_read_link, buffer_len, VINE_LINE_MAX, LINK_NOWAIT)) {
+		return 0;
+	}
+    sscanf(buffer_len, "%d", &length);
+
+    /* Now read that length of message and null-terminate it. */
+    char buffer[length + 1];
+    if (link_read(p->library_read_link, buffer, length, LINK_NOWAIT) <= 0) {
+		return 0;
+	}
+    buffer[length] = 0;
+
+    /* Check that the response is JX and contains the expected name. */
+    struct jx *response = jx_parse_string(buffer);
+
+    const char *name = jx_lookup_string(response, "name");
+
+	int ok = 0;
+    if (!strcmp(name, p->task->provides_library)) {
+    	ok = 1;
+    }
+	if (response) {
+		jx_delete(response);
+	}
+    return ok;
+}
+
+/* Check whether all known libraries are ready to execute functions.
+ * A library starts up and tells the vine_worker it's ready by reporting
+ * back its library name. */
+static void check_libraries_ready() {
+	uint64_t library_task_id;
+	struct vine_process* library_process;
+
+	struct link_info library_link_info;
+	library_link_info.events = LINK_READ;
+	library_link_info.revents = 0;
+
+	/* Loop through all known libraries and check if they are ready. */
+	ITABLE_ITERATE(libraries_table, library_task_id, library_process) {
+		if (!library_process->library_ready) {
+			/* Skip library processes that haven't been started. */
+			if (!library_process->library_read_link) {
+				continue;
+			}
+			library_link_info.link = library_process->library_read_link;
+			
+			/* Check if library has sent its startup message. */ 
+			if (link_poll(&library_link_info, 1, 0) && (library_link_info.revents & LINK_READ)) {
+				if (check_library_startup(library_process)) {
+					debug(D_VINE, "Library %s reports ready to execute functions.", library_process->task->provides_library);
+					library_process->library_ready = 1;
+				}
+				else {
+					/* Kill library if the name reported back doesn't match its name or
+					 * if there's any problem. */
+					debug(D_VINE, "Library verification failed. Killing it.");
+					itable_remove(libraries_table, library_task_id);
+					vine_process_kill(library_process);
+				}
+			}
+			library_link_info.revents = 0;
+		}
+	}
+}
+
 static void work_for_manager(struct link *manager)
 {
 	sigset_t mask;
@@ -1379,6 +1473,9 @@ static void work_for_manager(struct link *manager)
 			// finish all tasks, disconnect from manager, but don't kill the worker (no abort_flag = 1)
 			break;
 		}
+
+		/* Check all known libraries if they are ready to execute functions. */
+		check_libraries_ready();
 
 		int task_event = 0;
 		if (ok) {
@@ -1599,6 +1696,8 @@ static void workspace_delete()
 		itable_delete(procs_running);
 	if (procs_table)
 		itable_delete(procs_table);
+	if (libraries_table)
+		itable_delete(libraries_table);
 	if (procs_complete)
 		itable_delete(procs_complete);
 	if (procs_waiting)
@@ -2325,6 +2424,7 @@ int main(int argc, char *argv[])
 
 	procs_running = itable_create(0);
 	procs_table = itable_create(0);
+	libraries_table = itable_create(0);
 	procs_waiting = list_create();
 	procs_complete = itable_create(0);
 

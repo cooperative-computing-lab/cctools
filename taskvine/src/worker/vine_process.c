@@ -49,7 +49,6 @@ See the file COPYING for details.
 
 extern char *workspace;
 
-static int vine_process_wait_for_library_startup(struct vine_process *p, time_t stoptime);
 static char *vine_process_invoke_function(struct vine_process *library_process, const char *function_name,
 		const char *function_input, const int function_input_length, const char *sandbox_path,
 		int *function_output_len);
@@ -98,6 +97,7 @@ struct vine_process *vine_process_create(struct vine_task *task, vine_process_ty
 	p->output_file_name = string_format("%s/.taskvine.stdout", p->sandbox);
 
 	p->functions_running = 0;
+	p->library_ready = 0;
 
 	/* Note that create_dir recursively creates parents, so a single one is sufficient. */
 
@@ -289,6 +289,7 @@ pid_t vine_process_execute(struct vine_process *p)
 	int output_fd = -1;
 	int error_fd = -1;
 
+	/* Setting up input, output, and stderr for various task types. */
 	if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
 		/* If starting a library, create the pipes for parent-child communication. */
 
@@ -344,8 +345,6 @@ pid_t vine_process_execute(struct vine_process *p)
 		/* If we just started a library, then retain links to communicate with it. */
 		if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
 
-			debug(D_VINE, "waiting for library startup message from pid %d\n", p->pid);
-
 			p->library_read_link = link_attach_to_fd(pipe_out[0]);
 			p->library_write_link = link_attach_to_fd(pipe_in[1]);
 
@@ -355,15 +354,6 @@ pid_t vine_process_execute(struct vine_process *p)
 
 			/* Close the error stream that the parent won't use. */
 			close(error_fd);
-
-			/* TODO: Wait up to 60 seconds for library startup.  This should be asynchronous. */
-			time_t stoptime = time(0) + 60;
-
-			/* Now read back the initialization message so we know it is ready. */
-			if (!vine_process_wait_for_library_startup(p, stoptime)) {
-				/* If it did not, then send kill signal and reap library in main loop. */
-				vine_process_kill(p);
-			}
 		} else {
 			/* For any other task type, drop the fds unused by the parent. */
 			close(input_fd);
@@ -472,37 +462,6 @@ pid_t vine_process_execute(struct vine_process *p)
 		_exit(127); // Failed to execute the cmd.
 	}
 
-	return 0;
-}
-
-/*
-Given a freshly started process, wait for it to initialize and send
-back the library startup message with JSON containing the name of
-the library, which should match the task's provides_library label.
-*/
-
-static int vine_process_wait_for_library_startup(struct vine_process *p, time_t stoptime)
-{
-	char buffer_len[VINE_LINE_MAX];
-	int length = 0;
-
-	/* Read a line that gives the length of the response message. */
-	link_readline(p->library_read_link, buffer_len, VINE_LINE_MAX, stoptime);
-	sscanf(buffer_len, "%d", &length);
-
-	/* Now read that length of message and null-terminate it. */
-	char buffer[length + 1];
-	link_read(p->library_read_link, buffer, length, stoptime);
-	buffer[length] = 0;
-
-	/* Check that the response is JX and contains the expected name. */
-	struct jx *response = jx_parse_string(buffer);
-
-	const char *name = jx_lookup_string(response, "name");
-
-	if (!strcmp(name, p->task->provides_library)) {
-		return 1;
-	}
 	return 0;
 }
 

@@ -58,6 +58,9 @@ struct vine_process {
 	/* If this is a library process, the number of functions it is currently running. */
 	int functions_running;
 	
+	/* If this is a library process, whether the library is ready to execute functions. */
+    int library_ready;
+
 	/* expected disk usage by the process. If no cache is used, it is the same as in task. */
 	int64_t disk;
 
