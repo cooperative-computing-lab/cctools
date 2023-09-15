@@ -590,7 +590,6 @@ class Task(object):
     # @code
     # >>> print(t.get_metric("total_submissions")
     # @endcode
-    @property
     def get_metric(self, name):
         return cvine.vine_task_get_metric(self._task, name)
 
