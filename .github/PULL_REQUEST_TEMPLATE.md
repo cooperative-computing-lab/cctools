@@ -1,7 +1,7 @@
 ## Proposed changes
 
-Please describe your changes and what sub-software are affected (e.g., taskvine, poncho). 
-Please mention relevant issues and pull requests as appropriate.
+Please describe your changes (e.g., what problems they attempt to solve, what results are expected, etc.) Additional motivation and context are welcome.
+Please also mention relevant issues and pull requests as appropriate.
 
 ## Types of changes
 
