@@ -1312,67 +1312,69 @@ back the library startup message with JSON containing the name of
 the library, which should match the task's provides_library label.
 */
 
-static int check_library_startup(struct vine_process *p) {
-    char buffer_len[VINE_LINE_MAX];
-    int length = 0;
-	
-	
+static int check_library_startup(struct vine_process *p)
+{
+	char buffer_len[VINE_LINE_MAX];
+	int length = 0;
 
-    /* Read a line that gives the length of the response message. */
-    if (!link_readline(p->library_read_link, buffer_len, VINE_LINE_MAX, LINK_NOWAIT)) {
+	/* Read a line that gives the length of the response message. */
+	if (!link_readline(p->library_read_link, buffer_len, VINE_LINE_MAX, LINK_NOWAIT)) {
 		return 0;
 	}
-    sscanf(buffer_len, "%d", &length);
+	sscanf(buffer_len, "%d", &length);
 
-    /* Now read that length of message and null-terminate it. */
-    char buffer[length + 1];
-    if (link_read(p->library_read_link, buffer, length, LINK_NOWAIT) <= 0) {
+	/* Now read that length of message and null-terminate it. */
+	char buffer[length + 1];
+	if (link_read(p->library_read_link, buffer, length, LINK_NOWAIT) <= 0) {
 		return 0;
 	}
-    buffer[length] = 0;
+	buffer[length] = 0;
 
-    /* Check that the response is JX and contains the expected name. */
-    struct jx *response = jx_parse_string(buffer);
+	/* Check that the response is JX and contains the expected name. */
+	struct jx *response = jx_parse_string(buffer);
 
-    const char *name = jx_lookup_string(response, "name");
+	const char *name = jx_lookup_string(response, "name");
 
 	int ok = 0;
-    if (!strcmp(name, p->task->provides_library)) {
-    	ok = 1;
-    }
+	if (!strcmp(name, p->task->provides_library)) {
+		ok = 1;
+	}
 	if (response) {
 		jx_delete(response);
 	}
-    return ok;
+	return ok;
 }
 
 /* Check whether all known libraries are ready to execute functions.
  * A library starts up and tells the vine_worker it's ready by reporting
  * back its library name. */
-static void check_libraries_ready() {
+static void check_libraries_ready()
+{
 	uint64_t library_task_id;
-	struct vine_process* library_process;
+	struct vine_process *library_process;
 
 	struct link_info library_link_info;
 	library_link_info.events = LINK_READ;
 	library_link_info.revents = 0;
 
 	/* Loop through all known libraries and check if they are ready. */
-	ITABLE_ITERATE(libraries_table, library_task_id, library_process) {
+	ITABLE_ITERATE(libraries_table, library_task_id, library_process)
+	{
 		if (!library_process->library_ready) {
 			/* Skip library processes that haven't been started. */
 			if (!library_process->library_read_link) {
 				continue;
 			}
 			library_link_info.link = library_process->library_read_link;
-			
-			/* Check if library has sent its startup message. */ 
+
+			/* Check if library has sent its startup message. */
 			if (link_poll(&library_link_info, 1, 0) && (library_link_info.revents & LINK_READ)) {
 				if (check_library_startup(library_process)) {
-					debug(D_VINE, "Library %s reports ready to execute functions.", library_process->task->provides_library);
+					debug(D_VINE,
+							"Library %s reports ready to execute functions.",
+							library_process->task->provides_library);
 					library_process->library_ready = 1;
-				}
-				else {
+				} else {
 					/* Kill library if the name reported back doesn't match its name or
 					 * if there's any problem. */
 					debug(D_VINE, "Library verification failed. Killing it.");
