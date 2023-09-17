@@ -103,5 +103,4 @@ def plot_performance(performance_filename):
 
 if __name__ == "__main__":
     performance_filename = sys.argv[1]
-    plot_performance(performance_filename)
-    
+    plot_performance(performance_filename) 
