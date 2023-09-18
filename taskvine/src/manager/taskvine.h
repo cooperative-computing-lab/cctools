@@ -94,17 +94,6 @@ typedef enum {
 	VINE_RESULT_CANCELLED = 11<<3, /**< The task was cancelled by the caller. */
 } vine_result_t;
 
-/** Possible states of a task, given by @ref vine_task_state */
-
-typedef enum {
-	VINE_TASK_INITIAL = 0,       /**< Task has not been submitted to the manager **/
-	VINE_TASK_READY,             /**< Task is ready to be run, waiting in manager **/
-	VINE_TASK_RUNNING,           /**< Task has been dispatched to some worker **/
-	VINE_TASK_WAITING_RETRIEVAL, /**< Task results are available at the worker **/
-	VINE_TASK_RETRIEVED,         /**< Task results are available at the manager **/
-	VINE_TASK_DONE,              /**< Task is done, and returned through vine_wait >**/
-} vine_task_state_t;
-
 /** Select how to allocate resources for similar tasks with @ref vine_set_category_mode */
 
 typedef enum {
@@ -1019,13 +1008,6 @@ char *vine_get_status(struct vine_manager *m, const char *request);
 @return A null terminated array of struct rmsummary. Each summary s indicates the number of s->workers with a certain number of s->cores, s->memory, and s->disk. The array and summaries need to be freed after use to avoid memory leaks.
 */
 struct rmsummary **vine_summarize_workers(struct vine_manager *m);
-
-/** Get the current state of the task.
-@param m A manager object
-@param task_id The task_id of the task.
-@return One of: VINE_TASK(INITIAL|READY|RUNNING|RESULTS|RETRIEVED|DONE)
-*/
-vine_task_state_t vine_task_state(struct vine_manager *m, int task_id);
 
 /** Limit the manager bandwidth when transferring files to and from workers.
 @param m A manager object

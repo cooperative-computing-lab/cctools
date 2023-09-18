@@ -4040,16 +4040,6 @@ static void push_task_to_ready_list(struct vine_manager *q, struct vine_task *t)
 	vine_task_clean(t);
 }
 
-vine_task_state_t vine_task_state(struct vine_manager *q, int task_id)
-{
-	struct vine_task *t = itable_lookup(q->tasks, task_id);
-	if (t) {
-		return t->state;
-	} else {
-		return VINE_TASK_INITIAL;
-	}
-}
-
 /* Changes task state. Returns old state */
 /* State of the task. One of VINE_TASK(UNKNOWN|READY|RUNNING|WAITING_RETRIEVAL|RETRIEVED|DONE) */
 static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state)
