@@ -2966,7 +2966,7 @@ static void vine_manager_consider_recovery_task(
 		return;
 
 	switch (rt->state) {
-	case VINE_TASK_UNKNOWN:
+	case VINE_TASK_INITIAL:
 		/* The recovery task has never been run, so submit it now. */
 		vine_submit(q, rt);
 		notice(D_VINE,
@@ -3412,7 +3412,7 @@ static void cancel_task_on_worker(struct vine_manager *q, struct vine_task *t, v
 	struct vine_worker_info *w = t->worker;
 
 	switch (t->state) {
-	case VINE_TASK_UNKNOWN:
+	case VINE_TASK_INITIAL:
 		break;
 
 	case VINE_TASK_READY:
@@ -4046,7 +4046,7 @@ vine_task_state_t vine_task_state(struct vine_manager *q, int task_id)
 	if (t) {
 		return t->state;
 	} else {
-		return VINE_TASK_UNKNOWN;
+		return VINE_TASK_INITIAL;
 	}
 }
 
@@ -4209,7 +4209,7 @@ static int task_request_count(struct vine_manager *q, const char *category, cate
 
 int vine_submit(struct vine_manager *q, struct vine_task *t)
 {
-	if (t->state != VINE_TASK_UNKNOWN) {
+	if (t->state != VINE_TASK_INITIAL) {
 		notice(D_VINE,
 				"vine_submit: you cannot submit the same task (%d) (%s) twice!",
 				t->task_id,

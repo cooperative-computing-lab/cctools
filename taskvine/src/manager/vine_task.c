@@ -54,7 +54,7 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->resource_request = CATEGORY_ALLOCATION_FIRST;
 	t->worker_selection_algorithm = VINE_SCHEDULE_UNSET;
 
-	t->state = VINE_TASK_UNKNOWN;
+	t->state = VINE_TASK_INITIAL;
 	t->function_slots = 1;
 	t->function_slots_inuse = 0;
 
@@ -128,7 +128,7 @@ void vine_task_reset(struct vine_task *t)
 	t->current_resource_box = 0;
 
 	t->task_id = 0;
-	t->state = VINE_TASK_UNKNOWN;
+	t->state = VINE_TASK_INITIAL;
 }
 
 static struct list *vine_task_mount_list_copy(struct list *list)
@@ -731,8 +731,11 @@ const char *vine_task_state_to_string(vine_task_state_t task_state)
 	const char *str;
 
 	switch (task_state) {
+	case VINE_TASK_INITIAL:
+		str = "INITIAL";
+		break;
 	case VINE_TASK_READY:
-		str = "WAITING";
+		str = "READY";
 		break;
 	case VINE_TASK_RUNNING:
 		str = "RUNNING";
@@ -746,7 +749,6 @@ const char *vine_task_state_to_string(vine_task_state_t task_state)
 	case VINE_TASK_DONE:
 		str = "DONE";
 		break;
-	case VINE_TASK_UNKNOWN:
 	default:
 		str = "UNKNOWN";
 		break;

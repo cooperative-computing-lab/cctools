@@ -97,7 +97,7 @@ typedef enum {
 /** Possible states of a task, given by @ref vine_task_state */
 
 typedef enum {
-	VINE_TASK_UNKNOWN = 0,       /**< Task has not been submitted to the manager **/
+	VINE_TASK_INITIAL = 0,       /**< Task has not been submitted to the manager **/
 	VINE_TASK_READY,             /**< Task is ready to be run, waiting in manager **/
 	VINE_TASK_RUNNING,           /**< Task has been dispatched to some worker **/
 	VINE_TASK_WAITING_RETRIEVAL, /**< Task results are available at the worker **/
@@ -1023,7 +1023,7 @@ struct rmsummary **vine_summarize_workers(struct vine_manager *m);
 /** Get the current state of the task.
 @param m A manager object
 @param task_id The task_id of the task.
-@return One of: VINE_TASK(UNKNOWN|READY|RUNNING|RESULTS|RETRIEVED|DONE)
+@return One of: VINE_TASK(INITIAL|READY|RUNNING|RESULTS|RETRIEVED|DONE)
 */
 vine_task_state_t vine_task_state(struct vine_manager *m, int task_id);
 

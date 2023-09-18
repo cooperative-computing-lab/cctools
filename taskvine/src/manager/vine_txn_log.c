@@ -133,7 +133,7 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
 
 	buffer_printf(&B, "TASK %d %s", t->task_id, vine_task_state_to_string(state));
 
-	if (state == VINE_TASK_UNKNOWN) {
+	if (state == VINE_TASK_INITIAL) {
 		/* do not add any info */
 	} else if (state == VINE_TASK_READY) {
 		const char *allocation = (t->resource_request == CATEGORY_ALLOCATION_FIRST ? "FIRST_RESOURCES"
