@@ -746,9 +746,6 @@ const char *vine_task_state_to_string(vine_task_state_t task_state)
 	case VINE_TASK_DONE:
 		str = "DONE";
 		break;
-	case VINE_TASK_CANCELED:
-		str = "CANCELED";
-		break;
 	case VINE_TASK_UNKNOWN:
 	default:
 		str = "UNKNOWN";

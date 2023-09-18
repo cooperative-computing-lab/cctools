@@ -666,44 +666,51 @@ class Manager(object):
         return cvine.vine_initialize_categories(self._taskvine, rm, filename)
 
     ##
-    # Cancel task identified by its task_id and remove from the given manager.
+    # Cancel task identified by its task_id.
+    # The cancelled task will be returned in the normal way via @ref wait with a result of VINE_RESULT_CANCELLED.
     #
     # @param self   Reference to the current manager object.
     # @param id     The task_id returned from @ref ndcctools.taskvine.manager.Manager.submit.
+    # @return One if the task was found and cancelled, zero otherwise.
+    
     def cancel_by_task_id(self, id):
-        task = None
-        task_pointer = cvine.vine_cancel_by_task_id(self._taskvine, id)
-        if task_pointer:
-            task = self._task_table.pop(int(id))
-        return task
+        return cvine.vine_cancel_by_task_id(self._taskvine, id)
 
     ##
-    # Cancel task identified by its tag and remove from the given manager.
+    # Cancel task identified by its tag.
+    # The cancelled task will be returned in the normal way via @ref wait with a result of VINE_RESULT_CANCELLED.
     #
     # @param self   Reference to the current manager object.
     # @param tag    The tag assigned to task using @ref ndcctools.taskvine.task.Task.set_tag.
+    # @return One if the task was found and cancelled, zero otherwise.
+
     def cancel_by_task_tag(self, tag):
-        task = None
-        task_pointer = cvine.vine_cancel_by_task_tag(self._taskvine, tag)
-        if task_pointer:
-            task = self._task_table.pop(int(id))
-        return task
+        return cvine.vine_cancel_by_task_tag(self._taskvine, tag)
 
     ##
-    # Cancel all tasks of the given category and remove them from the manager.
+    # Cancel all tasks of the given category.
+    # The cancelled tasks will be returned in the normal way via @ref wait with a result of VINE_RESULT_CANCELLED.
     #
     # @param self   Reference to the current manager object.
     # @param category The name of the category to cancel.
+    # @return The total number of tasks cancelled.
     def cancel_by_category(self, category):
-        canceled_tasks = []
-        ids_to_cancel = []
-
+        total = 0
+ 
         for task in self._task_table.values():
             if task.category == category:
-                ids_to_cancel.append(task.id)
+                total += self.cancel_by_task_id(task.id)
 
-        canceled_tasks = [self.cancel_by_task_id(id) for id in ids_to_cancel]
-        return canceled_tasks
+        return total;
+
+    ##
+    # Cancel all tasks.
+    # The cancelled tasks will be returned in the normal way via @ref wait with a result of VINE_RESULT_CANCELLED.
+    #
+    # @param self   Reference to the current manager object.
+    # @return The total number of tasks cancelled.
+    def cancel_all(self):
+        return cvine.vine_cancel_all(self._taskvine)
 
     ##
     # Shutdown workers connected to manager.

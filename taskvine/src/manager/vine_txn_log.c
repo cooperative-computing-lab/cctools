@@ -140,8 +140,6 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
 											   : "MAX_RESOURCES");
 		buffer_printf(&B, " %s %s %d ", t->category, allocation, t->try_count + 1);
 		rmsummary_print_buffer(&B, vine_manager_task_resources_min(q, t), 1);
-	} else if (state == VINE_TASK_CANCELED) {
-		/* do not add any info */
 	} else if (state == VINE_TASK_DONE) {
 		buffer_printf(&B, " %s ", vine_result_string(t->result));
 		buffer_printf(&B, " %d ", t->exit_code);
