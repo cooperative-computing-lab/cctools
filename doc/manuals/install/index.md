@@ -66,7 +66,8 @@ This can run slowly, so, for a potential speedup, try running:
 
 ```sh
 unset PYTHONPATH
-echo y | conda create -y -n cctools-dev -c conda-forge --strict-channel-priority python=3 gcc_linux-64 gxx_linux-64 gdb m4 perl swig make zlib libopenssl-static openssl conda-pack cloudpickle packaging flake8 clang-format --experimental-solver=libmamba
+conda create -y -n cctools-dev -c conda-forge --strict-channel-priority python=3 gcc_linux-64 gxx_linux-64 gdb m4 perl swig make zlib libopenssl-static openssl conda-pack cloudpickle packaging flake8 clang-format --experimental-solver=libmamba
+
 ```
 
 Now that you are inside the `cctools-dev` environment, you can check out
