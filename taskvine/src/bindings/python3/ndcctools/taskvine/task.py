@@ -19,11 +19,7 @@ import tempfile
 import textwrap
 import uuid
 import weakref
-try:
-    import cloudpickle
-    pythontask_available = True
-except ModuleNotFoundError:
-    pythontask_available = False
+import cloudpickle
 
 ##
 # @class ndcctools.taskvine.task.Task
@@ -723,9 +719,6 @@ class PythonTask(Task):
     # @param args	arguments used in function to be executed by task
     # @param kwargs	keyword arguments used in function to be executed by task
     def __init__(self, func, *args, **kwargs):
-        if not pythontask_available:
-            raise RuntimeError("PythonTask is not available. The cloudpickle module is missing.")
-
         self._pp_run = None
         self._output_loaded = False
         self._output = None
