@@ -3411,12 +3411,12 @@ static void cancel_task_on_worker(struct vine_manager *q, struct vine_task *t, v
 {
 	struct vine_worker_info *w = t->worker;
 
-	switch(t->state) {
+	switch (t->state) {
 	case VINE_TASK_UNKNOWN:
 		break;
 
 	case VINE_TASK_READY:
-		list_remove(q->ready_list,t);
+		list_remove(q->ready_list, t);
 		change_task_state(q, t, new_state);
 		break;
 
@@ -3424,7 +3424,7 @@ static void cancel_task_on_worker(struct vine_manager *q, struct vine_task *t, v
 
 		// t->worker must be set if in RUNNING state.
 		assert(w);
-		
+
 		// send message to worker asking to kill its task.
 		vine_manager_send(q, w, "kill %d\n", t->task_id);
 		debug(D_VINE,
@@ -3444,14 +3444,14 @@ static void cancel_task_on_worker(struct vine_manager *q, struct vine_task *t, v
 		reap_task_from_worker(q, w, t, new_state);
 
 		break;
-		
+
 	case VINE_TASK_WAITING_RETRIEVAL:
-		list_remove(q->waiting_retrieval_list,t);
+		list_remove(q->waiting_retrieval_list, t);
 		change_task_state(q, t, new_state);
 		break;
 
 	case VINE_TASK_RETRIEVED:
-		list_remove(q->retrieved_list,t);
+		list_remove(q->retrieved_list, t);
 		change_task_state(q, t, new_state);
 		break;
 
@@ -4938,14 +4938,15 @@ int vine_cancel_by_task_id(struct vine_manager *q, int task_id)
 
 	task->result = VINE_RESULT_CANCELLED;
 	q->stats->tasks_cancelled++;
-	
+
 	return 1;
 }
 
 int vine_cancel_by_task_tag(struct vine_manager *q, const char *task_tag)
 {
-	if(!task_tag) return 0;
-	
+	if (!task_tag)
+		return 0;
+
 	struct vine_task *task = find_task_by_tag(q, task_tag);
 	if (task) {
 		return vine_cancel_by_task_id(q, task->task_id);

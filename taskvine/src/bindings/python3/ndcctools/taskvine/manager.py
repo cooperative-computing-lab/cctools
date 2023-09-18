@@ -701,7 +701,7 @@ class Manager(object):
             if task.category == category:
                 total += self.cancel_by_task_id(task.id)
 
-        return total;
+        return total
 
     ##
     # Cancel all tasks.
