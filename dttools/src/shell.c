@@ -9,8 +9,8 @@ See the file COPYING for details.
 #include "debug.h"
 
 #include <fcntl.h>
-#include <sys/wait.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <errno.h>
@@ -18,7 +18,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-static int execute (const char *cmd, const char * const env[], int in[2], int out[2], int err[2])
+static int execute(const char *cmd, const char *const env[], int in[2], int out[2], int err[2])
 {
 	int rc;
 	int i;
@@ -35,7 +35,7 @@ static int execute (const char *cmd, const char * const env[], int in[2], int ou
 	CATCHUNIX(close(out[1]));
 	CATCHUNIX(close(err[1]));
 
-	for(i = 0; env[i]; i++) {
+	for (i = 0; env[i]; i++) {
 		CATCHUNIX(putenv((char *)env[i]));
 	}
 
@@ -48,14 +48,15 @@ out:
 	abort();
 }
 
-int shellcode(const char *cmd, const char * const env[], const char *input, size_t len, buffer_t *Bout, buffer_t *Berr, int *status)
+int shellcode(const char *cmd, const char *const env[], const char *input, size_t len, buffer_t *Bout, buffer_t *Berr,
+		int *status)
 {
 	int rc;
 	int in[2] = {-1, -1};
 	int out[2] = {-1, -1};
 	int err[2] = {-1, -1};
 	pid_t child = 0;
-	const char * const _env[] = {NULL};
+	const char *const _env[] = {NULL};
 	struct timeval start, stop;
 
 	gettimeofday(&start, NULL);
@@ -69,7 +70,7 @@ int shellcode(const char *cmd, const char * const env[], const char *input, size
 
 	CATCHUNIX(child = fork());
 
-	if(child == 0) {
+	if (child == 0) {
 		return execute(cmd, env, in, out, err);
 	}
 
@@ -81,16 +82,16 @@ int shellcode(const char *cmd, const char * const env[], const char *input, size
 	err[1] = -1;
 
 	CATCHUNIX(fcntl(in[1], F_GETFL));
-	CATCHUNIX(fcntl(in[1], F_SETFL, rc|O_NONBLOCK));
+	CATCHUNIX(fcntl(in[1], F_SETFL, rc | O_NONBLOCK));
 
 	CATCHUNIX(fcntl(out[0], F_GETFL));
-	CATCHUNIX(fcntl(out[0], F_SETFL, rc|O_NONBLOCK));
+	CATCHUNIX(fcntl(out[0], F_SETFL, rc | O_NONBLOCK));
 
 	CATCHUNIX(fcntl(err[0], F_GETFL));
-	CATCHUNIX(fcntl(err[0], F_SETFL, rc|O_NONBLOCK));
+	CATCHUNIX(fcntl(err[0], F_SETFL, rc | O_NONBLOCK));
 
 	while (1) {
-		char b[1<<16];
+		char b[1 << 16];
 		pid_t w;
 		ssize_t result;
 
@@ -135,14 +136,22 @@ out:
 		kill(child, SIGKILL);
 		waitpid(child, NULL, 0);
 	}
-	if (in[0] >= 0) close(in[0]);
-	if (in[1] >= 0) close(in[1]);
-	if (out[0] >= 0) close(out[0]);
-	if (out[1] >= 0) close(out[1]);
-	if (err[0] >= 0) close(err[0]);
-	if (err[1] >= 0) close(err[1]);
+	if (in[0] >= 0)
+		close(in[0]);
+	if (in[1] >= 0)
+		close(in[1]);
+	if (out[0] >= 0)
+		close(out[0]);
+	if (out[1] >= 0)
+		close(out[1]);
+	if (err[0] >= 0)
+		close(err[0]);
+	if (err[1] >= 0)
+		close(err[1]);
 	gettimeofday(&stop, NULL);
-	debug(D_DEBUG, "shellcode finished in %.2fs", (double)(stop.tv_sec-start.tv_sec) + (stop.tv_usec-start.tv_usec)*1e-6);
+	debug(D_DEBUG,
+			"shellcode finished in %.2fs",
+			(double)(stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) * 1e-6);
 	return RCUNIX(rc);
 }
 

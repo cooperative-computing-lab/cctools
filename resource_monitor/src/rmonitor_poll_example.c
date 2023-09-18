@@ -5,20 +5,20 @@ See the file COPYING for details.
 */
 
 #include <stdio.h>
+#include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <string.h>
 
 #include "rmonitor_poll.h"
 #include "rmsummary.h"
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
 	sleep(2);
 
 	struct rmsummary *resources = rmonitor_measure_process(getpid());
 
-	fprintf(stdout, "command: %s, ",
-			resources->command);
+	fprintf(stdout, "command: %s, ", resources->command);
 
 	fprintf(stdout, "wall time used (s): %3.0f, ", resources->wall_time);
 

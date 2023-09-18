@@ -7,7 +7,7 @@ TARGETS ?= $(PHONY_TARGETS)
 all: $(TARGETS)
 
 $(TARGETS):
-	@$(MAKE) -C $@
+	@$(MAKE) -C $@ $(MAKECMDGOALS)
 
 CLEAN_TARGETS = $(TARGETS:%=clean-%)
 $(CLEAN_TARGETS):
@@ -23,5 +23,9 @@ TEST_TARGETS = $(TARGETS:%=test-%)
 $(TEST_TARGETS):
 	@$(MAKE) -C $(@:test-%=%) test
 test: $(TEST_TARGETS)
+
+lint: $(TARGETS)
+
+format: $(TARGETS)
 
 .PHONY: $(PHONY_TARGETS) $(CLEAN_TARGETS) $(INSTALL_TARGETS) $(TEST_TARGETS) all clean install test

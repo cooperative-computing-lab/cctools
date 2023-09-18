@@ -14,6 +14,9 @@ $(CLEAN_TARGETS):
 	@$(MAKE) -C $(@:clean-%=%) clean
 clean: $(CLEAN_TARGETS)
 
+lint:
+	@$(MAKE) -C src lint
+
 INSTALL_TARGETS = $(TARGETS:%=install-%)
 $(INSTALL_TARGETS):
 	@$(MAKE) -C $(@:install-%=%) install

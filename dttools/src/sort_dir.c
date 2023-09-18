@@ -9,11 +9,10 @@ See the file COPYING for details.
 #include "string_array.h"
 
 #include <dirent.h>
-#include <string.h>
 #include <stdlib.h>
-#include <dirent.h>
+#include <string.h>
 
-int sort_dir(const char *dirname, char ***list, int (*sort) (const char *a, const char *b))
+int sort_dir(const char *dirname, char ***list, int (*sort)(const char *a, const char *b))
 {
 	DIR *dir;
 	size_t n = 0;
@@ -21,10 +20,10 @@ int sort_dir(const char *dirname, char ***list, int (*sort) (const char *a, cons
 	*list = string_array_new();
 
 	dir = opendir(dirname);
-	if(dir) {
+	if (dir) {
 		struct dirent *d;
 
-		while((d = readdir(dir))) {
+		while ((d = readdir(dir))) {
 			*list = string_array_append(*list, d->d_name);
 			n += 1;
 		}
@@ -33,18 +32,13 @@ int sort_dir(const char *dirname, char ***list, int (*sort) (const char *a, cons
 		return 0;
 	}
 
-
-	if(sort) {
-		qsort(*list, n, sizeof(char *), (int (*)(const void *, const void *)) sort);
+	if (sort) {
+		qsort(*list, n, sizeof(char *), (int (*)(const void *, const void *))sort);
 	}
 
 	return 1;
 }
 
-void sort_dir_free( char **list )
-{
-	free(list);
-}
-
+void sort_dir_free(char **list) { free(list); }
 
 /* vim: set noexpandtab tabstop=8: */

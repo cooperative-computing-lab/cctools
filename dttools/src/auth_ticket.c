@@ -29,17 +29,17 @@ See the file COPYING for details.
 #include <string.h>
 
 /* Prevent openssl from opening $HOME/.rnd */
-#define OPENSSL_RANDFILE \
-	"if [ -r /dev/urandom ]; then\n" \
-	"	export RANDFILE=/dev/urandom\n" \
-	"elif [ -r /dev/random ]; then\n" \
-	"	export RANDFILE=/dev/random\n" \
-	"else\n" \
-	"	unset RANDFILE\n" \
-	"	export HOME=/\n" \
+#define OPENSSL_RANDFILE                                                                                               \
+	"if [ -r /dev/urandom ]; then\n"                                                                               \
+	"	export RANDFILE=/dev/urandom\n"                                                                              \
+	"elif [ -r /dev/random ]; then\n"                                                                              \
+	"	export RANDFILE=/dev/random\n"                                                                               \
+	"else\n"                                                                                                       \
+	"	unset RANDFILE\n"                                                                                            \
+	"	export HOME=/\n"                                                                                             \
 	"fi\n"
 
-#define CHALLENGE_LENGTH  (64)
+#define CHALLENGE_LENGTH (64)
 
 static auth_ticket_server_callback_t server_callback = NULL;
 static char **client_tickets = NULL;
@@ -50,11 +50,11 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 	char line[AUTH_LINE_MAX];
 	char **tickets = client_tickets;
 
-	if(tickets) {
+	if (tickets) {
 		char *ticket;
 
 		for (ticket = *tickets; ticket; ticket = *(++tickets)) {
-			char digest[MD5_DIGEST_LENGTH_HEX+1] = "";
+			char digest[MD5_DIGEST_LENGTH_HEX + 1] = "";
 			char challenge[1024];
 
 			if (access(ticket, R_OK) == -1) {
@@ -64,10 +64,7 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 
 			/* load the digest */
 			{
-				static const char cmd[] =
-					OPENSSL_RANDFILE
-					"openssl rsa -in \"$TICKET\" -pubout\n"
-					;
+				static const char cmd[] = OPENSSL_RANDFILE "openssl rsa -in \"$TICKET\" -pubout\n";
 
 				const char *env[] = {NULL, NULL};
 				BUFFER_STACK_ABORT(Benv, 8192);
@@ -100,14 +97,14 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 			CATCHUNIX(link_printf(link, stoptime, "%s\n", digest));
 
 			CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
-			if(strcmp(line, "declined") == 0) {
+			if (strcmp(line, "declined") == 0) {
 				debug(D_AUTH, "ticket %s declined, trying next one...", digest);
 				continue;
 			}
 
 			errno = 0;
 			unsigned long length = strtoul(line, NULL, 10);
-			if(errno == ERANGE || errno == EINVAL)
+			if (errno == ERANGE || errno == EINVAL)
 				CATCH(EIO);
 			else if (length > sizeof(challenge))
 				CATCH(EINVAL);
@@ -116,10 +113,10 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 			debug(D_AUTH, "received challenge of %lu bytes", length);
 
 			{
-				static const char cmd[] =
-					OPENSSL_RANDFILE
-					"openssl rsautl -inkey \"$TICKET\" -sign\n" /* reads challenge from stdin */
-					;
+				static const char cmd[] = OPENSSL_RANDFILE
+						"openssl rsautl -inkey \"$TICKET\" -sign\n" /* reads challenge from
+											       stdin */
+						;
 
 				const char *env[] = {NULL, NULL};
 				BUFFER_STACK_ABORT(Benv, 8192);
@@ -150,11 +147,11 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 
 			CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
 
-			if(strcmp(line, "success") == 0) {
+			if (strcmp(line, "success") == 0) {
 				debug(D_AUTH, "succeeded challenge for %s", digest);
 				rc = 0;
 				goto out;
-			} else if(strcmp(line, "failure") == 0) {
+			} else if (strcmp(line, "failure") == 0) {
 				debug(D_AUTH, "failed challenge for %s", digest);
 				THROW_QUIET(EINVAL);
 			} else {
@@ -180,24 +177,24 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 
 	debug(D_AUTH, "ticket: waiting for tickets");
 
-	while(1) {
+	while (1) {
 		char line[AUTH_LINE_MAX];
 		CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
-		if(strcmp(line, "==") == 0) {
+		if (strcmp(line, "==") == 0) {
 			debug(D_AUTH, "ticket: exhausted all ticket challenges");
 			break;
-		} else if(strlen(line) == MD5_DIGEST_LENGTH_HEX) {
+		} else if (strlen(line) == MD5_DIGEST_LENGTH_HEX) {
 			char ticket_digest[MD5_DIGEST_LENGTH_HEX + 1];
 			char ticket_subject[AUTH_LINE_MAX];
 			strcpy(ticket_digest, line);
 			strcpy(ticket_subject, line);
 			debug(D_AUTH, "ticket: read ticket digest: %s", ticket_digest);
-			if(server_callback) {
+			if (server_callback) {
 				free(ticket); /* free previously allocated ticket string or NULL (noop) */
 				ticket = server_callback(ticket_digest);
-				if(ticket) {
+				if (ticket) {
 					char challenge[CHALLENGE_LENGTH];
-					char sig[CHALLENGE_LENGTH*64]; /* 64x (4096) should be more than enough... */
+					char sig[CHALLENGE_LENGTH * 64]; /* 64x (4096) should be more than enough... */
 					size_t siglen;
 
 					random_array(challenge, sizeof(challenge));
@@ -208,7 +205,7 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 					CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
 					errno = 0;
 					siglen = strtoul(line, NULL, 10);
-					if(errno == ERANGE || errno == EINVAL) {
+					if (errno == ERANGE || errno == EINVAL) {
 						link_soak(link, siglen, stoptime);
 						CATCHUNIX(link_putliteral(link, "failure\n", stoptime));
 						CATCH(EIO);
@@ -221,10 +218,8 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 					debug(D_AUTH, "received signed challenge of %zu bytes", siglen);
 
 					{
-						static const char cmd[] =
-							OPENSSL_RANDFILE
-							"openssl rsautl -inkey \"$TICKET\" -pubin -verify\n"
-							;
+						static const char cmd[] = OPENSSL_RANDFILE
+								"openssl rsautl -inkey \"$TICKET\" -pubin -verify\n";
 
 						const char *env[] = {NULL, NULL};
 						BUFFER_STACK_ABORT(Benv, 8192);
@@ -251,7 +246,10 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 							CATCHUNIX(link_putliteral(link, "failure\n", stoptime));
 							continue;
 						}
-						if (buffer_pos(Bout) != sizeof(challenge) || memcmp(buffer_tostring(Bout), challenge, sizeof(challenge)) != 0) {
+						if (buffer_pos(Bout) != sizeof(challenge) ||
+								memcmp(buffer_tostring(Bout),
+										challenge,
+										sizeof(challenge)) != 0) {
 							debug(D_AUTH, "failed challenge for %s", ticket_digest);
 							CATCHUNIX(link_putliteral(link, "failure\n", stoptime));
 							continue;
@@ -291,7 +289,7 @@ out:
 
 int auth_ticket_register(void)
 {
-	if(!client_tickets) {
+	if (!client_tickets) {
 		client_tickets = xxrealloc(NULL, sizeof(char *));
 		client_tickets[0] = NULL;
 	}
@@ -299,10 +297,7 @@ int auth_ticket_register(void)
 	return auth_register("ticket", auth_ticket_assert, auth_ticket_accept);
 }
 
-void auth_ticket_server_callback (auth_ticket_server_callback_t sc)
-{
-	server_callback = sc;
-}
+void auth_ticket_server_callback(auth_ticket_server_callback_t sc) { server_callback = sc; }
 
 void auth_ticket_load(const char *tickets)
 {
@@ -310,12 +305,12 @@ void auth_ticket_load(const char *tickets)
 	client_tickets = xxrealloc(client_tickets, sizeof(char *));
 	client_tickets[n] = NULL;
 
-	if(tickets) {
+	if (tickets) {
 		const char *start, *end;
-		for(start = end = tickets; start < tickets + strlen(tickets); start = ++end) {
-			while(*end != '\0' && *end != ',')
+		for (start = end = tickets; start < tickets + strlen(tickets); start = ++end) {
+			while (*end != '\0' && *end != ',')
 				end++;
-			if(start == end)
+			if (start == end)
 				continue;
 			char *value = xxmalloc(end - start + 1);
 			memset(value, 0, end - start + 1);
@@ -330,8 +325,9 @@ void auth_ticket_load(const char *tickets)
 		int i;
 		char **list;
 		sort_dir(".", &list, strcmp);
-		for(i = 0; list[i]; i++) {
-			if(strncmp(list[i], "ticket.", strlen("ticket.")) == 0 && (strlen(list[i]) == (strlen("ticket.") + (MD5_DIGEST_LENGTH << 1)))) {
+		for (i = 0; list[i]; i++) {
+			if (strncmp(list[i], "ticket.", strlen("ticket.")) == 0 &&
+					(strlen(list[i]) == (strlen("ticket.") + (MD5_DIGEST_LENGTH << 1)))) {
 				debug(D_CHIRP, "adding ticket %s", list[i]);
 				client_tickets = xxrealloc(client_tickets, sizeof(char *) * ((++n) + 1));
 				client_tickets[n - 1] = strdup(list[i]);

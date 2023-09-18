@@ -49,7 +49,7 @@ def library_network_code():
         out_pipe = os.fdopen(args.output_fd, 'w')
 
         config = {
-            "name": name(),
+                "name": name(),  # noqa: F821
         }
         send_configuration(config, out_pipe)
 

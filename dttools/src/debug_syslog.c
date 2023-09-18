@@ -12,7 +12,7 @@ See the file COPYING for details.
 
 #include <stdarg.h>
 
-void debug_syslog_write (INT64_T flags, const char *str)
+void debug_syslog_write(INT64_T flags, const char *str)
 {
 	int priority = LOG_USER;
 	if (flags & D_FATAL) {
@@ -29,10 +29,7 @@ void debug_syslog_write (INT64_T flags, const char *str)
 	syslog(priority, "%s", str);
 }
 
-void debug_syslog_config (const char *name)
-{
-	openlog(name, LOG_PID|LOG_NOWAIT, LOG_USER);
-}
+void debug_syslog_config(const char *name) { openlog(name, LOG_PID | LOG_NOWAIT, LOG_USER); }
 #endif
 
 /* vim: set noexpandtab tabstop=8: */

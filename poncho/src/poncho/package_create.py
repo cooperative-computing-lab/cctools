@@ -7,11 +7,9 @@
 import os
 import sys
 import tempfile
-import argparse
 import subprocess
 import json
 import conda_pack
-import pathlib
 import hashlib
 import shutil
 import logging
@@ -212,7 +210,7 @@ def pack_env(spec, output, conda_executable=None, download_micromamba=False, ign
         _pack_env_with_conda_dir(conda_env_dir, output, ignore_editable_packages)
 
 def _get_conda_env_dir_by_name(env_name):
-    command = f"conda env list --json"
+    command = "conda env list --json"
     result = subprocess.run(command, capture_output=True, text=True, shell=True)
     
     if result.returncode == 0:
@@ -267,7 +265,7 @@ def git_data(data, out_dir):
             if 'remote' in data['git'][git_dir]:
                 git_repo = data['git'][git_dir]['remote']
             if 'ref' in data['git'][git_dir]:
-                ref = data['git'][git_dir]['ref']
+                ref = data['git'][git_dir]['ref']  # noqa: F841
 
             if git_repo:
                 # clone repo

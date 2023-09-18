@@ -9,9 +9,9 @@ See the file COPYING for details.
 #include "change_process_title.h"
 
 #include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 static char *process_title = 0;
 static int process_title_length;
@@ -23,12 +23,12 @@ void change_process_title_init(char **argv)
 	int i, argc;
 
 	/* count up the arguments */
-	for(argc = 0; argv[argc]; argc++) {
+	for (argc = 0; argv[argc]; argc++) {
 	}
 
 	/* duplicate the entire argv array */
 	newargv = malloc(argc * sizeof(char *));
-	for(i = 0; i < argc; i++) {
+	for (i = 0; i < argc; i++) {
 		newargv[i] = strdup(argv[i]);
 	}
 
@@ -46,7 +46,7 @@ void change_process_title_init(char **argv)
 	process_title_length = process_title_end - process_title;
 
 	/* reload argv with the copied values */
-	for(i = 0; i < argc; i++) {
+	for (i = 0; i < argc; i++) {
 		argv[i] = newargv[i];
 	}
 
@@ -59,14 +59,14 @@ void change_process_title(const char *fmt, ...)
 	va_list args;
 	va_start(args, fmt);
 
-	if(!process_title)
+	if (!process_title)
 		return;
 
 	/* print the new process title in place */
 	length = vsnprintf(process_title, process_title_length, fmt, args);
 
 	/* null out the rest of the string */
-	for(i = length; i < process_title_length; i++) {
+	for (i = length; i < process_title_length; i++) {
 		process_title[i] = 0;
 	}
 
@@ -89,13 +89,9 @@ Changing the process title is not supported
 on any other platform.
 */
 
-void change_process_title_init(char **argv)
-{
-}
+void change_process_title_init(char **argv) {}
 
-void change_process_title(char *fmt, ...)
-{
-}
+void change_process_title(char *fmt, ...) {}
 
 #endif
 

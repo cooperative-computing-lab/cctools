@@ -4,7 +4,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #if defined(__linux__)
-#	include <syscall.h>
+#include <syscall.h>
 #endif
 #include <unistd.h>
 
@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int memfdexe (const char *name, const char *extradir)
+int memfdexe(const char *name, const char *extradir)
 {
 	int fd;
 
@@ -27,13 +27,7 @@ int memfdexe (const char *name, const char *extradir)
 
 	if (fd == -1 && errno == ENOSYS) {
 		int i;
-		const char *dirs[] = {
-			"/dev/shm",
-			"/tmp",
-			"/var/tmp",
-			extradir,
-			NULL
-		};
+		const char *dirs[] = {"/dev/shm", "/tmp", "/var/tmp", extradir, NULL};
 		size_t pagesize = getpagesize();
 		for (i = 0; dirs[i]; i++) {
 			char path[PATH_MAX];
@@ -52,13 +46,14 @@ int memfdexe (const char *name, const char *extradir)
 					continue;
 				}
 
-				/* test if we can use it for executable data (i.e. is dir on a file system mounted with the 'noexec' option) */
+				/* test if we can use it for executable data (i.e. is dir on a file system mounted with
+				 * the 'noexec' option) */
 				if (ftruncate(fd, pagesize) == -1) {
 					debug(D_DEBUG, "could not grow memfdexe: %s", strerror(errno));
 					close(fd);
 					continue;
 				}
-				void *addr = mmap(NULL, pagesize, PROT_READ|PROT_EXEC, MAP_SHARED, fd, 0);
+				void *addr = mmap(NULL, pagesize, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
 				if (addr == MAP_FAILED) {
 					debug(D_DEBUG, "failed executable mapping: %s", strerror(errno));
 					close(fd);

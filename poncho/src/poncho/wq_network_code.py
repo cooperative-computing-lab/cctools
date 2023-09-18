@@ -44,7 +44,7 @@ def wq_network_code():
             sys.exit(1)
         # information to print to stdout for worker
         config = {
-                "name": name(),
+                "name": name(),  # noqa: F821
                 "port": s.getsockname()[1],
                 }
         send_configuration(config)

@@ -6,9 +6,9 @@ See the file COPYING for details.
 */
 #include "preadwrite.h"
 
-#include <unistd.h>
 #include <errno.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #ifndef HAS_PREAD
 ssize_t pread(int fd, void *data, size_t length, off_t offset)
@@ -17,7 +17,7 @@ ssize_t pread(int fd, void *data, size_t length, off_t offset)
 	off_t save_offset;
 	int save_errno;
 	save_offset = lseek(fd, offset, SEEK_SET);
-	if(save_offset == -1)
+	if (save_offset == -1)
 		return -1;
 	result = read(fd, data, length);
 	save_errno = errno;
@@ -25,7 +25,6 @@ ssize_t pread(int fd, void *data, size_t length, off_t offset)
 	errno = save_errno;
 	return result;
 }
-
 
 #endif /*  */
 
@@ -36,7 +35,7 @@ ssize_t pwrite(int fd, const void *data, size_t length, off_t offset)
 	off_t save_offset;
 	int save_errno;
 	save_offset = lseek(fd, offset, SEEK_SET);
-	if(save_offset == -1)
+	if (save_offset == -1)
 		return -1;
 	result = write(fd, data, length);
 	save_errno = errno;
@@ -44,7 +43,6 @@ ssize_t pwrite(int fd, const void *data, size_t length, off_t offset)
 	errno = save_errno;
 	return result;
 }
-
 
 #endif /*  */
 

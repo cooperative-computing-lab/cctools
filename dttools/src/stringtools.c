@@ -5,12 +5,12 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "stringtools.h"
+#include "buffer.h"
 #include "debug.h"
 #include "random.h"
-#include "stringtools.h"
 #include "timestamp.h"
 #include "xxmalloc.h"
-#include "buffer.h"
 
 #include <assert.h>
 #include <ctype.h>
@@ -24,11 +24,12 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-int string_compare(const void *p1, const void *p2) {
+int string_compare(const void *p1, const void *p2)
+{
 	/* The actual arguments to this function are "pointers to
 	 * pointers to char", but strcmp(3) arguments are "pointers
 	 * to char", hence the following cast plus dereference */
-	return strcmp(* (char * const *) p1, * (char * const *) p2);
+	return strcmp(*(char *const *)p1, *(char *const *)p2);
 }
 
 /*
@@ -39,45 +40,48 @@ int string_compare(const void *p1, const void *p2) {
  *
  * [ $ \ ` " ] Are always escaped.
  * */
-char *string_escape_shell( const char *str )
+char *string_escape_shell(const char *str)
 {
 	buffer_t B[1];
 	buffer_init(B);
 	buffer_abortonfailure(B, 1);
 
 	const char *s;
-	buffer_putliteral(B,"\"");
-	for(s=str;*s;s++) {
-		if(*s=='"' || *s=='\\' || *s=='$' || *s=='`')
-			buffer_putliteral(B,"\\");
-		buffer_putlstring(B,s,1);
+	buffer_putliteral(B, "\"");
+	for (s = str; *s; s++) {
+		if (*s == '"' || *s == '\\' || *s == '$' || *s == '`')
+			buffer_putliteral(B, "\\");
+		buffer_putlstring(B, s, 1);
 	}
-	buffer_putliteral(B,"\"");
+	buffer_putliteral(B, "\"");
 
 	char *result;
-	buffer_dup(B,&result);
+	buffer_dup(B, &result);
 	buffer_free(B);
 
 	return result;
 }
 
-int string_escape_chars( const char *s, char *t, const char *specials, int length )
+int string_escape_chars(const char *s, char *t, const char *specials, int length)
 {
-	while(*s) {
-		if(strchr(specials,*s)) {
-			if(length<3) return 0;
+	while (*s) {
+		if (strchr(specials, *s)) {
+			if (length < 3)
+				return 0;
 			*t++ = '\\';
 			length--;
 		}
-		if(length<2) return 0;
+		if (length < 2)
+			return 0;
 		*t++ = *s++;
 		length--;
 	}
 	*t = 0;
-	return 1;	
+	return 1;
 }
 
-char *string_quote_shell(const char *str) {
+char *string_quote_shell(const char *str)
+{
 	int backslashed = 0;
 	buffer_t B[1];
 	buffer_init(B);
@@ -85,21 +89,21 @@ char *string_quote_shell(const char *str) {
 
 	const char *s;
 	buffer_putliteral(B, "\"");
-	for (s=str; *s; s++) {
+	for (s = str; *s; s++) {
 		if (backslashed) {
 			backslashed = 0;
 		} else {
 			if (*s == '"')
-				buffer_putliteral(B,"\\");
+				buffer_putliteral(B, "\\");
 			else if (*s == '\\')
 				backslashed = 1;
 		}
-		buffer_putlstring(B,s,1);
+		buffer_putlstring(B, s, 1);
 	}
-	buffer_putliteral(B,"\"");
+	buffer_putliteral(B, "\"");
 
 	char *result;
-	buffer_dup(B,&result);
+	buffer_dup(B, &result);
 	buffer_free(B);
 
 	return result;
@@ -108,38 +112,38 @@ char *string_quote_shell(const char *str) {
 /*
  * Based on HTCondor documentation:
  * -The white space characters of spaces or tabs delimit arguments.
- * -To embed white space characters of spaces or tabs within a single argument, 
+ * -To embed white space characters of spaces or tabs within a single argument,
  * surround the entire argument with single quote marks.
- * -To insert a literal single quote mark, escape it within an argument already 
+ * -To insert a literal single quote mark, escape it within an argument already
  * delimited by single quote marks by adding another single quote mark.
  *
  * We surround the whole string with double quotes to enable quote escaping in
  * Condor. Then when a double quote is encountered we escape with another double
- * quote. When a single quote is encountered we add a single quote to enter 
+ * quote. When a single quote is encountered we add a single quote to enter
  * 'single quote mode' and then escape the quote with another single quote. This
- * does not attempt to match single quotes or double quotes, just tries to escape 
+ * does not attempt to match single quotes or double quotes, just tries to escape
  * every kind of quote.
  * */
-char *string_escape_condor( const char *str )
+char *string_escape_condor(const char *str)
 {
 	buffer_t B[1];
 	buffer_init(B);
 	buffer_abortonfailure(B, 1);
 
 	const char *s;
-	buffer_putliteral(B,"\"");
-	for(s=str;*s;s++) {
-		if(*s=='"')
-			buffer_putliteral(B,"\"");
-		if(*s=='\'')
-			buffer_putliteral(B,"\'\'");
-		buffer_putlstring(B,s,1);
+	buffer_putliteral(B, "\"");
+	for (s = str; *s; s++) {
+		if (*s == '"')
+			buffer_putliteral(B, "\"");
+		if (*s == '\'')
+			buffer_putliteral(B, "\'\'");
+		buffer_putlstring(B, s, 1);
 	}
-	buffer_putliteral(B," ");
-	buffer_putliteral(B,"\"");
+	buffer_putliteral(B, " ");
+	buffer_putliteral(B, "\"");
 
 	char *result;
-	buffer_dup(B,&result);
+	buffer_dup(B, &result);
 	buffer_free(B);
 
 	return result;
@@ -149,18 +153,18 @@ void string_chomp(char *start)
 {
 	char *s = start;
 
-	if(!s)
+	if (!s)
 		return;
-	if(!*s)
+	if (!*s)
 		return;
 
-	while(*s) {
+	while (*s) {
 		s++;
 	}
 
 	s--;
 
-	while(s >= start && (*s == '\n' || *s == '\r')) {
+	while (s >= start && (*s == '\n' || *s == '\r')) {
 		*s = 0;
 		s--;
 	}
@@ -171,18 +175,18 @@ int whole_string_match_regex(const char *text, const char *pattern)
 	char *new_pattern;
 	int result;
 
-	if(!pattern || !text)
+	if (!pattern || !text)
 		return 0;
 
-	new_pattern = (char *) malloc(sizeof(char) * (strlen(pattern) + 3));
-	if(!new_pattern)
+	new_pattern = (char *)malloc(sizeof(char) * (strlen(pattern) + 3));
+	if (!new_pattern)
 		return 0;
 
 	new_pattern[0] = '\0';
-	if(*pattern != '^')
+	if (*pattern != '^')
 		strcat(new_pattern, "^");
 	strcat(new_pattern, pattern);
-	if(pattern[strlen(pattern) - 1] != '$')
+	if (pattern[strlen(pattern) - 1] != '$')
 		strcat(new_pattern, "$");
 
 	result = string_match_regex(text, new_pattern);
@@ -191,20 +195,19 @@ int whole_string_match_regex(const char *text, const char *pattern)
 	return result;
 }
 
-
 int string_match_regex(const char *text, const char *pattern)
 {
 	int ret = 0;
 	regex_t re;
 
-	if(!pattern || !text)
+	if (!pattern || !text)
 		return 0;
-	if(regcomp(&re, pattern, REG_EXTENDED | REG_NOSUB) != 0) {
+	if (regcomp(&re, pattern, REG_EXTENDED | REG_NOSUB) != 0) {
 		return 0;
 	}
-	ret = regexec(&re, text, (size_t) 0, NULL, 0);
+	ret = regexec(&re, text, (size_t)0, NULL, 0);
 	regfree(&re);
-	if(!ret)
+	if (!ret)
 		return 1;
 	return 0;
 }
@@ -215,7 +218,7 @@ int string_match(const char *pattern, const char *text)
 	int headlen, taillen;
 
 	w = strchr(pattern, '*');
-	if(!w)
+	if (!w)
 		return !strcmp(pattern, text);
 
 	headlen = w - pattern;
@@ -230,7 +233,7 @@ char *string_front(const char *str, int max)
 	int length;
 
 	length = strlen(str);
-	if(length < max) {
+	if (length < max) {
 		strcpy(buffer, str);
 	} else {
 		strncpy(buffer, str, max);
@@ -244,7 +247,7 @@ const char *string_back(const char *str, int max)
 	int length;
 
 	length = strlen(str);
-	if(length < max) {
+	if (length < max) {
 		return str;
 	} else {
 		return &str[length - max];
@@ -253,19 +256,19 @@ const char *string_back(const char *str, int max)
 
 char *string_metric(double value, int power_needed, char *buffer)
 {
-	static const char suffix[][3] = { "", " K", " M", " G", " T", " P" };
+	static const char suffix[][3] = {"", " K", " M", " G", " T", " P"};
 	static char localbuffer[100];
 
 	double magnitude;
 
-	if(power_needed == -1) {
-		magnitude = floor(log(value)/log(1024.0));
+	if (power_needed == -1) {
+		magnitude = floor(log(value) / log(1024.0));
 	} else {
 		magnitude = power_needed;
 	}
-	magnitude = fmin(fmax(magnitude, 0.0), (double)(sizeof(suffix)/sizeof(suffix[0])-1));
+	magnitude = fmin(fmax(magnitude, 0.0), (double)(sizeof(suffix) / sizeof(suffix[0]) - 1));
 
-	if(!buffer)
+	if (!buffer)
 		buffer = localbuffer;
 
 	snprintf(buffer, sizeof(localbuffer), "%.1f%s", value / pow(1024.0, magnitude), suffix[(int)magnitude]);
@@ -279,25 +282,25 @@ int64_t string_metric_parse(const char *str)
 	char prefix;
 
 	switch (sscanf(str, "%" SCNd64 " %c", &result, &prefix)) {
-		case 2:
-			switch (toupper((int) prefix)) {
-				case 'P':
-					return result << 50;
-				case 'T':
-					return result << 40;
-				case 'G':
-					return result << 30;
-				case 'M':
-					return result << 20;
-				case 'K':
-					return result << 10;
-				default:
-					return result;
-			}
-		case 1:
-			return result;
+	case 2:
+		switch (toupper((int)prefix)) {
+		case 'P':
+			return result << 50;
+		case 'T':
+			return result << 40;
+		case 'G':
+			return result << 30;
+		case 'M':
+			return result << 20;
+		case 'K':
+			return result << 10;
 		default:
-			return errno = EINVAL, -1;
+			return result;
+		}
+	case 1:
+		return result;
+	default:
+		return errno = EINVAL, -1;
 	}
 }
 
@@ -307,22 +310,22 @@ time_t string_time_parse(const char *str)
 	char mod;
 
 	switch (sscanf(str, "%" SCNd64 " %c", &t, &mod)) {
-		case 2:
-			switch (tolower((int)mod)) {
-				case 'd':
-					return t * 60 * 60 * 24;
-				case 'h':
-					return t * 60 * 60;
-				case 'm':
-					return t * 60;
-				case 's':
-				default:
-					return t;
-			}
-		case 1:
-			return t;
+	case 2:
+		switch (tolower((int)mod)) {
+		case 'd':
+			return t * 60 * 60 * 24;
+		case 'h':
+			return t * 60 * 60;
+		case 'm':
+			return t * 60;
+		case 's':
 		default:
-			return errno = EINVAL, -1;
+			return t;
+		}
+	case 1:
+		return t;
+	default:
+		return errno = EINVAL, -1;
 	}
 }
 
@@ -336,18 +339,18 @@ int string_split(char *str, int *argc, char ***argv)
 	*argc = 0;
 
 	*argv = malloc((strlen(str) + 1) * sizeof(char *));
-	if(!*argv)
+	if (!*argv)
 		return 0;
 
-	while(*str) {
-		while(isspace((int) *str)) {
+	while (*str) {
+		while (isspace((int)*str)) {
 			str++;
 		}
 		(*argv)[(*argc)++] = str;
-		while(*str && !isspace((int) *str)) {
+		while (*str && !isspace((int)*str)) {
 			str++;
 		}
-		if(*str) {
+		if (*str) {
 			*str = 0;
 			str++;
 		}
@@ -368,46 +371,46 @@ int string_split_quotes(char *str, int *argc, char ***argv)
 	*argc = 0;
 
 	*argv = malloc((strlen(str) + 1) * sizeof(char *));
-	if(!*argv)
+	if (!*argv)
 		return 0;
 
-	while(*str) {
+	while (*str) {
 
 		/* Skip over leading whitespace */
 
-		while(isspace((int) *str)) {
+		while (isspace((int)*str)) {
 			str++;
 		}
 
-		if(!*str)
+		if (!*str)
 			break;
 
 		/* The token begins here. */
 		(*argv)[(*argc)++] = str;
 
 		/* Start advancing over tokens */
-		while(*str) {
-			if(*str == '\\') {
+		while (*str) {
+			if (*str == '\\') {
 				/* If we are backwhacked, shift and continue */
 				memmove(str, str + 1, strlen(str));
-				if(*str)
+				if (*str)
 					str++;
-			} else if(isspace((int) *str)) {
+			} else if (isspace((int)*str)) {
 				/* If we have found a delimiter, accept */
 				*str = 0;
 				str++;
 				break;
-			} else if(*str == '\'' || *str == '\"') {
+			} else if (*str == '\'' || *str == '\"') {
 				/* Upon finding a quote, we enter a new loop */
 				char quote = *str;
 				memmove(str, str + 1, strlen(str));
-				while(*str) {
-					if(*str == '\\') {
+				while (*str) {
+					if (*str == '\\') {
 						/* Skip anything backwhacked */
 						memmove(str, str + 1, strlen(str));
-						if(*str)
+						if (*str)
 							str++;
-					} else if(*str == quote) {
+					} else if (*str == quote) {
 						/* Shift and stop on a matching quote */
 						memmove(str, str + 1, strlen(str));
 						break;
@@ -416,7 +419,7 @@ int string_split_quotes(char *str, int *argc, char ***argv)
 						str++;
 					}
 				}
-			} else if(!*str) {
+			} else if (!*str) {
 				/* If we have found the end, accept */
 				break;
 			} else {
@@ -435,12 +438,12 @@ char *string_pad_right(char *old, unsigned int length)
 {
 	unsigned int i;
 	char *s = malloc(length + 1);
-	if(!s)
+	if (!s)
 		return 0;
 
-	if(strlen(old) <= length) {
+	if (strlen(old) <= length) {
 		strcpy(s, old);
-		for(i = strlen(old); i < length; i++) {
+		for (i = strlen(old); i < length; i++) {
 			s[i] = ' ';
 		}
 	} else {
@@ -458,14 +461,14 @@ char *string_pad_left(char *old, int length)
 	char *s;
 
 	s = malloc(length + 1);
-	if(!s)
+	if (!s)
 		return 0;
 
 	slength = strlen(old);
 	offset = length - slength;
 
-	for(i = 0; i < length; i++) {
-		if(i < offset) {
+	for (i = 0; i < length; i++) {
+		if (i < offset) {
 			s[i] = ' ';
 		} else {
 			s[i] = old[i - offset];
@@ -481,7 +484,7 @@ void string_cookie(char *s, int length)
 	int i;
 	random_init();
 
-	for(i = 0; i < length; i++) {
+	for (i = 0; i < length; i++) {
 		s[i] = 'a' + ((unsigned)random_int() % 26);
 	}
 
@@ -495,38 +498,38 @@ char *string_subst(char *value, string_subst_lookup_t lookup, void *arg)
 	char oldrdelim;
 	int length;
 
-	while(1) {
+	while (1) {
 		dollar = strchr(value, '$');
-		if(!dollar)
+		if (!dollar)
 			return value;
 
-		while(dollar > value) {
-			if(*(dollar - 1) == '\\') {
+		while (dollar > value) {
+			if (*(dollar - 1) == '\\') {
 				dollar = strchr(dollar + 1, '$');
-			} else if(*(dollar + 1) == '$') {
+			} else if (*(dollar + 1) == '$') {
 				*dollar = ' ';
 				dollar = strchr(dollar + 2, '$');
 			} else {
 				break;
 			}
 
-			if(!dollar)
+			if (!dollar)
 				return value;
 		}
 
 		ldelim = dollar + 1;
-		if(*ldelim == '(') {
+		if (*ldelim == '(') {
 			rdelim = ldelim + 1;
-			while(*rdelim != ')')
+			while (*rdelim != ')')
 				rdelim++;
-		} else if(*ldelim == '{') {
+		} else if (*ldelim == '{') {
 			rdelim = ldelim + 1;
-			while(*rdelim != '}')
+			while (*rdelim != '}')
 				rdelim++;
 		} else {
 			ldelim--;
 			rdelim = ldelim + 1;
-			while(isalnum((int) *rdelim) || *rdelim == '_')
+			while (isalnum((int)*rdelim) || *rdelim == '_')
 				rdelim++;
 		}
 
@@ -534,20 +537,20 @@ char *string_subst(char *value, string_subst_lookup_t lookup, void *arg)
 		*rdelim = 0;
 
 		subvalue = lookup(ldelim + 1, arg);
-		if(!subvalue)
+		if (!subvalue)
 			subvalue = strdup("");
 
 		*rdelim = oldrdelim;
 
 		length = strlen(value) - (rdelim - dollar) + strlen(subvalue) + 1;
 		newvalue = malloc(length);
-		if(!newvalue) {
+		if (!newvalue) {
 			free(subvalue);
 			free(value);
 			return 0;
 		}
 
-		if(ldelim != dollar)
+		if (ldelim != dollar)
 			rdelim++;
 		*dollar = 0;
 
@@ -562,32 +565,39 @@ char *string_subst(char *value, string_subst_lookup_t lookup, void *arg)
 	}
 }
 
-
-int string_prefix_is(const char *string, const char *prefix) {
+int string_prefix_is(const char *string, const char *prefix)
+{
 	size_t n;
 
-	if(!string || !prefix) return 0;
+	if (!string || !prefix)
+		return 0;
 
-	if((n = strlen(prefix)) == 0) return 0;
+	if ((n = strlen(prefix)) == 0)
+		return 0;
 
-	if(strncmp(string, prefix, n) == 0) return 1;
+	if (strncmp(string, prefix, n) == 0)
+		return 1;
 
 	return 0;
 }
 
-int string_suffix_is(const char *string, const char *suffix) {
+int string_suffix_is(const char *string, const char *suffix)
+{
 	size_t n, m;
 
-	if(!string || !suffix) return 0;
+	if (!string || !suffix)
+		return 0;
 
-	if((n = strlen(suffix)) == 0) return 0;
-	if((m = strlen(string)) < n)  return 0;
+	if ((n = strlen(suffix)) == 0)
+		return 0;
+	if ((m = strlen(string)) < n)
+		return 0;
 
-	if(strncmp((string + m - n), suffix, n) == 0) return 1;
+	if (strncmp((string + m - n), suffix, n) == 0)
+		return 1;
 
 	return 0;
 }
-
 
 /* This definition taken directly from the GNU C library */
 
@@ -601,21 +611,21 @@ char *strsep(char **stringp, const char *delim)
 	char *begin, *end;
 
 	begin = *stringp;
-	if(begin == NULL)
+	if (begin == NULL)
 		return NULL;
 
 	/* A frequent case is when the delimiter string contains only one
 	   character.  Here we don't need to call the expensive `strpbrk'
 	   function and instead work using `strchr'.  */
-	if(delim[0] == '\0' || delim[1] == '\0') {
+	if (delim[0] == '\0' || delim[1] == '\0') {
 		char ch = delim[0];
 
-		if(ch == '\0')
+		if (ch == '\0')
 			end = NULL;
 		else {
-			if(*begin == ch)
+			if (*begin == ch)
 				end = begin;
-			else if(*begin == '\0')
+			else if (*begin == '\0')
 				end = NULL;
 			else
 				end = strchr(begin + 1, ch);
@@ -624,7 +634,7 @@ char *strsep(char **stringp, const char *delim)
 		/* Find the end of the token.  */
 		end = strpbrk(begin, delim);
 
-	if(end) {
+	if (end) {
 		/* Terminate the token and set *STRINGP past NUL character.  */
 		*end++ = '\0';
 		*stringp = end;
@@ -642,19 +652,20 @@ char *string_combine(char *a, const char *b)
 	char *r = NULL;
 	size_t a_len;
 
-	if(!a) {
-		if(!b) {
+	if (!a) {
+		if (!b) {
 			return r;
 		} else {
 			return xxstrdup(b);
 		}
 	}
 
-	if(!b) return a;
+	if (!b)
+		return a;
 
 	a_len = strlen(a);
 	r = realloc(a, (a_len + strlen(b) + 1) * sizeof(char));
-	if(!r) {
+	if (!r) {
 		fatal("Cannot allocate memory for string concatenation.\n");
 	}
 	strcat(r, b);
@@ -668,8 +679,7 @@ char *string_combine_multi(char *r, ...)
 	va_list args;
 	va_start(args, r);
 
-
-	while((n = va_arg(args, char *))) {
+	while ((n = va_arg(args, char *))) {
 		r = string_combine(r, n);
 	}
 
@@ -683,44 +693,44 @@ char *string_signal(int sig)
 #ifdef HAS_STRSIGNAL
 	return strsignal(sig);
 #else
-	return (char *) _sys_siglist[sig];
+	return (char *)_sys_siglist[sig];
 #endif
 }
 
 void string_tolower(char *s)
 {
-	while(*s) {
-		*s = tolower((int) (*s));
+	while (*s) {
+		*s = tolower((int)(*s));
 		s++;
 	}
 }
 
 void string_toupper(char *s)
 {
-	while(*s) {
-		*s = toupper((int) (*s));
+	while (*s) {
+		*s = toupper((int)(*s));
 		s++;
 	}
 }
 
-int string_is_integer( const char *s, long long *integer_value )
+int string_is_integer(const char *s, long long *integer_value)
 {
 	char *endptr;
-	*integer_value = strtoll(s,&endptr,10);
+	*integer_value = strtoll(s, &endptr, 10);
 	return !*endptr;
 }
 
-int string_is_float( const char *s, double *double_value )
+int string_is_float(const char *s, double *double_value)
 {
 	char *endptr;
-	*double_value = strtod(s,&endptr);
+	*double_value = strtod(s, &endptr);
 	return !*endptr;
 }
 
 int string_isspace(const char *s)
 {
-	while(*s) {
-		if(!isspace((int) *s))
+	while (*s) {
+		if (!isspace((int)*s))
 			return 0;
 		s++;
 	}
@@ -730,32 +740,32 @@ int string_isspace(const char *s)
 
 void string_replace_backslash_codes(const char *a, char *b)
 {
-	while(*a) {
-		if(*a == '\\') {
+	while (*a) {
+		if (*a == '\\') {
 			a++;
 			char c;
 			switch (*a) {
 			case 'a':
 				c = 7;
-				break;	// bell
+				break; // bell
 			case 'b':
 				c = 8;
-				break;	// backspace
+				break; // backspace
 			case 't':
 				c = 9;
-				break;	// tab
+				break; // tab
 			case 'n':
 				c = 10;
-				break;	// newline
+				break; // newline
 			case 'v':
 				c = 11;
-				break;	// vertical tab
+				break; // vertical tab
 			case 'f':
 				c = 12;
-				break;	// formfeed
+				break; // formfeed
 			case 'r':
 				c = 13;
-				break;	// return
+				break; // return
 			default:
 				c = *a;
 				break;
@@ -770,31 +780,32 @@ void string_replace_backslash_codes(const char *a, char *b)
 	*b = 0;
 }
 
-char *string_replace_percents( const char *str, const char *replace )
+char *string_replace_percents(const char *str, const char *replace)
 {
 	/* Common case: do nothing if no percents. */
-	if(!strchr(str,'%')) return xxstrdup(str);
+	if (!strchr(str, '%'))
+		return xxstrdup(str);
 
 	buffer_t buffer;
 	buffer_init(&buffer);
 
 	const char *s;
-	for(s=str;*s;s++) {
-		if(*s=='%' && *(s+1)=='%' ) {
-			if( *(s+2)=='%' && *(s+3)=='%') {
-				buffer_putlstring(&buffer,"%%",2);
-				s+=3;
+	for (s = str; *s; s++) {
+		if (*s == '%' && *(s + 1) == '%') {
+			if (*(s + 2) == '%' && *(s + 3) == '%') {
+				buffer_putlstring(&buffer, "%%", 2);
+				s += 3;
 			} else {
-				buffer_putstring(&buffer,replace);
+				buffer_putstring(&buffer, replace);
 				s++;
 			}
 		} else {
-			buffer_putlstring(&buffer,s,1);
+			buffer_putlstring(&buffer, s, 1);
 		}
 	}
 
 	char *result;
-	buffer_dup(&buffer,&result);
+	buffer_dup(&buffer, &result);
 	buffer_free(&buffer);
 
 	return result;
@@ -804,23 +815,22 @@ int strpos(const char *str, char c)
 {
 
 	unsigned int i;
-	if(str != NULL) {
-		for(i = 0; i < strlen(str); i++) {
-			if(str[i] == c)
+	if (str != NULL) {
+		for (i = 0; i < strlen(str); i++) {
+			if (str[i] == c)
 				return i;
 		}
 	}
 	return -1;
 }
 
-
 int strrpos(const char *str, char c)
 {
 
 	int i;
-	if(str != NULL) {
-		for(i = strlen(str) - 1; i >= 0; i--) {
-			if(str[i] == c)
+	if (str != NULL) {
+		for (i = strlen(str) - 1; i >= 0; i--) {
+			if (str[i] == c)
 				return i;
 		}
 	}
@@ -829,9 +839,9 @@ int strrpos(const char *str, char c)
 
 int string_null_or_empty(const char *str)
 {
-	if(!str)
+	if (!str)
 		return 1;
-	if(!strncmp(str, "", 1))
+	if (!strncmp(str, "", 1))
 		return 1;
 	return 0;
 }
@@ -840,37 +850,35 @@ int getDateString(char *str)
 {
 
 	int retval;
-	char *Month[12] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-		"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-	};
+	char *Month[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
 	struct tm *T = NULL;
 	time_t Tval = 0;
 	Tval = time(NULL);
 	T = localtime(&Tval);
-	if(T->tm_mday < 10)
+	if (T->tm_mday < 10)
 		retval = sprintf(str, "%s0%d", Month[T->tm_mon], T->tm_mday);
 	else
 		retval = sprintf(str, "%s%d", Month[T->tm_mon], T->tm_mday);
-	if(retval <= 4)
+	if (retval <= 4)
 		return 0;
 	else
 		return 1;
 }
 
-char * string_format( const char *fmt, ... )
+char *string_format(const char *fmt, ...)
 {
 	va_list args;
 
-	va_start(args,fmt);
+	va_start(args, fmt);
 	int n = vsnprintf(NULL, 0, fmt, args);
 	va_end(args);
 
-	if(n < 0)
+	if (n < 0)
 		return NULL;
 
 	char *str = xxmalloc((n + 1) * sizeof(char));
-	va_start(args,fmt);
+	va_start(args, fmt);
 	n = vsnprintf(str, n + 1, fmt, args);
 	va_end(args);
 
@@ -879,14 +887,14 @@ char * string_format( const char *fmt, ... )
 	return str;
 }
 
-int string_nformat (char *str, const size_t max, const char *fmt, ...)
+int string_nformat(char *str, const size_t max, const char *fmt, ...)
 {
 	va_list(va);
 	va_start(va, fmt);
 	size_t n = vsnprintf(str, max, fmt, va);
 	va_end(va);
 
-	if( max <= n )
+	if (max <= n)
 		fatal("String '%30s...' is %zd (greater than the %zd limit).", str, n, max);
 
 	return n;
@@ -911,17 +919,14 @@ char *string_trim(char *s, int func(int))
 	return s;
 }
 
-char *string_trim_spaces(char *s)
-{
-	return string_trim(s, isspace);
-}
+char *string_trim_spaces(char *s) { return string_trim(s, isspace); }
 
 char *string_trim_quotes(char *s)
 {
 	char *front, *back;
 
 	front = s;
-	back  = s + strlen(s) - 1;
+	back = s + strlen(s) - 1;
 
 	while (*front == '\'' || *front == '"') {
 		if (*back != *front)
@@ -936,45 +941,44 @@ char *string_trim_quotes(char *s)
 
 int string_istrue(const char *str)
 {
-	if(str == NULL)
+	if (str == NULL)
 		str = "";
 	return (strcasecmp(str, "true") == 0) || (strcasecmp(str, "yes") == 0) || (atoi(str) > 0);
 }
 
-int string_equal(const char *str1, const char *str2){
-	return !strcmp(str1, str2);
-}
+int string_equal(const char *str1, const char *str2) { return !strcmp(str1, str2); }
 
-char * string_wrap_command( const char *command, const char *wrapper_command )
+char *string_wrap_command(const char *command, const char *wrapper_command)
 {
-	if(!wrapper_command) return xxstrdup(command);
+	if (!wrapper_command)
+		return xxstrdup(command);
 
-	char * braces = strstr(wrapper_command,"{}");
-	char * square = strstr(wrapper_command,"[]");
-	char * new_command;
+	char *braces = strstr(wrapper_command, "{}");
+	char *square = strstr(wrapper_command, "[]");
+	char *new_command;
 
-	if(braces) {
+	if (braces) {
 		new_command = xxstrdup(command);
 	} else {
 		new_command = string_escape_shell(command);
 	}
 
-	char * result = malloc(strlen(new_command)+strlen(wrapper_command)+16);
+	char *result = malloc(strlen(new_command) + strlen(wrapper_command) + 16);
 
-	if(braces) {
-		strcpy(result,wrapper_command);
-		result[braces-wrapper_command] = 0;
-		strcat(result,new_command);
-		strcat(result,braces+2);
-	} else if(square) {
-		strcpy(result,wrapper_command);
-		result[square-wrapper_command] = 0;
-		strcat(result,new_command);
-		strcat(result,square+2);
+	if (braces) {
+		strcpy(result, wrapper_command);
+		result[braces - wrapper_command] = 0;
+		strcat(result, new_command);
+		strcat(result, braces + 2);
+	} else if (square) {
+		strcpy(result, wrapper_command);
+		result[square - wrapper_command] = 0;
+		strcat(result, new_command);
+		strcat(result, square + 2);
 	} else {
-		strcpy(result,wrapper_command);
-		strcat(result," /bin/sh -c ");
-		strcat(result,new_command);
+		strcpy(result, wrapper_command);
+		strcat(result, " /bin/sh -c ");
+		strcat(result, new_command);
 	}
 
 	free(new_command);
@@ -982,10 +986,11 @@ char * string_wrap_command( const char *command, const char *wrapper_command )
 	return result;
 }
 
-char *strnchr (const char *s, int c)
+char *strnchr(const char *s, int c)
 {
 	char *next = strchr(s, c);
-	if (next) next += 1;
+	if (next)
+		next += 1;
 	return next;
 }
 
