@@ -119,13 +119,13 @@ jobs:
       - name: Conda-Setup
         run: ${GITHUB_WORKSPACE}/packaging/build-conda/setup.sh
       - name: Configure
-        run: conda run --name cctools-dev ${GITHUB_WORKSPACE}/packaging/build-conda/configure.sh
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/configure.sh
       - name: Build
-        run: conda run --name cctools-dev ${GITHUB_WORKSPACE}/packaging/build-conda/build.sh
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/build.sh
       - name: Install
-        run: conda run --name cctools-dev ${GITHUB_WORKSPACE}/packaging/build-conda/install.sh
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/install.sh
       - name: Test
-        run: conda run --name cctools-dev ${GITHUB_WORKSPACE}/packaging/build-conda/test.sh
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/test.sh
       - name: Deploy
         uses: ncipollo/release-action@v1
         if: github.event_name == 'workflow_dispatch'
