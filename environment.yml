@@ -2,7 +2,6 @@
 name: cctools-dev
 channels:
  - conda-forge
- - defaults
 dependencies:
  - python=3
  - gcc_linux-64
