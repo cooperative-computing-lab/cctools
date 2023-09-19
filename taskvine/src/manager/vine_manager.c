@@ -4058,12 +4058,10 @@ of scheduling, task completion, etc.
 
 static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state)
 {
-
 	vine_task_state_t old_state = t->state;
 
 	t->state = new_state;
 
-	// insert to corresponding table
 	debug(D_VINE,
 			"Task %d state change: %s (%d) to %s (%d)\n",
 			t->task_id,
@@ -4073,6 +4071,9 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 			new_state);
 
 	switch (new_state) {
+	case VINE_TASK_INITIAL:
+		/* should not happen, do nothing */
+		break;
 	case VINE_TASK_READY:
 		vine_task_set_result(t, VINE_RESULT_UNKNOWN);
 		push_task_to_ready_list(q, t);
@@ -4094,9 +4095,6 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 		vine_taskgraph_log_write_task(q, t);
 		itable_remove(q->tasks, t->task_id);
 		vine_task_delete(t);
-		break;
-	default:
-		/* do nothing */
 		break;
 	}
 
