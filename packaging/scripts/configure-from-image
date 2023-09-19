@@ -55,6 +55,8 @@ then
     fi
 fi
 
+# make sure we have nonstandard python packages present
+pip install cloudpickle packaging conda-pack
 
 # compile everything
 ./configure --strict $DEP_ARGS ${perl_option} ${python_option} ${cvmfs_option} "$@"
