@@ -110,7 +110,7 @@ static int shut_down_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 static void reap_task_from_worker(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, vine_task_state_t new_state);
-static void cancel_task_on_worker(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state);
+static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state);
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w);
 
 static void find_max_worker(struct vine_manager *q);
@@ -3316,7 +3316,7 @@ static int disconnect_slow_workers(struct vine_manager *q)
 			w = t->worker;
 			if (w && (w->type == VINE_WORKER_TYPE_WORKER)) {
 				debug(D_VINE, "Task %d is taking too long. Removing from worker.", t->task_id);
-				cancel_task_on_worker(q, t, VINE_TASK_READY);
+				reset_task_to_state(q, t, VINE_TASK_READY);
 				t->workers_slow++;
 
 				/* a task cannot mark two different workers as suspect */
@@ -3403,16 +3403,21 @@ static int task_tag_comparator(void *t, const void *r)
 }
 
 /*
-Cancel a specific task already running on a worker,
-by sending the appropriate kill message and removing any undesired state.
+Reset a specific task and return it to a known state.
+The task could be in any state in any data structure,
+including already running on a worker.  So, it must be
+removed from its current data structure and then
+transitioned to a new state and the corresponding
+data structure.
 */
 
-static void cancel_task_on_worker(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state)
+static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state)
 {
 	struct vine_worker_info *w = t->worker;
 
 	switch (t->state) {
 	case VINE_TASK_INITIAL:
+		/* should not happen: this means task was never submitted */
 		break;
 
 	case VINE_TASK_READY:
@@ -3439,8 +3444,8 @@ static void cancel_task_on_worker(struct vine_manager *q, struct vine_task *t, v
 		// Delete all output files since they are not needed as the task was cancelled.
 		delete_worker_files(q, w, t->output_mounts, 0);
 
-		// Collect task structure from work.
-		// Note that this calls change_task_state internally/
+		// Collect task structure from worker.
+		// Note that this calls change_task_state internally.
 		reap_task_from_worker(q, w, t, new_state);
 
 		break;
@@ -3456,6 +3461,7 @@ static void cancel_task_on_worker(struct vine_manager *q, struct vine_task *t, v
 		break;
 
 	case VINE_TASK_DONE:
+		/* should not happen: this means task was already returned */
 		break;
 	}
 }
@@ -4040,8 +4046,16 @@ static void push_task_to_ready_list(struct vine_manager *q, struct vine_task *t)
 	vine_task_clean(t);
 }
 
-/* Changes task state. Returns old state */
-/* State of the task. One of VINE_TASK(UNKNOWN|READY|RUNNING|WAITING_RETRIEVAL|RETRIEVED|DONE) */
+/*
+Changes task to a target state, and performs the associated
+accounting needed to log the event and put the task into the
+new data structure.
+
+Note that this function should only be called if the task has
+already been removed from its prior data structure as a part
+of scheduling, task completion, etc.
+*/
+
 static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state)
 {
 
@@ -4358,7 +4372,7 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 	{
 		struct vine_task *t = vine_manager_find_library_on_worker(q, w, name);
 		if (t) {
-			cancel_task_on_worker(q, t, VINE_TASK_RETRIEVED);
+			reset_task_to_state(q, t, VINE_TASK_RETRIEVED);
 		}
 	}
 	hash_table_remove(q->libraries, name);
@@ -4924,7 +4938,7 @@ int vine_cancel_by_task_id(struct vine_manager *q, int task_id)
 		return 0;
 	}
 
-	cancel_task_on_worker(q, task, VINE_TASK_RETRIEVED);
+	reset_task_to_state(q, task, VINE_TASK_RETRIEVED);
 
 	task->result = VINE_RESULT_CANCELLED;
 	q->stats->tasks_cancelled++;
@@ -5588,7 +5602,7 @@ void vine_remove_file(struct vine_manager *m, struct vine_file *f)
 			LIST_ITERATE(t->input_mounts, mnt)
 			{
 				if (strcmp(filename, mnt->file->cached_name) == 0) {
-					cancel_task_on_worker(m, t, VINE_TASK_READY);
+					reset_task_to_state(m, t, VINE_TASK_READY);
 					continue;
 				}
 			}
@@ -5596,7 +5610,7 @@ void vine_remove_file(struct vine_manager *m, struct vine_file *f)
 			LIST_ITERATE(t->output_mounts, mnt)
 			{
 				if (strcmp(filename, mnt->file->cached_name) == 0) {
-					cancel_task_on_worker(m, t, VINE_TASK_READY);
+					reset_task_to_state(m, t, VINE_TASK_READY);
 					continue;
 				}
 			}
