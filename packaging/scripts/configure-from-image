@@ -41,7 +41,6 @@ fi
 # disable perl bindings (to compile as we do in conda)
 perl_option='--with-perl-path no'
 
-
 # using rpm/deb for cvmfs from cclnd docker containers
 if [[ -n "${CCTOOLS_DOCKER_GITHUB}" ]]
 then
@@ -55,8 +54,12 @@ then
     fi
 fi
 
-# make sure we have nonstandard python packages present
-pip install cloudpickle packaging conda-pack
+# if we are not in a docker container but the base VM,
+# then pip is available so install python packages
+if [[ -z "${CCTOOLS_DOCKER_GITHUB}" ]]
+then
+    pip install cloudpickle packaging conda-pack
+fi
 
 # compile everything
 ./configure --strict $DEP_ARGS ${perl_option} ${python_option} ${cvmfs_option} "$@"
