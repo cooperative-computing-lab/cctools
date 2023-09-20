@@ -15,6 +15,11 @@ PORT_FILE=vine.port
 check_needed()
 {
 	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
+
+	# In some limited build circumstances (e.g. macos build on github),
+	# poncho doesn't work due to lack of conda-pack or cloudpickle
+	"${CCTOOLS_PYTHON_TEST_EXEC}" -c "import conda_pack" || return 1
+	"${CCTOOLS_PYTHON_TEST_EXEC}" -c "import cloudpickle" || return 1
 }
 
 prepare()
