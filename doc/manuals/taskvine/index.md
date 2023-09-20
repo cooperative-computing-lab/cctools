@@ -1266,10 +1266,10 @@ environment.
 ### Task Cancellations
 
 This feature is useful in workflows where there are redundant tasks or tasks
-that become obsolete as other tasks finish. Tasks that have been submitted can
-be cancelled and immediately retrieved without waiting for TaskVine to
-return them in `vine_wait`. The tasks to cancel can be identified by
-either their `taskid` or `tag`. For example:
+that become obsolete as other tasks finish.  Tasks can be removed either
+by either `task_id` or `tag`.  Tasks removed in this way will still be
+returned in the usual way via `wait` with a `result` of `VINE_RESULT_CANCELLED`.
+For example:
 
 === "Python"
     ```python
@@ -1285,11 +1285,11 @@ either their `taskid` or `tag`. For example:
 
     taskid = m.submit(t)
 
-    # cancel task by id. Return the canceled task.
-    t = m.cancel_by_taskid(taskid)
+    # cancel task by id.
+    m.cancel_by_taskid(taskid)
 
-    # or cancel task by tag. Return the canceled task.
-    t = m.cancel_by_tasktag("my-tag")
+    # or cancel task by tag.
+    m.cancel_by_tasktag("my-tag")
     ```
 
 === "C"
@@ -1300,20 +1300,20 @@ either their `taskid` or `tag`. For example:
 
     int taskid = vine_submit(m, t);
 
-    // cancel task by id. Return the canceled task.
-    t = vine_cancel_by_taskid(m, taskid);
+    // cancel task by id.
+    vine_cancel_by_taskid(m, taskid);
 
-    # or cancel task by tag. Return the canceled task.
-    t = vine_cancel_by_tasktag(m, "my-tag");
+    # or cancel task by tag.
+    vine_cancel_by_tasktag(m, "my-tag");
     ```
 
 
 !!! note
     If several tasks have the same tag, only one of them is cancelled. If you
     want to cancel all the tasks with the same tag, you can use loop until
-    `cancel_by_task` does not return a task, as in:
+    `cancel_by_task` returns zero:
 ```
-    while m.cancel_by_taskid("my-tag"):
+    while m.cancel_by_taskid("my-tag")>0:
         pass
 ```
 
