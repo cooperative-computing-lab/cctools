@@ -159,7 +159,7 @@ static struct vine_resources *total_resources = 0;
 
 /* When the amount of disk is not specified, manually set the reporting disk to
  * this percentage of the measured disk. This safeguards the fact that disk measurements
- * are estimates and thus may unncessarily forsaken tasks with unspecified resources. 
+ * are estimates and thus may unncessarily forsaken tasks with unspecified resources.
  * Defaults to 90%. */
 static int disk_percent = 90;
 
@@ -326,8 +326,7 @@ static void measure_worker_resources()
 
 	if (manual_disk_option > 0) {
 		r->disk.total = MIN(r->disk.total, manual_disk_option);
-	}
-	else {
+	} else {
 		/* Set the reporting disk to a fraction of the measured disk to avoid
 		 * unnecessarily forsaking tasks with unspecified resources. */
 		manual_disk_option = floor(r->disk.total * disk_percent / 100);
@@ -1147,7 +1146,7 @@ static int task_resources_fit_now(struct vine_task *t)
 {
 	return (cores_allocated + t->resources_requested->cores <= total_resources->cores.total) &&
 	       (memory_allocated + t->resources_requested->memory <= total_resources->memory.total) &&
-		   (disk_allocated + t->resources_requested->disk <= total_resources->disk.total) &&
+	       (disk_allocated + t->resources_requested->disk <= total_resources->disk.total) &&
 	       (gpus_allocated + t->resources_requested->gpus <= total_resources->gpus.total);
 }
 
@@ -1165,8 +1164,7 @@ static int task_resources_fit_eventually(struct vine_task *t)
 	r = total_resources;
 
 	return (t->resources_requested->cores <= r->cores.total) &&
-	       (t->resources_requested->memory <= r->memory.total) &&
-			(t->resources_requested->disk <= r->disk.total) &&
+	       (t->resources_requested->memory <= r->memory.total) && (t->resources_requested->disk <= r->disk.total) &&
 	       (t->resources_requested->gpus <= r->gpus.total);
 }
 
@@ -2098,8 +2096,9 @@ static void show_help(const char *cmd)
 
 	printf(" %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
 	printf(" %-30s If not given, or less than 1, then try to detect disk space available.\n", "");
-	
-	printf(" %-30s Set the conservative disk reporting percent when amount of disk is unspecified.\n", "--disk-percent=<percent>");
+
+	printf(" %-30s Set the conservative disk reporting percent when amount of disk is unspecified.\n",
+			"--disk-percent=<percent>");
 	printf(" %-30s Defaults to 90.\n", "");
 
 	printf(" %-30s Use loop devices for task sandboxes (default=disabled, requires root access).\n",
