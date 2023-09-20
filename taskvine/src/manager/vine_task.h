@@ -27,6 +27,15 @@ typedef enum {
       VINE_TASK_TYPE_LIBRARY,     /**< An internally-created library task that should not be returned to the user. */
 } vine_task_type_t;
 
+typedef enum {
+	VINE_TASK_INITIAL = 0,       /**< Task has not been submitted to the manager **/
+	VINE_TASK_READY,             /**< Task is ready to be run, waiting in manager **/
+	VINE_TASK_RUNNING,           /**< Task has been dispatched to some worker **/
+	VINE_TASK_WAITING_RETRIEVAL, /**< Task results are available at the worker **/
+	VINE_TASK_RETRIEVED,         /**< Task results are available at the manager **/
+	VINE_TASK_DONE,              /**< Task is done, and returned through vine_wait >**/
+} vine_task_state_t;
+
 struct vine_task {
         /***** Fixed properties of task at submit time. ******/
 
