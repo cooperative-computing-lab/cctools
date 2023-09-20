@@ -1036,7 +1036,6 @@ static void read_measured_resources(struct vine_manager *q, struct vine_task *t)
 		/* if no resources were measured, then we don't overwrite the return
 		 * status, and mark the task as with error from monitoring. */
 		t->resources_measured = rmsummary_create(-1);
-		vine_task_set_result(t, VINE_RESULT_RMONITOR_ERROR);
 	}
 
 	/* remove summary file, unless it is kept explicitly by the task */
@@ -1131,45 +1130,6 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 	// now have evidence that worker is not slow (e.g., it was probably the
 	// previous task that was slow).
 	w->alarm_slow_worker = 0;
-
-	if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
-		if (t->resources_measured && t->resources_measured->limits_exceeded) {
-			struct jx *j = rmsummary_to_json(t->resources_measured->limits_exceeded, 1);
-			if (j) {
-				char *str = jx_print_string(j);
-				debug(D_VINE,
-						"Task %d exhausted resources on %s (%s): %s\n",
-						t->task_id,
-						w->hostname,
-						w->addrport,
-						str);
-				free(str);
-				jx_delete(j);
-			}
-		} else {
-			debug(D_VINE,
-					"Task %d exhausted resources on %s (%s), but not resource usage was available.\n",
-					t->task_id,
-					w->hostname,
-					w->addrport);
-		}
-
-		struct category *c = vine_category_lookup_or_create(q, t->category);
-		category_allocation_t next = category_next_label(c,
-				t->resource_request,
-				/* resource overflow */ 1,
-				t->resources_requested,
-				t->resources_measured);
-
-		if (next == CATEGORY_ALLOCATION_ERROR) {
-			debug(D_VINE, "Task %d failed given max resource exhaustion.\n", t->task_id);
-		} else {
-			debug(D_VINE, "Task %d resubmitted using new resource allocation.\n", t->task_id);
-			t->resource_request = next;
-			change_task_state(q, t, VINE_TASK_READY);
-			return 1;
-		}
-	}
 
 	/* print warnings if the task ran for a very short time (1s) and exited with common non-zero status */
 	if (t->result == VINE_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
@@ -2464,11 +2424,23 @@ static int build_poll_table(struct vine_manager *q)
 struct rmsummary *vine_manager_choose_resources_for_task(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
+	struct rmsummary *limits = rmsummary_create(-1);
+
+	/* Special case: A function-call task consumes no resources. */
+	/* Return early, otherwise these zeroes are expanded to use the whole worker. */
+
+	if (t->needs_library) {
+		limits->cores = 0;
+		limits->memory = 0;
+		limits->disk = 0;
+		limits->gpus = 0;
+		return limits;
+	}
+
 	/* Compute the minimum and maximum resources for this task. */
 	const struct rmsummary *min = vine_manager_task_resources_min(q, t);
 	const struct rmsummary *max = vine_manager_task_resources_max(q, t);
 
-	struct rmsummary *limits = rmsummary_create(-1);
 	rmsummary_merge_override_basic(limits, max);
 
 	int use_whole_worker = 1;
@@ -2757,6 +2729,53 @@ static void commit_task_to_worker(struct vine_manager *q, struct vine_worker_inf
 	}
 }
 
+/* 1 if task resubmitted, 0 otherwise */
+static int resubmit_task_on_exhaustion(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	if (t->result != VINE_RESULT_RESOURCE_EXHAUSTION) {
+		return 0;
+	}
+
+	if (t->resources_measured && t->resources_measured->limits_exceeded) {
+		struct jx *j = rmsummary_to_json(t->resources_measured->limits_exceeded, 1);
+		if (j) {
+			char *str = jx_print_string(j);
+			debug(D_VINE,
+					"Task %d exhausted resources on %s (%s): %s\n",
+					t->task_id,
+					w->hostname,
+					w->addrport,
+					str);
+			free(str);
+			jx_delete(j);
+		}
+	} else {
+		debug(D_VINE,
+				"Task %d exhausted resources on %s (%s), but not resource usage was available.\n",
+				t->task_id,
+				w->hostname,
+				w->addrport);
+	}
+
+	struct category *c = vine_category_lookup_or_create(q, t->category);
+	category_allocation_t next = category_next_label(c,
+			t->resource_request,
+			/* resource overflow */ 1,
+			t->resources_requested,
+			t->resources_measured);
+
+	if (next == CATEGORY_ALLOCATION_ERROR) {
+		debug(D_VINE, "Task %d failed given max resource exhaustion.\n", t->task_id);
+	} else {
+		debug(D_VINE, "Task %d resubmitted using new resource allocation.\n", t->task_id);
+		t->resource_request = next;
+		change_task_state(q, t, VINE_TASK_READY);
+		return 1;
+	}
+
+	return 0;
+}
+
 /*
 Collect a completed task from a worker, and then update
 all auxiliary data structures to remove the association
@@ -2813,7 +2832,11 @@ static void reap_task_from_worker(
 	switch (t->type) {
 	case VINE_TASK_TYPE_STANDARD:
 	case VINE_TASK_TYPE_RECOVERY:
-		change_task_state(q, t, new_state);
+		if (new_state != VINE_TASK_RETRIEVED ||
+				!resubmit_task_on_exhaustion(
+						q, w, t)) { // if exhaustion, then task may go to ready state
+			change_task_state(q, t, new_state);
+		}
 		break;
 	case VINE_TASK_TYPE_LIBRARY:
 		change_task_state(q, t, VINE_TASK_RETRIEVED);
