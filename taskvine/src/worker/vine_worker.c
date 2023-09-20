@@ -1154,7 +1154,11 @@ static int task_resources_fit_eventually(struct vine_task *t)
 	r = total_resources;
 
 	return (t->resources_requested->cores <= r->cores.total) &&
-	       (t->resources_requested->memory <= r->memory.total) && (t->resources_requested->disk <= r->disk.total) &&
+	       (t->resources_requested->memory <= r->memory.total) &&
+	       /* XXX removed disk space check due to problems running workers locally or multiple workers on a single
+		* node since default tasks request the entire reported disk space. questionable if this check useful in
+		* practice.*/
+	       (1) && //(t->resources_requested->disk <= r->disk.total) &&
 	       (t->resources_requested->gpus <= r->gpus.total);
 }
 
