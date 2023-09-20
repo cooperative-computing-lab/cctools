@@ -32,6 +32,12 @@ init_function = \
 
 '''
 
+# Create the library driver code that will be run as a normal task
+# on workers and execute function invocations upon workers' instructions.
+# @param path       Path to the temporary Python script containing functions.
+# @param funcs      A list of relevant function names.
+# @param dest       Path to the final library script.
+# @param version    Whether this is for workqueue or taskvine serverless code.
 def create_library_code(path, funcs, dest, version):
 	import_modules = []
 	function_source_code = []
@@ -138,7 +144,7 @@ def generate_functions_hash(functions: list) -> str:
             source_code += fnc.__name__
             source_code += inspect.getsource(fnc)
         except OSError as e:
-            print(f"Can't retrieve source code of function {fnc.__name__}.")
+            print(f"Can't retrieve source code of function {fnc.__name__}.", file=sys.stderr)
             raise
     return hashlib.md5(source_code.encode("utf-8")).hexdigest()
 
@@ -149,7 +155,8 @@ def generate_functions_hash(functions: list) -> str:
 def serverize_library_from_code(path, functions, name, need_pack=True):
     tmp_library_path = f"{path}/tmp_library.py"
 
-    # write out functions into a temporary python file
+    # Write out functions into a temporary python file.
+    # Also write a helper function to identify the name of the library.
     with open(tmp_library_path, "w") as temp_source_file:
         temp_source_file.write("".join([inspect.getsource(fnc) for fnc in functions]))
         temp_source_file.write(f"def name():\n\treturn '{name}'")

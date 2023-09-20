@@ -1,3 +1,3 @@
 #! /bin/bash
 
-make install
+conda run --name cctools-build make install
