@@ -157,6 +157,12 @@ static struct vine_watcher *watcher = 0;
 /* The resources measured and available at this worker. */
 static struct vine_resources *total_resources = 0;
 
+/* When the amount of disk is not specified, manually set the reporting disk to
+ * this percentage of the measured disk. This safeguards the fact that disk measurements
+ * are estimates and thus may unncessarily forsaken tasks with unspecified resources. 
+ * Defaults to 90%. */
+static int disk_percent = 90;
+
 static int64_t last_task_received = 0;
 
 /* 0 means not given as a command line option. */
@@ -319,6 +325,12 @@ static void measure_worker_resources()
 		r->gpus.total = manual_gpus_option;
 
 	if (manual_disk_option > 0) {
+		r->disk.total = MIN(r->disk.total, manual_disk_option);
+	}
+	else {
+		/* Set the reporting disk to a fraction of the measured disk to avoid
+		 * unnecessarily forsaking tasks with unspecified resources. */
+		manual_disk_option = floor(r->disk.total * disk_percent / 100);
 		r->disk.total = MIN(r->disk.total, manual_disk_option);
 	}
 
@@ -1133,11 +1145,9 @@ Return true if this task can run with the resources currently available.
 
 static int task_resources_fit_now(struct vine_task *t)
 {
-	/* XXX removed disk space check due to problems running workers locally or multiple workers on a single node
-	 * since default tasks request the entire reported disk space. questionable if this check useful in practice.*/
 	return (cores_allocated + t->resources_requested->cores <= total_resources->cores.total) &&
 	       (memory_allocated + t->resources_requested->memory <= total_resources->memory.total) &&
-	       (1) && // disk_allocated   + t->resources_requested->disk   <= total_resources->disk.total) &&
+		   (disk_allocated + t->resources_requested->disk <= total_resources->disk.total) &&
 	       (gpus_allocated + t->resources_requested->gpus <= total_resources->gpus.total);
 }
 
@@ -1156,10 +1166,7 @@ static int task_resources_fit_eventually(struct vine_task *t)
 
 	return (t->resources_requested->cores <= r->cores.total) &&
 	       (t->resources_requested->memory <= r->memory.total) &&
-	       /* XXX removed disk space check due to problems running workers locally or multiple workers on a single
-		* node since default tasks request the entire reported disk space. questionable if this check useful in
-		* practice.*/
-	       (1) && //(t->resources_requested->disk <= r->disk.total) &&
+			(t->resources_requested->disk <= r->disk.total) &&
 	       (t->resources_requested->gpus <= r->gpus.total);
 }
 
@@ -2091,6 +2098,9 @@ static void show_help(const char *cmd)
 
 	printf(" %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
 	printf(" %-30s If not given, or less than 1, then try to detect disk space available.\n", "");
+	
+	printf(" %-30s Set the conservative disk reporting percent when amount of disk is unspecified.\n", "--disk-percent=<percent>");
+	printf(" %-30s Defaults to 90.\n", "");
 
 	printf(" %-30s Use loop devices for task sandboxes (default=disabled, requires root access).\n",
 			"--disk-allocation");
@@ -2113,6 +2123,7 @@ enum {
 	LONG_OPT_CORES,
 	LONG_OPT_MEMORY,
 	LONG_OPT_DISK,
+	LONG_OPT_DISK_PERCENT,
 	LONG_OPT_GPUS,
 	LONG_OPT_DISABLE_SYMLINKS,
 	LONG_OPT_IDLE_TIMEOUT,
@@ -2154,6 +2165,7 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"cores", required_argument, 0, LONG_OPT_CORES},
 		{"memory", required_argument, 0, LONG_OPT_MEMORY},
 		{"disk", required_argument, 0, LONG_OPT_DISK},
+		{"disk-percent", required_argument, 0, LONG_OPT_DISK_PERCENT},
 		{"gpus", required_argument, 0, LONG_OPT_GPUS},
 		{"wall-time", required_argument, 0, LONG_OPT_WALL_TIME},
 		{"help", no_argument, 0, 'h'},
@@ -2298,6 +2310,13 @@ int main(int argc, char *argv[])
 				manual_disk_option = 0;
 			} else {
 				manual_disk_option = atoll(optarg);
+			}
+			break;
+		case LONG_OPT_DISK_PERCENT:
+			if (!strncmp(optarg, "all", 3)) {
+				disk_percent = 100;
+			} else {
+				disk_percent = atoi(optarg);
 			}
 			break;
 		case LONG_OPT_GPUS:
