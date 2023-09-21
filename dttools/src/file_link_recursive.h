@@ -11,6 +11,6 @@ If source is a directory, do it recursively.
 @return 1 on success, 0 on failure.
 */
 
-int file_link_recursive( const char *source, const char *target, int allow_symlink );
+int file_link_recursive( const char *source, const char *target, int allow_symlink, int symlink_dirs );
 
 #endif
