@@ -129,8 +129,8 @@ parse_arguments() {
 
     if [[ $# -lt 1 ]]
     then
-	logmsg No command was specified no command will be executed!
-        PONCHO_NO_COMMAND=yes
+        logmsg No command was specified no command will be executed!
+        COMMAND_MISSING=yes
     fi
 
     final_arg_count=$#
@@ -159,7 +159,7 @@ function cleanup {
 
 
 PONCHO_KEEP_ALIVE=no
-PONCHO_NO_COMMAND=no
+COMMAND_MISSING=no
 
 parse_arguments "$@"
 
@@ -281,7 +281,7 @@ then
 fi
 
 # Finally run the command line:
-if [[ "${PONCHO_NO_COMMAND}" = no ]]
+if [[ "${COMMAND_MISSING}" = no ]]
 then
     logmsg executing command line: "${@}"
     "${@}"
