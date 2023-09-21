@@ -81,7 +81,7 @@ static int stage_input_file(struct vine_process *p, struct vine_mount *m, struct
 		if (status == VINE_CACHE_STATUS_READY) {
 			create_dir_parents(sandbox_path, 0777);
 			debug(D_VINE, "input: link %s -> %s", cache_path, sandbox_path);
-			result = file_link_recursive(cache_path, sandbox_path, vine_worker_symlinks_enabled);
+			result = file_link_recursive(cache_path, sandbox_path, vine_worker_symlinks_enabled, /* symlink dirs */ 1);
 			if (!result)
 				debug(D_VINE,
 						"couldn't link %s into sandbox as %s: %s",
