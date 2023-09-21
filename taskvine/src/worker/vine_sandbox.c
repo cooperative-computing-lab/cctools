@@ -163,11 +163,11 @@ static int stage_output_file(struct vine_process *p, struct vine_mount *m, struc
 	if (result) {
 		struct stat info;
 		if (stat(cache_path, &info) == 0) {
-			if (S_ISDIR(info.st_mode)) { 
+			if (S_ISDIR(info.st_mode)) {
 				struct path_disk_size_info *state = NULL;
 				path_disk_size_info_get_r(cache_path, -1, &state);
-				int64_t measured_size   = state->last_byte_size_complete;
-				
+				int64_t measured_size = state->last_byte_size_complete;
+
 				vine_cache_addfile(cache, measured_size, info.st_mode, f->cached_name);
 				vine_worker_send_cache_update(manager, f->cached_name, measured_size, 0, 0);
 				path_disk_size_info_delete_state(state);
