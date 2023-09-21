@@ -435,7 +435,7 @@ static vine_msg_code_t vine_manager_recv_no_retry(
 		struct vine_manager *q, struct vine_worker_info *w, char *line, size_t length)
 {
 	time_t stoptime;
-	stoptime = time(0) + q->short_timeout;
+	stoptime = time(0) + q->long_timeout;
 
 	int result = link_readline(w->link, line, length, stoptime);
 
