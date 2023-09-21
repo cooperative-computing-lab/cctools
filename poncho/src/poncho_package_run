@@ -25,7 +25,6 @@ usage() {
     echo " -w, --wait-for-lock <secs> Number of seconds to wait to get a writing lock"
     echo "                            on <dir>. Default is 300"
     echo " -d, --debug                Print debug messages."
-    echo " -k, --keep-alive           Keeps unpacked and activated environment alive after execution"
     echo " --help-env-creation        Show instructions to create conda environments as tar files."
     echo " -h, --help                 Show this help screen."
     echo "command and args            Command to execute inside the given environment."
@@ -106,9 +105,6 @@ parse_arguments() {
                 shift
                 LOCK_WAIT="$1"
                 ;;
-	    -k | --keep-alive)
-		export PONCHO_KEEP_ALIVE=yes
-		;;
             --)
                 shift
                 break
@@ -158,7 +154,6 @@ function cleanup {
 }
 
 
-PONCHO_KEEP_ALIVE=no
 COMMAND_MISSING=no
 
 parse_arguments "$@"
@@ -171,13 +166,7 @@ shift ${arg_counsumed}
 ENV_NAME_IS_DIR=no
 UNPACK_IS_TMP=no
 
-if [[ "${PONCHO_KEEP_ALIVE}" = no ]]
-then
-    trap cleanup EXIT
-else
-    logmsg unpacked environment will be kept alive
-fi
-	
+trap cleanup EXIT
 
 if [[ -d "${ENV_NAME}" ]]
 then
