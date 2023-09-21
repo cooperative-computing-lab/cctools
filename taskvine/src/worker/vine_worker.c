@@ -1170,7 +1170,7 @@ struct vine_process *find_library_for_function(const char *library_name)
 
 	ITABLE_ITERATE(procs_running, task_id, p)
 	{
-		if (!strcmp(p->task->provides_library, library_name)) {
+		if (p->task->provides_library && !strcmp(p->task->provides_library, library_name)) {
 			if (p->library_ready && p->functions_running < p->task->function_slots) {
 				return p;
 			}
