@@ -42,7 +42,7 @@ static int ensure_input_file( struct work_queue_process *p, struct work_queue_fi
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_path,0777);
 		debug(D_WQ,"input: link %s -> %s",cache_path,sandbox_path);
-		result = file_link_recursive(cache_path,sandbox_path,symlinks_enabled);
+		result = file_link_recursive(cache_path, sandbox_path, symlinks_enabled, /* symlink dirs */ 1);
 		if(!result) debug(D_WQ,"couldn't link %s into sandbox as %s: %s",cache_path,sandbox_path,strerror(errno));
 	}
 	
