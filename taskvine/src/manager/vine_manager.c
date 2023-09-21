@@ -1087,11 +1087,19 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 	// Start receiving output...
 	t->time_when_retrieval = timestamp_get();
 
-	if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
+	switch (t->result) {
+	case VINE_RESULT_FORSAKEN:
+		reap_task_from_worker(q, w, t, VINE_TASK_RETRIEVED);
+		return VINE_SUCCESS;
+		break;
+	case VINE_RESULT_RESOURCE_EXHAUSTION:
 		result = vine_manager_get_monitor_output_file(q, w, t);
-	} else {
+		break;
+	default:
 		result = vine_manager_get_output_files(q, w, t);
+		break;
 	}
+
 
 	if (result != VINE_SUCCESS) {
 		debug(D_VINE, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
@@ -1481,12 +1489,9 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	}
 
 	if (task_status == VINE_RESULT_FORSAKEN) {
-		// Delete any input files that are not to be cached.
-		delete_worker_files(q, w, t->input_mounts, VINE_CACHE);
-
-		/* task will be resubmitted, so we do not update any of the execution stats */
-		reap_task_from_worker(q, w, t, VINE_TASK_READY);
-
+		itable_remove(q->running_table, t->task_id);
+		vine_task_set_result(t, VINE_RESULT_FORSAKEN);
+		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
 		return VINE_SUCCESS;
 	}
 
@@ -2776,6 +2781,21 @@ static int resubmit_task_on_exhaustion(struct vine_manager *q, struct vine_worke
 	return 0;
 }
 
+static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	switch (t->result) {
+	case VINE_RESULT_RESOURCE_EXHAUSTION:
+		return resubmit_task_on_exhaustion(q, w, t);
+		break;
+	case VINE_RESULT_FORSAKEN:
+		change_task_state(q, t, VINE_TASK_READY);
+		return 1;
+		break;
+	default:
+		return 0;
+	}
+}
+
 /*
 Collect a completed task from a worker, and then update
 all auxiliary data structures to remove the association
@@ -2832,9 +2852,7 @@ static void reap_task_from_worker(
 	switch (t->type) {
 	case VINE_TASK_TYPE_STANDARD:
 	case VINE_TASK_TYPE_RECOVERY:
-		if (new_state != VINE_TASK_RETRIEVED ||
-				!resubmit_task_on_exhaustion(
-						q, w, t)) { // if exhaustion, then task may go to ready state
+		if (new_state != VINE_TASK_RETRIEVED || !resubmit_if_needed(q, w, t)) {
 			change_task_state(q, t, new_state);
 		}
 		break;
