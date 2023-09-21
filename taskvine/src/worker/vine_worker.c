@@ -329,8 +329,7 @@ static void measure_worker_resources()
 	} else {
 		/* Set the reporting disk to a fraction of the measured disk to avoid
 		 * unnecessarily forsaking tasks with unspecified resources. */
-		manual_disk_option = floor(r->disk.total * disk_percent / 100);
-		r->disk.total = MIN(r->disk.total, manual_disk_option);
+		r->disk.total = ceil(r->disk.total * disk_percent / 100);
 	}
 
 	r->disk.inuse = measure_worker_disk();
@@ -2097,9 +2096,9 @@ static void show_help(const char *cmd)
 	printf(" %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
 	printf(" %-30s If not given, or less than 1, then try to detect disk space available.\n", "");
 
-	printf(" %-30s Set the conservative disk reporting percent when amount of disk is unspecified.\n",
+	printf(" %-30s Set the conservative disk reporting percent when --disk is unspecified.\n",
 			"--disk-percent=<percent>");
-	printf(" %-30s Defaults to 90.\n", "");
+	printf(" %-30s Defaults to %d.\n", "", disk_percent);
 
 	printf(" %-30s Use loop devices for task sandboxes (default=disabled, requires root access).\n",
 			"--disk-allocation");
@@ -2315,7 +2314,8 @@ int main(int argc, char *argv[])
 			if (!strncmp(optarg, "all", 3)) {
 				disk_percent = 100;
 			} else {
-				disk_percent = atoi(optarg);
+				/* guard the disk percent value to [0, 100]. */
+				disk_percent = MIN(100, MAX(atoi(optarg), 0));
 			}
 			break;
 		case LONG_OPT_GPUS:
