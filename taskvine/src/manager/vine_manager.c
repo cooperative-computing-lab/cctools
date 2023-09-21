@@ -1100,7 +1100,6 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 		break;
 	}
 
-
 	if (result != VINE_SUCCESS) {
 		debug(D_VINE, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
