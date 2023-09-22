@@ -3015,6 +3015,11 @@ static void vine_manager_consider_recovery_task(
 		 * here. */
 		vine_task_reset(rt);
 		vine_submit(q, rt);
+		notice(D_VINE,
+				"Submitted recovery task %d (%s) to re-create lost temporary file %s.",
+				rt->task_id,
+				rt->command_line,
+				lost_file->cached_name);
 		break;
 	}
 }
@@ -4644,10 +4649,15 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 					goto end_of_loop;
 					break;
 				case VINE_TASK_TYPE_RECOVERY:
+					/* do nothing and let vine_manager_consider_recovery_task do its job */
+					t = 0;
+					continue;
+					break;
 				case VINE_TASK_TYPE_LIBRARY:
 					vine_task_delete(t);
 					t = 0;
 					continue;
+					break;
 				}
 			}
 		}
