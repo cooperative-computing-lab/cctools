@@ -111,7 +111,14 @@ void vine_cache_load(struct vine_cache *c)
 			if (!strcmp(d->d_name, ".."))
 				continue;
 
-			debug(D_VINE, "found %s in cache", d->d_name);
+			if (strstr(d->d_name, "-meta-") || strstr(d->d_name, "-rnd-")) {
+				char *filepath = string_format("cache/%s", d->d_name);
+				debug(D_VINE, "found non-workflow cache %s, trashing file", d->d_name);
+				trash_file(filepath);
+				free(filepath);
+			} else {
+				debug(D_VINE, "found %s in cache", d->d_name);
+			}
 
 			struct stat info;
 			int64_t nbytes, nfiles;
@@ -183,7 +190,7 @@ void vine_cache_delete(struct vine_cache *c)
 	{
 		if (strstr(cachename, "-meta-") || strstr(cachename, "-rnd-")) {
 			char *filepath = string_format("cache/%s", cachename);
-			unlink(filepath);
+			trash_file(filepath);
 			free(filepath);
 		}
 		vine_cache_kill(c, file, cachename, 0);
