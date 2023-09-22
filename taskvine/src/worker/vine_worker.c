@@ -392,7 +392,6 @@ static int send_keepalive(struct link *manager, int force_resources)
 {
 	send_message(manager, "alive\n");
 	send_resource_update(manager);
-	send_stats_update(manager);
 	return 1;
 }
 
@@ -594,8 +593,6 @@ static void report_task_complete(struct link *manager, struct vine_process *p)
 
 	total_task_execution_time += (p->execution_end - p->execution_start);
 	total_tasks_executed++;
-
-	send_stats_update(manager);
 }
 
 /*
@@ -612,7 +609,6 @@ static void report_tasks_complete(struct link *manager)
 	}
 
 	vine_watcher_send_changes(watcher, manager, time(0) + active_timeout);
-
 	send_message(manager, "end\n");
 
 	results_to_be_sent_msg = 0;
@@ -1490,14 +1486,14 @@ static void work_for_manager(struct link *manager)
 			}
 		}
 
-		if (task_event > 0) {
-			send_stats_update(manager);
-		}
-
 		if (ok && !results_to_be_sent_msg) {
 			if (vine_watcher_check(watcher) || itable_size(procs_complete) > 0) {
 				send_message(manager, "available_results\n");
 				results_to_be_sent_msg = 1;
+			}
+
+			if (task_event > 0) {
+				send_stats_update(manager);
 			}
 		}
 
