@@ -1084,18 +1084,22 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 		return 0;
 	}
 
-	// Start receiving output...
 	t->time_when_retrieval = timestamp_get();
 
+	/* Determine what subset of outputs to retrieve based on status. */
+
 	switch (t->result) {
+	case VINE_RESULT_INPUT_MISSING:
 	case VINE_RESULT_FORSAKEN:
-		reap_task_from_worker(q, w, t, VINE_TASK_RETRIEVED);
-		return VINE_SUCCESS;
+		/* If the worker didn't run the task don't bother fetching outputs. */
+		result = VINE_SUCCESS;
 		break;
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
+		/* On resource exhaustion, just get the monitor files to figure out what happened. */
 		result = vine_manager_get_monitor_output_file(q, w, t);
 		break;
 	default:
+		/* Otherwise get all of the output files. */
 		result = vine_manager_get_output_files(q, w, t);
 		break;
 	}
