@@ -44,6 +44,9 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 	struct vine_file_replica *remote_info;
 	HASH_TABLE_ITERATE(q->worker_table, id, peer)
 	{
+		if (strnlen(peer->transfer_addr, LINK_ADDRESS_MAX) == 0)
+			continue;
+
 		// generate a peer address stub as it would appear in the transfer table
 		char *peer_addr = string_format("worker://%s:%d", peer->transfer_addr, peer->transfer_port);
 		if ((remote_info = hash_table_lookup(peer->current_files, cachename)) && remote_info->in_cache) {
