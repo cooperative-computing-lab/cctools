@@ -31,7 +31,7 @@ def plot_performance(performance_filename):
     for all tasks and the separate schedulling time for each task 
     """
     
-    print(f"Plotting the performance of task...")
+    print(f"Plotting schedulling performance of task...")
     f = open(performance_filename)
     fields = read_fields(f)
     f.seek(0)
@@ -82,11 +82,11 @@ def plot_performance(performance_filename):
     # time_top means the most popular schedulling time of all tasks, with given value indicating how popular it is
     mean_scheduled_time = statistics.mean(scheduled_time)
     std_dev = statistics.stdev(scheduled_time)
-    lower_bound = mean_scheduled_time - 2 * std_dev
-    upper_bound = mean_scheduled_time + 2 * std_dev
+    lower_bound = mean_scheduled_time - 1 * std_dev
+    upper_bound = mean_scheduled_time + 1 * std_dev
     count = sum(1 for x in scheduled_time if lower_bound <= x <= upper_bound)
     top_value = count / len(scheduled_time) * 100
-    
+
     time_top = np.percentile(scheduled_time, top_value)
     scheduled_task_top, scheduled_time_top = [], []
     scheduled_task_tail, scheduled_time_tail = [], []
@@ -128,7 +128,7 @@ def plot_performance(performance_filename):
     log_dir = os.path.dirname(performance_filename)
     save_png = os.path.join(log_dir, 'schedulling_performance.png')
     plt.savefig(save_png)
-    print("Done, png image has been saved in the same log directory")
+    print("Plotting done, result image has been saved in the log directory.")
 
     return
 

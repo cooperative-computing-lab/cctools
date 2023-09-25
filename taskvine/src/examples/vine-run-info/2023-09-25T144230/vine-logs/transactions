@@ -1,0 +1,26 @@
+# time manager_pid MANAGER manager_pid START|END time_from_origin
+# time manager_pid WORKER worker_id CONNECTION host:port
+# time manager_pid WORKER worker_id DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT)
+# time manager_pid WORKER worker_id RESOURCES {resources}
+# time manager_pid WORKER worker_id CACHE_UPDATE filename size_in_mb wall_time_us start_time_us
+# time manager_pid WORKER worker_id TRANSFER (INPUT|OUTPUT) filename size_in_mb wall_time_us start_time_us
+# time manager_pid CATEGORY name MAX {resources_max_per_task}
+# time manager_pid CATEGORY name MIN {resources_min_per_task_per_worker}
+# time manager_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}
+# time manager_pid TASK task_id WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) attempt_number {resources_requested}
+# time manager_pid TASK task_id RUNNING worker_id (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}
+# time manager_pid TASK task_id WAITING_RETRIEVAL worker_id
+# time manager_pid TASK task_id RETRIEVED (SUCCESS|UNKNOWN|INPUT_MISSING|OUTPUT_MISSING|STDOUT_MISSING|SIGNAL|RESOURCE_EXHAUSTION|MAX_RETRIES|MAX_END_TIME|MAX_WALL_TIME|FORSAKEN) {limits_exceeded} {resources_measured}
+# time manager_pid TASK task_id DONE (SUCCESS|UNKNOWN|INPUT_MISSING|OUTPUT_MISSING|STDOUT_MISSING|SIGNAL|RESOURCE_EXHAUSTION|MAX_RETRIES|MAX_END_TIME|MAX_WALL_TIME|FORSAKEN) exit_code
+# time manager_pid LIBRARY library_id (WAITING|SENT|STARTED|FAILURE) worker_id
+1695667350154217 3551566 MANAGER 3551566 START 0
+1695667350457102 3551566 TASK 1 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
+1695667350457232 3551566 TASK 2 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
+1695667350457347 3551566 TASK 3 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
+1695667350457462 3551566 TASK 4 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
+1695667350457578 3551566 TASK 5 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
+1695667350457685 3551566 TASK 6 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
+1695667350457795 3551566 TASK 7 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
+1695667350457906 3551566 TASK 8 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
+1695667350458023 3551566 TASK 9 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
+1695667350458129 3551566 TASK 10 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
