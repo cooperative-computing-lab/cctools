@@ -48,10 +48,12 @@ If the argument to --unpack-to does not exist, then it is created as an empty di
 
 
 - **-e**,**--environment=_&lt;file&gt;_**<br />   Conda environment as a tar file. (Required.)
-- **-d**,**--unpack-to=_&lt;dir&gt;_**<br />      Directory to unpack the environment. If not given, a temporary directory is used.
+- **-u**,**--unpack-to=_&lt;dir&gt;_**<br />      Directory to unpack the environment. If not given, a temporary directory is used.
 - **-w**,**--wait-for-lock=_&lt;secs&gt;_**<br /> Number of seconds to wait to get a writing lock on _&lt;dir&gt;_. Default is 300.
-- **-w**,**--wait-for-lock=_&lt;secs&gt;_**<br /> Number of seconds to wait to get a writing lock on _&lt;dir&gt;_. Default is 300.
+- **-d**,**--debug**<br /> Print debug messages.
+- **--help-env-creation**<br /> Show instructions to create conda environments as tar files.
 - **-h**,**--help**<br />                Show the help screen.
+
 
 ## EXIT STATUS
 
