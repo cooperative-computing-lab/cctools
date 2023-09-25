@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import os
 import numpy as np
+import statistics
 
 def read_fields(f, lines_patience = 10):
     for line in f:
@@ -79,7 +80,13 @@ def plot_performance(performance_filename):
                 scheduled_time.append(time_for_each_task)
 
     # time_top means the most popular schedulling time of all tasks, with given value indicating how popular it is
-    top_value = 99.9
+    mean_scheduled_time = statistics.mean(scheduled_time)
+    std_dev = statistics.stdev(scheduled_time)
+    lower_bound = mean_scheduled_time - 2 * std_dev
+    upper_bound = mean_scheduled_time + 2 * std_dev
+    count = sum(1 for x in scheduled_time if lower_bound <= x <= upper_bound)
+    top_value = count / len(scheduled_time) * 100
+    
     time_top = np.percentile(scheduled_time, top_value)
     scheduled_task_top, scheduled_time_top = [], []
     scheduled_task_tail, scheduled_time_tail = [], []
