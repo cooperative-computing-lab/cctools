@@ -26,11 +26,13 @@ SECTION(OPTIONS)
 
 OPTIONS_BEGIN
 OPTION_ARG(e, environment, file)   Conda environment as a tar file. (Required.)
-OPTION_ARG(d, unpack-to, dir)      Directory to unpack the environment. If not given, a temporary directory is used.
+OPTION_ARG(u, unpack-to, dir)      Directory to unpack the environment. If not given, a temporary directory is used.
 OPTION_ARG(w, wait-for-lock, secs) Number of seconds to wait to get a writing lock on PARAM(dir). Default is 300.
-OPTION_ARG(w, wait-for-lock, secs) Number of seconds to wait to get a writing lock on PARAM(dir). Default is 300.
+OPTION_FLAG(d, debug) Print debug messages.
+OPTION_FLAG_LONG(help-env-creation) Show instructions to create conda environments as tar files.
 OPTION_FLAG(h, help)                Show the help screen.
 OPTIONS_END
+
 SECTION(EXIT STATUS)
 
 On success, returns 0. On failure, returns non-zero.
