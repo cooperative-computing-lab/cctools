@@ -10,8 +10,6 @@ import sys
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import os
-import numpy as np
-import statistics
 
 def read_fields(f, lines_patience = 10):
     for line in f:
@@ -80,14 +78,24 @@ def plot_performance(performance_filename):
                 scheduled_time.append(time_for_each_task)
 
     # time_top means the most popular schedulling time of all tasks, with given value indicating how popular it is
-    mean_scheduled_time = statistics.mean(scheduled_time)
-    std_dev = statistics.stdev(scheduled_time)
+    mean_scheduled_time = sum(scheduled_time) / len(scheduled_time)
+    variance = sum([(x - mean_scheduled_time) ** 2 for x in scheduled_time]) / (len(scheduled_time) - 1) ** 0.5
+    std_dev = variance ** 0.5
+    
     lower_bound = mean_scheduled_time - 1 * std_dev
     upper_bound = mean_scheduled_time + 1 * std_dev
     count = sum(1 for x in scheduled_time if lower_bound <= x <= upper_bound)
     top_value = count / len(scheduled_time) * 100
 
-    time_top = np.percentile(scheduled_time, top_value)
+    data_sorted = sorted(scheduled_time)
+    index = (top_value / 100) * len(data_sorted)
+    if index.is_integer():
+        time_top = data_sorted[int(index) - 1]
+    else:
+        lower_val = data_sorted[int(index) - 1]
+        upper_val = data_sorted[int(index)]
+        time_top = lower_val + (upper_val - lower_val) * (index % 1)
+
     scheduled_task_top, scheduled_time_top = [], []
     scheduled_task_tail, scheduled_time_tail = [], []
     for idx, time in enumerate(scheduled_time):
