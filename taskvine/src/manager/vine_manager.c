@@ -797,7 +797,7 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 
 		// recreate inputs lost
 		if (q->immediate_recovery) {
-		    vine_manager_check_inputs_available(q, t);
+			vine_manager_check_inputs_available(q, t);
 		}
 
 		vine_task_clean(t);
@@ -5138,7 +5138,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		q->ramp_down_heuristic = MAX(0, (int)value);
 
 	} else if (!strcmp(name, "immediate-recovery")) {
-		q->immediate_recovery = !!((int) value);
+		q->immediate_recovery = !!((int)value);
 
 	} else if (!strcmp(name, "file-source-max-transfers")) {
 		q->file_source_max_transfers = MAX(1, (int)value);
