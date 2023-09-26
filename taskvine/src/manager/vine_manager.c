@@ -5199,26 +5199,10 @@ void vine_get_stats(struct vine_manager *q, struct vine_stats *s)
 	// s->workers_able computed below.
 
 	// info about tasks
-	int ready_tasks = list_size(q->ready_list);
-	int waiting_tasks = list_size(q->waiting_retrieval_list);
-	int running_tasks = itable_size(q->running_table);
-
-	s->tasks_waiting = ready_tasks;
-	s->tasks_with_results = waiting_tasks;
-	s->tasks_on_workers = running_tasks + s->tasks_with_results;
-
-	{
-		// accumulate tasks running, from workers:
-		char *key;
-		struct vine_worker_info *w;
-		s->tasks_running = 0;
-		HASH_TABLE_ITERATE(q->worker_table, key, w) { accumulate_stat(s, w->stats, tasks_running); }
-		/* we rely on workers messages to update tasks_running. such data are
-		 * attached to keepalive messages, thus tasks_running is not always
-		 * current. Here we simply enforce that there can be more tasks_running
-		 * that tasks_on_workers. */
-		s->tasks_running = MIN(s->tasks_running, s->tasks_on_workers);
-	}
+	s->tasks_waiting = list_size(q->ready_list);
+	s->tasks_with_results = list_size(q->waiting_retrieval_list);
+	s->tasks_running = itable_size(q->running_table);
+	s->tasks_on_workers = s->tasks_with_results + s->tasks_running;
 
 	vine_task_info_compute_capacity(q, s);
 
