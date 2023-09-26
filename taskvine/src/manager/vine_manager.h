@@ -190,6 +190,9 @@ struct vine_manager {
 	int proportional_whole_tasks; /* If true, round-up proportions to whole number of tasks. */
 	int ramp_down_heuristic;      /* If true, and there are more workers than tasks waiting, then tasks are allocated all the free resources of a worker large enough to run them.
 																	 If monitoring watchdog is not enabled, then this heuristic has no effect. */
+	int immediate_recovery;       /* If true, recovery tasks for tmp files are created as soon as the worker that had them
+																	 disconnects. Otherwise, create them only when a tasks needs then as inputs (this is
+																	 the default). */
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
 	int disk_avail_threshold; /* Ensure this minimum amount of available disk space. (in MB) */

@@ -148,6 +148,8 @@ static void release_all_workers(struct vine_manager *q);
 static void vine_manager_send_library_to_workers(struct vine_manager *q, const char *name, time_t stoptime);
 static void vine_manager_send_libraries_to_workers(struct vine_manager *q, time_t stoptime);
 
+static int vine_manager_check_inputs_available(struct vine_manager *q, struct vine_task *t);
+
 static void delete_worker_file(
 		struct vine_manager *q, struct vine_worker_info *w, const char *filename, int flags, int except_flags);
 
@@ -792,6 +794,11 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 		}
 
 		reap_task_from_worker(q, w, t, VINE_TASK_READY);
+
+		// recreate inputs lost
+		if (q->immediate_recovery) {
+			vine_manager_check_inputs_available(q, t);
+		}
 
 		vine_task_clean(t);
 
@@ -5129,6 +5136,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "ramp-down-heuristic")) {
 		q->ramp_down_heuristic = MAX(0, (int)value);
+
+	} else if (!strcmp(name, "immediate-recovery")) {
+		q->immediate_recovery = !!((int)value);
 
 	} else if (!strcmp(name, "file-source-max-transfers")) {
 		q->file_source_max_transfers = MAX(1, (int)value);
