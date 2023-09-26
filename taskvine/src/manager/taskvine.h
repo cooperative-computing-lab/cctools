@@ -46,6 +46,7 @@ typedef enum {
 	VINE_WATCH = 2,           /**< Watch the output file and send back changes as the task runs. */
 	VINE_FAILURE_ONLY = 4,    /**< Only return this output file if the task failed.  (Useful for returning large log files.) */
 	VINE_SUCCESS_ONLY = 8,    /**< Only return this output file if the task succeeded. */
+	VINE_RETRACT_ON_RESET = 16  /**< Remove this file from the mount lists if the task is reset. (TaskVine internal use only.) */
 } vine_mount_flags_t;
 
 /** Control caching and sharing behavior of file objects.

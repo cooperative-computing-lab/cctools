@@ -106,6 +106,21 @@ void vine_task_clean(struct vine_task *t)
 	t->current_resource_box = 0;
 }
 
+static void retract_mounts_on_reset(struct list *mount_list)
+{
+	int mount_count = list_size(mount_list);
+	while (mount_count > 0) {
+		mount_count--;
+		struct vine_mount *m = list_pop_head(mount_list);
+		if (m->flags & VINE_RETRACT_ON_RESET) {
+			vine_mount_delete(m);
+			continue;
+		}
+
+		list_push_tail(mount_list, m);
+	}
+}
+
 void vine_task_reset(struct vine_task *t)
 {
 	vine_task_clean(t);
@@ -129,6 +144,9 @@ void vine_task_reset(struct vine_task *t)
 
 	t->task_id = 0;
 	t->state = VINE_TASK_INITIAL;
+
+	retract_mounts_on_reset(t->input_mounts);
+	retract_mounts_on_reset(t->output_mounts);
 }
 
 static struct list *vine_task_mount_list_copy(struct list *list)

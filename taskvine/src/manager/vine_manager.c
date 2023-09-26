@@ -3987,11 +3987,13 @@ void vine_disable_monitoring(struct vine_manager *q)
 
 void vine_monitor_add_files(struct vine_manager *q, struct vine_task *t)
 {
-	vine_task_add_input(t, q->monitor_exe, RESOURCE_MONITOR_REMOTE_NAME, 0);
+	vine_task_add_input(t, q->monitor_exe, RESOURCE_MONITOR_REMOTE_NAME, VINE_RETRACT_ON_RESET);
 
 	char *summary = monitor_file_name(q, t, ".summary", 0);
-	vine_task_add_output(
-			t, vine_declare_file(q, summary, VINE_CACHE_NEVER), RESOURCE_MONITOR_REMOTE_NAME ".summary", 0);
+	vine_task_add_output(t,
+			vine_declare_file(q, summary, VINE_CACHE_NEVER),
+			RESOURCE_MONITOR_REMOTE_NAME ".summary",
+			VINE_RETRACT_ON_RESET);
 	free(summary);
 
 	if (q->monitor_mode & VINE_MON_FULL) {
@@ -4001,11 +4003,11 @@ void vine_monitor_add_files(struct vine_manager *q, struct vine_task *t)
 		vine_task_add_output(t,
 				vine_declare_file(q, debug, VINE_CACHE_NEVER),
 				RESOURCE_MONITOR_REMOTE_NAME ".debug",
-				0);
+				VINE_RETRACT_ON_RESET);
 		vine_task_add_output(t,
 				vine_declare_file(q, series, VINE_CACHE_NEVER),
 				RESOURCE_MONITOR_REMOTE_NAME ".series",
-				0);
+				VINE_RETRACT_ON_RESET);
 
 		free(debug);
 		free(series);
