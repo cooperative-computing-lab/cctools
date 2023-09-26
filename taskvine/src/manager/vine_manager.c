@@ -2030,7 +2030,6 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "capacity_gpus", info.capacity_gpus);
 	jx_insert_integer(j, "capacity_instantaneous", info.capacity_instantaneous);
 	jx_insert_integer(j, "capacity_weighted", info.capacity_weighted);
-	jx_insert_integer(j, "manager_load", info.manager_load);
 
 	// Add the resources computed from tributary workers.
 	struct vine_resources r, rmin, rmax;
@@ -2116,7 +2115,6 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "capacity_disk", info.capacity_disk);
 	jx_insert_integer(j, "capacity_gpus", info.capacity_gpus);
 	jx_insert_integer(j, "capacity_weighted", info.capacity_weighted);
-	jx_insert_double(j, "manager_load", info.manager_load);
 
 	// resources information the factory needs
 	struct rmsummary *total = total_resources_needed(q);
@@ -2607,22 +2605,6 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	}
 
 	return result;
-}
-
-static void compute_manager_load(struct vine_manager *q, int task_activity)
-{
-
-	double alpha = 0.05;
-
-	double load = q->stats->manager_load;
-
-	if (task_activity) {
-		load = load * (1 - alpha) + 1 * alpha;
-	} else {
-		load = load * (1 - alpha) + 0 * alpha;
-	}
-
-	q->stats->manager_load = load;
 }
 
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w)
@@ -3170,7 +3152,6 @@ static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_
 			/* Attempt to fetch it. */
 			if (fetch_output_from_worker(q, w, task_id)) {
 				/* If it was fetched, update stats and keep going. */
-				compute_manager_load(q, 1);
 				tasks_received++;
 
 				if (tasks_received >= max_to_receive) {
@@ -4710,7 +4691,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			{
 				received += receive_tasks_from_worker(q, w, received);
 				events += received;
-				compute_manager_load(q, 1);
+
 				received_at_least_one = 1;
 				break; // do one worker at a time
 			}
@@ -4721,7 +4702,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 					// retrieved at least one task
 					received++;
 					events++;
-					compute_manager_load(q, 1);
 					received_at_least_one = 1;
 				} else {
 					// didn't received a task this cycle, thus there are no
@@ -4746,12 +4726,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		if (result) {
 			// expired or ended at least one task
 			events++;
-			compute_manager_load(q, 1);
 			continue;
 		}
-
-		// record that there was not task activity for this iteration
-		compute_manager_load(q, 0);
 
 		if (q->wait_for_workers <= hash_table_size(q->worker_table)) {
 			if (q->wait_for_workers > 0) {
@@ -4768,8 +4744,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				continue;
 			}
 		}
-		// we reach here only if no task was neither sent nor received.
-		compute_manager_load(q, 1);
 
 		// send keepalives to appropriate workers
 		BEGIN_ACCUM_TIME(q, time_status_msgs);
