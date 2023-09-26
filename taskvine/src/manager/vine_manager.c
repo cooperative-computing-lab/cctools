@@ -4679,54 +4679,48 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// if worker_retrievals, then all the tasks from a worker
 		// are retrieved. (this is the default)
 		// otherwise, retrieve at most q->max_retrievals (default is 1)
-		int received = 0;
-		int no_ready_tasks = list_size(q->ready_list);
+		int retrieved_this_cycle = 0;
 		BEGIN_ACCUM_TIME(q, time_receive);
 		do {
-			int received_at_least_one = 0;
 			char *key;
 			struct vine_worker_info *w;
 
-			HASH_TABLE_ITERATE(q->workers_with_available_results, key, w)
-			{
-				received += receive_tasks_from_worker(q, w, received);
-				events += received;
-
-				received_at_least_one = 1;
-				break; // do one worker at a time
+			// consider one worker at a time
+			hash_table_firstkey(q->workers_with_available_results);
+			if (hash_table_nextkey(q->workers_with_available_results, &key, (void **)&w)) {
+				retrieved_this_cycle += receive_tasks_from_worker(q, w, retrieved_this_cycle);
+				events += retrieved_this_cycle;
+			} else if (receive_one_task(q)) {
+				// retrieved at least one task
+				retrieved_this_cycle++;
+				events++;
+			} else {
+				// didn't received a task this cycle, thus there are no
+				// task to be received
+				break;
 			}
-
-			// tasks waiting to be retrieved?
-			if (!received_at_least_one) {
-				if (receive_one_task(q)) {
-					// retrieved at least one task
-					received++;
-					events++;
-					received_at_least_one = 1;
-				} else {
-					// didn't received a task this cycle, thus there are no
-					// task to be received
-					break;
-				}
-			}
-
-		} while (q->max_retrievals < 0 || received < q->max_retrievals || no_ready_tasks);
+		} while (q->max_retrievals < 0 || retrieved_this_cycle < q->max_retrievals ||
+				!list_size(q->ready_list));
 		END_ACCUM_TIME(q, time_receive);
 
 		// expired tasks
 		BEGIN_ACCUM_TIME(q, time_internal);
 		result = expire_waiting_tasks(q);
+		END_ACCUM_TIME(q, time_internal);
+		if (result > 0) {
+			events++;
+			continue;
+		}
 
 		// only check for fixed location if any are present (high overhead)
 		if (q->fixed_location_in_queue) {
-			result |= enforce_waiting_fixed_locations(q);
-		}
-
-		END_ACCUM_TIME(q, time_internal);
-		if (result) {
-			// expired or ended at least one task
-			events++;
-			continue;
+			BEGIN_ACCUM_TIME(q, time_internal);
+			result = enforce_waiting_fixed_locations(q);
+			END_ACCUM_TIME(q, time_internal);
+			if (result > 0) {
+				events++;
+				continue;
+			}
 		}
 
 		if (q->wait_for_workers <= hash_table_size(q->worker_table)) {
@@ -4756,11 +4750,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		result += shutdown_drained_workers(q);
 		vine_blocklist_unblock_all_by_time(q, time(0));
 		END_ACCUM_TIME(q, time_internal);
-		if (result) {
-			// removed at least one worker
-			events++;
-			continue;
-		}
 
 		// if new workers, connect n of them
 		BEGIN_ACCUM_TIME(q, time_status_msgs);
@@ -4792,9 +4781,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// return if manager is empty and something interesting already happened
 		// in this wait.
 		if (events > 0) {
-			if (list_size(q->retrieved_list) > 0 && retrievals == 0) {
-				continue;
-			}
 			BEGIN_ACCUM_TIME(q, time_internal);
 			int done = !list_size(q->ready_list) && !list_size(q->waiting_retrieval_list) &&
 				   !itable_size(q->running_table);
@@ -4811,7 +4797,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			vine_schedule_check_for_large_tasks(q);
 		}
 
-		// if we got here, no events were triggered.
+		// if we got here, no events were triggered this time around.
 		// we set the busy_waiting flag so that link_poll waits for some time
 		// the next time around.
 		q->busy_waiting_flag = 1;
