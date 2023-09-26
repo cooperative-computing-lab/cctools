@@ -4587,6 +4587,50 @@ static int connect_new_workers(struct vine_manager *q, int stoptime, int max_new
 	return new_workers;
 }
 
+struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, int task_id)
+{
+	while (1) {
+		struct vine_task *t = NULL;
+
+		if (tag) {
+			t = task_state_any_with_tag(q, VINE_TASK_RETRIEVED, tag);
+		} else if (task_id >= 0) {
+			struct vine_task *temp = itable_lookup(q->tasks, task_id);
+			if (temp->state == VINE_TASK_RETRIEVED) {
+				t = temp;
+			}
+		} else if (list_size(q->retrieved_list) > 0) {
+			t = list_pop_head(q->retrieved_list);
+		}
+
+		if (!t) {
+			/* didn't find a retrieved task to return */
+			return NULL;
+		}
+
+		change_task_state(q, t, VINE_TASK_DONE);
+		if (t->result != VINE_RESULT_SUCCESS) {
+			q->stats->tasks_failed++;
+		}
+
+		switch (t->type) {
+		case VINE_TASK_TYPE_STANDARD:
+			/* if this is a standard task type, then break and return it to the user. */
+			return t;
+			break;
+		case VINE_TASK_TYPE_RECOVERY:
+			/* do nothing and let vine_manager_consider_recovery_task do its job */
+			break;
+		case VINE_TASK_TYPE_LIBRARY:
+			/* silently delete it */
+			vine_task_delete(t);
+			break;
+		}
+	}
+
+	return NULL;
+}
+
 static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout, const char *tag, int task_id)
 {
 	/*
@@ -4605,7 +4649,10 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	   - manager empty?                            Yes: return null
 	   - go to S
 	*/
+
 	int events = 0;
+	int retrievals = 0;
+
 	// account for time we spend outside vine_wait
 	if (q->time_last_wait > 0) {
 		q->stats->time_application += timestamp_get() - q->time_last_wait;
@@ -4619,62 +4666,11 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	time_t stoptime = (timeout == VINE_WAIT_FOREVER) ? 0 : time(0) + timeout;
 
 	int result;
-	struct vine_task *t = NULL;
 
 	// time left?
 	while ((stoptime == 0) || (time(0) < stoptime)) {
-
-		BEGIN_ACCUM_TIME(q, time_internal);
-		// tasks completed?
-		if (t == NULL) {
-			if (tag) {
-				t = task_state_any_with_tag(q, VINE_TASK_RETRIEVED, tag);
-			} else if (task_id >= 0) {
-				struct vine_task *temp = itable_lookup(q->tasks, task_id);
-				if (temp->state == VINE_TASK_RETRIEVED) {
-					t = temp;
-				}
-			} else if ((t = list_peek_head(q->retrieved_list))) {
-				list_pop_head(q->retrieved_list);
-			}
-
-			if (t) {
-				change_task_state(q, t, VINE_TASK_DONE);
-
-				if (t->result != VINE_RESULT_SUCCESS) {
-					q->stats->tasks_failed++;
-				}
-
-				events++;
-				END_ACCUM_TIME(q, time_internal);
-
-				/*
-				If this is a standard task type, then breaK out of the loop
-				and return it to the user.  Other task types are deleted silently.
-				*/
-
-				/*
-				(Yes, the use of goto is a bit gross here, but a switch is
-				the right way to deal with the enumeration, and so "break"
-				doesn't have the usual meaning.
-				*/
-
-				switch (t->type) {
-				case VINE_TASK_TYPE_STANDARD:
-					goto end_of_loop;
-					break;
-				case VINE_TASK_TYPE_RECOVERY:
-					/* do nothing and let vine_manager_consider_recovery_task do its job */
-					t = 0;
-					continue;
-					break;
-				case VINE_TASK_TYPE_LIBRARY:
-					vine_task_delete(t);
-					t = 0;
-					continue;
-					break;
-				}
-			}
+		if (retrievals > 0) {
+		    break;
 		}
 
 		// update catalog if appropriate
@@ -4822,8 +4818,9 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// return if manager is empty and something interesting already happened
 		// in this wait.
 		if (events > 0) {
-			if (list_size(q->retrieved_list) && t == NULL)
+			if (list_size(q->retrieved_list) > 0 && retrievals == 0) {
 				continue;
+			}
 			BEGIN_ACCUM_TIME(q, time_internal);
 			int done = !list_size(q->ready_list) && !list_size(q->waiting_retrieval_list) &&
 				   !itable_size(q->running_table);
@@ -4846,7 +4843,9 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		q->busy_waiting_flag = 1;
 	}
 
-end_of_loop:
+	BEGIN_ACCUM_TIME(q, time_internal);
+	struct vine_task *t = find_task_to_return(q, tag, task_id);
+	END_ACCUM_TIME(q, time_internal);
 
 	if (events > 0) {
 		vine_perf_log_write_update(q, 1);
