@@ -328,8 +328,12 @@ static void measure_worker_resources()
 		r->disk.total = MIN(r->disk.total, manual_disk_option);
 	} else {
 		/* Set the reporting disk to a fraction of the measured disk to avoid
-		 * unnecessarily forsaking tasks with unspecified resources. */
-		r->disk.total = ceil(r->disk.total * disk_percent / 100);
+		 * unnecessarily forsaking tasks with unspecified resources.
+		 * Note that @vine_resources_measure_locally reports that
+		 * disk.total = available_disk + disk.inuse, so we leave out disk.inuse in
+		 * the discounting calculation, then add it back in. */
+		r->disk.total -= r->disk.inuse;
+		r->disk.total = ceil(r->disk.total * disk_percent / 100) + r->disk.inuse;
 	}
 
 	r->disk.inuse = measure_worker_disk();
