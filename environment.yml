@@ -16,4 +16,5 @@ dependencies:
  - openssl
  - conda-pack
  - cloudpickle
+ - packaging
 ...
