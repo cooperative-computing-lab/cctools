@@ -4632,7 +4632,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	*/
 
 	int events = 0;
-	int retrievals = 0;
 
 	// account for time we spend outside vine_wait
 	if (q->time_last_wait > 0) {
@@ -4650,19 +4649,23 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 	// time left?
 	while ((stoptime == 0) || (time(0) < stoptime)) {
-		if (retrievals > 0) {
-		    break;
-		}
-
+		BEGIN_ACCUM_TIME(q, time_internal);
 		// update catalog if appropriate
 		if (q->name) {
 			update_catalog(q, 0);
 		}
 
-		if (q->monitor_mode)
+		if (q->monitor_mode) {
 			update_resource_report(q);
-
+		}
 		END_ACCUM_TIME(q, time_internal);
+
+		// break loop if there is a task to be returned to the user; or if prefering dispatching, if there
+		// are no tasks to be dispatched; or if we already looped once and no events were triggered.
+		if (list_size(q->retrieved_list) > 0 &&
+				(!q->prefer_dispatch || list_size(q->ready_list) == 0 || q->busy_waiting_flag)) {
+			break;
+		}
 
 		// retrieve worker status messages
 		if (poll_active_workers(q, stoptime) > 0) {
@@ -4799,7 +4802,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 		// if we got here, no events were triggered this time around.
 		// we set the busy_waiting flag so that link_poll waits for some time
-		// the next time around.
+		// the next time around, or return retrieved tasks if there some available.
 		q->busy_waiting_flag = 1;
 	}
 
@@ -5089,6 +5092,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "worker-retrievals")) {
 		q->worker_retrievals = MAX(0, (int)value);
+
+	} else if (!strcmp(name, "prefer-dispatch")) {
+		q->prefer_dispatch = !!((int)value);
 
 	} else if (!strcmp(name, "force-proportional-resources") || !strcmp(name, "proportional-resources")) {
 		q->proportional_resources = MAX(0, (int)value);
