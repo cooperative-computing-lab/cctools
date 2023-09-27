@@ -5155,22 +5155,22 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		/* 0 means use monitor's default */
 		q->monitor_interval = MAX(0, (int)value);
 
-	} else if (!strcmp(name, "update_interval")) {
+	} else if (!strcmp(name, "update-interval")) {
 		q->update_interval = MAX(1, (int)value);
 
-	} else if (!strcmp(name, "resource_management_interval")) {
+	} else if (!strcmp(name, "resource-management-interval")) {
 		q->resource_management_interval = MAX(1, (int)value);
 
-	} else if (!strcmp(name, "max_task_stdout_storage")) {
+	} else if (!strcmp(name, "max-task-stdout-storage")) {
 		q->max_task_stdout_storage = MAX(1, (int)value);
 
-	} else if (!strcmp(name, "max_new_workers")) {
+	} else if (!strcmp(name, "max-new-workers")) {
 		q->max_new_workers = MAX(0, (int)value); /*todo: confirm 0 or 1*/
 
-	} else if (!strcmp(name, "large_task_check_interval")) {
+	} else if (!strcmp(name, "large-task-check-interval")) {
 		q->large_task_check_interval = MAX(1, (timestamp_t)value);
 
-	} else if (!strcmp(name, "option_blocklist_slow_workers_timeout")) {
+	} else if (!strcmp(name, "option-blocklist-slow-workers-timeout")) {
 		q->option_blocklist_slow_workers_timeout = MAX(0, value); /*todo: confirm 0 or 1*/
 
 	} else {
