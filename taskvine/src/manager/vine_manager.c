@@ -3073,8 +3073,10 @@ static int send_one_task(struct vine_manager *q)
 	int tasks_considered = 0;
 	timestamp_t now = timestamp_get();
 
+	int tasks_to_consider = MIN(list_size(q->ready_list), q->attempt_schedule_depth);
+
 	while ((t = list_rotate(q->ready_list))) {
-		if (tasks_considered++ > q->attempt_schedule_depth) {
+		if (tasks_considered++ > tasks_to_consider) {
 			return 0;
 		}
 
