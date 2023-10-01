@@ -16,9 +16,12 @@ The file [CREDITS](CREDITS) lists the many people that have contributed to the s
 ## Quick Install Via Miniconda
 
 The easiest way to install the binaries is via [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
-
 ```
-conda install -y -c conda-forge ndcctools
+git clone git://github.com/cooperative-computing-lab/cctools.git cctools-src
+cd cctools-src
+unset PYTHONPATH
+conda env create -f environment.yml
+conda activate cctools-dev
 ```
 
 ## Build From Source
