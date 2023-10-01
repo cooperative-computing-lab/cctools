@@ -57,8 +57,10 @@ software dependencies, and the easiest way to do this is to create
 a new `cctools-dev` environment via Conda:
 
 ```sh
+git clone git://github.com/cooperative-computing-lab/cctools.git cctools-src
+cd cctools-src
 unset PYTHONPATH
-conda create -y -n cctools-dev -c conda-forge --strict-channel-priority python=3 gcc_linux-64 gxx_linux-64 gdb m4 perl swig make zlib libopenssl-static openssl conda-pack packaging cloudpickle flake8 clang-format
+conda env create -f environment.yml
 conda activate cctools-dev
 ```
 
@@ -74,8 +76,6 @@ Now that you are inside the `cctools-dev` environment, you can check out
 the software repository and build it:
 
 ```sh
-git clone git://github.com/cooperative-computing-lab/cctools.git cctools-src
-cd cctools-src
 ./configure --with-base-dir $CONDA_PREFIX --prefix $CONDA_PREFIX
 make
 make install
