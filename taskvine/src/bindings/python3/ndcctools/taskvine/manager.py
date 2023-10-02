@@ -913,8 +913,7 @@ class Manager(object):
             t.add_environment(f)
     
         # Declare the library code as an input.
-        # Permit mounting as a symlink, which accelerates use of large directories.
-        f = self.declare_file(library_code_path, cache=True, mount_symlink=True)
+        f = self.declare_file(library_code_path, cache=True)
         t.add_input(f, "library_code.py")
         return t
 
