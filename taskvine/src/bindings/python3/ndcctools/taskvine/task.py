@@ -258,12 +258,12 @@ class Task(object):
     # >>> f = m.declare_untar(url)
     # >>> task.add_input(f,"data")
     # @endcode
-    def add_input(self, file, remote_name, strict_input=False):
+    def add_input(self, file, remote_name, strict_input=False, mount_symlink=False ):
         # SWIG expects strings
         if not isinstance(remote_name, str):
             raise TypeError(f"remote_name {remote_name} is not a str")
 
-        flags = Task._determine_mount_flags(strict_input=strict_input)
+        flags = Task._determine_mount_flags(strict_input=strict_input, mount_symlink=mount_symlink)
 
         if cvine.vine_task_add_input(self._task, file._file, remote_name, flags)==0:
             raise ValueError("invalid file description")
