@@ -117,9 +117,6 @@ static int sigchld_received_flag = 0;
 // Password shared between manager and worker.
 char *vine_worker_password = 0;
 
-// Allow worker to use symlinks when link() fails.  Enabled by default.
-int vine_worker_symlinks_enabled = 1;
-
 int mini_task_id = 0;
 
 // Worker id. A unique id for this worker instance.
@@ -2123,7 +2120,6 @@ enum {
 	LONG_OPT_DISK,
 	LONG_OPT_DISK_PERCENT,
 	LONG_OPT_GPUS,
-	LONG_OPT_DISABLE_SYMLINKS,
 	LONG_OPT_IDLE_TIMEOUT,
 	LONG_OPT_CONNECT_TIMEOUT,
 	LONG_OPT_SINGLE_SHOT,
@@ -2153,7 +2149,6 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"min-backoff", required_argument, 0, 'i'},
 		{"max-backoff", required_argument, 0, 'b'},
 		{"single-shot", no_argument, 0, LONG_OPT_SINGLE_SHOT},
-		{"disable-symlinks", no_argument, 0, LONG_OPT_DISABLE_SYMLINKS},
 		{"disk-threshold", required_argument, 0, 'z'},
 		{"memory-threshold", required_argument, 0, LONG_OPT_MEMORY_THRESHOLD},
 		{"arch", required_argument, 0, 'A'},
@@ -2331,9 +2326,6 @@ int main(int argc, char *argv[])
 				manual_wall_time_option = 0;
 				warn(D_NOTICE, "Ignoring --wall-time, a positive integer is expected.");
 			}
-			break;
-		case LONG_OPT_DISABLE_SYMLINKS:
-			vine_worker_symlinks_enabled = 0;
 			break;
 		case LONG_OPT_SINGLE_SHOT:
 			single_shot_mode = 1;
