@@ -124,7 +124,7 @@ class Task(object):
         self._task = None
 
     @staticmethod
-    def _determine_mount_flags(watch=False, failure_only=False, success_only=False, strict_input=False, mount_symlink=False ):
+    def _determine_mount_flags(watch=False, failure_only=False, success_only=False, strict_input=False, mount_symlink=False):
         flags = cvine.VINE_TRANSFER_ALWAYS
         if watch:
             flags |= cvine.VINE_WATCH
@@ -258,7 +258,7 @@ class Task(object):
     # >>> f = m.declare_untar(url)
     # >>> task.add_input(f,"data")
     # @endcode
-    def add_input(self, file, remote_name, strict_input=False, mount_symlink=False ):
+    def add_input(self, file, remote_name, strict_input=False, mount_symlink=False):
         # SWIG expects strings
         if not isinstance(remote_name, str):
             raise TypeError(f"remote_name {remote_name} is not a str")
