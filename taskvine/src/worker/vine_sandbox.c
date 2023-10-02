@@ -81,7 +81,7 @@ static int stage_input_file(struct vine_process *p, struct vine_mount *m, struct
 		if (status == VINE_CACHE_STATUS_READY) {
 			create_dir_parents(sandbox_path, 0777);
 			debug(D_VINE, "input: link %s -> %s", cache_path, sandbox_path);
-			if (m->flags && VINE_MOUNT_SYMLINK) {
+			if (m->flags & VINE_MOUNT_SYMLINK) {
 				/* If the user has requested a symlink, just do that b/c it is faster for large dirs. */
 				result = symlink(cache_path, sandbox_path);
 				/* Change sense of Unix result to true/false. */
