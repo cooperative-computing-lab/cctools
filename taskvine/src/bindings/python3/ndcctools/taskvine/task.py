@@ -124,7 +124,7 @@ class Task(object):
         self._task = None
 
     @staticmethod
-    def _determine_mount_flags(watch=False, failure_only=False, success_only=False, strict_input=False):
+    def _determine_mount_flags(watch=False, failure_only=False, success_only=False, strict_input=False, mount_symlink=False ):
         flags = cvine.VINE_TRANSFER_ALWAYS
         if watch:
             flags |= cvine.VINE_WATCH
@@ -134,6 +134,8 @@ class Task(object):
             flags |= cvine.VINE_SUCCESS_ONLY
         if strict_input:
             flags |= cvine.VINE_FIXED_LOCATION
+        if mount_symlink:
+            flags |= cvine.VINE_MOUNT_SYMLINK
         return flags
 
     @staticmethod
