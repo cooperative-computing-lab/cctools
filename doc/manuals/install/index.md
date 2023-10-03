@@ -60,7 +60,7 @@ a new `cctools-dev` environment via Conda:
 git clone git://github.com/cooperative-computing-lab/cctools.git cctools-src
 cd cctools-src
 unset PYTHONPATH
-conda env create -f environment.yml
+conda env create -y -f environment.yml
 conda activate cctools-dev
 ```
 
@@ -68,7 +68,7 @@ This can run slowly, so, for a potential speedup, try running:
 
 ```sh
 unset PYTHONPATH
-conda create -y -n cctools-dev -c conda-forge --strict-channel-priority python=3 gcc_linux-64 gxx_linux-64 gdb m4 perl swig make zlib libopenssl-static openssl conda-pack cloudpickle packaging flake8 clang-format --experimental-solver=libmamba
+conda env create -y -f environment.yml --experimental-solver=libmamba
 
 ```
 
