@@ -336,7 +336,7 @@ class ParseTxn:
         if not self.check_task_range(task_id):
             return
 
-        if event == "WAITING":
+        if event == "READY":
             (category, allocation, attempt_number, arg) = arg.split()
             self.cm.task_last_attempt[task_id] = attempt_number
 
@@ -347,7 +347,7 @@ class ParseTxn:
         ca["last_state"] = event
         ca["last_state_time"] = time
 
-        if event == "WAITING":
+        if event == "READY":
             ca["task_id"] = task_id
             ca["attempt_number"] = attempt_number
             ca["category"] = category
@@ -444,7 +444,7 @@ class TxnPlot:
             if spec == "dispatched-first-task":
                 origin = m.tasks["time_commit_start"].min()
             elif spec == "waiting-first-task":
-                origin = m.tasks["WAITING"].min()
+                origin = m.tasks["READY"].min()
             elif spec == "connected-first-worker":
                 origin = m.workers["CONNECTION"].min()
             elif spec == "start-manager":
