@@ -114,7 +114,7 @@ def library_network_code():
 
     def send_result(out_pipe_fd, task_id):
         buff = bytes(str(task_id), 'utf-8')
-        buff = bytes(len(buff), 'utf-8')+b'\n'+buff
+        buff = bytes(str(len(buff)), 'utf-8')+b'\n'+buff
         os.writev(out_pipe_fd, [buff])
 
     def main():
@@ -150,12 +150,13 @@ def library_network_code():
             rlist, wlist, xlist = select.select([in_pipe_fd], [], [], 0)
             if len(rlist) > 0:
                 pid, func_id = start_function(in_pipe_fd)
-                func_id_to_pid[func_id] = pid
+                pid_to_func_id[pid] = func_id
 
             # check if child exits, noblock
             if len(pid_to_func_id) > 0:
                 c_pid, c_exit_status = os.waitpid(-1, os.WNOHANG)
                 if c_pid > 0:
                     send_result(out_pipe_fd, pid_to_func_id[c_pid])
+                    del pid_to_func_id[c_pid]
                                
         return 0
