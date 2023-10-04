@@ -18,6 +18,7 @@ def library_network_code():
     import argparse
     import traceback
     import cloudpickle
+    import select
 
     
     # This class captures how results from FunctionCalls are conveyed from 
@@ -54,13 +55,59 @@ def library_network_code():
         return remote_wrapper
 
     # Self-identifying message to send back to the worker, including the name of this library.
-    def send_configuration(config, out_pipe):
+    def send_configuration(config, out_pipe_fd):
         config_string = json.dumps(config)
         config_cmd = f"{len(config_string)}\n{config_string}"
-        out_pipe.write(bytes(config_cmd, 'utf-8'))
-        out_pipe.flush()
+        os.writev(out_pipe_fd, [bytes(config_cmd, 'utf-8')])
+
+    def start_function(in_pipe_fd):
+        buffer_len = int(in_pipe.readline()[:-1])
+
+        line = str(in_pipe.read(buffer_len), encoding='utf-8')
+        function_id, function_name, function_sandbox = line.split(" ", maxsplit=2)
+        function_id = int(function_id)
+        
+        if function_name:
+            exec_method = 'fork'
+
+            if exec_method == "direct":
+                library_sandbox = os.getcwd()
+                try:
+                    os.chdir(function_sandbox)
+                    response = cloudpickle.dumps(globals()[function_name](event))
+                except Exception as e:
+                    print(f'Library code: Function call failed due to {e}', file=sys.stderr)
+                    sys.exit(1)
+                finally:
+                    os.chdir(library_sandbox)
+            else:
+                p = os.fork()
+                if p == 0:
+                    os.chdir(function_sandbox)
+                    with open('infile', 'rb') as f:
+                        event = cloudpickle.load(f)
+                    with open('outfile', 'wb') as f:
+                        cloudpickle.dump(globals()[function_name](event), f)
+                    os._exit(0)
+                elif p < 0:
+                    print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)
+                    result = None
+                    success = False
+                    reason = f'unable to fork-exec function {function_name}'
+                    response = LibraryResponse(result, success, reason).generate()
+
+                # parent collects result and waits for child to exit.
+                else:
+                    return p, function_id
+        return -1
+
+    def send_result(out_pipe_fd, task_id):
+        buff = bytes(str(task_id), 'utf-8')
+        buff = bytes(len(buff), 'utf-8')+b'\n'+buff
+        os.writev(out_pipe_fd, [buff])
 
     def main():
+        ppid = os.getppid()
         parser = argparse.ArgumentParser('Parse input and output file descriptors this process should use. The relevant fds should already be prepared by the vine_worker.')
         parser.add_argument('--input-fd', required=True, type=int, help='input fd to receive messages from the vine_worker via a pipe')
         parser.add_argument('--output-fd', required=True, type=int, help='output fd to send messages to the vine_worker via a pipe')
@@ -70,85 +117,34 @@ def library_network_code():
         # The file descriptors are inherited from the vine_worker parent process 
         # and should already be open for reads and writes.
         # Below lines only convert file descriptors into native Python file objects.
-        in_pipe = os.fdopen(args.input_fd, 'rb')
-        out_pipe = os.fdopen(args.output_fd, 'wb')
+        #in_pipe = os.fdopen(args.input_fd, 'rb')
+        #out_pipe = os.fdopen(args.output_fd, 'wb')
+        in_pipe_fd = args.input_fd
+        out_pipe_fd = args.output_fd
 
         config = {
             "name": name(),
         }
-        send_configuration(config, out_pipe)
+        send_configuration(config, out_pipe_fd)
         
-        # A pair of pipes to communicate with the child process if needed.
-        read, write = os.pipe()
+        pid_to_func_id = {}
 
         while True:
-            while True:
-                # wait for message from worker about what function to execute
-                try:
-                    # get length of first buffer
-                    # remove trailing \n
-                    buffer_len = int(in_pipe.readline()[:-1])
-                # if the worker closed the pipe connected to the input of this process, we should just exit
-                # stderr is already dup2'ed to send error messages to an output file that can be brought back for further analysis.
-                except Exception as e:
-                    print("Cannot read message from the manager, exiting. ", e, file=sys.stderr)
-                    sys.exit(1)
+            # check if parent exits
+            c_ppid = os.getppid()
+            if c_ppid != ppid or c_ppid == 1:
+                exit(0)
 
-                # read first buffer, this buffer should contain only utf-8 chars.
-                line = str(in_pipe.read(buffer_len), encoding='utf-8')
-                function_name, event_size, function_sandbox = line.split(" ", maxsplit=2)
-                
-                if event_size:
-                    event_size = int(event_size)
-                    event_str = in_pipe.read(event_size)
+            # check if worker has anything to say, noblock
+            rlist, wlist, xlist = select.select([in_pipe_fd], [], [], 0)
+            if len(rlist) > 0:
+                pid, func_id = start_function(in_pipe_fd)
+                func_id_to_pid[func_id] = pid
 
-                    # load the event into a Python object
-                    event = cloudpickle.loads(event_str)
-
-                    # see if the user specified an execution method
-                    exec_method = event.get("remote_task_exec_method", None)
-
-                    # library either directly executes or forks to do so.
-                    if exec_method == "direct":
-                        library_sandbox = os.getcwd()
-                        try:
-                            os.chdir(function_sandbox)
-                            response = cloudpickle.dumps(globals()[function_name](event))
-                        except Exception as e:
-                            print(f'Library code: Function call failed due to {e}', file=sys.stderr)
-                            sys.exit(1)
-                        finally:
-                            os.chdir(library_sandbox)
-                    else:
-                        p = os.fork()
-
-                        # child executes and pipes result back to parent.
-                        if p == 0:
-                            os.chdir(function_sandbox)
-                            response = cloudpickle.dumps(globals()[function_name](event))
-                            written = 0
-                            buff = len(response).to_bytes(8, sys.byteorder)+response
-                            while written < len(buff):
-                                written += os.write(write, buff[written:])
-                            os._exit(0)
-                        elif p < 0:
-                            print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)
-                            result = None
-                            success = False
-                            reason = f'unable to fork-exec function {function_name}'
-                            response = LibraryResponse(result, success, reason).generate()
-
-                        # parent collects result and waits for child to exit.
-                        else:
-                            response_len = b''
-                            while len(response_len) < 8:
-                                response_len += os.read(read, 8-len(response_len))
-                            response_len = int.from_bytes(response_len, sys.byteorder)
-                            response = b''
-                            while len(response) < response_len:
-                                response += os.read(read, response_len-len(response))
-                            os.waitpid(p, 0)
-                    
-                    out_pipe.write(bytes(str(len(response)), 'utf-8')+b'\n'+response)
-                    out_pipe.flush()
+            # check if child exits, noblock
+            if len(pid_to_func_id) > 0:
+                c_pid, c_exit_status = os.waitpid(-1, os.WNOHANG)
+                if c_pid > 0:
+                    send_result(out_pipe_fd, pid_to_func_id[c_pid])
+                               
         return 0

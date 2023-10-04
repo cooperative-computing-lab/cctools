@@ -490,6 +490,23 @@ static void report_worker_ready(struct link *manager)
 	send_keepalive(manager, 1);
 }
 
+int start_function(struct vine_process* p)
+{
+	uint64_t proc_id;
+	struct vine_process* proc;
+	ITABLE_ITERATE(procs_running, proc_id, proc)
+	{
+		if (proc->type == VINE_PROCESS_TYPE_LIBRARY && proc->library_ready && !strcmp(proc->task->provides_library, p->task->needs_library)) {
+			
+			char* buffer = string_format("invoke %d %s %s", p->task->task_id, p->task->command_line, p->sandbox);
+			link_printf(proc->library_write_link, time(0)+active_timeout, "%ld\n%s", strlen(buffer), buffer);
+			free(buffer);
+			break;
+		}
+	}
+	return 1;
+}
+
 /*
 Start executing the given process on the local host,
 accounting for the resources as necessary.
@@ -518,6 +535,12 @@ static int start_process(struct vine_process *p, struct link *manager)
 	gpus_allocated += t->resources_requested->gpus;
 	if (t->resources_requested->gpus > 0) {
 		vine_gpus_allocate(t->resources_requested->gpus, t->task_id);
+	}
+
+	/* Starting a function call is different from starting a standard task, so we return early. */
+	if (t->needs_library) {
+		itable_insert(procs_running, p->task->task_id, p);
+		return start_function(p);
 	}
 
 	/* Now start the actual process. */
@@ -656,7 +679,28 @@ static int handle_completed_tasks(struct link *manager)
 			/* must reset the table iterator because an item was removed. */
 			itable_firstkey(procs_running);
 		}
+		if (p->library_ready) {
+			int readable = link_usleep(p->library_read_link, 0, 1, 0);
+			if (readable) {
+				char buffer[VINE_LINE_MAX];
+				link_readline(p->library_read_link, buffer, VINE_LINE_MAX, time(0)+30);
+				int len_buffer = atoi(buffer);
+				char buffer2[VINE_LINE_MAX];
+				link_read(p->library_read_link, buffer2, len_buffer, time(0)+30);
+				uint64_t done_task_id = (uint64_t) strtoul(buffer2, NULL, 10);
+
+				itable_firstkey(procs_running);
+				ITABLE_ITERATE(procs_running, task_id, p) {
+					if (task_id == done_task_id) {
+						reap_process(p, manager);
+						break;
+					}
+				}
+				itable_firstkey(procs_running);
+			}
+		}
 	}
+
 	return 1;
 }
 
