@@ -61,9 +61,20 @@ def library_network_code():
         os.writev(out_pipe_fd, [bytes(config_cmd, 'utf-8')])
 
     def start_function(in_pipe_fd):
-        buffer_len = int(in_pipe.readline()[:-1])
-
-        line = str(in_pipe.read(buffer_len), encoding='utf-8')
+        buffer_len = b''
+        while True:
+            c = os.read(in_pipe_fd, 1)
+            if c == b'':
+                print('Library code: cant get length', file=sys.stderr)
+                exit(1)
+            elif c == b'\n':
+                break
+            else:
+                buffer_len += c
+        buffer_len = int(buffer_len)
+        
+        line = str(os.read(in_pipe_fd, buffer_len), encoding='utf-8')
+        #line = str(in_pipe.read(buffer_len), encoding='utf-8')
         function_id, function_name, function_sandbox = line.split(" ", maxsplit=2)
         function_id = int(function_id)
         

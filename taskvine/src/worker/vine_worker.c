@@ -498,7 +498,7 @@ int start_function(struct vine_process* p)
 	{
 		if (proc->type == VINE_PROCESS_TYPE_LIBRARY && proc->library_ready && !strcmp(proc->task->provides_library, p->task->needs_library)) {
 			
-			char* buffer = string_format("invoke %d %s %s", p->task->task_id, p->task->command_line, p->sandbox);
+			char* buffer = string_format("%d %s %s", p->task->task_id, p->task->command_line, p->sandbox);
 			link_printf(proc->library_write_link, time(0)+active_timeout, "%ld\n%s", strlen(buffer), buffer);
 			free(buffer);
 			break;
