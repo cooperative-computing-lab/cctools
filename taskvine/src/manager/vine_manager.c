@@ -4616,19 +4616,22 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 {
 	/*
 	   - compute stoptime
-	   S time left?                              No:  return null
-	   - task completed?                         Yes: return completed task to user
+	   S time left?                                               No:  break and find task to return
 	   - update catalog if appropriate
+	   - task completed or (prefer-dispatch and would busy wait)? Yes: return completed task to user
 	   - retrieve workers status messages
-	   - tasks waiting to be retrieved?          Yes: retrieve all tasks from one worker.
-	   - tasks waiting to be dispatched?         Yes: dispatch one task and go to S.
+	   - workers with available results?                          Yes: retrieve max_retrievals tasks from worker
+	   - tasks waiting to be retrieved?                           Yes: retrieve max_retrievals
+	   - tasks expired?                                           Yes: mark as retrieved and go to S
+	   - tasks lost fixed location files?                         Yes: mark as retrieved and go to S
+	   - tasks waiting to be dispatched?                          Yes: dispatch one task and go to S.
 	   - send keepalives to appropriate workers
 	   - disconnect slow workers
 	   - drain workers from factories
-	   - if new workers, connect n of them
-	   - expired tasks?                          Yes: mark expired tasks as retrieved and go to S.
-	   - manager empty?                            Yes: return null
-	   - go to S
+	   - new workers?                                             Yes: connect max_new_workers and to to S
+	   - send all libraries to all workers
+	   - manager empty?                                           Yes: break and find task to return
+	   - mark as busy-waiting and go to S
 	*/
 
 	int events = 0;
