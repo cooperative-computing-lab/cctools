@@ -4616,21 +4616,22 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 {
 	/*
 	   - compute stoptime
-	   S time left?                                               No:  break and find task to return
+	   S time left?                                               No:  break
 	   - update catalog if appropriate
 	   - task completed or (prefer-dispatch and would busy wait)? Yes: return completed task to user
 	   - retrieve workers status messages
 	   - workers with available results?                          Yes: retrieve max_retrievals tasks from worker
 	   - tasks waiting to be retrieved?                           Yes: retrieve max_retrievals
-	   - tasks expired?                                           Yes: mark as retrieved and go to S
-	   - tasks lost fixed location files?                         Yes: mark as retrieved and go to S
+	   - tasks expired?                                           Yes: mark as retrieved
+	   - tasks lost fixed location files?                         Yes: mark as retrieved
+	   - tasks mark as retrieved and not prefer-dispatch          Yes: go to S
 	   - tasks waiting to be dispatched?                          Yes: dispatch one task and go to S.
 	   - send keepalives to appropriate workers
 	   - disconnect slow workers
 	   - drain workers from factories
 	   - new workers?                                             Yes: connect max_new_workers and to to S
 	   - send all libraries to all workers
-	   - manager empty?                                           Yes: break and find task to return
+	   - manager empty?                                           Yes: break
 	   - mark as busy-waiting and go to S
 	*/
 
@@ -4649,6 +4650,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	time_t stoptime = (timeout == VINE_WAIT_FOREVER) ? 0 : time(0) + timeout;
 
 	int result;
+	struct vine_task *t = NULL;
 
 	// time left?
 	while ((stoptime == 0) || (time(0) < stoptime)) {
@@ -4665,9 +4667,16 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 		// break loop if there is a task to be returned to the user; or if prefering dispatching, if there
 		// are no tasks to be dispatched; or if we already looped once and no events were triggered.
-		if (list_size(q->retrieved_list) > 0 &&
-				(!q->prefer_dispatch || list_size(q->ready_list) == 0 || q->busy_waiting_flag)) {
-			break;
+		if (list_size(q->retrieved_list) > 0) {
+			if (!t) {
+				BEGIN_ACCUM_TIME(q, time_internal);
+				t = find_task_to_return(q, tag, task_id);
+				END_ACCUM_TIME(q, time_internal);
+			}
+
+			if (t && (!q->prefer_dispatch || list_size(q->ready_list) == 0 || q->busy_waiting_flag)) {
+				break;
+			}
 		}
 
 		// retrieve worker status messages
@@ -4694,8 +4703,9 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			// consider one worker at a time
 			hash_table_firstkey(q->workers_with_available_results);
 			if (hash_table_nextkey(q->workers_with_available_results, &key, (void **)&w)) {
-				retrieved_this_cycle += receive_tasks_from_worker(q, w, retrieved_this_cycle);
-				events += retrieved_this_cycle;
+				int retrieved_from_worker = receive_tasks_from_worker(q, w, retrieved_this_cycle);
+				retrieved_this_cycle += retrieved_from_worker;
+				events += retrieved_from_worker;
 			} else if (receive_one_task(q)) {
 				// retrieved at least one task
 				retrieved_this_cycle++;
@@ -4714,8 +4724,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		result = expire_waiting_tasks(q);
 		END_ACCUM_TIME(q, time_internal);
 		if (result > 0) {
+			retrieved_this_cycle += result;
 			events++;
-			continue;
 		}
 
 		// only check for fixed location if any are present (high overhead)
@@ -4724,9 +4734,13 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			result = enforce_waiting_fixed_locations(q);
 			END_ACCUM_TIME(q, time_internal);
 			if (result > 0) {
+				retrieved_this_cycle += result;
 				events++;
-				continue;
 			}
+		}
+
+		if (retrieved_this_cycle && !q->prefer_dispatch) {
+			continue;
 		}
 
 		if (q->wait_for_workers <= hash_table_size(q->worker_table)) {
@@ -4793,7 +4807,12 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			END_ACCUM_TIME(q, time_internal);
 
 			if (done) {
-				break;
+				if (retrieved_this_cycle > 0) {
+					continue; // we only get here with prefer-dispatch, continue to find a task to
+						  // return
+				} else {
+					break;
+				}
 			}
 		}
 
@@ -4808,10 +4827,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// the next time around, or return retrieved tasks if there some available.
 		q->busy_waiting_flag = 1;
 	}
-
-	BEGIN_ACCUM_TIME(q, time_internal);
-	struct vine_task *t = find_task_to_return(q, tag, task_id);
-	END_ACCUM_TIME(q, time_internal);
 
 	if (events > 0) {
 		vine_perf_log_write_update(q, 1);
