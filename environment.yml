@@ -17,4 +17,6 @@ dependencies:
  - conda-pack
  - cloudpickle
  - packaging
+ - flake8
+ - clang-format
 ...
