@@ -46,7 +46,7 @@ def library_network_code():
                 result = func(*args, **kwargs)
                 success = True
                 reason = None
-            except Exception as e:
+            except Exception as e:  # noqa: F841
                 result = None
                 success = False
                 reason = traceback.format_exc()
