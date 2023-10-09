@@ -589,6 +589,10 @@ static void reap_process(struct vine_process *p, struct link *manager)
 		p->exit_code = 1;
 	}
 
+	if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
+		p->library_process->functions_running--;
+	}
+
 	itable_remove(procs_running, p->task->task_id);
 	itable_insert(procs_complete, p->task->task_id, p);
 }

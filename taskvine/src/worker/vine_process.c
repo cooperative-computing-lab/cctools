@@ -221,12 +221,6 @@ static void vine_process_complete(struct vine_process *p, int status)
 				p->pid,
 				p->exit_code);
 	}
-
-	/* If this is a completed function, then decrease the number of funcs on that library. */
-
-	if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
-		p->library_process->functions_running--;
-	}
 }
 
 /*
