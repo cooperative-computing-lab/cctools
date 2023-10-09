@@ -19,8 +19,12 @@ def library_network_code():
     import traceback
     import cloudpickle
     import select
-
-    
+    import signal
+ 
+    # self-pipe to turn a sigchld signal when a child finishes execution 
+    # into an I/O event.
+    r, w = os.pipe()
+   
     # This class captures how results from FunctionCalls are conveyed from 
     # the library to the manager. 
     # For now, all communication details should use this class to generate responses.
@@ -55,12 +59,21 @@ def library_network_code():
         return remote_wrapper
 
     # Self-identifying message to send back to the worker, including the name of this library.
-    def send_configuration(config, out_pipe_fd):
+    # Send back a SIGCHLD to interrupt worker sleep and get it to work.
+    def send_configuration(config, out_pipe_fd, worker_pid):
         config_string = json.dumps(config)
         config_cmd = f"{len(config_string)}\n{config_string}"
         os.writev(out_pipe_fd, [bytes(config_cmd, 'utf-8')])
+        os.kill(worker_pid, signal.SIGCHLD)
 
+    # Handler to sigchld when child exits.
+    def sigchld_handler(signum, frame):
+        # write any byte to signal that there's at least 1 child
+        os.writev(w, [b'a'])
+
+    # Read data from worker, start function, and dump result to `outfile`.
     def start_function(in_pipe_fd):
+        # read length of buffer to read
         buffer_len = b''
         while True:
             c = os.read(in_pipe_fd, 1)
@@ -73,14 +86,14 @@ def library_network_code():
                 buffer_len += c
         buffer_len = int(buffer_len)
         
+        # now read the buffer to get invocation details
         line = str(os.read(in_pipe_fd, buffer_len), encoding='utf-8')
-        #line = str(in_pipe.read(buffer_len), encoding='utf-8')
         function_id, function_name, function_sandbox = line.split(" ", maxsplit=2)
         function_id = int(function_id)
         
         if function_name:
+            # exec method for now is fork only, direct will be supported later
             exec_method = 'fork'
-
             if exec_method == "direct":
                 library_sandbox = os.getcwd()
                 try:
@@ -94,9 +107,12 @@ def library_network_code():
             else:
                 p = os.fork()
                 if p == 0:
+                    # parameters are represented as infile.
                     os.chdir(function_sandbox)
                     with open('infile', 'rb') as f:
                         event = cloudpickle.load(f)
+
+                    # output of execution should be dumped to outfile.
                     with open('outfile', 'wb') as f:
                         cloudpickle.dump(globals()[function_name](event), f)
                     os._exit(0)
@@ -107,38 +123,50 @@ def library_network_code():
                     reason = f'unable to fork-exec function {function_name}'
                     response = LibraryResponse(result, success, reason).generate()
 
-                # parent collects result and waits for child to exit.
+                # return pid and function id of child process to parent.
                 else:
                     return p, function_id
+        else:
+            # malformed message from worker so we exit
+            print('malformed message from worker. Exiting..', file=sys.stderr)
+            exit(1)
         return -1
 
-    def send_result(out_pipe_fd, task_id):
+    # Send result of a function execution to worker. Wake worker up to do work with SIGCHLD.
+    def send_result(out_pipe_fd, task_id, worker_pid):
         buff = bytes(str(task_id), 'utf-8')
         buff = bytes(str(len(buff)), 'utf-8')+b'\n'+buff
         os.writev(out_pipe_fd, [buff])
+        os.kill(worker_pid, signal.SIGCHLD)
 
     def main():
         ppid = os.getppid()
         parser = argparse.ArgumentParser('Parse input and output file descriptors this process should use. The relevant fds should already be prepared by the vine_worker.')
         parser.add_argument('--input-fd', required=True, type=int, help='input fd to receive messages from the vine_worker via a pipe')
         parser.add_argument('--output-fd', required=True, type=int, help='output fd to send messages to the vine_worker via a pipe')
+        parser.add_argument('--worker-pid', required=True, type=int, help='pid of main vine worker to send sigchild to let it know theres some result.')
         args = parser.parse_args()
 
         # Open communication pipes to vine_worker.
         # The file descriptors are inherited from the vine_worker parent process 
         # and should already be open for reads and writes.
-        # Below lines only convert file descriptors into native Python file objects.
-        #in_pipe = os.fdopen(args.input_fd, 'rb')
-        #out_pipe = os.fdopen(args.output_fd, 'wb')
         in_pipe_fd = args.input_fd
         out_pipe_fd = args.output_fd
 
+        # send configuration of library, just its name for now
         config = {
             "name": name(),
         }
-        send_configuration(config, out_pipe_fd)
+        send_configuration(config, out_pipe_fd, args.worker_pid)
         
+        # mapping of child pid to function id of currently running functions
         pid_to_func_id = {}
+
+        # register sigchld handler to turn a sigchld signal into an I/O event
+        signal.signal(signal.SIGCHLD, sigchld_handler)
+       
+        # 5 seconds to wait for select, any value long enough would probably do
+        timeout = 5     
 
         while True:
             # check if parent exits
@@ -146,17 +174,26 @@ def library_network_code():
             if c_ppid != ppid or c_ppid == 1:
                 exit(0)
 
-            # check if worker has anything to say, noblock
-            rlist, wlist, xlist = select.select([in_pipe_fd], [], [], 0)
-            if len(rlist) > 0:
-                pid, func_id = start_function(in_pipe_fd)
-                pid_to_func_id[pid] = func_id
-
-            # check if child exits, noblock
-            if len(pid_to_func_id) > 0:
-                c_pid, c_exit_status = os.waitpid(-1, os.WNOHANG)
-                if c_pid > 0:
-                    send_result(out_pipe_fd, pid_to_func_id[c_pid])
-                    del pid_to_func_id[c_pid]
-                               
+            # wait for messages from worker or child to return
+            rlist, wlist, xlist = select.select([in_pipe_fd, r], [], [], timeout)
+            
+            for re in rlist:
+                # worker has a function, run it
+                if re == in_pipe_fd:
+                    pid, func_id = start_function(in_pipe_fd)
+                    pid_to_func_id[pid] = func_id
+                else:
+                    # at least 1 child exits, reap all.
+                    # read only once as os.read is blocking if there's nothing to read.
+                    # note that there might still be bytes in `r` but it's ok as they will
+                    # be discarded in the next iterations.
+                    os.read(r, 1)
+                    while len(pid_to_func_id) > 0:
+                        c_pid, c_exit_status = os.waitpid(-1, os.WNOHANG)
+                        if c_pid > 0:
+                            send_result(out_pipe_fd, pid_to_func_id[c_pid], args.worker_pid)
+                            del pid_to_func_id[c_pid]
+                        # no exited child to reap, break
+                        else:
+                            break
         return 0
