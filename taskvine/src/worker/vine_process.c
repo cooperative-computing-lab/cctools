@@ -49,10 +49,6 @@ See the file COPYING for details.
 
 extern char *workspace;
 
-static char *vine_process_invoke_function(struct vine_process *library_process, const char *function_name,
-		const char *function_input, const int function_input_length, const char *sandbox_path,
-		int *function_output_len);
-
 /*
 Give the letter code used for the process sandbox dir.
 */
@@ -204,29 +200,6 @@ static void set_resources_vars(struct vine_process *p)
 	}
 }
 
-static char *load_input_file(struct vine_task *t, int *len)
-{
-	FILE *fp = fopen("infile", "r");
-	if (!fp) {
-		fatal("coprocess could not open file 'infile' for reading: %s", strerror(errno));
-	}
-
-	fseek(fp, 0L, SEEK_END);
-	size_t fsize = ftell(fp);
-	fseek(fp, 0L, SEEK_SET);
-
-	char *buf = malloc(fsize);
-
-	int bytes_read = full_fread(fp, buf, fsize);
-	if (bytes_read < 0) {
-		fatal("error reading file: %s", strerror(errno));
-	}
-
-	fclose(fp);
-	*len = fsize;
-	return buf;
-}
-
 /*
 After a process exit has been observed, record the completion in the process structure.
 */
@@ -310,19 +283,12 @@ pid_t vine_process_execute(struct vine_process *p)
 	} else {
 		/* For other task types, read input from null and send output to assigned file. */
 		input_fd = open("/dev/null", O_RDONLY);
-		if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
-			char *output_file = string_format("%s/outfile", p->sandbox);
-			output_fd = open(output_file, O_WRONLY | O_TRUNC | O_CREAT, 0777);
-			error_fd = open(p->output_file_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
-			free(output_file);
-		} else {
-			output_fd = open(p->output_file_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
-			if (output_fd < 0) {
-				debug(D_VINE, "Could not open worker stdout: %s", strerror(errno));
-				return 0;
-			}
-			error_fd = output_fd;
+		output_fd = open(p->output_file_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
+		if (output_fd < 0) {
+			debug(D_VINE, "Could not open worker stdout: %s", strerror(errno));
+			return 0;
 		}
+		error_fd = output_fd;
 	}
 
 	/* Start the performance clock just prior to forking the task. */
@@ -336,11 +302,6 @@ pid_t vine_process_execute(struct vine_process *p)
 		setpgid(p->pid, 0);
 
 		debug(D_VINE, "started task %d pid %d: %s", p->task->task_id, p->pid, p->task->command_line);
-
-		/* If we just started a function, increase the number assigned to this library. */
-		if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
-			p->library_process->functions_running++;
-		}
 
 		/* If we just started a library, then retain links to communicate with it. */
 		if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
@@ -381,33 +342,6 @@ pid_t vine_process_execute(struct vine_process *p)
 		if (chdir(p->sandbox)) {
 			printf("The sandbox dir is %s", p->sandbox);
 			fatal("could not change directory into %s: %s", p->sandbox, strerror(errno));
-		}
-
-		/* In the special case of a function-call-task, just load data, communicate with the library, and exit.
-		 */
-
-		if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
-
-			change_process_title("vine_worker [function]");
-
-			// load data from input file
-			int input_len = 0;
-			char *input = load_input_file(p->task, &input_len);
-
-			int output_len = 0;
-
-			// communicate with library to invoke the function
-			char *output = vine_process_invoke_function(p->library_process,
-					p->task->command_line,
-					input,
-					input_len,
-					p->sandbox,
-					&output_len);
-
-			// write data to output file
-			full_write(output_fd, output, output_len);
-
-			_exit(0);
 		}
 		/* For process types other than library, set up file desciptors.
 		 * The library will use the input_fd and output_fd to talk to the manager instead. */
@@ -467,54 +401,6 @@ pid_t vine_process_execute(struct vine_process *p)
 	}
 
 	return 0;
-}
-
-/*
-Invoke a function against a library by sending the invocation message,
-and then reading back the result from the necessary pipe.
-*/
-
-static char *vine_process_invoke_function(struct vine_process *library_process, const char *function_name,
-		const char *function_input, const int function_input_len, const char *sandbox_path,
-		int *function_output_len)
-{
-	/* If this function has a valid maximum runtime, we'll wait for that long for some result.
-	 * Otherwise wait forever. */
-	int64_t max_run_time = library_process->task->resources_requested->wall_time;
-	time_t stoptime = LINK_FOREVER;
-	if (max_run_time >= 1) {
-		stoptime = time(0) + max_run_time;
-	}
-
-	int length = function_input_len;
-
-	/* Send the function name, length of data, and sandbox directory.
-	 * The length of the buffer goes first (marked by `\n`) then followed
-	 * by the buffer. */
-	char *buffer = string_format("%s %d %s", function_name, length, sandbox_path);
-	int buffer_len = strlen(buffer);
-	link_printf(library_process->library_write_link, stoptime, "%d\n%s", buffer_len, buffer);
-
-	/* Then send the function data itself. */
-	link_write(library_process->library_write_link, function_input, length, stoptime);
-
-	/* Read back function result by first reading the length of the result buffer (`\n` terminated),
-	 * then read the result buffer. Return nothing if any error happens.*/
-	char response_len_str[VINE_LINE_MAX];
-	if (link_readline(library_process->library_read_link, response_len_str, VINE_LINE_MAX, stoptime) == 0) {
-		*function_output_len = 0;
-		return 0;
-	}
-
-	int response_len = atoi(response_len_str);
-	char *line = malloc(sizeof(char) * response_len);
-	if (link_read(library_process->library_read_link, line, response_len, stoptime)) {
-		*function_output_len = response_len;
-		return line;
-	} else {
-		*function_output_len = 0;
-		return 0;
-	}
 }
 
 /*

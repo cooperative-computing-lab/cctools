@@ -544,6 +544,8 @@ static int start_process(struct vine_process *p, struct link *manager)
 	/* Starting a function call is different from starting a standard task, so we return early. */
 	if (t->needs_library) {
 		itable_insert(procs_running, p->task->task_id, p);
+		debug(D_VINE, "started function call %d: %s", p->task->task_id, p->task->command_line);
+		p->library_process->functions_running++;
 		return start_function(p);
 	}
 
