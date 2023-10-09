@@ -62,10 +62,10 @@ jobs:
           tag: ${{ github.event.inputs.tag }}
 
   build-osx:
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 30
     env:
-      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, 'osx-11') }}
+      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, 'osx-12') }}
     needs: lint
     steps:
       - name: checkout CCTools from branch head
