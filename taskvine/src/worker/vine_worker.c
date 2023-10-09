@@ -490,15 +490,20 @@ static void report_worker_ready(struct link *manager)
 	send_keepalive(manager, 1);
 }
 
-int start_function(struct vine_process* p)
+int start_function(struct vine_process *p)
 {
 	uint64_t proc_id;
-	struct vine_process* proc;
+	struct vine_process *proc;
 	ITABLE_ITERATE(procs_running, proc_id, proc)
 	{
-		if (proc->type == VINE_PROCESS_TYPE_LIBRARY && proc->library_ready && !strcmp(proc->task->provides_library, p->task->needs_library)) {
-			char* buffer = string_format("%d %s %s", p->task->task_id, p->task->command_line, p->sandbox);
-			link_printf(proc->library_write_link, time(0)+active_timeout, "%ld\n%s", strlen(buffer), buffer);
+		if (proc->type == VINE_PROCESS_TYPE_LIBRARY && proc->library_ready &&
+				!strcmp(proc->task->provides_library, p->task->needs_library)) {
+			char *buffer = string_format("%d %s %s", p->task->task_id, p->task->command_line, p->sandbox);
+			link_printf(proc->library_write_link,
+					time(0) + active_timeout,
+					"%ld\n%s",
+					strlen(buffer),
+					buffer);
 			free(buffer);
 			break;
 		}
@@ -547,7 +552,7 @@ static int start_process(struct vine_process *p, struct link *manager)
 	if (pid < 0)
 		fatal("unable to fork process for task_id %d!", p->task->task_id);
 
-	/* If this process represents a library, notify the manager that it is running. 
+	/* If this process represents a library, notify the manager that it is running.
 	 * Also set the sigchld flag so the worker will immediately check for the library
 	 * startup instead of sleeping and waiting for the manager. */
 	if (p->task->provides_library) {
@@ -675,7 +680,7 @@ static int handle_completed_tasks(struct link *manager)
 	ITABLE_ITERATE(procs_running, task_id, p)
 	{
 		/* Skip functions, we take care of them later by checking if the library sends any message. */
-		if (p->type != VINE_PROCESS_TYPE_FUNCTION && vine_process_is_complete(p)) { 
+		if (p->type != VINE_PROCESS_TYPE_FUNCTION && vine_process_is_complete(p)) {
 			/* collect the resources associated with the process */
 			reap_process(p, manager);
 
@@ -684,22 +689,23 @@ static int handle_completed_tasks(struct link *manager)
 		}
 		/* Check if the library has any function invocations done, noblock. */
 		if (p->library_ready) {
-			char buffer[VINE_LINE_MAX];		// Buffer to store data from library.
-			int local_timeout = 60;			// Will try up to local_timeout to read data.
+			char buffer[VINE_LINE_MAX]; // Buffer to store data from library.
+			int local_timeout = 60;	    // Will try up to local_timeout to read data.
 			/* Retrieve all results. */
 			while (link_usleep(p->library_read_link, 0, 1, 0)) {
 				// read number of bytes of buffer first.
-				link_readline(p->library_read_link, buffer, VINE_LINE_MAX, time(0)+local_timeout);
+				link_readline(p->library_read_link, buffer, VINE_LINE_MAX, time(0) + local_timeout);
 				int len_buffer = atoi(buffer);
 				memset(buffer, 0, VINE_LINE_MAX);
 
 				// now read the buffer, which is the task id of the done function invocation.
-				link_read(p->library_read_link, buffer, len_buffer, time(0)+30);
-				uint64_t done_task_id = (uint64_t) strtoul(buffer, NULL, 10);
+				link_read(p->library_read_link, buffer, len_buffer, time(0) + 30);
+				uint64_t done_task_id = (uint64_t)strtoul(buffer, NULL, 10);
 				memset(buffer, 0, VINE_LINE_MAX);
 				debug(D_VINE, "Received result for function %lu", done_task_id);
 				itable_firstkey(procs_running);
-				ITABLE_ITERATE(procs_running, task_id, pp) {
+				ITABLE_ITERATE(procs_running, task_id, pp)
+				{
 					if (task_id == done_task_id) {
 						reap_process(pp, manager);
 						break;
