@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if ! make test
+if ! conda run --name cctools-build make test
 then
     echo === Contents of cctools.test.fail ===
     cat cctools.test.fail

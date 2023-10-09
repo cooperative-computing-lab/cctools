@@ -81,7 +81,16 @@ static int stage_input_file(struct vine_process *p, struct vine_mount *m, struct
 		if (status == VINE_CACHE_STATUS_READY) {
 			create_dir_parents(sandbox_path, 0777);
 			debug(D_VINE, "input: link %s -> %s", cache_path, sandbox_path);
-			result = file_link_recursive(cache_path, sandbox_path, vine_worker_symlinks_enabled);
+			if (m->flags & VINE_MOUNT_SYMLINK) {
+				/* If the user has requested a symlink, just do that b/c it is faster for large dirs. */
+				result = symlink(cache_path, sandbox_path);
+				/* Change sense of Unix result to true/false. */
+				result = !result;
+			} else {
+				/* Otherwise recursively hard-link the object into the sandbox. */
+				result = file_link_recursive(cache_path, sandbox_path, 1);
+			}
+
 			if (!result)
 				debug(D_VINE,
 						"couldn't link %s into sandbox as %s: %s",
@@ -163,8 +172,18 @@ static int stage_output_file(struct vine_process *p, struct vine_mount *m, struc
 	if (result) {
 		struct stat info;
 		if (stat(cache_path, &info) == 0) {
-			vine_cache_addfile(cache, info.st_size, info.st_mode, f->cached_name);
-			vine_worker_send_cache_update(manager, f->cached_name, info.st_size, 0, 0);
+			if (S_ISDIR(info.st_mode)) {
+				struct path_disk_size_info *state = NULL;
+				path_disk_size_info_get_r(cache_path, -1, &state);
+				int64_t measured_size = state->last_byte_size_complete;
+
+				vine_cache_addfile(cache, measured_size, info.st_mode, f->cached_name);
+				vine_worker_send_cache_update(manager, f->cached_name, measured_size, 0, 0);
+				path_disk_size_info_delete_state(state);
+			} else {
+				vine_cache_addfile(cache, info.st_size, info.st_mode, f->cached_name);
+				vine_worker_send_cache_update(manager, f->cached_name, info.st_size, 0, 0);
+			}
 		} else {
 			// This seems implausible given that the rename/copy succeded, but we still have to check...
 			debug(D_VINE, "output: failed to stat %s: %s", cache_path, strerror(errno));

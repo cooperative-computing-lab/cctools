@@ -46,6 +46,8 @@ typedef enum {
 	VINE_WATCH = 2,           /**< Watch the output file and send back changes as the task runs. */
 	VINE_FAILURE_ONLY = 4,    /**< Only return this output file if the task failed.  (Useful for returning large log files.) */
 	VINE_SUCCESS_ONLY = 8,    /**< Only return this output file if the task succeeded. */
+	VINE_RETRACT_ON_RESET = 16,  /**< Remove this file from the mount lists if the task is reset. (TaskVine internal use only.) */
+	VINE_MOUNT_SYMLINK = 32   /**< Permit this directory to be mounted via symlink instead of hardlink. */
 } vine_mount_flags_t;
 
 /** Control caching and sharing behavior of file objects.
@@ -90,20 +92,9 @@ typedef enum {
 	VINE_RESULT_MAX_WALL_TIME       = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
 	VINE_RESULT_RMONITOR_ERROR      = 8 << 3, /**< The task failed because the monitor did not produce a summary report. **/
 	VINE_RESULT_OUTPUT_TRANSFER_ERROR = 9 << 3,  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
-	VINE_RESULT_FIXED_LOCATION_MISSING = 10 << 3 /**< The task failed because no worker could satisfy the fixed location input file requirements. */
+	VINE_RESULT_FIXED_LOCATION_MISSING = 10 << 3, /**< The task failed because no worker could satisfy the fixed location input file requirements. */
+	VINE_RESULT_CANCELLED = 11<<3, /**< The task was cancelled by the caller. */
 } vine_result_t;
-
-/** Possible states of a task, given by @ref vine_task_state */
-
-typedef enum {
-	VINE_TASK_UNKNOWN = 0,       /**< Task has not been submitted to the manager **/
-	VINE_TASK_READY,             /**< Task is ready to be run, waiting in manager **/
-	VINE_TASK_RUNNING,           /**< Task has been dispatched to some worker **/
-	VINE_TASK_WAITING_RETRIEVAL, /**< Task results are available at the worker **/
-	VINE_TASK_RETRIEVED,         /**< Task results are available at the manager **/
-	VINE_TASK_DONE,              /**< Task is done, and returned through vine_wait >**/
-	VINE_TASK_CANCELED,           /**< Task was canceled before completion **/
-} vine_task_state_t;
 
 /** Select how to allocate resources for similar tasks with @ref vine_set_category_mode */
 
@@ -1020,13 +1011,6 @@ char *vine_get_status(struct vine_manager *m, const char *request);
 */
 struct rmsummary **vine_summarize_workers(struct vine_manager *m);
 
-/** Get the current state of the task.
-@param m A manager object
-@param task_id The task_id of the task.
-@return One of: VINE_TASK(UNKNOWN|READY|RUNNING|RESULTS|RETRIEVED|DONE)
-*/
-vine_task_state_t vine_task_state(struct vine_manager *m, int task_id);
-
 /** Limit the manager bandwidth when transferring files to and from workers.
 @param m A manager object
 @param bandwidth The bandwidth limit in bytes per second.
@@ -1119,25 +1103,28 @@ void vine_set_tasks_left_count(struct vine_manager *m, int ntasks);
 */
 void vine_set_catalog_servers(struct vine_manager *m, const char *hosts);
 
-/** Cancel a submitted task using its task id and remove it from manager.
+/** Cancel a submitted task using its task id.
+The cancelled task will be returned in the normal way via @ref vine_wait with a result of VINE_RESULT_CANCELLED.
 @param m A manager object
 @param id The task_id returned from @ref vine_submit.
-@return The task description of the cancelled task, or null if the task was not found in manager. The returned task must be deleted with @ref vine_task_delete or resubmitted with @ref vine_submit.
+@return True if the task was found in the manager and cancelled, false otherwise.
 */
-struct vine_task *vine_cancel_by_task_id(struct vine_manager *m, int id);
+int vine_cancel_by_task_id(struct vine_manager *m, int id);
 
 /** Cancel a submitted task using its tag and remove it from manager.
+The cancelled task will be returned in the normal way via @ref vine_wait with a result of VINE_RESULT_CANCELLED.
 @param m A manager object
 @param tag The tag name assigned to task using @ref vine_task_set_tag.
-@return The task description of the cancelled task, or null if the task was not found in manager. The returned task must be deleted with @ref vine_task_delete or resubmitted with @ref vine_submit.
+@return True if the task was found in the manager and cancelled, false otherwise.
 */
-struct vine_task *vine_cancel_by_task_tag(struct vine_manager *m, const char *tag);
+int vine_cancel_by_task_tag(struct vine_manager *m, const char *tag);
 
 /** Cancel all submitted tasks and remove them from the manager.
+Each cancelled task will be returned in the normal way via @ref vine_wait with a result of VINE_RESULT_CANCELLED.
 @param m A manager object
-@return A struct list of all of the tasks canceled.  Each task must be deleted with @ref vine_task_delete or resubmitted with @ref vine_submit.
+@return The number of tasks cancelled.
 */
-struct list * vine_tasks_cancel(struct vine_manager *m);
+int vine_cancel_all(struct vine_manager *m);
 
 /** Turn on the debugging log output and send to the named file.
  * (Note it does not need the vine_manager structure, as it is enabled before

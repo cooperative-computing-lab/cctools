@@ -32,6 +32,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 struct vine_cache {
 	struct hash_table *table;
@@ -110,6 +111,14 @@ void vine_cache_load(struct vine_cache *c)
 			if (!strcmp(d->d_name, ".."))
 				continue;
 
+			if (strstr(d->d_name, "-meta-") || strstr(d->d_name, "-rnd-")) {
+				char *filepath = vine_cache_full_path(c, d->d_name);
+				debug(D_VINE, "found non-workflow cache %s, trashing file", d->d_name);
+				trash_file(filepath);
+				free(filepath);
+				continue;
+			}
+
 			debug(D_VINE, "found %s in cache", d->d_name);
 
 			struct stat info;
@@ -178,7 +187,15 @@ void vine_cache_delete(struct vine_cache *c)
 	/* Ensure that all child processes are killed off. */
 	char *cachename;
 	struct vine_cache_file *file;
-	HASH_TABLE_ITERATE(c->table, cachename, file) { vine_cache_kill(c, file, cachename, 0); }
+	HASH_TABLE_ITERATE(c->table, cachename, file)
+	{
+		if (strstr(cachename, "-meta-") || strstr(cachename, "-rnd-")) {
+			char *filepath = vine_cache_full_path(c, cachename);
+			trash_file(filepath);
+			free(filepath);
+		}
+		vine_cache_kill(c, file, cachename, 0);
+	}
 
 	hash_table_clear(c->table, (void *)vine_cache_file_delete);
 	hash_table_delete(c->table);

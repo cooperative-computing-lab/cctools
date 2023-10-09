@@ -12,7 +12,6 @@ from . import cvine
 from .file import File
 
 import copy
-import json
 import os
 import shutil
 import sys
@@ -20,7 +19,7 @@ import tempfile
 import textwrap
 import uuid
 import weakref
-
+import cloudpickle
 
 ##
 # @class ndcctools.taskvine.task.Task
@@ -125,7 +124,7 @@ class Task(object):
         self._task = None
 
     @staticmethod
-    def _determine_mount_flags(watch=False, failure_only=False, success_only=False, strict_input=False):
+    def _determine_mount_flags(watch=False, failure_only=False, success_only=False, strict_input=False, mount_symlink=False):
         flags = cvine.VINE_TRANSFER_ALWAYS
         if watch:
             flags |= cvine.VINE_WATCH
@@ -135,6 +134,8 @@ class Task(object):
             flags |= cvine.VINE_SUCCESS_ONLY
         if strict_input:
             flags |= cvine.VINE_FIXED_LOCATION
+        if mount_symlink:
+            flags |= cvine.VINE_MOUNT_SYMLINK
         return flags
 
     @staticmethod
@@ -257,12 +258,12 @@ class Task(object):
     # >>> f = m.declare_untar(url)
     # >>> task.add_input(f,"data")
     # @endcode
-    def add_input(self, file, remote_name, strict_input=False):
+    def add_input(self, file, remote_name, strict_input=False, mount_symlink=False):
         # SWIG expects strings
         if not isinstance(remote_name, str):
             raise TypeError(f"remote_name {remote_name} is not a str")
 
-        flags = Task._determine_mount_flags(strict_input=strict_input)
+        flags = Task._determine_mount_flags(strict_input=strict_input, mount_symlink=mount_symlink)
 
         if cvine.vine_task_add_input(self._task, file._file, remote_name, flags)==0:
             raise ValueError("invalid file description")
@@ -481,8 +482,6 @@ class Task(object):
     # @endcode
     @property
     def output(self):
-        if (isinstance(self, FunctionCall)):
-            return json.loads(cvine.vine_task_get_stdout(self._task))['Result']
         return cvine.vine_task_get_stdout(self._task)
 
     ##
@@ -590,7 +589,6 @@ class Task(object):
     # @code
     # >>> print(t.get_metric("total_submissions")
     # @endcode
-    @property
     def get_metric(self, name):
         return cvine.vine_task_get_metric(self._task, name)
 
@@ -710,13 +708,7 @@ class Task(object):
 # The class represents a Task specialized to execute remote Python code.
 #
 
-try:
-    import cloudpickle
-    pythontask_available = True
-except Exception:
-    # Note that the intended exception here is ModuleNotFoundError.
-    # However, that type does not exist in Python 2
-    pythontask_available = False
+
 
 
 class PythonTask(Task):
@@ -728,9 +720,6 @@ class PythonTask(Task):
     # @param args	arguments used in function to be executed by task
     # @param kwargs	keyword arguments used in function to be executed by task
     def __init__(self, func, *args, **kwargs):
-        if not pythontask_available:
-            raise RuntimeError("PythonTask is not available. The cloudpickle module is missing.")
-
         self._pp_run = None
         self._output_loaded = False
         self._output = None
@@ -967,7 +956,9 @@ class FunctionCall(Task):
         self._event = {}
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
+        self.set_time_max(900)     # maximum run time for function calls is 900s by default.
         self.needs_library(library_name)
+        self.output_buffer = None
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -978,8 +969,10 @@ class FunctionCall(Task):
     # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
         super().submit_finalize(manager)
-        f = manager.declare_buffer(json.dumps(self._event))
+        f = manager.declare_buffer(cloudpickle.dumps(self._event))
         self.add_input(f, "infile")
+        self.output_buffer = manager.declare_buffer(cache=False, peer_transfer=False)
+        self.add_output(self.output_buffer, "outfile")
 
     ##
     # Specify function arguments. Accepts arrays and dictionaries. This
@@ -1002,6 +995,15 @@ class FunctionCall(Task):
             print("Error, vine_exec_method must either be fork or direct, choosing fork by default")
             remote_task_exec_method = "fork"
         self._event["remote_task_exec_method"] = remote_task_exec_method
+
+    @property
+    def output(self):
+        output = cloudpickle.loads(self.output_buffer.contents())
+        if output['Success']:
+            return output['Result']
+        else:
+            return output['Reason']
+
 
 ##
 # \class LibraryTask

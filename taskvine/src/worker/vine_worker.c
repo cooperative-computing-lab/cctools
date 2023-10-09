@@ -117,9 +117,6 @@ static int sigchld_received_flag = 0;
 // Password shared between manager and worker.
 char *vine_worker_password = 0;
 
-// Allow worker to use symlinks when link() fails.  Enabled by default.
-int vine_worker_symlinks_enabled = 1;
-
 int mini_task_id = 0;
 
 // Worker id. A unique id for this worker instance.
@@ -156,6 +153,12 @@ static struct vine_watcher *watcher = 0;
 
 /* The resources measured and available at this worker. */
 static struct vine_resources *total_resources = 0;
+
+/* When the amount of disk is not specified, manually set the reporting disk to
+ * this percentage of the measured disk. This safeguards the fact that disk measurements
+ * are estimates and thus may unncessarily forsaken tasks with unspecified resources.
+ * Defaults to 90%. */
+static int disk_percent = 90;
 
 static int64_t last_task_received = 0;
 
@@ -320,6 +323,14 @@ static void measure_worker_resources()
 
 	if (manual_disk_option > 0) {
 		r->disk.total = MIN(r->disk.total, manual_disk_option);
+	} else {
+		/* Set the reporting disk to a fraction of the measured disk to avoid
+		 * unnecessarily forsaking tasks with unspecified resources.
+		 * Note that @vine_resources_measure_locally reports that
+		 * disk.total = available_disk + disk.inuse, so we leave out disk.inuse in
+		 * the discounting calculation, then add it back in. */
+		r->disk.total -= r->disk.inuse;
+		r->disk.total = ceil(r->disk.total * disk_percent / 100) + r->disk.inuse;
 	}
 
 	r->disk.inuse = measure_worker_disk();
@@ -382,7 +393,6 @@ static int send_keepalive(struct link *manager, int force_resources)
 {
 	send_message(manager, "alive\n");
 	send_resource_update(manager);
-	send_stats_update(manager);
 	return 1;
 }
 
@@ -584,8 +594,6 @@ static void report_task_complete(struct link *manager, struct vine_process *p)
 
 	total_task_execution_time += (p->execution_end - p->execution_start);
 	total_tasks_executed++;
-
-	send_stats_update(manager);
 }
 
 /*
@@ -602,7 +610,6 @@ static void report_tasks_complete(struct link *manager)
 	}
 
 	vine_watcher_send_changes(watcher, manager, time(0) + active_timeout);
-
 	send_message(manager, "end\n");
 
 	results_to_be_sent_msg = 0;
@@ -859,6 +866,7 @@ static int do_kill(int task_id)
 	struct vine_process *p;
 
 	p = itable_remove(procs_table, task_id);
+
 	if (!p) {
 		debug(D_VINE, "manager requested kill of task %d which does not exist!", task_id);
 		return 1;
@@ -1132,11 +1140,9 @@ Return true if this task can run with the resources currently available.
 
 static int task_resources_fit_now(struct vine_task *t)
 {
-	/* XXX removed disk space check due to problems running workers locally or multiple workers on a single node
-	 * since default tasks request the entire reported disk space. questionable if this check useful in practice.*/
 	return (cores_allocated + t->resources_requested->cores <= total_resources->cores.total) &&
 	       (memory_allocated + t->resources_requested->memory <= total_resources->memory.total) &&
-	       (1) && // disk_allocated   + t->resources_requested->disk   <= total_resources->disk.total) &&
+	       (disk_allocated + t->resources_requested->disk <= total_resources->disk.total) &&
 	       (gpus_allocated + t->resources_requested->gpus <= total_resources->gpus.total);
 }
 
@@ -1169,8 +1175,8 @@ struct vine_process *find_library_for_function(const char *library_name)
 
 	ITABLE_ITERATE(procs_running, task_id, p)
 	{
-		if (!strcmp(p->task->provides_library, library_name)) {
-			if (p->functions_running < p->task->function_slots) {
+		if (p->task->provides_library && !strcmp(p->task->provides_library, library_name)) {
+			if (p->library_ready && p->functions_running < p->task->function_slots) {
 				return p;
 			}
 		}
@@ -1291,6 +1297,82 @@ static int enforce_worker_promises(struct link *manager)
 	return 1;
 }
 
+/*
+Given a freshly started process, wait for it to initialize and send
+back the library startup message with JSON containing the name of
+the library, which should match the task's provides_library label.
+*/
+
+static int check_library_startup(struct vine_process *p)
+{
+	char buffer_len[VINE_LINE_MAX];
+	int length = 0;
+
+	/* Read a line that gives the length of the response message. */
+	if (!link_readline(p->library_read_link, buffer_len, VINE_LINE_MAX, LINK_NOWAIT)) {
+		return 0;
+	}
+	sscanf(buffer_len, "%d", &length);
+
+	/* Now read that length of message and null-terminate it. */
+	char buffer[length + 1];
+	if (link_read(p->library_read_link, buffer, length, LINK_NOWAIT) <= 0) {
+		return 0;
+	}
+	buffer[length] = 0;
+
+	/* Check that the response is JX and contains the expected name. */
+	struct jx *response = jx_parse_string(buffer);
+
+	const char *name = jx_lookup_string(response, "name");
+
+	int ok = 0;
+	if (!strcmp(name, p->task->provides_library)) {
+		ok = 1;
+	}
+	if (response) {
+		jx_delete(response);
+	}
+	return ok;
+}
+
+/* Check whether all known libraries are ready to execute functions.
+ * A library starts up and tells the vine_worker it's ready by reporting
+ * back its library name. */
+static void check_libraries_ready()
+{
+	uint64_t library_task_id;
+	struct vine_process *library_process;
+
+	struct link_info library_link_info;
+	library_link_info.events = LINK_READ;
+	library_link_info.revents = 0;
+
+	/* Loop through all processes to find libraries and check if they are ready. */
+	ITABLE_ITERATE(procs_running, library_task_id, library_process)
+	{
+		if ((library_process->type == VINE_PROCESS_TYPE_LIBRARY) && !library_process->library_ready) {
+			library_link_info.link = library_process->library_read_link;
+
+			/* Check if library has sent its startup message. */
+			if (link_poll(&library_link_info, 1, 0) && (library_link_info.revents & LINK_READ)) {
+				if (check_library_startup(library_process)) {
+					debug(D_VINE,
+							"Library %s reports ready to execute functions.",
+							library_process->task->provides_library);
+					library_process->library_ready = 1;
+				} else {
+					/* Kill library if the name reported back doesn't match its name or
+					 * if there's any problem. */
+					debug(D_VINE, "Library verification failed. Killing it.");
+					vine_process_kill(library_process);
+				}
+			}
+			library_link_info.revents = 0;
+		}
+	}
+}
+
 static void work_for_manager(struct link *manager)
 {
 	sigset_t mask;
@@ -1380,6 +1462,9 @@ static void work_for_manager(struct link *manager)
 			break;
 		}
 
+		/* Check all known libraries if they are ready to execute functions. */
+		check_libraries_ready();
+
 		int task_event = 0;
 		if (ok) {
 			struct vine_process *p;
@@ -1402,14 +1487,14 @@ static void work_for_manager(struct link *manager)
 			}
 		}
 
-		if (task_event > 0) {
-			send_stats_update(manager);
-		}
-
 		if (ok && !results_to_be_sent_msg) {
 			if (vine_watcher_check(watcher) || itable_size(procs_complete) > 0) {
 				send_message(manager, "available_results\n");
 				results_to_be_sent_msg = 1;
+			}
+
+			if (task_event > 0) {
+				send_stats_update(manager);
 			}
 		}
 
@@ -2008,6 +2093,10 @@ static void show_help(const char *cmd)
 	printf(" %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
 	printf(" %-30s If not given, or less than 1, then try to detect disk space available.\n", "");
 
+	printf(" %-30s Set the conservative disk reporting percent when --disk is unspecified.\n",
+			"--disk-percent=<percent>");
+	printf(" %-30s Defaults to %d.\n", "", disk_percent);
+
 	printf(" %-30s Use loop devices for task sandboxes (default=disabled, requires root access).\n",
 			"--disk-allocation");
 	printf(" %-30s Specifies a user-defined feature the worker provides. May be specified several times.\n",
@@ -2029,8 +2118,8 @@ enum {
 	LONG_OPT_CORES,
 	LONG_OPT_MEMORY,
 	LONG_OPT_DISK,
+	LONG_OPT_DISK_PERCENT,
 	LONG_OPT_GPUS,
-	LONG_OPT_DISABLE_SYMLINKS,
 	LONG_OPT_IDLE_TIMEOUT,
 	LONG_OPT_CONNECT_TIMEOUT,
 	LONG_OPT_SINGLE_SHOT,
@@ -2060,7 +2149,6 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"min-backoff", required_argument, 0, 'i'},
 		{"max-backoff", required_argument, 0, 'b'},
 		{"single-shot", no_argument, 0, LONG_OPT_SINGLE_SHOT},
-		{"disable-symlinks", no_argument, 0, LONG_OPT_DISABLE_SYMLINKS},
 		{"disk-threshold", required_argument, 0, 'z'},
 		{"memory-threshold", required_argument, 0, LONG_OPT_MEMORY_THRESHOLD},
 		{"arch", required_argument, 0, 'A'},
@@ -2070,6 +2158,7 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"cores", required_argument, 0, LONG_OPT_CORES},
 		{"memory", required_argument, 0, LONG_OPT_MEMORY},
 		{"disk", required_argument, 0, LONG_OPT_DISK},
+		{"disk-percent", required_argument, 0, LONG_OPT_DISK_PERCENT},
 		{"gpus", required_argument, 0, LONG_OPT_GPUS},
 		{"wall-time", required_argument, 0, LONG_OPT_WALL_TIME},
 		{"help", no_argument, 0, 'h'},
@@ -2216,6 +2305,14 @@ int main(int argc, char *argv[])
 				manual_disk_option = atoll(optarg);
 			}
 			break;
+		case LONG_OPT_DISK_PERCENT:
+			if (!strncmp(optarg, "all", 3)) {
+				disk_percent = 100;
+			} else {
+				/* guard the disk percent value to [0, 100]. */
+				disk_percent = MIN(100, MAX(atoi(optarg), 0));
+			}
+			break;
 		case LONG_OPT_GPUS:
 			if (!strncmp(optarg, "all", 3)) {
 				manual_gpus_option = -1;
@@ -2229,9 +2326,6 @@ int main(int argc, char *argv[])
 				manual_wall_time_option = 0;
 				warn(D_NOTICE, "Ignoring --wall-time, a positive integer is expected.");
 			}
-			break;
-		case LONG_OPT_DISABLE_SYMLINKS:
-			vine_worker_symlinks_enabled = 0;
 			break;
 		case LONG_OPT_SINGLE_SHOT:
 			single_shot_mode = 1;

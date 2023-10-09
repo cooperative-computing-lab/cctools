@@ -1266,10 +1266,10 @@ environment.
 ### Task Cancellations
 
 This feature is useful in workflows where there are redundant tasks or tasks
-that become obsolete as other tasks finish. Tasks that have been submitted can
-be cancelled and immediately retrieved without waiting for TaskVine to
-return them in `vine_wait`. The tasks to cancel can be identified by
-either their `taskid` or `tag`. For example:
+that become obsolete as other tasks finish.  Tasks can be removed either
+by either `task_id` or `tag`.  Tasks removed in this way will still be
+returned in the usual way via `wait` with a `result` of `VINE_RESULT_CANCELLED`.
+For example:
 
 === "Python"
     ```python
@@ -1285,11 +1285,11 @@ either their `taskid` or `tag`. For example:
 
     taskid = m.submit(t)
 
-    # cancel task by id. Return the canceled task.
-    t = m.cancel_by_taskid(taskid)
+    # cancel task by id.
+    m.cancel_by_taskid(taskid)
 
-    # or cancel task by tag. Return the canceled task.
-    t = m.cancel_by_tasktag("my-tag")
+    # or cancel task by tag.
+    m.cancel_by_tasktag("my-tag")
     ```
 
 === "C"
@@ -1300,20 +1300,20 @@ either their `taskid` or `tag`. For example:
 
     int taskid = vine_submit(m, t);
 
-    // cancel task by id. Return the canceled task.
-    t = vine_cancel_by_taskid(m, taskid);
+    // cancel task by id.
+    vine_cancel_by_taskid(m, taskid);
 
-    # or cancel task by tag. Return the canceled task.
-    t = vine_cancel_by_tasktag(m, "my-tag");
+    # or cancel task by tag.
+    vine_cancel_by_tasktag(m, "my-tag");
     ```
 
 
 !!! note
     If several tasks have the same tag, only one of them is cancelled. If you
     want to cancel all the tasks with the same tag, you can use loop until
-    `cancel_by_task` does not return a task, as in:
+    `cancel_by_task` returns zero:
 ```
-    while m.cancel_by_taskid("my-tag"):
+    while m.cancel_by_taskid("my-tag")>0:
         pass
 ```
 
@@ -2374,11 +2374,12 @@ change.
 | hungry-minimum          | Smallest number of waiting tasks in the manager before declaring it hungry | 10 |
 | hungry-minimum-factor   | Queue is hungry if number of waiting tasks is less than hungry-minumum-factor x (number of workers) | 2 |
 | ramp-down-heuristic     | If set to 1 and there are more workers than tasks waiting, then tasks are allocated all the free resources of a worker large enough to run them. If monitoring watchdog is not enabled, then this heuristic has no effect. | 0 |
+| immediate-recovery    | If set to 1, create recovery tasks for temporary files as soon as their worker disconnects. Otherwise, create recovery tasks only if the temporary files are used as input when trying to dispatch another task. | 0 |
 | monitor-interval        | Maximum number of seconds between resource monitor measurements. If less than 1, use default. | 5 |
 | resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
-| max-retrievals | Sets the max number of tasks to retrievals per manager wait(). If less than 1, the manager prefers to retrievals all completed tasks before dispatching new tasks to workers. | 1 |
-| worker-retrievals | If 1, retrievals all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |
+| max-retrievals | Sets the max number of tasks to retrieve per manager wait(). If less than 1, the manager prefers to retrieve all completed tasks before dispatching new tasks to workers. | 1 |
+| worker-retrievals | If 1, retrieve all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |
 
 
 === "Python"

@@ -99,11 +99,11 @@ jobs:
           tag: ${{ github.event.inputs.tag }}
 
   build-conda:
+    needs: lint
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
       CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-linux-conda.tar.gz', github.event.inputs.version) }}
-    needs: lint
     steps:
       - name: Checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'

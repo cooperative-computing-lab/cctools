@@ -54,7 +54,7 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->resource_request = CATEGORY_ALLOCATION_FIRST;
 	t->worker_selection_algorithm = VINE_SCHEDULE_UNSET;
 
-	t->state = VINE_TASK_UNKNOWN;
+	t->state = VINE_TASK_INITIAL;
 	t->function_slots = 1;
 	t->function_slots_inuse = 0;
 
@@ -106,6 +106,21 @@ void vine_task_clean(struct vine_task *t)
 	t->current_resource_box = 0;
 }
 
+static void retract_mounts_on_reset(struct list *mount_list)
+{
+	int mount_count = list_size(mount_list);
+	while (mount_count > 0) {
+		mount_count--;
+		struct vine_mount *m = list_pop_head(mount_list);
+		if (m->flags & VINE_RETRACT_ON_RESET) {
+			vine_mount_delete(m);
+			continue;
+		}
+
+		list_push_tail(mount_list, m);
+	}
+}
+
 void vine_task_reset(struct vine_task *t)
 {
 	vine_task_clean(t);
@@ -128,7 +143,10 @@ void vine_task_reset(struct vine_task *t)
 	t->current_resource_box = 0;
 
 	t->task_id = 0;
-	t->state = VINE_TASK_UNKNOWN;
+	t->state = VINE_TASK_INITIAL;
+
+	retract_mounts_on_reset(t->input_mounts);
+	retract_mounts_on_reset(t->output_mounts);
 }
 
 static struct list *vine_task_mount_list_copy(struct list *list)
@@ -555,7 +573,7 @@ int vine_task_add_environment(struct vine_task *t, struct vine_file *environment
 	}
 
 	char *env_name = string_format("__vine_env_%s", environment_file->cached_name);
-	vine_task_add_input(t, environment_file, env_name, 0);
+	vine_task_add_input(t, environment_file, env_name, VINE_MOUNT_SYMLINK);
 
 	char *new_cmd = string_format("%s/bin/run_in_env %s", env_name, t->command_line);
 	vine_task_set_command(t, new_cmd);
@@ -731,8 +749,11 @@ const char *vine_task_state_to_string(vine_task_state_t task_state)
 	const char *str;
 
 	switch (task_state) {
+	case VINE_TASK_INITIAL:
+		str = "INITIAL";
+		break;
 	case VINE_TASK_READY:
-		str = "WAITING";
+		str = "READY";
 		break;
 	case VINE_TASK_RUNNING:
 		str = "RUNNING";
@@ -746,10 +767,6 @@ const char *vine_task_state_to_string(vine_task_state_t task_state)
 	case VINE_TASK_DONE:
 		str = "DONE";
 		break;
-	case VINE_TASK_CANCELED:
-		str = "CANCELED";
-		break;
-	case VINE_TASK_UNKNOWN:
 	default:
 		str = "UNKNOWN";
 		break;
