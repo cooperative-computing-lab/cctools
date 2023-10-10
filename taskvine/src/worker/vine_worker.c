@@ -490,23 +490,16 @@ static void report_worker_ready(struct link *manager)
 	send_keepalive(manager, 1);
 }
 
-int start_function(struct vine_process *p)
+/* Send a message containing details of a function call to the relevant library to execute it. 
+ * @param p 	The relevant vine_process structure encapsulating a function call. 
+ * @return 		1 if the message is successfully sent to the library, 0 otherwise. */
+static int start_function(struct vine_process *p)
 {
-	uint64_t proc_id;
-	struct vine_process *proc;
-	ITABLE_ITERATE(procs_running, proc_id, proc)
-	{
-		if (proc->type == VINE_PROCESS_TYPE_LIBRARY && proc->library_ready &&
-				!strcmp(proc->task->provides_library, p->task->needs_library)) {
-			char *buffer = string_format("%d %s %s", p->task->task_id, p->task->command_line, p->sandbox);
-			link_printf(proc->library_write_link,
-					time(0) + active_timeout,
-					"%ld\n%s",
-					strlen(buffer),
-					buffer);
-			free(buffer);
-			break;
-		}
+	char *buffer = string_format("%d %s %s", p->task->task_id, p->task->command_line, p->sandbox);
+	ssize_t result = link_printf(p->library_process->library_write_link, time(0) + active_timeout, "%ld\n%s", strlen(buffer), buffer);
+	free(buffer);
+	if (result < 0) {
+		return 0;
 	}
 	return 1;
 }
@@ -522,6 +515,7 @@ static int start_process(struct vine_process *p, struct link *manager)
 	pid_t pid;
 
 	struct vine_task *t = p->task;
+	int ok = 1;
 
 	/* Create the sandbox environment for the task. */
 	if (!vine_sandbox_stagein(p, global_cache)) {
@@ -541,30 +535,36 @@ static int start_process(struct vine_process *p, struct link *manager)
 		vine_gpus_allocate(t->resources_requested->gpus, t->task_id);
 	}
 
-	/* Starting a function call is different from starting a standard task, so we return early. */
+	/* Starting a function call is different from starting a standard task, as a function call is not
+	 * launched through vine_process_exeute. */
 	if (t->needs_library) {
-		itable_insert(procs_running, p->task->task_id, p);
 		debug(D_VINE, "started function call %d: %s", p->task->task_id, p->task->command_line);
-		p->library_process->functions_running++;
-		return start_function(p);
+		ok = start_function(p);
+		if (ok) {
+			p->library_process->functions_running++;
+		}
+	}
+	else {
+		/* Now start the actual process. */
+		pid = vine_process_execute(p);
+		if (pid < 0)
+			fatal("unable to fork process for task_id %d!", p->task->task_id);
+
+		/* If this process represents a library, notify the manager that it is running.
+		 * Also set the sigchld flag so the worker will immediately check for the library
+		 * startup instead of sleeping and waiting for the manager. */
+		if (p->task->provides_library) {
+			send_message(manager, "info library-update %d %d\n", p->task->task_id, VINE_LIBRARY_STARTED);
+			sigchld_received_flag = 1;
+		}
 	}
 
-	/* Now start the actual process. */
-	pid = vine_process_execute(p);
-	if (pid < 0)
-		fatal("unable to fork process for task_id %d!", p->task->task_id);
-
-	/* If this process represents a library, notify the manager that it is running.
-	 * Also set the sigchld flag so the worker will immediately check for the library
-	 * startup instead of sleeping and waiting for the manager. */
-	if (p->task->provides_library) {
-		send_message(manager, "info library-update %d %d\n", p->task->task_id, VINE_LIBRARY_STARTED);
-		sigchld_received_flag = 1;
+	/* Only insert process to procs_running if everything runs fine. */
+	if (ok) {
+		itable_insert(procs_running, p->task->task_id, p);
 	}
 
-	itable_insert(procs_running, p->task->task_id, p);
-
-	return 1;
+	return ok;
 }
 
 /*
@@ -672,6 +672,38 @@ static void expire_procs_running()
 	}
 }
 
+/* Receive a message containing a function call id from the library and 
+ * reap the completed function call.
+ * @param p			The vine process encapsulating the function call.
+ * @param manager	The link to the manager.
+ * return 			1 if the operation succeeds, 0 otherwise. */
+static int reap_completed_function_call(struct vine_process* p, struct link* manager) 
+{			
+	char buffer[VINE_LINE_MAX]; // Buffer to store length of data from library.
+	int ok = 1;
+
+	/* read number of bytes of data first. */
+	ok = link_readline(p->library_read_link, buffer, VINE_LINE_MAX, time(0) + active_timeout);
+	if (!ok) {
+		return 0;
+	}
+	int len_buffer = atoi(buffer);
+
+	/* now read the buffer, which is the task id of the done function invocation. */
+	char buffer_data[len_buffer];
+	ok = link_read(p->library_read_link, buffer_data, len_buffer, time(0) + active_timeout);
+	if (ok <= 0) {
+		return 0;
+	}
+	uint64_t done_task_id = (uint64_t)strtoul(buffer_data, NULL, 10);
+	debug(D_VINE, "Received result for function %" PRIu64, done_task_id);
+
+	/* Reap the completed function call. */
+	struct vine_process* pp = (struct vine_process*) itable_lookup(procs_table, done_task_id);
+	reap_process(pp, manager);
+	return ok;	
+}
+
 /*
 Scan over all of the processes known by the worker,
 and if they have exited, move them into the procs_complete table
@@ -680,7 +712,7 @@ for later processing.
 
 static int handle_completed_tasks(struct link *manager)
 {
-	struct vine_process *p, *pp;
+	struct vine_process *p;
 	uint64_t task_id;
 
 	ITABLE_ITERATE(procs_running, task_id, p)
@@ -695,29 +727,16 @@ static int handle_completed_tasks(struct link *manager)
 		}
 		/* Check if the library has any function invocations done, noblock. */
 		if (p->library_ready) {
-			char buffer[VINE_LINE_MAX]; // Buffer to store data from library.
-			int local_timeout = 60;	    // Will try up to local_timeout to read data.
 			/* Retrieve all results. */
+			int result_retrieved = 0;
 			while (link_usleep(p->library_read_link, 0, 1, 0)) {
-				// read number of bytes of buffer first.
-				link_readline(p->library_read_link, buffer, VINE_LINE_MAX, time(0) + local_timeout);
-				int len_buffer = atoi(buffer);
-				memset(buffer, 0, VINE_LINE_MAX);
-
-				// now read the buffer, which is the task id of the done function invocation.
-				link_read(p->library_read_link, buffer, len_buffer, time(0) + 30);
-				uint64_t done_task_id = (uint64_t)strtoul(buffer, NULL, 10);
-				memset(buffer, 0, VINE_LINE_MAX);
-				debug(D_VINE, "Received result for function %lu", done_task_id);
-				itable_firstkey(procs_running);
-				ITABLE_ITERATE(procs_running, task_id, pp)
-				{
-					if (task_id == done_task_id) {
-						reap_process(pp, manager);
-						break;
-					}
+				result_retrieved = reap_completed_function_call(p, manager);
+				if (!result_retrieved) {
+					fatal("Cannot retrieve result for function call %d - %s", p->task->task_id, p->task->command_line);
 				}
-				/* Reset iterator in case the inner loop breaks. */
+			}
+			if (result_retrieved) {
+				/* Reset iterator in case a function call is reaped. */
 				itable_firstkey(procs_running);
 			}
 		}
