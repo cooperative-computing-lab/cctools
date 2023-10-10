@@ -17,11 +17,7 @@ The file [CREDITS](CREDITS) lists the many people that have contributed to the s
 
 The easiest way to install the binaries is via [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
 ```
-git clone git://github.com/cooperative-computing-lab/cctools.git cctools-src
-cd cctools-src
-unset PYTHONPATH
-conda env create -f environment.yml
-conda activate cctools-dev
+conda install -y -c conda-forge ndcctools
 ```
 
 ## Build From Source
@@ -29,14 +25,18 @@ conda activate cctools-dev
 To build from source and install in your home directory:
 
 ```
-./configure --prefix ${HOME}/cctools
+git clone git://github.com/cooperative-computing-lab/cctools.git cctools-src
+cd cctools-src
+unset PYTHONPATH
+conda env create -y -f environment.yml
+./configure --with-base-dir $CONDA_PREFIX --prefix $CONDA_PREFIX
 make
 make install
 ```
 
 Then run the executables out of your home directory like this:
 ```
-export PATH=$HOME/cctools/bin:$PATH
+export PATH=$HOME/cctools-src/bin:$PATH
 makeflow -v
 vine_status
 ```
