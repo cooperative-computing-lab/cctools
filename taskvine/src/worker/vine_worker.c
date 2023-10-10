@@ -490,13 +490,17 @@ static void report_worker_ready(struct link *manager)
 	send_keepalive(manager, 1);
 }
 
-/* Send a message containing details of a function call to the relevant library to execute it. 
- * @param p 	The relevant vine_process structure encapsulating a function call. 
+/* Send a message containing details of a function call to the relevant library to execute it.
+ * @param p 	The relevant vine_process structure encapsulating a function call.
  * @return 		1 if the message is successfully sent to the library, 0 otherwise. */
 static int start_function(struct vine_process *p)
 {
 	char *buffer = string_format("%d %s %s", p->task->task_id, p->task->command_line, p->sandbox);
-	ssize_t result = link_printf(p->library_process->library_write_link, time(0) + active_timeout, "%ld\n%s", strlen(buffer), buffer);
+	ssize_t result = link_printf(p->library_process->library_write_link,
+			time(0) + active_timeout,
+			"%ld\n%s",
+			strlen(buffer),
+			buffer);
 	free(buffer);
 	if (result < 0) {
 		return 0;
@@ -543,8 +547,7 @@ static int start_process(struct vine_process *p, struct link *manager)
 		if (ok) {
 			p->library_process->functions_running++;
 		}
-	}
-	else {
+	} else {
 		/* Now start the actual process. */
 		pid = vine_process_execute(p);
 		if (pid < 0)
@@ -672,13 +675,13 @@ static void expire_procs_running()
 	}
 }
 
-/* Receive a message containing a function call id from the library and 
+/* Receive a message containing a function call id from the library and
  * reap the completed function call.
  * @param p			The vine process encapsulating the function call.
  * @param manager	The link to the manager.
  * return 			1 if the operation succeeds, 0 otherwise. */
-static int reap_completed_function_call(struct vine_process* p, struct link* manager) 
-{			
+static int reap_completed_function_call(struct vine_process *p, struct link *manager)
+{
 	char buffer[VINE_LINE_MAX]; // Buffer to store length of data from library.
 	int ok = 1;
 
@@ -699,9 +702,9 @@ static int reap_completed_function_call(struct vine_process* p, struct link* man
 	debug(D_VINE, "Received result for function %" PRIu64, done_task_id);
 
 	/* Reap the completed function call. */
-	struct vine_process* pp = (struct vine_process*) itable_lookup(procs_table, done_task_id);
+	struct vine_process *pp = (struct vine_process *)itable_lookup(procs_table, done_task_id);
 	reap_process(pp, manager);
-	return ok;	
+	return ok;
 }
 
 /*
@@ -732,7 +735,9 @@ static int handle_completed_tasks(struct link *manager)
 			while (link_usleep(p->library_read_link, 0, 1, 0)) {
 				result_retrieved = reap_completed_function_call(p, manager);
 				if (!result_retrieved) {
-					fatal("Cannot retrieve result for function call %d - %s", p->task->task_id, p->task->command_line);
+					fatal("Cannot retrieve result for function call %d - %s",
+							p->task->task_id,
+							p->task->command_line);
 				}
 			}
 			if (result_retrieved) {
