@@ -1512,19 +1512,11 @@ function definitions into a library task `libtask`
     libtask = m.create_library_from_functions("my_library", my_sum, my_mul)
     ```
 
-The library task can be further described by any of options available
-to normal tasks, such as resources or additional input files. Additionally,
-you can specify the number of functions the library can run concurrently by
-setting the number of function slots (default to 1):
+You can optionally specify the number of functions the library can 
+run concurrently by setting the number of function slots (default to 1):
 
 === "Python"
     ```python
-    # regular options
-    libtask.set_cores(1)
-    libtask.set_memory(2000)
-    libtask.set_disk(2000)
-
-    # library-specific options
     libtask.set_function_slots(4)   # maximum 4 concurrent functions
     ```
 
