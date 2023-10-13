@@ -87,7 +87,6 @@ struct vine_process *vine_process_create(struct vine_task *task, vine_process_ty
 
 	const char *dirtype = vine_process_sandbox_code(p->type);
 
-	p->cache_dir = string_format("%s/cache", workspace);
 	p->sandbox = string_format("%s/%s.%d", workspace, dirtype, p->task->task_id);
 	p->tmpdir = string_format("%s/.taskvine.tmp", p->sandbox);
 	p->output_file_name = string_format("%s/.taskvine.stdout", p->sandbox);
@@ -126,9 +125,6 @@ void vine_process_delete(struct vine_process *p)
 
 	if (p->tmpdir)
 		free(p->tmpdir);
-
-	if (p->cache_dir)
-		free(p->cache_dir);
 
 	free(p);
 }

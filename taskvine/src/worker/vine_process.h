@@ -52,7 +52,6 @@ struct vine_process {
 	timestamp_t execution_start;
 	timestamp_t execution_end;
 
-       	char *cache_dir;
 	/* The private sandbox directory which will be the working directory. */
 	char *sandbox;
 
