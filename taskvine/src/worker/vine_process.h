@@ -33,34 +33,19 @@ This object is private to the vine_worker.
 */
 
 struct vine_process {
-	/* The basic type of the process, controlling how it is stopped and started. */
-	vine_process_type_t type;
+	vine_process_type_t type; /* The basic type of the process, */
+	pid_t pid;                /* If running, the Unix process ID. */
+	vine_result_t result;     /* If complete, the TaskVine result. */
+	int exit_code;            /* If successful, the Unix exit code. */
 
-	/* If running, the Unix process ID of this object. */
-	pid_t pid;
+	struct rusage rusage;        /* If complete, the resources consumed. */
+	timestamp_t execution_start; /* Start time in microseconds. */
+	timestamp_t execution_end;   /* Stop time in microseconds. */
 
-	/* If complete, the result of the process. */
-	vine_result_t result;
-
-	/* If result==VINE_RESULT_SUCCESS, the Unix exit code of the process, otherwise zero. */
-	int exit_code;
-
-	/* The resource usage of the process once complete. */
-	struct rusage rusage;
-
-	/* The time at which execution started and ended, in microseconds. */
-	timestamp_t execution_start;
-	timestamp_t execution_end;
-
-	/* The private sandbox directory which will be the working directory. */
-	char *sandbox;
-
-	/* A temporary directory within the sandbox, TMPDIR will point to this. */
-	char *tmpdir;
-
-	/* The file which will capture the standard output of the process. */
-	char *output_file_name;
-
+	char *sandbox;           /* The private sandbox directory to run in. */
+	char *tmpdir; 	         /* A temp dir inside the private sandbox. */
+	char *output_file_name;	 /* The intended standard output location. */
+	
 	/* If a normal task, the details of the task to execute. */
 	struct vine_task *task;
 
