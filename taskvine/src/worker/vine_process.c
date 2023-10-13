@@ -12,6 +12,7 @@ See the file COPYING for details.
 
 #include "vine_file.h"
 #include "vine_mount.h"
+#include "vine_worker.h"
 
 #include "change_process_title.h"
 #include "create_dir.h"
@@ -234,6 +235,25 @@ int vine_process_execute_and_wait(struct vine_process *p)
 	}
 }
 
+/* Send a message containing details of a function call to the relevant library to execute it.
+ * @param p 	The relevant vine_process structure encapsulating a function call.
+ * @return 		1 if the message is successfully sent to the library, 0 otherwise. */
+
+int vine_process_invoke_function( struct vine_process *p )
+{
+	char *buffer = string_format("%d %s %s", p->task->task_id, p->task->command_line, p->sandbox);
+	ssize_t result = link_printf(p->library_process->library_write_link,
+			time(0) + active_timeout,
+			"%ld\n%s",
+			strlen(buffer),
+			buffer);
+	free(buffer);
+	if (result < 0) {
+		return 0;
+	}
+	return 1;
+}
+
 /*
 Start a process executing and if successful, return true.
 Otherwise return false.
@@ -241,6 +261,11 @@ Otherwise return false.
 
 int vine_process_execute(struct vine_process *p)
 {
+	/* Special case: invoke function by sending message. */
+	if(p->type==VINE_PROCESS_TYPE_FUNCTION) {
+		return vine_process_invoke_function(p);
+	}
+	
 	/* Flush pending stdio buffers prior to forking process, to avoid stale output in child. */
 	fflush(NULL);
 
@@ -431,6 +456,49 @@ int vine_process_wait(struct vine_process *p)
 	}
 }
 
+/* Receive a message containing a function call id from the library.
+ * @param p			The vine process encapsulating the function call.
+ * @param done_task_id          Pointer to location to store completed task id.
+ * return 			1 if the operation succeeds, 0 otherwise.
+*/
+
+int vine_process_library_get_result( struct vine_process *p, uint64_t *done_task_id )
+{
+	char buffer[VINE_LINE_MAX]; // Buffer to store length of data from library.
+	int ok = 1;
+
+	/* read number of bytes of data first. */
+	ok = link_readline(p->library_read_link, buffer, VINE_LINE_MAX, time(0)+active_timeout);
+	if (!ok) {
+		return 0;
+	}
+	int len_buffer = atoi(buffer);
+
+	/* now read the buffer, which is the task id of the done function invocation. */
+	char buffer_data[len_buffer];
+	ok = link_read(p->library_read_link, buffer_data, len_buffer, time(0)+active_timeout);
+	if (ok <= 0) {
+		return 0;
+	}
+
+	*done_task_id = (uint64_t)strtoul(buffer_data, NULL, 10);
+	debug(D_VINE, "Received result for function %" PRIu64, *done_task_id);
+
+	return ok;
+}
+
+
+/* Check to see if a library process has a pending message to give us. */
+
+int vine_process_library_results_waiting( struct vine_process *p )
+{
+	if(p->type==VINE_PROCESS_TYPE_LIBRARY && p->library_ready) {
+		return link_usleep(p->library_read_link, 0, 1, 0);
+	} else {
+		return 0;
+	}
+}
+						
 /*
 Send a kill signal to a running process.
 Note that the process must still be waited-for to collect its final disposition.

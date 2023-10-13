@@ -10,5 +10,6 @@ void vine_worker_send_cache_update( struct link *manager, const char *cachename,
 void vine_worker_send_cache_invalid( struct link *manager, const char *cachename, const char *message );
 
 extern char *vine_worker_password;
+extern int active_timeout;
 
 #endif
