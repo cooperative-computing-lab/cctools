@@ -17,6 +17,8 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/resource.h>
 
+/* The basic type of the process, controlling how it is stopped and started. */
+
 typedef enum {
 	VINE_PROCESS_TYPE_STANDARD,   // standard task with command line
 	VINE_PROCESS_TYPE_LIBRARY,   // task providing serverless library
@@ -31,18 +33,33 @@ This object is private to the vine_worker.
 */
 
 struct vine_process {
+	/* The basic type of the process, controlling how it is stopped and started. */
 	vine_process_type_t type;
-	pid_t pid;
-	vine_result_t result;                // Any of VINE_RESULT_*
-	int exit_code;                 // Exit code, or signal number to task process.
 
+	/* If running, the Unix process ID of this object. */
+	pid_t pid;
+
+	/* If complete, the result of the process. */
+	vine_result_t result;
+
+	/* If result==VINE_RESULT_SUCCESS, the Unix exit code of the process, otherwise zero. */
+	int exit_code;
+
+	/* The resource usage of the process once complete. */
 	struct rusage rusage;
+
+	/* The time at which execution started and ended, in microseconds. */
 	timestamp_t execution_start;
 	timestamp_t execution_end;
 
-	char *cache_dir;
+       	char *cache_dir;
+	/* The private sandbox directory which will be the working directory. */
 	char *sandbox;
-	char *tmpdir;                   // TMPDIR per task, expected to be a subdir of sandbox.
+
+	/* A temporary directory within the sandbox, TMPDIR will point to this. */
+	char *tmpdir;
+
+	/* The file which will capture the standard output of the process. */
 	char *output_file_name;
 
 	/* If a normal task, the details of the task to execute. */
@@ -59,7 +76,7 @@ struct vine_process {
 	int functions_running;
 	
 	/* If this is a library process, whether the library is ready to execute functions. */
-    int library_ready;
+	int library_ready;
 
 	/* expected disk usage by the process. If no cache is used, it is the same as in task. */
 	int64_t disk;
