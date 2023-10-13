@@ -456,7 +456,7 @@ int vine_process_wait(struct vine_process *p)
 	}
 }
 
-/* Receive a message containing a function call id from the library.
+/* Receive a message containing a function call id from the library without blocking.
  * @param p			The vine process encapsulating the function call.
  * @param done_task_id          Pointer to location to store completed task id.
  * return 			1 if the operation succeeds, 0 otherwise.
@@ -464,6 +464,15 @@ int vine_process_wait(struct vine_process *p)
 
 int vine_process_library_get_result( struct vine_process *p, uint64_t *done_task_id )
 {
+	/* If this is not a library process, don't check. */
+	if(p->type!=VINE_PROCESS_TYPE_LIBRARY) return 0;
+
+	/* If the library is not initialized, don't check. */
+	if(!p->library_ready) return 0;
+	
+	/* If there is no data waiting on the link, don't check. */
+	if(!link_usleep(p->library_read_link, 0, 1, 0)) return 0;
+	
 	char buffer[VINE_LINE_MAX]; // Buffer to store length of data from library.
 	int ok = 1;
 
@@ -487,18 +496,6 @@ int vine_process_library_get_result( struct vine_process *p, uint64_t *done_task
 	return ok;
 }
 
-
-/* Check to see if a library process has a pending message to give us. */
-
-int vine_process_library_results_waiting( struct vine_process *p )
-{
-	if(p->type==VINE_PROCESS_TYPE_LIBRARY && p->library_ready) {
-		return link_usleep(p->library_read_link, 0, 1, 0);
-	} else {
-		return 0;
-	}
-}
-						
 /*
 Send a kill signal to a running process.
 Note that the process must still be waited-for to collect its final disposition.
