@@ -225,8 +225,7 @@ Execute a task synchronously and return true on success.
 
 int vine_process_execute_and_wait(struct vine_process *p)
 {
-	pid_t pid = vine_process_execute(p);
-	if (pid > 0) {
+	if (vine_process_execute(p)) {
 		vine_process_wait(p);
 		return 1;
 	} else {
@@ -236,11 +235,11 @@ int vine_process_execute_and_wait(struct vine_process *p)
 }
 
 /*
-Start a process executing and if successful, return its Unix pid.
-On failure, return negative value.
+Start a process executing and if successful, return true.
+Otherwise return false.
 */
 
-pid_t vine_process_execute(struct vine_process *p)
+int vine_process_execute(struct vine_process *p)
 {
 	/* Flush pending stdio buffers prior to forking process, to avoid stale output in child. */
 	fflush(NULL);
@@ -312,8 +311,8 @@ pid_t vine_process_execute(struct vine_process *p)
 			close(error_fd);
 		}
 
-		return p->pid;
-
+		return 1;
+		
 	} else if (p->pid < 0) {
 
 		debug(D_VINE, "couldn't create new process: %s\n", strerror(errno));
@@ -326,8 +325,8 @@ pid_t vine_process_execute(struct vine_process *p)
 		close(output_fd);
 		close(error_fd);
 
-		return -1;
-
+		return 0;
+		
 	} else {
 		if (chdir(p->sandbox)) {
 			printf("The sandbox dir is %s", p->sandbox);
@@ -388,9 +387,10 @@ pid_t vine_process_execute(struct vine_process *p)
 			execl("/bin/sh", "sh", "-c", final_command, (char *)0);
 		}
 		_exit(127); // Failed to execute the cmd.
-	}
 
-	return 0;
+		/* NOTREACHED */
+		return 0;
+	}
 }
 
 /*

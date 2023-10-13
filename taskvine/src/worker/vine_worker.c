@@ -516,8 +516,6 @@ Should maintain parallel structure to reap_process() above.
 
 static int start_process(struct vine_process *p, struct link *manager)
 {
-	pid_t pid;
-
 	struct vine_task *t = p->task;
 	int ok = 1;
 
@@ -549,8 +547,8 @@ static int start_process(struct vine_process *p, struct link *manager)
 		}
 	} else {
 		/* Now start the actual process. */
-		pid = vine_process_execute(p);
-		if (pid < 0)
+		int result = vine_process_execute(p);
+		if (!result)
 			fatal("unable to fork process for task_id %d!", p->task->task_id);
 
 		/* If this process represents a library, notify the manager that it is running.
