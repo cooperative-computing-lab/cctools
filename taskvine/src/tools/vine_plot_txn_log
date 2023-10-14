@@ -514,7 +514,7 @@ class TxnPlot:
     def bh(self, fig, slots, left, width, color, **kwargs):
         # bar plot with some defaults
         edge_color_default = "#000010"
-        edge_color_te_dask = "#92d180"
+        edge_color_te_dask = "#afdfa4"
         edge_color_cu_dask = "#ea4733"
 
         edge_color = edge_color_default
