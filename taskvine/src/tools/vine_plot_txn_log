@@ -425,7 +425,7 @@ class TxnPlot:
         # default legend
         self.legend = {
                 "workers lifetime": 'C9',
-                "tasks waiting at worker": 'C7',
+                "tasks waiting at worker": 'C7'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             ,
                 "tasks executing": 'C0',
                 "tasks lost on disconnection": 'lightcoral',
                 "results waiting retrieval": 'C8',
@@ -437,7 +437,7 @@ class TxnPlot:
         # dask legend
         self.legend_dask = {
                 "tasks executing": '#7fc86b',
-                "cache updates": '#f7ada7',
+                "cache updates": '#e3170050',  # ori  f7ada7
                 }
 
         self.display_plot()
@@ -513,9 +513,10 @@ class TxnPlot:
 
     def bh(self, fig, slots, left, width, color, **kwargs):
         # bar plot with some defaults
-        edge_color_default = "#000010"
-        edge_color_te_dask = "#afdfa4"
-        edge_color_cu_dask = "#ea4733"
+        edge_color_default = "#00000010"
+        edge_color_te_dask = "#afdfa4ff"
+        edge_color_cu_dask = "#cc1f12ff"
+        # ea4733
 
         edge_color = edge_color_default
         if 'type' in kwargs:
@@ -526,7 +527,7 @@ class TxnPlot:
                 edge_color = edge_color_te_dask
             kwargs.pop('type', None)
 
-        args = { "left": left, "width": width, "color": color, "linewidth": 0.8, "align": "edge", "edgecolor": edge_color }
+        args = { "left": left, "width": width, "color": color, "linewidth": 0.7, "align": "edge", "edgecolor": edge_color }
         args.update(kwargs)
 
         if not args["edgecolor"]:
@@ -711,11 +712,10 @@ class TxnPlotWorkers(TxnPlot):
     
     
     def plot_by_worker_dask(self, fig, worker_tasks, worker_times, worker_xfers, base_slot):
-
-        worker_tasks["slot"] += base_slot
+        worker_tasks["slot"] += (base_slot + 0.5)
         retrieved_tasks = worker_tasks[~worker_tasks["RETRIEVED"].isna()]
         cache_updates = worker_xfers[ worker_xfers["direction"] == "CACHE_UPDATE" ]
-        slot_height = 0.9
+        slot_height = 0.8
 
         # draw the red bar: cache updates
         self.bh(fig, base_slot, cache_updates["start_time"], cache_updates["wall_time"], 
@@ -730,7 +730,7 @@ class TxnPlotWorkers(TxnPlot):
                 self.legend_dask["tasks executing"], height=slot_height, type="te_dask")
         
         # determine the following starting slot for tasks in the next worker
-        return worker_tasks["slot"].max()
+        return worker_tasks["slot"].max() + 0.5
 
     def plot(self, fig, manager):
         tasks = manager.tasks
