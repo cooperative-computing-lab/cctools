@@ -434,9 +434,10 @@ class TxnPlot:
                 "inputs from manager": 'C3',
                 "outputs to manager": 'C5',
                 }
+
         # dask legend
         self.legend_dask = {
-                "tasks executing": '#7fc86b',
+                "tasks executing": '#7fc96aff',
                 "cache updates": '#e3170050',  # ori  f7ada7
                 }
 
@@ -552,7 +553,6 @@ class TxnPlot:
         ticks = sorted(list(set(ticks)))
         return ticks
 
-
     def display_plot(self):
         plt.title(self.opts.title)
 
@@ -572,7 +572,6 @@ class TxnPlot:
 
             self.plot(s, m)
             self.set_legend(s)
-
 
         if self.opts.output:
             plt.savefig(self.opts.output)
@@ -667,7 +666,6 @@ class TxnPlotTasks(TxnPlot):
         fig.set_ylabel("tasks")
         fig.set_yticks([0, len(dt.index)])
         fig.set_yticklabels(["1", str(len(dt.index)+1)])  # ytick number of workers
-
 
 
 class TxnPlotWorkers(TxnPlot):
@@ -825,7 +823,6 @@ class TxnStats(TxnPlot):
         print(f"Bytes created: {temps_size}")
         print("-----------------------------------------")
         print()
-
 
 
 if __name__ == "__main__":
