@@ -90,7 +90,7 @@ class Manager:
         try:
             tasks_df["measured_wall_time"] = tasks_df["time_worker_end"] - tasks_df["time_worker_start"]
         except KeyError:
-            print(f"No tasks that were found in the log for manager pid {self.pid}")
+            print(f"No tasks that finished were found in the log for manager pid {self.pid}")
             sys.exit(1)
         
         return self.assign_slots(tasks_df, expand_waiting)
@@ -418,14 +418,13 @@ class TxnPlot:
 
         height = opts.height if opts.height else opts.width * (2/3)
 
-
         self.fig = plt.figure(constrained_layout=True, figsize=(opts.width, height), dpi=opts.dpi)
         self.subs = self.fig.subplots(nrows=1, ncols=len(managers), squeeze=False)
 
         # default legend
-        self.legend = {
+        self.legend_cb = {
                 "workers lifetime": 'C9',
-                "tasks waiting at worker": 'C7'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             ,
+                "tasks waiting at worker": 'C7',
                 "tasks executing": 'C0',
                 "tasks lost on disconnection": 'lightcoral',
                 "results waiting retrieval": 'C8',
@@ -434,11 +433,16 @@ class TxnPlot:
                 "inputs from manager": 'C3',
                 "outputs to manager": 'C5',
                 }
+
         # dask legend
         self.legend_dask = {
-                "tasks executing": '#7fc86b',
-                "cache updates": '#e3170050',  # ori  f7ada7
+                "tasks executing": '#7fc96aff',
+                "data transfers": '#e3170050', 
                 }
+        
+        self.legend = self.legend_cb
+        if args.dask_colors:
+            self.legend = self.legend_dask
 
         self.display_plot()
 
@@ -512,11 +516,11 @@ class TxnPlot:
         return "{:.3g}{}".format(l, u)
 
     def bh(self, fig, slots, left, width, color, **kwargs):
-        # bar plot with some defaults
+        # default edgecolor for bars 
         edge_color_default = "#00000010"
+        # Dask edgecolors for bars
         edge_color_te_dask = "#afdfa4ff"
         edge_color_cu_dask = "#cc1f12ff"
-        # ea4733
 
         edge_color = edge_color_default
         if 'type' in kwargs:
@@ -527,7 +531,7 @@ class TxnPlot:
                 edge_color = edge_color_te_dask
             kwargs.pop('type', None)
 
-        args = { "left": left, "width": width, "color": color, "linewidth": 0.7, "align": "edge", "edgecolor": edge_color }
+        args = { "left": left, "width": width, "color": color, "linewidth": 0.5, "align": "edge", "edgecolor": edge_color }
         args.update(kwargs)
 
         if not args["edgecolor"]:
@@ -552,7 +556,6 @@ class TxnPlot:
         ticks = sorted(list(set(ticks)))
         return ticks
 
-
     def display_plot(self):
         plt.title(self.opts.title)
 
@@ -561,6 +564,7 @@ class TxnPlot:
 
             plot_origin = self.determine_origin(m)
             plot_end = self.determine_end(m)
+
             s.axis(xmin=plot_origin, xmax=plot_end)
 
             ticks = self.generate_ticks(plot_origin, plot_end)
@@ -573,7 +577,6 @@ class TxnPlot:
             self.plot(s, m)
             self.set_legend(s)
 
-
         if self.opts.output:
             plt.savefig(self.opts.output)
 
@@ -582,11 +585,10 @@ class TxnPlot:
 
     def set_legend(self, fig):
         if self.opts.legend != 'none':
-            if args.dask_colors:
-                handles = [mpl.patches.Patch(color=c, label=l) for l,c in self.legend_dask.items()]
-            else:
-                handles = [mpl.patches.Patch(color=c, label=l) for l,c in self.legend.items()]
-            fig.legend(loc=self.opts.legend, handles=handles)
+            handles = [mpl.patches.Patch(color=c, label=l) for l,c in self.legend.items()]
+
+            fontsize = args.fontsize
+            fig.legend(loc=self.opts.legend, handles=handles, fontsize=fontsize)
 
     def plot(self, fig, manager):
         return NotImplemented
@@ -669,7 +671,6 @@ class TxnPlotTasks(TxnPlot):
         fig.set_yticklabels(["1", str(len(dt.index)+1)])  # ytick number of workers
 
 
-
 class TxnPlotWorkers(TxnPlot):
 
     def plot_by_worker(self, fig, worker, worker_times, worker_xfers, base_slot):
@@ -712,25 +713,25 @@ class TxnPlotWorkers(TxnPlot):
     
     
     def plot_by_worker_dask(self, fig, worker_tasks, worker_times, worker_xfers, base_slot):
-        worker_tasks["slot"] += (base_slot + 0.5)
+        worker_tasks["slot"] += (base_slot + 0.2)
         retrieved_tasks = worker_tasks[~worker_tasks["RETRIEVED"].isna()]
         cache_updates = worker_xfers[ worker_xfers["direction"] == "CACHE_UPDATE" ]
-        slot_height = 0.8
+        slot_height = 1
 
-        # draw the red bar: cache updates
+        # plot the red bar: cache updates
         self.bh(fig, base_slot, cache_updates["start_time"], cache_updates["wall_time"], 
-                self.legend_dask["cache updates"], height=slot_height, type="cu_dask")
+                self.legend_dask["data transfers"], height=slot_height, type="cu_dask")
 
         # every following task's bar slot add 1
         worker_tasks["slot"] += 1
 
-        # draw the green bar: tasks executing
+        # plot the green bar: tasks executing
         self.bh(fig, retrieved_tasks["slot"], retrieved_tasks["time_worker_start"], 
                 retrieved_tasks["time_worker_end"] - retrieved_tasks["time_worker_start"], 
                 self.legend_dask["tasks executing"], height=slot_height, type="te_dask")
         
         # determine the following starting slot for tasks in the next worker
-        return worker_tasks["slot"].max() + 0.5
+        return worker_tasks["slot"].max() + 0.2
 
     def plot(self, fig, manager):
         tasks = manager.tasks
@@ -757,7 +758,7 @@ class TxnPlotWorkers(TxnPlot):
         fig.set_yticks((0, base_slot))
         fig.set_yticklabels(["0", str(grouped_tasks.ngroups)])  # ytick number of workers
 
-        if not self.opts.expand_waiting:
+        if not args.dask_colors and not self.opts.expand_waiting:
             del self.legend["tasks waiting at worker"]
 
 class TxnStats(TxnPlot):
@@ -827,7 +828,6 @@ class TxnStats(TxnPlot):
         print()
 
 
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(prog="vine_example_blast.py",
@@ -852,6 +852,7 @@ if __name__ == "__main__":
     parser.add_argument('--tex', action='store_true', help='use tex fonts')
     parser.add_argument('--nograph', action='store_true', help='do not show a matplotlib window')
     parser.add_argument('--dask-colors', action='store_true', help='color palette aligns with Dask\'s')
+    parser.add_argument('--fontsize', nargs='?', type=str, help='set fontsize of legend (default medium or 10)', default='medium')
 
     args = parser.parse_args()
 
