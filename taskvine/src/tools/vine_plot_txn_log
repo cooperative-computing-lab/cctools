@@ -418,7 +418,6 @@ class TxnPlot:
 
         height = opts.height if opts.height else opts.width * (2/3)
 
-
         self.fig = plt.figure(constrained_layout=True, figsize=(opts.width, height), dpi=opts.dpi)
         self.subs = self.fig.subplots(nrows=1, ncols=len(managers), squeeze=False)
 
@@ -588,9 +587,7 @@ class TxnPlot:
         if self.opts.legend != 'none':
             handles = [mpl.patches.Patch(color=c, label=l) for l,c in self.legend.items()]
 
-            fontsize = 'medium'
-            if args.fontsize:
-                fontsize = args.fontsize
+            fontsize = args.fontsize
             fig.legend(loc=self.opts.legend, handles=handles, fontsize=fontsize)
 
     def plot(self, fig, manager):
