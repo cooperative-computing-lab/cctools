@@ -18,9 +18,8 @@ even in successive workflows.
 
 - [**Work Queue**](work_queue/index.md) is a system and library for creating and
   managing scalable manager-worker style programs that scale up to thousands of
-  machines on clusters, clouds, and grids. Work Queue programs are easy to
-Python ([example](work_queue/examples/work_queue_example.py)|[api](api/html/namespacework__queue.html))
-Perl   ([example](work_queue/examples/work_queue_example.pl)|[api](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html)),
+  machines on clusters, clouds, and grids. Work Queue programs are easy to write in 
+Python ([example](work_queue/examples/work_queue_example.py)|[api](api/html/namespacendcctools_1_1work__queue.html))
 or C   ([example](work_queue/examples/work_queue_example.c)|[api](api/html/work__queue_8h.html))
 .
 
@@ -35,7 +34,7 @@ or C   ([example](work_queue/examples/work_queue_example.c)|[api](api/html/work_
   and can optionally enforce limits on each resource. The monitor can be
   compiled to a single executable that is easily deployed to track executable
   file, or it can be used as a library to track the execution of [Python
-  functions](api/html/namespaceresource__monitor.html).
+  functions](api/html/namespacendcctools_1_1resource__monitor.html).
 
 - [**Parrot**](parrot/index.md) is a transparent user-level virtual filesystem that
   allows any ordinary program to be attached to many different remote storage

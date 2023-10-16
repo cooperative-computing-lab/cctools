@@ -116,7 +116,7 @@ A manager program can be written in Python, Perl, or C.
 In each language, the underlying principles are the same, but there are some syntactic differences shown below.
 The full API documentation for each language is here:
 
-- [Work Queue Python API](../api/html/namespacework__queue.html)
+- [Work Queue Python API](../api/html/namespacendcctools_1_1work__queue.html)
 - [Work Queue Perl API](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueuePerl.html)
 - [Work Queue C API](../api/html/work__queue_8h.html)
 
