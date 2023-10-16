@@ -561,7 +561,7 @@ class TxnPlot:
 
             plot_origin = self.determine_origin(m)
             plot_end = self.determine_end(m)
-            
+
             s.axis(xmin=plot_origin, xmax=plot_end)
 
             ticks = self.generate_ticks(plot_origin, plot_end)
@@ -711,25 +711,25 @@ class TxnPlotWorkers(TxnPlot):
     
     
     def plot_by_worker_dask(self, fig, worker_tasks, worker_times, worker_xfers, base_slot):
-        worker_tasks["slot"] += (base_slot + 0.5)
+        worker_tasks["slot"] += (base_slot + 0.2)
         retrieved_tasks = worker_tasks[~worker_tasks["RETRIEVED"].isna()]
         cache_updates = worker_xfers[ worker_xfers["direction"] == "CACHE_UPDATE" ]
-        slot_height = 0.8
+        slot_height = 1
 
-        # draw the red bar: cache updates
+        # plot the red bar: cache updates
         self.bh(fig, base_slot, cache_updates["start_time"], cache_updates["wall_time"], 
                 self.legend_dask["cache updates"], height=slot_height, type="cu_dask")
 
         # every following task's bar slot add 1
         worker_tasks["slot"] += 1
 
-        # draw the green bar: tasks executing
+        # plot the green bar: tasks executing
         self.bh(fig, retrieved_tasks["slot"], retrieved_tasks["time_worker_start"], 
                 retrieved_tasks["time_worker_end"] - retrieved_tasks["time_worker_start"], 
                 self.legend_dask["tasks executing"], height=slot_height, type="te_dask")
         
         # determine the following starting slot for tasks in the next worker
-        return worker_tasks["slot"].max() + 0.5
+        return worker_tasks["slot"].max() + 0.2
 
     def plot(self, fig, manager):
         tasks = manager.tasks
