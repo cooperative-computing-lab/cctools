@@ -586,7 +586,11 @@ class TxnPlot:
                 handles = [mpl.patches.Patch(color=c, label=l) for l,c in self.legend_dask.items()]
             else:
                 handles = [mpl.patches.Patch(color=c, label=l) for l,c in self.legend.items()]
-            fig.legend(loc=self.opts.legend, handles=handles)
+
+            fontsize = 'medium'
+            if args.fontsize:
+                fontsize = args.fontsize
+            fig.legend(loc=self.opts.legend, handles=handles, fontsize=fontsize)
 
     def plot(self, fig, manager):
         return NotImplemented
@@ -850,6 +854,7 @@ if __name__ == "__main__":
     parser.add_argument('--tex', action='store_true', help='use tex fonts')
     parser.add_argument('--nograph', action='store_true', help='do not show a matplotlib window')
     parser.add_argument('--dask-colors', action='store_true', help='color palette aligns with Dask\'s')
+    parser.add_argument('--fontsize', nargs='?', type=str, help='set fontsize of legend (default medium or 10)', default='medium')
 
     args = parser.parse_args()
 
