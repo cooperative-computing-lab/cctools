@@ -90,7 +90,7 @@ class Manager:
         try:
             tasks_df["measured_wall_time"] = tasks_df["time_worker_end"] - tasks_df["time_worker_start"]
         except KeyError:
-            print(f"No tasks that were found in the log for manager pid {self.pid}")
+            print(f"No tasks that finished were found in the log for manager pid {self.pid}")
             sys.exit(1)
         
         return self.assign_slots(tasks_df, expand_waiting)
@@ -425,7 +425,7 @@ class TxnPlot:
         # default legend
         self.legend = {
                 "workers lifetime": 'C9',
-                "tasks waiting at worker": 'C7'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             ,
+                "tasks waiting at worker": 'C7',
                 "tasks executing": 'C0',
                 "tasks lost on disconnection": 'lightcoral',
                 "results waiting retrieval": 'C8',
@@ -528,7 +528,7 @@ class TxnPlot:
                 edge_color = edge_color_te_dask
             kwargs.pop('type', None)
 
-        args = { "left": left, "width": width, "color": color, "linewidth": 0.7, "align": "edge", "edgecolor": edge_color }
+        args = { "left": left, "width": width, "color": color, "linewidth": 0.5, "align": "edge", "edgecolor": edge_color }
         args.update(kwargs)
 
         if not args["edgecolor"]:
@@ -561,6 +561,7 @@ class TxnPlot:
 
             plot_origin = self.determine_origin(m)
             plot_end = self.determine_end(m)
+            
             s.axis(xmin=plot_origin, xmax=plot_end)
 
             ticks = self.generate_ticks(plot_origin, plot_end)
