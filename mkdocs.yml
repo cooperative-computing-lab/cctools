@@ -42,6 +42,10 @@ markdown_extensions:
     - pymdownx.snippets:
         base_path: doc/manuals
 
+validation:
+    nav:
+        omitted_files: ignore
+
 permalink: True
 
 docs_dir: doc/manuals
