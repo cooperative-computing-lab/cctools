@@ -517,11 +517,11 @@ class TxnPlot:
         return "{:.3g}{}".format(l, u)
 
     def bh(self, fig, slots, left, width, color, **kwargs):
-        # bar plot with some defaults
+        # default edgecolor for bars 
         edge_color_default = "#00000010"
+        # Dask edgecolors for bars
         edge_color_te_dask = "#afdfa4ff"
         edge_color_cu_dask = "#cc1f12ff"
-        # ea4733
 
         edge_color = edge_color_default
         if 'type' in kwargs:
