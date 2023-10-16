@@ -46,8 +46,6 @@ validation:
     nav:
         omitted_files: ignore
 
-permalink: True
-
 docs_dir: doc/manuals
 site_dir: doc/mkdocs-site
 
