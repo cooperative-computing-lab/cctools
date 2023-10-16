@@ -2,7 +2,7 @@
 
 The JX Workflow Language is a language for expressing workflows
 that allows for easy manipulations to the structure and
-partitioning of a workflow.  It makes use of the [JX expression language](../jx)
+partitioning of a workflow.  It makes use of the [JX expression language](../jx/index.md)
 to create concise and expressive structures.
 
 For example, you can specify 100 batch jobs compactly like this:
@@ -16,14 +16,14 @@ For example, you can specify 100 batch jobs compactly like this:
 
 ## Getting Started
 
-  * [JX Workflow Tutorial](jx-tutorial)  
+  * [JX Workflow Tutorial](jx-tutorial.md)
 
 ## Quick Reference
 
-  * [JX Workflow Quick Reference](jx-quick)  
-
+  * [JX Workflow Quick Reference](jx-quick.md)
+  
 ## Complete Reference
 
-  * [JX Workflow Reference](jx)
+  * [JX Workflow Reference](jx.md)
 
 

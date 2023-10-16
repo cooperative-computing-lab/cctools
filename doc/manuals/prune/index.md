@@ -21,7 +21,7 @@ chosen by a scientist rather than captured at the level of system calls.
 ### Installing Prune
 
 Prune is part of the [Cooperating Computing
-Tools](http://ccl.cse.nd.edu/software). Follow the [installation instructions](../install) to setup CCTools required for
+Tools](http://ccl.cse.nd.edu/software). Follow the [installation instructions](../install/index.md) to setup CCTools required for
 running Prune.
 
 
@@ -136,7 +136,7 @@ Export results: duration=0.000000 size=1883 file_cnt=2 task_cnt=3 temp_cnt=0 mor
 ## Prune Example Workflow: High Energy Physics (HEP)
 
 The Merge Sort example above did not specify an environment. A different
-workflow (involving High Energy Physics) uses [Umbrella](../umbrella) to
+workflow (involving High Energy Physics) uses [Umbrella](../umbrella/index.md) to
 specify and create the appropriate environment for individual workflow tasks:
 
 - Environment definition: [cms.umbrella](examples/hep/cms.umbrella)
@@ -165,7 +165,7 @@ $ python hep.py
 ## Prune Example Workflow: U.S. Census
 
 The U.S. Census workflow demonstrates the scalability of Prune by using [Work
-Queue](../work_queue/) to execute the workflow in a distributed manner, rather
+Queue](../work_queue/index.md) to execute the workflow in a distributed manner, rather
 than only executing with the local machine. The included census data is a
 small simulation of a real census, but could be applied to the real U.S.
 Censuses if available.
@@ -185,7 +185,7 @@ Work Queue manager:
 
 `condor_submit_workers -N prune_census_example 10`
 
-See the [Work Queue Manual](../work_queue) for more information on ways to
+See the [Work Queue Manual](../work_queue/index.md) for more information on ways to
 assign workers to execute tasks in the workflow.
 
 (The hep.wq.py script, in the hep example folder, runs the HEP workflow using

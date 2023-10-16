@@ -29,7 +29,7 @@ status page](http://ccl.cse.nd.edu/software/workqueue/status).
 
 There are a variety of ways to install Work Queue, depending on your local environment.
 In most cases, installing via `conda` is the easiest method.
-Please see our [full installation instructions](../install) for other options.
+Please see our [full installation instructions](../install/index.md) for other options.
 
 First, [Install Miniconda](https://docs.conda.io/en/latest/miniconda.html) if you haven't done so before.
 Then, open a terminal and install `ndcctools` like this:
@@ -605,7 +605,7 @@ if there are multiple managers. To help with this, a **project name** can be use
 Work Queue workers can then be started for their managers by providing
 the project name instead of a host an port number.
 
-The project name feature uses the [Catalog Server](../catalog) to maintain and track the
+The project name feature uses the [Catalog Server](../catalog/index.md) to maintain and track the
 project names of managers and their respective locations. It works as follows:
 the manager advertises its project name along with its hostname and port to the
 catalog server. Work Queue workers that are provided with the manager's project
@@ -661,7 +661,7 @@ Your job 153099 ("worker.sh") has been submitted
 ### Work Queue Status Display
 
 An additional benefit of using a project name is that you can
-now use the [work_queue_status](../man_pages/work_queue_status) command
+now use the [work_queue_status](../man_pages/work_queue_status.md) command
 to display the progress of your application.  This shows the name,
 location, and statistics of each application that reports itself to the
 catalog server.  (Note that this information is updated about once
@@ -2210,7 +2210,7 @@ change.
 
 ## Further Information
 
-For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
+For more information, please see [Getting Help](../help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
 ## Copyright
 
