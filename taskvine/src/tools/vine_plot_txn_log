@@ -586,9 +586,7 @@ class TxnPlot:
     def set_legend(self, fig):
         if self.opts.legend != 'none':
             handles = [mpl.patches.Patch(color=c, label=l) for l,c in self.legend.items()]
-
-            fontsize = args.fontsize
-            fig.legend(loc=self.opts.legend, handles=handles, fontsize=fontsize)
+            fig.legend(loc=self.opts.legend, handles=handles, fontsize=args.fontsize)
 
     def plot(self, fig, manager):
         return NotImplemented
@@ -734,29 +732,29 @@ class TxnPlotWorkers(TxnPlot):
         return worker_tasks["slot"].max() + 0.2
 
     def plot(self, fig, manager):
-        tasks = manager.tasks
-        transfers = manager.transfers
-        workers = manager.workers
+        ts = manager.tasks
+        xs = manager.transfers
+        ws = manager.workers
 
-        grouped_tasks = tasks.groupby("worker_id", sort=False)
-        grouped_tasks_dict = {worker_id: group  for (worker_id, group) in grouped_tasks}
-        grouped_workers = workers.groupby("worker_id")["CONNECTION"].min().sort_values().index
-        base_slot = 0
-        t=0
-        for worker_id in grouped_workers:
-            current_worker_tasks = grouped_tasks_dict.get(worker_id, None)
-            current_worker_times = workers[workers["worker_id"] == worker_id]
-            current_worker_transfers = transfers[transfers["worker_id"] == worker_id]
+        gs = ts.groupby("worker_id", sort=False)
+        by_min_connects = ws.groupby("worker_id")["CONNECTION"].min().sort_values().index
+        gsd = {wid: g  for (wid, g) in gs}
+
+        base_slot=0
+        for wid in by_min_connects:
+            worker = gsd.get(wid, None)
+            worker_times = ws[ws["worker_id"] == wid]
+            worker_xfers = xs[xs["worker_id"] == wid]
             
-            if current_worker_tasks is not None:
+            if worker is not None:
                 if args.dask_colors:
-                    base_slot = self.plot_by_worker_dask(fig, current_worker_tasks, current_worker_times, current_worker_transfers, base_slot)
+                    base_slot = self.plot_by_worker_dask(fig, worker, worker_times, worker_xfers, base_slot)
                 else:
-                    base_slot = self.plot_by_worker(fig, current_worker_tasks, current_worker_times, current_worker_transfers, base_slot)
+                    base_slot = self.plot_by_worker(fig, worker, worker_times, worker_xfers, base_slot)
 
         fig.set_ylabel("workers")
         fig.set_yticks((0, base_slot))
-        fig.set_yticklabels(["0", str(grouped_tasks.ngroups)])  # ytick number of workers
+        fig.set_yticklabels(["0", str(gs.ngroups)])  # ytick number of workers
 
         if not args.dask_colors and not self.opts.expand_waiting:
             del self.legend["tasks waiting at worker"]
@@ -852,7 +850,7 @@ if __name__ == "__main__":
     parser.add_argument('--tex', action='store_true', help='use tex fonts')
     parser.add_argument('--nograph', action='store_true', help='do not show a matplotlib window')
     parser.add_argument('--dask-colors', action='store_true', help='color palette aligns with Dask\'s')
-    parser.add_argument('--fontsize', nargs='?', type=str, help='set fontsize of legend (default medium or 10)', default='medium')
+    parser.add_argument('--fontsize', nargs='?', type=str, help='set fontsize of figure legend', default='medium')
 
     args = parser.parse_args()
 
