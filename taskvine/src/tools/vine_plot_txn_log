@@ -423,7 +423,7 @@ class TxnPlot:
         self.subs = self.fig.subplots(nrows=1, ncols=len(managers), squeeze=False)
 
         # default legend
-        self.legend = {
+        self.legend_cb = {
                 "workers lifetime": 'C9',
                 "tasks waiting at worker": 'C7',
                 "tasks executing": 'C0',
@@ -438,8 +438,12 @@ class TxnPlot:
         # dask legend
         self.legend_dask = {
                 "tasks executing": '#7fc96aff',
-                "cache updates": '#e3170050',  # ori  f7ada7
+                "data transfers": '#e3170050', 
                 }
+        
+        self.legend = self.legend_cb
+        if args.dask_colors:
+            self.legend = self.legend_dask
 
         self.display_plot()
 
@@ -582,10 +586,7 @@ class TxnPlot:
 
     def set_legend(self, fig):
         if self.opts.legend != 'none':
-            if args.dask_colors:
-                handles = [mpl.patches.Patch(color=c, label=l) for l,c in self.legend_dask.items()]
-            else:
-                handles = [mpl.patches.Patch(color=c, label=l) for l,c in self.legend.items()]
+            handles = [mpl.patches.Patch(color=c, label=l) for l,c in self.legend.items()]
 
             fontsize = 'medium'
             if args.fontsize:
@@ -722,7 +723,7 @@ class TxnPlotWorkers(TxnPlot):
 
         # plot the red bar: cache updates
         self.bh(fig, base_slot, cache_updates["start_time"], cache_updates["wall_time"], 
-                self.legend_dask["cache updates"], height=slot_height, type="cu_dask")
+                self.legend_dask["data transfers"], height=slot_height, type="cu_dask")
 
         # every following task's bar slot add 1
         worker_tasks["slot"] += 1
@@ -760,7 +761,7 @@ class TxnPlotWorkers(TxnPlot):
         fig.set_yticks((0, base_slot))
         fig.set_yticklabels(["0", str(grouped_tasks.ngroups)])  # ytick number of workers
 
-        if not self.opts.expand_waiting:
+        if not args.dask_colors and not self.opts.expand_waiting:
             del self.legend["tasks waiting at worker"]
 
 class TxnStats(TxnPlot):
