@@ -698,6 +698,11 @@ static int reap_completed_function_call(struct vine_process *p, struct link *man
 	if (ok <= 0) {
 		return 0;
 	}
+
+	/* null terminate the buffer before treating it as a string. */
+	buffer_data[ok] = 0;
+
+	/* parse out the taskid of the completed task */
 	uint64_t done_task_id = (uint64_t)strtoul(buffer_data, NULL, 10);
 	debug(D_VINE, "Received result for function %" PRIu64, done_task_id);
 
