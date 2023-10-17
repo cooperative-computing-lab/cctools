@@ -693,7 +693,7 @@ static int reap_completed_function_call(struct vine_process *p, struct link *man
 	int len_buffer = atoi(buffer);
 
 	/* now read the buffer, which is the task id of the done function invocation. */
-	char buffer_data[len_buffer];
+	char buffer_data[len_buffer+1];
 	ok = link_read(p->library_read_link, buffer_data, len_buffer, time(0) + active_timeout);
 	if (ok <= 0) {
 		return 0;
