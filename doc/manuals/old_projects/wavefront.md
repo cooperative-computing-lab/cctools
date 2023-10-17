@@ -47,7 +47,7 @@ mymachine.somewhere.edu 9123` in which 9123 is the default port for Work Queue
 applications. Work Queue provides convenient alternatives to launch many
 workers simultaneously for different batch systems (e.g. condor), which are
 explained in the section **Project names** in the [ Work Queue manual
-](../work_queue). Wavefront will check for a few error conditions, and then
+](../work_queue/index.md). Wavefront will check for a few error conditions, and then
 start to run, showing progress on the console like this: `# elapsed time :
 waiting jobs / running jobs / complete jobs (percent complete) 0 : 0 / 1 / 0
 (%0.00) 5 : 0 / 2 / 1 (%1.23) 10 : 0 / 3 / 3 (%3.70) 16 : 0 / 4 / 6 (%7.41) 21

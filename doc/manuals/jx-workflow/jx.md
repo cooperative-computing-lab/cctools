@@ -2,10 +2,10 @@
 
 ## Overview
 
-[Makeflow](../../makeflow) allows for workflows to be expressed in pure [JSON](http://json.org)
+[Makeflow](../makeflow/index.md) allows for workflows to be expressed in pure [JSON](http://json.org)
 or in an extended language known as JX which can be evaluated to produce pure
 JSON. This document provides the detailed reference for this language. If you
-are just getting started, see the [JX Tutorial](../jx-tutorial) before
+are just getting started, see the [JX Tutorial](jx-tutorial.md) before
 reading this reference manual.
 
 ## JSON Workflow Representation
@@ -180,7 +180,7 @@ Currently this is only used when submitting SLURM jobs.
 ## Computed Values
 
 To simplify the construction of complex workflows, you may also use any
-of the expressions and operators found in the [JX Expression Language](../jx)
+of the expressions and operators found in the [JX Expression Language](../jx/index.md)
 to compute JSON values at runtime.
 
 

@@ -12,7 +12,7 @@ reported should be considered just as an estimate (this is in contrast with
 direct methods, such as ptrace). It works on Linux, and it can be used in three ways:
 
 - Stand alone mode, directly calling the `resource_monitor` executable.
-- Activating the monitoring modes of [makeflow](../makeflow) and [work queue](../work_queue) applications.
+- Activating the monitoring modes of [makeflow](../makeflow/index.md) and [work queue](../work_queue/index.md) applications.
 - As a [python module](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceresource__monitor.html) to monitor single function evaluations.
 
 **resource_monitor** generates up to three log files: a JSON encoded summary
@@ -33,7 +33,7 @@ obtain a better estimate of the resources used.
 
 ### Installing
 
-See the [Installation Instructions](../install) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
+See the [Installation Instructions](../install/index.md) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
 
 
 ## Running resource_monitor
@@ -493,7 +493,7 @@ available to the calling environment.
 
 ## Further Information
 
-For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
+For more information, please see [Getting Help](../help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
 ## Copyright
 
