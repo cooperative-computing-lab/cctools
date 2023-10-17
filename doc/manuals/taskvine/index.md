@@ -559,7 +559,7 @@ if there are multiple managers. To help with this, a **project name** can be use
 TaskVine workers can then be started for their managers by providing
 the project name instead of a host an port number.
 
-The project name feature uses the [Catalog Server](../catalog) to maintain and track the
+The project name feature uses the [Catalog Server](../catalog/index.md) to maintain and track the
 project names of managers and their respective locations. It works as follows:
 the manager advertises its project name along with its hostname and port to the
 catalog server. TaskVine workers that are provided with the manager's project
@@ -610,7 +610,7 @@ Your job 153099 ("worker.sh") has been submitted
 ### TaskVine Online Status Display
 
 An additional benefit of using a project name is that you can
-now use the [vine_status](../man_pages/taskvine_status) command
+now use the [vine_status](../man_pages/vine_status.md) command
 to display the progress of your application.  This shows the name,
 location, and statistics of each application that reports itself to the
 catalog server.  (Note that this information is updated about once
@@ -2467,7 +2467,7 @@ The `compute` call above may receive the following keyword arguments:
 
 ### Further Information
 
-For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
+For more information, please see [Getting Help](../help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
 ### Copyright
 

@@ -11,7 +11,7 @@ grids, or any idle machines.
 AWE uses Work Queue, which is part of the Cooperating Computing Tools
 (CCTools) package, for dispatching jobs for execution on allocated resources.
 Documentation on downloading, installing, and using Work Queue can be found
-[here](../work_queue).
+[here](../work_queue/index.md).
 
 ## Software Requirements
 

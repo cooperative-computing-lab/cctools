@@ -54,7 +54,7 @@ catalog_query
 Use the `--where` option to show only records matching an expression. (The
 expression must be quoted to protect it from the shell.)  You may
 construct expressions using any combination of operators and values in
-the [JX Expression Language](../jx).
+the [JX Expression Language](../jx/index.md).
 
 For example, to show all records of catalog servers:
 
@@ -76,7 +76,7 @@ more `--output` options to select specific values to show.
 catalog_query --where 'type=="chirp"' --output name --output port --output cpus
 ```
 
-Again, you may construct complex output expressions using the [JX Expression Language](../jx):
+Again, you may construct complex output expressions using the [JX Expression Language](../jx/index.md):
 
 ```sh
 catalog_query --where 'type=="chirp"' --output '{"name": name, "port": port, "size": avail/1024.0 }'
@@ -196,11 +196,11 @@ commas, e.g. `$ chirp_server -u 'dopey,happy:9000,grumpy'`
 
 (Hint: If you want to ensure that your chirp and catalog servers run
 continuously and are automatically restarted after an upgrade, consider using
-[Watchdog](../watchdog).)
+[Watchdog](../watchdog/index.md).)
 
 ## Further Information
 
-For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
+For more information, please see [Getting Help](../help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
 ## Copyright
 

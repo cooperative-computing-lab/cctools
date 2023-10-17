@@ -28,7 +28,7 @@ storage access. Read on below for more details.
 
 ### Installing
 
-See the [Installation Instructions](../install) for the Cooperative Computing Tools package.  Then, Make sure to set your `PATH` appropriately.
+See the [Installation Instructions](../install/index.md) for the Cooperative Computing Tools package.  Then, Make sure to set your `PATH` appropriately.
 
 ### Running a Chirp Server
 
@@ -173,7 +173,7 @@ $ chirp_server -u -
 ```
 
 Alternatively, you may establish your own catalog server. See [Catalog
-Servers](../catalog) for details.
+Servers](../catalog/index.md) for details.
 
 ## Security
 
@@ -1172,7 +1172,7 @@ When debugging problems with Chirp and Parrot, we recommend selectively using
 ### Confuga
 
 Confuga is an active storage cluster file system harnessing Chirp. To learn
-more about it, please see the [Confuga manual](../confuga).
+more about it, please see the [Confuga manual](../confuga/index.md).
 
 
 
@@ -1184,7 +1184,7 @@ Please use the following citation for Chirp in a scientific publication:
 
 ## Further Information
 
-For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
+For more information, please see [Getting Help](../help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
 ## Copyright
 
