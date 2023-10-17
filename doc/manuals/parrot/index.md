@@ -48,7 +48,7 @@ our [forum](http://ccl.cse.nd.edu/community/forum) and bugs to our
 
 ### Installing
 
-See the [Installation Instructions](../install) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
+See the [Installation Instructions](../install/index.md) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
 
 ## Examples
 
@@ -114,7 +114,7 @@ currently supported services:
 /hdfs/namenode:port/path| Hadoop Distributed File System (HDFS)| [more info](http://hadoop.apache.org/common/docs/current/hdfs_user_guide.html) |
 /xrootd/host:port/path| XRootD/Scalla Distributed Storage System (xrootd)| [more info](http://project-arda-dev.web.cern.ch/project-arda- dev/xrootd/site/index.html) |
 /cvmfs/grid.cern.ch/path| CernVM-FS| [more info](http://cernvm.cern.ch/portal/filesystem) |
-/chirp/target.cs.wisc.edu/path| Chirp Storage System| included + [more info](../chirp)
+/chirp/target.cs.wisc.edu/path| Chirp Storage System| included + [more info](../chirp/index.md)
 
 The following protocols have been supported in the past, but are not currently
 in active use.
@@ -220,7 +220,7 @@ $ ls -la
 
 In general, Parrot gives better performance and usability with Chirp than with
 other protocols. You can read extensively about the Chirp server and protocol
-[in the Chirp manual](../chirp).
+[in the Chirp manual](../chirp/index.md).
 
 In addition, Parrot provides several custom command line tools, such as
 `parrot_getacl`, `parrot_setacl`, `parrot_lsalloc`, and `parrot_mkalloc`, that
@@ -634,7 +634,7 @@ additional advantages over plain HTTP:
 ### iRODS
 
 To use Parrot with [iRODS](http://www.irods.org), you must first follow the [special
-build instructions](../install).
+build instructions](../install/index.md).
 
 Then, use the `iinit` command to log into the desired iRODS service, and
 verify that you are connected with the `ils` command. If those work, then you
@@ -819,7 +819,7 @@ items in the current directory. Now, suppose that `MyFriend` wants to allow
 `Freddy` read access to the same directory. Simply edit the ACL file to read:
 `MyFriend rwlxa Freddy rl ` Identity boxing and ACLs are particularly useful
 when using distributed storage. You can read more about ACLs and identity
-boxing in the [Chirp](../chirp) manual.
+boxing in the [Chirp](../chirp/index.md) manual.
 
 ## 64-Bit Support
 
@@ -866,7 +866,7 @@ Douglas Thain and Miron Livny, [Parrot: An Application Environment for Data-Inte
 
 ## Further Information
 
-For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
+For more information, please see [Getting Help](../help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
 ## Copyright
 

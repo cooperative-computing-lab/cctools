@@ -26,11 +26,11 @@ fetch(url).select(type=="wq_master").select(tasks_submitted>100).project([name,t
 
 Read about the full details here:
 
-- [JX Expression Language Reference](reference)
-- [JX REPL Tool](repl)
+- [JX Expression Language Reference](reference.md)
+- [JX REPL Tool](repl.md)
 
 JX is used as the basic language underlying these tools and systems:
 
-- [JX Workflow Language](../jx-workflow)
-- [Catalog Server Queries](../catalog)
-- [DeltaDB Time Series Database](../man_pages/deltadb_query)
+- [JX Workflow Language](../jx-workflow/index.md)
+- [Catalog Server Queries](../catalog/index.md)
+- [DeltaDB Time Series Database](../man_pages/deltadb_query.md)

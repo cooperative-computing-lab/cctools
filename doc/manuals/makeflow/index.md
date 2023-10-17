@@ -36,7 +36,7 @@ System Support section.
 
 ### Installing
 
-See the [Installation Instructions](../install) for the Cooperative Computing Tools package.  Then, Make sure to set your `PATH` appropriately.
+See the [Installation Instructions](../install/index.md) for the Cooperative Computing Tools package.  Then, Make sure to set your `PATH` appropriately.
 
 ### Basic Usage
 
@@ -150,7 +150,7 @@ using JX:
 You can use the JX language with Makeflow by simply using
 the `--jx` argument to any invocation. For example: `makeflow --jx example.jx -T condor`
 
-Learn more about JX [here](../jx-workflow).
+Learn more about JX [here](../jx-workflow/index.md).
 
 
 ### Resources
@@ -198,7 +198,7 @@ $ makeflow_graph_log example.makeflow.makeflowlog example.png
     [Visualization](#visualization).
 
 In addition, if you give the workflow a "project name" with the `-N` option,
-it will report its status to the [catalog server](../catalog) once per
+it will report its status to the [catalog server](../catalog/index.md) once per
 minute. The `makeflow_status` command will query the catalog and summarize
 your currently running workloads, like this:
 
@@ -629,7 +629,7 @@ $ makeflow_lambda_cleanup my.config
 ### Generic Cluster Submission
 
 For clusters that are not directly supported by Makeflow we strongly suggest
-using the [TaskVine](../taskvine) system and
+using the [TaskVine](../taskvine/index.md) system and
 submitting workers via the cluster's normal submission mechanism.
 
 However, if you have a system similar to Torque, SGE, or PBS which submits
@@ -667,7 +667,7 @@ take 30 seconds or more for the batch system to start an individual job. If
 common files are needed by each job, they may end up being transferred to the
 same node multiple times.
 
-To get around these limitations, we provide the [TaskVine](../taskvine) system.
+To get around these limitations, we provide the [TaskVine](../taskvine/index.md) system.
 The basic idea is
 to submit a number of persistent "worker" processes to an existing batch
 system. Makeflow communicates directly with the workers to quickly dispatch
@@ -715,7 +715,7 @@ will automatically exit.
 
 Note that `vine_submit_workers` is a simple shell script,
 so you can edit it directly if you would like to change batch
-options or other details. Please refer to the [TaskVine manual ](../taskvine) for more details.
+options or other details. Please refer to the [TaskVine manual ](../taskvine/index.md) for more details.
 
 ### Port Numbers
 
@@ -769,7 +769,7 @@ Server address are taken from the environment variables **CATALOG_HOST** and
 `catalog.cse.nd.edu,backup-catalog.cse.nd.edu` and port `9097` will be used.
 
 It is also easy to run your own catalog server, if you prefer. For more
-details, see the [Catalog Server Manual](../catalog).
+details, see the [Catalog Server Manual](../catalog/index.md).
 
 ### Setting a Password
 
@@ -1516,7 +1516,7 @@ Each file state line records the state change and time:
 
 ## Further Information
 
-For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
+For more information, please see [Getting Help](../help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
 ## Copyright
 

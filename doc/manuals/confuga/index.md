@@ -18,16 +18,16 @@ head node.
 
 A Confuga cluster can be setup as an ordinary user or maintained as a dedicated
 service within the cluster. The head node and storage nodes run the
-[Chirp](../chirp) file system service. Users may interact with Confuga using
-Chirp's client toolset [chirp(1)](../chirp), [Parrot](../parrot), or
-[Makeflow](../makeflow).
+[Chirp](../chirp/index.md) file system service. Users may interact with Confuga using
+Chirp's client toolset [chirp(1)](../chirp/index.md), [Parrot](../parrot/index.md), or
+[Makeflow](../makeflow/index.md).
 
 Confuga manages the details of scheduling and executing jobs for you. However,
 it does not concern itself with job ordering; it appears as a simple batch
 execution platform. We recommend using a high-level workflow execution system
-like [Makeflow](../makeflow) to manage your workflow and to handle the
+like [Makeflow](../makeflow/index.md) to manage your workflow and to handle the
 details of submitting jobs. However, you can also program job submmission
-directly using the [Chirp job protocol](../chirp#job-execution-on-chirp).
+directly using the [Chirp job protocol](../chirp/index.md#job-execution-on-chirp).
 
 Confuga is designed to exploit the unique parameters and characteristics of
 POSIX scientific workflows. Jobs are single task POSIX applications that are
@@ -35,7 +35,7 @@ expressed with all input files and all output files. Confuga uses this
 restricted job specification to achieve performance and to control load within
 the cluster.
 
-To get started using Confuga, please begin by [installing CCTools](../install)
+To get started using Confuga, please begin by [installing CCTools](../install/index.md)
 on your system. When you are ready, proceed with the Getting Started section
 below.
 
@@ -45,7 +45,7 @@ There are three services you need to start to get an operational cluster:
 
   * **The Storage Nodes (1 or more).** You must start a number of storage nodes which host data and execute jobs, all managed by Confuga. Each storage node is a Chirp server. Each storage node is added to the list of nodes passed to the Confuga head node.
   * **The Confuga Head Node.** This is naturally the core service for the cluster. It manages the storage nodes, distributing data and jobs.
-  * **The Catalog Server (Optional).** The catalog server keeps track of operational storage nodes. It functions as a heartbeat listener for the Confuga head node. This service is optional because you may use the default catalog server managed by the Cooperative Computing Lab. Or you can start your own. See [Catalog Servers](../catalog) for details.
+  * **The Catalog Server (Optional).** The catalog server keeps track of operational storage nodes. It functions as a heartbeat listener for the Confuga head node. This service is optional because you may use the default catalog server managed by the Cooperative Computing Lab. Or you can start your own. See [Catalog Servers](../catalog/index.md) for details.
 
 ### Running a Test Cluster
 
@@ -115,7 +115,7 @@ chirp *.*.*.* 9000 batrick     6.0.0  163.1 GB  112.4 GB
 
 ### Running a Workflow
 
-In another terminal, we can run the [standard Makeflow example](../makeflow)
+In another terminal, we can run the [standard Makeflow example](../makeflow/index.md)
 against the cluster to confirm everything works:
 
 [example.makeflow](example.makeflow)
@@ -181,7 +181,7 @@ $ chirp localhost:9000 get /capitol.montage.gif
 $ display ./capitol.montage.gif
 ```
 
-You can also achieve the same thing using [Parrot](../parrot):
+You can also achieve the same thing using [Parrot](../parrot/index.md):
 
 ```sh
 $ parrot_run display /chirp/localhost:9000/capitol.montage.gif
@@ -206,7 +206,7 @@ These options are also suggested but not required:
   * Project name for the cluster (`--project-name=foo`).
 
 You must also ensure that the storage nodes and the Confuga head node are
-using the same [catalog_server](../catalog). By default, this
+using the same [catalog_server](../catalog/index.md). By default, this
 should be the case.
 
 ### Confuga Options
@@ -235,7 +235,7 @@ complete and up-to-date listing of Confuga's options.
 
 To execute jobs on Confuga, you must first place all of the jobs data
 requirements, including the executable itself, within Confuga. This can be
-done using Chirp's client toolset [chirp](../chirp), and [parrot](../parrot).
+done using Chirp's client toolset [chirp](../chirp/index.md), and [parrot](../parrot/index.md).
 
 Once data is located on Confuga, you may begin executing jobs. Normally, you
 will construct a workflow that executes within a **workflow namespace** within
@@ -272,7 +272,7 @@ $ makeflow -T chirp --working-dir=chirp://confuga.name.org /users/me/workflow
 
 ### Protocol
 
-Jobs are executed using the [Chirp job protocol](../chirp#job-execution-on-chirp). No special
+Jobs are executed using the [Chirp job protocol](../chirp/index.md#job-execution-on-chirp). No special
 modifications are required to submit jobs to Confuga. We recommend using the
 Makeflow workflow manager but you may also program your own jobs using this
 protocol if so desired.
@@ -288,7 +288,7 @@ authentication.
 
 The head node is accessed by clients just like a regular Chirp server.
 Therefore, you authenticate with Confuga in the [same way as
-Chirp](../chirp#security). You may enable authentication
+Chirp](../chirp/index.md#security). You may enable authentication
 mechanisms on the head node using the `--auth` switch, documented in
 [chirp_server(1)](../man_pages/chirp_server.md).
 
@@ -298,7 +298,7 @@ authenticate with its storage nodes.
 
 Lastly, Confuga handles the details of storage node to storage node
 authentication. This is done using Chirp's [ticket authentication
-mechanism.](../chirp#ticket-authentication) You as a user do not need to
+mechanism.](../chirp/index.md#ticket-authentication) You as a user do not need to
 do anything special to get this working beyond enabling ticket authentication (`--auth=ticket`) on
 each storage node.
 
@@ -307,7 +307,7 @@ each storage node.
 Confuga offers the same strong authorization system as Chirp. This includes
 per-directory access control lists (ACL). For information on authorization
 controls in Chirp, please see the [Authorization
-section](../chirp#security) in the Chirp manual.
+section](../chirp/index.md#security) in the Chirp manual.
 
 ## Debugging
 
@@ -333,7 +333,7 @@ $ makeflow --batch-type=chirp \
 ### AFS
 
 Storage nodes used by Confuga must [not use AFS as their backing
-storage](../chirp#chirp-jobs-on-afs). Confuga requires use of the Chirp job `LINK`
+storage](../chirp/index.md#chirp-jobs-on-afs). Confuga requires use of the Chirp job `LINK`
 file binding. For this reason, it cannot use Chirp servers running with
 `--root` on AFS.
 

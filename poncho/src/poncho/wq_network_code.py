@@ -48,6 +48,7 @@ def wq_network_code():
                 "port": s.getsockname()[1],
                 }
         send_configuration(config)
+        abs_working_dir = os.getcwd()
         while True:
             s.listen()
             conn, addr = s.accept()
@@ -72,7 +73,7 @@ def wq_network_code():
                         event = json.loads(event_str)
                         # see if the user specified an execution method
                         exec_method = event.get("remote_task_exec_method", None)
-                        os.chdir(f"t.{task_id}")
+                        os.chdir(os.path.join(abs_working_dir, f't.{task_id}'))
                         if exec_method == "direct":
                             response = json.dumps(globals()[function_name](event)).encode("utf-8")
                         else:
@@ -102,8 +103,20 @@ def wq_network_code():
                         conn.sendall(size_msg.encode('utf-8'))
                         # send response
                         conn.sendall(response)
-                        os.chdir("..")
                         break
                 except Exception as e:
                     print("Network function encountered exception ", str(e), file=sys.stderr)
+                    response = {
+                        'Result': f'network function encountered exception {e}',
+                        'Status Code': 500
+                    }
+                    response = json.dumps(response).encode('utf-8')
+                    response_size = len(response)
+                    size_msg = "{}\n".format(response_size)
+                    # send the size of response
+                    conn.sendall(size_msg.encode('utf-8'))
+                    # send response
+                    conn.sendall(response)
+                finally:
+                    os.chdir(abs_working_dir)
         return 0
