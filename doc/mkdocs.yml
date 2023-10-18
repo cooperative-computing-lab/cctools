@@ -1,3 +1,5 @@
+# mkdocs configuration file for building the manual for readthedocs
+
 site_name: CCTools Documentation
 site_url: https://cctools.readthedocs.io/en/latest
 site_author: Cooperative Computing Lab at the University of Notre Dame
@@ -40,13 +42,13 @@ markdown_extensions:
     - pymdownx.tabbed:
     - pymdownx.superfences:
     - pymdownx.snippets:
-        base_path: doc/manuals
+        base_path: manuals
 
 validation:
     nav:
         omitted_files: ignore
 
-docs_dir: doc/manuals
-site_dir: doc/mkdocs-site
+docs_dir: manuals
+site_dir: mkdocs-site
 
 theme: readthedocs
