@@ -11,7 +11,7 @@ apipages: manuals/api/html/index.html
 
 manuals/api/html/index.html:
 	mkdir -p manuals/api/html
-	doxygen cctools.doxygen.config
+	doxygen api/cctools.doxygen.config
 
 manuals/api/html/work_queue_perl.html:
 	mkdir -p manuals/api/html
