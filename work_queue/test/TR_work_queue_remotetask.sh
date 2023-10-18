@@ -30,9 +30,8 @@ prepare()
 
 run()
 {
-    # ${PONCHO_PACKAGE_SERVERIZE} --src wq_remote_task.py --function add --function multiply --dest serverless_function.py
-
-    # wait_for_file_creation serverless_function.py 5
+	${PONCHO_PACKAGE_SERVERIZE} --src wq_remote_task.py --function add --function multiply --function kwargs_test --function no_arguments_test --function exception_test --dest serverless_function.py --version work_queue
+    wait_for_file_creation serverless_function.py 5
 
     chmod +x serverless_function.py
 
