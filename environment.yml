@@ -3,7 +3,7 @@ name: cctools-dev
 channels:
  - conda-forge
 dependencies:
- - python=3             # recuired for build
+ - python=3             # required for build
  - gcc_linux-64         # required for build
  - gxx_linux-64         # required for build
  - make                 # required for build
