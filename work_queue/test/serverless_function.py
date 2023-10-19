@@ -1,23 +1,13 @@
 #! /usr/bin/env python3
 
 import sys, json
+import ndcctools.work_queue as wq
 import socket
 import json
 import os
 import sys
-import threading
-import queue
-
-import socket
-import json
-import os
-import sys
-import threading
-import queue
 def remote_execute(func):
-    def remote_wrapper(event, q=None):
-        if q:
-            event = json.loads(event)
+    def remote_wrapper(event):
         kwargs = event["fn_kwargs"]
         args = event["fn_args"]
         try:
@@ -26,16 +16,14 @@ def remote_execute(func):
                 "StatusCode": 200
             }
         except Exception as e:
-            response = { 
+            response = {
                 "Result": str(e),
-                "StatusCode": 500 
+                "StatusCode": 500
             }
-        if not q:
-            return response
-        q.put(response)
+        return response
     return remote_wrapper
-    
-read, write = os.pipe() 
+
+read, write = os.pipe()
 def send_configuration(config):
     config_string = json.dumps(config)
     config_cmd = f"{len(config_string) + 1}\n{config_string}\n"
@@ -48,14 +36,15 @@ def main():
         s.bind(('localhost', 0))
     except Exception as e:
         s.close()
-        print(e)
-        exit(1)
+        print(e, file=sys.stderr)
+        sys.exit(1)
     # information to print to stdout for worker
     config = {
             "name": name(),
             "port": s.getsockname()[1],
             }
     send_configuration(config)
+    abs_working_dir = os.getcwd()
     while True:
         s.listen()
         conn, addr = s.accept()
@@ -80,50 +69,57 @@ def main():
                     event = json.loads(event_str)
                     # see if the user specified an execution method
                     exec_method = event.get("remote_task_exec_method", None)
-                    print('Network function: recieved event: {}'.format(event), file=sys.stderr)
-                    os.chdir(f"t.{task_id}")
-                    if exec_method == "thread":
-                        # create a forked process for function handler
-                        q = queue.Queue()
-                        p = threading.Thread(target=globals()[function_name], args=(event_str, q))
-                        p.start()
-                        p.join()
-                        response = json.dumps(q.get()).encode("utf-8")
-                    elif exec_method == "direct":
+                    os.chdir(os.path.join(abs_working_dir, f't.{task_id}'))
+                    if exec_method == "direct":
                         response = json.dumps(globals()[function_name](event)).encode("utf-8")
                     else:
                         p = os.fork()
                         if p == 0:
                             response =globals()[function_name](event)
                             os.write(write, json.dumps(response).encode("utf-8"))
-                            os._exit(-1)
+                            os._exit(0)
                         elif p < 0:
-                            print('Network function: unable to fork', file=sys.stderr)
-                            response = { 
+                            print(f'Network function: unable to fork to execute {function_name}', file=sys.stderr)
+                            response = {
                                 "Result": "unable to fork",
-                                "StatusCode": 500 
+                                "StatusCode": 500
                             }
                         else:
-                            chunk = os.read(read, 65536).decode("utf-8")
+                            max_read = 65536
+                            chunk = os.read(read, max_read).decode("utf-8")
                             all_chunks = [chunk]
-                            while (len(chunk) >= 65536):
-                                chunk = os.read(read, 65536).decode("utf-8")
+                            while (len(chunk) >= max_read):
+                                chunk = os.read(read, max_read).decode("utf-8")
                                 all_chunks.append(chunk)
                             response = "".join(all_chunks).encode("utf-8")
-                            os.waitid(os.P_PID, p, os.WEXITED)
+                            os.waitpid(p, 0)
                     response_size = len(response)
                     size_msg = "{}\n".format(response_size)
                     # send the size of response
                     conn.sendall(size_msg.encode('utf-8'))
                     # send response
                     conn.sendall(response)
-                    os.chdir("..")
                     break
             except Exception as e:
                 print("Network function encountered exception ", str(e), file=sys.stderr)
+                response = {
+                    'Result': f'network function encountered exception {e}',
+                    'Status Code': 500
+                }
+                response = json.dumps(response).encode('utf-8')
+                response_size = len(response)
+                size_msg = "{}\n".format(response_size)
+                # send the size of response
+                conn.sendall(size_msg.encode('utf-8'))
+                # send response
+                conn.sendall(response)
+            finally:
+                os.chdir(abs_working_dir)
     return 0
 def name():
-    return 'my_coprocess'
+	return "my_coprocess"
+
+
 @remote_execute
 def add(x, y):
     return x + y
@@ -138,8 +134,7 @@ def no_arguments_test(a, b, c):
     return a + b + c
 @remote_execute
 def exception_test():
-    raise Exception('I will raise an exception')
+    raise Exception('I am a bad funtion')
 if __name__ == "__main__":
 	main()
 
-# vim: set sts=4 sw=4 ts=4 expandtab ft=python:
