@@ -484,12 +484,15 @@ int vine_process_library_get_result( struct vine_process *p, uint64_t *done_task
 	int len_buffer = atoi(buffer);
 
 	/* now read the buffer, which is the task id of the done function invocation. */
-	char buffer_data[len_buffer];
+	char buffer_data[len_buffer+1];
 	ok = link_read(p->library_read_link, buffer_data, len_buffer, time(0)+active_timeout);
 	if (ok <= 0) {
 		return 0;
 	}
 
+	/* null terminate the buffer before treating it as a string. */
+        buffer_data[ok] = 0;
+	
 	*done_task_id = (uint64_t)strtoul(buffer_data, NULL, 10);
 	debug(D_VINE, "Received result for function %" PRIu64, *done_task_id);
 
