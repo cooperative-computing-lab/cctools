@@ -250,10 +250,10 @@ int vine_process_invoke_function( struct vine_process *p )
 	free(buffer);
 
 	if (result < 0) {	
-		debug(D_VINE, "failed to communicate with library '%s' task %d", p->library_process->pid);
+		debug(D_VINE, "failed to communicate with library '%s' task %d", p->task->needs_library, p->library_process->pid);
 		return 0;
 	} else {	
-		debug(D_VINE, "started task %d as function call '%s' to library '%s' task %d", p->task->task_id, p->task->command_line->needs_library, p->library_process->pid);
+		debug(D_VINE, "started task %d as function call '%s' to library '%s' task %d", p->task->task_id, p->task->command_line, p->task->needs_library, p->library_process->pid);
 		return 1;
 	}
 }
@@ -430,7 +430,7 @@ Returns true if complete, false otherwise.
 int vine_process_is_complete(struct vine_process *p)
 {
 	/* A function call doesn't have a Unix process to check. */
-	if(p->type==VINE_PROCESS_FUNCTION) {
+	if(p->type==VINE_PROCESS_TYPE_FUNCTION) {
 		return 0;
 	}
 
@@ -452,6 +452,11 @@ Return true if the process was found, false otherwise,
 
 int vine_process_wait(struct vine_process *p)
 {
+	/* A function call cannot be waited for directly. */
+	if(p->type==VINE_PROCESS_TYPE_FUNCTION) {
+		return 0;
+	}
+	
 	while (1) {
 		int status;
 		pid_t pid = waitpid(p->pid, &status, 0);
@@ -516,6 +521,12 @@ Note that the process must still be waited-for to collect its final disposition.
 
 void vine_process_kill(struct vine_process *p)
 {
+	/* XXX A function call cannot (yet) be killed directly. */
+	/* This could be implemented by sending a message to the library process. */
+	if(p->type==VINE_PROCESS_TYPE_FUNCTION) {
+		return;
+	}
+	
 	// make sure a few seconds have passed since child process was created to avoid sending a signal
 	// before it has been fully initialized. Else, the signal sent to that process gets lost.
 	timestamp_t elapsed_time_execution_start = timestamp_get() - p->execution_start;
