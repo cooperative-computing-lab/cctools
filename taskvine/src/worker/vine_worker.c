@@ -1637,7 +1637,9 @@ static int workspace_check()
 
 		if (WIFEXITED(exit_status) && WEXITSTATUS(exit_status) == 126) {
 			/* Note that we do not set status=1 on 126, as the executables may live ouside workspace. */
-			warn(D_NOTICE, "Could not execute a test script in the workspace directory '%s'.", vine_workspace_dir);
+			warn(D_NOTICE,
+					"Could not execute a test script in the workspace directory '%s'.",
+					vine_workspace_dir);
 			warn(D_NOTICE, "Is the filesystem mounted as 'noexec'?\n");
 			warn(D_NOTICE, "Unless the task command is an absolute path, the task will fail with exit status 126.\n");
 		} else if (!WIFEXITED(exit_status) || WEXITSTATUS(exit_status) != 0) {
