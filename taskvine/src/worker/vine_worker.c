@@ -81,25 +81,25 @@ See the file COPYING for details.
 /***************************************************************/
 
 /* The workspace is the top level directory under which all worker state is stored. */
-char *workspace;
+char *vine_workspace_dir;
 
-// Table of all processes in any state, indexed by task_id.
-// Processes should be created/deleted when added/removed from this table.
+/* Table of all processes in any state, indexed by task_id. */
+/* Processes should be created/deleted when added/removed from this table. */
 static struct itable *procs_table = NULL;
 
-// Table of all processes currently running, indexed by task_id.
-// These are additional pointers into procs_table.
+/* Table of all processes currently running, indexed by task_id. */
+/* These are additional pointers into procs_table and should not be deleted */
 static struct itable *procs_running = NULL;
 
-// List of all procs that are waiting to be run.
-// These are additional pointers into procs_table.
+/* List of all procs that are waiting to be run. */
+/* These are additional pointers into procs_table and should not be deleted */
 static struct list *procs_waiting = NULL;
 
-// Table of all processes with results to be sent back, indexed by task_id.
-// These are additional pointers into procs_table.
+/* Table of all processes with results to be sent back, indexed by task_id. */
+/* These are additional pointers into procs_table and should not be deleted */
 static struct itable *procs_complete = NULL;
 
-// Table of current transfers and their id
+/* Table of current transfers and their id. */
 static struct hash_table *current_transfers = NULL;
 
 /* The main cache object keeping track of files stored by the worker. */
@@ -116,12 +116,6 @@ static struct vine_watcher *watcher = 0;
 /* The resources measured and available at this worker. */
 static struct vine_resources *total_resources = 0;
 
-/* When the amount of disk is not specified, manually set the reporting disk to
- * this percentage of the measured disk. This safeguards the fact that disk measurements
- * are estimates and thus may unncessarily forsaken tasks with unspecified resources.
- * Defaults to 90%. */
-static int disk_percent = 90;
-
 /* 0 means not given as a command line option. */
 static int64_t manual_cores_option = 0;
 static int64_t manual_disk_option = 0;
@@ -136,6 +130,12 @@ static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
+
+/* When the amount of disk is not specified, manually set the reporting disk to
+ * this percentage of the measured disk. This safeguards the fact that disk measurements
+ * are estimates and thus may unncessarily forsaken tasks with unspecified resources.
+ * Defaults to 90%. */
+static int disk_percent = 90;
 
 /***************************************************************/
 /*     State of Interactions Between Manager and Worker        */
@@ -210,48 +210,47 @@ static int64_t files_counted = 0;
 /*       Configuration Options Given on the Command Line       */
 /***************************************************************/
 
-// In single shot mode, immediately quit when disconnected.
-// Useful for accelerating the test suite.
+/* In single shot mode, immediately quit when disconnected. Useful for accelerating the test suite. */
 static int single_shot_mode = 0;
 
-// Maximum time to stay connected to a single manager without any work.
+/* Maximum time to stay connected to a single manager without any work. */
 static int idle_timeout = 900;
 
-// Current time at which we will give up if no work is received.
+/* Current time at which we will give up if no work is received. */
 static time_t idle_stoptime = 0;
 
-// Current time at which we will give up if no manager is found.
+/* Current time at which we will give up if no manager is found. */
 static time_t connect_stoptime = 0;
 
-// Maximum time to attempt connecting to all available managers before giving up.
+/* Maximum time to attempt connecting to all available managers before giving up. */
 static int connect_timeout = 900;
 
-// Maximum time to attempt sending/receiving any given file or message.
+/* Maximum time to attempt sending/receiving any given file or message. */
 int active_timeout = 3600;
 
-// Initial value for backoff interval (in seconds) when worker fails to connect to a manager.
+/* Initial value for backoff interval (in seconds) when worker fails to connect to a manager. */
 static int init_backoff_interval = 1;
 
-// Maximum value for backoff interval (in seconds) when worker fails to connect to a manager.
+/* Maximum value for backoff interval (in seconds) when worker fails to connect to a manager. */
 static int max_backoff_interval = 8;
 
-// Absolute end time (in useconds) for worker, worker is killed after this point.
+/* Absolute end time (in useconds) for worker, worker is killed after this point. */
 static timestamp_t end_time = 0;
 
-// Password shared between manager and worker.
+/* Password shared between manager and worker. */
 char *vine_worker_password = 0;
 
-// If set to "by_ip", "by_hostname", or "by_apparent_ip", overrides manager's
-// preferred connection mode.
+/* If set to "by_ip", "by_hostname", or "by_apparent_ip", overrides manager's preferred connection mode. */
 static char *preferred_connection = NULL;
 
-// Whether to force a ssl connection. If using the catalog server and the
-// manager announces it is using SSL, then SSL is used regardless of
-// manual_ssl_option.
+/*
+Whether to force a ssl connection. If using the catalog server and the
+manager announces it is using SSL, then SSL is used regardless of manual_ssl_option.
+*/
 static int manual_ssl_option = 0;
 
-// pid of the worker's parent process. If different from zero, worker will be
-// terminated when its parent process changes.
+/* pid of the worker's parent process. If different from zero, worker will be */
+/* terminated when its parent process changes. */
 static pid_t initial_ppid = 0;
 
 /* Manual option given by the user to control the location of the workspace. */
@@ -361,7 +360,7 @@ static void measure_worker_resources()
 
 	struct vine_resources *r = total_resources;
 
-	vine_resources_measure_locally(r, workspace);
+	vine_resources_measure_locally(r, vine_workspace_dir);
 
 	if (manual_cores_option > 0)
 		r->cores.total = manual_cores_option;
@@ -921,11 +920,11 @@ static int do_unlink(struct link *manager, const char *path)
 
 	int result = 0;
 
-	if (path_within_dir(cached_path, workspace)) {
+	if (path_within_dir(cached_path, vine_workspace_dir)) {
 		vine_cache_remove(global_cache, path, manager);
 		result = 1;
 	} else {
-		debug(D_VINE, "%s is not within workspace %s", cached_path, workspace);
+		debug(D_VINE, "%s is not within workspace %s", cached_path, vine_workspace_dir);
 		result = 0;
 	}
 
@@ -1314,7 +1313,7 @@ static int enforce_worker_limits(struct link *manager)
 		fprintf(stderr,
 				"vine_worker: %s used more than declared disk space (--disk - < disk used) %" PRIu64
 				" < %" PRIu64 " MB\n",
-				workspace,
+				vine_workspace_dir,
 				manual_disk_option,
 				total_resources->disk.inuse);
 
@@ -1598,20 +1597,20 @@ static int workspace_create()
 	char absolute[VINE_LINE_MAX];
 
 	// Setup working space(dir)
-	if (!workspace) {
+	if (!vine_workspace_dir) {
 		const char *workdir = system_tmp_dir(user_specified_workdir);
-		workspace = string_format("%s/worker-%d-%d", workdir, (int)getuid(), (int)getpid());
+		vine_workspace_dir = string_format("%s/worker-%d-%d", workdir, (int)getuid(), (int)getpid());
 	}
 
-	printf("vine_worker: creating workspace %s\n", workspace);
+	printf("vine_worker: creating workspace %s\n", vine_workspace_dir);
 
-	if (!create_dir(workspace, 0777)) {
+	if (!create_dir(vine_workspace_dir, 0777)) {
 		return 0;
 	}
 
-	path_absolute(workspace, absolute, 1);
-	free(workspace);
-	workspace = xxstrdup(absolute);
+	path_absolute(vine_workspace_dir, absolute, 1);
+	free(vine_workspace_dir);
+	vine_workspace_dir = xxstrdup(absolute);
 
 	return 1;
 }
@@ -1623,11 +1622,11 @@ With this we check the scratch directory allows file execution.
 static int workspace_check()
 {
 	int error = 0; /* set 1 on error */
-	char *fname = string_format("%s/test.sh", workspace);
+	char *fname = string_format("%s/test.sh", vine_workspace_dir);
 
 	FILE *file = fopen(fname, "w");
 	if (!file) {
-		warn(D_NOTICE, "Could not write to %s", workspace);
+		warn(D_NOTICE, "Could not write to %s", vine_workspace_dir);
 		error = 1;
 	} else {
 		fprintf(file, "#!/bin/sh\nexit 0\n");
@@ -1638,7 +1637,7 @@ static int workspace_check()
 
 		if (WIFEXITED(exit_status) && WEXITSTATUS(exit_status) == 126) {
 			/* Note that we do not set status=1 on 126, as the executables may live ouside workspace. */
-			warn(D_NOTICE, "Could not execute a test script in the workspace directory '%s'.", workspace);
+			warn(D_NOTICE, "Could not execute a test script in the workspace directory '%s'.", vine_workspace_dir);
 			warn(D_NOTICE, "Is the filesystem mounted as 'noexec'?\n");
 			warn(D_NOTICE, "Unless the task command is an absolute path, the task will fail with exit status 126.\n");
 		} else if (!WIFEXITED(exit_status) || WEXITSTATUS(exit_status) != 0) {
@@ -1651,7 +1650,7 @@ static int workspace_check()
 	free(fname);
 
 	if (error) {
-		warn(D_NOTICE, "The workspace %s could not be used.\n", workspace);
+		warn(D_NOTICE, "The workspace %s could not be used.\n", vine_workspace_dir);
 		warn(D_NOTICE, "Use the --workdir command line switch to change where the workspace is created.\n");
 	}
 
@@ -1683,9 +1682,9 @@ file is trashed.  (See trash_file.[ch])
 
 static int workspace_prepare()
 {
-	debug(D_VINE, "preparing workspace %s", workspace);
+	debug(D_VINE, "preparing workspace %s", vine_workspace_dir);
 
-	char *cachedir = string_format("%s/cache", workspace);
+	char *cachedir = string_format("%s/cache", vine_workspace_dir);
 	struct stat info;
 	int result;
 	if (!(stat(cachedir, &info) == 0 && S_ISDIR(info.st_mode))) {
@@ -1697,12 +1696,12 @@ static int workspace_prepare()
 	global_cache = vine_cache_create(cachedir);
 	free(cachedir);
 
-	char *tmp_name = string_format("%s/temp", workspace);
+	char *tmp_name = string_format("%s/temp", vine_workspace_dir);
 	result |= create_dir(tmp_name, 0777);
 	setenv("WORKER_TMPDIR", tmp_name, 1);
 	free(tmp_name);
 
-	char *trash_dir = string_format("%s/trash", workspace);
+	char *trash_dir = string_format("%s/trash", vine_workspace_dir);
 	trash_setup(trash_dir);
 	free(trash_dir);
 
@@ -1719,11 +1718,11 @@ directories (except trash) and move them to the trash directory.
 
 static void workspace_cleanup()
 {
-	debug(D_VINE, "cleaning workspace %s", workspace);
+	debug(D_VINE, "cleaning workspace %s", vine_workspace_dir);
 
 	vine_transfer_server_stop();
 
-	DIR *dir = opendir(workspace);
+	DIR *dir = opendir(vine_workspace_dir);
 	if (dir) {
 		struct dirent *d;
 		while ((d = readdir(dir))) {
@@ -1772,14 +1771,14 @@ static void workspace_delete()
 	if (watcher)
 		vine_watcher_delete(watcher);
 
-	printf("vine_worker: deleting workspace %s\n", workspace);
+	printf("vine_worker: deleting workspace %s\n", vine_workspace_dir);
 
 	/*
 	Note that we cannot use trash_file here because the trash dir is inside the
 	workspace. The whole workspace is being deleted anyway.
 	*/
-	unlink_recursive(workspace);
-	free(workspace);
+	unlink_recursive(vine_workspace_dir);
+	free(vine_workspace_dir);
 }
 
 static int serve_manager_by_hostport(const char *host, int port, const char *verify_project, int use_ssl)
@@ -2480,7 +2479,7 @@ int main(int argc, char *argv[])
 	random_init();
 
 	if (!workspace_create()) {
-		fprintf(stderr, "vine_worker: failed to setup workspace at %s.\n", workspace);
+		fprintf(stderr, "vine_worker: failed to setup workspace at %s.\n", vine_workspace_dir);
 		exit(1);
 	}
 
@@ -2489,11 +2488,11 @@ int main(int argc, char *argv[])
 	}
 
 	// set $VINE_SANDBOX to workspace.
-	debug(D_VINE, "VINE_SANDBOX set to %s.\n", workspace);
-	setenv("VINE_SANDBOX", workspace, 0);
+	debug(D_VINE, "VINE_SANDBOX set to %s.\n", vine_workspace_dir);
+	setenv("VINE_SANDBOX", vine_workspace_dir, 0);
 
 	// change to workspace
-	chdir(workspace);
+	chdir(vine_workspace_dir);
 
 	unlink_recursive("cache");
 
