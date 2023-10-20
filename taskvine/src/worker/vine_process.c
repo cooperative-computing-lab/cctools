@@ -248,10 +248,14 @@ int vine_process_invoke_function( struct vine_process *p )
 			strlen(buffer),
 			buffer);
 	free(buffer);
-	if (result < 0) {
+
+	if (result < 0) {	
+		debug(D_VINE, "failed to communicate with library '%s' task %d", p->library_process->pid);
 		return 0;
+	} else {	
+		debug(D_VINE, "started task %d as function call '%s' to library '%s' task %d", p->task->task_id, p->task->command_line->needs_library, p->library_process->pid);
+		return 1;
 	}
-	return 1;
 }
 
 /*
@@ -425,6 +429,12 @@ Returns true if complete, false otherwise.
 
 int vine_process_is_complete(struct vine_process *p)
 {
+	/* A function call doesn't have a Unix process to check. */
+	if(p->type==VINE_PROCESS_FUNCTION) {
+		return 0;
+	}
+
+	/* But any other type of process is done when the Unix process completes. */
 	int status;
 	int result = wait4(p->pid, &status, WNOHANG, &p->rusage);
 	if (result == p->pid) {
