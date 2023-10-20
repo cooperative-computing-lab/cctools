@@ -2068,17 +2068,22 @@ static int serve_manager_by_name(const char *catalog_hosts, const char *project_
 	}
 }
 
-void set_worker_id()
+/* Generate a unique worker ID string from local information. */
+
+static char * make_worker_id()
 {
 	srand(time(NULL));
 
 	char *salt_and_pepper = string_format("%d%d%d", getpid(), getppid(), rand());
-	unsigned char digest[MD5_DIGEST_LENGTH];
 
+	unsigned char digest[MD5_DIGEST_LENGTH];
 	md5_buffer(salt_and_pepper, strlen(salt_and_pepper), digest);
-	worker_id = string_format("worker-%s", md5_to_string(digest));
+
+	char *id = string_format("worker-%s", md5_to_string(digest));
 
 	free(salt_and_pepper);
+
+	return id;
 }
 
 static void handle_abort(int sig)
@@ -2295,9 +2300,8 @@ int main(int argc, char *argv[])
 	features = hash_table_create(4, 0);
 	current_transfers = hash_table_create(0, 0);
 	worker_start_time = timestamp_get();
-
-	set_worker_id();
-
+	worker_id = make_worker_id();
+	
 	// obtain the architecture and os on which worker is running.
 	uname(&uname_data);
 	os_name = xxstrdup(uname_data.sysname);
