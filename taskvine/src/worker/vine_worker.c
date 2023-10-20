@@ -76,91 +76,45 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/utsname.h>
 
-// In single shot mode, immediately quit when disconnected.
-// Useful for accelerating the test suite.
-static int single_shot_mode = 0;
+/***************************************************************/
+/* Primary Worker Data Structures for Tracking Tasks and Files */
+/***************************************************************/
 
-// Maximum time to stay connected to a single manager without any work.
-static int idle_timeout = 900;
+/* The workspace is the top level directory under which all worker state is stored. */
+char *vine_workspace_dir;
 
-// Current time at which we will give up if no work is received.
-static time_t idle_stoptime = 0;
+/* Table of all processes in any state, indexed by task_id. */
+/* Processes should be created/deleted when added/removed from this table. */
+static struct itable *procs_table = NULL;
 
-// Current time at which we will give up if no manager is found.
-static time_t connect_stoptime = 0;
+/* Table of all processes currently running, indexed by task_id. */
+/* These are additional pointers into procs_table and should not be deleted */
+static struct itable *procs_running = NULL;
 
-// Maximum time to attempt connecting to all available managers before giving up.
-static int connect_timeout = 900;
+/* List of all procs that are waiting to be run. */
+/* These are additional pointers into procs_table and should not be deleted */
+static struct list *procs_waiting = NULL;
 
-// Maximum time to attempt sending/receiving any given file or message.
-int active_timeout = 3600;
+/* Table of all processes with results to be sent back, indexed by task_id. */
+/* These are additional pointers into procs_table and should not be deleted */
+static struct itable *procs_complete = NULL;
 
-// Initial value for backoff interval (in seconds) when worker fails to connect to a manager.
-static int init_backoff_interval = 1;
+/* Table of current transfers and their id. */
+static struct hash_table *current_transfers = NULL;
 
-// Maximum value for backoff interval (in seconds) when worker fails to connect to a manager.
-static int max_backoff_interval = 8;
+/* The cache manager object keeping track of files stored by the worker. */
+struct vine_cache *cache_manager = 0;
 
-// Absolute end time (in useconds) for worker, worker is killed after this point.
-static timestamp_t end_time = 0;
-
-// If flag is set, then the worker proceeds to immediately cleanup and shut down.
-// This can be set by Ctrl-C or by any condition that prevents further progress.
-static int abort_flag = 0;
-
-// Record the signal received, to inform the manager if appropiate.
-static int abort_signal_received = 0;
-
-// Flag used to indicate a child must be waited for.
-static int sigchld_received_flag = 0;
-
-// Password shared between manager and worker.
-char *vine_worker_password = 0;
-
-int mini_task_id = 0;
-
-// Worker id. A unique id for this worker instance.
-static char *worker_id;
-
-// If set to "by_ip", "by_hostname", or "by_apparent_ip", overrides manager's
-// preferred connection mode.
-char *preferred_connection = NULL;
-
-// Whether to force a ssl connection. If using the catalog server and the
-// manager announces it is using SSL, then SSL is used regardless of
-// manual_ssl_option.
-int manual_ssl_option = 0;
-
-// pid of the worker's parent process. If different from zero, worker will be
-// terminated when its parent process changes.
-static pid_t initial_ppid = 0;
-
-struct manager_address {
-	char host[DOMAIN_NAME_MAX];
-	int port;
-	char addr[DOMAIN_NAME_MAX];
-};
-struct list *manager_addresses;
-struct manager_address *current_manager_address;
-
-char *workspace;
-static char *os_name = NULL;
-static char *arch_name = NULL;
-static char *user_specified_workdir = NULL;
-static timestamp_t worker_start_time = 0;
-
+/* The watcher object is responsible for periodically checking whether */
+/* files marked with VINE_WATCH have been modified and should be streamed back. */
 static struct vine_watcher *watcher = 0;
+
+/***************************************************************/
+/*         Machine Resources Managed by the Worker             */
+/***************************************************************/
 
 /* The resources measured and available at this worker. */
 static struct vine_resources *total_resources = 0;
-
-/* When the amount of disk is not specified, manually set the reporting disk to
- * this percentage of the measured disk. This safeguards the fact that disk measurements
- * are estimates and thus may unncessarily forsaken tasks with unspecified resources.
- * Defaults to 90%. */
-static int disk_percent = 90;
-
-static int64_t last_task_received = 0;
 
 /* 0 means not given as a command line option. */
 static int64_t manual_cores_option = 0;
@@ -177,53 +131,149 @@ static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
 
+/* When the amount of disk is not specified, manually set the reporting disk to
+ * this percentage of the measured disk. This safeguards the fact that disk measurements
+ * are estimates and thus may unncessarily forsaken tasks with unspecified resources.
+ * Defaults to 90%. */
+static int disk_percent = 90;
+
+/***************************************************************/
+/*     State of Interactions Between Manager and Worker        */
+/***************************************************************/
+
+/* A regular expression (usually just a plain string) naming the manager(s) to connect to .*/
+static const char *project_regex = 0;
+
+/* A string giving the list of catalog hosts to query to find the manager. */
+static char *catalog_hosts = NULL;
+
+/* The name of the factory process that started this worker, if any. */
+static char *factory_name = NULL;
+
+/* A complete description of the address of a manager and how to connect. */
+struct manager_address {
+	char host[DOMAIN_NAME_MAX];
+	int port;
+	char addr[DOMAIN_NAME_MAX];
+};
+
+/* The list of matching manager addresses obtained from the catalog server. */
+static struct list *manager_addresses;
+
+/* The address of the current manager we are (attempting to) talk to. */
+static struct manager_address *current_manager_address;
+
+/* The worker ID is a unique string generated by the worker to uniquely identify  */
+/* to the manager, even across multiple connections. */
+static char *worker_id;
+
+/* True when the worker has informed the manager that there are results pending. */
+static int results_to_be_sent_msg = 0;
+
+/* If flag is set, then the worker proceeds to immediately cleanup and shut down. */
+/* This can be set by Ctrl-C or by any condition that prevents further progress.  */
+static int abort_flag = 0;
+
+/* Record the signal received, to inform the manager if appropiate. */
+static int abort_signal_received = 0;
+
+/* Flag used to indicate a child must be waited for. */
+static int sigchld_received_flag = 0;
+
+/* True if manager sent explicit message to release worker from its service. */
+static int released_by_manager = 0;
+
+/***************************************************************/
+/*       Accumulated Statistics Tracked by Worker              */
+/***************************************************************/
+
+/* Tracks the most recent taskid recevied from the manager. */
+/* This is used to signal the "freshness" of status data given back to the manager. */
+static int64_t last_task_received = 0;
+
+// Unique counter for generating unique mini task ids and sandboxes
+static int mini_task_id = 0;
+
+/* The timestamp at which the worker began executing. */
+static timestamp_t worker_start_time = 0;
+
+/* The accumulated time of all task executions. */
+static timestamp_t total_task_execution_time = 0;
+
+/* Total count of tasks executed. */
+static int total_tasks_executed = 0;
+
+/* Total number of files counted when measuring worker disk. */
 static int64_t files_counted = 0;
 
-static int check_resources_interval = 5;
-static int max_time_on_measurement = 3;
+/***************************************************************/
+/*       Configuration Options Given on the Command Line       */
+/***************************************************************/
 
-// Table of all processes in any state, indexed by task_id.
-// Processes should be created/deleted when added/removed from this table.
-static struct itable *procs_table = NULL;
+/* In single shot mode, immediately quit when disconnected. Useful for accelerating the test suite. */
+static int single_shot_mode = 0;
 
-// Table of all processes currently running, indexed by task_id.
-// These are additional pointers into procs_table.
-static struct itable *procs_running = NULL;
+/* Maximum time to stay connected to a single manager without any work. */
+static int idle_timeout = 900;
 
-// List of all procs that are waiting to be run.
-// These are additional pointers into procs_table.
-static struct list *procs_waiting = NULL;
+/* Current time at which we will give up if no work is received. */
+static time_t idle_stoptime = 0;
 
-// Table of all processes with results to be sent back, indexed by task_id.
-// These are additional pointers into procs_table.
-static struct itable *procs_complete = NULL;
+/* Current time at which we will give up if no manager is found. */
+static time_t connect_stoptime = 0;
 
-// Table of current transfers and their id
-static struct hash_table *current_transfers = NULL;
+/* Maximum time to attempt connecting to all available managers before giving up. */
+static int connect_timeout = 900;
+
+/* Maximum time to attempt sending/receiving any given file or message. */
+int active_timeout = 3600;
+
+/* Initial value for backoff interval (in seconds) when worker fails to connect to a manager. */
+static int init_backoff_interval = 1;
+
+/* Maximum value for backoff interval (in seconds) when worker fails to connect to a manager. */
+static int max_backoff_interval = 8;
+
+/* Absolute end time (in useconds) for worker, worker is killed after this point. */
+static timestamp_t end_time = 0;
+
+/* Password shared between manager and worker. */
+char *vine_worker_password = 0;
+
+/* If set to "by_ip", "by_hostname", or "by_apparent_ip", overrides manager's preferred connection mode. */
+static char *preferred_connection = NULL;
 
 /*
-Table of user-specified features.
-The key represents the name of the feature.
-The corresponding value is just a pointer to feature_dummy and can be ignored.
+Whether to force a ssl connection. If using the catalog server and the
+manager announces it is using SSL, then SSL is used regardless of manual_ssl_option.
 */
+static int manual_ssl_option = 0;
+
+/* pid of the worker's parent process. If different from zero, worker will be */
+/* terminated when its parent process changes. */
+static pid_t initial_ppid = 0;
+
+/* Manual option given by the user to control the location of the workspace. */
+static char *user_specified_workdir = NULL;
+
+/* Operating system and architecture strings determined at startup time. */
+static char *os_name = NULL;
+static char *arch_name = NULL;
+
+/* Table of user-specified features. The key represents the name of the feature. */
+/* The corresponding value is just a pointer to feature_dummy and can be ignored. */
 static struct hash_table *features = NULL;
 static const char *feature_dummy = "dummy";
 
-static int results_to_be_sent_msg = 0;
+/* How frequently to measure resources available. */
+static int check_resources_interval = 5;
 
-static timestamp_t total_task_execution_time = 0;
-static int total_tasks_executed = 0;
-
-static const char *project_regex = 0;
-static int released_by_manager = 0;
-
-static char *catalog_hosts = NULL;
-
-static char *factory_name = NULL;
-
-struct vine_cache *global_cache = 0;
+/* Maximum number of seconds to spend on each resource management. */
+static int max_time_on_measurement = 3;
 
 extern int vine_hack_do_not_compute_cached_name;
+
+/* Send a printf-formatted message to the current manager. */
 
 __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const char *fmt, ...)
 {
@@ -241,6 +291,8 @@ __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const ch
 
 	va_end(va);
 }
+
+/* Receive a single-line message from the current manager. */
 
 int recv_message(struct link *l, char *line, int length, time_t stoptime)
 {
@@ -265,10 +317,10 @@ static int64_t measure_worker_disk()
 {
 	static struct path_disk_size_info *state = NULL;
 
-	if (!global_cache)
+	if (!cache_manager)
 		return 0;
 
-	char *cache_dir = vine_cache_full_path(global_cache, ".");
+	char *cache_dir = vine_cache_full_path(cache_manager, ".");
 	path_disk_size_info_get_r(cache_dir, max_time_on_measurement, &state);
 	free(cache_dir);
 
@@ -312,7 +364,7 @@ static void measure_worker_resources()
 
 	struct vine_resources *r = total_resources;
 
-	vine_resources_measure_locally(r, workspace);
+	vine_resources_measure_locally(r, vine_workspace_dir);
 
 	if (manual_cores_option > 0)
 		r->cores.total = manual_cores_option;
@@ -477,7 +529,7 @@ static void report_worker_ready(struct link *manager)
 			CCTOOLS_VERSION_MINOR,
 			CCTOOLS_VERSION_MICRO);
 	send_message(manager, "info worker-id %s\n", worker_id);
-	vine_cache_scan(global_cache, manager);
+	vine_cache_scan(cache_manager, manager);
 
 	send_features(manager);
 	send_transfer_address(manager);
@@ -490,24 +542,6 @@ static void report_worker_ready(struct link *manager)
 	send_keepalive(manager, 1);
 }
 
-/* Send a message containing details of a function call to the relevant library to execute it.
- * @param p 	The relevant vine_process structure encapsulating a function call.
- * @return 		1 if the message is successfully sent to the library, 0 otherwise. */
-static int start_function(struct vine_process *p)
-{
-	char *buffer = string_format("%d %s %s", p->task->task_id, p->task->command_line, p->sandbox);
-	ssize_t result = link_printf(p->library_process->library_write_link,
-			time(0) + active_timeout,
-			"%ld\n%s",
-			strlen(buffer),
-			buffer);
-	free(buffer);
-	if (result < 0) {
-		return 0;
-	}
-	return 1;
-}
-
 /*
 Start executing the given process on the local host,
 accounting for the resources as necessary.
@@ -516,13 +550,10 @@ Should maintain parallel structure to reap_process() above.
 
 static int start_process(struct vine_process *p, struct link *manager)
 {
-	pid_t pid;
-
 	struct vine_task *t = p->task;
-	int ok = 1;
 
 	/* Create the sandbox environment for the task. */
-	if (!vine_sandbox_stagein(p, global_cache)) {
+	if (!vine_sandbox_stagein(p, cache_manager)) {
 		p->execution_start = p->execution_end = timestamp_get();
 		p->result = VINE_RESULT_INPUT_MISSING;
 		p->exit_code = 1;
@@ -539,19 +570,8 @@ static int start_process(struct vine_process *p, struct link *manager)
 		vine_gpus_allocate(t->resources_requested->gpus, t->task_id);
 	}
 
-	/* Starting a function call is different from starting a standard task, as a function call is not
-	 * launched through vine_process_exeute. */
-	if (t->needs_library) {
-		debug(D_VINE, "started function call %d: %s", p->task->task_id, p->task->command_line);
-		ok = start_function(p);
-		if (ok) {
-			p->library_process->functions_running++;
-		}
-	} else {
-		/* Now start the actual process. */
-		pid = vine_process_execute(p);
-		if (pid < 0)
-			fatal("unable to fork process for task_id %d!", p->task->task_id);
+	/* Now start the process (or function) running. */
+	if (vine_process_execute(p)) {
 
 		/* If this process represents a library, notify the manager that it is running.
 		 * Also set the sigchld flag so the worker will immediately check for the library
@@ -560,14 +580,18 @@ static int start_process(struct vine_process *p, struct link *manager)
 			send_message(manager, "info library-update %d %d\n", p->task->task_id, VINE_LIBRARY_STARTED);
 			sigchld_received_flag = 1;
 		}
+
+		/* If this process represents a function, update the number running. */
+		if (t->needs_library) {
+			p->library_process->functions_running++;
+		}
+	} else {
+		fatal("unable to start task_id %d!", p->task->task_id);
 	}
 
-	/* Only insert process to procs_running if everything runs fine. */
-	if (ok) {
-		itable_insert(procs_running, p->task->task_id, p);
-	}
+	itable_insert(procs_running, p->task->task_id, p);
 
-	return ok;
+	return 1;
 }
 
 /*
@@ -587,7 +611,7 @@ static void reap_process(struct vine_process *p, struct link *manager)
 
 	vine_gpus_free(p->task->task_id);
 
-	if (!vine_sandbox_stageout(p, global_cache, manager)) {
+	if (!vine_sandbox_stageout(p, cache_manager, manager)) {
 		p->result = VINE_RESULT_OUTPUT_MISSING;
 		p->exit_code = 1;
 	}
@@ -675,43 +699,6 @@ static void expire_procs_running()
 	}
 }
 
-/* Receive a message containing a function call id from the library and
- * reap the completed function call.
- * @param p			The vine process encapsulating the function call.
- * @param manager	The link to the manager.
- * return 			1 if the operation succeeds, 0 otherwise. */
-static int reap_completed_function_call(struct vine_process *p, struct link *manager)
-{
-	char buffer[VINE_LINE_MAX]; // Buffer to store length of data from library.
-	int ok = 1;
-
-	/* read number of bytes of data first. */
-	ok = link_readline(p->library_read_link, buffer, VINE_LINE_MAX, time(0) + active_timeout);
-	if (!ok) {
-		return 0;
-	}
-	int len_buffer = atoi(buffer);
-
-	/* now read the buffer, which is the task id of the done function invocation. */
-	char buffer_data[len_buffer + 1];
-	ok = link_read(p->library_read_link, buffer_data, len_buffer, time(0) + active_timeout);
-	if (ok <= 0) {
-		return 0;
-	}
-
-	/* null terminate the buffer before treating it as a string. */
-	buffer_data[ok] = 0;
-
-	/* parse out the taskid of the completed task */
-	uint64_t done_task_id = (uint64_t)strtoul(buffer_data, NULL, 10);
-	debug(D_VINE, "Received result for function %" PRIu64, done_task_id);
-
-	/* Reap the completed function call. */
-	struct vine_process *pp = (struct vine_process *)itable_lookup(procs_table, done_task_id);
-	reap_process(pp, manager);
-	return ok;
-}
-
 /*
 Scan over all of the processes known by the worker,
 and if they have exited, move them into the procs_complete table
@@ -721,34 +708,35 @@ for later processing.
 static int handle_completed_tasks(struct link *manager)
 {
 	struct vine_process *p;
+	struct vine_process *fp;
 	uint64_t task_id;
+	uint64_t done_task_id;
 
 	ITABLE_ITERATE(procs_running, task_id, p)
 	{
-		/* Skip functions, we take care of them later by checking if the library sends any message. */
-		if (p->type != VINE_PROCESS_TYPE_FUNCTION && vine_process_is_complete(p)) {
-			/* collect the resources associated with the process */
-			reap_process(p, manager);
+		int result_retrieved = 0;
 
-			/* must reset the table iterator because an item was removed. */
-			itable_firstkey(procs_running);
+		/* Check to see if this process itself is completed. */
+
+		if (vine_process_is_complete(p)) {
+			reap_process(p, manager);
+			result_retrieved++;
 		}
-		/* Check if the library has any function invocations done, noblock. */
-		if (p->library_ready) {
-			/* Retrieve all results. */
-			int result_retrieved = 0;
-			while (link_usleep(p->library_read_link, 0, 1, 0)) {
-				result_retrieved = reap_completed_function_call(p, manager);
-				if (!result_retrieved) {
-					fatal("Cannot retrieve result for function call %d - %s",
-							p->task->task_id,
-							p->task->command_line);
-				}
+
+		/* If p is a library, check to see if any results waiting. */
+
+		while (vine_process_library_get_result(p, &done_task_id)) {
+			fp = itable_lookup(procs_table, done_task_id);
+			if (fp) {
+				reap_process(fp, manager);
+				result_retrieved++;
 			}
-			if (result_retrieved) {
-				/* Reset iterator in case a function call is reaped. */
-				itable_firstkey(procs_running);
-			}
+		}
+
+		/* If any items were removed, reset the iterator to get back to a known position */
+
+		if (result_retrieved) {
+			itable_firstkey(procs_running);
 		}
 	}
 
@@ -863,6 +851,8 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 	return task;
 }
 
+/* Handle the receipt of a task description and add it to the proper data structures. */
+
 static int do_task(struct link *manager, int task_id, time_t stoptime)
 {
 	struct vine_task *task = do_task_body(manager, task_id, stoptime);
@@ -901,7 +891,7 @@ Accept a url specification and queue it for later transfer.
 
 static int do_put_url(const char *cache_name, int64_t size, int mode, const char *source)
 {
-	return vine_cache_queue_transfer(global_cache, source, cache_name, size, mode);
+	return vine_cache_queue_transfer(cache_manager, source, cache_name, size, mode);
 }
 
 /*
@@ -921,7 +911,7 @@ static int do_put_mini_task(struct link *manager, time_t stoptime, const char *c
 	free(output_mount->file->cached_name);
 	output_mount->file->cached_name = strdup(cache_name);
 
-	return vine_cache_queue_command(global_cache, mini_task, cache_name, size, mode);
+	return vine_cache_queue_command(cache_manager, mini_task, cache_name, size, mode);
 }
 
 /*
@@ -932,15 +922,15 @@ trash and deal with it there.
 
 static int do_unlink(struct link *manager, const char *path)
 {
-	char *cached_path = vine_cache_full_path(global_cache, path);
+	char *cached_path = vine_cache_full_path(cache_manager, path);
 
 	int result = 0;
 
-	if (path_within_dir(cached_path, workspace)) {
-		vine_cache_remove(global_cache, path, manager);
+	if (path_within_dir(cached_path, vine_workspace_dir)) {
+		vine_cache_remove(cache_manager, path, manager);
 		result = 1;
 	} else {
-		debug(D_VINE, "%s is not within workspace %s", cached_path, workspace);
+		debug(D_VINE, "%s is not within workspace %s", cached_path, vine_workspace_dir);
 		result = 0;
 	}
 
@@ -1014,11 +1004,15 @@ static void kill_all_tasks()
 	debug(D_VINE, "all data structures are clean");
 }
 
+/* Force a single running task to finish with the given result flag. */
+
 static void finish_running_task(struct vine_process *p, vine_result_t result)
 {
 	p->result |= result;
 	vine_process_kill(p);
 }
+
+/* Force all running tasks to finish with the given result flag. */
 
 static void finish_running_tasks(vine_result_t result)
 {
@@ -1027,6 +1021,8 @@ static void finish_running_tasks(vine_result_t result)
 
 	ITABLE_ITERATE(procs_running, task_id, p) { finish_running_task(p, result); }
 }
+
+/* Check whether a given process is still within the various limits imposed on it. */
 
 static int enforce_process_limits(struct vine_process *p)
 {
@@ -1046,6 +1042,8 @@ static int enforce_process_limits(struct vine_process *p)
 
 	return 1;
 }
+
+/* Check all processes to see whether they have exceeded various limits, and kill if necessary. */
 
 static int enforce_processes_limits()
 {
@@ -1109,12 +1107,16 @@ static void enforce_processes_max_running_time()
 	return;
 }
 
+/* Handle a release message from the manager, asking the worker to cleanly exit. */
+
 static int do_release()
 {
 	debug(D_VINE, "released by manager %s:%d.\n", current_manager_address->addr, current_manager_address->port);
 	released_by_manager = 1;
 	return 0;
 }
+
+/* Handle an unexpected disconnection by the current manager, and clean up everything. */
 
 static void disconnect_manager(struct link *manager)
 {
@@ -1132,6 +1134,8 @@ static void disconnect_manager(struct link *manager)
 		sleep(5);
 	}
 }
+
+/* Handle the next incoming message from the currently connected manager. */
 
 static int handle_manager(struct link *manager)
 {
@@ -1152,11 +1156,11 @@ static int handle_manager(struct link *manager)
 		} else if (sscanf(line, "file %s %" SCNd64 " %o", filename_encoded, &length, &mode) == 3) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			r = vine_transfer_get_file(
-					manager, global_cache, filename, length, mode, time(0) + active_timeout);
+					manager, cache_manager, filename, length, mode, time(0) + active_timeout);
 			reset_idle_timer();
 		} else if (sscanf(line, "dir %s", filename_encoded) == 1) {
 			url_decode(filename_encoded, filename, sizeof(filename));
-			r = vine_transfer_get_dir(manager, global_cache, filename, time(0) + active_timeout);
+			r = vine_transfer_get_dir(manager, cache_manager, filename, time(0) + active_timeout);
 			reset_idle_timer();
 		} else if (sscanf(line,
 					   "puturl %s %s %" SCNd64 " %o %s",
@@ -1186,14 +1190,14 @@ static int handle_manager(struct link *manager)
 		} else if (sscanf(line, "getfile %s", filename_encoded) == 1) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			r = vine_transfer_put_any(manager,
-					global_cache,
+					cache_manager,
 					filename,
 					VINE_TRANSFER_MODE_FILE_ONLY,
 					time(0) + active_timeout);
 		} else if (sscanf(line, "get %s", filename_encoded) == 1) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			r = vine_transfer_put_any(manager,
-					global_cache,
+					cache_manager,
 					filename,
 					VINE_TRANSFER_MODE_ANY,
 					time(0) + active_timeout);
@@ -1329,7 +1333,7 @@ static int enforce_worker_limits(struct link *manager)
 		fprintf(stderr,
 				"vine_worker: %s used more than declared disk space (--disk - < disk used) %" PRIu64
 				" < %" PRIu64 " MB\n",
-				workspace,
+				vine_workspace_dir,
 				manual_disk_option,
 				total_resources->disk.inuse);
 
@@ -1434,6 +1438,7 @@ static int check_library_startup(struct vine_process *p)
 /* Check whether all known libraries are ready to execute functions.
  * A library starts up and tells the vine_worker it's ready by reporting
  * back its library name. */
+
 static void check_libraries_ready()
 {
 	uint64_t library_task_id;
@@ -1467,6 +1472,8 @@ static void check_libraries_ready()
 		}
 	}
 }
+
+/* Start working for the (newly connected) manager on this given link. */
 
 static void work_for_manager(struct link *manager)
 {
@@ -1533,7 +1540,7 @@ static void work_for_manager(struct link *manager)
 		expire_procs_running();
 
 		ok &= handle_completed_tasks(manager);
-		ok &= vine_cache_wait(global_cache, manager);
+		ok &= vine_cache_wait(cache_manager, manager);
 
 		measure_worker_resources();
 
@@ -1570,7 +1577,7 @@ static void work_for_manager(struct link *manager)
 				p = list_pop_head(procs_waiting);
 				if (!p) {
 					break;
-				} else if (process_ready_to_run_now(p, global_cache, manager)) {
+				} else if (process_ready_to_run_now(p, cache_manager, manager)) {
 					start_process(p, manager);
 					task_event++;
 				} else if (process_can_run_eventually(p)) {
@@ -1613,20 +1620,20 @@ static int workspace_create()
 	char absolute[VINE_LINE_MAX];
 
 	// Setup working space(dir)
-	if (!workspace) {
+	if (!vine_workspace_dir) {
 		const char *workdir = system_tmp_dir(user_specified_workdir);
-		workspace = string_format("%s/worker-%d-%d", workdir, (int)getuid(), (int)getpid());
+		vine_workspace_dir = string_format("%s/worker-%d-%d", workdir, (int)getuid(), (int)getpid());
 	}
 
-	printf("vine_worker: creating workspace %s\n", workspace);
+	printf("vine_worker: creating workspace %s\n", vine_workspace_dir);
 
-	if (!create_dir(workspace, 0777)) {
+	if (!create_dir(vine_workspace_dir, 0777)) {
 		return 0;
 	}
 
-	path_absolute(workspace, absolute, 1);
-	free(workspace);
-	workspace = xxstrdup(absolute);
+	path_absolute(vine_workspace_dir, absolute, 1);
+	free(vine_workspace_dir);
+	vine_workspace_dir = xxstrdup(absolute);
 
 	return 1;
 }
@@ -1638,11 +1645,11 @@ With this we check the scratch directory allows file execution.
 static int workspace_check()
 {
 	int error = 0; /* set 1 on error */
-	char *fname = string_format("%s/test.sh", workspace);
+	char *fname = string_format("%s/test.sh", vine_workspace_dir);
 
 	FILE *file = fopen(fname, "w");
 	if (!file) {
-		warn(D_NOTICE, "Could not write to %s", workspace);
+		warn(D_NOTICE, "Could not write to %s", vine_workspace_dir);
 		error = 1;
 	} else {
 		fprintf(file, "#!/bin/sh\nexit 0\n");
@@ -1653,7 +1660,9 @@ static int workspace_check()
 
 		if (WIFEXITED(exit_status) && WEXITSTATUS(exit_status) == 126) {
 			/* Note that we do not set status=1 on 126, as the executables may live ouside workspace. */
-			warn(D_NOTICE, "Could not execute a test script in the workspace directory '%s'.", workspace);
+			warn(D_NOTICE,
+					"Could not execute a test script in the workspace directory '%s'.",
+					vine_workspace_dir);
 			warn(D_NOTICE, "Is the filesystem mounted as 'noexec'?\n");
 			warn(D_NOTICE, "Unless the task command is an absolute path, the task will fail with exit status 126.\n");
 		} else if (!WIFEXITED(exit_status) || WEXITSTATUS(exit_status) != 0) {
@@ -1666,7 +1675,7 @@ static int workspace_check()
 	free(fname);
 
 	if (error) {
-		warn(D_NOTICE, "The workspace %s could not be used.\n", workspace);
+		warn(D_NOTICE, "The workspace %s could not be used.\n", vine_workspace_dir);
 		warn(D_NOTICE, "Use the --workdir command line switch to change where the workspace is created.\n");
 	}
 
@@ -1698,9 +1707,9 @@ file is trashed.  (See trash_file.[ch])
 
 static int workspace_prepare()
 {
-	debug(D_VINE, "preparing workspace %s", workspace);
+	debug(D_VINE, "preparing workspace %s", vine_workspace_dir);
 
-	char *cachedir = string_format("%s/cache", workspace);
+	char *cachedir = string_format("%s/cache", vine_workspace_dir);
 	struct stat info;
 	int result;
 	if (!(stat(cachedir, &info) == 0 && S_ISDIR(info.st_mode))) {
@@ -1709,19 +1718,19 @@ static int workspace_prepare()
 		result = 1;
 		debug(D_VINE, "cache directory already exists!");
 	}
-	global_cache = vine_cache_create(cachedir);
+	cache_manager = vine_cache_create(cachedir);
 	free(cachedir);
 
-	char *tmp_name = string_format("%s/temp", workspace);
+	char *tmp_name = string_format("%s/temp", vine_workspace_dir);
 	result |= create_dir(tmp_name, 0777);
 	setenv("WORKER_TMPDIR", tmp_name, 1);
 	free(tmp_name);
 
-	char *trash_dir = string_format("%s/trash", workspace);
+	char *trash_dir = string_format("%s/trash", vine_workspace_dir);
 	trash_setup(trash_dir);
 	free(trash_dir);
 
-	vine_transfer_server_start(global_cache);
+	vine_transfer_server_start(cache_manager);
 
 	return result;
 }
@@ -1734,11 +1743,11 @@ directories (except trash) and move them to the trash directory.
 
 static void workspace_cleanup()
 {
-	debug(D_VINE, "cleaning workspace %s", workspace);
+	debug(D_VINE, "cleaning workspace %s", vine_workspace_dir);
 
 	vine_transfer_server_stop();
 
-	DIR *dir = opendir(workspace);
+	DIR *dir = opendir(vine_workspace_dir);
 	if (dir) {
 		struct dirent *d;
 		while ((d = readdir(dir))) {
@@ -1756,8 +1765,8 @@ static void workspace_cleanup()
 	}
 	trash_empty();
 
-	vine_cache_delete(global_cache);
-	global_cache = 0;
+	vine_cache_delete(cache_manager);
+	cache_manager = 0;
 }
 
 /*
@@ -1787,15 +1796,17 @@ static void workspace_delete()
 	if (watcher)
 		vine_watcher_delete(watcher);
 
-	printf("vine_worker: deleting workspace %s\n", workspace);
+	printf("vine_worker: deleting workspace %s\n", vine_workspace_dir);
 
 	/*
 	Note that we cannot use trash_file here because the trash dir is inside the
 	workspace. The whole workspace is being deleted anyway.
 	*/
-	unlink_recursive(workspace);
-	free(workspace);
+	unlink_recursive(vine_workspace_dir);
+	free(vine_workspace_dir);
 }
+
+/* Attempt to connect, authenticate, and work with the manager at this specific host and port. */
 
 static int serve_manager_by_hostport(const char *host, int port, const char *verify_project, int use_ssl)
 {
@@ -1875,7 +1886,7 @@ static int serve_manager_by_hostport(const char *host, int port, const char *ver
 	}
 
 	workspace_prepare();
-	vine_cache_load(global_cache);
+	vine_cache_load(cache_manager);
 
 	measure_worker_resources();
 
@@ -1897,6 +1908,8 @@ static int serve_manager_by_hostport(const char *host, int port, const char *ver
 
 	return 1;
 }
+
+/* Attempt to connect and work with any opf the managers in this list. */
 
 int serve_manager_by_hostport_list(struct list *manager_addresses, int use_ssl)
 {
@@ -1957,6 +1970,8 @@ static struct list *interfaces_to_list(const char *addr, int port, struct jx *if
 
 	return l;
 }
+
+/* Attempt to connect and work with managers found in the catalog matching a project regex. */
 
 static int serve_manager_by_name(const char *catalog_hosts, const char *project_regex)
 {
@@ -2053,17 +2068,22 @@ static int serve_manager_by_name(const char *catalog_hosts, const char *project_
 	}
 }
 
-void set_worker_id()
+/* Generate a unique worker ID string from local information. */
+
+static char *make_worker_id()
 {
 	srand(time(NULL));
 
 	char *salt_and_pepper = string_format("%d%d%d", getpid(), getppid(), rand());
-	unsigned char digest[MD5_DIGEST_LENGTH];
 
+	unsigned char digest[MD5_DIGEST_LENGTH];
 	md5_buffer(salt_and_pepper, strlen(salt_and_pepper), digest);
-	worker_id = string_format("worker-%s", md5_to_string(digest));
+
+	char *id = string_format("worker-%s", md5_to_string(digest));
 
 	free(salt_and_pepper);
+
+	return id;
 }
 
 static void handle_abort(int sig)
@@ -2280,8 +2300,7 @@ int main(int argc, char *argv[])
 	features = hash_table_create(4, 0);
 	current_transfers = hash_table_create(0, 0);
 	worker_start_time = timestamp_get();
-
-	set_worker_id();
+	worker_id = make_worker_id();
 
 	// obtain the architecture and os on which worker is running.
 	uname(&uname_data);
@@ -2495,7 +2514,7 @@ int main(int argc, char *argv[])
 	random_init();
 
 	if (!workspace_create()) {
-		fprintf(stderr, "vine_worker: failed to setup workspace at %s.\n", workspace);
+		fprintf(stderr, "vine_worker: failed to setup workspace at %s.\n", vine_workspace_dir);
 		exit(1);
 	}
 
@@ -2504,11 +2523,11 @@ int main(int argc, char *argv[])
 	}
 
 	// set $VINE_SANDBOX to workspace.
-	debug(D_VINE, "VINE_SANDBOX set to %s.\n", workspace);
-	setenv("VINE_SANDBOX", workspace, 0);
+	debug(D_VINE, "VINE_SANDBOX set to %s.\n", vine_workspace_dir);
+	setenv("VINE_SANDBOX", vine_workspace_dir, 0);
 
 	// change to workspace
-	chdir(workspace);
+	chdir(vine_workspace_dir);
 
 	unlink_recursive("cache");
 
