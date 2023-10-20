@@ -273,6 +273,8 @@ static int max_time_on_measurement = 3;
 
 extern int vine_hack_do_not_compute_cached_name;
 
+/* Send a printf-formatted message to the current manager. */
+
 __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const char *fmt, ...)
 {
 	char debug_msg[2 * VINE_LINE_MAX];
@@ -289,6 +291,8 @@ __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const ch
 
 	va_end(va);
 }
+
+/* Receive a single-line message from the current manager. */
 
 int recv_message(struct link *l, char *line, int length, time_t stoptime)
 {
@@ -847,6 +851,8 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 	return task;
 }
 
+/* Handle the receipt of a task description and add it to the proper data structures. */
+
 static int do_task(struct link *manager, int task_id, time_t stoptime)
 {
 	struct vine_task *task = do_task_body(manager, task_id, stoptime);
@@ -998,11 +1004,15 @@ static void kill_all_tasks()
 	debug(D_VINE, "all data structures are clean");
 }
 
+/* Force a single running task to finish with the given result flag. */
+
 static void finish_running_task(struct vine_process *p, vine_result_t result)
 {
 	p->result |= result;
 	vine_process_kill(p);
 }
+
+/* Force all running tasks to finish with the given result flag. */
 
 static void finish_running_tasks(vine_result_t result)
 {
@@ -1011,6 +1021,8 @@ static void finish_running_tasks(vine_result_t result)
 
 	ITABLE_ITERATE(procs_running, task_id, p) { finish_running_task(p, result); }
 }
+
+/* Check whether a given process is still within the various limits imposed on it. */
 
 static int enforce_process_limits(struct vine_process *p)
 {
@@ -1030,6 +1042,8 @@ static int enforce_process_limits(struct vine_process *p)
 
 	return 1;
 }
+
+/* Check all processes to see whether they have exceeded various limits, and kill if necessary. */
 
 static int enforce_processes_limits()
 {
@@ -1093,12 +1107,16 @@ static void enforce_processes_max_running_time()
 	return;
 }
 
+/* Handle a release message from the manager, asking the worker to cleanly exit. */
+
 static int do_release()
 {
 	debug(D_VINE, "released by manager %s:%d.\n", current_manager_address->addr, current_manager_address->port);
 	released_by_manager = 1;
 	return 0;
 }
+
+/* Handle an unexpected disconnection by the current manager, and clean up everything. */
 
 static void disconnect_manager(struct link *manager)
 {
@@ -1116,6 +1134,8 @@ static void disconnect_manager(struct link *manager)
 		sleep(5);
 	}
 }
+
+/* Handle the next incoming message from the currently connected manager. */
 
 static int handle_manager(struct link *manager)
 {
@@ -1418,6 +1438,7 @@ static int check_library_startup(struct vine_process *p)
 /* Check whether all known libraries are ready to execute functions.
  * A library starts up and tells the vine_worker it's ready by reporting
  * back its library name. */
+
 static void check_libraries_ready()
 {
 	uint64_t library_task_id;
@@ -1451,6 +1472,8 @@ static void check_libraries_ready()
 		}
 	}
 }
+
+/* Start working for the (newly connected) manager on this given link. */
 
 static void work_for_manager(struct link *manager)
 {
@@ -1783,6 +1806,8 @@ static void workspace_delete()
 	free(vine_workspace_dir);
 }
 
+/* Attempt to connect, authenticate, and work with the manager at this specific host and port. */
+
 static int serve_manager_by_hostport(const char *host, int port, const char *verify_project, int use_ssl)
 {
 	if (!domain_name_cache_lookup(host, current_manager_address->addr)) {
@@ -1884,6 +1909,8 @@ static int serve_manager_by_hostport(const char *host, int port, const char *ver
 	return 1;
 }
 
+/* Attempt to connect and work with any opf the managers in this list. */
+
 int serve_manager_by_hostport_list(struct list *manager_addresses, int use_ssl)
 {
 	int result = 0;
@@ -1943,6 +1970,8 @@ static struct list *interfaces_to_list(const char *addr, int port, struct jx *if
 
 	return l;
 }
+
+/* Attempt to connect and work with managers found in the catalog matching a project regex. */
 
 static int serve_manager_by_name(const char *catalog_hosts, const char *project_regex)
 {
