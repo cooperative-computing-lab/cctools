@@ -2070,7 +2070,7 @@ static int serve_manager_by_name(const char *catalog_hosts, const char *project_
 
 /* Generate a unique worker ID string from local information. */
 
-static char * make_worker_id()
+static char *make_worker_id()
 {
 	srand(time(NULL));
 
@@ -2301,7 +2301,7 @@ int main(int argc, char *argv[])
 	current_transfers = hash_table_create(0, 0);
 	worker_start_time = timestamp_get();
 	worker_id = make_worker_id();
-	
+
 	// obtain the architecture and os on which worker is running.
 	uname(&uname_data);
 	os_name = xxstrdup(uname_data.sysname);
