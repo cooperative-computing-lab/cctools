@@ -102,8 +102,8 @@ static struct itable *procs_complete = NULL;
 /* Table of current transfers and their id. */
 static struct hash_table *current_transfers = NULL;
 
-/* The main cache object keeping track of files stored by the worker. */
-struct vine_cache *global_cache = 0;
+/* The cache manager object keeping track of files stored by the worker. */
+struct vine_cache *cache_manager = 0;
 
 /* The watcher object is responsible for periodically checking whether */
 /* files marked with VINE_WATCH have been modified and should be streamed back. */
@@ -313,10 +313,10 @@ static int64_t measure_worker_disk()
 {
 	static struct path_disk_size_info *state = NULL;
 
-	if (!global_cache)
+	if (!cache_manager)
 		return 0;
 
-	char *cache_dir = vine_cache_full_path(global_cache, ".");
+	char *cache_dir = vine_cache_full_path(cache_manager, ".");
 	path_disk_size_info_get_r(cache_dir, max_time_on_measurement, &state);
 	free(cache_dir);
 
@@ -525,7 +525,7 @@ static void report_worker_ready(struct link *manager)
 			CCTOOLS_VERSION_MINOR,
 			CCTOOLS_VERSION_MICRO);
 	send_message(manager, "info worker-id %s\n", worker_id);
-	vine_cache_scan(global_cache, manager);
+	vine_cache_scan(cache_manager, manager);
 
 	send_features(manager);
 	send_transfer_address(manager);
@@ -549,7 +549,7 @@ static int start_process(struct vine_process *p, struct link *manager)
 	struct vine_task *t = p->task;
 
 	/* Create the sandbox environment for the task. */
-	if (!vine_sandbox_stagein(p, global_cache)) {
+	if (!vine_sandbox_stagein(p, cache_manager)) {
 		p->execution_start = p->execution_end = timestamp_get();
 		p->result = VINE_RESULT_INPUT_MISSING;
 		p->exit_code = 1;
@@ -607,7 +607,7 @@ static void reap_process(struct vine_process *p, struct link *manager)
 
 	vine_gpus_free(p->task->task_id);
 
-	if (!vine_sandbox_stageout(p, global_cache, manager)) {
+	if (!vine_sandbox_stageout(p, cache_manager, manager)) {
 		p->result = VINE_RESULT_OUTPUT_MISSING;
 		p->exit_code = 1;
 	}
@@ -885,7 +885,7 @@ Accept a url specification and queue it for later transfer.
 
 static int do_put_url(const char *cache_name, int64_t size, int mode, const char *source)
 {
-	return vine_cache_queue_transfer(global_cache, source, cache_name, size, mode);
+	return vine_cache_queue_transfer(cache_manager, source, cache_name, size, mode);
 }
 
 /*
@@ -905,7 +905,7 @@ static int do_put_mini_task(struct link *manager, time_t stoptime, const char *c
 	free(output_mount->file->cached_name);
 	output_mount->file->cached_name = strdup(cache_name);
 
-	return vine_cache_queue_command(global_cache, mini_task, cache_name, size, mode);
+	return vine_cache_queue_command(cache_manager, mini_task, cache_name, size, mode);
 }
 
 /*
@@ -916,12 +916,12 @@ trash and deal with it there.
 
 static int do_unlink(struct link *manager, const char *path)
 {
-	char *cached_path = vine_cache_full_path(global_cache, path);
+	char *cached_path = vine_cache_full_path(cache_manager, path);
 
 	int result = 0;
 
 	if (path_within_dir(cached_path, vine_workspace_dir)) {
-		vine_cache_remove(global_cache, path, manager);
+		vine_cache_remove(cache_manager, path, manager);
 		result = 1;
 	} else {
 		debug(D_VINE, "%s is not within workspace %s", cached_path, vine_workspace_dir);
@@ -1136,11 +1136,11 @@ static int handle_manager(struct link *manager)
 		} else if (sscanf(line, "file %s %" SCNd64 " %o", filename_encoded, &length, &mode) == 3) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			r = vine_transfer_get_file(
-					manager, global_cache, filename, length, mode, time(0) + active_timeout);
+					manager, cache_manager, filename, length, mode, time(0) + active_timeout);
 			reset_idle_timer();
 		} else if (sscanf(line, "dir %s", filename_encoded) == 1) {
 			url_decode(filename_encoded, filename, sizeof(filename));
-			r = vine_transfer_get_dir(manager, global_cache, filename, time(0) + active_timeout);
+			r = vine_transfer_get_dir(manager, cache_manager, filename, time(0) + active_timeout);
 			reset_idle_timer();
 		} else if (sscanf(line,
 					   "puturl %s %s %" SCNd64 " %o %s",
@@ -1170,14 +1170,14 @@ static int handle_manager(struct link *manager)
 		} else if (sscanf(line, "getfile %s", filename_encoded) == 1) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			r = vine_transfer_put_any(manager,
-					global_cache,
+					cache_manager,
 					filename,
 					VINE_TRANSFER_MODE_FILE_ONLY,
 					time(0) + active_timeout);
 		} else if (sscanf(line, "get %s", filename_encoded) == 1) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			r = vine_transfer_put_any(manager,
-					global_cache,
+					cache_manager,
 					filename,
 					VINE_TRANSFER_MODE_ANY,
 					time(0) + active_timeout);
@@ -1517,7 +1517,7 @@ static void work_for_manager(struct link *manager)
 		expire_procs_running();
 
 		ok &= handle_completed_tasks(manager);
-		ok &= vine_cache_wait(global_cache, manager);
+		ok &= vine_cache_wait(cache_manager, manager);
 
 		measure_worker_resources();
 
@@ -1554,7 +1554,7 @@ static void work_for_manager(struct link *manager)
 				p = list_pop_head(procs_waiting);
 				if (!p) {
 					break;
-				} else if (process_ready_to_run_now(p, global_cache, manager)) {
+				} else if (process_ready_to_run_now(p, cache_manager, manager)) {
 					start_process(p, manager);
 					task_event++;
 				} else if (process_can_run_eventually(p)) {
@@ -1695,7 +1695,7 @@ static int workspace_prepare()
 		result = 1;
 		debug(D_VINE, "cache directory already exists!");
 	}
-	global_cache = vine_cache_create(cachedir);
+	cache_manager = vine_cache_create(cachedir);
 	free(cachedir);
 
 	char *tmp_name = string_format("%s/temp", vine_workspace_dir);
@@ -1707,7 +1707,7 @@ static int workspace_prepare()
 	trash_setup(trash_dir);
 	free(trash_dir);
 
-	vine_transfer_server_start(global_cache);
+	vine_transfer_server_start(cache_manager);
 
 	return result;
 }
@@ -1742,8 +1742,8 @@ static void workspace_cleanup()
 	}
 	trash_empty();
 
-	vine_cache_delete(global_cache);
-	global_cache = 0;
+	vine_cache_delete(cache_manager);
+	cache_manager = 0;
 }
 
 /*
@@ -1861,7 +1861,7 @@ static int serve_manager_by_hostport(const char *host, int port, const char *ver
 	}
 
 	workspace_prepare();
-	vine_cache_load(global_cache);
+	vine_cache_load(cache_manager);
 
 	measure_worker_resources();
 
