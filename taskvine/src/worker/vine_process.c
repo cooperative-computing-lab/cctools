@@ -239,7 +239,7 @@ int vine_process_execute_and_wait(struct vine_process *p)
  * @param p 	The relevant vine_process structure encapsulating a function call.
  * @return 		1 if the message is successfully sent to the library, 0 otherwise. */
 
-int vine_process_invoke_function( struct vine_process *p )
+int vine_process_invoke_function(struct vine_process *p)
 {
 	char *buffer = string_format("%d %s %s", p->task->task_id, p->task->command_line, p->sandbox);
 	ssize_t result = link_printf(p->library_process->library_write_link,
@@ -249,11 +249,19 @@ int vine_process_invoke_function( struct vine_process *p )
 			buffer);
 	free(buffer);
 
-	if (result < 0) {	
-		debug(D_VINE, "failed to communicate with library '%s' task %d", p->task->needs_library, p->library_process->pid);
+	if (result < 0) {
+		debug(D_VINE,
+				"failed to communicate with library '%s' task %d",
+				p->task->needs_library,
+				p->library_process->pid);
 		return 0;
-	} else {	
-		debug(D_VINE, "started task %d as function call '%s' to library '%s' task %d", p->task->task_id, p->task->command_line, p->task->needs_library, p->library_process->pid);
+	} else {
+		debug(D_VINE,
+				"started task %d as function call '%s' to library '%s' task %d",
+				p->task->task_id,
+				p->task->command_line,
+				p->task->needs_library,
+				p->library_process->pid);
 		return 1;
 	}
 }
@@ -266,10 +274,10 @@ Otherwise return false.
 int vine_process_execute(struct vine_process *p)
 {
 	/* Special case: invoke function by sending message. */
-	if(p->type==VINE_PROCESS_TYPE_FUNCTION) {
+	if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
 		return vine_process_invoke_function(p);
 	}
-	
+
 	/* Flush pending stdio buffers prior to forking process, to avoid stale output in child. */
 	fflush(NULL);
 
@@ -341,7 +349,7 @@ int vine_process_execute(struct vine_process *p)
 		}
 
 		return 1;
-		
+
 	} else if (p->pid < 0) {
 
 		debug(D_VINE, "couldn't create new process: %s\n", strerror(errno));
@@ -355,7 +363,7 @@ int vine_process_execute(struct vine_process *p)
 		close(error_fd);
 
 		return 0;
-		
+
 	} else {
 		if (chdir(p->sandbox)) {
 			printf("The sandbox dir is %s", p->sandbox);
@@ -430,7 +438,7 @@ Returns true if complete, false otherwise.
 int vine_process_is_complete(struct vine_process *p)
 {
 	/* A function call doesn't have a Unix process to check. */
-	if(p->type==VINE_PROCESS_TYPE_FUNCTION) {
+	if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
 		return 0;
 	}
 
@@ -453,10 +461,10 @@ Return true if the process was found, false otherwise,
 int vine_process_wait(struct vine_process *p)
 {
 	/* A function call cannot be waited for directly. */
-	if(p->type==VINE_PROCESS_TYPE_FUNCTION) {
+	if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
 		return 0;
 	}
-	
+
 	while (1) {
 		int status;
 		pid_t pid = waitpid(p->pid, &status, 0);
@@ -475,39 +483,42 @@ int vine_process_wait(struct vine_process *p)
  * @param p			The vine process encapsulating the function call.
  * @param done_task_id          Pointer to location to store completed task id.
  * return 			1 if the operation succeeds, 0 otherwise.
-*/
+ */
 
-int vine_process_library_get_result( struct vine_process *p, uint64_t *done_task_id )
+int vine_process_library_get_result(struct vine_process *p, uint64_t *done_task_id)
 {
 	/* If this is not a library process, don't check. */
-	if(p->type!=VINE_PROCESS_TYPE_LIBRARY) return 0;
+	if (p->type != VINE_PROCESS_TYPE_LIBRARY)
+		return 0;
 
 	/* If the library is not initialized, don't check. */
-	if(!p->library_ready) return 0;
-	
+	if (!p->library_ready)
+		return 0;
+
 	/* If there is no data waiting on the link, don't check. */
-	if(!link_usleep(p->library_read_link, 0, 1, 0)) return 0;
-	
+	if (!link_usleep(p->library_read_link, 0, 1, 0))
+		return 0;
+
 	char buffer[VINE_LINE_MAX]; // Buffer to store length of data from library.
 	int ok = 1;
 
 	/* read number of bytes of data first. */
-	ok = link_readline(p->library_read_link, buffer, VINE_LINE_MAX, time(0)+active_timeout);
+	ok = link_readline(p->library_read_link, buffer, VINE_LINE_MAX, time(0) + active_timeout);
 	if (!ok) {
 		return 0;
 	}
 	int len_buffer = atoi(buffer);
 
 	/* now read the buffer, which is the task id of the done function invocation. */
-	char buffer_data[len_buffer+1];
-	ok = link_read(p->library_read_link, buffer_data, len_buffer, time(0)+active_timeout);
+	char buffer_data[len_buffer + 1];
+	ok = link_read(p->library_read_link, buffer_data, len_buffer, time(0) + active_timeout);
 	if (ok <= 0) {
 		return 0;
 	}
 
 	/* null terminate the buffer before treating it as a string. */
-        buffer_data[ok] = 0;
-	
+	buffer_data[ok] = 0;
+
 	*done_task_id = (uint64_t)strtoul(buffer_data, NULL, 10);
 	debug(D_VINE, "Received result for function %" PRIu64, *done_task_id);
 
@@ -523,10 +534,10 @@ void vine_process_kill(struct vine_process *p)
 {
 	/* XXX A function call cannot (yet) be killed directly. */
 	/* This could be implemented by sending a message to the library process. */
-	if(p->type==VINE_PROCESS_TYPE_FUNCTION) {
+	if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
 		return;
 	}
-	
+
 	// make sure a few seconds have passed since child process was created to avoid sending a signal
 	// before it has been fully initialized. Else, the signal sent to that process gets lost.
 	timestamp_t elapsed_time_execution_start = timestamp_get() - p->execution_start;

@@ -519,7 +519,7 @@ static int start_process(struct vine_process *p, struct link *manager)
 	}
 
 	/* Now start the process (or function) running. */
-	if(vine_process_execute(p)) {
+	if (vine_process_execute(p)) {
 
 		/* If this process represents a library, notify the manager that it is running.
 		 * Also set the sigchld flag so the worker will immediately check for the library
@@ -530,13 +530,13 @@ static int start_process(struct vine_process *p, struct link *manager)
 		}
 
 		/* If this process represents a function, update the number running. */
-		if( t->needs_library ){
+		if (t->needs_library) {
 			p->library_process->functions_running++;
 		}
 	} else {
 		fatal("unable to start task_id %d!", p->task->task_id);
 	}
-	
+
 	itable_insert(procs_running, p->task->task_id, p);
 
 	return 1;
@@ -665,27 +665,27 @@ static int handle_completed_tasks(struct link *manager)
 		int result_retrieved = 0;
 
 		/* Check to see if this process itself is completed. */
-		
+
 		if (vine_process_is_complete(p)) {
 			reap_process(p, manager);
 			result_retrieved++;
 		}
 
 		/* If p is a library, check to see if any results waiting. */
-		
-		while (vine_process_library_get_result(p,&done_task_id)) {
-			fp = itable_lookup(procs_table,done_task_id);
-			if(fp) {
-				reap_process(fp,manager);
+
+		while (vine_process_library_get_result(p, &done_task_id)) {
+			fp = itable_lookup(procs_table, done_task_id);
+			if (fp) {
+				reap_process(fp, manager);
 				result_retrieved++;
 			}
 		}
 
 		/* If any items were removed, reset the iterator to get back to a known position */
 
-	       	if (result_retrieved) {
-	       		itable_firstkey(procs_running);
-       		}
+		if (result_retrieved) {
+			itable_firstkey(procs_running);
+		}
 	}
 
 	return 1;
