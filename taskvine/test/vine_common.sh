@@ -18,7 +18,7 @@ quit
 EOF
 
 	echo "starting master"
-	vine_benchmark -Z master.port < master.script &
+	../src/tools/vine_benchmark -Z master.port < master.script &
 
 	echo "waiting for master to get ready"
 	wait_for_file_creation master.port 5
@@ -26,7 +26,7 @@ EOF
 	port=`cat master.port`
 
 	echo "starting worker"
-	vine_worker -o worker.log -d all localhost $port -b 1 --timeout 20 --cores $CORES --memory-threshold 10 --memory 50 --single-shot
+	../src/worker/vine_worker -o worker.log -d all localhost $port -b 1 --timeout 20 --cores $CORES --memory-threshold 10 --memory 50 --single-shot
 
 	echo "checking for output"
 	i=0
