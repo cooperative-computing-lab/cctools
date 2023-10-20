@@ -48,8 +48,6 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/wait.h>
 
-extern char *vine_workspace_dir;
-
 /*
 Give the letter code used for the process sandbox dir.
 */
