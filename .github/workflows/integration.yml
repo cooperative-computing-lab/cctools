@@ -126,22 +126,26 @@ jobs:
                 source ~/.zshrc
                 conda install -n base conda-libmamba-solver
                 conda create --name cctools-build --yes --quiet --channel conda-forge --strict-channel-priority --solver=libmamba python=3 gdb m4 perl swig make zlib libopenssl-static openssl conda-pack cloudpickle packaging
-        shell: zsh
       - name: Verify Conda Installation
-        run: conda list --name cctools-build
-        shell: zsh
+        run: |
+                source ~/.zshrc
+                conda list --name cctools-build
       - name: Configure
-        run: ${GITHUB_WORKSPACE}/packaging/build-conda/configure.sh
-        shell: zsh
+        run: |
+                source ~/.zshrc
+                ${GITHUB_WORKSPACE}/packaging/build-conda/configure.sh
       - name: Build
-        run: ${GITHUB_WORKSPACE}/packaging/build-conda/build.sh
-        shell: zsh
+        run: |
+                source ~/.zshrc
+                ${GITHUB_WORKSPACE}/packaging/build-conda/build.sh
       - name: Install
-        run: ${GITHUB_WORKSPACE}/packaging/build-conda/install.sh
-        shell: zsh
+        run: |
+                source ~/.zshrc
+                ${GITHUB_WORKSPACE}/packaging/build-conda/install.sh
       - name: Test
-        run: ${GITHUB_WORKSPACE}/packaging/build-conda/test.sh
-        shell: zsh
+        run: |
+                source ~/.zshrc
+                ${GITHUB_WORKSPACE}/packaging/build-conda/test.sh
       - name: deploy
         uses: ncipollo/release-action@v1
         if: github.event_name == 'workflow_dispatch'
