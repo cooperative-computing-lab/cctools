@@ -260,11 +260,14 @@ static void handle_worker_timeout(struct vine_manager *q, struct vine_worker_inf
 	// Look at the files and check if any are endangered temps.
 	char *cachename;
 	struct vine_file_replica *remote_info;
+	//debug(D_VINE, "Handling timeout request"); 
 	HASH_TABLE_ITERATE(w->current_files, cachename, remote_info)
 	{
+	//	debug(D_VINE, "Looking at file %s", cachename); 
 		if(strncmp(cachename, "temp-rnd-", 9) == 0)
 		{
 			int c = vine_file_replica_table_count_replicas(q, cachename);
+	//		debug(D_VINE, "Temp file found with %d replicas", c); 
 			if(c == 1)
 			{
 				debug(D_VINE, "Rejecting timeout request from worker %s (%s). Has unique file %s", w->hostname, w->addrport, cachename); 
