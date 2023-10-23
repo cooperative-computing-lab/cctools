@@ -71,11 +71,12 @@ int vine_file_replica_table_count_replicas(struct vine_manager *q, const char *c
 	struct vine_worker_info *w;
 	struct vine_file_replica *r;
 	int c = 0;
-	
+
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
 		r = hash_table_lookup(w->current_files, cachename);
-		if (r) c++;
+		if (r)
+			c++;
 	}
 	return c;
 }

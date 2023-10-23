@@ -250,7 +250,6 @@ static vine_msg_code_t handle_name(struct vine_manager *q, struct vine_worker_in
 	return VINE_MSG_PROCESSED;
 }
 
-
 /*
 Handle a timeout request from a worker. Check if the worker has any important data before letting it go.
 */
@@ -260,23 +259,24 @@ static void handle_worker_timeout(struct vine_manager *q, struct vine_worker_inf
 	// Look at the files and check if any are endangered temps.
 	char *cachename;
 	struct vine_file_replica *remote_info;
-	//debug(D_VINE, "Handling timeout request"); 
+	// debug(D_VINE, "Handling timeout request");
 	HASH_TABLE_ITERATE(w->current_files, cachename, remote_info)
 	{
-	//	debug(D_VINE, "Looking at file %s", cachename); 
-		if(strncmp(cachename, "temp-rnd-", 9) == 0)
-		{
+		//	debug(D_VINE, "Looking at file %s", cachename);
+		if (strncmp(cachename, "temp-rnd-", 9) == 0) {
 			int c = vine_file_replica_table_count_replicas(q, cachename);
-	//		debug(D_VINE, "Temp file found with %d replicas", c); 
-			if(c == 1)
-			{
-				debug(D_VINE, "Rejecting timeout request from worker %s (%s). Has unique file %s", w->hostname, w->addrport, cachename); 
+			//		debug(D_VINE, "Temp file found with %d replicas", c);
+			if (c == 1) {
+				debug(D_VINE,
+						"Rejecting timeout request from worker %s (%s). Has unique file %s",
+						w->hostname,
+						w->addrport,
+						cachename);
 				return;
 			}
-		} 
-
+		}
 	}
-	debug(D_VINE, "Accepting drain request from worker %s (%s).", w->hostname, w->addrport); 
+	debug(D_VINE, "Accepting drain request from worker %s (%s).", w->hostname, w->addrport);
 	w->draining = 1;
 	return;
 }
@@ -1320,7 +1320,6 @@ static void handle_worker_failure(struct vine_manager *q, struct vine_worker_inf
 	remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
 	return;
 }
-
 
 /*
 Handle the failure of a task, taking different actions depending on whether
