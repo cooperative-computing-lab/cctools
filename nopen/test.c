@@ -10,7 +10,7 @@ int main(void){
     int fd;
     char c;
 
-    fd = open("main.c", O_RDONLY);
+    fd = open("test.c", O_RDONLY);
     fp = fdopen(fd, "r");
     if (fp == NULL) 
     {

@@ -1,3 +1,5 @@
+include ../config.mk
+
 CC=			gcc
 CFLAGS=		-g -Wall -std=gnu99
 LD=			gcc
@@ -26,7 +28,7 @@ program: test.o
 main.o: test.c lib-new-open.h
 	$(CC) $(CFLAGS) -c -o test.o test.c
 
-preload: lib-new-open.so program
+test: lib-new-open.so program
 	LD_PRELOAD=./lib-new-open.so ./program
 
 worker:
