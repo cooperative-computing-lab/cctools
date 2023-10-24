@@ -130,6 +130,8 @@ jobs:
         run: |
                 source ~/.zshrc
                 conda list --name cctools-build
+                python --version
+                conda activate cctools-build
       - name: Configure
         run: |
                 source ~/.zshrc
