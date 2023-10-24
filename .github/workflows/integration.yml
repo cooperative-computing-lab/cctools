@@ -92,7 +92,10 @@ jobs:
         - name: Verify Conda Installation
           run: |
                   source ~/.zshrc
-                  conda list --name cctools-build
+                  echo "$SHELL"
+                  echo "$SHELL"
+                  echo "$SHELL"
+                  echo "$SHELL"
         - name: Configure
           run: |
                   source ~/.zshrc
