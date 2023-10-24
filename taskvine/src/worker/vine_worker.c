@@ -1891,6 +1891,67 @@ static int serve_manager_by_name(const char *catalog_hosts, const char *project_
 	}
 }
 
+static void vine_worker_main_loop()
+{	
+	int backoff_interval = init_backoff_interval;
+
+	while (1) {
+		int result = 0;
+
+		if (initial_ppid != 0 && getppid() != initial_ppid) {
+			debug(D_NOTICE, "parent process exited, shutting down\n");
+			break;
+		}
+
+		measure_worker_resources();
+		if (!enforce_worker_promises(NULL)) {
+			abort_flag = 1;
+			break;
+		}
+
+		if (project_regex) {
+			result = serve_manager_by_name(catalog_hosts, project_regex);
+		} else {
+			result = serve_manager_by_hostport_list(
+					manager_addresses, /* use ssl only if --ssl */ manual_ssl_option);
+		}
+
+		/*
+		If the last attempt was a succesful connection, then reset the backoff_interval,
+		and the connect timeout, then try again if a project name was given.
+		If the connect attempt failed, then slow down the retries.
+		*/
+
+		if (result) {
+			if (single_shot_mode) {
+				debug(D_DEBUG, "stopping: single shot mode");
+				break;
+			}
+			backoff_interval = init_backoff_interval;
+			connect_stoptime = time(0) + connect_timeout;
+
+			if (!project_regex && (time(0) > idle_stoptime)) {
+				debug(D_NOTICE, "stopping: no other managers available");
+				break;
+			}
+		} else {
+			backoff_interval = MIN(backoff_interval * 2, max_backoff_interval);
+		}
+
+		if (abort_flag) {
+			debug(D_NOTICE, "stopping: abort signal received");
+			break;
+		}
+
+		if (time(0) > connect_stoptime) {
+			debug(D_NOTICE, "stopping: could not connect after %d seconds.", connect_timeout);
+			break;
+		}
+
+		sleep(backoff_interval);
+	}
+}
+ 
 /* Generate a unique worker ID string from local information. */
 
 static char *make_worker_id()
@@ -2406,71 +2467,17 @@ int main(int argc, char *argv[])
 		manual_cores_option = load_average_get_cpus();
 	}
 
-	int backoff_interval = init_backoff_interval;
 	connect_stoptime = time(0) + connect_timeout;
 
 	measure_worker_resources();
+
 	printf("vine_worker: using %" PRId64 " cores, %" PRId64 " MB memory, %" PRId64 " MB disk, %" PRId64 " gpus\n",
 			total_resources->cores.total,
 			total_resources->memory.total,
 			total_resources->disk.total,
 			total_resources->gpus.total);
 
-	while (1) {
-		int result = 0;
-
-		if (initial_ppid != 0 && getppid() != initial_ppid) {
-			debug(D_NOTICE, "parent process exited, shutting down\n");
-			break;
-		}
-
-		measure_worker_resources();
-		if (!enforce_worker_promises(NULL)) {
-			abort_flag = 1;
-			break;
-		}
-
-		if (project_regex) {
-			result = serve_manager_by_name(catalog_hosts, project_regex);
-		} else {
-			result = serve_manager_by_hostport_list(
-					manager_addresses, /* use ssl only if --ssl */ manual_ssl_option);
-		}
-
-		/*
-		If the last attempt was a succesful connection, then reset the backoff_interval,
-		and the connect timeout, then try again if a project name was given.
-		If the connect attempt failed, then slow down the retries.
-		*/
-
-		if (result) {
-			if (single_shot_mode) {
-				debug(D_DEBUG, "stopping: single shot mode");
-				break;
-			}
-			backoff_interval = init_backoff_interval;
-			connect_stoptime = time(0) + connect_timeout;
-
-			if (!project_regex && (time(0) > idle_stoptime)) {
-				debug(D_NOTICE, "stopping: no other managers available");
-				break;
-			}
-		} else {
-			backoff_interval = MIN(backoff_interval * 2, max_backoff_interval);
-		}
-
-		if (abort_flag) {
-			debug(D_NOTICE, "stopping: abort signal received");
-			break;
-		}
-
-		if (time(0) > connect_stoptime) {
-			debug(D_NOTICE, "stopping: could not connect after %d seconds.", connect_timeout);
-			break;
-		}
-
-		sleep(backoff_interval);
-	}
+	vine_worker_main_loop();
 
 	vine_workspace_delete(workspace);
 	workspace = 0;
