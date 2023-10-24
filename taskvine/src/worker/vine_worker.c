@@ -1977,33 +1977,54 @@ struct list *parse_manager_addresses(const char *specs, int default_port)
 
 /* Set up initial shared data structures. */
 	
-void create_worker_structures()
+void vine_worker_create_structures()
 {
 	procs_table = itable_create(0);
 	procs_running = itable_create(0);
 	procs_waiting = list_create();
 	procs_complete = itable_create(0);
 
+	features = hash_table_create(4, 0);
+
+	current_transfers = hash_table_create(0, 0);
+
 	watcher = vine_watcher_create();
 
 	total_resources = vine_resources_create();
+
+	struct utsname uname_data;
+	uname(&uname_data);
+
+	os_name = xxstrdup(uname_data.sysname);
+	arch_name = xxstrdup(uname_data.machine);
+
+	worker_id = make_worker_id();
 }
 
 /* Final cleanup of all worker structures before exiting */
 
-static void delete_worker_structures()
+static void vine_worker_delete_structures()
 {
-	/* These items may have been set during option processing. */
-	
 	if (manual_workspace_option)
 		free(manual_workspace_option);
+
+	if (worker_id)
+		free(worker_id);
+			
 	if (os_name)
 		free(os_name);
 	if (arch_name)
 		free(arch_name);
-
-	/* These items were created by create_worker_structures */
 	
+	if (total_resources)
+		vine_resources_delete(total_resources);
+	if (watcher)
+		vine_watcher_delete(watcher);
+	if (current_transfers)
+		hash_table_delete(current_transfers);
+	if (features)
+		hash_table_delete(features);
+		       
 	if (procs_table)
 		itable_delete(procs_table);
 	if (procs_running)
@@ -2013,11 +2034,6 @@ static void delete_worker_structures()
 	if (procs_waiting)
 		list_delete(procs_waiting);
 
-	if (watcher)
-		vine_watcher_delete(watcher);
-
-	if (total_resources)
-		vine_resources_delete(total_resources);
 }
 
 static void show_help(const char *cmd)
@@ -2159,24 +2175,17 @@ int main(int argc, char *argv[])
 	/* This must come first in main, allows us to change process titles in ps later. */
 	change_process_title_init(argv);
 
-	int c;
-	int w;
-	struct utsname uname_data;
-
 	catalog_hosts = CATALOG_HOST;
 
-	features = hash_table_create(4, 0);
-	current_transfers = hash_table_create(0, 0);
 	worker_start_time = timestamp_get();
-	worker_id = make_worker_id();
 
-	// obtain the architecture and os on which worker is running.
-	uname(&uname_data);
-	os_name = xxstrdup(uname_data.sysname);
-	arch_name = xxstrdup(uname_data.machine);
-
+	vine_worker_create_structures();
+ 
 	debug_config(argv[0]);
 	read_resources_env_vars();
+
+	int c;
+	int w;
 
 	while ((c = getopt_long(argc, argv, "aC:d:t:o:p:M:N:P:w:i:b:z:A:O:s:v:h", long_options, 0)) != -1) {
 		switch (c) {
@@ -2393,8 +2402,6 @@ int main(int argc, char *argv[])
 
 	chdir(workspace->workspace_dir);
 
-	create_worker_structures();
- 
 	if (manual_cores_option < 1) {
 		manual_cores_option = load_average_get_cpus();
 	}
@@ -2465,10 +2472,10 @@ int main(int argc, char *argv[])
 		sleep(backoff_interval);
 	}
 
-	delete_worker_structures();
-
 	vine_workspace_delete(workspace);
 	workspace = 0;
+
+	vine_worker_delete_structures();
 
 	return 0;
 }
