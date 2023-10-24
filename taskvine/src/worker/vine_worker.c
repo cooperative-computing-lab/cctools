@@ -1892,7 +1892,7 @@ static int vine_worker_serve_manager_by_name(const char *catalog_hosts, const ch
 }
 
 static void vine_worker_serve_managers()
-{	
+{
 	int backoff_interval = init_backoff_interval;
 
 	while (1) {
@@ -1951,7 +1951,7 @@ static void vine_worker_serve_managers()
 		sleep(backoff_interval);
 	}
 }
- 
+
 /* Generate a unique worker ID string from local information. */
 
 static char *make_worker_id()
@@ -2037,7 +2037,7 @@ struct list *parse_manager_addresses(const char *specs, int default_port)
 }
 
 /* Set up initial shared data structures. */
-	
+
 void vine_worker_create_structures()
 {
 	procs_table = itable_create(0);
@@ -2071,12 +2071,12 @@ static void vine_worker_delete_structures()
 
 	if (worker_id)
 		free(worker_id);
-			
+
 	if (os_name)
 		free(os_name);
 	if (arch_name)
 		free(arch_name);
-	
+
 	if (total_resources)
 		vine_resources_delete(total_resources);
 	if (watcher)
@@ -2085,7 +2085,7 @@ static void vine_worker_delete_structures()
 		hash_table_delete(current_transfers);
 	if (features)
 		hash_table_delete(features);
-		       
+
 	if (procs_table)
 		itable_delete(procs_table);
 	if (procs_running)
@@ -2094,7 +2094,6 @@ static void vine_worker_delete_structures()
 		itable_delete(procs_complete);
 	if (procs_waiting)
 		list_delete(procs_waiting);
-
 }
 
 static void show_help(const char *cmd)
@@ -2241,7 +2240,7 @@ int main(int argc, char *argv[])
 	worker_start_time = timestamp_get();
 
 	vine_worker_create_structures();
- 
+
 	debug_config(argv[0]);
 	read_resources_env_vars();
 

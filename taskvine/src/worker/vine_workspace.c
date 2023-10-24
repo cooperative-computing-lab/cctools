@@ -46,7 +46,7 @@ struct vine_workspace *vine_workspace_create(const char *manual_tmpdir)
 	/* On first startup, delete the cache directory. */
 	/* XXX This is holdover from WQ, is it correct? */
 
-	printf("vine_worker: cleaning up cache directory %s",w->cache_dir);
+	printf("vine_worker: cleaning up cache directory %s", w->cache_dir);
 	unlink_recursive(w->cache_dir);
 
 	return w;
