@@ -85,32 +85,22 @@ jobs:
                   mkdir -p ~/miniconda3
                   curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o ~/miniconda3/miniconda.sh
                   bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
-                  ~/miniconda3/bin/conda init zsh
-                  source ~/.zshrc
+                  touch ~/.bashrc
+                  ~/miniconda3/bin/conda init bash
+                  source ~/.bashrc
                   conda install -n base conda-libmamba-solver
                   conda create --name cctools-build --yes --quiet --channel conda-forge --strict-channel-priority --solver=libmamba python=3 gdb m4 perl swig make zlib libopenssl-static openssl conda-pack cloudpickle packaging
-        - name: Verify Conda Installation
-          run: |
-                  source ~/.zshrc
-                  echo "$SHELL"
-                  echo "$SHELL"
-                  echo "$SHELL"
-                  echo "$SHELL"
         - name: Configure
           run: |
-                  source ~/.zshrc
                   ${GITHUB_WORKSPACE}/packaging/build-conda/configure.sh
         - name: Build
           run: |
-                  source ~/.zshrc
                   ${GITHUB_WORKSPACE}/packaging/build-conda/build.sh
         - name: Install
           run: |
-                  source ~/.zshrc
                   ${GITHUB_WORKSPACE}/packaging/build-conda/install.sh
         - name: Test
           run: |
-                  source ~/.zshrc
                   ${GITHUB_WORKSPACE}/packaging/build-conda/test.sh
         - name: deploy
           uses: ncipollo/release-action@v1
@@ -152,25 +142,22 @@ jobs:
                 mkdir -p ~/miniconda3
                 curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o ~/miniconda3/miniconda.sh
                 bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
-                ~/miniconda3/bin/conda init zsh
-                source ~/.zshrc
+                touch ~/.bashrc
+                ~/miniconda3/bin/conda init bash
+                source ~/.bashrc
                 conda install -n base conda-libmamba-solver
                 conda create --name cctools-build --yes --quiet --channel conda-forge --strict-channel-priority --solver=libmamba python=3 gdb m4 perl swig make zlib libopenssl-static openssl conda-pack cloudpickle packaging
       - name: Verify Conda Installation
         run: |
-                source ~/.zshrc
                 conda list --name cctools-build
       - name: Configure
         run: |
-                source ~/.zshrc
                 ${GITHUB_WORKSPACE}/packaging/build-conda/configure.sh
       - name: Build
         run: |
-                source ~/.zshrc
                 ${GITHUB_WORKSPACE}/packaging/build-conda/build.sh
       - name: Install
         run: |
-                source ~/.zshrc
                 ${GITHUB_WORKSPACE}/packaging/build-conda/install.sh
       - name: Test
         run: |
