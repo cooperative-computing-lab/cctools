@@ -1476,7 +1476,7 @@ static void check_libraries_ready()
 
 /* Start working for the (newly connected) manager on this given link. */
 
-static void work_for_manager(struct link *manager)
+static void vine_worker_serve_manager(struct link *manager)
 {
 	sigset_t mask;
 
@@ -1614,7 +1614,7 @@ static void work_for_manager(struct link *manager)
 
 /* Attempt to connect, authenticate, and work with the manager at this specific host and port. */
 
-static int serve_manager_by_hostport(const char *host, int port, const char *verify_project, int use_ssl)
+static int vine_worker_serve_manager_by_hostport(const char *host, int port, const char *verify_project, int use_ssl)
 {
 	if (!domain_name_cache_lookup(host, current_manager_address->addr)) {
 		fprintf(stderr, "couldn't resolve hostname %s", host);
@@ -1705,7 +1705,7 @@ static int serve_manager_by_hostport(const char *host, int port, const char *ver
 
 	report_worker_ready(manager);
 
-	work_for_manager(manager);
+	vine_worker_serve_manager(manager);
 
 	if (abort_signal_received) {
 		send_message(manager, "info vacating %d\n", abort_signal_received);
@@ -1734,7 +1734,7 @@ static int serve_manager_by_hostport(const char *host, int port, const char *ver
 
 /* Attempt to connect and work with any opf the managers in this list. */
 
-int serve_manager_by_hostport_list(struct list *manager_addresses, int use_ssl)
+static int vine_worker_serve_manager_by_hostport_list(struct list *manager_addresses, int use_ssl)
 {
 	int result = 0;
 
@@ -1742,7 +1742,7 @@ int serve_manager_by_hostport_list(struct list *manager_addresses, int use_ssl)
 	 * are tried, or a succesful connection was done */
 	LIST_ITERATE(manager_addresses, current_manager_address)
 	{
-		result = serve_manager_by_hostport(current_manager_address->host,
+		result = vine_worker_serve_manager_by_hostport(current_manager_address->host,
 				current_manager_address->port,
 				/*verify name*/ 0,
 				use_ssl);
@@ -1796,7 +1796,7 @@ static struct list *interfaces_to_list(const char *addr, int port, struct jx *if
 
 /* Attempt to connect and work with managers found in the catalog matching a project regex. */
 
-static int serve_manager_by_name(const char *catalog_hosts, const char *project_regex)
+static int vine_worker_serve_manager_by_name(const char *catalog_hosts, const char *project_regex)
 {
 	struct list *managers_list = vine_catalog_query_cached(catalog_hosts, -1, project_regex);
 
@@ -1871,7 +1871,7 @@ static int serve_manager_by_name(const char *catalog_hosts, const char *project_
 			manager_addresses = interfaces_to_list(addr, port, ifas);
 		}
 
-		result = serve_manager_by_hostport_list(manager_addresses, use_ssl);
+		result = vine_worker_serve_manager_by_hostport_list(manager_addresses, use_ssl);
 
 		struct manager_address *m;
 		while ((m = list_pop_head(manager_addresses))) {
@@ -1891,7 +1891,7 @@ static int serve_manager_by_name(const char *catalog_hosts, const char *project_
 	}
 }
 
-static void vine_worker_main_loop()
+static void vine_worker_serve_managers()
 {	
 	int backoff_interval = init_backoff_interval;
 
@@ -1910,9 +1910,9 @@ static void vine_worker_main_loop()
 		}
 
 		if (project_regex) {
-			result = serve_manager_by_name(catalog_hosts, project_regex);
+			result = vine_worker_serve_manager_by_name(catalog_hosts, project_regex);
 		} else {
-			result = serve_manager_by_hostport_list(
+			result = vine_worker_serve_manager_by_hostport_list(
 					manager_addresses, /* use ssl only if --ssl */ manual_ssl_option);
 		}
 
@@ -2477,7 +2477,7 @@ int main(int argc, char *argv[])
 			total_resources->disk.total,
 			total_resources->gpus.total);
 
-	vine_worker_main_loop();
+	vine_worker_serve_managers();
 
 	vine_workspace_delete(workspace);
 	workspace = 0;
