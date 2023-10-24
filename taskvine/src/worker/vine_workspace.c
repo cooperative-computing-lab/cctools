@@ -16,6 +16,8 @@
 #include <stdio.h>
 #include <string.h>
 
+/* Create a new workspace object and sub-paths */
+
 struct vine_workspace *vine_workspace_create(const char *manual_tmpdir)
 {
 	char absolute[VINE_LINE_MAX];
@@ -41,13 +43,16 @@ struct vine_workspace *vine_workspace_create(const char *manual_tmpdir)
 	w->temp_dir = string_format("%s/temp", w->workspace_dir);
 	w->trash_dir = string_format("%s/trash", w->workspace_dir);
 
+	/* On first startup, delete the cache directory. */
+	/* XXX This is holdover from WQ, is it correct? */
+
+	printf("vine_worker: cleaning up cache directory %s",w->cache_dir);
+	unlink_recursive(w->cache_dir);
+
 	return w;
 }
 
-/*
-Create a test script and try to execute.
-With this we check the scratch directory allows file execution.
-*/
+/* Check that the workspace is actually writable and executable. */
 
 int vine_workspace_check(struct vine_workspace *w)
 {
@@ -89,28 +94,7 @@ int vine_workspace_check(struct vine_workspace *w)
 	return !error;
 }
 
-/*
-workspace_prepare is called every time we connect to a new manager.
-The peer transfer server is associated with a particular cache
-directory, and so gets created (and deleted) with the corresponding cache.
-
-The workspace consists of the following directories:
-
-- cache - contains only files/directories that are sent by the manager, or downloaded at the manager's direction.  These
-are meant for use by tasks as input/output files, and are immutable once created.  The name of each file in the cache is
-chosen by the manager for the purpose of avoiding accidental sharing, and may differ from the name of the file in the
-task sandbox.
-
-- temp - a temporary directory of last resort if a tool needs some space to work on items that neither belong in the
-cache or in a task sandbox.  Really anything using this directory is a hack and its behavior should be reconsidered.
-
-- trash - deleted files are moved here, and then unlinked.  This is done because (a) it may not be possible to unlink a
-file outright if it is still in use as an executable, and (b) the move of an entire directory can be done quickly and
-atomically.  An attempt is made to deleted everything in this directory on startup, shutdown, and whenever an individual
-file is trashed.  (See trash_file.[ch])
-
-- task.%d - each executing task gets its own sandbox directory as it runs
-*/
+/* Prepare the workspace prior to working with a manager. */
 
 int vine_workspace_prepare(struct vine_workspace *w)
 {
@@ -133,11 +117,7 @@ int vine_workspace_prepare(struct vine_workspace *w)
 	return 1;
 }
 
-/*
-workspace_cleanup is called every time we disconnect from a manager,
-to remove any state left over from a previous run.  Remove all
-directories (except trash) and move them to the trash directory.
-*/
+/* Cleanup task directories when disconnecting from a given manager. */
 
 int vine_workspace_cleanup(struct vine_workspace *w)
 {
@@ -155,19 +135,20 @@ int vine_workspace_cleanup(struct vine_workspace *w)
 				continue;
 			if (!strcmp(d->d_name, "cache"))
 				continue;
+
+			/* Anything not matching gets moved into the trash. */
 			trash_file(d->d_name);
 		}
 		closedir(dir);
 	}
+
+	/* Now remove everything in the trash. */
 	trash_empty();
 
 	return 1;
 }
 
-/*
-workspace_delete is called when the worker is about to exit,
-so that all files are removed.
-*/
+/* Remove the entire workspace recursively when the worker exits. */
 
 void vine_workspace_delete(struct vine_workspace *w)
 {
