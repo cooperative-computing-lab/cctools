@@ -276,8 +276,12 @@ static void handle_worker_timeout(struct vine_manager *q, struct vine_worker_inf
 			}
 		}
 	}
-	debug(D_VINE, "Accepting drain request from worker %s (%s).", w->hostname, w->addrport);
-	w->draining = 1;
+
+	if (itable_size(w->current_tasks) == 0) {
+		debug(D_VINE, "Accepting timeout request from worker %s (%s).", w->hostname, w->addrport);
+		shut_down_worker(q, w);
+	}
+
 	return;
 }
 
