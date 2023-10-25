@@ -168,7 +168,7 @@ static void export_environment(struct vine_process *p)
 
 	/* Adds current working directory to rule allow list and sets LD PRELOAD */
 
-	if (p->nopen_option) {	
+	if (p->nopen_option) {
 		FILE *rules;
 		char cwd[BUFSIZ];
 
