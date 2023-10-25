@@ -168,16 +168,18 @@ static void export_environment(struct vine_process *p)
 
 	/* Adds current working directory to rule allow list and sets LD PRELOAD */
 
-	FILE *rules;
-	char cwd[BUFSIZ];
+	if (p->nopen_option) {	
+		FILE *rules;
+		char cwd[BUFSIZ];
 
-	rules = fopen("./rules.txt", "a");
+		rules = fopen("./rules.txt", "a");
 
-	if (rules) {
-		fputs(strcat(getcwd(cwd, BUFSIZ), "\n"), rules);
-		fclose(rules);
+		if (rules) {
+			fputs(strcat(getcwd(cwd, BUFSIZ), "\n"), rules);
+			fclose(rules);
 
-		setenv("LD_PRELOAD", "./lib-nopen.so", 1);
+			setenv("LD_PRELOAD", "./lib-nopen.so", 1);
+		}
 	}
 }
 

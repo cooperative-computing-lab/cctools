@@ -273,6 +273,8 @@ static int max_time_on_measurement = 3;
 
 extern int vine_hack_do_not_compute_cached_name;
 
+static int nopen_option = 0;
+
 /* Send a printf-formatted message to the current manager. */
 
 __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const char *fmt, ...)
@@ -551,6 +553,8 @@ Should maintain parallel structure to reap_process() above.
 static int start_process(struct vine_process *p, struct link *manager)
 {
 	struct vine_task *t = p->task;
+
+	p->nopen_option = nopen_option;
 
 	/* Create the sandbox environment for the task. */
 	if (!vine_sandbox_stagein(p, cache_manager)) {
@@ -2246,7 +2250,8 @@ enum {
 	LONG_OPT_USE_SSL,
 	LONG_OPT_PYTHON_FUNCTION,
 	LONG_OPT_FROM_FACTORY,
-	LONG_OPT_TRANSFER_PORT
+	LONG_OPT_TRANSFER_PORT,
+	LONG_OPT_USE_NOPEN
 };
 
 static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
@@ -2284,6 +2289,7 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"ssl", no_argument, 0, LONG_OPT_USE_SSL},
 		{"from-factory", required_argument, 0, LONG_OPT_FROM_FACTORY},
 		{"transfer-port", required_argument, 0, LONG_OPT_TRANSFER_PORT},
+		{"nopen", no_argument, 0, LONG_OPT_USE_NOPEN},
 		{0, 0, 0, 0}};
 
 int main(int argc, char *argv[])
@@ -2471,6 +2477,9 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_TRANSFER_PORT:
 			vine_transfer_server_port = atoi(optarg);
+			break;
+		case LONG_OPT_USE_NOPEN:
+			nopen_option = 1;
 			break;
 		default:
 			show_help(argv[0]);

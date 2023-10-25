@@ -71,6 +71,8 @@ struct vine_process {
 
 	/* state between complete disk measurements. */
 	struct path_disk_size_info *disk_measurement_state;
+
+    int nopen_option;
 };
 
 struct vine_process * vine_process_create( struct vine_task *task, vine_process_type_t type );
