@@ -1495,14 +1495,15 @@ static void vine_worker_serve_manager(struct link *manager)
 	// Start serving managers
 	while (!abort_flag) {
 
+		/* Propose a disconnect from the manager, but do not do it until requested */
 		if (time(0) > idle_stoptime) {
 			debug(D_NOTICE,
-					"disconnecting from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n",
+					"requesting disconnect from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n",
 					current_manager_address->addr,
 					current_manager_address->port,
 					idle_timeout);
-			send_message(manager, "info idle-disconnecting %lld\n", (long long)idle_timeout);
-			break;
+			send_message(manager, "info idle-disconnect-request %lld\n", (long long)idle_timeout);
+			reset_idle_timer();
 		}
 
 		if (initial_ppid != 0 && getppid() != initial_ppid) {

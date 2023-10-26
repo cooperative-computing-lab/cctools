@@ -27,6 +27,8 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 
 int vine_file_replica_table_exists_somewhere( struct vine_manager *q, const char *cachename );
 
+int vine_file_replica_table_count_replicas( struct vine_manager *q, const char *cachename );
+
 
 #endif
 

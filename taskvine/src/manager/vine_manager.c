@@ -250,6 +250,42 @@ static vine_msg_code_t handle_name(struct vine_manager *q, struct vine_worker_in
 	return VINE_MSG_PROCESSED;
 }
 
+/*
+Handle a timeout request from a worker. Check if the worker has any important data before letting it go.
+*/
+
+static void handle_worker_timeout(struct vine_manager *q, struct vine_worker_info *w)
+{
+	// Look at the files and check if any are endangered temps.
+	char *cachename;
+	struct vine_file_replica *remote_info;
+	// debug(D_VINE, "Handling timeout request");
+	HASH_TABLE_ITERATE(w->current_files, cachename, remote_info)
+	{
+		//	debug(D_VINE, "Looking at file %s", cachename);
+		if (strncmp(cachename, "temp-rnd-", 9) == 0) {
+			int c = vine_file_replica_table_count_replicas(q, cachename);
+			//		debug(D_VINE, "Temp file found with %d replicas", c);
+			if (c == 1) {
+				debug(D_VINE,
+						"Rejecting timeout request from worker %s (%s). Has unique file %s",
+						w->hostname,
+						w->addrport,
+						cachename);
+				return;
+			}
+		}
+	}
+
+	if (itable_size(w->current_tasks) == 0) {
+		debug(D_VINE, "Accepting timeout request from worker %s (%s).", w->hostname, w->addrport);
+		q->stats->workers_idled_out++;
+		shut_down_worker(q, w);
+	}
+
+	return;
+}
+
 /* Handle an info message coming from the worker that provides a variety of metrics. */
 
 static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_info *w, char *line)
@@ -280,9 +316,8 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 		w->stats->tasks_waiting = atoll(value);
 	} else if (string_prefix_is(field, "tasks_running")) {
 		w->stats->tasks_running = atoll(value);
-	} else if (string_prefix_is(field, "idle-disconnecting")) {
-		remove_worker(q, w, VINE_WORKER_DISCONNECT_IDLE_OUT);
-		q->stats->workers_idled_out++;
+	} else if (string_prefix_is(field, "idle-disconnect-request")) {
+		handle_worker_timeout(q, w);
 	} else if (string_prefix_is(field, "end_of_resource_update")) {
 		count_worker_resources(q, w);
 		vine_txn_log_write_worker_resources(q, w);
