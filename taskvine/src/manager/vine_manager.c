@@ -279,6 +279,7 @@ static void handle_worker_timeout(struct vine_manager *q, struct vine_worker_inf
 
 	if (itable_size(w->current_tasks) == 0) {
 		debug(D_VINE, "Accepting timeout request from worker %s (%s).", w->hostname, w->addrport);
+		q->stats->workers_idled_out++;
 		shut_down_worker(q, w);
 	}
 
