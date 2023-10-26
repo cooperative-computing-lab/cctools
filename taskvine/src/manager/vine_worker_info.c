@@ -63,6 +63,7 @@ void vine_worker_delete(struct vine_worker_info *w)
 	hash_table_delete(w->features);
 	free(w->stats);
 	hash_table_clear(w->libraries, (void (*)(void *))vine_task_delete);
+	hash_table_delete(w->libraries);
 
 	hash_table_clear(w->current_files, (void *)vine_file_replica_delete);
 	hash_table_delete(w->current_files);
