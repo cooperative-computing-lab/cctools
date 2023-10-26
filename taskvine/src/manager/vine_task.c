@@ -87,7 +87,6 @@ void vine_task_clean(struct vine_task *t)
 	t->bytes_received = 0;
 	t->bytes_transferred = 0;
 
-	t->library_task = 0;
 	t->function_slots_inuse = 0;
 
 	free(t->output);

@@ -53,10 +53,11 @@ struct vine_worker_info {
 	int64_t     end_time;                   // epoch time (in seconds) at which the worker terminates
 	                                        // If -1, means the worker has not reported in. If 0, means no limit.
 
-	/* Resources and features that describe this worker. */
+	/* Resources, features, and libraries that describe this worker. */
 	struct vine_resources *resources;
 	struct hash_table     *features;
 	struct vine_stats     *stats;
+        struct hash_table     *libraries;       // name -> vine_task describing library.
 
 	/* Current files and tasks that have been transfered to this worker */
 	struct hash_table   *current_files;

@@ -67,7 +67,6 @@ struct vine_task {
 
 	vine_task_state_t state;       /**< Current state of task: READY, RUNNING, etc */
 	struct vine_worker_info *worker;    /**< Worker to which this task has been dispatched. */
-	struct vine_task *library_task; /**< Library task to which a function task has been matched. */
 	int try_count;               /**< The number of times the task has been dispatched to a worker. If larger than max_retries, the task failes with @ref VINE_RESULT_MAX_RETRIES. */
 	int exhausted_attempts;      /**< Number of times the task failed given exhausted resources. */
 	int workers_slow;            /**< Number of times this task has been terminated for running too long. */

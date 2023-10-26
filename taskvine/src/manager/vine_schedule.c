@@ -43,25 +43,6 @@ int check_fixed_location_worker(struct vine_manager *m, struct vine_worker_info 
 	return all_present;
 }
 
-/* Find a library task running on a specific worker that has an available slot. */
-
-static struct vine_task *find_library_on_worker_for_task(
-		struct vine_manager *q, struct vine_worker_info *w, const char *library_name)
-{
-	uint64_t task_id;
-	struct vine_task *task;
-
-	ITABLE_ITERATE(w->current_tasks, task_id, task)
-	{
-		if (task->provides_library && !strcmp(task->provides_library, library_name) &&
-				task->function_slots_inuse < task->function_slots) {
-			return task;
-		}
-	}
-
-	return 0;
-}
-
 /* Check if queue has entered ramp_down mode (more workers than waiting tasks).
  * @param q The manager structure.
  * @return 1 if in ramp down mode, 0 otherwise.
@@ -84,6 +65,23 @@ int vine_schedule_in_ramp_down(struct vine_manager *q)
 	}
 
 	return 0;
+}
+
+/* Check if library on worker can run more function slots.
+ * Note that it's okay for worker to not have library, we'll send it right before
+ * sending the function call. 
+ * @param w             Info about worker.
+ * @param library_name  Name of the library. 
+ * @return 1 if available, 0 otherwise. */
+static int library_on_worker_available(struct vine_worker_info* w, char* library_name) {
+    struct vine_task* library_task = hash_table_lookup(w->libraries, library_name);
+    if (!library_task) {
+        return 1;
+    }
+    if (library_task->function_slots_inuse < library_task->function_slots) {
+        return 1;
+    }
+    return 0;
 }
 
 /* Check if this task is compatible with this given worker by considering
@@ -119,17 +117,10 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		return 0;
 	}
 
-	/* If this is a function task needing a library, see if a library is available. */
-
-	if (t->needs_library) {
-		t->library_task = find_library_on_worker_for_task(q, w, t->needs_library);
-		if (t->library_task) {
-			/* Found it, keep going. */
-		} else {
-			/* Function cannot run here at all. */
-			return 0;
-		}
-	}
+        /* If this is a function call, check if the library on this worker can run more. */
+        if (t->needs_library && !library_on_worker_available(w, t->needs_library)) {
+            return 0;
+        }
 
 	/* Compute the resources to allocate to this task. */
 	struct rmsummary *l = vine_manager_choose_resources_for_task(q, w, t);
