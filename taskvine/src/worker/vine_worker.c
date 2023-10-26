@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "vine_transfer.h"
 #include "vine_transfer_server.h"
 #include "vine_watcher.h"
+#include "vine_workspace.h"
 
 #include "catalog_query.h"
 #include "cctools.h"
@@ -81,7 +82,7 @@ See the file COPYING for details.
 /***************************************************************/
 
 /* The workspace is the top level directory under which all worker state is stored. */
-char *vine_workspace_dir;
+struct vine_workspace *workspace;
 
 /* Table of all processes in any state, indexed by task_id. */
 /* Processes should be created/deleted when added/removed from this table. */
@@ -254,7 +255,7 @@ static int manual_ssl_option = 0;
 static pid_t initial_ppid = 0;
 
 /* Manual option given by the user to control the location of the workspace. */
-static char *user_specified_workdir = NULL;
+static char *manual_workspace_option = NULL;
 
 /* Operating system and architecture strings determined at startup time. */
 static char *os_name = NULL;
@@ -364,7 +365,7 @@ static void measure_worker_resources()
 
 	struct vine_resources *r = total_resources;
 
-	vine_resources_measure_locally(r, vine_workspace_dir);
+	vine_resources_measure_locally(r, workspace->workspace_dir);
 
 	if (manual_cores_option > 0)
 		r->cores.total = manual_cores_option;
@@ -926,11 +927,11 @@ static int do_unlink(struct link *manager, const char *path)
 
 	int result = 0;
 
-	if (path_within_dir(cached_path, vine_workspace_dir)) {
+	if (path_within_dir(cached_path, workspace->workspace_dir)) {
 		vine_cache_remove(cache_manager, path, manager);
 		result = 1;
 	} else {
-		debug(D_VINE, "%s is not within workspace %s", cached_path, vine_workspace_dir);
+		debug(D_VINE, "%s is not within workspace %s", cached_path, workspace->workspace_dir);
 		result = 0;
 	}
 
@@ -1333,7 +1334,7 @@ static int enforce_worker_limits(struct link *manager)
 		fprintf(stderr,
 				"vine_worker: %s used more than declared disk space (--disk - < disk used) %" PRIu64
 				" < %" PRIu64 " MB\n",
-				vine_workspace_dir,
+				workspace->workspace_dir,
 				manual_disk_option,
 				total_resources->disk.inuse);
 
@@ -1475,7 +1476,7 @@ static void check_libraries_ready()
 
 /* Start working for the (newly connected) manager on this given link. */
 
-static void work_for_manager(struct link *manager)
+static void vine_worker_serve_manager(struct link *manager)
 {
 	sigset_t mask;
 
@@ -1611,204 +1612,9 @@ static void work_for_manager(struct link *manager)
 	}
 }
 
-/*
-workspace_create is done once when the worker starts.
-*/
-
-static int workspace_create()
-{
-	char absolute[VINE_LINE_MAX];
-
-	// Setup working space(dir)
-	if (!vine_workspace_dir) {
-		const char *workdir = system_tmp_dir(user_specified_workdir);
-		vine_workspace_dir = string_format("%s/worker-%d-%d", workdir, (int)getuid(), (int)getpid());
-	}
-
-	printf("vine_worker: creating workspace %s\n", vine_workspace_dir);
-
-	if (!create_dir(vine_workspace_dir, 0777)) {
-		return 0;
-	}
-
-	path_absolute(vine_workspace_dir, absolute, 1);
-	free(vine_workspace_dir);
-	vine_workspace_dir = xxstrdup(absolute);
-
-	return 1;
-}
-
-/*
-Create a test script and try to execute.
-With this we check the scratch directory allows file execution.
-*/
-static int workspace_check()
-{
-	int error = 0; /* set 1 on error */
-	char *fname = string_format("%s/test.sh", vine_workspace_dir);
-
-	FILE *file = fopen(fname, "w");
-	if (!file) {
-		warn(D_NOTICE, "Could not write to %s", vine_workspace_dir);
-		error = 1;
-	} else {
-		fprintf(file, "#!/bin/sh\nexit 0\n");
-		fclose(file);
-		chmod(fname, 0755);
-
-		int exit_status = system(fname);
-
-		if (WIFEXITED(exit_status) && WEXITSTATUS(exit_status) == 126) {
-			/* Note that we do not set status=1 on 126, as the executables may live ouside workspace. */
-			warn(D_NOTICE,
-					"Could not execute a test script in the workspace directory '%s'.",
-					vine_workspace_dir);
-			warn(D_NOTICE, "Is the filesystem mounted as 'noexec'?\n");
-			warn(D_NOTICE, "Unless the task command is an absolute path, the task will fail with exit status 126.\n");
-		} else if (!WIFEXITED(exit_status) || WEXITSTATUS(exit_status) != 0) {
-			error = 1;
-		}
-	}
-
-	/* do not use trash here; workspace has not been set up yet */
-	unlink(fname);
-	free(fname);
-
-	if (error) {
-		warn(D_NOTICE, "The workspace %s could not be used.\n", vine_workspace_dir);
-		warn(D_NOTICE, "Use the --workdir command line switch to change where the workspace is created.\n");
-	}
-
-	return !error;
-}
-
-/*
-workspace_prepare is called every time we connect to a new manager.
-The peer transfer server is associated with a particular cache
-directory, and so gets created (and deleted) with the corresponding cache.
-
-The workspace consists of the following directories:
-
-- cache - contains only files/directories that are sent by the manager, or downloaded at the manager's direction.  These
-are meant for use by tasks as input/output files, and are immutable once created.  The name of each file in the cache is
-chosen by the manager for the purpose of avoiding accidental sharing, and may differ from the name of the file in the
-task sandbox.
-
-- temp - a temporary directory of last resort if a tool needs some space to work on items that neither belong in the
-cache or in a task sandbox.  Really anything using this directory is a hack and its behavior should be reconsidered.
-
-- trash - deleted files are moved here, and then unlinked.  This is done because (a) it may not be possible to unlink a
-file outright if it is still in use as an executable, and (b) the move of an entire directory can be done quickly and
-atomically.  An attempt is made to deleted everything in this directory on startup, shutdown, and whenever an individual
-file is trashed.  (See trash_file.[ch])
-
-- task.%d - each executing task gets its own sandbox directory as it runs
-*/
-
-static int workspace_prepare()
-{
-	debug(D_VINE, "preparing workspace %s", vine_workspace_dir);
-
-	char *cachedir = string_format("%s/cache", vine_workspace_dir);
-	struct stat info;
-	int result;
-	if (!(stat(cachedir, &info) == 0 && S_ISDIR(info.st_mode))) {
-		result = create_dir(cachedir, 0777);
-	} else {
-		result = 1;
-		debug(D_VINE, "cache directory already exists!");
-	}
-	cache_manager = vine_cache_create(cachedir);
-	free(cachedir);
-
-	char *tmp_name = string_format("%s/temp", vine_workspace_dir);
-	result |= create_dir(tmp_name, 0777);
-	setenv("WORKER_TMPDIR", tmp_name, 1);
-	free(tmp_name);
-
-	char *trash_dir = string_format("%s/trash", vine_workspace_dir);
-	trash_setup(trash_dir);
-	free(trash_dir);
-
-	vine_transfer_server_start(cache_manager);
-
-	return result;
-}
-
-/*
-workspace_cleanup is called every time we disconnect from a manager,
-to remove any state left over from a previous run.  Remove all
-directories (except trash) and move them to the trash directory.
-*/
-
-static void workspace_cleanup()
-{
-	debug(D_VINE, "cleaning workspace %s", vine_workspace_dir);
-
-	vine_transfer_server_stop();
-
-	DIR *dir = opendir(vine_workspace_dir);
-	if (dir) {
-		struct dirent *d;
-		while ((d = readdir(dir))) {
-			if (!strcmp(d->d_name, "."))
-				continue;
-			if (!strcmp(d->d_name, ".."))
-				continue;
-			if (!strcmp(d->d_name, "trash"))
-				continue;
-			if (!strcmp(d->d_name, "cache"))
-				continue;
-			trash_file(d->d_name);
-		}
-		closedir(dir);
-	}
-	trash_empty();
-
-	vine_cache_delete(cache_manager);
-	cache_manager = 0;
-}
-
-/*
-workspace_delete is called when the worker is about to exit,
-so that all files are removed.
-XXX the cleanup of internal data structures doesn't quite belong here.
-*/
-
-static void workspace_delete()
-{
-	if (user_specified_workdir)
-		free(user_specified_workdir);
-	if (os_name)
-		free(os_name);
-	if (arch_name)
-		free(arch_name);
-
-	if (procs_running)
-		itable_delete(procs_running);
-	if (procs_table)
-		itable_delete(procs_table);
-	if (procs_complete)
-		itable_delete(procs_complete);
-	if (procs_waiting)
-		list_delete(procs_waiting);
-
-	if (watcher)
-		vine_watcher_delete(watcher);
-
-	printf("vine_worker: deleting workspace %s\n", vine_workspace_dir);
-
-	/*
-	Note that we cannot use trash_file here because the trash dir is inside the
-	workspace. The whole workspace is being deleted anyway.
-	*/
-	unlink_recursive(vine_workspace_dir);
-	free(vine_workspace_dir);
-}
-
 /* Attempt to connect, authenticate, and work with the manager at this specific host and port. */
 
-static int serve_manager_by_hostport(const char *host, int port, const char *verify_project, int use_ssl)
+static int vine_worker_serve_manager_by_hostport(const char *host, int port, const char *verify_project, int use_ssl)
 {
 	if (!domain_name_cache_lookup(host, current_manager_address->addr)) {
 		fprintf(stderr, "couldn't resolve hostname %s", host);
@@ -1885,14 +1691,21 @@ static int serve_manager_by_hostport(const char *host, int port, const char *ver
 		}
 	}
 
-	workspace_prepare();
+	/* Setup the various directories in the workspace. */
+	vine_workspace_prepare(workspace);
+
+	/* Start the cache manager and scan for existing files. */
+	cache_manager = vine_cache_create(workspace->cache_dir);
 	vine_cache_load(cache_manager);
+
+	/* Start the transfer server, which serves up the cache directory. */
+	vine_transfer_server_start(cache_manager);
 
 	measure_worker_resources();
 
 	report_worker_ready(manager);
 
-	work_for_manager(manager);
+	vine_worker_serve_manager(manager);
 
 	if (abort_signal_received) {
 		send_message(manager, "info vacating %d\n", abort_signal_received);
@@ -1904,14 +1717,24 @@ static int serve_manager_by_hostport(const char *host, int port, const char *ver
 	disconnect_manager(manager);
 	printf("disconnected from manager %s:%d\n", host, port);
 
-	workspace_cleanup();
+	/* Do these in the opposite order of setup: */
+
+	/* Stop the transfer server from serving the cache directory. */
+	vine_transfer_server_stop();
+
+	/* Stop the cache manager. */
+	vine_cache_delete(cache_manager);
+	cache_manager = 0;
+
+	/* Clean up the workspace and remove state from this manager. */
+	vine_workspace_cleanup(workspace);
 
 	return 1;
 }
 
 /* Attempt to connect and work with any opf the managers in this list. */
 
-int serve_manager_by_hostport_list(struct list *manager_addresses, int use_ssl)
+static int vine_worker_serve_manager_by_hostport_list(struct list *manager_addresses, int use_ssl)
 {
 	int result = 0;
 
@@ -1919,7 +1742,7 @@ int serve_manager_by_hostport_list(struct list *manager_addresses, int use_ssl)
 	 * are tried, or a succesful connection was done */
 	LIST_ITERATE(manager_addresses, current_manager_address)
 	{
-		result = serve_manager_by_hostport(current_manager_address->host,
+		result = vine_worker_serve_manager_by_hostport(current_manager_address->host,
 				current_manager_address->port,
 				/*verify name*/ 0,
 				use_ssl);
@@ -1973,7 +1796,7 @@ static struct list *interfaces_to_list(const char *addr, int port, struct jx *if
 
 /* Attempt to connect and work with managers found in the catalog matching a project regex. */
 
-static int serve_manager_by_name(const char *catalog_hosts, const char *project_regex)
+static int vine_worker_serve_manager_by_name(const char *catalog_hosts, const char *project_regex)
 {
 	struct list *managers_list = vine_catalog_query_cached(catalog_hosts, -1, project_regex);
 
@@ -2048,7 +1871,7 @@ static int serve_manager_by_name(const char *catalog_hosts, const char *project_
 			manager_addresses = interfaces_to_list(addr, port, ifas);
 		}
 
-		result = serve_manager_by_hostport_list(manager_addresses, use_ssl);
+		result = vine_worker_serve_manager_by_hostport_list(manager_addresses, use_ssl);
 
 		struct manager_address *m;
 		while ((m = list_pop_head(manager_addresses))) {
@@ -2065,6 +1888,67 @@ static int serve_manager_by_name(const char *catalog_hosts, const char *project_
 		}
 
 		return result;
+	}
+}
+
+static void vine_worker_serve_managers()
+{
+	int backoff_interval = init_backoff_interval;
+
+	while (1) {
+		int result = 0;
+
+		if (initial_ppid != 0 && getppid() != initial_ppid) {
+			debug(D_NOTICE, "parent process exited, shutting down\n");
+			break;
+		}
+
+		measure_worker_resources();
+		if (!enforce_worker_promises(NULL)) {
+			abort_flag = 1;
+			break;
+		}
+
+		if (project_regex) {
+			result = vine_worker_serve_manager_by_name(catalog_hosts, project_regex);
+		} else {
+			result = vine_worker_serve_manager_by_hostport_list(
+					manager_addresses, /* use ssl only if --ssl */ manual_ssl_option);
+		}
+
+		/*
+		If the last attempt was a succesful connection, then reset the backoff_interval,
+		and the connect timeout, then try again if a project name was given.
+		If the connect attempt failed, then slow down the retries.
+		*/
+
+		if (result) {
+			if (single_shot_mode) {
+				debug(D_DEBUG, "stopping: single shot mode");
+				break;
+			}
+			backoff_interval = init_backoff_interval;
+			connect_stoptime = time(0) + connect_timeout;
+
+			if (!project_regex && (time(0) > idle_stoptime)) {
+				debug(D_NOTICE, "stopping: no other managers available");
+				break;
+			}
+		} else {
+			backoff_interval = MIN(backoff_interval * 2, max_backoff_interval);
+		}
+
+		if (abort_flag) {
+			debug(D_NOTICE, "stopping: abort signal received");
+			break;
+		}
+
+		if (time(0) > connect_stoptime) {
+			debug(D_NOTICE, "stopping: could not connect after %d seconds.", connect_timeout);
+			break;
+		}
+
+		sleep(backoff_interval);
 	}
 }
 
@@ -2150,6 +2034,66 @@ struct list *parse_manager_addresses(const char *specs, int default_port)
 	free(managers_args);
 
 	return (managers);
+}
+
+/* Set up initial shared data structures. */
+
+void vine_worker_create_structures()
+{
+	procs_table = itable_create(0);
+	procs_running = itable_create(0);
+	procs_waiting = list_create();
+	procs_complete = itable_create(0);
+
+	features = hash_table_create(4, 0);
+
+	current_transfers = hash_table_create(0, 0);
+
+	watcher = vine_watcher_create();
+
+	total_resources = vine_resources_create();
+
+	struct utsname uname_data;
+	uname(&uname_data);
+
+	os_name = xxstrdup(uname_data.sysname);
+	arch_name = xxstrdup(uname_data.machine);
+
+	worker_id = make_worker_id();
+}
+
+/* Final cleanup of all worker structures before exiting */
+
+static void vine_worker_delete_structures()
+{
+	if (manual_workspace_option)
+		free(manual_workspace_option);
+
+	if (worker_id)
+		free(worker_id);
+
+	if (os_name)
+		free(os_name);
+	if (arch_name)
+		free(arch_name);
+
+	if (total_resources)
+		vine_resources_delete(total_resources);
+	if (watcher)
+		vine_watcher_delete(watcher);
+	if (current_transfers)
+		hash_table_delete(current_transfers);
+	if (features)
+		hash_table_delete(features);
+
+	if (procs_table)
+		itable_delete(procs_table);
+	if (procs_running)
+		itable_delete(procs_running);
+	if (procs_complete)
+		itable_delete(procs_complete);
+	if (procs_waiting)
+		list_delete(procs_waiting);
 }
 
 static void show_help(const char *cmd)
@@ -2291,24 +2235,17 @@ int main(int argc, char *argv[])
 	/* This must come first in main, allows us to change process titles in ps later. */
 	change_process_title_init(argv);
 
-	int c;
-	int w;
-	struct utsname uname_data;
-
 	catalog_hosts = CATALOG_HOST;
 
-	features = hash_table_create(4, 0);
-	current_transfers = hash_table_create(0, 0);
 	worker_start_time = timestamp_get();
-	worker_id = make_worker_id();
 
-	// obtain the architecture and os on which worker is running.
-	uname(&uname_data);
-	os_name = xxstrdup(uname_data.sysname);
-	arch_name = xxstrdup(uname_data.machine);
+	vine_worker_create_structures();
 
 	debug_config(argv[0]);
 	read_resources_env_vars();
+
+	int c;
+	int w;
 
 	while ((c = getopt_long(argc, argv, "aC:d:t:o:p:M:N:P:w:i:b:z:A:O:s:v:h", long_options, 0)) != -1) {
 		switch (c) {
@@ -2376,7 +2313,7 @@ int main(int argc, char *argv[])
 		case 's': {
 			char temp_abs_path[PATH_MAX];
 			path_absolute(optarg, temp_abs_path, 1);
-			user_specified_workdir = xxstrdup(temp_abs_path);
+			manual_workspace_option = xxstrdup(temp_abs_path);
 			break;
 		}
 		case 'v':
@@ -2513,104 +2450,38 @@ int main(int argc, char *argv[])
 
 	random_init();
 
-	if (!workspace_create()) {
-		fprintf(stderr, "vine_worker: failed to setup workspace at %s.\n", vine_workspace_dir);
+	workspace = vine_workspace_create(manual_workspace_option);
+	if (!workspace) {
+		fprintf(stderr, "vine_worker: failed to setup workspace directory.\n");
 		exit(1);
 	}
 
-	if (!workspace_check()) {
+	if (!vine_workspace_check(workspace)) {
 		return 1;
 	}
 
-	// set $VINE_SANDBOX to workspace.
-	debug(D_VINE, "VINE_SANDBOX set to %s.\n", vine_workspace_dir);
-	setenv("VINE_SANDBOX", vine_workspace_dir, 0);
-
-	// change to workspace
-	chdir(vine_workspace_dir);
-
-	unlink_recursive("cache");
-
-	procs_running = itable_create(0);
-	procs_table = itable_create(0);
-	procs_waiting = list_create();
-	procs_complete = itable_create(0);
-
-	watcher = vine_watcher_create();
-
-	total_resources = vine_resources_create();
+	chdir(workspace->workspace_dir);
 
 	if (manual_cores_option < 1) {
 		manual_cores_option = load_average_get_cpus();
 	}
 
-	int backoff_interval = init_backoff_interval;
 	connect_stoptime = time(0) + connect_timeout;
 
 	measure_worker_resources();
+
 	printf("vine_worker: using %" PRId64 " cores, %" PRId64 " MB memory, %" PRId64 " MB disk, %" PRId64 " gpus\n",
 			total_resources->cores.total,
 			total_resources->memory.total,
 			total_resources->disk.total,
 			total_resources->gpus.total);
 
-	while (1) {
-		int result = 0;
+	vine_worker_serve_managers();
 
-		if (initial_ppid != 0 && getppid() != initial_ppid) {
-			debug(D_NOTICE, "parent process exited, shutting down\n");
-			break;
-		}
+	vine_workspace_delete(workspace);
+	workspace = 0;
 
-		measure_worker_resources();
-		if (!enforce_worker_promises(NULL)) {
-			abort_flag = 1;
-			break;
-		}
-
-		if (project_regex) {
-			result = serve_manager_by_name(catalog_hosts, project_regex);
-		} else {
-			result = serve_manager_by_hostport_list(
-					manager_addresses, /* use ssl only if --ssl */ manual_ssl_option);
-		}
-
-		/*
-		If the last attempt was a succesful connection, then reset the backoff_interval,
-		and the connect timeout, then try again if a project name was given.
-		If the connect attempt failed, then slow down the retries.
-		*/
-
-		if (result) {
-			if (single_shot_mode) {
-				debug(D_DEBUG, "stopping: single shot mode");
-				break;
-			}
-			backoff_interval = init_backoff_interval;
-			connect_stoptime = time(0) + connect_timeout;
-
-			if (!project_regex && (time(0) > idle_stoptime)) {
-				debug(D_NOTICE, "stopping: no other managers available");
-				break;
-			}
-		} else {
-			backoff_interval = MIN(backoff_interval * 2, max_backoff_interval);
-		}
-
-		if (abort_flag) {
-			debug(D_NOTICE, "stopping: abort signal received");
-			break;
-		}
-
-		if (time(0) > connect_stoptime) {
-			debug(D_NOTICE, "stopping: could not connect after %d seconds.", connect_timeout);
-			break;
-		}
-
-		sleep(backoff_interval);
-	}
-
-	workspace_delete();
+	vine_worker_delete_structures();
 
 	return 0;
 }

@@ -86,7 +86,7 @@ struct vine_process *vine_process_create(struct vine_task *task, vine_process_ty
 
 	const char *dirtype = vine_process_sandbox_code(p->type);
 
-	p->sandbox = string_format("%s/%s.%d", vine_workspace_dir, dirtype, p->task->task_id);
+	p->sandbox = string_format("%s/%s.%d", workspace->workspace_dir, dirtype, p->task->task_id);
 	p->tmpdir = string_format("%s/.taskvine.tmp", p->sandbox);
 	p->output_file_name = string_format("%s/.taskvine.stdout", p->sandbox);
 
