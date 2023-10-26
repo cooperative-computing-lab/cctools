@@ -2594,19 +2594,20 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	/* Send library first if this is a function call and worker doesn't have the library. */
 	int ok = 1;
 	if (t->needs_library && !hash_table_lookup(w->libraries, t->needs_library)) {
-	    if (vine_manager_send_library_to_worker(q, w, t->needs_library)) {
-		hash_table_insert(w->libraries, t->needs_library, vine_task_copy(hash_table_lookup(q->libraries, t->needs_library)));
-		debug(D_VINE, "Sending library %s to worker %s\n", t->needs_library, w->workerid);
-	    }
-	    else {
-		debug(D_VINE, "Cannot send library %s to worker %s\n", t->needs_library, w->workerid);
-		ok = 0;
-	    }
+		if (vine_manager_send_library_to_worker(q, w, t->needs_library)) {
+			hash_table_insert(w->libraries,
+					t->needs_library,
+					vine_task_copy(hash_table_lookup(q->libraries, t->needs_library)));
+			debug(D_VINE, "Sending library %s to worker %s\n", t->needs_library, w->workerid);
+		} else {
+			debug(D_VINE, "Cannot send library %s to worker %s\n", t->needs_library, w->workerid);
+			ok = 0;
+		}
 	}
-	
+
 	if (!ok) {
-	    rmsummary_delete(limits);
-	    return VINE_WORKER_FAILURE;
+		rmsummary_delete(limits);
+		return VINE_WORKER_FAILURE;
 	}
 
 	vine_result_code_t result = vine_manager_put_task(q, w, t, command_line, limits, 0);
@@ -2727,12 +2728,11 @@ static void commit_task_to_worker(struct vine_manager *q, struct vine_worker_inf
 	if (result != VINE_SUCCESS) {
 		debug(D_VINE, "Failed to send task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
-	}
-	else {
-	    if (t->needs_library) {
-		struct vine_task* library_task = hash_table_lookup(w->libraries, t->needs_library);
-		library_task->function_slots_inuse++;
-	    }
+	} else {
+		if (t->needs_library) {
+			struct vine_task *library_task = hash_table_lookup(w->libraries, t->needs_library);
+			library_task->function_slots_inuse++;
+		}
 	}
 }
 
@@ -2824,7 +2824,7 @@ static void reap_task_from_worker(
 	*/
 
 	if (t->needs_library) {
-		struct vine_task* library_task = hash_table_lookup(w->libraries, t->needs_library);
+		struct vine_task *library_task = hash_table_lookup(w->libraries, t->needs_library);
 		library_task->function_slots_inuse--;
 	}
 
