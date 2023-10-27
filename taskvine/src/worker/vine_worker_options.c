@@ -231,9 +231,6 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 
 	while ((c = getopt_long(argc, argv, "aC:d:t:o:p:M:N:P:w:i:b:z:A:O:s:v:h", long_options, 0)) != -1) {
 		switch (c) {
-		case 'a':
-			// Left here for backwards compatibility
-			break;
 		case 'C':
 			options->catalog_hosts = xxstrdup(optarg);
 			break;
@@ -259,9 +256,6 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 		case 'N':
 			options->project_regex = xxstrdup(optarg);
 			break;
-		case 'p':
-			// ignore for backwards compatibility
-			break;
 		case 'w': {
 			int w = string_metric_parse(optarg);
 			link_window_set(w, w);
@@ -278,12 +272,6 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 						options->init_backoff_interval);
 				exit(1);
 			}
-			break;
-		case 'z':
-			/* deprecated */
-			break;
-		case LONG_OPT_MEMORY_THRESHOLD:
-			/* deprecated */
 			break;
 		case 'A':
 			options->arch_name = xxstrdup(optarg);
