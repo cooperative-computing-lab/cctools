@@ -202,10 +202,33 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"transfer-port", required_argument, 0, LONG_OPT_TRANSFER_PORT},
 		{0, 0, 0, 0}};
 
+static void vine_worker_options_get_env(const char *name, int64_t *manual_option)
+{
+	char *value;
+	value = getenv(name);
+	if (value) {
+		*manual_option = atoi(value);
+		/* unset variable so that children task cannot read the global value */
+		unsetenv(name);
+	}
+}
+
+static void vine_worker_options_get_envs( struct vine_worker_options *options )
+{
+	vine_worker_options_get_env("CORES", &options->cores_total);
+	vine_worker_options_get_env("MEMORY", &options->memory_total);
+	vine_worker_options_get_env("DISK", &options->disk_total);
+	vine_worker_options_get_env("GPUS", &options->gpus_total);
+}
+
 void vine_worker_options_get(struct vine_worker_options *options, int argc, char *argv[])
 {
 	int c;
 
+	/* Before parsing the command line, read in defaults from environment. */
+	/* These will be overridden by command line args if needed. */
+	vine_worker_options_get_envs(options);
+	
 	while ((c = getopt_long(argc, argv, "aC:d:t:o:p:M:N:P:w:i:b:z:A:O:s:v:h", long_options, 0)) != -1) {
 		switch (c) {
 		case 'a':

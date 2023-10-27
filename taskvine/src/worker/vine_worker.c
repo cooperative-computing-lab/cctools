@@ -1903,25 +1903,6 @@ static void handle_abort(int sig)
 
 static void handle_sigchld(int sig) { sigchld_received_flag = 1; }
 
-static void read_resources_env_var(const char *name, int64_t *manual_option)
-{
-	char *value;
-	value = getenv(name);
-	if (value) {
-		*manual_option = atoi(value);
-		/* unset variable so that children task cannot read the global value */
-		unsetenv(name);
-	}
-}
-
-static void read_resources_env_vars()
-{
-	read_resources_env_var("CORES", &options->cores_total);
-	read_resources_env_var("MEMORY", &options->memory_total);
-	read_resources_env_var("DISK", &options->disk_total);
-	read_resources_env_var("GPUS", &options->gpus_total);
-}
-
 struct list *parse_manager_addresses(const char *specs, int default_port)
 {
 	struct list *managers = list_create();
@@ -2019,9 +2000,6 @@ int main(int argc, char *argv[])
 
 	/* Create the options structure with defaults. */
 	options = vine_worker_options_create();
-
-	/* Read in any environment variables that override total resource usage. */
-	read_resources_env_vars();
 
 	/* Now process the command line options */
 	vine_worker_options_get(options, argc, argv);
