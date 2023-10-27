@@ -43,7 +43,7 @@ struct vine_worker_options *vine_worker_options_create()
 	self->os_name = xxstrdup(uname_data.sysname);
 	self->arch_name = xxstrdup(uname_data.machine);
 
-	self->catalog_hosts = CATALOG_HOST;
+	self->catalog_hosts = xxstrdup(CATALOG_HOST);
 	self->disk_percent = 90;
 
 	self->initial_ppid = 0;
