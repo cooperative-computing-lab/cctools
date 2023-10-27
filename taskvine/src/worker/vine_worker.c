@@ -1975,9 +1975,6 @@ void vine_worker_create_structures()
 
 static void vine_worker_delete_structures()
 {
-	if (options->workspace_dir)
-		free(options->workspace_dir);
-
 	if (worker_id)
 		free(worker_id);
 
