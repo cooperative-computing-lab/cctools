@@ -213,7 +213,7 @@ static void vine_worker_options_get_env(const char *name, int64_t *manual_option
 	}
 }
 
-static void vine_worker_options_get_envs( struct vine_worker_options *options )
+static void vine_worker_options_get_envs(struct vine_worker_options *options)
 {
 	vine_worker_options_get_env("CORES", &options->cores_total);
 	vine_worker_options_get_env("MEMORY", &options->memory_total);
@@ -228,7 +228,7 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 	/* Before parsing the command line, read in defaults from environment. */
 	/* These will be overridden by command line args if needed. */
 	vine_worker_options_get_envs(options);
-	
+
 	while ((c = getopt_long(argc, argv, "aC:d:t:o:p:M:N:P:w:i:b:z:A:O:s:v:h", long_options, 0)) != -1) {
 		switch (c) {
 		case 'a':
