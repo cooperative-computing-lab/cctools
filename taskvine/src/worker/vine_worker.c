@@ -2000,19 +2000,27 @@ int main(int argc, char *argv[])
 	/* This must come first in main, allows us to change process titles in ps later. */
 	change_process_title_init(argv);
 
+	/* Pass the program name to the debug subsystem */
+	debug_config(argv[0]);
+
+	/* Start the clock on the worker operation. */
 	worker_start_time = timestamp_get();
 
+	/* Allocate all of the data structures to track tasks an files. */
 	vine_worker_create_structures();
 
-	debug_config(argv[0]);
-	read_resources_env_vars();
-
+	/* Create the options structure with defaults. */
 	options = vine_worker_options_create();
 
+	/* Read in any environment variables that override total resource usage. */
+	read_resources_env_vars();
+
+	/* Now process the command line options */
 	vine_worker_options_get(options,argc,argv);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
+	/* The caller must either provide a project regex or an explicit manager host and port. */
 	if (!options->project_regex) {
 		if ((argc - optind) < 1 || (argc - optind) > 2) {
 			vine_worker_options_show_help(argv[0],options);
@@ -2028,12 +2036,14 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	/* If a GPU is installed, then attach that to the features table. */
 	char *gpu_name = gpu_name_get();
 	if (gpu_name) {
 		hash_table_insert(options->features, gpu_name, "feature");
 		free(gpu_name);
 	}
 
+	/* Set up signal handlers so that they call dummy functions that interrupt I/O operations. */
 	signal(SIGTERM, handle_abort);
 	signal(SIGQUIT, handle_abort);
 	signal(SIGINT, handle_abort);
@@ -2044,43 +2054,50 @@ int main(int argc, char *argv[])
 	signal(SIGUSR2, handle_abort);
 	signal(SIGCHLD, handle_sigchld);
 
+	/* The random number generator must be initialized exactly once at startup. */
 	random_init();
 
+	/* Create the workspace directory and move there. */
 	workspace = vine_workspace_create(options->workspace_dir);
 	if (!workspace) {
 		fprintf(stderr, "vine_worker: failed to setup workspace directory.\n");
 		exit(1);
 	}
 
+	/* Check that programs can actually execute in the workspace, this is an occasional problem with HPCs. */
 	if (!vine_workspace_check(workspace)) {
 		return 1;
 	}
-
+	
+	/* Move to the workspace directory. */
 	chdir(workspace->workspace_dir);
 
+	/* If the total number of cores was not set manually, fix it to the observed number of cores. */
 	if (options->cores_total < 1) {
 		options->cores_total = load_average_get_cpus();
 	}
 
 	options->connect_stoptime = time(0) + options->connect_timeout;
 
+	/* Display the available resources once at startup. */
 	measure_worker_resources();
-
 	printf("vine_worker: using %" PRId64 " cores, %" PRId64 " MB memory, %" PRId64 " MB disk, %" PRId64 " gpus\n",
 			total_resources->cores.total,
 			total_resources->memory.total,
 			total_resources->disk.total,
 			total_resources->gpus.total);
 
+	/* MAIN LOOP: get to work */
 	vine_worker_serve_managers();
 
+	/* Clean up data structures to satisfy valgrind at process exit. */
+	
 	vine_workspace_delete(workspace);
 	workspace = 0;
-
 	vine_worker_delete_structures();
-
 	vine_worker_options_delete(options);
-
+	options = 0;
+	
 	return 0;
 }
 
