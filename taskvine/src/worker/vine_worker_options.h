@@ -2,6 +2,7 @@
 #define VINE_WORKER_OPTIONS_H
 
 #include <stdint.h>
+#include <unistd.h>
 #include <sys/time.h>
 
 #include "hash_table.h"
