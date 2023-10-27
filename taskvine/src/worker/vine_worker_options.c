@@ -1,23 +1,23 @@
 #include "vine_worker_options.h"
-#include "vine_transfer_server.h"
 #include "vine_catalog.h"
+#include "vine_transfer_server.h"
 
-#include "hash_table.h"
-#include "debug.h"
 #include "catalog_query.h"
-#include "stringtools.h"
-#include "macros.h"
-#include "path.h"
 #include "cctools.h"
 #include "copy_stream.h"
+#include "debug.h"
+#include "hash_table.h"
+#include "macros.h"
+#include "path.h"
+#include "stringtools.h"
 
 #include "getopt.h"
 #include "getopt_aux.h"
 #include "xxmalloc.h"
 
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <sys/utsname.h>
 
 struct vine_worker_options *vine_worker_options_create()
@@ -47,23 +47,28 @@ struct vine_worker_options *vine_worker_options_create()
 	self->disk_percent = 90;
 
 	self->initial_ppid = 0;
-	
+
 	return self;
 }
 
 void vine_worker_options_delete(struct vine_worker_options *self)
 {
-	if(self->os_name) free(self->os_name);
-	if(self->arch_name) free(self->arch_name);
-	if(self->project_regex) free(self->project_regex);
-	if(self->catalog_hosts) free(self->catalog_hosts);
-	if(self->factory_name) free(self->factory_name);
-		
+	if (self->os_name)
+		free(self->os_name);
+	if (self->arch_name)
+		free(self->arch_name);
+	if (self->project_regex)
+		free(self->project_regex);
+	if (self->catalog_hosts)
+		free(self->catalog_hosts);
+	if (self->factory_name)
+		free(self->factory_name);
+
 	hash_table_delete(self->features);
 	free(self);
 }
 
-void vine_worker_options_show_help( const char *cmd, struct vine_worker_options *options )
+void vine_worker_options_show_help(const char *cmd, struct vine_worker_options *options)
 {
 	printf("Use: %s [options] <managerhost> <port> \n"
 	       "or\n     %s [options] \"managerhost:port[;managerhost:port;managerhost:port;...]\"\n"
@@ -160,47 +165,45 @@ enum {
 	LONG_OPT_TRANSFER_PORT
 };
 
-static const struct option long_options[] = {
-	{"advertise", no_argument, 0, 'a'},
-	{"catalog", required_argument, 0, 'C'},
-	{"debug", required_argument, 0, 'd'},
-	{"debug-file", required_argument, 0, 'o'},
-	{"debug-rotate-max", required_argument, 0, LONG_OPT_DEBUG_FILESIZE},
-	{"manager-name", required_argument, 0, 'M'},
-	{"master-name", required_argument, 0, 'M'},
-	{"password", required_argument, 0, 'P'},
-	{"timeout", required_argument, 0, 't'},
-	{"idle-timeout", required_argument, 0, LONG_OPT_OPTIONS_IDLE_TIMEOUT},
-	{"connect-timeout", required_argument, 0, LONG_OPT_CONNECT_TIMEOUT},
-	{"tcp-window-size", required_argument, 0, 'w'},
-	{"min-backoff", required_argument, 0, 'i'},
-	{"max-backoff", required_argument, 0, 'b'},
-	{"single-shot", no_argument, 0, LONG_OPT_SINGLE_SHOT},
-	{"disk-threshold", required_argument, 0, 'z'},
-	{"memory-threshold", required_argument, 0, LONG_OPT_MEMORY_THRESHOLD},
-	{"arch", required_argument, 0, 'A'},
-	{"os", required_argument, 0, 'O'},
-	{"workdir", required_argument, 0, 's'},
-	{"bandwidth", required_argument, 0, LONG_OPT_BANDWIDTH},
-	{"cores", required_argument, 0, LONG_OPT_CORES},
-	{"memory", required_argument, 0, LONG_OPT_MEMORY},
-	{"disk", required_argument, 0, LONG_OPT_DISK},
-	{"disk-percent", required_argument, 0, LONG_OPT_DISK_PERCENT},
-	{"gpus", required_argument, 0, LONG_OPT_GPUS},
-	{"wall-time", required_argument, 0, LONG_OPT_WALL_TIME},
-	{"help", no_argument, 0, 'h'},
-	{"version", no_argument, 0, 'v'},
-	{"feature", required_argument, 0, LONG_OPT_FEATURE},
-	{"parent-death", no_argument, 0, LONG_OPT_PARENT_DEATH},
-	{"connection-mode", required_argument, 0, LONG_OPT_CONN_MODE},
-	{"ssl", no_argument, 0, LONG_OPT_USE_SSL},
-	{"from-factory", required_argument, 0, LONG_OPT_FROM_FACTORY},
-	{"transfer-port", required_argument, 0, LONG_OPT_TRANSFER_PORT},
-	{0, 0, 0, 0}
-};
+static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
+		{"catalog", required_argument, 0, 'C'},
+		{"debug", required_argument, 0, 'd'},
+		{"debug-file", required_argument, 0, 'o'},
+		{"debug-rotate-max", required_argument, 0, LONG_OPT_DEBUG_FILESIZE},
+		{"manager-name", required_argument, 0, 'M'},
+		{"master-name", required_argument, 0, 'M'},
+		{"password", required_argument, 0, 'P'},
+		{"timeout", required_argument, 0, 't'},
+		{"idle-timeout", required_argument, 0, LONG_OPT_OPTIONS_IDLE_TIMEOUT},
+		{"connect-timeout", required_argument, 0, LONG_OPT_CONNECT_TIMEOUT},
+		{"tcp-window-size", required_argument, 0, 'w'},
+		{"min-backoff", required_argument, 0, 'i'},
+		{"max-backoff", required_argument, 0, 'b'},
+		{"single-shot", no_argument, 0, LONG_OPT_SINGLE_SHOT},
+		{"disk-threshold", required_argument, 0, 'z'},
+		{"memory-threshold", required_argument, 0, LONG_OPT_MEMORY_THRESHOLD},
+		{"arch", required_argument, 0, 'A'},
+		{"os", required_argument, 0, 'O'},
+		{"workdir", required_argument, 0, 's'},
+		{"bandwidth", required_argument, 0, LONG_OPT_BANDWIDTH},
+		{"cores", required_argument, 0, LONG_OPT_CORES},
+		{"memory", required_argument, 0, LONG_OPT_MEMORY},
+		{"disk", required_argument, 0, LONG_OPT_DISK},
+		{"disk-percent", required_argument, 0, LONG_OPT_DISK_PERCENT},
+		{"gpus", required_argument, 0, LONG_OPT_GPUS},
+		{"wall-time", required_argument, 0, LONG_OPT_WALL_TIME},
+		{"help", no_argument, 0, 'h'},
+		{"version", no_argument, 0, 'v'},
+		{"feature", required_argument, 0, LONG_OPT_FEATURE},
+		{"parent-death", no_argument, 0, LONG_OPT_PARENT_DEATH},
+		{"connection-mode", required_argument, 0, LONG_OPT_CONN_MODE},
+		{"ssl", no_argument, 0, LONG_OPT_USE_SSL},
+		{"from-factory", required_argument, 0, LONG_OPT_FROM_FACTORY},
+		{"transfer-port", required_argument, 0, LONG_OPT_TRANSFER_PORT},
+		{0, 0, 0, 0}};
 
-void vine_worker_options_get( struct vine_worker_options *options, int argc, char *argv[] )
-{		
+void vine_worker_options_get(struct vine_worker_options *options, int argc, char *argv[])
+{
 	int c;
 
 	while ((c = getopt_long(argc, argv, "aC:d:t:o:p:M:N:P:w:i:b:z:A:O:s:v:h", long_options, 0)) != -1) {
@@ -337,7 +340,7 @@ void vine_worker_options_get( struct vine_worker_options *options, int argc, cha
 			options->single_shot_mode = 1;
 			break;
 		case 'h':
-			vine_worker_options_show_help(argv[0],options);
+			vine_worker_options_show_help(argv[0], options);
 			exit(0);
 			break;
 		case LONG_OPT_FEATURE:
@@ -349,7 +352,8 @@ void vine_worker_options_get( struct vine_worker_options *options, int argc, cha
 		case LONG_OPT_CONN_MODE:
 			free(options->preferred_connection);
 			options->preferred_connection = xxstrdup(optarg);
-			if (strcmp(options->preferred_connection, "by_ip") && strcmp(options->preferred_connection, "by_hostname") &&
+			if (strcmp(options->preferred_connection, "by_ip") &&
+					strcmp(options->preferred_connection, "by_hostname") &&
 					strcmp(options->preferred_connection, "by_apparent_ip")) {
 				fatal("connection-mode should be one of: by_ip, by_hostname, by_apparent_ip");
 			}
@@ -364,9 +368,8 @@ void vine_worker_options_get( struct vine_worker_options *options, int argc, cha
 			vine_transfer_server_port = atoi(optarg);
 			break;
 		default:
-			vine_worker_options_show_help(argv[0],options);
+			vine_worker_options_show_help(argv[0], options);
 			exit(1);
 		}
 	}
 }
- 

@@ -187,7 +187,6 @@ static int64_t files_counted = 0;
 
 struct vine_worker_options *options = 0;
 
-
 extern int vine_hack_do_not_compute_cached_name;
 
 /* Send a printf-formatted message to the current manager. */
@@ -450,7 +449,9 @@ static void report_worker_ready(struct link *manager)
 
 	send_features(manager);
 	send_transfer_address(manager);
-	send_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t)DIV_INT_ROUND_UP(options->end_time, USECOND));
+	send_message(manager,
+			"info worker-end-time %" PRId64 "\n",
+			(int64_t)DIV_INT_ROUND_UP(options->end_time, USECOND));
 
 	if (options->factory_name) {
 		send_message(manager, "info from-factory %s\n", options->factory_name);
@@ -1072,8 +1073,12 @@ static int handle_manager(struct link *manager)
 			r = do_task(manager, task_id, time(0) + options->active_timeout);
 		} else if (sscanf(line, "file %s %" SCNd64 " %o", filename_encoded, &length, &mode) == 3) {
 			url_decode(filename_encoded, filename, sizeof(filename));
-			r = vine_transfer_get_file(
-					manager, cache_manager, filename, length, mode, time(0) + options->active_timeout);
+			r = vine_transfer_get_file(manager,
+					cache_manager,
+					filename,
+					length,
+					mode,
+					time(0) + options->active_timeout);
 			reset_idle_timer();
 		} else if (sscanf(line, "dir %s", filename_encoded) == 1) {
 			url_decode(filename_encoded, filename, sizeof(filename));
@@ -1099,7 +1104,8 @@ static int handle_manager(struct link *manager)
 					   &length,
 					   &mode) == 4) {
 			url_decode(filename_encoded, filename, sizeof(filename));
-			r = do_put_mini_task(manager, time(0) + options->active_timeout, filename, length, mode, source);
+			r = do_put_mini_task(
+					manager, time(0) + options->active_timeout, filename, length, mode, source);
 			reset_idle_timer();
 		} else if (sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded, filename, sizeof(filename));
@@ -1748,12 +1754,14 @@ static int vine_worker_serve_manager_by_name(const char *catalog_hosts, const ch
 		}
 
 		if (last_addr) {
-			if (time(0) > options->idle_stoptime && strcmp(addr, last_addr->host) == 0 && port == last_addr->port) {
+			if (time(0) > options->idle_stoptime && strcmp(addr, last_addr->host) == 0 &&
+					port == last_addr->port) {
 				if (list_size(managers_list) < 2) {
 					free(last_addr);
 					last_addr = NULL;
 
-					/* convert options->idle_stoptime into connect_stoptime (e.g., time already served). */
+					/* convert options->idle_stoptime into connect_stoptime (e.g., time already
+					 * served). */
 					options->connect_stoptime = options->idle_stoptime;
 					debug(D_VINE,
 							"Previous idle disconnection from only manager available project=%s name=%s addr=%s port=%d",
@@ -2016,14 +2024,14 @@ int main(int argc, char *argv[])
 	read_resources_env_vars();
 
 	/* Now process the command line options */
-	vine_worker_options_get(options,argc,argv);
+	vine_worker_options_get(options, argc, argv);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
 	/* The caller must either provide a project regex or an explicit manager host and port. */
 	if (!options->project_regex) {
 		if ((argc - optind) < 1 || (argc - optind) > 2) {
-			vine_worker_options_show_help(argv[0],options);
+			vine_worker_options_show_help(argv[0], options);
 			exit(1);
 		}
 
@@ -2031,7 +2039,7 @@ int main(int argc, char *argv[])
 		manager_addresses = parse_manager_addresses(argv[optind], default_manager_port);
 
 		if (list_size(manager_addresses) < 1) {
-			vine_worker_options_show_help(argv[0],options);
+			vine_worker_options_show_help(argv[0], options);
 			fatal("No manager has been specified");
 		}
 	}
@@ -2068,7 +2076,7 @@ int main(int argc, char *argv[])
 	if (!vine_workspace_check(workspace)) {
 		return 1;
 	}
-	
+
 	/* Move to the workspace directory. */
 	chdir(workspace->workspace_dir);
 
@@ -2091,13 +2099,13 @@ int main(int argc, char *argv[])
 	vine_worker_serve_managers();
 
 	/* Clean up data structures to satisfy valgrind at process exit. */
-	
+
 	vine_workspace_delete(workspace);
 	workspace = 0;
 	vine_worker_delete_structures();
 	vine_worker_options_delete(options);
 	options = 0;
-	
+
 	return 0;
 }
 
