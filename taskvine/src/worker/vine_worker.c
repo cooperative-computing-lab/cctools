@@ -309,15 +309,15 @@ static void measure_worker_resources()
 
 	vine_resources_measure_locally(r, workspace->workspace_dir);
 
-	if (options->manual_cores_option > 0)
-		r->cores.total = options->manual_cores_option;
-	if (options->manual_memory_option > 0)
-		r->memory.total = options->manual_memory_option;
-	if (options->manual_gpus_option > -1)
-		r->gpus.total = options->manual_gpus_option;
+	if (options->cores_total > 0)
+		r->cores.total = options->cores_total;
+	if (options->memory_total > 0)
+		r->memory.total = options->memory_total;
+	if (options->gpus_total > -1)
+		r->gpus.total = options->gpus_total;
 
-	if (options->manual_disk_option > 0) {
-		r->disk.total = MIN(r->disk.total, options->manual_disk_option);
+	if (options->disk_total > 0) {
+		r->disk.total = MIN(r->disk.total, options->disk_total);
 	} else {
 		/* Set the reporting disk to a fraction of the measured disk to avoid
 		 * unnecessarily forsaking tasks with unspecified resources.
@@ -1272,12 +1272,12 @@ If 0, the worker is using more resources than promised. 1 if resource usage hold
 
 static int enforce_worker_limits(struct link *manager)
 {
-	if (options->manual_disk_option > 0 && total_resources->disk.inuse > options->manual_disk_option) {
+	if (options->disk_total > 0 && total_resources->disk.inuse > options->disk_total) {
 		fprintf(stderr,
 				"vine_worker: %s used more than declared disk space (--disk - < disk used) %" PRIu64
 				" < %" PRIu64 " MB\n",
 				workspace->workspace_dir,
-				options->manual_disk_option,
+				options->disk_total,
 				total_resources->disk.inuse);
 
 		if (manager) {
@@ -1287,11 +1287,11 @@ static int enforce_worker_limits(struct link *manager)
 		return 0;
 	}
 
-	if (options->manual_memory_option > 0 && total_resources->memory.inuse > options->manual_memory_option) {
+	if (options->memory_total > 0 && total_resources->memory.inuse > options->memory_total) {
 		fprintf(stderr,
 				"vine_worker: used more than declared memory (--memory < memory used) %" PRIu64
 				" < %" PRIu64 " MB\n",
-				options->manual_memory_option,
+				options->memory_total,
 				total_resources->memory.inuse);
 
 		if (manager) {
@@ -1322,11 +1322,11 @@ static int enforce_worker_promises(struct link *manager)
 		return 0;
 	}
 
-	if (options->manual_disk_option > 0 && total_resources->disk.total < options->manual_disk_option) {
+	if (options->disk_total > 0 && total_resources->disk.total < options->disk_total) {
 		fprintf(stderr,
 				"vine_worker: has less than the promised disk space (--disk > disk total) %" PRIu64
 				" < %" PRIu64 " MB\n",
-				options->manual_disk_option,
+				options->disk_total,
 				total_resources->disk.total);
 
 		if (manager) {
@@ -1587,11 +1587,11 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 		return 0;
 	}
 
-	if (options->manual_ssl_option && !use_ssl) {
+	if (options->ssl_requested && !use_ssl) {
 		fprintf(stderr, "vine_worker: --ssl was given, but manager %s:%d is not using ssl.\n", host, port);
 		link_close(manager);
 		return 0;
-	} else if (options->manual_ssl_option || use_ssl) {
+	} else if (options->ssl_requested || use_ssl) {
 		if (link_ssl_wrap_connect(manager) < 1) {
 			fprintf(stderr, "vine_worker: could not setup ssl connection.\n");
 			link_close(manager);
@@ -1608,9 +1608,9 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 	printf("connected to manager %s:%d via local address %s:%d\n", host, port, local_addr, local_port);
 	debug(D_VINE, "connected to manager %s:%d via local address %s:%d", host, port, local_addr, local_port);
 
-	if (options->vine_worker_password) {
+	if (options->password) {
 		debug(D_VINE, "authenticating to manager");
-		if (!link_auth_password(manager, options->vine_worker_password, options->idle_stoptime)) {
+		if (!link_auth_password(manager, options->password, options->idle_stoptime)) {
 			fprintf(stderr, "vine_worker: wrong password for manager %s:%d\n", host, port);
 			link_close(manager);
 			return 0;
@@ -1856,7 +1856,7 @@ static void vine_worker_serve_managers()
 			result = vine_worker_serve_manager_by_name(catalog_hosts, project_regex);
 		} else {
 			result = vine_worker_serve_manager_by_hostport_list(
-					manager_addresses, /* use ssl only if --ssl */ options->manual_ssl_option);
+					manager_addresses, /* use ssl only if --ssl */ options->ssl_requested);
 		}
 
 		/*
@@ -1934,10 +1934,10 @@ static void read_resources_env_var(const char *name, int64_t *manual_option)
 
 static void read_resources_env_vars()
 {
-	read_resources_env_var("CORES", &options->manual_cores_option);
-	read_resources_env_var("MEMORY", &options->manual_memory_option);
-	read_resources_env_var("DISK", &options->manual_disk_option);
-	read_resources_env_var("GPUS", &options->manual_gpus_option);
+	read_resources_env_var("CORES", &options->cores_total);
+	read_resources_env_var("MEMORY", &options->memory_total);
+	read_resources_env_var("DISK", &options->disk_total);
+	read_resources_env_var("GPUS", &options->gpus_total);
 }
 
 struct list *parse_manager_addresses(const char *specs, int default_port)
@@ -2007,8 +2007,8 @@ void vine_worker_create_structures()
 
 static void vine_worker_delete_structures()
 {
-	if (options->manual_workspace_option)
-		free(options->manual_workspace_option);
+	if (options->workspace_dir)
+		free(options->workspace_dir);
 
 	if (worker_id)
 		free(worker_id);
@@ -2254,7 +2254,7 @@ int main(int argc, char *argv[])
 		case 's': {
 			char temp_abs_path[PATH_MAX];
 			path_absolute(optarg, temp_abs_path, 1);
-			options->manual_workspace_option = xxstrdup(temp_abs_path);
+			options->workspace_dir = xxstrdup(temp_abs_path);
 			break;
 		}
 		case 'v':
@@ -2262,7 +2262,7 @@ int main(int argc, char *argv[])
 			exit(EXIT_SUCCESS);
 			break;
 		case 'P':
-			if (copy_file_to_buffer(optarg, &options->vine_worker_password, NULL) < 0) {
+			if (copy_file_to_buffer(optarg, &options->password, NULL) < 0) {
 				fprintf(stderr,
 						"vine_worker: couldn't load password from %s: %s\n",
 						optarg,
@@ -2278,23 +2278,23 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_CORES:
 			if (!strncmp(optarg, "all", 3)) {
-				options->manual_cores_option = 0;
+				options->cores_total = 0;
 			} else {
-				options->manual_cores_option = atoi(optarg);
+				options->cores_total = atoi(optarg);
 			}
 			break;
 		case LONG_OPT_MEMORY:
 			if (!strncmp(optarg, "all", 3)) {
-				options->manual_memory_option = 0;
+				options->memory_total = 0;
 			} else {
-				options->manual_memory_option = atoll(optarg);
+				options->memory_total = atoll(optarg);
 			}
 			break;
 		case LONG_OPT_DISK:
 			if (!strncmp(optarg, "all", 3)) {
-				options->manual_disk_option = 0;
+				options->disk_total = 0;
 			} else {
-				options->manual_disk_option = atoll(optarg);
+				options->disk_total = atoll(optarg);
 			}
 			break;
 		case LONG_OPT_DISK_PERCENT:
@@ -2307,9 +2307,9 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_GPUS:
 			if (!strncmp(optarg, "all", 3)) {
-				options->manual_gpus_option = -1;
+				options->gpus_total = -1;
 			} else {
-				options->manual_gpus_option = atoi(optarg);
+				options->gpus_total = atoi(optarg);
 			}
 			break;
 		case LONG_OPT_WALL_TIME:
@@ -2340,7 +2340,7 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case LONG_OPT_USE_SSL:
-			options->manual_ssl_option = 1;
+			options->ssl_requested = 1;
 			break;
 		case LONG_OPT_FROM_FACTORY:
 			if (factory_name)
@@ -2391,7 +2391,7 @@ int main(int argc, char *argv[])
 
 	random_init();
 
-	workspace = vine_workspace_create(options->manual_workspace_option);
+	workspace = vine_workspace_create(options->workspace_dir);
 	if (!workspace) {
 		fprintf(stderr, "vine_worker: failed to setup workspace directory.\n");
 		exit(1);
@@ -2403,8 +2403,8 @@ int main(int argc, char *argv[])
 
 	chdir(workspace->workspace_dir);
 
-	if (options->manual_cores_option < 1) {
-		options->manual_cores_option = load_average_get_cpus();
+	if (options->cores_total < 1) {
+		options->cores_total = load_average_get_cpus();
 	}
 
 	options->connect_stoptime = time(0) + options->connect_timeout;

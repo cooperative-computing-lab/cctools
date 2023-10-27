@@ -10,13 +10,13 @@
 struct vine_worker_options {
 	
 	/* 0 means not given as a command line option. */
-	int64_t manual_cores_option;
-	int64_t manual_disk_option;
-	int64_t manual_memory_option;
+	int64_t cores_total;
+	int64_t disk_total;
+	int64_t memory_total;
 	time_t manual_wall_time_option;
 
 	/* -1 means not given as a command line option. */
-	int64_t manual_gpus_option;
+	int64_t gpus_total;
 
 	/* In single shot mode, immediately quit when disconnected. Useful for accelerating the test suite. */
 	int single_shot_mode;
@@ -46,19 +46,19 @@ struct vine_worker_options {
 	timestamp_t end_time;
 
 	/* Password shared between manager and worker. */
-	char *vine_worker_password;
+	char *password;
 
 	/* If set to "by_ip", "by_hostname", or "by_apparent_ip", overrides manager's preferred connection mode. */
 	char *preferred_connection;
 
 	/*
 	Whether to force a ssl connection. If using the catalog server and the
-	manager announces it is using SSL, then SSL is used regardless of manual_ssl_option.
+	manager announces it is using SSL, then SSL is used regardless of ssl_requested.
 	*/
-	int manual_ssl_option;
+	int ssl_requested;
 
 	/* Manual option given by the user to control the location of the workspace. */
-	char *manual_workspace_option;
+	char *workspace_dir;
 	
 	/* Table of user-specified features. The key represents the name of the feature. */
 	/* The corresponding value is just a pointer to feature_dummy and can be ignored. */

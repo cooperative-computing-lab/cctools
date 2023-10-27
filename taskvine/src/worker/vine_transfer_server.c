@@ -46,8 +46,8 @@ static void vine_transfer_handler(struct link *lnk, struct vine_cache *cache)
 
 	change_process_title("vine_worker [transfer]");
 
-	if (options->vine_worker_password) {
-		if (!link_auth_password(lnk, options->vine_worker_password, time(0) + command_timeout)) {
+	if (options->password) {
+		if (!link_auth_password(lnk, options->password, time(0) + command_timeout)) {
 			debug(D_VINE, "transfer server: could not authenticate peer worker via password!");
 			return;
 		}
