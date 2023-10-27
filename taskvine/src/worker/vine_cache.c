@@ -385,8 +385,8 @@ static int do_worker_transfer(
 		return 0;
 	}
 
-	if (vine_worker_password) {
-		if (!link_auth_password(worker_link, vine_worker_password, time(0) + 5)) {
+	if (options->vine_worker_password) {
+		if (!link_auth_password(worker_link, options->vine_worker_password, time(0) + 5)) {
 			*error_message =
 					string_format("Could not authenticate to peer worker at %s:%d", addr, port_num);
 			link_close(worker_link);

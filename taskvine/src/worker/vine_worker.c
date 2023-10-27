@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "vine_transfer.h"
 #include "vine_transfer_server.h"
 #include "vine_watcher.h"
+#include "vine_worker_options.h"
 #include "vine_workspace.h"
 
 #include "catalog_query.h"
@@ -117,15 +118,6 @@ static struct vine_watcher *watcher = 0;
 /* The resources measured and available at this worker. */
 static struct vine_resources *total_resources = 0;
 
-/* 0 means not given as a command line option. */
-static int64_t manual_cores_option = 0;
-static int64_t manual_disk_option = 0;
-static int64_t manual_memory_option = 0;
-static time_t manual_wall_time_option = 0;
-
-/* -1 means not given as a command line option. */
-static int64_t manual_gpus_option = -1;
-
 /* The resources currently allocated to running tasks. */
 static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
@@ -137,6 +129,10 @@ static int64_t gpus_allocated = 0;
  * are estimates and thus may unncessarily forsaken tasks with unspecified resources.
  * Defaults to 90%. */
 static int disk_percent = 90;
+
+/* Operating system and architecture strings determined at startup time. */
+static char *os_name = NULL;
+static char *arch_name = NULL;
 
 /***************************************************************/
 /*     State of Interactions Between Manager and Worker        */
@@ -211,66 +207,12 @@ static int64_t files_counted = 0;
 /*       Configuration Options Given on the Command Line       */
 /***************************************************************/
 
-/* In single shot mode, immediately quit when disconnected. Useful for accelerating the test suite. */
-static int single_shot_mode = 0;
+struct vine_worker_options *options = 0;
 
-/* Maximum time to stay connected to a single manager without any work. */
-static int idle_timeout = 900;
 
-/* Current time at which we will give up if no work is received. */
-static time_t idle_stoptime = 0;
-
-/* Current time at which we will give up if no manager is found. */
-static time_t connect_stoptime = 0;
-
-/* Maximum time to attempt connecting to all available managers before giving up. */
-static int connect_timeout = 900;
-
-/* Maximum time to attempt sending/receiving any given file or message. */
-int active_timeout = 3600;
-
-/* Initial value for backoff interval (in seconds) when worker fails to connect to a manager. */
-static int init_backoff_interval = 1;
-
-/* Maximum value for backoff interval (in seconds) when worker fails to connect to a manager. */
-static int max_backoff_interval = 8;
-
-/* Absolute end time (in useconds) for worker, worker is killed after this point. */
-static timestamp_t end_time = 0;
-
-/* Password shared between manager and worker. */
-char *vine_worker_password = 0;
-
-/* If set to "by_ip", "by_hostname", or "by_apparent_ip", overrides manager's preferred connection mode. */
-static char *preferred_connection = NULL;
-
-/*
-Whether to force a ssl connection. If using the catalog server and the
-manager announces it is using SSL, then SSL is used regardless of manual_ssl_option.
-*/
-static int manual_ssl_option = 0;
-
-/* pid of the worker's parent process. If different from zero, worker will be */
-/* terminated when its parent process changes. */
-static pid_t initial_ppid = 0;
-
-/* Manual option given by the user to control the location of the workspace. */
-static char *manual_workspace_option = NULL;
-
-/* Operating system and architecture strings determined at startup time. */
-static char *os_name = NULL;
-static char *arch_name = NULL;
-
-/* Table of user-specified features. The key represents the name of the feature. */
-/* The corresponding value is just a pointer to feature_dummy and can be ignored. */
-static struct hash_table *features = NULL;
-static const char *feature_dummy = "dummy";
-
-/* How frequently to measure resources available. */
-static int check_resources_interval = 5;
-
-/* Maximum number of seconds to spend on each resource management. */
-static int max_time_on_measurement = 3;
+/* Initial PID of parent process, to tell if parent has gone away. */
+static pid_t initial_ppid;
+static const char *feature_dummy="feature";
 
 extern int vine_hack_do_not_compute_cached_name;
 
@@ -288,7 +230,7 @@ __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const ch
 	va_copy(debug_va, va);
 
 	vdebug(D_VINE, debug_msg, debug_va);
-	link_vprintf(l, time(0) + active_timeout, fmt, va);
+	link_vprintf(l, time(0) + options->active_timeout, fmt, va);
 
 	va_end(va);
 }
@@ -308,7 +250,7 @@ We track how much time has elapsed since the manager assigned a task.
 If time(0) > idle_stoptime, then the worker will disconnect.
 */
 
-static void reset_idle_timer() { idle_stoptime = time(0) + idle_timeout; }
+static void reset_idle_timer() { options->idle_stoptime = time(0) + options->idle_timeout; }
 
 /*
 Measure the disk used by the worker. We only manually measure the cache directory, as processes measure themselves.
@@ -322,7 +264,7 @@ static int64_t measure_worker_disk()
 		return 0;
 
 	char *cache_dir = vine_cache_full_path(cache_manager, ".");
-	path_disk_size_info_get_r(cache_dir, max_time_on_measurement, &state);
+	path_disk_size_info_get_r(cache_dir, options->max_time_on_measurement, &state);
 	free(cache_dir);
 
 	int64_t disk_measured = 0;
@@ -359,7 +301,7 @@ and apply any local options that override it.
 static void measure_worker_resources()
 {
 	static time_t last_resources_measurement = 0;
-	if (time(0) < last_resources_measurement + check_resources_interval) {
+	if (time(0) < last_resources_measurement + options->check_resources_interval) {
 		return;
 	}
 
@@ -367,15 +309,15 @@ static void measure_worker_resources()
 
 	vine_resources_measure_locally(r, workspace->workspace_dir);
 
-	if (manual_cores_option > 0)
-		r->cores.total = manual_cores_option;
-	if (manual_memory_option > 0)
-		r->memory.total = manual_memory_option;
-	if (manual_gpus_option > -1)
-		r->gpus.total = manual_gpus_option;
+	if (options->manual_cores_option > 0)
+		r->cores.total = options->manual_cores_option;
+	if (options->manual_memory_option > 0)
+		r->memory.total = options->manual_memory_option;
+	if (options->manual_gpus_option > -1)
+		r->gpus.total = options->manual_gpus_option;
 
-	if (manual_disk_option > 0) {
-		r->disk.total = MIN(r->disk.total, manual_disk_option);
+	if (options->manual_disk_option > 0) {
+		r->disk.total = MIN(r->disk.total, options->manual_disk_option);
 	} else {
 		/* Set the reporting disk to a fraction of the measured disk to avoid
 		 * unnecessarily forsaking tasks with unspecified resources.
@@ -403,7 +345,7 @@ static void send_features(struct link *manager)
 	char *f;
 	void *dummy;
 
-	HASH_TABLE_ITERATE(features, f, dummy)
+	HASH_TABLE_ITERATE(options->features, f, dummy)
 	{
 		char feature_encoded[VINE_LINE_MAX];
 		url_encode(f, feature_encoded, VINE_LINE_MAX);
@@ -417,11 +359,11 @@ Send a message to the manager with my current resources.
 
 static void send_resource_update(struct link *manager)
 {
-	time_t stoptime = time(0) + active_timeout;
+	time_t stoptime = time(0) + options->active_timeout;
 
 	// if workers are set to expire in some time, send the expiration time to manager
-	if (manual_wall_time_option > 0) {
-		end_time = worker_start_time + (manual_wall_time_option * 1e6);
+	if (options->manual_wall_time_option > 0) {
+		options->end_time = worker_start_time + (options->manual_wall_time_option * 1e6);
 	}
 
 	vine_resources_send(manager, total_resources, stoptime);
@@ -488,7 +430,7 @@ void vine_worker_send_cache_invalid(struct link *manager, const char *cachename,
 	} else {
 		send_message(manager, "cache-invalid %s %d\n", cachename, length);
 	}
-	link_write(manager, message, length, time(0) + active_timeout);
+	link_write(manager, message, length, time(0) + options->active_timeout);
 }
 
 /*
@@ -534,7 +476,7 @@ static void report_worker_ready(struct link *manager)
 
 	send_features(manager);
 	send_transfer_address(manager);
-	send_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t)DIV_INT_ROUND_UP(end_time, USECOND));
+	send_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t)DIV_INT_ROUND_UP(options->end_time, USECOND));
 
 	if (factory_name) {
 		send_message(manager, "info from-factory %s\n", factory_name);
@@ -652,7 +594,7 @@ static void report_task_complete(struct link *manager, struct vine_process *p)
 			p->task->task_id);
 
 	if (output_file >= 0) {
-		link_stream_from_fd(manager, output_file, output_length, time(0) + active_timeout);
+		link_stream_from_fd(manager, output_file, output_length, time(0) + options->active_timeout);
 		close(output_file);
 	}
 
@@ -673,7 +615,7 @@ static void report_tasks_complete(struct link *manager)
 		report_task_complete(manager, p);
 	}
 
-	vine_watcher_send_changes(watcher, manager, time(0) + active_timeout);
+	vine_watcher_send_changes(watcher, manager, time(0) + options->active_timeout);
 	send_message(manager, "end\n");
 
 	results_to_be_sent_msg = 0;
@@ -1031,7 +973,7 @@ static int enforce_process_limits(struct vine_process *p)
 	if (p->disk < 1)
 		return 1;
 
-	vine_process_measure_disk(p, max_time_on_measurement);
+	vine_process_measure_disk(p, options->max_time_on_measurement);
 	if (p->sandbox_size > p->task->resources_requested->disk) {
 		debug(D_VINE,
 				"Task %d went over its disk size limit: %s > %s\n",
@@ -1056,7 +998,7 @@ static int enforce_processes_limits()
 	int ok = 1;
 
 	/* Do not check too often, as it is expensive (particularly disk) */
-	if ((time(0) - last_check_time) < check_resources_interval)
+	if ((time(0) - last_check_time) < options->check_resources_interval)
 		return 1;
 
 	ITABLE_ITERATE(procs_running, task_id, p)
@@ -1151,17 +1093,17 @@ static int handle_manager(struct link *manager)
 	int mode, n;
 	int r = 0;
 
-	if (recv_message(manager, line, sizeof(line), idle_stoptime)) {
+	if (recv_message(manager, line, sizeof(line), options->idle_stoptime)) {
 		if (sscanf(line, "task %" SCNd64, &task_id) == 1) {
-			r = do_task(manager, task_id, time(0) + active_timeout);
+			r = do_task(manager, task_id, time(0) + options->active_timeout);
 		} else if (sscanf(line, "file %s %" SCNd64 " %o", filename_encoded, &length, &mode) == 3) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			r = vine_transfer_get_file(
-					manager, cache_manager, filename, length, mode, time(0) + active_timeout);
+					manager, cache_manager, filename, length, mode, time(0) + options->active_timeout);
 			reset_idle_timer();
 		} else if (sscanf(line, "dir %s", filename_encoded) == 1) {
 			url_decode(filename_encoded, filename, sizeof(filename));
-			r = vine_transfer_get_dir(manager, cache_manager, filename, time(0) + active_timeout);
+			r = vine_transfer_get_dir(manager, cache_manager, filename, time(0) + options->active_timeout);
 			reset_idle_timer();
 		} else if (sscanf(line,
 					   "puturl %s %s %" SCNd64 " %o %s",
@@ -1183,7 +1125,7 @@ static int handle_manager(struct link *manager)
 					   &length,
 					   &mode) == 4) {
 			url_decode(filename_encoded, filename, sizeof(filename));
-			r = do_put_mini_task(manager, time(0) + active_timeout, filename, length, mode, source);
+			r = do_put_mini_task(manager, time(0) + options->active_timeout, filename, length, mode, source);
 			reset_idle_timer();
 		} else if (sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded, filename, sizeof(filename));
@@ -1194,14 +1136,14 @@ static int handle_manager(struct link *manager)
 					cache_manager,
 					filename,
 					VINE_TRANSFER_MODE_FILE_ONLY,
-					time(0) + active_timeout);
+					time(0) + options->active_timeout);
 		} else if (sscanf(line, "get %s", filename_encoded) == 1) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			r = vine_transfer_put_any(manager,
 					cache_manager,
 					filename,
 					VINE_TRANSFER_MODE_ANY,
-					time(0) + active_timeout);
+					time(0) + options->active_timeout);
 		} else if (sscanf(line, "kill %" SCNd64, &task_id) == 1) {
 			if (task_id >= 0) {
 				r = do_kill(task_id);
@@ -1330,12 +1272,12 @@ If 0, the worker is using more resources than promised. 1 if resource usage hold
 
 static int enforce_worker_limits(struct link *manager)
 {
-	if (manual_disk_option > 0 && total_resources->disk.inuse > manual_disk_option) {
+	if (options->manual_disk_option > 0 && total_resources->disk.inuse > options->manual_disk_option) {
 		fprintf(stderr,
 				"vine_worker: %s used more than declared disk space (--disk - < disk used) %" PRIu64
 				" < %" PRIu64 " MB\n",
 				workspace->workspace_dir,
-				manual_disk_option,
+				options->manual_disk_option,
 				total_resources->disk.inuse);
 
 		if (manager) {
@@ -1345,11 +1287,11 @@ static int enforce_worker_limits(struct link *manager)
 		return 0;
 	}
 
-	if (manual_memory_option > 0 && total_resources->memory.inuse > manual_memory_option) {
+	if (options->manual_memory_option > 0 && total_resources->memory.inuse > options->manual_memory_option) {
 		fprintf(stderr,
 				"vine_worker: used more than declared memory (--memory < memory used) %" PRIu64
 				" < %" PRIu64 " MB\n",
-				manual_memory_option,
+				options->manual_memory_option,
 				total_resources->memory.inuse);
 
 		if (manager) {
@@ -1368,23 +1310,23 @@ If 0, the worker has less resources than promised. 1 otherwise.
 
 static int enforce_worker_promises(struct link *manager)
 {
-	if (end_time > 0 && timestamp_get() > ((uint64_t)end_time)) {
+	if (options->end_time > 0 && timestamp_get() > ((uint64_t)options->end_time)) {
 		warn(D_NOTICE,
 				"vine_worker: reached the wall time limit %" PRIu64 " s\n",
-				(uint64_t)manual_wall_time_option);
+				(uint64_t)options->manual_wall_time_option);
 		if (manager) {
 			send_message(manager,
 					"info wall_time_exhausted %" PRIu64 "\n",
-					(uint64_t)manual_wall_time_option);
+					(uint64_t)options->manual_wall_time_option);
 		}
 		return 0;
 	}
 
-	if (manual_disk_option > 0 && total_resources->disk.total < manual_disk_option) {
+	if (options->manual_disk_option > 0 && total_resources->disk.total < options->manual_disk_option) {
 		fprintf(stderr,
 				"vine_worker: has less than the promised disk space (--disk > disk total) %" PRIu64
 				" < %" PRIu64 " MB\n",
-				manual_disk_option,
+				options->manual_disk_option,
 				total_resources->disk.total);
 
 		if (manager) {
@@ -1496,13 +1438,13 @@ static void vine_worker_serve_manager(struct link *manager)
 	while (!abort_flag) {
 
 		/* Propose a disconnect from the manager, but do not do it until requested */
-		if (time(0) > idle_stoptime) {
+		if (time(0) > options->idle_stoptime) {
 			debug(D_NOTICE,
 					"requesting disconnect from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n",
 					current_manager_address->addr,
 					current_manager_address->port,
-					idle_timeout);
-			send_message(manager, "info idle-disconnect-request %lld\n", (long long)idle_timeout);
+					options->idle_timeout);
+			send_message(manager, "info idle-disconnect-request %lld\n", (long long)options->idle_timeout);
 			reset_idle_timer();
 		}
 
@@ -1606,7 +1548,7 @@ static void vine_worker_serve_manager(struct link *manager)
 			break;
 		}
 
-		// Reset idle_stoptime if something interesting is happening at this worker.
+		// Reset options->idle_stoptime if something interesting is happening at this worker.
 		if (list_size(procs_waiting) > 0 || itable_size(procs_table) > 0 || itable_size(procs_complete) > 0) {
 			reset_idle_timer();
 		}
@@ -1634,7 +1576,7 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 
 	reset_idle_timer();
 
-	struct link *manager = link_connect(current_manager_address->addr, port, idle_stoptime);
+	struct link *manager = link_connect(current_manager_address->addr, port, options->idle_stoptime);
 
 	if (!manager) {
 		fprintf(stderr,
@@ -1645,11 +1587,11 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 		return 0;
 	}
 
-	if (manual_ssl_option && !use_ssl) {
+	if (options->manual_ssl_option && !use_ssl) {
 		fprintf(stderr, "vine_worker: --ssl was given, but manager %s:%d is not using ssl.\n", host, port);
 		link_close(manager);
 		return 0;
-	} else if (manual_ssl_option || use_ssl) {
+	} else if (options->manual_ssl_option || use_ssl) {
 		if (link_ssl_wrap_connect(manager) < 1) {
 			fprintf(stderr, "vine_worker: could not setup ssl connection.\n");
 			link_close(manager);
@@ -1666,9 +1608,9 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 	printf("connected to manager %s:%d via local address %s:%d\n", host, port, local_addr, local_port);
 	debug(D_VINE, "connected to manager %s:%d via local address %s:%d", host, port, local_addr, local_port);
 
-	if (vine_worker_password) {
+	if (options->vine_worker_password) {
 		debug(D_VINE, "authenticating to manager");
-		if (!link_auth_password(manager, vine_worker_password, idle_stoptime)) {
+		if (!link_auth_password(manager, options->vine_worker_password, options->idle_stoptime)) {
 			fprintf(stderr, "vine_worker: wrong password for manager %s:%d\n", host, port);
 			link_close(manager);
 			return 0;
@@ -1679,7 +1621,7 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 		char line[VINE_LINE_MAX];
 		debug(D_VINE, "verifying manager's project name");
 		send_message(manager, "name\n");
-		if (!recv_message(manager, line, sizeof(line), idle_stoptime)) {
+		if (!recv_message(manager, line, sizeof(line), options->idle_stoptime)) {
 			debug(D_VINE, "no response from manager while verifying name");
 			link_close(manager);
 			return 0;
@@ -1827,18 +1769,18 @@ static int vine_worker_serve_manager_by_name(const char *catalog_hosts, const ch
 		int use_ssl = jx_lookup_boolean(jx, "ssl");
 
 		// give priority to worker's preferred connection option
-		if (preferred_connection) {
-			pref = preferred_connection;
+		if (options->preferred_connection) {
+			pref = options->preferred_connection;
 		}
 
 		if (last_addr) {
-			if (time(0) > idle_stoptime && strcmp(addr, last_addr->host) == 0 && port == last_addr->port) {
+			if (time(0) > options->idle_stoptime && strcmp(addr, last_addr->host) == 0 && port == last_addr->port) {
 				if (list_size(managers_list) < 2) {
 					free(last_addr);
 					last_addr = NULL;
 
-					/* convert idle_stoptime into connect_stoptime (e.g., time already served). */
-					connect_stoptime = idle_stoptime;
+					/* convert options->idle_stoptime into connect_stoptime (e.g., time already served). */
+					options->connect_stoptime = options->idle_stoptime;
 					debug(D_VINE,
 							"Previous idle disconnection from only manager available project=%s name=%s addr=%s port=%d",
 							project,
@@ -1894,7 +1836,7 @@ static int vine_worker_serve_manager_by_name(const char *catalog_hosts, const ch
 
 static void vine_worker_serve_managers()
 {
-	int backoff_interval = init_backoff_interval;
+	int backoff_interval = options->init_backoff_interval;
 
 	while (1) {
 		int result = 0;
@@ -1914,7 +1856,7 @@ static void vine_worker_serve_managers()
 			result = vine_worker_serve_manager_by_name(catalog_hosts, project_regex);
 		} else {
 			result = vine_worker_serve_manager_by_hostport_list(
-					manager_addresses, /* use ssl only if --ssl */ manual_ssl_option);
+					manager_addresses, /* use ssl only if --ssl */ options->manual_ssl_option);
 		}
 
 		/*
@@ -1924,19 +1866,19 @@ static void vine_worker_serve_managers()
 		*/
 
 		if (result) {
-			if (single_shot_mode) {
+			if (options->single_shot_mode) {
 				debug(D_DEBUG, "stopping: single shot mode");
 				break;
 			}
-			backoff_interval = init_backoff_interval;
-			connect_stoptime = time(0) + connect_timeout;
+			backoff_interval = options->init_backoff_interval;
+			options->connect_stoptime = time(0) + options->connect_timeout;
 
-			if (!project_regex && (time(0) > idle_stoptime)) {
+			if (!project_regex && (time(0) > options->idle_stoptime)) {
 				debug(D_NOTICE, "stopping: no other managers available");
 				break;
 			}
 		} else {
-			backoff_interval = MIN(backoff_interval * 2, max_backoff_interval);
+			backoff_interval = MIN(backoff_interval * 2, options->max_backoff_interval);
 		}
 
 		if (abort_flag) {
@@ -1944,8 +1886,8 @@ static void vine_worker_serve_managers()
 			break;
 		}
 
-		if (time(0) > connect_stoptime) {
-			debug(D_NOTICE, "stopping: could not connect after %d seconds.", connect_timeout);
+		if (time(0) > options->connect_stoptime) {
+			debug(D_NOTICE, "stopping: could not connect after %d seconds.", options->connect_timeout);
 			break;
 		}
 
@@ -1992,10 +1934,10 @@ static void read_resources_env_var(const char *name, int64_t *manual_option)
 
 static void read_resources_env_vars()
 {
-	read_resources_env_var("CORES", &manual_cores_option);
-	read_resources_env_var("MEMORY", &manual_memory_option);
-	read_resources_env_var("DISK", &manual_disk_option);
-	read_resources_env_var("GPUS", &manual_gpus_option);
+	read_resources_env_var("CORES", &options->manual_cores_option);
+	read_resources_env_var("MEMORY", &options->manual_memory_option);
+	read_resources_env_var("DISK", &options->manual_disk_option);
+	read_resources_env_var("GPUS", &options->manual_gpus_option);
 }
 
 struct list *parse_manager_addresses(const char *specs, int default_port)
@@ -2046,8 +1988,6 @@ void vine_worker_create_structures()
 	procs_waiting = list_create();
 	procs_complete = itable_create(0);
 
-	features = hash_table_create(4, 0);
-
 	current_transfers = hash_table_create(0, 0);
 
 	watcher = vine_watcher_create();
@@ -2067,8 +2007,8 @@ void vine_worker_create_structures()
 
 static void vine_worker_delete_structures()
 {
-	if (manual_workspace_option)
-		free(manual_workspace_option);
+	if (options->manual_workspace_option)
+		free(options->manual_workspace_option);
 
 	if (worker_id)
 		free(worker_id);
@@ -2084,8 +2024,6 @@ static void vine_worker_delete_structures()
 		vine_watcher_delete(watcher);
 	if (current_transfers)
 		hash_table_delete(current_transfers);
-	if (features)
-		hash_table_delete(features);
 
 	if (procs_table)
 		itable_delete(procs_table);
@@ -2123,18 +2061,18 @@ static void show_help(const char *cmd)
 	printf(" %-30s Set both --idle-timeout and --connect-timeout.\n", "-t,--timeout=<time>");
 	printf(" %-30s Disconnect after this time if manager sends no work. (default=%ds)\n",
 			"   --idle-timeout=<time>",
-			idle_timeout);
+			options->idle_timeout);
 	printf(" %-30s Abort after this time if no managers are available. (default=%ds)\n",
 			"   --connect-timeout=<time>",
-			idle_timeout);
+			options->idle_timeout);
 	printf(" %-30s Exit if parent process dies.\n", "--parent-death");
 	printf(" %-30s Set TCP window size.\n", "-w,--tcp-window-size=<size>");
 	printf(" %-30s Set initial value for backoff interval when worker fails to connect\n",
 			"-i,--min-backoff=<time>");
-	printf(" %-30s to a manager. (default=%ds)\n", "", init_backoff_interval);
+	printf(" %-30s to a manager. (default=%ds)\n", "", options->init_backoff_interval);
 	printf(" %-30s Set maximum value for backoff interval when worker fails to connect\n",
 			"-b,--max-backoff=<time>");
-	printf(" %-30s to a manager. (default=%ds)\n", "", max_backoff_interval);
+	printf(" %-30s to a manager. (default=%ds)\n", "", options->max_backoff_interval);
 	printf(" %-30s Set architecture string for the worker to report to manager instead\n", "-A,--arch=<arch>");
 	printf(" %-30s of the value in uname (%s).\n", "", arch_name);
 	printf(" %-30s Set operating system string for the worker to report to manager instead\n", "-O,--os=<os>");
@@ -2180,7 +2118,7 @@ enum {
 	LONG_OPT_DISK,
 	LONG_OPT_DISK_PERCENT,
 	LONG_OPT_GPUS,
-	LONG_OPT_IDLE_TIMEOUT,
+	LONG_OPT_OPTIONS_IDLE_TIMEOUT,
 	LONG_OPT_CONNECT_TIMEOUT,
 	LONG_OPT_SINGLE_SHOT,
 	LONG_OPT_WALL_TIME,
@@ -2203,7 +2141,7 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"master-name", required_argument, 0, 'M'},
 		{"password", required_argument, 0, 'P'},
 		{"timeout", required_argument, 0, 't'},
-		{"idle-timeout", required_argument, 0, LONG_OPT_IDLE_TIMEOUT},
+		{"idle-timeout", required_argument, 0, LONG_OPT_OPTIONS_IDLE_TIMEOUT},
 		{"connect-timeout", required_argument, 0, LONG_OPT_CONNECT_TIMEOUT},
 		{"tcp-window-size", required_argument, 0, 'w'},
 		{"min-backoff", required_argument, 0, 'i'},
@@ -2248,6 +2186,8 @@ int main(int argc, char *argv[])
 	int c;
 	int w;
 
+	options = vine_worker_options_create();
+
 	while ((c = getopt_long(argc, argv, "aC:d:t:o:p:M:N:P:w:i:b:z:A:O:s:v:h", long_options, 0)) != -1) {
 		switch (c) {
 		case 'a':
@@ -2263,13 +2203,13 @@ int main(int argc, char *argv[])
 			debug_config_file_size(MAX(0, string_metric_parse(optarg)));
 			break;
 		case 't':
-			connect_timeout = idle_timeout = string_time_parse(optarg);
+			options->connect_timeout = options->idle_timeout = string_time_parse(optarg);
 			break;
-		case LONG_OPT_IDLE_TIMEOUT:
-			idle_timeout = string_time_parse(optarg);
+		case LONG_OPT_OPTIONS_IDLE_TIMEOUT:
+			options->idle_timeout = string_time_parse(optarg);
 			break;
 		case LONG_OPT_CONNECT_TIMEOUT:
-			connect_timeout = string_time_parse(optarg);
+			options->connect_timeout = string_time_parse(optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);
@@ -2286,14 +2226,14 @@ int main(int argc, char *argv[])
 			link_window_set(w, w);
 			break;
 		case 'i':
-			init_backoff_interval = string_metric_parse(optarg);
+			options->init_backoff_interval = string_metric_parse(optarg);
 			break;
 		case 'b':
-			max_backoff_interval = string_metric_parse(optarg);
-			if (max_backoff_interval < init_backoff_interval) {
+			options->max_backoff_interval = string_metric_parse(optarg);
+			if (options->max_backoff_interval < options->init_backoff_interval) {
 				fprintf(stderr,
 						"Maximum backoff interval provided must be greater than the initial backoff interval of %ds.\n",
-						init_backoff_interval);
+						options->init_backoff_interval);
 				exit(1);
 			}
 			break;
@@ -2314,7 +2254,7 @@ int main(int argc, char *argv[])
 		case 's': {
 			char temp_abs_path[PATH_MAX];
 			path_absolute(optarg, temp_abs_path, 1);
-			manual_workspace_option = xxstrdup(temp_abs_path);
+			options->manual_workspace_option = xxstrdup(temp_abs_path);
 			break;
 		}
 		case 'v':
@@ -2322,7 +2262,7 @@ int main(int argc, char *argv[])
 			exit(EXIT_SUCCESS);
 			break;
 		case 'P':
-			if (copy_file_to_buffer(optarg, &vine_worker_password, NULL) < 0) {
+			if (copy_file_to_buffer(optarg, &options->vine_worker_password, NULL) < 0) {
 				fprintf(stderr,
 						"vine_worker: couldn't load password from %s: %s\n",
 						optarg,
@@ -2338,23 +2278,23 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_CORES:
 			if (!strncmp(optarg, "all", 3)) {
-				manual_cores_option = 0;
+				options->manual_cores_option = 0;
 			} else {
-				manual_cores_option = atoi(optarg);
+				options->manual_cores_option = atoi(optarg);
 			}
 			break;
 		case LONG_OPT_MEMORY:
 			if (!strncmp(optarg, "all", 3)) {
-				manual_memory_option = 0;
+				options->manual_memory_option = 0;
 			} else {
-				manual_memory_option = atoll(optarg);
+				options->manual_memory_option = atoll(optarg);
 			}
 			break;
 		case LONG_OPT_DISK:
 			if (!strncmp(optarg, "all", 3)) {
-				manual_disk_option = 0;
+				options->manual_disk_option = 0;
 			} else {
-				manual_disk_option = atoll(optarg);
+				options->manual_disk_option = atoll(optarg);
 			}
 			break;
 		case LONG_OPT_DISK_PERCENT:
@@ -2367,40 +2307,40 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_GPUS:
 			if (!strncmp(optarg, "all", 3)) {
-				manual_gpus_option = -1;
+				options->manual_gpus_option = -1;
 			} else {
-				manual_gpus_option = atoi(optarg);
+				options->manual_gpus_option = atoi(optarg);
 			}
 			break;
 		case LONG_OPT_WALL_TIME:
-			manual_wall_time_option = atoi(optarg);
-			if (manual_wall_time_option < 1) {
-				manual_wall_time_option = 0;
+			options->manual_wall_time_option = atoi(optarg);
+			if (options->manual_wall_time_option < 1) {
+				options->manual_wall_time_option = 0;
 				warn(D_NOTICE, "Ignoring --wall-time, a positive integer is expected.");
 			}
 			break;
 		case LONG_OPT_SINGLE_SHOT:
-			single_shot_mode = 1;
+			options->single_shot_mode = 1;
 			break;
 		case 'h':
 			show_help(argv[0]);
 			return 0;
 		case LONG_OPT_FEATURE:
-			hash_table_insert(features, optarg, feature_dummy);
+			hash_table_insert(options->features, optarg, feature_dummy);
 			break;
 		case LONG_OPT_PARENT_DEATH:
 			initial_ppid = getppid();
 			break;
 		case LONG_OPT_CONN_MODE:
-			free(preferred_connection);
-			preferred_connection = xxstrdup(optarg);
-			if (strcmp(preferred_connection, "by_ip") && strcmp(preferred_connection, "by_hostname") &&
-					strcmp(preferred_connection, "by_apparent_ip")) {
+			free(options->preferred_connection);
+			options->preferred_connection = xxstrdup(optarg);
+			if (strcmp(options->preferred_connection, "by_ip") && strcmp(options->preferred_connection, "by_hostname") &&
+					strcmp(options->preferred_connection, "by_apparent_ip")) {
 				fatal("connection-mode should be one of: by_ip, by_hostname, by_apparent_ip");
 			}
 			break;
 		case LONG_OPT_USE_SSL:
-			manual_ssl_option = 1;
+			options->manual_ssl_option = 1;
 			break;
 		case LONG_OPT_FROM_FACTORY:
 			if (factory_name)
@@ -2435,7 +2375,7 @@ int main(int argc, char *argv[])
 
 	char *gpu_name = gpu_name_get();
 	if (gpu_name) {
-		hash_table_insert(features, gpu_name, feature_dummy);
+		hash_table_insert(options->features, gpu_name, feature_dummy);
 		free(gpu_name);
 	}
 
@@ -2451,7 +2391,7 @@ int main(int argc, char *argv[])
 
 	random_init();
 
-	workspace = vine_workspace_create(manual_workspace_option);
+	workspace = vine_workspace_create(options->manual_workspace_option);
 	if (!workspace) {
 		fprintf(stderr, "vine_worker: failed to setup workspace directory.\n");
 		exit(1);
@@ -2463,11 +2403,11 @@ int main(int argc, char *argv[])
 
 	chdir(workspace->workspace_dir);
 
-	if (manual_cores_option < 1) {
-		manual_cores_option = load_average_get_cpus();
+	if (options->manual_cores_option < 1) {
+		options->manual_cores_option = load_average_get_cpus();
 	}
 
-	connect_stoptime = time(0) + connect_timeout;
+	options->connect_stoptime = time(0) + options->connect_timeout;
 
 	measure_worker_resources();
 
@@ -2483,6 +2423,8 @@ int main(int argc, char *argv[])
 	workspace = 0;
 
 	vine_worker_delete_structures();
+
+	vine_worker_options_delete(options);
 
 	return 0;
 }
