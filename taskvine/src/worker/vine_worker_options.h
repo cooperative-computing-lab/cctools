@@ -70,10 +70,33 @@ struct vine_worker_options {
 	/* Maximum number of seconds to spend on each resource management. */
 	int max_time_on_measurement;
 
+	/* Name of worker architecture and operating system */
+	char *arch_name;
+	char *os_name;
+
+	/* A regular expression (usually just a plain string) naming the manager(s) to connect to .*/
+	char *project_regex;
+
+	/* A string giving the list of catalog hosts to query to find the manager. */
+	char *catalog_hosts;
+
+	/* The name of the factory process that started this worker, if any. */
+	char *factory_name;
+
+	/* When the amount of disk is not specified, manually set the reporting disk to
+	 * this percentage of the measured disk. This safeguards the fact that disk measurements
+	 * are estimates and thus may unncessarily forsaken tasks with unspecified resources.
+	 * Defaults to 90%. */
+	int disk_percent;
+
+	/* The parent process pid, to detect when the parent has exited. */
+	pid_t initial_ppid;
 };
 
 struct vine_worker_options * vine_worker_options_create();
-void vine_worker_options_delete( struct vine_worker_options *s );
+void vine_worker_options_show_help( const char *cmd, struct vine_worker_options *options );
+void vine_worker_options_get( struct vine_worker_options *options, int argc, char *argv[] );
+void vine_worker_options_delete( struct vine_worker_options *options );
 
 #endif
 

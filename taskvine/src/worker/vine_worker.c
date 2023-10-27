@@ -28,8 +28,6 @@ See the file COPYING for details.
 #include "debug.h"
 #include "domain_name_cache.h"
 #include "envtools.h"
-#include "getopt.h"
-#include "getopt_aux.h"
 #include "gpu_info.h"
 #include "hash_cache.h"
 #include "hash_table.h"
@@ -76,7 +74,6 @@ See the file COPYING for details.
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/utsname.h>
 
 /***************************************************************/
 /* Primary Worker Data Structures for Tracking Tasks and Files */
@@ -124,28 +121,9 @@ static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
 
-/* When the amount of disk is not specified, manually set the reporting disk to
- * this percentage of the measured disk. This safeguards the fact that disk measurements
- * are estimates and thus may unncessarily forsaken tasks with unspecified resources.
- * Defaults to 90%. */
-static int disk_percent = 90;
-
-/* Operating system and architecture strings determined at startup time. */
-static char *os_name = NULL;
-static char *arch_name = NULL;
-
 /***************************************************************/
 /*     State of Interactions Between Manager and Worker        */
 /***************************************************************/
-
-/* A regular expression (usually just a plain string) naming the manager(s) to connect to .*/
-static const char *project_regex = 0;
-
-/* A string giving the list of catalog hosts to query to find the manager. */
-static char *catalog_hosts = NULL;
-
-/* The name of the factory process that started this worker, if any. */
-static char *factory_name = NULL;
 
 /* A complete description of the address of a manager and how to connect. */
 struct manager_address {
@@ -209,10 +187,6 @@ static int64_t files_counted = 0;
 
 struct vine_worker_options *options = 0;
 
-
-/* Initial PID of parent process, to tell if parent has gone away. */
-static pid_t initial_ppid;
-static const char *feature_dummy="feature";
 
 extern int vine_hack_do_not_compute_cached_name;
 
@@ -325,7 +299,7 @@ static void measure_worker_resources()
 		 * disk.total = available_disk + disk.inuse, so we leave out disk.inuse in
 		 * the discounting calculation, then add it back in. */
 		r->disk.total -= r->disk.inuse;
-		r->disk.total = ceil(r->disk.total * disk_percent / 100) + r->disk.inuse;
+		r->disk.total = ceil(r->disk.total * options->disk_percent / 100) + r->disk.inuse;
 	}
 
 	r->disk.inuse = measure_worker_disk();
@@ -466,8 +440,8 @@ static void report_worker_ready(struct link *manager)
 			"taskvine %d %s %s %s %d.%d.%d\n",
 			VINE_PROTOCOL_VERSION,
 			hostname,
-			os_name,
-			arch_name,
+			options->os_name,
+			options->arch_name,
 			CCTOOLS_VERSION_MAJOR,
 			CCTOOLS_VERSION_MINOR,
 			CCTOOLS_VERSION_MICRO);
@@ -478,8 +452,8 @@ static void report_worker_ready(struct link *manager)
 	send_transfer_address(manager);
 	send_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t)DIV_INT_ROUND_UP(options->end_time, USECOND));
 
-	if (factory_name) {
-		send_message(manager, "info from-factory %s\n", factory_name);
+	if (options->factory_name) {
+		send_message(manager, "info from-factory %s\n", options->factory_name);
 	}
 
 	send_keepalive(manager, 1);
@@ -1448,7 +1422,7 @@ static void vine_worker_serve_manager(struct link *manager)
 			reset_idle_timer();
 		}
 
-		if (initial_ppid != 0 && getppid() != initial_ppid) {
+		if (options->initial_ppid != 0 && getppid() != options->initial_ppid) {
 			debug(D_NOTICE, "parent process exited, shutting down\n");
 			break;
 		}
@@ -1841,7 +1815,7 @@ static void vine_worker_serve_managers()
 	while (1) {
 		int result = 0;
 
-		if (initial_ppid != 0 && getppid() != initial_ppid) {
+		if (options->initial_ppid != 0 && getppid() != options->initial_ppid) {
 			debug(D_NOTICE, "parent process exited, shutting down\n");
 			break;
 		}
@@ -1852,8 +1826,8 @@ static void vine_worker_serve_managers()
 			break;
 		}
 
-		if (project_regex) {
-			result = vine_worker_serve_manager_by_name(catalog_hosts, project_regex);
+		if (options->project_regex) {
+			result = vine_worker_serve_manager_by_name(options->catalog_hosts, options->project_regex);
 		} else {
 			result = vine_worker_serve_manager_by_hostport_list(
 					manager_addresses, /* use ssl only if --ssl */ options->ssl_requested);
@@ -1873,7 +1847,7 @@ static void vine_worker_serve_managers()
 			backoff_interval = options->init_backoff_interval;
 			options->connect_stoptime = time(0) + options->connect_timeout;
 
-			if (!project_regex && (time(0) > options->idle_stoptime)) {
+			if (!options->project_regex && (time(0) > options->idle_stoptime)) {
 				debug(D_NOTICE, "stopping: no other managers available");
 				break;
 			}
@@ -1994,12 +1968,6 @@ void vine_worker_create_structures()
 
 	total_resources = vine_resources_create();
 
-	struct utsname uname_data;
-	uname(&uname_data);
-
-	os_name = xxstrdup(uname_data.sysname);
-	arch_name = xxstrdup(uname_data.machine);
-
 	worker_id = make_worker_id();
 }
 
@@ -2012,11 +1980,6 @@ static void vine_worker_delete_structures()
 
 	if (worker_id)
 		free(worker_id);
-
-	if (os_name)
-		free(os_name);
-	if (arch_name)
-		free(arch_name);
 
 	if (total_resources)
 		vine_resources_delete(total_resources);
@@ -2035,146 +1998,10 @@ static void vine_worker_delete_structures()
 		list_delete(procs_waiting);
 }
 
-static void show_help(const char *cmd)
-{
-	printf("Use: %s [options] <managerhost> <port> \n"
-	       "or\n     %s [options] \"managerhost:port[;managerhost:port;managerhost:port;...]\"\n"
-	       "or\n     %s [options] -M projectname\n",
-			cmd,
-			cmd,
-			cmd);
-	printf("where options are:\n");
-	printf(" %-30s Show version string\n", "-v,--version");
-	printf(" %-30s Show this help screen\n", "-h,--help");
-	printf(" %-30s Name of manager (project) to contact.  May be a regular expression.\n",
-			"-M,--manager-name=<name>");
-	printf(" %-30s Catalog server to query for managers.  (default: %s:%d) \n",
-			"-C,--catalog=<host:port>",
-			CATALOG_HOST,
-			CATALOG_PORT);
-	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
-	printf(" %-30s Send debugging to this file. (can also be :stderr, or :stdout)\n", "-o,--debug-file=<file>");
-	printf(" %-30s Set the maximum size of the debug log (default 10M, 0 disables).\n",
-			"--debug-rotate-max=<bytes>");
-	printf(" %-30s Use SSL to connect to the manager. (Not needed if using -M)", "--ssl");
-	printf(" %-30s Password file for authenticating to the manager.\n", "-P,--password=<pwfile>");
-	printf(" %-30s Set both --idle-timeout and --connect-timeout.\n", "-t,--timeout=<time>");
-	printf(" %-30s Disconnect after this time if manager sends no work. (default=%ds)\n",
-			"   --idle-timeout=<time>",
-			options->idle_timeout);
-	printf(" %-30s Abort after this time if no managers are available. (default=%ds)\n",
-			"   --connect-timeout=<time>",
-			options->idle_timeout);
-	printf(" %-30s Exit if parent process dies.\n", "--parent-death");
-	printf(" %-30s Set TCP window size.\n", "-w,--tcp-window-size=<size>");
-	printf(" %-30s Set initial value for backoff interval when worker fails to connect\n",
-			"-i,--min-backoff=<time>");
-	printf(" %-30s to a manager. (default=%ds)\n", "", options->init_backoff_interval);
-	printf(" %-30s Set maximum value for backoff interval when worker fails to connect\n",
-			"-b,--max-backoff=<time>");
-	printf(" %-30s to a manager. (default=%ds)\n", "", options->max_backoff_interval);
-	printf(" %-30s Set architecture string for the worker to report to manager instead\n", "-A,--arch=<arch>");
-	printf(" %-30s of the value in uname (%s).\n", "", arch_name);
-	printf(" %-30s Set operating system string for the worker to report to manager instead\n", "-O,--os=<os>");
-	printf(" %-30s of the value in uname (%s).\n", "", os_name);
-	printf(" %-30s Set the location for creating the working directory of the worker.\n", "-s,--workdir=<path>");
-	printf(" %-30s Set the number of cores reported by this worker. If not given, or less than 1,\n",
-			"--cores=<n>");
-	printf(" %-30s then try to detect cores available.\n", "");
-
-	printf(" %-30s Set the number of GPUs reported by this worker. If not given, or less than 0,\n", "--gpus=<n>");
-	printf(" %-30s then try to detect gpus available.\n", "");
-
-	printf(" %-30s Manually set the amount of memory (in MB) reported by this worker.\n", "--memory=<mb>");
-	printf(" %-30s If not given, or less than 1, then try to detect memory available.\n", "");
-
-	printf(" %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
-	printf(" %-30s If not given, or less than 1, then try to detect disk space available.\n", "");
-
-	printf(" %-30s Set the conservative disk reporting percent when --disk is unspecified.\n",
-			"--disk-percent=<percent>");
-	printf(" %-30s Defaults to %d.\n", "", disk_percent);
-
-	printf(" %-30s Use loop devices for task sandboxes (default=disabled, requires root access).\n",
-			"--disk-allocation");
-	printf(" %-30s Specifies a user-defined feature the worker provides. May be specified several times.\n",
-			"--feature");
-	printf(" %-30s Set the maximum number of seconds the worker may be active. (in s).\n", "--wall-time=<s>");
-
-	printf(" %-30s When using -M, override manager preference to resolve its address.\n", "--connection-mode");
-	printf(" %-30s One of by_ip, by_hostname, or by_apparent_ip. Default is set by manager.\n", "");
-
-	printf(" %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
-	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
-	printf(" %-30s Listening port for worker-worker transfers. (default: any)\n", "--transfer-port");
-}
-
-enum {
-	LONG_OPT_DEBUG_FILESIZE = 256,
-	LONG_OPT_BANDWIDTH,
-	LONG_OPT_DEBUG_RELEASE,
-	LONG_OPT_CORES,
-	LONG_OPT_MEMORY,
-	LONG_OPT_DISK,
-	LONG_OPT_DISK_PERCENT,
-	LONG_OPT_GPUS,
-	LONG_OPT_OPTIONS_IDLE_TIMEOUT,
-	LONG_OPT_CONNECT_TIMEOUT,
-	LONG_OPT_SINGLE_SHOT,
-	LONG_OPT_WALL_TIME,
-	LONG_OPT_MEMORY_THRESHOLD,
-	LONG_OPT_FEATURE,
-	LONG_OPT_PARENT_DEATH,
-	LONG_OPT_CONN_MODE,
-	LONG_OPT_USE_SSL,
-	LONG_OPT_PYTHON_FUNCTION,
-	LONG_OPT_FROM_FACTORY,
-	LONG_OPT_TRANSFER_PORT
-};
-
-static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
-		{"catalog", required_argument, 0, 'C'},
-		{"debug", required_argument, 0, 'd'},
-		{"debug-file", required_argument, 0, 'o'},
-		{"debug-rotate-max", required_argument, 0, LONG_OPT_DEBUG_FILESIZE},
-		{"manager-name", required_argument, 0, 'M'},
-		{"master-name", required_argument, 0, 'M'},
-		{"password", required_argument, 0, 'P'},
-		{"timeout", required_argument, 0, 't'},
-		{"idle-timeout", required_argument, 0, LONG_OPT_OPTIONS_IDLE_TIMEOUT},
-		{"connect-timeout", required_argument, 0, LONG_OPT_CONNECT_TIMEOUT},
-		{"tcp-window-size", required_argument, 0, 'w'},
-		{"min-backoff", required_argument, 0, 'i'},
-		{"max-backoff", required_argument, 0, 'b'},
-		{"single-shot", no_argument, 0, LONG_OPT_SINGLE_SHOT},
-		{"disk-threshold", required_argument, 0, 'z'},
-		{"memory-threshold", required_argument, 0, LONG_OPT_MEMORY_THRESHOLD},
-		{"arch", required_argument, 0, 'A'},
-		{"os", required_argument, 0, 'O'},
-		{"workdir", required_argument, 0, 's'},
-		{"bandwidth", required_argument, 0, LONG_OPT_BANDWIDTH},
-		{"cores", required_argument, 0, LONG_OPT_CORES},
-		{"memory", required_argument, 0, LONG_OPT_MEMORY},
-		{"disk", required_argument, 0, LONG_OPT_DISK},
-		{"disk-percent", required_argument, 0, LONG_OPT_DISK_PERCENT},
-		{"gpus", required_argument, 0, LONG_OPT_GPUS},
-		{"wall-time", required_argument, 0, LONG_OPT_WALL_TIME},
-		{"help", no_argument, 0, 'h'},
-		{"version", no_argument, 0, 'v'},
-		{"feature", required_argument, 0, LONG_OPT_FEATURE},
-		{"parent-death", no_argument, 0, LONG_OPT_PARENT_DEATH},
-		{"connection-mode", required_argument, 0, LONG_OPT_CONN_MODE},
-		{"ssl", no_argument, 0, LONG_OPT_USE_SSL},
-		{"from-factory", required_argument, 0, LONG_OPT_FROM_FACTORY},
-		{"transfer-port", required_argument, 0, LONG_OPT_TRANSFER_PORT},
-		{0, 0, 0, 0}};
-
 int main(int argc, char *argv[])
 {
 	/* This must come first in main, allows us to change process titles in ps later. */
 	change_process_title_init(argv);
-
-	catalog_hosts = CATALOG_HOST;
 
 	worker_start_time = timestamp_get();
 
@@ -2183,184 +2010,15 @@ int main(int argc, char *argv[])
 	debug_config(argv[0]);
 	read_resources_env_vars();
 
-	int c;
-	int w;
-
 	options = vine_worker_options_create();
 
-	while ((c = getopt_long(argc, argv, "aC:d:t:o:p:M:N:P:w:i:b:z:A:O:s:v:h", long_options, 0)) != -1) {
-		switch (c) {
-		case 'a':
-			// Left here for backwards compatibility
-			break;
-		case 'C':
-			catalog_hosts = xxstrdup(optarg);
-			break;
-		case 'd':
-			debug_flags_set(optarg);
-			break;
-		case LONG_OPT_DEBUG_FILESIZE:
-			debug_config_file_size(MAX(0, string_metric_parse(optarg)));
-			break;
-		case 't':
-			options->connect_timeout = options->idle_timeout = string_time_parse(optarg);
-			break;
-		case LONG_OPT_OPTIONS_IDLE_TIMEOUT:
-			options->idle_timeout = string_time_parse(optarg);
-			break;
-		case LONG_OPT_CONNECT_TIMEOUT:
-			options->connect_timeout = string_time_parse(optarg);
-			break;
-		case 'o':
-			debug_config_file(optarg);
-			break;
-		case 'M':
-		case 'N':
-			project_regex = optarg;
-			break;
-		case 'p':
-			// ignore for backwards compatibility
-			break;
-		case 'w':
-			w = string_metric_parse(optarg);
-			link_window_set(w, w);
-			break;
-		case 'i':
-			options->init_backoff_interval = string_metric_parse(optarg);
-			break;
-		case 'b':
-			options->max_backoff_interval = string_metric_parse(optarg);
-			if (options->max_backoff_interval < options->init_backoff_interval) {
-				fprintf(stderr,
-						"Maximum backoff interval provided must be greater than the initial backoff interval of %ds.\n",
-						options->init_backoff_interval);
-				exit(1);
-			}
-			break;
-		case 'z':
-			/* deprecated */
-			break;
-		case LONG_OPT_MEMORY_THRESHOLD:
-			/* deprecated */
-			break;
-		case 'A':
-			free(arch_name); // free the arch string obtained from uname
-			arch_name = xxstrdup(optarg);
-			break;
-		case 'O':
-			free(os_name); // free the os string obtained from uname
-			os_name = xxstrdup(optarg);
-			break;
-		case 's': {
-			char temp_abs_path[PATH_MAX];
-			path_absolute(optarg, temp_abs_path, 1);
-			options->workspace_dir = xxstrdup(temp_abs_path);
-			break;
-		}
-		case 'v':
-			cctools_version_print(stdout, argv[0]);
-			exit(EXIT_SUCCESS);
-			break;
-		case 'P':
-			if (copy_file_to_buffer(optarg, &options->password, NULL) < 0) {
-				fprintf(stderr,
-						"vine_worker: couldn't load password from %s: %s\n",
-						optarg,
-						strerror(errno));
-				exit(EXIT_FAILURE);
-			}
-			break;
-		case LONG_OPT_BANDWIDTH:
-			setenv("VINE_BANDWIDTH", optarg, 1);
-			break;
-		case LONG_OPT_DEBUG_RELEASE:
-			setenv("VINE_RESET_DEBUG_FILE", "yes", 1);
-			break;
-		case LONG_OPT_CORES:
-			if (!strncmp(optarg, "all", 3)) {
-				options->cores_total = 0;
-			} else {
-				options->cores_total = atoi(optarg);
-			}
-			break;
-		case LONG_OPT_MEMORY:
-			if (!strncmp(optarg, "all", 3)) {
-				options->memory_total = 0;
-			} else {
-				options->memory_total = atoll(optarg);
-			}
-			break;
-		case LONG_OPT_DISK:
-			if (!strncmp(optarg, "all", 3)) {
-				options->disk_total = 0;
-			} else {
-				options->disk_total = atoll(optarg);
-			}
-			break;
-		case LONG_OPT_DISK_PERCENT:
-			if (!strncmp(optarg, "all", 3)) {
-				disk_percent = 100;
-			} else {
-				/* guard the disk percent value to [0, 100]. */
-				disk_percent = MIN(100, MAX(atoi(optarg), 0));
-			}
-			break;
-		case LONG_OPT_GPUS:
-			if (!strncmp(optarg, "all", 3)) {
-				options->gpus_total = -1;
-			} else {
-				options->gpus_total = atoi(optarg);
-			}
-			break;
-		case LONG_OPT_WALL_TIME:
-			options->manual_wall_time_option = atoi(optarg);
-			if (options->manual_wall_time_option < 1) {
-				options->manual_wall_time_option = 0;
-				warn(D_NOTICE, "Ignoring --wall-time, a positive integer is expected.");
-			}
-			break;
-		case LONG_OPT_SINGLE_SHOT:
-			options->single_shot_mode = 1;
-			break;
-		case 'h':
-			show_help(argv[0]);
-			return 0;
-		case LONG_OPT_FEATURE:
-			hash_table_insert(options->features, optarg, feature_dummy);
-			break;
-		case LONG_OPT_PARENT_DEATH:
-			initial_ppid = getppid();
-			break;
-		case LONG_OPT_CONN_MODE:
-			free(options->preferred_connection);
-			options->preferred_connection = xxstrdup(optarg);
-			if (strcmp(options->preferred_connection, "by_ip") && strcmp(options->preferred_connection, "by_hostname") &&
-					strcmp(options->preferred_connection, "by_apparent_ip")) {
-				fatal("connection-mode should be one of: by_ip, by_hostname, by_apparent_ip");
-			}
-			break;
-		case LONG_OPT_USE_SSL:
-			options->ssl_requested = 1;
-			break;
-		case LONG_OPT_FROM_FACTORY:
-			if (factory_name)
-				free(factory_name);
-			factory_name = xxstrdup(optarg);
-			break;
-		case LONG_OPT_TRANSFER_PORT:
-			vine_transfer_server_port = atoi(optarg);
-			break;
-		default:
-			show_help(argv[0]);
-			return 1;
-		}
-	}
+	vine_worker_options_get(options,argc,argv);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
-	if (!project_regex) {
+	if (!options->project_regex) {
 		if ((argc - optind) < 1 || (argc - optind) > 2) {
-			show_help(argv[0]);
+			vine_worker_options_show_help(argv[0],options);
 			exit(1);
 		}
 
@@ -2368,14 +2026,14 @@ int main(int argc, char *argv[])
 		manager_addresses = parse_manager_addresses(argv[optind], default_manager_port);
 
 		if (list_size(manager_addresses) < 1) {
-			show_help(argv[0]);
+			vine_worker_options_show_help(argv[0],options);
 			fatal("No manager has been specified");
 		}
 	}
 
 	char *gpu_name = gpu_name_get();
 	if (gpu_name) {
-		hash_table_insert(options->features, gpu_name, feature_dummy);
+		hash_table_insert(options->features, gpu_name, "feature");
 		free(gpu_name);
 	}
 
