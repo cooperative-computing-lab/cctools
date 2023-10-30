@@ -85,7 +85,6 @@ jobs:
                   mkdir -p ~/miniconda3
                   curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o ~/miniconda3/miniconda.sh
                   bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
-                  touch ~/.bashrc
                   ~/miniconda3/bin/conda init bash
                   source ~/.bashrc
                   conda install -n base conda-libmamba-solver
@@ -142,7 +141,6 @@ jobs:
                 mkdir -p ~/miniconda3
                 curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o ~/miniconda3/miniconda.sh
                 bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
-                touch ~/.bashrc
                 ~/miniconda3/bin/conda init zsh
                 source ~/.zshrc
                 conda install -n base conda-libmamba-solver
@@ -151,6 +149,7 @@ jobs:
         run: |
                 source ~/.zshrc
                 conda list --name cctools-build
+                echo $SHELL
       - name: Configure
         run: |
                 source ~/.zshrc
