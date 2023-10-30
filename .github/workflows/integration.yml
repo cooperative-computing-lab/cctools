@@ -165,6 +165,7 @@ jobs:
       - name: Test
         run: |
                 source ~/.zshrc
+                chmod 777 ${GITHUB_WORKSPACE}/makeflow/test/TR_makeflow_001_*
                 ${GITHUB_WORKSPACE}/packaging/build-conda/test.sh
       - name: deploy
         uses: ncipollo/release-action@v1
