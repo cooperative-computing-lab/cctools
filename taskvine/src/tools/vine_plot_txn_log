@@ -822,8 +822,14 @@ class TxnStats(TxnPlot):
         print(f"Bytes created: {minitasks_size}")    
         print(f"Number of temps: {num_temps}")
         print(f"Bytes created: {temps_size}")
+        times = []
+        for l in manager.worker_lifetime.values():
+            times.append(l["DISCONNECTION"] - l["CONNECTION"])
+        cpu_time = sum(times)
+        print(f"Worker CPU Time (h): {round(cpu_time/60/60, 2)}")
         print("-----------------------------------------")
         print()
+
 
 
 if __name__ == "__main__":
