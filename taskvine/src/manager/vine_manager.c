@@ -150,7 +150,7 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 static void delete_worker_file(
 		struct vine_manager *q, struct vine_worker_info *w, const char *filename, int flags, int except_flags);
 
-static struct vine_task* vine_manager_send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
+static struct vine_task* send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
@@ -2680,6 +2680,18 @@ static void find_max_worker(struct vine_manager *q)
 	}
 }
 
+/* Tell worker to kill all empty libraries except the case where
+ * the task is a function call and the library can run it. */
+static void kill_empty_libraries_on_workers(struct vine_manager* q, struct vine_worker_info* w, struct vine_task* t) {
+    uint64_t task_id;
+    struct vine_task* task;
+    ITABLE_ITERATE(w->current_tasks, task_id, task) {
+	if (task->provides_library && task->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, task->provides_library))) {
+	    reset_task_to_state(q, task, VINE_TASK_RETRIEVED); 
+	}
+    }
+}
+
 /*
 Commit a given task to a worker by sending the task details,
 then updating all auxiliary data structures to note the
@@ -2688,6 +2700,7 @@ assignment and the new task state.
 
 static void commit_task_to_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
+	kill_empty_libraries_on_workers(q, w, t);
 	t->hostname = xxstrdup(w->hostname);
 	t->addrport = xxstrdup(w->addrport);
 
@@ -3053,7 +3066,7 @@ static struct vine_task *find_library_on_worker_for_task(struct vine_worker_info
 static int check_worker_can_run_function_task(struct vine_manager* q, struct vine_worker_info* w, struct vine_task* t){
     struct vine_task* library = find_library_on_worker_for_task(w, t->needs_library);
     if (!library) {
-	library = vine_manager_send_library_to_worker(q, w, t->needs_library);
+	library = send_library_to_worker(q, w, t->needs_library);
     }
     if (!library) {
 	return 0;
@@ -4319,7 +4332,7 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
  * @return pointer to the library task if the operation succeeds, 0 otherwise.
  */
 
-static struct vine_task* vine_manager_send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name)
+static struct vine_task* send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name)
 {
 	/* Find the original prototype library task by name, if it exists. */
 	struct vine_task *original = hash_table_lookup(q->libraries, name);
