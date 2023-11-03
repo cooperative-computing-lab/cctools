@@ -150,7 +150,7 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 static void delete_worker_file(
 		struct vine_manager *q, struct vine_worker_info *w, const char *filename, int flags, int except_flags);
 
-static struct vine_task* send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
+static struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
@@ -2682,14 +2682,17 @@ static void find_max_worker(struct vine_manager *q)
 
 /* Tell worker to kill all empty libraries except the case where
  * the task is a function call and the library can run it. */
-static void kill_empty_libraries_on_workers(struct vine_manager* q, struct vine_worker_info* w, struct vine_task* t) {
-    uint64_t task_id;
-    struct vine_task* task;
-    ITABLE_ITERATE(w->current_tasks, task_id, task) {
-	if (task->provides_library && task->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, task->provides_library))) {
-	    reset_task_to_state(q, task, VINE_TASK_RETRIEVED); 
+static void kill_empty_libraries_on_workers(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	uint64_t task_id;
+	struct vine_task *task;
+	ITABLE_ITERATE(w->current_tasks, task_id, task)
+	{
+		if (task->provides_library && task->function_slots_inuse == 0 &&
+				(!t->needs_library || strcmp(t->needs_library, task->provides_library))) {
+			reset_task_to_state(q, task, VINE_TASK_RETRIEVED);
+		}
 	}
-    }
 }
 
 /*
@@ -3041,7 +3044,7 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 	return 1;
 }
 
-/* Find a library task running on a specific worker that has an available slot. 
+/* Find a library task running on a specific worker that has an available slot.
  * @return pointer to the library task if there's one, 0 otherwise. */
 
 static struct vine_task *find_library_on_worker_for_task(struct vine_worker_info *w, const char *library_name)
@@ -3063,18 +3066,19 @@ static struct vine_task *find_library_on_worker_for_task(struct vine_worker_info
 /* Check if this worker can run the function task.
  * @return 1 if it can, 0 otherwise.
  */
-static int check_worker_can_run_function_task(struct vine_manager* q, struct vine_worker_info* w, struct vine_task* t){
-    struct vine_task* library = find_library_on_worker_for_task(w, t->needs_library);
-    if (!library) {
-	library = send_library_to_worker(q, w, t->needs_library);
-    }
-    if (!library) {
-	return 0;
-    }
+static int check_worker_can_run_function_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	struct vine_task *library = find_library_on_worker_for_task(w, t->needs_library);
+	if (!library) {
+		library = send_library_to_worker(q, w, t->needs_library);
+	}
+	if (!library) {
+		return 0;
+	}
 
-    // Mark that this function task will be run on this library.
-    t->library_task = library;
-    return 1;
+	// Mark that this function task will be run on this library.
+	t->library_task = library;
+	return 1;
 }
 
 /*
@@ -3128,7 +3132,7 @@ static int send_one_task(struct vine_manager *q)
 		// If this is a function task, check if the worker can run it.
 		// May require the manager to send a library to the worker first.
 		if (t->needs_library && !check_worker_can_run_function_task(q, w, t)) {
-		    continue;
+			continue;
 		}
 
 		// Otherwise, remove it from the ready list and start it:
@@ -4332,7 +4336,7 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
  * @return pointer to the library task if the operation succeeds, 0 otherwise.
  */
 
-static struct vine_task* send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name)
+static struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name)
 {
 	/* Find the original prototype library task by name, if it exists. */
 	struct vine_task *original = hash_table_lookup(q->libraries, name);

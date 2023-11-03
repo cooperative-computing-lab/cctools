@@ -29,15 +29,16 @@ struct vine_resources *vine_resources_create()
 
 void vine_resources_delete(struct vine_resources *r) { free(r); }
 
-struct vine_resources* vine_resources_copy(struct vine_resources* r) {
-    struct vine_resources* t = vine_resources_create();
-    t->tag = r->tag;
-    t->workers = r->workers;
-    t->disk = r->disk;
-    t->cores = r->cores;
-    t->memory = r->memory;
-    t->gpus = r->gpus;
-    return t;
+struct vine_resources *vine_resources_copy(struct vine_resources *r)
+{
+	struct vine_resources *t = vine_resources_create();
+	t->tag = r->tag;
+	t->workers = r->workers;
+	t->disk = r->disk;
+	t->cores = r->cores;
+	t->memory = r->memory;
+	t->gpus = r->gpus;
+	return t;
 }
 
 void vine_resources_measure_locally(struct vine_resources *r, const char *disk_path)

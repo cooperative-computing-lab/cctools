@@ -73,40 +73,48 @@ int vine_schedule_in_ramp_down(struct vine_manager *q)
  * @param t     Task info structure.
  * @param tr    Task resources.
  * @return 1 if yes, 0 otherwise. */
-int check_worker_have_enough_resources(struct vine_manager* q, struct vine_worker_info* w, struct vine_task* t, struct rmsummary* tr) {
-    struct vine_resources* worker_net_resources = vine_resources_copy(w->resources);
-    
-    /* Pretend to reclaim resources from empty libraries. */
-    uint64_t task_id;
-    struct vine_task* ti;
-    ITABLE_ITERATE(w->current_tasks, task_id, ti) {
-        if (ti->provides_library && ti->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, ti->provides_library))) {
-            worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
-            worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
-            worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
-            worker_net_resources->gpus.inuse -= ti->current_resource_box->gpus;
-        }
-    }
+int check_worker_have_enough_resources(
+		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *tr)
+{
+	struct vine_resources *worker_net_resources = vine_resources_copy(w->resources);
 
-    if (worker_net_resources->disk.inuse + tr->disk > worker_net_resources->disk.total) { /* No overcommit disk */
-            return 0;
-    }
+	/* Pretend to reclaim resources from empty libraries. */
+	uint64_t task_id;
+	struct vine_task *ti;
+	ITABLE_ITERATE(w->current_tasks, task_id, ti)
+	{
+		if (ti->provides_library && ti->function_slots_inuse == 0 &&
+				(!t->needs_library || strcmp(t->needs_library, ti->provides_library))) {
+			worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
+			worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
+			worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
+			worker_net_resources->gpus.inuse -= ti->current_resource_box->gpus;
+		}
+	}
 
-    if ((tr->cores > worker_net_resources->cores.total) ||
-                    (worker_net_resources->cores.inuse + tr->cores > overcommitted_resource_total(q, worker_net_resources->cores.total))) {
-            return 0;
-    }
+	if (worker_net_resources->disk.inuse + tr->disk > worker_net_resources->disk.total) { /* No overcommit disk */
+		return 0;
+	}
 
-    if ((tr->memory > worker_net_resources->memory.total) ||
-                    (worker_net_resources->memory.inuse + tr->memory > overcommitted_resource_total(q, worker_net_resources->memory.total))) {
-            return 0;
-    }
+	if ((tr->cores > worker_net_resources->cores.total) ||
+			(worker_net_resources->cores.inuse + tr->cores >
+					overcommitted_resource_total(q, worker_net_resources->cores.total))) {
+		return 0;
+	}
 
-    if ((tr->gpus > worker_net_resources->gpus.total) || (worker_net_resources->gpus.inuse + tr->gpus > overcommitted_resource_total(q, worker_net_resources->gpus.total))) {
-            return 0;
-    }
-    vine_resources_delete(worker_net_resources);
-    return 1;
+	if ((tr->memory > worker_net_resources->memory.total) ||
+			(worker_net_resources->memory.inuse + tr->memory >
+					overcommitted_resource_total(q, worker_net_resources->memory.total))) {
+		return 0;
+	}
+
+	if ((tr->gpus > worker_net_resources->gpus.total) ||
+			(worker_net_resources->gpus.inuse + tr->gpus >
+					overcommitted_resource_total(q, worker_net_resources->gpus.total))) {
+		return 0;
+	}
+	vine_resources_delete(worker_net_resources);
+	return 1;
 }
 
 /* Check if this task is compatible with this given worker by considering
@@ -145,25 +153,25 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	/* Compute the resources to allocate to this task. */
 	struct rmsummary *l = vine_manager_choose_resources_for_task(q, w, t);
 
-        if (!check_worker_have_enough_resources(q, w, t, l)) {
-            return 0;
-        }	
+	if (!check_worker_have_enough_resources(q, w, t, l)) {
+		return 0;
+	}
 
 	rmsummary_delete(l);
 
 	// if worker's end time has not been received
 	if (w->end_time < 0) {
-            return 0;
+		return 0;
 	}
 
 	// if wall time for worker is specified and there's not enough time for task, then not ok
 	if (w->end_time > 0) {
 		double current_time = timestamp_get() / ONE_SECOND;
 		if (t->resources_requested->end > 0 && w->end_time < t->resources_requested->end) {
-                        return 0;
+			return 0;
 		}
 		if (t->min_running_time > 0 && w->end_time - current_time < t->min_running_time) {
-                        return 0;
+			return 0;
 		}
 	}
 
