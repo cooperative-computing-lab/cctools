@@ -67,24 +67,6 @@ int vine_schedule_in_ramp_down(struct vine_manager *q)
 	return 0;
 }
 
-/* Check if library on worker can run more function slots.
- * Note that it's okay for worker to not have library, we'll send it right before
- * sending the function call.
- * @param w             Info about worker.
- * @param library_name  Name of the library.
- * @return 1 if available, 0 otherwise. */
-static int library_on_worker_available(struct vine_worker_info *w, char *library_name)
-{
-	struct vine_task *library_task = hash_table_lookup(w->libraries, library_name);
-	if (!library_task) {
-		return 1;
-	}
-	if (library_task->function_slots_inuse < library_task->function_slots) {
-		return 1;
-	}
-	return 0;
-}
-
 /* Check if this task is compatible with this given worker by considering
  * resources availability, features, blocklist, and all other relevant factors.
  * Used by all scheduling methods for basic compatibility.
@@ -115,11 +97,6 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 
 	/* Check if worker is blocked from the manager. */
 	if (vine_blocklist_is_blocked(q, w->hostname)) {
-		return 0;
-	}
-
-	/* If this is a function call, check if the library on this worker can run more. */
-	if (t->needs_library && !library_on_worker_available(w, t->needs_library)) {
 		return 0;
 	}
 
