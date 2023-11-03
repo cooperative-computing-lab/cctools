@@ -92,29 +92,30 @@ int check_worker_have_enough_resources(
 		}
 	}
 
+	int ok = 1;
 	if (worker_net_resources->disk.inuse + tr->disk > worker_net_resources->disk.total) { /* No overcommit disk */
-		return 0;
+		ok = 0;
 	}
 
 	if ((tr->cores > worker_net_resources->cores.total) ||
 			(worker_net_resources->cores.inuse + tr->cores >
 					overcommitted_resource_total(q, worker_net_resources->cores.total))) {
-		return 0;
+		ok = 0;
 	}
 
 	if ((tr->memory > worker_net_resources->memory.total) ||
 			(worker_net_resources->memory.inuse + tr->memory >
 					overcommitted_resource_total(q, worker_net_resources->memory.total))) {
-		return 0;
+		ok = 0;
 	}
 
 	if ((tr->gpus > worker_net_resources->gpus.total) ||
 			(worker_net_resources->gpus.inuse + tr->gpus >
 					overcommitted_resource_total(q, worker_net_resources->gpus.total))) {
-		return 0;
+		ok = 0;
 	}
 	vine_resources_delete(worker_net_resources);
-	return 1;
+	return ok;
 }
 
 /* Check if this task is compatible with this given worker by considering
@@ -154,9 +155,9 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	struct rmsummary *l = vine_manager_choose_resources_for_task(q, w, t);
 
 	if (!check_worker_have_enough_resources(q, w, t, l)) {
+		rmsummary_delete(l);
 		return 0;
 	}
-
 	rmsummary_delete(l);
 
 	// if worker's end time has not been received
