@@ -211,13 +211,6 @@ struct vine_stats {
 	int64_t min_memory;       /**< The smallest memory size in MB observed among the connected workers. */
 	int64_t min_disk;         /**< The smallest disk space in MB observed among the connected workers. */
 	int64_t min_gpus;         /**< The smallest number of gpus observed among the connected workers. */
-
-	double manager_load;      /**< In the range of [0,1]. If close to 1, then
-                                the manager is at full load and spends most
-                                of its time sending and receiving taks, and
-                                thus cannot accept connections from new
-                                workers. If close to 0, the manager is spending
-                                most of its time waiting for something to happen. */
 };
 
 /** @name Functions - Tasks */

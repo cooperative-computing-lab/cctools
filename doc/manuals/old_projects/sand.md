@@ -20,7 +20,7 @@ Assembler, or can be used as a standalone tool by advanced users.
 SAND is part of the [Cooperating Computing
 Tools](http://ccl.cse.nd.edu/software). You can download the CCTools from
 [this web page](http://ccl.cse.nd.edu/software/download), follow the
-[installation instructions](../install), and you are ready to go.
+[installation instructions](../install/index.md), and you are ready to go.
 
 ## Using SAND with the Celera Assembler
 

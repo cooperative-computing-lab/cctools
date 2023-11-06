@@ -61,10 +61,28 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 }
 
 /*
-Determine if this file is cached *anywhere* in the system.
+Count number of replicas of a file in the system.
 XXX Note that this implementation is another inefficient linear search.
 */
 
+int vine_file_replica_table_count_replicas(struct vine_manager *q, const char *cachename)
+{
+	char *key;
+	struct vine_worker_info *w;
+	struct vine_file_replica *r;
+	int c = 0;
+
+	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	{
+		r = hash_table_lookup(w->current_files, cachename);
+		if (r)
+			c++;
+	}
+	return c;
+}
+
+/*
+ */
 int vine_file_replica_table_exists_somewhere(struct vine_manager *q, const char *cachename)
 {
 	char *key;

@@ -11,7 +11,11 @@ SOURCES = \
 	vine_transfer_server.c \
 	vine_process.c \
 	vine_watcher.c \
-	vine_gpus.c
+	vine_gpus.c \
+	vine_workspace.c \
+	vine_worker_options.c \
+	vine_worker.c
+
 
 OBJECTS = $(SOURCES:%.c=%.o)
 PROGRAMS = vine_worker

@@ -1,0 +1,3 @@
+# readthedocs needs a new additional python packages in order
+# to run mkdocs with pymdown extensions.
+pymdown-extensions

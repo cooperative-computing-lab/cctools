@@ -1,2 +1,0 @@
-# pip packages required for building the documentation via mkdocs
-pymdown-extensions

@@ -1,7 +1,8 @@
+# mkdocs configuration file for building the manual for readthedocs
+
 site_name: CCTools Documentation
 site_url: https://cctools.readthedocs.io/en/latest
-
-author: Cooperative Computing Lab at the University of Notre Dame
+site_author: Cooperative Computing Lab at the University of Notre Dame
 copyright: Copyright (C) 2022 The University of Notre Dame
 
 nav:
@@ -13,8 +14,9 @@ nav:
         - TaskVine: 'taskvine/index.md'
         - Work Queue: 'work_queue/index.md' 
         - Makeflow: 'makeflow/index.md'
-        - JX Workflow Language: 'jx-workflow/index.md'
         - Resource Monitor: 'resource_monitor/index.md'
+        - JX Workflow Language: 'jx-workflow/index.md'
+        - JX Expressions: 'jx/index.md'
         - Parrot: 'parrot/index.md'
         - Chirp: 'chirp/index.md'
         - Catalog Server: 'catalog/index.md'
@@ -40,11 +42,13 @@ markdown_extensions:
     - pymdownx.tabbed:
     - pymdownx.superfences:
     - pymdownx.snippets:
-        base_path: doc/manuals
+        base_path: manuals
 
-permalink: True
+validation:
+    nav:
+        omitted_files: ignore
 
-docs_dir: doc/manuals
-site_dir: doc/mkdocs-site
+docs_dir: manuals
+site_dir: mkdocs-site
 
 theme: readthedocs

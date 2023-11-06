@@ -38,7 +38,7 @@ void vine_perf_log_write_header(struct vine_manager *q)
 			// bandwidth:
 			" bytes_sent bytes_received bandwidth"
 			// resources:
-			" capacity_tasks capacity_cores capacity_memory capacity_disk capacity_instantaneous capacity_weighted manager_load"
+			" capacity_tasks capacity_cores capacity_memory capacity_disk capacity_instantaneous capacity_weighted"
 			" total_cores total_memory total_disk"
 			" committed_cores committed_memory committed_disk"
 			" max_cores max_memory max_disk"
@@ -128,7 +128,6 @@ void vine_perf_log_write_update(struct vine_manager *q, int force)
 	buffer_printf(&B, " %d", s.capacity_disk);
 	buffer_printf(&B, " %d", s.capacity_instantaneous);
 	buffer_printf(&B, " %d", s.capacity_weighted);
-	buffer_printf(&B, " %f", s.manager_load);
 
 	buffer_printf(&B, " %" PRId64, s.total_cores);
 	buffer_printf(&B, " %" PRId64, s.total_memory);

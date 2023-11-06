@@ -3,18 +3,23 @@ name: cctools-dev
 channels:
  - conda-forge
 dependencies:
- - python=3
- - gcc_linux-64
- - gxx_linux-64
- - gdb
- - m4
- - perl
- - swig
- - make
- - zlib
- - libopenssl-static
- - openssl
- - conda-pack
- - cloudpickle
- - packaging
+ - python=3             # required for build
+ - gcc_linux-64         # required for build
+ - gxx_linux-64         # required for build
+ - make                 # required for build
+ - zlib                 # required for compressed catalog updates
+ - swig                 # required for WorkQueue/TaskVine language bindings
+ - perl                 # optional for WorkQueue Perl bindings
+ - libopenssl-static    # optional for WorkQueue/TaskVine SSL connection
+ - openssl              # optional for WorkQueue/TaskVine SSL connection
+ - conda-pack           # required for Poncho packaging
+ - packaging            # required for Poncho packaging
+ - cloudpickle          # required for WorkQueue/TaskVine remote function invocation
+ - gdb                  # optional debugger to match compiler
+ - flake8               # optional to lint and format Python code
+ - clang-format         # optional to lint and format C code
+ - m4                   # optional for building man pages
+ - doxygen              # optional to make doxygen api docs
+ - mkdocs               # optional to make readthedocs online manual
+ - pymdown-extensions   # optional to make readthedocs online manual
 ...

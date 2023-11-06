@@ -4,12 +4,12 @@ The Poncho packaging utilities allow users to easily analyze their Python script
 
 ## Commands
 
-- [`poncho_package_analyze`](../man_pages/poncho_package_analyze)
+- [`poncho_package_analyze`](../man_pages/poncho_package_analyze.md)
 analyzes a Python script to determine all its top-level module dependencies and the interpreter version it uses. It then generates a concise, human-readable JSON output file containing the necessary information required to build a self-contained Conda virtual environment for the Python script.
 
-- [`poncho_package_create`](../man_pages/poncho_package_create) takes a enviornment specification JSON file  and creates this Conda environment, preinstalled with all the necessary libraries and the correct Python interpreter version. It then generates a packaged tarball of the environment that can be easily relocated to a different machine within the system to run the Python task.
+- [`poncho_package_create`](../man_pages/poncho_package_create.md) takes a enviornment specification JSON file  and creates this Conda environment, preinstalled with all the necessary libraries and the correct Python interpreter version. It then generates a packaged tarball of the environment that can be easily relocated to a different machine within the system to run the Python task.
 
-- [`poncho_package_run`](../man_pages/poncho_package_run) acts as a wrapper script for the Python task, unpacking and activating the Conda environment and running the task within the environment.
+- [`poncho_package_run`](../man_pages/poncho_package_run.md) acts as a wrapper script for the Python task, unpacking and activating the Conda environment and running the task within the environment.
 
 ## Example
 

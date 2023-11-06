@@ -9,14 +9,14 @@ then you have come to the right place.
 <img src="https://github.com/cooperative-computing-lab/makeflow-examples/raw/master/banner.png" width=100%>
 
 If you are a first-time user, start by checking out the 
-[Makeflow workflow system](../makeflow), and use it to get your work
+[Makeflow workflow system](makeflow/index.md), and use it to get your work
 organized into a regular graph.  You can test it on your laptop,
 and when you are ready, throw the switch to dispatch jobs to
 your account University campus cluster, a national supercomputing site,
 or a commercial cloud.
 
 For more advanced dynamic applications, take a look at the 
-the [Work Queue framework](../work_queue), which can be used to construct
+the [Work Queue framework](work_queue/index.md), which can be used to construct
 applications that consist of many asynchronous tasks running across
 multiple distributed systems.  WQ has been used to build custom genome assemblers, ensemble molecular simulators, data analysis systems, and more.
 
