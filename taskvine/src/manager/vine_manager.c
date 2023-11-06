@@ -2681,8 +2681,11 @@ static void find_max_worker(struct vine_manager *q)
 }
 
 /* Tell worker to kill all empty libraries except the case where
- * the task is a function call and the library can run it. */
-static void kill_empty_libraries_on_workers(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+ * the task is a function call and the library can run it.
+ * This code corresponds to the assumption of
+ * @vine.schedule.c:check_worker_have_enough_resources() - empty libraries
+ * are not counted towards the resources in use and will be killed if needed. */
+static void kill_empty_libraries_on_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	uint64_t task_id;
 	struct vine_task *task;
@@ -2703,7 +2706,9 @@ assignment and the new task state.
 
 static void commit_task_to_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	kill_empty_libraries_on_workers(q, w, t);
+	/* Kill empty libraries to reclaim resources. Match the assumption of
+	 * @vine.schedule.c:check_worker_have_enough_resources() */
+	kill_empty_libraries_on_worker(q, w, t);
 	t->hostname = xxstrdup(w->hostname);
 	t->addrport = xxstrdup(w->addrport);
 
@@ -2712,6 +2717,13 @@ static void commit_task_to_worker(struct vine_manager *q, struct vine_worker_inf
 	t->time_when_commit_end = timestamp_get();
 
 	itable_insert(w->current_tasks, t->task_id, t);
+
+	/* Increment the function count if this is a function task.
+	 * If the manager fails to send this function task to the worker however,
+	 * then the count will be decremented properly in @handle_failure() below. */
+	if (t->needs_library) {
+		t->library_task->function_slots_inuse++;
+	}
 
 	t->worker = w;
 
@@ -2725,10 +2737,6 @@ static void commit_task_to_worker(struct vine_manager *q, struct vine_worker_inf
 	if (result != VINE_SUCCESS) {
 		debug(D_VINE, "Failed to send task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
-	} else {
-		if (t->needs_library) {
-			t->library_task->function_slots_inuse++;
-		}
 	}
 }
 
@@ -2820,7 +2828,7 @@ static void reap_task_from_worker(
 	*/
 
 	if (t->needs_library) {
-		t->library_task->function_slots_inuse--;
+		t->library_task->function_slots_inuse = MAX(0, t->library_task->function_slots_inuse - 1);
 	}
 
 	t->worker = 0;

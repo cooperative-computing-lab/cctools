@@ -68,10 +68,13 @@ int vine_schedule_in_ramp_down(struct vine_manager *q)
 }
 
 /* Check if worker resources are enough to run the task.
+ * Note that empty libraries are not *real* tasks and can be
+ * killed as needed to reclaim unused resources and
+ * make space for other libraries or tasks.
  * @param q     Manager info structure.
  * @param w     Worker info structure.
  * @param t     Task info structure.
- * @param tr    Task resources.
+ * @param tr    Chosen task resources.
  * @return 1 if yes, 0 otherwise. */
 int check_worker_have_enough_resources(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *tr)
