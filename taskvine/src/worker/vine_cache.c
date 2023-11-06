@@ -251,6 +251,18 @@ int vine_cache_queue_transfer(struct vine_cache *c, const char *source, const ch
 }
 
 /*
+Perform a remote file transfer to produce a file.
+*/
+
+int vine_cache_transfer_now(struct vine_cache *c, const char *source, const char *cachename, int64_t size, int mode)
+{
+	struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_TRANSFER, source, size, mode, 0);
+	hash_table_insert(c->table, cachename, f);
+	vine_cache_ensure(c, cachename);
+	return 1;
+}
+
+/*
 Queue a mini-task to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */

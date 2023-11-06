@@ -60,6 +60,34 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 	return 0;
 }
 
+struct vine_worker_info **vine_file_replica_table_find_replication_targets(struct vine_manager *q, struct vine_worker_info *w, const char *cachename, int *count)
+{
+	char *id;
+	struct vine_worker_info *peer;
+	struct vine_file_replica *remote_info;
+	
+	int found = 0;
+	struct vine_worker_info **workers = malloc(sizeof(struct vine_worker_info)*(q->temp_replica_count));
+
+	HASH_TABLE_ITERATE(q->worker_table, id, peer)
+	{
+		if (found == q->temp_replica_count) break;
+		if (!peer->transfer_port_active)
+			continue;
+
+		// generate a peer address stub as it would appear in the transfer table
+		char *peer_addr = string_format("worker://%s:%d", peer->transfer_addr, peer->transfer_port);
+		if (!(remote_info = hash_table_lookup(peer->current_files, cachename)) && (strcmp(w->hostname, peer->hostname))) {
+			debug(D_VINE, "found replication target : %s", peer_addr); 
+			workers[found] = peer;
+			found++;
+		}
+		free(peer_addr);
+	}
+	*count = found;
+	return workers;
+}
+
 /*
 Count number of replicas of a file in the system.
 XXX Note that this implementation is another inefficient linear search.

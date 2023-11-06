@@ -211,6 +211,36 @@ may be an estimate at this point and will be updated by return
 message once the object is actually loaded into the cache.
 */
 
+vine_result_code_t vine_manager_put_url_now(
+		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f)
+{
+	char source_encoded[VINE_LINE_MAX];
+	char cached_name_encoded[VINE_LINE_MAX];
+
+	url_encode(f->source, source_encoded, sizeof(source_encoded));
+	url_encode(f->cached_name, cached_name_encoded, sizeof(cached_name_encoded));
+
+	char *transfer_id = vine_current_transfers_add(q, w, f->source);
+	vine_manager_send(q,
+			w,
+			"puturl_now %s %s %lld %o %s\n",
+			source_encoded,
+			cached_name_encoded,
+			(long long)f->size,
+			0777,
+			transfer_id);
+
+	free(transfer_id);
+	return VINE_SUCCESS;
+}
+
+/*
+Send a url to generate a cached file,
+if it has not already been cached there.  Note that the length
+may be an estimate at this point and will be updated by return
+message once the object is actually loaded into the cache.
+*/
+
 static vine_result_code_t vine_manager_put_url(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f)
 {

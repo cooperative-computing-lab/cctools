@@ -813,6 +813,15 @@ static int do_put_url(const char *cache_name, int64_t size, int mode, const char
 }
 
 /*
+Accept a url specification and transfer immediately.
+*/
+
+static int do_put_url_now(const char *cache_name, int64_t size, int mode, const char *source)
+{
+	return vine_cache_transfer_now(cache_manager, source, cache_name, size, mode);
+}
+
+/*
 Accept a mini_task that is executed on demand.
 We will then extract the file "source" from the sandbox in order to produce "cache_name".
 */
@@ -1089,6 +1098,19 @@ static int handle_manager(struct link *manager)
 			url_decode(filename_encoded, filename, sizeof(filename));
 			url_decode(source_encoded, source, sizeof(source));
 			r = do_put_url(filename, length, mode, source);
+			reset_idle_timer();
+			hash_table_insert(current_transfers, strdup(filename), strdup(transfer_id));
+			debug(D_VINE, "Insert ID-File pair into transfer table : %s :: %s", filename, transfer_id);
+		} else if (sscanf(line,
+					   "puturl_now %s %s %" SCNd64 " %o %s",
+					   source_encoded,
+					   filename_encoded,
+					   &length,
+					   &mode,
+					   transfer_id) == 5) {
+			url_decode(filename_encoded, filename, sizeof(filename));
+			url_decode(source_encoded, source, sizeof(source));
+			r = do_put_url_now(filename, length, mode, source);
 			reset_idle_timer();
 			hash_table_insert(current_transfers, strdup(filename), strdup(transfer_id));
 			debug(D_VINE, "Insert ID-File pair into transfer table : %s :: %s", filename, transfer_id);
