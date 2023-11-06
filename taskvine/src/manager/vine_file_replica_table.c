@@ -60,6 +60,8 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 	return 0;
 }
 
+// return a set of up to q->temp_replica_count workers that do not have the file cachename
+// and are not on the same host as worker w.
 struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 		struct vine_manager *q, struct vine_worker_info *w, const char *cachename, int *count)
 {
@@ -77,15 +79,12 @@ struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 		if (!peer->transfer_port_active)
 			continue;
 
-		// generate a peer address stub as it would appear in the transfer table
-		char *peer_addr = string_format("worker://%s:%d", peer->transfer_addr, peer->transfer_port);
 		if (!(remote_info = hash_table_lookup(peer->current_files, cachename)) &&
 				(strcmp(w->hostname, peer->hostname))) {
-			debug(D_VINE, "found replication target : %s", peer_addr);
+			debug(D_VINE, "found replication target : %s", peer->transfer_addr);
 			workers[found] = peer;
 			found++;
 		}
-		free(peer_addr);
 	}
 	*count = found;
 	return workers;

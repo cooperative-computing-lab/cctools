@@ -343,9 +343,17 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 	return VINE_MSG_PROCESSED;
 }
 
-static void replicate_temp(struct vine_manager *q, struct vine_worker_info *w, const char *cachename, long long size)
+/*
+At this point we have received a cache update for a temp file. If q->temp_replica_count > 0 then tell up to that
+many workers to get the file from worker w.
+*/
+static void replicate_temp_file(
+		struct vine_manager *q, struct vine_worker_info *w, const char *cachename, long long size)
 {
-	int found = q->temp_replica_count;
+	if (!q->temp_replica_count)
+		return;
+
+	int found = 0;
 	struct vine_worker_info **workers;
 	workers = vine_file_replica_table_find_replication_targets(q, w, cachename, &found);
 
@@ -408,11 +416,10 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 		vine_current_transfers_remove(q, id);
 
 		vine_txn_log_write_cache_update(q, w, size, transfer_time, start_time, cachename);
-		debug(D_VINE, "Received cache update id %c", *id);
 
-		if (strncmp(cachename, "temp-rnd-", 9) == 0 && *id == 'X') {
-			debug(D_VINE, "Received temp to potentially replicate");
-			replicate_temp(q, w, cachename, size);
+		// If the file was not a url, eg. 'X', and it is a temp
+		if (*id == 'X' && strncmp(cachename, "temp-rnd-", 9) == 0) {
+			replicate_temp_file(q, w, cachename, size);
 		}
 	}
 
