@@ -348,17 +348,13 @@ static void replicate_temp(struct vine_manager *q, struct vine_worker_info *w, c
 	int found = q->temp_replica_count;
 	struct vine_worker_info **workers;
 	workers = vine_file_replica_table_find_replication_targets(q, w, cachename, &found);
-	
+
 	debug(D_VINE, "Found %d available workers to replicate %s", found, cachename);
 
-	for(int i=0; i<found; i++)
-	{
+	for (int i = 0; i < found; i++) {
 		struct vine_worker_info *peer = workers[i];
-		char *worker_source = string_format("worker://%s:%d/%s",
-						w->transfer_addr,
-						w->transfer_port,
-						cachename);
-		
+		char *worker_source = string_format("worker://%s:%d/%s", w->transfer_addr, w->transfer_port, cachename);
+
 		char *transfer_id = vine_current_transfers_add(q, w, worker_source);
 		vine_manager_send(q,
 				peer,
@@ -369,12 +365,10 @@ static void replicate_temp(struct vine_manager *q, struct vine_worker_info *w, c
 				0777,
 				transfer_id);
 
-		
 		free(worker_source);
 		free(transfer_id);
-
 	}
-	free(workers);	
+	free(workers);
 }
 
 /*
@@ -394,7 +388,6 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 	if (sscanf(line, "cache-update %s %lld %lld %lld %s", cachename, &size, &transfer_time, &start_time, id) == 5) {
 		struct vine_file_replica *remote_info = vine_file_replica_table_lookup(w, cachename);
 
-		
 		if (!remote_info) {
 			/*
 			If an unsolicited cache-update arrives, there are several possibilities:
@@ -416,7 +409,7 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 
 		vine_txn_log_write_cache_update(q, w, size, transfer_time, start_time, cachename);
 		debug(D_VINE, "Received cache update id %c", *id);
-		
+
 		if (strncmp(cachename, "temp-rnd-", 9) == 0 && *id == 'X') {
 			debug(D_VINE, "Received temp to potentially replicate");
 			replicate_temp(q, w, cachename, size);
