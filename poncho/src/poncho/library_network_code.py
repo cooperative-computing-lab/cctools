@@ -98,7 +98,16 @@ def library_network_code():
                 library_sandbox = os.getcwd()
                 try:
                     os.chdir(function_sandbox)
-                    response = cloudpickle.dumps(globals()[function_name](event))
+
+                    # parameters are represented as infile.
+                    os.chdir(function_sandbox)
+                    with open('infile', 'rb') as f:
+                        event = cloudpickle.load(f)
+
+                    # output of execution should be dumped to outfile.
+                    with open('outfile', 'wb') as f:
+                        cloudpickle.dump(globals()[function_name](event), f)
+
                 except Exception as e:
                     print(f'Library code: Function call failed due to {e}', file=sys.stderr)
                     sys.exit(1)
@@ -118,10 +127,7 @@ def library_network_code():
                     os._exit(0)
                 elif p < 0:
                     print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)
-                    result = None
-                    success = False
-                    reason = f'unable to fork-exec function {function_name}'
-                    response = LibraryResponse(result, success, reason).generate()
+                    return -1
 
                 # return pid and function id of child process to parent.
                 else:
@@ -130,6 +136,7 @@ def library_network_code():
             # malformed message from worker so we exit
             print('malformed message from worker. Exiting..', file=sys.stderr)
             exit(1)
+
         return -1
 
     # Send result of a function execution to worker. Wake worker up to do work with SIGCHLD.
