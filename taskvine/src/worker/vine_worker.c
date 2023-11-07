@@ -2022,13 +2022,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	/* If a GPU is installed, then attach that to the features table. */
-	char *gpu_name = gpu_name_get();
-	if (gpu_name) {
-		hash_table_insert(options->features, gpu_name, "feature");
-		free(gpu_name);
-	}
-
 	/* Set up signal handlers so that they call dummy functions that interrupt I/O operations. */
 	signal(SIGTERM, handle_abort);
 	signal(SIGQUIT, handle_abort);
@@ -2072,6 +2065,14 @@ int main(int argc, char *argv[])
 			total_resources->memory.total,
 			total_resources->disk.total,
 			total_resources->gpus.total);
+
+	/* If a GPU is installed, then display and describe as a feature. */
+	char *gpu_name = gpu_name_get();
+	if (gpu_name) {
+		printf("vine_worker: gpu is called feature \"%s\"\n", gpu_name);
+		hash_table_insert(options->features, gpu_name, "feature");
+		free(gpu_name);
+	}
 
 	/* MAIN LOOP: get to work */
 	vine_worker_serve_managers();
