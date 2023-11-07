@@ -2069,7 +2069,7 @@ int main(int argc, char *argv[])
 	/* If a GPU is installed, then display and describe as a feature. */
 	char *gpu_name = gpu_name_get();
 	if (gpu_name) {
-		printf("vine_worker: gpu is called feature \"%s\"\n",gpu_name);
+		printf("vine_worker: gpu is called feature \"%s\"\n", gpu_name);
 		hash_table_insert(options->features, gpu_name, "feature");
 		free(gpu_name);
 	}
