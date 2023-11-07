@@ -85,6 +85,16 @@ struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 			workers[found] = peer;
 			found++;
 		}
+		char *peer_addr = string_format("worker://%s:%d", peer->transfer_addr, peer->transfer_port);
+		if (!(remote_info = hash_table_lookup(peer->current_files, cachename)) &&
+				(strcmp(w->hostname, peer->hostname))) {
+			if (vine_current_transfers_worker_in_use(q, peer_addr) < q->worker_source_max_transfers) {
+				debug(D_VINE, "found replication target : %s", peer->transfer_addr);
+				workers[found] = peer;
+				found++;
+			}
+		}
+		free(peer_addr);
 	}
 	*count = found;
 	return workers;

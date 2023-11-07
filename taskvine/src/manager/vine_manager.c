@@ -362,6 +362,7 @@ static void replicate_temp_file(
 	for (int i = 0; i < found; i++) {
 		struct vine_worker_info *peer = workers[i];
 		char *worker_source = string_format("worker://%s:%d/%s", w->transfer_addr, w->transfer_port, cachename);
+		char *worker_addr = string_format("worker://%s:%d", w->transfer_addr, w->transfer_port);
 
 		char *transfer_id = vine_current_transfers_add(q, w, worker_source);
 		vine_manager_send(q,
@@ -374,6 +375,7 @@ static void replicate_temp_file(
 				transfer_id);
 
 		free(worker_source);
+		free(worker_addr);
 		free(transfer_id);
 	}
 	free(workers);
