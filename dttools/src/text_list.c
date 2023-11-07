@@ -25,12 +25,12 @@ struct text_list *text_list_load(const char *path)
 	char line[1024];
 
 	FILE *file = fopen(path, "r");
-	if(!file)
+	if (!file)
 		return 0;
 
 	struct text_list *t = text_list_create();
 
-	while(fgets(line, sizeof(line), file)) {
+	while (fgets(line, sizeof(line), file)) {
 		string_chomp(line);
 		text_list_append(t, line);
 	}
@@ -48,19 +48,19 @@ struct text_list *text_list_load_str(const char *inp_str)
 
 	struct text_list *t = text_list_create();
 	char *pch = NULL;
-	char * tmp_str = strdup(inp_str);
+	char *tmp_str = strdup(inp_str);
 	pch = strtok(tmp_str, ",");
-	while(pch != NULL) {
+	while (pch != NULL) {
 		text_list_append(t, pch);
 		pch = strtok(NULL, ",");
-	}	
+	}
 	free(tmp_str);
 	return t;
 }
 
 char *text_list_get(struct text_list *t, int i)
 {
-	if(i >= 0 && i < t->used_length) {
+	if (i >= 0 && i < t->used_length) {
 		return t->items[i];
 	} else {
 		return 0;
@@ -69,7 +69,7 @@ char *text_list_get(struct text_list *t, int i)
 
 int text_list_append(struct text_list *t, const char *str)
 {
-	if(t->used_length == t->alloc_length) {
+	if (t->used_length == t->alloc_length) {
 		t->alloc_length *= 2;
 		t->items = realloc(t->items, sizeof(*t->items) * t->alloc_length);
 	}
@@ -78,15 +78,12 @@ int text_list_append(struct text_list *t, const char *str)
 	return t->used_length++;
 }
 
-int text_list_size(struct text_list *t)
-{
-	return t->used_length;
-}
+int text_list_size(struct text_list *t) { return t->used_length; }
 
 void text_list_delete(struct text_list *t)
 {
 	int i;
-	for(i = 0; i < t->used_length; i++) {
+	for (i = 0; i < t->used_length; i++) {
 		free(t->items[i]);
 	}
 	free(t->items);

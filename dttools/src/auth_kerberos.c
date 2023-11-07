@@ -11,13 +11,13 @@ See the file COPYING for details.
 
 #include "auth.h"
 #include "catch.h"
-#include "link.h"
 #include "debug.h"
-#include "xxmalloc.h"
 #include "domain_name_cache.h"
+#include "link.h"
+#include "xxmalloc.h"
 
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #define SERVICE "host"
@@ -41,19 +41,19 @@ int auth_kerberos_assert(struct link *link, time_t stoptime)
 	debug(D_AUTH, "kerberos: determining service name");
 
 	link_address_remote(link, addr, &port);
-	if(domain_name_cache_lookup_reverse(addr, dname)) {
+	if (domain_name_cache_lookup_reverse(addr, dname)) {
 		debug(D_AUTH, "kerberos: name of %s is %s", addr, dname);
 		cksum.data = dname;
 		cksum.length = strlen(dname);
 
 		debug(D_AUTH, "kerberos: creating context");
-		if(!krb5_init_context(&context)) {
+		if (!krb5_init_context(&context)) {
 
 			debug(D_AUTH, "kerberos: opening credential cache");
-			if(!krb5_cc_default(context, &ccdef)) {
+			if (!krb5_cc_default(context, &ccdef)) {
 
 				debug(D_AUTH, "kerberos: loading my credentials");
-				if(!krb5_cc_get_principal(context, ccdef, &client)) {
+				if (!krb5_cc_get_principal(context, ccdef, &client)) {
 
 					char *name;
 					krb5_unparse_name(context, client, &name);
@@ -61,19 +61,32 @@ int auth_kerberos_assert(struct link *link, time_t stoptime)
 					free(name);
 
 					debug(D_AUTH, "kerberos: building server principal");
-					if(!krb5_sname_to_principal(context, dname, SERVICE, KRB5_NT_SRV_HST, &server)) {
+					if (!krb5_sname_to_principal(
+							    context, dname, SERVICE, KRB5_NT_SRV_HST, &server)) {
 
 						krb5_unparse_name(context, server, &name);
 						debug(D_AUTH, "kerberos: expecting server %s", name);
 						free(name);
 						debug(D_AUTH, "kerberos: waiting for server");
-						if(auth_barrier(link, "yes\n", stoptime) == 0) {
+						if (auth_barrier(link, "yes\n", stoptime) == 0) {
 							debug(D_AUTH, "kerberos: authenticating with server");
 							int fd = link_fd(link);
 							link_nonblocking(link, 0);
-							int result = krb5_sendauth(context, &auth_context, &fd, VERSION, client, server, AP_OPTS_MUTUAL_REQUIRED, &cksum, 0, ccdef, &err_ret, &rep_ret, 0);
+							int result = krb5_sendauth(context,
+									&auth_context,
+									&fd,
+									VERSION,
+									client,
+									server,
+									AP_OPTS_MUTUAL_REQUIRED,
+									&cksum,
+									0,
+									ccdef,
+									&err_ret,
+									&rep_ret,
+									0);
 							link_nonblocking(link, 1);
-							if(result == 0) {
+							if (result == 0) {
 								debug(D_AUTH, "kerberos: credentials accepted!");
 								krb5_free_ap_rep_enc_part(context, rep_ret);
 								krb5_auth_con_free(context, auth_context);
@@ -130,30 +143,37 @@ int auth_kerberos_accept(struct link *link, char **subject, time_t stoptime)
 	int success = 0;
 
 	debug(D_AUTH, "kerberos: creating a context");
-	if(!krb5_init_context(&context)) {
+	if (!krb5_init_context(&context)) {
 
 		debug(D_AUTH, "kerberos: computing my service name");
-		if(!krb5_sname_to_principal(context, NULL, SERVICE, KRB5_NT_SRV_HST, &principal)) {
+		if (!krb5_sname_to_principal(context, NULL, SERVICE, KRB5_NT_SRV_HST, &principal)) {
 			char *name;
 			krb5_unparse_name(context, principal, &name);
 			debug(D_AUTH, "kerberos: I am %s", name);
 			free(name);
 
 			debug(D_AUTH, "kerberos: looking for a keytab");
-			if(!krb5_kt_default(context, &keytab)) {
+			if (!krb5_kt_default(context, &keytab)) {
 				debug(D_AUTH, "kerberos: attempting to open keytab");
-				if(!krb5_kt_start_seq_get(context, keytab, &cursor)) {
+				if (!krb5_kt_start_seq_get(context, keytab, &cursor)) {
 					krb5_kt_close(context, keytab);
 
 					debug(D_AUTH, "kerberos: waiting for client");
-					if(auth_barrier(link, "yes\n", stoptime) == 0) {
+					if (auth_barrier(link, "yes\n", stoptime) == 0) {
 
 						debug(D_AUTH, "kerberos: receiving client credentials");
 						int fd = link_fd(link);
 						link_nonblocking(link, 0);
-						int result = krb5_recvauth(context, &auth_context, &fd, VERSION, principal, 0, 0, &ticket);
+						int result = krb5_recvauth(context,
+								&auth_context,
+								&fd,
+								VERSION,
+								principal,
+								0,
+								0,
+								&ticket);
 						link_nonblocking(link, 1);
-						if(result == 0) {
+						if (result == 0) {
 
 							char myrealm[AUTH_SUBJECT_MAX];
 							char userrealm[AUTH_SUBJECT_MAX];
@@ -161,19 +181,25 @@ int auth_kerberos_accept(struct link *link, char **subject, time_t stoptime)
 
 							debug(D_AUTH, "kerberos: parsing client name");
 
-							strncpy(myrealm, principal->realm.data, principal->realm.length);
+							strncpy(myrealm,
+									principal->realm.data,
+									principal->realm.length);
 							myrealm[principal->realm.length] = 0;
 
-							strncpy(userrealm, ticket->enc_part2->client->realm.data, ticket->enc_part2->client->realm.length);
+							strncpy(userrealm,
+									ticket->enc_part2->client->realm.data,
+									ticket->enc_part2->client->realm.length);
 							userrealm[ticket->enc_part2->client->realm.length] = 0;
 
-							strncpy(username, ticket->enc_part2->client->data->data, ticket->enc_part2->client->data->length);
+							strncpy(username,
+									ticket->enc_part2->client->data->data,
+									ticket->enc_part2->client->data->length);
 							username[ticket->enc_part2->client->data->length] = 0;
 
 							debug(D_AUTH, "kerberos: user is %s@%s\n", username, userrealm);
 							debug(D_AUTH, "kerberos: my realm is %s\n", myrealm);
 
-							if(strcmp(myrealm, userrealm)) {
+							if (strcmp(myrealm, userrealm)) {
 								debug(D_AUTH, "kerberos: sorry, you come from another realm\n");
 							} else {
 								debug(D_AUTH, "kerberos: local user is %s\n", username);
@@ -204,7 +230,7 @@ int auth_kerberos_accept(struct link *link, char **subject, time_t stoptime)
 		auth_barrier(link, "no\n", stoptime);
 	}
 
-	if(getuid() != 0) {
+	if (getuid() != 0) {
 		debug(D_AUTH, "kerberos: perhaps this didn't work because I am not run as root.");
 	}
 

@@ -4,9 +4,9 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "hdfs_library.h"
 #include "buffer.h"
 #include "debug.h"
-#include "hdfs_library.h"
 #include "path.h"
 
 #include <dlfcn.h>
@@ -20,14 +20,14 @@ See the file COPYING for details.
 /* Use the cryptic *(void **)(&hs->lval) cast, rather than just
  hs->lval because we get a warning when converting an object
  pointer to a function pointer. */
-#define HDFS_LOAD_FUNC( lval, name ) \
-	*(void **)(&hs->lval) = dlsym(hs->libhdfs_handle,name); \
-	if(!hs->lval) { \
-		debug(D_NOTICE|D_HDFS,"couldn't find %s in libhdfs.so",name); \
-		goto failure; \
+#define HDFS_LOAD_FUNC(lval, name)                                                                                     \
+	*(void **)(&hs->lval) = dlsym(hs->libhdfs_handle, name);                                                       \
+	if (!hs->lval) {                                                                                               \
+		debug(D_NOTICE | D_HDFS, "couldn't find %s in libhdfs.so", name);                                      \
+		goto failure;                                                                                          \
 	}
 
-int hdfs_library_envinit (void)
+int hdfs_library_envinit(void)
 {
 	buffer_t B;
 	const char *CLASSPATH;
@@ -66,7 +66,7 @@ int hdfs_library_envinit (void)
 			goto failure;
 		}
 		/* NUL padded */
-		for (path = buffer_tostring(&paths); *path; path = path+strlen(path)+1) {
+		for (path = buffer_tostring(&paths); *path; path = path + strlen(path) + 1) {
 			buffer_printf(&B, ":%s", path);
 		}
 		buffer_free(&paths);
@@ -90,7 +90,7 @@ out:
 	return rc;
 }
 
-static int load_lib (void **handle, const char *envpath, const char *envhome, const char *name)
+static int load_lib(void **handle, const char *envpath, const char *envhome, const char *name)
 {
 	int rc;
 	const char *HOME;
@@ -117,7 +117,7 @@ static int load_lib (void **handle, const char *envpath, const char *envhome, co
 	}
 
 	/* NUL padded */
-	for (path = buffer_tostring(&B); *path; path += strlen(path)+1) {
+	for (path = buffer_tostring(&B); *path; path += strlen(path) + 1) {
 		debug(D_HDFS, "trying to load `%s'", path);
 		*handle = dlopen(path, RTLD_LAZY);
 		if (*handle) {

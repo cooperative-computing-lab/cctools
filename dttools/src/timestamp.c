@@ -5,17 +5,16 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-
 #include "timestamp.h"
 
-#include <sys/time.h>
 #include <sys/select.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 
 time_t timestamp_file(const char *filename)
 {
 	struct stat buf;
-	if(stat(filename, &buf) == 0) {
+	if (stat(filename, &buf) == 0) {
 		return buf.st_mtime;
 	} else {
 		return 0;
@@ -28,7 +27,7 @@ timestamp_t timestamp_get()
 	timestamp_t stamp;
 
 	gettimeofday(&current, 0);
-	stamp = ((timestamp_t) current.tv_sec) * 1000000 + current.tv_usec;
+	stamp = ((timestamp_t)current.tv_sec) * 1000000 + current.tv_usec;
 
 	return stamp;
 }
@@ -38,18 +37,20 @@ int timestamp_fmt(char *buf, size_t size, const char *fmt, timestamp_t ts)
 	time_t tv_sec;
 	struct tm *tp;
 
-	if(buf == NULL) return 0;
+	if (buf == NULL)
+		return 0;
 
 	tv_sec = ts / 1000000;
 
-#if defined (_XOPEN_SOURCE) || defined (_BSD_SOURCE) || defined (_SVID_SOURCE) || defined (_POSIX_SOURCE) || _POSIX_C_SOURCE >= 1
+#if defined(_XOPEN_SOURCE) || defined(_BSD_SOURCE) || defined(_SVID_SOURCE) || defined(_POSIX_SOURCE) ||               \
+		_POSIX_C_SOURCE >= 1
 	struct tm t;
 	tp = localtime_r(&tv_sec, &t);
 #else
 	tp = localtime(&tv_sec);
 #endif
 
-	if(tp != NULL) {
+	if (tp != NULL) {
 		return strftime(buf, size, fmt, tp);
 	}
 

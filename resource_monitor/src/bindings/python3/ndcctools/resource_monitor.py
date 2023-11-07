@@ -55,6 +55,7 @@ from .cresource_monitor import (
     rmsummary_create,
     rmsummary_delete,
     rmsummary_copy,
+    rmsummary_get_snapshot,
     rmsummary_merge_max,
     rmsummaryArray_getitem,
     delete_rmsummaryArray,

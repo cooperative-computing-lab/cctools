@@ -8,8 +8,8 @@ See the file COPYING for details.
 #include "hash_cache.h"
 #include "hash_table.h"
 
-#include <time.h>
 #include <stdlib.h>
+#include <time.h>
 
 struct hash_cache {
 	struct hash_table *table;
@@ -26,11 +26,11 @@ struct hash_cache *hash_cache_create(int size, hash_func_t func, hash_cache_clea
 	struct hash_cache *cache;
 
 	cache = malloc(sizeof(*cache));
-	if(!cache)
+	if (!cache)
 		return 0;
 
 	cache->table = hash_table_create(size, func);
-	if(!cache->table) {
+	if (!cache->table) {
 		free(cache);
 		return 0;
 	}
@@ -42,8 +42,8 @@ struct hash_cache *hash_cache_create(int size, hash_func_t func, hash_cache_clea
 
 void hash_cache_delete(struct hash_cache *cache)
 {
-	if(cache) {
-		if(cache->table)
+	if (cache) {
+		if (cache->table)
 			hash_table_delete(cache->table);
 		free(cache);
 	}
@@ -54,14 +54,14 @@ int hash_cache_insert(struct hash_cache *cache, const char *key, void *value, in
 	struct entry *e, *old;
 
 	e = malloc(sizeof(*e));
-	if(!e)
+	if (!e)
 		return 0;
 
 	e->value = value;
 	e->expires = time(0) + lifetime;
 
 	old = hash_table_remove(cache->table, key);
-	if(old) {
+	if (old) {
 		cache->cleanup(old->value);
 		free(old);
 	}
@@ -77,9 +77,9 @@ void *hash_cache_remove(struct hash_cache *cache, const char *key)
 	void *result;
 
 	e = hash_table_remove(cache->table, key);
-	if(e) {
+	if (e) {
 		result = e->value;
-		if(e->expires < time(0)) {
+		if (e->expires < time(0)) {
 			cache->cleanup(result);
 			result = 0;
 		}
@@ -97,11 +97,12 @@ void *hash_cache_lookup(struct hash_cache *cache, const char *key)
 	void *result;
 
 	e = hash_table_lookup(cache->table, key);
-	if(e) {
+	if (e) {
 		result = e->value;
-		if(e->expires < time(0)) {
+		if (e->expires < time(0)) {
 			result = hash_cache_remove(cache, key);
-			if(result) cache->cleanup(result);
+			if (result)
+				cache->cleanup(result);
 			result = 0;
 		}
 	} else {
@@ -111,18 +112,15 @@ void *hash_cache_lookup(struct hash_cache *cache, const char *key)
 	return result;
 }
 
-void hash_cache_firstkey(struct hash_cache *cache)
-{
-	hash_table_firstkey(cache->table);
-}
+void hash_cache_firstkey(struct hash_cache *cache) { hash_table_firstkey(cache->table); }
 
 int hash_cache_nextkey(struct hash_cache *cache, char **key, void **item)
 {
 	struct entry *e;
 	time_t current = time(0);
 
-	while(hash_table_nextkey(cache->table, key, (void **) &e)) {
-		if(e->expires < current) {
+	while (hash_table_nextkey(cache->table, key, (void **)&e)) {
+		if (e->expires < current) {
 			hash_cache_remove(cache, *key);
 			continue;
 		} else {

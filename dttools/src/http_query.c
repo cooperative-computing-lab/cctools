@@ -8,42 +8,42 @@ See the file COPYING for details.
 #include "http_query.h"
 
 #include "buffer.h"
-#include "stringtools.h"
 #include "debug.h"
 #include "domain_name_cache.h"
+#include "stringtools.h"
 #include "url_encode.h"
 
+#include <ctype.h>
 #include <errno.h>
-#include <string.h>
-#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
+#include <string.h>
+#include <unistd.h>
 
 #define HTTP_LINE_MAX 4096
 #define HTTP_PORT 80
 
 static int http_response_to_errno(int response)
 {
-	if(response <= 299) {
+	if (response <= 299) {
 		return 0;
-	} else if(response <= 399) {
+	} else if (response <= 399) {
 		return EBUSY;
-	} else if(response == 400) {
+	} else if (response == 400) {
 		return EINVAL;
-	} else if(response <= 403) {
+	} else if (response <= 403) {
 		return EACCES;
-	} else if(response == 404) {
+	} else if (response == 404) {
 		return ENOENT;
-	} else if(response <= 406) {
+	} else if (response <= 406) {
 		return EINVAL;
-	} else if(response == 407) {
+	} else if (response == 407) {
 		return EACCES;
-	} else if(response == 408) {
+	} else if (response == 408) {
 		return ETIMEDOUT;
-	} else if(response <= 410) {
+	} else if (response <= 410) {
 		return ENOENT;
-	} else if(errno <= 499) {
+	} else if (errno <= 499) {
 		return EINVAL;
 	} else {
 		return EIO;
@@ -62,9 +62,9 @@ struct link *http_query(const char *url, const char *action, time_t stoptime)
 	return http_query_size(url, action, &size, stoptime, 0);
 }
 
-struct link *http_query_size(const char *url, const char *action, INT64_T * size, time_t stoptime, int cache_reload)
+struct link *http_query_size(const char *url, const char *action, INT64_T *size, time_t stoptime, int cache_reload)
 {
-	if(!getenv("HTTP_PROXY")) {
+	if (!getenv("HTTP_PROXY")) {
 		return http_query_size_via_proxy(0, url, action, size, stoptime, cache_reload);
 	} else {
 		char proxies[HTTP_LINE_MAX];
@@ -73,10 +73,10 @@ struct link *http_query_size(const char *url, const char *action, INT64_T * size
 		strcpy(proxies, getenv("HTTP_PROXY"));
 		proxy = strtok(proxies, ";");
 
-		while(proxy) {
+		while (proxy) {
 			struct link *result;
 			result = http_query_size_via_proxy(proxy, url, action, size, stoptime, cache_reload);
-			if(result)
+			if (result)
 				return result;
 			proxy = strtok(0, ";");
 		}
@@ -84,7 +84,8 @@ struct link *http_query_size(const char *url, const char *action, INT64_T * size
 	}
 }
 
-struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, const char *action, INT64_T * size, time_t stoptime, int cache_reload)
+struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, const char *action, INT64_T *size,
+		time_t stoptime, int cache_reload)
 {
 	char url[HTTP_LINE_MAX];
 	char newurl[HTTP_LINE_MAX];
@@ -99,14 +100,14 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 
 	url_encode(urlin, url, sizeof(url));
 
-	if(proxy && !strcmp(proxy, "DIRECT"))
+	if (proxy && !strcmp(proxy, "DIRECT"))
 		proxy = 0;
 
-	if(proxy) {
+	if (proxy) {
 		int fields = sscanf(proxy, "http://%[^:]:%d", actual_host, &actual_port);
-		if(fields == 2) {
+		if (fields == 2) {
 			/* host and port are good */
-		} else if(fields == 1) {
+		} else if (fields == 1) {
 			actual_port = HTTP_PORT;
 		} else {
 			debug(D_HTTP, "invalid proxy syntax: %s", proxy);
@@ -115,9 +116,9 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 	} else {
 		int fields = sscanf(url, "http://%[^:]:%d", actual_host, &actual_port);
 		size_t delta;
-		if(fields != 2) {
+		if (fields != 2) {
 			fields = sscanf(url, "http://%[^/]", actual_host);
-			if(fields == 1) {
+			if (fields == 1) {
 				actual_port = HTTP_PORT;
 			} else {
 				debug(D_HTTP, "malformed url: %s", url);
@@ -127,7 +128,7 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 
 		/* When there is no proxy to be used, the Request-URI field should be abs_path. */
 		delta = strlen("http://") + strlen(actual_host);
-		if(fields == 2) {
+		if (fields == 2) {
 			size_t s_port = snprintf(NULL, 0, "%d", actual_port);
 			delta = delta + 1 + s_port; /* 1 is for the colon between host and port. */
 		}
@@ -135,15 +136,14 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 	}
 
 	debug(D_HTTP, "connect %s port %d", actual_host, actual_port);
-	if(!domain_name_cache_lookup(actual_host, addr))
+	if (!domain_name_cache_lookup(actual_host, addr))
 		return 0;
 
 	link = link_connect(addr, actual_port, stoptime);
-	if(!link) {
+	if (!link) {
 		errno = ECONNRESET;
 		return 0;
 	}
-
 
 	{
 		buffer_t B;
@@ -152,14 +152,19 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 		buffer_abortonfailure(&B, 1);
 
 		buffer_printf(&B, "%s %s HTTP/1.1\r\n", action, url);
-		if(cache_reload)
+		if (cache_reload)
 			buffer_putliteral(&B, "Cache-Control: max-age=0\r\n");
 		buffer_putliteral(&B, "Connection: close\r\n");
 		buffer_printf(&B, "Host: %s\r\n", actual_host);
-		if(getenv("HTTP_USER_AGENT"))
-			buffer_printf(&B, "User-Agent: Mozilla/5.0 (compatible; CCTools %s Parrot; http://ccl.cse.nd.edu/ %s)\r\n", CCTOOLS_VERSION, getenv("HTTP_USER_AGENT"));
+		if (getenv("HTTP_USER_AGENT"))
+			buffer_printf(&B,
+					"User-Agent: Mozilla/5.0 (compatible; CCTools %s Parrot; http://ccl.cse.nd.edu/ %s)\r\n",
+					CCTOOLS_VERSION,
+					getenv("HTTP_USER_AGENT"));
 		else
-			buffer_printf(&B, "User-Agent: Mozilla/5.0 (compatible; CCTools %s Parrot; http://ccl.cse.nd.edu/)\r\n", CCTOOLS_VERSION);
+			buffer_printf(&B,
+					"User-Agent: Mozilla/5.0 (compatible; CCTools %s Parrot; http://ccl.cse.nd.edu/)\r\n",
+					CCTOOLS_VERSION);
 		buffer_putliteral(&B, "\r\n"); /* header terminator */
 
 		debug(D_HTTP, "%s", buffer_tostring(&B));
@@ -168,17 +173,17 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 		buffer_free(&B);
 	}
 
-	if(link_readline(link, line, HTTP_LINE_MAX, stoptime)) {
+	if (link_readline(link, line, HTTP_LINE_MAX, stoptime)) {
 		string_chomp(line);
 		debug(D_HTTP, "%s", line);
-		if(sscanf(line, "HTTP/%*d.%*d %d", &response) == 1) {
+		if (sscanf(line, "HTTP/%*d.%*d %d", &response) == 1) {
 			newurl[0] = 0;
-			while(link_readline(link, line, HTTP_LINE_MAX, stoptime)) {
+			while (link_readline(link, line, HTTP_LINE_MAX, stoptime)) {
 				string_chomp(line);
 				debug(D_HTTP, "%s", line);
 				sscanf(line, "Location: %s", newurl);
 				sscanf(line, "Content-Length: %" SCNd64, size);
-				if(strlen(line) <= 2) {
+				if (strlen(line) <= 2) {
 					break;
 				}
 			}
@@ -192,13 +197,17 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 			case 303:
 			case 307:
 				link_close(link);
-				if(newurl[0]) {
-					if(!strcmp(url, newurl)) {
-						debug(D_HTTP, "error: server gave %d redirect from %s back to the same url!", response, url);
+				if (newurl[0]) {
+					if (!strcmp(url, newurl)) {
+						debug(D_HTTP,
+								"error: server gave %d redirect from %s back to the same url!",
+								response,
+								url);
 						errno = EIO;
 						return 0;
 					} else {
-						return http_query_size_via_proxy(proxy,newurl,action,size,stoptime,cache_reload);
+						return http_query_size_via_proxy(
+								proxy, newurl, action, size, stoptime, cache_reload);
 					}
 				} else {
 					errno = ENOENT;
@@ -233,13 +242,13 @@ INT64_T http_fetch_to_file(const char *url, const char *filename, time_t stoptim
 	struct link *link;
 
 	file = fopen(filename, "w");
-	if(file) {
+	if (file) {
 		link = http_query_size(url, "GET", &size, stoptime, 1);
-		if(link) {
+		if (link) {
 			actual = link_stream_to_file(link, file, size, stoptime);
 			link_close(link);
 			fclose(file);
-			if(actual == size) {
+			if (actual == size) {
 				return actual;
 			} else {
 				unlink(filename);
@@ -252,7 +261,6 @@ INT64_T http_fetch_to_file(const char *url, const char *filename, time_t stoptim
 	} else {
 		return -1;
 	}
-
 }
 
 /* vim: set noexpandtab tabstop=8: */

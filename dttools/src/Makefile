@@ -237,6 +237,19 @@ install: all
 
 test: all
 
+lint:
+		if ( ! clang-format -Werror --dry-run --style='file:../../.clang-format' $(SOURCES));\
+		then\
+				echo  "========================================================";\
+				echo  "NOTICE: Run `make format` to format your latest changes.";\
+				echo  "========================================================";\
+				exit 1;\
+		fi
+
+format:
+		clang-format -i $(SOURCES)
+
+
 .PHONY: all clean install test
 
 # vim: set noexpandtab tabstop=4:

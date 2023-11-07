@@ -4,41 +4,40 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
 #include <fcntl.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
-#include <arpa/inet.h>
+#include <unistd.h>
 
-#include "mq.h"
 #include "buffer.h"
-#include "list.h"
-#include "itable.h"
-#include "set.h"
-#include "link.h"
-#include "xxmalloc.h"
-#include "macros.h"
-#include "debug.h"
-#include "ppoll_compat.h"
 #include "cctools_endian.h"
-
+#include "debug.h"
+#include "itable.h"
+#include "link.h"
+#include "list.h"
+#include "macros.h"
+#include "mq.h"
+#include "ppoll_compat.h"
+#include "set.h"
+#include "xxmalloc.h"
 
 #define HDR_SIZE (sizeof(struct mq_msg) - offsetof(struct mq_msg, magic))
 #define HDR_MAGIC "MQ"
 
 #define HDR_MSG_CONT 0
-#define HDR_MSG_START (1<<0)
-#define HDR_MSG_END (1<<1)
+#define HDR_MSG_START (1 << 0)
+#define HDR_MSG_END (1 << 1)
 
 #define MQ_FRAME_WIDTH 16
-#define MQ_FRAME_MAX (1<<MQ_FRAME_WIDTH)
-#define FRAME_POS(p) (p & ((1<<MQ_FRAME_WIDTH) - 1))
-#define NEXT_FRAME(p) (((p>>MQ_FRAME_WIDTH) + 1)<<MQ_FRAME_WIDTH)
+#define MQ_FRAME_MAX (1 << MQ_FRAME_WIDTH)
+#define FRAME_POS(p) (p & ((1 << MQ_FRAME_WIDTH) - 1))
+#define NEXT_FRAME(p) (((p >> MQ_FRAME_WIDTH) + 1) << MQ_FRAME_WIDTH)
 
 enum mq_socket {
 	MQ_SOCKET_SERVER,
@@ -109,35 +108,43 @@ struct mq_poll {
 	struct set *error;
 };
 
-static size_t checked_add(size_t a, size_t b) {
+static size_t checked_add(size_t a, size_t b)
+{
 	size_t out = a + b;
 	assert(out >= a);
 	return out;
 }
 
-static int set_nonblocking (struct mq_msg *msg) {
+static int set_nonblocking(struct mq_msg *msg)
+{
 	assert(msg);
 #ifndef MQ_BLOCKING_IO
-	if (msg->pipefd < 0) return 0;
+	if (msg->pipefd < 0)
+		return 0;
 	msg->origfl = fcntl(msg->pipefd, F_GETFL);
-	if (msg->origfl < 0) return msg->origfl;
-	return fcntl(msg->pipefd, F_SETFL, msg->origfl|O_NONBLOCK);
+	if (msg->origfl < 0)
+		return msg->origfl;
+	return fcntl(msg->pipefd, F_SETFL, msg->origfl | O_NONBLOCK);
 #else
 	return 0;
 #endif
 }
 
-static int unset_nonblocking (struct mq_msg *msg) {
-	if (!msg) return 0;
+static int unset_nonblocking(struct mq_msg *msg)
+{
+	if (!msg)
+		return 0;
 #ifndef MQ_BLOCKING_IO
-	if (msg->pipefd < 0) return 0;
+	if (msg->pipefd < 0)
+		return 0;
 	return fcntl(msg->pipefd, F_SETFL, msg->origfl);
 #else
 	return 0;
 #endif
 }
 
-static struct mq_msg *msg_create (void) {
+static struct mq_msg *msg_create(void)
+{
 	// sanity check
 	assert(HDR_SIZE == 8);
 	struct mq_msg *out = xxcalloc(1, sizeof(struct mq_msg));
@@ -146,9 +153,12 @@ static struct mq_msg *msg_create (void) {
 	return out;
 }
 
-static void mq_msg_delete(struct mq_msg *msg) {
-	if (!msg) return;
-	if (msg->pipefd >= 0) close(msg->pipefd);
+static void mq_msg_delete(struct mq_msg *msg)
+{
+	if (!msg)
+		return;
+	if (msg->pipefd >= 0)
+		close(msg->pipefd);
 	if (msg->buffer) {
 		buffer_free(msg->buffer);
 		free(msg->buffer);
@@ -156,7 +166,8 @@ static void mq_msg_delete(struct mq_msg *msg) {
 	free(msg);
 }
 
-static void mq_die(struct mq *mq, int err) {
+static void mq_die(struct mq *mq, int err)
+{
 	assert(mq);
 	mq->err = err;
 
@@ -174,7 +185,7 @@ static void mq_die(struct mq *mq, int err) {
 
 	struct list_cursor *cur = list_cursor_create(mq->send);
 	list_seek(cur, 0);
-	for (struct mq_msg *msg; list_get(cur, (void **) &msg); list_next(cur)) {
+	for (struct mq_msg *msg; list_get(cur, (void **)&msg); list_next(cur)) {
 		mq_msg_delete(msg);
 	}
 	list_cursor_destroy(cur);
@@ -190,7 +201,8 @@ static void mq_die(struct mq *mq, int err) {
 	}
 }
 
-static struct mq *mq_create(enum mq_socket state, struct link *link) {
+static struct mq *mq_create(enum mq_socket state, struct link *link)
+{
 	struct mq *out = xxcalloc(1, sizeof(*out));
 	out->send = list_create();
 	out->state = state;
@@ -198,8 +210,10 @@ static struct mq *mq_create(enum mq_socket state, struct link *link) {
 	return out;
 }
 
-void mq_close(struct mq *mq) {
-	if (!mq) return;
+void mq_close(struct mq *mq)
+{
+	if (!mq)
+		return;
 
 	mq_die(mq, 0);
 	if (mq->poll_group) {
@@ -211,7 +225,8 @@ void mq_close(struct mq *mq) {
 	free(mq);
 }
 
-int mq_geterror(struct mq *mq) {
+int mq_geterror(struct mq *mq)
+{
 	assert(mq);
 	if (mq->state != MQ_SOCKET_ERROR) {
 		return 0;
@@ -220,25 +235,24 @@ int mq_geterror(struct mq *mq) {
 	}
 }
 
-void *mq_get_tag(struct mq *mq) {
+void *mq_get_tag(struct mq *mq)
+{
 	assert(mq);
 	return mq->tag;
 }
 
-void mq_set_tag(struct mq *mq, void *tag) {
+void mq_set_tag(struct mq *mq, void *tag)
+{
 	assert(mq);
 	mq->tag = tag;
 }
 
-int mq_address_local(struct mq *mq, char *addr, int *port) {
-    return link_address_local(mq->link, addr, port);
-}
+int mq_address_local(struct mq *mq, char *addr, int *port) { return link_address_local(mq->link, addr, port); }
 
-int mq_address_remote(struct mq *mq, char *addr, int *port) {
-    return link_address_remote(mq->link, addr, port);
-}
+int mq_address_remote(struct mq *mq, char *addr, int *port) { return link_address_remote(mq->link, addr, port); }
 
-static int validate_header(struct mq_msg *msg) {
+static int validate_header(struct mq_msg *msg)
+{
 	assert(msg);
 	errno = EBADMSG;
 
@@ -248,8 +262,8 @@ static int validate_header(struct mq_msg *msg) {
 	if (msg->pad2 != 0) {
 		return -1;
 	}
-	if (msg->type>>2) {
-			return -1;
+	if (msg->type >> 2) {
+		return -1;
 	}
 	if (!!msg->seen_initial == !!(msg->type & HDR_MSG_START)) {
 		return -1;
@@ -261,7 +275,8 @@ static int validate_header(struct mq_msg *msg) {
 	return 0;
 }
 
-static int flush_send(struct mq *mq) {
+static int flush_send(struct mq *mq)
+{
 	assert(mq);
 
 	int socket = link_fd(mq->link);
@@ -271,7 +286,8 @@ static int flush_send(struct mq *mq) {
 			mq->sending = list_pop_head(mq->send);
 		}
 		struct mq_msg *snd = mq->sending;
-		if (!snd) return 0;
+		if (!snd)
+			return 0;
 
 		/* The logic here is a bit dense, since there are several modes of operation.
 		 * If a pipe/fd has been connected, we need to read some data in (of unknown
@@ -287,8 +303,8 @@ static int flush_send(struct mq *mq) {
 		if (snd->buffering) {
 			if (snd->buf_pos < snd->len) {
 				ssize_t rc = read(snd->pipefd,
-					(char *) buffer_tostring(snd->buffer) + snd->buf_pos,
-					snd->len - snd->buf_pos);
+						(char *)buffer_tostring(snd->buffer) + snd->buf_pos,
+						snd->len - snd->buf_pos);
 				if (rc == -1 && errno_is_temporary(errno) && !snd->hung_up) {
 					return 0;
 				} else if (rc == 0) {
@@ -336,8 +352,7 @@ static int flush_send(struct mq *mq) {
 				snd->type |= HDR_MSG_END;
 			}
 
-			ssize_t rc = send(socket, &snd->magic + snd->hdr_pos,
-					HDR_SIZE - snd->hdr_pos, 0);
+			ssize_t rc = send(socket, &snd->magic + snd->hdr_pos, HDR_SIZE - snd->hdr_pos, 0);
 			if (rc == -1 && errno_is_temporary(errno)) {
 				return 0;
 			} else if (rc <= 0) {
@@ -347,8 +362,9 @@ static int flush_send(struct mq *mq) {
 			continue;
 		} else if (snd->buf_pos < snd->len) {
 			ssize_t rc = send(socket,
-				buffer_tostring(snd->buffer) + snd->buf_pos,
-				MIN(snd->len, NEXT_FRAME(snd->buf_pos)) - snd->buf_pos, 0);
+					buffer_tostring(snd->buffer) + snd->buf_pos,
+					MIN(snd->len, NEXT_FRAME(snd->buf_pos)) - snd->buf_pos,
+					0);
 			if (rc == -1 && errno_is_temporary(errno)) {
 				return 0;
 			} else if (rc <= 0) {
@@ -387,7 +403,8 @@ static int flush_send(struct mq *mq) {
 	}
 }
 
-static int flush_recv(struct mq *mq) {
+static int flush_recv(struct mq *mq)
+{
 	assert(mq);
 
 	int socket = link_fd(mq->link);
@@ -402,8 +419,7 @@ static int flush_recv(struct mq *mq) {
 
 		if (!rcv->buffering) {
 			if (rcv->hdr_pos < HDR_SIZE) {
-				ssize_t rc = recv(socket, &rcv->magic + rcv->hdr_pos,
-						HDR_SIZE - rcv->hdr_pos, 0);
+				ssize_t rc = recv(socket, &rcv->magic + rcv->hdr_pos, HDR_SIZE - rcv->hdr_pos, 0);
 				if (rc == -1 && errno_is_temporary(errno)) {
 					return 0;
 				} else if (rc == 0) {
@@ -423,7 +439,8 @@ static int flush_recv(struct mq *mq) {
 				 * If storing in a buffer, we'll need to keep the whole message in memory
 				 * at once, so a limit is necessary.
 				 */
-				if (validate_header(rcv) == -1) return -1;
+				if (validate_header(rcv) == -1)
+					return -1;
 				rcv->buf_pos = rcv->len;
 				rcv->len = checked_add(rcv->len, ntohl(rcv->hdr_len));
 				rcv->total_len = checked_add(rcv->total_len, ntohl(rcv->hdr_len));
@@ -440,17 +457,19 @@ static int flush_recv(struct mq *mq) {
 				continue;
 			} else if (rcv->buf_pos < rcv->len) {
 				ssize_t rc = recv(socket,
-					(char *) buffer_tostring(rcv->buffer) + rcv->buf_pos,
-					rcv->len - rcv->buf_pos, 0);
+						(char *)buffer_tostring(rcv->buffer) + rcv->buf_pos,
+						rcv->len - rcv->buf_pos,
+						0);
 
 				if (rc == -1 && errno_is_temporary(errno) && errno != 0) {
-                    /* for write, rc == 0 is only an error if errno != 0. */
+					/* for write, rc == 0 is only an error if errno != 0. */
 					return 0;
 				} else if (rc == 0) {
 					errno = ECONNRESET;
 					return -1;
 				} else if (rc < 0) {
-					return -1;;
+					return -1;
+					;
 				}
 				rcv->buf_pos = checked_add(rcv->buf_pos, rc);
 				continue;
@@ -471,8 +490,8 @@ static int flush_recv(struct mq *mq) {
 		if (rcv->storage == MQ_MSG_FD) {
 			if (rcv->buf_pos < rcv->len) {
 				ssize_t rc = write(rcv->pipefd,
-					(char *) buffer_tostring(rcv->buffer) + rcv->buf_pos,
-					rcv->len - rcv->buf_pos);
+						(char *)buffer_tostring(rcv->buffer) + rcv->buf_pos,
+						rcv->len - rcv->buf_pos);
 				if (rc == -1 && errno_is_temporary(errno)) {
 					return 0;
 				} else if (rc <= 0) {
@@ -504,7 +523,8 @@ static int flush_recv(struct mq *mq) {
  * did the simple thing and always used 2 per connection. If only one socket
  * is needed, the other is set to -1 (will be ignored by the kernel).
  */
-static void poll_events(struct mq *mq, struct pollfd *pfd) {
+static void poll_events(struct mq *mq, struct pollfd *pfd)
+{
 	assert(mq);
 	assert(pfd);
 
@@ -515,55 +535,59 @@ static void poll_events(struct mq *mq, struct pollfd *pfd) {
 	pfd[1].events = 0;
 
 	switch (mq->state) {
-		case MQ_SOCKET_INPROGRESS:
-			/* Socket connect has completed/failed if it polls writable.
-			 * Note that it will poll readable before it's done, so it's
-			 * important not to check that.
-			 */
+	case MQ_SOCKET_INPROGRESS:
+		/* Socket connect has completed/failed if it polls writable.
+		 * Note that it will poll readable before it's done, so it's
+		 * important not to check that.
+		 */
+		pfd[0].fd = link_fd(mq->link);
+		pfd[0].events |= POLLOUT;
+		break;
+	case MQ_SOCKET_CONNECTED:
+		/* Ugly checks to figure out the state of the connection.
+		 */
+		if (mq->sending && mq->sending->buffering) {
+			if (!mq->sending->hung_up) {
+				pfd[0].fd = mq->sending->pipefd;
+			}
+			pfd[0].events |= POLLIN;
+		} else if (mq->sending || list_length(mq->send)) {
 			pfd[0].fd = link_fd(mq->link);
 			pfd[0].events |= POLLOUT;
-			break;
-		case MQ_SOCKET_CONNECTED:
-			/* Ugly checks to figure out the state of the connection.
-			 */
-			if (mq->sending && mq->sending->buffering) {
-				if (!mq->sending->hung_up) {
-					pfd[0].fd = mq->sending->pipefd;
-				}
-				pfd[0].events |= POLLIN;
-			} else if (mq->sending || list_length(mq->send)) {
-				pfd[0].fd = link_fd(mq->link);
-				pfd[0].events |= POLLOUT;
-			}
-			if (mq->recving && mq->recving->buffering) {
-				pfd[1].fd = mq->recving->pipefd;
-				pfd[1].events |= POLLOUT;
-			} else if (!mq->recv) {
-				pfd[1].fd = link_fd(mq->link);
-				pfd[1].events |= POLLIN;
-			}
-			break;
-		case MQ_SOCKET_SERVER:
-			/* Server sockets poll readable when a connection
-			 * is ready to be accepted.
-			 */
-			if (!mq->acc) {
-				pfd[1].fd = link_fd(mq->link);
-				pfd[1].events |= POLLIN;
-			}
-			break;
-		case MQ_SOCKET_ERROR:
-			break;
+		}
+		if (mq->recving && mq->recving->buffering) {
+			pfd[1].fd = mq->recving->pipefd;
+			pfd[1].events |= POLLOUT;
+		} else if (!mq->recv) {
+			pfd[1].fd = link_fd(mq->link);
+			pfd[1].events |= POLLIN;
+		}
+		break;
+	case MQ_SOCKET_SERVER:
+		/* Server sockets poll readable when a connection
+		 * is ready to be accepted.
+		 */
+		if (!mq->acc) {
+			pfd[1].fd = link_fd(mq->link);
+			pfd[1].events |= POLLIN;
+		}
+		break;
+	case MQ_SOCKET_ERROR:
+		break;
 	}
 
-	if (pfd[0].fd == -1) pfd[0].revents = 0;
-	if (pfd[1].fd == -1) pfd[1].revents = 0;
+	if (pfd[0].fd == -1)
+		pfd[0].revents = 0;
+	if (pfd[1].fd == -1)
+		pfd[1].revents = 0;
 }
 
-static void update_poll_group(struct mq *mq) {
+static void update_poll_group(struct mq *mq)
+{
 	assert(mq);
 
-	if (!mq->poll_group) return;
+	if (!mq->poll_group)
+		return;
 	if (mq->state == MQ_SOCKET_ERROR) {
 		set_insert(mq->poll_group->error, mq);
 	}
@@ -575,7 +599,8 @@ static void update_poll_group(struct mq *mq) {
 	}
 }
 
-static int handle_revents(struct mq *mq, struct pollfd *pfd) {
+static int handle_revents(struct mq *mq, struct pollfd *pfd)
+{
 	assert(pfd);
 	assert(mq);
 
@@ -584,89 +609,88 @@ static int handle_revents(struct mq *mq, struct pollfd *pfd) {
 	socklen_t size = sizeof(err);
 
 	switch (mq->state) {
-		case MQ_SOCKET_ERROR:
-			break;
-		case MQ_SOCKET_INPROGRESS:
-			/* Once the connection attempt has a result, we can advance the state
-			 * to either connected or error. On ancient systems, some tricks may
-			 * be necessary (see https://cr.yp.to/docs/connect.html). We just do
-			 * the simple/modern thing here.
-			 */
-			if (pfd[0].revents & POLLOUT) {
-				rc = getsockopt(link_fd(mq->link), SOL_SOCKET, SO_ERROR,
-						&err, &size);
-				assert(rc == 0);
-				if (err == 0) {
-					mq->state = MQ_SOCKET_CONNECTED;
+	case MQ_SOCKET_ERROR:
+		break;
+	case MQ_SOCKET_INPROGRESS:
+		/* Once the connection attempt has a result, we can advance the state
+		 * to either connected or error. On ancient systems, some tricks may
+		 * be necessary (see https://cr.yp.to/docs/connect.html). We just do
+		 * the simple/modern thing here.
+		 */
+		if (pfd[0].revents & POLLOUT) {
+			rc = getsockopt(link_fd(mq->link), SOL_SOCKET, SO_ERROR, &err, &size);
+			assert(rc == 0);
+			if (err == 0) {
+				mq->state = MQ_SOCKET_CONNECTED;
 #ifdef MQ_BLOCKING_IO
-					link_nonblocking(mq->link, 0);
+				link_nonblocking(mq->link, 0);
 #endif
-				} else {
-					mq_die(mq, err);
-				}
+			} else {
+				mq_die(mq, err);
 			}
-			break;
-		case MQ_SOCKET_CONNECTED:
-			/* If we got ERR or HUP on the source being sent, it indicates the
-			 * other end of the pipe exited or closed the fd. In this case, we
-			 * flush what's left in the buffer and let the send loop close the
-			 * socket. Gettin ERR or HUP on the socket in either direction is
-			 * a fatal error (not sure if this can really happen). We also kill
-			 * the connection if the pipe we're recving into dies, as we don't
-			 * have anywhere to store the data we recv.
-			 */
-			if (pfd[0].revents & (POLLERR | POLLHUP)) {
-				if (mq->sending && mq->sending->buffering) {
-					pfd[0].revents |= POLLIN;
-					mq->sending->hung_up = true;
-				} else {
-					mq_die(mq, ECONNRESET);
-					goto DONE;
-				}
+		}
+		break;
+	case MQ_SOCKET_CONNECTED:
+		/* If we got ERR or HUP on the source being sent, it indicates the
+		 * other end of the pipe exited or closed the fd. In this case, we
+		 * flush what's left in the buffer and let the send loop close the
+		 * socket. Gettin ERR or HUP on the socket in either direction is
+		 * a fatal error (not sure if this can really happen). We also kill
+		 * the connection if the pipe we're recving into dies, as we don't
+		 * have anywhere to store the data we recv.
+		 */
+		if (pfd[0].revents & (POLLERR | POLLHUP)) {
+			if (mq->sending && mq->sending->buffering) {
+				pfd[0].revents |= POLLIN;
+				mq->sending->hung_up = true;
+			} else {
+				mq_die(mq, ECONNRESET);
+				goto DONE;
 			}
-			if (pfd[1].revents & (POLLERR | POLLHUP)) {
-				if (mq->recving && mq->recving->buffering) {
-					mq_die(mq, EPIPE);
-					goto DONE;
-				} else {
-					mq_die(mq, ECONNRESET);
-					goto DONE;
-				}
+		}
+		if (pfd[1].revents & (POLLERR | POLLHUP)) {
+			if (mq->recving && mq->recving->buffering) {
+				mq_die(mq, EPIPE);
+				goto DONE;
+			} else {
+				mq_die(mq, ECONNRESET);
+				goto DONE;
 			}
+		}
 
-			if (pfd[0].revents & (POLLOUT | POLLIN)) {
-				rc = flush_send(mq);
-				if (rc == -1) {
-					mq_die(mq, errno);
-					rc = 0; // will not be polled again, treat as OK
-					goto DONE;
-				}
+		if (pfd[0].revents & (POLLOUT | POLLIN)) {
+			rc = flush_send(mq);
+			if (rc == -1) {
+				mq_die(mq, errno);
+				rc = 0; // will not be polled again, treat as OK
+				goto DONE;
 			}
+		}
 
-			if (pfd[1].revents & (POLLOUT | POLLIN)) {
-				rc = flush_recv(mq);
-				if (rc == -1) {
-					mq_die(mq, errno);
-					rc = 0; // will not be polled again, treat as OK
-					goto DONE;
-				}
+		if (pfd[1].revents & (POLLOUT | POLLIN)) {
+			rc = flush_recv(mq);
+			if (rc == -1) {
+				mq_die(mq, errno);
+				rc = 0; // will not be polled again, treat as OK
+				goto DONE;
 			}
-			break;
-		case MQ_SOCKET_SERVER:
-			if (pfd[1].revents & POLLIN) {
-				struct link *link = link_accept(mq->link, LINK_NOWAIT);
-				// If the server socket polls readable,
-				// this should never block.
-				assert(link);
-				// Should only poll on read if accept slot is free
-				assert(!mq->acc);
-				struct mq *out = mq_create(MQ_SOCKET_CONNECTED, link);
-				mq->acc = out;
+		}
+		break;
+	case MQ_SOCKET_SERVER:
+		if (pfd[1].revents & POLLIN) {
+			struct link *link = link_accept(mq->link, LINK_NOWAIT);
+			// If the server socket polls readable,
+			// this should never block.
+			assert(link);
+			// Should only poll on read if accept slot is free
+			assert(!mq->acc);
+			struct mq *out = mq_create(MQ_SOCKET_CONNECTED, link);
+			mq->acc = out;
 #ifdef MQ_BLOCKING_IO
-				link_nonblocking(link, 0);
+			link_nonblocking(link, 0);
 #endif
-			}
-			break;
+		}
+		break;
 	}
 
 DONE:
@@ -674,21 +698,26 @@ DONE:
 	return rc;
 }
 
-struct mq *mq_serve(const char *addr, int port) {
+struct mq *mq_serve(const char *addr, int port)
+{
 	struct link *link = link_serve_address(addr, port);
-	if (!link) return NULL;
+	if (!link)
+		return NULL;
 	struct mq *out = mq_create(MQ_SOCKET_SERVER, link);
 	return out;
 }
 
-struct mq *mq_connect(const char *addr, int port) {
+struct mq *mq_connect(const char *addr, int port)
+{
 	struct link *link = link_connect(addr, port, LINK_NOWAIT);
-	if (!link) return NULL;
+	if (!link)
+		return NULL;
 	struct mq *out = mq_create(MQ_SOCKET_INPROGRESS, link);
 	return out;
 }
 
-struct mq *mq_accept(struct mq *mq) {
+struct mq *mq_accept(struct mq *mq)
+{
 	assert(mq);
 	struct mq *out = mq->acc;
 	mq->acc = NULL;
@@ -698,7 +727,8 @@ struct mq *mq_accept(struct mq *mq) {
 	return out;
 }
 
-int mq_wait(struct mq *mq, time_t stoptime) {
+int mq_wait(struct mq *mq, time_t stoptime)
+{
 	assert(mq);
 
 	int rc;
@@ -708,15 +738,15 @@ int mq_wait(struct mq *mq, time_t stoptime) {
 
 	do {
 		// NB: we're using revents from the *previous* iteration
-		if (handle_revents(mq, (struct pollfd *) &pfd) == -1) {
+		if (handle_revents(mq, (struct pollfd *)&pfd) == -1) {
 			return -1;
 		}
-		poll_events(mq, (struct pollfd *) &pfd);
+		poll_events(mq, (struct pollfd *)&pfd);
 
 		if (mq->recv || mq->acc || mq->state == MQ_SOCKET_ERROR) {
 			return 1;
 		}
-	} while ((rc = ppoll_compat((struct pollfd *) &pfd, 2, stoptime)) > 0);
+	} while ((rc = ppoll_compat((struct pollfd *)&pfd, 2, stoptime)) > 0);
 
 	if (rc == 0 || (rc == -1 && errno == EINTR)) {
 		return 0;
@@ -725,7 +755,8 @@ int mq_wait(struct mq *mq, time_t stoptime) {
 	}
 }
 
-struct mq_poll *mq_poll_create(void) {
+struct mq_poll *mq_poll_create(void)
+{
 	struct mq_poll *out = xxcalloc(1, sizeof(*out));
 	out->members = set_create(0);
 	out->acceptable = set_create(0);
@@ -734,12 +765,14 @@ struct mq_poll *mq_poll_create(void) {
 	return out;
 }
 
-void mq_poll_delete(struct mq_poll *p) {
-	if (!p) return;
+void mq_poll_delete(struct mq_poll *p)
+{
+	if (!p)
+		return;
 
-    struct mq *mq = NULL;
+	struct mq *mq = NULL;
 	set_first_element(p->members);
-    while((mq = set_next_element(p->members))) {
+	while ((mq = set_next_element(p->members))) {
 		mq->poll_group = NULL;
 	}
 	set_delete(p->members);
@@ -749,7 +782,8 @@ void mq_poll_delete(struct mq_poll *p) {
 	free(p);
 }
 
-int mq_poll_add(struct mq_poll *p, struct mq *mq) {
+int mq_poll_add(struct mq_poll *p, struct mq *mq)
+{
 	assert(p);
 	assert(mq);
 
@@ -768,7 +802,8 @@ int mq_poll_add(struct mq_poll *p, struct mq *mq) {
 	return 0;
 }
 
-int mq_poll_rm(struct mq_poll *p, struct mq *mq) {
+int mq_poll_rm(struct mq_poll *p, struct mq *mq)
+{
 	assert(p);
 	assert(mq);
 
@@ -785,33 +820,37 @@ int mq_poll_rm(struct mq_poll *p, struct mq *mq) {
 	return 0;
 }
 
-struct mq *mq_poll_acceptable(struct mq_poll *p) {
+struct mq *mq_poll_acceptable(struct mq_poll *p)
+{
 	assert(p);
 
 	set_first_element(p->acceptable);
 	return set_next_element(p->acceptable);
 }
 
-struct mq *mq_poll_readable(struct mq_poll *p) {
+struct mq *mq_poll_readable(struct mq_poll *p)
+{
 	assert(p);
 
 	set_first_element(p->readable);
 	return set_next_element(p->readable);
 }
 
-struct mq *mq_poll_error(struct mq_poll *p) {
+struct mq *mq_poll_error(struct mq_poll *p)
+{
 	assert(p);
 
 	set_first_element(p->error);
 	return set_next_element(p->error);
 }
 
-int mq_poll_wait(struct mq_poll *p, time_t stoptime) {
+int mq_poll_wait(struct mq_poll *p, time_t stoptime)
+{
 	assert(p);
 
 	int rc;
 	int count = set_size(p->members);
-	struct pollfd *pfds = xxcalloc(2*count, sizeof(*pfds));
+	struct pollfd *pfds = xxcalloc(2 * count, sizeof(*pfds));
 	int i;
 
 	do {
@@ -819,8 +858,8 @@ int mq_poll_wait(struct mq_poll *p, time_t stoptime) {
 		// change the order of the elements.
 		i = 0;
 		set_first_element(p->members);
-        struct mq *mq = NULL;
-        while((mq = set_next_element(p->members))) {
+		struct mq *mq = NULL;
+		while ((mq = set_next_element(p->members))) {
 			// NB: we're using revents from the *previous* iteration
 			rc = handle_revents(mq, &pfds[i]);
 			if (rc == -1) {
@@ -834,8 +873,9 @@ int mq_poll_wait(struct mq_poll *p, time_t stoptime) {
 		rc += set_size(p->acceptable);
 		rc += set_size(p->readable);
 		rc += set_size(p->error);
-		if (rc > 0) goto DONE;
-	} while ((rc = ppoll_compat(pfds, 2*count, stoptime)) > 0);
+		if (rc > 0)
+			goto DONE;
+	} while ((rc = ppoll_compat(pfds, 2 * count, stoptime)) > 0);
 
 DONE:
 	free(pfds);
@@ -848,12 +888,14 @@ DONE:
 	}
 }
 
-int mq_send_buffer(struct mq *mq, buffer_t *buf, size_t maxlen) {
+int mq_send_buffer(struct mq *mq, buffer_t *buf, size_t maxlen)
+{
 	assert(mq);
 	assert(buf);
 
 	errno = mq_geterror(mq);
-	if (errno != 0) return -1;
+	if (errno != 0)
+		return -1;
 
 	if (maxlen == 0) {
 		maxlen = SIZE_MAX;
@@ -870,12 +912,14 @@ int mq_send_buffer(struct mq *mq, buffer_t *buf, size_t maxlen) {
 	return 0;
 }
 
-int mq_send_fd(struct mq *mq, int fd, size_t maxlen) {
+int mq_send_fd(struct mq *mq, int fd, size_t maxlen)
+{
 	assert(mq);
 	assert(fd >= 0);
 
 	errno = mq_geterror(mq);
-	if (errno != 0) return -1;
+	if (errno != 0)
+		return -1;
 
 	if (maxlen == 0) {
 		maxlen = SIZE_MAX;
@@ -901,10 +945,12 @@ int mq_send_fd(struct mq *mq, int fd, size_t maxlen) {
 	return 0;
 }
 
-mq_msg_t mq_recv(struct mq *mq, size_t *length) {
+mq_msg_t mq_recv(struct mq *mq, size_t *length)
+{
 	assert(mq);
 
-	if (!mq->recv) return MQ_MSG_NONE;
+	if (!mq->recv)
+		return MQ_MSG_NONE;
 	struct mq_msg *msg = mq->recv;
 	assert(msg->storage != MQ_MSG_NONE);
 	mq->recv = NULL;
@@ -924,7 +970,8 @@ mq_msg_t mq_recv(struct mq *mq, size_t *length) {
 	return storage;
 }
 
-int mq_store_buffer(struct mq *mq, buffer_t *buf, size_t maxlen) {
+int mq_store_buffer(struct mq *mq, buffer_t *buf, size_t maxlen)
+{
 	assert(mq);
 	assert(buf);
 
@@ -942,7 +989,8 @@ int mq_store_buffer(struct mq *mq, buffer_t *buf, size_t maxlen) {
 	return 0;
 }
 
-int mq_store_fd(struct mq *mq, int fd, size_t maxlen) {
+int mq_store_fd(struct mq *mq, int fd, size_t maxlen)
+{
 	assert(mq);
 	assert(fd >= 0);
 

@@ -2,23 +2,23 @@
  * Copyright (C) 2022 The University of Notre Dame
  * This software is distributed under the GNU General Public License.
  * See the file COPYING for details.
-*/
+ */
 
 #include "daemon.h"
 
 #include "debug.h"
 #include "fd.h"
 
-#include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-void daemonize (int cdroot, const char *pidfile)
+void daemonize(int cdroot, const char *pidfile)
 {
 	/* Become session leader and lose controlling terminal */
 	pid_t pid = fork();
@@ -29,7 +29,7 @@ void daemonize (int cdroot, const char *pidfile)
 	}
 
 	pid_t group = setsid();
-	if (group == (pid_t) -1) {
+	if (group == (pid_t)-1) {
 		fatal("could not create session: %s", strerror(errno));
 	}
 
@@ -51,7 +51,7 @@ void daemonize (int cdroot, const char *pidfile)
 		}
 	}
 
-	if (cdroot){
+	if (cdroot) {
 		int status = chdir("/");
 		if (status == -1) {
 			fatal("could not chdir to `/': %s", strerror(errno));

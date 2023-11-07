@@ -6,29 +6,29 @@ See the file COPYING for details.
 */
 
 #include "domain_name.h"
+#include "address.h"
+#include "debug.h"
 #include "link.h"
 #include "stringtools.h"
-#include "debug.h"
-#include "address.h"
 
-#include <sys/types.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
 #include <sys/file.h>
+#include <sys/socket.h>
 #include <sys/time.h>
-#include <sys/utsname.h>
+#include <sys/types.h>
 #include <sys/un.h>
+#include <sys/utsname.h>
 
-#include <fcntl.h>
-#include <unistd.h>
-#include <signal.h>
-#include <netdb.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <netdb.h>
+#include <signal.h>
+#include <unistd.h>
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 int domain_name_lookup_reverse(const char *addr, char *name)
@@ -39,12 +39,12 @@ int domain_name_lookup_reverse(const char *addr, char *name)
 
 	debug(D_DNS, "looking up addr %s", addr);
 
-	if(!address_to_sockaddr(addr,0,&saddr,&saddr_length)) {
+	if (!address_to_sockaddr(addr, 0, &saddr, &saddr_length)) {
 		debug(D_DNS, "%s is not a valid addr", addr);
 		return 0;
 	}
 
-	if ((err = getnameinfo((struct sockaddr *) &saddr, sizeof(saddr), name, DOMAIN_NAME_MAX,0,0,0)) !=0 ) {
+	if ((err = getnameinfo((struct sockaddr *)&saddr, sizeof(saddr), name, DOMAIN_NAME_MAX, 0, 0, 0)) != 0) {
 		debug(D_DNS, "couldn't look up %s: %s", addr, gai_strerror(err));
 		return 0;
 	}
@@ -70,9 +70,9 @@ int domain_name_lookup(const char *name, char *addr)
 		return 0;
 	}
 
-	int r = address_from_sockaddr(addr,result->ai_addr);
+	int r = address_from_sockaddr(addr, result->ai_addr);
 
-	if(r) {
+	if (r) {
 		debug(D_DNS, "%s is %s", name, addr);
 	} else {
 		debug(D_DNS, "unable to translate result from getaddrinfo");

@@ -49,11 +49,17 @@ install: $(INSTALL_PACKAGES)
 test: $(CCTOOLS_PACKAGES)
 	./run_all_tests.sh
 
-lint: config.mk
-	@$(MAKE) -C taskvine lint
+PACKAGES_TO_LINT = taskvine dttools poncho resource_monitor
+LINT_PACKAGES = $(PACKAGES_TO_LINT:%=lint-%)
+$(LINT_PACKAGES): config.mk
+	@$(MAKE) -C $(@:lint-%=%) lint
+lint: $(LINT_PACKAGES)
 
-format: config.mk
-	@$(MAKE) -C taskvine format
+PACKAGES_TO_FORMAT = taskvine resource_monitor dttools
+FORMAT_PACKAGES = $(PACKAGES_TO_FORMAT:%=format-%)
+$(FORMAT_PACKAGES): config.mk
+	@$(MAKE) -C $(@:format-%=%) format
+format: $(FORMAT_PACKAGES)
 
 rpm:
 	./packaging/rpm/rpm_creator.sh $(RPM_VERSION) $(RPM_RELEASE)
