@@ -1840,8 +1840,6 @@ The type of a GPU is automatically reported as a "feature" that tasks can select
 
 To describe a task that can only run on a specific GPU type, use `add_feature`:
 
-```
-
 === "Python"
     ```python
     t.add_feature("NVIDIA RTX A2000") # task requires worker with this feature
