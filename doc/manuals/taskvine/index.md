@@ -1512,7 +1512,88 @@ function definitions into a library task `libtask`
     libtask = m.create_library_from_functions("my_library", my_sum, my_mul)
     ```
 
-You can optionally specify the number of functions the library can 
+The situation is straightforward for simple functions that don't utilize additional packages. However, it becomes complex when the function incorporates external packages via `import` statements.
+
+You can certainly embed `import` statements within the function and install any necessary packages:
+
+=== Python
+    ```python
+    def divide(dividend, divisor): 
+        import math 
+        return dividend / math.sqrt(divisor)
+
+    libtask = m.create_library_from_functions("my_library", divide)
+    ```
+
+In the prevailing approach to executing library functions, each invocation of a function triggers the creation of a new child process to execute the corresponding code. Given that a single function might be executed repeatedly, this process is replicated for each call, leading to the multiple executions of `import` statements within the function's code. Such redundancy results in considerable, unnecessary latency, adversely impacting performance.
+
+To mitigate this, pass the `imports` argument to the `create_library_from_functions` function, specifying the packages your functions will use. Those `import` statements will be prepended to the serverless library's preamble, thus reducing execution time by avoiding redundant imports:
+
+=== Python 
+    ```python 
+    imports = { 
+        'math': [] 
+    }
+
+    def divide(dividend, divisor):
+        return dividend / math.sqrt(divisor)
+
+    libtask = m.create_library_from_functions("my_library", divide, imports=imports)
+    ```
+
+This feature supports various `import` statement formats, such as:
+=== Python 
+    ```python
+    # format it as a dictionary supporting comprehensive usage
+    imports = { 
+        'math': '',                        # import math 
+        'time': '',                        # import time 
+        'numpy': 'np',                     # import numpy as np 
+        'random': {'uniform': ''},         # from random import uniform
+        'time': {'sleep': 'time_sleep'}    # from time import sleep as time_sleep 
+    }
+
+    # format it as a list or a string for simple usage
+    imports = ['os.path', 'sys', 'time']   # import os.path
+                                           # import sys
+                                           # import time
+
+    imports = 'tensorflow'                 # import tensorflow
+    ```
+
+Alternatively, you may combine both methods:
+=== Python
+    ```python
+    imports = { 
+        'math': '',                        # import math 
+        'time': '',                        # import time 
+        'numpy': 'np',                     # import numpy as np 
+        'random': {'uniform': ''},         # from random import uniform
+        'time': {'sleep': 'time_sleep'}    # from time import sleep as time_sleep 
+    }
+
+    def cube_sqrt(x):
+        random_delay = uniform(0.00001, 0.0001)
+        time_sleep(random_delay)
+
+        sqrt_value = math.sqrt(x)
+        cube_value = np.power(sqrt_value, 3)
+
+        return cube_value
+
+    def divide(dividend, divisor):
+        return dividend / math.sqrt(divisor)
+
+    # Package imports can also be inside of the function
+    def double(x):
+        import math as m
+        return m.prod([x, 2])
+
+    libtask = q.create_library_from_functions('test-library', divide, double, cube_sqrt, imports=imports)
+
+    ```
+
+After installing the packages and functions, you can optionally specify the number of functions the library can 
 run concurrently by setting the number of function slots (default to 1):
 
 === "Python"
