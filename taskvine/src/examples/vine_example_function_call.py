@@ -5,24 +5,25 @@
 # using FunctionCall tasks.
 
 import ndcctools.taskvine as vine
+import math
 import argparse
-import time
-import math as m
-from random import randint
-from decimal import Decimal as D
+import numpy as np
+from time import sleep as time_sleep
+from random import uniform
 
-# The library will consist of the following two functions:
+# The library will consist of the following three functions:
 
-# This function is only used to show the usage of various import statements
-def calculate_with_delay():
-    random_int = randint(1, 10)
-    sqrt_value = m.sqrt(random_int)
-    time.sleep(0.001)
-    D(sqrt_value)
-    return None
+def cube_sqrt(x):
+    random_delay = uniform(0.00001, 0.0001)
+    time_sleep(random_delay)
+
+    sqrt_value = math.sqrt(x)
+    cube_value = np.power(sqrt_value, 3)
+
+    return cube_value
 
 def divide(dividend, divisor):
-    return dividend / m.sqrt(divisor)
+    return dividend / math.sqrt(divisor)
 
 def double(x):
     return x * 2
@@ -54,14 +55,15 @@ def main():
 
     print("Creating library from packages and functions...")
 
-    # This format shows how to create package import statements in the library
+    # This format shows how to create package import statements for the library
     imports = {
+        'math': [],                        # import math
         'time': [],                        # import time
-        'math': 'm',                       # import math as m
-        'random': ['randint'],             # from random import randint
-        'decimal': {'Decimal': 'D'}        # from decimal import Decimal as D
+        'numpy': 'np',                     # import numpy as np
+        'random': ['uniform'],             # from random import uniform
+        'time': {'sleep': 'time_sleep'}    # from decimal import Decimal as D
     }
-    libtask = q.create_library_from_functions('test-library', divide, double, imports=imports)
+    libtask = q.create_library_from_functions('test-library', divide, double, cube_sqrt, imports=imports)
     q.install_library(libtask)
 
     print("Submitting function call tasks...")
@@ -75,7 +77,7 @@ def main():
         s_task = vine.FunctionCall('test-library', 'double', 3)
         q.submit(s_task)
 
-        s_task = vine.FunctionCall('test-library', 'calculate_with_delay')
+        s_task = vine.FunctionCall('test-library', 'cube_sqrt', 4)
         q.submit(s_task)
 
     print("Waiting for results...")
@@ -86,13 +88,11 @@ def main():
         t = q.wait(5)
         if t:
             x = t.output
-            if x == None:
-                continue
             total_sum += x
             print(f"task {t.id} completed with result {x}")
 
     # Check that we got the right result.
-    expected = tasks * ( divide(2, 2**2) + double(3) )
+    expected = tasks * ( divide(2, 2**2) + double(3) + cube_sqrt(4))
 
     print(f"Total:    {total_sum}")
     print(f"Expected: {expected}")
@@ -101,4 +101,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
