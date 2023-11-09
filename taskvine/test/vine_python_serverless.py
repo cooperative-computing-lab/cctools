@@ -21,8 +21,10 @@ def cube_sqrt(x):
 def divide(dividend, divisor):
     return dividend / math.sqrt(divisor)
 
+# Package imports can also be inside of the function
 def double(x):
-    return x * 2
+    import math as m
+    return m.prod([x, 2])
 
 
 def main():
