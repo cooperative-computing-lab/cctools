@@ -37,35 +37,36 @@ init_function = \
 # @param imports         A formatted package list that is used for the library
 #                        Usage example:
 #                        imports = {
-#                           'numpy': [],                                  # import numpy
+#                           'numpy': '',                                  # import numpy
 #                           'pytorch': 'torch'                            # import pytorch as torch
-#                           'tensorflow': ['*']                           # from tensorflow import *
-#                           'sys': ['path', 'argv'],                      # from sys import path, argv
+#                           'tensorflow': {'*': ''}                       # from tensorflow import *
+#                           'sys': {'path': '', 'argv': ''},              # from sys import path, argv
 #                           'os': {'environ': 'env', 'path': 'os_path'},  # from os import environ as env, path as os_path
 #                        }
 def generate_import_statements(imports):
-    import_modules = []
+    import_statements = []
 
-    for key, value in imports.items():
-        if isinstance(value, list):
-            # The list is not empty, which means we have specific imports
-            if value:
-                items_list = ", ".join(value)
-                import_modules.append(f"from {key} import {items_list}")
-            # An empty list indicates a generic import
+    for module, import_items in imports.items():
+        # Handle importing entire module or module with alias
+        if isinstance(import_items, str):
+            if import_items:
+                import_statements.append(f"import {module} as {import_items}")
             else:
-                import_modules.append(f"import {key}")
-        # This is an import with alias
-        elif isinstance(value, dict):
-            for original_name, alias_name in value.items():
-                import_modules.append(f"from {key} import {original_name} as {alias_name}")
-        # A single string means using an alias
-        elif isinstance(value, str):
-            import_modules.append(f"import {key} as {value}")
+                import_statements.append(f"import {module}")
+        # Handle from-imports with potential aliases
+        elif isinstance(import_items, dict):
+            # Handle importing specific attributes with or without aliases
+            parts = []
+            for attr, alias in import_items.items():
+                if alias:
+                    parts.append(f"{attr} as {alias}")
+                else:
+                    parts.append(attr)
+            import_statements.append(f"from {module} import {', '.join(parts)}")
         else:
-            raise ValueError(f"Invalid import value: {value}. Only lists and dicts are allowed.")
+            raise ValueError(f"Invalid import value: {import_items}. Only strings and dicts are allowed.")
 
-    return import_modules
+    return import_statements
 
 
 # Create the library driver code that will be run as a normal task
@@ -77,11 +78,11 @@ def generate_import_statements(imports):
 # @param imports         A formatted package list that is used for the library
 #                        Usage example:
 #                        imports = {
-#                           'numpy': [],                                  # import numpy
-#                           'pytorch': 'torch'                            # import pytorch as torch
-#                           'tensorflow': ['*']                           # from tensorflow import *
-#                           'sys': ['path', 'argv'],                      # from sys import path, argv
-#                           'os': {'environ': 'env', 'path': 'os_path'},  # from os import environ as env, path as os_path
+#                            'numpy': '',                                   # import numpy
+#                            'pytorch': 'torch',                            # import pytorch as torch
+#                            'tensorflow': {'*': ''},                       # from tensorflow import *
+#                            'sys': {'path': '', 'argv': ''},               # from sys import path, argv
+#                            'os': {'environ': 'env', 'path': ''},          # from os import environ as env, path
 #                        }
 def create_library_code(path, funcs, dest, version, imports=None):
 
@@ -200,11 +201,12 @@ def generate_functions_hash(functions: list) -> str:
 # @param imports    A formatted package list that is used for the library
 #                   Usage example:
 #                   imports = {
-#                       'numpy': [],  # import numpy
-#                        'tensorflow': ['*']  # from tensorflow import *
-#                        'sys': ['path', 'argv'],  # from sys import path, argv
-#                        'os': {'environ': 'env', 'path': 'os_path'},  # from os import environ as env, path as os_path
-#                    }
+#                       'numpy': '',                                   # import numpy
+#                       'pytorch': 'torch',                            # import pytorch as torch
+#                       'tensorflow': {'*': ''},                       # from tensorflow import *
+#                       'sys': {'path': '', 'argv': ''},               # from sys import path, argv
+#                       'os': {'environ': 'env', 'path': ''},          # from os import environ as env, path
+#                   }
 def serverize_library_from_code(path, functions, name, need_pack=True, imports=None):
     tmp_library_path = f"{path}/tmp_library.py"
 

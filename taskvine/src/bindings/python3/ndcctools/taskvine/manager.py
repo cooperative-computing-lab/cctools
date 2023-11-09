@@ -864,11 +864,11 @@ class Manager(object):
     # @param imports         A formatted package list that is used for the library
     #                        Usage example:
     #                        imports = {
-    #                           'numpy': [],                                  # import numpy
-    #                           'pytorch': 'torch'                            # import pytorch as torch
-    #                           'tensorflow': ['*']                           # from tensorflow import *
-    #                           'sys': ['path', 'argv'],                      # from sys import path, argv
-    #                           'os': {'environ': 'env', 'path': 'os_path'},  # from os import environ as env, path as os_path
+    #                            'numpy': '',                                   # import numpy
+    #                            'pytorch': 'torch',                            # import pytorch as torch
+    #                            'tensorflow': {'*': ''},                       # from tensorflow import *
+    #                            'sys': {'path': '', 'argv': ''},               # from sys import path, argv
+    #                            'os': {'environ': 'env', 'path': ''},          # from os import environ as env, path
     #                        }
     def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True, imports=None):
         # Delay loading of poncho until here, to avoid bringing in poncho dependencies unless needed.

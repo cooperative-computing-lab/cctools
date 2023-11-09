@@ -45,11 +45,11 @@ def main():
 
     # This format shows how to create package import statements for the library
     imports = {
-        'math': [],                        # import math
-        'time': [],                        # import time
+        'math': '',                        # import math
+        'time': '',                        # import time
         'numpy': 'np',                     # import numpy as np
-        'random': ['uniform'],             # from random import uniform
-        'time': {'sleep': 'time_sleep'}    # from decimal import Decimal as D
+        'random': {'uniform': ''},         # from random import uniform
+        'time': {'sleep': 'time_sleep'}    # from time import sleep as time_sleep
     }
     libtask = q.create_library_from_functions('test-library', divide, double, cube_sqrt, imports=imports)
     libtask.set_cores(1)

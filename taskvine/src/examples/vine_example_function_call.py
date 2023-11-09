@@ -57,13 +57,13 @@ def main():
 
     print("Creating library from packages and functions...")
 
-    # This format shows how to create package import statements for the library
+    # This format shows how tocd create package import statements for the library
     imports = {
-        'math': [],                        # import math
-        'time': [],                        # import time
+        'math': '',                        # import math
+        'time': '',                        # import time
         'numpy': 'np',                     # import numpy as np
-        'random': ['uniform'],             # from random import uniform
-        'time': {'sleep': 'time_sleep'}    # from decimal import Decimal as D
+        'random': {'uniform': ''},         # from random import uniform
+        'time': {'sleep': 'time_sleep'}    # from time import sleep as time_sleep
     }
     libtask = q.create_library_from_functions('test-library', divide, double, cube_sqrt, imports=imports)
     q.install_library(libtask)
