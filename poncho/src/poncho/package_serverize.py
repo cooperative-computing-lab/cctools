@@ -23,14 +23,50 @@ shebang = "#! /usr/bin/env python3\n\n"
 
 default_name_func = \
 '''def name():
-	return "my_coprocess"
+    return "my_coprocess"
 
 '''
 init_function = \
 '''if __name__ == "__main__":
-	main()
+    main()
 
 '''
+
+ 
+# Generates a list of import statements from a dictionary of modules and their elements or aliases.
+# @param imports         A formatted package list that is used for the library
+#                        Usage example:
+#                        imports = {
+#                           'numpy': [],                                  # import numpy
+#                           'pytorch': 'torch'                            # import pytorch as torch
+#                           'tensorflow': ['*']                           # from tensorflow import *
+#                           'sys': ['path', 'argv'],                      # from sys import path, argv
+#                           'os': {'environ': 'env', 'path': 'os_path'},  # from os import environ as env, path as os_path
+#                        }
+def generate_import_statements(imports):
+    import_modules = []
+
+    for key, value in imports.items():
+        if isinstance(value, list):
+            # The list is not empty, which means we have specific imports
+            if value:
+                items_list = ", ".join(value)
+                import_modules.append(f"from {key} import {items_list}")
+            # An empty list indicates a generic import
+            else:
+                import_modules.append(f"import {key}")
+        # This is an import with alias
+        elif isinstance(value, dict):
+            for original_name, alias_name in value.items():
+                import_modules.append(f"from {key} import {original_name} as {alias_name}")
+        # A single string means using an alias
+        elif isinstance(value, str):
+            import_modules.append(f"import {key} as {value}")
+        else:
+            raise ValueError(f"Invalid import value: {value}. Only lists and dicts are allowed.")
+
+    return import_modules
+
 
 # Create the library driver code that will be run as a normal task
 # on workers and execute function invocations upon workers' instructions.
@@ -38,54 +74,63 @@ init_function = \
 # @param funcs      A list of relevant function names.
 # @param dest       Path to the final library script.
 # @param version    Whether this is for workqueue or taskvine serverless code.
-def create_library_code(path, funcs, dest, version):
-	import_modules = []
-	function_source_code = []
-	name_source_code = ""
-	absolute_path = os.path.abspath(path)
-	# open the source file, parse the code into an ast, and then unparse the ast import statements and functions back into python code
-	with open(absolute_path, 'r') as source:
-		code = ast.parse(source.read(), filename=absolute_path)
-		for stmt in ast.walk(code):
-			if isinstance(stmt, ast.Import) or isinstance(stmt, ast.ImportFrom):
-				import_modules.append(ast.unparse(stmt))
-			if isinstance(stmt, ast.FunctionDef):
-				if stmt.name == "name":
-					name_source_code = ast.unparse(stmt)
-				elif stmt.name in funcs:
-					function_source_code.append(ast.unparse(stmt))
-					funcs.remove(stmt.name)
-	if name_source_code == "":
-		print("No name function found, defaulting to my_coprocess")
-		name_source_code = default_name_func
-	for func in funcs:
-		print(f"No function found named {func}, skipping")
-	# create output file
-	output_file = open(dest, "w")
-	# write shebang to file
-	output_file.write(shebang)
-	# write imports to file
-	for import_module in import_modules:
-		output_file.write(f"{import_module}\n")
-	# write network code into it
-	if version == "work_queue":
-		raw_source_fnc = wq_network_code
-	elif version == "taskvine":
-		raw_source_fnc = library_network_code
-	raw_source_code = inspect.getsource(raw_source_fnc)
-	network_code = "\n".join([line[4:] for line in raw_source_code.split("\n")[1:]])
-	output_file.write(network_code)
-	# write name function code into it
-	output_file.write(f"{name_source_code}\n")
-	# iterate over every function the user requested and attempt to put it into the library code
-	for function_code in function_source_code:
-		output_file.write("@remote_execute\n")
-		output_file.write(function_code)
-		output_file.write("\n")
-	output_file.write(init_function)
-	output_file.close()
-	st = os.stat(dest)
-	os.chmod(dest, st.st_mode | stat.S_IEXEC)
+# @param imports         A formatted package list that is used for the library
+#                        Usage example:
+#                        imports = {
+#                           'numpy': [],                                  # import numpy
+#                           'pytorch': 'torch'                            # import pytorch as torch
+#                           'tensorflow': ['*']                           # from tensorflow import *
+#                           'sys': ['path', 'argv'],                      # from sys import path, argv
+#                           'os': {'environ': 'env', 'path': 'os_path'},  # from os import environ as env, path as os_path
+#                        }
+def create_library_code(path, funcs, dest, version, imports=None):
+
+    function_source_code = []
+    name_source_code = ""
+    absolute_path = os.path.abspath(path)
+    # open the source file, parse the code into an ast, and then unparse functions back into python code
+    with open(absolute_path, 'r') as source:
+        code = ast.parse(source.read(), filename=absolute_path)
+        for stmt in ast.walk(code):
+            if isinstance(stmt, ast.FunctionDef):
+                if stmt.name == "name":
+                    name_source_code = ast.unparse(stmt)
+                elif stmt.name in funcs:
+                    function_source_code.append(ast.unparse(stmt))
+                    funcs.remove(stmt.name)
+    if name_source_code == "":
+        print("No name function found, defaulting to my_coprocess")
+        name_source_code = default_name_func
+    for func in funcs:
+        print(f"No function found named {func}, skipping")
+    # create output file
+    output_file = open(dest, "w")
+    # write shebang to file
+    output_file.write(shebang)
+    # write imports to file
+    import_modules = generate_import_statements(imports=imports)
+    for import_module in import_modules:
+        output_file.write(f"{import_module}\n")
+    # write network code into it
+    if version == "work_queue":
+        raw_source_fnc = wq_network_code
+    elif version == "taskvine":
+        raw_source_fnc = library_network_code
+    raw_source_code = inspect.getsource(raw_source_fnc)
+    network_code = "\n".join([line[4:] for line in raw_source_code.split("\n")[1:]])
+    output_file.write(network_code)
+
+    # write name function code into it
+    output_file.write(f"{name_source_code}\n")
+    # iterate over every function the user requested and attempt to put it into the library code
+    for function_code in function_source_code:
+        output_file.write("@remote_execute\n")
+        output_file.write(function_code)
+        output_file.write("\n")
+    output_file.write(init_function)
+    output_file.close()
+    st = os.stat(dest)
+    os.chmod(dest, st.st_mode | stat.S_IEXEC)
 
 def sort_spec(spec):
     sorted_spec = json.load(spec)
@@ -152,7 +197,15 @@ def generate_functions_hash(functions: list) -> str:
 # The functions in the list must have source code for this code to work.
 # @param path       path to directory to create the library python file and the environment tarball.
 # @param functions  list of functions to include in the 
-def serverize_library_from_code(path, functions, name, need_pack=True):
+# @param imports    A formatted package list that is used for the library
+#                   Usage example:
+#                   imports = {
+#                       'numpy': [],  # import numpy
+#                        'tensorflow': ['*']  # from tensorflow import *
+#                        'sys': ['path', 'argv'],  # from sys import path, argv
+#                        'os': {'environ': 'env', 'path': 'os_path'},  # from os import environ as env, path as os_path
+#                    }
+def serverize_library_from_code(path, functions, name, need_pack=True, imports=None):
     tmp_library_path = f"{path}/tmp_library.py"
 
     # Write out functions into a temporary python file.
@@ -162,7 +215,7 @@ def serverize_library_from_code(path, functions, name, need_pack=True):
         temp_source_file.write(f"def name():\n\treturn '{name}'")
 
     # create the final library code from that temporary file
-    create_library_code(tmp_library_path, [fnc.__name__ for fnc in functions], path + "/library_code.py", "taskvine")
+    create_library_code(tmp_library_path, [fnc.__name__ for fnc in functions], path + "/library_code.py", "taskvine", imports=imports)
 
     # remove the temp library file
     os.remove(tmp_library_path)

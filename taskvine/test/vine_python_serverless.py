@@ -1,15 +1,26 @@
 #!/usr/bin/env python3
 
 import ndcctools.taskvine as vine
-import json
 import argparse
+import time
+import math as m
+from random import randint
+from decimal import Decimal as D
+
+
+# This function is only used to show the usage of various import statements
+def calculate_with_delay():
+    random_int = randint(1, 10)
+    sqrt_value = m.sqrt(random_int)
+    time.sleep(0.001)
+    D(sqrt_value)
+    return None
 
 def divide(dividend, divisor):
-    import math
-    return dividend/math.sqrt(divisor)
+    return dividend / m.sqrt(divisor)
 
 def double(x):
-    return x*2
+    return x * 2
 
 def main():
     parser = argparse.ArgumentParser("Test for taskvine python bindings.")
@@ -25,9 +36,16 @@ def main():
         print("Writing port {port} to file {file}".format(port=q.port, file=args.port_file))
         f.write(str(q.port))
 
-    print("Creating library from functions...")
+    print("Creating library from packages and functions...")
 
-    libtask = q.create_library_from_functions('test-library', divide, double, add_env=False)
+    # This format shows how to create package import statements in the library
+    imports = {
+        'time': [],                        # import time
+        'math': 'm',                       # import math as m
+        'random': ['randint'],             # from random import randint
+        'decimal': {'Decimal': 'D'}        # from decimal import Decimal as D
+    }
+    libtask = q.create_library_from_functions('test-library', divide, double, calculate_with_delay, add_env=False, imports=imports)
     libtask.set_cores(1)
     libtask.set_memory(1000)
     libtask.set_disk(1000)
@@ -38,11 +56,14 @@ def main():
     
     tasks = 100
 
-    for i in range(0,tasks): 
+    for _ in range(0, tasks): 
         s_task = vine.FunctionCall('test-library', 'divide', 2, 2**2)
         q.submit(s_task)
     
         s_task = vine.FunctionCall('test-library', 'double', 3)
+        q.submit(s_task)
+
+        s_task = vine.FunctionCall('test-library', 'calculate_with_delay')
         q.submit(s_task)
 
     print("Waiting for results...")
@@ -52,13 +73,15 @@ def main():
     while not q.empty():
         t = q.wait(5)
         if t:
-            x = t.output 
+            x = t.output
+            if x == None:
+                continue
             total_sum += x
             print(f"task {t.id} completed with result {x}")
 
     # Check that we got the right result.
     expected = tasks * ( divide(2, 2**2) + double(3) )
-
+    
     print(f"Total:    {total_sum}")
     print(f"Expected: {expected}")
 

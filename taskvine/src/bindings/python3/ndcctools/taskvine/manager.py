@@ -861,7 +861,16 @@ class Manager(object):
     # @param init_command    A string describing a shell command to execute before the library task is run
     # @param add_env         Whether to automatically create and/or add environment to the library
     # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
-    def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True):
+    # @param imports         A formatted package list that is used for the library
+    #                        Usage example:
+    #                        imports = {
+    #                           'numpy': [],                                  # import numpy
+    #                           'pytorch': 'torch'                            # import pytorch as torch
+    #                           'tensorflow': ['*']                           # from tensorflow import *
+    #                           'sys': ['path', 'argv'],                      # from sys import path, argv
+    #                           'os': {'environ': 'env', 'path': 'os_path'},  # from os import environ as env, path as os_path
+    #                        }
+    def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True, imports=None):
         # Delay loading of poncho until here, to avoid bringing in poncho dependencies unless needed.
         # Ensure poncho python library is available.
         try:
@@ -896,7 +905,7 @@ class Manager(object):
                 need_pack=False
             
             # create library code and environment, if appropriate
-            package_serverize.serverize_library_from_code(library_cache_path, function_list, name, need_pack=need_pack)
+            package_serverize.serverize_library_from_code(library_cache_path, function_list, name, need_pack=need_pack, imports=imports)
 
             # enable correct permissions for library code
             os.chmod(library_code_path, 0o775)
