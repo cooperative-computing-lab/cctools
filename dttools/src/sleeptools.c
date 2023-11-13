@@ -6,16 +6,16 @@ See the file COPYING for details.
 */
 
 #include "sleeptools.h"
-#include <unistd.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 void sleep_until(time_t stoptime)
 {
 	struct timeval tv;
 
-	while(1) {
+	while (1) {
 		time_t current = time(0);
-		if(current >= stoptime)
+		if (current >= stoptime)
 			break;
 		tv.tv_sec = stoptime - current;
 		tv.tv_usec = 0;
@@ -23,9 +23,6 @@ void sleep_until(time_t stoptime)
 	}
 }
 
-void sleep_for(time_t interval)
-{
-	sleep_until(time(0) + interval);
-}
+void sleep_for(time_t interval) { sleep_until(time(0) + interval); }
 
 /* vim: set noexpandtab tabstop=8: */

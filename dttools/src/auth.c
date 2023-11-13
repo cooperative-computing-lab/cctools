@@ -8,15 +8,15 @@ See the file COPYING for details.
 #include "auth.h"
 #include "catch.h"
 #include "debug.h"
-#include "stringtools.h"
 #include "domain_name_cache.h"
+#include "stringtools.h"
 #include "xxmalloc.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
 #include <ctype.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 struct auth_ops {
 	char *type;
@@ -35,8 +35,8 @@ static struct auth_ops *type_lookup(char *type)
 {
 	struct auth_ops *a;
 
-	for(a = state.ops; a; a = a->next) {
-		if(!strcmp(a->type, type))
+	for (a = state.ops; a; a = a->next) {
+		if (!strcmp(a->type, type))
 			return a;
 	}
 
@@ -51,13 +51,12 @@ newlines, and other crazy stuff like that.
 
 static void auth_sanitize(char *s)
 {
-	while(*s) {
-		if(isspace((int) (*s)) || !isprint((int) (*s))) {
+	while (*s) {
+		if (isspace((int)(*s)) || !isprint((int)(*s))) {
 			*s = '_';
 		}
 		s++;
 	}
-
 }
 
 int auth_assert(struct link *link, char **type, char **subject, time_t stoptime)
@@ -65,7 +64,7 @@ int auth_assert(struct link *link, char **type, char **subject, time_t stoptime)
 	int rc;
 	struct auth_ops *a;
 
-	for(a = state.ops; a; a = a->next) {
+	for (a = state.ops; a; a = a->next) {
 		char line[AUTH_LINE_MAX];
 
 		debug(D_AUTH, "requesting '%s' authentication", a->type);
@@ -74,13 +73,13 @@ int auth_assert(struct link *link, char **type, char **subject, time_t stoptime)
 
 		CATCHUNIX(link_readline(link, line, AUTH_LINE_MAX, stoptime) ? 0 : -1);
 
-		if(strcmp(line, "yes") == 0) {
+		if (strcmp(line, "yes") == 0) {
 			debug(D_AUTH, "server agrees to try '%s'", a->type);
-			if(a->assert(link, stoptime) == 0) {
+			if (a->assert(link, stoptime) == 0) {
 				debug(D_AUTH, "successfully authenticated");
 
 				CATCHUNIX(link_readline(link, line, AUTH_LINE_MAX, stoptime) ? 0 : -1);
-				if(!strcmp(line, "yes")) {
+				if (!strcmp(line, "yes")) {
 					debug(D_AUTH, "reading back auth info from server");
 					CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
 					*type = xxstrdup(line);
@@ -122,13 +121,13 @@ int auth_accept(struct link *link, char **typeout, char **subject, time_t stopti
 
 	link_address_remote(link, addr, &port);
 
-	while(link_readline(link, type, AUTH_TYPE_MAX, stoptime)) {
+	while (link_readline(link, type, AUTH_TYPE_MAX, stoptime)) {
 		string_chomp(type);
 
 		debug(D_AUTH, "%s:%d requests '%s' authentication", addr, port, type);
 
 		a = type_lookup(type);
-		if(a) {
+		if (a) {
 			debug(D_AUTH, "I agree to try '%s' ", type);
 			if (link_putliteral(link, "yes\n", stoptime) <= 0)
 				return 0;
@@ -139,7 +138,7 @@ int auth_accept(struct link *link, char **typeout, char **subject, time_t stopti
 			continue;
 		}
 
-		if(a->accept(link, subject, stoptime)) {
+		if (a->accept(link, subject, stoptime)) {
 			auth_sanitize(*subject);
 			debug(D_AUTH, "'%s' authentication succeeded", type);
 			debug(D_AUTH, "%s:%d is %s:%s\n", addr, port, type, *subject);
@@ -158,7 +157,6 @@ int auth_accept(struct link *link, char **typeout, char **subject, time_t stopti
 	return 0;
 }
 
-
 int auth_barrier(struct link *link, const char *response, time_t stoptime)
 {
 	int rc;
@@ -167,7 +165,7 @@ int auth_barrier(struct link *link, const char *response, time_t stoptime)
 	CATCHUNIX(link_putstring(link, response, stoptime));
 	CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
 
-	if(strcmp(line, "yes") != 0) {
+	if (strcmp(line, "yes") != 0) {
 		THROW_QUIET(EACCES);
 	}
 
@@ -179,8 +177,8 @@ out:
 
 int auth_register(char *type, auth_assert_t assert, auth_accept_t accept)
 {
-	struct auth_ops *a = (struct auth_ops *) malloc(sizeof(struct auth_ops));
-	if(!a)
+	struct auth_ops *a = (struct auth_ops *)malloc(sizeof(struct auth_ops));
+	if (!a)
 		return 0;
 
 	a->type = type;
@@ -188,12 +186,12 @@ int auth_register(char *type, auth_assert_t assert, auth_accept_t accept)
 	a->accept = accept;
 	a->next = 0;
 
-	if(!state.ops) {
+	if (!state.ops) {
 		state.ops = a;
 	} else {
 		/* inserts go at the tail of the list */
 		struct auth_ops *l = state.ops;
-		while(l->next) {
+		while (l->next) {
 			l = l->next;
 		}
 		l->next = a;
@@ -204,14 +202,14 @@ int auth_register(char *type, auth_assert_t assert, auth_accept_t accept)
 
 void auth_clear()
 {
-	while(state.ops) {
+	while (state.ops) {
 		struct auth_ops *n = state.ops->next;
 		free(state.ops);
 		state.ops = n;
 	}
 }
 
-struct auth_state *auth_clone (void)
+struct auth_state *auth_clone(void)
 {
 	struct auth_state *clone = xxmalloc(sizeof(struct auth_state));
 	struct auth_ops **opsp;
@@ -224,13 +222,13 @@ struct auth_state *auth_clone (void)
 	return clone;
 }
 
-void auth_replace (struct auth_state *new)
+void auth_replace(struct auth_state *new)
 {
 	auth_clear();
 	state = *new;
 }
 
-void auth_free (struct auth_state *as)
+void auth_free(struct auth_state *as)
 {
 	while (as->ops) {
 		struct auth_ops *n = as->ops->next;

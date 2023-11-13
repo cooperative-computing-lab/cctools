@@ -5,12 +5,12 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include <signal.h>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <sys/types.h>
-#include <string.h>
 #include <errno.h>
+#include <signal.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include "full_io.h"
 #include "get_canonical_path.h"
@@ -40,35 +40,35 @@ int get_canonical_path(const char *path, char *canonical, int length)
 
 	signal(SIGPIPE, SIG_IGN);
 
-	if(pipe(fds) != 0)
+	if (pipe(fds) != 0)
 		return 0;
 
 	pid = fork();
-	if(pid == 0) {
+	if (pid == 0) {
 		close(fds[0]);
 		result = chdir(path);
-		if(result != 0)
+		if (result != 0)
 			_exit(errno);
 
-		if(getcwd(canonical, length)) {
+		if (getcwd(canonical, length)) {
 			full_write(fds[1], canonical, strlen(canonical));
 			_exit(0);
 		} else {
 			_exit(errno);
 		}
-	} else if(pid > 0) {
+	} else if (pid > 0) {
 		int status;
 		int value;
 		pid_t gotpid;
 
 		close(fds[1]);
 
-		while(1) {
+		while (1) {
 			gotpid = waitpid(pid, &status, 0);
-			if(gotpid >= 0) {
+			if (gotpid >= 0) {
 				break;
 			} else {
-				if(errno == EINTR) {
+				if (errno == EINTR) {
 					continue;
 				} else {
 					break;
@@ -76,11 +76,11 @@ int get_canonical_path(const char *path, char *canonical, int length)
 			}
 		}
 
-		if(gotpid == pid && WIFEXITED(status)) {
+		if (gotpid == pid && WIFEXITED(status)) {
 			value = WEXITSTATUS(status);
-			if(value == 0) {
+			if (value == 0) {
 				actual = full_read(fds[0], canonical, length);
-				if(actual > 0) {
+				if (actual > 0) {
 					canonical[actual] = 0;
 					result = actual;
 				} else {
@@ -103,7 +103,7 @@ int get_canonical_path(const char *path, char *canonical, int length)
 		result = -1;
 	}
 
-	if(save_errno)
+	if (save_errno)
 		errno = save_errno;
 	return result;
 }

@@ -1644,12 +1644,13 @@ as in the following example:
 
 === "Python"
     ```python
-    t.set_cores(1)                     # task needs one core
-    t.set_memory(1024)                 # task needs 1024 MB of memory
-    t.set_disk(4096)                   # task needs 4096 MB of disk space
-    t.set_gpus(0)                      # task does not need a gpu
-    t.set_time_max(100)        # task is allowed to run in 100 seconds
-    t.set_time_min(10)         # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
+    t.set_cores(1)           # task needs one core
+    t.set_memory(1024)       # task needs 1024 MB of memory
+    t.set_disk(4096)         # task needs 4096 MB of disk space
+    t.set_gpus(0)            # task does not need a gpu
+    t.set_time_max(100)      # task is allowed to run in 100 seconds
+    t.set_time_min(10)       # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
+    t.add_feature("NVIDIA RTX A2000")  # task requires this specific GPU type
 
     # these can be set when the task is declared as well:
      t = vine.Task(
@@ -1665,12 +1666,13 @@ as in the following example:
 
 === "C"
     ```C
-    vine_task_set_cores(t,1)                 # task needs one core
-    vine_task_set_memory(t,1024)             # task needs 1024 MB of memory
-    vine_task_set_disk(t,4096)               # task needs 4096 MB of disk space
-    vine_task_set_gpus(t,0)                  # task does not need a gpu
+    vine_task_set_cores(t,1)             # task needs one core
+    vine_task_set_memory(t,1024)         # task needs 1024 MB of memory
+    vine_task_set_disk(t,4096)           # task needs 4096 MB of disk space
+    vine_task_set_gpus(t,0)              # task does not need a gpu
     vine_task_set_run_time_max(t,100)    # task is allowed to run in 100 seconds
     vine_task_set_run_time_min(t,10)     # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
+    vine_task_add_feature(t,"NVIDIA RTX A2000")  # task requires this specific GPU type
     ```
 
 When the maximum running time is specified, TaskVine will kill any task that
@@ -1830,7 +1832,44 @@ set in the configuration file as follows:
 }
 ```
 
-Both memory and disk are set in `MB`.
+### GPU Types and Custom Features
+
+It is sometimes necessary to match a task to a worker that has a specific capability.
+Perhaps your pool of workers has two different kinds of GPUs.
+The type of a GPU is automatically reported as a "feature" that tasks can select.
+
+To describe a task that can only run on a specific GPU type, use `add_feature`:
+
+=== "Python"
+    ```python
+    t.add_feature("NVIDIA RTX A2000") # task requires worker with this feature
+    ```
+
+=== "C"
+    ```C
+    vine_task_add_feature(t,"NVIDIA RTX A2000") # task requires worker with this feature
+    ```
+
+(Note that the GPU feature is automatically reported by the worker
+when it starts up.)
+
+```
+vine_worker: using 4 cores, 15610 MB memory, 33859 MB disk, 1 gpus
+vine_worker: gpu is called feature "NVIDIA RTX A2000"
+```
+
+You may also add additional custom features to a worker at startup time
+using the `--feature` option:
+
+```
+vine_worker ... --feature alpha --feature beta ...
+```
+
+Or, use the factory to start a large number of workers with that feature:
+
+```
+vine_factory ... --feature alpha --feature beta ...
+```
 
 ### Monitoring and Enforcement
 

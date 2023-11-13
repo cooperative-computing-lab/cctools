@@ -9,113 +9,113 @@ struct sigdef {
 };
 
 static const struct sigdef sigdefs[] = {
-	/* ANSI C signals */
+/* ANSI C signals */
 #ifdef SIGABRT
-	{"SIGABRT", SIGABRT},
+		{"SIGABRT", SIGABRT},
 #endif
 #ifdef SIGFPE
-	{"SIGFPE", SIGFPE},
+		{"SIGFPE", SIGFPE},
 #endif
 #ifdef SIGILL
-	{"SIGILL", SIGILL},
+		{"SIGILL", SIGILL},
 #endif
 #ifdef SIGINT
-	{"SIGINT", SIGINT},
+		{"SIGINT", SIGINT},
 #endif
 #ifdef SIGSEGV
-	{"SIGSEGV", SIGSEGV},
+		{"SIGSEGV", SIGSEGV},
 #endif
 #ifdef SIGTERM
-	{"SIGTERM", SIGTERM},
+		{"SIGTERM", SIGTERM},
 #endif
-	/* posix signals */
+/* posix signals */
 #ifdef SIGHUP
-	{"SIGHUP", SIGHUP},
+		{"SIGHUP", SIGHUP},
 #endif
 #ifdef SIGQUIT
-	{"SIGQUIT", SIGQUIT},
+		{"SIGQUIT", SIGQUIT},
 #endif
 #ifdef SIGTRAP
-	{"SIGTRAP", SIGTRAP},
+		{"SIGTRAP", SIGTRAP},
 #endif
 #ifdef SIGKILL
-	{"SIGKILL", SIGKILL},
+		{"SIGKILL", SIGKILL},
 #endif
 #ifdef SIGUSR1
-	{"SIGUSR1", SIGUSR1},
+		{"SIGUSR1", SIGUSR1},
 #endif
 #ifdef SIGUSR2
-	{"SIGUSR2", SIGUSR2},
+		{"SIGUSR2", SIGUSR2},
 #endif
 #ifdef SIGPIPE
-	{"SIGPIPE", SIGPIPE},
+		{"SIGPIPE", SIGPIPE},
 #endif
 #ifdef SIGALRM
-	{"SIGALRM", SIGALRM},
+		{"SIGALRM", SIGALRM},
 #endif
 #ifdef SIGCHLD
-	{"SIGCHLD", SIGCHLD},
+		{"SIGCHLD", SIGCHLD},
 #endif
 #ifdef SIGCONT
-	{"SIGCONT", SIGCONT},
+		{"SIGCONT", SIGCONT},
 #endif
 #ifdef SIGSTOP
-	{"SIGSTOP", SIGSTOP},
+		{"SIGSTOP", SIGSTOP},
 #endif
 #ifdef SIGTSTP
-	{"SIGTSTP", SIGTSTP},
+		{"SIGTSTP", SIGTSTP},
 #endif
 #ifdef SIGTTIN
-	{"SIGTTIN", SIGTTIN},
+		{"SIGTTIN", SIGTTIN},
 #endif
 #ifdef SIGTTOU
-	{"SIGTTOU", SIGTTOU},
+		{"SIGTTOU", SIGTTOU},
 #endif
-	/* some BSD signals */
+/* some BSD signals */
 #ifdef SIGIOT
-	{"SIGIOT", SIGIOT},
+		{"SIGIOT", SIGIOT},
 #endif
 #ifdef SIGBUS
-	{"SIGBUS", SIGBUS},
+		{"SIGBUS", SIGBUS},
 #endif
 #ifdef SIGCLD
-	{"SIGCLD", SIGCLD},
+		{"SIGCLD", SIGCLD},
 #endif
 #ifdef SIGURG
-	{"SIGURG", SIGURG},
+		{"SIGURG", SIGURG},
 #endif
 #ifdef SIGXCPU
-	{"SIGXCPU", SIGXCPU},
+		{"SIGXCPU", SIGXCPU},
 #endif
 #ifdef SIGXFSZ
-	{"SIGXFSZ", SIGXFSZ},
+		{"SIGXFSZ", SIGXFSZ},
 #endif
 #ifdef SIGVTALRM
-	{"SIGVTALRM", SIGVTALRM},
+		{"SIGVTALRM", SIGVTALRM},
 #endif
 #ifdef SIGPROF
-	{"SIGPROF", SIGPROF},
+		{"SIGPROF", SIGPROF},
 #endif
 #ifdef SIGWINCH
-	{"SIGWINCH", SIGWINCH},
+		{"SIGWINCH", SIGWINCH},
 #endif
 #ifdef SIGPOLL
-	{"SIGPOLL", SIGPOLL},
+		{"SIGPOLL", SIGPOLL},
 #endif
 #ifdef SIGIO
-	{"SIGIO", SIGIO},
+		{"SIGIO", SIGIO},
 #endif
-	/* add odd signals */
+/* add odd signals */
 #ifdef SIGSTKFLT
-	{"SIGSTKFLT", SIGSTKFLT}, /* stack fault */
+		{"SIGSTKFLT", SIGSTKFLT}, /* stack fault */
 #endif
 #ifdef SIGSYS
-	{"SIGSYS", SIGSYS},
+		{"SIGSYS", SIGSYS},
 #endif
-	{"", 0} /* sentinel */
+		{"", 0} /* sentinel */
 };
 
-const char *sigdefstr (int s)
+const char *sigdefstr(int s)
 {
 	int i;
 	for (i = 0; sigdefs[i].signal; i++) {
@@ -126,7 +126,7 @@ const char *sigdefstr (int s)
 	return "(Unknown)";
 }
 
-int sigdefint (const char *def)
+int sigdefint(const char *def)
 {
 	int i;
 	for (i = 0; sigdefs[i].signal; i++) {

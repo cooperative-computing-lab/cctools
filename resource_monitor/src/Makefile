@@ -1,5 +1,15 @@
 UNAME := $(shell uname)
 
+SOURCES = \
+    rminimonitor_helper.c \
+    rmonitor_helper_comm.c \
+    rmonitor_helper.c \
+    rmonitor_snapshot.c \
+    rmonitor_file_watch.c \
+    rmonitor_poll_example.c \
+    piggybacker.c \
+    resource_monitor.c
+
 include ../../config.mk
 include ../../rules.mk
 
@@ -41,6 +51,19 @@ rmonitor_poll_example: rmonitor_poll_example.o
 bindings:
 	$(MAKE) -C bindings
 
+lint:
+	if ( ! clang-format -Werror --dry-run --style='file:../../.clang-format' $(SOURCES));\
+		then\
+		echo "========================================================";\
+		echo "NOTICE: Run 'make format' to format your latest changes.";\
+		echo "========================================================";\
+		exit 1;\
+	fi
+	$(MAKE) -C bindings lint
+
+format:
+	clang-format -i $(SOURCES)
+
 clean:
 	rm -f $(OBJECTS) $(TARGETS) $(PROGRAMS) resource_monitor_pb.* rmonitor_piggyback.h* *.o
 	$(MAKE) -C bindings clean
@@ -58,4 +81,4 @@ endif
 
 test: all
 
-.PHONY: all clean install test bindings
+.PHONY: all clean install test lint format bindings

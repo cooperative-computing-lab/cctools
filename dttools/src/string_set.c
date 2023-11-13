@@ -34,20 +34,20 @@ struct string_set *string_set_create(int bucket_count, hash_func_t func)
 {
 	struct string_set *s;
 
-	s = (struct string_set *) malloc(sizeof(struct string_set));
-	if(!s)
+	s = (struct string_set *)malloc(sizeof(struct string_set));
+	if (!s)
 		return 0;
 
-	if(bucket_count == 0)
+	if (bucket_count == 0)
 		bucket_count = DEFAULT_SIZE;
 
-	if(!func)
+	if (!func)
 		func = DEFAULT_FUNC;
 
 	s->hash_func = func;
 	s->bucket_count = bucket_count;
-	s->buckets = (struct entry **) calloc(bucket_count, sizeof(struct entry *));
-	if(!s->buckets) {
+	s->buckets = (struct entry **)calloc(bucket_count, sizeof(struct entry *));
+	if (!s->buckets) {
 		free(s);
 		return 0;
 	}
@@ -64,11 +64,10 @@ struct string_set *string_set_duplicate(struct string_set *s)
 	s2 = string_set_create(0, s->hash_func);
 	string_set_first_element(s);
 	char *element;
-	while(string_set_next_element(s, &element))
+	while (string_set_next_element(s, &element))
 		string_set_insert(s2, element);
 
 	return s2;
-
 }
 
 struct string_set *string_set_union(struct string_set *s1, struct string_set *s2)
@@ -78,11 +77,10 @@ struct string_set *string_set_union(struct string_set *s1, struct string_set *s2
 
 	string_set_first_element(s2);
 	char *element;
-	while(string_set_next_element(s2, &element))
+	while (string_set_next_element(s2, &element))
 		string_set_insert(s, element);
 
 	return s;
-
 }
 
 void string_set_clear(struct string_set *s)
@@ -90,9 +88,9 @@ void string_set_clear(struct string_set *s)
 	struct entry *e, *f;
 	int i;
 
-	for(i = 0; i < s->bucket_count; i++) {
+	for (i = 0; i < s->bucket_count; i++) {
 		e = s->buckets[i];
-		while(e) {
+		while (e) {
 			f = e->next;
 			free(e->element);
 			free(e);
@@ -100,7 +98,7 @@ void string_set_clear(struct string_set *s)
 		}
 	}
 
-	for(i = 0; i < s->bucket_count; i++) {
+	for (i = 0; i < s->bucket_count; i++) {
 		s->buckets[i] = 0;
 	}
 }
@@ -112,10 +110,7 @@ void string_set_delete(struct string_set *s)
 	free(s);
 }
 
-int string_set_size(struct string_set *s)
-{
-	return s->size;
-}
+int string_set_size(struct string_set *s) { return s->size; }
 
 int string_set_lookup(struct string_set *s, const char *element)
 {
@@ -126,8 +121,8 @@ int string_set_lookup(struct string_set *s, const char *element)
 	index = hash % s->bucket_count;
 	e = s->buckets[index];
 
-	while(e) {
-		if(hash == e->hash && !strcmp(element, e->element)) {
+	while (e) {
+		if (hash == e->hash && !strcmp(element, e->element)) {
 			return 1;
 		}
 		e = e->next;
@@ -140,15 +135,14 @@ static int string_set_double_buckets(struct string_set *s)
 {
 	struct string_set *sn = string_set_create(2 * s->bucket_count, s->hash_func);
 
-	if(!sn)
+	if (!sn)
 		return 0;
 
 	/* Move elements to new string_set */
 	char *element;
 	string_set_first_element(s);
-	while(string_set_next_element(s, &element) )
-		if(!string_set_insert(sn, element))
-		{
+	while (string_set_next_element(s, &element))
+		if (!string_set_insert(sn, element)) {
 			string_set_delete(sn);
 			return 0;
 		}
@@ -156,9 +150,9 @@ static int string_set_double_buckets(struct string_set *s)
 	/* Delete all elements */
 	struct entry *e, *f;
 	int i;
-	for(i = 0; i < s->bucket_count; i++) {
+	for (i = 0; i < s->bucket_count; i++) {
 		e = s->buckets[i];
-		while(e) {
+		while (e) {
 			f = e->next;
 			free(e->element);
 			free(e);
@@ -168,9 +162,9 @@ static int string_set_double_buckets(struct string_set *s)
 
 	/* Make the old point to the new */
 	free(s->buckets);
-	s->buckets      = sn->buckets;
+	s->buckets = sn->buckets;
 	s->bucket_count = sn->bucket_count;
-	s->size         = sn->size;
+	s->size = sn->size;
 
 	/* Delete reference to new, so old is safe */
 	free(sn);
@@ -183,26 +177,26 @@ int string_set_insert(struct string_set *s, const char *element)
 	struct entry *e;
 	uint64_t hash, index;
 
-	if( ((float) s->size / s->bucket_count) > DEFAULT_LOAD )
+	if (((float)s->size / s->bucket_count) > DEFAULT_LOAD)
 		string_set_double_buckets(s);
 
 	hash = s->hash_func(element);
 	index = hash % s->bucket_count;
 	e = s->buckets[index];
 
-	while(e) {
-		if(hash == e->hash && !strcmp(element, e->element)) {
+	while (e) {
+		if (hash == e->hash && !strcmp(element, e->element)) {
 			return 1;
 		}
 		e = e->next;
 	}
 
-	e = (struct entry *) malloc(sizeof(struct entry));
-	if(!e)
+	e = (struct entry *)malloc(sizeof(struct entry));
+	if (!e)
 		return 0;
 
 	e->element = strdup(element);
-	if(!e->element) {
+	if (!e->element) {
 		free(e);
 		return 0;
 	}
@@ -220,17 +214,14 @@ int string_set_insert_string_set(struct string_set *s, struct string_set *s2)
 	string_set_first_element(s2);
 	int additions = 0;
 	char *element;
-	while(string_set_next_element(s2, &element)){
+	while (string_set_next_element(s2, &element)) {
 		additions += string_set_insert(s, element);
 	}
 
 	return additions;
 }
 
-int string_set_push(struct string_set *s, const char *element)
-{
-  return string_set_insert(s, element);
-}
+int string_set_push(struct string_set *s, const char *element) { return string_set_insert(s, element); }
 
 int string_set_remove(struct string_set *s, const char *element)
 {
@@ -242,9 +233,9 @@ int string_set_remove(struct string_set *s, const char *element)
 	e = s->buckets[index];
 	f = 0;
 
-	while(e) {
-		if(hash == e->hash && !strcmp(element, e->element)) {
-			if(f) {
+	while (e) {
+		if (hash == e->hash && !strcmp(element, e->element)) {
+			if (f) {
 				f->next = e->next;
 			} else {
 				s->buckets[index] = e->next;
@@ -264,24 +255,24 @@ int string_set_remove(struct string_set *s, const char *element)
 void string_set_first_element(struct string_set *s)
 {
 	s->ientry = 0;
-	for(s->ibucket = 0; s->ibucket < s->bucket_count; s->ibucket++) {
+	for (s->ibucket = 0; s->ibucket < s->bucket_count; s->ibucket++) {
 		s->ientry = s->buckets[s->ibucket];
-		if(s->ientry)
+		if (s->ientry)
 			break;
 	}
 }
 
 int string_set_next_element(struct string_set *s, char **element)
 {
-	if(s->ientry) {
-		*element = (char *) s->ientry->element;
+	if (s->ientry) {
+		*element = (char *)s->ientry->element;
 
 		s->ientry = s->ientry->next;
-		if(!s->ientry) {
+		if (!s->ientry) {
 			s->ibucket++;
-			for(; s->ibucket < s->bucket_count; s->ibucket++) {
+			for (; s->ibucket < s->bucket_count; s->ibucket++) {
 				s->ientry = s->buckets[s->ibucket];
-				if(s->ientry)
+				if (s->ientry)
 					break;
 			}
 		}

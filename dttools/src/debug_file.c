@@ -7,11 +7,11 @@ See the file COPYING for details.
 #include "catch.h"
 #include "debug.h"
 #include "full_io.h"
-#include "stringtools.h"
 #include "path.h"
+#include "stringtools.h"
 
-#include <unistd.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #include <sys/stat.h>
 
@@ -29,17 +29,19 @@ static off_t file_size_max = 0;
 
 /* define custom debug for catch */
 #undef debug
-#define debug(l,fmt,...) fprintf(stderr, "%s: " fmt "\n", #l, __VA_ARGS__);
+#define debug(l, fmt, ...) fprintf(stderr, "%s: " fmt "\n", #l, __VA_ARGS__);
 
-int debug_file_reopen (void)
+int debug_file_reopen(void)
 {
 	int rc;
 	if (strlen(file_path)) {
 		int flags;
-		if(file_fd > 2) {
+		if (file_fd > 2) {
 			close(file_fd);
 		}
-		CATCHUNIX(file_fd = open(file_path, O_CREAT|O_APPEND|O_WRONLY|O_NOCTTY, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP));
+		CATCHUNIX(file_fd = open(file_path,
+					  O_CREAT | O_APPEND | O_WRONLY | O_NOCTTY,
+					  S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP));
 		CATCHUNIX(flags = fcntl(file_fd, F_GETFD));
 		flags |= FD_CLOEXEC;
 		CATCHUNIX(fcntl(file_fd, F_SETFD, flags));
@@ -57,7 +59,7 @@ out:
 	return RCUNIX(rc);
 }
 
-void debug_file_write (INT64_T flags, const char *str)
+void debug_file_write(INT64_T flags, const char *str)
 {
 	int rc;
 
@@ -66,7 +68,7 @@ void debug_file_write (INT64_T flags, const char *str)
 	 * new logs. The stat on the filename and inode comparison catches this
 	 * after one lost debug message.
 	 */
-	if(file_fd <= -1) {
+	if (file_fd <= -1) {
 		return;
 	}
 
@@ -96,18 +98,15 @@ void debug_file_write (INT64_T flags, const char *str)
 	}
 }
 
-int debug_file_path (const char *path)
+int debug_file_path(const char *path)
 {
-	strncpy(file_path, path, sizeof(file_path)-1);
+	strncpy(file_path, path, sizeof(file_path) - 1);
 	return debug_file_reopen();
 }
 
-void debug_file_size (off_t size)
-{
-	file_size_max = size;
-}
+void debug_file_size(off_t size) { file_size_max = size; }
 
-void debug_file_rename (const char *suffix)
+void debug_file_rename(const char *suffix)
 {
 	if (strlen(file_path)) {
 		char old[PATH_MAX] = "";
@@ -118,9 +117,9 @@ void debug_file_rename (const char *suffix)
 	}
 }
 
-void debug_file_close ()
+void debug_file_close()
 {
-	if(file_fd > 2) {
+	if (file_fd > 2) {
 		close(file_fd);
 		file_fd = -1;
 	}

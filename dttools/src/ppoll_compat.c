@@ -5,21 +5,23 @@ See the file COPYING for details.
 */
 
 #include <assert.h>
-#include <signal.h>
-#include <poll.h>
-#include <time.h>
 #include <errno.h>
+#include <poll.h>
+#include <signal.h>
+#include <time.h>
 
 #include "ppoll_compat.h"
 
 static void noop(int sig) {}
 
-int ppoll_compat(struct pollfd fds[], nfds_t nfds, int stoptime) {
+int ppoll_compat(struct pollfd fds[], nfds_t nfds, int stoptime)
+{
 	assert(fds);
 	sigset_t mask;
 	sigemptyset(&mask);
 	int timeout = stoptime - time(NULL);
-	if (timeout < 0) return 0;
+	if (timeout < 0)
+		return 0;
 
 #ifdef HAS_PPOLL
 	struct timespec s;
@@ -29,7 +31,7 @@ int ppoll_compat(struct pollfd fds[], nfds_t nfds, int stoptime) {
 #else
 	sigset_t origmask;
 	sigprocmask(SIG_SETMASK, &mask, &origmask);
-	int rc = poll(fds, nfds, timeout*1000);
+	int rc = poll(fds, nfds, timeout * 1000);
 	int saved_errno = errno;
 	sigprocmask(SIG_SETMASK, &origmask, NULL);
 	errno = saved_errno;
@@ -37,7 +39,8 @@ int ppoll_compat(struct pollfd fds[], nfds_t nfds, int stoptime) {
 #endif
 }
 
-void ppoll_compat_set_up_sigchld(void) {
+void ppoll_compat_set_up_sigchld(void)
+{
 	sigset_t mask;
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGCHLD);

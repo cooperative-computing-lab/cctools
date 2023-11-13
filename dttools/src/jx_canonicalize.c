@@ -8,23 +8,25 @@ See the file COPYING for details.
 #include <stdbool.h>
 
 #include "jx.h"
-#include "jx_print.h"
 #include "jx_canonicalize.h"
+#include "jx_print.h"
 #include "list.h"
 
 static bool jx_canonicalize_buffer(struct jx *j, buffer_t *b);
 
-static int pair_compare(const void *p1, const void *p2) {
+static int pair_compare(const void *p1, const void *p2)
+{
 	assert(p1);
 	assert(p2);
-	struct jx_pair *i1 = *(struct jx_pair **) p1;
-	struct jx_pair *i2 = *(struct jx_pair **) p2;
+	struct jx_pair *i1 = *(struct jx_pair **)p1;
+	struct jx_pair *i2 = *(struct jx_pair **)p2;
 	assert(i1);
 	assert(i2);
 	return strcmp(i1->key->u.string_value, i2->key->u.string_value);
 }
 
-static bool jx_canonicalize_array(struct jx_item *i, buffer_t *b) {
+static bool jx_canonicalize_array(struct jx_item *i, buffer_t *b)
+{
 	assert(b);
 
 	buffer_putstring(b, "[");
@@ -32,7 +34,8 @@ static bool jx_canonicalize_array(struct jx_item *i, buffer_t *b) {
 	const char *sep = "";
 	for (; i; i = i->next) {
 		buffer_putstring(b, sep);
-		if (!jx_canonicalize_buffer(i->value, b)) return false;
+		if (!jx_canonicalize_buffer(i->value, b))
+			return false;
 		sep = ",";
 	}
 
@@ -40,7 +43,8 @@ static bool jx_canonicalize_array(struct jx_item *i, buffer_t *b) {
 	return true;
 }
 
-static bool jx_canonicalize_object(struct jx_pair *p, buffer_t *b) {
+static bool jx_canonicalize_object(struct jx_pair *p, buffer_t *b)
+{
 	assert(b);
 
 	bool rc = false;
@@ -50,21 +54,24 @@ static bool jx_canonicalize_object(struct jx_pair *p, buffer_t *b) {
 	buffer_putstring(b, "{");
 
 	for (; p; p = p->next) {
-		if (!jx_istype(p->key, JX_STRING)) goto OUT;
+		if (!jx_istype(p->key, JX_STRING))
+			goto OUT;
 		list_push_tail(pairs, p);
 	}
 	list_sort(pairs, pair_compare);
-	
+
 	struct jx_pair *cur;
 	struct jx_pair *prev = NULL;
 	const char *sep = "";
-	for (list_seek(csr, 0); list_get(csr, (void **) &cur); list_next(csr)) {
+	for (list_seek(csr, 0); list_get(csr, (void **)&cur); list_next(csr)) {
 		assert(cur);
-		if (prev && !pair_compare(&cur, &prev)) goto OUT;
+		if (prev && !pair_compare(&cur, &prev))
+			goto OUT;
 		buffer_putstring(b, sep);
 		jx_canonicalize_buffer(cur->key, b); // known to be a string
 		buffer_putstring(b, ":");
-		if (!jx_canonicalize_buffer(cur->value, b)) goto OUT;
+		if (!jx_canonicalize_buffer(cur->value, b))
+			goto OUT;
 		prev = cur;
 		sep = ",";
 	}
@@ -78,7 +85,8 @@ OUT:
 	return rc;
 }
 
-static bool jx_canonicalize_buffer(struct jx *j, buffer_t *b) {
+static bool jx_canonicalize_buffer(struct jx *j, buffer_t *b)
+{
 	assert(j);
 	assert(b);
 
@@ -90,7 +98,7 @@ static bool jx_canonicalize_buffer(struct jx *j, buffer_t *b) {
 		jx_print_buffer(j, b);
 		return true;
 	case JX_DOUBLE:
-		buffer_printf(b,"%e",j->u.double_value);
+		buffer_printf(b, "%e", j->u.double_value);
 		return true;
 	case JX_ARRAY:
 		return jx_canonicalize_array(j->u.items, b);
@@ -101,13 +109,15 @@ static bool jx_canonicalize_buffer(struct jx *j, buffer_t *b) {
 	}
 }
 
-char *jx_canonicalize(struct jx *j) {
+char *jx_canonicalize(struct jx *j)
+{
 	assert(j);
 
 	char *out = NULL;
 	buffer_t buffer;
 	buffer_init(&buffer);
-	if (!jx_canonicalize_buffer(j, &buffer)) goto OUT;
+	if (!jx_canonicalize_buffer(j, &buffer))
+		goto OUT;
 	buffer_dup(&buffer, &out);
 OUT:
 	buffer_free(&buffer);
