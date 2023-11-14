@@ -131,25 +131,15 @@ jobs:
         shell: bash
         run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - name: Conda-Setup
-        run: | 
-                source ~/.zshrc
-                ${GITHUB_WORKSPACE}/packaging/mac-os/setup.sh
+        run: ${GITHUB_WORKSPACE}/packaging/mac-os/setup.sh
       - name: Configure
-        run: |
-                source ~/.zshrc
-                ${GITHUB_WORKSPACE}/packaging/mac-os/configure.sh
+        run: ${GITHUB_WORKSPACE}/packaging/mac-os/configure.sh
       - name: Build
-        run: |
-                source ~/.zshrc
-                ${GITHUB_WORKSPACE}/packaging/mac-os/build.sh
+        run: ${GITHUB_WORKSPACE}/packaging/mac-os/build.sh
       - name: Install
-        run: |
-                source ~/.zshrc
-                ${GITHUB_WORKSPACE}/packaging/mac-os/install.sh
+        run: ${GITHUB_WORKSPACE}/packaging/mac-os/install.sh
       - name: Test
-        run: |
-                source ~/.zshrc
-                ${GITHUB_WORKSPACE}/packaging/mac-os/test.sh
+        run: ${GITHUB_WORKSPACE}/packaging/mac-os/test.sh
       - name: deploy
         uses: ncipollo/release-action@v1
         if: github.event_name == 'workflow_dispatch'
