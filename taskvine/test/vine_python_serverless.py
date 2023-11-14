@@ -7,6 +7,7 @@
 import ndcctools.taskvine as vine
 import argparse
 import math
+import json
 import math as m
 
 # The library will consist of the following three functions:
