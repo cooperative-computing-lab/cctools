@@ -10,7 +10,6 @@ from ndcctools.poncho import package_create as create
 from ndcctools.poncho.wq_network_code import wq_network_code
 from ndcctools.poncho.library_network_code import library_network_code
 
-import argparse
 import json
 import os
 import stat
@@ -33,58 +32,53 @@ init_function = \
 '''
 
  
-# Generates a list of import statements from a dictionary of modules and their elements or aliases.
-# @param imports         A formatted package list that is used for the library
-#                        Usage example:
-#                        imports = {
-#                           'numpy': '',                                  # import numpy
-#                           'pytorch': 'torch'                            # import pytorch as torch
-#                           'tensorflow': {'*': ''}                       # from tensorflow import *
-#                           'sys': {'path': '', 'argv': ''},              # from sys import path, argv
-#                           'os': {'environ': 'env', 'path': 'os_path'},  # from os import environ as env, path as os_path
-#                        }
-def generate_import_statements(imports):
+# Generates a list of import statements based on the given argument.
+# @param import_modules    A list of modules that will be translated to import statements
+#                          Usage example:
+#                          import_modules = ["sys", "os.path", ("numpy", "np")]
+#                          This will be translated to: import sys / import os.path / import numpy as np
+def generate_import_statements(import_modules):
+    if import_modules == None:
+        return
+    
     import_statements = []
 
-    for module, import_items in imports.items():
-        # Handle importing entire module or module with alias
-        if isinstance(import_items, str):
-            if import_items:
-                import_statements.append(f"import {module} as {import_items}")
-            else:
-                import_statements.append(f"import {module}")
-        # Handle from-imports with potential aliases
-        elif isinstance(import_items, dict):
-            # Handle importing specific attributes with or without aliases
-            parts = []
-            for attr, alias in import_items.items():
-                if alias:
-                    parts.append(f"{attr} as {alias}")
-                else:
-                    parts.append(attr)
-            import_statements.append(f"from {module} import {', '.join(parts)}")
+    if not isinstance(import_modules, list):
+        raise ValueError("Expected 'imports' to be a list.")
+    
+    for module in import_modules:
+        if isinstance(module, str):
+            import_statements.append(f"import {module}")
+        elif isinstance(module, tuple) and len(module) == 2:
+            module_name, alias = module
+            import_statements.append(f"import {module_name} as {alias}")
         else:
-            raise ValueError(f"Invalid import value: {import_items}. Only strings and dicts are allowed.")
-
+            raise ValueError("Invalid format in imports list.")
+    
     return import_statements
 
 
 # Create the library driver code that will be run as a normal task
 # on workers and execute function invocations upon workers' instructions.
-# @param path       Path to the temporary Python script containing functions.
-# @param funcs      A list of relevant function names.
-# @param dest       Path to the final library script.
-# @param version    Whether this is for workqueue or taskvine serverless code.
-# @param imports         A formatted package list that is used for the library
+# @param path            Path to the temporary Python script containing functions.
+# @param funcs           A list of relevant function names.
+# @param dest            Path to the final library script.
+# @param version         Whether this is for workqueue or taskvine serverless code.
+# @param import_modules  A list of modules that will be translated to import statements
 #                        Usage example:
-#                        imports = {
-#                            'numpy': '',                                   # import numpy
-#                            'pytorch': 'torch',                            # import pytorch as torch
-#                            'tensorflow': {'*': ''},                       # from tensorflow import *
-#                            'sys': {'path': '', 'argv': ''},               # from sys import path, argv
-#                            'os': {'environ': 'env', 'path': ''},          # from os import environ as env, path
-#                        }
-def create_library_code(path, funcs, dest, version, imports=None):
+#                        imports = ["sys", "os.path", ("numpy", "np")]
+#                        This will be translated to: import sys / import os.path / import numpy as np
+def create_library_code(path, funcs, dest, version, import_modules=None):
+
+    # create output file
+    output_file = open(dest, "w")
+    # write shebang to file
+    output_file.write(shebang)
+    # write imports to file
+    import_statements = generate_import_statements(import_modules)
+    if import_statements:
+        for import_statement in import_statements:
+            output_file.write(f"{import_statement}\n")
 
     function_source_code = []
     name_source_code = ""
@@ -104,14 +98,7 @@ def create_library_code(path, funcs, dest, version, imports=None):
         name_source_code = default_name_func
     for func in funcs:
         print(f"No function found named {func}, skipping")
-    # create output file
-    output_file = open(dest, "w")
-    # write shebang to file
-    output_file.write(shebang)
-    # write imports to file
-    import_modules = generate_import_statements(imports=imports)
-    for import_module in import_modules:
-        output_file.write(f"{import_module}\n")
+
     # write network code into it
     if version == "work_queue":
         raw_source_fnc = wq_network_code
@@ -196,18 +183,13 @@ def generate_functions_hash(functions: list) -> str:
 
 # Create a library file and a poncho environment tarball from a list of functions as needed.
 # The functions in the list must have source code for this code to work.
-# @param path       path to directory to create the library python file and the environment tarball.
-# @param functions  list of functions to include in the 
-# @param imports    A formatted package list that is used for the library
-#                   Usage example:
-#                   imports = {
-#                       'numpy': '',                                   # import numpy
-#                       'pytorch': 'torch',                            # import pytorch as torch
-#                       'tensorflow': {'*': ''},                       # from tensorflow import *
-#                       'sys': {'path': '', 'argv': ''},               # from sys import path, argv
-#                       'os': {'environ': 'env', 'path': ''},          # from os import environ as env, path
-#                   }
-def serverize_library_from_code(path, functions, name, need_pack=True, imports=None):
+# @param path             path to directory to create the library python file and the environment tarball.
+# @param functions        list of functions to include in the 
+# @param import_modules   A list of modules that will be translated to import statements
+#                         Usage example:
+#                         import_modules = ["sys", "os.path", ("numpy", "np")]
+#                         This will be translated to: import sys / import os.path / import numpy as np
+def serverize_library_from_code(path, functions, name, need_pack=True, import_modules=None):
     tmp_library_path = f"{path}/tmp_library.py"
 
     # Write out functions into a temporary python file.
@@ -217,7 +199,7 @@ def serverize_library_from_code(path, functions, name, need_pack=True, imports=N
         temp_source_file.write(f"def name():\n\treturn '{name}'")
 
     # create the final library code from that temporary file
-    create_library_code(tmp_library_path, [fnc.__name__ for fnc in functions], path + "/library_code.py", "taskvine", imports=imports)
+    create_library_code(tmp_library_path, [fnc.__name__ for fnc in functions], path + "/library_code.py", "taskvine", import_modules=import_modules)
 
     # remove the temp library file
     os.remove(tmp_library_path)

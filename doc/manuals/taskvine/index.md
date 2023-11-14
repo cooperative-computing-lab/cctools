@@ -1531,9 +1531,7 @@ To mitigate this, pass the `imports` argument to the `create_library_from_functi
 
 === Python 
     ```python 
-    imports = { 
-        'math': [] 
-    }
+    imports = ["math"]
 
     def divide(dividend, divisor):
         return dividend / math.sqrt(divisor)
@@ -1541,7 +1539,17 @@ To mitigate this, pass the `imports` argument to the `create_library_from_functi
     libtask = m.create_library_from_functions("my_library", divide, imports=imports)
     ```
 
-This feature supports various `import` statement formats, such as:
+At current implementation, you can only specify the modules that need to be imported, each module can be given a alias by formatting it to be a tuple:
+
+=== Python
+    ```python
+    imports = ["sys", ("math", "m")]
+    ```
+
+You are not allowed to put a `FromImport` statement at the preamble of the library. Whenever the function needs a `FromImport` statement, it should include it inside of that function (remember that ).
+
+it a :
+
 === Python 
     ```python
     # format it as a dictionary supporting comprehensive usage

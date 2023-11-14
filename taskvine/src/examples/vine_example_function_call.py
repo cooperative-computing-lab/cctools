@@ -5,29 +5,29 @@
 # using FunctionCall tasks.
 
 import ndcctools.taskvine as vine
-import math
 import argparse
-import numpy as np
-from time import sleep as time_sleep
-from random import uniform
+import math
+import math as m
 
 # The library will consist of the following three functions:
 
-def cube_sqrt(x):
+def cube(x):
+    # import random.uniform as uniform is not a valid Python statement
+    # whenever you have a FormImport statement, put is inside of function
+    from random import uniform
+    from time import sleep as time_sleep
+
     random_delay = uniform(0.00001, 0.0001)
     time_sleep(random_delay)
 
-    sqrt_value = math.sqrt(x)
-    cube_value = np.power(sqrt_value, 3)
-
-    return cube_value
+    return math.pow(x, 3)
 
 def divide(dividend, divisor):
+    # straightfoward usage of preamble import statements
     return dividend / math.sqrt(divisor)
 
-# Package imports can also be inside of the function
 def double(x):
-    import math as m
+    # straightfoward usage of preamble import statements
     return m.prod([x, 2])
 
 
@@ -58,28 +58,27 @@ def main():
     print("Creating library from packages and functions...")
 
     # This format shows how tocd create package import statements for the library
-    imports = {
-        'math': '',                        # import math
-        'time': '',                        # import time
-        'numpy': 'np',                     # import numpy as np
-        'random': {'uniform': ''},         # from random import uniform
-        'time': {'sleep': 'time_sleep'}    # from time import sleep as time_sleep
-    }
-    libtask = q.create_library_from_functions('test-library', divide, double, cube_sqrt, imports=imports)
+    import_modules = [("math", "m"), "math"]
+    libtask = q.create_library_from_functions('test-library', divide, double, cube, import_modules=import_modules)
+    
+    libtask.set_cores(1)
+    libtask.set_memory(1000)
+    libtask.set_disk(1000)
+
     q.install_library(libtask)
 
     print("Submitting function call tasks...")
     
     tasks = 100
 
-    for _ in range(0, tasks): 
+    for _ in range(0, tasks):
         s_task = vine.FunctionCall('test-library', 'divide', 2, 2**2)
         q.submit(s_task)
     
         s_task = vine.FunctionCall('test-library', 'double', 3)
         q.submit(s_task)
 
-        s_task = vine.FunctionCall('test-library', 'cube_sqrt', 4)
+        s_task = vine.FunctionCall('test-library', 'cube', 4)
         q.submit(s_task)
 
     print("Waiting for results...")
@@ -94,7 +93,7 @@ def main():
             print(f"task {t.id} completed with result {x}")
 
     # Check that we got the right result.
-    expected = tasks * ( divide(2, 2**2) + double(3) + cube_sqrt(4))
+    expected = tasks * (divide(2, 2**2) + double(3) + cube(4))
 
     print(f"Total:    {total_sum}")
     print(f"Expected: {expected}")
