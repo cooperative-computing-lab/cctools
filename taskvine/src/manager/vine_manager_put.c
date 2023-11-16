@@ -276,11 +276,7 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 		break;
 
 	case VINE_MINI_TASK:
-		debug(D_VINE,
-				"%s (%s) will produce %s via mini task",
-				w->hostname,
-				w->addrport,
-		                m->remote_name);
+		debug(D_VINE, "%s (%s) will produce %s via mini task", w->hostname, w->addrport, m->remote_name);
 		result = vine_manager_put_task(q, w, f->mini_task, 0, 0, f);
 		break;
 
