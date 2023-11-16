@@ -1487,6 +1487,11 @@ class Manager(object):
     #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
     # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
     def declare_minitask(self, minitask, name="minitask", cache=False, peer_transfer=True):
+
+        # Attaching a task as a mini-task is like submitting it, so we must finalize the details.
+        minitask.submit_finalize(self)
+
+        # Then proceed to attach the task to the mini-task file object.
         flags = Task._determine_file_flags(cache, peer_transfer)
         f = cvine.vine_declare_mini_task(self._taskvine, minitask._task, name, flags)
 
