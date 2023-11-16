@@ -255,7 +255,7 @@ Queue a mini-task to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */
 
-int vine_cache_queue_command(struct vine_cache *c, struct vine_task *mini_task, const char *source,
+int vine_cache_queue_mini_task(struct vine_cache *c, struct vine_task *mini_task, const char *source,
 		const char *cachename, int64_t size, int mode)
 {
 	struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_MINI_TASK, source, size, mode, mini_task);

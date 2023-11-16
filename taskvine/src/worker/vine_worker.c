@@ -824,7 +824,7 @@ static int do_put_mini_task(struct link *manager, time_t stoptime, const char *c
 	struct vine_task *mini_task = do_task_body(manager, mini_task_id, stoptime);
 	if (!mini_task)
 		return 0;
-	return vine_cache_queue_command(cache_manager, mini_task, source, cache_name, size, mode);
+	return vine_cache_queue_mini_task(cache_manager, mini_task, source, cache_name, size, mode);
 }
 
 /*
