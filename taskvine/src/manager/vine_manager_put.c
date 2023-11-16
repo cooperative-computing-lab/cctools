@@ -475,8 +475,9 @@ vine_result_code_t vine_manager_put_task(struct vine_manager *q, struct vine_wor
 	if (target) {
 		vine_manager_send(q,
 				w,
-				"mini_task %lld %s %lld %o\n",
+				"mini_task %lld %s %s %lld %o\n",
 				(long long)target->mini_task->task_id,
+				target->source,
 				target->cached_name,
 				(long long)target->size,
 				0777);

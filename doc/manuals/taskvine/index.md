@@ -775,9 +775,8 @@ like the input to be the result of a query to a database.
 
     my_url = m.declare_url("http://somewhere.com/archive.cpio", cache=True)
     t.add_input(my_url, "archive.cpio")
-    t.set_mini_task_output("output_dir")
 
-    mini_task = m.declare_mini_task(t)
+    mini_task = m.declare_mini_task(t,"output_dir")
 
     # regular tasks can use the mini task as input # the output of the mini
     # task is mounted in the regular task sandbox
@@ -797,9 +796,8 @@ like the input to be the result of a query to a database.
 
     struct vine_file *my_url = vine_declare_url("http://somewhere.com/archive.cpio", VINE_CACHE);
     vine_task_add_input(my_url, "archive.cpio", 0);
-    vine_task_set_mini_task_output(t, "output_dir");
 
-    struct vine_file *mini_task = m.declare_mini_task(t)
+    struct vine_file *mini_task = m.declare_mini_task(t,"output_dir")
 
     // regular tasks can use the mini task as input
     // the output of the mini task is mounted in the regular task sandbox
@@ -977,11 +975,8 @@ mini task to construct the environment structure directly on the workers.
     mt.add_input(runner, "env_dir/bin/run_in_env")
     mt.add_input(image,  "env_dir/image.img")
 
-    # the output of the mini task is the environment directory
-    mt.add_output(image,  "env_dir")
-
-    # tell the manager that this is a mini task.
-    env = m.declare_mini_task(mt)
+    # the mini task will extract the environment directory
+    env = m.declare_mini_task(mt,"env_dir")
 
     # now we define our regular task, and attach the environment to it.
     t = Task("/bin/echo from inside apptainer!")

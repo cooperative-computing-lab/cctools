@@ -813,7 +813,8 @@ static int do_put_url(const char *cache_name, int64_t size, int mode, const char
 }
 
 /*
-Accept a mini_task that is executed on demand to produce a specific file.
+Accept a mini_task that is executed on demand.
+We will then extract the file "source" from the sandbox in order to produce "cache_name".
 */
 
 static int do_put_mini_task(struct link *manager, time_t stoptime, const char *cache_name, int64_t size, int mode,
@@ -823,13 +824,7 @@ static int do_put_mini_task(struct link *manager, time_t stoptime, const char *c
 	struct vine_task *mini_task = do_task_body(manager, mini_task_id, stoptime);
 	if (!mini_task)
 		return 0;
-
-	/* XXX hacky hack -- the single output of the task must have the target cachename */
-	struct vine_mount *output_mount = list_peek_head(mini_task->output_mounts);
-	free(output_mount->file->cached_name);
-	output_mount->file->cached_name = strdup(cache_name);
-
-	return vine_cache_queue_command(cache_manager, mini_task, cache_name, size, mode);
+	return vine_cache_queue_command(cache_manager, mini_task, source, cache_name, size, mode);
 }
 
 /*
@@ -1098,11 +1093,13 @@ static int handle_manager(struct link *manager)
 			hash_table_insert(current_transfers, strdup(filename), strdup(transfer_id));
 			debug(D_VINE, "Insert ID-File pair into transfer table : %s :: %s", filename, transfer_id);
 		} else if (sscanf(line,
-					   "mini_task %" SCNd64 " %s %" SCNd64 " %o",
+					   "mini_task %" SCNd64 " %s %s %" SCNd64 " %o",
 					   &task_id,
+					   source_encoded,
 					   filename_encoded,
 					   &length,
-					   &mode) == 4) {
+					   &mode) == 5) {
+			url_decode(source_encoded, source, sizeof(source));
 			url_decode(filename_encoded, filename, sizeof(filename));
 			r = do_put_mini_task(
 					manager, time(0) + options->active_timeout, filename, length, mode, source);

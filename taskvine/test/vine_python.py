@@ -233,9 +233,7 @@ if __name__ == "__main__":
 
     # Create an explicit minitask description to run curl
     minitask = vine.Task("curl https://www.nd.edu -o output")
-    output_file = q.declare_file("output", cache=False)
-    minitask.add_output(output_file, "output")
-    intask = q.declare_minitask(minitask)
+    intask = q.declare_minitask(minitask,"output")
 
     # Now generate an input file from a shell command:
     t = vine.Task("wc -l infile")

@@ -709,7 +709,7 @@ renaming, or unpacking to be useful.  A mini-task should be a short-running
 activity with minimal resource consumption.
 @param m A manager object
 @param mini_task The task which produces the file
-@param name A descriptive name for the mini-task.
+@param name The name of the file in the task's sandbox to extract.
 @param flags Whether to never cache the output of the mini task at the workers (VINE_CACHE_NEVER,
 the default), to cache it only for the current manager (VINE_CACHE), or to
 cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be
