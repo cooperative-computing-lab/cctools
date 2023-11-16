@@ -1093,12 +1093,11 @@ static int handle_manager(struct link *manager)
 			hash_table_insert(current_transfers, strdup(filename), strdup(transfer_id));
 			debug(D_VINE, "Insert ID-File pair into transfer table : %s :: %s", filename, transfer_id);
 		} else if (sscanf(line,
-					   "mini_task %" SCNd64 " %s %s %" SCNd64 " %o",
-					   &task_id,
+					   "mini_task %s %s %" SCNd64 " %o",
 					   source_encoded,
 					   filename_encoded,
 					   &length,
-					   &mode) == 5) {
+					   &mode) == 4) {
 			url_decode(source_encoded, source, sizeof(source));
 			url_decode(filename_encoded, filename, sizeof(filename));
 			r = do_put_mini_task(

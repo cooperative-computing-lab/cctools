@@ -277,11 +277,10 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 
 	case VINE_MINI_TASK:
 		debug(D_VINE,
-				"%s (%s) will produce %s via mini task %d",
+				"%s (%s) will produce %s via mini task",
 				w->hostname,
 				w->addrport,
-				m->remote_name,
-				f->mini_task->task_id);
+		                m->remote_name);
 		result = vine_manager_put_task(q, w, f->mini_task, 0, 0, f);
 		break;
 
@@ -475,8 +474,7 @@ vine_result_code_t vine_manager_put_task(struct vine_manager *q, struct vine_wor
 	if (target) {
 		vine_manager_send(q,
 				w,
-				"mini_task %lld %s %s %lld %o\n",
-				(long long)target->mini_task->task_id,
+				"mini_task %s %s %lld %o\n",
 				target->source,
 				target->cached_name,
 				(long long)target->size,
