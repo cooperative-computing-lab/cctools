@@ -255,10 +255,10 @@ Queue a mini-task to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */
 
-int vine_cache_queue_command(
-		struct vine_cache *c, struct vine_task *mini_task, const char *cachename, int64_t size, int mode)
+int vine_cache_queue_mini_task(struct vine_cache *c, struct vine_task *mini_task, const char *source,
+		const char *cachename, int64_t size, int mode)
 {
-	struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_MINI_TASK, "task", size, mode, mini_task);
+	struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_MINI_TASK, source, size, mode, mini_task);
 	hash_table_insert(c->table, cachename, f);
 	return 1;
 }
@@ -511,6 +511,7 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 		break;
 	}
 
+	/* For a mini-task, we must also insure the inputs to the task exist. */
 	if (f->type == VINE_CACHE_MINI_TASK) {
 		if (f->mini_task->input_mounts) {
 			struct vine_mount *m;
@@ -578,13 +579,24 @@ static void vine_cache_check_outputs(
 
 	/* If this was produced by a mini task, first move the output in the cache directory. */
 	if (f->type == VINE_CACHE_MINI_TASK) {
-
 		if (f->status == VINE_CACHE_STATUS_READY) {
-			if (vine_sandbox_stageout(f->process, c, manager)) {
+
+			char *source_path = vine_sandbox_full_path(f->process, f->source);
+
+			debug(D_VINE, "cache: extracting %s from mini-task sandbox to %s\n", f->source, cachename);
+			int result = rename(source_path, cache_path);
+			if (result == 0) {
 				f->status = VINE_CACHE_STATUS_READY;
 			} else {
+				debug(D_VINE,
+						"cache: unable to rename %s to %s: %s\n",
+						source_path,
+						cache_path,
+						strerror(errno));
 				f->status = VINE_CACHE_STATUS_FAILED;
 			}
+
+			free(source_path);
 		}
 
 		/* Clean up the minitask process, but keep the defining task. */
