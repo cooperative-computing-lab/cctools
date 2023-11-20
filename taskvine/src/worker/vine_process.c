@@ -86,7 +86,7 @@ struct vine_process *vine_process_create(struct vine_task *task, vine_process_ty
 
 	const char *dirtype = vine_process_sandbox_code(p->type);
 
-	p->sandbox = string_format("%s/%s.%d", vine_workspace_dir, dirtype, p->task->task_id);
+	p->sandbox = string_format("%s/%s.%d", workspace->workspace_dir, dirtype, p->task->task_id);
 	p->tmpdir = string_format("%s/.taskvine.tmp", p->sandbox);
 	p->output_file_name = string_format("%s/.taskvine.stdout", p->sandbox);
 
@@ -241,7 +241,7 @@ int vine_process_invoke_function(struct vine_process *p)
 {
 	char *buffer = string_format("%d %s %s", p->task->task_id, p->task->command_line, p->sandbox);
 	ssize_t result = link_printf(p->library_process->library_write_link,
-			time(0) + active_timeout,
+			time(0) + options->active_timeout,
 			"%ld\n%s",
 			strlen(buffer),
 			buffer);
@@ -501,7 +501,7 @@ int vine_process_library_get_result(struct vine_process *p, uint64_t *done_task_
 	int ok = 1;
 
 	/* read number of bytes of data first. */
-	ok = link_readline(p->library_read_link, buffer, VINE_LINE_MAX, time(0) + active_timeout);
+	ok = link_readline(p->library_read_link, buffer, VINE_LINE_MAX, time(0) + options->active_timeout);
 	if (!ok) {
 		return 0;
 	}
@@ -509,7 +509,7 @@ int vine_process_library_get_result(struct vine_process *p, uint64_t *done_task_
 
 	/* now read the buffer, which is the task id of the done function invocation. */
 	char buffer_data[len_buffer + 1];
-	ok = link_read(p->library_read_link, buffer_data, len_buffer, time(0) + active_timeout);
+	ok = link_read(p->library_read_link, buffer_data, len_buffer, time(0) + options->active_timeout);
 	if (ok <= 0) {
 		return 0;
 	}

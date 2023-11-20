@@ -2,7 +2,7 @@
  * Copyright (C) 2022 The University of Notre Dame
  * This software is distributed under the GNU General Public License.
  * See the file COPYING for details.
-*/
+ */
 
 #include "debug.h"
 
@@ -18,17 +18,17 @@
 #include <string.h>
 
 #if defined(OPEN_MAX)
-#  define FD_MAX  OPEN_MAX
+#define FD_MAX OPEN_MAX
 #elif defined(_POSIX_OPEN_MAX)
-#  define FD_MAX  _POSIX_OPEN_MAX
+#define FD_MAX _POSIX_OPEN_MAX
 #else
-#  define FD_MAX  256  /* guess */
+#define FD_MAX 256 /* guess */
 #endif
 
-int fd_max (void)
+int fd_max(void)
 {
 	errno = 0;
-	int max = (int) sysconf(_SC_OPEN_MAX);
+	int max = (int)sysconf(_SC_OPEN_MAX);
 	if (max == -1) {
 		if (errno == 0) {
 			max = FD_MAX;
@@ -40,10 +40,10 @@ int fd_max (void)
 	return max;
 }
 
-int fd_nonstd_close (void)
+int fd_nonstd_close(void)
 {
 	int fd, max = fd_max();
-	for (fd = STDERR_FILENO+1; fd < max; fd++) {
+	for (fd = STDERR_FILENO + 1; fd < max; fd++) {
 		if (close(fd) == -1 && errno != EBADF) {
 			debug(D_DEBUG, "could not close open file descriptor: %s", strerror(errno));
 			return errno;
@@ -52,7 +52,7 @@ int fd_nonstd_close (void)
 	return 0;
 }
 
-int fd_null (int fd, int oflag)
+int fd_null(int fd, int oflag)
 {
 	int rc;
 	int fdn;
@@ -70,7 +70,8 @@ start:
 	}
 	rc = 0;
 out:
-	while (close(fdn) == -1 && errno == EINTR) ; /* nothing we can do if this fails any other way */
+	while (close(fdn) == -1 && errno == EINTR)
+		; /* nothing we can do if this fails any other way */
 	return rc;
 }
 

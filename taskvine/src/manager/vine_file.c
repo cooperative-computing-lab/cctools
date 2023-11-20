@@ -161,8 +161,7 @@ struct vine_file *vine_file_untar(struct vine_file *f, vine_file_flags_t flags)
 {
 	struct vine_task *t = vine_task_create("mkdir output && tar xf input -C output");
 	vine_task_add_input(t, f, "input", 0);
-	vine_task_add_output(t, vine_file_local("output", flags), "output", 0);
-	return vine_file_mini_task(t, "untar", flags);
+	return vine_file_mini_task(t, "output", flags);
 }
 
 struct vine_file *vine_file_poncho(struct vine_file *f, vine_file_flags_t flags)
@@ -172,16 +171,14 @@ struct vine_file *vine_file_poncho(struct vine_file *f, vine_file_flags_t flags)
 	free(cmd);
 
 	vine_task_add_input(t, f, "package.tar.gz", 0);
-	vine_task_add_output(t, vine_file_local("output", flags), "output", 0);
-	return vine_file_mini_task(t, "poncho", flags);
+	return vine_file_mini_task(t, "output", flags);
 }
 
 struct vine_file *vine_file_starch(struct vine_file *f, vine_file_flags_t flags)
 {
 	struct vine_task *t = vine_task_create("SFX_DIR=output SFX_EXTRACT_ONLY=1 ./package.sfx");
 	vine_task_add_input(t, f, "package.sfx", 0);
-	vine_task_add_output(t, vine_file_local("output", flags), "output", 0);
-	return vine_file_mini_task(t, "starch", flags);
+	return vine_file_mini_task(t, "output", flags);
 }
 
 static char *find_x509_proxy()
@@ -220,8 +217,6 @@ struct vine_file *vine_file_xrootd(
 	char *command = string_format("xrdcp %s output.root", source);
 	struct vine_task *t = vine_task_create(command);
 
-	vine_task_add_output(t, vine_file_local("output.root", flags), "output.root", 0);
-
 	if (proxy) {
 		vine_task_set_env_var(t, "X509_USER_PROXY", "proxy509");
 		vine_task_add_input(t, proxy, "proxy509.pem", 0);
@@ -233,7 +228,7 @@ struct vine_file *vine_file_xrootd(
 
 	free(command);
 
-	return vine_file_mini_task(t, "xrootd", flags);
+	return vine_file_mini_task(t, "output.root", flags);
 }
 
 struct vine_file *vine_file_chirp(const char *server, const char *source, struct vine_file *ticket,
@@ -246,8 +241,6 @@ struct vine_file *vine_file_chirp(const char *server, const char *source, struct
 
 	struct vine_task *t = vine_task_create(command);
 
-	vine_task_add_output(t, vine_file_local("output.chirp", flags), "output.chirp", 0);
-
 	if (ticket) {
 		vine_task_add_input(t, ticket, "ticket.chirp", 0);
 	}
@@ -258,7 +251,7 @@ struct vine_file *vine_file_chirp(const char *server, const char *source, struct
 
 	free(command);
 
-	return vine_file_mini_task(t, "chirp", flags);
+	return vine_file_mini_task(t, "output.chirp", flags);
 }
 
 /* vim: set noexpandtab tabstop=8: */

@@ -124,6 +124,9 @@ int manual_ssl_option = 0;
 //Environment variables to pass along in batch_job_submit
 struct jx *batch_env = NULL;
 
+//Features to pass along as worker arguments
+struct hash_table *features_table = NULL;
+
 //0 means the container image does not container work_queue_worker binary
 int k8s_worker_image = 0;
 /*
@@ -390,6 +393,27 @@ static void set_worker_resources_options( struct batch_queue *queue )
 	buffer_free(&b);
 }
 
+/*
+Given a hashtable containing the desired features,
+convert it into a string like "--feature x --feature y"
+to pass to the worker.  The returned string must be freed.
+*/
+
+static char * make_features_string( struct hash_table *features_table )
+{
+	char *str = strdup("");
+
+	char *key;
+	void *value;
+	HASH_TABLE_ITERATE(features_table,key,value) {
+		char * newstr = string_format("%s --feature \"%s\"",str,key);
+		free(str);
+		str = newstr;
+	}
+
+	return str;
+}
+
 static int submit_worker( struct batch_queue *queue )
 {
 	char *cmd;
@@ -401,9 +425,11 @@ static int submit_worker( struct batch_queue *queue )
 		worker = string_format("./%s", worker_command);
 	}
 
+	char *features_string = make_features_string(features_table);
+	
 	if(using_catalog) {
 		cmd = string_format(
-		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s %s %s",
+		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s %s %s %s",
 		worker,
 		submission_regex,
 		worker_timeout,
@@ -412,12 +438,13 @@ static int submit_worker( struct batch_queue *queue )
 		password_file ? "-P pwfile" : "",
 		resource_args ? resource_args : "",
 		manual_ssl_option ? "--ssl" : "",
+		features_string,
 		extra_worker_args ? extra_worker_args : ""
 		);
 	}
 	else {
 		cmd = string_format(
-		"%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s %s",
+		"%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s %s %s",
 		worker,
 		manager_host,
 		manager_port,
@@ -426,10 +453,13 @@ static int submit_worker( struct batch_queue *queue )
 		password_file ? "-P pwfile" : "",
 		resource_args ? resource_args : "",
 		manual_ssl_option ? "--ssl" : "",
+		features_string,
 		extra_worker_args ? extra_worker_args : ""
 		);
 	}
 
+	free(features_string);
+	
 	if(wrapper_command) {
 		// Note that we don't use string_wrap_command here,
 		// because the clever quoting interferes with the $$([Target.Memory]) substitution above.
@@ -1135,6 +1165,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Set the number of GPUs requested per worker.\n", "--gpus=<n>");
 	printf(" %-30s Set the amount of memory (in MB) per worker.\n", "--memory=<mb>           ");
 	printf(" %-30s Set the amount of disk (in MB) per worker.\n", "--disk=<mb>");
+	printf(" %-30s Add a custom feature to each worker.\n", "--feature=<name>");
 	printf(" %-30s Autosize worker to slot (Condor, Mesos, K8S).\n", "--autosize");
 
 	printf("\nWorker environment options:\n");
@@ -1162,6 +1193,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_MEMORY, 
 		LONG_OPT_DISK, 
 		LONG_OPT_GPUS, 
+	        LONG_OPT_FEATURE,
 		LONG_OPT_TASKS_PER_WORKER, 
 		LONG_OPT_CONF_FILE, 
 		LONG_OPT_AMAZON_CONFIG, 
@@ -1204,6 +1236,7 @@ static const struct option long_options[] = {
 	{"env", required_argument, 0, LONG_OPT_ENVIRONMENT_VARIABLE},
 	{"extra-options", required_argument, 0, 'E'},
 	{"factory-timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
+	{"feature", required_argument, 0, LONG_OPT_FEATURE},
 	{"foremen-name", required_argument, 0, 'F'},
 	{"gpus",   required_argument,  0,  LONG_OPT_GPUS},
 	{"help", no_argument, 0, 'h'},
@@ -1254,6 +1287,7 @@ int main(int argc, char *argv[])
 	char *env = NULL;
 	char *val = NULL;
 	batch_env = jx_object(NULL);
+	features_table = hash_table_create(0,0);
 
 	batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNKNOWN;
 
@@ -1338,6 +1372,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_GPUS:
 				resources->gpus = atoi(optarg);
+				break;
+			case LONG_OPT_FEATURE:
+				hash_table_insert(features_table,optarg,"true");
 				break;
 			case LONG_OPT_AUTOSIZE:
 				autosize = 1;

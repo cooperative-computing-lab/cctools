@@ -34,20 +34,20 @@ struct hash_table *hash_table_create(int bucket_count, hash_func_t func)
 {
 	struct hash_table *h;
 
-	h = (struct hash_table *) malloc(sizeof(struct hash_table));
-	if(!h)
+	h = (struct hash_table *)malloc(sizeof(struct hash_table));
+	if (!h)
 		return 0;
 
-	if(bucket_count < 1)
+	if (bucket_count < 1)
 		bucket_count = DEFAULT_SIZE;
-	if(!func)
+	if (!func)
 		func = DEFAULT_FUNC;
 
 	h->size = 0;
 	h->hash_func = func;
 	h->bucket_count = bucket_count;
-	h->buckets = (struct entry **) calloc(bucket_count, sizeof(struct entry *));
-	if(!h->buckets) {
+	h->buckets = (struct entry **)calloc(bucket_count, sizeof(struct entry *));
+	if (!h->buckets) {
 		free(h);
 		return 0;
 	}
@@ -55,31 +55,31 @@ struct hash_table *hash_table_create(int bucket_count, hash_func_t func)
 	return h;
 }
 
-void hash_table_clear(struct hash_table *h, void (*delete_func) ( void *) )
+void hash_table_clear(struct hash_table *h, void (*delete_func)(void *))
 {
 	struct entry *e, *f;
 	int i;
 
-	for(i = 0; i < h->bucket_count; i++) {
+	for (i = 0; i < h->bucket_count; i++) {
 		e = h->buckets[i];
-		while(e) {
+		while (e) {
 			f = e->next;
-			if(delete_func) delete_func(e->value);
+			if (delete_func)
+				delete_func(e->value);
 			free(e->key);
 			free(e);
 			e = f;
 		}
 	}
 
-	for(i = 0; i < h->bucket_count; i++) {
+	for (i = 0; i < h->bucket_count; i++) {
 		h->buckets[i] = 0;
 	}
 }
 
-
 void hash_table_delete(struct hash_table *h)
 {
-	hash_table_clear(h,0);
+	hash_table_clear(h, 0);
 	free(h->buckets);
 	free(h);
 }
@@ -93,8 +93,8 @@ void *hash_table_lookup(struct hash_table *h, const char *key)
 	index = hash % h->bucket_count;
 	e = h->buckets[index];
 
-	while(e) {
-		if(hash == e->hash && !strcmp(key, e->key)) {
+	while (e) {
+		if (hash == e->hash && !strcmp(key, e->key)) {
 			return e->value;
 		}
 		e = e->next;
@@ -103,25 +103,21 @@ void *hash_table_lookup(struct hash_table *h, const char *key)
 	return 0;
 }
 
-int hash_table_size(struct hash_table *h)
-{
-	return h->size;
-}
+int hash_table_size(struct hash_table *h) { return h->size; }
 
 static int hash_table_double_buckets(struct hash_table *h)
 {
 	struct hash_table *hn = hash_table_create(2 * h->bucket_count, h->hash_func);
 
-	if(!hn)
+	if (!hn)
 		return 0;
 
 	/* Move pairs to new hash */
 	char *key;
 	void *value;
 	hash_table_firstkey(h);
-	while(hash_table_nextkey(h, &key, &value))
-		if(!hash_table_insert(hn, key, value))
-		{
+	while (hash_table_nextkey(h, &key, &value))
+		if (!hash_table_insert(hn, key, value)) {
 			hash_table_delete(hn);
 			return 0;
 		}
@@ -129,9 +125,9 @@ static int hash_table_double_buckets(struct hash_table *h)
 	/* Delete all old pairs */
 	struct entry *e, *f;
 	int i;
-	for(i = 0; i < h->bucket_count; i++) {
+	for (i = 0; i < h->bucket_count; i++) {
 		e = h->buckets[i];
-		while(e) {
+		while (e) {
 			f = e->next;
 			free(e->key);
 			free(e);
@@ -141,9 +137,9 @@ static int hash_table_double_buckets(struct hash_table *h)
 
 	/* Make the old point to the new */
 	free(h->buckets);
-	h->buckets      = hn->buckets;
+	h->buckets = hn->buckets;
 	h->bucket_count = hn->bucket_count;
-	h->size         = hn->size;
+	h->size = hn->size;
 
 	/* Delete reference to new, so old is safe */
 	free(hn);
@@ -156,30 +152,30 @@ int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 	struct entry *e;
 	unsigned hash, index;
 
-	if( ((float) h->size / h->bucket_count) > DEFAULT_LOAD )
+	if (((float)h->size / h->bucket_count) > DEFAULT_LOAD)
 		hash_table_double_buckets(h);
 
 	hash = h->hash_func(key);
 	index = hash % h->bucket_count;
 	e = h->buckets[index];
 
-	while(e) {
-		if(hash == e->hash && !strcmp(key, e->key))
+	while (e) {
+		if (hash == e->hash && !strcmp(key, e->key))
 			return 0;
 		e = e->next;
 	}
 
-	e = (struct entry *) malloc(sizeof(struct entry));
-	if(!e)
+	e = (struct entry *)malloc(sizeof(struct entry));
+	if (!e)
 		return 0;
 
 	e->key = strdup(key);
-	if(!e->key) {
+	if (!e->key) {
 		free(e);
 		return 0;
 	}
 
-	e->value = (void *) value;
+	e->value = (void *)value;
 	e->hash = hash;
 	e->next = h->buckets[index];
 	h->buckets[index] = e;
@@ -199,9 +195,9 @@ void *hash_table_remove(struct hash_table *h, const char *key)
 	e = h->buckets[index];
 	f = 0;
 
-	while(e) {
-		if(hash == e->hash && !strcmp(key, e->key)) {
-			if(f) {
+	while (e) {
+		if (hash == e->hash && !strcmp(key, e->key)) {
+			if (f) {
 				f->next = e->next;
 			} else {
 				h->buckets[index] = e->next;
@@ -222,25 +218,25 @@ void *hash_table_remove(struct hash_table *h, const char *key)
 void hash_table_firstkey(struct hash_table *h)
 {
 	h->ientry = 0;
-	for(h->ibucket = 0; h->ibucket < h->bucket_count; h->ibucket++) {
+	for (h->ibucket = 0; h->ibucket < h->bucket_count; h->ibucket++) {
 		h->ientry = h->buckets[h->ibucket];
-		if(h->ientry)
+		if (h->ientry)
 			break;
 	}
 }
 
 int hash_table_nextkey(struct hash_table *h, char **key, void **value)
 {
-	if(h->ientry) {
+	if (h->ientry) {
 		*key = h->ientry->key;
 		*value = h->ientry->value;
 
 		h->ientry = h->ientry->next;
-		if(!h->ientry) {
+		if (!h->ientry) {
 			h->ibucket++;
-			for(; h->ibucket < h->bucket_count; h->ibucket++) {
+			for (; h->ibucket < h->bucket_count; h->ibucket++) {
 				h->ientry = h->buckets[h->ibucket];
-				if(h->ientry)
+				if (h->ientry)
 					break;
 			}
 		}
@@ -250,11 +246,11 @@ int hash_table_nextkey(struct hash_table *h, char **key, void **value)
 	}
 }
 
-typedef unsigned long int ub4;	/* unsigned 4-byte quantities */
-typedef unsigned char ub1;	/* unsigned 1-byte quantities */
+typedef unsigned long int ub4; /* unsigned 4-byte quantities */
+typedef unsigned char ub1;     /* unsigned 1-byte quantities */
 
-#define hashsize(n) ((ub4)1<<(n))
-#define hashmask(n) (hashsize(n)-1)
+#define hashsize(n) ((ub4)1 << (n))
+#define hashmask(n) (hashsize(n) - 1)
 
 /*
 --------------------------------------------------------------------
@@ -283,18 +279,36 @@ mix() was built out of 36 single-cycle latency instructions in a
 --------------------------------------------------------------------
 */
 
-#define mix(a,b,c) \
-{ \
-  a -= b; a -= c; a ^= (c>>13); \
-  b -= c; b -= a; b ^= (a<<8); \
-  c -= a; c -= b; c ^= (b>>13); \
-  a -= b; a -= c; a ^= (c>>12);  \
-  b -= c; b -= a; b ^= (a<<16); \
-  c -= a; c -= b; c ^= (b>>5); \
-  a -= b; a -= c; a ^= (c>>3);  \
-  b -= c; b -= a; b ^= (a<<10); \
-  c -= a; c -= b; c ^= (b>>15); \
-}
+#define mix(a, b, c)                                                                                                   \
+	{                                                                                                              \
+		a -= b;                                                                                                \
+		a -= c;                                                                                                \
+		a ^= (c >> 13);                                                                                        \
+		b -= c;                                                                                                \
+		b -= a;                                                                                                \
+		b ^= (a << 8);                                                                                         \
+		c -= a;                                                                                                \
+		c -= b;                                                                                                \
+		c ^= (b >> 13);                                                                                        \
+		a -= b;                                                                                                \
+		a -= c;                                                                                                \
+		a ^= (c >> 12);                                                                                        \
+		b -= c;                                                                                                \
+		b -= a;                                                                                                \
+		b ^= (a << 16);                                                                                        \
+		c -= a;                                                                                                \
+		c -= b;                                                                                                \
+		c ^= (b >> 5);                                                                                         \
+		a -= b;                                                                                                \
+		a -= c;                                                                                                \
+		a ^= (c >> 3);                                                                                         \
+		b -= c;                                                                                                \
+		b -= a;                                                                                                \
+		b ^= (a << 10);                                                                                        \
+		c -= a;                                                                                                \
+		c -= b;                                                                                                \
+		c ^= (b >> 15);                                                                                        \
+	}
 
 /*
 --------------------------------------------------------------------
@@ -308,10 +322,10 @@ About 6*len+35 instructions. The best hash table sizes are powers of 2.  There i
 mod a prime (mod is sooo slow!).  If you need less than 32 bits,
 use a bitmask.  For example, if you need only 10 bits, do
   h = (h & hashmask(10));
-In which case, the hash table should have hashsize(10) elements. If you are hashing n strings (ub1 **)k, do it like this:
-  for (i=0, h=0; i<n; ++i) h = hash( k[i], len[i], h); By Bob Jenkins, 1996.  bob_jenkins@burtleburtle.net.  You may use this
-code any way you wish, private, educational, or commercial.  It's free. See http://burtleburtle.net/bob/hash/evahash.html
-Use for hash table lookup, or anything where one collision in 2^^32 is
+In which case, the hash table should have hashsize(10) elements. If you are hashing n strings (ub1 **)k, do it like
+this: for (i=0, h=0; i<n; ++i) h = hash( k[i], len[i], h); By Bob Jenkins, 1996.  bob_jenkins@burtleburtle.net.  You may
+use this code any way you wish, private, educational, or commercial.  It's free. See
+http://burtleburtle.net/bob/hash/evahash.html Use for hash table lookup, or anything where one collision in 2^^32 is
 acceptable.  Do NOT use for cryptographic purposes.
 --------------------------------------------------------------------
 */
@@ -322,51 +336,51 @@ acceptable.  Do NOT use for cryptographic purposes.
 /* initval the previous hash, or an arbitrary value */
 static ub4 jenkins_hash(register const ub1 *k, register ub4 length, register ub4 initval)
 {
-	register ub4 a, b, c, len;	/* Set up the internal state */
+	register ub4 a, b, c, len; /* Set up the internal state */
 	len = length;
-	a = b = 0x9e3779b9;	/* the golden ratio; an arbitrary value */
-	c = initval;					 /* the previous hash value *//*---------------------------------------- handle most of the key */
-	while(len >= 12) {
-		a += (k[0] + ((ub4) k[1] << 8) + ((ub4) k[2] << 16) + ((ub4) k[3] << 24));
-		b += (k[4] + ((ub4) k[5] << 8) + ((ub4) k[6] << 16) + ((ub4) k[7] << 24));
-		c += (k[8] + ((ub4) k[9] << 8) + ((ub4) k[10] << 16) + ((ub4) k[11] << 24));
+	a = b = 0x9e3779b9;			   /* the golden ratio; an arbitrary value */
+	c = initval; /* the previous hash value */ /*---------------------------------------- handle most of the key */
+	while (len >= 12) {
+		a += (k[0] + ((ub4)k[1] << 8) + ((ub4)k[2] << 16) + ((ub4)k[3] << 24));
+		b += (k[4] + ((ub4)k[5] << 8) + ((ub4)k[6] << 16) + ((ub4)k[7] << 24));
+		c += (k[8] + ((ub4)k[9] << 8) + ((ub4)k[10] << 16) + ((ub4)k[11] << 24));
 		mix(a, b, c);
 		k += 12;
 		len -= 12;
 	}
 	/*------------------------------------- handle the last 11 bytes */
 	c += length;
-	switch (len) {		/* all the case statements fall through */
+	switch (len) { /* all the case statements fall through */
 	case 11:
-		c += ((ub4) k[10] << 24);
+		c += ((ub4)k[10] << 24);
 		/* falls through */
 	case 10:
-		c += ((ub4) k[9] << 16);
+		c += ((ub4)k[9] << 16);
 		/* falls through */
 	case 9:
 		/* the first byte of c is reserved for the length */
-		c += ((ub4) k[8] << 8);
+		c += ((ub4)k[8] << 8);
 		/* falls through */
 	case 8:
-		b += ((ub4) k[7] << 24);
+		b += ((ub4)k[7] << 24);
 		/* falls through */
 	case 7:
-		b += ((ub4) k[6] << 16);
+		b += ((ub4)k[6] << 16);
 		/* falls through */
 	case 6:
-		b += ((ub4) k[5] << 8);
+		b += ((ub4)k[5] << 8);
 		/* falls through */
 	case 5:
 		b += k[4];
 		/* falls through */
 	case 4:
-		a += ((ub4) k[3] << 24);
+		a += ((ub4)k[3] << 24);
 		/* falls through */
 	case 3:
-		a += ((ub4) k[2] << 16);
+		a += ((ub4)k[2] << 16);
 		/* falls through */
 	case 2:
-		a += ((ub4) k[1] << 8);
+		a += ((ub4)k[1] << 8);
 		/* falls through */
 	case 1:
 		a += k[0];
@@ -377,13 +391,10 @@ static ub4 jenkins_hash(register const ub1 *k, register ub4 length, register ub4
 		break;
 	}
 	mix(a, b, c);
-   /*-------------------------------------------- report the result */
+	/*-------------------------------------------- report the result */
 	return c;
 }
 
-unsigned hash_string(const char *s)
-{
-	return jenkins_hash((const ub1 *) s, strlen(s), 0);
-}
+unsigned hash_string(const char *s) { return jenkins_hash((const ub1 *)s, strlen(s), 0); }
 
 /* vim: set noexpandtab tabstop=8: */

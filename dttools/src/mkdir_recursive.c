@@ -20,7 +20,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-int mkdirat_recursive (int fd, const char *path, mode_t mode)
+int mkdirat_recursive(int fd, const char *path, mode_t mode)
 {
 	int rc;
 	size_t i;
@@ -28,12 +28,12 @@ int mkdirat_recursive (int fd, const char *path, mode_t mode)
 	if (strlen(path) >= PATH_MAX)
 		CATCH(ENAMETOOLONG);
 
-	for (i = strspn(path, "/"); path[i]; i += strspn(path+i, "/")) {
+	for (i = strspn(path, "/"); path[i]; i += strspn(path + i, "/")) {
 		char subpath[PATH_MAX] = "";
-		size_t nextdelim = strcspn(path+i, "/");
+		size_t nextdelim = strcspn(path + i, "/");
 
-		assert(i+nextdelim < PATH_MAX);
-		memcpy(subpath, path, i+nextdelim);
+		assert(i + nextdelim < PATH_MAX);
+		memcpy(subpath, path, i + nextdelim);
 
 		rc = mkdirat(fd, subpath, mode);
 		if (rc == -1) {
@@ -56,12 +56,9 @@ out:
 	return RCUNIX(rc);
 }
 
-int mkdir_recursive (const char *path, mode_t mode)
-{
-	return mkdirat_recursive(AT_FDCWD, path, mode);
-}
+int mkdir_recursive(const char *path, mode_t mode) { return mkdirat_recursive(AT_FDCWD, path, mode); }
 
-int mkdirat_recursive_parents (int fd, const char *path, mode_t mode)
+int mkdirat_recursive_parents(int fd, const char *path, mode_t mode)
 {
 	int rc;
 	char parent[PATH_MAX] = "";
@@ -71,7 +68,7 @@ int mkdirat_recursive_parents (int fd, const char *path, mode_t mode)
 		CATCH(ENAMETOOLONG);
 
 	strcpy(parent, path);
-	slash = strrchr(parent+1, '/');
+	slash = strrchr(parent + 1, '/');
 	if (slash) {
 		*slash = 0;
 		CATCHUNIX(mkdirat_recursive(fd, parent, mode));
@@ -83,9 +80,6 @@ out:
 	return RCUNIX(rc);
 }
 
-int mkdir_recursive_parents (const char *path, mode_t mode)
-{
-	return mkdirat_recursive_parents(AT_FDCWD, path, mode);
-}
+int mkdir_recursive_parents(const char *path, mode_t mode) { return mkdirat_recursive_parents(AT_FDCWD, path, mode); }
 
 /* vim: set noexpandtab tabstop=8: */

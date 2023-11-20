@@ -22,11 +22,10 @@ def exception_test():
     raise Exception("I am a bad funtion")
 
 # Create a new queue
-queue = wq.WorkQueue(port=[9123,9130])
+queue = wq.WorkQueue(port=[9123,9130], debug_log="manager.log")
 print("listening on port {}".format(queue.port))
 with open(port_file, "w") as f:
     f.write(str(queue.port))
-
 
 # Submit several tasks for execution:
 print("submitting tasks...")

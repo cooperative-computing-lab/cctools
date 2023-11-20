@@ -1480,15 +1480,21 @@ class Manager(object):
     #
     # @param self     The manager to register this file
     # @param minitask The task to execute in order to produce a file
+    # @param source   The name of the file to extract from the task's sandbox.
     # @param cache   If True or 'workflow', cache the file at workers for reuse
     #                until the end of the workflow. If 'always', the file is cache until the
     #                end-of-life of the worker. Default is False (file is not cache).
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
     # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
-    def declare_minitask(self, minitask, name="minitask", cache=False, peer_transfer=True):
+    def declare_minitask(self, minitask, source, cache=False, peer_transfer=True):
+
+        # Attaching a task as a mini-task is like submitting it, so we must finalize the details.
+        minitask.submit_finalize(self)
+
+        # Then proceed to attach the task to the mini-task file object.
         flags = Task._determine_file_flags(cache, peer_transfer)
-        f = cvine.vine_declare_mini_task(self._taskvine, minitask._task, name, flags)
+        f = cvine.vine_declare_mini_task(self._taskvine, minitask._task, source, flags)
 
         # minitasks are freed when the manager frees its related file structure
         minitask._manager_will_free = True

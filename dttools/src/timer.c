@@ -38,7 +38,11 @@ void timer_init(int timers, const char *timer_strings[])
 	TimerStrings = timer_strings;
 }
 
-#define FREE_AND_NULL(s) if (s) { free (s); (s) = NULL; }
+#define FREE_AND_NULL(s)                                                                                               \
+	if (s) {                                                                                                       \
+		free(s);                                                                                               \
+		(s) = NULL;                                                                                            \
+	}
 
 void timer_destroy()
 {
@@ -48,16 +52,14 @@ void timer_destroy()
 	FREE_AND_NULL(TimedRuns);
 }
 
-void timer_start(int i)
-{
-	gettimeofday(&StartTime[i], NULL);
-}
+void timer_start(int i) { gettimeofday(&StartTime[i], NULL); }
 
 void timer_stop(int i)
 {
 	gettimeofday(&EndTime[i], NULL);
 
-	ElapsedTime[i] += (double) (EndTime[i].tv_sec - StartTime[i].tv_sec) + (double) (EndTime[i].tv_usec - StartTime[i].tv_usec) / 1000000.0;
+	ElapsedTime[i] += (double)(EndTime[i].tv_sec - StartTime[i].tv_sec) +
+			  (double)(EndTime[i].tv_usec - StartTime[i].tv_usec) / 1000000.0;
 	TimedRuns[i]++;
 }
 
@@ -67,22 +69,20 @@ void timer_reset(int i)
 	TimedRuns[i] = 0;
 }
 
-double timer_elapsed_time(int i)
-{
-	return (ElapsedTime[i]);
-}
+double timer_elapsed_time(int i) { return (ElapsedTime[i]); }
 
-double timer_average_time(int i)
-{
-	return (ElapsedTime[i] / TimedRuns[i]);
-}
+double timer_average_time(int i) { return (ElapsedTime[i] / TimedRuns[i]); }
 
 void timer_print_summary(int print_all)
 {
 	int i;
-	for(i = 0; i < NumberOfTimers; i++)
-		if(TimedRuns[i] > 0 || print_all)
-			printf("%s = average(%2.6lf), total(%2.6lf), runs(%d)\n", TimerStrings[i], timer_average_time(i), ElapsedTime[i], TimedRuns[i]);
+	for (i = 0; i < NumberOfTimers; i++)
+		if (TimedRuns[i] > 0 || print_all)
+			printf("%s = average(%2.6lf), total(%2.6lf), runs(%d)\n",
+					TimerStrings[i],
+					timer_average_time(i),
+					ElapsedTime[i],
+					TimedRuns[i]);
 }
 
 /* vim: set noexpandtab tabstop=8: */

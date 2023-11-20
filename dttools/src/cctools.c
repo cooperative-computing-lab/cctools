@@ -11,7 +11,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <string.h>
 
-void cctools_version_print (FILE *stream, const char *cmd)
+void cctools_version_print(FILE *stream, const char *cmd)
 {
 	fprintf(stream, "%s version %s (released %s)\n", cmd, CCTOOLS_VERSION, CCTOOLS_RELEASE_DATE);
 	fprintf(stream, "\tBuilt by %s@%s on %s\n", BUILD_USER, BUILD_HOST, BUILD_DATE);
@@ -19,7 +19,7 @@ void cctools_version_print (FILE *stream, const char *cmd)
 	fprintf(stream, "\tConfiguration: %s\n", CCTOOLS_CONFIGURE_ARGUMENTS);
 }
 
-void cctools_version_debug (uint64_t type, const char *cmd)
+void cctools_version_debug(uint64_t type, const char *cmd)
 {
 	debug(type, "%s version %s (released %s)", cmd, CCTOOLS_VERSION, CCTOOLS_RELEASE_DATE);
 	debug(type, "Built by %s@%s on %s", BUILD_USER, BUILD_HOST, BUILD_DATE);
@@ -27,7 +27,7 @@ void cctools_version_debug (uint64_t type, const char *cmd)
 	debug(type, "Configuration: %s", CCTOOLS_CONFIGURE_ARGUMENTS);
 }
 
-int cctools_version_cmp (const char *v1, const char *v2)
+int cctools_version_cmp(const char *v1, const char *v2)
 {
 	int major1 = 0, minor1 = 0, micro1 = 0;
 	int major2 = 0, minor2 = 0, micro2 = 0;

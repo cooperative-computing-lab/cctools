@@ -5,8 +5,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "debug.h"
 #include "xxmalloc.h"
+#include "debug.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -20,7 +20,7 @@ such as readline, we use xxmalloc, but it means the same thing.
 void *xxmalloc(size_t nbytes)
 {
 	void *result = malloc(nbytes);
-	if(result) {
+	if (result) {
 		return result;
 	} else {
 		fatal("out of memory");
@@ -31,7 +31,7 @@ void *xxmalloc(size_t nbytes)
 char *xxstrdup(const char *str)
 {
 	void *result = strdup(str);
-	if(result) {
+	if (result) {
 		return result;
 	} else {
 		fatal("out of memory");
@@ -42,12 +42,13 @@ char *xxstrdup(const char *str)
 void *xxrealloc(void *ptr, size_t nsize)
 {
 	void *result = realloc(ptr, nsize);
-	if(nsize > 0 && result == NULL)
+	if (nsize > 0 && result == NULL)
 		fatal("out of memory");
 	return result;
 }
 
-void *xxcalloc(size_t nmemb, size_t size) {
+void *xxcalloc(size_t nmemb, size_t size)
+{
 	void *result = calloc(nmemb, size);
 	if (result) {
 		return result;

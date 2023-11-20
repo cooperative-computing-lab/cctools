@@ -8,21 +8,18 @@ See the file COPYING for details.
 #include "username.h"
 
 #include <pwd.h>
-#include <unistd.h>
-#include <sys/types.h>
 #include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-int username_is_super()
-{
-	return !getuid();
-}
+int username_is_super() { return !getuid(); }
 
 int username_get(char *name)
 {
 	struct passwd *p;
 
 	p = getpwuid(getuid());
-	if(p) {
+	if (p) {
 		strcpy(name, p->pw_name);
 		return 1;
 	} else {
@@ -35,7 +32,7 @@ int username_home(char *dir)
 	struct passwd *p;
 
 	p = getpwuid(getuid());
-	if(p) {
+	if (p) {
 		strcpy(dir, p->pw_dir);
 		return 1;
 	} else {
@@ -51,18 +48,18 @@ int username_set(const char *name)
 	gid_t gid;
 
 	p = getpwnam(name);
-	if(!p) {
+	if (!p) {
 		return 0;
 	}
 
 	uid = p->pw_uid;
 	gid = p->pw_gid;
 
-	if(geteuid() == uid)
+	if (geteuid() == uid)
 		return 1;
 
 	result = seteuid(0);
-	if(result < 0)
+	if (result < 0)
 		return 0;
 
 	setuid(uid);

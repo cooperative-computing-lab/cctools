@@ -1,3 +1,3 @@
 #! /bin/bash
 
-conda env create --name cctools-build --quiet --experimental-solver=libmamba --file environment.yml
+conda env create --name cctools-build --quiet --file environment.yml

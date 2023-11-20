@@ -16,7 +16,7 @@ def send_udp_message(id, fun_name, step, resources):
     import socket
     import json
 
-    finished   = True if step == -1 else False
+    finished = True if step == -1 else False
     exhaustion = True if resources.get('limits_exceeded', False) else False
 
     msg = {'id': id, 'function': fun_name, 'finished': finished, 'resource_exhaustion': exhaustion, 'resources': resources}
@@ -34,7 +34,7 @@ def my_function(wait_for, buffer_size):
     """
     import time
     start = time.time()
-    buf   = bytearray(int(buffer_size * 1024 * 1024))
+    buf = bytearray(int(buffer_size * 1024 * 1024))  # noqa: F841
     delta = wait_for/1e6 - (time.time() - start)   # x/1e6 because sleep expects seconds
     if delta < 0:
         delta = 0

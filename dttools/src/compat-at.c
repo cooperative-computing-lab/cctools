@@ -2,7 +2,7 @@
  * Copyright (C) 2022 The University of Notre Dame
  * This software is distributed under the GNU General Public License.
  * See the file COPYING for details.
-*/
+ */
 
 #if !defined(HAS_OPENAT) || !defined(HAS_UTIMENSAT)
 
@@ -22,7 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static int getfullpath (int dirfd, const char *path, char fullpath[PATH_MAX])
+static int getfullpath(int dirfd, const char *path, char fullpath[PATH_MAX])
 {
 	char dirpath[PATH_MAX] = ".";
 	if (path[0] == '/') {
@@ -38,7 +38,7 @@ static int getfullpath (int dirfd, const char *path, char fullpath[PATH_MAX])
 		if (readlink(procpath, dirpath, PATH_MAX) == -1)
 			return -1;
 #else
-#	error "Cannot proceed without support for *at system calls."
+#error "Cannot proceed without support for *at system calls."
 #endif
 	}
 	int rc = snprintf(fullpath, PATH_MAX, "%s/%s", dirpath, path);
@@ -51,7 +51,7 @@ static int getfullpath (int dirfd, const char *path, char fullpath[PATH_MAX])
 }
 
 #ifndef HAS_OPENAT
-int cctools_faccessat (int dirfd, const char *path, int amode, int flag)
+int cctools_faccessat(int dirfd, const char *path, int amode, int flag)
 {
 	char fullpath[PATH_MAX];
 	if (getfullpath(dirfd, path, fullpath) == -1)
@@ -60,7 +60,7 @@ int cctools_faccessat (int dirfd, const char *path, int amode, int flag)
 	return access(fullpath, amode);
 }
 
-int cctools_fchmodat (int dirfd, const char *path, mode_t mode, int flag)
+int cctools_fchmodat(int dirfd, const char *path, mode_t mode, int flag)
 {
 	char fullpath[PATH_MAX];
 	if (getfullpath(dirfd, path, fullpath) == -1)
@@ -69,7 +69,7 @@ int cctools_fchmodat (int dirfd, const char *path, mode_t mode, int flag)
 	return chmod(fullpath, mode);
 }
 
-DIR *cctools_fdopendir (int dirfd)
+DIR *cctools_fdopendir(int dirfd)
 {
 	char fullpath[PATH_MAX];
 	if (getfullpath(dirfd, ".", fullpath) == -1)
@@ -77,7 +77,7 @@ DIR *cctools_fdopendir (int dirfd)
 	return opendir(fullpath);
 }
 
-int cctools_fstatat (int dirfd, const char *path, struct stat *buf, int flag)
+int cctools_fstatat(int dirfd, const char *path, struct stat *buf, int flag)
 {
 	char fullpath[PATH_MAX];
 	if (getfullpath(dirfd, path, fullpath) == -1)
@@ -89,7 +89,7 @@ int cctools_fstatat (int dirfd, const char *path, struct stat *buf, int flag)
 	}
 }
 
-int cctools_linkat (int dirfd, const char *path, int newdirfd, const char *newpath, int flag)
+int cctools_linkat(int dirfd, const char *path, int newdirfd, const char *newpath, int flag)
 {
 	char fullpath[PATH_MAX];
 	if (getfullpath(dirfd, path, fullpath) == -1)
@@ -101,7 +101,7 @@ int cctools_linkat (int dirfd, const char *path, int newdirfd, const char *newpa
 	return link(fullpath, newfullpath);
 }
 
-int cctools_openat (int dirfd, const char *path, int oflag, mode_t cmode)
+int cctools_openat(int dirfd, const char *path, int oflag, mode_t cmode)
 {
 	char fullpath[PATH_MAX];
 	if (getfullpath(dirfd, path, fullpath) == -1)
@@ -109,7 +109,7 @@ int cctools_openat (int dirfd, const char *path, int oflag, mode_t cmode)
 	return open(fullpath, oflag, cmode);
 }
 
-int cctools_mkdirat (int dirfd, const char *path, mode_t mode)
+int cctools_mkdirat(int dirfd, const char *path, mode_t mode)
 {
 	char fullpath[PATH_MAX];
 	if (getfullpath(dirfd, path, fullpath) == -1)
@@ -117,7 +117,7 @@ int cctools_mkdirat (int dirfd, const char *path, mode_t mode)
 	return mkdir(fullpath, mode);
 }
 
-int cctools_readlinkat (int dirfd, const char *path, char *buf, size_t bufsize)
+int cctools_readlinkat(int dirfd, const char *path, char *buf, size_t bufsize)
 {
 	char fullpath[PATH_MAX];
 	if (getfullpath(dirfd, path, fullpath) == -1)
@@ -125,7 +125,7 @@ int cctools_readlinkat (int dirfd, const char *path, char *buf, size_t bufsize)
 	return readlink(fullpath, buf, bufsize);
 }
 
-int cctools_renameat (int dirfd, const char *path, int newdirfd, const char *newpath)
+int cctools_renameat(int dirfd, const char *path, int newdirfd, const char *newpath)
 {
 	char fullpath[PATH_MAX];
 	if (getfullpath(dirfd, path, fullpath) == -1)
@@ -136,7 +136,7 @@ int cctools_renameat (int dirfd, const char *path, int newdirfd, const char *new
 	return rename(fullpath, newfullpath);
 }
 
-int cctools_symlinkat (const char *target, int dirfd, const char *path)
+int cctools_symlinkat(const char *target, int dirfd, const char *path)
 {
 	char fullpath[PATH_MAX];
 	if (getfullpath(dirfd, path, fullpath) == -1)
@@ -144,7 +144,7 @@ int cctools_symlinkat (const char *target, int dirfd, const char *path)
 	return symlink(target, fullpath);
 }
 
-int cctools_unlinkat (int dirfd, const char *path, int flag)
+int cctools_unlinkat(int dirfd, const char *path, int flag)
 {
 	char fullpath[PATH_MAX];
 	if (getfullpath(dirfd, path, fullpath) == -1)
@@ -158,7 +158,7 @@ int cctools_unlinkat (int dirfd, const char *path, int flag)
 #endif /* HAS_OPENAT */
 
 #ifndef HAS_UTIMENSAT
-int cctools_utimensat (int dirfd, const char *path, const struct timespec times[2], int flag)
+int cctools_utimensat(int dirfd, const char *path, const struct timespec times[2], int flag)
 {
 	struct timeval tv[2] = {{.tv_sec = times[0].tv_sec}, {.tv_sec = times[1].tv_sec}};
 	char fullpath[PATH_MAX];

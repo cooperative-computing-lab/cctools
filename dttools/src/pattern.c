@@ -17,11 +17,11 @@
 #undef uchar
 #define uchar(c) ((unsigned char)(c))
 
-static int luaL_error (void *ms, const char *fmt, ...)
+static int luaL_error(void *ms, const char *fmt, ...)
 {
 	va_list va;
 	va_start(va, fmt);
-	vdebug(D_FATAL|D_NOTICE|D_DEBUG, fmt, va);
+	vdebug(D_FATAL | D_NOTICE | D_DEBUG, fmt, va);
 	va_end(va);
 	abort();
 	return 0;
@@ -29,7 +29,7 @@ static int luaL_error (void *ms, const char *fmt, ...)
 
 #include "luapatt.c"
 
-ptrdiff_t pattern_vmatch (const char *str, const char *patt, va_list va)
+ptrdiff_t pattern_vmatch(const char *str, const char *patt, va_list va)
 {
 	MatchState ms;
 	int anchor = (*patt == '^');
@@ -54,20 +54,20 @@ ptrdiff_t pattern_vmatch (const char *str, const char *patt, va_list va)
 					*capture = ms.capture[i].init - ms.src_init;
 				} else {
 					char **capture = va_arg(va, char **);
-					*capture = malloc(l+1);
+					*capture = malloc(l + 1);
 					if (*capture == NULL)
 						luaL_error(ms.L, "out of memory");
 					strncpy(*capture, ms.capture[i].init, l);
 					(*capture)[l] = '\0';
 				}
 			}
-			return str-ms.src_init;
+			return str - ms.src_init;
 		}
 	} while (str++ < ms.src_end && !anchor);
 	return -1;
 }
 
-ptrdiff_t pattern_match (const char *str, const char *patt, ...)
+ptrdiff_t pattern_match(const char *str, const char *patt, ...)
 {
 	ptrdiff_t rc;
 	va_list va;

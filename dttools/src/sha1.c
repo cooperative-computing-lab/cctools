@@ -47,47 +47,46 @@ effort (for example the reengineering of a great many Capstone chips).
 typedef unsigned char *POINTER;
 
 #ifndef TRUE
-#define FALSE	0
-#define TRUE	( !FALSE )
+#define FALSE 0
+#define TRUE (!FALSE)
 #endif
 
 /* The SHS block size and message digest sizes, in bytes */
 
-#define SHS_DATASIZE    64
-#define SHS_DIGESTSIZE  20
-
+#define SHS_DATASIZE 64
+#define SHS_DIGESTSIZE 20
 
 /* The SHS f()-functions.  The f1 and f3 functions can be optimized to
    save one boolean operation each - thanks to Rich Schroeppel,
    rcs@cs.arizona.edu for discovering this */
 
 /*#define f1(x,y,z) ( ( x & y ) | ( ~x & z ) )          // Rounds  0-19 */
-#define f1(x,y,z)   ( z ^ ( x & ( y ^ z ) ) )	/* Rounds  0-19 */
-#define f2(x,y,z)   ( x ^ y ^ z )	/* Rounds 20-39 */
+#define f1(x, y, z) (z ^ (x & (y ^ z))) /* Rounds  0-19 */
+#define f2(x, y, z) (x ^ y ^ z)		/* Rounds 20-39 */
 /*#define f3(x,y,z) ( ( x & y ) | ( x & z ) | ( y & z ) )   // Rounds 40-59 */
-#define f3(x,y,z)   ( ( x & y ) | ( z & ( x | y ) ) )	/* Rounds 40-59 */
-#define f4(x,y,z)   ( x ^ y ^ z )	/* Rounds 60-79 */
+#define f3(x, y, z) ((x & y) | (z & (x | y))) /* Rounds 40-59 */
+#define f4(x, y, z) (x ^ y ^ z)		      /* Rounds 60-79 */
 
 /* The SHS Mysterious Constants */
 
-#define K1  0x5A827999L		/* Rounds  0-19 */
-#define K2  0x6ED9EBA1L		/* Rounds 20-39 */
-#define K3  0x8F1BBCDCL		/* Rounds 40-59 */
-#define K4  0xCA62C1D6L		/* Rounds 60-79 */
+#define K1 0x5A827999L /* Rounds  0-19 */
+#define K2 0x6ED9EBA1L /* Rounds 20-39 */
+#define K3 0x8F1BBCDCL /* Rounds 40-59 */
+#define K4 0xCA62C1D6L /* Rounds 60-79 */
 
 /* SHS initial values */
 
-#define h0init  0x67452301L
-#define h1init  0xEFCDAB89L
-#define h2init  0x98BADCFEL
-#define h3init  0x10325476L
-#define h4init  0xC3D2E1F0L
+#define h0init 0x67452301L
+#define h1init 0xEFCDAB89L
+#define h2init 0x98BADCFEL
+#define h3init 0x10325476L
+#define h4init 0xC3D2E1F0L
 
 /* Note that it may be necessary to add parentheses to these macros if they
    are to be called with expressions as arguments */
 /* 32-bit rotate left - kludged with shifts */
 
-#define ROTL(n,X)  ( ( ( X ) << n ) | ( ( X ) >> ( 32 - n ) ) )
+#define ROTL(n, X) (((X) << n) | ((X) >> (32 - n)))
 
 /* The initial expanding function.  The hash function is defined over an
    80-UINT2 expanded input array W, where the first 16 are copies of the input
@@ -103,9 +102,7 @@ typedef unsigned char *POINTER;
    bit.  Thanks to Jim Gillogly, jim@rand.org, and an anonymous contributor
    for this information */
 
-#define expand(W,i) ( W[ i & 15 ] = ROTL( 1, ( W[ i & 15 ] ^ W[ (i - 14) & 15 ] ^ \
-												 W[ (i - 8) & 15 ] ^ W[ (i - 3) & 15 ] ) ) )
-
+#define expand(W, i) (W[i & 15] = ROTL(1, (W[i & 15] ^ W[(i - 14) & 15] ^ W[(i - 8) & 15] ^ W[(i - 3) & 15])))
 
 /* The prototype SHS sub-round.  The fundamental sub-round is:
 
@@ -120,12 +117,11 @@ typedef unsigned char *POINTER;
    This code is then replicated 20 times for each of the 4 functions, using
    the next 20 values from the W[] array each time */
 
-#define subRound(a, b, c, d, e, f, k, data) \
-	( e += ROTL( 5, a ) + f( b, c, d ) + k + data, b = ROTL( 30, b ) )
+#define subRound(a, b, c, d, e, f, k, data) (e += ROTL(5, a) + f(b, c, d) + k + data, b = ROTL(30, b))
 
 static void endianTest(int *endian_ness)
 {
-	if((*(unsigned short *) ("#S") >> 8) == '#') {
+	if ((*(unsigned short *)("#S") >> 8) == '#') {
 		/* printf("Big endian = no change\n"); */
 		*endian_ness = !(0);
 	} else {
@@ -134,10 +130,9 @@ static void endianTest(int *endian_ness)
 	}
 }
 
-
 /* Initialize the SHS values */
 
-void sha1_init(sha1_context_t * shsInfo)
+void sha1_init(sha1_context_t *shsInfo)
 {
 	endianTest(&shsInfo->Endianness);
 	/* Set the h-vars to their initial values */
@@ -151,7 +146,6 @@ void sha1_init(sha1_context_t * shsInfo)
 	shsInfo->countLo = shsInfo->countHi = 0;
 }
 
-
 /* Perform the SHS transformation.  Note that this code, like MD5, seems to
    break some optimizing compilers due to the complexity of the expressions
    and the size of the basic block.  It may be necessary to split it into
@@ -161,7 +155,7 @@ void sha1_init(sha1_context_t * shsInfo)
 
 static void SHSTransform(uint32_t *digest, uint32_t *data)
 {
-	uint32_t A, B, C, D, E;	/* Local vars */
+	uint32_t A, B, C, D, E; /* Local vars */
 	uint32_t eData[16];	/* Expanded data */
 
 	/* Set up first buffer and local data buffer */
@@ -170,7 +164,7 @@ static void SHSTransform(uint32_t *digest, uint32_t *data)
 	C = digest[2];
 	D = digest[3];
 	E = digest[4];
-	memcpy((POINTER) eData, (POINTER) data, SHS_DATASIZE);
+	memcpy((POINTER)eData, (POINTER)data, SHS_DATASIZE);
 
 	/* Heavy mangling, in 4 sub-rounds of 20 interations each. */
 	subRound(A, B, C, D, E, f1, K1, eData[0]);
@@ -268,14 +262,14 @@ static void SHSTransform(uint32_t *digest, uint32_t *data)
 /* When run on a little-endian CPU we need to perform byte reversal on an
    array of long words. */
 
-static void longReverse(uint32_t * buffer, size_t byteCount, int Endianness)
+static void longReverse(uint32_t *buffer, size_t byteCount, int Endianness)
 {
 	uint32_t value;
 
-	if(Endianness == TRUE)
+	if (Endianness == TRUE)
 		return;
 	byteCount /= sizeof(uint32_t);
-	while(byteCount--) {
+	while (byteCount--) {
 		value = *buffer;
 		value = ((value & 0xFF00FF00L) >> 8) | ((value & 0x00FF00FFL) << 8);
 		*buffer++ = (value << 16) | (value >> 16);
@@ -284,7 +278,7 @@ static void longReverse(uint32_t * buffer, size_t byteCount, int Endianness)
 
 /* Update SHS for a block of data */
 
-void sha1_update(sha1_context_t * shsInfo, const void *buffer, size_t count)
+void sha1_update(sha1_context_t *shsInfo, const void *buffer, size_t count)
 {
 	uint32_t tmp;
 	size_t dataCount;
@@ -292,19 +286,19 @@ void sha1_update(sha1_context_t * shsInfo, const void *buffer, size_t count)
 
 	/* Update bitcount */
 	tmp = shsInfo->countLo;
-	if((shsInfo->countLo = tmp + ((uint32_t) count << 3)) < tmp)
-		shsInfo->countHi++;	/* Carry from low to high */
+	if ((shsInfo->countLo = tmp + ((uint32_t)count << 3)) < tmp)
+		shsInfo->countHi++; /* Carry from low to high */
 	shsInfo->countHi += count >> 29;
 
 	/* Get count of bytes already in data */
-	dataCount = (int) (tmp >> 3) & 0x3F;
+	dataCount = (int)(tmp >> 3) & 0x3F;
 
 	/* Handle any leading odd-sized chunks */
-	if(dataCount) {
-		uint8_t *p = (uint8_t *) shsInfo->data + dataCount;
+	if (dataCount) {
+		uint8_t *p = (uint8_t *)shsInfo->data + dataCount;
 
 		dataCount = SHS_DATASIZE - dataCount;
-		if(count < dataCount) {
+		if (count < dataCount) {
 			memcpy(p, uchars, count);
 			return;
 		}
@@ -316,8 +310,8 @@ void sha1_update(sha1_context_t * shsInfo, const void *buffer, size_t count)
 	}
 
 	/* Process data in SHS_DATASIZE chunks */
-	while(count >= SHS_DATASIZE) {
-		memcpy((POINTER) shsInfo->data, (POINTER) uchars, SHS_DATASIZE);
+	while (count >= SHS_DATASIZE) {
+		memcpy((POINTER)shsInfo->data, (POINTER)uchars, SHS_DATASIZE);
 		longReverse(shsInfo->data, SHS_DATASIZE, shsInfo->Endianness);
 		SHSTransform(shsInfo->digest, shsInfo->data);
 		uchars += SHS_DATASIZE;
@@ -325,50 +319,50 @@ void sha1_update(sha1_context_t * shsInfo, const void *buffer, size_t count)
 	}
 
 	/* Handle any remaining bytes of data. */
-	memcpy((POINTER) shsInfo->data, (POINTER) uchars, count);
+	memcpy((POINTER)shsInfo->data, (POINTER)uchars, count);
 }
 
 /* Final wrapup - pad to SHS_DATASIZE-byte boundary with the bit pattern
    1 0* (64-bit count of bits processed, MSB-first) */
 
-static void SHAtoByte(uint8_t * output, uint32_t * input, size_t len)
-{				/* Output SHA digest in byte array */
+static void SHAtoByte(uint8_t *output, uint32_t *input, size_t len)
+{ /* Output SHA digest in byte array */
 	size_t i, j;
 
-	for(i = 0, j = 0; j < len; i++, j += 4) {
-		output[j + 3] = (uint8_t) (input[i] & 0xff);
-		output[j + 2] = (uint8_t) ((input[i] >> 8) & 0xff);
-		output[j + 1] = (uint8_t) ((input[i] >> 16) & 0xff);
-		output[j] = (uint8_t) ((input[i] >> 24) & 0xff);
+	for (i = 0, j = 0; j < len; i++, j += 4) {
+		output[j + 3] = (uint8_t)(input[i] & 0xff);
+		output[j + 2] = (uint8_t)((input[i] >> 8) & 0xff);
+		output[j + 1] = (uint8_t)((input[i] >> 16) & 0xff);
+		output[j] = (uint8_t)((input[i] >> 24) & 0xff);
 	}
 }
 
-void sha1_final(unsigned char output[SHA1_DIGEST_LENGTH], sha1_context_t * shsInfo)
+void sha1_final(unsigned char output[SHA1_DIGEST_LENGTH], sha1_context_t *shsInfo)
 {
 	size_t count;
 	uint8_t *dataPtr;
 
 	/* Compute number of bytes mod 64 */
-	count = (int) shsInfo->countLo;
+	count = (int)shsInfo->countLo;
 	count = (count >> 3) & 0x3F;
 
 	/* Set the first char of padding to 0x80.  This is safe since there is
 	   always at least one byte free */
-	dataPtr = (uint8_t *) shsInfo->data + count;
+	dataPtr = (uint8_t *)shsInfo->data + count;
 	*dataPtr++ = 0x80;
 
 	/* Bytes of padding needed to make 64 bytes */
 	count = SHS_DATASIZE - 1 - count;
 
 	/* Pad out to 56 mod 64 */
-	if(count < 8) {
+	if (count < 8) {
 		/* Two lots of padding:  Pad the first block to 64 bytes */
 		memset(dataPtr, 0, count);
 		longReverse(shsInfo->data, SHS_DATASIZE, shsInfo->Endianness);
 		SHSTransform(shsInfo->digest, shsInfo->data);
 
 		/* Now fill the next block with 56 bytes */
-		memset((POINTER) shsInfo->data, 0, SHS_DATASIZE - 8);
+		memset((POINTER)shsInfo->data, 0, SHS_DATASIZE - 8);
 	} else
 		/* Pad block to 56 bytes */
 		memset(dataPtr, 0, count - 8);
@@ -384,10 +378,10 @@ void sha1_final(unsigned char output[SHA1_DIGEST_LENGTH], sha1_context_t * shsIn
 	SHAtoByte(output, shsInfo->digest, SHS_DIGESTSIZE);
 
 	/* Zeroise sensitive stuff */
-	memset((POINTER) shsInfo, 0, sizeof(shsInfo));
+	memset((POINTER)shsInfo, 0, sizeof(shsInfo));
 }
 
-#define BUFFER_SIZE (1<<20)
+#define BUFFER_SIZE (1 << 20)
 int sha1_fd(int fd, unsigned char digest[20])
 {
 	struct stat buf;
@@ -419,7 +413,7 @@ int sha1_fd(int fd, unsigned char digest[20])
 
 int sha1_file(const char *path, unsigned char digest[20])
 {
-	int fd = open(path, O_RDONLY|O_NOCTTY);
+	int fd = open(path, O_RDONLY | O_NOCTTY);
 	if (fd == -1)
 		return 0;
 	int rc = sha1_fd(fd, digest);
@@ -440,8 +434,8 @@ const char *sha1_string(unsigned char digest[20])
 {
 	static char str[41];
 	int i;
-	for(i = 0; i < 20; i++) {
-		sprintf(&str[i * 2], "%02x", (unsigned) digest[i]);
+	for (i = 0; i < 20; i++) {
+		sprintf(&str[i * 2], "%02x", (unsigned)digest[i]);
 	}
 	str[40] = 0;
 	return str;
