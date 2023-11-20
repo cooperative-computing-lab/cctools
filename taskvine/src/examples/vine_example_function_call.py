@@ -60,7 +60,7 @@ def main():
 
     # This format shows how tocd create package import statements for the library
     import_modules = [math]
-    libtask = q.create_library_from_functions('test-library', divide, double, cube, import_modules=import_modules)
+    libtask = q.create_library_from_functions('test-library', divide, double, cube, import_modules=import_modules, add_env=False)
 
     q.install_library(libtask)
 

@@ -49,7 +49,7 @@ def main():
 
     # This format shows how to create package import statements for the library
     import_modules = [math]
-    libtask = q.create_library_from_functions('test-library', divide, double, cube, import_modules=import_modules)
+    libtask = q.create_library_from_functions('test-library', divide, double, cube, import_modules=import_modules, add_env=False)
     
     libtask.set_cores(1)
     libtask.set_memory(1000)
@@ -74,7 +74,7 @@ def main():
     print("Waiting for results...")
 
     total_sum = 0
-    
+
     while not q.empty():
         t = q.wait(5)
         if t:
