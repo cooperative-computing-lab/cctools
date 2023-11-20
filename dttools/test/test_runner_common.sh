@@ -138,7 +138,7 @@ run_taskvine_worker()
 		exit 1
 	fi
 	echo "Running worker."
-	if ! "$TASKVINE_WORKER" --single-shot --timeout=200s --cores ${cores:-1} --memory ${memory:-250} --disk ${disk:-250} --gpus ${gpus:-0} --debug=all --debug-file="$log" $* localhost $(cat "$port_file"); then
+	if ! "$TASKVINE_WORKER" --single-shot --timeout=10 --cores ${cores:-1} --memory ${memory:-250} --disk ${disk:-250} --gpus ${gpus:-0} --debug=all --debug-file="$log" $* localhost $(cat "$port_file"); then
 		echo "ERROR: could not start worker"
 		exit 1
 	fi

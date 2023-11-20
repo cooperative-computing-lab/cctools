@@ -1527,82 +1527,45 @@ You can certainly embed `import` statements within the function and install any 
 
 In the prevailing approach to executing library functions, each invocation of a function triggers the creation of a new child process to execute the corresponding code. Given that a single function might be executed repeatedly, this process is replicated for each call, leading to the multiple executions of `import` statements within the function's code. Such redundancy results in considerable, unnecessary latency, adversely impacting performance.
 
-To mitigate this, pass the `imports` argument to the `create_library_from_functions` function, specifying the packages your functions will use. Those `import` statements will be prepended to the serverless library's preamble, thus reducing execution time by avoiding redundant imports:
+To mitigate this, pass the `import_modules` argument to the `create_library_from_functions` function, specifying the packages your functions will use. Those `import` statements will be prepended to the serverless library's preamble, thus reducing execution time by avoiding redundant imports:
 
 === Python 
-    ```python 
-    imports = ["math"]
+    ```python
+    import math
 
     def divide(dividend, divisor):
         return dividend / math.sqrt(divisor)
 
-    libtask = m.create_library_from_functions("my_library", divide, imports=imports)
+    libtask = m.create_library_from_functions("my_library", divide, import_modules=[math])
     ```
 
-At current implementation, you can only specify the modules that need to be imported, each module can be given a alias by formatting it to be a tuple:
+At current implementation, you can only specify the modules that need to be imported, and elements in the list should be TypeModule:
 
 === Python
     ```python
-    imports = ["sys", ("math", "m")]
+    import numpy
+    import math
+
+    import_modules = [numpy, math]
     ```
 
-You are not allowed to put a `FromImport` statement at the preamble of the library. Whenever the function needs a `FromImport` statement, it should include it inside of that function (remember that ).
+You are not allowed to put a `FromImport` statement at the preamble of the library. Whenever the function needs a `FromImport` statement, or an alias of a module, it should be directly included inside of that function:
 
-it a :
-
-=== Python 
-    ```python
-    # format it as a dictionary supporting comprehensive usage
-    imports = { 
-        'math': '',                        # import math 
-        'time': '',                        # import time 
-        'numpy': 'np',                     # import numpy as np 
-        'random': {'uniform': ''},         # from random import uniform
-        'time': {'sleep': 'time_sleep'}    # from time import sleep as time_sleep 
-    }
-
-    # format it as a list or a string for simple usage
-    imports = ['os.path', 'sys', 'time']   # import os.path
-                                           # import sys
-                                           # import time
-
-    imports = 'tensorflow'                 # import tensorflow
-    ```
-
-Alternatively, you may combine both methods:
 === Python
     ```python
-    imports = { 
-        'math': '',                        # import math 
-        'time': '',                        # import time 
-        'numpy': 'np',                     # import numpy as np 
-        'random': {'uniform': ''},         # from random import uniform
-        'time': {'sleep': 'time_sleep'}    # from time import sleep as time_sleep 
-    }
+    def cube(x):
+        # whenever using FromImport statments, put them inside of functions
+        from random import uniform
+        from time import sleep as time_sleep
 
-    def cube_sqrt(x):
         random_delay = uniform(0.00001, 0.0001)
         time_sleep(random_delay)
 
-        sqrt_value = math.sqrt(x)
-        cube_value = np.power(sqrt_value, 3)
-
-        return cube_value
-
-    def divide(dividend, divisor):
-        return dividend / math.sqrt(divisor)
-
-    # Package imports can also be inside of the function
-    def double(x):
-        import math as m
-        return m.prod([x, 2])
-
-    libtask = q.create_library_from_functions('test-library', divide, double, cube_sqrt, imports=imports)
-
+        return math.pow(x, 3)
     ```
 
-After installing the packages and functions, you can optionally specify the number of functions the library can 
-run concurrently by setting the number of function slots (default to 1):
+
+After installing the packages and functions, you can optionally specify the number of functions the library can run concurrently by setting the number of function slots (default to 1):
 
 === "Python"
     ```python

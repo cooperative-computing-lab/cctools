@@ -14,6 +14,7 @@ import json
 import os
 import stat
 import ast
+import types
 import tarfile
 import hashlib
 import inspect
@@ -33,27 +34,23 @@ init_function = \
 
  
 # Generates a list of import statements based on the given argument.
-# @param import_modules    A list of modules that will be translated to import statements
-#                          Usage example:
-#                          import_modules = ["sys", "os.path", ("numpy", "np")]
-#                          This will be translated to: import sys / import os.path / import numpy as np
+# @param import_modules  A list of modules imported at the preamble of library
+#                        Usage example:
+#                        import_modules = [sys, numpy]
 def generate_import_statements(import_modules):
     if import_modules == None:
         return
     
-    import_statements = []
 
     if not isinstance(import_modules, list):
-        raise ValueError("Expected 'imports' to be a list.")
+        raise ValueError("Expected 'import_modules' to be a list.")
     
+    import_statements = []
     for module in import_modules:
-        if isinstance(module, str):
-            import_statements.append(f"import {module}")
-        elif isinstance(module, tuple) and len(module) == 2:
-            module_name, alias = module
-            import_statements.append(f"import {module_name} as {alias}")
-        else:
-            raise ValueError("Invalid format in imports list.")
+        if not isinstance(module, types.ModuleType):
+            raise ValueError("Expected ModuleType in 'import_modules'.")
+        
+        import_statements.append(f"import {module.__name__}")
     
     return import_statements
 
@@ -64,10 +61,9 @@ def generate_import_statements(import_modules):
 # @param funcs           A list of relevant function names.
 # @param dest            Path to the final library script.
 # @param version         Whether this is for workqueue or taskvine serverless code.
-# @param import_modules  A list of modules that will be translated to import statements
+# @param import_modules  A list of modules imported at the preamble of library
 #                        Usage example:
-#                        imports = ["sys", "os.path", ("numpy", "np")]
-#                        This will be translated to: import sys / import os.path / import numpy as np
+#                        import_modules = [sys, numpy]
 def create_library_code(path, funcs, dest, version, import_modules=None):
 
     # create output file
@@ -185,10 +181,9 @@ def generate_functions_hash(functions: list) -> str:
 # The functions in the list must have source code for this code to work.
 # @param path             path to directory to create the library python file and the environment tarball.
 # @param functions        list of functions to include in the 
-# @param import_modules   A list of modules that will be translated to import statements
+# @param import_modules   A list of modules imported at the preamble of library
 #                         Usage example:
-#                         import_modules = ["sys", "os.path", ("numpy", "np")]
-#                         This will be translated to: import sys / import os.path / import numpy as np
+#                         import_modules = [sys, numpy]
 def serverize_library_from_code(path, functions, name, need_pack=True, import_modules=None):
     tmp_library_path = f"{path}/tmp_library.py"
 

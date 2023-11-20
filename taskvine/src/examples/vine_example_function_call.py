@@ -7,14 +7,13 @@
 import ndcctools.taskvine as vine
 import argparse
 import math
-import json
 import math as m
+import json
 
 # The library will consist of the following three functions:
 
 def cube(x):
-    # import random.uniform as uniform is not a valid Python statement
-    # whenever you have a FormImport statement, put is inside of function
+    # whenever using FromImport statments, put them inside of functions
     from random import uniform
     from time import sleep as time_sleep
 
@@ -28,7 +27,8 @@ def divide(dividend, divisor):
     return dividend / math.sqrt(divisor)
 
 def double(x):
-    # straightfoward usage of preamble import statements
+    import math as m
+    # use alias inside of functions
     return m.prod([x, 2])
 
 
@@ -59,12 +59,8 @@ def main():
     print("Creating library from packages and functions...")
 
     # This format shows how tocd create package import statements for the library
-    import_modules = [("math", "m"), "math"]
+    import_modules = [math]
     libtask = q.create_library_from_functions('test-library', divide, double, cube, import_modules=import_modules)
-    
-    libtask.set_cores(1)
-    libtask.set_memory(1000)
-    libtask.set_disk(1000)
 
     q.install_library(libtask)
 
@@ -75,7 +71,7 @@ def main():
     for _ in range(0, tasks):
         s_task = vine.FunctionCall('test-library', 'divide', 2, 2**2)
         q.submit(s_task)
-    
+
         s_task = vine.FunctionCall('test-library', 'double', 3)
         q.submit(s_task)
 
@@ -85,7 +81,7 @@ def main():
     print("Waiting for results...")
 
     total_sum = 0
-    x = 0
+
     while not q.empty():
         t = q.wait(5)
         if t:
