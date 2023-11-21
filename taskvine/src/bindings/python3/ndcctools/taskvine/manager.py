@@ -861,9 +861,7 @@ class Manager(object):
     # @param init_command    A string describing a shell command to execute before the library task is run
     # @param add_env         Whether to automatically create and/or add environment to the library
     # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
-    # @param import_modules  A list of modules imported at the preamble of library
-    #                        Usage example:
-    #                        import_modules = [sys, numpy]
+    # @param import_modules  A list of modules to be imported at the preamble of library
     def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True, import_modules=None):
         # Delay loading of poncho until here, to avoid bringing in poncho dependencies unless needed.
         # Ensure poncho python library is available.

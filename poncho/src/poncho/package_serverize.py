@@ -35,13 +35,10 @@ init_function = \
  
 # Generates a list of import statements based on the given argument.
 # @param import_modules  A list of modules imported at the preamble of library
-#                        Usage example:
-#                        import_modules = [sys, numpy]
 def generate_import_statements(import_modules):
-    if import_modules == None:
+    if not import_modules:
         return
     
-
     if not isinstance(import_modules, list):
         raise ValueError("Expected 'import_modules' to be a list.")
     
@@ -61,58 +58,56 @@ def generate_import_statements(import_modules):
 # @param funcs           A list of relevant function names.
 # @param dest            Path to the final library script.
 # @param version         Whether this is for workqueue or taskvine serverless code.
-# @param import_modules  A list of modules imported at the preamble of library
-#                        Usage example:
-#                        import_modules = [sys, numpy]
+# @param import_modules  A list of modules to be imported at the preamble of library
 def create_library_code(path, funcs, dest, version, import_modules=None):
 
     # create output file
-    output_file = open(dest, "w")
-    # write shebang to file
-    output_file.write(shebang)
-    # write imports to file
-    import_statements = generate_import_statements(import_modules)
-    if import_statements:
-        for import_statement in import_statements:
-            output_file.write(f"{import_statement}\n")
+    with open(dest, "w") as output_file:
+        # write shebang to file
+        output_file.write(shebang)
+        # write imports to file
+        import_statements = generate_import_statements(import_modules)
+        if import_statements:
+            for import_statement in import_statements:
+                output_file.write(f"{import_statement}\n")
 
-    function_source_code = []
-    name_source_code = ""
-    absolute_path = os.path.abspath(path)
-    # open the source file, parse the code into an ast, and then unparse functions back into python code
-    with open(absolute_path, 'r') as source:
-        code = ast.parse(source.read(), filename=absolute_path)
-        for stmt in ast.walk(code):
-            if isinstance(stmt, ast.FunctionDef):
-                if stmt.name == "name":
-                    name_source_code = ast.unparse(stmt)
-                elif stmt.name in funcs:
-                    function_source_code.append(ast.unparse(stmt))
-                    funcs.remove(stmt.name)
-    if name_source_code == "":
-        print("No name function found, defaulting to my_coprocess")
-        name_source_code = default_name_func
-    for func in funcs:
-        print(f"No function found named {func}, skipping")
+        function_source_code = []
+        name_source_code = ""
+        absolute_path = os.path.abspath(path)
+        # open the source file, parse the code into an ast, and then unparse functions back into python code
+        with open(absolute_path, 'r') as source:
+            code = ast.parse(source.read(), filename=absolute_path)
+            for stmt in ast.walk(code):
+                if isinstance(stmt, ast.FunctionDef):
+                    if stmt.name == "name":
+                        name_source_code = ast.unparse(stmt)
+                    elif stmt.name in funcs:
+                        function_source_code.append(ast.unparse(stmt))
+                        funcs.remove(stmt.name)
+        if name_source_code == "":
+            print("No name function found, defaulting to my_coprocess")
+            name_source_code = default_name_func
+        for func in funcs:
+            print(f"No function found named {func}, skipping")
 
-    # write network code into it
-    if version == "work_queue":
-        raw_source_fnc = wq_network_code
-    elif version == "taskvine":
-        raw_source_fnc = library_network_code
-    raw_source_code = inspect.getsource(raw_source_fnc)
-    network_code = "\n".join([line[4:] for line in raw_source_code.split("\n")[1:]])
-    output_file.write(network_code)
+        # write network code into it
+        if version == "work_queue":
+            raw_source_fnc = wq_network_code
+        elif version == "taskvine":
+            raw_source_fnc = library_network_code
+        raw_source_code = inspect.getsource(raw_source_fnc)
+        network_code = "\n".join([line[4:] for line in raw_source_code.split("\n")[1:]])
+        output_file.write(network_code)
 
-    # write name function code into it
-    output_file.write(f"{name_source_code}\n")
-    # iterate over every function the user requested and attempt to put it into the library code
-    for function_code in function_source_code:
-        output_file.write("@remote_execute\n")
-        output_file.write(function_code)
-        output_file.write("\n")
-    output_file.write(init_function)
-    output_file.close()
+        # write name function code into it
+        output_file.write(f"{name_source_code}\n")
+        # iterate over every function the user requested and attempt to put it into the library code
+        for function_code in function_source_code:
+            output_file.write("@remote_execute\n")
+            output_file.write(function_code)
+            output_file.write("\n")
+        output_file.write(init_function)
+
     st = os.stat(dest)
     os.chmod(dest, st.st_mode | stat.S_IEXEC)
 
@@ -181,9 +176,7 @@ def generate_functions_hash(functions: list) -> str:
 # The functions in the list must have source code for this code to work.
 # @param path             path to directory to create the library python file and the environment tarball.
 # @param functions        list of functions to include in the 
-# @param import_modules   A list of modules imported at the preamble of library
-#                         Usage example:
-#                         import_modules = [sys, numpy]
+# @param import_modules   a list of modules to be imported at the preamble of library
 def serverize_library_from_code(path, functions, name, need_pack=True, import_modules=None):
     tmp_library_path = f"{path}/tmp_library.py"
 

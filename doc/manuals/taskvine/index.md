@@ -1512,7 +1512,7 @@ function definitions into a library task `libtask`
     libtask = m.create_library_from_functions("my_library", my_sum, my_mul)
     ```
 
-The situation is straightforward for simple functions that don't utilize additional packages. However, it becomes complex when the function incorporates external packages via `import` statements.
+We strongly recommend specify the modules the function needs inside the function itself. This ensures that the correct modules and their aliases will be available when the functions are executed in isolation at the worker:
 
 You can certainly embed `import` statements within the function and install any necessary packages:
 
@@ -1525,21 +1525,8 @@ You can certainly embed `import` statements within the function and install any 
     libtask = m.create_library_from_functions("my_library", divide)
     ```
 
-In the prevailing approach to executing library functions, each invocation of a function triggers the creation of a new child process to execute the corresponding code. Given that a single function might be executed repeatedly, this process is replicated for each call, leading to the multiple executions of `import` statements within the function's code. Such redundancy results in considerable, unnecessary latency, adversely impacting performance.
+If the overhead of importing modules per function is noticeable, modules can be optionally imported as a common preamble to the function executions. Common modules can be specified with the `import_modules` argument to `create_library_from_functions`. This reduces the overhead by eliminating redundant imports:
 
-To mitigate this, pass the `import_modules` argument to the `create_library_from_functions` function, specifying the packages your functions will use. Those `import` statements will be prepended to the serverless library's preamble, thus reducing execution time by avoiding redundant imports:
-
-=== Python 
-    ```python
-    import math
-
-    def divide(dividend, divisor):
-        return dividend / math.sqrt(divisor)
-
-    libtask = m.create_library_from_functions("my_library", divide, import_modules=[math])
-    ```
-
-At current implementation, you can only specify the modules that need to be imported, and elements in the list should be TypeModule:
 
 === Python
     ```python
@@ -1549,7 +1536,7 @@ At current implementation, you can only specify the modules that need to be impo
     import_modules = [numpy, math]
     ```
 
-You are not allowed to put a `FromImport` statement at the preamble of the library. Whenever the function needs a `FromImport` statement, or an alias of a module, it should be directly included inside of that function:
+`import_modules` only accepts modules as arguments (e.g. it can't be used to import functions, or select particular names with `from ... import ...` statements. Such statements should be made inside functions after specifying the modules with `import_modules`.
 
 === Python
     ```python
