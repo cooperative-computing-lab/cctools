@@ -62,13 +62,18 @@ int file_link_recursive(const char *source, const char *target, int allow_symlin
 			be accidentally relative to the current directory.
 			*/
 
-			char *cwd = path_getcwd();
-			char *absolute_source = string_format("%s/%s", cwd, source);
+			int result = 0;
+			if (source[0] == '/') {
+				result = symlink(source, target);
+			} else {
+				char *cwd = path_getcwd();
+				char *absolute_source = string_format("%s/%s", cwd, source);
 
-			int result = symlink(absolute_source, target);
+				result = symlink(absolute_source, target);
 
-			free(absolute_source);
-			free(cwd);
+				free(absolute_source);
+				free(cwd);
+			}
 
 			if (result == 0)
 				return 1;
