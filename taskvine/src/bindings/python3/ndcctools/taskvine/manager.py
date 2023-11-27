@@ -861,7 +861,8 @@ class Manager(object):
     # @param init_command    A string describing a shell command to execute before the library task is run
     # @param add_env         Whether to automatically create and/or add environment to the library
     # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
-    def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True):
+    # @param import_modules  A list of modules to be imported at the preamble of library
+    def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True, import_modules=None):
         # Delay loading of poncho until here, to avoid bringing in poncho dependencies unless needed.
         # Ensure poncho python library is available.
         try:
@@ -872,7 +873,7 @@ class Manager(object):
         # Positional arguments are the list of functions to include in the library.
         # Create a unique hash of a combination of function names and bodies.
         functions_hash = package_serverize.generate_functions_hash(function_list)
-
+        
         # Create path for caching library code and environment based on function hash.
         library_cache_path = f"{self.cache_directory}/vine-library-cache/{functions_hash}"
         library_code_path = f"{library_cache_path}/library_code.py"
@@ -896,7 +897,7 @@ class Manager(object):
                 need_pack=False
             
             # create library code and environment, if appropriate
-            package_serverize.serverize_library_from_code(library_cache_path, function_list, name, need_pack=need_pack)
+            package_serverize.serverize_library_from_code(library_cache_path, function_list, name, need_pack=need_pack, import_modules=import_modules)
 
             # enable correct permissions for library code
             os.chmod(library_code_path, 0o775)

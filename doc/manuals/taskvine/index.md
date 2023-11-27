@@ -1507,8 +1507,47 @@ function definitions into a library task `libtask`
     libtask = m.create_library_from_functions("my_library", my_sum, my_mul)
     ```
 
-You can optionally specify the number of functions the library can 
-run concurrently by setting the number of function slots (default to 1):
+We strongly recommend to specify the modules the function needs inside the function itself. This ensures that the correct modules and their aliases will be available when the functions are executed in isolation at the worker:
+
+You can certainly embed `import` statements within the function and install any necessary packages:
+
+=== Python
+    ```python
+    def divide(dividend, divisor): 
+        import math 
+        return dividend / math.sqrt(divisor)
+
+    libtask = m.create_library_from_functions("my_library", divide)
+    ```
+
+If the overhead of importing modules per function is noticeable, modules can be optionally imported as a common preamble to the function executions. Common modules can be specified with the `import_modules` argument to `create_library_from_functions`. This reduces the overhead by eliminating redundant imports:
+
+
+=== Python
+    ```python
+    import numpy
+    import math
+
+    import_modules = [numpy, math]
+    ```
+
+`import_modules` only accepts modules as arguments (e.g. it can't be used to import functions, or select particular names with `from ... import ...` statements. Such statements should be made inside functions after specifying the modules with `import_modules`.
+
+=== Python
+    ```python
+    def cube(x):
+        # whenever using FromImport statments, put them inside of functions
+        from random import uniform
+        from time import sleep as time_sleep
+
+        random_delay = uniform(0.00001, 0.0001)
+        time_sleep(random_delay)
+
+        return math.pow(x, 3)
+    ```
+
+
+After installing the packages and functions, you can optionally specify the number of functions the library can run concurrently by setting the number of function slots (default to 1):
 
 === "Python"
     ```python

@@ -1,15 +1,35 @@
 #!/usr/bin/env python3
 
+# This example shows how to install a library of functions once
+# as a LibraryTask, and then invoke that library remotely by
+# using FunctionCall tasks.
+
 import ndcctools.taskvine as vine
-import json
 import argparse
+import math
+import json
+
+# The library will consist of the following three functions:
+
+def cube(x):
+    # whenever using FromImport statments, put them inside of functions
+    from random import uniform
+    from time import sleep as time_sleep
+
+    random_delay = uniform(0.00001, 0.0001)
+    time_sleep(random_delay)
+
+    return math.pow(x, 3)
 
 def divide(dividend, divisor):
-    import math
-    return dividend/math.sqrt(divisor)
+    # straightfoward usage of preamble import statements
+    return dividend / math.sqrt(divisor)
 
 def double(x):
-    return x*2
+    import math as m
+    # use alias inside of functions
+    return m.prod([x, 2])
+
 
 def main():
     parser = argparse.ArgumentParser("Test for taskvine python bindings.")
@@ -25,9 +45,12 @@ def main():
         print("Writing port {port} to file {file}".format(port=q.port, file=args.port_file))
         f.write(str(q.port))
 
-    print("Creating library from functions...")
+    print("Creating library from packages and functions...")
 
-    libtask = q.create_library_from_functions('test-library', divide, double, add_env=False)
+    # This format shows how to create package import statements for the library
+    import_modules = [math]
+    libtask = q.create_library_from_functions('test-library', divide, double, cube, import_modules=import_modules, add_env=False)
+    
     libtask.set_cores(1)
     libtask.set_memory(1000)
     libtask.set_disk(1000)
@@ -38,27 +61,30 @@ def main():
     
     tasks = 100
 
-    for i in range(0,tasks): 
+    for _ in range(0, tasks):
         s_task = vine.FunctionCall('test-library', 'divide', 2, 2**2)
         q.submit(s_task)
     
         s_task = vine.FunctionCall('test-library', 'double', 3)
         q.submit(s_task)
 
+        s_task = vine.FunctionCall('test-library', 'cube', 4)
+        q.submit(s_task)
+
     print("Waiting for results...")
 
     total_sum = 0
-    x = 0
+
     while not q.empty():
         t = q.wait(5)
         if t:
-            x = t.output 
+            x = t.output
             total_sum += x
             print(f"task {t.id} completed with result {x}")
 
     # Check that we got the right result.
-    expected = tasks * ( divide(2, 2**2) + double(3) )
-
+    expected = tasks * (divide(2, 2**2) + double(3) + cube(4))
+    
     print(f"Total:    {total_sum}")
     print(f"Expected: {expected}")
 
@@ -66,5 +92,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:

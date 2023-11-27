@@ -44,7 +44,7 @@ def load_matrices(levels):
 
 def write_matrices(levels, n):
     for x in range(2**(levels+1)):
-        matrix = generateRandomMatrix(n)
+        matrix = generate_random_matrix(n)
         with open('matrices/matrix-{}'.format(x), 'wb') as f:
             cloudpickle.dump(matrix, f)
 
