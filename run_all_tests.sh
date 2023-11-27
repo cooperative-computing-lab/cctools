@@ -49,7 +49,6 @@ START_TIME=$(date +%s)
 for package in ${CCTOOLS_PACKAGES_TEST}; do
     if [ ${package} != "makeflow" ]; then
         continue;
-        echo "HERE"
     fi
 	if [ -d "${package}/test" ]; then
 		cd "./${package}/test"
