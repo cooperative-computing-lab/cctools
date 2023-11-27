@@ -1512,7 +1512,7 @@ function definitions into a library task `libtask`
     libtask = m.create_library_from_functions("my_library", my_sum, my_mul)
     ```
 
-We strongly recommend specify the modules the function needs inside the function itself. This ensures that the correct modules and their aliases will be available when the functions are executed in isolation at the worker:
+We strongly recommend to specify the modules the function needs inside the function itself. This ensures that the correct modules and their aliases will be available when the functions are executed in isolation at the worker:
 
 You can certainly embed `import` statements within the function and install any necessary packages:
 
