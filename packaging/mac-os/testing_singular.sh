@@ -9,5 +9,7 @@ ls
 ls mydir
 cat mydir/1.txt
 cat mydir/2.txt
+ls input
+cat input/hello
 
 exit 1
