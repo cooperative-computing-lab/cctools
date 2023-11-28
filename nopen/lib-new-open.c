@@ -1,3 +1,5 @@
+#include "lib-new-open.h"
+
 #define _GNU_SOURCE
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -6,15 +8,14 @@
 #include <errno.h>
 #include <stdlib.h>
 
+#include <sys/types.h>
+
 #define LOGGING 0
-
-
-int file_permission(const char *pathname);
 
 int open(const char *pathname, int flags) {
     int file_descriptor;
     
-    if (file_permission(pathname)) {
+    if (_file_permission(pathname)) {
         errno = ENOENT;
         return -1;
     }
@@ -23,7 +24,15 @@ int open(const char *pathname, int flags) {
      
 }
 
-int file_permission(const char *pathname) {
+int stat(const char *pathname, struct stat *statbuf) {
+
+    fprintf(stdout,"heelo\n");
+
+    syscall(SYS_stat, pathname, statbuf);
+    return 777;
+}
+
+int _file_permission(const char *pathname) {
     char log_path[BUFSIZ] = "./log.txt";
     int fd_log = syscall(SYS_open, log_path, 1025);
     FILE* fp_log = fdopen(fd_log, "a");
@@ -71,13 +80,13 @@ int file_permission(const char *pathname) {
         rule[strcspn(rule, "\n")] = '\0';
 
         if (strstr(a_path,rule)) {
-            if (LOGGING) fprintf(fp_log, "access granted:   '%s'\n",a_path);
+            if (1) fprintf(stdout, "access granted:   '%s'\n",a_path);
             return 0;
         } 
 
     }
 
-    fprintf(stderr, "access forbidden: '%s' not in allow list\n",a_path);
+    fprintf(stdout, "access forbidden: '%s' not in allow list\n",a_path);
     if (LOGGING) fprintf(fp_log, "access forbidden: '%s' not in allow list\n",a_path);
     return 1;
 }

@@ -33,6 +33,10 @@ test: lib-new-open.so program
 
 worker:
 	vine_worker $$HOSTNAME 9123
+
+worker-nopen:
+	vine_worker --nopen $$HOSTNAME 9123
+
 worker-debug:
 	vine_worker -d all -o worker.debug $$HOSTNAME 9123
 condor-submit:
