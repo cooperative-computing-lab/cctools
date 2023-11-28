@@ -119,7 +119,7 @@ class DaskVine(Manager):
         tag = f"dag-{id(dag)}"
 
         rs = dag.set_targets(keys_flatten)
-        self._submit_calls(dag, tag, rs)
+        self._submit_calls(dag, tag, rs, self.retries)
 
         while not self.empty():
             t = self.wait_for_tag(tag, 5)
@@ -129,12 +129,12 @@ class DaskVine(Manager):
 
                 if t.successful():
                     rs = dag.set_result(t.key, DaskVineFile(t.output_file, t.key, self.staging_directory))
-                    self._submit_calls(dag, tag, rs)
+                    self._submit_calls(dag, tag, rs, self.retries)
                 else:
                     retries_left = t.decrement_retry()
                     print(f"task id {t.id} key {t.key} failed. {retries_left} attempts left.\n{t.std_output}")
                     if retries_left > 0:
-                        self._submit_calls(dag, tag, [(t.key, t.sexpr)])
+                        self._submit_calls(dag, tag, [(t.key, t.sexpr)], retries_left)
                     else:
                         raise Exception(f"tasks for key {t.key} failed permanently")
         return self._load_results(dag, indices, keys)
@@ -145,7 +145,7 @@ class DaskVine(Manager):
         else:
             return "other"
 
-    def _submit_calls(self, dag, tag, rs):
+    def _submit_calls(self, dag, tag, rs, retries):
         targets = dag.get_targets()
         for (k, sexpr) in rs:
             lazy = self.lazy_transfers and k not in targets
@@ -168,7 +168,7 @@ class DaskVine(Manager):
                                category=cat,
                                environment=self.environment,
                                extra_files=self.extra_files,
-                               retries=self.retries,
+                               retries=retries,
                                lazy_transfers=lazy)
             t.set_tag(tag)  # tag that identifies this dag
             self.submit(t)
