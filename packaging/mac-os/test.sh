@@ -1,6 +1,7 @@
 #!/bin/bash
 source ~/.zshrc
-if ! conda run --name cctools-build make test
+conda activate cctools-build
+if ! make test
 then
     echo === Contents of cctools.test.fail ===
     cat cctools.test.fail

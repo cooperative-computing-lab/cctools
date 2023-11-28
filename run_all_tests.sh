@@ -99,6 +99,7 @@ for package in ${CCTOOLS_PACKAGES_TEST}; do
 					echo "=== Test ${package}/test/${script}: failure." >> $CCTOOLS_TEST_LOG
 				fi
 			fi
+            break
 		done
 		cd ../..
 	fi
