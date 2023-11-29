@@ -10,6 +10,7 @@
 
 from .manager import Manager
 from .task import PythonTask
+from .task import FunctionCall
 from .dask_dag import DaskVineDag
 
 import cloudpickle
@@ -69,10 +70,15 @@ class DaskVine(Manager):
     #                      to the manager.
     # @param resources     A dictionary with optional keys of cores, memory and disk (MB)
     #                      to set maximum resource usage per task.
+    # @param lib_resources A dictionary with optional keys of cores, memory and disk (MB) 
+    # @param lib_command A command to be prefixed to the execution of a Library task. 
+    # @param lib_environment path to environent file for a Library (string). 
     # @param resources_mode Automatically resize allocation per task. One of 'fixed'
     #                       (use the value of 'resources' above), 'max througput',
     #                       'max' (for maximum values seen), 'min_waste', 'greedy bucketing'
     #                       or 'exhaustive bucketing'. This is done per function type in dsk.
+    # @param task_mode     Create tasks as either PythonTasks('tasks') or Function Calls
+    #                      ('function_calls')
     # @param retries       Number of times to attempt a task. Default is 5.
     # @param verbose       if true, emit additional debugging information.
     
@@ -83,7 +89,11 @@ class DaskVine(Manager):
             low_memory_mode=False,
             checkpoint_fn=None,
             resources=None,
+            lib_resources=None,
+            lib_command=None,
+            lib_environment=None,
             resources_mode='fixed',
+            task_mode='tasks',
             retries=5,
             verbose=False
             ):
@@ -97,7 +107,11 @@ class DaskVine(Manager):
             self.low_memory_mode = low_memory_mode
             self.checkpoint_fn = checkpoint_fn
             self.resources = resources
+            self.lib_resources = lib_resources
+            self.lib_command = lib_command
+            self.lib_environment = lib_environment
             self.resources_mode = resources_mode
+            self.task_mode = task_mode
             self.retries = retries
             self.verbose = verbose
 
@@ -117,6 +131,18 @@ class DaskVine(Manager):
 
         dag = DaskVineDag(dsk, low_memory_mode=self.low_memory_mode)
         tag = f"dag-{id(dag)}"
+        
+        # create Library if using 'function_calls' task mode.
+        if self.task_mode == 'function_calls':
+            libtask = self.create_library_from_functions('Dask-Library', execute_graph_vertex, poncho_env=self.lib_environment, add_env=False, init_command=self.lib_command)
+            if self.lib_resources and self.lib_resources['cores']:
+                libtask.set_cores(self.lib_resources['cores'])
+            if self.lib_resources and self.lib_resources['memory']:
+                libtask.set_memory(self.lib_resources['memory'])
+            if self.lib_resources and self.lib_resources['disk']:
+                libtask.set_disk(self.lib_resources['disk'])
+            self.install_library(libtask)
+
 
         rs = dag.set_targets(keys_flatten)
         self._submit_calls(dag, tag, rs, self.retries)
@@ -128,7 +154,7 @@ class DaskVine(Manager):
                     print(f"{t.key} ran on {t.hostname}")
 
                 if t.successful():
-                    rs = dag.set_result(t.key, DaskVineFile(t.output_file, t.key, self.staging_directory))
+                    rs = dag.set_result(t.key, DaskVineFile(t.output_file, t.key, self.staging_directory, self.task_mode))
                     self._submit_calls(dag, tag, rs, self.retries)
                 else:
                     retries_left = t.decrement_retry()
@@ -153,23 +179,32 @@ class DaskVine(Manager):
                 lazy = self.checkpoint_fn(dag, k)
 
             cat = self.category_name(sexpr)
-            if cat not in self._categories_known:
-                if self.resources:
-                    self.set_category_resources_max(cat, self.resources)
-                if self.resources_mode:
-                    self.set_category_mode(cat, self.resources_mode)
+            if self.task_mode == 'tasks':
+                if cat not in self._categories_known:
+                    if self.resources:
+                        self.set_category_resources_max(cat, self.resources)
+                    if self.resources_mode:
+                        self.set_category_mode(cat, self.resources_mode)
 
-                    if not self._categories_known:
-                        self.enable_monitoring()
-                self._categories_known.add(cat)
+                        if not self._categories_known:
+                            self.enable_monitoring()
+                    self._categories_known.add(cat)
 
-            t = PythonTaskDask(self,
-                               dag, k, sexpr,
-                               category=cat,
-                               environment=self.environment,
-                               extra_files=self.extra_files,
-                               retries=retries,
-                               lazy_transfers=lazy)
+            if self.task_mode == 'function_calls':
+                t = FunctionCallDask(self,
+                       dag, k, sexpr,
+                       category=cat,
+                       extra_files=self.extra_files,
+                       retries=retries,
+                       lazy_transfers=lazy)
+            if self.task_mode == 'tasks':
+                t = PythonTaskDask(self,
+                                   dag, k, sexpr,
+                                   category=cat,
+                                   environment=self.environment,
+                                   extra_files=self.extra_files,
+                                   retries=retries,
+                                   lazy_transfers=lazy)
             t.set_tag(tag)  # tag that identifies this dag
             self.submit(t)
 
@@ -203,17 +238,27 @@ class DaskVine(Manager):
 #
 
 class DaskVineFile:
-    def __init__(self, file, key, staging_dir):
+    def __init__(self, file, key, staging_dir, task_mode):
         self._file = file
         self._loaded = False
         self._load = None
+        self._task_mode = task_mode
         assert file
 
     def load(self):
         if not self._loaded:
-            with open(self.staging_path, "rb") as f:
-                self._load = cloudpickle.load(f)
+            if self._task_mode == 'tasks':
+                with open(self.staging_path, "rb") as f:
+                    self._load = cloudpickle.load(f)
+                    self._loaded = True
+            if self._task_mode == 'function_calls':
+                output = cloudpickle.loads(self._file.contents())
                 self._loaded = True
+                if output['Success']:
+                    self._load = output['Result']
+                else:
+                    self._load = output['Reason']
+
         return self._load
 
     @property
@@ -308,10 +353,86 @@ class PythonTaskDask(PythonTask):
         self._retries_left -= 1
         return self._retries_left
 
+##
+# @class ndcctools.taskvine.dask_executor.FunctionCallDask
+#
+# Internal class representing a Dask function call to be executed,
+# materialized as a special case of a TaskVine FunctionCall.
+#
+
+class FunctionCallDask(FunctionCall):
+    ##
+    # Create a new PythonTaskDask.
+    #
+    # @param self  This task object.
+    # @param m     TaskVine manager object.
+    # @param dag   Dask graph object.
+    # @param key   Key of task in graph.
+    # @param sexpr          Positional arguments to function.
+    # @param category       TaskVine category name.
+    # @param resources      Resources to be set for a FunctionCall.
+    # @param extra_files    Additional files to provide to the task.
+    # @param retries        Number of times to retry failed task.
+    # @param lazy_transfers If true, do not return outputs to manager until required.
+    #
+    
+    def __init__(self, m,
+                 dag, key, sexpr, *,
+                 category=None,
+                 resources=None,
+                 extra_files=None,
+                 retries=5,
+                 lazy_transfers=False):
+
+        self._key = key
+        self.resources=resources
+        self._sexpr = sexpr
+
+        self._retries_left = retries
+        if self.resources:
+            if 'cores' in self.resources:
+                self.set_cores(self.resources['cores'])
+            if 'memory' in self.resources:
+                self.set_memory(self.resources['memory'])
+            if 'disk' in self.resources:
+                self.set_disk(self.resources['disk'])
+
+        args_raw = {k: dag.get_result(k) for k in dag.get_children(key)}
+        args = {k: f"{uuid4()}.p" for k, v in args_raw.items() if isinstance(v, DaskVineFile)}
+
+        keys_of_files = list(args.keys())
+        args = args_raw | args
+
+        super().__init__('Dask-Library', 'execute_graph_vertex', sexpr, args, keys_of_files)
+        self.set_output_cache(cache=True)
+
+        for k, f in args_raw.items():
+            if isinstance(f, DaskVineFile):
+                self.add_input(f.file, args[k])
+
+        if category:
+            self.set_category(category)
+        if lazy_transfers:
+            self.enable_temp_output()
+        if extra_files:
+            for f, name in extra_files.items():
+                self.add_input(f, name)
+    @property
+    def key(self):
+        return self._key
+
+    @property
+    def sexpr(self):
+        return self._sexpr
+
+    def decrement_retry(self):
+        self._retries_left -= 1
+        return self._retries_left
 
 def execute_graph_vertex(sexpr, args, keys_of_files):
     import traceback
     import cloudpickle
+    from ndcctools.taskvine import DaskVineDag
 
     def rec_call(sexpr):
         if DaskVineDag.keyp(sexpr) and sexpr in args:
@@ -326,7 +447,10 @@ def execute_graph_vertex(sexpr, args, keys_of_files):
     for k in keys_of_files:
         try:
             with open(args[k], "rb") as f:
-                args[k] = cloudpickle.load(f)
+                arg = cloudpickle.load(f)
+                if isinstance(arg, dict) and 'Result' in arg and arg['Result'] is not None:
+                    arg = arg['Result']
+                args[k] = arg
         except Exception as e:
             print(f"Could not read input file {args[k]} for key {k}: {e}")
             raise

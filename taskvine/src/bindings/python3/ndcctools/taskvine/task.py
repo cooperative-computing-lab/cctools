@@ -958,7 +958,8 @@ class FunctionCall(Task):
         self._event["fn_args"] = args
         self.set_time_max(900)     # maximum run time for function calls is 900s by default.
         self.needs_library(library_name)
-        self.output_buffer = None
+        self._tmp_output_enabled = False
+        self.output_file = None
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -971,8 +972,11 @@ class FunctionCall(Task):
         super().submit_finalize(manager)
         f = manager.declare_buffer(cloudpickle.dumps(self._event))
         self.add_input(f, "infile")
-        self.output_buffer = manager.declare_buffer(cache=False, peer_transfer=False)
-        self.add_output(self.output_buffer, "outfile")
+        if self._tmp_output_enabled:
+            self.output_file = manager.declare_temp()
+        else:
+            self.output_file = manager.declare_buffer(cache=False, peer_transfer=False)
+        self.add_output(self.output_file, "outfile")
 
     ##
     # Specify function arguments. Accepts arrays and dictionaries. This
@@ -995,6 +999,13 @@ class FunctionCall(Task):
             print("Error, vine_exec_method must either be fork or direct, choosing fork by default")
             remote_task_exec_method = "fork"
         self._event["remote_task_exec_method"] = remote_task_exec_method
+
+    def set_output_cache(self, cache=False):
+        self._cache_output = cache
+    def enable_temp_output(self):
+        self._tmp_output_enabled = True
+    def disable_temp_output(self):
+        self._tmp_output_enabled = False
 
     @property
     def output(self):
