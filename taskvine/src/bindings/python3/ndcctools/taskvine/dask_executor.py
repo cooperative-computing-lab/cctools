@@ -197,6 +197,7 @@ class DaskVine(Manager):
 # as a file in the filesystem.
 #
 
+
 class DaskVineFile:
     def __init__(self, file, key, staging_dir):
         self._file = file
@@ -255,7 +256,6 @@ class PythonTaskDask(PythonTask):
     # @param retries        Number of times to retry failed task.
     # @param lazy_transfers If true, do not return outputs to manager until required.
     #
-    
     def __init__(self, m,
                  dag, key, sexpr, *,
                  category=None,
