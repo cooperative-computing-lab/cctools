@@ -127,7 +127,7 @@ class DaskVine(Manager):
                     self._submit_calls(dag, tag, rs, self.retries)
                 else:
                     retries_left = t.decrement_retry()
-                    print(f"task id {t.id} key {t.key} failed. {retries_left} attempts left.\n{t.std_output}")
+                    print(f"task id {t.id} key {t.key} failed: {t.result}. {retries_left} attempts left.\n{t.std_output}")
                     if retries_left > 0:
                         self._submit_calls(dag, tag, [(t.key, t.sexpr)], retries_left)
                     else:
