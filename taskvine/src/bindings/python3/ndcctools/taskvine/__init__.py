@@ -59,7 +59,6 @@ from .task import (
 
 try:
     from .dask_executor import DaskVine
-    from .dask_dag import DaskVineDag
 except ImportError as e:
     print(f"DaskVine not available. Couldn't find module: {e.name}")
     ## DaskVine compatibility class.
@@ -69,6 +68,18 @@ except ImportError as e:
         def __init__(*args, **kwargs):
             raise DaskVine.exception
     DaskVine.exception = e
+
+try:
+    from .dask_dag import DaskVineDag
+except ImportError as e:
+    print(f"DaskVine not available. Couldn't find module: {e.name}")
+    ## DaskVine compatibility class.
+    # See @ref dask_executor.DaskVine
+    class DaskVineDag:
+        exception = ImportError()
+        def __init__(*args, **kwargs):
+            raise DaskVineDag.exception
+    DaskVineDag.exception = e
 
 __all__ = [
     "Manager",
@@ -83,6 +94,7 @@ __all__ = [
     "PythonTask",
     "PythonTaskNoResult",
     "DaskVine",
+    "DaskVineDag"
 ]
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
