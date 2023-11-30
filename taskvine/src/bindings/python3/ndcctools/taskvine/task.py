@@ -1009,7 +1009,7 @@ class FunctionCall(Task):
 
     @property
     def output(self):
-        output = cloudpickle.loads(self.output_buffer.contents())
+        output = cloudpickle.loads(self.output_file.contents())
         if output['Success']:
             return output['Result']
         else:
