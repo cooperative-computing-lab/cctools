@@ -81,7 +81,7 @@ class DaskVine(Manager):
             low_memory_mode=False,
             checkpoint_fn=None,
             resources=None,
-            resources_mode='fixed',
+            resources_mode=None,
             retries=5,
             verbose=False
             ):
