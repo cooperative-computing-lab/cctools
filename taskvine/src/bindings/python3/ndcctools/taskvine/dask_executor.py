@@ -53,8 +53,7 @@ class DaskVine(Manager):
     # Execute the task graph dsk and return the results for keys
     # in graph.
     # @param dsk           The task graph to execute.
-    # @param keys          A single key or a possible nested list of keys to compute the
-    #                      value from dsk.
+    # @param keys          A possible nested list of keys to compute the value from dsk.
     # @param environment   A taskvine file representing an environment to run the tasks.
     # @param extra_files   A dictionary of {taskvine.File: "remote_name"} to add to each
     #                      task.
@@ -75,7 +74,6 @@ class DaskVine(Manager):
     #                       or 'exhaustive bucketing'. This is done per function type in dsk.
     # @param retries       Number of times to attempt a task. Default is 5.
     # @param verbose       if true, emit additional debugging information.
-    
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
@@ -109,11 +107,8 @@ class DaskVine(Manager):
             raise e
 
     def _dask_execute(self, dsk, keys):
-        if isinstance(keys, list):
-            indices = {k: inds for (k, inds) in find_dask_keys(keys)}
-            keys_flatten = indices.keys()
-        else:
-            keys_flatten = [keys]
+        indices = {k: inds for (k, inds) in find_dask_keys(keys)}
+        keys_flatten = indices.keys()
 
         dag = DaskVineDag(dsk, low_memory_mode=self.low_memory_mode)
         tag = f"dag-{id(dag)}"
