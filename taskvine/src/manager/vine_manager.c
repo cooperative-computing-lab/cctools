@@ -5214,7 +5214,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		q->worker_source_max_transfers = MAX(1, (int)value);
 
 	} else if (!strcmp(name, "temp-replica-count")) {
-		q->temp_replica_count = MAX(1, (int)value);
+		q->temp_replica_count = MAX(0, (int)value);
 
 	} else if (!strcmp(name, "perf-log-interval")) {
 		q->perf_log_interval = MAX(1, (int)value);

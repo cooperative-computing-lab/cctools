@@ -221,7 +221,7 @@ vine_result_code_t vine_manager_put_url_now(
 	url_encode(f->cached_name, cached_name_encoded, sizeof(cached_name_encoded));
 
 	char *transfer_id = vine_current_transfers_add(q, w, f->source);
-	vine_manager_send(q,
+	int result = vine_manager_send(q,
 			w,
 			"puturl_now %s %s %lld %o %s\n",
 			source_encoded,
@@ -231,7 +231,7 @@ vine_result_code_t vine_manager_put_url_now(
 			transfer_id);
 
 	free(transfer_id);
-	return VINE_SUCCESS;
+	return result;
 }
 
 /*

@@ -1100,7 +1100,6 @@ static int handle_manager(struct link *manager)
 			r = do_put_url(filename, length, mode, source);
 			reset_idle_timer();
 			hash_table_insert(current_transfers, strdup(filename), strdup(transfer_id));
-			debug(D_VINE, "Insert ID-File pair into transfer table : %s :: %s", filename, transfer_id);
 		} else if (sscanf(line,
 					   "puturl_now %s %s %" SCNd64 " %o %s",
 					   source_encoded,
@@ -1113,7 +1112,6 @@ static int handle_manager(struct link *manager)
 			r = do_put_url_now(filename, length, mode, source);
 			reset_idle_timer();
 			hash_table_insert(current_transfers, strdup(filename), strdup(transfer_id));
-			debug(D_VINE, "Insert ID-File pair into transfer table : %s :: %s", filename, transfer_id);
 		} else if (sscanf(line,
 					   "mini_task %s %s %" SCNd64 " %o",
 					   source_encoded,

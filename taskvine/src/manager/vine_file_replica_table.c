@@ -72,10 +72,14 @@ struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 	int found = 0;
 	struct vine_worker_info **workers = malloc(sizeof(struct vine_worker_info) * (q->temp_replica_count));
 
+	// some random distribution
+	int skip_workers = (rand() % hash_table_size(q->worker_table)) + 1;
 	HASH_TABLE_ITERATE(q->worker_table, id, peer)
 	{
 		if (found == q->temp_replica_count)
 			break;
+		if (skip_workers--)
+			continue;
 		if (!peer->transfer_port_active)
 			continue;
 
@@ -85,10 +89,7 @@ struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 			if ((vine_current_transfers_worker_in_use(q, peer_addr) < q->worker_source_max_transfers) &&
 					(vine_current_transfers_dest_in_use(q, peer) <
 							q->worker_source_max_transfers)) {
-				debug(D_VINE,
-						"found replication target : %s, current load %d",
-						peer->transfer_addr,
-						vine_current_transfers_dest_in_use(q, peer));
+				debug(D_VINE, "found replication target : %s", peer->transfer_addr);
 				workers[found] = peer;
 				found++;
 			}
