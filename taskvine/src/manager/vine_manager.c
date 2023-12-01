@@ -3740,7 +3740,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->worker_source_max_transfers = VINE_WORKER_SOURCE_MAX_TRANSFERS;
 	q->perf_log_interval = VINE_PERF_LOG_INTERVAL;
 
-	q->temp_replica_count = 1;
+	q->temp_replica_count = 0;
 
 	q->resource_submit_multiplier = 1.0;
 
