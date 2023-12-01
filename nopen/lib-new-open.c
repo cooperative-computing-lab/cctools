@@ -3,8 +3,7 @@
 #define LOGGING 0
 
 int open(const char *pathname, int flags) {
-    int file_descriptor;
-
+    
     int perms = _file_permission(pathname);
 
     if (!perms) {
@@ -14,20 +13,23 @@ int open(const char *pathname, int flags) {
         return -1;
     }
 
-    if ((flags & 2) && (perms & NOPEN_R) && (perms & NOPEN_W)) {
-        file_descriptor = syscall(SYS_open, pathname, flags);
-        return file_descriptor;
-    }
-    if ((flags & 1) && (perms & NOPEN_W) && !(flags)) {
-        file_descriptor = syscall(SYS_open, pathname, flags);
-        return file_descriptor;
-    }
-    if (!(flags & 1) && !(flags & 2) && ( perms & NOPEN_R)) {
-        file_descriptor = syscall(SYS_open, pathname, flags);
-        return file_descriptor;
+    if ((flags & 64) && !(perms & NOPEN_N)) {
+        fprintf(stderr,"Program terminated : open : File in allow list but does not have permissions to create files : %s\n", pathname);
+        errno = EACCES;
+        exit(EXIT_FAILURE);
     }
 
-    fprintf(stderr,"Program terminated : File in allow list but does not have action permissions : %s\n", pathname);
+    if ((flags & 2) && (perms & NOPEN_R) && (perms & NOPEN_W)) {
+        return syscall(SYS_open, pathname, flags);
+    }
+    if ((flags & 1) && (perms & NOPEN_W) && !(flags)) {
+        return syscall(SYS_open, pathname, flags);
+    }
+    if (!(flags & 1) && !(flags & 2) && ( perms & NOPEN_R)) {
+        return syscall(SYS_open, pathname, flags);
+    }
+
+    fprintf(stderr,"Program terminated : open : File in allow list but does not have permission: %s\n", pathname);
      
     errno = EACCES;
     exit(EXIT_FAILURE);
@@ -44,10 +46,31 @@ int __xstat(int ver, const char *pathname, struct stat *statbuf) {
         exit(EXIT_FAILURE);
         return -1;
     }
+
     if (perms & NOPEN_S) {
         return syscall(SYS_stat, pathname, statbuf);
     }
-    fprintf(stderr,"Program terminated : File in allow list but does not have action permissions : %s\n", pathname);
+
+    fprintf(stderr,"Program terminated : stat : File in allow list but does not have action permissions : %s\n", pathname);
+    errno = EACCES;
+    exit(EXIT_FAILURE);
+}
+
+int unlink(const char *pathname) {
+    int perms = _file_permission(pathname);
+    
+    if (!perms) {
+        fprintf(stderr,"File not in allow list : %s\n", pathname);
+        errno = ENOENT;
+        exit(EXIT_FAILURE);
+        return -1;
+    }
+
+    if (perms & NOPEN_D) {
+        return syscall(SYS_unlink, pathname);
+    }
+
+    fprintf(stderr,"Program terminated : unlink : File in allow list but does not have action permissions : %s\n", pathname);
     errno = EACCES;
     exit(EXIT_FAILURE);
 }
@@ -83,7 +106,7 @@ int _file_permission(const char *pathname) {
     file_pointer = fdopen(file_descriptor, "r");
     
     char rule_file[BUFSIZ];
-    char rule_perm[5];
+    char rule_perm[6];
     int rule_mask = NOPEN_0;
 
     while(fgets(rule,BUFSIZ,file_pointer) != NULL) {
@@ -112,6 +135,8 @@ int _file_permission(const char *pathname) {
             if (LOGGING) fprintf(stdout, "file found in rules: %s    '%s'\n",rule_perm, a_path);
             return rule_mask;
         } 
+
+        strcpy(rule_perm,"00000");
 
     }
 

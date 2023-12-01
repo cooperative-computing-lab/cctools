@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 int main(void){
     FILE *fp;
@@ -29,9 +30,11 @@ int main(void){
     stat("test.c",&sb);
     printf("%ld\n",sb.st_size);
     
-    fd = open("hello.txt", O_RDWR);
+    fd = open("hello.txt", O_RDWR | O_CREAT);
     fp = fdopen(fd, "w+");
 
     fprintf(fp,"hello world");
+
+    unlink("hello.txt");
     return 0;
 }

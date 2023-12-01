@@ -47,5 +47,6 @@ enum {
 int _file_permission(const char *pathname);
 int open(const char *pathname, int flags);
 int stat(const char *pathname, struct stat *statbuf);
+int unlink(const char *pathname);
 
 /* vim: set sts=4 sw=4 ts=8 expandtab ft=c: */
