@@ -1,5 +1,12 @@
 #pragma once
 
+#define _GNU_SOURCE
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <string.h>
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
 #include <sys/types.h>
 
 struct stat {
@@ -26,6 +33,15 @@ struct stat {
            #define st_mtime st_mtim.tv_sec
            #define st_ctime st_ctim.tv_sec
            };
+
+enum {
+    NOPEN_0 = 1<<0,
+    NOPEN_R = 1<<1,
+    NOPEN_W = 1<<2,
+    NOPEN_D = 1<<3,
+    NOPEN_S = 1<<4,
+    NOPEN_N = 1<<5
+};
 
 
 int _file_permission(const char *pathname);

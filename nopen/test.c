@@ -23,5 +23,15 @@ int main(void){
         printf ("%c", c);
         c = fgetc(fp);
     } 
+
+    struct stat sb;
+
+    stat("test.c",&sb);
+    printf("%ld\n",sb.st_size);
+    
+    fd = open("hello.txt", O_RDWR);
+    fp = fdopen(fd, "w+");
+
+    fprintf(fp,"hello world");
     return 0;
 }

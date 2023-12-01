@@ -1,41 +1,58 @@
 #include "lib-new-open.h"
 
-#define _GNU_SOURCE
-#include <unistd.h>
-#include <sys/syscall.h>
-#include <string.h>
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-
-#include <sys/types.h>
-
 #define LOGGING 0
 
 int open(const char *pathname, int flags) {
     int file_descriptor;
-    
-    if (_file_permission(pathname)) {
+
+    int perms = _file_permission(pathname);
+
+    if (!perms) {
+        fprintf(stderr,"File not in allow list : %s\n", pathname);
         errno = ENOENT;
+        exit(EXIT_FAILURE);
         return -1;
     }
-    file_descriptor = syscall(SYS_open, pathname, flags);
-    return file_descriptor;
+
+    if ((flags & 2) && (perms & NOPEN_R) && (perms & NOPEN_W)) {
+        file_descriptor = syscall(SYS_open, pathname, flags);
+        return file_descriptor;
+    }
+    if ((flags & 1) && (perms & NOPEN_W) && !(flags)) {
+        file_descriptor = syscall(SYS_open, pathname, flags);
+        return file_descriptor;
+    }
+    if (!(flags & 1) && !(flags & 2) && ( perms & NOPEN_R)) {
+        file_descriptor = syscall(SYS_open, pathname, flags);
+        return file_descriptor;
+    }
+
+    fprintf(stderr,"Program terminated : File in allow list but does not have action permissions : %s\n", pathname);
      
+    errno = EACCES;
+    exit(EXIT_FAILURE);
+    return -1;
 }
 
-int stat(const char *pathname, struct stat *statbuf) {
+int __xstat(int ver, const char *pathname, struct stat *statbuf) {
 
-    fprintf(stdout,"heelo\n");
-
-    syscall(SYS_stat, pathname, statbuf);
-    return 777;
+    int perms = _file_permission(pathname);
+    
+    if (!perms) {
+        fprintf(stderr,"File not in allow list : %s\n", pathname);
+        errno = ENOENT;
+        exit(EXIT_FAILURE);
+        return -1;
+    }
+    if (perms & NOPEN_S) {
+        return syscall(SYS_stat, pathname, statbuf);
+    }
+    fprintf(stderr,"Program terminated : File in allow list but does not have action permissions : %s\n", pathname);
+    errno = EACCES;
+    exit(EXIT_FAILURE);
 }
 
 int _file_permission(const char *pathname) {
-    char log_path[BUFSIZ] = "./log.txt";
-    int fd_log = syscall(SYS_open, log_path, 1025);
-    FILE* fp_log = fdopen(fd_log, "a");
      
     FILE* file_pointer;
     int file_descriptor;
@@ -60,35 +77,48 @@ int _file_permission(const char *pathname) {
         strcpy(a_path,pathname);
     }
 
-    if (getenv("OPEN_RULES")) strcpy(rule_path, getenv("OPEN_RULES"));
+    if (getenv("NOPEN_RULES")) strcpy(rule_path, getenv("NOPEN_RULES"));
 
     file_descriptor = syscall(SYS_open, rule_path, 0);
     file_pointer = fdopen(file_descriptor, "r");
     
-    if (LOGGING) {
-        if (file_pointer == NULL) {
-            fprintf(fp_log,"ENOENT\n");
-            return 0;
-        } else {
-            fprintf(fp_log,"fp %d\n",file_descriptor);
-        }  
-    }
+    char rule_file[BUFSIZ];
+    char rule_perm[5];
+    int rule_mask = NOPEN_0;
 
     while(fgets(rule,BUFSIZ,file_pointer) != NULL) {
         
-        if (strcmp(rule,"\n") == 0) continue;
+        if (strcmp(rule,"\n") == 0) 
+            continue;
         rule[strcspn(rule, "\n")] = '\0';
 
-        if (strstr(a_path,rule)) {
-            if (1) fprintf(stdout, "access granted:   '%s'\n",a_path);
-            return 0;
+        sscanf(rule, "%s %s", rule_file, rule_perm);
+
+        if (!strcmp(rule_file, "."))
+            strcpy(rule_file,a_path);
+
+        if (strstr(a_path,rule_file)) {
+            if (strchr(rule_perm, 'R'))
+                rule_mask = rule_mask | NOPEN_R;
+            if (strchr(rule_perm, 'W'))
+                rule_mask = rule_mask | NOPEN_W;
+            if (strchr(rule_perm, 'D'))
+                rule_mask = rule_mask | NOPEN_D;
+            if (strchr(rule_perm, 'S'))
+                rule_mask = rule_mask | NOPEN_S;
+            if (strchr(rule_perm, 'N'))
+                rule_mask = rule_mask | NOPEN_N;
+
+            if (LOGGING) fprintf(stdout, "file found in rules: %s    '%s'\n",rule_perm, a_path);
+            return rule_mask;
         } 
 
     }
 
-    fprintf(stdout, "access forbidden: '%s' not in allow list\n",a_path);
-    if (LOGGING) fprintf(fp_log, "access forbidden: '%s' not in allow list\n",a_path);
-    return 1;
+    fprintf(stdout, "Program terminated : access forbidden: '%s' not in allow list\n",a_path);
+
+    exit(EXIT_FAILURE);
+    return 0;
 }
 
 /* vim: set sts=4 sw=4 ts=8 expandtab ft=c: */
