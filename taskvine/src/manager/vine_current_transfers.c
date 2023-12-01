@@ -70,6 +70,20 @@ int vine_current_transfers_source_in_use(struct vine_manager *q, const char *sou
 	return c;
 }
 
+// count the number of ongoing transfers to a specific worker
+int vine_current_transfers_dest_in_use(struct vine_manager *q, struct vine_worker_info *w)
+{
+	char *id;
+	struct vine_transfer_pair *t;
+	int c = 0;
+	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
+	{
+		if (t->to == w)
+			c++;
+	}
+	return c;
+}
+
 int vine_current_transfers_worker_in_use(struct vine_manager *q, const char *peer_addr)
 {
 	char *id;

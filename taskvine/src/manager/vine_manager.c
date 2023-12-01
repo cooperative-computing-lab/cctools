@@ -364,7 +364,7 @@ static void replicate_temp_file(
 		char *worker_source = string_format("worker://%s:%d/%s", w->transfer_addr, w->transfer_port, cachename);
 		char *worker_addr = string_format("worker://%s:%d", w->transfer_addr, w->transfer_port);
 
-		char *transfer_id = vine_current_transfers_add(q, w, worker_source);
+		char *transfer_id = vine_current_transfers_add(q, peer, worker_source);
 		vine_manager_send(q,
 				peer,
 				"puturl_now %s %s %lld %o %s\n",
