@@ -89,7 +89,11 @@ class DaskVine(Manager):
             if retries and retries < 1:
                 raise ValueError("retries should be larger than 0")
 
-            self.environment = environment
+            if isinstance(environment, str):
+                self.environment = self.declare_poncho(environment, cache=True)
+            else:
+                self.environment = environment
+
             self.extra_files = extra_files
             self.lazy_transfers = lazy_transfers
             self.low_memory_mode = low_memory_mode
