@@ -14,6 +14,7 @@ wait_for_file_creation_mac()
     while [ $counter_seconds -lt $timeout ];
     do
         ls
+        [ -f $filename ] && return 0
         # if ls -1 | grep -q "^$filename$"; then
         #     echo "File $filename exists."
         #     return 0
@@ -25,6 +26,9 @@ wait_for_file_creation_mac()
     done
 
     exit 1
+}
+is_macos() {
+    [ "$(uname -s)" = "Darwin" ]
 }
 
 prepare()
@@ -47,7 +51,13 @@ run()
 	(../src/makeflow -d all -T vine -Z $PORT_FILE  $MAKE_FILE; echo $? > $STATUS_FILE) &
     echo "HERE2"
 	# wait at most 5 seconds for makeflow to find a port.
-	wait_for_file_creation_mac $PORT_FILE 5
+    if is_macos; then
+        # Execute macOS-specific code
+        wait_for_file_creation_mac $PORT_FILE 5
+    else
+        # Execute code for other operating systems
+        wait_for_file_creation $PORT_FILE 5
+    fi
     echo "HERE3"
 	run_taskvine_worker $PORT_FILE worker.log
     echo "HERE4"
