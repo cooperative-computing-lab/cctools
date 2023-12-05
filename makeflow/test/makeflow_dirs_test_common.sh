@@ -3,6 +3,10 @@
 STATUS_FILE=makeflow.status
 PORT_FILE=makeflow.port
 
+is_macos() {
+    [ "$(uname -s)" = "Darwin" ]
+}
+
 prepare()
 {
 	rm -f $STATUS_FILE
