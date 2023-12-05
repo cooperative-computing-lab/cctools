@@ -6,7 +6,7 @@
 MAKE_FILE=dirs/testcase.subdir.01.makeflow
 
 PRODUCTS="mydir/1.txt mydir/2.txt"
-
+echo "HERE1"
 . ./makeflow_dirs_test_common.sh
 
 dispatch "$@"
