@@ -7,6 +7,7 @@ wait_for_file_creation_mac()
 {
     filename=$!
     timeout=${2:-5}
+    counter_seconds=0
     
     [ -z $filename ] && exit
 
@@ -21,7 +22,7 @@ wait_for_file_creation_mac()
         # fi
     done
 
-    exit 0
+    exit 1
 }
 
 prepare()
