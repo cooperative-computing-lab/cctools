@@ -138,10 +138,10 @@ jobs:
         run: ${GITHUB_WORKSPACE}/packaging/mac-os/build.sh
       - name: Install
         run: ${GITHUB_WORKSPACE}/packaging/mac-os/install.sh
-    #   - name: Test
-    #     run: ${GITHUB_WORKSPACE}/packaging/mac-os/test.sh
-      - name: Test-Singular
-        run: ${GITHUB_WORKSPACE}/packaging/mac-os/testing_singular.sh
+      - name: Test
+        run: ${GITHUB_WORKSPACE}/packaging/mac-os/test.sh
+    #   - name: Test-Singular
+    #     run: ${GITHUB_WORKSPACE}/packaging/mac-os/testing_singular.sh
       - name: deploy
         uses: ncipollo/release-action@v1
         if: github.event_name == 'workflow_dispatch'

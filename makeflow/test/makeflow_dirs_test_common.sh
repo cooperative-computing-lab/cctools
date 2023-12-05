@@ -3,34 +3,6 @@
 STATUS_FILE=makeflow.status
 PORT_FILE=makeflow.port
 
-wait_for_file_creation_mac()
-{
-    filename=$!
-    timeout=${2:-5}
-    counter_seconds=0
-    
-    [ -z $filename ] && exit
-
-    while [ $counter_seconds -lt $timeout ];
-    do
-        ls
-        [ -f $filename ] && return 0
-        # if ls -1 | grep -q "^$filename$"; then
-        #     echo "File $filename exists."
-        #     return 0
-        # else
-        #     echo "File $filename does not exist."
-        # fi
-        counter_seconds=$(($counter_seconds + 1))
-		sleep 1
-    done
-
-    exit 1
-}
-is_macos() {
-    [ "$(uname -s)" = "Darwin" ]
-}
-
 prepare()
 {
 	rm -f $STATUS_FILE
@@ -49,28 +21,27 @@ run()
 {
 	# send makeflow to the background, saving its exit status.
 	(../src/makeflow -d all -T vine -Z $PORT_FILE  $MAKE_FILE; echo $? > $STATUS_FILE) &
-    echo "HERE2"
+
 	# wait at most 5 seconds for makeflow to find a port.
     if is_macos; then
         # Execute macOS-specific code
-        wait_for_file_creation_mac $PORT_FILE 5
+        :
     else
         # Execute code for other operating systems
         wait_for_file_creation $PORT_FILE 5
     fi
-    echo "HERE3"
+
 	run_taskvine_worker $PORT_FILE worker.log
-    echo "HERE4"
+
 	# wait for makeflow to exit.
 	wait_for_file_creation $STATUS_FILE 10
-    echo "HERE5"
+
 	# retrieve makeflow exit status
 	status=`cat $STATUS_FILE`
 	if [ $status -ne 0 ]
 	then
 		exit 1
 	fi
-    echo "HERE6"
 	# verify that makeflow created the required files from
 	# $MAKE_FILE
 	for file in $PRODUCTS
