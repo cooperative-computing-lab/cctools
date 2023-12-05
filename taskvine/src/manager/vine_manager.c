@@ -145,13 +145,12 @@ static void aggregate_workers_resources(struct vine_manager *q, struct vine_reso
 static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout, const char *tag, int task_id);
 static void release_all_workers(struct vine_manager *q);
 
-static void vine_manager_send_library_to_workers(struct vine_manager *q, const char *name, time_t stoptime);
-static void vine_manager_send_libraries_to_workers(struct vine_manager *q, time_t stoptime);
-
 static int vine_manager_check_inputs_available(struct vine_manager *q, struct vine_task *t);
 
 static void delete_worker_file(
 		struct vine_manager *q, struct vine_worker_info *w, const char *filename, int flags, int except_flags);
+
+static struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
@@ -2716,6 +2715,24 @@ static void find_max_worker(struct vine_manager *q)
 	}
 }
 
+/* Tell worker to kill all empty libraries except the case where
+ * the task is a function call and the library can run it.
+ * This code corresponds to the assumption of
+ * @vine.schedule.c:check_worker_have_enough_resources() - empty libraries
+ * are not counted towards the resources in use and will be killed if needed. */
+static void kill_empty_libraries_on_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	uint64_t task_id;
+	struct vine_task *task;
+	ITABLE_ITERATE(w->current_tasks, task_id, task)
+	{
+		if (task->provides_library && task->function_slots_inuse == 0 &&
+				(!t->needs_library || strcmp(t->needs_library, task->provides_library))) {
+			reset_task_to_state(q, task, VINE_TASK_RETRIEVED);
+		}
+	}
+}
+
 /*
 Commit a given task to a worker by sending the task details,
 then updating all auxiliary data structures to note the
@@ -2724,6 +2741,9 @@ assignment and the new task state.
 
 static void commit_task_to_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
+	/* Kill empty libraries to reclaim resources. Match the assumption of
+	 * @vine.schedule.c:check_worker_have_enough_resources() */
+	kill_empty_libraries_on_worker(q, w, t);
 	t->hostname = xxstrdup(w->hostname);
 	t->addrport = xxstrdup(w->addrport);
 
@@ -2733,22 +2753,16 @@ static void commit_task_to_worker(struct vine_manager *q, struct vine_worker_inf
 
 	itable_insert(w->current_tasks, t->task_id, t);
 
+	/* Increment the function count if this is a function task.
+	 * If the manager fails to send this function task to the worker however,
+	 * then the count will be decremented properly in @handle_failure() below. */
+	if (t->needs_library) {
+		t->library_task->function_slots_inuse++;
+	}
+
 	t->worker = w;
 
 	change_task_state(q, t, VINE_TASK_RUNNING);
-
-	/*
-	If this is a function call assigned to a library,
-	then increase the count of functions assigned.
-	t->library_task was assigned in the scheduler.
-	*/
-
-	if (t->library_task) {
-		/* Add a reference to the library, mirror in reap_task_from_worker */
-		/* Needed in case the library fails or is removed before this task. */
-		vine_task_clone(t->library_task);
-		t->library_task->function_slots_inuse++;
-	}
 
 	t->try_count += 1;
 	q->stats->tasks_dispatched += 1;
@@ -2848,11 +2862,8 @@ static void reap_task_from_worker(
 	and disassociate the task from the library.
 	*/
 
-	if (t->library_task) {
-		t->library_task->function_slots_inuse--;
-		/* Remove a reference to the library, mirror in reap_task_from_worker */
-		vine_task_delete(t->library_task);
-		t->library_task = 0;
+	if (t->needs_library) {
+		t->library_task->function_slots_inuse = MAX(0, t->library_task->function_slots_inuse - 1);
 	}
 
 	t->worker = 0;
@@ -3076,6 +3087,43 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 	return 1;
 }
 
+/* Find a library task running on a specific worker that has an available slot.
+ * @return pointer to the library task if there's one, 0 otherwise. */
+
+static struct vine_task *find_library_on_worker_for_task(struct vine_worker_info *w, const char *library_name)
+{
+	uint64_t task_id;
+	struct vine_task *task;
+
+	ITABLE_ITERATE(w->current_tasks, task_id, task)
+	{
+		if (task->provides_library && !strcmp(task->provides_library, library_name) &&
+				task->function_slots_inuse < task->function_slots) {
+			return task;
+		}
+	}
+
+	return 0;
+}
+
+/* Check if this worker can run the function task.
+ * @return 1 if it can, 0 otherwise.
+ */
+static int check_worker_can_run_function_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	struct vine_task *library = find_library_on_worker_for_task(w, t->needs_library);
+	if (!library) {
+		library = send_library_to_worker(q, w, t->needs_library);
+	}
+	if (!library) {
+		return 0;
+	}
+
+	// Mark that this function task will be run on this library.
+	t->library_task = library;
+	return 1;
+}
+
 /*
 Advance the state of the system by selecting one task available
 to run, finding the best worker for that task, and then committing
@@ -3122,6 +3170,12 @@ static int send_one_task(struct vine_manager *q)
 		if (q->peer_transfers_enabled) {
 			if (!vine_manager_transfer_capacity_available(q, w, t))
 				continue;
+		}
+
+		// If this is a function task, check if the worker can run it.
+		// May require the manager to send a library to the worker first.
+		if (t->needs_library && !check_worker_can_run_function_task(q, w, t)) {
+			continue;
 		}
 
 		// Otherwise, remove it from the ready list and start it:
@@ -4322,10 +4376,10 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
  * @param q The manager structure.
  * @param w The worker info structure.
  * @param name The name of the library to be sent.
- * @return 1 if the operation succeeds, 0 otherwise.
+ * @return pointer to the library task if the operation succeeds, 0 otherwise.
  */
 
-static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name)
+static struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name)
 {
 	/* Find the original prototype library task by name, if it exists. */
 	struct vine_task *original = hash_table_lookup(q->libraries, name);
@@ -4353,7 +4407,7 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 	/* Make the special log recordings for the library. */
 	vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
 
-	return 1;
+	return t;
 }
 
 struct vine_task *vine_manager_find_library_on_worker(
@@ -4370,50 +4424,6 @@ struct vine_task *vine_manager_find_library_on_worker(
 	}
 
 	return 0;
-}
-
-/* Send the library task to all known workers.
- * @param q 		The manager structure.
- * @param name 		The name of the library task.
- * @param stoptime 	When to stop sending libraries to workers. */
-static void vine_manager_send_library_to_workers(struct vine_manager *q, const char *name, time_t stoptime)
-{
-	char *worker_key;
-	struct vine_worker_info *w;
-
-	HASH_TABLE_ITERATE(q->worker_table, worker_key, w)
-	{
-		if (stoptime < time(0)) {
-			return;
-		}
-
-		/* If the worker id is not 0, then it is ready to receive work from the manager.
-		 * See @report_worker_ready in ../worker/vine_worker.c */
-		if (!w->workerid) {
-			continue;
-		}
-
-		/* Send the library task to the worker if possible. */
-		if (!vine_manager_find_library_on_worker(q, w, name)) {
-			if (vine_manager_send_library_to_worker(q, w, name)) {
-				debug(D_VINE, "Sending library %s to worker %s\n", name, w->workerid);
-			} else {
-				/* No error here, library might not match the worker. */
-			}
-		}
-	}
-}
-
-static void vine_manager_send_libraries_to_workers(struct vine_manager *q, time_t stoptime)
-{
-	char *library;
-	struct vine_task *t;
-	HASH_TABLE_ITERATE(q->libraries, library, t)
-	{
-		if (stoptime < time(0))
-			return;
-		vine_manager_send_library_to_workers(q, library, stoptime);
-	}
 }
 
 void vine_manager_install_library(struct vine_manager *q, struct vine_task *t, const char *name)
@@ -4827,11 +4837,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				break;
 			}
 		}
-
-		// attempt to send libraries to connected workers
-		BEGIN_ACCUM_TIME(q, time_send);
-		vine_manager_send_libraries_to_workers(q, stoptime);
-		END_ACCUM_TIME(q, time_send);
 
 		// return if manager is empty and something interesting already happened
 		// in this wait.
