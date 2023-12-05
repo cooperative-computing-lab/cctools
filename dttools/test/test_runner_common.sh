@@ -52,6 +52,7 @@ wait_for_file_creation()
 
 	while [ $counter_seconds -lt $timeout ];
 	do
+        echo $filename
 		[ -f $filename ] && return 0
 		counter_seconds=$(($counter_seconds + 1))
 		sleep 1
