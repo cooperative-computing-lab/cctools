@@ -52,13 +52,33 @@ wait_for_file_creation()
 
 	while [ $counter_seconds -lt $timeout ];
 	do
-        echo $filename
+        ls
 		[ -f $filename ] && return 0
 		counter_seconds=$(($counter_seconds + 1))
 		sleep 1
 	done
 
 	exit 1
+}
+
+wait_for_file_creation_mac()
+{
+    filename=$!
+    timeout=${2:-5}
+    
+    [ -z $filename ] && exit
+
+    while [ $counter_seconds -lt $timeout ];
+    do
+        if ls -1 | grep -q "^$filename$"; then
+            echo "File $filename exists."
+            return 0
+        else
+            echo "File $filename does not exist."
+        fi
+    done
+
+    exit 1
 }
 
 # wait_for_file_modification(filename, timeout)
