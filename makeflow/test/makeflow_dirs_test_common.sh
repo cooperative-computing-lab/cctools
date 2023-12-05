@@ -20,6 +20,8 @@ wait_for_file_creation_mac()
         # else
         #     echo "File $filename does not exist."
         # fi
+        counter_seconds=$(($counter_seconds + 1))
+		sleep 1
     done
 
     exit 1
