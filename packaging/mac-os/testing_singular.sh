@@ -7,11 +7,11 @@ conda activate cctools-build
 ./TR_makeflow_001_dirs_01.sh run
 # ./TR_makeflow_001_dirs_01.sh clean
 sleep 5
-ls
+# ls
 # sleep 1
-# ls mydir
-# cat mydir/1.txt
-# cat mydir/2.txt
+ls mydir
+cat mydir/1.txt
+cat mydir/2.txt
 # ls input
 # cat input/hello
 
