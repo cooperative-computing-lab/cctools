@@ -3,6 +3,27 @@
 STATUS_FILE=makeflow.status
 PORT_FILE=makeflow.port
 
+wait_for_file_creation_mac()
+{
+    filename=$!
+    timeout=${2:-5}
+    
+    [ -z $filename ] && exit
+
+    while [ $counter_seconds -lt $timeout ];
+    do
+        ls
+        # if ls -1 | grep -q "^$filename$"; then
+        #     echo "File $filename exists."
+        #     return 0
+        # else
+        #     echo "File $filename does not exist."
+        # fi
+    done
+
+    exit 0
+}
+
 prepare()
 {
 	rm -f $STATUS_FILE
@@ -23,7 +44,7 @@ run()
 	(../src/makeflow -d all -T vine -Z $PORT_FILE  $MAKE_FILE; echo $? > $STATUS_FILE) &
     echo "HERE2"
 	# wait at most 5 seconds for makeflow to find a port.
-	wait_for_file_creation $PORT_FILE 5
+	wait_for_file_creation_mac $PORT_FILE 5
     echo "HERE3"
 	run_taskvine_worker $PORT_FILE worker.log
     echo "HERE4"
