@@ -23,14 +23,16 @@ run()
 	(../src/makeflow -d all -T vine -Z $PORT_FILE  $MAKE_FILE; echo $? > $STATUS_FILE) &
 
 	# wait at most 5 seconds for makeflow to find a port.
+    echo "HERE1"
     if is_macos; then
         # Execute macOS-specific code
         :
+        echo "HERE2"
     else
         # Execute code for other operating systems
         wait_for_file_creation $PORT_FILE 5
     fi
-
+    echo "HERE3"
 	run_taskvine_worker $PORT_FILE worker.log
 
 	# wait for makeflow to exit.
