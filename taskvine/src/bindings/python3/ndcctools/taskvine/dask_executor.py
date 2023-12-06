@@ -135,12 +135,15 @@ class DaskVine(Manager):
         # create Library if using 'function_calls' task mode.
         if self.task_mode == 'function_calls':
             libtask = self.create_library_from_functions('Dask-Library', execute_graph_vertex, poncho_env=self.lib_environment, add_env=False, init_command=self.lib_command)
-            if self.lib_resources and self.lib_resources['cores']:
-                libtask.set_cores(self.lib_resources['cores'])
-            if self.lib_resources and self.lib_resources['memory']:
-                libtask.set_memory(self.lib_resources['memory'])
-            if self.lib_resources and self.lib_resources['disk']:
-                libtask.set_disk(self.lib_resources['disk'])
+            if self.lib_resources:
+                if 'cores' in self.lib_resources:
+                    libtask.set_cores(self.lib_resources['cores'])
+                if 'memory' in self.lib_resources:
+                    libtask.set_memory(self.lib_resources['memory'])
+                if 'disk' in self.lib_resources:
+                    libtask.set_disk(self.lib_resources['disk'])
+                if 'slots' in self.lib_resources:
+                    libtask.set_function_slots(self.lib_resources['slots'])
             self.install_library(libtask)
 
 
@@ -196,6 +199,7 @@ class DaskVine(Manager):
                        category=cat,
                        extra_files=self.extra_files,
                        retries=retries,
+                       resources=self.resources,
                        lazy_transfers=lazy)
             if self.task_mode == 'tasks':
                 t = PythonTaskDask(self,
@@ -389,6 +393,13 @@ class FunctionCallDask(FunctionCall):
         self._sexpr = sexpr
 
         self._retries_left = retries
+        args_raw = {k: dag.get_result(k) for k in dag.get_children(key)}
+        args = {k: f"{uuid4()}.p" for k, v in args_raw.items() if isinstance(v, DaskVineFile)}
+
+        keys_of_files = list(args.keys())
+        args = args_raw | args
+
+        super().__init__('Dask-Library', 'execute_graph_vertex', sexpr, args, keys_of_files)
         if self.resources:
             if 'cores' in self.resources:
                 self.set_cores(self.resources['cores'])
@@ -397,13 +408,6 @@ class FunctionCallDask(FunctionCall):
             if 'disk' in self.resources:
                 self.set_disk(self.resources['disk'])
 
-        args_raw = {k: dag.get_result(k) for k in dag.get_children(key)}
-        args = {k: f"{uuid4()}.p" for k, v in args_raw.items() if isinstance(v, DaskVineFile)}
-
-        keys_of_files = list(args.keys())
-        args = args_raw | args
-
-        super().__init__('Dask-Library', 'execute_graph_vertex', sexpr, args, keys_of_files)
         self.set_output_cache(cache=True)
 
         for k, f in args_raw.items():
