@@ -497,7 +497,7 @@ class Task(object):
     # Get the exit code of the command executed by the task. Must be called only
     # after the task completes execution.
     # @code
-    # >>> print(t.return_status)
+    # >>> print(t.exit_code)
     # @endcode
     @property
     def exit_code(self):
