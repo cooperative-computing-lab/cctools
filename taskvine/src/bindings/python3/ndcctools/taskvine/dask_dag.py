@@ -79,13 +79,6 @@ class DaskVineDag:
         # target keys that the dag should compute
         self._targets = set()
 
-        # set of keys which functions are ready to be computed
-        # only tasks of the form (fn, arg1, arg2, ...) are ever added to the ready set.
-        self._ready = set()
-
-        # set of keys currently being computed.
-        self._computing = set()
-
         self._working_graph = dict(dsk)
         if low_memory_mode:
             self._flatten_graph()

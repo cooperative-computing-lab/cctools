@@ -53,8 +53,7 @@ class DaskVine(Manager):
     # Execute the task graph dsk and return the results for keys
     # in graph.
     # @param dsk           The task graph to execute.
-    # @param keys          A single key or a possible nested list of keys to compute the
-    #                      value from dsk.
+    # @param keys          A possible nested list of keys to compute the value from dsk.
     # @param environment   A taskvine file representing an environment to run the tasks.
     # @param extra_files   A dictionary of {taskvine.File: "remote_name"} to add to each
     #                      task.
@@ -75,7 +74,6 @@ class DaskVine(Manager):
     #                       or 'exhaustive bucketing'. This is done per function type in dsk.
     # @param retries       Number of times to attempt a task. Default is 5.
     # @param verbose       if true, emit additional debugging information.
-    
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
@@ -83,7 +81,7 @@ class DaskVine(Manager):
             low_memory_mode=False,
             checkpoint_fn=None,
             resources=None,
-            resources_mode='fixed',
+            resources_mode=None,
             retries=5,
             verbose=False
             ):
@@ -91,7 +89,11 @@ class DaskVine(Manager):
             if retries and retries < 1:
                 raise ValueError("retries should be larger than 0")
 
-            self.environment = environment
+            if isinstance(environment, str):
+                self.environment = self.declare_poncho(environment, cache=True)
+            else:
+                self.environment = environment
+
             self.extra_files = extra_files
             self.lazy_transfers = lazy_transfers
             self.low_memory_mode = low_memory_mode
@@ -109,11 +111,8 @@ class DaskVine(Manager):
             raise e
 
     def _dask_execute(self, dsk, keys):
-        if isinstance(keys, list):
-            indices = {k: inds for (k, inds) in find_dask_keys(keys)}
-            keys_flatten = indices.keys()
-        else:
-            keys_flatten = [keys]
+        indices = {k: inds for (k, inds) in find_dask_keys(keys)}
+        keys_flatten = indices.keys()
 
         dag = DaskVineDag(dsk, low_memory_mode=self.low_memory_mode)
         tag = f"dag-{id(dag)}"
@@ -132,7 +131,7 @@ class DaskVine(Manager):
                     self._submit_calls(dag, tag, rs, self.retries)
                 else:
                     retries_left = t.decrement_retry()
-                    print(f"task id {t.id} key {t.key} failed. {retries_left} attempts left.\n{t.std_output}")
+                    print(f"task id {t.id} key {t.key} failed: {t.result}. {retries_left} attempts left.\n{t.std_output}")
                     if retries_left > 0:
                         self._submit_calls(dag, tag, [(t.key, t.sexpr)], retries_left)
                     else:
@@ -202,6 +201,7 @@ class DaskVine(Manager):
 # as a file in the filesystem.
 #
 
+
 class DaskVineFile:
     def __init__(self, file, key, staging_dir):
         self._file = file
@@ -260,7 +260,6 @@ class PythonTaskDask(PythonTask):
     # @param retries        Number of times to retry failed task.
     # @param lazy_transfers If true, do not return outputs to manager until required.
     #
-    
     def __init__(self, m,
                  dag, key, sexpr, *,
                  category=None,
