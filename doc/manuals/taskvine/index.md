@@ -2532,8 +2532,9 @@ The `compute` call above may receive the following keyword arguments:
 | Keyword | Description |
 |------------ |---------|
 | environment | A TaskVine file that provides an [environment](#environments) to execute each task. |
-| extra_files | A dictionary of {taskvine.File: "remote_name"} of input files to attach to each task.|
-| lazy_transfer | Whether to bring each result back from the workers (False, default), or keep transient results at workers (True) |
+| env\_vars   | A dictionary of VAR=VALUE environment variables to set per task. A value should be either a string, or a function that accepts as arguments the manager and task, and that returns a string. |
+| extra\_files | A dictionary of {taskvine.File: "remote_name"} of input files to attach to each task.|
+| lazy\_transfer | Whether to bring each result back from the workers (False, default), or keep transient results at workers (True) |
 | resources   | A dictionary to specify [maximum resources](#task-resources), e.g. `{"cores": 1, "memory": 2000"}` |
 | resources\_mode | [Automatic resource management](#automatic-resource-management) to use, e.g., "fixed", "max", or "max throughput"| 
 
