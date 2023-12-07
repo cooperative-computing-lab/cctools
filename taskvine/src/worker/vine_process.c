@@ -285,8 +285,8 @@ int vine_process_execute(struct vine_process *p)
 	int input_fd = -1;
 	int output_fd = -1;
 	int error_fd = -1;
-	int in_pipe_fd = -1;	// only for library task, fd to send functions to library
-	int out_pipe_fd = -1;	// only for library task, fd to receive results from library
+	int in_pipe_fd = -1;  // only for library task, fd to send functions to library
+	int out_pipe_fd = -1; // only for library task, fd to receive results from library
 
 	/* Setting up input, output, and stderr for various task types. */
 	if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
