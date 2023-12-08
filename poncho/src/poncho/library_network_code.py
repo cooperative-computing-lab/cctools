@@ -88,7 +88,7 @@ def library_network_code():
         
         # now read the buffer to get invocation details
         line = str(os.read(in_pipe_fd, buffer_len), encoding='utf-8')
-        function_id, function_name, function_sandbox = line.split(" ", maxsplit=2)
+        function_id, function_name, function_sandbox, function_stdout_file = line.split(" ", maxsplit=3)
         function_id = int(function_id)
         
         if function_name:
@@ -116,6 +116,11 @@ def library_network_code():
             else:
                 p = os.fork()
                 if p == 0:
+                    # setup stdout/err for a function call so we can capture them.
+                    stdout_capture_fd = os.open(function_stdout_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
+                    os.dup2(stdout_capture_fd, sys.stdout.fileno())
+                    os.dup2(stdout_capture_fd, sys.stderr.fileno())
+
                     # parameters are represented as infile.
                     os.chdir(function_sandbox)
                     with open('infile', 'rb') as f:
@@ -124,6 +129,8 @@ def library_network_code():
                     # output of execution should be dumped to outfile.
                     with open('outfile', 'wb') as f:
                         cloudpickle.dump(globals()[function_name](event), f)
+                    os.fsync(stdout_capture_fd)
+                    os.close(stdout_capture_fd)
                     os._exit(0)
                 elif p < 0:
                     print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)
