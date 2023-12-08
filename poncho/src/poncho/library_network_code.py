@@ -129,7 +129,6 @@ def library_network_code():
                     # output of execution should be dumped to outfile.
                     with open('outfile', 'wb') as f:
                         cloudpickle.dump(globals()[function_name](event), f)
-                    os.fsync(stdout_capture_fd)
                     os.close(stdout_capture_fd)
                     os._exit(0)
                 elif p < 0:
