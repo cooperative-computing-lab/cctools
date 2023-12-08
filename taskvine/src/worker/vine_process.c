@@ -239,7 +239,8 @@ int vine_process_execute_and_wait(struct vine_process *p)
 
 int vine_process_invoke_function(struct vine_process *p)
 {
-	char *buffer = string_format("%d %s %s %s", p->task->task_id, p->task->command_line, p->sandbox, p->output_file_name);
+	char *buffer = string_format(
+			"%d %s %s %s", p->task->task_id, p->task->command_line, p->sandbox, p->output_file_name);
 	ssize_t result = link_printf(p->library_process->library_write_link,
 			time(0) + options->active_timeout,
 			"%ld\n%s",
