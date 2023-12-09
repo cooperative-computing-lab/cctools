@@ -61,6 +61,9 @@ class DaskVine(Manager):
     #                      or to bring back each result to the manager (False, default).
     #                      True is more IO efficient, but runs the risk of needing to
     #                      recompute results if workers are lost.
+    # @param env_vars      A dictionary of VAR=VALUE environment variables to set per task. A value
+    #                      should be either a string, or a function that accepts as arguments the manager
+    #                      and task, and that returns a string.
     # @param low_memory_mode Split graph vertices to reduce memory needed per function call. It
     #                      removes some of the dask graph optimizations, thus proceed with care.
     # @param  checkpoint_fn When using lazy_transfers, a predicate with arguments (dag, key)
@@ -78,6 +81,7 @@ class DaskVine(Manager):
             environment=None,
             extra_files=None,
             lazy_transfers=False,
+            env_vars=None,
             low_memory_mode=False,
             checkpoint_fn=None,
             resources=None,
@@ -96,6 +100,7 @@ class DaskVine(Manager):
 
             self.extra_files = extra_files
             self.lazy_transfers = lazy_transfers
+            self.env_vars = env_vars
             self.low_memory_mode = low_memory_mode
             self.checkpoint_fn = checkpoint_fn
             self.resources = resources
@@ -167,6 +172,7 @@ class DaskVine(Manager):
                                category=cat,
                                environment=self.environment,
                                extra_files=self.extra_files,
+                               env_vars=self.env_vars,
                                retries=retries,
                                lazy_transfers=lazy)
             t.set_tag(tag)  # tag that identifies this dag
@@ -257,6 +263,7 @@ class PythonTaskDask(PythonTask):
     # @param category       TaskVine category name.
     # @param environment    TaskVine execution environment.
     # @param extra_files    Additional files to provide to the task.
+    # @param env_vars       A dictionary of environment variables.
     # @param retries        Number of times to retry failed task.
     # @param lazy_transfers If true, do not return outputs to manager until required.
     #
@@ -265,6 +272,7 @@ class PythonTaskDask(PythonTask):
                  category=None,
                  environment=None,
                  extra_files=None,
+                 env_vars=None,
                  retries=5,
                  lazy_transfers=False):
         self._key = key
@@ -294,6 +302,13 @@ class PythonTaskDask(PythonTask):
         if extra_files:
             for f, name in extra_files.items():
                 self.add_input(f, name)
+        if env_vars:
+            for k, v in env_vars.items():
+                if callable(v):
+                    s = v(m, self)
+                else:
+                    s = v
+                self.set_env_var(k, s)
 
     @property
     def key(self):
