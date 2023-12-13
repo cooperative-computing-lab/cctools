@@ -699,6 +699,16 @@ class Task(object):
             return None
         return self._task.resources_allocated
 
+    def add_nopen(self, manager):
+        try:
+            vine_dir = os.environ['CCTOOLS_HOME']
+            self.add_input(manager.declare_file(f"{vine_dir}/lib-new-open.so") , "./lib-nopen.so")
+        except KeyError: 
+            self.add_input(manager.declare_file(f"./lib-new-open.so") , "./lib-nopen.so")
+            self.add_input(manager.declare_file("./rules.txt") , "./rules.txt")
+        
+        self.set_env_var("LD_PRELOAD","./lib-nopen.so")
+
 
 ##
 # @class ndcctools.taskvine.PythonTask
