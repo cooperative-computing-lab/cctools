@@ -115,6 +115,9 @@ class DaskVine(Manager):
             # unhandled exceptions for now
             raise e
 
+    def __call__(self, *args, **kwargs):
+        return self.get(*args, **kwargs)
+
     def _dask_execute(self, dsk, keys):
         indices = {k: inds for (k, inds) in find_dask_keys(keys)}
         keys_flatten = indices.keys()
