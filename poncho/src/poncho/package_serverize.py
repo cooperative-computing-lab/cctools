@@ -21,34 +21,32 @@ import inspect
 
 shebang = "#! /usr/bin/env python3\n\n"
 
-default_name_func = \
-'''def name():
+default_name_func = """def name():
     return "my_coprocess"
 
-'''
-init_function = \
-'''if __name__ == "__main__":
+"""
+init_function = """if __name__ == "__main__":
     main()
 
-'''
+"""
 
- 
+
 # Generates a list of import statements based on the given argument.
 # @param import_modules  A list of modules imported at the preamble of library
 def generate_import_statements(import_modules):
     if not import_modules:
         return
-    
+
     if not isinstance(import_modules, list):
         raise ValueError("Expected 'import_modules' to be a list.")
-    
+
     import_statements = []
     for module in import_modules:
         if not isinstance(module, types.ModuleType):
             raise ValueError("Expected ModuleType in 'import_modules'.")
-        
+
         import_statements.append(f"import {module.__name__}")
-    
+
     return import_statements
 
 
@@ -60,7 +58,6 @@ def generate_import_statements(import_modules):
 # @param version         Whether this is for workqueue or taskvine serverless code.
 # @param import_modules  A list of modules to be imported at the preamble of library
 def create_library_code(path, funcs, dest, version, import_modules=None):
-
     # create output file
     with open(dest, "w") as output_file:
         # write shebang to file
@@ -75,7 +72,7 @@ def create_library_code(path, funcs, dest, version, import_modules=None):
         name_source_code = ""
         absolute_path = os.path.abspath(path)
         # open the source file, parse the code into an ast, and then unparse functions back into python code
-        with open(absolute_path, 'r') as source:
+        with open(absolute_path, "r") as source:
             code = ast.parse(source.read(), filename=absolute_path)
             for stmt in ast.walk(code):
                 if isinstance(stmt, ast.FunctionDef):
@@ -111,6 +108,7 @@ def create_library_code(path, funcs, dest, version, import_modules=None):
     st = os.stat(dest)
     os.chmod(dest, st.st_mode | stat.S_IEXEC)
 
+
 def sort_spec(spec):
     sorted_spec = json.load(spec)
     conda_deps = []
@@ -125,10 +123,13 @@ def sort_spec(spec):
             dep[key] = dep[key].sort()
     return json.dumps(sorted(conda_deps) + nested_deps, sort_keys=True).encode("utf-8")
 
+
 def search_env_for_spec(envpath):
     env_spec = None
     if os.path.exists(envpath) and envpath.endswith(".tar.gz"):
-        print("Cached environment found, checking if it is compatiable with new library code")
+        print(
+            "Cached environment found, checking if it is compatiable with new library code"
+        )
         with tarfile.open(envpath) as env_tar:
             for member in env_tar:
                 if member.name == "conda_spec.yml":
@@ -136,10 +137,13 @@ def search_env_for_spec(envpath):
                         env_spec = hashlib.md5(sort_spec(f)).digest()
                     break
             if env_spec is None:
-                print("Error, could not find conda_spec.yml in cached environment, creating new environment")
+                print(
+                    "Error, could not find conda_spec.yml in cached environment, creating new environment"
+                )
     else:
         print("No environment found at output path, creating new environment")
     return env_spec
+
 
 def pack_library_code(path, envpath):
     prev_env_spec = search_env_for_spec(envpath)
@@ -156,6 +160,7 @@ def pack_library_code(path, envpath):
         print("Cached package is out of date, rebuilding")
         create.pack_env("/tmp/tmp.json", envpath)
 
+
 # Combine function names and function bodies to create a unique hash of the functions.
 # Note that these functions must have source code, so dynamic functions generated from
 # Python's exec or Jupyter Notebooks won't work here.
@@ -168,16 +173,22 @@ def generate_functions_hash(functions: list) -> str:
             source_code += fnc.__name__
             source_code += inspect.getsource(fnc)
         except OSError as e:
-            print(f"Can't retrieve source code of function {fnc.__name__}.", file=sys.stderr)
+            print(
+                f"Can't retrieve source code of function {fnc.__name__}.",
+                file=sys.stderr,
+            )
             raise
     return hashlib.md5(source_code.encode("utf-8")).hexdigest()
+
 
 # Create a library file and a poncho environment tarball from a list of functions as needed.
 # The functions in the list must have source code for this code to work.
 # @param path             path to directory to create the library python file and the environment tarball.
-# @param functions        list of functions to include in the 
+# @param functions        list of functions to include in the
 # @param import_modules   a list of modules to be imported at the preamble of library
-def serverize_library_from_code(path, functions, name, need_pack=True, import_modules=None):
+def serverize_library_from_code(
+    path, functions, name, need_pack=True, import_modules=None
+):
     tmp_library_path = f"{path}/tmp_library.py"
 
     # Write out functions into a temporary python file.
@@ -187,7 +198,13 @@ def serverize_library_from_code(path, functions, name, need_pack=True, import_mo
         temp_source_file.write(f"def name():\n\treturn '{name}'")
 
     # create the final library code from that temporary file
-    create_library_code(tmp_library_path, [fnc.__name__ for fnc in functions], path + "/library_code.py", "taskvine", import_modules=import_modules)
+    create_library_code(
+        tmp_library_path,
+        [fnc.__name__ for fnc in functions],
+        path + "/library_code.py",
+        "taskvine",
+        import_modules=import_modules,
+    )
 
     # remove the temp library file
     os.remove(tmp_library_path)
@@ -195,4 +212,6 @@ def serverize_library_from_code(path, functions, name, need_pack=True, import_mo
     # and pack it into an environment, if needed
     if need_pack:
         pack_library_code(path + "/library_code.py", path + "/library_env.tar.gz")
+
+
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
