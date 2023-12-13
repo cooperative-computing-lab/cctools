@@ -2519,11 +2519,11 @@ scheduler. The class `DaskVine` implements a TaskVine manager that has a
     # Define the dask workflow...
     dask_value = ... 
 
-    # use the manager as the dask scheduler using its get() function
-    result = dask_value.compute(scheduler=m.get)
+    # use the manager as the dask scheduler:
+    result = dask_value.compute(scheduler=m)
 
     # or:
-    with dask.config.set(scheduler=m.get):
+    with dask.config.set(scheduler=m):
         result = dask_value.compute()
     ```
 
