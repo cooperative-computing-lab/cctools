@@ -163,6 +163,12 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	}
 	rmsummary_delete(l);
 
+	/* If this is a function task, check if the worker can run it.
+	 * May require the manager to send a library to the worker first. */
+	if (t->needs_library && !vine_manager_check_worker_can_run_function_task(q, w, t)) {
+		return 0;
+	}
+
 	// if worker's end time has not been received
 	if (w->end_time < 0) {
 		return 0;
