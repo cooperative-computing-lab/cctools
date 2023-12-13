@@ -703,14 +703,14 @@ class Task(object):
     # Adds inputs for nopen library and rules file and sets LD_PRELOAD
     #
     def add_nopen(self, manager):
-            try:
-                vine_dir = os.environ['CCTOOLS_HOME']
-                self.add_input(manager.declare_file(f"{vine_dir}/lib-nopen.so"), "./lib-nopen.so")
-            except KeyError: 
-                self.add_input(manager.declare_file(f"./lib-nopen.so"), "./lib-nopen.so")
-                self.add_input(manager.declare_file("./rules.txt"), "./rules.txt")
+        try:
+            vine_dir = os.environ['CCTOOLS_HOME']
+            self.add_input(manager.declare_file(f"{vine_dir}/lib-nopen.so"), "./lib-nopen.so")
+        except KeyError: 
+            self.add_input(manager.declare_file("./lib-nopen.so"), "./lib-nopen.so")
+            self.add_input(manager.declare_file("./rules.txt"), "./rules.txt")
 
-            self.set_env_var("LD_PRELOAD", "./lib-nopen.so")
+        self.set_env_var("LD_PRELOAD", "./lib-nopen.so")
 
 ##
 # @class ndcctools.taskvine.PythonTask
