@@ -43,10 +43,17 @@ enum {
     NOPEN_N = 1<<5
 };
 
+enum {
+    NOPEN_EXIT,
+    NOPEN_ENOENT,
+    NOPEN_LOG
+};
 
 int _file_permission(const char *pathname);
 int open(const char *pathname, int flags);
 int stat(const char *pathname, struct stat *statbuf);
 int unlink(const char *pathname);
+void read_env_vars();
+int exit_handler();
 
 /* vim: set sts=4 sw=4 ts=8 expandtab ft=c: */
