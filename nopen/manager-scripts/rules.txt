@@ -1,5 +1,6 @@
-#/dev/null   comments work
-#/dev/
-#/usr/lib64/
-#/etc/
-#/
+/dev/ RWS
+/proc/ RS
+/usr/lib64/ RS
+/etc/ RS
+. RWSDN
+/ S

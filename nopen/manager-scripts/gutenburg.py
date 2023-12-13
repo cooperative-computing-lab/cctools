@@ -77,11 +77,6 @@ if __name__ == "__main__":
     # script to process the files
     my_script = m.declare_buffer(compare_script, cache=True)
 
-    ###
-    rules_file = m.declare_file("./rules.txt")
-    nopen_file = m.declare_file("../lib-new-open.so")
-    ###
-
     for (i, url_a) in enumerate(urls):
         for (j, url_b) in enumerate(urls):
 
@@ -93,12 +88,8 @@ if __name__ == "__main__":
             t.add_input(url_a, "file_a.txt")
             t.add_input(url_b, "file_b.txt")
 
-            ###
-            t.add_input(rules_file,"./rules.txt")
-            t.add_input(nopen_file,"./lib-nopen.so")
-            ###
-
             t.set_cores(1)
+            t.add_nopen(m)
 
             m.submit(t)
             print(f"submitted task {t.id}: {t.command}")

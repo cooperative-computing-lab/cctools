@@ -43,11 +43,11 @@ def create_env(env_name, convert="convert", montage="montage"):
 def process_result(t):
     if t:
         if t.successful():
-            print(f"task {t.id} done: {t.command}")
+            print(f"task {t.id} done: {t.command}\n {t.output}")
         elif t.completed():
-            print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
+            print(f"task {t.id} completed with an executin error, exit code {t.exit_code}\n {t.output}")
         else:
-            print(f"task {t.id} failed with status {t.result}")
+            print(f"task {t.id} failed with status {t.result}\n {t.output}")
 
 
 if __name__ == "__main__":
@@ -62,7 +62,7 @@ if __name__ == "__main__":
     env_filename = "convert_montage.sfx"
     create_env(env_filename)
 
-    m = vine.Manager()
+    m = vine.Manager(name="jdolak-test")
     print(f"listening on port {m.port}")
 
     # declare the environment just created as a starch file.
@@ -72,11 +72,6 @@ if __name__ == "__main__":
 
     # source image to which all the operations will be applied
     image_file = m.declare_url("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", cache=True)
-
-    ###
-    rules_file = m.declare_file("./rules.txt")
-    nopen_file = m.declare_file("../lib-new-open.so")
-    ###
 
 
     # the image_file will be rotated in steps of 10 degrees by the tasks. The
@@ -102,11 +97,6 @@ if __name__ == "__main__":
         # add the main source image
         t.add_input(image_file,"cat.jpg")
 
-        ###
-        t.add_input(rules_file,"./rules.txt")
-        t.add_input(nopen_file,"./lib-nopen.so")
-        ###
-
 
         # declare the temporary file, associate it with output.jpg, and record
         # it for future use in montage.
@@ -117,6 +107,8 @@ if __name__ == "__main__":
         # specify that tasks won't use more than one core. This allows the
         # manager to dispatch as many tasks to a worker as its number of cores.
         t.set_cores(1)
+
+        t.add_nopen(m)
 
         m.submit(t)
         print(f"submitted task {t.id}: {t.command}")

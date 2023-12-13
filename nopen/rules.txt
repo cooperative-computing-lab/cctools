@@ -1,5 +1,2 @@
-#/dev/null   comments work
-/dev/
-/usr/lib64/
-/etc/
-/
+/dev/ RW
+#. RWND
