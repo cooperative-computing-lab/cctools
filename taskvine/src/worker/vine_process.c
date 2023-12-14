@@ -239,7 +239,8 @@ int vine_process_execute_and_wait(struct vine_process *p)
 
 int vine_process_invoke_function(struct vine_process *p)
 {
-	char *buffer = string_format("%d %s %s", p->task->task_id, p->task->command_line, p->sandbox);
+	char *buffer = string_format(
+			"%d %s %s %s", p->task->task_id, p->task->command_line, p->sandbox, p->output_file_name);
 	ssize_t result = link_printf(p->library_process->library_write_link,
 			time(0) + options->active_timeout,
 			"%ld\n%s",
@@ -285,35 +286,28 @@ int vine_process_execute(struct vine_process *p)
 	int input_fd = -1;
 	int output_fd = -1;
 	int error_fd = -1;
+	int in_pipe_fd = -1;  // only for library task, fd to send functions to library
+	int out_pipe_fd = -1; // only for library task, fd to receive results from library
 
 	/* Setting up input, output, and stderr for various task types. */
 	if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
 		/* If starting a library, create the pipes for parent-child communication. */
-
 		if (pipe(pipe_in) < 0)
 			fatal("couldn't create library pipes: %s\n", strerror(errno));
 		if (pipe(pipe_out) < 0)
 			fatal("couldn't create library pipes: %s\n", strerror(errno));
-
-		input_fd = pipe_in[0];
-		output_fd = pipe_out[1];
-
-		/* Standard error of library goes to output file name for return to manager. */
-		error_fd = open(p->output_file_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
-		if (output_fd == -1) {
-			debug(D_VINE, "Could not open worker stdout: %s", strerror(errno));
-			return 0;
-		}
-	} else {
-		/* For other task types, read input from null and send output to assigned file. */
-		input_fd = open("/dev/null", O_RDONLY);
-		output_fd = open(p->output_file_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
-		if (output_fd < 0) {
-			debug(D_VINE, "Could not open worker stdout: %s", strerror(errno));
-			return 0;
-		}
-		error_fd = output_fd;
+		in_pipe_fd = pipe_in[0];
+		out_pipe_fd = pipe_out[1];
 	}
+
+	/* Read input from null and send output to assigned file. */
+	input_fd = open("/dev/null", O_RDONLY);
+	output_fd = open(p->output_file_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
+	if (output_fd < 0) {
+		debug(D_VINE, "Could not open worker stdout: %s", strerror(errno));
+		return 0;
+	}
+	error_fd = output_fd;
 
 	/* Start the performance clock just prior to forking the task. */
 	p->execution_start = timestamp_get();
@@ -336,15 +330,10 @@ int vine_process_execute(struct vine_process *p)
 			/* Close the ends of the pipes that the parent process won't use. */
 			close(pipe_in[0]);
 			close(pipe_out[1]);
-
-			/* Close the error stream that the parent won't use. */
-			close(error_fd);
-		} else {
-			/* For any other task type, drop the fds unused by the parent. */
-			close(input_fd);
-			close(output_fd);
-			close(error_fd);
 		}
+		/* Drop the fds unused by the parent, error_fd is output_fd so close once. */
+		close(input_fd);
+		close(output_fd);
 
 		return 1;
 
@@ -367,31 +356,22 @@ int vine_process_execute(struct vine_process *p)
 			printf("The sandbox dir is %s", p->sandbox);
 			fatal("could not change directory into %s: %s", p->sandbox, strerror(errno));
 		}
-		/* For process types other than library, set up file desciptors.
-		 * The library will use the input_fd and output_fd to talk to the manager instead. */
-		if (p->type != VINE_PROCESS_TYPE_LIBRARY) {
-			int result = dup2(input_fd, STDIN_FILENO);
-			if (result < 0)
-				fatal("could not dup input to stdin: %s", strerror(errno));
+		int result = dup2(input_fd, STDIN_FILENO);
+		if (result < 0)
+			fatal("could not dup input to stdin: %s", strerror(errno));
 
-			result = dup2(output_fd, STDOUT_FILENO);
-			if (result < 0)
-				fatal("could not dup output to stdout: %s", strerror(errno));
+		result = dup2(output_fd, STDOUT_FILENO);
+		if (result < 0)
+			fatal("could not dup output to stdout: %s", strerror(errno));
 
-			result = dup2(error_fd, STDERR_FILENO);
-			if (result < 0)
-				fatal("could not dup error to stderr: %s", strerror(errno));
+		result = dup2(error_fd, STDERR_FILENO);
+		if (result < 0)
+			fatal("could not dup error to stderr: %s", strerror(errno));
 
-			/* Close redundant file descriptors.
-			 * Note that output_fd is the same as error_fd so it's only closed once. */
-			close(input_fd);
-			close(output_fd); // no need to close error_fd.
-		} else {
-			int result = dup2(error_fd, STDERR_FILENO);
-			if (result < 0)
-				fatal("could not dup error to stderr: %s", strerror(errno));
-			close(error_fd);
-		}
+		/* Close redundant file descriptors after dup()'ing.
+		 * Note that output_fd is the same as error_fd so it's only closed once. */
+		close(input_fd);
+		close(output_fd); // no need to close error_fd.
 
 		/* For a library task, close the unused sides of the pipes. */
 		if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
@@ -416,8 +396,8 @@ int vine_process_execute(struct vine_process *p)
 		} else {
 			char *final_command = string_format("%s --input-fd %d --output-fd %d --worker-pid %d",
 					p->task->command_line,
-					input_fd,
-					output_fd,
+					in_pipe_fd,
+					out_pipe_fd,
 					getppid());
 			execl("/bin/sh", "sh", "-c", final_command, (char *)0);
 		}

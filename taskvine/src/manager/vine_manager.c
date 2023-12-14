@@ -3109,7 +3109,8 @@ static struct vine_task *find_library_on_worker_for_task(struct vine_worker_info
 /* Check if this worker can run the function task.
  * @return 1 if it can, 0 otherwise.
  */
-static int check_worker_can_run_function_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+int vine_manager_check_worker_can_run_function_task(
+		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	struct vine_task *library = find_library_on_worker_for_task(w, t->needs_library);
 	if (!library) {
@@ -3170,12 +3171,6 @@ static int send_one_task(struct vine_manager *q)
 		if (q->peer_transfers_enabled) {
 			if (!vine_manager_transfer_capacity_available(q, w, t))
 				continue;
-		}
-
-		// If this is a function task, check if the worker can run it.
-		// May require the manager to send a library to the worker first.
-		if (t->needs_library && !check_worker_can_run_function_task(q, w, t)) {
-			continue;
 		}
 
 		// Otherwise, remove it from the ready list and start it:
