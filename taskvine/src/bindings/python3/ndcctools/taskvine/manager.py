@@ -120,7 +120,6 @@ class Manager(object):
 
             ssl_key, ssl_cert = self._setup_ssl(ssl, run_info_path)
             self._taskvine = cvine.vine_ssl_create(port, ssl_key, ssl_cert)
-            self._finalizer = weakref.finalize(self, self._free)
 
             if ssl_key:
                 self._using_ssl = True
@@ -143,12 +142,18 @@ class Manager(object):
             raise
 
     def _free(self):
-        if self._taskvine:
-            if self._shutdown:
-                self.shutdown_workers(0)
-            self._update_status_display(force=True)
-            cvine.vine_delete(self._taskvine)
-            self._taskvine = None
+        try:
+            if self._taskvine:
+                if self._shutdown:
+                    self.shutdown_workers(0)
+                self._update_status_display(force=True)
+                cvine.vine_delete(self._taskvine)
+                self._taskvine = None
+        except TypeError:
+            pass
+
+    def __del__(self):
+        self._free()
 
     def _setup_ssl(self, ssl, run_info_path):
         if not ssl:
@@ -191,7 +196,7 @@ class Manager(object):
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
-        self._finalizer()
+        self._free()
 
     ##
     # Get the project name of the manager.
