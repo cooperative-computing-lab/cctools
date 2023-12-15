@@ -749,12 +749,14 @@ class PythonTask(Task):
         self._fn_def = (func, args, kwargs)
         super(PythonTask, self).__init__(self._command)
 
-        self._finalizer = weakref.finalize(self, self._free)
+    @property
+    def _tmpdir(self):
+        return self._tmpdir_value
 
-    def _free(self):
-        if self._tmpdir and os.path.exists(self._tmpdir):
-            shutil.rmtree(self._tmpdir)
-        super()._free()
+    @_tmpdir.setter
+    def _tmpdir(self, value):
+        self._tmpdir_value = value
+        weakref.finalize(self, shutil.rmtree, value, ignore_errors=True)
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
