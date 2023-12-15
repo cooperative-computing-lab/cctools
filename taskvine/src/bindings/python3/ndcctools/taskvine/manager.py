@@ -1719,7 +1719,6 @@ class Factory(object):
         self._factory_proc = None
         self._log_file = log_file
         self._error_file = None
-        self._scratch_safe_to_delete = False
 
         self._opts = {}
 
@@ -1736,18 +1735,9 @@ class Factory(object):
             # we need to use some other directory.
             self._opts["scratch-dir"] = os.path.dirname(manager.staging_directory)
 
-        self._finalizer = weakref.finalize(self, self._free)
-
-    def _free(self):
+    def _stop(self):
         if self._factory_proc is not None:
             self.stop()
-        if self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
-            try:
-                shutil.rmtree(self.scratch_dir)
-            except OSError:
-                # if we could not delete it now because some file is being used,
-                # we leave it for the atexit function
-                pass
 
     def _set_manager(self, batch_type, manager, manager_host_port, manager_name):
         if not (manager or manager_host_port or manager_name):
@@ -1877,8 +1867,6 @@ class Factory(object):
 
         # specialize scratch_dir for this run
         self.scratch_dir = tempfile.mkdtemp(prefix="vine-factory-", dir=self.scratch_dir)
-        self._scratch_safe_to_delete = True
-
         atexit.register(lambda: shutil.rmtree(self.scratch_dir, ignore_errors=True))
 
         self._error_file = os.path.join(self.scratch_dir, "error.log")
