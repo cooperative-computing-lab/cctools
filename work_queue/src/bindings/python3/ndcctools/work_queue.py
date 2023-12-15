@@ -104,17 +104,18 @@ class Task(object):
         if not self._task:
             raise Exception("Unable to create internal Task structure")
 
-        self._finalizer = weakref.finalize(self, self._free)
-
-    def _free(self):
-        if not self._task:
-            return
-        if self._manager and self._manager._finalizer.alive and self.id in self._manager._task_table:
-            # interpreter is shutting down. Don't delete task here so that manager
-            # does not get memory errors
-            return
-        work_queue_task_delete(self._task)
-        self._task = None
+    def __del__(self):
+        try:
+            if not self._task:
+                return
+            if self._manager and self.id in self._manager._task_table:
+                # interpreter is shutting down. Don't delete task here so that manager
+                # does not get memory errors
+                return
+            work_queue_task_delete(self._task)
+            self._task = None
+        except TypeError:
+            pass
 
     @staticmethod
     def _determine_file_flags(flags, cache, failure_only):
@@ -982,13 +983,7 @@ class PythonTask(Task):
 
         super(PythonTask, self).__init__(self._command)
         self._specify_IO_files()
-
-        self._finalizer = weakref.finalize(self, self._free)
-
-    def _free(self):
-        if self._tmpdir and os.path.exists(self._tmpdir):
-            shutil.rmtree(self._tmpdir)
-        super()._free()
+        self._finalizer = weakref.finalize(self, shutil.rmtree, self._tmpdir, ignore_errors=True)
 
     ##
     # returns the result of a python task as a python variable
@@ -1167,28 +1162,28 @@ class WorkQueue(object):
                 work_queue_specify_name(self._work_queue, name)
         except Exception as e:
             raise Exception("Unable to create internal Work Queue structure: {}".format(e))
-        finally:
-            self._finalizer = weakref.finalize(self, self._free)
+
         self._update_status_display()
 
     def _free(self):
-        if self._work_queue:
-            if self._shutdown:
-                self.shutdown_workers(0)
-            self._update_status_display(force=True)
-            work_queue_delete(self._work_queue)
-            self._work_queue = None
+        try:
+            if self._work_queue:
+                if self._shutdown:
+                    self.shutdown_workers(0)
+                self._update_status_display(force=True)
+                work_queue_delete(self._work_queue)
+                self._work_queue = None
+        except TypeError:
+            pass
 
     def __del__(self):
-        # method needed because coffea executor pre-2023 calls __del__ explicitly.
-        pass
+        self._free()
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self._update_status_display(force=True)
-        self._finalizer()
+        self._free()
 
     def _setup_ssl(self, ssl):
         if not ssl:
