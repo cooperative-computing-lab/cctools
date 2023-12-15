@@ -50,8 +50,6 @@ class Task(object):
         if not self._task:
             raise Exception("Unable to create internal Task structure")
 
-        self._finalizer = weakref.finalize(self, self._free)
-
         attributes = [
             "needs_library_name",
             "provides_library_name",
@@ -111,17 +109,21 @@ class Task(object):
         except KeyError:
             pass
 
-    def _free(self):
-        if not self._task:
-            return
-        if self._manager_will_free:
-            return
-        if self._manager and self._manager._finalizer.alive and self.id in self._manager._task_table:
-            # interpreter is shutting down. Don't delete task here so that manager
-            # does not get memory errors
-            return
-        cvine.vine_task_delete(self._task)
-        self._task = None
+    def __del__(self):
+        try:
+            if not self._task:
+                return
+            if self._manager_will_free:
+                return
+            if self._manager and self.id in self._manager._task_table:
+                # interpreter is shutting down. Don't delete task here so that manager
+                # does not get memory errors
+                return
+            cvine.vine_task_delete(self._task)
+            self._task = None
+        except TypeError:
+            # modules were freed before task (e.g. interpreter shutdown)
+            pass
 
     @staticmethod
     def _determine_mount_flags(watch=False, failure_only=False, success_only=False, strict_input=False, mount_symlink=False):
