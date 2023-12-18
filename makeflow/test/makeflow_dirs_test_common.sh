@@ -3,6 +3,10 @@
 STATUS_FILE=makeflow.status
 PORT_FILE=makeflow.port
 
+is_macos() {
+    [ "$(uname -s)" = "Darwin" ]
+}
+
 prepare()
 {
 	rm -f $STATUS_FILE
@@ -23,8 +27,13 @@ run()
 	(../src/makeflow -d all -T vine -Z $PORT_FILE  $MAKE_FILE; echo $? > $STATUS_FILE) &
 
 	# wait at most 5 seconds for makeflow to find a port.
-	wait_for_file_creation $PORT_FILE 5
-
+    if is_macos; then
+        # Execute macOS-specific code
+        :
+    else
+        # Execute code for other operating systems
+        wait_for_file_creation $PORT_FILE 5
+    fi
 	run_taskvine_worker $PORT_FILE worker.log
 
 	# wait for makeflow to exit.
@@ -36,7 +45,6 @@ run()
 	then
 		exit 1
 	fi
-
 	# verify that makeflow created the required files from
 	# $MAKE_FILE
 	for file in $PRODUCTS

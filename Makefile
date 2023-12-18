@@ -47,6 +47,7 @@ install: $(INSTALL_PACKAGES)
 	cp README.md COPYING CREDITS ${CCTOOLS_INSTALL_DIR}/doc/cctools
 
 test: $(CCTOOLS_PACKAGES)
+	echo "TESTING PULLING FROM CURRENT BRANCH"
 	./run_all_tests.sh
 
 PACKAGES_TO_LINT = taskvine dttools poncho resource_monitor

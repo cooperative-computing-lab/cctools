@@ -61,27 +61,87 @@ jobs:
           commit: ${{ steps.vars.output.tag_sha }}
           tag: ${{ github.event.inputs.tag }}
 
-  build-osx:
-    runs-on: macos-11
-    timeout-minutes: 45
+#   build-os12:
+#     runs-on: macos-12
+#     timeout-minutes: 30
+#     env:
+#       CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, 'osx-12') }}
+#     needs: lint
+#     steps:
+#         - name: checkout CCTools from branch head
+        #   if: github.event_name != 'workflow_dispatch'
+        #   uses: actions/checkout@v3
+        # - name: checkout CCTools from tag
+        #   if: github.event_name == 'workflow_dispatch'
+        #   uses: actions/checkout@v3
+        #   with:
+        #     ref: ${{ github.event.inputs.tag }}
+        # - name: Get sha of tag
+        #   id: vars
+        #   shell: bash
+        #   run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        # - name: Conda-Setup
+        #   run: | 
+        #           mkdir -p ~/miniconda3
+        #           curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o ~/miniconda3/miniconda.sh
+        #           bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
+        #           ~/miniconda3/bin/conda init bash
+        #           source ~/.bashrc
+        #           conda install -n base conda-libmamba-solver
+        #           conda create --name cctools-build --yes --quiet --channel conda-forge --strict-channel-priority --solver=libmamba python=3 gdb m4 perl swig make zlib libopenssl-static openssl conda-pack cloudpickle packaging
+        # - name: Configure
+        #   run: |
+        #           ${GITHUB_WORKSPACE}/packaging/build-conda/configure.sh
+        # - name: Build
+        #   run: |
+        #           ${GITHUB_WORKSPACE}/packaging/build-conda/build.sh
+        # - name: Install
+        #   run: |
+        #           ${GITHUB_WORKSPACE}/packaging/build-conda/install.sh
+        # - name: Test
+        #   run: |
+        #           ${GITHUB_WORKSPACE}/packaging/build-conda/test.sh
+        # - name: deploy
+        #   uses: ncipollo/release-action@v1
+        #   if: github.event_name == 'workflow_dispatch'
+        #   with:
+        #     artifacts: /tmp/${{ env.CCTOOLS_OUTPUT }}
+        #     token: ${{ secrets.GITHUB_TOKEN }}
+        #     allowUpdates: true
+        #     artifactContentType: application/gzip
+        #     draft: true
+        #     omitBody: true
+        #     omitBodyDuringUpdate: true
+        #     prerelease: true
+        #     replacesArtifacts: true
+        #     commit: ${{ steps.vars.output.tag_sha }}
+        #     tag: ${{ github.event.inputs.tag }}
+
+  build-os13:
+    runs-on: macos-13
+    timeout-minutes: 30
     env:
-      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, 'osx-11') }}
+      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, 'osx-13') }}
     needs: lint
     steps:
       - name: checkout CCTools from branch head
-        if: github.event_name != 'workflow_dispatch'
         uses: actions/checkout@v3
-      - name: checkout CCTools from tag
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.inputs.tag }}
       - name: Get sha of tag
         id: vars
         shell: bash
         run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-      - name: build
-        run: ${GITHUB_WORKSPACE}/packaging/scripts/build.sh
+      - name: Conda-Setup
+        run: ${GITHUB_WORKSPACE}/packaging/mac-os/setup.sh
+      - name: Configure
+        run: ${GITHUB_WORKSPACE}/packaging/mac-os/configure.sh
+      - name: Build
+        run: ${GITHUB_WORKSPACE}/packaging/mac-os/build.sh
+      - name: Install
+        run: ${GITHUB_WORKSPACE}/packaging/mac-os/install.sh
+      - name: Test
+        run: ${GITHUB_WORKSPACE}/packaging/mac-os/test.sh
+    #   - name: Test-Singular
+    #     run: ${GITHUB_WORKSPACE}/packaging/mac-os/testing_singular.sh
       - name: deploy
         uses: ncipollo/release-action@v1
         if: github.event_name == 'workflow_dispatch'
