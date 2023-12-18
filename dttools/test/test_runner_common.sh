@@ -48,6 +48,8 @@ wait_for_file_creation()
 	filename=$1
 	timeout=$2
 
+	echo "wait_for_file_creation: $1 $2"
+
 	if [ -z $filename ]
 	then
 		exit 1
@@ -55,10 +57,13 @@ wait_for_file_creation()
 	
 	for i in {1..$timeout}
 	do
+		echo "wait_for_file_creation: loop $i"
 		if [ -f $filename ]
 		then
+			echo "wait_for_file_creation: exists!"
 			return 0
 		else
+			echo "wait_for_file_creation: sleep (`which sleep`)"
 			sleep 1
 		fi
 	done
