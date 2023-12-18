@@ -243,11 +243,12 @@ Queue a remote file transfer to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */
 
-int vine_cache_queue_transfer(struct vine_cache *c, const char *source, const char *cachename, int64_t size, int mode, int flags)
+int vine_cache_queue_transfer(
+		struct vine_cache *c, const char *source, const char *cachename, int64_t size, int mode, int flags)
 {
 	struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_TRANSFER, source, size, mode, 0);
 	hash_table_insert(c->table, cachename, f);
-	if(flags==VINE_CACHE_NOW)
+	if (flags == VINE_CACHE_NOW)
 		vine_cache_ensure(c, cachename);
 	return 1;
 }

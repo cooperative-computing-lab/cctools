@@ -211,8 +211,8 @@ may be an estimate at this point and will be updated by return
 message once the object is actually loaded into the cache.
 */
 
-vine_result_code_t vine_manager_put_url_now(
-		struct vine_manager *q, struct vine_worker_info *w, const char *source, const char *cachename, long long size)
+vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_worker_info *w, const char *source,
+		const char *cachename, long long size)
 {
 	char source_encoded[VINE_LINE_MAX];
 	char cached_name_encoded[VINE_LINE_MAX];
