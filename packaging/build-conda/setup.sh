@@ -13,10 +13,11 @@ then
     # Now we pull in the configuration.
     source ~/.bash_profile
     # But we also have to setup Conda in every normal shell as well:
+    echo "export PATH=$HOME/miniconda3/bin:$PATH" >> $HOME/.bashrc
     echo ". $HOME/miniconda3/etc/profile.d/conda.sh" >> $HOME/.bashrc
     conda install -n base conda-libmamba-solver
     # Remove Linux specific packages from environment.
-    grep -v linux environment.yml > environment.macos.yml
+    grep -v linux environment.yml | grep -v gdb > environment.macos.yml
     conda env create --name cctools-build --quiet --solver=libmamba --file environment.macos.yml
 else
     conda env create --name cctools-build --quiet --file environment.yml
