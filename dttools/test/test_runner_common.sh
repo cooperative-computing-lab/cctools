@@ -55,7 +55,7 @@ wait_for_file_creation()
 		exit 1
 	fi
 	
-	for i in {1..$timeout}
+	for i in $(seq 1 $timeout)
 	do
 		echo "wait_for_file_creation: loop $i"
 		if [ -f $filename ]
