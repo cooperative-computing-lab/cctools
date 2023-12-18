@@ -18,7 +18,6 @@ import sys
 import tempfile
 import textwrap
 import uuid
-import weakref
 import cloudpickle
 
 ##
@@ -114,6 +113,8 @@ class Task(object):
             if not self._task:
                 return
             if self._manager_will_free:
+                # e.g., for a minitask that won't be in self._manager._task_table
+                # otherwise the task gets a double-free
                 return
             if self._manager and self.id in self._manager._task_table:
                 # interpreter is shutting down. Don't delete task here so that manager
@@ -709,10 +710,6 @@ class Task(object):
 #
 # The class represents a Task specialized to execute remote Python code.
 #
-
-
-
-
 class PythonTask(Task):
     ##
     # Creates a new python task
@@ -749,15 +746,6 @@ class PythonTask(Task):
         self._fn_def = (func, args, kwargs)
         super(PythonTask, self).__init__(self._command)
 
-    @property
-    def _tmpdir(self):
-        return self._tmpdir_value
-
-    @_tmpdir.setter
-    def _tmpdir(self, value):
-        self._tmpdir_value = value
-        weakref.finalize(self, shutil.rmtree, value, ignore_errors=True)
-
     ##
     # Finalizes the task definition once the manager that will execute is run.
     # This function is run by the manager before registering the task for
@@ -772,6 +760,18 @@ class PythonTask(Task):
         self._fn_def = None  # avoid possible memory leak
         self._create_wrapper()
         self._add_IO_files(manager)
+
+    # remove any temp files generated
+    # if __del__ is never called, or called too late (e.g. on interpreter shutdown),
+    # then temp files will be deleted in the atexit of the manager staging directory
+    def __del__(self):
+        try:
+            if self._tmpdir:
+                shutil.rmtree(self._tmpdir, ignore_errors=True)
+            super().__del__()
+        except TypeError:
+            # in case the interpreter is shuting down. staging files will be deleted by manager atexit function.
+            pass
 
     ##
     # Marks the output of this task to stay at the worker.

@@ -1865,11 +1865,11 @@ class Factory(object):
             self.scratch_dir = candidate
 
         # specialize scratch_dir for this run
-        self.scratch_dir = tempfile.mkdtemp(prefix="vine-factory-", dir=self.scratch_dir)
-        atexit.register(lambda: shutil.rmtree(self.scratch_dir, ignore_errors=True))
+        self._scratch_dir_run = tempfile.mkdtemp(prefix="vine-factory-", dir=self.scratch_dir)
+        atexit.register(lambda: shutil.rmtree(self._scratch_dir_run, ignore_errors=True))
 
-        self._error_file = os.path.join(self.scratch_dir, "error.log")
-        self._config_file = os.path.join(self.scratch_dir, "config.json")
+        self._error_file = os.path.join(self._scratch_dir_run, "error.log")
+        self._config_file = os.path.join(self._scratch_dir_run, "config.json")
 
         self._write_config()
         logfd = open(self._log_file, "a")
