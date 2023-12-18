@@ -212,21 +212,21 @@ message once the object is actually loaded into the cache.
 */
 
 vine_result_code_t vine_manager_put_url_now(
-		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f)
+		struct vine_manager *q, struct vine_worker_info *w, const char *source, const char *cachename, long long size)
 {
 	char source_encoded[VINE_LINE_MAX];
 	char cached_name_encoded[VINE_LINE_MAX];
 
-	url_encode(f->source, source_encoded, sizeof(source_encoded));
-	url_encode(f->cached_name, cached_name_encoded, sizeof(cached_name_encoded));
+	url_encode(source, source_encoded, sizeof(source_encoded));
+	url_encode(cachename, cached_name_encoded, sizeof(cached_name_encoded));
 
-	char *transfer_id = vine_current_transfers_add(q, w, f->source);
+	char *transfer_id = vine_current_transfers_add(q, w, cachename);
 	int result = vine_manager_send(q,
 			w,
 			"puturl_now %s %s %lld %o %s\n",
 			source_encoded,
 			cached_name_encoded,
-			(long long)f->size,
+			size,
 			0777,
 			transfer_id);
 

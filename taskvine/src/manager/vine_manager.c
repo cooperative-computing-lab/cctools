@@ -362,21 +362,8 @@ static void replicate_temp_file(
 	for (int i = 0; i < found; i++) {
 		struct vine_worker_info *peer = workers[i];
 		char *worker_source = string_format("worker://%s:%d/%s", w->transfer_addr, w->transfer_port, cachename);
-		char *worker_addr = string_format("worker://%s:%d", w->transfer_addr, w->transfer_port);
-
-		char *transfer_id = vine_current_transfers_add(q, peer, worker_source);
-		vine_manager_send(q,
-				peer,
-				"puturl_now %s %s %lld %o %s\n",
-				worker_source,
-				cachename,
-				size,
-				0777,
-				transfer_id);
-
+		vine_manager_put_url_now(q, peer, worker_source, cachename, size); 
 		free(worker_source);
-		free(worker_addr);
-		free(transfer_id);
 	}
 	free(workers);
 }
