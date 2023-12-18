@@ -41,7 +41,6 @@ import shutil
 import atexit
 import time
 import math
-import weakref
 
 
 def set_debug_flag(*flags):
@@ -80,6 +79,7 @@ def cleanup_staging_directory():
         sys.stderr.write("could not delete {}: {}\n".format(staging_directory, e))
 
 
+# BUG: the atexit won't be called if python exits with an exception.
 atexit.register(cleanup_staging_directory)
 
 
@@ -983,7 +983,18 @@ class PythonTask(Task):
 
         super(PythonTask, self).__init__(self._command)
         self._specify_IO_files()
-        self._finalizer = weakref.finalize(self, shutil.rmtree, self._tmpdir, ignore_errors=True)
+
+    # remove any temp files generated
+    # if __del__ is never called, or called too late (e.g. on interpreter shutdown),
+    # then temp files will be deleted in the atexit of the staging directory
+    def __del__(self):
+        try:
+            if self._tmpdir:
+                shutil.rmtree(self._tmpdir, ignore_errors=True)
+            super().__del__()
+        except TypeError:
+            # in case the interpreter is shuting down. staging files will be deleted by manager atexit function.
+            pass
 
     ##
     # returns the result of a python task as a python variable
@@ -2355,7 +2366,6 @@ class Factory(object):
         self._factory_proc = None
         self._log_file = log_file
         self._error_file = None
-        self._scratch_safe_to_delete = False
 
         self._opts = {}
 
@@ -2365,13 +2375,6 @@ class Factory(object):
         self._opts["worker-binary"] = self._find_exe(worker_binary, "work_queue_worker")
         self._factory_binary = self._find_exe(factory_binary, "work_queue_factory")
         self._opts["scratch-dir"] = None
-
-        def free():
-            if self._factory_proc is not None:
-                self.stop()
-            if self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
-                shutil.rmtree(self.scratch_dir)
-        self._finalizer = weakref.finalize(self, free)
 
     def _set_manager(self, batch_type, manager, manager_host_port, manager_name):
         if not (manager or manager_host_port or manager_name):
@@ -2500,13 +2503,11 @@ class Factory(object):
             self.scratch_dir = candidate
 
         # specialize scratch_dir for this run
-        self.scratch_dir = tempfile.mkdtemp(prefix="wq-factory-", dir=self.scratch_dir)
-        self._scratch_safe_to_delete = True
+        self._scratch_dir_run = tempfile.mkdtemp(prefix="vine-factory-", dir=self.scratch_dir)
+        atexit.register(lambda: shutil.rmtree(self._scratch_dir_run, ignore_errors=True))
 
-        atexit.register(lambda: os.path.exists(self.scratch_dir) and shutil.rmtree(self.scratch_dir))
-
-        self._error_file = os.path.join(self.scratch_dir, "error.log")
-        self._config_file = os.path.join(self.scratch_dir, "config.json")
+        self._error_file = os.path.join(self._scratch_dir_run, "error.log")
+        self._config_file = os.path.join(self._scratch_dir_run, "config.json")
 
         self._write_config()
         logfd = open(self._log_file, "a")
@@ -2542,6 +2543,12 @@ class Factory(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.stop()
+
+    def __del__(self):
+        try:
+            self.stop()
+        except TypeError:
+            pass
 
     def _write_config(self):
         if self._config_file is None:

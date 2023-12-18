@@ -1906,6 +1906,12 @@ class Factory(object):
     def __exit__(self, exc_type, exc_value, traceback):
         self.stop()
 
+    def __del__(self):
+        try:
+            self.stop()
+        except TypeError:
+            pass
+
     def _write_config(self):
         if self._config_file is None:
             return
