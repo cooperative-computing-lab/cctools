@@ -17,7 +17,7 @@ then
     conda install -n base conda-libmamba-solver
     # Remove Linux specific packages from environment.
     grep -v linux environment.yml > environment.macos.yml
-    conda env create --name cctools-build --quiet --file environment.macos.yml
+    conda env create --name cctools-build --quiet --solver=libmamba --file environment.macos.yml
 else
     conda env create --name cctools-build --quiet --file environment.yml
 fi
