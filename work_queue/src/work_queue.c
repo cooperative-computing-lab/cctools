@@ -5958,13 +5958,8 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 
 	q->time_last_wait = timestamp_get();
 
-	char hostname[DOMAIN_NAME_MAX];
-	if(domain_name_cache_guess(hostname)) {
-		debug(D_WQ, "Master advertising as %s:%d", hostname, q->port);
-	}
-	else {
-		debug(D_WQ, "Work Queue is listening on port %d.", q->port);
-	}
+	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
+
 	return q;
 }
 
