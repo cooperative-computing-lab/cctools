@@ -248,7 +248,7 @@ int vine_cache_queue_transfer(
 {
 	struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_TRANSFER, source, size, mode, 0);
 	hash_table_insert(c->table, cachename, f);
-	if (flags == VINE_CACHE_NOW)
+	if (flags & VINE_CACHE_FLAGS_NOW)
 		vine_cache_ensure(c, cachename);
 	return 1;
 }

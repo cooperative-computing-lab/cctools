@@ -31,9 +31,9 @@ typedef enum {
 } vine_cache_type_t;
 
 typedef enum {
-	VINE_CACHE_ON_TASK,
-	VINE_CACHE_NOW
-} vine_cache_ensure_when_t;
+	VINE_CACHE_FLAGS_ON_TASK = 1,
+	VINE_CACHE_FLAGS_NOW = 2,
+} vine_cache_flags_t;
 
 typedef enum {
 	VINE_CACHE_STATUS_NOT_PRESENT,

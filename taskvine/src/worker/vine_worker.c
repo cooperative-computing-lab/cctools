@@ -809,7 +809,7 @@ Accept a url specification and queue it for later transfer.
 
 static int do_put_url(const char *cache_name, int64_t size, int mode, const char *source)
 {
-	return vine_cache_queue_transfer(cache_manager, source, cache_name, size, mode, VINE_CACHE_ON_TASK);
+	return vine_cache_queue_transfer(cache_manager, source, cache_name, size, mode, VINE_CACHE_FLAGS_ON_TASK);
 }
 
 /*
@@ -818,7 +818,7 @@ Accept a url specification and transfer immediately.
 
 static int do_put_url_now(const char *cache_name, int64_t size, int mode, const char *source)
 {
-	return vine_cache_queue_transfer(cache_manager, source, cache_name, size, mode, VINE_CACHE_NOW);
+	return vine_cache_queue_transfer(cache_manager, source, cache_name, size, mode, VINE_CACHE_FLAGS_NOW);
 }
 
 /*
