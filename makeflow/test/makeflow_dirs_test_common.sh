@@ -26,14 +26,9 @@ run()
 	# send makeflow to the background, saving its exit status.
 	(../src/makeflow -d all -T vine -Z $PORT_FILE  $MAKE_FILE; echo $? > $STATUS_FILE) &
 
-	# wait at most 5 seconds for makeflow to find a port.
-    if is_macos; then
-        # Execute macOS-specific code
-        :
-    else
-        # Execute code for other operating systems
-        wait_for_file_creation $PORT_FILE 5
-    fi
+	# wait at most 10 seconds for makeflow to find a port.
+        wait_for_file_creation $PORT_FILE 10
+
 	run_taskvine_worker $PORT_FILE worker.log
 
 	# wait for makeflow to exit.
