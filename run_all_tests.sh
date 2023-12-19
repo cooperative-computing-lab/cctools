@@ -47,9 +47,6 @@ FAILURE=0
 SKIP=0
 START_TIME=$(date +%s)
 for package in ${CCTOOLS_PACKAGES_TEST}; do
-    if [ ${package} != "makeflow" ]; then
-        continue;
-    fi
 	if [ -d "${package}/test" ]; then
 		cd "./${package}/test"
 		for script in TR_*; do
