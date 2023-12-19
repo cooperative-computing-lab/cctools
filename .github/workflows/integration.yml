@@ -24,6 +24,7 @@ jobs:
     timeout-minutes: 30
     env:
       CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, 'osx-13') }}
+      CCTOOLS_SOURCE_PROFILE: yes
     #needs: lint
     steps:
       - name: checkout CCTools from branch head
