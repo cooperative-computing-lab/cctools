@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ $OSNAME = Darwin ]
+then
+    source ~/.bash_profile
+fi
+
 if ! conda run --name cctools-build make test
 then
     echo === Contents of cctools.test.fail ===
