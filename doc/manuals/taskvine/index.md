@@ -228,7 +228,10 @@ for the duration of a workflow, and are deleted when no longer needed.
 This accelerates a workflow by avoiding the step of returning the
 data to the manager.
 If a temporary file is unexpectedly lost due to the crash or failure
-of a worker, then the task that created it will be re-executed.
+of a worker, then the task that created it will be re-executed. Temp files
+may also be replicated across workers to a degree set by the `vine_tune` parameter
+`temp-replica-count'. Temp file replicas are useful if significant work
+is required to re-execute the task that created it. 
 The contents of a temporary file can be obtained with `fetch_file`
 
 If it is necessary to unpack a file before it is used,
@@ -2446,6 +2449,7 @@ change.
 | hungry-minimum-factor   | Queue is hungry if number of waiting tasks is less than hungry-minumum-factor x (number of workers) | 2 |
 | ramp-down-heuristic     | If set to 1 and there are more workers than tasks waiting, then tasks are allocated all the free resources of a worker large enough to run them. If monitoring watchdog is not enabled, then this heuristic has no effect. | 0 |
 | immediate-recovery    | If set to 1, create recovery tasks for temporary files as soon as their worker disconnects. Otherwise, create recovery tasks only if the temporary files are used as input when trying to dispatch another task. | 0 |
+| temp-replica-count    | Number of temp file replicas created across workers | 0 |
 | monitor-interval        | Maximum number of seconds between resource monitor measurements. If less than 1, use default. | 5 |
 | resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
