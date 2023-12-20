@@ -22,6 +22,8 @@ See the file COPYING for details.
 #include <string.h>
 #include <unistd.h>
 #include <sys/utsname.h>
+#include <errno.h>
+#include <string.h>
 
 void show_help(const char *cmd) {
 	printf( "Use: %s [options]\n", cmd);
@@ -123,7 +125,7 @@ int main(int argc, char *argv[]) {
 	char *text = jx_print_string(merged);
 
 	if(catalog_query_send_update(host, text, 0) < 1) {
-		fprintf(stderr, "Unable to send update");
+		fprintf(stderr, "catalog_update: unable to send update: %s\n",strerror(errno));
 	}
 
 	jx_delete(j);
