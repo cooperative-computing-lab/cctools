@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "domain_name_cache.h"
 #include "debug.h"
 #include "hash_cache.h"
+#include "stringtools.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -133,10 +134,30 @@ int domain_name_cache_guess(char *name)
 	if (uname(&n) < 0)
 		return 0;
 
-	if (!domain_name_cache_lookup(n.nodename, addr))
-		return 0;
-	if (!domain_name_cache_lookup_reverse(addr, name))
-		return 0;
+	/*
+	A common situation in testing and other isolated situations
+	is a machine whose uname ends in .local indicating that it
+	does not correspond to a domain name, and may not event be
+	int /etc/hosts.  Attempting to look this up via DNS results
+	in long delays.  Short circuit that situation by failing quickly.
+	*/
+
+	if(string_match(n.nodename,"^.*\\.local$")) {
+		strcpy(name, n.nodename);
+		return 1;
+	}
+
+	/* Otherwise, take the nodename, and look it up in DNS and then reverse it. */
+	
+	if (!domain_name_cache_lookup(n.nodename, addr)) {
+		strcpy(name, n.nodename);
+		return 1;
+	}
+
+	if (!domain_name_cache_lookup_reverse(addr, name)) {
+		strcpy(name, n.nodename);
+		return 1;
+	}
 
 	debug(D_DNS, "finding my hostname: uname = %s, address = %s, hostname = %s", n.nodename, addr, name);
 
