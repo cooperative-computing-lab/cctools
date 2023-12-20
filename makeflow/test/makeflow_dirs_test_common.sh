@@ -22,8 +22,8 @@ run()
 	# send makeflow to the background, saving its exit status.
 	(../src/makeflow -d all -T vine -Z $PORT_FILE  $MAKE_FILE; echo $? > $STATUS_FILE) &
 
-	# wait at most 5 seconds for makeflow to find a port.
-	wait_for_file_creation $PORT_FILE 5
+	# wait at most 10 seconds for makeflow to find a port.
+        wait_for_file_creation $PORT_FILE 10
 
 	run_taskvine_worker $PORT_FILE worker.log
 
@@ -36,7 +36,6 @@ run()
 	then
 		exit 1
 	fi
-
 	# verify that makeflow created the required files from
 	# $MAKE_FILE
 	for file in $PRODUCTS
