@@ -29,7 +29,6 @@ jobs:
     strategy: 
       matrix:
         os-name: ['centos7', 'almalinux8', 'ubuntu20.04']
-    needs: lint
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
@@ -62,7 +61,6 @@ jobs:
           tag: ${{ github.event.inputs.tag }}
 
   build-conda:
-    needs: lint
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -115,7 +113,6 @@ jobs:
     env:
       CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, matrix.os-name) }}
       CCTOOLS_SOURCE_PROFILE: yes
-    needs: lint
     steps:
       - name: checkout CCTools from branch head
         uses: actions/checkout@v3
