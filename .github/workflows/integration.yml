@@ -29,7 +29,6 @@ jobs:
     strategy: 
       matrix:
         os-name: ['centos7', 'almalinux8', 'ubuntu20.04']
-    needs: lint
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
@@ -44,7 +43,7 @@ jobs:
         shell: bash
         run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - name: build
-        run: ${GITHUB_WORKSPACE}/packaging/scripts/build.sh
+        run: ${GITHUB_WORKSPACE}/packaging/build-docker/build.sh
       - name: deploy
         uses: ncipollo/release-action@v1
         if: github.event_name == 'workflow_dispatch'
@@ -62,7 +61,6 @@ jobs:
           tag: ${{ github.event.inputs.tag }}
 
   build-conda:
-    needs: lint
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -110,12 +108,11 @@ jobs:
     runs-on: ${{ matrix.os-name }}
     strategy:
       matrix:
-        os-name: ['macos-11','macos-12','macos-13']
+        os-name: ['macos-12','macos-13']
     timeout-minutes: 30
     env:
       CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, matrix.os-name) }}
       CCTOOLS_SOURCE_PROFILE: yes
-    needs: lint
     steps:
       - name: checkout CCTools from branch head
         uses: actions/checkout@v3
