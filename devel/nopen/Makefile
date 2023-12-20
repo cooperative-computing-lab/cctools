@@ -1,13 +1,5 @@
 include ../../config.mk
 
-CC=			gcc
-CFLAGS=		-g -Wall -std=gnu99
-LD=			gcc
-LDFLAGS=	-L.
-LIBS= 		-lstr
-AR=			ar
-ARFLAGS=	rcs
-
 TARGETS=    lib-nopen.so
 
 all:		$(TARGETS)
