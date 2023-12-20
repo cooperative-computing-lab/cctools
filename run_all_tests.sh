@@ -1,5 +1,7 @@
 #!/bin/sh
 
+export CCTOOLS_PACKAGES_TEST=deltadb
+
 if [ X$1 != X ]
 then
 	CCTOOLS_PACKAGES_TEST=$1
