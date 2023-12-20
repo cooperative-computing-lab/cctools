@@ -14,8 +14,8 @@ run()
 	../src/catalog_server -d all -o catalog.log &
 	pid=$!
 
-	echo "sending three udp updates to the server"
-	for i in 1 2 3
+	echo "sending udp updates to the server"
+	for i in 1 2 3 4 5
 	do
 		../../dttools/src/catalog_update --catalog localhost:9097 --file update.json -d all
 		sleep 1
