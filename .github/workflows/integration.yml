@@ -26,7 +26,7 @@ jobs:
         os-name: ['macos-11','macos-12','macos-13']
     timeout-minutes: 30
     env:
-      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, os-name) }}
+      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, matrix.os-name) }}
       CCTOOLS_SOURCE_PROFILE: yes
     #needs: lint
     steps:
