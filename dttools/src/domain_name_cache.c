@@ -142,7 +142,7 @@ int domain_name_cache_guess(char *name)
 	in long delays.  Short circuit that situation by failing quickly.
 	*/
 
-	if(string_match(n.nodename,"^.*\\.local$")) {
+	if(string_match_regex(n.nodename,"^.*\\.local$")) {
 		strcpy(name, n.nodename);
 		return 1;
 	}
