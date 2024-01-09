@@ -1013,15 +1013,34 @@ class FunctionCall(Task):
             remote_task_exec_method = "fork"
         self._event["remote_task_exec_method"] = remote_task_exec_method
 
+    ##
+    # Retrieve output, handles cleanup, and returns result or failure reason.
     @property
     def output(self):
         output = cloudpickle.loads(self._output_buffer.contents())
         self._manager.remove_file(self._input_buffer)
+        self._input_buffer = None
         self._manager.remove_file(self._output_buffer)
+        self._output_buffer = None
+
         if output['Success']:
             return output['Result']
         else:
             return output['Reason']
+
+    ## 
+    # Remove input and output buffers under some circumstances `output` is not called
+    def __del__(self):
+        try:
+            if self._input_buffer:
+                self._manager.remove_file(self._input_buffer)
+                self._input_buffer = None
+            if self._output_buffer:
+                self._manager.remove_file(self._output_buffer)
+                self._output_buffer = None
+            super().__del__()
+        except TypeError:
+            pass
 
 
 ##
