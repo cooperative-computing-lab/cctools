@@ -2547,7 +2547,7 @@ class Factory(object):
     def __del__(self):
         try:
             self.stop()
-        except TypeError:
+        except (TypeError, RuntimeError):
             pass
 
     def _write_config(self):
