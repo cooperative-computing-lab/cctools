@@ -1028,7 +1028,7 @@ class FunctionCall(Task):
     # Retrieve output, handles cleanup, and returns result or failure reason.
     @property
     def output(self):
-        output = cloudpickle.loads(self._output_buffer.contents())
+        output = cloudpickle.loads(self._output_file.contents())
         self._manager.remove_file(self._input_buffer)
         self._input_buffer = None
         self._manager.remove_file(self._output_file)
