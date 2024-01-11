@@ -12,6 +12,9 @@ def wq_network_code():
     import sys
     import io
 
+    # If enabled, coprocess will print to stdout
+    debug_mode = False
+        
     # Send a message on a binary I/O stream by sending the message length and then the (string) message.
     def send_message( stream, data ):
         size = len(data)
@@ -73,22 +76,36 @@ def wq_network_code():
             s.listen()
             conn, addr = s.accept()
             connstream = conn.makefile("rw",encoding="utf-8")
-            print('Network function: connection from {}'.format(addr), file=sys.stderr)
+
+            if debug_mode:
+                print('Network function: connection from {}'.format(addr), file=sys.stderr)
+
             while True:
+                # Read the invocation header from the worker
                 line = connstream.readline()
+
+                # If end of file, then break out and accept again
+                if not line:
+                    break
+
+                # Parse the invocation header.
                 input_spec = line.split()
                 function_name = input_spec[0]
                 task_id = int(input_spec[1])
                 event_size = int(input_spec[2])
+
+                # then read the contents of the event itself
+                event_str = connstream.read(event_size)
+                event = json.loads(event_str)
+                exec_method = event.get("remote_task_exec_method", None)
+
                 try:
-                    if event_size:
-                        # receive the bytes containing the event and turn it into a string
-                        event_str = connstream.read(event_size)
-                        # turn the event into a python dictionary
-                        event = json.loads(event_str)
-                        # see if the user specified an execution method
-                        exec_method = event.get("remote_task_exec_method", None)
+                        # First move to target directory (is undone in finally block)
                         os.chdir(os.path.join(abs_working_dir, f't.{task_id}'))
+
+                        # Then invoke function by desired method, resulting in
+                        # response containing the text representation of the result.
+                        
                         if exec_method == "direct":
                             response = json.dumps(globals()[function_name](event))
                         else:
@@ -100,7 +117,8 @@ def wq_network_code():
                                 wpipestream.flush()
                                 os._exit(0)
                             elif p < 0:
-                                print(f'Network function: unable to fork to execute {function_name}', file=sys.stderr)
+                                if debug_mode:
+                                    print(f'Network function: unable to fork to execute {function_name}', file=sys.stderr)
                                 response = {
                                     "Result": "unable to fork",
                                     "StatusCode": 500
@@ -112,18 +130,22 @@ def wq_network_code():
                                 # Wait for child process to complete
                                 os.waitpid(p, 0)
 
-                        # Send response string back to parent worker process.
-                        send_message(connstream,response)
-                        connstream.flush()
-                        break
+                        # At this point, response is set to a value one way or the other
+                        
                 except Exception as e:
-                    print("Network function encountered exception ", str(e), file=sys.stderr)
+                    if debug_mode:
+                        print("Network function encountered exception ", str(e), file=sys.stderr)
                     response = {
                         'Result': f'network function encountered exception {e}',
                         'Status Code': 500
                     }
-                    send_message(connstream,json.dumps(response))
-                    connstream.flush()
+                    response = json.dumps(response)
                 finally:
+                    # Restore the working directory, no matter how the function ended.
                     os.chdir(abs_working_dir)
+
+                # Send response string back to parent worker process.
+                send_message(connstream,response)
+                connstream.flush()
+            
         return 0

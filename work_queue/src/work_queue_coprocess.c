@@ -26,80 +26,41 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 
-static int coprocess_max_timeout = 1000 * 60 * 5; // set max timeout to 5 minutes
+static time_t coprocess_connect_timeout = 60;   // max time to connect, one minute
+static time_t coprocess_execute_timeout = 3600; // max time to execute, one hour
 
-int work_queue_coprocess_write_to_link(char *buffer, int len, int timeout, struct link* link)
+/* Read back a fixed size message consisting of a length header, then the data itself. */
+
+char * work_queue_coprocess_read_message( struct link *link, time_t stoptime )
 {
-	timestamp_t curr_time = timestamp_get();
-	timestamp_t stoptime = curr_time + timeout;
-
-	int bytes_sent = link_printf(link, stoptime, "%s %d\n", buffer, len);
-	if(bytes_sent < 0) {
-		fatal("could not send input data size: %s", strerror(errno));
-	}
-
-	// send actual data
-	bytes_sent = link_write(link, buffer, len, stoptime);
-	if(bytes_sent < 0) {
-		fatal("could not send input data: %s", strerror(errno));
-	}
-	return bytes_sent;
-}
-
-int work_queue_coprocess_read_from_link(char *buffer, int len, int timeout, struct link* link){
-
-	timestamp_t curr_time = timestamp_get();
-	timestamp_t stoptime = curr_time + timeout;
-
-	char len_buffer[WORK_QUEUE_LINE_MAX];
-	int length, poll_result, bytes_read = 0;
-
-	struct link_info coprocess_link_info[] = {{link, LINK_READ, stoptime}};
-	poll_result = link_poll(coprocess_link_info, sizeof(coprocess_link_info) / sizeof(coprocess_link_info[0]), stoptime);
-	if (poll_result == 0) {
-		debug(D_WQ, "No data to read from coprocess\n");
+	char line[WORK_QUEUE_LINE_MAX];
+	int length;
+	
+	if(!link_readline(link, line, WORK_QUEUE_LINE_MAX, stoptime)) {
 		return 0;
 	}
-	
-	link_readline(link, len_buffer, WORK_QUEUE_LINE_MAX, stoptime);
-	sscanf(len_buffer, "%d", &length);
-	
-	int current_bytes_read = 0;
-	while (1)
-	{
-		current_bytes_read = link_read(link, buffer + bytes_read, length - bytes_read, stoptime);
-		if (current_bytes_read < 0) {
-			debug(D_WQ, "Read from coprocess link failed\n");
-			return -1;
-		}
-		else if (current_bytes_read == 0) {
-			debug(D_WQ, "Read from coprocess link failed: pipe closed\n");
-			return -1;
-		}
-		bytes_read += current_bytes_read;
-		if (bytes_read == length) {
-			break;
-		}
-	}
+			
+	sscanf(line, "%d", &length);
 
-	if (bytes_read < 0)
-	{
-		debug(D_WQ, "Read from coprocess failed: %s\n", strerror(errno));
-		return -1;
-	}
-	buffer[bytes_read] = '\0';
+	char *buffer = malloc(length+1);
+	
+	int result = link_read(link,buffer,length,stoptime);
 
-	return bytes_read;
+	if(result==length) {
+		buffer[length] = 0;
+		return buffer;
+	} else {
+		free(buffer);
+		return 0;
+	}
 }
 
 int work_queue_coprocess_setup(struct work_queue_coprocess *coprocess)
 {
-	int bytes_read = 0;
-	char buffer[WORK_QUEUE_LINE_MAX];
-    char *name = NULL;
+	char *name = NULL;
 
-	bytes_read = work_queue_coprocess_read_from_link(buffer, WORK_QUEUE_LINE_MAX, coprocess_max_timeout, coprocess->read_link);
-	if (bytes_read < 0) {
+	char * buffer = work_queue_coprocess_read_message(coprocess->read_link,time(0)+coprocess_connect_timeout);
+	if(!buffer) {
 		fatal("Unable to get information from coprocess\n");
 	}
 
@@ -134,6 +95,8 @@ int work_queue_coprocess_setup(struct work_queue_coprocess *coprocess)
 
 	coprocess->name = name;
 
+	free(buffer);
+	
     return 0;
 }
 
@@ -199,52 +162,37 @@ int work_queue_coprocess_check(struct work_queue_coprocess *coprocess)
     return 1;
 }
 
-char *work_queue_coprocess_run(const char *function_name, const char *function_input, struct work_queue_coprocess *coprocess, int task_id) {
-	char addr[DOMAIN_NAME_MAX];
-	int timeout = 60000000; // one minute, can be changed
+/* Invoke a function by connecting, sending the invocation, and reading back the result. */
 
-	if(!domain_name_lookup("localhost", addr)) {
-		fatal("could not lookup address of localhost");
-	}
+char *work_queue_coprocess_run(const char *function_name, const char *function_input, struct work_queue_coprocess *coprocess, int task_id)
+{
+	int connect_stoptime = time(0) + coprocess_connect_timeout;
+	int execute_stoptime = time(0) + coprocess_execute_timeout;
 
-	timestamp_t curr_time = timestamp_get();
-	time_t stoptime = curr_time + timeout;
-
-	int connected = 0;
-	int tries = 0;
-	// retry connection for ~30 seconds
-	while(!connected && tries < 30) {
-		coprocess->network_link = link_connect(addr, coprocess->port, stoptime);
-		if(coprocess->network_link) {
-			connected = 1;
-		} else {
-			tries++;
-			sleep(1);
+	/* Connect to the coprocess if we haven't already done so. */
+	if(!coprocess->network_link) {
+		coprocess->network_link = link_connect("127.0.0.1",coprocess->port,connect_stoptime);
+		if(!coprocess->network_link) {
+			debug(D_WQ,"failed to connect to coprocess: %s",strerror(errno));
+			return 0;
 		}
 	}
-	// if we can't connect at all, abort
-	if(!coprocess->network_link) {
-		fatal("connection error: %s", strerror(errno));
+
+	/* Send the invocation header indicating the function name and length of input. */
+	link_printf(coprocess->network_link, connect_stoptime, "%s %d %ld\n", function_name, task_id, strlen(function_input));
+	/* Followed by the function_input itself. */
+	link_write(coprocess->network_link, function_input, strlen(function_input), connect_stoptime );
+
+	/* Read back the result buffer with a longer timeout. */
+	char *result = work_queue_coprocess_read_message(coprocess->network_link,execute_stoptime);
+
+	/* If the invocation did not work, close the link and return failure. */
+	if(!result) {
+		link_close(coprocess->network_link);
+		coprocess->network_link = 0;
 	}
 
-	curr_time = timestamp_get();
-	stoptime = curr_time + timeout;
-	int bytes_sent = link_printf(coprocess->network_link, stoptime, "%s %d %ld\n", function_name, task_id, strlen(function_input));
-	if(bytes_sent < 0) {
-		fatal("could not send input data size: %s", strerror(errno));
-	}
-
-	char *buffer = calloc(WORK_QUEUE_LINE_MAX, sizeof(char));
-	strcpy(buffer, function_input);
-	work_queue_coprocess_write_to_link(buffer, strlen(function_input), timeout, coprocess->network_link);
-
-	memset(buffer, 0, WORK_QUEUE_LINE_MAX * sizeof(char));
-	if (work_queue_coprocess_read_from_link(buffer, WORK_QUEUE_LINE_MAX, timeout, coprocess->network_link) < 0) {
-		free(buffer);
-		return NULL;
-	}
-
-	return buffer;
+	return result;
 }
 
 struct work_queue_coprocess *work_queue_coprocess_find_state(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses, work_queue_coprocess_state_t state) {
