@@ -16,14 +16,6 @@ check_needed()
 {
     [ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
 
-    # Temporary skipping this test on Darwin b/c it fails for reasons
-    # we don't understand yet, needs more investigation
-
-    if [ `uname -s` = Darwin ]
-    then
-	return 1
-    fi
-    
     # Poncho currently requires ast.unparse to serialize the function,
     # which only became available in Python 3.9.  Some older platforms
     # (e.g. almalinux8) will not have this natively.
