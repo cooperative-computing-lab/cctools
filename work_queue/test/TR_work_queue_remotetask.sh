@@ -58,14 +58,14 @@ run()
 	# wait at most 5 seconds for wq to find a port.
 	wait_for_file_creation $PORT_FILE 5
 
-	cores=4
-	memory=2000
-	disk=2000
+	cores=8
+	memory=4000
+	disk=4000
 
 	coprocess="--coprocess serverless_function.py --coprocesses-total 4"
-	coprocess_cores=1
-	coprocess_memory=200
-	coprocess_disk=200
+	coprocess_cores=2
+	coprocess_memory=500
+	coprocess_disk=500
 	coprocess_gpus=0
 
 	run_wq_worker $PORT_FILE worker.log 
