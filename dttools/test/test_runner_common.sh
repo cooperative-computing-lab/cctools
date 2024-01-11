@@ -40,23 +40,32 @@ dispatch()
 }
 
 # wait_for_file_creation(filename, timeout)
-# Waits at most timeout seconds (default 5) for filename to be created.
+# Waits at most timeout seconds for filename to be created.
 # Returns 0 if filename created before timeout, otherwise terminates the script.
+
 wait_for_file_creation()
 {
 	filename=$1
-	timeout=${2:-5}
-	counter_seconds=0
+	timeout=$2
 
-	[ -z $filename ] && exit 1
-
-	while [ $counter_seconds -lt $timeout ];
+	if [ -z $filename ]
+	then
+		exit 1
+	fi
+	
+	for i in $(seq 1 $timeout)
 	do
-		[ -f $filename ] && return 0
-		counter_seconds=$(($counter_seconds + 1))
-		sleep 1
+		if [ -f $filename ]
+		then
+			return 0
+		else
+			echo "waiting for $filename ($i)..."
+			sleep 1
+		fi
 	done
 
+	echo "$filename was not created after $timeout seconds!"
+	
 	exit 1
 }
 

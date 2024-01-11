@@ -14,10 +14,10 @@ run()
 	../src/catalog_server -d all -o catalog.log &
 	pid=$!
 
-	echo "sending three udp updates to the server"
-	for i in 1 2 3
+	echo "sending udp updates to the server"
+	for i in 1 2 3 4 5
 	do
-		../../dttools/src/catalog_update --catalog localhost:9097 --file update.json
+		../../dttools/src/catalog_update --catalog localhost:9097 --file update.json -d all
 		sleep 1
 	done
 
@@ -34,11 +34,18 @@ run()
 	else
 		echo "output is not valid json:"
 		cat query.out
+		echo "========================="
 		result=1
 	fi
 
 	echo "killing the catalog server"
 	kill -9 $pid
+
+	if [ $result != 0 ]
+	then
+		echo "contents of catalog.log:"
+		cat catalog.log
+	fi
 
 	return $result
 }

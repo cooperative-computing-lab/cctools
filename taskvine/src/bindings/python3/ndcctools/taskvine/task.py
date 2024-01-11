@@ -18,7 +18,6 @@ import sys
 import tempfile
 import textwrap
 import uuid
-import weakref
 import cloudpickle
 
 ##
@@ -49,8 +48,6 @@ class Task(object):
         self._task = cvine.vine_task_create(command)
         if not self._task:
             raise Exception("Unable to create internal Task structure")
-
-        self._finalizer = weakref.finalize(self, self._free)
 
         attributes = [
             "needs_library_name",
@@ -111,17 +108,23 @@ class Task(object):
         except KeyError:
             pass
 
-    def _free(self):
-        if not self._task:
-            return
-        if self._manager_will_free:
-            return
-        if self._manager and self._manager._finalizer.alive and self.id in self._manager._task_table:
-            # interpreter is shutting down. Don't delete task here so that manager
-            # does not get memory errors
-            return
-        cvine.vine_task_delete(self._task)
-        self._task = None
+    def __del__(self):
+        try:
+            if not self._task:
+                return
+            if self._manager_will_free:
+                # e.g., for a minitask that won't be in self._manager._task_table
+                # otherwise the task gets a double-free
+                return
+            if self._manager and self.id in self._manager._task_table:
+                # interpreter is shutting down. Don't delete task here so that manager
+                # does not get memory errors
+                return
+            cvine.vine_task_delete(self._task)
+            self._task = None
+        except TypeError:
+            # modules were freed before task (e.g. interpreter shutdown)
+            pass
 
     @staticmethod
     def _determine_mount_flags(watch=False, failure_only=False, success_only=False, strict_input=False, mount_symlink=False):
@@ -699,6 +702,18 @@ class Task(object):
             return None
         return self._task.resources_allocated
 
+    ##
+    # Adds inputs for nopen library and rules file and sets LD_PRELOAD
+    #
+    def add_nopen(self, manager):
+        try:
+            vine_dir = os.environ['CCTOOLS_HOME']
+            self.add_input(manager.declare_file(f"{vine_dir}/lib-nopen.so"), "./lib-nopen.so")
+        except KeyError: 
+            self.add_input(manager.declare_file("./lib-nopen.so"), "./lib-nopen.so")
+            self.add_input(manager.declare_file("./rules.txt"), "./rules.txt")
+
+        self.set_env_var("LD_PRELOAD", "./lib-nopen.so")
 
 ##
 # @class ndcctools.taskvine.PythonTask
@@ -707,10 +722,6 @@ class Task(object):
 #
 # The class represents a Task specialized to execute remote Python code.
 #
-
-
-
-
 class PythonTask(Task):
     ##
     # Creates a new python task
@@ -747,13 +758,6 @@ class PythonTask(Task):
         self._fn_def = (func, args, kwargs)
         super(PythonTask, self).__init__(self._command)
 
-        self._finalizer = weakref.finalize(self, self._free)
-
-    def _free(self):
-        if self._tmpdir and os.path.exists(self._tmpdir):
-            shutil.rmtree(self._tmpdir)
-        super()._free()
-
     ##
     # Finalizes the task definition once the manager that will execute is run.
     # This function is run by the manager before registering the task for
@@ -768,6 +772,18 @@ class PythonTask(Task):
         self._fn_def = None  # avoid possible memory leak
         self._create_wrapper()
         self._add_IO_files(manager)
+
+    # remove any temp files generated
+    # if __del__ is never called, or called too late (e.g. on interpreter shutdown),
+    # then temp files will be deleted in the atexit of the manager staging directory
+    def __del__(self):
+        try:
+            if self._tmpdir:
+                shutil.rmtree(self._tmpdir, ignore_errors=True)
+            super().__del__()
+        except TypeError:
+            # in case the interpreter is shuting down. staging files will be deleted by manager atexit function.
+            pass
 
     ##
     # Marks the output of this task to stay at the worker.
@@ -959,19 +975,20 @@ class FunctionCall(Task):
         self.set_time_max(900)     # maximum run time for function calls is 900s by default.
         self.needs_library(library_name)
         self._tmp_output_enabled = False
+        self._input_buffer = None
         self.output_file = None
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
     # This function is run by the manager before registering the task for
     # execution.
-    #
+    # 
     # @param self 	Reference to the current python task object
     # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
         super().submit_finalize(manager)
-        f = manager.declare_buffer(cloudpickle.dumps(self._event))
-        self.add_input(f, "infile")
+        self._input_buffer = manager.declare_buffer(cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
+        self.add_input(self._input_buffer, "infile")
         if self._tmp_output_enabled:
             self.output_file = manager.declare_temp()
         else:
@@ -1007,13 +1024,33 @@ class FunctionCall(Task):
     def disable_temp_output(self):
         self._tmp_output_enabled = False
 
+    ##
+    # Retrieve output, handles cleanup, and returns result or failure reason.
     @property
     def output(self):
-        output = cloudpickle.loads(self.output_file.contents())
+        output = cloudpickle.loads(self._output_buffer.contents())
+        self._manager.remove_file(self._input_buffer)
+        self._input_buffer = None
+        self._manager.remove_file(self._output_file)
+        self._output_file = None
         if output['Success']:
             return output['Result']
         else:
             return output['Reason']
+
+    ## 
+    # Remove input and output buffers under some circumstances `output` is not called
+    def __del__(self):
+        try:
+            if self._input_buffer:
+                self._manager.remove_file(self._input_buffer)
+                self._input_buffer = None
+            if self._output_file:
+                self._manager.remove_file(self._output_file)
+                self._output_file = None
+            super().__del__()
+        except TypeError:
+            pass
 
 
 ##

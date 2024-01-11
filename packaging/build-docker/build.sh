@@ -6,6 +6,6 @@ D="/tmp/${CCTOOLS_OUTPUT}-dir"
 
 rm -rf ${D}
 
-"${GITHUB_WORKSPACE}"/packaging/scripts/configure-from-image --prefix "${D}"
+"${GITHUB_WORKSPACE}"/packaging/build-docker/configure-from-image --prefix "${D}"
 
 cd $(dirname "$D") && tar czf "${CCTOOLS_OUTPUT}" "$(basename $D)"

@@ -25,6 +25,8 @@ struct vine_file_replica *vine_file_replica_table_lookup(struct vine_worker_info
 
 struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager *q, const char *cachename);
 
+struct vine_worker_info **vine_file_replica_table_find_replication_targets(struct vine_manager *q, struct vine_worker_info *w, const char *cachename, int *count);
+
 int vine_file_replica_table_exists_somewhere( struct vine_manager *q, const char *cachename );
 
 int vine_file_replica_table_count_replicas( struct vine_manager *q, const char *cachename );

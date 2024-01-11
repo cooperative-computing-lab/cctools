@@ -343,6 +343,31 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 }
 
 /*
+At this point we have received a cache update for a temp file. If q->temp_replica_count > 0 then tell up to that
+many workers to get the file from worker w.
+*/
+static void replicate_temp_file(
+		struct vine_manager *q, struct vine_worker_info *w, const char *cachename, long long size)
+{
+	if (!q->temp_replica_count)
+		return;
+
+	int found = 0;
+	struct vine_worker_info **workers;
+	workers = vine_file_replica_table_find_replication_targets(q, w, cachename, &found);
+
+	debug(D_VINE, "Found %d available workers to replicate %s", found, cachename);
+
+	for (int i = 0; i < found; i++) {
+		struct vine_worker_info *peer = workers[i];
+		char *worker_source = string_format("worker://%s:%d/%s", w->transfer_addr, w->transfer_port, cachename);
+		vine_manager_put_url_now(q, peer, worker_source, cachename, size);
+		free(worker_source);
+	}
+	free(workers);
+}
+
+/*
 A cache-update message coming from the worker means that a requested
 remote transfer or command was successful, and know we know the size
 of the file for the purposes of cache storage management.
@@ -379,6 +404,11 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 		vine_current_transfers_remove(q, id);
 
 		vine_txn_log_write_cache_update(q, w, size, transfer_time, start_time, cachename);
+
+		// If the file was not a url, eg. 'X', and it is a temp
+		if (*id == 'X' && strncmp(cachename, "temp-rnd-", 9) == 0) {
+			replicate_temp_file(q, w, cachename, size);
+		}
 	}
 
 	return VINE_MSG_PROCESSED;
@@ -3746,6 +3776,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->worker_source_max_transfers = VINE_WORKER_SOURCE_MAX_TRANSFERS;
 	q->perf_log_interval = VINE_PERF_LOG_INTERVAL;
 
+	q->temp_replica_count = 0;
+
 	q->resource_submit_multiplier = 1.0;
 
 	q->minimum_transfer_timeout = 60;
@@ -3777,12 +3809,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->time_last_wait = timestamp_get();
 
-	char hostname[DOMAIN_NAME_MAX];
-	if (domain_name_cache_guess(hostname)) {
-		debug(D_VINE, "Manager advertising as %s:%d", hostname, q->port);
-	} else {
-		debug(D_VINE, "Manager is listening on port %d.", q->port);
-	}
+	debug(D_VINE, "Manager is listening on port %d.", q->port);
+
 	return q;
 }
 
@@ -5167,6 +5195,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "worker-source-max-transfers")) {
 		q->worker_source_max_transfers = MAX(1, (int)value);
+
+	} else if (!strcmp(name, "temp-replica-count")) {
+		q->temp_replica_count = MAX(0, (int)value);
 
 	} else if (!strcmp(name, "perf-log-interval")) {
 		q->perf_log_interval = MAX(1, (int)value);

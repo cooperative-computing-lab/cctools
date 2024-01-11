@@ -31,6 +31,11 @@ typedef enum {
 } vine_cache_type_t;
 
 typedef enum {
+	VINE_CACHE_FLAGS_ON_TASK = 1,
+	VINE_CACHE_FLAGS_NOW = 2,
+} vine_cache_flags_t;
+
+typedef enum {
 	VINE_CACHE_STATUS_NOT_PRESENT,
 	VINE_CACHE_STATUS_PROCESSING,
 	VINE_CACHE_STATUS_READY,
@@ -45,8 +50,9 @@ void vine_cache_scan( struct vine_cache *c, struct link *manager );
 char *vine_cache_full_path( struct vine_cache *c, const char *cachename );
 
 int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char *cachename );
-int vine_cache_queue_transfer( struct vine_cache *c, const char *source, const char *cachename, int64_t size, int mode );
+int vine_cache_queue_transfer( struct vine_cache *c, const char *source, const char *cachename, int64_t size, int mode, int flags );
 int vine_cache_queue_mini_task( struct vine_cache *c, struct vine_task *minitask, const char *source, const char *cachename, int64_t size, int mode );
+int vine_cache_queue_command( struct vine_cache *c, struct vine_task *minitask, const char *cachename, int64_t size, int mode );
 vine_cache_status_t vine_cache_ensure( struct vine_cache *c, const char *cachename);
 int vine_cache_remove( struct vine_cache *c, const char *cachename, struct link *manager );
 int vine_cache_contains( struct vine_cache *c, const char *cachename );

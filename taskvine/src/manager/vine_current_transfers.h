@@ -16,6 +16,8 @@ int vine_current_transfers_remove(struct vine_manager *q, const char *id);
 
 int vine_current_transfers_source_in_use(struct vine_manager *q,const char *source);
 
+int vine_current_transfers_dest_in_use(struct vine_manager *q,struct vine_worker_info *w);
+
 int vine_current_transfers_worker_in_use(struct vine_manager *q,const char *peer_addr);
 
 int vine_current_transfers_wipe_worker(struct vine_manager *q, struct vine_worker_info *w);
