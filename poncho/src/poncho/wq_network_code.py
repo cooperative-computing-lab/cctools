@@ -15,14 +15,14 @@ def wq_network_code():
     def send_message( stream, data ):
         size = len(data)
         size_msg = "{}\n".format(size)
-        stream.sendall(size_msg.encode('utf-8'))
-        stream.sendall(data)
+        stream.write(size_msg.encode('utf-8'))
+        stream.write(data)
 
     # Receive a standard message from an I/O stream by reading length and then returning the (string) message
     def recv_message( stream ):
         line = stream.readline()
         length = int(line)
-        return stream.readall(length).decode('utf-8')
+        return stream.read(length).decode('utf-8')
 
     # Decorator for remotely execution functions to package things as json.
     def remote_execute(func):
@@ -66,7 +66,7 @@ def wq_network_code():
 
         # Create pipe for communication with child process
         rpipe, wpipe = os.pipe()
-        rpipestream = fdopen("r",rpipe)
+        rpipestream = fdopen("rb",rpipe)
 
         while True:
             s.listen()
@@ -99,7 +99,7 @@ def wq_network_code():
                             p = os.fork()
                             if p == 0:
                                 response = globals()[function_name](event)
-                                wpipestream = fdopen(wpipe,"w")
+                                wpipestream = fdopen(wpipe,"wb")
                                 send_message(wpipestream,json.dumps(response))
                                 wpipestream.flush()
                                 os._exit(0)
