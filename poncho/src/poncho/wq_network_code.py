@@ -58,7 +58,7 @@ def wq_network_code():
                 "name": name(),  # noqa: F821
                 "port": s.getsockname()[1],
                 }
-        send_message(sys.stdout,json_dumps(config))
+        send_message(sys.stdout,json.dumps(config))
         sys.stdout.flush()
 
         # Remember original working directory b/c we change for each invocation.
@@ -100,7 +100,7 @@ def wq_network_code():
                             if p == 0:
                                 response = globals()[function_name](event)
                                 wpipestream = fdopen(wpipe,"w")
-                                send_message(wpipestream,json_dumps(response))
+                                send_message(wpipestream,json.dumps(response))
                                 wpipestream.flush()
                                 os._exit(0)
                             elif p < 0:
@@ -125,7 +125,7 @@ def wq_network_code():
                         'Result': f'network function encountered exception {e}',
                         'Status Code': 500
                     }
-                    send_message(conn,json_dumps(response))
+                    send_message(conn,json.dumps(response))
                 finally:
                     os.chdir(abs_working_dir)
         return 0
