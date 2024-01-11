@@ -15,14 +15,14 @@ def wq_network_code():
     debug_mode = False
         
     # Send a message on a binary I/O stream by sending the message length and then the (string) message.
-    def send_message( stream, data ):
+    def send_message(stream, data):
         size = len(data)
         size_msg = "{}\n".format(size)
         stream.write(size_msg)
         stream.write(data)
 
     # Receive a standard message from a binary I/O stream by reading length and then returning the (string) message
-    def recv_message( stream ):
+    def recv_message(stream):
         line = stream.readline()
         length = int(line)
         return stream.read(length)
@@ -99,37 +99,37 @@ def wq_network_code():
                 exec_method = event.get("remote_task_exec_method", None)
 
                 try:
-                        # First move to target directory (is undone in finally block)
-                        os.chdir(os.path.join(abs_working_dir, f't.{task_id}'))
+                    # First move to target directory (is undone in finally block)
+                    os.chdir(os.path.join(abs_working_dir, f't.{task_id}'))
 
-                        # Then invoke function by desired method, resulting in
-                        # response containing the text representation of the result.
+                    # Then invoke function by desired method, resulting in
+                    # response containing the text representation of the result.
                         
-                        if exec_method == "direct":
-                            response = json.dumps(globals()[function_name](event))
+                    if exec_method == "direct":
+                        response = json.dumps(globals()[function_name](event))
+                    else:
+                        p = os.fork()
+                        if p == 0:
+                            response = globals()[function_name](event)
+                            wpipestream = os.fdopen(wpipe,"w")
+                            send_message(wpipestream,json.dumps(response))
+                            wpipestream.flush()
+                            os._exit(0)
+                        elif p < 0:
+                            if debug_mode:
+                                print(f'Network function: unable to fork to execute {function_name}', file=sys.stderr)
+                            response = {
+                                "Result": "unable to fork",
+                                "StatusCode": 500
+                            }
+                            response = json.dumps(response)
                         else:
-                            p = os.fork()
-                            if p == 0:
-                                response = globals()[function_name](event)
-                                wpipestream = os.fdopen(wpipe,"w")
-                                send_message(wpipestream,json.dumps(response))
-                                wpipestream.flush()
-                                os._exit(0)
-                            elif p < 0:
-                                if debug_mode:
-                                    print(f'Network function: unable to fork to execute {function_name}', file=sys.stderr)
-                                response = {
-                                    "Result": "unable to fork",
-                                    "StatusCode": 500
-                                }
-                                response = json.dumps(response)
-                            else:
-                                # Get response string from child process.
-                                response = recv_message(rpipestream)
-                                # Wait for child process to complete
-                                os.waitpid(p, 0)
+                            # Get response string from child process.
+                            response = recv_message(rpipestream)
+                            # Wait for child process to complete
+                            os.waitpid(p, 0)
 
-                        # At this point, response is set to a value one way or the other
+                    # At this point, response is set to a value one way or the other
                         
                 except Exception as e:
                     if debug_mode:
