@@ -73,7 +73,7 @@ def wq_network_code():
             while True:
                 # peek at message to find newline to get the size
                 event_size = None
-                line = conn.recv(100, socket.MSG_PEEK)
+                line = conn.recv(4096, socket.MSG_PEEK)
                 eol = line.find(b'\n')
                 if eol >= 0:
                     size = eol+1
