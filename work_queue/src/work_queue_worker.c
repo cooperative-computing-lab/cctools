@@ -2912,16 +2912,16 @@ int main(int argc, char *argv[])
 		else {
 			// if manual resource allocation, issue warning messages if the user overallocates worker resources
 			if ( (coprocess_cores * number_of_coprocess_instances) > total_resources->cores.total ) {
-				debug(D_WQ, "Warning: cores allocated to coprocesses is greater than cores allocated to worker\n");
+				debug(D_WQ|D_NOTICE, "Warning: cores allocated to coprocesses is greater than cores allocated to worker\n");
 			}
 			else if  ((coprocess_memory * number_of_coprocess_instances) > total_resources->memory.total ) {
-				debug(D_WQ, "Warning: memory allocated to coprocesses is greater than cores allocated to worker\n");
+				debug(D_WQ|D_NOTICE, "Warning: memory allocated to coprocesses is greater than cores allocated to worker\n");
 			}
 			else if  ((coprocess_disk * number_of_coprocess_instances) > total_resources->disk.total ) {
-				debug(D_WQ, "Warning: disk allocated to coprocesses is greater than cores allocated to worker\n");
+				debug(D_WQ|D_NOTICE, "Warning: disk allocated to coprocesses is greater than cores allocated to worker\n");
 			}
 			else if  ((coprocess_gpus * number_of_coprocess_instances) > total_resources->gpus.total ) {
-				debug(D_WQ, "Warning: gpus allocated to coprocesses is greater than cores allocated to worker\n");
+				debug(D_WQ|D_NOTICE, "Warning: gpus allocated to coprocesses is greater than cores allocated to worker\n");
 			}
 		}
 		coprocess_resources = work_queue_resources_create();
