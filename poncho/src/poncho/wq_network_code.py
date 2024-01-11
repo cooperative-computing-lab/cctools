@@ -43,11 +43,6 @@ def wq_network_code():
 
     read, write = os.pipe()
 
-    def send_configuration(config):
-        config_string = json.dumps(config)
-        config_cmd = f"{len(config_string) + 1}\n{config_string}\n"
-        sys.stdout.write(config_cmd)
-        sys.stdout.flush()
     def main():
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
@@ -57,12 +52,15 @@ def wq_network_code():
             s.close()
             print(e, file=sys.stderr)
             sys.exit(1)
+
         # information to print to stdout for worker
         config = {
                 "name": name(),  # noqa: F821
                 "port": s.getsockname()[1],
                 }
-        send_configuration(config)
+        send_message(sys.stdout,json_dumps(config))
+        sys.stdout.flush()
+        
         abs_working_dir = os.getcwd()
         while True:
             s.listen()
@@ -103,21 +101,17 @@ def wq_network_code():
                                     "Result": "unable to fork",
                                     "StatusCode": 500
                                 }
+                                response = json.dumps(response)
                             else:
                                 max_read = 65536
-                                chunk = os.read(read, max_read).decode("utf-8")
+                                chunk = os.read(read, max_read)
                                 all_chunks = [chunk]
                                 while (len(chunk) >= max_read):
-                                    chunk = os.read(read, max_read).decode("utf-8")
+                                    chunk = os.read(read, max_read)
                                     all_chunks.append(chunk)
-                                response = "".join(all_chunks).encode("utf-8")
+                                response = "".join(all_chunks)
                                 os.waitpid(p, 0)
-                        response_size = len(response)
-                        size_msg = "{}\n".format(response_size)
-                        # send the size of response
-                        conn.sendall(size_msg.encode('utf-8'))
-                        # send response
-                        conn.sendall(response)
+                        send_message(conn,response)
                         break
                 except Exception as e:
                     print("Network function encountered exception ", str(e), file=sys.stderr)
@@ -125,13 +119,7 @@ def wq_network_code():
                         'Result': f'network function encountered exception {e}',
                         'Status Code': 500
                     }
-                    response = json.dumps(response).encode('utf-8')
-                    response_size = len(response)
-                    size_msg = "{}\n".format(response_size)
-                    # send the size of response
-                    conn.sendall(size_msg.encode('utf-8'))
-                    # send response
-                    conn.sendall(response)
+                    send_message(conn,json_dumps(response))
                 finally:
                     os.chdir(abs_working_dir)
         return 0
