@@ -10,7 +10,6 @@ def wq_network_code():
     import json
     import os
     import sys
-    import io
 
     # If enabled, coprocess will print to stdout
     debug_mode = False
