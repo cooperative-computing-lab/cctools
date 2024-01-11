@@ -42,8 +42,6 @@ def wq_network_code():
             return response
         return remote_wrapper
 
-    read, write = os.pipe()
-
     # Main loop of coprocess for executing network functions.
     def main():
         # Listen on an arbitrary port to be reported to the worker.
@@ -65,6 +63,10 @@ def wq_network_code():
 
         # Remember original working directory b/c we change for each invocation.
         abs_working_dir = os.getcwd()
+
+        # Create pipe for communication with child process
+        rpipe, wpipe = os.pipe()
+        rpipestream = fdopen("r",rpipe)
 
         while True:
             s.listen()
@@ -97,7 +99,9 @@ def wq_network_code():
                             p = os.fork()
                             if p == 0:
                                 response = globals()[function_name](event)
-                                os.write(write, json.dumps(response))
+                                wpipestream = fdopen(wpipe,"w")
+                                send_message(wpipestream,json_dumps(response))
+                                wpipestream.flush()
                                 os._exit(0)
                             elif p < 0:
                                 print(f'Network function: unable to fork to execute {function_name}', file=sys.stderr)
@@ -107,14 +111,12 @@ def wq_network_code():
                                 }
                                 response = json.dumps(response)
                             else:
-                                max_read = 65536
-                                chunk = os.read(read, max_read)
-                                all_chunks = [chunk]
-                                while (len(chunk) >= max_read):
-                                    chunk = os.read(read, max_read)
-                                    all_chunks.append(chunk)
-                                response = "".join(all_chunks)
+                                # Get response string from child process.
+                                response = recv_message(rpipestream)
+                                # Wait for child process to complete
                                 os.waitpid(p, 0)
+
+                        # Send response string back to parent worker process.
                         send_message(conn,response)
                         break
                 except Exception as e:
