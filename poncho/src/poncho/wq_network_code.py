@@ -10,6 +10,20 @@ def wq_network_code():
     import json
     import os
     import sys
+
+    # Send a message on an I/O stream by sending the message length and then the (string) message.
+    def send_message( stream, data ):
+        size = len(data)
+        size_msg = "{}\n".format(size)
+        stream.sendall(size_msg.encode('utf-8'))
+        stream.sendall(data)
+
+    # Receive a standard message from an I/O stream by reading length and then returning the (string) message
+    def recv_message( stream ):
+        line = stream.readline()
+        length = int(line)
+        return stream.readall(length).decode('utf-8')
+
     def remote_execute(func):
         def remote_wrapper(event):
             kwargs = event["fn_kwargs"]
@@ -28,6 +42,7 @@ def wq_network_code():
         return remote_wrapper
 
     read, write = os.pipe()
+
     def send_configuration(config):
         config_string = json.dumps(config)
         config_cmd = f"{len(config_string) + 1}\n{config_string}\n"
