@@ -976,7 +976,7 @@ class FunctionCall(Task):
         self.needs_library(library_name)
         self._tmp_output_enabled = False
         self._input_buffer = None
-        self.output_file = None
+        self._output_file = None
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -990,10 +990,10 @@ class FunctionCall(Task):
         self._input_buffer = manager.declare_buffer(cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
         self.add_input(self._input_buffer, "infile")
         if self._tmp_output_enabled:
-            self.output_file = manager.declare_temp()
+            self._output_file = manager.declare_temp()
         else:
-            self.output_file = manager.declare_buffer(cache=False, peer_transfer=False)
-        self.add_output(self.output_file, "outfile")
+            self._output_file = manager.declare_buffer(cache=False, peer_transfer=False)
+        self.add_output(self._output_file, "outfile")
 
     ##
     # Specify function arguments. Accepts arrays and dictionaries. This
