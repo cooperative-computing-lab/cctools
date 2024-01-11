@@ -24,6 +24,7 @@ def wq_network_code():
         length = int(line)
         return stream.readall(length).decode('utf-8')
 
+    # Decorator for remotely execution functions to package things as json.
     def remote_execute(func):
         def remote_wrapper(event):
             kwargs = event["fn_kwargs"]
@@ -43,25 +44,28 @@ def wq_network_code():
 
     read, write = os.pipe()
 
+    # Main loop of coprocess for executing network functions.
     def main():
+        # Listen on an arbitrary port to be reported to the worker.
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            # modify the port argument to be 0 to listen on an arbitrary port
             s.bind(('localhost', 0))
         except Exception as e:
             s.close()
             print(e, file=sys.stderr)
             sys.exit(1)
 
-        # information to print to stdout for worker
+        # Inform the worker of name and port for later connection.
         config = {
                 "name": name(),  # noqa: F821
                 "port": s.getsockname()[1],
                 }
         send_message(sys.stdout,json_dumps(config))
         sys.stdout.flush()
-        
+
+        # Remember original working directory b/c we change for each invocation.
         abs_working_dir = os.getcwd()
+
         while True:
             s.listen()
             conn, addr = s.accept()
@@ -88,12 +92,12 @@ def wq_network_code():
                         exec_method = event.get("remote_task_exec_method", None)
                         os.chdir(os.path.join(abs_working_dir, f't.{task_id}'))
                         if exec_method == "direct":
-                            response = json.dumps(globals()[function_name](event)).encode("utf-8")
+                            response = json.dumps(globals()[function_name](event))
                         else:
                             p = os.fork()
                             if p == 0:
-                                response =globals()[function_name](event)
-                                os.write(write, json.dumps(response).encode("utf-8"))
+                                response = globals()[function_name](event)
+                                os.write(write, json.dumps(response))
                                 os._exit(0)
                             elif p < 0:
                                 print(f'Network function: unable to fork to execute {function_name}', file=sys.stderr)
