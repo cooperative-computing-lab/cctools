@@ -2925,7 +2925,7 @@ int main(int argc, char *argv[])
 			}
 		}
 		coprocess_resources = work_queue_resources_create();
-		coprocess_info = work_queue_coprocess_initalize_all_coprocesses(coprocess_cores, coprocess_memory, coprocess_disk, coprocess_gpus, total_resources, coprocess_resources, coprocess_command, number_of_coprocess_instances);
+		coprocess_info = work_queue_coprocess_initialize_all_coprocesses(coprocess_cores, coprocess_memory, coprocess_disk, coprocess_gpus, total_resources, coprocess_resources, coprocess_command, number_of_coprocess_instances);
 		coprocess_name = xxstrdup(coprocess_info[0].name);
 		hash_table_insert(features, coprocess_name, (void **) 1);
 	}
