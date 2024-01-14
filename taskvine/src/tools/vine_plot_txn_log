@@ -170,7 +170,23 @@ class ParseTxn:
         self.expand_waiting = expand_waiting
         self.tasks_range = self.expand_range(tasks_range_spec)
 
+        self.library_ids = set()
+        self._get_library_ids()
+
         self._parse()
+
+    # Collect library ids ahead of parsing task records,
+    # as a LIBRARY are also recognized as a TASK, we do not want to
+    # parse LIBRARY tasks in the course of parsing TASKs
+    def _get_library_ids(self):
+        with open(self._log, 'r') as f:
+            for line in f:
+                if line.startswith("#"):
+                    continue
+                parts = line.strip().split()
+                record_type = parts[2]   # MANAGER, WORKER, TASK, LIBRARY, etc.
+                if record_type == "LIBRARY":
+                    self.library_ids.add(int(parts[3]))
 
     def expand_range(self, tasks_range_spec):
         start, end, step = 1, None, 1
@@ -314,9 +330,13 @@ class ParseTxn:
 
     def _parse_library(self, time, manager_pid, task_id, event, arg):
         task_id = int(task_id)
-        la = self.cm.task_last_attempt[task_id]
-        ca = self.cm.tasks_attempts[task_id][la]
 
+        if task_id in self.cm.task_last_attempt:
+            la = self.cm.task_last_attempt[task_id]
+            ca = self.cm.tasks_attempts[task_id][la]
+        else:
+            return
+        
         if event == "SENT":
             ca["time_worker_start"] = time
             ca["time_commit_start"] = time
@@ -332,14 +352,17 @@ class ParseTxn:
 
     def _parse_task(self, time, manager_pid, task_id, event, arg):
         task_id = int(task_id)
-
+        
+        if task_id in self.library_ids:
+            return 
+        
         if not self.check_task_range(task_id):
             return
 
         if event == "READY":
             (category, allocation, attempt_number, arg) = arg.split()
             self.cm.task_last_attempt[task_id] = attempt_number
-
+        
         la = self.cm.task_last_attempt[task_id]
         ca = self.cm.tasks_attempts[task_id][la]
 
