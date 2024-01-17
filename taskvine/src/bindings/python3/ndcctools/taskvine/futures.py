@@ -4,6 +4,7 @@ from concurrent.futures import Executor
 from concurrent.futures import Future
 from .task import (
     PythonTask,
+    FunctionCall,
     PythonTaskNoResult,
 )
 from .manager import (
@@ -33,8 +34,11 @@ except Exception:
 class Executor(Executor):
     def __init__(self, port=9123, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull, factory=True, opts={}):
         self.manager = Manager(port=port)
+        self.port = self.manager.port
         if manager_name:
             self.manager.set_name(manager_name)
+        self.manager_name = manager_name
+        self.task_table = []
         if factory:
             self.factory = Factory(batch_type=batch_type, manager=manager, manager_host_port=manager_host_port, manager_name=manager_name, 
                     factory_binary=factory_binary, worker_binary=worker_binary, log_file=os.devnull)
@@ -45,16 +49,33 @@ class Executor(Executor):
         else: 
             self.factory = None
 
-    def submit(self, fn, *args, **kwargs):
-        if isinstance(fn, FutureTask):
-            self.manager.submit(fn)
-            return fn._future
-        future_task = FutureTask(self.manager, False, fn, *args, **kwargs)
-        self.manager.submit(future_task)
-        return future_task._future
+    def submit(self, task):
+        if isinstance(task, FutureTask):
+            self.manager.submit(task)
+            return task._future
+        if isinstance(task, FutureFunctionCall):
+            self.manager.submit(task)
+            self.manager.submit(task.retriver)
+            self.task_table.append(task)
+            self.task_table.append(task.retriver)
+            return
+        raise TypeError("task must be a FutureTask or FutureFunctionCall object")
 
     def task(self, fn, *args, **kwargs):
         return FutureTask(self.manager, False, fn, *args, **kwargs)
+    
+    def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True, import_modules=None):
+        return self.manager.create_library_from_functions(name, *function_list, poncho_env=poncho_env, init_command=init_command, add_env=add_env, import_modules=import_modules)
+    
+    def install_library(self, libtask):
+        self.manager.install_library(libtask)
+
+    def future_funcall(self, library_name, fn, *args, **kwargs):
+        future_funcall = FutureFunctionCall(self.manager, False, library_name, fn, *args, **kwargs)
+        future_funcall_retriver = FutureFunctionCall(self.manager, True, library_name, fn, *args, **kwargs)
+        future_funcall.retriver = future_funcall_retriver
+        future_funcall_retriver.retrivee = future_funcall
+        return future_funcall
 
     def set(self, name, value):
         if self.factory:
@@ -63,6 +84,56 @@ class Executor(Executor):
     def get(self, name):
         if self.factory:
             return self.factory.__getattr__(name)
+        
+    def __del__(self):
+        for task in self.task_table:
+            task.__del__()
+        self.manager.__del__()
+                
+
+class FutureFunctionCall(FunctionCall):
+    def __init__(self, manager, is_retrival_task, library_name, fn, *args, **kwargs):
+        super().__init__(library_name, fn, *args, **kwargs)
+        self._manager = manager
+        self.library_name = library_name
+        self._envs = []
+        self._ran_functions = False
+        self._is_retriver = is_retrival_task
+        self._retrival_task = None
+        self._mother_task = None
+        self.retriver = None
+        self.retrivee = None
+        self._cache_output = True
+    
+    def __del__(self):
+        super().__del__()
+    
+    def submit_finalize(self, manager):
+        return super().submit_finalize(manager)
+
+    @property
+    def output(self, timeout="wait_forever"):
+        # for retrival task: load output of the primary task
+        if self._is_retriver:
+            self._manager.wait_for_task_id(self.retrivee.id, timeout=timeout)
+            if self.retrivee.successful():
+                output = cloudpickle.loads(self.retrivee._output_buffer.contents())
+                print(f"result pickled!")
+                if output['Success']:
+                    if self._cache_enabled:
+                        self._cached_output = output['Result']
+                    return output['Result']
+                else:
+                    return output['Reason']
+        
+        # for regular function call: invoke retrival function call
+        if not self._is_retriver:
+            if self._cached_output:
+                return self._cached_output
+            self._manager.wait_for_task_id(self.retriver.id, timeout=timeout)
+            if self.retriver.successful():
+                self._cached_output = self.retriver.output
+                return self._cached_output
 ##
 # \class Vinefuture
 #

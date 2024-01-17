@@ -976,6 +976,8 @@ class FunctionCall(Task):
         self.needs_library(library_name)
         self._input_buffer = None
         self._output_buffer = None
+        self._cache_enabled = False    # if cache is enabled, output will be stored in task class
+        self._cached_output = None
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
