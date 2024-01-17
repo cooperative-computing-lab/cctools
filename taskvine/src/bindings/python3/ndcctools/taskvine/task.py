@@ -743,8 +743,9 @@ class PythonTask(Task):
         self._out_name_file = f"out_{self._id}.p"
         self._stdout_file = f"stdout_{self._id}.p"
         self._wrapper = f"pytask_wrapper_{self._id}.py"
-        self._command = self._python_function_command()
         self._serialize_output = True
+
+        self._command = self._python_function_command()
 
         self._tmp_output_enabled = False
         self._cache_output = False
@@ -816,6 +817,7 @@ class PythonTask(Task):
     # @param self 	Reference to the current python task object
     def enable_temp_output(self):
         self._tmp_output_enabled = True
+
     def disable_temp_output(self):
         self._tmp_output_enabled = False
 
@@ -890,7 +892,7 @@ class PythonTask(Task):
         else:
             py_exec = f"python{sys.version_info[0]}"
 
-        command = f"{py_exec} {self._wrapper} {self._func_file} {self._args_file} {self._out_name_file} > {self._stdout_file} 2>&1"
+        command = f"{py_exec} {self._wrapper} {self._func_file} {self._args_file} {self._id} > {self._stdout_file} 2>&1"
         return command
 
     def _add_IO_files(self, manager):
@@ -907,7 +909,7 @@ class PythonTask(Task):
             self._output_file = manager.declare_temp()
         else:
             self._output_file = manager.declare_file(source(self._out_name_file), cache=self._cache_output)
-        self.add_output(self._output_file, self._out_name_file)
+        self.add_output(self._output_file, self._id)
 
     ##
     # creates the wrapper script which will execute the function. pickles output.
