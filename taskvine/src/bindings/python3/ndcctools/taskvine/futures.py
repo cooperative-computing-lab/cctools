@@ -91,29 +91,25 @@ class Executor(Executor):
         self.manager.__del__()
 
 
+##
+# \class FutureFunctionCall
+#
+# TaskVine FutureFunctionCall object
+#
+# This class is a sublcass of FunctionCall that is specialized for future execution
+
 class FutureFunctionCall(FunctionCall):
-    def __init__(self, manager, is_retrival_task, library_name, fn, *args, **kwargs):
+    def __init__(self, manager, is_retriver, library_name, fn, *args, **kwargs):
         super().__init__(library_name, fn, *args, **kwargs)
-        self._manager = manager
+        self.manager = manager
         self.library_name = library_name
-        self._envs = []
-        self._ran_functions = False
-        self._is_retriver = is_retrival_task
-        self._retrival_task = None
-        self._mother_task = None
+        self._is_retriver = is_retriver
         self.retriver = None
         self.retrivee = None
-        self._cache_output = True
-    
-    def __del__(self):
-        super().__del__()
-    
-    def submit_finalize(self, manager):
-        return super().submit_finalize(manager)
 
     @property
     def output(self, timeout="wait_forever"):
-        # for retrival task: load output of the primary task
+        # for retriver: fetch the result of retrivee on completion
         if self._is_retriver:
             self._manager.wait_for_task_id(self.retrivee.id, timeout=timeout)
             if self.retrivee.successful():
@@ -125,7 +121,7 @@ class FutureFunctionCall(FunctionCall):
                 else:
                     return output['Reason']
         
-        # for regular function call: invoke retrival function call
+        # for retrivee: wait for retriver to get result
         if not self._is_retriver:
             if self._cached_output:
                 return self._cached_output
@@ -133,6 +129,9 @@ class FutureFunctionCall(FunctionCall):
             if self.retriver.successful():
                 self._cached_output = self.retriver.output
                 return self._cached_output
+            
+    def __del__(self):
+        super().__del__()
 ##
 # \class Vinefuture
 #
