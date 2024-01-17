@@ -61,7 +61,7 @@ class Executor(Executor):
             return
         raise TypeError("task must be a FutureTask or FutureFunctionCall object")
 
-    def task(self, fn, *args, **kwargs):
+    def future_pythontask(self, fn, *args, **kwargs):
         return FutureTask(self.manager, False, fn, *args, **kwargs)
     
     def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True, import_modules=None):
@@ -89,7 +89,7 @@ class Executor(Executor):
         for task in self.task_table:
             task.__del__()
         self.manager.__del__()
-                
+
 
 class FutureFunctionCall(FunctionCall):
     def __init__(self, manager, is_retrival_task, library_name, fn, *args, **kwargs):
@@ -118,7 +118,6 @@ class FutureFunctionCall(FunctionCall):
             self._manager.wait_for_task_id(self.retrivee.id, timeout=timeout)
             if self.retrivee.successful():
                 output = cloudpickle.loads(self.retrivee._output_buffer.contents())
-                print(f"result pickled!")
                 if output['Success']:
                     if self._cache_enabled:
                         self._cached_output = output['Result']

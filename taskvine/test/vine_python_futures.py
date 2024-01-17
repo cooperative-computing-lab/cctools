@@ -24,24 +24,28 @@ def my_sum(x, y, negate=False):
 
 # Create Executor
 executor = vine.Executor(port=9123, manager_name='vine_matrtix_build_test', factory=False)
-print("listening on port {}".format(executor.manager.port))
+print("listening on port {}".format(executor.port))
 with open(port_file, "w") as f:
-    f.write(str(executor.manager.port))
+    f.write(str(executor.port))
 
 
-# Submit several tasks for execution:
-print("submitting tasks...")
-t1 = executor.task(my_sum, 3, 4)
+# Submit several tasks for execution
+print("submitting python tasks...")
+t1 = executor.future_pythontask(my_sum, 3, 4)
 t1.set_cores(1)
-t2 = executor.task(my_sum, 2, 5)
+t2 = executor.future_pythontask(my_sum, 2, 5)
 t2.set_cores(1)
 a = executor.submit(t1)
 b = executor.submit(t2)
 
-t3 = executor.task(my_sum, a, b)
+t3 = executor.future_pythontask(my_sum, a, b)
 t3.set_cores(1)
 c = executor.submit(t3)
+
 # Get result
 print("waiting for result...")
+
+print(f"result is {c.result()}")
 assert c.result() == 14
+
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
