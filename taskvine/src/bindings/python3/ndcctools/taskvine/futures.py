@@ -50,7 +50,7 @@ class Executor(Executor):
             self.factory = None
 
     def submit(self, task):
-        if isinstance(task, FutureTask):
+        if isinstance(task, FuturePythonTask):
             self.manager.submit(task)
             return task._future
         if isinstance(task, FutureFunctionCall):
@@ -59,10 +59,10 @@ class Executor(Executor):
             self.task_table.append(task)
             self.task_table.append(task.retriver)
             return
-        raise TypeError("task must be a FutureTask or FutureFunctionCall object")
+        raise TypeError("task must be a FuturePythonTask or FutureFunctionCall object")
 
     def future_pythontask(self, fn, *args, **kwargs):
-        return FutureTask(self.manager, False, fn, *args, **kwargs)
+        return FuturePythonTask(self.manager, False, fn, *args, **kwargs)
     
     def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True, import_modules=None):
         return self.manager.create_library_from_functions(name, *function_list, poncho_env=poncho_env, init_command=init_command, add_env=add_env, import_modules=import_modules)
@@ -170,13 +170,13 @@ class VineFuture(Future):
         self.callback_fns.append(fn)
 
 ##
-# \class FutureTask
+# \class FuturePythonTask
 #
-# TaskVine Futuretask object
+# TaskVine FuturePythonTask object
 #
 # This class is a sublcass of PythonTask that is specialized for futures
 
-class FutureTask(PythonTask):
+class FuturePythonTask(PythonTask):
     ##
     # Creates a new Future Task
     #
@@ -185,7 +185,7 @@ class FutureTask(PythonTask):
     # @param args
     # @param kwargs
     def __init__(self, manager, rf, func, *args, **kwargs):
-        super(FutureTask, self).__init__(func, *args, **kwargs)
+        super(FuturePythonTask, self).__init__(func, *args, **kwargs)
         self.enable_temp_output()
         self._module_manager = manager
         self._future = VineFuture(self)
@@ -199,7 +199,7 @@ class FutureTask(PythonTask):
         def retrieve_output(arg):
             return arg
         if not self._retrieval_future and not self._retrieval_task:
-            self._retrieval_task = FutureTask(self._module_manager, True, retrieve_output, self._future)
+            self._retrieval_task = FuturePythonTask(self._module_manager, True, retrieve_output, self._future)
             self._retrieval_task.set_cores(1)
             for env in self._envs:
                 self._retrieval_task.add_environment(env)
