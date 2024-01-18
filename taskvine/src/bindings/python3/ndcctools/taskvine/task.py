@@ -970,8 +970,8 @@ class FunctionCall(Task):
     def __init__(self, library_name, fn, *args, **kwargs):
         Task.__init__(self, fn)
         self._event = {}
-        self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
+        self._event["fn_kwargs"] = kwargs
         self.set_time_max(900)     # maximum run time for function calls is 900s by default.
         self.needs_library(library_name)
         self._input_buffer = None
@@ -1000,8 +1000,8 @@ class FunctionCall(Task):
     # @param args             An array of positional args to be passed to the function
     # @param kwargs           A dictionary of keyword arguments to be passed to the function
     def set_fn_args(self, args=[], kwargs={}):
-        self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
+        self._event["fn_kwargs"] = kwargs
 
     ##
     # Specify how the remote task should execute

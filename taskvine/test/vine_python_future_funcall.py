@@ -31,16 +31,22 @@ libtask = executor.create_library_from_functions('test-library', divide, import_
 executor.install_library(libtask)
 
 # Submit several tasks for execution
-print("submitting function call tasks...")
-t1 = executor.future_funcall('test-library', 'divide', 8, 2**2)
-executor.submit(t1)
-t2 = executor.future_funcall('test-library', 'divide', t1.output, t1.output)
-executor.submit(t2)
-t3 = executor.future_funcall('test-library', 'divide', t2.output, t1.output)
-executor.submit(t3)
+print("creating future function call tasks...")
+t1 = executor.future_funcall('test-library', 'divide', 128, 4)
+t2 = executor.future_funcall('test-library', 'divide', t1.future, t1.future)
+t3 = executor.future_funcall('test-library', 'divide', t2.future, t1.future)
+print("all tasks are created")
 
+executor.submit(t1)
+executor.submit(t2)
+executor.submit(t3)
+print("all tasks are submitted")
+
+print("submitting future function call tasks...")
 print(f"t1 output is {t1.output}")
 print(f"t2 output is: {t2.output}")
 print(f"t3 output is: {t3.output}")
+
+
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:

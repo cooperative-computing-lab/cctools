@@ -54,10 +54,10 @@ class Executor(Executor):
             self.manager.submit(task)
             return task._future
         if isinstance(task, FutureFunctionCall):
+            # submit the task
             self.manager.submit(task)
-            self.manager.submit(task.retriver)
+            # append it to the task table
             self.task_table.append(task)
-            self.task_table.append(task.retriver)
             return
         raise TypeError("task must be a FuturePythonTask or FutureFunctionCall object")
 
@@ -72,9 +72,10 @@ class Executor(Executor):
 
     def future_funcall(self, library_name, fn, *args, **kwargs):
         future_funcall = FutureFunctionCall(self.manager, False, library_name, fn, *args, **kwargs)
-        future_funcall_retriver = FutureFunctionCall(self.manager, True, library_name, fn, *args, **kwargs)
-        future_funcall.retriver = future_funcall_retriver
-        future_funcall_retriver.retrivee = future_funcall
+        # create and submit a retriver once the funcall is created
+        future_funcall.set_retriver()
+        # append it to the task table
+        self.task_table.append(future_funcall.retriver)
         return future_funcall
 
     def set(self, name, value):
@@ -87,6 +88,8 @@ class Executor(Executor):
         
     def __del__(self):
         for task in self.task_table:
+            if hasattr(task, 'retriver') and task.retriver:
+                task.retriver.__del__()
             task.__del__()
         self.manager.__del__()
 
@@ -104,32 +107,74 @@ class FutureFunctionCall(FunctionCall):
         self.manager = manager
         self.library_name = library_name
         self._is_retriver = is_retriver
+        self._has_retrieved = False
         self.retriver = None
         self.retrivee = None
+        self._cache_enabled = True
 
+    # set a retriver for this task, there are two tasks running simutaneously,
+    # once called the `output` on retriver, it will wait for the completion of 
+    # its retrivee and bring back its output
+    def set_retriver(self):
+        self.retriver = FutureFunctionCall(self.manager, True, self.library_name, 'None', None)
+        self.retriver.retrivee = self
+        self.manager.submit(self.retriver)
+
+    # just as that of a regular FunctionCall task, the user can call task.output 
+    # to get the result of it
     @property
     def output(self, timeout="wait_forever"):
         # for retriver: fetch the result of retrivee on completion
         if self._is_retriver:
-            self._manager.wait_for_task_id(self.retrivee.id, timeout=timeout)
+            if self._has_retrieved:
+                return self.retrivee._cached_output
+            self.manager.wait_for_task_id(self.retrivee.id, timeout=timeout)
             if self.retrivee.successful():
                 output = cloudpickle.loads(self.retrivee._output_buffer.contents())
+                self._has_retrieved = True
+                self.retrivee._has_retrieved = True
                 if output['Success']:
-                    if self._cache_enabled:
+                    if self.retrivee._cache_enabled:
+                        self.retrivee._cached_output = output['Result']
                         self._cached_output = output['Result']
                     return output['Result']
                 else:
                     return output['Reason']
+            else:
+                print(f"Warning: task {self.retrivee.id} was failed")
         
         # for retrivee: wait for retriver to get result
         if not self._is_retriver:
             if self._cached_output:
                 return self._cached_output
-            self._manager.wait_for_task_id(self.retriver.id, timeout=timeout)
+            self.manager.wait_for_task_id(self.retriver.id, timeout=timeout)
             if self.retriver.successful():
                 self._cached_output = self.retriver.output
                 return self._cached_output
-            
+            else:
+                print(f"Warning: task {self.retriver.id} was failed")
+    
+    # This will return whether the retriver or the already cached output of a normal task on the user's site.
+    # The user should call task.future to make the future output of another task as the input of this task.
+    @property
+    def future(self):
+        if self._has_retrieved:
+            return self.retrivee._cached_output
+        else:
+            return self.retriver
+        
+    # extract outputs from other tasks as the inputs of this particular task
+    # and do the input and output files declaration in superclass
+    def submit_finalize(self, manager):
+        new_args = []
+        for arg in self._event['fn_args']:
+            if isinstance(arg, FutureFunctionCall):
+                new_args.append(arg.output)
+            else:
+                new_args.append(arg)
+        self._event['fn_args'] = tuple(new_args)
+        super().submit_finalize(manager)
+        
     def __del__(self):
         super().__del__()
 ##
