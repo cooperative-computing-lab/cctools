@@ -37,12 +37,12 @@ t2 = executor.future_funcall('test-library', 'divide', t1.future, t1.future)
 t3 = executor.future_funcall('test-library', 'divide', t2.future, t1.future)
 print("all tasks are created")
 
+print("submitting future function call tasks...")
 executor.submit(t1)
 executor.submit(t2)
 executor.submit(t3)
 print("all tasks are submitted")
 
-print("submitting future function call tasks...")
 print(f"t1 output is {t1.output}")
 print(f"t2 output is: {t2.output}")
 print(f"t3 output is: {t3.output}")
