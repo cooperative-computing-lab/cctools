@@ -128,6 +128,11 @@ class FutureFunctionCall(FunctionCall):
         if self._is_retriver:
             if self._has_retrieved:
                 return self.retrivee._cached_output
+            # in the environment of multithreading, the dependent task might
+            # have not been submitted, this task should wait for its submission
+            while True:
+                if self.retrivee.id:
+                    break
             self.manager.wait_for_task_id(self.retrivee.id, timeout=timeout)
             if self.retrivee.successful():
                 output = cloudpickle.loads(self.retrivee._output_buffer.contents())
@@ -154,8 +159,8 @@ class FutureFunctionCall(FunctionCall):
             else:
                 print(f"Warning: task {self.retriver.id} was failed")
     
-    # This will return whether the retriver or the already cached output of a normal task on the user's site.
-    # The user should call task.future to make the future output of another task as the input of this task.
+    # this will return whether the retriver or the already cached output of a normal task on the user's site.
+    # the user should call task.future to make the future output of another task as the input of this task.
     @property
     def future(self):
         if self._has_retrieved:
@@ -215,9 +220,9 @@ class VineFuture(Future):
 
 ##
 # \class FuturePythonTask
-#
+# 
 # TaskVine FuturePythonTask object
-#
+# 
 # This class is a sublcass of PythonTask that is specialized for futures
 
 class FuturePythonTask(PythonTask):
