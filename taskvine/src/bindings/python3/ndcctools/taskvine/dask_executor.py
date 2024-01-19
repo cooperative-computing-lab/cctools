@@ -76,7 +76,8 @@ class DaskVine(Manager):
     #                       'max' (for maximum values seen), 'min_waste', 'greedy bucketing'
     #                       or 'exhaustive bucketing'. This is done per function type in dsk.
     # @param retries       Number of times to attempt a task. Default is 5.
-    # @param submit_per_cycle Maximum number of tasks to submit per wait call.
+    # @param submit_per_cycle Maximum number of tasks to serialize per wait call. If None, or less than 1, then all
+    #                         tasks are serialized as they are available.
     # @param verbose       if true, emit additional debugging information.
     def get(self, dsk, keys, *,
             environment=None,
@@ -87,7 +88,7 @@ class DaskVine(Manager):
             checkpoint_fn=None,
             resources=None,
             resources_mode=None,
-            submit_per_cycle=50,
+            submit_per_cycle=None,
             retries=5,
             verbose=False
             ):
@@ -141,7 +142,12 @@ class DaskVine(Manager):
 
         while not self.empty() or enqueued_calls:
             submitted = 0
-            while submitted < self.submit_per_cycle and enqueued_calls:
+            while (
+                enqueued_calls
+                and not self.submit_per_cycle
+                or self.submit_per_cycle < 0
+                or submitted < self.submit_per_cycle
+            ):
                 submitted += 1
                 self.submit(enqueued_calls.pop())
 
