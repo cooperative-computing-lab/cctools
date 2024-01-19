@@ -52,13 +52,9 @@ from .cresource_monitor import (
     rmonitor_minimonitor,
     rmsummary,
     rmsummary_check_limits,
-    rmsummary_create,
-    rmsummary_delete,
     rmsummary_copy,
     rmsummary_get_snapshot,
     rmsummary_merge_max,
-    rmsummaryArray_getitem,
-    delete_rmsummaryArray,
 )
 
 
@@ -624,5 +620,6 @@ def rmsummary_snapshots(self):
         snapshot = rmsummary_get_snapshot(self, i)
         snapshots.append(snapshot)
     return snapshots
+
 
 rmsummary.snapshots = property(rmsummary_snapshots)
