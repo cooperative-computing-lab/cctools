@@ -32,7 +32,7 @@ import struct
 import tempfile
 import threading
 
-from .cresource_monitor import (
+from .cresource_monitor import (  # noqa: F401
     CATEGORY_ALLOCATION_MODE_FIXED,
     CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT,
     CATEGORY_ALLOCATION_MODE_MIN_WASTE,
@@ -52,9 +52,13 @@ from .cresource_monitor import (
     rmonitor_minimonitor,
     rmsummary,
     rmsummary_check_limits,
+    rmsummary_create,
+    rmsummary_delete,
     rmsummary_copy,
     rmsummary_get_snapshot,
     rmsummary_merge_max,
+    rmsummaryArray_getitem,
+    delete_rmsummaryArray,
 )
 
 
