@@ -212,7 +212,7 @@ class DaskVine(Manager):
 
 
 class DaskVineFile:
-    def __init__(self, file, key, staging_dir):
+    def __init__(self, file, key):
         self._file = file
         self._loaded = False
         self._load = None
@@ -300,6 +300,8 @@ class PythonTaskDask(PythonTask):
             self.set_category(category)
         if lazy_transfers:
             self.enable_temp_output()
+        else:
+            self.set_output_name(f"{m.staging_directory}/{uuid4()}.p")
         if environment:
             self.add_environment(environment)
         if extra_files:
@@ -324,6 +326,10 @@ class PythonTaskDask(PythonTask):
     def decrement_retry(self):
         self._retries_left -= 1
         return self._retries_left
+
+    def set_output_name(self, filename):
+        self._out_name_file = filename
+
 
 
 def execute_graph_vertex(sexpr, args, keys_of_files):
