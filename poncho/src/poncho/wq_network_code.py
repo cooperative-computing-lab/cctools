@@ -13,7 +13,7 @@ def wq_network_code():
 
     # If enabled, coprocess will print to stdout
     debug_mode = False
-        
+
     # Send a message on a binary I/O stream by sending the message length and then the (string) message.
     def send_message(stream, data):
         size = len(data)
@@ -58,10 +58,10 @@ def wq_network_code():
 
         # Inform the worker of name and port for later connection.
         config = {
-                "name": name(),  # noqa: F821
-                "port": s.getsockname()[1],
-                }
-        send_message(sys.stdout,json.dumps(config))
+            "name": name(),  # noqa: F821
+            "port": s.getsockname()[1],
+        }
+        send_message(sys.stdout, json.dumps(config))
         sys.stdout.flush()
 
         # Remember original working directory b/c we change for each invocation.
@@ -69,12 +69,12 @@ def wq_network_code():
 
         # Create pipe for communication with child process
         rpipe, wpipe = os.pipe()
-        rpipestream = os.fdopen(rpipe,"r")
+        rpipestream = os.fdopen(rpipe, "r")
 
         while True:
             s.listen()
             conn, addr = s.accept()
-            connstream = conn.makefile("rw",encoding="utf-8")
+            connstream = conn.makefile("rw", encoding="utf-8")
 
             if debug_mode:
                 print('Network function: connection from {}'.format(addr), file=sys.stderr)
@@ -104,15 +104,15 @@ def wq_network_code():
 
                     # Then invoke function by desired method, resulting in
                     # response containing the text representation of the result.
-                        
+
                     if exec_method == "direct":
                         response = json.dumps(globals()[function_name](event))
                     else:
                         p = os.fork()
                         if p == 0:
                             response = globals()[function_name](event)
-                            wpipestream = os.fdopen(wpipe,"w")
-                            send_message(wpipestream,json.dumps(response))
+                            wpipestream = os.fdopen(wpipe, "w")
+                            send_message(wpipestream, json.dumps(response))
                             wpipestream.flush()
                             os._exit(0)
                         elif p < 0:
@@ -130,7 +130,7 @@ def wq_network_code():
                             os.waitpid(p, 0)
 
                     # At this point, response is set to a value one way or the other
-                        
+
                 except Exception as e:
                     if debug_mode:
                         print("Network function encountered exception ", str(e), file=sys.stderr)
@@ -144,7 +144,7 @@ def wq_network_code():
                     os.chdir(abs_working_dir)
 
                 # Send response string back to parent worker process.
-                send_message(connstream,response)
+                send_message(connstream, response)
                 connstream.flush()
-            
+
         return 0
