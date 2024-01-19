@@ -6,6 +6,7 @@ from . import cvine
 
 import os
 
+
 def get_c_constant(constant):
     """ Returns a TaskVine C constant value from a string. E.g.:
         "result_success" -> VINE_RESULT_SUCCESS

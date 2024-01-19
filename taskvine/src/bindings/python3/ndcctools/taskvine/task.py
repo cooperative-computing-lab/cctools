@@ -20,6 +20,7 @@ import textwrap
 import uuid
 import cloudpickle
 
+
 ##
 # @class ndcctools.taskvine.task.Task
 #
@@ -188,7 +189,7 @@ class Task(object):
     def needs_library(self, library_name):
         self.needs_library_name = library_name
         return cvine.vine_task_needs_library(self._task, library_name)
-    
+
     ##
     # Set the library name provided by this task.
     # This is not needed for regular tasks.
@@ -198,7 +199,7 @@ class Task(object):
     def provides_library(self, library_name):
         self.provides_library_name = library_name
         return cvine.vine_task_provides_library(self._task, library_name)
-    
+
     ##
     # Set the number of concurrent functions a library can run.
     # This is not needed for regular tasks.
@@ -207,7 +208,7 @@ class Task(object):
     # @param nslots The maximum number of concurrent functions this library can run.
     def set_function_slots(self, nslots):
         return cvine.vine_task_set_function_slots(self._task, nslots)
-        
+
     ##
     # Set the worker selection scheduler for task.
     #
@@ -268,7 +269,7 @@ class Task(object):
 
         flags = Task._determine_mount_flags(strict_input=strict_input, mount_symlink=mount_symlink)
 
-        if cvine.vine_task_add_input(self._task, file._file, remote_name, flags)==0:
+        if cvine.vine_task_add_input(self._task, file._file, remote_name, flags) == 0:
             raise ValueError("invalid file description")
 
     ##
@@ -292,7 +293,7 @@ class Task(object):
             raise TypeError(f"remote_name {remote_name} is not a str")
 
         flags = Task._determine_mount_flags(watch, failure_only, success_only)
-        if cvine.vine_task_add_output(self._task, file._file, remote_name, flags)==0:
+        if cvine.vine_task_add_output(self._task, file._file, remote_name, flags) == 0:
             raise ValueError("invalid file description")
 
     ##
@@ -709,11 +710,12 @@ class Task(object):
         try:
             vine_dir = os.environ['CCTOOLS_HOME']
             self.add_input(manager.declare_file(f"{vine_dir}/lib-nopen.so"), "./lib-nopen.so")
-        except KeyError: 
+        except KeyError:
             self.add_input(manager.declare_file("./lib-nopen.so"), "./lib-nopen.so")
             self.add_input(manager.declare_file("./rules.txt"), "./rules.txt")
 
         self.set_env_var("LD_PRELOAD", "./lib-nopen.so")
+
 
 ##
 # @class ndcctools.taskvine.PythonTask
@@ -917,7 +919,7 @@ class PythonTask(Task):
         with open(os.path.join(self._tmpdir, self._wrapper), "w") as f:
             f.write(
                 textwrap.dedent(
-                f"""
+                    f"""
                 try:
                     import sys
                     import cloudpickle
@@ -983,7 +985,7 @@ class FunctionCall(Task):
     # Finalizes the task definition once the manager that will execute is run.
     # This function is run by the manager before registering the task for
     # execution.
-    # 
+    #
     # @param self 	Reference to the current python task object
     # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
@@ -1030,7 +1032,7 @@ class FunctionCall(Task):
         else:
             return output['Reason']
 
-    ## 
+    ##
     # Remove input and output buffers under some circumstances `output` is not called
     def __del__(self):
         try:
