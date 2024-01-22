@@ -676,7 +676,7 @@ class Manager(object):
     # @param self   Reference to the current manager object.
     # @param id     The task_id returned from @ref ndcctools.taskvine.manager.Manager.submit.
     # @return One if the task was found and cancelled, zero otherwise.
-    
+
     def cancel_by_task_id(self, id):
         return cvine.vine_cancel_by_task_id(self._taskvine, id)
 
@@ -700,7 +700,7 @@ class Manager(object):
     # @return The total number of tasks cancelled.
     def cancel_by_category(self, category):
         total = 0
- 
+
         for task in self._task_table.values():
             if task.category == category:
                 total += self.cancel_by_task_id(task.id)
@@ -824,9 +824,9 @@ class Manager(object):
     def submit(self, task):
         task.submit_finalize(self)
         task_id = cvine.vine_submit(self._taskvine, task._task)
-        if(task_id==0):
+        if task_id == 0:
             raise ValueError("invalid task description")
-        else:   
+        else:
             self._task_table[task_id] = task
             return task_id
 
@@ -877,7 +877,7 @@ class Manager(object):
         # Positional arguments are the list of functions to include in the library.
         # Create a unique hash of a combination of function names and bodies.
         functions_hash = package_serverize.generate_functions_hash(function_list)
-        
+
         # Create path for caching library code and environment based on function hash.
         library_cache_path = f"{self.cache_directory}/vine-library-cache/{functions_hash}"
         library_code_path = f"{library_cache_path}/library_code.py"
@@ -890,16 +890,16 @@ class Manager(object):
 
         # If library cache directory doesn't exist, create it.
         pathlib.Path(library_cache_path).mkdir(mode=0o755, parents=True, exist_ok=True)
-        
+
         # If the library code and environment exist, move on to creating the Library Task.
         # Else create them in the relevant paths.
         if not (os.path.isfile(library_code_path) and os.path.isfile(library_env_path)):
             # Don't create a new poncho environment tarball is one is already provided or
             # user explicitly tells not to via `add_env`.
-            need_pack=True
+            need_pack = True
             if poncho_env or not add_env:
-                need_pack=False
-            
+                need_pack = False
+
             # create library code and environment, if appropriate
             package_serverize.serverize_library_from_code(library_cache_path, function_list, name, need_pack=need_pack, import_modules=import_modules)
 
@@ -916,7 +916,7 @@ class Manager(object):
         if add_env:
             f = self.declare_poncho(library_env_path, cache=True)
             t.add_environment(f)
-    
+
         # Declare the library code as an input.
         f = self.declare_file(library_code_path, cache=True)
         t.add_input(f, "library_code.py")
@@ -1090,8 +1090,8 @@ class Manager(object):
                     n += 1
                     break
 
-        results=[elem if isinstance(elem, list) else [elem] for elem in results]
-        
+        results = [elem if isinstance(elem, list) else [elem] for elem in results]
+
         return [item for elem in results for item in elem]
 
     ##
@@ -1158,8 +1158,8 @@ class Manager(object):
                     n += 1
                     break
 
-        results=[elem if isinstance(elem, list) else [elem] for elem in results]
-        
+        results = [elem if isinstance(elem, list) else [elem] for elem in results]
+
         return [item for elem in results for item in elem]
 
     ##
@@ -1255,8 +1255,8 @@ class Manager(object):
                     n += 1
                     break
 
-        results=[elem if isinstance(elem, list) else [elem] for elem in results]
-        
+        results = [elem if isinstance(elem, list) else [elem] for elem in results]
+
         return [item for elem in results for item in elem]
 
     ##
@@ -1314,8 +1314,8 @@ class Manager(object):
                     n += 1
                     break
 
-        results=[elem if isinstance(elem, list) else [elem] for elem in results]
-        
+        results = [elem if isinstance(elem, list) else [elem] for elem in results]
+
         return [item for elem in results for item in elem]
 
     ##
@@ -1394,7 +1394,7 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param file    The file object
     # @return The contents of the file as a strong.
-    
+
     def fetch_file(self, file):
         return cvine.vine_fetch_file(self._taskvine, file._file)
 

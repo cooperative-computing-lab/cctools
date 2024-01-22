@@ -331,7 +331,6 @@ class PythonTaskDask(PythonTask):
         self._out_name_file = filename
 
 
-
 def execute_graph_vertex(sexpr, args, keys_of_files):
     import traceback
     import cloudpickle
