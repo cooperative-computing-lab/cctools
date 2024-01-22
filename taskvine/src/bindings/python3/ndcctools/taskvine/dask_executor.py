@@ -76,6 +76,8 @@ class DaskVine(Manager):
     #                       'max' (for maximum values seen), 'min_waste', 'greedy bucketing'
     #                       or 'exhaustive bucketing'. This is done per function type in dsk.
     # @param retries       Number of times to attempt a task. Default is 5.
+    # @param submit_per_cycle Maximum number of tasks to serialize per wait call. If None, or less than 1, then all
+    #                         tasks are serialized as they are available.
     # @param verbose       if true, emit additional debugging information.
     def get(self, dsk, keys, *,
             environment=None,
@@ -86,6 +88,7 @@ class DaskVine(Manager):
             checkpoint_fn=None,
             resources=None,
             resources_mode=None,
+            submit_per_cycle=None,
             retries=5,
             verbose=False
             ):
@@ -108,7 +111,15 @@ class DaskVine(Manager):
             self.retries = retries
             self.verbose = verbose
 
+            self.submit_per_cycle = submit_per_cycle
+
             self._categories_known = set()
+
+            self.tune("category-steady-n-tasks", 1)
+            self.tune("prefer-dispatch", 1)
+            self.tune("ramp-down-heuristic", 1)
+            self.tune("immediate-recovery", 1)
+            self.tune("max-retrievals", 10)
 
             return self._dask_execute(dsk, keys)
         except Exception as e:
@@ -125,10 +136,21 @@ class DaskVine(Manager):
         dag = DaskVineDag(dsk, low_memory_mode=self.low_memory_mode)
         tag = f"dag-{id(dag)}"
 
+        enqueued_calls = []
         rs = dag.set_targets(keys_flatten)
-        self._submit_calls(dag, tag, rs, self.retries)
+        self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
 
-        while not self.empty():
+        while not self.empty() or enqueued_calls:
+            submitted = 0
+            while (
+                enqueued_calls
+                and not self.submit_per_cycle
+                or self.submit_per_cycle < 0
+                or submitted < self.submit_per_cycle
+            ):
+                submitted += 1
+                self.submit(enqueued_calls.pop())
+
             t = self.wait_for_tag(tag, 5)
             if t:
                 if self.verbose:
@@ -136,12 +158,12 @@ class DaskVine(Manager):
 
                 if t.successful():
                     rs = dag.set_result(t.key, DaskVineFile(t.output_file, t.key, self.staging_directory))
-                    self._submit_calls(dag, tag, rs, self.retries)
+                    self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
                 else:
                     retries_left = t.decrement_retry()
                     print(f"task id {t.id} key {t.key} failed: {t.result}. {retries_left} attempts left.\n{t.std_output}")
                     if retries_left > 0:
-                        self._submit_calls(dag, tag, [(t.key, t.sexpr)], retries_left)
+                        self._enqueue_dask_calls(dag, tag, [(t.key, t.sexpr)], retries_left, enqueued_calls)
                     else:
                         raise Exception(f"tasks for key {t.key} failed permanently")
         return self._load_results(dag, indices, keys)
@@ -152,7 +174,7 @@ class DaskVine(Manager):
         else:
             return "other"
 
-    def _submit_calls(self, dag, tag, rs, retries):
+    def _enqueue_dask_calls(self, dag, tag, rs, retries, enqueued_calls):
         targets = dag.get_targets()
         for (k, sexpr) in rs:
             lazy = self.lazy_transfers and k not in targets
@@ -179,7 +201,7 @@ class DaskVine(Manager):
                                retries=retries,
                                lazy_transfers=lazy)
             t.set_tag(tag)  # tag that identifies this dag
-            self.submit(t)
+            enqueued_calls.append(t)
 
     def _load_results(self, dag, key_indices, keys):
         results = list(keys)
