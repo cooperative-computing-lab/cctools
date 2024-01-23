@@ -60,7 +60,8 @@ typedef enum {
 	VINE_CACHE_NEVER = 0,  /**< Do not cache file at execution site. (default) */
 	VINE_CACHE = 1,        /**< File remains in cache until workflow ends. */
 	VINE_CACHE_ALWAYS = 3, /**< File remains in cache until the worker teminates. **/
-	VINE_PEER_NOSHARE = 4  /**< Schedule this file to be shared between peers where available. See @ref vine_enable_peer_transfers **/
+	VINE_PEER_NOSHARE = 4,  /**< Schedule this file to be shared between peers where available. See @ref vine_enable_peer_transfers **/
+	VINE_UNLINK_ON_RC0 = 8  /**< Remove the file from disk at the manager execution site when the reference count of the file is 0. (Use with care, TaskVine internal use only.) */
 } vine_file_flags_t;
 
 /** Select overall scheduling algorithm for matching tasks to workers. */

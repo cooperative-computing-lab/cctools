@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "path.h"
 #include "stringtools.h"
+#include "unlink_recursive.h"
 #include "xxmalloc.h"
 
 #include <limits.h>
@@ -33,6 +34,10 @@ int vine_file_delete(struct vine_file *f)
 		if (f->refcount < 0) {
 			notice(D_VINE, "vine_file_delete: prevented multiple-free of file");
 			return 0;
+		}
+
+		if (f->type == VINE_FILE && f->flags & VINE_UNLINK_ON_RC0) {
+			unlink_recursive(f->source);
 		}
 
 		vine_task_delete(f->mini_task);
