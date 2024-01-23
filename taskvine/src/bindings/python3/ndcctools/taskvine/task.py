@@ -13,7 +13,6 @@ from .file import File
 
 import copy
 import os
-import shutil
 import sys
 import tempfile
 import textwrap
@@ -143,7 +142,7 @@ class Task(object):
         return flags
 
     @staticmethod
-    def _determine_file_flags(cache=False, peer_transfer=False):
+    def _determine_file_flags(cache=False, peer_transfer=False, _unlink_on_rc=False):
         flags = cvine.VINE_CACHE_NEVER
         if cache is True or cache == "workflow":
             flags |= cvine.VINE_CACHE
@@ -151,6 +150,8 @@ class Task(object):
             flags |= cvine.VINE_CACHE_ALWAYS
         if not peer_transfer:
             flags |= cvine.VINE_PEER_NOSHARE
+        if _unlink_on_rc:
+            flags |= cvine.VINE_UNLINK_ON_RC0
         return flags
 
     ##
@@ -740,11 +741,6 @@ class PythonTask(Task):
         self._tmpdir = None
 
         self._id = str(uuid.uuid4())
-        self._func_file = f"function_{self._id}.p"
-        self._args_file = f"args_{self._id}.p"
-        self._out_name_file = f"out_{self._id}.p"
-        self._stdout_file = f"stdout_{self._id}.p"
-        self._wrapper = f"pytask_wrapper_{self._id}.py"
         self._serialize_output = True
 
         self._command = self._python_function_command()
@@ -775,18 +771,6 @@ class PythonTask(Task):
         self._fn_def = None  # avoid possible memory leak
         self._create_wrapper()
         self._add_IO_files(manager)
-
-    # remove any temp files generated
-    # if __del__ is never called, or called too late (e.g. on interpreter shutdown),
-    # then temp files will be deleted in the atexit of the manager staging directory
-    def __del__(self):
-        try:
-            if self._tmpdir:
-                shutil.rmtree(self._tmpdir, ignore_errors=True)
-            super().__del__()
-        except TypeError:
-            # in case the interpreter is shuting down. staging files will be deleted by manager atexit function.
-            pass
 
     ##
     # Marks the output of this task to stay at the worker.
@@ -850,7 +834,7 @@ class PythonTask(Task):
         if not self._output_loaded:
             if self.successful():
                 try:
-                    with open(os.path.join(self._tmpdir, self._out_name_file), "rb") as f:
+                    with open(os.path.join(self._tmpdir, "output"), "rb") as f:
                         if self._serialize_output:
                             self._output = cloudpickle.load(f)
                         else:
@@ -883,9 +867,9 @@ class PythonTask(Task):
         self._serialize_output = False
 
     def _serialize_python_function(self, func, args, kwargs):
-        with open(os.path.join(self._tmpdir, self._func_file), "wb") as wf:
+        with open(os.path.join(self._tmpdir, "function"), "wb") as wf:
             cloudpickle.dump(func, wf)
-        with open(os.path.join(self._tmpdir, self._args_file), "wb") as wf:
+        with open(os.path.join(self._tmpdir, "arguments"), "wb") as wf:
             cloudpickle.dump([args, kwargs], wf)
 
     def _python_function_command(self, remote_env_dir=None):
@@ -894,29 +878,26 @@ class PythonTask(Task):
         else:
             py_exec = f"python{sys.version_info[0]}"
 
-        command = f"{py_exec} {self._wrapper} {self._func_file} {self._args_file} {self._id} > {self._stdout_file} 2>&1"
+        command = f"{py_exec} input_dir/wrapper input_dir/function input_dir/arguments output > stdout 2>&1"
         return command
 
     def _add_IO_files(self, manager):
-        def source(name):
-            return os.path.join(self._tmpdir, name)
-        for name in [self._wrapper, self._func_file, self._args_file]:
-            f = manager.declare_file(source(name))
-            self.add_input(f, name)
+        f = manager.declare_file(self._tmpdir, _unlink_on_rc=True)
+        self.add_input(f, "input_dir")
 
-        f = manager.declare_file(source(self._stdout_file))
-        self.add_output(f, self._stdout_file)
+        f = manager.declare_file(os.path.join(self._tmpdir, "stdout"))
+        self.add_output(f, "stdout")
 
         if self._tmp_output_enabled:
             self._output_file = manager.declare_temp()
         else:
-            self._output_file = manager.declare_file(source(self._out_name_file), cache=self._cache_output)
-        self.add_output(self._output_file, self._id)
+            self._output_file = manager.declare_file(os.path.join(self._tmpdir, "output"), cache=self._cache_output)
+        self.add_output(self._output_file, "output")
 
     ##
     # creates the wrapper script which will execute the function. pickles output.
     def _create_wrapper(self):
-        with open(os.path.join(self._tmpdir, self._wrapper), "w") as f:
+        with open(os.path.join(self._tmpdir, "wrapper"), "w") as f:
             f.write(
                 textwrap.dedent(
                     f"""

@@ -168,7 +168,7 @@ class FutureTask(PythonTask):
             if not self._output_loaded and self._future_resolved:
                 if self.successful():
                     try:
-                        with open(os.path.join(self._tmpdir, self._out_name_file), "rb") as f:
+                        with open(os.path.join(self._tmpdir, "output"), "rb") as f:
                             if self._serialize_output:
                                 self._output = cloudpickle.load(f)
                             else:
@@ -202,7 +202,7 @@ class FutureTask(PythonTask):
         return cvine.vine_task_add_environment(self._task, f._file)
 
     def _create_wrapper(self):
-        with open(os.path.join(self._tmpdir, self._wrapper), "w") as f:
+        with open(os.path.join(self._tmpdir, "wrapper"), "w") as f:
             f.write(
                 textwrap.dedent(
                     f"""

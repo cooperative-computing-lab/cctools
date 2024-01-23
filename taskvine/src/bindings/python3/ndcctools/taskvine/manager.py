@@ -1381,10 +1381,11 @@ class Manager(object):
     #                end-of-life of the worker. Default is False (file is not cache).
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
+    # @param _unlink_on_rc   Whether to delete the file when its reference count is 0. (Use with care, TaskVine internal only)
     # @return
     # A file object to use in @ref ndcctools.taskvine.task.Task.add_input or @ref ndcctools.taskvine.task.Task.add_output
-    def declare_file(self, path, cache=False, peer_transfer=True):
-        flags = Task._determine_file_flags(cache, peer_transfer)
+    def declare_file(self, path, cache=False, peer_transfer=True, _unlink_on_rc=False):
+        flags = Task._determine_file_flags(cache, peer_transfer, _unlink_on_rc)
         f = cvine.vine_declare_file(self._taskvine, path, flags)
         return File(f)
 
