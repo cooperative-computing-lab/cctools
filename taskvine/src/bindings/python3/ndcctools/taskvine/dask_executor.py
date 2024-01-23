@@ -142,9 +142,8 @@ class DaskVine(Manager):
 
         while not self.empty() or enqueued_calls:
             submitted = 0
-            while (
-                enqueued_calls
-                and not self.submit_per_cycle
+            while enqueued_calls and (
+                not self.submit_per_cycle
                 or self.submit_per_cycle < 0
                 or submitted < self.submit_per_cycle
             ):
