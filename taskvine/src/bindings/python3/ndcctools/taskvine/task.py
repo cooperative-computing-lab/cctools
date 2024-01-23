@@ -142,7 +142,7 @@ class Task(object):
         return flags
 
     @staticmethod
-    def _determine_file_flags(cache=False, peer_transfer=False, _unlink_on_rc=False):
+    def _determine_file_flags(cache=False, peer_transfer=False, unlink_when_done=False):
         flags = cvine.VINE_CACHE_NEVER
         if cache is True or cache == "workflow":
             flags |= cvine.VINE_CACHE
@@ -150,8 +150,8 @@ class Task(object):
             flags |= cvine.VINE_CACHE_ALWAYS
         if not peer_transfer:
             flags |= cvine.VINE_PEER_NOSHARE
-        if _unlink_on_rc:
-            flags |= cvine.VINE_UNLINK_ON_RC0
+        if unlink_when_done:
+            flags |= cvine.VINE_UNLINK_WHEN_DONE
         return flags
 
     ##
@@ -882,7 +882,7 @@ class PythonTask(Task):
         return command
 
     def _add_IO_files(self, manager):
-        f = manager.declare_file(self._tmpdir, _unlink_on_rc=True)
+        f = manager.declare_file(self._tmpdir, unlink_when_done=True)
         self.add_input(f, "input_dir")
 
         f = manager.declare_file(os.path.join(self._tmpdir, "stdout"))

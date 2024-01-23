@@ -36,7 +36,7 @@ int vine_file_delete(struct vine_file *f)
 			return 0;
 		}
 
-		if (f->type == VINE_FILE && f->flags & VINE_UNLINK_ON_RC0) {
+		if (f->type == VINE_FILE && f->flags & VINE_UNLINK_WHEN_DONE) {
 			unlink_recursive(f->source);
 		}
 
