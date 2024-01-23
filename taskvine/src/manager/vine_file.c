@@ -12,8 +12,8 @@ See the file COPYING for details.
 #include "debug.h"
 #include "path.h"
 #include "stringtools.h"
-#include "unlink_recursive.h"
 #include "timestamp.h"
+#include "unlink_recursive.h"
 #include "xxmalloc.h"
 
 #include <limits.h>
@@ -42,7 +42,9 @@ int vine_file_delete(struct vine_file *f)
 			unlink_recursive(f->source);
 			timestamp_t end_time = timestamp_get();
 
-			debug(D_VINE, "vine_file_delete: deleting file on reference count took: %.02lfs", (end_time - start_time)/1000000.0);
+			debug(D_VINE,
+					"vine_file_delete: deleting file on reference count took: %.02lfs",
+					(end_time - start_time) / 1000000.0);
 		}
 
 		vine_task_delete(f->mini_task);
