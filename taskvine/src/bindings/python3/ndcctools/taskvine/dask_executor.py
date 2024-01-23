@@ -142,9 +142,8 @@ class DaskVine(Manager):
 
         while not self.empty() or enqueued_calls:
             submitted = 0
-            while (
-                enqueued_calls
-                and not self.submit_per_cycle
+            while enqueued_calls and (
+                not self.submit_per_cycle
                 or self.submit_per_cycle < 0
                 or submitted < self.submit_per_cycle
             ):
@@ -157,7 +156,7 @@ class DaskVine(Manager):
                     print(f"{t.key} ran on {t.hostname}")
 
                 if t.successful():
-                    rs = dag.set_result(t.key, DaskVineFile(t.output_file, t.key, self.staging_directory))
+                    rs = dag.set_result(t.key, DaskVineFile(t.output_file, t.key))
                     self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
                 else:
                     retries_left = t.decrement_retry()
