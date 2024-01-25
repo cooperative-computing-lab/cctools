@@ -1046,8 +1046,9 @@ class FunctionCall(Task):
                 self._manager.remove_file(self._input_buffer)
                 self._input_buffer = None
             if self._output_file:
-                self._manager.remove_file(self._output_file)
-                self._output_file = None
+                if self._tmp_output_enabled == False:
+                    self._manager.remove_file(self._output_file)
+                    self._output_file = None
             super().__del__()
         except TypeError:
             pass

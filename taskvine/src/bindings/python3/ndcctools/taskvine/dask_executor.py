@@ -164,7 +164,7 @@ class DaskVine(Manager):
                     print(f"{t.key} ran on {t.hostname}")
 
                 if t.successful():
-                    rs = dag.set_result(t.key, DaskVineFile(t.output_file, t.key, self.staging_directory, self.task_mode))
+                    rs = dag.set_result(t.key, DaskVineFile(t._output_file, t.key, self.staging_directory, self.task_mode))
                     self._submit_calls(dag, tag, rs, self.retries)
                 else:
                     retries_left = t.decrement_retry()
