@@ -857,7 +857,7 @@ class TxnStats(TxnPlot):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(prog="vine_example_blast.py",
+    parser = argparse.ArgumentParser(prog="vine_plot_txn_log",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                      description='Plot TaskVine workflow information from a transaction log file.')
 
