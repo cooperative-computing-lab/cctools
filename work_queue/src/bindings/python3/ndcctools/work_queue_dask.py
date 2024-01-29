@@ -60,9 +60,6 @@ class DaskWQ(WorkQueue):
     #                      and task, and that returns a string.
     # @param low_memory_mode Split graph vertices to reduce memory needed per function call. It
     #                      removes some of the dask graph optimizations, thus proceed with care.
-    # @param  checkpoint_fn When using lazy_transfers, a predicate with arguments (dag, key)
-    #                      called before submitting a task. If True, the result is brought back
-    #                      to the manager.
     # @param resources     A dictionary with optional keys of cores, memory and disk (MB)
     #                      to set maximum resource usage per task.
     # @param resources_mode One of work_queue.WORK_QUEUE_ALLOCATION_MODE_{FIXED,MAX,MIN_WASTE,MAX_THROUGHPUT,GREEDY_BUCKETING,EXHAUSTIVE_BUCKETING}
@@ -71,16 +68,19 @@ class DaskWQ(WorkQueue):
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
-            lazy_transfers=False,
             env_vars=None,
             low_memory_mode=False,
-            checkpoint_fn=None,
             resources=None,
             resources_mode=None,
             retries=5,
-            verbose=False
+            verbose=False,
+            **ignored
             ):
         try:
+
+            if ignored:
+                print("options ignored:", ignored)
+
             if retries and retries < 1:
                 raise ValueError("retries should be larger than 0")
 
@@ -90,10 +90,8 @@ class DaskWQ(WorkQueue):
                 self.environment = environment
 
             self.extra_files = extra_files
-            self.lazy_transfers = lazy_transfers
             self.env_vars = env_vars
             self.low_memory_mode = low_memory_mode
-            self.checkpoint_fn = checkpoint_fn
             self.resources = resources
             self.resources_mode = resources_mode
             self.retries = retries
@@ -144,12 +142,7 @@ class DaskWQ(WorkQueue):
             return "other"
 
     def _submit_calls(self, dag, tag, rs, retries):
-        targets = dag.get_targets()
         for (k, sexpr) in rs:
-            lazy = self.lazy_transfers and k not in targets
-            if lazy and self.checkpoint_fn:
-                lazy = self.checkpoint_fn(dag, k)
-
             cat = self.category_name(sexpr)
             if cat not in self._categories_known:
                 if self.resources:

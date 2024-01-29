@@ -19,10 +19,10 @@ def kwargs_test(x=5, y=6, z=7):
 def no_arguments_test(a, b, c):
     return a + b + c
 def exception_test():
-    raise Exception("I am a bad funtion")
+    raise Exception("I am a bad function")
 
 # Create a new queue
-queue = wq.WorkQueue(port=[9123,9130], debug_log="manager.log")
+queue = wq.WorkQueue(port=0, debug_log="manager.log")
 print("listening on port {}".format(queue.port))
 with open(port_file, "w") as f:
     f.write(str(queue.port))

@@ -292,10 +292,11 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 
 			// call invoke_coprocess_function
 		 	char *output = work_queue_coprocess_run(p->task->command_line, input, p->coprocess, p->task->taskid);
-
 			// write data to output file
-			full_write(p->output_fd, output, strlen(output));
-
+			if(output) {
+				full_write(p->output_fd, output, strlen(output));
+			}
+			
 			exit(0);
 		}
 

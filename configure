@@ -1536,6 +1536,8 @@ CCTOOLS_PYTHON3_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/python\$(CCTOOLS_PYTHON3_VERSIO
 
 CCTOOLS_PYDOC=$(which pydoc 2> /dev/null || which pydoc2 2> /dev/null || which pydoc3 > /dev/null)
 
+CCTOOLS_FLAKE8_IGNORE_ERRORS=C901,E501,W503
+
 CCTOOLS_SGE_PARAMETERS=$(echo ${sge_parameters} | sed -e 's/\$/\\\$\$/g')
 
 CCTOOLS_DOCTARGETS=${cctools_doctargets}

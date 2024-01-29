@@ -4,6 +4,7 @@
 
 import resource_monitor
 
+
 # monitor callback function example
 # a callback function will be called everytime resources are measured.
 # arguments are:
@@ -35,13 +36,16 @@ def my_function(wait_for, buffer_size):
     import time
     start = time.time()
     buf = bytearray(int(buffer_size * 1024 * 1024))  # noqa: F841
-    delta = wait_for/1e6 - (time.time() - start)   # x/1e6 because sleep expects seconds
+    delta = wait_for / 1e6 - (
+        time.time() - start
+    )  # x/1e6 because sleep expects seconds
     if delta < 0:
         delta = 0
     time.sleep(delta)
     return delta
 
-@resource_monitor.monitored(callback = send_udp_message, interval = 0.1 * 1e6)
+
+@resource_monitor.monitored(callback=send_udp_message, interval=0.1 * 1e6)
 def my_function_monitored(wait_for, buffer_size):
     """
     Like my_function, but because of the decorator,
@@ -50,9 +54,10 @@ def my_function_monitored(wait_for, buffer_size):
     """
     return my_function(wait_for, buffer_size)
 
+
 # alternatively, we could have defined my_function_monitored as:
 # my_function_monitored = resource_monitor.make_monitored(my_function, callback = send_udp_message, interval = 0.5/1e6)
-@resource_monitor.monitored(callback = send_udp_message, limits = {'memory': 100, 'wall_time': 10e6})
+@resource_monitor.monitored(callback=send_udp_message, limits={'memory': 100, 'wall_time': 10e6})
 def my_function_with_limits(wait_for, buffer_size):
     """
     Like my_function_monitored, but because of the decorator,
@@ -65,19 +70,22 @@ def my_function_with_limits(wait_for, buffer_size):
 # my_function_with_limits = resource_monitor.make_monitored(my_function, callback = send_udp_message, limits = {'memory': ...})
 
 
-print('\ncalling original function...')
-result_original = my_function(wait_for = 1e6, buffer_size = 1024)
-print('original function result: {}'.format(result_original))
+print("\ncalling original function...")
+result_original = my_function(wait_for=1e6, buffer_size=1024)
+print("original function result: {}".format(result_original))
 
-print('\ncalling monitored function...')
-(result_monitored, resources_used) = my_function_monitored(wait_for = 1e6, buffer_size = 1024)
-print('monitored function result: {}'.format(result_monitored))
-print('monitored function resources used: {}'.format(resources_used))
+print("\ncalling monitored function...")
+(result_monitored, resources_used) = my_function_monitored(
+    wait_for=1e6, buffer_size=1024
+)
+print("monitored function result: {}".format(result_monitored))
+print("monitored function resources used: {}".format(resources_used))
 
-print('\ncalling function with limits...')
+print("\ncalling function with limits...")
 try:
-    (result_exh, resources_exh) = my_function_with_limits(wait_for = 10e6, buffer_size = 1024)
+    (result_exh, resources_exh) = my_function_with_limits(
+        wait_for=10e6, buffer_size=1024
+    )
 except resource_monitor.ResourceExhaustion as e:
     print(e)
-    print('resources broken: {}'.format(e.resources['limits_exceeded']))
-
+    print("resources broken: {}".format(e.resources["limits_exceeded"]))

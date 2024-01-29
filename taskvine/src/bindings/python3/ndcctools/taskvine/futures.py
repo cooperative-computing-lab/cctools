@@ -23,26 +23,33 @@ except Exception:
     # However, that type does not exist in Python 2
     pythontask_available = False
 
+
 ##
 # \class Executor
 #
 # TaskVine Executor object
 #
 # This class acts as an interface for the creation of Futures
-
 class Executor(Executor):
     def __init__(self, port=9123, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull, factory=True, opts={}):
         self.manager = Manager(port=port)
         if manager_name:
             self.manager.set_name(manager_name)
         if factory:
-            self.factory = Factory(batch_type=batch_type, manager=manager, manager_host_port=manager_host_port, manager_name=manager_name, 
-                    factory_binary=factory_binary, worker_binary=worker_binary, log_file=os.devnull)
+            self.factory = Factory(
+                batch_type=batch_type,
+                manager=manager,
+                manager_host_port=manager_host_port,
+                manager_name=manager_name,
+                factory_binary=factory_binary,
+                worker_binary=worker_binary,
+                log_file=os.devnull,
+            )
             self.set('min-workers', 5)
             for opt in opts:
                 self.set(opt, opts[opt])
             self.factory.start()
-        else: 
+        else:
             self.factory = None
 
     def submit(self, fn, *args, **kwargs):
@@ -63,41 +70,49 @@ class Executor(Executor):
     def get(self, name):
         if self.factory:
             return self.factory.__getattr__(name)
+
+
 ##
 # \class Vinefuture
 #
 # TaskVine VineFuture Object
 #
 # An instance of this class can re resolved to a value that will be computed asynchronously
-
 class VineFuture(Future):
     def __init__(self, task):
         self._task = task
         self._callback_fns = []
+
     def cancel(self):
         self._task._module_manager.cancel_by_task_id(self._task.id)
+
     def cancelled(self):
         state = self._task._module_manager.task_state(self._task.id)
         if state == cvine.VINE_TASK_CANCELED:
             return True
         else:
             return False
+
     def running(self):
         state = self._task._module_manager.task_state(self._task.id)
         if state == cvine.VINE_TASK_RUNNING:
             return True
         else:
             return False
+
     def done(self):
         state = self._task._module_manager.task_state(self._task.id)
         if state == cvine.VINE_TASK_DONE:
             return True
         else:
             return False
+
     def result(self, timeout="wait_forever"):
         return self._task.output(timeout=timeout)
+
     def add_done_callback(self, fn):
         self.callback_fns.append(fn)
+
 
 ##
 # \class FutureTask
@@ -105,12 +120,11 @@ class VineFuture(Future):
 # TaskVine Futuretask object
 #
 # This class is a sublcass of PythonTask that is specialized for futures
-
 class FutureTask(PythonTask):
     ##
     # Creates a new Future Task
     #
-    # @param self 
+    # @param self
     # @param func
     # @param args
     # @param kwargs
@@ -145,7 +159,7 @@ class FutureTask(PythonTask):
                     fn(self._output)
                 self._ran_functions = True
             return self._output
-    
+
         else:
             if not self._future_resolved:
                 result = self._module_manager.wait_for_task_id(self.id, timeout=timeout)
@@ -191,7 +205,7 @@ class FutureTask(PythonTask):
         with open(os.path.join(self._tmpdir, self._wrapper), "w") as f:
             f.write(
                 textwrap.dedent(
-                f"""
+                    f"""
 
                 try:
                     import sys
@@ -209,10 +223,9 @@ class FutureTask(PythonTask):
                     exec_function = cloudpickle.load(f)
                 with open(args, 'rb') as f:
                     args, kwargs = cloudpickle.load(f)
-                
 
                 args = [vineLoadArg(arg) if isinstance(arg, dict) and "VineFutureFile" in arg else arg for arg in args]
-                status = 0 
+                status = 0
                 try:
                     exec_out = exec_function(*args, **kwargs)
                 except Exception as e:

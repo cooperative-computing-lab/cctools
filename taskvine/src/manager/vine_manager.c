@@ -5716,8 +5716,8 @@ void vine_remove_file(struct vine_manager *m, struct vine_file *f)
 		/* the rest of the references, if any, will be deleted as the tasks
 		 * that reference the file are deleted. */
 
-		vine_file_delete(f);
 		hash_table_remove(m->file_table, f->cached_name);
+		vine_file_delete(f);
 	}
 }
 

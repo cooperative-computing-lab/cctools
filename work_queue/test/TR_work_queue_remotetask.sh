@@ -23,7 +23,7 @@ check_needed()
     then
 	return 1
     fi
-    
+
     # Poncho currently requires ast.unparse to serialize the function,
     # which only became available in Python 3.9.  Some older platforms
     # (e.g. almalinux8) will not have this natively.
@@ -34,7 +34,7 @@ check_needed()
     "${CCTOOLS_PYTHON_TEST_EXEC}" -c "import conda_pack" || return 1
     "${CCTOOLS_PYTHON_TEST_EXEC}" -c "import cloudpickle" || return 1
 
-	return 0
+    return 0
 }
 
 prepare()
@@ -58,10 +58,14 @@ run()
 	# wait at most 5 seconds for wq to find a port.
 	wait_for_file_creation $PORT_FILE 5
 
-	coprocess="--coprocess serverless_function.py --coprocesses-total 1"
+	cores=8
+	memory=4000
+	disk=4000
+
+	coprocess="--coprocess serverless_function.py --coprocesses-total 4"
 	coprocess_cores=2
-	coprocess_memory=1000
-	coprocess_disk=1000
+	coprocess_memory=500
+	coprocess_disk=500
 	coprocess_gpus=0
 
 	run_wq_worker $PORT_FILE worker.log 

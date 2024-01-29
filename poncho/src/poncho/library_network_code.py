@@ -20,13 +20,13 @@ def library_network_code():
     import cloudpickle
     import select
     import signal
- 
-    # self-pipe to turn a sigchld signal when a child finishes execution 
+
+    # self-pipe to turn a sigchld signal when a child finishes execution
     # into an I/O event.
     r, w = os.pipe()
-   
-    # This class captures how results from FunctionCalls are conveyed from 
-    # the library to the manager. 
+
+    # This class captures how results from FunctionCalls are conveyed from
+    # the library to the manager.
     # For now, all communication details should use this class to generate responses.
     # In the future, this common protocol should be listed someplace else
     # so library tasks from other languages can use.
@@ -41,9 +41,9 @@ def library_network_code():
                     'Success': self.success,
                     'Reason': self.reason}
 
-    
     # A wrapper around functions in library to extract arguments and formulate responses.
     def remote_execute(func):
+
         def remote_wrapper(event):
             args = event.get("fn_args", [])
             kwargs = event.get("fn_kwargs", {})
@@ -85,12 +85,12 @@ def library_network_code():
             else:
                 buffer_len += c
         buffer_len = int(buffer_len)
-        
+
         # now read the buffer to get invocation details
         line = str(os.read(in_pipe_fd, buffer_len), encoding='utf-8')
         function_id, function_name, function_sandbox, function_stdout_file = line.split(" ", maxsplit=3)
         function_id = int(function_id)
-        
+
         if function_name:
             # exec method for now is fork only, direct will be supported later
             exec_method = 'fork'
@@ -148,7 +148,7 @@ def library_network_code():
     # Send result of a function execution to worker. Wake worker up to do work with SIGCHLD.
     def send_result(out_pipe_fd, task_id, worker_pid):
         buff = bytes(str(task_id), 'utf-8')
-        buff = bytes(str(len(buff)), 'utf-8')+b'\n'+buff
+        buff = bytes(str(len(buff)), "utf-8") + b"\n" + buff
         os.writev(out_pipe_fd, [buff])
         os.kill(worker_pid, signal.SIGCHLD)
 
@@ -161,25 +161,25 @@ def library_network_code():
         args = parser.parse_args()
 
         # Open communication pipes to vine_worker.
-        # The file descriptors are inherited from the vine_worker parent process 
+        # The file descriptors are inherited from the vine_worker parent process
         # and should already be open for reads and writes.
         in_pipe_fd = args.input_fd
         out_pipe_fd = args.output_fd
 
         # send configuration of library, just its name for now
         config = {
-                "name": name(),  # noqa: F821
+            "name": name(),  # noqa: F821
         }
         send_configuration(config, out_pipe_fd, args.worker_pid)
-        
+
         # mapping of child pid to function id of currently running functions
         pid_to_func_id = {}
 
         # register sigchld handler to turn a sigchld signal into an I/O event
         signal.signal(signal.SIGCHLD, sigchld_handler)
-       
+
         # 5 seconds to wait for select, any value long enough would probably do
-        timeout = 5     
+        timeout = 5
 
         while True:
             # check if parent exits
@@ -189,7 +189,7 @@ def library_network_code():
 
             # wait for messages from worker or child to return
             rlist, wlist, xlist = select.select([in_pipe_fd, r], [], [], timeout)
-            
+
             for re in rlist:
                 # worker has a function, run it
                 if re == in_pipe_fd:
