@@ -1622,6 +1622,22 @@ class Manager(object):
         f = cvine.vine_declare_chirp(self._taskvine, server, source, ticket_c, env_c, flags)
         return File(f)
 
+    ##
+    # Adds a custom APPLICATION entry to the transactions log.
+    #
+    # @param self   The manager to register this file.
+    # @param server A custom transaction message
+    def log_txn_app(self, entry):
+        cvine.vine_log_txn_app(self._taskvine, entry)
+
+    ##
+    # Adds a custom APPLICATION entry to the debug log.
+    #
+    # @param self   The manager to register this file.
+    # @param server A custom debug message
+    def log_debug_app(self, entry):
+        cvine.vine_log_debug_app(self._taskvine, entry)
+
 
 ##
 # @class ndcctools.taskvine.manager.Factory

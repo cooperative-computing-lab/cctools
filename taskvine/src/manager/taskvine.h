@@ -1267,6 +1267,20 @@ void vine_initialize_categories(struct vine_manager *m, struct rmsummary *max, c
 void vine_set_runtime_info_path(const char *path);
 
 
+/** Adds a custom APPLICATION entry to the debug log.
+@param m     Reference to the current manager object.
+@param entry A custom debug message.
+*/
+void vine_log_debug_app(struct vine_manager *q, const char *entry);
+
+/** Adds a custom APPLICATION entry to the transactions log.
+@param m     Reference to the current manager object.
+@param entry A custom transaction message.
+*/
+void vine_log_txn_app(struct vine_manager *q, const char *entry);
+
+
+
 //@}
 
 #endif

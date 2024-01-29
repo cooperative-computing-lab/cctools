@@ -2203,6 +2203,7 @@ If you need to change the prefix `vine-run-info` to some other directory, use
     ```
 
 === "C"
+    ```C
     // logs appear at /new/desired/path/%Y-%m-%dT%H:%M:%S/vine-logs
     vine_set_runtime_info_path("/new/desired/path")
     struct taskvine *m = vine_create(0);
@@ -2231,6 +2232,18 @@ To enable debugging at the worker, set the `-d` option:
 ```sh
 $ vine_worker -d all -o worker.debug -M myproject
 ```
+
+Custom APPLICATION messages can be added to the log with the calls:
+
+=== "Python"
+    ```python
+    m.log_debug_app("your custom log message")
+    ```
+
+=== "C"
+    ```
+    vine_log_debug_app("your custom log message")
+    ```
 
 ### Performance Log
 
@@ -2279,6 +2292,19 @@ to produce a visualization of how tasks are packed into workers like this:
 ![](images/plot-txn-workers.png)
 
 - [Transactions Log File Format Details](log-file-formats#transactions-log-format)
+
+
+Custom APPLICATION messages can be added to the log with the calls:
+
+=== "Python"
+    ```python
+    m.log_txn_app("your custom log message")
+    ```
+
+=== "C"
+    ```
+    vine_log_txn_app("your custom log message")
+    ```
 
 ### Task Graph Log
 

@@ -5857,4 +5857,8 @@ const char *vine_fetch_file(struct vine_manager *m, struct vine_file *f)
 	return 0;
 }
 
+void vine_log_debug_app(struct vine_manager *m, const char *entry) { debug(D_VINE, "APPLICATION %s", entry); }
+
+void vine_log_txn_app(struct vine_manager *m, const char *entry) { vine_txn_log_write_app_entry(m, entry); }
+
 /* vim: set noexpandtab tabstop=8: */
