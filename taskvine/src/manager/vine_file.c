@@ -34,13 +34,13 @@ int vine_file_delete(struct vine_file *f)
 		(which will delete this file object) and return.
 		*/
 
-		if(f->refcount==1 && f->recovery_task && f->recovery_task->refcount==1) {
+		if (f->refcount == 1 && f->recovery_task && f->recovery_task->refcount == 1) {
 			vine_task_delete(f->recovery_task);
 			/* Careful: vine_task_delete() will call vine_file_delete(f) */
 			/* And so the object f no longer exists here. */
 			return 0;
 		}
-		
+
 		if (f->refcount > 0) {
 			return f->refcount;
 		}
