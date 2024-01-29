@@ -14,6 +14,7 @@ from .task import FunctionCall
 from .dask_dag import DaskVineDag
 
 import cloudpickle
+import shutil
 from uuid import uuid4
 
 ##
@@ -93,6 +94,8 @@ class DaskVine(Manager):
             resources=None,
             lib_resources=None,
             lib_command=None,
+            import_modules=None,
+            dumb_env=None,
             lib_environment=None,
             task_mode='tasks',
             resources_mode=None,
@@ -119,15 +122,26 @@ class DaskVine(Manager):
             self.lib_environment = lib_environment
             self.resources_mode = resources_mode
             self.task_mode = task_mode
+            self.dumb_env = dumb_env
+            self.import_modules = import_modules
             self.retries = retries
             self.verbose = verbose
 
             self._categories_known = set()
+            
+            if self.dumb_env:
+                poncho_file = shutil.which('poncho_package_run')
+                pf = self.declare_file(poncho_file)
+                ef = self.declare_file(self.dumb_env)
+                self.dumb_env = [pf, ef, dumb_env]
+
 
             return self._dask_execute(dsk, keys)
         except Exception as e:
             # unhandled exceptions for now
             raise e
+
+
 
     def __call__(self, *args, **kwargs):
         return self.get(*args, **kwargs)
@@ -141,7 +155,7 @@ class DaskVine(Manager):
         
         # create Library if using 'function_calls' task mode.
         if self.task_mode == 'function_calls':
-            libtask = self.create_library_from_functions('Dask-Library', execute_graph_vertex, poncho_env=self.lib_environment, add_env=False, init_command=self.lib_command)
+            libtask = self.create_library_from_functions('Dask-Library', execute_graph_vertex, poncho_env=self.lib_environment, add_env=False, init_command=self.lib_command, import_modules=self.import_modules)
             if self.lib_resources:
                 if 'cores' in self.lib_resources:
                     libtask.set_cores(self.lib_resources['cores'])
@@ -215,8 +229,13 @@ class DaskVine(Manager):
                                    environment=self.environment,
                                    extra_files=self.extra_files,
                                    env_vars=self.env_vars,
+                                   dumb_env=self.dumb_env,
                                    retries=retries,
                                    lazy_transfers=lazy)
+                if self.dumb_env:
+                    t.set_command('{} -e {} {}'.format('poncho_package_run', self.dumb_env[2], t._command))
+                    t.add_input(self.dumb_env[0], 'poncho_package_run')
+                    t.add_input(self.dumb_env[1], self.dumb_env[2])
 
             t.set_tag(tag)  # tag that identifies this dag
             self.submit(t)
@@ -327,6 +346,7 @@ class PythonTaskDask(PythonTask):
                  extra_files=None,
                  env_vars=None,
                  retries=5,
+                 dumb_env=None,
                  lazy_transfers=False):
         self._key = key
         self._sexpr = sexpr
