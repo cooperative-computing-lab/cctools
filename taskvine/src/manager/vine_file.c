@@ -26,6 +26,21 @@ int vine_file_delete(struct vine_file *f)
 {
 	if (f) {
 		f->refcount--;
+
+		/*
+		Special case: If this file has refcount==1 and also has a
+		recovery task with refcount==1 then this is a cycle of refcounts
+		and we can break it by deleting the recovery task
+		(which will delete this file object) and return.
+		*/
+
+		if(f->refcount==1 && f->recovery_task && f->recovery_task->refcount==1) {
+			vine_task_delete(f->recovery_task);
+			/* Careful: vine_task_delete() will call vine_file_delete(f) */
+			/* And so the object f no longer exists here. */
+			return 0;
+		}
+		
 		if (f->refcount > 0) {
 			return f->refcount;
 		}
