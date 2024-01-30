@@ -524,16 +524,16 @@ class Manager(object):
     def set_catalog_servers(self, catalogs):
         return cvine.vine_set_catalog_servers(self._taskvine, catalogs)
     
-    ##
-    # Add a property to the periodic report made to the catalog server.
+    ## Add a global property to the manager which will be included in periodic
+    # reports to the catalog server and other telemetry destinations.
     # This is helpful for distinguishing higher level information about the entire run,
     # such as the name of the framework being used, or the logical name of the dataset
     # being processed.
     # @param m A manager object
     # @param name The name of the property.
     # @param value The value of the property.
-    def set_catalog_property(self, name, value):
-        cvine.vine_set_catalog_property(self._taskvine, name, value)
+    def set_property(self, name, value):
+        cvine.vine_set_property(self._taskvine, name, value)
 
     ##
     # Specify a directory to write logs and staging files.

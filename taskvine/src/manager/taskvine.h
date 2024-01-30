@@ -1096,7 +1096,8 @@ void vine_set_tasks_left_count(struct vine_manager *m, int ntasks);
 */
 void vine_set_catalog_servers(struct vine_manager *m, const char *hosts);
 
-/** Add a property to the periodic report made to the catalog server.
+/** Add a global property to the manager which will be included in periodic
+reports to the catalog server and other telemetry destinations.
 This is helpful for distinguishing higher level information about the entire run,
 such as the name of the framework being used, or the logical name of the dataset
 being processed.
@@ -1105,7 +1106,7 @@ being processed.
 @param value The value of the property.
 */
 
-void vine_set_catalog_property( struct vine_manager *m, const char *name, const char *value );
+void vine_set_property( struct vine_manager *m, const char *name, const char *value );
 	
 /** Cancel a submitted task using its task id.
 The cancelled task will be returned in the normal way via @ref vine_wait with a result of VINE_RESULT_CANCELLED.

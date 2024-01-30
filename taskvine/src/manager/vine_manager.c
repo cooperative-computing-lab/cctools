@@ -3969,7 +3969,7 @@ void vine_set_catalog_servers(struct vine_manager *q, const char *hosts)
 	}
 }
 
-void vine_set_catalog_property(struct vine_manager *m, const char *name, const char *value)
+void vine_set_property(struct vine_manager *m, const char *name, const char *value)
 {
 	char *oldvalue = hash_table_remove(m->properties, name);
 	if (oldvalue)
