@@ -523,8 +523,7 @@ class Manager(object):
     # @param catalogs   The catalog servers given as a comma delimited list of hostnames or hostname:port
     def set_catalog_servers(self, catalogs):
         return cvine.vine_set_catalog_servers(self._taskvine, catalogs)
-
-
+    
     ##
     # Add a property to the periodic report made to the catalog server.
     # This is helpful for distinguishing higher level information about the entire run,
@@ -535,7 +534,7 @@ class Manager(object):
     # @param value The value of the property.
     def set_catalog_property(self, name, value):
         cvine.vine_set_catalog_property(self._taskvine, name, value)
-                
+
     ##
     # Specify a directory to write logs and staging files.
     #
