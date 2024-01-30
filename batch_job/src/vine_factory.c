@@ -1199,7 +1199,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_RUN_AS_MANAGER,
 		LONG_OPT_RUN_OS,
 		LONG_OPT_PARENT_DEATH,
-		LONG_OPT_PYTHON_PACKAGE,
+		LONG_OPT_PONCHO_ENV,
 		LONG_OPT_USE_SSL,
 		LONG_OPT_FACTORY_NAME,
 		LONG_OPT_DEBUG_WORKERS,
@@ -1236,8 +1236,9 @@ static const struct option long_options[] = {
 	{"min-workers", required_argument, 0, 'w'},
 	{"parent-death", no_argument, 0, LONG_OPT_PARENT_DEATH},
 	{"password", required_argument, 0, 'P'},
-	{"python-env", required_argument, 0, LONG_OPT_PYTHON_PACKAGE},
-	{"python-package", required_argument, 0, LONG_OPT_PYTHON_PACKAGE}, //same as python-env, kept for compatibility
+	{"poncho-env", required_argument, 0, LONG_OPT_PONCHO_ENV},
+	{"python-env", required_argument, 0, LONG_OPT_PONCHO_ENV}, // backwards compatibility
+	{"python-package", required_argument, 0, LONG_OPT_PONCHO_ENV}, // backwards compatibility
 	{"scratch-dir", required_argument, 0, 'S' },
 	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
 	{"timeout", required_argument, 0, 't'},
@@ -1365,9 +1366,9 @@ int main(int argc, char *argv[])
 					condor_requirements = string_format("(%s)", optarg);
 				}
 				break;
-			case LONG_OPT_PYTHON_PACKAGE:
+			case LONG_OPT_PONCHO_ENV:
 				{
-				// --package X is the equivalent of --wrapper "poncho_package_run X" --wrapper-input X
+				// --poncho-env X is the equivalent of --wrapper "poncho_package_run X" --wrapper-input X
 				char *fullpath = path_which("poncho_package_run");
 				if(!fullpath) {
 					fprintf(stderr,"vine_factory: could not find poncho_package_run in PATH");
