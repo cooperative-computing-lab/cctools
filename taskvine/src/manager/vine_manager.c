@@ -2016,7 +2016,8 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "port", vine_port(q));
 	jx_insert_integer(j, "priority", q->priority);
 	jx_insert_string(j, "manager_preferred_connection", q->manager_preferred_connection);
-
+	jx_insert_string(j, "uuid", q->manager_uuid );
+	
 	int use_ssl = 0;
 #ifdef HAS_OPENSSL
 	if (q->ssl_enabled) {
@@ -3691,6 +3692,15 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	getcwd(q->workingdir, PATH_MAX);
 
+	/*
+	Do it the long way around here so that m->manager_uuid
+	is a plain string pointer and we don't end up polluting
+	taskvine.h with dttools/uuid.h
+	*/
+	cctools_uuid_t local_uuid;
+	cctools_uuid_create(&local_uuid);
+	q->manager_uuid = strdup(local_uuid.str);
+		
 	q->next_task_id = 1;
 	q->fixed_location_in_queue = 0;
 
@@ -4020,7 +4030,8 @@ void vine_delete(struct vine_manager *q)
 
 	free(q->name);
 	free(q->manager_preferred_connection);
-
+	free(q->manager_uuid);
+	
 	free(q->poll_table);
 	free(q->ssl_cert);
 	free(q->ssl_key);
