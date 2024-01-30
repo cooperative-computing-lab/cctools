@@ -2016,7 +2016,7 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "port", vine_port(q));
 	jx_insert_integer(j, "priority", q->priority);
 	jx_insert_string(j, "manager_preferred_connection", q->manager_preferred_connection);
-	jx_insert_string(j, "uuid", q->manager_uuid);
+	jx_insert_string(j, "taskvine_uuid", q->uuid);
 
 	char *name, *key;
 	HASH_TABLE_ITERATE(q->properties, name, key) { jx_insert_string(j, name, key); }
@@ -3701,13 +3701,13 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->properties = hash_table_create(3, 0);
 
 	/*
-	Do it the long way around here so that m->manager_uuid
+	Do it the long way around here so that m->uuid
 	is a plain string pointer and we don't end up polluting
 	taskvine.h with dttools/uuid.h
 	*/
 	cctools_uuid_t local_uuid;
 	cctools_uuid_create(&local_uuid);
-	q->manager_uuid = strdup(local_uuid.str);
+	q->uuid = strdup(local_uuid.str);
 
 	q->next_task_id = 1;
 	q->fixed_location_in_queue = 0;
@@ -4047,7 +4047,7 @@ void vine_delete(struct vine_manager *q)
 
 	free(q->name);
 	free(q->manager_preferred_connection);
-	free(q->manager_uuid);
+	free(q->uuid);
 
 	hash_table_clear(q->properties, (void *)free);
 	hash_table_delete(q->properties);
