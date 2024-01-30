@@ -2141,6 +2141,9 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	jx_insert_string(j, "type", "vine_manager");
 	jx_insert_integer(j, "port", vine_port(q));
 
+	char *name, *key;
+	HASH_TABLE_ITERATE(q->properties, name, key) { jx_insert_string(j, name, key); }
+
 	int use_ssl = 0;
 #ifdef HAS_OPENSSL
 	if (q->ssl_enabled) {
@@ -4045,6 +4048,9 @@ void vine_delete(struct vine_manager *q)
 	free(q->name);
 	free(q->manager_preferred_connection);
 	free(q->manager_uuid);
+
+	hash_table_clear(q->properties, (void *)free);
+	hash_table_delete(q->properties);
 
 	free(q->poll_table);
 	free(q->ssl_cert);
