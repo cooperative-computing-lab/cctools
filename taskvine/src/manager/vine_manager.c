@@ -4405,6 +4405,9 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	/* If the task produces temporary files, create recovery tasks for those. */
 	vine_manager_create_recovery_tasks(q, t);
 
+	/* If the task produces watched output files, truncate them. */
+	vine_task_truncate_watched_outputs(t);
+
 	/* Add reference to task when adding it to primary table. */
 	itable_insert(q->tasks, t->task_id, vine_task_clone(t));
 
