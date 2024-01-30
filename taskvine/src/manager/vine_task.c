@@ -462,8 +462,8 @@ void vine_task_truncate_watched_outputs(struct vine_task *t)
 	LIST_ITERATE(t->output_mounts, m)
 	{
 		if (m->file->type == VINE_FILE && m->flags & VINE_WATCH) {
-			debug(D_VINE,"truncating watched output file %s\n",m->file->source);
-			truncate(m->file->source,0);
+			debug(D_VINE, "truncating watched output file %s\n", m->file->source);
+			truncate(m->file->source, 0);
 		}
 	}
 }
