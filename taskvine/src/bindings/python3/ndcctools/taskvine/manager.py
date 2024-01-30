@@ -523,8 +523,9 @@ class Manager(object):
     # @param catalogs   The catalog servers given as a comma delimited list of hostnames or hostname:port
     def set_catalog_servers(self, catalogs):
         return cvine.vine_set_catalog_servers(self._taskvine, catalogs)
-    
-    ## Add a global property to the manager which will be included in periodic
+
+    ##
+    # Add a global property to the manager which will be included in periodic
     # reports to the catalog server and other telemetry destinations.
     # This is helpful for distinguishing higher level information about the entire run,
     # such as the name of the framework being used, or the logical name of the dataset
