@@ -2016,8 +2016,11 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "port", vine_port(q));
 	jx_insert_integer(j, "priority", q->priority);
 	jx_insert_string(j, "manager_preferred_connection", q->manager_preferred_connection);
-	jx_insert_string(j, "uuid", q->manager_uuid );
-	
+	jx_insert_string(j, "uuid", q->manager_uuid);
+
+	char *name, *key;
+	HASH_TABLE_ITERATE(q->properties, name, key) { jx_insert_string(j, name, key); }
+
 	int use_ssl = 0;
 #ifdef HAS_OPENSSL
 	if (q->ssl_enabled) {
@@ -3692,6 +3695,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	getcwd(q->workingdir, PATH_MAX);
 
+	q->properties = hash_table_create(3, 0);
+
 	/*
 	Do it the long way around here so that m->manager_uuid
 	is a plain string pointer and we don't end up polluting
@@ -3700,7 +3705,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	cctools_uuid_t local_uuid;
 	cctools_uuid_create(&local_uuid);
 	q->manager_uuid = strdup(local_uuid.str);
-		
+
 	q->next_task_id = 1;
 	q->fixed_location_in_queue = 0;
 
@@ -3961,6 +3966,15 @@ void vine_set_catalog_servers(struct vine_manager *q, const char *hosts)
 	}
 }
 
+void vine_set_catalog_property(struct vine_manager *m, const char *name, const char *value)
+{
+	char *oldvalue = hash_table_remove(m->properties, name);
+	if (oldvalue)
+		free(oldvalue);
+
+	hash_table_insert(m->properties, name, strdup(value));
+}
+
 void vine_set_password(struct vine_manager *q, const char *password) { q->password = xxstrdup(password); }
 
 int vine_set_password_file(struct vine_manager *q, const char *file)
@@ -4031,7 +4045,7 @@ void vine_delete(struct vine_manager *q)
 	free(q->name);
 	free(q->manager_preferred_connection);
 	free(q->manager_uuid);
-	
+
 	free(q->poll_table);
 	free(q->ssl_cert);
 	free(q->ssl_key);
