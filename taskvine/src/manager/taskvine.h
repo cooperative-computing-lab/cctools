@@ -1098,7 +1098,8 @@ void vine_set_catalog_servers(struct vine_manager *m, const char *hosts);
 
 /** Add a property to the periodic report made to the catalog server.
 This is helpful for distinguishing higher level information about the entire run,
-such as the name of the dataset being processed.
+such as the name of the framework being used, or the logical name of the dataset
+being processed.
 @param m A manager object
 @param name The name of the property.
 @param value The value of the property.
