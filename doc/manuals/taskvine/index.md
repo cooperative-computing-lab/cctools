@@ -1201,39 +1201,39 @@ warranted:
 
 ### Automatic Garbage Collection on Disk
 
-For workflows that generate intermediate files, TaskVine can automatically
-delete them from disk when the application indicates that they will not be
-needed anymore:
+For workflows that generate partial results that are not needed once a final
+result has been computed, TaskVine can automatically delete them from disk when
+the application indicates that they will not be needed anymore:
 
 === "Python"
     ```python
-    intemerdiate = m.declare_file("intermediate_file", unlink_when_done=True)
+    partial_result = m.declare_file("my_partial_result", unlink_when_done=True)
 
     t1 = Task(...)
-    t1.add_output(intermediate, "my_file")
+    t1.add_output(partial_result, "my_partial_result")
     ...
 
     t2 = Task(...)
-    t2.add_input(intermediate, "my_file")
+    t2.add_input(partial_result, "my_partial_result")
     ...
 
     # once t2 is done, the following call will remove the file from the
     # taskvine workflow. Further, when not task refers to the file, the file
     # will be removed from the manager's disk because of unlink_when_done=True
     # at its declaration.
-    m.remove_file(intermediate)
+    m.remove_file(partial_result)
     ```
 
 === "C"
     ```C
-    struct vine_file *intemerdiate = vine_declare_file(m, "intermediate_file", VINE_UNLINK_WHEN_DONE);
+    struct vine_file *intemerdiate = vine_declare_file(m, "my_partial_result", VINE_UNLINK_WHEN_DONE);
 
     struct vine_task *t1 = vine_task_create(...);
-    vine_task_add_output(intermediate, "my_file", /* any desired mount flags */ 0);
+    vine_task_add_output(partial_result, "my_partial_result", /* any desired mount flags */ 0);
     ...
 
     struct vine_task *t2 = vine_task_create(...);
-    vine_task_add_input(intermediate, "my_file", /* any desired mount flags */ 0);
+    vine_task_add_input(partial_result, "my_partial_result", /* any desired mount flags */ 0);
     ...
 
     # once t2 is done and deleted with `vine_task_delete`, the following call
