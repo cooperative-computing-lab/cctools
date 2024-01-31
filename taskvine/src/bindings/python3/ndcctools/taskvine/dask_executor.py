@@ -93,6 +93,7 @@ class DaskVine(Manager):
             verbose=False
             ):
         try:
+            self.set_property("framework", "dask")
             if retries and retries < 1:
                 raise ValueError("retries should be larger than 0")
 
