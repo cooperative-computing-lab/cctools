@@ -74,11 +74,11 @@ class DaskVine(Manager):
     #                      to the manager.
     # @param resources     A dictionary with optional keys of cores, memory and disk (MB)
     #                      to set maximum resource usage per task.
-    # @param lib_resources A dictionary with optional keys of cores, memory and disk (MB) 
-    # @param lib_command A command to be prefixed to the execution of a Library task. 
-    # @param lib_environment path to environent file for a Library (string). 
+    # @param lib_resources A dictionary with optional keys of cores, memory and disk (MB)
+    # @param lib_command A command to be prefixed to the execution of a Library task.
+    # @param lib_environment path to environent file for a Library (string).
     # @param import_modules Hoist these module imports for the DaskVine Library.
-    # @param env_per_task execute each task 
+    # @param env_per_task execute each task
     # @param resources_mode Automatically resize allocation per task. One of 'fixed'
     #                       (use the value of 'resources' above), 'max througput',
     #                       'max' (for maximum values seen), 'min_waste', 'greedy bucketing'
@@ -89,7 +89,7 @@ class DaskVine(Manager):
     # @param submit_per_cycle Maximum number of tasks to serialize per wait call. If None, or less than 1, then all
     #                         tasks are serialized as they are available.
     # @param verbose       if true, emit additional debugging information.
-    # @param env_per_task  if true, each task individually expands its own environment. Must use environment option as a str. 
+    # @param env_per_task  if true, each task individually expands its own environment. Must use environment option as a str.
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
@@ -155,7 +155,6 @@ class DaskVine(Manager):
             # unhandled exceptions for now
             raise e
 
-
     def __call__(self, *args, **kwargs):
         return self.get(*args, **kwargs)
 
@@ -165,14 +164,16 @@ class DaskVine(Manager):
 
         dag = DaskVineDag(dsk, low_memory_mode=self.low_memory_mode)
         tag = f"dag-{id(dag)}"
-        
+
         # create Library if using 'function_calls' task mode.
         if self.task_mode == 'function_calls':
-            libtask = self.create_library_from_functions('Dask-Library', execute_graph_vertex, 
-                                                          poncho_env=self.lib_environment, 
-                                                          add_env=False, 
-                                                          init_command=self.lib_command, 
-                                                          import_modules=self.import_modules)
+            libtask = self.create_library_from_functions('Dask-Library',
+                                                         execute_graph_vertex,
+                                                         poncho_env=self.lib_environment,
+                                                         add_env=False,
+                                                         init_command=self.lib_command,
+                                                         import_modules=self.import_modules)
+
             if self.lib_resources:
                 if 'cores' in self.lib_resources:
                     libtask.set_cores(self.lib_resources['cores'])
@@ -183,7 +184,6 @@ class DaskVine(Manager):
                 if 'slots' in self.lib_resources:
                     libtask.set_function_slots(self.lib_resources['slots'])
             self.install_library(libtask)
-
 
         enqueued_calls = []
         rs = dag.set_targets(keys_flatten)
@@ -260,11 +260,11 @@ class DaskVine(Manager):
 
             if self.task_mode == 'function_calls':
                 t = FunctionCallDask(self,
-                       dag, k, sexpr,
-                       category=cat,
-                       extra_files=self.extra_files,
-                       retries=retries,
-                       lazy_transfers=lazy)
+                                     dag, k, sexpr,
+                                     category=cat,
+                                     extra_files=self.extra_files,
+                                     retries=retries,
+                                     lazy_transfers=lazy)
 
                 t.set_tag(tag)  # tag that identifies this dag
                 enqueued_calls.append(t)
@@ -437,6 +437,7 @@ class PythonTaskDask(PythonTask):
 # materialized as a special case of a TaskVine FunctionCall.
 #
 
+
 class FunctionCallDask(FunctionCall):
     ##
     # Create a new PythonTaskDask.
@@ -452,7 +453,7 @@ class FunctionCallDask(FunctionCall):
     # @param retries        Number of times to retry failed task.
     # @param lazy_transfers If true, do not return outputs to manager until required.
     #
-    
+
     def __init__(self, m,
                  dag, key, sexpr, *,
                  category=None,
@@ -462,7 +463,7 @@ class FunctionCallDask(FunctionCall):
                  lazy_transfers=False):
 
         self._key = key
-        self.resources=resources
+        self.resources = resources
         self._sexpr = sexpr
 
         self._retries_left = retries
@@ -487,6 +488,7 @@ class FunctionCallDask(FunctionCall):
         if extra_files:
             for f, name in extra_files.items():
                 self.add_input(f, name)
+
     @property
     def key(self):
         return self._key

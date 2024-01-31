@@ -1023,8 +1023,10 @@ class FunctionCall(Task):
 
     def set_output_cache(self, cache=False):
         self._cache_output = cache
+
     def enable_temp_output(self):
         self._tmp_output_enabled = True
+
     def disable_temp_output(self):
         self._tmp_output_enabled = False
 
@@ -1050,7 +1052,7 @@ class FunctionCall(Task):
                 self._manager.remove_file(self._input_buffer)
                 self._input_buffer = None
             if self._output_file:
-                # Do not delete temp files out on cluster when task is deleted. For now... 
+                # Do not delete temp files out on cluster when task is deleted. For now...
                 if not self._tmp_output_enabled:
                     self._manager.remove_file(self._output_file)
                     self._output_file = None
