@@ -581,19 +581,19 @@ int vine_task_add_input_mini_task(
 	return r;
 }
 
-int vine_task_add_poncho_package(struct vine_task *t, struct vine_file *f )
+int vine_task_add_poncho_package(struct vine_task *t, struct vine_file *f)
 {
-	return vine_task_add_execution_context(t,f);
+	return vine_task_add_execution_context(t, f);
 }
 
-int vine_task_add_starch_package(struct vine_task *t, struct vine_file *f )
+int vine_task_add_starch_package(struct vine_task *t, struct vine_file *f)
 {
-	return vine_task_add_execution_context(t,f);
+	return vine_task_add_execution_context(t, f);
 }
 
-int vine_task_add_environment(struct vine_task *t, struct vine_file *f )
+int vine_task_add_environment(struct vine_task *t, struct vine_file *f)
 {
-	return vine_task_add_execution_context(t,f);
+	return vine_task_add_execution_context(t, f);
 }
 
 int vine_task_add_execution_context(struct vine_task *t, struct vine_file *context_file)
