@@ -15,6 +15,7 @@ from .dask_dag import DaskVineDag
 
 import cloudpickle
 import shutil
+import os
 from uuid import uuid4
 
 ##
@@ -76,6 +77,8 @@ class DaskVine(Manager):
     # @param lib_resources A dictionary with optional keys of cores, memory and disk (MB) 
     # @param lib_command A command to be prefixed to the execution of a Library task. 
     # @param lib_environment path to environent file for a Library (string). 
+    # @param import_modules Hoist these module imports for the DaskVine Library.
+    # @param env_per_task execute each task 
     # @param resources_mode Automatically resize allocation per task. One of 'fixed'
     #                       (use the value of 'resources' above), 'max througput',
     #                       'max' (for maximum values seen), 'min_waste', 'greedy bucketing'
@@ -86,6 +89,7 @@ class DaskVine(Manager):
     # @param submit_per_cycle Maximum number of tasks to serialize per wait call. If None, or less than 1, then all
     #                         tasks are serialized as they are available.
     # @param verbose       if true, emit additional debugging information.
+    # @param env_per_task  if true, each task individually expands its own environment. Must use environment option as a str. 
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
@@ -94,16 +98,16 @@ class DaskVine(Manager):
             low_memory_mode=False,
             checkpoint_fn=None,
             resources=None,
-            lib_resources=None,
-            lib_command=None,
-            import_modules=None,
-            dumb_env=None,
-            lib_environment=None,
-            task_mode='tasks',
             resources_mode=None,
             submit_per_cycle=None,
             retries=5,
-            verbose=False
+            verbose=False,
+            lib_resources=None,
+            lib_command=None,
+            lib_environment=None,
+            import_modules=None,
+            task_mode='tasks',
+            env_per_task=False,
             ):
         try:
             if retries and retries < 1:
@@ -120,26 +124,19 @@ class DaskVine(Manager):
             self.low_memory_mode = low_memory_mode
             self.checkpoint_fn = checkpoint_fn
             self.resources = resources
+            self.resources_mode = resources_mode
+            self.retries = retries
+            self.verbose = verbose
             self.lib_resources = lib_resources
             self.lib_command = lib_command
             self.lib_environment = lib_environment
-            self.resources_mode = resources_mode
-            self.task_mode = task_mode
-            self.dumb_env = dumb_env
             self.import_modules = import_modules
-            self.retries = retries
-            self.verbose = verbose
+            self.task_mode = task_mode
+            self.env_per_task = env_per_task
 
             self.submit_per_cycle = submit_per_cycle
 
             self._categories_known = set()
-            
-            if self.dumb_env:
-                poncho_file = shutil.which('poncho_package_run')
-                pf = self.declare_file(poncho_file)
-                ef = self.declare_file(self.dumb_env)
-                self.dumb_env = [pf, ef, dumb_env]
-
 
             self.tune("category-steady-n-tasks", 1)
             self.tune("prefer-dispatch", 1)
@@ -147,11 +144,16 @@ class DaskVine(Manager):
             self.tune("immediate-recovery", 1)
             self.tune("max-retrievals", 10)
 
+            if self.env_per_task:
+                self.poncho_file = self.declare_file(shutil.which('ponho_package_run'))
+                self.environment_file = self.declare_file(environment)
+                self.environment_name = os.path.basename(environment)
+                self.environment = None
+
             return self._dask_execute(dsk, keys)
         except Exception as e:
             # unhandled exceptions for now
             raise e
-
 
 
     def __call__(self, *args, **kwargs):
@@ -166,7 +168,11 @@ class DaskVine(Manager):
         
         # create Library if using 'function_calls' task mode.
         if self.task_mode == 'function_calls':
-            libtask = self.create_library_from_functions('Dask-Library', execute_graph_vertex, poncho_env=self.lib_environment, add_env=False, init_command=self.lib_command, import_modules=self.import_modules)
+            libtask = self.create_library_from_functions('Dask-Library', execute_graph_vertex, 
+                                                          poncho_env=self.lib_environment, 
+                                                          add_env=False, 
+                                                          init_command=self.lib_command, 
+                                                          import_modules=self.import_modules)
             if self.lib_resources:
                 if 'cores' in self.lib_resources:
                     libtask.set_cores(self.lib_resources['cores'])
@@ -235,31 +241,33 @@ class DaskVine(Manager):
                             self.enable_monitoring()
                     self._categories_known.add(cat)
 
-            if self.task_mode == 'function_calls':
-                t = FunctionCallDask(self,
-                       dag, k, sexpr,
-                       category=cat,
-                       extra_files=self.extra_files,
-                       retries=retries,
-                       resources=self.resources,
-                       lazy_transfers=lazy)
-            if self.task_mode == 'tasks':
                 t = PythonTaskDask(self,
                                    dag, k, sexpr,
                                    category=cat,
                                    environment=self.environment,
                                    extra_files=self.extra_files,
                                    env_vars=self.env_vars,
-                                   dumb_env=self.dumb_env,
                                    retries=retries,
                                    lazy_transfers=lazy)
-                if self.dumb_env:
-                    t.set_command('{} -e {} {}'.format('poncho_package_run', self.dumb_env[2], t._command))
-                    t.add_input(self.dumb_env[0], 'poncho_package_run')
-                    t.add_input(self.dumb_env[1], self.dumb_env[2])
 
-            t.set_tag(tag)  # tag that identifies this dag
-            enqueued_calls.append(t)
+                if self.env_per_task:
+                    t.set_command('{} -e {} {}'.format('poncho_package_run', self.environment_name, t._command))
+                    t.add_input(self.poncho_file, 'poncho_package_run')
+                    t.add_input(self.environment_file, self.environment_name)
+
+                t.set_tag(tag)  # tag that identifies this dag
+                enqueued_calls.append(t)
+
+            if self.task_mode == 'function_calls':
+                t = FunctionCallDask(self,
+                       dag, k, sexpr,
+                       category=cat,
+                       extra_files=self.extra_files,
+                       retries=retries,
+                       lazy_transfers=lazy)
+
+                t.set_tag(tag)  # tag that identifies this dag
+                enqueued_calls.append(t)
 
     def _load_results(self, dag, key_indices, keys):
         results = list(keys)
@@ -301,10 +309,12 @@ class DaskVineFile:
 
     def load(self):
         if not self._loaded:
+
             if self._task_mode == 'tasks':
                 with open(self.staging_path, "rb") as f:
                     self._load = cloudpickle.load(f)
                     self._loaded = True
+
             if self._task_mode == 'function_calls':
                 output = cloudpickle.loads(self._file.contents())
                 self._loaded = True
@@ -367,7 +377,6 @@ class PythonTaskDask(PythonTask):
                  extra_files=None,
                  env_vars=None,
                  retries=5,
-                 dumb_env=None,
                  lazy_transfers=False):
         self._key = key
         self._sexpr = sexpr
@@ -464,13 +473,6 @@ class FunctionCallDask(FunctionCall):
         args = args_raw | args
 
         super().__init__('Dask-Library', 'execute_graph_vertex', sexpr, args, keys_of_files)
-        if self.resources:
-            if 'cores' in self.resources:
-                self.set_cores(self.resources['cores'])
-            if 'memory' in self.resources:
-                self.set_memory(self.resources['memory'])
-            if 'disk' in self.resources:
-                self.set_disk(self.resources['disk'])
 
         self.set_output_cache(cache=True)
 

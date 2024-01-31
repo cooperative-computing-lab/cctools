@@ -1050,7 +1050,8 @@ class FunctionCall(Task):
                 self._manager.remove_file(self._input_buffer)
                 self._input_buffer = None
             if self._output_file:
-                if self._tmp_output_enabled == False:
+                # Do not delete temp files out on cluster when task is deleted. For now... 
+                if not self._tmp_output_enabled:
                     self._manager.remove_file(self._output_file)
                     self._output_file = None
             super().__del__()
