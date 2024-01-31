@@ -5,6 +5,7 @@ SECTION(NAME)
 BOLD(poncho_package_create) - command-line utility for creating a Conda virtual environment given a Python dependencies file
 
 SECTION(SYNOPSIS) Creates a portable Conda environment using a poncho specification. Tasks can run within the environment using poncho_package_run.
+LONGCODE_BEGIN()
 Example Specification:
 {
     "conda": {
@@ -42,6 +43,7 @@ Example Specification:
                 }
     }
 }
+LONGCODE_END()
 
 
 CODE(poncho_package_create [options] PARAM(dependency-file) PARAM(PARAM(output-path)))
