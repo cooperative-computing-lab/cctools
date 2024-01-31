@@ -2018,6 +2018,10 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "port", vine_port(q));
 	jx_insert_integer(j, "priority", q->priority);
 	jx_insert_string(j, "manager_preferred_connection", q->manager_preferred_connection);
+	jx_insert_string(j, "taskvine_uuid", q->uuid);
+
+	char *name, *key;
+	HASH_TABLE_ITERATE(q->properties, name, key) { jx_insert_string(j, name, key); }
 
 	int use_ssl = 0;
 #ifdef HAS_OPENSSL
@@ -2138,6 +2142,9 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	jx_insert_string(j, "version", CCTOOLS_VERSION);
 	jx_insert_string(j, "type", "vine_manager");
 	jx_insert_integer(j, "port", vine_port(q));
+
+	char *name, *key;
+	HASH_TABLE_ITERATE(q->properties, name, key) { jx_insert_string(j, name, key); }
 
 	int use_ssl = 0;
 #ifdef HAS_OPENSSL
@@ -3694,6 +3701,17 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	getcwd(q->workingdir, PATH_MAX);
 
+	q->properties = hash_table_create(3, 0);
+
+	/*
+	Do it the long way around here so that m->uuid
+	is a plain string pointer and we don't end up polluting
+	taskvine.h with dttools/uuid.h
+	*/
+	cctools_uuid_t local_uuid;
+	cctools_uuid_create(&local_uuid);
+	q->uuid = strdup(local_uuid.str);
+
 	q->next_task_id = 1;
 	q->fixed_location_in_queue = 0;
 
@@ -3954,6 +3972,15 @@ void vine_set_catalog_servers(struct vine_manager *q, const char *hosts)
 	}
 }
 
+void vine_set_property(struct vine_manager *m, const char *name, const char *value)
+{
+	char *oldvalue = hash_table_remove(m->properties, name);
+	if (oldvalue)
+		free(oldvalue);
+
+	hash_table_insert(m->properties, name, strdup(value));
+}
+
 void vine_set_password(struct vine_manager *q, const char *password) { q->password = xxstrdup(password); }
 
 int vine_set_password_file(struct vine_manager *q, const char *file)
@@ -4023,6 +4050,10 @@ void vine_delete(struct vine_manager *q)
 
 	free(q->name);
 	free(q->manager_preferred_connection);
+	free(q->uuid);
+
+	hash_table_clear(q->properties, (void *)free);
+	hash_table_delete(q->properties);
 
 	free(q->poll_table);
 	free(q->ssl_cert);
@@ -4376,6 +4407,9 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 	/* If the task produces temporary files, create recovery tasks for those. */
 	vine_manager_create_recovery_tasks(q, t);
+
+	/* If the task produces watched output files, truncate them. */
+	vine_task_truncate_watched_outputs(t);
 
 	/* Add reference to task when adding it to primary table. */
 	itable_insert(q->tasks, t->task_id, vine_task_clone(t));
@@ -5859,5 +5893,9 @@ const char *vine_fetch_file(struct vine_manager *m, struct vine_file *f)
 
 	return 0;
 }
+
+void vine_log_debug_app(struct vine_manager *m, const char *entry) { debug(D_VINE, "APPLICATION %s", entry); }
+
+void vine_log_txn_app(struct vine_manager *m, const char *entry) { vine_txn_log_write_app_entry(m, entry); }
 
 /* vim: set noexpandtab tabstop=8: */

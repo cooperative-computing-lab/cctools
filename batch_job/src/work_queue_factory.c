@@ -1175,7 +1175,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
 	printf(" %-30s Use runos tool to create environment (ND only).\n","--runos=<img>");
-	printf(" %-30s Run each worker inside this python environment.\n","--python-env=<file.tar.gz>");
+	printf(" %-30s Run each worker inside this poncho environment.\n","--poncho-env=<file.tar.gz>");
 
 	printf("\nOptions specific to batch systems:\n");
 	printf(" %-30s Generic batch system options.\n", "-B,--batch-options=<options>");
@@ -1214,7 +1214,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_RUN_AS_MANAGER,
 		LONG_OPT_RUN_OS,
 		LONG_OPT_PARENT_DEATH,
-		LONG_OPT_PYTHON_PACKAGE,
+		LONG_OPT_PONCHO_ENV,
 		LONG_OPT_USE_SSL,
 		LONG_OPT_FACTORY_NAME
 	};
@@ -1252,8 +1252,9 @@ static const struct option long_options[] = {
 	{"min-workers", required_argument, 0, 'w'},
 	{"parent-death", no_argument, 0, LONG_OPT_PARENT_DEATH},
 	{"password", required_argument, 0, 'P'},
-	{"python-env", required_argument, 0, LONG_OPT_PYTHON_PACKAGE},
-	{"python-package", required_argument, 0, LONG_OPT_PYTHON_PACKAGE}, //same as python-env, kept for compatibility
+	{"poncho-env", required_argument, 0, LONG_OPT_PONCHO_ENV},
+	{"python-env", required_argument, 0, LONG_OPT_PONCHO_ENV}, // backwards compatibility
+	{"python-package", required_argument, 0, LONG_OPT_PONCHO_ENV}, // backwards compatibility
 	{"run-factory-as-manager", no_argument, 0, LONG_OPT_RUN_AS_MANAGER},
 	{"runos", required_argument, 0, LONG_OPT_RUN_OS},
 	{"scratch-dir", required_argument, 0, 'S' },
@@ -1391,9 +1392,9 @@ int main(int argc, char *argv[])
 					condor_requirements = string_format("(%s)", optarg);
 				}
 				break;
-			case LONG_OPT_PYTHON_PACKAGE:
+			case LONG_OPT_PONCHO_ENV:
 				{
-				// --package X is the equivalent of --wrapper "poncho_package_run X" --wrapper-input X
+				// --poncho-env X is the equivalent of --wrapper "poncho_package_run X" --wrapper-input X
 				char *fullpath = path_which("poncho_package_run");
 				if(!fullpath) {
 					fprintf(stderr,"work_queue_factory: could not find poncho_package_run in PATH");

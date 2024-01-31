@@ -452,6 +452,22 @@ void vine_task_check_consistency(struct vine_task *t)
 	hash_table_delete(table);
 }
 
+/* Truncate any output files with the WATCH flag, to avoid confusion with prior runs. */
+/* We use truncate instead of unlink, so that "tail -f logfile" has the desired result. */
+
+void vine_task_truncate_watched_outputs(struct vine_task *t)
+{
+	struct vine_mount *m;
+
+	LIST_ITERATE(t->output_mounts, m)
+	{
+		if (m->file->type == VINE_FILE && m->flags & VINE_WATCH) {
+			debug(D_VINE, "truncating watched output file %s\n", m->file->source);
+			truncate(m->file->source, 0);
+		}
+	}
+}
+
 int vine_task_add_input(struct vine_task *t, struct vine_file *f, const char *remote_name, vine_mount_flags_t flags)
 {
 	if (!t || !f || !f->source || !remote_name) {

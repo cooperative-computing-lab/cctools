@@ -525,6 +525,18 @@ class Manager(object):
         return cvine.vine_set_catalog_servers(self._taskvine, catalogs)
 
     ##
+    # Add a global property to the manager which will be included in periodic
+    # reports to the catalog server and other telemetry destinations.
+    # This is helpful for distinguishing higher level information about the entire run,
+    # such as the name of the framework being used, or the logical name of the dataset
+    # being processed.
+    # @param m A manager object
+    # @param name The name of the property.
+    # @param value The value of the property.
+    def set_property(self, name, value):
+        cvine.vine_set_property(self._taskvine, name, value)
+
+    ##
     # Specify a directory to write logs and staging files.
     #
     # @param self     Reference to the current manager object.
@@ -1621,6 +1633,22 @@ class Manager(object):
         flags = Task._determine_file_flags(cache, peer_transfer)
         f = cvine.vine_declare_chirp(self._taskvine, server, source, ticket_c, env_c, flags)
         return File(f)
+
+    ##
+    # Adds a custom APPLICATION entry to the transactions log.
+    #
+    # @param self   The manager to register this file.
+    # @param server A custom transaction message
+    def log_txn_app(self, entry):
+        cvine.vine_log_txn_app(self._taskvine, entry)
+
+    ##
+    # Adds a custom APPLICATION entry to the debug log.
+    #
+    # @param self   The manager to register this file.
+    # @param server A custom debug message
+    def log_debug_app(self, entry):
+        cvine.vine_log_debug_app(self._taskvine, entry)
 
 
 ##
