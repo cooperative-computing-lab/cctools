@@ -1199,6 +1199,56 @@ warranted:
     }
     ```
 
+### Automatic Garbage Collection on Disk
+
+For workflows that generate intermediate files, TaskVine can automatically
+delete them from disk when the application indicates that they will not be
+needed anymore:
+
+=== "Python"
+    ```python
+    intemerdiate = m.declare_file("intermediate_file", unlink_when_done=True)
+
+    t1 = Task(...)
+    t1.add_output(intermediate, "my_file")
+    ...
+
+    t2 = Task(...)
+    t2.add_input(intermediate, "my_file")
+    ...
+
+    # once t2 is done, the following call will remove the file from the
+    # taskvine workflow. Further, when not task refers to the file, the file
+    # will be removed from the manager's disk because of unlink_when_done=True
+    # at its declaration.
+    m.remove_file(intermediate)
+    ```
+
+=== "C"
+    ```C
+    struct vine_file *intemerdiate = vine_declare_file(m, "intermediate_file", VINE_UNLINK_WHEN_DONE);
+
+    struct vine_task *t1 = vine_task_create(...);
+    vine_task_add_output(intermediate, "my_file", /* any desired mount flags */ 0);
+    ...
+
+    struct vine_task *t2 = vine_task_create(...);
+    vine_task_add_input(intermediate, "my_file", /* any desired mount flags */ 0);
+    ...
+
+    # once t2 is done and deleted with `vine_task_delete`, the following call
+    # will remove the file from the taskvine workflow. Further, when not task
+    # refers to the file, the file will be removed from the manager's disk
+    # because of VINE_UNLINK_WHEN_DONE at its declaration.
+    vine_remove_file(intermediate);
+    ```
+
+!!! warning
+    Never use this feature on files that the TaskVine application did not create. Otherwise you
+    run the risk of removing irreplaceable input files
+
+
+
 ### Disconnect slow workers
 
 A large computation can often be slowed down by stragglers. If you have a
