@@ -26,6 +26,16 @@ int vine_file_delete(struct vine_file *f)
 {
 	if (f) {
 		f->refcount--;
+
+		if (f->refcount == 1 && f->recovery_task) {
+			/* delete the recovery task for this file, if any, to break the refcount cycle.
+			 * (The f and f->recovery_task have pointers to each other.) */
+			struct vine_task *rt = f->recovery_task;
+			f->recovery_task = NULL;
+			vine_task_delete(rt);
+			return 0;
+		}
+
 		if (f->refcount > 0) {
 			return f->refcount;
 		}
@@ -36,7 +46,6 @@ int vine_file_delete(struct vine_file *f)
 		}
 
 		vine_task_delete(f->mini_task);
-		vine_task_delete(f->recovery_task);
 		free(f->source);
 		free(f->cached_name);
 		free(f->data);
