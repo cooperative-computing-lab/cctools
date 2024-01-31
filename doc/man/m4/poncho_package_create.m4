@@ -4,7 +4,45 @@ HEADER(poncho_package_create)
 SECTION(NAME)
 BOLD(poncho_package_create) - command-line utility for creating a Conda virtual environment given a Python dependencies file
 
-SECTION(SYNOPSIS)
+SECTION(SYNOPSIS) Creates a portable Conda environment using a poncho specification. Tasks can run within the environment using poncho package run.
+Example Specification:
+{
+    "conda": {
+        "channels": [
+            "conda-forge"
+        ],
+        "dependencies": [
+            "matplotlib=3.7.1=py311h38be061_0",
+            "numpy=1.24.2=py311h8e6699e_0",
+            "pip=23.0.1=pyhd8ed1ab_0",
+            "python=3.11.0=he550d4f_1_cpython",
+            {
+                "pip": [
+                    "uproot==5.0.5"
+                ]
+            }
+        ]
+    },
+
+    "git": {
+                "DATA_DIR": {
+                        "remote": "http://.../repo.git",
+                }
+    },
+
+    "http": {
+                "REFERENCE_DB": {
+                        "type": "file",
+                        "url": "https://.../example.dat"
+                },
+                "TRAINING_DATASET": {
+                        "type": "tar",
+                        "compression": "gzip",
+                        "url": "http://.../dataset.tar.gz"
+                }
+    }
+}
+
 
 CODE(poncho_package_create [options] PARAM(dependency-file) PARAM(PARAM(output-path)))
 
