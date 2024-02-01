@@ -143,7 +143,7 @@ class Task(object):
         return flags
 
     @staticmethod
-    def _determine_file_flags(cache=False, peer_transfer=False):
+    def _determine_file_flags(cache=False, peer_transfer=False, unlink_when_done=False):
         flags = cvine.VINE_CACHE_NEVER
         if cache is True or cache == "workflow":
             flags |= cvine.VINE_CACHE
@@ -151,6 +151,8 @@ class Task(object):
             flags |= cvine.VINE_CACHE_ALWAYS
         if not peer_transfer:
             flags |= cvine.VINE_PEER_NOSHARE
+        if unlink_when_done:
+            flags |= cvine.VINE_UNLINK_WHEN_DONE
         return flags
 
     ##
@@ -1022,9 +1024,9 @@ class FunctionCall(Task):
     @property
     def output(self):
         output = cloudpickle.loads(self._output_buffer.contents())
-        self._manager.remove_file(self._input_buffer)
+        self._manager.undeclare_file(self._input_buffer)
         self._input_buffer = None
-        self._manager.remove_file(self._output_buffer)
+        self._manager.undeclare_file(self._output_buffer)
         self._output_buffer = None
 
         if output['Success']:
@@ -1037,10 +1039,10 @@ class FunctionCall(Task):
     def __del__(self):
         try:
             if self._input_buffer:
-                self._manager.remove_file(self._input_buffer)
+                self._manager.undeclare_file(self._input_buffer)
                 self._input_buffer = None
             if self._output_buffer:
-                self._manager.remove_file(self._output_buffer)
+                self._manager.undeclare_file(self._output_buffer)
                 self._output_buffer = None
             super().__del__()
         except TypeError:

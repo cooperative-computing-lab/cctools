@@ -60,7 +60,8 @@ typedef enum {
 	VINE_CACHE_NEVER = 0,  /**< Do not cache file at execution site. (default) */
 	VINE_CACHE = 1,        /**< File remains in cache until workflow ends. */
 	VINE_CACHE_ALWAYS = 3, /**< File remains in cache until the worker teminates. **/
-	VINE_PEER_NOSHARE = 4  /**< Schedule this file to be shared between peers where available. See @ref vine_enable_peer_transfers **/
+	VINE_PEER_NOSHARE = 4,  /**< Schedule this file to be shared between peers where available. See @ref vine_enable_peer_transfers **/
+	VINE_UNLINK_WHEN_DONE = 8  /**< Whether to delete the file when its reference count is 0. (Warning: Only use on files produced by the application, and never on irreplaceable input files.) */
 } vine_file_flags_t;
 
 /** Select overall scheduling algorithm for matching tasks to workers. */
@@ -770,14 +771,16 @@ whose contents are not returned to the manager by default.
 
 const char * vine_fetch_file( struct vine_manager *m, struct vine_file *f );
 
-/** Remove a file that is no longer needed.
+/** Un-declare a file that was created by @ref vine_declare_file or similar functions.
 The given file or directory object is deleted from all worker's caches,
 and is no longer available for use as an input file.
 Completed tasks waiting for retrieval are not affected.
+Note that all declared files are automatically undeclared by @ref vine_delete,
+however this function can be used for earlier cleanup of unneeded file objects.
 @param m A manager object
 @param f Any file object.
 */
-void vine_remove_file(struct vine_manager *m, struct vine_file *f );
+void vine_undeclare_file(struct vine_manager *m, struct vine_file *f );
 
 //@}
 

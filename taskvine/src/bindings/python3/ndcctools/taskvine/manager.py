@@ -1393,10 +1393,11 @@ class Manager(object):
     #                end-of-life of the worker. Default is False (file is not cache).
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
+    # @param unlink_when_done   Whether to delete the file when its reference count is 0. (Warning: Only use on files produced by the application, and never on irreplaceable input files.)
     # @return
     # A file object to use in @ref ndcctools.taskvine.task.Task.add_input or @ref ndcctools.taskvine.task.Task.add_output
-    def declare_file(self, path, cache=False, peer_transfer=True):
-        flags = Task._determine_file_flags(cache, peer_transfer)
+    def declare_file(self, path, cache=False, peer_transfer=True, unlink_when_done=False):
+        flags = Task._determine_file_flags(cache, peer_transfer, unlink_when_done)
         f = cvine.vine_declare_file(self._taskvine, path, flags)
         return File(f)
 
@@ -1411,13 +1412,21 @@ class Manager(object):
         return cvine.vine_fetch_file(self._taskvine, file._file)
 
     ##
-    # Remove file from workers, undeclare it at the manager.
-    # Note that this does not remove the file's local copy at the manager, if any.
+    # Un-declare a file that was created by @ref declare_file or similar methods.
+    # The given file or directory object is deleted from all worker's caches,
+    # and is no longer available for use as an input file.
+    # Completed tasks waiting for retrieval are not affected.
+    # Note that all declared files are automatically undeclared by @ref vine_delete,
+    # however this function can be used for earlier cleanup of unneeded file objects.
     #
     # @param self    The manager to register this file
     # @param file    The file object
+    def undeclare_file(self, file):
+        cvine.vine_undeclare_file(self._taskvine, file._file)
+
+    # Deprecated, for backwards compatibility.
     def remove_file(self, file):
-        cvine.vine_remove_file(self._taskvine, file._file)
+        undeclare_file(self,file)
 
     ##
     # Declare an anonymous file has no initial content, but is created as the

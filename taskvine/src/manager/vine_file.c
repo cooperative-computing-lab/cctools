@@ -12,6 +12,8 @@ See the file COPYING for details.
 #include "debug.h"
 #include "path.h"
 #include "stringtools.h"
+#include "timestamp.h"
+#include "unlink_recursive.h"
 #include "xxmalloc.h"
 
 #include <limits.h>
@@ -41,8 +43,22 @@ int vine_file_delete(struct vine_file *f)
 		}
 
 		if (f->refcount < 0) {
-			notice(D_VINE, "vine_file_delete: prevented multiple-free of file");
+			notice(D_VINE, "vine_file_delete: prevented multiple-free of file: %s", f->source);
 			return 0;
+		}
+
+		if (f->type == VINE_FILE && f->flags & VINE_UNLINK_WHEN_DONE) {
+			/* when an VINE_UNLINK_WHEN_DONE file is requested to be deleted, and its refcount is 1, this
+			 * means that no task is using it. The only reference is the one made when created. Thus, we
+			 * delete it here.*/
+			timestamp_t start_time = timestamp_get();
+			unlink_recursive(f->source);
+			timestamp_t end_time = timestamp_get();
+
+			debug(D_VINE,
+					"vine_file_delete: deleting %s on reference count took: %.03lfs",
+					f->source,
+					(end_time - start_time) / 1000000.00);
 		}
 
 		vine_task_delete(f->mini_task);

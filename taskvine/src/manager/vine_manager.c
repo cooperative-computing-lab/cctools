@@ -5695,23 +5695,23 @@ int vine_set_task_id_min(struct vine_manager *q, int minid)
 /* File functions */
 
 /*
-Careful: The semantics of remove_file are a little subtle.
+Careful: The semantics of undeclare_file are a little subtle.
 The user calls this function to indicate that they are done
 using a particular file, and there will be no more tasks
 that can consume it.
 
 This causes the file to be removed from the manager's table,
-the replicas in the cluster to be deleted, and the recovery
-task of the file taken away.  There should be no running tasks
-that require the file after this.
+the replicas in the cluster to be deleted.
+There should be no running tasks that require the file after this.
 
 However, there may be *returned* tasks that still hold
 references to the vine_file object, and so it will not be
 fully garbage collected until those also call vine_file_delete
-to bring the reference count to zero.
+to bring the reference count to zero.  At that point, if
+the UNLINK_WHEN_DONE flag is on, the local state will also be deleted.
 */
 
-void vine_remove_file(struct vine_manager *m, struct vine_file *f)
+void vine_undeclare_file(struct vine_manager *m, struct vine_file *f)
 {
 	if (!f) {
 		return;
