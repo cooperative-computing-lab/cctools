@@ -129,6 +129,7 @@ class Manager(object):
             if name:
                 cvine.vine_set_name(self._taskvine, name)
 
+            # support for PythonTask serialization:
             self._function_buffers = {}
             for d in ['outputs', 'arguments', 'functions']:
                 pathlib.Path.mkdir(pathlib.Path(self.staging_directory, d), exist_ok=True)

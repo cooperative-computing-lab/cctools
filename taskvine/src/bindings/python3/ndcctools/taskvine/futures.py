@@ -182,60 +182,58 @@ class FutureTask(PythonTask):
     def add_future_dep(self, arg):
         self.add_input(arg._task._output_file, str('outfile-' + str(arg._task.id)))
 
-    def submit_finalize(self):
+    def submit_finalize(self, manager):
         func, args, kwargs = self._fn_def
         for arg in args:
             if isinstance(arg, VineFuture):
                 self.add_future_dep(arg)
         args = [{"VineFutureFile": str('outfile-' + str(arg._task.id))} if isinstance(arg, VineFuture) else arg for arg in args]
-        self._fn_def = (func, args, kwargs)
-        self._add_IO_files()
+        self._add_inputs_outputs(manager, func, args, kwargs)
 
     def add_environment(self, f):
         self._envs.append(f)
         return cvine.vine_task_add_environment(self._task, f._file)
 
-    def _create_wrapper(self, filename):
-        with open(filename, "w") as f:
-            f.write(
-                textwrap.dedent(
-                    f"""
+    def _fn_wrapper(self, manager, serialize):
+        base = f"py_futures_wrapper_{int(bool(serialize))}"
+        if base not in manager._function_buffers:
+            name = os.path.join(manager.staging_directory, base)
+            with open(name, "w") as f:
+                f.write(
+                    textwrap.dedent(
+                        f"""
+                        import sys
+                        import cloudpickle
 
-                try:
-                    import sys
-                    import cloudpickle
-                except ImportError as e:
-                    print("Could not execute PythonTask function because a module was not available at the worker.")
-                    raise
+                        def vineLoadArg(arg):
+                            with open (arg["VineFutureFile"] , 'rb') as f:
+                                return cloudpickle.load(f)
 
-                def vineLoadArg(arg):
-                    with open (arg["VineFutureFile"] , 'rb') as f:
-                        return cloudpickle.load(f)
+                        (fn, args, out) = sys.argv[1], sys.argv[2], sys.argv[3]
+                        with open (fn , 'rb') as f:
+                            exec_function = cloudpickle.load(f)
+                        with open(args, 'rb') as f:
+                            args, kwargs = cloudpickle.load(f)
 
-                (fn, args, out) = sys.argv[1], sys.argv[2], sys.argv[3]
-                with open (fn , 'rb') as f:
-                    exec_function = cloudpickle.load(f)
-                with open(args, 'rb') as f:
-                    args, kwargs = cloudpickle.load(f)
-
-                args = [vineLoadArg(arg) if isinstance(arg, dict) and "VineFutureFile" in arg else arg for arg in args]
-                status = 0
-                try:
-                    exec_out = exec_function(*args, **kwargs)
-                except Exception as e:
-                    exec_out = e
-                    status = 1
-
-                with open(out, 'wb') as f:
-                    if {self._serialize_output}:
-                        cloudpickle.dump(exec_out, f)
-                    else:
-                        f.write(exec_out)
-
-                sys.exit(status)
-                """
+                        args = [vineLoadArg(arg) if isinstance(arg, dict) and "VineFutureFile" in arg else arg for arg in args]
+                        error = None
+                        try:
+                            exec_out = exec_function(*args, **kwargs)
+                        except Exception as e:
+                            exec_out = e
+                            error = e
+                        finally:
+                            with open(out, 'wb') as f:
+                                if {serialize}:
+                                    cloudpickle.dump(exec_out, f)
+                                else:
+                                    f.write(exec_out)
+                            if error:
+                                raise error
+                        """
+                    )
                 )
-            )
-
+            manager._function_buffers[base] = manager.declare_file(name, cache=True)
+        return manager._function_buffers[base]
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
