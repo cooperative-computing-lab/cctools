@@ -132,7 +132,7 @@ class Manager(object):
             # support for PythonTask serialization:
             self._function_buffers = {}
             for d in ['outputs', 'arguments', 'functions']:
-                pathlib.Path.mkdir(pathlib.Path(self.staging_directory, d), exist_ok=True)
+                pathlib.Path.mkdir(pathlib.Pure(self.staging_directory, d), exist_ok=True)
 
             try:
                 if init_fn:
