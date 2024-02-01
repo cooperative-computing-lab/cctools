@@ -581,15 +581,30 @@ int vine_task_add_input_mini_task(
 	return r;
 }
 
-int vine_task_add_environment(struct vine_task *t, struct vine_file *environment_file)
+int vine_task_add_poncho_package(struct vine_task *t, struct vine_file *f)
 {
-	if (!environment_file) {
-		debug(D_NOTICE | D_VINE, "%s: environment_file cannot be null", __func__);
+	return vine_task_add_execution_context(t, f);
+}
+
+int vine_task_add_starch_package(struct vine_task *t, struct vine_file *f)
+{
+	return vine_task_add_execution_context(t, f);
+}
+
+int vine_task_add_environment(struct vine_task *t, struct vine_file *f)
+{
+	return vine_task_add_execution_context(t, f);
+}
+
+int vine_task_add_execution_context(struct vine_task *t, struct vine_file *context_file)
+{
+	if (!context_file) {
+		debug(D_NOTICE | D_VINE, "%s: context_file cannot be null", __func__);
 		return 0;
 	}
 
-	char *env_name = string_format("__vine_env_%s", environment_file->cached_name);
-	vine_task_add_input(t, environment_file, env_name, VINE_MOUNT_SYMLINK);
+	char *env_name = string_format("__vine_env_%s", context_file->cached_name);
+	vine_task_add_input(t, context_file, env_name, VINE_MOUNT_SYMLINK);
 
 	char *new_cmd = string_format("%s/bin/run_in_env %s", env_name, t->command_line);
 	vine_task_set_command(t, new_cmd);

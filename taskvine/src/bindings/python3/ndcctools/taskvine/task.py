@@ -361,13 +361,43 @@ class Task(object):
         return cvine.vine_task_set_snapshot_file(self._task, filename)
 
     ##
-    # Adds an execution environment to the task. The environment file specified
-    # is expected to expand to a directory with a bin/run_in_env file that will wrap
-    # the task command (e.g. a poncho or a starch file, or any other vine mini_task
-    # that creates such a wrapper). If specified multiple times,
-    # environments are nested in the order given (i.e. first added is the first applied).
-    # @param self Reference to the current task object.
-    # @param f The environment file.
+    # Add a Starch package as an execution context.
+    # The file given must refer to a (unpacked) package
+    # containing libraries captured by the <tt>starch</tt> command.
+    # The task will execute using this package as its environment.
+    # @param t A task object.
+    # @param f A file containing an unpacked Starch package.
+    def add_starch_package(self, file):
+        return cvine.vine_task_add_starch_package(self._task, file._file)
+
+    ##
+    # Add a Poncho package as an execution context.
+    # The file given must refer to a (unpacked) PONCHO package,
+    # containing a set of Python modules needed by the task.
+    # The task will execute using this package as its Python environment.
+    # @param t A task object.
+    # @param f A file containing an unpacked Poncho package.
+    def add_poncho_package(self, file):
+        return cvine.vine_task_add_poncho_package(self._task, file._file)
+
+    ##
+    # Adds an execution context to the task.
+    # The context file given must expand to a directory containing
+    # (at a minimum) a file
+    # named bin/run_in_env that will perform any desired setup
+    # (e.g. setting PATH, LD_LIBRARY_PATH, PYTHONPATH), execute the given command,
+    # and then perform any desired cleanup.  The context directory
+    # may also include any support files or libraries needed by the task.
+    # If specified multiple times, execution contexts are
+    # nested in the order given (i.e. first added is the first applied).
+    # @see add_poncho_package
+    # @see add_starch_package
+    # @param t A task object.
+    # @param f The execution context file.
+    def add_execution_context(self, f):
+        return cvine.vine_task_add_execution_context(self._task, f._file)
+
+    # Deprecated, for backwards compatibility.
     def add_environment(self, f):
         return cvine.vine_task_add_environment(self._task, f._file)
 

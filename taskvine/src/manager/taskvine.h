@@ -572,18 +572,45 @@ For more information, consult the manual of the resource_monitor.
 
 int vine_task_set_snapshot_file(struct vine_task *t, struct vine_file *monitor_snapshot_file);
 
-
-/** Adds an execution environment to the task. The environment file specified
-is expected to expand to a directory with a bin/run_in_env file that will
-wrap the task command (e.g. a poncho, starch file, or any other vine mini_task
-that creates such a wrapper). If specified multiple times, environments are
-nested in the order given (i.e. first added is the first applied).
+/** Add a Starch package as an execution context.
+The file given must refer to a (unpacked) package
+containing libraries captured by the <tt>starch</tt> command.
+The task will execute using this package as its environment.
 @param t A task object.
-@param f The environment file.
+@param f A file containing an unpacked Starch package.
 */
 
-int vine_task_add_environment(struct vine_task *t, struct vine_file *f);
+int vine_task_add_starch_package(struct vine_task *t, struct vine_file *f);
 
+/** Add a Poncho package as an execution context.
+The file given must refer to a (unpacked) PONCHO package,
+containing a set of Python modules needed by the task.
+The task will execute using this package as its Python environment.
+@param t A task object.
+@param f A file containing an unpacked Poncho package.
+*/
+
+int vine_task_add_poncho_package(struct vine_task *t, struct vine_file *f);
+
+/** Adds an execution context to the task.
+The context file given must expand to a directory containing
+(at a minimum) a file
+named bin/run_in_env that will perform any desired setup
+(e.g. setting PATH, LD_LIBRARY_PATH, PYTHONPATH), execute the given command,
+and then perform any desired cleanup.  The context directory
+may also include any support files or libraries needed by the task.
+If specified multiple times, execution contexts are
+nested in the order given (i.e. first added is the first applied).
+@see vine_task_add_starch_package
+@see vine_task_add_poncho_package
+@param t A task object.
+@param f The execution context file.
+*/
+
+int vine_task_add_execution_context(struct vine_task *t, struct vine_file *f);
+
+/* Deprecated alias for vine_task_add_execution_context. */
+int vine_task_add_environment(struct vine_task *t, struct vine_file *f);
 
 //@}
 
