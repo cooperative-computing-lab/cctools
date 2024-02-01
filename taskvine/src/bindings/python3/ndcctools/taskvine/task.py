@@ -1024,9 +1024,9 @@ class FunctionCall(Task):
     @property
     def output(self):
         output = cloudpickle.loads(self._output_buffer.contents())
-        self._manager.remove_file(self._input_buffer)
+        self._manager.undeclare_file(self._input_buffer)
         self._input_buffer = None
-        self._manager.remove_file(self._output_buffer)
+        self._manager.undeclare_file(self._output_buffer)
         self._output_buffer = None
 
         if output['Success']:
@@ -1039,10 +1039,10 @@ class FunctionCall(Task):
     def __del__(self):
         try:
             if self._input_buffer:
-                self._manager.remove_file(self._input_buffer)
+                self._manager.undeclare_file(self._input_buffer)
                 self._input_buffer = None
             if self._output_buffer:
-                self._manager.remove_file(self._output_buffer)
+                self._manager.undeclare_file(self._output_buffer)
                 self._output_buffer = None
             super().__del__()
         except TypeError:

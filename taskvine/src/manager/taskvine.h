@@ -771,14 +771,16 @@ whose contents are not returned to the manager by default.
 
 const char * vine_fetch_file( struct vine_manager *m, struct vine_file *f );
 
-/** Remove a file that is no longer needed.
+/** Un-declare a file that was created by @ref vine_declare_file or similar functions.
 The given file or directory object is deleted from all worker's caches,
 and is no longer available for use as an input file.
 Completed tasks waiting for retrieval are not affected.
+Note that all declared files are automatically undeclared by @ref vine_delete,
+however this function can be used for earlier cleanup of unneeded file objects.
 @param m A manager object
 @param f Any file object.
 */
-void vine_remove_file(struct vine_manager *m, struct vine_file *f );
+void vine_undeclare_file(struct vine_manager *m, struct vine_file *f );
 
 //@}
 

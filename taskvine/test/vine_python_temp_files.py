@@ -50,7 +50,7 @@ while not m.empty():
         sys.exit(1)
 
 # we now can remove the temp file from the worker
-m.remove_file(t_a.output_file)
+m.undeclare_file(t_a.output_file)
 
 print(f"final output: {t_b.output}")
 

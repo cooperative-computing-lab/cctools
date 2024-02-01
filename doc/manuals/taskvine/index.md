@@ -1218,10 +1218,10 @@ the application indicates that they will not be needed anymore:
     ...
 
     # once t2 is done, the following call will remove the file from the
-    # taskvine workflow. Further, when not task refers to the file, the file
+    # taskvine workflow. Further, when no task refers to the file, the file
     # will be removed from the manager's disk because of unlink_when_done=True
     # at its declaration.
-    m.remove_file(partial_result)
+    m.undeclare_file(partial_result)
     ```
 
 === "C"
@@ -1237,10 +1237,10 @@ the application indicates that they will not be needed anymore:
     ...
 
     # once t2 is done and deleted with `vine_task_delete`, the following call
-    # will remove the file from the taskvine workflow. Further, when not task
+    # will remove the file from the taskvine workflow. Further, when no task
     # refers to the file, the file will be removed from the manager's disk
     # because of VINE_UNLINK_WHEN_DONE at its declaration.
-    vine_remove_file(partial_result);
+    vine_undeclare_file(partial_result);
     ```
 
 !!! warning
