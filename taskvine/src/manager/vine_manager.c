@@ -5723,7 +5723,7 @@ void vine_remove_file(struct vine_manager *m, struct vine_file *f)
 	file object itself, which may have further cleanup
 	side effects.
 	*/
-	
+
 	if (!m) {
 		vine_file_delete(f);
 		return;
@@ -5739,7 +5739,8 @@ void vine_remove_file(struct vine_manager *m, struct vine_file *f)
 	if((m->file->flags&VINE_CACHE_ALWAYS)!=VINE_CACHE_ALWAYS {
 		char *key;
 		struct vine_worker_info *w;
-		HASH_TABLE_ITERATE(m->worker_table, key, w) {
+		HASH_TABLE_ITERATE(m->worker_table, key, w)
+		{
 			if (vine_file_replica_table_lookup(w, filename)) {
 				delete_worker_file(m, w, filename, 0, 0);
 			}
