@@ -5698,7 +5698,7 @@ int vine_set_task_id_min(struct vine_manager *q, int minid)
 Request to remove a file
 Decrement the reference count and delete if zero.
 */
-void vine_remove_file(struct vine_manager *m, struct vine_file *f)
+void vine_undeclare_file(struct vine_manager *m, struct vine_file *f)
 {
 	if (!f) {
 		return;

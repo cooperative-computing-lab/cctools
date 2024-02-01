@@ -158,6 +158,6 @@ if __name__ == "__main__":
     # in this small example this is not strictly necessary, as these files are
     # deleted from workers once the manager terminates.
     for f in convert_temporary_outputs.values():
-        m.remove_file(f)
+        m.undeclare_file(f)
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
