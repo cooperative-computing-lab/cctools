@@ -1226,7 +1226,7 @@ the application indicates that they will not be needed anymore:
 
 === "C"
     ```C
-    struct vine_file *intemerdiate = vine_declare_file(m, "my_partial_result", VINE_UNLINK_WHEN_DONE);
+    struct vine_file *partial_result = vine_declare_file(m, "my_partial_result", VINE_UNLINK_WHEN_DONE);
 
     struct vine_task *t1 = vine_task_create(...);
     vine_task_add_output(partial_result, "my_partial_result", /* any desired mount flags */ 0);
@@ -1240,7 +1240,7 @@ the application indicates that they will not be needed anymore:
     # will remove the file from the taskvine workflow. Further, when not task
     # refers to the file, the file will be removed from the manager's disk
     # because of VINE_UNLINK_WHEN_DONE at its declaration.
-    vine_remove_file(intermediate);
+    vine_remove_file(partial_result);
     ```
 
 !!! warning
