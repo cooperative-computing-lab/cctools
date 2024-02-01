@@ -5695,68 +5695,70 @@ int vine_set_task_id_min(struct vine_manager *q, int minid)
 /* File functions */
 
 /*
-Request to remove a file
-Decrement the reference count and delete if zero.
+Careful: The semantics of remove_file are a little subtle.
+The user calls this function to indicate that they are done
+using a particular file, and there will be no more tasks
+that can consume it.
+
+This causes the file to be removed from the manager's table,
+the replicas in the cluster to be deleted, and the recovery
+task of the file taken away.  There should be no running tasks
+that require the file after this.
+
+However, there may be *returned* tasks that still hold
+references to the vine_file object, and so it will not be
+fully garbage collected until those also call vine_file_delete
+to bring the reference count to zero.
 */
+
 void vine_remove_file(struct vine_manager *m, struct vine_file *f)
 {
 	if (!f) {
 		return;
 	}
 
+	/*
+	Special case: If the manager has already been gc'ed
+	(e.g. by python exiting), we can still delete the
+	file object itself, which may have further cleanup
+	side effects.
+	*/
+	
 	if (!m) {
-		/* if manager has been already gc'ed (e.g. by python exiting), we stil want to
-		 * free any external resources the file has */
 		vine_file_delete(f);
 		return;
 	}
 
 	const char *filename = f->cached_name;
 
-	char *key;
-	struct vine_worker_info *w;
-	HASH_TABLE_ITERATE(m->worker_table, key, w)
-	{
+	/*
+	If this is not a file that should be cached forever,
+	delete all of the replicas present at remote workers.
+	*/
 
-		if (!vine_file_replica_table_lookup(w, filename))
-			continue;
-
-		struct vine_task *t;
-		uint64_t task_id;
-		ITABLE_ITERATE(w->current_tasks, task_id, t)
-		{
-
-			struct vine_mount *mnt;
-			LIST_ITERATE(t->input_mounts, mnt)
-			{
-				if (strcmp(filename, mnt->file->cached_name) == 0) {
-					reset_task_to_state(m, t, VINE_TASK_READY);
-					continue;
-				}
-			}
-
-			LIST_ITERATE(t->output_mounts, mnt)
-			{
-				if (strcmp(filename, mnt->file->cached_name) == 0) {
-					reset_task_to_state(m, t, VINE_TASK_READY);
-					continue;
-				}
+	if((m->file->flags&VINE_CACHE_ALWAYS)!=VINE_CACHE_ALWAYS {
+		char *key;
+		struct vine_worker_info *w;
+		HASH_TABLE_ITERATE(m->worker_table, key, w) {
+			if (vine_file_replica_table_lookup(w, filename)) {
+				delete_worker_file(m, w, filename, 0, 0);
 			}
 		}
-
-		/* when explicitely asked to remove a file, we remove it regardless of
-		 * the cache flags. */
-		delete_worker_file(m, w, filename, 0, 0);
 	}
-
+		
+	/* Remove the object from our table and delete a reference. */
+	
 	if (hash_table_lookup(m->file_table, f->cached_name)) {
-		/* delete the reference added when declaring the file. */
-		/* the rest of the references, if any, will be deleted as the tasks
-		 * that reference the file are deleted. */
-
 		hash_table_remove(m->file_table, f->cached_name);
 		vine_file_delete(f);
 	}
+
+	/*
+	Note that the file object may still exist if the user
+	still holds pointers to inactive tasks that refer to
+	this file. But the object is no longer the manager's
+	responsibility.
+	*/
 }
 
 struct vine_file *vine_manager_lookup_file(struct vine_manager *m, const char *cached_name)
