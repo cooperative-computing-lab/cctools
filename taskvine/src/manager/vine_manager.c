@@ -5707,6 +5707,13 @@ void vine_remove_file(struct vine_manager *m, struct vine_file *f)
 		return;
 	}
 
+	if (!m) {
+		/* if manager has been already gc'ed (e.g. by python exiting), we stil want to
+		 * free any external resources the file has */
+		vine_file_delete(f);
+		return;
+	}
+
 	const char *filename = f->cached_name;
 
 	char *key;
