@@ -1426,7 +1426,7 @@ class Manager(object):
 
     # Deprecated, for backwards compatibility.
     def remove_file(self, file):
-        undeclare_file(self,file)
+        self.undeclare_file(self, file)
 
     ##
     # Declare an anonymous file has no initial content, but is created as the
