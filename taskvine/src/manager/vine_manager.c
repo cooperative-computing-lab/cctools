@@ -5736,7 +5736,7 @@ void vine_remove_file(struct vine_manager *m, struct vine_file *f)
 	delete all of the replicas present at remote workers.
 	*/
 
-	if((f->flags&VINE_CACHE_ALWAYS)!=VINE_CACHE_ALWAYS) {
+	if ((f->flags & VINE_CACHE_ALWAYS) != VINE_CACHE_ALWAYS) {
 		char *key;
 		struct vine_worker_info *w;
 		HASH_TABLE_ITERATE(m->worker_table, key, w)
@@ -5746,9 +5746,9 @@ void vine_remove_file(struct vine_manager *m, struct vine_file *f)
 			}
 		}
 	}
-		
+
 	/* Remove the object from our table and delete a reference. */
-	
+
 	if (hash_table_lookup(m->file_table, f->cached_name)) {
 		hash_table_remove(m->file_table, f->cached_name);
 		vine_file_delete(f);
