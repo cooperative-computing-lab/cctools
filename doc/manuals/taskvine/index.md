@@ -1199,6 +1199,56 @@ warranted:
     }
     ```
 
+### Automatic Garbage Collection on Disk
+
+For workflows that generate partial results that are not needed once a final
+result has been computed, TaskVine can automatically delete them from disk when
+the application indicates that they will not be needed anymore:
+
+=== "Python"
+    ```python
+    partial_result = m.declare_file("my_partial_result", unlink_when_done=True)
+
+    t1 = Task(...)
+    t1.add_output(partial_result, "my_partial_result")
+    ...
+
+    t2 = Task(...)
+    t2.add_input(partial_result, "my_partial_result")
+    ...
+
+    # once t2 is done, the following call will remove the file from the
+    # taskvine workflow. Further, when not task refers to the file, the file
+    # will be removed from the manager's disk because of unlink_when_done=True
+    # at its declaration.
+    m.remove_file(partial_result)
+    ```
+
+=== "C"
+    ```C
+    struct vine_file *partial_result = vine_declare_file(m, "my_partial_result", VINE_UNLINK_WHEN_DONE);
+
+    struct vine_task *t1 = vine_task_create(...);
+    vine_task_add_output(partial_result, "my_partial_result", /* any desired mount flags */ 0);
+    ...
+
+    struct vine_task *t2 = vine_task_create(...);
+    vine_task_add_input(partial_result, "my_partial_result", /* any desired mount flags */ 0);
+    ...
+
+    # once t2 is done and deleted with `vine_task_delete`, the following call
+    # will remove the file from the taskvine workflow. Further, when not task
+    # refers to the file, the file will be removed from the manager's disk
+    # because of VINE_UNLINK_WHEN_DONE at its declaration.
+    vine_remove_file(partial_result);
+    ```
+
+!!! warning
+    Never use this feature on files that the TaskVine application did not create. Otherwise you
+    run the risk of removing irreplaceable input files
+
+
+
 ### Disconnect slow workers
 
 A large computation can often be slowed down by stragglers. If you have a

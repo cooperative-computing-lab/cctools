@@ -143,7 +143,7 @@ class Task(object):
         return flags
 
     @staticmethod
-    def _determine_file_flags(cache=False, peer_transfer=False):
+    def _determine_file_flags(cache=False, peer_transfer=False, unlink_when_done=False):
         flags = cvine.VINE_CACHE_NEVER
         if cache is True or cache == "workflow":
             flags |= cvine.VINE_CACHE
@@ -151,6 +151,8 @@ class Task(object):
             flags |= cvine.VINE_CACHE_ALWAYS
         if not peer_transfer:
             flags |= cvine.VINE_PEER_NOSHARE
+        if unlink_when_done:
+            flags |= cvine.VINE_UNLINK_WHEN_DONE
         return flags
 
     ##
