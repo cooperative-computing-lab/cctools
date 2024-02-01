@@ -367,7 +367,7 @@ class Task(object):
     # @param f A file containing an unpacked Starch package.
     def add_starch_package(self, file):
         return cvine.vine_task_add_starch_package(self._task, file._file)
-    
+
     ##
     # Add a Poncho package as an execution context.
     # The file given must refer to a (unpacked) PONCHO package,
@@ -378,7 +378,8 @@ class Task(object):
     def add_poncho_package(self, file):
         return cvine.vine_task_add_poncho_package(self._task, file._file)
 
-    ## Adds an execution context to the task.
+    ##
+    # Adds an execution context to the task.
     # The context file given must expand to a directory containing
     # (at a minimum) a file
     # named bin/run_in_env that will perform any desired setup
