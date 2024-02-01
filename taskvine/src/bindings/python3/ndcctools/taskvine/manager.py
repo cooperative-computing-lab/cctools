@@ -1417,8 +1417,8 @@ class Manager(object):
     #
     # @param self    The manager to register this file
     # @param file    The file object
-    def remove_file(self, file):
-        cvine.vine_remove_file(self._taskvine, file._file)
+    def undeclare_file(self, file):
+        cvine.vine_undeclare_file(self._taskvine, file._file)
 
     ##
     # Declare an anonymous file has no initial content, but is created as the

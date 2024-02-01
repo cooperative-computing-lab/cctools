@@ -778,7 +778,7 @@ Completed tasks waiting for retrieval are not affected.
 @param m A manager object
 @param f Any file object.
 */
-void vine_remove_file(struct vine_manager *m, struct vine_file *f );
+void vine_undeclare_file(struct vine_manager *m, struct vine_file *f );
 
 //@}
 

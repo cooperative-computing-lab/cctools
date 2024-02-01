@@ -76,7 +76,7 @@ if __name__ == "__main__":
 
     # we are done with the unsorted lists and we remove them from the cluster
     for f in temporary_unsorted_lists.values():
-        m.remove_file(f)
+        m.undeclare_file(f)
 
     merge_outputs = []
     for tids in tasks_of_worker.values():
@@ -101,7 +101,7 @@ if __name__ == "__main__":
 
     # we are done with the sorted lists and we remove them from the cluster
     for f in temporary_sorted_lists.values():
-        m.remove_file(f)
+        m.undeclare_file(f)
 
     # create final merge, and run it at whatever worker has the most inputs
     out_file = m.declare_file("final_output.txt")
@@ -128,7 +128,7 @@ if __name__ == "__main__":
 
     # we are done with the merged lists and we remove them from the cluster
     for f in merge_outputs:
-        m.remove_file(f)
+        m.undeclare_file(f)
 
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
