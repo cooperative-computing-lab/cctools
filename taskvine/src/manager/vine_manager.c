@@ -5736,7 +5736,7 @@ void vine_remove_file(struct vine_manager *m, struct vine_file *f)
 	delete all of the replicas present at remote workers.
 	*/
 
-	if((m->file->flags&VINE_CACHE_ALWAYS)!=VINE_CACHE_ALWAYS {
+	if((f->flags&VINE_CACHE_ALWAYS)!=VINE_CACHE_ALWAYS) {
 		char *key;
 		struct vine_worker_info *w;
 		HASH_TABLE_ITERATE(m->worker_table, key, w)
