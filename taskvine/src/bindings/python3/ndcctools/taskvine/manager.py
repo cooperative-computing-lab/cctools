@@ -1435,6 +1435,18 @@ class Manager(object):
         self.undeclare_file(file)
 
     ##
+    # Remove the manager's local serialized copy of a function used with PythonTask.
+    #
+    # @param self    The manager to register this file
+    # @param fn      The function that the manager should forget.
+    def undeclare_function(self, fn):
+        try:
+            b = self._function_buffers.pop(fn, None)
+            self.remove_file(b)
+        except KeyError:
+            pass
+
+    ##
     # Declare an anonymous file has no initial content, but is created as the
     # output of a task, and may be consumed by other tasks.
     #
