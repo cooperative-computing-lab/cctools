@@ -16,7 +16,6 @@ from .manager import (
 
 import os
 import textwrap
-import tempfile
 
 try:
     import cloudpickle
