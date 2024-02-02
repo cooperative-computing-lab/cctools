@@ -1066,11 +1066,11 @@ class FunctionCall(Task):
     # Retrieve output, handles cleanup, and returns result or failure reason.
     @property
     def output(self):
-        output = cloudpickle.loads(self._output_buffer.contents())
+        output = cloudpickle.loads(self._output_file.contents())
         self._manager.undeclare_file(self._input_buffer)
         self._input_buffer = None
-        self._manager.undeclare_file(self._output_buffer)
-        self._output_buffer = None
+        self._manager.undeclare_file(self._output_file)
+        self._output_file = None
         if output['Success']:
             return output['Result']
         else:
@@ -1086,9 +1086,8 @@ class FunctionCall(Task):
 
             if self._output_file:
                 # Do not delete temp files out on cluster when task is deleted. For now...
-                if not self._tmp_output_enabled:
-                    self._manager.undeclare_file(self._output_file)
-                    self._output_file = None
+                self._manager.undeclare_file(self._output_file)
+                self._output_file = None
             super().__del__()
         except TypeError:
             pass
