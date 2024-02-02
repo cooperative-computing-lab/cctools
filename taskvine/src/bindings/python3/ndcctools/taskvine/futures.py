@@ -126,7 +126,7 @@ class VineFuture(Future):
     def add_done_callback(self, fn):
         self.callback_fns.append(fn)
 
-        
+
 ##
 # \class FutureFunctionCall
 #
@@ -243,7 +243,7 @@ class FuturePythonTask(PythonTask):
         self._module_manager = manager
         self._future = VineFuture(self)
         self._envs = []
-        self._has_retrived = False
+        self._has_retrieved = False
         self._ran_functions = False
         self._is_retriever = rf
         self._retriever = None
@@ -270,11 +270,11 @@ class FuturePythonTask(PythonTask):
             return self._output
     
         else:
-            if not self._has_retrived:
+            if not self._has_retrieved:
                 result = self._module_manager.wait_for_task_id(self.id, timeout=timeout)
                 if result:
-                    self._has_retrived = True
-            if not self._output_loaded and self._has_retrived:
+                    self._has_retrieved = True
+            if not self._output_loaded and self._has_retrieved:
                 if self.successful():
                     try:
                         with open(os.path.join(self._tmpdir, self._out_name_file), "rb") as f:
