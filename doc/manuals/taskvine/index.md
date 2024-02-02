@@ -1444,9 +1444,28 @@ a Future object. The result of the task can retrieved by calling `future.result(
     print(f.result())
     ```
 
-Futures can be passed as arguments to other 
-tasks using the executor. In this case, relevant files
-will be transported between workers when necessary.
+
+The Executor supports two kinds tasks, the `FuturePythonTask` and the `FutureFunctionCall` task. The `Executor.submit` with return an instance of `Future`, which can be used to retrieve the result that was computed on remote workers. 
+
+`Future`s can be passed as arguments to other tasks using the executor. In this case, relevant files will be transported between workers when necessary. 
+
+In case of `FuturePythonTask`, Users can interaface with future python tasks themselves by calling the `future_pythontask` function from the future executor. 
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+
+    def my_sum(x, y):
+        return x + y
+
+    e = vine.Executor(manager_name='my_manager')
+    t = e.future_pythontask(my_sum, 3, 4)
+    t.set_cores(1)
+    f = e.submit(t)
+    print(f.result())
+    ```
+
+Or, uses can also directly send the function along with its arguments to `submit` function from the executor. This returns a `FuturePythonTask` which can also be submitted to the future executor. The benefit of doing this is allowing users to add additional input files and task specifications before submission.
 
 === "Python"
     ```python
@@ -1462,11 +1481,7 @@ will be transported between workers when necessary.
     print(c.result())
     ```
 
-Users can interaface with future tasks themselves by calling
-the `task` function from the future executor. This returns a
-FutureTask which can also be submitted to the future executor.
-The benefit of doing this is allowing users to add additional input 
-files and task specifications before submission.
+In case of `FutureFunctionCall`, users can invoke `future_funcall` from the future executor to construct an instance of `FutureFunctionCall` by giving the name and arguments of their function, the behavior of submitting tasks and retrieving results aligns with that of `FuturePythonTask`.
 
 === "Python"
     ```python
@@ -1475,11 +1490,11 @@ files and task specifications before submission.
     def my_sum(x, y):
         return x + y
 
-    s = vine.Executor(manager_name='my_manager')
-    t = s.task(my_sum, 3, 4)
-    t.set_cores(1)
-    f = s.submit(t)
-    print(f.result())
+    libtask = executor.create_library_from_functions('test-library', my_sum)
+    executor.install_library(libtask)
+    t = executor.future_funcall('test-library', 'my_sum', 7, 4)
+    a = executor.submit(t)
+    print(a.result())
     ```
 
 
