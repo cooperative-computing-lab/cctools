@@ -25,13 +25,13 @@ int main(int argc, char *argv[])
 
 	struct vine_file *script = vine_declare_file(m, "script_example_for_poncho.py", VINE_CACHE);
 
-	struct vine_file *poncho_tarball = vine_declare_file(m, "package.tar.gz", VINE_CACHE);
-	struct vine_file *poncho_env = vine_declare_poncho(m, poncho_tarball, VINE_CACHE);
+	struct vine_file *tarball = vine_declare_file(m, "package.tar.gz", VINE_CACHE);
+	struct vine_file *package = vine_declare_poncho(m, tarball, VINE_CACHE);
 
 	for(i=0;i<5;i++) {
 
 		struct vine_task *task = vine_task_create("python my_script.py");
-		vine_task_add_environment(task, poncho_env);
+		vine_task_add_poncho_package(task, package);
 
 		vine_task_add_input(task, script, "my_script.py", 0);
 

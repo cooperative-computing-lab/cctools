@@ -1412,13 +1412,21 @@ class Manager(object):
         return cvine.vine_fetch_file(self._taskvine, file._file)
 
     ##
-    # Remove file from workers, undeclare it at the manager.
-    # Note that this does not remove the file's local copy at the manager, if any.
+    # Un-declare a file that was created by @ref declare_file or similar methods.
+    # The given file or directory object is deleted from all worker's caches,
+    # and is no longer available for use as an input file.
+    # Completed tasks waiting for retrieval are not affected.
+    # Note that all declared files are automatically undeclared by @ref vine_delete,
+    # however this function can be used for earlier cleanup of unneeded file objects.
     #
     # @param self    The manager to register this file
     # @param file    The file object
+    def undeclare_file(self, file):
+        cvine.vine_undeclare_file(self._taskvine, file._file)
+
+    # Deprecated, for backwards compatibility.
     def remove_file(self, file):
-        cvine.vine_remove_file(self._taskvine, file._file)
+        self.undeclare_file(file)
 
     ##
     # Declare an anonymous file has no initial content, but is created as the

@@ -3,7 +3,7 @@
 # This example shows how to declare an chirp file
 # so that it can be cached at the workers.
 # It assumes that chirp is installed where workers are executed. If this is
-# not the case, a starch recipe to construct this environment is also given.
+# not the case, a starch recipe to construct this package is also given.
 #
 
 import ndcctools.taskvine as vine
@@ -21,19 +21,19 @@ def count_lines(chirp_file):
     return lines
 
 
-# construct a starch environment to execute the tasks. Only needed if the chirp
+# construct a starch package to execute the tasks. Only needed if the chirp
 # executables are not available where the workers execute
-def create_env(env_name):
+def create_package(package_name):
     import subprocess
-    # add the executables chirp, chirp_get, and chirp_put to the env_name starch file.
+    # add the executables chirp, chirp_get, and chirp_put to the package_name starch file.
     # these executables are assumed to be in the current $PATH.
     # by default, the starch file will execute the chirp command.
 
-    if os.path.exists(env_name):
-        print(f"reusing existing {env_name} starch file...")
+    if os.path.exists(package_name):
+        print(f"reusing existing {package_name} starch file...")
     else:
-        print(f"creating {env_name} starch file...")
-        subprocess.run(["starch", "-x", "chirp_get", "-x", "chirp_put", "-x", "chirp", "-c", "chirp", env_name], check=True)
+        print(f"creating {package_name} starch file...")
+        subprocess.run(["starch", "-x", "chirp_get", "-x", "chirp_put", "-x", "chirp", "-c", "chirp", package_name], check=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -43,17 +43,17 @@ if __name__ == "__main__":
     parser.add_argument('chirp_server', action='store', help='the chirp server where the file is located')
     parser.add_argument('filename', action='store', help='the name of the file')
     parser.add_argument('--ticket', action='store', help='optional server authentication ticket', default=None)
-    parser.add_argument('--create-env', action='store_true', help='whether to create mini environment to ensure chirp is available at the worker.', default=False)
+    parser.add_argument('--create-package', action='store_true', help='whether to create starch package to ensure chirp is available at the worker.', default=False)
 
     args = parser.parse_args()
 
-    # create the chirp environment if needed. This just creates the environment
+    # create the chirp package if needed. This just creates the package
     # in a local file, but does not registers it with a manager. The
-    # environment created comes from a starch file.
-    env_filename = None
-    if args.create_env:
-        env_filename = "chirp_client.sfx"
-        create_env(env_filename)
+    # package created comes from a starch file.
+    package_filename = None
+    if args.create_package:
+        package_filename = "chirp_client.sfx"
+        create_package(package_filename)
 
     # create the manager to now listen to connections, and register files and
     # tasks.
@@ -61,18 +61,18 @@ if __name__ == "__main__":
     print(f"logs in {m.logging_directory}")
     print(f"listening on port {m.port}")
 
-    # declare ticket and env file if needed. These vine files that can
+    # declare ticket and package file if needed. These vine files that can
     # be used as input to tasks.
     ticket = None
     if args.ticket:
         ticket = m.declare_file(args.ticket, cache=True)
 
-    env = None
-    if env_filename:
-        env = m.declare_starch(env_filename, cache=True)
+    package = None
+    if package_filename:
+        package = m.declare_starch(package_filename, cache=True)
 
     # declaring the file as coming from chirp server
-    chirp_file = m.declare_chirp(args.chirp_server, args.filename, ticket=ticket, env=env, cache=True)
+    chirp_file = m.declare_chirp(args.chirp_server, args.filename, ticket=ticket, env=package, cache=True)
 
     # create a task from the python function count_lines. The function will
     # operate on the file "mychirp.file", with is the name that the input file

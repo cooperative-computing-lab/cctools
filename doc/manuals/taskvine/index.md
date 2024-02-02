@@ -812,22 +812,21 @@ like the input to be the result of a query to a database.
     vine_submit(m, my_other_task);
     ```
 
-### Environments
+### Execution Contexts
 
-The execution of a task can be wrapped with specially designed files called
-environments. These environments ensure that the software dependencies for the
+The execution of a task can be wrapped with specially designed packages called execution contexts.
+These ensure that the software dependencies for the
 task are available in the execution site. TaskVine natively supports two types
 of environments: [poncho](../poncho/index.md), which is based on `conda-pack`;
 and [starch](../man_pages/starch.md), a lightweight package useful when the
 manager and workers run the same linux version. Mini tasks can be used to
 create environments not natively supported, as we will show later to construct
-environments for Apptainer (i.e., singularity containers).
+execution contexts for Apptainer (i.e., singularity containers).
 
 #### Poncho
 
-A Poncho environment is a tarball based on `conda-pack`, and is useful to deliver
-complete python environments. For example, to create a python environment with
-`numpy`:
+A Poncho package is a tarball based on `conda-pack`, and is useful to deliver
+a complete python execution context. For example, to create a python package containing `numpy`:
 
 `my_poncho_spec.json`
 ```json
@@ -844,13 +843,13 @@ complete python environments. For example, to create a python environment with
 }
 ```
 
-In the command line, create the poncho environment from the specification:
+From the command line, create the poncho package like this:
 
 ```sh
-poncho_package_create my_poncho_spec.json my_env.tar.gz
+poncho_package_create my_poncho_spec.json my_poncho_pkg.tar.gz
 ```
 
-Attach the environment to the task:
+Attach the package to the task:
 
 === "Python"
     ```python
@@ -860,12 +859,12 @@ Attach the environment to the task:
     s = m.declare_file("my_numpy_script.py", cache=True)
     t.add_input(s, "my_numpy_script.py")
 
-    # declare the environment and its input file
-    poncho_file = m.declare_file("my_env.tar.gz", cache=True)
-    poncho_env = m.declare_poncho(poncho_file, cache=True)
+    # declare the package and its input file
+    poncho_file = m.declare_file("my_poncho_pkg.tar.gz", cache=True)
+    poncho_pkg = m.declare_poncho(poncho_file, cache=True)
 
-    # attach the environment to the task
-    t.add_environment(poncho_env)
+    # attach the package to the task
+    t.add_poncho_package(poncho_pkg)
 
     m.submit(t)
     ```
@@ -878,12 +877,12 @@ Attach the environment to the task:
     struct vine_file *s = vine_declare_file("my_numpy_script.py", VINE_CACHE);
     vine_task_add_input(t, "my_numpy_script.py", 0);
 
-    // declare the environment and its input file
-    struct vine_file *poncho_file = vine_declare_file("my_env.tar.gz", cache=True);
-    struct vine_file *poncho_env  = vine_declare_poncho(poncho_file, cache=True)
+    // declare the package and its input file
+    struct vine_file *poncho_file = vine_declare_file("my_poncho_pkg.tar.gz", cache=True);
+    struct vine_file *poncho_pkg  = vine_declare_poncho(poncho_file, cache=True)
 
-    # attach the environment to the task
-    vine_task_add_environment(poncho_env);
+    # attach the package to the task
+    vine_task_add_poncho_package(t,poncho_pkg);
 
     vine_submit(m, t);
     ```
@@ -892,23 +891,23 @@ Attach the environment to the task:
 
 (to do)
 
-#### Custom Environments
+#### Custom Execution Contents
 
-TaskVine expects environments to expand to a directory, with this minimal
+TaskVine expects execution contents to expand to a directory, with this minimal
 structure:
 
 ```text
-env
+root
 └── bin
     └── run_in_env
 ```
 
 where `run_in_env` is an executable file (usually a shell script) that takes as
 an argument a command line to execute. In the rest of this section we will show
-how to construct an environment that runs its command line inside an Apptainer
+how to construct an execution context that runs its command line inside an Apptainer
 container.
 
-##### Apptainer Custom Environment
+##### Apptainer Execution Context
 
 Our script `run_in_env` script simply calls Apptainer with the desired image, and
 mounts the task's sandbox as the home directory:
@@ -919,30 +918,30 @@ mounts the task's sandbox as the home directory:
 ```
 
 To start, we can manually construct in the command line the needed directory
-structure as follows. Later will be automate these steps with a mini task.
+structure as follows. Later we will automate these steps with a mini task.
 
 ```sh
 # ensure the right execution permissions for the script
 chmod 755 run_command_in_apptainer.sh
 
 # construct the needed directory structure
-mkdir -p my_env/bin
+mkdir -p my_ctx/bin
 
 # copy the apptainer script to the expected run_in_env location
-cp run_command_in_apptainer.sh my_env/bin/run_in_env
+cp run_command_in_apptainer.sh my_ctx/bin/run_in_env
 
-# copy the desired image to the environment's directory
-cp path/to/my_image.img my_env/image.img
+# copy the desired image into the package
+cp path/to/my_image.img my_ctx/image.img
 ```
 
-Now we are ready to declare the environment from its local directory "my_env":
+Now we are ready to declare the execution context from its local directory "my_ctx":
 
 === "Python"
     ```python
     t = Task("/bin/echo from inside apptainer!")
 
-    env = m.declare_file("my_env", cache=True)
-    t.add_environment(env)
+    ctx = m.declare_file("my_ctx", cache=True)
+    t.add_execution_context(ctx)
 
     m.submit(t)
     ```
@@ -951,19 +950,19 @@ Now we are ready to declare the environment from its local directory "my_env":
     ```C
     struct vine_task *t = vine_task_create("/bin/echo from inside apptainer!");
 
-    struct vine_file *env = vine_declare_file(m, "my_env", VINE_CACHE);
-    vine_task_add_environment(env);
+    struct vine_file *ctx = vine_declare_file(m, "my_ctx", VINE_CACHE);
+    vine_task_add_execution_context(ctx);
 
     vine_submit(t);
     ```
 
 
-##### Apptainer Custom Environment with a Mini Task
+##### Apptainer Execution Cpntext From a Mini Task
 
 In the previous section we manually built the directory structure needed for
-the environment. This is not very flexible, as we need to create one such
+the execution context. This is not very flexible, as we need to create one such
 directory per container image that we would like to use. Instead, we can use a
-mini task to construct the environment structure directly on the workers.
+mini task to construct the execution context directly on the workers.
 
 
 === "Python"
@@ -975,20 +974,20 @@ mini task to construct the environment structure directly on the workers.
     runner = m.declare_file("run_command_in_apptainer.sh", cache=True)
     image  = m.declare_file("path/to/my_image.img", cache=True)
 
-    mt.add_input(runner, "env_dir/bin/run_in_env")
-    mt.add_input(image,  "env_dir/image.img")
+    mt.add_input(runner, "ctx/bin/run_in_env")
+    mt.add_input(image,  "ctx/image.img")
 
     # the mini task will extract the environment directory
-    env = m.declare_mini_task(mt,"env_dir")
+    ctx = m.declare_mini_task(mt,"ctx")
 
     # now we define our regular task, and attach the environment to it.
     t = Task("/bin/echo from inside apptainer!")
-    t.add_environment(env)
+    t.add_execution_context(ctx)
 
     m.submit(t)
     ```
 
-You can see the complete example [here](examples/vine_example_apptainer_env.py).
+You can see the complete example [here](examples/vine_example_apptainer_ctx.py).
 
 ### Watching Output Files
 
@@ -1218,10 +1217,10 @@ the application indicates that they will not be needed anymore:
     ...
 
     # once t2 is done, the following call will remove the file from the
-    # taskvine workflow. Further, when not task refers to the file, the file
+    # taskvine workflow. Further, when no task refers to the file, the file
     # will be removed from the manager's disk because of unlink_when_done=True
     # at its declaration.
-    m.remove_file(partial_result)
+    m.undeclare_file(partial_result)
     ```
 
 === "C"
@@ -1237,10 +1236,10 @@ the application indicates that they will not be needed anymore:
     ...
 
     # once t2 is done and deleted with `vine_task_delete`, the following call
-    # will remove the file from the taskvine workflow. Further, when not task
+    # will remove the file from the taskvine workflow. Further, when no task
     # refers to the file, the file will be removed from the manager's disk
     # because of VINE_UNLINK_WHEN_DONE at its declaration.
-    vine_remove_file(partial_result);
+    vine_undeclare_file(partial_result);
     ```
 
 !!! warning
