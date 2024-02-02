@@ -44,6 +44,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import gc
 
 
 ##
@@ -1422,6 +1423,9 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param file    The file object
     def undeclare_file(self, file):
+        # Force outstanding references to the file (or tasks that use the file) to be collected.
+        # This to make unlink_when_done work when we expect it (or to some approximation)
+        gc.collect()
         cvine.vine_undeclare_file(self._taskvine, file._file)
 
     # Deprecated, for backwards compatibility.
