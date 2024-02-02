@@ -54,5 +54,12 @@ m.remove_file(t_a.output_file)
 
 print(f"final output: {t_b.output}")
 
+import os
+import cloudpickle
+outfile = os.path.join(t_b._tmpdir, t_b._out_name_file)
+with open(outfile, "rb") as f:
+    data = cloudpickle.load(f)
+print(f"data = {data}")
+
 assert t_b.output == "hello world!"
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
