@@ -127,6 +127,9 @@ struct jx *batch_env = NULL;
 //Features to pass along as worker arguments
 struct hash_table *features_table = NULL;
 
+// Disable the check for invalid use of AFS with HTCondor.
+static int disable_afs_check = 0;
+
 /*
 In a signal handler, only a limited number of functions are safe to
 invoke, so we construct a string and emit it with a low-level write.
@@ -1170,6 +1173,7 @@ static void show_help(const char *cmd)
 	printf("\nOptions specific to batch systems:\n");
 	printf(" %-30s Generic batch system options.\n", "-B,--batch-options=<options>");
 	printf(" %-30s Specify Amazon config file.\n", "--amazon-config");
+	printf(" %-30s Disable check for use of AFS with HTCondor.\n", "--disable-afs-check");
 	printf(" %-30s Set requirements for the workers as Condor jobs.\n", "--condor-requirements");
 
 }
@@ -1199,10 +1203,11 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_RUN_AS_MANAGER,
 		LONG_OPT_RUN_OS,
 		LONG_OPT_PARENT_DEATH,
-		LONG_OPT_PYTHON_PACKAGE,
+		LONG_OPT_PONCHO_ENV,
 		LONG_OPT_USE_SSL,
 		LONG_OPT_FACTORY_NAME,
 		LONG_OPT_DEBUG_WORKERS,
+		LONG_OPT_DISABLE_AFS_CHECK,
 };
 
 static const struct option long_options[] = {
@@ -1219,6 +1224,7 @@ static const struct option long_options[] = {
 	{"debug-file", required_argument, 0, 'o'},
 	{"debug-file-size", required_argument, 0, 'O'},
 	{"debug-workers", no_argument, 0, LONG_OPT_DEBUG_WORKERS },
+	{"disable-afs-check", no_argument, 0, LONG_OPT_DISABLE_AFS_CHECK },
 	{"disk",   required_argument,  0,  LONG_OPT_DISK},
 	{"env", required_argument, 0, LONG_OPT_ENVIRONMENT_VARIABLE},
 	{"extra-options", required_argument, 0, 'E'},
@@ -1236,8 +1242,9 @@ static const struct option long_options[] = {
 	{"min-workers", required_argument, 0, 'w'},
 	{"parent-death", no_argument, 0, LONG_OPT_PARENT_DEATH},
 	{"password", required_argument, 0, 'P'},
-	{"python-env", required_argument, 0, LONG_OPT_PYTHON_PACKAGE},
-	{"python-package", required_argument, 0, LONG_OPT_PYTHON_PACKAGE}, //same as python-env, kept for compatibility
+	{"poncho-env", required_argument, 0, LONG_OPT_PONCHO_ENV},
+	{"python-env", required_argument, 0, LONG_OPT_PONCHO_ENV}, // backwards compatibility
+	{"python-package", required_argument, 0, LONG_OPT_PONCHO_ENV}, // backwards compatibility
 	{"scratch-dir", required_argument, 0, 'S' },
 	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
 	{"timeout", required_argument, 0, 't'},
@@ -1365,9 +1372,9 @@ int main(int argc, char *argv[])
 					condor_requirements = string_format("(%s)", optarg);
 				}
 				break;
-			case LONG_OPT_PYTHON_PACKAGE:
+			case LONG_OPT_PONCHO_ENV:
 				{
-				// --package X is the equivalent of --wrapper "poncho_package_run X" --wrapper-input X
+				// --poncho-env X is the equivalent of --wrapper "poncho_package_run X" --wrapper-input X
 				char *fullpath = path_which("poncho_package_run");
 				if(!fullpath) {
 					fprintf(stderr,"vine_factory: could not find poncho_package_run in PATH");
@@ -1432,6 +1439,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_FACTORY_NAME:
 				factory_name = xxstrdup(optarg);
+				break;
+			case LONG_OPT_DISABLE_AFS_CHECK:
+				disable_afs_check = 1;
 				break;
 			default:
 				show_help(argv[0]);
@@ -1511,14 +1521,22 @@ int main(int argc, char *argv[])
 	/*
 	Careful here: most of the supported batch systems expect
 	that jobs are submitting from a single shared filesystem.
-	Changing to /tmp only works in the case of Condor.
+	In general, we will put log files into a subdir of the
+	current working directory, with a unique name to separate
+	factory instances.
+
+	However, HTCondor has two constraints:
+	1 - Recent versions of HTCondor insist upon the user log
+	being written to a file under $HOME, for reasons unknown.
+	It will emit errors at submit time if this happens.
+
+	2 - Condor cannot easily deal with files submitted from
+	an AFS home directory, without making things world writeable.
+	We will complain about that here.
 	*/
+
 	if(!scratch_dir) {
-		const char *scratch_parent_dir = ".";
-		if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
-			scratch_parent_dir = system_tmp_dir(NULL);
-		}
-		scratch_dir = string_format("%s/vine-factory-%d", scratch_parent_dir, getuid());
+		scratch_dir = string_format("vine-factory-%d",getuid());
 	}
 
 	if(!create_dir(scratch_dir,0777)) {
@@ -1526,6 +1544,21 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR && !disable_afs_check) {
+		char *absolute_scratch_dir = realpath(scratch_dir,0);
+		if(!absolute_scratch_dir) {
+			fprintf(stderr,"vine_factory: couldn't get full path of %s: %s\n",scratch_dir,strerror(errno));
+			return 1;
+		}
+
+		if(!strncmp(absolute_scratch_dir,"/afs",4)) {
+			fprintf(stderr,"vine_factory: The scratch directory is '%s'\n", absolute_scratch_dir);
+			fprintf(stderr,"This won't work because Condor is not able to write to files in AFS.\n");
+			fprintf(stderr,"Please use --scratch-dir to choose a different scratch directory.\n");
+			return 1;
+		}
+	}
+		
 	const char *item = NULL;
 	list_first_item(wrapper_inputs);
 	while((item = list_next_item(wrapper_inputs))) {

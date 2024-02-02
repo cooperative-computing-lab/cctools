@@ -525,6 +525,18 @@ class Manager(object):
         return cvine.vine_set_catalog_servers(self._taskvine, catalogs)
 
     ##
+    # Add a global property to the manager which will be included in periodic
+    # reports to the catalog server and other telemetry destinations.
+    # This is helpful for distinguishing higher level information about the entire run,
+    # such as the name of the framework being used, or the logical name of the dataset
+    # being processed.
+    # @param m A manager object
+    # @param name The name of the property.
+    # @param value The value of the property.
+    def set_property(self, name, value):
+        cvine.vine_set_property(self._taskvine, name, value)
+
+    ##
     # Specify a directory to write logs and staging files.
     #
     # @param self     Reference to the current manager object.
@@ -676,7 +688,7 @@ class Manager(object):
     # @param self   Reference to the current manager object.
     # @param id     The task_id returned from @ref ndcctools.taskvine.manager.Manager.submit.
     # @return One if the task was found and cancelled, zero otherwise.
-    
+
     def cancel_by_task_id(self, id):
         return cvine.vine_cancel_by_task_id(self._taskvine, id)
 
@@ -700,7 +712,7 @@ class Manager(object):
     # @return The total number of tasks cancelled.
     def cancel_by_category(self, category):
         total = 0
- 
+
         for task in self._task_table.values():
             if task.category == category:
                 total += self.cancel_by_task_id(task.id)
@@ -824,9 +836,9 @@ class Manager(object):
     def submit(self, task):
         task.submit_finalize(self)
         task_id = cvine.vine_submit(self._taskvine, task._task)
-        if(task_id==0):
+        if task_id == 0:
             raise ValueError("invalid task description")
-        else:   
+        else:
             self._task_table[task_id] = task
             return task_id
 
@@ -877,7 +889,7 @@ class Manager(object):
         # Positional arguments are the list of functions to include in the library.
         # Create a unique hash of a combination of function names and bodies.
         functions_hash = package_serverize.generate_functions_hash(function_list)
-        
+
         # Create path for caching library code and environment based on function hash.
         library_cache_path = f"{self.cache_directory}/vine-library-cache/{functions_hash}"
         library_code_path = f"{library_cache_path}/library_code.py"
@@ -890,16 +902,16 @@ class Manager(object):
 
         # If library cache directory doesn't exist, create it.
         pathlib.Path(library_cache_path).mkdir(mode=0o755, parents=True, exist_ok=True)
-        
+
         # If the library code and environment exist, move on to creating the Library Task.
         # Else create them in the relevant paths.
         if not (os.path.isfile(library_code_path) and os.path.isfile(library_env_path)):
             # Don't create a new poncho environment tarball is one is already provided or
             # user explicitly tells not to via `add_env`.
-            need_pack=True
+            need_pack = True
             if poncho_env or not add_env:
-                need_pack=False
-            
+                need_pack = False
+
             # create library code and environment, if appropriate
             package_serverize.serverize_library_from_code(library_cache_path, function_list, name, need_pack=need_pack, import_modules=import_modules)
 
@@ -916,7 +928,7 @@ class Manager(object):
         if add_env:
             f = self.declare_poncho(library_env_path, cache=True)
             t.add_environment(f)
-    
+
         # Declare the library code as an input.
         f = self.declare_file(library_code_path, cache=True)
         t.add_input(f, "library_code.py")
@@ -1090,8 +1102,8 @@ class Manager(object):
                     n += 1
                     break
 
-        results=[elem if isinstance(elem, list) else [elem] for elem in results]
-        
+        results = [elem if isinstance(elem, list) else [elem] for elem in results]
+
         return [item for elem in results for item in elem]
 
     ##
@@ -1158,8 +1170,8 @@ class Manager(object):
                     n += 1
                     break
 
-        results=[elem if isinstance(elem, list) else [elem] for elem in results]
-        
+        results = [elem if isinstance(elem, list) else [elem] for elem in results]
+
         return [item for elem in results for item in elem]
 
     ##
@@ -1255,8 +1267,8 @@ class Manager(object):
                     n += 1
                     break
 
-        results=[elem if isinstance(elem, list) else [elem] for elem in results]
-        
+        results = [elem if isinstance(elem, list) else [elem] for elem in results]
+
         return [item for elem in results for item in elem]
 
     ##
@@ -1314,8 +1326,8 @@ class Manager(object):
                     n += 1
                     break
 
-        results=[elem if isinstance(elem, list) else [elem] for elem in results]
-        
+        results = [elem if isinstance(elem, list) else [elem] for elem in results]
+
         return [item for elem in results for item in elem]
 
     ##
@@ -1381,10 +1393,11 @@ class Manager(object):
     #                end-of-life of the worker. Default is False (file is not cache).
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
+    # @param unlink_when_done   Whether to delete the file when its reference count is 0. (Warning: Only use on files produced by the application, and never on irreplaceable input files.)
     # @return
     # A file object to use in @ref ndcctools.taskvine.task.Task.add_input or @ref ndcctools.taskvine.task.Task.add_output
-    def declare_file(self, path, cache=False, peer_transfer=True):
-        flags = Task._determine_file_flags(cache, peer_transfer)
+    def declare_file(self, path, cache=False, peer_transfer=True, unlink_when_done=False):
+        flags = Task._determine_file_flags(cache, peer_transfer, unlink_when_done)
         f = cvine.vine_declare_file(self._taskvine, path, flags)
         return File(f)
 
@@ -1394,18 +1407,26 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param file    The file object
     # @return The contents of the file as a strong.
-    
+
     def fetch_file(self, file):
         return cvine.vine_fetch_file(self._taskvine, file._file)
 
     ##
-    # Remove file from workers, undeclare it at the manager.
-    # Note that this does not remove the file's local copy at the manager, if any.
+    # Un-declare a file that was created by @ref declare_file or similar methods.
+    # The given file or directory object is deleted from all worker's caches,
+    # and is no longer available for use as an input file.
+    # Completed tasks waiting for retrieval are not affected.
+    # Note that all declared files are automatically undeclared by @ref vine_delete,
+    # however this function can be used for earlier cleanup of unneeded file objects.
     #
     # @param self    The manager to register this file
     # @param file    The file object
+    def undeclare_file(self, file):
+        cvine.vine_undeclare_file(self._taskvine, file._file)
+
+    # Deprecated, for backwards compatibility.
     def remove_file(self, file):
-        cvine.vine_remove_file(self._taskvine, file._file)
+        self.undeclare_file(file)
 
     ##
     # Declare an anonymous file has no initial content, but is created as the
@@ -1621,6 +1642,22 @@ class Manager(object):
         flags = Task._determine_file_flags(cache, peer_transfer)
         f = cvine.vine_declare_chirp(self._taskvine, server, source, ticket_c, env_c, flags)
         return File(f)
+
+    ##
+    # Adds a custom APPLICATION entry to the transactions log.
+    #
+    # @param self   The manager to register this file.
+    # @param server A custom transaction message
+    def log_txn_app(self, entry):
+        cvine.vine_log_txn_app(self._taskvine, entry)
+
+    ##
+    # Adds a custom APPLICATION entry to the debug log.
+    #
+    # @param self   The manager to register this file.
+    # @param server A custom debug message
+    def log_debug_app(self, entry):
+        cvine.vine_log_debug_app(self._taskvine, entry)
 
 
 ##

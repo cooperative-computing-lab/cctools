@@ -2016,6 +2016,10 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "port", vine_port(q));
 	jx_insert_integer(j, "priority", q->priority);
 	jx_insert_string(j, "manager_preferred_connection", q->manager_preferred_connection);
+	jx_insert_string(j, "taskvine_uuid", q->uuid);
+
+	char *name, *key;
+	HASH_TABLE_ITERATE(q->properties, name, key) { jx_insert_string(j, name, key); }
 
 	int use_ssl = 0;
 #ifdef HAS_OPENSSL
@@ -2136,6 +2140,9 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	jx_insert_string(j, "version", CCTOOLS_VERSION);
 	jx_insert_string(j, "type", "vine_manager");
 	jx_insert_integer(j, "port", vine_port(q));
+
+	char *name, *key;
+	HASH_TABLE_ITERATE(q->properties, name, key) { jx_insert_string(j, name, key); }
 
 	int use_ssl = 0;
 #ifdef HAS_OPENSSL
@@ -3691,6 +3698,17 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	getcwd(q->workingdir, PATH_MAX);
 
+	q->properties = hash_table_create(3, 0);
+
+	/*
+	Do it the long way around here so that m->uuid
+	is a plain string pointer and we don't end up polluting
+	taskvine.h with dttools/uuid.h
+	*/
+	cctools_uuid_t local_uuid;
+	cctools_uuid_create(&local_uuid);
+	q->uuid = strdup(local_uuid.str);
+
 	q->next_task_id = 1;
 	q->fixed_location_in_queue = 0;
 
@@ -3951,6 +3969,15 @@ void vine_set_catalog_servers(struct vine_manager *q, const char *hosts)
 	}
 }
 
+void vine_set_property(struct vine_manager *m, const char *name, const char *value)
+{
+	char *oldvalue = hash_table_remove(m->properties, name);
+	if (oldvalue)
+		free(oldvalue);
+
+	hash_table_insert(m->properties, name, strdup(value));
+}
+
 void vine_set_password(struct vine_manager *q, const char *password) { q->password = xxstrdup(password); }
 
 int vine_set_password_file(struct vine_manager *q, const char *file)
@@ -4020,6 +4047,10 @@ void vine_delete(struct vine_manager *q)
 
 	free(q->name);
 	free(q->manager_preferred_connection);
+	free(q->uuid);
+
+	hash_table_clear(q->properties, (void *)free);
+	hash_table_delete(q->properties);
 
 	free(q->poll_table);
 	free(q->ssl_cert);
@@ -4373,6 +4404,9 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 	/* If the task produces temporary files, create recovery tasks for those. */
 	vine_manager_create_recovery_tasks(q, t);
+
+	/* If the task produces watched output files, truncate them. */
+	vine_task_truncate_watched_outputs(t);
 
 	/* Add reference to task when adding it to primary table. */
 	itable_insert(q->tasks, t->task_id, vine_task_clone(t));
@@ -5661,61 +5695,71 @@ int vine_set_task_id_min(struct vine_manager *q, int minid)
 /* File functions */
 
 /*
-Request to remove a file
-Decrement the reference count and delete if zero.
+Careful: The semantics of undeclare_file are a little subtle.
+The user calls this function to indicate that they are done
+using a particular file, and there will be no more tasks
+that can consume it.
+
+This causes the file to be removed from the manager's table,
+the replicas in the cluster to be deleted.
+There should be no running tasks that require the file after this.
+
+However, there may be *returned* tasks that still hold
+references to the vine_file object, and so it will not be
+fully garbage collected until those also call vine_file_delete
+to bring the reference count to zero.  At that point, if
+the UNLINK_WHEN_DONE flag is on, the local state will also be deleted.
 */
-void vine_remove_file(struct vine_manager *m, struct vine_file *f)
+
+void vine_undeclare_file(struct vine_manager *m, struct vine_file *f)
 {
 	if (!f) {
 		return;
 	}
 
+	/*
+	Special case: If the manager has already been gc'ed
+	(e.g. by python exiting), we can still delete the
+	file object itself, which may have further cleanup
+	side effects.
+	*/
+
+	if (!m) {
+		vine_file_delete(f);
+		return;
+	}
+
 	const char *filename = f->cached_name;
 
-	char *key;
-	struct vine_worker_info *w;
-	HASH_TABLE_ITERATE(m->worker_table, key, w)
-	{
+	/*
+	If this is not a file that should be cached forever,
+	delete all of the replicas present at remote workers.
+	*/
 
-		if (!vine_file_replica_table_lookup(w, filename))
-			continue;
-
-		struct vine_task *t;
-		uint64_t task_id;
-		ITABLE_ITERATE(w->current_tasks, task_id, t)
+	if ((f->flags & VINE_CACHE_ALWAYS) != VINE_CACHE_ALWAYS) {
+		char *key;
+		struct vine_worker_info *w;
+		HASH_TABLE_ITERATE(m->worker_table, key, w)
 		{
-
-			struct vine_mount *mnt;
-			LIST_ITERATE(t->input_mounts, mnt)
-			{
-				if (strcmp(filename, mnt->file->cached_name) == 0) {
-					reset_task_to_state(m, t, VINE_TASK_READY);
-					continue;
-				}
-			}
-
-			LIST_ITERATE(t->output_mounts, mnt)
-			{
-				if (strcmp(filename, mnt->file->cached_name) == 0) {
-					reset_task_to_state(m, t, VINE_TASK_READY);
-					continue;
-				}
+			if (vine_file_replica_table_lookup(w, filename)) {
+				delete_worker_file(m, w, filename, 0, 0);
 			}
 		}
-
-		/* when explicitely asked to remove a file, we remove it regardless of
-		 * the cache flags. */
-		delete_worker_file(m, w, filename, 0, 0);
 	}
+
+	/* Remove the object from our table and delete a reference. */
 
 	if (hash_table_lookup(m->file_table, f->cached_name)) {
-		/* delete the reference added when declaring the file. */
-		/* the rest of the references, if any, will be deleted as the tasks
-		 * that reference the file are deleted. */
-
-		vine_file_delete(f);
 		hash_table_remove(m->file_table, f->cached_name);
+		vine_file_delete(f);
 	}
+
+	/*
+	Note that the file object may still exist if the user
+	still holds pointers to inactive tasks that refer to
+	this file. But the object is no longer the manager's
+	responsibility.
+	*/
 }
 
 struct vine_file *vine_manager_lookup_file(struct vine_manager *m, const char *cached_name)
@@ -5856,5 +5900,9 @@ const char *vine_fetch_file(struct vine_manager *m, struct vine_file *f)
 
 	return 0;
 }
+
+void vine_log_debug_app(struct vine_manager *m, const char *entry) { debug(D_VINE, "APPLICATION %s", entry); }
+
+void vine_log_txn_app(struct vine_manager *m, const char *entry) { vine_txn_log_write_app_entry(m, entry); }
 
 /* vim: set noexpandtab tabstop=8: */

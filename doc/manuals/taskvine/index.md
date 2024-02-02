@@ -812,22 +812,21 @@ like the input to be the result of a query to a database.
     vine_submit(m, my_other_task);
     ```
 
-### Environments
+### Execution Contexts
 
-The execution of a task can be wrapped with specially designed files called
-environments. These environments ensure that the software dependencies for the
+The execution of a task can be wrapped with specially designed packages called execution contexts.
+These ensure that the software dependencies for the
 task are available in the execution site. TaskVine natively supports two types
 of environments: [poncho](../poncho/index.md), which is based on `conda-pack`;
 and [starch](../man_pages/starch.md), a lightweight package useful when the
 manager and workers run the same linux version. Mini tasks can be used to
 create environments not natively supported, as we will show later to construct
-environments for Apptainer (i.e., singularity containers).
+execution contexts for Apptainer (i.e., singularity containers).
 
 #### Poncho
 
-A Poncho environment is a tarball based on `conda-pack`, and is useful to deliver
-complete python environments. For example, to create a python environment with
-`numpy`:
+A Poncho package is a tarball based on `conda-pack`, and is useful to deliver
+a complete python execution context. For example, to create a python package containing `numpy`:
 
 `my_poncho_spec.json`
 ```json
@@ -844,13 +843,13 @@ complete python environments. For example, to create a python environment with
 }
 ```
 
-In the command line, create the poncho environment from the specification:
+From the command line, create the poncho package like this:
 
 ```sh
-poncho_package_create my_poncho_spec.json my_env.tar.gz
+poncho_package_create my_poncho_spec.json my_poncho_pkg.tar.gz
 ```
 
-Attach the environment to the task:
+Attach the package to the task:
 
 === "Python"
     ```python
@@ -860,12 +859,12 @@ Attach the environment to the task:
     s = m.declare_file("my_numpy_script.py", cache=True)
     t.add_input(s, "my_numpy_script.py")
 
-    # declare the environment and its input file
-    poncho_file = m.declare_file("my_env.tar.gz", cache=True)
-    poncho_env = m.declare_poncho(poncho_file, cache=True)
+    # declare the package and its input file
+    poncho_file = m.declare_file("my_poncho_pkg.tar.gz", cache=True)
+    poncho_pkg = m.declare_poncho(poncho_file, cache=True)
 
-    # attach the environment to the task
-    t.add_environment(poncho_env)
+    # attach the package to the task
+    t.add_poncho_package(poncho_pkg)
 
     m.submit(t)
     ```
@@ -878,12 +877,12 @@ Attach the environment to the task:
     struct vine_file *s = vine_declare_file("my_numpy_script.py", VINE_CACHE);
     vine_task_add_input(t, "my_numpy_script.py", 0);
 
-    // declare the environment and its input file
-    struct vine_file *poncho_file = vine_declare_file("my_env.tar.gz", cache=True);
-    struct vine_file *poncho_env  = vine_declare_poncho(poncho_file, cache=True)
+    // declare the package and its input file
+    struct vine_file *poncho_file = vine_declare_file("my_poncho_pkg.tar.gz", cache=True);
+    struct vine_file *poncho_pkg  = vine_declare_poncho(poncho_file, cache=True)
 
-    # attach the environment to the task
-    vine_task_add_environment(poncho_env);
+    # attach the package to the task
+    vine_task_add_poncho_package(t,poncho_pkg);
 
     vine_submit(m, t);
     ```
@@ -892,23 +891,23 @@ Attach the environment to the task:
 
 (to do)
 
-#### Custom Environments
+#### Custom Execution Contents
 
-TaskVine expects environments to expand to a directory, with this minimal
+TaskVine expects execution contents to expand to a directory, with this minimal
 structure:
 
 ```text
-env
+root
 └── bin
     └── run_in_env
 ```
 
 where `run_in_env` is an executable file (usually a shell script) that takes as
 an argument a command line to execute. In the rest of this section we will show
-how to construct an environment that runs its command line inside an Apptainer
+how to construct an execution context that runs its command line inside an Apptainer
 container.
 
-##### Apptainer Custom Environment
+##### Apptainer Execution Context
 
 Our script `run_in_env` script simply calls Apptainer with the desired image, and
 mounts the task's sandbox as the home directory:
@@ -919,30 +918,30 @@ mounts the task's sandbox as the home directory:
 ```
 
 To start, we can manually construct in the command line the needed directory
-structure as follows. Later will be automate these steps with a mini task.
+structure as follows. Later we will automate these steps with a mini task.
 
 ```sh
 # ensure the right execution permissions for the script
 chmod 755 run_command_in_apptainer.sh
 
 # construct the needed directory structure
-mkdir -p my_env/bin
+mkdir -p my_ctx/bin
 
 # copy the apptainer script to the expected run_in_env location
-cp run_command_in_apptainer.sh my_env/bin/run_in_env
+cp run_command_in_apptainer.sh my_ctx/bin/run_in_env
 
-# copy the desired image to the environment's directory
-cp path/to/my_image.img my_env/image.img
+# copy the desired image into the package
+cp path/to/my_image.img my_ctx/image.img
 ```
 
-Now we are ready to declare the environment from its local directory "my_env":
+Now we are ready to declare the execution context from its local directory "my_ctx":
 
 === "Python"
     ```python
     t = Task("/bin/echo from inside apptainer!")
 
-    env = m.declare_file("my_env", cache=True)
-    t.add_environment(env)
+    ctx = m.declare_file("my_ctx", cache=True)
+    t.add_execution_context(ctx)
 
     m.submit(t)
     ```
@@ -951,19 +950,19 @@ Now we are ready to declare the environment from its local directory "my_env":
     ```C
     struct vine_task *t = vine_task_create("/bin/echo from inside apptainer!");
 
-    struct vine_file *env = vine_declare_file(m, "my_env", VINE_CACHE);
-    vine_task_add_environment(env);
+    struct vine_file *ctx = vine_declare_file(m, "my_ctx", VINE_CACHE);
+    vine_task_add_execution_context(ctx);
 
     vine_submit(t);
     ```
 
 
-##### Apptainer Custom Environment with a Mini Task
+##### Apptainer Execution Cpntext From a Mini Task
 
 In the previous section we manually built the directory structure needed for
-the environment. This is not very flexible, as we need to create one such
+the execution context. This is not very flexible, as we need to create one such
 directory per container image that we would like to use. Instead, we can use a
-mini task to construct the environment structure directly on the workers.
+mini task to construct the execution context directly on the workers.
 
 
 === "Python"
@@ -975,20 +974,20 @@ mini task to construct the environment structure directly on the workers.
     runner = m.declare_file("run_command_in_apptainer.sh", cache=True)
     image  = m.declare_file("path/to/my_image.img", cache=True)
 
-    mt.add_input(runner, "env_dir/bin/run_in_env")
-    mt.add_input(image,  "env_dir/image.img")
+    mt.add_input(runner, "ctx/bin/run_in_env")
+    mt.add_input(image,  "ctx/image.img")
 
     # the mini task will extract the environment directory
-    env = m.declare_mini_task(mt,"env_dir")
+    ctx = m.declare_mini_task(mt,"ctx")
 
     # now we define our regular task, and attach the environment to it.
     t = Task("/bin/echo from inside apptainer!")
-    t.add_environment(env)
+    t.add_execution_context(ctx)
 
     m.submit(t)
     ```
 
-You can see the complete example [here](examples/vine_example_apptainer_env.py).
+You can see the complete example [here](examples/vine_example_apptainer_ctx.py).
 
 ### Watching Output Files
 
@@ -1198,6 +1197,56 @@ warranted:
         // submit more tasks...
     }
     ```
+
+### Automatic Garbage Collection on Disk
+
+For workflows that generate partial results that are not needed once a final
+result has been computed, TaskVine can automatically delete them from disk when
+the application indicates that they will not be needed anymore:
+
+=== "Python"
+    ```python
+    partial_result = m.declare_file("my_partial_result", unlink_when_done=True)
+
+    t1 = Task(...)
+    t1.add_output(partial_result, "my_partial_result")
+    ...
+
+    t2 = Task(...)
+    t2.add_input(partial_result, "my_partial_result")
+    ...
+
+    # once t2 is done, the following call will remove the file from the
+    # taskvine workflow. Further, when no task refers to the file, the file
+    # will be removed from the manager's disk because of unlink_when_done=True
+    # at its declaration.
+    m.undeclare_file(partial_result)
+    ```
+
+=== "C"
+    ```C
+    struct vine_file *partial_result = vine_declare_file(m, "my_partial_result", VINE_UNLINK_WHEN_DONE);
+
+    struct vine_task *t1 = vine_task_create(...);
+    vine_task_add_output(partial_result, "my_partial_result", /* any desired mount flags */ 0);
+    ...
+
+    struct vine_task *t2 = vine_task_create(...);
+    vine_task_add_input(partial_result, "my_partial_result", /* any desired mount flags */ 0);
+    ...
+
+    # once t2 is done and deleted with `vine_task_delete`, the following call
+    # will remove the file from the taskvine workflow. Further, when no task
+    # refers to the file, the file will be removed from the manager's disk
+    # because of VINE_UNLINK_WHEN_DONE at its declaration.
+    vine_undeclare_file(partial_result);
+    ```
+
+!!! warning
+    Never use this feature on files that the TaskVine application did not create. Otherwise you
+    run the risk of removing irreplaceable input files
+
+
 
 ### Disconnect slow workers
 
@@ -2218,6 +2267,7 @@ If you need to change the prefix `vine-run-info` to some other directory, use
     ```
 
 === "C"
+    ```C
     // logs appear at /new/desired/path/%Y-%m-%dT%H:%M:%S/vine-logs
     vine_set_runtime_info_path("/new/desired/path")
     struct taskvine *m = vine_create(0);
@@ -2247,26 +2297,16 @@ To enable debugging at the worker, set the `-d` option:
 $ vine_worker -d all -o worker.debug -M myproject
 ```
 
-### Task Graph Log
+Custom APPLICATION messages can be added to the log with the calls:
 
-The complete graph of tasks and files is recorded in `taskgraph`
-using the [Graphviz](https://graphviz.org) Dot file format.  With the `dot` tool installed, you
-can visualize the task graph as follows:
-
-```sh
-dot -Tpng vine-run-info/most-recent/vine-logs/taskgraph > taskgraph.png
-```
-
-This can produce results like this:
-
-![Example Task Graph](images/taskgraph.png)
-
-Note that very large task graphs may be impractical to graph at this level of detail.
-
-!!! note
-    You may need to install Graphviz Dot separately like this:
+=== "Python"
+    ```python
+    m.log_debug_app("your custom log message")
     ```
-    conda install -c conda-forge graphviz
+
+=== "C"
+    ```
+    vine_log_debug_app("your custom log message")
     ```
 
 ### Performance Log
@@ -2279,175 +2319,78 @@ total number of cores available, etc. The log is located by default at:
 vine-run-info/%Y-%m-%dT%H:%M:%S/vine-logs/performance
 ```
 
-The time series are presented in columns, with the leftmost column as a
-timestamp in microseconds. The first row always contains the name of the
-columns. Here is an example of the first few rows and columns.
-
-```text
-# timestamp workers_connected workers_init workers_idle workers_busy workers_...
-1602165237833411 0 0 0 0 0 0 0 0 0 0 0 0 5 0 0 0 5 0 0 0 0 0 1602165237827668 ...
-1602165335687547 1 0 0 1 1 1 0 0 0 0 0 0 4 1 0 0 5 0 0 0 0 0 1602165237827668 ...
-1602165335689677 1 0 0 1 1 1 0 0 0 0 0 0 4 1 1 1 5 1 0 0 0 0 1602165237827668 ...
-...
-```
-
 The script `vine_graph_log` is a wrapper for `gnuplot`, and with it you
 can plot some of the statistics, such as total time spent transfering tasks,
-number of tasks running, and workers connected:
+number of tasks running, and workers connected.  For example, this command:
 
 ```sh
 $ vine_graph_log -o myplots my.stats.log
-$ ls *.png
-$ ... my.stats.log.tasks.png my.stats.log.tasks-log.png my.stats.log.time.png my.stats.log.time-log.png ...
 ```
 
-We find it very helpful to plot these statistics when diagnosing a problem with
-TaskVine applications.
+produces the following graphs:
+
+![](images/plot-perf-montage.png)
+
+- [Performance Log File Format Details](log-file-formats#performance-log-format)
 
 ### Transactions Log
 
-Finally, the transactions log records the lifetime of tasks and workers. It is
+The transactions log records the lifetime of tasks and workers. It is
 specially useful for tracking the resources requested, allocated, and used by
-tasks. It is located by default at:
+specific tasks. It is located by default at:
 
 ```sh
 vine-run-info/%Y-%m-%dT%H:%M:%S/vine-logs/transactions
 ```
 
-The first few lines of the log document the possible log records:
-
-```text
-# time manager_pid MANAGER manager_pid START|END time_from_origin
-# time manager_pid WORKER worker_id CONNECTION host:port
-# time manager_pid WORKER worker_id DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT)
-# time manager_pid WORKER worker_id RESOURCES {resources}
-# time manager_pid WORKER worker_id CACHE_UPDATE filename size_in_mb wall_time_us start_time_us
-# time manager_pid WORKER worker_id TRANSFER (INPUT|OUTPUT) filename size_in_mb wall_time_us start_time_us
-# time manager_pid CATEGORY name MAX {resources_max_per_task}
-# time manager_pid CATEGORY name MIN {resources_min_per_task_per_worker}
-# time manager_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}
-# time manager_pid TASK task_id WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) attempt_number {resources_requested}
-# time manager_pid TASK task_id RUNNING worker_id (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}
-# time manager_pid TASK task_id WAITING_RETRIEVAL worker_id
-# time manager_pid TASK task_id RETRIEVED (SUCCESS|UNKNOWN|INPUT_MISSING|OUTPUT_MISSING|STDOUT_MISSING|SIGNAL|RESOURCE_EXHAUSTION|MAX_RETRIES|MAX_END_TIME|MAX_WALL_TIME|FORSAKEN) {limits_exceeded} {resources_measured}
-# time manager_pid TASK task_id DONE (SUCCESS|UNKNOWN|INPUT_MISSING|OUTPUT_MISSING|STDOUT_MISSING|SIGNAL|RESOURCE_EXHAUSTION|MAX_RETRIES|MAX_END_TIME|MAX_WALL_TIME|FORSAKEN) exit_code
-# time manager_pid LIBRARY library_id (WAITING|SENT|STARTED|FAILURE) worker_id
-
-```
-
-Lowercase words indicate values, and uppercase indicate constants. A bar (|) inside parentheses indicate a choice of possible constants. Variables encased in braces {} indicate a JSON dictionary. Here is an example of the first few records of a transactions log:
-
-```
-1679929304405580 4107108 MANAGER 4107108 START 0
-1679929315785718 4107108 TASK 1 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
-1679929315789781 4107108 TASK 2 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
-1679929315791349 4107108 TASK 3 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
-1679929315792852 4107108 TASK 4 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
-1679929315794343 4107108 TASK 5 WAITING default FIRST_RESOURCES 1 {"cores":[1,"cores"]}
-...
-```
-
-With the transactions log, it is easy to track the lifetime of a task. For example, to print the lifetime of the task with id 1, we can simply do:
-
-```
-$ grep 'TASK \<1\>' my.tr.log
-1599244364466668 16444 TASK 1 WAITING default FIRST_RESOURCES {"cores":[1,"cores"],"memory":[800,"MB"],"disk":[500,"MB"]}
-1599244400311044 16444 TASK 1 RUNNING 10.32.79.143:48268  FIRST_RESOURCES {"cores":[4,"cores"],"memory":[4100,"MB"],...}
-1599244539953798 16444 TASK 1 WAITING_RETRIEVAL 10.32.79.143:48268
-1599244540075173 16444 TASK 1 RETRIEVED SUCCESS  0  {} {"cores":[1,"cores"],"wall_time":[123.137485,"s"],...}
-1599244540083820 16444 TASK 1 DONE SUCCESS  0  {} {"cores":[1,"cores"],"wall_time":[123.137485,"s"],...}
-```
-
-The statistics available are:
-
-| Field | Description |
-|-------|-------------|
-|       | **Stats for the current state of workers** |
-| workers_connected	    | Number of workers currently connected to the manager |
-| workers_init          | Number of workers connected, but that have not send their available resources report yet |
-| workers_idle          | Number of workers that are not running a task |
-| workers_busy          | Number of workers that are running at least one task |
-| workers_able          | Number of workers on which the largest task can run |
-|||
-|       | **Cumulative stats for workers** |
-| workers_joined        | Total number of worker connections that were established to the manager |
-| workers_removed       | Total number of worker connections that were released by the manager, idled-out, slow, or lost |
-| workers_released      | Total number of worker connections that were asked by the manager to disconnect |
-| workers_idled_out     | Total number of worker that disconnected for being idle |
-| workers_slow          | Total number of worker connections terminated for being too slow |
-| workers_blacklisted   | Total number of workers blacklisted by the manager (includes workers_slow) |
-| workers_lost          | Total number of worker connections that were unexpectedly lost (does not include idled-out or slow) |
-|||
-|       | **Stats for the current state of tasks** |
-| tasks_waiting         | Number of tasks waiting to be dispatched |
-| tasks_on_workers      | Number of tasks currently dispatched to some worker |
-| tasks_running         | Number of tasks currently executing at some worker |
-| tasks_with_results    | Number of tasks with retrieved results and waiting to be returned to user |
-|||
-|       | **Cumulative stats for tasks** |
-| tasks_submitted            | Total number of tasks submitted to the manager |
-| tasks_dispatched           | Total number of tasks dispatch to workers |
-| tasks_done                 | Total number of tasks completed and returned to user (includes tasks_failed) |
-| tasks_failed               | Total number of tasks completed and returned to user with result other than VINE_RESULT_SUCCESS |
-| tasks_cancelled            | Total number of tasks cancelled |
-| tasks_exhausted_attempts   | Total number of task executions that failed given resource exhaustion |
-|||
-|       | **Manager time statistics (in microseconds)** |
-| time_when_started  | Absolute time at which the manager started |
-| time_send          | Total time spent in sending tasks to workers (tasks descriptions, and input files) |
-| time_receive       | Total time spent in receiving results from workers (output files) |
-| time_send_good     | Total time spent in sending data to workers for tasks with result VINE_RESULT_SUCCESS |
-| time_receive_good  | Total time spent in sending data to workers for tasks with result VINE_RESULT_SUCCESS |
-| time_status_msgs   | Total time spent sending and receiving status messages to and from workers, including workers' standard output, new workers connections, resources updates, etc. |
-| time_internal      | Total time the manager spents in internal processing |
-| time_polling       | Total time blocking waiting for worker communications (i.e., manager idle waiting for a worker message) |
-| time_application   | Total time spent outside vine_wait |
-|||
-|       | **Wrokers time statistics (in microseconds)** |
-| time_workers_execute             | Total time workers spent executing done tasks |
-| time_workers_execute_good        | Total time workers spent executing done tasks with result VINE_RESULT_SUCCESS |
-| time_workers_execute_exhaustion  | Total time workers spent executing tasks that exhausted resources |
-|||
-|       | **Transfer statistics** |
-| bytes_sent      | Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the manager |
-| bytes_received  | Total number of file bytes (not including protocol control msg bytes) received from the workers by the manager |
-| bandwidth       | Average network bandwidth in MB/S observed by the manager when transferring to workers |
-|||
-|       | **Resources statistics** |
-| capacity_tasks      | The estimated number of tasks that this manager can effectively support |
-| capacity_cores      | The estimated number of workers' cores that this manager can effectively support |
-| capacity_memory     | The estimated number of workers' MB of RAM that this manager can effectively support |
-| capacity_disk       | The estimated number of workers' MB of disk that this manager can effectively support |
-| capacity_instantaneous       | The estimated number of tasks that this manager can support considering only the most recently completed task |
-| capacity_weighted   | The estimated number of tasks that this manager can support placing greater weight on the most recently completed task |
-|||
-| total_cores       | Total number of cores aggregated across the connected workers |
-| total_memory      | Total memory in MB aggregated across the connected workers |
-| total_disk	    | Total disk space in MB aggregated across the connected workers |
-|||
-| committed_cores   | Committed number of cores aggregated across the connected workers |
-| committed_memory  | Committed memory in MB aggregated across the connected workers |
-| committed_disk    | Committed disk space in MB aggregated across the connected workers |
-|||
-| max_cores         | The highest number of cores observed among the connected workers |
-| max_memory        | The largest memory size in MB observed among the connected workers |
-| max_disk          | The largest disk space in MB observed among the connected workers |
-|||
-| min_cores         | The lowest number of cores observed among the connected workers |
-| min_memory        | The smallest memory size in MB observed among the connected workers |
-| min_disk          | The smallest disk space in MB observed among the connected workers |
-|||
-| manager_load       | In the range of [0,1]. If close to 1, then the manager is at full load <br /> and spends most of its time sending and receiving taks, and thus <br /> cannot accept connections from new workers. If close to 0, the <br /> manager is spending most of its time waiting for something to happen. |
-
-
-The script `vine_plot_txn_log` is a visualization tool for
-TaskVine transaction logs based on Python's `matplotlib`. It can be used to
-visualize the life time of tasks and workers, as well as diagnosing the effects
-of file transfer time on overall performance. For example:
+`vine_plot_txn_log` visualizes the transaction logs in several different
+ways, particularly to show the life time of specific tasks and workers,
+as well as the effects of file transfers on overall performance.
 
 ```sh
-vine_plot_txn_log vine-run-info/most-recent/vine-logs/transactions
+vine_plot_txn_log --mode workers vine-run-info/most-recent/vine-logs/transactions workers.png
 ```
+
+to produce a visualization of how tasks are packed into workers like this:
+
+![](images/plot-txn-workers.png)
+
+- [Transactions Log File Format Details](log-file-formats#transactions-log-format)
+
+
+Custom APPLICATION messages can be added to the log with the calls:
+
+=== "Python"
+    ```python
+    m.log_txn_app("your custom log message")
+    ```
+
+=== "C"
+    ```
+    vine_log_txn_app("your custom log message")
+    ```
+
+### Task Graph Log
+
+The complete graph of tasks and files is recorded in `taskgraph`
+using the [Graphviz](https://graphviz.org) Dot file format.  With the `dot` tool installed, you
+can visualize the task graph as follows:
+
+```sh
+dot -Tpng vine-run-info/most-recent/vine-logs/taskgraph > taskgraph.png
+```
+
+This can produce results like this:
+
+![Example Task Graph](images/plot-taskgraph.png)
+
+Note that very large task graphs may be impractical to graph at this level of detail.
+
+!!! note
+    You may need to install Graphviz Dot separately like this:
+    ```
+    conda install -c conda-forge graphviz
+    ```
 
 ### Tuning Specialized Execution Parameters
 

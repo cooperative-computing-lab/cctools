@@ -196,7 +196,13 @@ then
 fi
 
 # unpacking environment if needed...
-mkdir -p "${UNPACK_TO}"
+if ! mkdir -p "${UNPACK_TO}"
+then
+	errmsg "could not create directory at ${UNPACK_TO}"
+	exit 1
+fi
+
+
 
 UNTAR_SCRIPT=$(mktemp poncho_package_run.XXXXXX)
 cat > "${UNTAR_SCRIPT}" << EOF

@@ -20,6 +20,7 @@ import textwrap
 import uuid
 import cloudpickle
 
+
 ##
 # @class ndcctools.taskvine.task.Task
 #
@@ -142,7 +143,7 @@ class Task(object):
         return flags
 
     @staticmethod
-    def _determine_file_flags(cache=False, peer_transfer=False):
+    def _determine_file_flags(cache=False, peer_transfer=False, unlink_when_done=False):
         flags = cvine.VINE_CACHE_NEVER
         if cache is True or cache == "workflow":
             flags |= cvine.VINE_CACHE
@@ -150,6 +151,8 @@ class Task(object):
             flags |= cvine.VINE_CACHE_ALWAYS
         if not peer_transfer:
             flags |= cvine.VINE_PEER_NOSHARE
+        if unlink_when_done:
+            flags |= cvine.VINE_UNLINK_WHEN_DONE
         return flags
 
     ##
@@ -188,7 +191,7 @@ class Task(object):
     def needs_library(self, library_name):
         self.needs_library_name = library_name
         return cvine.vine_task_needs_library(self._task, library_name)
-    
+
     ##
     # Set the library name provided by this task.
     # This is not needed for regular tasks.
@@ -198,7 +201,7 @@ class Task(object):
     def provides_library(self, library_name):
         self.provides_library_name = library_name
         return cvine.vine_task_provides_library(self._task, library_name)
-    
+
     ##
     # Set the number of concurrent functions a library can run.
     # This is not needed for regular tasks.
@@ -207,7 +210,7 @@ class Task(object):
     # @param nslots The maximum number of concurrent functions this library can run.
     def set_function_slots(self, nslots):
         return cvine.vine_task_set_function_slots(self._task, nslots)
-        
+
     ##
     # Set the worker selection scheduler for task.
     #
@@ -268,7 +271,7 @@ class Task(object):
 
         flags = Task._determine_mount_flags(strict_input=strict_input, mount_symlink=mount_symlink)
 
-        if cvine.vine_task_add_input(self._task, file._file, remote_name, flags)==0:
+        if cvine.vine_task_add_input(self._task, file._file, remote_name, flags) == 0:
             raise ValueError("invalid file description")
 
     ##
@@ -292,7 +295,7 @@ class Task(object):
             raise TypeError(f"remote_name {remote_name} is not a str")
 
         flags = Task._determine_mount_flags(watch, failure_only, success_only)
-        if cvine.vine_task_add_output(self._task, file._file, remote_name, flags)==0:
+        if cvine.vine_task_add_output(self._task, file._file, remote_name, flags) == 0:
             raise ValueError("invalid file description")
 
     ##
@@ -358,13 +361,43 @@ class Task(object):
         return cvine.vine_task_set_snapshot_file(self._task, filename)
 
     ##
-    # Adds an execution environment to the task. The environment file specified
-    # is expected to expand to a directory with a bin/run_in_env file that will wrap
-    # the task command (e.g. a poncho or a starch file, or any other vine mini_task
-    # that creates such a wrapper). If specified multiple times,
-    # environments are nested in the order given (i.e. first added is the first applied).
-    # @param self Reference to the current task object.
-    # @param f The environment file.
+    # Add a Starch package as an execution context.
+    # The file given must refer to a (unpacked) package
+    # containing libraries captured by the <tt>starch</tt> command.
+    # The task will execute using this package as its environment.
+    # @param t A task object.
+    # @param f A file containing an unpacked Starch package.
+    def add_starch_package(self, file):
+        return cvine.vine_task_add_starch_package(self._task, file._file)
+
+    ##
+    # Add a Poncho package as an execution context.
+    # The file given must refer to a (unpacked) PONCHO package,
+    # containing a set of Python modules needed by the task.
+    # The task will execute using this package as its Python environment.
+    # @param t A task object.
+    # @param f A file containing an unpacked Poncho package.
+    def add_poncho_package(self, file):
+        return cvine.vine_task_add_poncho_package(self._task, file._file)
+
+    ##
+    # Adds an execution context to the task.
+    # The context file given must expand to a directory containing
+    # (at a minimum) a file
+    # named bin/run_in_env that will perform any desired setup
+    # (e.g. setting PATH, LD_LIBRARY_PATH, PYTHONPATH), execute the given command,
+    # and then perform any desired cleanup.  The context directory
+    # may also include any support files or libraries needed by the task.
+    # If specified multiple times, execution contexts are
+    # nested in the order given (i.e. first added is the first applied).
+    # @see add_poncho_package
+    # @see add_starch_package
+    # @param t A task object.
+    # @param f The execution context file.
+    def add_execution_context(self, f):
+        return cvine.vine_task_add_execution_context(self._task, f._file)
+
+    # Deprecated, for backwards compatibility.
     def add_environment(self, f):
         return cvine.vine_task_add_environment(self._task, f._file)
 
@@ -709,11 +742,12 @@ class Task(object):
         try:
             vine_dir = os.environ['CCTOOLS_HOME']
             self.add_input(manager.declare_file(f"{vine_dir}/lib-nopen.so"), "./lib-nopen.so")
-        except KeyError: 
+        except KeyError:
             self.add_input(manager.declare_file("./lib-nopen.so"), "./lib-nopen.so")
             self.add_input(manager.declare_file("./rules.txt"), "./rules.txt")
 
         self.set_env_var("LD_PRELOAD", "./lib-nopen.so")
+
 
 ##
 # @class ndcctools.taskvine.PythonTask
@@ -743,8 +777,9 @@ class PythonTask(Task):
         self._out_name_file = f"out_{self._id}.p"
         self._stdout_file = f"stdout_{self._id}.p"
         self._wrapper = f"pytask_wrapper_{self._id}.py"
-        self._command = self._python_function_command()
         self._serialize_output = True
+
+        self._command = self._python_function_command()
 
         self._tmp_output_enabled = False
         self._cache_output = False
@@ -816,6 +851,7 @@ class PythonTask(Task):
     # @param self 	Reference to the current python task object
     def enable_temp_output(self):
         self._tmp_output_enabled = True
+
     def disable_temp_output(self):
         self._tmp_output_enabled = False
 
@@ -890,7 +926,7 @@ class PythonTask(Task):
         else:
             py_exec = f"python{sys.version_info[0]}"
 
-        command = f"{py_exec} {self._wrapper} {self._func_file} {self._args_file} {self._out_name_file} > {self._stdout_file} 2>&1"
+        command = f"{py_exec} {self._wrapper} {self._func_file} {self._args_file} {self._id} > {self._stdout_file} 2>&1"
         return command
 
     def _add_IO_files(self, manager):
@@ -908,7 +944,7 @@ class PythonTask(Task):
             self._output_file = manager.declare_temp()
         else:
             self._output_file = manager.declare_file(source(self._out_name_file), cache=self._cache_output)
-        self.add_output(self._output_file, self._out_name_file)
+        self.add_output(self._output_file, self._id)
 
     ##
     # creates the wrapper script which will execute the function. pickles output.
@@ -916,7 +952,7 @@ class PythonTask(Task):
         with open(os.path.join(self._tmpdir, self._wrapper), "w") as f:
             f.write(
                 textwrap.dedent(
-                f"""
+                    f"""
                 try:
                     import sys
                     import cloudpickle
@@ -1001,7 +1037,7 @@ class FunctionCall(Task):
     # Finalizes the task definition once the manager that will execute is run.
     # This function is run by the manager before registering the task for
     # execution.
-    # 
+    #
     # @param self 	Reference to the current python task object
     # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
@@ -1042,9 +1078,9 @@ class FunctionCall(Task):
     @property
     def output(self):
         output = cloudpickle.loads(self._output_buffer.contents())
-        self._manager.remove_file(self._input_buffer)
+        self._manager.undeclare_file(self._input_buffer)
         self._input_buffer = None
-        self._manager.remove_file(self._output_buffer)
+        self._manager.undeclare_file(self._output_buffer)
         self._output_buffer = None
 
         if output['Success']:
@@ -1052,16 +1088,16 @@ class FunctionCall(Task):
         else:
             return output['Reason']
 
-    ## 
+    ##
     # Remove input and output buffers under some circumstances `output` is not called
 
     def __del__(self):
         try:
             if self._input_buffer:
-                self._manager.remove_file(self._input_buffer)
+                self._manager.undeclare_file(self._input_buffer)
                 self._input_buffer = None
             if self._output_buffer:
-                self._manager.remove_file(self._output_buffer)
+                self._manager.undeclare_file(self._output_buffer)
                 self._output_buffer = None
             super().__del__()
         except TypeError:

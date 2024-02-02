@@ -60,7 +60,8 @@ typedef enum {
 	VINE_CACHE_NEVER = 0,  /**< Do not cache file at execution site. (default) */
 	VINE_CACHE = 1,        /**< File remains in cache until workflow ends. */
 	VINE_CACHE_ALWAYS = 3, /**< File remains in cache until the worker teminates. **/
-	VINE_PEER_NOSHARE = 4  /**< Schedule this file to be shared between peers where available. See @ref vine_enable_peer_transfers **/
+	VINE_PEER_NOSHARE = 4,  /**< Schedule this file to be shared between peers where available. See @ref vine_enable_peer_transfers **/
+	VINE_UNLINK_WHEN_DONE = 8  /**< Whether to delete the file when its reference count is 0. (Warning: Only use on files produced by the application, and never on irreplaceable input files.) */
 } vine_file_flags_t;
 
 /** Select overall scheduling algorithm for matching tasks to workers. */
@@ -571,18 +572,45 @@ For more information, consult the manual of the resource_monitor.
 
 int vine_task_set_snapshot_file(struct vine_task *t, struct vine_file *monitor_snapshot_file);
 
-
-/** Adds an execution environment to the task. The environment file specified
-is expected to expand to a directory with a bin/run_in_env file that will
-wrap the task command (e.g. a poncho, starch file, or any other vine mini_task
-that creates such a wrapper). If specified multiple times, environments are
-nested in the order given (i.e. first added is the first applied).
+/** Add a Starch package as an execution context.
+The file given must refer to a (unpacked) package
+containing libraries captured by the <tt>starch</tt> command.
+The task will execute using this package as its environment.
 @param t A task object.
-@param f The environment file.
+@param f A file containing an unpacked Starch package.
 */
 
-int vine_task_add_environment(struct vine_task *t, struct vine_file *f);
+int vine_task_add_starch_package(struct vine_task *t, struct vine_file *f);
 
+/** Add a Poncho package as an execution context.
+The file given must refer to a (unpacked) PONCHO package,
+containing a set of Python modules needed by the task.
+The task will execute using this package as its Python environment.
+@param t A task object.
+@param f A file containing an unpacked Poncho package.
+*/
+
+int vine_task_add_poncho_package(struct vine_task *t, struct vine_file *f);
+
+/** Adds an execution context to the task.
+The context file given must expand to a directory containing
+(at a minimum) a file
+named bin/run_in_env that will perform any desired setup
+(e.g. setting PATH, LD_LIBRARY_PATH, PYTHONPATH), execute the given command,
+and then perform any desired cleanup.  The context directory
+may also include any support files or libraries needed by the task.
+If specified multiple times, execution contexts are
+nested in the order given (i.e. first added is the first applied).
+@see vine_task_add_starch_package
+@see vine_task_add_poncho_package
+@param t A task object.
+@param f The execution context file.
+*/
+
+int vine_task_add_execution_context(struct vine_task *t, struct vine_file *f);
+
+/* Deprecated alias for vine_task_add_execution_context. */
+int vine_task_add_environment(struct vine_task *t, struct vine_file *f);
 
 //@}
 
@@ -770,14 +798,16 @@ whose contents are not returned to the manager by default.
 
 const char * vine_fetch_file( struct vine_manager *m, struct vine_file *f );
 
-/** Remove a file that is no longer needed.
+/** Un-declare a file that was created by @ref vine_declare_file or similar functions.
 The given file or directory object is deleted from all worker's caches,
 and is no longer available for use as an input file.
 Completed tasks waiting for retrieval are not affected.
+Note that all declared files are automatically undeclared by @ref vine_delete,
+however this function can be used for earlier cleanup of unneeded file objects.
 @param m A manager object
 @param f Any file object.
 */
-void vine_remove_file(struct vine_manager *m, struct vine_file *f );
+void vine_undeclare_file(struct vine_manager *m, struct vine_file *f );
 
 //@}
 
@@ -1096,6 +1126,18 @@ void vine_set_tasks_left_count(struct vine_manager *m, int ntasks);
 */
 void vine_set_catalog_servers(struct vine_manager *m, const char *hosts);
 
+/** Add a global property to the manager which will be included in periodic
+reports to the catalog server and other telemetry destinations.
+This is helpful for distinguishing higher level information about the entire run,
+such as the name of the framework being used, or the logical name of the dataset
+being processed.
+@param m A manager object
+@param name The name of the property.
+@param value The value of the property.
+*/
+
+void vine_set_property( struct vine_manager *m, const char *name, const char *value );
+	
 /** Cancel a submitted task using its task id.
 The cancelled task will be returned in the normal way via @ref vine_wait with a result of VINE_RESULT_CANCELLED.
 @param m A manager object
@@ -1265,6 +1307,20 @@ void vine_initialize_categories(struct vine_manager *m, struct rmsummary *max, c
 @param path A directory
 */
 void vine_set_runtime_info_path(const char *path);
+
+
+/** Adds a custom APPLICATION entry to the debug log.
+@param m     Reference to the current manager object.
+@param entry A custom debug message.
+*/
+void vine_log_debug_app(struct vine_manager *q, const char *entry);
+
+/** Adds a custom APPLICATION entry to the transactions log.
+@param m     Reference to the current manager object.
+@param entry A custom transaction message.
+*/
+void vine_log_txn_app(struct vine_manager *q, const char *entry);
+
 
 
 //@}

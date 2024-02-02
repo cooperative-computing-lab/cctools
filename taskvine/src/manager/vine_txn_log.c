@@ -55,8 +55,8 @@ void vine_txn_log_write_header(struct vine_manager *q)
 			"# time manager_pid TASK task_id RETRIEVED (SUCCESS|UNKNOWN|INPUT_MISSING|OUTPUT_MISSING|STDOUT_MISSING|SIGNAL|RESOURCE_EXHAUSTION|MAX_RETRIES|MAX_END_TIME|MAX_WALL_TIME|FORSAKEN) {limits_exceeded} {resources_measured}\n");
 	fprintf(q->txn_logfile,
 			"# time manager_pid TASK task_id DONE (SUCCESS|UNKNOWN|INPUT_MISSING|OUTPUT_MISSING|STDOUT_MISSING|SIGNAL|RESOURCE_EXHAUSTION|MAX_RETRIES|MAX_END_TIME|MAX_WALL_TIME|FORSAKEN) exit_code\n");
-	fprintf(q->txn_logfile, "# time manager_pid LIBRARY library_id (WAITING|SENT|STARTED|FAILURE) worker_id");
-	fprintf(q->txn_logfile, "\n");
+	fprintf(q->txn_logfile, "# time manager_pid LIBRARY library_id (WAITING|SENT|STARTED|FAILURE) worker_id\n");
+	fprintf(q->txn_logfile, "# time manager_pid APPLICATION message*\n");
 }
 
 static struct jx *resources_with_io_report(const struct vine_task *t, const struct rmsummary *s)
@@ -376,6 +376,15 @@ void vine_txn_log_write_library_update(
 	buffer_printf(&B, " %s", status);
 	buffer_printf(&B, " %s", w->workerid);
 
+	vine_txn_log_write(q, buffer_tostring(&B));
+	buffer_free(&B);
+}
+
+void vine_txn_log_write_app_entry(struct vine_manager *q, const char *entry)
+{
+	struct buffer B;
+	buffer_init(&B);
+	buffer_printf(&B, "APPLICATION %s", entry);
 	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_free(&B);
 }

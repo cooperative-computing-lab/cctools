@@ -55,13 +55,13 @@ def main():
     if args.disable_peer_transfers:
         q.disable_peer_transfers()
 
-    env_spec = {"conda": {"channels": ["conda-forge"],"packages": ["python","pip","conda","conda-pack","cloudpickle","xrootd"]},"pip": ["matplotlib"]}
-    env_tarball = package_create.dict_to_env(env_spec, cache=True)
-    env_file = q.declare_poncho(env_tarball, cache=True)
+    spec = {"conda": {"channels": ["conda-forge"],"packages": ["python","pip","conda","conda-pack","cloudpickle","xrootd"]},"pip": ["matplotlib"]}
+    tarball = package_create.dict_to_env(spec, cache=True)
+    package = q.declare_poncho(tarball, cache=True)
 
     for i in range(1, 16):
         p_task = vine.PythonTask(divide, 1, i**2)
-        p_task.add_environment(env_file)
+        p_task.add_poncho_package(package);
 
         q.submit(p_task)
 

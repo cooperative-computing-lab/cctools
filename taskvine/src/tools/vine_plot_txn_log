@@ -19,6 +19,7 @@
 # time manager_pid TASK task_id WAITING_RETRIEVAL worker_id
 # time manager_pid TASK task_id (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}
 # time manager_pid LIBRARY task_id (WAITING|SENT|STARTED|FAILURE) worker_id
+# time manager_pid APPLICATION message*
 
 
 from collections import defaultdict
@@ -416,6 +417,8 @@ class ParseTxn:
                 self._parse_library(time, manager_pid, target, event, arg)
             elif subject == "TASK":
                 self._parse_task(time, manager_pid, target, event, arg)
+            elif subject == "APPLICATION":
+                continue
 
         if self.cm:
             # if self.cm still assigned, then END record missing. Here we force
@@ -857,7 +860,7 @@ class TxnStats(TxnPlot):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(prog="vine_example_blast.py",
+    parser = argparse.ArgumentParser(prog="vine_plot_txn_log",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                      description='Plot TaskVine workflow information from a transaction log file.')
 

@@ -32,7 +32,7 @@ import struct
 import tempfile
 import threading
 
-from .cresource_monitor import (
+from .cresource_monitor import (  # noqa: F401
     CATEGORY_ALLOCATION_MODE_FIXED,
     CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT,
     CATEGORY_ALLOCATION_MODE_MIN_WASTE,
@@ -624,5 +624,6 @@ def rmsummary_snapshots(self):
         snapshot = rmsummary_get_snapshot(self, i)
         snapshots.append(snapshot)
     return snapshots
+
 
 rmsummary.snapshots = property(rmsummary_snapshots)

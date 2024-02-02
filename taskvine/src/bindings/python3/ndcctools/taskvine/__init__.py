@@ -62,12 +62,16 @@ try:
     from .dask_executor import DaskVine
 except ImportError as e:
     print(f"DaskVine not available. Couldn't find module: {e.name}")
-    ## DaskVine compatibility class.
+
+    ##
+    # DaskVine compatibility class.
     # See @ref dask_executor.DaskVine
     class DaskVine:
         exception = ImportError()
+
         def __init__(*args, **kwargs):
             raise DaskVine.exception
+
     DaskVine.exception = e
 
 __all__ = [

@@ -452,6 +452,22 @@ void vine_task_check_consistency(struct vine_task *t)
 	hash_table_delete(table);
 }
 
+/* Truncate any output files with the WATCH flag, to avoid confusion with prior runs. */
+/* We use truncate instead of unlink, so that "tail -f logfile" has the desired result. */
+
+void vine_task_truncate_watched_outputs(struct vine_task *t)
+{
+	struct vine_mount *m;
+
+	LIST_ITERATE(t->output_mounts, m)
+	{
+		if (m->file->type == VINE_FILE && m->flags & VINE_WATCH) {
+			debug(D_VINE, "truncating watched output file %s\n", m->file->source);
+			truncate(m->file->source, 0);
+		}
+	}
+}
+
 int vine_task_add_input(struct vine_task *t, struct vine_file *f, const char *remote_name, vine_mount_flags_t flags)
 {
 	if (!t || !f || !f->source || !remote_name) {
@@ -565,15 +581,30 @@ int vine_task_add_input_mini_task(
 	return r;
 }
 
-int vine_task_add_environment(struct vine_task *t, struct vine_file *environment_file)
+int vine_task_add_poncho_package(struct vine_task *t, struct vine_file *f)
 {
-	if (!environment_file) {
-		debug(D_NOTICE | D_VINE, "%s: environment_file cannot be null", __func__);
+	return vine_task_add_execution_context(t, f);
+}
+
+int vine_task_add_starch_package(struct vine_task *t, struct vine_file *f)
+{
+	return vine_task_add_execution_context(t, f);
+}
+
+int vine_task_add_environment(struct vine_task *t, struct vine_file *f)
+{
+	return vine_task_add_execution_context(t, f);
+}
+
+int vine_task_add_execution_context(struct vine_task *t, struct vine_file *context_file)
+{
+	if (!context_file) {
+		debug(D_NOTICE | D_VINE, "%s: context_file cannot be null", __func__);
 		return 0;
 	}
 
-	char *env_name = string_format("__vine_env_%s", environment_file->cached_name);
-	vine_task_add_input(t, environment_file, env_name, VINE_MOUNT_SYMLINK);
+	char *env_name = string_format("__vine_env_%s", context_file->cached_name);
+	vine_task_add_input(t, context_file, env_name, VINE_MOUNT_SYMLINK);
 
 	char *new_cmd = string_format("%s/bin/run_in_env %s", env_name, t->command_line);
 	vine_task_set_command(t, new_cmd);

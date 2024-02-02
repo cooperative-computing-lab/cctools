@@ -12,29 +12,29 @@
 # on remote machines.  To make the tasks portable, the program "/usr/bin/convert"
 # is packaged up into a self-contained archive "convert.sfx" which contains
 # the executable and all of its dynamic dependencies.  This allows the
-# use of arbitrary workers without regard to their software environment.
+# use of arbitrary workers without regard to their software context.
 
 import ndcctools.taskvine as vine
 import argparse
 import os
 import sys
 
-# construct a starch environment that ensures convert and montage are available
+# construct a starch package that ensures convert and montage are available
 # when the task executes at the worker.
-def create_env(env_name, convert="convert", montage="montage"):
+def create_package(package_name, convert="convert", montage="montage"):
     import subprocess
-    # add the executables convert, and montage to the env_name starch file.
+    # add the executables convert, and montage to the package_name starch file.
     # these executables are assumed to be in the current $PATH if a full path was not specified.
     # by default, the starch file will execute the convert command.
 
-    if os.path.exists(env_name):
-        print(f"reusing existing {env_name} starch file...")
+    if os.path.exists(package_name):
+        print(f"reusing existing {package_name} starch file...")
     else:
         try:
-            print(f"creating {env_name} starch file...")
-            subprocess.run(["starch", "-x", "convert", "-x", "montage", "-c", "montage", env_name], check=True)
+            print(f"creating {package_name} starch file...")
+            subprocess.run(["starch", "-x", "convert", "-x", "montage", "-c", "montage", package_name], check=True)
         except subprocess.CalledProcessError:
-            print("could not create environment.")
+            print("could not create package.")
             print("check that starch is in $PATH, and check that ImageMagick executables are in $PATH,")
             print("or provide their location at the command line.")
 
@@ -45,7 +45,7 @@ def process_result(t):
         if t.successful():
             print(f"task {t.id} done: {t.command}")
         elif t.completed():
-            print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
+            print(f"task {t.id} completed with an execution error, exit code {t.exit_code}")
         else:
             print(f"task {t.id} failed with status {t.result}")
 
@@ -53,22 +53,22 @@ def process_result(t):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
             prog="vine_example_mosaic.py",
-            description="This example TaskVine program produces a mosaic of images, each one transformed with a different amount of swirl. Each task consumes remote data accessed via url, cached and shared among all tasks on that machine. Also each task is executed in a mini environment that ensures that the required executables and libraries are available at the worker.")
+            description="This example TaskVine program produces a mosaic of images, each one transformed with a different amount of swirl. Each task consumes remote data accessed via url, cached and shared among all tasks on that machine. Also each task is executed in a starch package that ensures that the required executables and libraries are available at the worker.")
 
     parser.add_argument('--convert', action='store', help='path to the convert ImageMagick executable.', default="convert")
     parser.add_argument('--montage', action='store', help='path to the montage ImageMagick executable.', default="montage")
     args = parser.parse_args()
 
-    env_filename = "convert_montage.sfx"
-    create_env(env_filename)
+    package_filename = "convert_montage.sfx"
+    create_package(package_filename)
 
     m = vine.Manager()
     print(f"listening on port {m.port}")
 
-    # declare the environment just created as a starch file.
-    # when this env is associated with a task, it will be expanded and wrap its
+    # declare the package just created as a starch file.
+    # when this package is associated with a task, it will be expanded and wrap its
     # command.
-    env = m.declare_starch(env_filename)
+    package = m.declare_starch(package_filename)
 
     # source image to which all the operations will be applied
     image_file = m.declare_url("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", cache=True)
@@ -85,14 +85,14 @@ if __name__ == "__main__":
     # from 0 to 360, by steps of 10 degrees
     for angle in range(0, 360, 10):
         # the command the task will execute. The convert executable will be
-        # provided by the starch environment.
+        # provided by the starch package.
         # note that all tasks will produce as a result a file named output.jpg
         # in their respective sandboxes. It is this file that will be declared
         # as temporary file.
         command = f"convert -swirl {angle} cat.jpg output.jpg"
 
         t = vine.Task(command)
-        t.add_environment(env)
+        t.add_starch_package(package)
 
         # add the main source image
         t.add_input(image_file,"cat.jpg")
@@ -127,9 +127,9 @@ if __name__ == "__main__":
 
     # create a tasks that combines the results of all the convert tasks.
     # each convert temporary output will be mapped to an {angle}.cat.jpg file.
-    # the montage executable will be provided by the starch environment
+    # the montage executable will be provided by the starch package
     t = vine.Task("montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 output_of_montage.jpg")
-    t.add_environment(env)
+    t.add_starch_package(package)
 
     for (angle, f) in convert_temporary_outputs.items():
         convert_output = f"{angle}.cat.jpg"
@@ -158,6 +158,6 @@ if __name__ == "__main__":
     # in this small example this is not strictly necessary, as these files are
     # deleted from workers once the manager terminates.
     for f in convert_temporary_outputs.values():
-        m.remove_file(f)
+        m.undeclare_file(f)
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
