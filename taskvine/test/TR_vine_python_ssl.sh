@@ -62,7 +62,7 @@ run()
 	run_taskvine_worker $PORT_FILE worker.log --ssl
 
 	# wait for command to exit.
-	wait_for_file_creation $STATUS_FILE 15
+	wait_for_file_creation $STATUS_FILE 30
 
 	# retrieve taskvine exit status
 	status=$(cat $STATUS_FILE)
