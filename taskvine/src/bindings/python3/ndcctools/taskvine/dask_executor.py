@@ -146,7 +146,7 @@ class DaskVine(Manager):
             self.tune("max-retrievals", 10)
 
             if self.env_per_task:
-                self.poncho_file = self.declare_file(shutil.which('ponho_package_run'))
+                self.poncho_file = self.declare_file(shutil.which('poncho_package_run'))
                 self.environment_file = self.declare_file(environment)
                 self.environment_name = os.path.basename(environment)
                 self.environment = None
@@ -259,7 +259,7 @@ class DaskVine(Manager):
                 t.set_tag(tag)  # tag that identifies this dag
                 enqueued_calls.append(t)
 
-            if self.task_mode == 'function_calls':
+            if self.task_mode == 'function-calls':
                 t = FunctionCallDask(self,
                                      dag, k, sexpr,
                                      category=cat,
