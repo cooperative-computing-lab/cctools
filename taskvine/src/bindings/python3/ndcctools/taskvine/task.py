@@ -37,7 +37,7 @@ class Task(object):
     def __init__(self, command, **task_info):
         self._task = None
 
-        self._manager = None  # set by submit_finalize
+        self._manager = None  # set when task is submitted
 
         if isinstance(command, dict):
             raise TypeError(f"{command} is not a str. Did you mean **{command}?")
@@ -114,10 +114,10 @@ class Task(object):
             if not self._task:
                 return
             if self._manager_will_free:
-                # e.g., for a minitask that won't be in self._manager._task_table
+                # e.g., for a minitask that won't be in self.manager._task_table
                 # otherwise the task gets a double-free
                 return
-            if self._manager and self.id in self._manager._task_table:
+            if self.manager and self.id in self.manager._task_table:
                 # interpreter is shutting down. Don't delete task here so that manager
                 # does not get memory errors
                 return
@@ -161,8 +161,15 @@ class Task(object):
     # execution.
     #
     # @param self 	Reference to the current python task object
-    # @param manager Manager to which the task was submitted
-    def submit_finalize(self, manager):
+    def submit_finalize(self):
+        pass
+
+    @property
+    def manager(self):
+        return self._manager
+
+    @manager.setter
+    def manager(self, manager):
         self._manager = manager
 
     ##
@@ -800,13 +807,13 @@ class PythonTask(Task):
     #
     # @param self 	Reference to the current python task object
     # @param manager Manager to which the task was submitted
-    def submit_finalize(self, manager):
-        super().submit_finalize(manager)
-        self._tmpdir = tempfile.mkdtemp(dir=manager.staging_directory)
+    def submit_finalize(self):
+        super().submit_finalize()
+        self._tmpdir = tempfile.mkdtemp(dir=self.manager.staging_directory)
         self._serialize_python_function(*self._fn_def)
         self._fn_def = None  # avoid possible memory leak
         self._create_wrapper()
-        self._add_IO_files(manager)
+        self._add_IO_files()
 
     # remove any temp files generated
     # if __del__ is never called, or called too late (e.g. on interpreter shutdown),
@@ -929,21 +936,21 @@ class PythonTask(Task):
         command = f"{py_exec} {self._wrapper} {self._func_file} {self._args_file} {self._id} > {self._stdout_file} 2>&1"
         return command
 
-    def _add_IO_files(self, manager):
+    def _add_IO_files(self):
         def source(name):
             return os.path.join(self._tmpdir, name)
         
         for name in [self._wrapper, self._func_file, self._args_file]:
-            f = manager.declare_file(source(name))
+            f = self.manager.declare_file(source(name))
             self.add_input(f, name)
 
-        f = manager.declare_file(source(self._stdout_file))
+        f = self.manager.declare_file(source(self._stdout_file))
         self.add_output(f, self._stdout_file)
 
         if self._tmp_output_enabled:
-            self._output_file = manager.declare_temp()
+            self._output_file = self.manager.declare_temp()
         else:
-            self._output_file = manager.declare_file(source(self._out_name_file), cache=self._cache_output)
+            self._output_file = self.manager.declare_file(source(self._out_name_file), cache=self._cache_output)
         self.add_output(self._output_file, self._id)
 
     ##
@@ -1039,10 +1046,9 @@ class FunctionCall(Task):
     # execution.
     #
     # @param self 	Reference to the current python task object
-    # @param manager Manager to which the task was submitted
-    def submit_finalize(self, manager):
-        super().submit_finalize(manager)
-        self._input_buffer = manager.declare_buffer(buffer=cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
+    def submit_finalize(self):
+        super().submit_finalize()
+        self._input_buffer = self.manager.declare_buffer(buffer=cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
         self.add_input(self._input_buffer, "infile")
         if self._tmp_output_enabled:
             self._output_file = manager.declare_temp()
@@ -1050,6 +1056,7 @@ class FunctionCall(Task):
         else:
             self._output_buffer = manager.declare_buffer(buffer=None, cache=False, peer_transfer=False)
             self.add_output(self._output_buffer, "outfile")
+
 
     ##
     # Specify function arguments. Accepts arrays and dictionaries. This
@@ -1078,9 +1085,9 @@ class FunctionCall(Task):
     @property
     def output(self):
         output = cloudpickle.loads(self._output_buffer.contents())
-        self._manager.undeclare_file(self._input_buffer)
+        self.manager.undeclare_file(self._input_buffer)
         self._input_buffer = None
-        self._manager.undeclare_file(self._output_buffer)
+        self.manager.undeclare_file(self._output_buffer)
         self._output_buffer = None
 
         if output['Success']:
@@ -1094,10 +1101,10 @@ class FunctionCall(Task):
     def __del__(self):
         try:
             if self._input_buffer:
-                self._manager.undeclare_file(self._input_buffer)
+                self.manager.undeclare_file(self._input_buffer)
                 self._input_buffer = None
             if self._output_buffer:
-                self._manager.undeclare_file(self._output_buffer)
+                self.manager.undeclare_file(self._output_buffer)
                 self._output_buffer = None
             super().__del__()
         except TypeError:

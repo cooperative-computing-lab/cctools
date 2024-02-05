@@ -323,6 +323,7 @@ class FuturePythonTask(PythonTask):
 
         super().submit_finalize(manager)
 
+
     def add_environment(self, f):
         self._envs.append(f)
         return cvine.vine_task_add_environment(self._task, f._file)
