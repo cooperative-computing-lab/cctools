@@ -218,7 +218,7 @@ class FutureFunctionCall(FunctionCall):
             if isinstance(arg, VineFuture):
                 # for the task where the input comes from the output of a prior task, add that output file as its input
                 # the purpose of using hash digest is to avoid using the name for multiple input files
-                input_filename = str(arg_id) + str(arg._task.id)
+                input_filename = str(arg_id) + str(arg._task.id) + str(self.id)
                 input_filename = hashlib.md5(input_filename.encode()).hexdigest()
                 self.add_input(arg._task._output_file, input_filename)
                 # create a special format {'VineFutureFile': 'outfile-x'} to indicate loading input from a tempfile
@@ -311,7 +311,7 @@ class FuturePythonTask(PythonTask):
         for arg in args:
             arg_id += 1
             if isinstance(arg, VineFuture):
-                input_filename = str(arg_id) + str(arg._task.id)
+                input_filename = str(arg_id) + str(arg._task.id) + str(self.id)
                 input_filename = hashlib.md5(input_filename.encode()).hexdigest()
                 self.add_input(arg._task._output_file, input_filename)
                 new_fn_args.append({"VineFutureFile": input_filename})
