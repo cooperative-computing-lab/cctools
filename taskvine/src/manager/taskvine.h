@@ -716,19 +716,6 @@ workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
 struct vine_file * vine_declare_buffer( struct vine_manager *m, const char *buffer, size_t size, vine_file_flags_t flags );
 
 
-/** Create a file object representing an empty directory.
-This is very occasionally needed for applications that expect
-certain directories to exist in the working directory, prior to producing output.
-This function does not transfer any data to the task, but just creates
-a directory in its working sandbox.  If you want to transfer an entire
-directory worth of data to a task, use @ref vine_declare_file and give a
-directory name.
-@param m A manager object
-@return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
-*/
-struct vine_file * vine_declare_empty_dir( struct vine_manager *m );
-
-
 /** Create a file object produced from a mini-task
 Attaches a task definition to produce an input file by running a Unix command.
 This mini-task will be run on demand in order to produce the desired input file.

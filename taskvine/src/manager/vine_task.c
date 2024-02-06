@@ -515,7 +515,6 @@ int vine_task_add_output(struct vine_task *t, struct vine_file *f, const char *r
 		break;
 	case VINE_URL:
 	case VINE_MINI_TASK:
-	case VINE_EMPTY_DIR:
 		debug(D_NOTICE | D_VINE, "%s: unsupported output file type", __func__);
 		return 0;
 	}
@@ -550,14 +549,6 @@ int vine_task_add_input_url(
 {
 	struct vine_file *f = vine_file_url(file_url, 0);
 	int r = vine_task_add_input(t, f, remote_name, flags);
-	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
-	return r;
-}
-
-int vine_task_add_empty_dir(struct vine_task *t, const char *remote_name)
-{
-	struct vine_file *f = vine_file_empty_dir();
-	int r = vine_task_add_input(t, f, remote_name, 0);
 	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
 	return r;
 }

@@ -32,7 +32,6 @@ typedef enum {
 	VINE_TEMP,		    /**< A temporary file created as an output of a task. */
 	VINE_BUFFER,                /**< A file obtained from data in the manager's memory space. */
 	VINE_MINI_TASK,             /**< A file obtained by executing a Unix command line. */
-	VINE_EMPTY_DIR,              /**< An empty directory to create in the task sandbox. */
 } vine_file_t;
 
 struct vine_file {

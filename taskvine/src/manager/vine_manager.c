@@ -5892,10 +5892,6 @@ const char *vine_fetch_file(struct vine_manager *m, struct vine_file *f)
 			return f->data;
 		}
 		break;
-	case VINE_EMPTY_DIR:
-		/* Never anything to get. */
-		return 0;
-		break;
 	}
 
 	return 0;

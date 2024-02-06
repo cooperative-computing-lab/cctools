@@ -68,39 +68,30 @@ static int stage_input_file(struct vine_process *p, struct vine_mount *m, struct
 
 	int result = 0;
 
-	if (f->type == VINE_EMPTY_DIR) {
-		/* Special case: empty directories are not cached objects, just create in sandbox */
-		result = create_dir(sandbox_path, 0700);
-		if (!result)
-			debug(D_VINE, "couldn't create directory %s: %s", sandbox_path, strerror(errno));
-
-	} else {
-		/* All other types, link the cached object into the sandbox */
-		vine_cache_status_t status;
-		status = vine_cache_ensure(cache, f->cached_name);
-		if (status == VINE_CACHE_STATUS_READY) {
-			create_dir_parents(sandbox_path, 0777);
-			debug(D_VINE, "input: link %s -> %s", cache_path, sandbox_path);
-			if (m->flags & VINE_MOUNT_SYMLINK) {
-				/* If the user has requested a symlink, just do that b/c it is faster for large dirs. */
-				result = symlink(cache_path, sandbox_path);
-				/* Change sense of Unix result to true/false. */
-				result = !result;
-			} else {
-				/* Otherwise recursively hard-link the object into the sandbox. */
-				result = file_link_recursive(cache_path, sandbox_path, 1);
-			}
-
-			if (!result)
-				debug(D_VINE,
-						"couldn't link %s into sandbox as %s: %s",
-						cache_path,
-						sandbox_path,
-						strerror(errno));
+	vine_cache_status_t status;
+	status = vine_cache_ensure(cache, f->cached_name);
+	if (status == VINE_CACHE_STATUS_READY) {
+		create_dir_parents(sandbox_path, 0777);
+		debug(D_VINE, "input: link %s -> %s", cache_path, sandbox_path);
+		if (m->flags & VINE_MOUNT_SYMLINK) {
+			/* If the user has requested a symlink, just do that b/c it is faster for large dirs. */
+			result = symlink(cache_path, sandbox_path);
+			/* Change sense of Unix result to true/false. */
+			result = !result;
 		} else {
-			debug(D_VINE, "input: %s is not ready in the cache!", f->cached_name);
-			result = 0;
+			/* Otherwise recursively hard-link the object into the sandbox. */
+			result = file_link_recursive(cache_path, sandbox_path, 1);
 		}
+
+		if (!result)
+			debug(D_VINE,
+					"couldn't link %s into sandbox as %s: %s",
+					cache_path,
+					sandbox_path,
+					strerror(errno));
+	} else {
+		debug(D_VINE, "input: %s is not ready in the cache!", f->cached_name);
+		result = 0;
 	}
 
 	free(cache_path);
@@ -182,7 +173,7 @@ static int stage_output_file(struct vine_process *p, struct vine_mount *m, struc
 				path_disk_size_info_delete_state(state);
 			} else {
 				vine_cache_addfile(cache, info.st_size, info.st_mode, f->cached_name);
-				vine_worker_send_cache_update(manager, f->cached_name, info.st_size, 0, 0);
+				vine_worker_send_cache_update(manager, f->cached_name, info.st_mode, 0, 0);
 			}
 		} else {
 			// This seems implausible given that the rename/copy succeded, but we still have to check...
