@@ -47,7 +47,8 @@ typedef enum {
 	VINE_FAILURE_ONLY = 4,    /**< Only return this output file if the task failed.  (Useful for returning large log files.) */
 	VINE_SUCCESS_ONLY = 8,    /**< Only return this output file if the task succeeded. */
 	VINE_RETRACT_ON_RESET = 16,  /**< Remove this file from the mount lists if the task is reset. (TaskVine internal use only.) */
-	VINE_MOUNT_SYMLINK = 32   /**< Permit this directory to be mounted via symlink instead of hardlink. */
+	VINE_MOUNT_SYMLINK = 32,   /**< Permit this directory to be mounted via symlink instead of hardlink. */
+	VINE_MOUNT_MKDIR = 64     /**< Create this empty output directory in the task sandbox prior to execution. */
 } vine_mount_flags_t;
 
 /** Control caching and sharing behavior of file objects.
