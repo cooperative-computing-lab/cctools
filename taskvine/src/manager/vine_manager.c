@@ -257,9 +257,9 @@ static void handle_worker_timeout(struct vine_manager *q, struct vine_worker_inf
 {
 	// Look at the files and check if any are endangered temps.
 	char *cachename;
-	struct vine_file_replica *remote_info;
+	struct vine_file_replica *replica;
 	// debug(D_VINE, "Handling timeout request");
-	HASH_TABLE_ITERATE(w->current_files, cachename, remote_info)
+	HASH_TABLE_ITERATE(w->current_files, cachename, replica)
 	{
 		//	debug(D_VINE, "Looking at file %s", cachename);
 		if (strncmp(cachename, "temp-rnd-", 9) == 0) {
@@ -382,21 +382,21 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 	char id[VINE_LINE_MAX];
 
 	if (sscanf(line, "cache-update %s %lld %lld %lld %s", cachename, &size, &transfer_time, &start_time, id) == 5) {
-		struct vine_file_replica *remote_info = vine_file_replica_table_lookup(w, cachename);
+		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, cachename);
 
-		if (!remote_info) {
+		if (!replica) {
 			/*
 			If an unsolicited cache-update arrives, there are several possibilities:
 			- The worker is telling us about an item from a previous run.
 			- The file was created as an output of a task.
 			*/
-			remote_info = vine_file_replica_create(size, 0);
-			vine_file_replica_table_insert(w, cachename, remote_info);
+			replica = vine_file_replica_create(size, 0);
+			vine_file_replica_table_insert(w, cachename, replica);
 		}
 
-		remote_info->size = size;
-		remote_info->transfer_time = transfer_time;
-		remote_info->state = VINE_FILE_REPLICA_STATE_READY;
+		replica->size = size;
+		replica->transfer_time = transfer_time;
+		replica->state = VINE_FILE_REPLICA_STATE_READY;
 
 		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
 		if (f)
@@ -454,10 +454,10 @@ static int handle_cache_invalid(struct vine_manager *q, struct vine_worker_info 
 		debug(D_VINE, "%s (%s) invalidated %s with error: %s", w->hostname, w->addrport, cachename, message);
 		free(message);
 
-		struct vine_file_replica *remote_info = vine_file_replica_table_remove(w, cachename);
+		struct vine_file_replica *replica = vine_file_replica_table_remove(w, cachename);
 		vine_current_transfers_remove(q, id);
-		if (remote_info)
-			vine_file_replica_delete(remote_info);
+		if (replica)
+			vine_file_replica_delete(replica);
 	} else if (sscanf(line, "cache-invalid %s %d", cachename, &length) == 2) {
 
 		char *message = malloc(length + 1);
@@ -1031,9 +1031,9 @@ static void delete_worker_file(
 {
 	if (!(flags & except_flags)) {
 		vine_manager_send(q, w, "unlink %s\n", filename);
-		struct vine_file_replica *remote_info;
-		remote_info = vine_file_replica_table_remove(w, filename);
-		vine_file_replica_delete(remote_info);
+		struct vine_file_replica *replica;
+		replica = vine_file_replica_table_remove(w, filename);
+		vine_file_replica_delete(replica);
 	}
 }
 
@@ -2956,9 +2956,9 @@ static int vine_manager_transfer_capacity_available(
 	LIST_ITERATE(t->input_mounts, m)
 	{
 		/* Is the file already present on that worker? */
-		struct vine_file_replica *remote_info;
+		struct vine_file_replica *replica;
 
-		if ((remote_info = vine_file_replica_table_lookup(w, m->file->cached_name)))
+		if ((replica = vine_file_replica_table_lookup(w, m->file->cached_name)))
 			continue;
 
 		struct vine_worker_info *peer;
@@ -3116,7 +3116,7 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 	{
 		struct vine_file *f = m->file;
 		if (f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED) {
-			if(!vine_file_replica_table_exists_somewhere(q, f->cached_name)) {
+			if (!vine_file_replica_table_exists_somewhere(q, f->cached_name)) {
 				vine_manager_consider_recovery_task(q, f, f->recovery_task);
 				return 0;
 			}

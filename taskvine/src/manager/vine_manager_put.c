@@ -405,7 +405,7 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 	}
 
 	/* Has this file already been sent and cached? */
-	struct vine_file_replica *remote_info = vine_file_replica_table_lookup(w, f->cached_name);
+	struct vine_file_replica *replica = vine_file_replica_table_lookup(w, f->cached_name);
 
 	/*
 	If so, check that it hasn't changed, and return success.
@@ -414,10 +414,9 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 	mtime was sent in file transfers, and then returned by
 	cache-update messages.
 	*/
-	if (remote_info) {
-		if (f->type == VINE_FILE &&
-				(info.st_size != remote_info->size ||
-						((info.st_mtime != remote_info->mtime) && (remote_info->mtime != 0)))) {
+	if (replica) {
+		if (f->type == VINE_FILE && (info.st_size != replica->size || ((info.st_mtime != replica->mtime) &&
+											      (replica->mtime != 0)))) {
 			debug(D_NOTICE | D_VINE, "File %s has changed since it was first cached!", f->source);
 			debug(D_NOTICE | D_VINE, "You may be getting inconsistent results.");
 		}
@@ -445,21 +444,21 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 
 	/* If the send succeeded, then record it in the worker */
 	if (result == VINE_SUCCESS) {
-		struct vine_file_replica *remote_info = vine_file_replica_create(info.st_size, info.st_mtime);
-		vine_file_replica_table_insert(w, f->cached_name, remote_info);
+		struct vine_file_replica *replica = vine_file_replica_create(info.st_size, info.st_mtime);
+		vine_file_replica_table_insert(w, f->cached_name, replica);
 
 		switch (file_to_send->type) {
 		case VINE_URL:
 		case VINE_TEMP:
 		case VINE_EMPTY_DIR:
 			/* For these types, a cache-update will arrive when the replica actually exists. */
-			remote_info->state = VINE_FILE_REPLICA_STATE_PENDING;
+			replica->state = VINE_FILE_REPLICA_STATE_PENDING;
 			break;
 		case VINE_FILE:
 		case VINE_MINI_TASK:
 		case VINE_BUFFER:
 			/* For these types, we sent the data, so we know it exists. */
-			remote_info->state = VINE_FILE_REPLICA_STATE_READY;
+			replica->state = VINE_FILE_REPLICA_STATE_READY;
 			f->state = VINE_FILE_STATE_CREATED;
 			break;
 		}

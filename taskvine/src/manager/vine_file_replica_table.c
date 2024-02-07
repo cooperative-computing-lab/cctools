@@ -16,10 +16,9 @@ See the file COPYING for details.
 #include "debug.h"
 
 // add a file to the remote file table.
-int vine_file_replica_table_insert(
-		struct vine_worker_info *w, const char *cachename, struct vine_file_replica *remote_info)
+int vine_file_replica_table_insert(struct vine_worker_info *w, const char *cachename, struct vine_file_replica *replica)
 {
-	hash_table_insert(w->current_files, cachename, remote_info);
+	hash_table_insert(w->current_files, cachename, replica);
 	return 1;
 }
 
@@ -32,8 +31,7 @@ struct vine_file_replica *vine_file_replica_table_remove(struct vine_worker_info
 // lookup a file in posession of a specific worker
 struct vine_file_replica *vine_file_replica_table_lookup(struct vine_worker_info *w, const char *cachename)
 {
-	struct vine_file_replica *remote_info = hash_table_lookup(w->current_files, cachename);
-	return remote_info;
+	return hash_table_lookup(w->current_files, cachename);
 }
 
 // find a worker in posession of a specific file, and is ready to transfer it.
@@ -41,7 +39,7 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 {
 	char *id;
 	struct vine_worker_info *peer;
-	struct vine_file_replica *remote_info;
+	struct vine_file_replica *replica;
 	HASH_TABLE_ITERATE(q->worker_table, id, peer)
 	{
 		if (!peer->transfer_port_active)
@@ -49,7 +47,8 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 
 		// generate a peer address stub as it would appear in the transfer table
 		char *peer_addr = string_format("worker://%s:%d", peer->transfer_addr, peer->transfer_port);
-		if ((remote_info = hash_table_lookup(peer->current_files, cachename)) && remote_info->state==VINE_FILE_REPLICA_STATE_READY) {
+		if ((replica = hash_table_lookup(peer->current_files, cachename)) &&
+				replica->state == VINE_FILE_REPLICA_STATE_READY) {
 			if (vine_current_transfers_worker_in_use(q, peer_addr) < q->worker_source_max_transfers) {
 				free(peer_addr);
 				return peer;
@@ -67,7 +66,7 @@ struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 {
 	char *id;
 	struct vine_worker_info *peer;
-	struct vine_file_replica *remote_info;
+	struct vine_file_replica *replica;
 
 	int found = 0;
 	struct vine_worker_info **workers = malloc(sizeof(struct vine_worker_info) * (q->temp_replica_count));
@@ -84,7 +83,7 @@ struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 			continue;
 
 		char *peer_addr = string_format("worker://%s:%d", peer->transfer_addr, peer->transfer_port);
-		if (!(remote_info = hash_table_lookup(peer->current_files, cachename)) &&
+		if (!(replica = hash_table_lookup(peer->current_files, cachename)) &&
 				(strcmp(w->hostname, peer->hostname))) {
 			if ((vine_current_transfers_worker_in_use(q, peer_addr) < q->worker_source_max_transfers) &&
 					(vine_current_transfers_dest_in_use(q, peer) <
