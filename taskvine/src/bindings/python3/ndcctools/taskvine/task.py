@@ -939,7 +939,7 @@ class PythonTask(Task):
     def _add_IO_files(self):
         def source(name):
             return os.path.join(self._tmpdir, name)
-        
+
         for name in [self._wrapper, self._func_file, self._args_file]:
             f = self.manager.declare_file(source(name))
             self.add_input(f, name)
@@ -1028,9 +1028,9 @@ class FunctionCall(Task):
 
     def enable_temp_output(self):
         self._tmp_output_enabled = True
+
     def disable_temp_output(self):
         self._tmp_output_enabled = False
-
 
     ##
     # Returns the ndcctools.taskvine.file.File object that
@@ -1038,7 +1038,6 @@ class FunctionCall(Task):
     @property
     def output_file(self):
         return self._output_file
-    
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -1056,7 +1055,6 @@ class FunctionCall(Task):
         else:
             self._output_buffer = self.manager.declare_buffer(buffer=None, cache=False, peer_transfer=False)
             self.add_output(self._output_buffer, "outfile")
-
 
     ##
     # Specify function arguments. Accepts arrays and dictionaries. This
@@ -1113,6 +1111,7 @@ class FunctionCall(Task):
 
 class FunctionCallNoResult(Exception):
     pass
+
 
 ##
 # \class LibraryTask

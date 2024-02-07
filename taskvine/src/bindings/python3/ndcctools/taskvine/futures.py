@@ -70,10 +70,10 @@ class Executor(Executor):
 
     def future_pythontask(self, fn, *args, **kwargs):
         return FuturePythonTask(self.manager, False, fn, *args, **kwargs)
-    
+
     def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True, import_modules=None):
         return self.manager.create_library_from_functions(name, *function_list, poncho_env=poncho_env, init_command=init_command, add_env=add_env, import_modules=import_modules)
-    
+
     def install_library(self, libtask):
         self.manager.install_library(libtask)
 
@@ -94,7 +94,6 @@ class Executor(Executor):
                 task._retriever.__del__()
             task.__del__()
         self.manager.__del__()
-
 
 
 ##
@@ -160,14 +159,14 @@ class FutureFunctionCall(FunctionCall):
         self._retriever = None
         self._ran_functions = False
 
-    # Set a retriever for this task, it has to disable temp_output b/c 
+    # Set a retriever for this task, it has to disable temp_output b/c
     # it aims to bring the remote output back to the manager
     def set_retriever(self):
         self._retriever = FutureFunctionCall(self.manager, True, self.library_name, 'retrieve_output', self._future)
         self._retriever.disable_temp_output()
         self.manager.submit(self._retriever)
 
-    # Given that every designated task stores its outcome in a temp file, 
+    # Given that every designated task stores its outcome in a temp file,
     # this function is invoked through `VineFuture.result()` to trigger its retriever
     # to bring that output back to the manager.
     def output(self, timeout="wait_forever"):
@@ -186,7 +185,7 @@ class FutureFunctionCall(FunctionCall):
                     fn(self._output)
                 self._ran_functions = True
             return self._cached_output
-        
+
         # for retriever task: fetch the result of its retrievee on completion
         if self._is_retriever:
             if not self._has_retrieved:
@@ -207,7 +206,6 @@ class FutureFunctionCall(FunctionCall):
                 else:
                     self._cached_output = FunctionCallNoResult()
             return self._cached_output
-    
 
     # gather results from preceding tasks to use as inputs for this specific task
     def submit_finalize(self):
@@ -229,16 +227,15 @@ class FutureFunctionCall(FunctionCall):
 
         super().submit_finalize()
 
-
     def __del__(self):
         super().__del__()
 
 
 ##
 # \class FuturePythonTask
-# 
+#
 # TaskVine FuturePythonTask object
-# 
+#
 # This class is a sublcass of PythonTask that is specialized for futures
 
 class FuturePythonTask(PythonTask):
@@ -260,7 +257,7 @@ class FuturePythonTask(PythonTask):
         self._ran_functions = False
         self._is_retriever = rf
         self._retriever = None
-    
+
     def output(self, timeout="wait_forever"):
         def retrieve_output(arg):
             return arg
@@ -321,7 +318,6 @@ class FuturePythonTask(PythonTask):
         self._fn_def = (func, args, kwargs)
 
         super().submit_finalize()
-
 
     def add_environment(self, f):
         self._envs.append(f)
