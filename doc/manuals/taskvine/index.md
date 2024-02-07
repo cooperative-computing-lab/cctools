@@ -1482,6 +1482,7 @@ then be submitted through the `submit` function. This will return
 a Future object. The result of the task can retrieved by calling `future.result()`
 
 === "Python"
+
     ```python
     import ndcctools.taskvine as vine
 
