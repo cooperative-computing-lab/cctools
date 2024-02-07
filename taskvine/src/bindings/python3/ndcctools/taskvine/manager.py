@@ -834,7 +834,8 @@ class Manager(object):
     # @param self   Reference to the current manager object.
     # @param task   A task description created from @ref ndcctools.taskvine.task.Task.
     def submit(self, task):
-        task.submit_finalize(self)
+        task.manager = self
+        task.submit_finalize()
         task_id = cvine.vine_submit(self._taskvine, task._task)
         if task_id == 0:
             raise ValueError("invalid task description")
@@ -1516,7 +1517,8 @@ class Manager(object):
     def declare_minitask(self, minitask, source, cache=False, peer_transfer=True):
 
         # Attaching a task as a mini-task is like submitting it, so we must finalize the details.
-        minitask.submit_finalize(self)
+        minitask.manager = self
+        minitask.submit_finalize()
 
         # Then proceed to attach the task to the mini-task file object.
         flags = Task._determine_file_flags(cache, peer_transfer)
