@@ -33,16 +33,15 @@ typedef enum {
 	VINE_BUFFER,                /**< A file obtained from data in the manager's memory space. */
 	VINE_MINI_TASK,             /**< A file obtained by executing a Unix command line. */
 	VINE_EMPTY_DIR,              /**< An empty directory to create in the task sandbox. */
-} vine_file_t;
+} vine_file_type_t;
 
 typedef enum {
         VINE_FILE_STATE_PENDING, /**< This file has not yet been created by a task. */
 	VINE_FILE_STATE_CREATED   /**< This file has been created at some point.  (although it might have been lost!) */
 } vine_file_state_t;
 
-
 struct vine_file {
-	vine_file_t type;   // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
+	vine_file_type_t  type;  // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
 	vine_file_flags_t flags; // Whether or not to transfer this file between workers.
 	vine_file_state_t state; // Whether the file is PENDING or has been CREATED
 	char *source;       // Name of source file, url, buffer.
@@ -54,7 +53,7 @@ struct vine_file {
 	int refcount;       // Number of references from a task object, delete when zero.
 };
 
-struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task, vine_file_flags_t flags);
+struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_type_t type, struct vine_task *mini_task, vine_file_flags_t flags);
 
 struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source );
 
