@@ -8,7 +8,10 @@ See the file COPYING for details.
 
 #ifndef HAS_IFADDRS
 
-struct jx *interfaces_of_host() { return NULL; }
+struct jx *interfaces_of_host()
+{
+	return NULL;
+}
 
 #else
 

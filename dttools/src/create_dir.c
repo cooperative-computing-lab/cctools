@@ -8,8 +8,14 @@ See the file COPYING for details.
 
 #include "mkdir_recursive.h"
 
-int create_dir(const char *path, mode_t mode) { return mkdir_recursive(path, mode) == 0 ? 1 : 0; }
+int create_dir(const char *path, mode_t mode)
+{
+	return mkdir_recursive(path, mode) == 0 ? 1 : 0;
+}
 
-int create_dir_parents(const char *path, mode_t mode) { return mkdir_recursive_parents(path, mode) == 0 ? 1 : 0; }
+int create_dir_parents(const char *path, mode_t mode)
+{
+	return mkdir_recursive_parents(path, mode) == 0 ? 1 : 0;
+}
 
 /* vim: set noexpandtab tabstop=8: */

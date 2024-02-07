@@ -167,7 +167,10 @@ static struct list *vine_task_string_list_copy(struct list *string_list)
 	struct list *new = list_create();
 	char *var;
 
-	LIST_ITERATE(string_list, var) { list_push_tail(new, xxstrdup(var)); }
+	LIST_ITERATE(string_list, var)
+	{
+		list_push_tail(new, xxstrdup(var));
+	}
 
 	return new;
 }
@@ -277,7 +280,10 @@ void vine_task_provides_library(struct vine_task *t, const char *library_name)
 	}
 }
 
-void vine_task_set_function_slots(struct vine_task *t, int nslots) { t->function_slots = nslots; }
+void vine_task_set_function_slots(struct vine_task *t, int nslots)
+{
+	t->function_slots = nslots;
+}
 
 void vine_task_set_env_var(struct vine_task *t, const char *name, const char *value)
 {
@@ -632,7 +638,10 @@ void vine_task_set_scheduler(struct vine_task *t, vine_schedule_t algorithm)
 	t->worker_selection_algorithm = algorithm;
 }
 
-void vine_task_set_priority(struct vine_task *t, double priority) { t->priority = priority; }
+void vine_task_set_priority(struct vine_task *t, double priority)
+{
+	t->priority = priority;
+}
 
 int vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output_directory)
 {
@@ -726,23 +735,50 @@ void vine_task_delete(struct vine_task *t)
 	free(t);
 }
 
-const char *vine_task_get_command(struct vine_task *t) { return t->command_line; }
+const char *vine_task_get_command(struct vine_task *t)
+{
+	return t->command_line;
+}
 
-const char *vine_task_get_tag(struct vine_task *t) { return t->tag; }
+const char *vine_task_get_tag(struct vine_task *t)
+{
+	return t->tag;
+}
 
-const char *vine_task_get_category(struct vine_task *t) { return t->category; }
+const char *vine_task_get_category(struct vine_task *t)
+{
+	return t->category;
+}
 
-int vine_task_get_id(struct vine_task *t) { return t->task_id; }
+int vine_task_get_id(struct vine_task *t)
+{
+	return t->task_id;
+}
 
-const char *vine_task_get_stdout(struct vine_task *t) { return t->output; }
+const char *vine_task_get_stdout(struct vine_task *t)
+{
+	return t->output;
+}
 
-int vine_task_get_exit_code(struct vine_task *t) { return t->exit_code; }
+int vine_task_get_exit_code(struct vine_task *t)
+{
+	return t->exit_code;
+}
 
-vine_result_t vine_task_get_result(struct vine_task *t) { return t->result; }
+vine_result_t vine_task_get_result(struct vine_task *t)
+{
+	return t->result;
+}
 
-const char *vine_task_get_addrport(struct vine_task *t) { return t->addrport; }
+const char *vine_task_get_addrport(struct vine_task *t)
+{
+	return t->addrport;
+}
 
-const char *vine_task_get_hostname(struct vine_task *t) { return t->hostname; }
+const char *vine_task_get_hostname(struct vine_task *t)
+{
+	return t->hostname;
+}
 
 #define METRIC(x)                                                                                                      \
 	if (!strcmp(name, #x))                                                                                         \
@@ -908,13 +944,19 @@ char *vine_task_to_json(struct vine_task *t)
 
 	if (t->output_mounts) {
 		buffer_putfstring(&b, "outputs = ");
-		LIST_ITERATE(t->output_mounts, m) { buffer_putfstring(&b, "{ name: \"%s\" }, ", m->remote_name); }
+		LIST_ITERATE(t->output_mounts, m)
+		{
+			buffer_putfstring(&b, "{ name: \"%s\" }, ", m->remote_name);
+		}
 		buffer_putfstring(&b, "\n");
 	}
 
 	if (t->env_list) {
 		buffer_putfstring(&b, "environment = ");
-		LIST_ITERATE(t->env_list, env_name) { buffer_putfstring(&b, "{ name: \"%s\" }, ", env_name); }
+		LIST_ITERATE(t->env_list, env_name)
+		{
+			buffer_putfstring(&b, "{ name: \"%s\" }, ", env_name);
+		}
 		buffer_putfstring(&b, "\n");
 	}
 

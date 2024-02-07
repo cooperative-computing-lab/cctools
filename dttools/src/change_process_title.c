@@ -89,9 +89,13 @@ Changing the process title is not supported
 on any other platform.
 */
 
-void change_process_title_init(char **argv) {}
+void change_process_title_init(char **argv)
+{
+}
 
-void change_process_title(char *fmt, ...) {}
+void change_process_title(char *fmt, ...)
+{
+}
 
 #endif
 

@@ -221,7 +221,10 @@ int rmonitor_get_int_attribute(FILE *fstatus, char *attribute, uint64_t *value, 
 	return not_found;
 }
 
-uint64_t clicks_to_usecs(uint64_t clicks) { return ((clicks * ONE_SECOND) / sysconf(_SC_CLK_TCK)); }
+uint64_t clicks_to_usecs(uint64_t clicks)
+{
+	return ((clicks * ONE_SECOND) / sysconf(_SC_CLK_TCK));
+}
 
 /***
  * Low level resource monitor functions.
@@ -380,7 +383,10 @@ int rmonitor_get_ctxsw_usage(pid_t pid, struct rmonitor_ctxsw_info *switches)
 	return notfound;
 }
 
-void acc_ctxsw_usage(struct rmonitor_ctxsw_info *acc, struct rmonitor_ctxsw_info *other) { acc->delta += other->delta; }
+void acc_ctxsw_usage(struct rmonitor_ctxsw_info *acc, struct rmonitor_ctxsw_info *other)
+{
+	acc->delta += other->delta;
+}
 
 int rmonitor_get_loadavg(struct rmonitor_load_info *load)
 {

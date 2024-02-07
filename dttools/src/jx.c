@@ -52,7 +52,10 @@ static struct jx *jx_create(jx_type_t type)
 	return j;
 }
 
-struct jx *jx_null() { return jx_create(JX_NULL); }
+struct jx *jx_null()
+{
+	return jx_create(JX_NULL);
+}
 
 struct jx *jx_symbol(const char *symbol_name)
 {
@@ -204,7 +207,10 @@ struct jx *jx_lookup_guard(struct jx *j, const char *key, int *found)
 	return 0;
 }
 
-struct jx *jx_lookup(struct jx *j, const char *key) { return jx_lookup_guard(j, key, NULL); }
+struct jx *jx_lookup(struct jx *j, const char *key)
+{
+	return jx_lookup_guard(j, key, NULL);
+}
 
 const char *jx_lookup_string(struct jx *object, const char *key)
 {
@@ -312,21 +318,30 @@ int jx_insert_unless_empty(struct jx *object, struct jx *key, struct jx *value)
 	}
 }
 
-void jx_insert_boolean(struct jx *j, const char *key, int value) { jx_insert(j, jx_string(key), jx_boolean(value)); }
+void jx_insert_boolean(struct jx *j, const char *key, int value)
+{
+	jx_insert(j, jx_string(key), jx_boolean(value));
+}
 
 void jx_insert_integer(struct jx *j, const char *key, jx_int_t value)
 {
 	jx_insert(j, jx_string(key), jx_integer(value));
 }
 
-void jx_insert_double(struct jx *j, const char *key, double value) { jx_insert(j, jx_string(key), jx_double(value)); }
+void jx_insert_double(struct jx *j, const char *key, double value)
+{
+	jx_insert(j, jx_string(key), jx_double(value));
+}
 
 void jx_insert_string(struct jx *j, const char *key, const char *value)
 {
 	jx_insert(j, jx_string(key), jx_string(value));
 }
 
-void jx_array_insert(struct jx *array, struct jx *value) { array->u.items = jx_item(value, array->u.items); }
+void jx_array_insert(struct jx *array, struct jx *value)
+{
+	array->u.items = jx_item(value, array->u.items);
+}
 
 void jx_array_append(struct jx *array, struct jx *value)
 {
@@ -474,11 +489,20 @@ int jx_isatomic(struct jx *j)
 	}
 }
 
-int jx_istype(struct jx *j, jx_type_t type) { return j && j->type == type; }
+int jx_istype(struct jx *j, jx_type_t type)
+{
+	return j && j->type == type;
+}
 
-int jx_istrue(struct jx *j) { return j && j->type == JX_BOOLEAN && j->u.boolean_value; }
+int jx_istrue(struct jx *j)
+{
+	return j && j->type == JX_BOOLEAN && j->u.boolean_value;
+}
 
-int jx_isfalse(struct jx *j) { return j && j->type == JX_BOOLEAN && !j->u.boolean_value; }
+int jx_isfalse(struct jx *j)
+{
+	return j && j->type == JX_BOOLEAN && !j->u.boolean_value;
+}
 
 int jx_comprehension_equals(struct jx_comprehension *j, struct jx_comprehension *k)
 {

@@ -12,7 +12,9 @@ See the file COPYING for details.
 
 #include "ppoll_compat.h"
 
-static void noop(int sig) {}
+static void noop(int sig)
+{
+}
 
 int ppoll_compat(struct pollfd fds[], nfds_t nfds, int stoptime)
 {

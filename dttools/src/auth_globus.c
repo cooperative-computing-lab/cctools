@@ -184,9 +184,15 @@ static int auth_globus_accept(struct link *link, char **subject, time_t stoptime
 	return success;
 }
 
-void auth_globus_use_delegated_credential(int yesno) { use_delegated_credential = yesno; }
+void auth_globus_use_delegated_credential(int yesno)
+{
+	use_delegated_credential = yesno;
+}
 
-int auth_globus_has_delegated_credential(void) { return delegated_credential != GSS_C_NO_CREDENTIAL; }
+int auth_globus_has_delegated_credential(void)
+{
+	return delegated_credential != GSS_C_NO_CREDENTIAL;
+}
 
 int auth_globus_register(void)
 {
@@ -212,9 +218,14 @@ int auth_globus_register(void)
 	return 0;
 }
 
-int auth_globus_has_delegated_credential(void) { return 0; }
+int auth_globus_has_delegated_credential(void)
+{
+	return 0;
+}
 
-void auth_globus_use_delegated_credential(int yesno) {}
+void auth_globus_use_delegated_credential(int yesno)
+{
+}
 
 #endif
 

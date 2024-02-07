@@ -40,9 +40,15 @@ void text_array_delete(struct text_array *t)
 	free(t);
 }
 
-int text_array_width(struct text_array *t) { return t->width; }
+int text_array_width(struct text_array *t)
+{
+	return t->width;
+}
 
-int text_array_height(struct text_array *t) { return t->height; }
+int text_array_height(struct text_array *t)
+{
+	return t->height;
+}
 
 const char *text_array_get(struct text_array *t, int x, int y)
 {

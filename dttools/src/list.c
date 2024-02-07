@@ -325,7 +325,10 @@ void list_insert(struct list_cursor *cur, void *item)
  * based on the minimal core above.
  */
 
-int list_size(struct list *list) { return (int)list_length(list); }
+int list_size(struct list *list)
+{
+	return (int)list_length(list);
+}
 
 struct list *list_splice(struct list *top, struct list *bottom)
 {
@@ -413,7 +416,10 @@ void list_delete(struct list *l)
 	assert(ok);
 }
 
-void list_free(struct list *l) { list_clear(l, free); }
+void list_free(struct list *l)
+{
+	list_clear(l, free);
+}
 
 void list_clear(struct list *l, void (*delete_func)(void *item))
 {
@@ -618,7 +624,10 @@ int list_iterate_reverse(struct list *l, list_op_t operator, const void * arg)
 	return alltheway;
 }
 
-void list_first_item(struct list *list) { list_seek(list->iter, 0); }
+void list_first_item(struct list *list)
+{
+	list_seek(list->iter, 0);
+}
 
 void *list_next_item(struct list *list)
 {

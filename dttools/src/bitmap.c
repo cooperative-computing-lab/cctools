@@ -76,11 +76,20 @@ void bitmap_set(struct bitmap *m, int x, int y, int value)
 	m->data[y * m->width + x] = value;
 }
 
-int bitmap_width(struct bitmap *m) { return m->width; }
+int bitmap_width(struct bitmap *m)
+{
+	return m->width;
+}
 
-int bitmap_height(struct bitmap *m) { return m->height; }
+int bitmap_height(struct bitmap *m)
+{
+	return m->height;
+}
 
-int *bitmap_data(struct bitmap *m) { return m->data; }
+int *bitmap_data(struct bitmap *m)
+{
+	return m->data;
+}
 
 int bitmap_average(struct bitmap *m)
 {

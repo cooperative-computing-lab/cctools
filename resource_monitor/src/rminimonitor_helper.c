@@ -111,11 +111,20 @@ pid_t fork()
 	return pid;
 }
 
-pid_t __fork() { return fork(); }
+pid_t __fork()
+{
+	return fork();
+}
 
-pid_t vfork() { return fork(); }
+pid_t vfork()
+{
+	return fork();
+}
 
-pid_t __vfork() { return fork(); }
+pid_t __vfork()
+{
+	return fork();
+}
 
 int exit_wrapper(int status)
 {

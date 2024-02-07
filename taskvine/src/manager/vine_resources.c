@@ -27,7 +27,10 @@ struct vine_resources *vine_resources_create()
 	return r;
 }
 
-void vine_resources_delete(struct vine_resources *r) { free(r); }
+void vine_resources_delete(struct vine_resources *r)
+{
+	free(r);
+}
 
 struct vine_resources *vine_resources_copy(struct vine_resources *r)
 {
@@ -100,7 +103,10 @@ void vine_resources_debug(struct vine_resources *r)
 	vine_resource_debug(&r->cores, "cores");
 }
 
-void vine_resources_clear(struct vine_resources *r) { memset(r, 0, sizeof(*r)); }
+void vine_resources_clear(struct vine_resources *r)
+{
+	memset(r, 0, sizeof(*r));
+}
 
 static void vine_resource_add(struct vine_resource *total, struct vine_resource *r)
 {

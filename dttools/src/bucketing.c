@@ -28,7 +28,10 @@ static bucketing_point_t *bucketing_point_create(double val, double sig)
 
 /* Delete a bucketing point
  * @param p the bucketing point to be deleted */
-static void bucketing_point_delete(bucketing_point_t *p) { free(p); }
+static void bucketing_point_delete(bucketing_point_t *p)
+{
+	free(p);
+}
 
 /* Insert a bucketing point into a sorted list of points in O(log(n))
  * @param l pointer to sorted list of points
@@ -77,7 +80,10 @@ static void bucketing_insert_point_to_sorted_list(struct list *l, bucketing_poin
 	list_cursor_destroy(lc);
 }
 
-static void generate_next_task_sig(bucketing_state_t *s) { ++s->next_task_sig; }
+static void generate_next_task_sig(bucketing_state_t *s)
+{
+	++s->next_task_sig;
+}
 
 static int bucketing_ready_to_update_buckets(bucketing_state_t *s)
 {
@@ -121,7 +127,10 @@ bucketing_bucket_t *bucketing_bucket_create(double val, double prob)
 	return b;
 }
 
-void bucketing_bucket_delete(bucketing_bucket_t *b) { free(b); }
+void bucketing_bucket_delete(bucketing_bucket_t *b)
+{
+	free(b);
+}
 
 bucketing_state_t *bucketing_state_create(double default_value, int num_sampling_points, double increase_rate,
 		int max_num_buckets, bucketing_mode_t mode, int update_epoch)
