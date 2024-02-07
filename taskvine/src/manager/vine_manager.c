@@ -5813,12 +5813,6 @@ struct vine_file *vine_declare_buffer(struct vine_manager *m, const char *buffer
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_empty_dir(struct vine_manager *m)
-{
-	struct vine_file *f = vine_file_empty_dir();
-	return vine_manager_declare_file(m, f);
-}
-
 struct vine_file *vine_declare_mini_task(
 		struct vine_manager *m, struct vine_task *t, const char *name, vine_file_flags_t flags)
 {
