@@ -399,7 +399,7 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 		remote_info->in_cache = 1;
 		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
 		if (f)
-			f->created = 1;
+			f->state = VINE_FILE_STATE_CREATED;
 
 		vine_current_transfers_remove(q, id);
 
@@ -3104,7 +3104,7 @@ static void vine_manager_consider_recovery_task(
 Determine whether the input files needed for this task are available in some form.
 Most file types (FILE, URL, BUFFER) we can materialize on demand.
 But TEMP files must have been created by a prior task.
-If they were not present, we cannot run this task,
+If they are no longer present, we cannot run this task,
 and should consider re-creating it via a recovery task.
 */
 
@@ -3114,8 +3114,8 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 	LIST_ITERATE(t->input_mounts, m)
 	{
 		struct vine_file *f = m->file;
-		if (f->type == VINE_TEMP) {
-			if (!vine_file_replica_table_exists_somewhere(q, f->cached_name) && f->created) {
+		if (f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED) {
+			if(!vine_file_replica_table_exists_somewhere(q, f->cached_name)) {
 				vine_manager_consider_recovery_task(q, f, f->recovery_task);
 				return 0;
 			}

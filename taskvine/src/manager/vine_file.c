@@ -83,7 +83,7 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 	f->size = size;
 	f->mini_task = mini_task;
 	f->recovery_task = 0;
-	f->created = 0;
+	f->state = VINE_FILE_STATE_PENDING;
 	f->flags = flags;
 
 	if (data) {
