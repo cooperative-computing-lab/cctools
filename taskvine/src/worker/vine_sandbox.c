@@ -37,21 +37,21 @@ vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cach
 	struct vine_task *t = p->task;
 	vine_cache_status_t cache_status = VINE_CACHE_STATUS_READY;
 
-	if (t->input_mounts) {
-		struct vine_mount *m;
-		LIST_ITERATE(t->input_mounts, m)
-		{
-			cache_status = vine_cache_ensure(cache, m->file->cached_name);
-			if (cache_status == VINE_CACHE_STATUS_PROCESSING)
-				processing = 1;
-			if (cache_status == VINE_CACHE_STATUS_FAILED)
-				break;
-		}
+	struct vine_mount *m;
+	LIST_ITERATE(t->input_mounts, m)
+	{
+		cache_status = vine_cache_ensure(cache, m->file->cached_name);
+		if (cache_status == VINE_CACHE_STATUS_PROCESSING)
+			processing = 1;
+		if (cache_status == VINE_CACHE_STATUS_FAILED)
+			break;
 	}
+
 	if (cache_status == VINE_CACHE_STATUS_FAILED)
 		return VINE_CACHE_STATUS_FAILED;
 	if (processing)
 		return VINE_CACHE_STATUS_PROCESSING;
+
 	return VINE_CACHE_STATUS_READY;
 }
 
