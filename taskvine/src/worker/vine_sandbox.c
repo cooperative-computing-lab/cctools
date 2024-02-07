@@ -102,13 +102,13 @@ static int stage_input_file(struct vine_process *p, struct vine_mount *m, struct
 
 /* Create an empty output directory when requested by VINE_MOUNT_MKDIR */
 
-static int create_empty_output_dir( struct vine_process *p, struct vine_mount *m )
+static int create_empty_output_dir(struct vine_process *p, struct vine_mount *m)
 {
 	char *sandbox_path = vine_sandbox_full_path(p, m->remote_name);
 
-	int result = mkdir(sandbox_path,0755);
-	if(result!=0) {
-		debug(D_VINE,"sandbox: couldn't mkdir %s: %s",sandbox_path,strerror(errno));
+	int result = mkdir(sandbox_path, 0755);
+	if (result != 0) {
+		debug(D_VINE, "sandbox: couldn't mkdir %s: %s", sandbox_path, strerror(errno));
 		free(sandbox_path);
 		return 0;
 	} else {
@@ -139,12 +139,13 @@ int vine_sandbox_stagein(struct vine_process *p, struct vine_cache *cache)
 	}
 
 	/* If any of the output mounts have the MKDIR flag, then create those empty dirs. */
-	
+
 	LIST_ITERATE(t->output_mounts, m)
 	{
-		if(m->flags & VINE_MOUNT_MKDIR) {
-			result = create_empty_output_dir(p,m);
-			if(!result) break;
+		if (m->flags & VINE_MOUNT_MKDIR) {
+			result = create_empty_output_dir(p, m);
+			if (!result)
+				break;
 		}
 	}
 

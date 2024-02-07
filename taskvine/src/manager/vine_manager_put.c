@@ -558,12 +558,8 @@ vine_result_code_t vine_manager_put_task(struct vine_manager *q, struct vine_wor
 		{
 			char remote_name_encoded[PATH_MAX];
 			url_encode(m->remote_name, remote_name_encoded, PATH_MAX);
-			vine_manager_send(q,
-					w,
-					"infile %s %s %d\n",
-					m->file->cached_name,
-					remote_name_encoded,
-					m->flags);
+			vine_manager_send(
+					q, w, "infile %s %s %d\n", m->file->cached_name, remote_name_encoded, m->flags);
 		}
 	}
 
