@@ -448,17 +448,18 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 		struct vine_file_replica *remote_info = vine_file_replica_create(info.st_size, info.st_mtime);
 		vine_file_replica_table_insert(w, f->cached_name, remote_info);
 
-		/* If the file came from the manager we already sent it synchronously and we will not receive a cache
-		 * update */
 		switch (file_to_send->type) {
 		case VINE_URL:
 		case VINE_TEMP:
 		case VINE_EMPTY_DIR:
+			/* For these types, a cache-update will arrive when the replica actually exists. */
+			remote_info->state = VINE_FILE_REPLICA_STATE_PENDING;
 			break;
 		case VINE_FILE:
 		case VINE_MINI_TASK:
 		case VINE_BUFFER:
-			remote_info->in_cache = 1;
+			/* For these types, we sent the data, so we know it exists. */
+			remote_info->state = VINE_FILE_REPLICA_STATE_READY;
 			f->state = VINE_FILE_STATE_CREATED;
 			break;
 		}

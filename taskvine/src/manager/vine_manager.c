@@ -396,7 +396,8 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 
 		remote_info->size = size;
 		remote_info->transfer_time = transfer_time;
-		remote_info->in_cache = 1;
+		remote_info->state = VINE_FILE_REPLICA_STATE_READY;
+
 		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
 		if (f)
 			f->state = VINE_FILE_STATE_CREATED;

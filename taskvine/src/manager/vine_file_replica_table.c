@@ -49,7 +49,7 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 
 		// generate a peer address stub as it would appear in the transfer table
 		char *peer_addr = string_format("worker://%s:%d", peer->transfer_addr, peer->transfer_port);
-		if ((remote_info = hash_table_lookup(peer->current_files, cachename)) && remote_info->in_cache) {
+		if ((remote_info = hash_table_lookup(peer->current_files, cachename)) && remote_info->state==VINE_FILE_REPLICA_STATE_READY) {
 			if (vine_current_transfers_worker_in_use(q, peer_addr) < q->worker_source_max_transfers) {
 				free(peer_addr);
 				return peer;
