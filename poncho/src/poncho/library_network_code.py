@@ -47,6 +47,18 @@ def library_network_code():
         def remote_wrapper(event):
             args = event.get("fn_args", [])
             kwargs = event.get("fn_kwargs", {})
+
+            # in case of FutureFunctionCall tasks
+            new_args = []
+            for arg in args:
+                if isinstance(arg, dict) and "VineFutureFile" in arg:
+                    with open(arg["VineFutureFile"], 'rb') as f:
+                        output = cloudpickle.load(f)["Result"]
+                        new_args.append(output)
+                else:
+                    new_args.append(arg)
+            args = tuple(new_args)
+
             try:
                 result = func(*args, **kwargs)
                 success = True
