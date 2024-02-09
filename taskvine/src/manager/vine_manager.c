@@ -5,7 +5,6 @@ See the file COPYING for details.
 */
 
 #include "vine_manager.h"
-#include "vine_manager_factory.h"
 #include "vine_blocklist.h"
 #include "vine_current_transfers.h"
 #include "vine_factory_info.h"
@@ -13,10 +12,10 @@ See the file COPYING for details.
 #include "vine_file.h"
 #include "vine_file_replica.h"
 #include "vine_file_replica_table.h"
+#include "vine_manager_factory.h"
 #include "vine_manager_get.h"
 #include "vine_manager_put.h"
 #include "vine_manager_summarize.h"
-#include "vine_manager_factory.h"
 #include "vine_mount.h"
 #include "vine_perf_log.h"
 #include "vine_protocol.h"
@@ -658,7 +657,7 @@ static void update_read_catalog(struct vine_manager *q)
 	time_t stoptime = time(0) + 5; // Short timeout for query
 
 	if (q->fetch_factory) {
-		vine_manager_factory_update_all(q,stoptime);
+		vine_manager_factory_update_all(q, stoptime);
 	}
 }
 
@@ -811,7 +810,7 @@ static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vi
 	hash_table_remove(q->workers_with_available_results, w->hashkey);
 
 	record_removed_worker_stats(q, w);
-	vine_manager_factory_worker_leave(q,w);
+	vine_manager_factory_worker_leave(q, w);
 
 	vine_worker_delete(w);
 

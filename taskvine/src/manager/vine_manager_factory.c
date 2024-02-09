@@ -6,17 +6,17 @@ See the file COPYING for details.
 
 #include "vine_manager_factory.h"
 
+#include "vine_factory_info.h"
 #include "vine_manager.h"
 #include "vine_worker_info.h"
-#include "vine_factory_info.h"
 
 #include "catalog_query.h"
-#include "stringtools.h"
+#include "debug.h"
 #include "hash_table.h"
-#include "list.h"
 #include "jx.h"
 #include "jx_parse.h"
-#include "debug.h"
+#include "list.h"
+#include "stringtools.h"
 #include "xxmalloc.h"
 
 #include <assert.h>
@@ -28,8 +28,9 @@ by a specific factory.  If this puts us over the limit for that
 factory, then disconnect it.
 */
 
-int vine_manager_factory_worker_arrive( struct vine_manager *q, struct vine_worker_info *w, const char *factory_name ) {
-			
+int vine_manager_factory_worker_arrive(struct vine_manager *q, struct vine_worker_info *w, const char *factory_name)
+{
+
 	/* The manager is now obliged to query the catalog for factory info. */
 	q->fetch_factory = 1;
 
@@ -50,8 +51,8 @@ int vine_manager_factory_worker_arrive( struct vine_manager *q, struct vine_work
 Consider a worker that is disconnecting, and remove the factory state if needed.
 */
 
-void vine_manager_factory_worker_leave( struct vine_manager *q, struct vine_worker_info *w )
-{	
+void vine_manager_factory_worker_leave(struct vine_manager *q, struct vine_worker_info *w)
+{
 	if (w->factory_name) {
 		struct vine_factory_info *f = vine_factory_info_lookup(q, w->factory_name);
 		if (f)
@@ -64,9 +65,9 @@ If this currently connected worker is over the factory limit,
 and isn't running anything, then shut it down.
 */
 
-int vine_manager_factory_worker_prune( struct vine_manager *q, struct vine_worker_info *w )
+int vine_manager_factory_worker_prune(struct vine_manager *q, struct vine_worker_info *w)
 {
-	if(w->factory_name) {
+	if (w->factory_name) {
 		struct vine_factory_info *f = vine_factory_info_lookup(q, w->factory_name);
 		if (f && f->connected_workers > f->max_workers && itable_size(w->current_tasks) < 1) {
 			debug(D_VINE, "Final task received from worker %s, shutting down.", w->hostname);
