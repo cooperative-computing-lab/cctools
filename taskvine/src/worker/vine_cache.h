@@ -20,6 +20,7 @@ for file transfers to occur asynchronously of the manager.
 
 #include <stdint.h>
 #include "vine_file.h"
+#include "vine_cache_meta.h"
 
 struct link;
 struct vine_cache_file;
@@ -47,12 +48,13 @@ void vine_cache_delete( struct vine_cache *c );
 void vine_cache_load( struct vine_cache *c );
 void vine_cache_scan( struct vine_cache *c, struct link *manager );
 
-char *vine_cache_full_path( struct vine_cache *c, const char *cachename );
+char *vine_cache_data_path( struct vine_cache *c, const char *cachename );
+char *vine_cache_meta_path( struct vine_cache *c, const char *cachename );
 
-int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char *cachename );
-int vine_cache_queue_transfer( struct vine_cache *c, const char *source, const char *cachename, int64_t size, int mode, int flags );
-int vine_cache_queue_mini_task( struct vine_cache *c, struct vine_task *minitask, const char *source, const char *cachename, int64_t size, int mode );
-int vine_cache_queue_command( struct vine_cache *c, struct vine_task *minitask, const char *cachename, int64_t size, int mode );
+int vine_cache_addfile( struct vine_cache *c, struct vine_cache_meta *meta, const char *cachename );
+int vine_cache_queue_transfer( struct vine_cache *c, const char *source, const char *cachename, struct vine_cache_meta *meta, int flags );
+int vine_cache_queue_mini_task( struct vine_cache *c, struct vine_task *minitask, const char *source, const char *cachename, struct vine_cache_meta *meta );
+
 vine_cache_status_t vine_cache_ensure( struct vine_cache *c, const char *cachename);
 int vine_cache_remove( struct vine_cache *c, const char *cachename, struct link *manager );
 int vine_cache_contains( struct vine_cache *c, const char *cachename );
