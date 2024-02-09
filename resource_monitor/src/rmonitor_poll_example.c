@@ -16,7 +16,7 @@ int main(int argc, char **argv)
 {
 	sleep(2);
 
-	struct rmsummary *resources = rmonitor_measure_process(getpid());
+	struct rmsummary *resources = rmonitor_measure_process(getpid(), /* include disk */ 1);
 
 	fprintf(stdout, "command: %s, ", resources->command);
 

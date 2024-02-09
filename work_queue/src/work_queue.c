@@ -6002,7 +6002,7 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dire
 	if(q->measured_local_resources)
 		rmsummary_delete(q->measured_local_resources);
 
-	q->measured_local_resources = rmonitor_measure_process(getpid());
+	q->measured_local_resources = rmonitor_measure_process(getpid(), /* do not include disk */ 0);
 	q->monitor_mode = MON_SUMMARY;
 
 	if(watchdog) {
@@ -6261,7 +6261,7 @@ void update_resource_report(struct work_queue *q) {
 	if((time(0) - q->resources_last_update_time) < WORK_QUEUE_RESOURCE_MEASUREMENT_INTERVAL)
 		return;
 
-	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid());
+	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid(), /* do not include disk */ 0);
 
 	q->resources_last_update_time = time(0);
 }
@@ -6270,7 +6270,7 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 	if(q->monitor_mode == MON_DISABLED)
 		return;
 
-	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid());
+	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid(), /* do not include disk */ 0);
 	if(!q->measured_local_resources->exit_type)
 		q->measured_local_resources->exit_type = xxstrdup("normal");
 
@@ -6978,8 +6978,9 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			update_catalog(q, foreman_uplink, 0);
 		}
 
-		if(q->monitor_mode)
+		if(q->monitor_mode) {
 			update_resource_report(q);
+		}
 
 		END_ACCUM_TIME(q, time_internal);
 

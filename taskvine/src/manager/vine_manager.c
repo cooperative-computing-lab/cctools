@@ -3863,7 +3863,7 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 	if (q->measured_local_resources) {
 		rmsummary_delete(q->measured_local_resources);
 	}
-	q->measured_local_resources = rmonitor_measure_process(getpid());
+	q->measured_local_resources = rmonitor_measure_process(getpid(), /* do not include disk */ 0);
 
 	q->monitor_mode = VINE_MON_SUMMARY;
 	if (series) {
@@ -4097,7 +4097,7 @@ static void update_resource_report(struct vine_manager *q)
 	if ((time(0) - q->resources_last_update_time) < q->resource_management_interval)
 		return;
 
-	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid());
+	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid(), /* do not include disk */ 0);
 
 	q->resources_last_update_time = time(0);
 }

@@ -9,8 +9,8 @@ See the file COPYING for details.
 
 #include "rmsummary.h"
 
-struct rmsummary *rmonitor_measure_process(pid_t pid);
-int rmonitor_measure_process_update_to_peak(struct rmsummary *tr, pid_t pid);
+struct rmsummary *rmonitor_measure_process(pid_t pid, int include_disk);
+int rmonitor_measure_process_update_to_peak(struct rmsummary *tr, pid_t pid, int include_disk);
 struct rmsummary *rmonitor_measure_host(char *);
 
 int rmonitor_get_children(pid_t pid, uint64_t **children);
