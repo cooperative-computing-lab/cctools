@@ -301,24 +301,8 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 	if (n != 2)
 		return VINE_MSG_FAILURE;
 
-	if (string_prefix_is(field, "workers_joined")) {
-		w->stats->workers_joined = atoll(value);
-	} else if (string_prefix_is(field, "workers_removed")) {
-		w->stats->workers_removed = atoll(value);
-	} else if (string_prefix_is(field, "time_send")) {
-		w->stats->time_send = atoll(value);
-	} else if (string_prefix_is(field, "time_receive")) {
-		w->stats->time_receive = atoll(value);
-	} else if (string_prefix_is(field, "time_execute")) {
-		w->stats->time_workers_execute = atoll(value);
-	} else if (string_prefix_is(field, "bytes_sent")) {
-		w->stats->bytes_sent = atoll(value);
-	} else if (string_prefix_is(field, "bytes_received")) {
-		w->stats->bytes_received = atoll(value);
-	} else if (string_prefix_is(field, "tasks_waiting")) {
-		w->stats->tasks_waiting = atoll(value);
-	} else if (string_prefix_is(field, "tasks_running")) {
-		w->stats->tasks_running = atoll(value);
+	if (string_prefix_is(field, "tasks_running")) {
+		w->dynamic_tasks_running = atoi(value);
 	} else if (string_prefix_is(field, "idle-disconnect-request")) {
 		handle_worker_timeout(q, w);
 	} else if (string_prefix_is(field, "worker-id")) {
@@ -762,32 +746,6 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 			delete_worker_file(q, w, f->cached_name, f->flags, (~VINE_CACHE & VINE_CACHE_ALWAYS));
 		}
 	}
-}
-
-#define accumulate_stat(qs, ws, field) (qs)->field += (ws)->field
-
-static void record_removed_worker_stats(struct vine_manager *q, struct vine_worker_info *w)
-{
-	struct vine_stats *qs = q->stats_disconnected_workers;
-	struct vine_stats *ws = w->stats;
-
-	accumulate_stat(qs, ws, workers_joined);
-	accumulate_stat(qs, ws, workers_removed);
-	accumulate_stat(qs, ws, workers_released);
-	accumulate_stat(qs, ws, workers_idled_out);
-	accumulate_stat(qs, ws, workers_slow);
-	accumulate_stat(qs, ws, workers_blocked);
-	accumulate_stat(qs, ws, workers_lost);
-
-	accumulate_stat(qs, ws, time_send);
-	accumulate_stat(qs, ws, time_receive);
-	accumulate_stat(qs, ws, time_workers_execute);
-
-	accumulate_stat(qs, ws, bytes_sent);
-	accumulate_stat(qs, ws, bytes_received);
-
-	// Count all the workers joined as removed.
-	qs->workers_removed = ws->workers_joined;
 }
 
 /* Remove a worker from this master by removing all remote state, all local state, and disconnecting. */
