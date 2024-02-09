@@ -217,6 +217,9 @@ int vine_cache_addfile(struct vine_cache *c, struct vine_cache_meta *meta, const
 	if (!f) {
 		f = vine_cache_file_create(VINE_CACHE_FILE, "manager", meta, 0);
 		hash_table_insert(c->table, cachename, f);
+		char *meta_path = vine_cache_meta_path(c,cachename);
+		vine_cache_meta_save(meta,meta_path);
+		free(meta_path);
 	}
 
 	f->status = VINE_CACHE_STATUS_READY;
@@ -242,6 +245,9 @@ int vine_cache_queue_transfer(
 {
 	struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_TRANSFER, source, meta, 0);
 	hash_table_insert(c->table, cachename, f);
+	char *meta_path = vine_cache_meta_path(c,cachename);
+	vine_cache_meta_save(meta,meta_path);
+	free(meta_path);
 	if (flags & VINE_CACHE_FLAGS_NOW)
 		vine_cache_ensure(c, cachename);
 	return 1;
@@ -257,6 +263,9 @@ int vine_cache_queue_mini_task(struct vine_cache *c, struct vine_task *mini_task
 {
 	struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_MINI_TASK, source, meta, mini_task);
 	hash_table_insert(c->table, cachename, f);
+	char *meta_path = vine_cache_meta_path(c,cachename);
+	vine_cache_meta_save(meta,meta_path);
+	free(meta_path);
 	return 1;
 }
 
