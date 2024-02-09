@@ -114,7 +114,7 @@ struct jx *vine_worker_to_jx(struct vine_worker_info *w)
 	jx_insert_integer(j, "total_tasks_running", itable_size(w->current_tasks));
 	jx_insert_integer(j, "total_bytes_transferred", w->total_bytes_transferred);
 	jx_insert_integer(j, "total_transfer_time", w->total_transfer_time);
-	
+
 	jx_insert_integer(j, "start_time", w->start_time);
 	jx_insert_integer(j, "current_time", timestamp_get());
 

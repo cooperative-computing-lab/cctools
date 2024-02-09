@@ -126,7 +126,7 @@ static vine_msg_code_t handle_http_request(
 static vine_msg_code_t handle_taskvine(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 static vine_msg_code_t handle_manager_status(
 		struct vine_manager *q, struct vine_worker_info *w, const char *line, time_t stoptime);
-static vine_msg_code_t handle_resources(struct vine_manager *q, struct vine_worker_info *w, time_t stoptime );
+static vine_msg_code_t handle_resources(struct vine_manager *q, struct vine_worker_info *w, time_t stoptime);
 static vine_msg_code_t handle_feature(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 static void handle_library_update(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 
@@ -2189,34 +2189,35 @@ Handle a resource update message from the worker describing
 its cores, memory, disk, etc.
 */
 
-static vine_msg_code_t handle_resources(struct vine_manager *q, struct vine_worker_info *w, time_t stoptime )
+static vine_msg_code_t handle_resources(struct vine_manager *q, struct vine_worker_info *w, time_t stoptime)
 {
-	while(1) {
+	while (1) {
 		char line[VINE_LINE_MAX];
 		int64_t total;
-		
-		int result = link_readline(w->link, line, sizeof(line), stoptime);
-		if (result <= 0) return VINE_MSG_FAILURE;
 
-		debug(D_VINE,"%s",line);
-		
-		if(sscanf(line, "cores %" PRId64,&total)) {
+		int result = link_readline(w->link, line, sizeof(line), stoptime);
+		if (result <= 0)
+			return VINE_MSG_FAILURE;
+
+		debug(D_VINE, "%s", line);
+
+		if (sscanf(line, "cores %" PRId64, &total)) {
 			w->resources->cores.total = total;
-		} else if(sscanf(line,"memory %" PRId64,&total)) {
+		} else if (sscanf(line, "memory %" PRId64, &total)) {
 			w->resources->memory.total = total;
-		} else if(sscanf(line,"disk %" PRId64,&total)) {
+		} else if (sscanf(line, "disk %" PRId64, &total)) {
 			w->resources->disk.total = total;
-		} else if(sscanf(line,"gpus %" PRId64,&total)) {
+		} else if (sscanf(line, "gpus %" PRId64, &total)) {
 			w->resources->gpus.total = total;
-		} else if(sscanf(line,"workers %" PRId64,&total)) {
+		} else if (sscanf(line, "workers %" PRId64, &total)) {
 			w->resources->workers.total = total;
-		} else if(sscanf(line,"tag %" PRId64,&total)) {
+		} else if (sscanf(line, "tag %" PRId64, &total)) {
 			w->resources->tag = total;
-		} else if(!strcmp(line,"end")) {
+		} else if (!strcmp(line, "end")) {
 			/* Stop when we get an end marker. */
 			break;
 		} else {
-			debug(D_VINE,"unexpected data in resource update!");
+			debug(D_VINE, "unexpected data in resource update!");
 			/* But keep going until we get an "end" */
 		}
 	}
