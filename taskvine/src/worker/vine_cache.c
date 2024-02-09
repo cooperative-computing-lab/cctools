@@ -124,7 +124,13 @@ void vine_cache_load(struct vine_cache *c)
 				trash_file(data_path);
 			} else {
 				debug(D_VINE, "cache: %s has cache-level %d, keeping",d->d_name,meta->cache_level);
-				vine_cache_addfile(c, meta, d->d_name);
+
+				// XXX source should come from metadata
+				// XXX great opportunity to check metadata against the file
+				struct vine_cache_file *f;
+				f = vine_cache_file_create(VINE_CACHE_FILE, "manager", meta, 0);
+				hash_table_insert(c->table, d->d_name, f);
+				f->status = VINE_CACHE_STATUS_READY;
 			}
 
 			free(meta_path);
@@ -207,23 +213,50 @@ char *vine_cache_meta_path(struct vine_cache *c, const char *cachename)
 	return string_format("%s/%s.meta", c->cache_dir, cachename);
 }
 
+// XXX hack pass this one in
+extern struct vine_workspace *workspace;
+
+char *vine_cache_transfer_path(struct vine_cache *c, const char *cachename)
+{
+	return string_format("%s/%s.meta", workspace->transfer_dir, cachename);
+}
+
 /*
-Add a file to the cache manager (already created in the proper place) and note its size.
+Add a file to the cache manager by renaming it from its current location
+and writing out the metadata to the proper location.
 */
 
-int vine_cache_addfile(struct vine_cache *c, struct vine_cache_meta *meta, const char *cachename)
+int vine_cache_addfile(struct vine_cache *c, const char *transfer_path, struct vine_cache_meta *meta, const char *cachename)
 {
 	struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
-	if (!f) {
-		f = vine_cache_file_create(VINE_CACHE_FILE, "manager", meta, 0);
-		hash_table_insert(c->table, cachename, f);
-		char *meta_path = vine_cache_meta_path(c,cachename);
-		vine_cache_meta_save(meta,meta_path);
-		free(meta_path);
+	if (f) {
+		debug(D_VINE,"cache: attempt to add cachename %s twice failed!",cachename);
+		return 0;
 	}
 
-	f->status = VINE_CACHE_STATUS_READY;
-	return 1;
+	int result = 0;
+	
+	char *data_path = vine_cache_data_path(c,cachename);
+	char *meta_path = vine_cache_meta_path(c,cachename);
+
+	if(rename(transfer_path,data_path)==0) {
+		vine_cache_meta_save(meta,meta_path);
+
+		// XXX source should come from metadata
+		f = vine_cache_file_create(VINE_CACHE_FILE, "manager", meta, 0);
+		hash_table_insert(c->table, cachename, f);
+
+		f->status = VINE_CACHE_STATUS_READY;
+
+		result = 1;
+	} else {
+		result = 0;
+	}
+
+	free(data_path);
+	free(meta_path);
+	
+	return result;
 }
 
 /*
@@ -332,18 +365,35 @@ static int do_internal_command(struct vine_cache *c, const char *command, char *
 }
 
 /*
-Transfer a single input file from a url to a local filename by using /usr/bin/curl.
+Transfer a single input file from a url to the local transfer path via curl.
+If that succeeds, then ingest the file into the proper cache_path.
 -s Do not show progress bar.  (Also disables errors.)
 -S Show errors.
 -L Follow redirects as needed.
 --stderr Send errors to /dev/stdout so that they are observed by popen.
 */
 
-static int do_curl_transfer(struct vine_cache *c, const char *source_url, const char *cache_path, char **error_message)
+static int do_curl_transfer(struct vine_cache *c, const char *source_url, const char *transfer_path, const char *cache_path, char **error_message)
 {
-	char *command = string_format("curl -sSL --stderr /dev/stdout -o \"%s\" \"%s\"", cache_path, source_url);
+	char *command = string_format("curl -sSL --stderr /dev/stdout -o \"%s\" \"%s\"", transfer_path, source_url);
 	int result = do_internal_command(c, command, error_message);
 	free(command);
+
+	if (result) {
+		// XXX do we drop the metadata file here as well?
+		if (rename(transfer_path, cache_path) == 0) {
+			debug(D_VINE, "cache: renamed %s to %s", transfer_path, cache_path);
+		} else {
+			debug(D_VINE,
+					"cache: failed to rename %s to %s: %s",
+					transfer_path,
+					cache_path,
+					strerror(errno));
+			result = 0;
+		}
+	}
+
+
 	return result;
 }
 
@@ -375,15 +425,15 @@ Transfer a single input file from a worker url to a local file name.
 
 */
 static int do_worker_transfer(
-		struct vine_cache *c, const char *source_url, const char *cache_path, char **error_message)
+		struct vine_cache *c, const char *source_url, const char *cachename, char **error_message)
 {
 	int port_num;
-	char addr[VINE_LINE_MAX], path[VINE_LINE_MAX];
+	char addr[VINE_LINE_MAX], source_path[VINE_LINE_MAX];
 	int stoptime;
 	struct link *worker_link;
 
 	// expect the form: worker://addr:port/path/to/file
-	sscanf(source_url, "worker://%99[^:]:%d/%s", addr, &port_num, path);
+	sscanf(source_url, "worker://%99[^:]:%d/%s", addr, &port_num, source_path);
 	debug(D_VINE, "Setting up worker transfer file %s", source_url);
 
 	stoptime = time(0) + 15;
@@ -405,57 +455,45 @@ static int do_worker_transfer(
 
 	/* XXX A fixed timeout of 900 certainly can't be right! */
 
-	if (!vine_transfer_get_any(worker_link, c, path, time(0) + 900)) {
-		*error_message = string_format("Could not transfer file %s from worker %s:%d", path, addr, port_num);
+	if (!vine_transfer_get_any(worker_link, c, source_path, cachename, time(0) + 900)) {
+		*error_message = string_format("Could not transfer file from %s", source_url);
 		link_close(worker_link);
 		return 0;
 	}
 
+	/* If we got to this point, the file is already renamed into the cache location. */
+	
 	link_close(worker_link);
 
 	return 1;
 }
 
 /*
-Transfer a single obejct into the cache,
+Transfer a single object into the cache,
 whether by worker or via curl.
 Use a temporary transfer path while downloading,
 and then rename it into the proper place.
 */
 
-static int do_transfer(struct vine_cache *c, const char *source_url, const char *cache_path, char **error_message)
+static int do_transfer(struct vine_cache *c, const char *source_url, const char *cachename, char **error_message)
 {
-	char *transfer_path = string_format("%s.transfer", cache_path);
+	char *transfer_path = vine_cache_transfer_path(c,cachename);
+	char *cache_path = vine_cache_data_path(c,cachename);
+
 	int result = 0;
 
 	if (strncmp(source_url, "worker://", 9) == 0) {
-		result = do_worker_transfer(c, source_url, transfer_path, error_message);
-		if (result) {
-			debug(D_VINE, "received file from worker");
-			rename(cache_path, transfer_path);
-		}
+		result = do_worker_transfer(c, source_url, cachename, error_message);
 	} else {
-		result = do_curl_transfer(c, source_url, transfer_path, error_message);
-	}
-
-	if (result) {
-		if (rename(transfer_path, cache_path) == 0) {
-			debug(D_VINE, "cache: renamed %s to %s", transfer_path, cache_path);
-		} else {
-			debug(D_VINE,
-					"cache: failed to rename %s to %s: %s",
-					transfer_path,
-					cache_path,
-					strerror(errno));
-			result = 0;
-		}
+		result = do_curl_transfer(c, source_url, transfer_path, cache_path, error_message);
 	}
 
 	if (!result)
 		trash_file(transfer_path);
 
 	free(transfer_path);
-
+	free(cache_path);
+	
 	return result;
 }
 
@@ -474,13 +512,14 @@ static void vine_cache_worker_process(struct vine_cache_file *f, struct vine_cac
 		result = 1;
 		break;
 	case VINE_CACHE_TRANSFER:
-		result = do_transfer(c, f->source, cache_path, &error_message);
+		result = do_transfer(c, f->source, cachename, &error_message);
 		break;
 	case VINE_CACHE_MINI_TASK:
 		result = do_mini_task(c, f, &error_message);
 		break;
 	}
 
+	// XXX We need a way to pull out the error message and return to the manager.
 	if (error_message) {
 		debug(D_VINE, "An error occured when creating %s via mini task: %s", cachename, error_message);
 		free(error_message);

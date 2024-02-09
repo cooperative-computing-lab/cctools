@@ -50,8 +50,9 @@ void vine_cache_scan( struct vine_cache *c, struct link *manager );
 
 char *vine_cache_data_path( struct vine_cache *c, const char *cachename );
 char *vine_cache_meta_path( struct vine_cache *c, const char *cachename );
+char *vine_cache_transfer_path( struct vine_cache *c, const char *cachename );
 
-int vine_cache_addfile( struct vine_cache *c, struct vine_cache_meta *meta, const char *cachename );
+int vine_cache_addfile( struct vine_cache *c, const char *transfer_path, struct vine_cache_meta *meta, const char *cachename );
 int vine_cache_queue_transfer( struct vine_cache *c, const char *source, const char *cachename, struct vine_cache_meta *meta, int flags );
 int vine_cache_queue_mini_task( struct vine_cache *c, struct vine_task *minitask, const char *source, const char *cachename, struct vine_cache_meta *meta );
 

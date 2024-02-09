@@ -345,64 +345,67 @@ static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname,
 int vine_transfer_get_dir(struct link *lnk, struct vine_cache *cache, const char *dirname, time_t stoptime)
 {
 	int64_t totalsize = 0;
-	char *cached_path = vine_cache_data_path(cache, dirname);
-	int r = vine_transfer_get_dir_internal(lnk, cached_path, &totalsize, stoptime);
+	char *transfer_path = vine_cache_transfer_path(cache, dirname);
+	int r = vine_transfer_get_dir_internal(lnk, transfer_path, &totalsize, stoptime);
 	if (r) {
 		// XXX need the proper cachelevel
 		// XXX need the proper mtime
 		struct vine_cache_meta *meta = vine_cache_meta_create(VINE_FILE,VINE_CACHE_LEVEL_TASK,0755,totalsize,0,0);
-		vine_cache_addfile(cache, meta, dirname);
+		vine_cache_addfile(cache, transfer_path, meta, dirname);
 	} else {
 		// Remove the file if there's any problem with getting it.
-		if (unlink_recursive(cached_path) < 0) {
-			debug(D_VINE, "Can't remove invalid file %s: (%s)", cached_path, strerror(errno));
+		if (unlink_recursive(transfer_path) < 0) {
+			debug(D_VINE, "Can't remove invalid file %s: (%s)", transfer_path, strerror(errno));
 		}
 	}
-	free(cached_path);
+	free(transfer_path);
 	return r;
 }
 
-int vine_transfer_get_file(struct link *lnk, struct vine_cache *cache, const char *filename, int64_t length, int mode,
+int vine_transfer_get_file(struct link *lnk, struct vine_cache *cache, const char *cachename, int64_t length, int mode,
 		time_t stoptime)
 {
-	char *cached_path = vine_cache_data_path(cache, filename);
-	int r = vine_transfer_get_file_internal(lnk, cached_path, length, mode, stoptime);
+	char *transfer_path = vine_cache_transfer_path(cache, cachename);
+	int r = vine_transfer_get_file_internal(lnk, transfer_path, length, mode, stoptime);
 	if (r) {
 		// XXX fill in the proper cachelevel
 		// XXX fill in the proper mtime
 		// XXX fill in the transfer time
 		struct vine_cache_meta *meta = vine_cache_meta_create(VINE_FILE,VINE_CACHE_LEVEL_TASK,mode,length,0,0);
-		vine_cache_addfile(cache, meta, filename);
+		vine_cache_addfile(cache, transfer_path, meta, cachename);
 	} else {
 		// Remove the file if there's any problem with getting it.
-		if (unlink_recursive(cached_path) < 0) {
-			debug(D_VINE, "Can't remove invalid file %s: (%s)", cached_path, strerror(errno));
+		if (unlink_recursive(transfer_path) < 0) {
+			debug(D_VINE, "Can't remove invalid file %s: (%s)", transfer_path, strerror(errno));
 		}
 	}
-	free(cached_path);
+	free(transfer_path);
 	return r;
 }
 
-int vine_transfer_get_any(struct link *lnk, struct vine_cache *cache, const char *filename, time_t stoptime)
+int vine_transfer_get_any(struct link *lnk, struct vine_cache *cache, const char *source_path, const char *cachename, time_t stoptime)
 {
 	int64_t totalsize = 0;
-	send_message(lnk, "get %s\n", filename);
-	char *cache_root = vine_cache_data_path(cache, "");
-	int r = vine_transfer_get_any_internal(lnk, cache_root, &totalsize, stoptime);
+
+	char *transfer_dir = vine_cache_transfer_path(cache, ".");
+	char *transfer_path = vine_cache_transfer_path(cache,cachename);
+	
+	send_message(lnk, "get %s\n", source_path);
+
+	int r = vine_transfer_get_any_internal(lnk, transfer_dir, &totalsize, stoptime);
 	if (r) {
 		// XXX fill in the proper cachelevel
 		// XXX fill in the proper mtime
 		// XXX fill in the transfer time
 		struct vine_cache_meta *meta = vine_cache_meta_create(VINE_FILE,VINE_CACHE_LEVEL_TASK,0755,totalsize,0,0);
-		vine_cache_addfile(cache, meta, filename);
+		vine_cache_addfile(cache, transfer_path, meta, cachename);
 	} else {
-		// Remove the file or directory if there's any problem with getting it.
-		char *cached_path = string_format("%s/%s", cache_root, filename);
-		if (unlink_recursive(cached_path) < 0) {
-			debug(D_VINE, "Can't remove invalid any %s: (%s)", cached_path, strerror(errno));
+		if (unlink_recursive(transfer_path) < 0) {
+			debug(D_VINE, "Can't remove invalid any %s: (%s)", transfer_path, strerror(errno));
 		}
-		free(cached_path);
 	}
-	free(cache_root);
+	free(transfer_dir);
+	free(transfer_path);
+	
 	return r;
 }

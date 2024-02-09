@@ -29,12 +29,13 @@ int vine_transfer_put_any( struct link *lnk, struct vine_cache *cache, const cha
 /** Get any named filesystem item (file, directory, symlink) using the recursive transfer protocol.
 @param lnk The network link to use.
 @param cache The cache object where the file is located.
-@param filename The name of the file, relative to the cache object.
+@param source_path The name of the file to fetch from the remote host.
+@param cachename The name of the entry in the local cache.
 @param stoptime The absolute Unix time at which to stop and accept failure.
 @return Non-zero on success, zero on failure.
 */
 
-int vine_transfer_get_any( struct link *lnk, struct vine_cache *cache, const char *filename, time_t stoptime );
+int vine_transfer_get_any( struct link *lnk, struct vine_cache *cache, const char *source_path, const char *cachename, time_t stoptime );
 
 /** Get a directory using the recursive transfer protocol.
 This presumes that the directory header message has already
