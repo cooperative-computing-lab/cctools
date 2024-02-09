@@ -108,7 +108,6 @@ double vine_option_blocklist_slow_workers_timeout = 900;
 static void handle_failure(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, vine_result_code_t fail_type);
 static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason);
-static int shut_down_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 static void reap_task_from_worker(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, vine_task_state_t new_state);
@@ -281,7 +280,7 @@ static void handle_worker_timeout(struct vine_manager *q, struct vine_worker_inf
 	if (itable_size(w->current_tasks) == 0) {
 		debug(D_VINE, "Accepting timeout request from worker %s (%s).", w->hostname, w->addrport);
 		q->stats->workers_idled_out++;
-		shut_down_worker(q, w);
+		vine_manager_shut_down_worker(q, w);
 	}
 
 	return;
@@ -3359,7 +3358,7 @@ static int disconnect_slow_workers(struct vine_manager *q)
 
 /* Forcibly shutdown a worker by telling it to exit, then disconnect it. */
 
-static int shut_down_worker(struct vine_manager *q, struct vine_worker_info *w)
+int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
 	if (!w)
 		return 0;
@@ -3382,7 +3381,7 @@ static int shutdown_drained_workers(struct vine_manager *q)
 	{
 		if (w->draining && itable_size(w->current_tasks) == 0) {
 			removed++;
-			shut_down_worker(q, w);
+			vine_manager_shut_down_worker(q, w);
 		}
 	}
 
@@ -4885,9 +4884,9 @@ int vine_workers_shutdown(struct vine_manager *q, int n)
 		if (i >= n)
 			break;
 		if (itable_size(w->current_tasks) == 0) {
-			shut_down_worker(q, w);
+			vine_manager_shut_down_worker(q, w);
 
-			/* shut_down_worker alters the table, so we reset it here. */
+			/* vine_manager_shut_down_worker alters the table, so we reset it here. */
 			hash_table_firstkey(q->worker_table);
 			i++;
 		}

@@ -22,8 +22,6 @@ See the file COPYING for details.
 #include <assert.h>
 #include <string.h>
 
-extern void shut_down_worker( struct vine_manager *m, struct vine_worker_info *w );
-
 /*
 Consider a newly arriving worker that declares it was created
 by a specific factory.  If this puts us over the limit for that
@@ -41,7 +39,7 @@ int vine_manager_factory_worker_arrive( struct vine_manager *q, struct vine_work
 	/* If we are over the desired number of workers from this factory, disconnect. */
 	struct vine_factory_info *f = vine_factory_info_lookup(q, w->factory_name);
 	if (f && f->connected_workers + 1 > f->max_workers) {
-		shut_down_worker(q, w);
+		vine_manager_shut_down_worker(q, w);
 		return 0;
 	}
 
@@ -72,7 +70,7 @@ int vine_manager_factory_worker_prune( struct vine_manager *q, struct vine_worke
 		struct vine_factory_info *f = vine_factory_info_lookup(q, w->factory_name);
 		if (f && f->connected_workers > f->max_workers && itable_size(w->current_tasks) < 1) {
 			debug(D_VINE, "Final task received from worker %s, shutting down.", w->hostname);
-			shut_down_worker(q, w);
+			vine_manager_shut_down_worker(q, w);
 			return 1;
 		}
 	}
@@ -111,7 +109,7 @@ static int vine_manager_factory_trim_workers(struct vine_manager *q, struct vine
 	{
 		hash_table_remove(idle_workers, key);
 		hash_table_firstkey(idle_workers);
-		shut_down_worker(q, w);
+		vine_manager_shut_down_worker(q, w);
 	}
 	hash_table_delete(idle_workers);
 
