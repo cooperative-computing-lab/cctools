@@ -40,6 +40,7 @@ struct vine_workspace *vine_workspace_create(const char *manual_tmpdir)
 
 	w->workspace_dir = xxstrdup(absolute);
 	w->cache_dir = string_format("%s/cache", w->workspace_dir);
+	w->transfer_dir = string_format("%s/transfer", w->workspace_dir);
 	w->temp_dir = string_format("%s/temp", w->workspace_dir);
 	w->trash_dir = string_format("%s/trash", w->workspace_dir);
 
@@ -105,6 +106,11 @@ int vine_workspace_prepare(struct vine_workspace *w)
 		return 0;
 	}
 
+	if (!create_dir(w->transfer_dir, 0777)) {
+		debug(D_VINE, "couldn't create %s: %s", w->transfer_dir, strerror(errno));
+		return 0;
+	}
+
 	if (!create_dir(w->temp_dir, 0777)) {
 		debug(D_VINE, "couldn't create %s: %s", w->cache_dir, strerror(errno));
 		return 0;
@@ -161,6 +167,7 @@ void vine_workspace_delete(struct vine_workspace *w)
 	unlink_recursive(w->workspace_dir);
 
 	free(w->workspace_dir);
+	free(w->transfer_dir);
 	free(w->cache_dir);
 	free(w->trash_dir);
 	free(w->temp_dir);

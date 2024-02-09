@@ -10,6 +10,9 @@ A workspace object describes the directories managed by a worker:
 - cache_dir - Contains only files/directories that are sent by the
 manager, or downloaded at the manager's direction.  These are managed
 by the vine_cache object.
+- transfer_dir - Contains files in the process of being transferred,
+either from the manager or another worker.  Files are only moved from
+the transfer_dir to the cache once their contents are known good.
 - temp_dir - a temporary directory of last resort if a tool needs some
 space to work on items that neither belong in the cache or in a task sandbox.
 Really anything using this directory is a hack and its behavior should be reconsidered.
@@ -27,6 +30,7 @@ directory on startup, shutdown, and whenever an individual file is trashed.
 struct vine_workspace {
 	char *workspace_dir;
 	char *cache_dir;
+	char *transfer_dir;
 	char *trash_dir;
 	char *temp_dir;
 };
