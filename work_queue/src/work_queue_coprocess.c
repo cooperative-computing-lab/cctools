@@ -256,7 +256,7 @@ void work_queue_coprocess_measure_resources(struct work_queue_coprocess *coproce
 		if (curr_coprocess->state == WORK_QUEUE_COPROCESS_DEAD || curr_coprocess->state == WORK_QUEUE_COPROCESS_UNINITIALIZED) {
 			continue;
 		}
-		struct rmsummary *resources = rmonitor_measure_process(curr_coprocess->pid);
+		struct rmsummary *resources = rmonitor_measure_process(curr_coprocess->pid, /* include disk */ 1);
 
 		if(!resources)
 			continue;
