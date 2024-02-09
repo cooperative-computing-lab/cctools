@@ -218,7 +218,7 @@ extern struct vine_workspace *workspace;
 
 char *vine_cache_transfer_path(struct vine_cache *c, const char *cachename)
 {
-	return string_format("%s/%s.meta", workspace->transfer_dir, cachename);
+	return string_format("%s/%s", workspace->transfer_dir, cachename);
 }
 
 /*
