@@ -343,7 +343,6 @@ static void send_resource_update(struct link *manager)
 	}
 
 	vine_resources_send(manager, total_resources, stoptime);
-	send_message(manager, "info end_of_resource_update %d\n", 0);
 }
 
 /*

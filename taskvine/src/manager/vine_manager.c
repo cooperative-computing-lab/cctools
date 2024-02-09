@@ -126,7 +126,7 @@ static vine_msg_code_t handle_http_request(
 static vine_msg_code_t handle_taskvine(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 static vine_msg_code_t handle_manager_status(
 		struct vine_manager *q, struct vine_worker_info *w, const char *line, time_t stoptime);
-static vine_msg_code_t handle_resource(struct vine_manager *q, struct vine_worker_info *w, const char *line);
+static vine_msg_code_t handle_resources(struct vine_manager *q, struct vine_worker_info *w, time_t stoptime );
 static vine_msg_code_t handle_feature(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 static void handle_library_update(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 
@@ -321,9 +321,6 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 		w->stats->tasks_running = atoll(value);
 	} else if (string_prefix_is(field, "idle-disconnect-request")) {
 		handle_worker_timeout(q, w);
-	} else if (string_prefix_is(field, "end_of_resource_update")) {
-		count_worker_resources(q, w);
-		vine_txn_log_write_worker_resources(q, w);
 	} else if (string_prefix_is(field, "worker-id")) {
 		free(w->workerid);
 		w->workerid = xxstrdup(value);
@@ -526,8 +523,8 @@ static vine_msg_code_t vine_manager_recv_no_retry(
 	} else if (string_prefix_is(line, "available_results")) {
 		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
 		result = VINE_MSG_PROCESSED;
-	} else if (string_prefix_is(line, "resource")) {
-		result = handle_resource(q, w, line);
+	} else if (string_prefix_is(line, "resources")) {
+		result = handle_resources(q, w, stoptime);
 	} else if (string_prefix_is(line, "feature")) {
 		result = handle_feature(q, w, line);
 	} else if (string_prefix_is(line, "auth")) {
@@ -2230,33 +2227,47 @@ static vine_msg_code_t handle_manager_status(
 }
 
 /*
-Handle a resource update message from the worker by updating local structures.
+Handle a resource update message from the worker describing
+its cores, memory, disk, etc.
 */
 
-static vine_msg_code_t handle_resource(struct vine_manager *q, struct vine_worker_info *w, const char *line)
+static vine_msg_code_t handle_resources(struct vine_manager *q, struct vine_worker_info *w, time_t stoptime )
 {
-	char resource_name[VINE_LINE_MAX];
-	int64_t total;
+	while(1) {
+		char line[VINE_LINE_MAX];
+		int64_t total;
+		
+		int result = link_readline(w->link, line, sizeof(line), stoptime);
+		if (result <= 0) return VINE_MSG_FAILURE;
 
-	int n = sscanf(line, "resource %s %" PRId64, resource_name, &total);
-
-	if (n == 2) {
-		if (!strcmp(resource_name, "cores")) {
+		debug(D_VINE,"%s",line);
+		
+		if(sscanf(line, "cores %" PRId64,&total)) {
 			w->resources->cores.total = total;
-		} else if (!strcmp(resource_name, "memory")) {
+		} else if(sscanf(line,"memory %" PRId64,&total)) {
 			w->resources->memory.total = total;
-		} else if (!strcmp(resource_name, "disk")) {
+		} else if(sscanf(line,"disk %" PRId64,&total)) {
 			w->resources->disk.total = total;
-		} else if (!strcmp(resource_name, "gpus")) {
+		} else if(sscanf(line,"gpus %" PRId64,&total)) {
 			w->resources->gpus.total = total;
-		} else if (!strcmp(resource_name, "workers")) {
+		} else if(sscanf(line,"workers %" PRId64,&total)) {
 			w->resources->workers.total = total;
-		} else if (!strcmp(resource_name, "tag")) {
+		} else if(sscanf(line,"tag %" PRId64,&total)) {
 			w->resources->tag = total;
+		} else if(!strcmp(line,"end")) {
+			/* Stop when we get an end marker. */
+			break;
+		} else {
+			debug(D_VINE,"unexpected data in resource update!");
+			/* But keep going until we get an "end" */
 		}
-	} else {
-		return VINE_MSG_FAILURE;
 	}
+
+	/* Update the queue total since one worker changed. */
+	count_worker_resources(q, w);
+
+	/* Record the update into the transaction log. */
+	vine_txn_log_write_worker_resources(q, w);
 
 	return VINE_MSG_PROCESSED;
 }
