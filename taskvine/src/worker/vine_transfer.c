@@ -346,11 +346,15 @@ int vine_transfer_get_dir(struct link *lnk, struct vine_cache *cache, const char
 {
 	int64_t totalsize = 0;
 	char *transfer_path = vine_cache_transfer_path(cache, dirname);
+
+	timestamp_t start = timestamp_get();
 	int r = vine_transfer_get_dir_internal(lnk, transfer_path, &totalsize, stoptime);
+	timestamp_t stop = timestamp_get();
+
 	if (r) {
 		// XXX need the proper cachelevel
 		// XXX need the proper mtime
-		struct vine_cache_meta *meta = vine_cache_meta_create(VINE_FILE,VINE_CACHE_LEVEL_TASK,0755,totalsize,0,0);
+		struct vine_cache_meta *meta = vine_cache_meta_create(VINE_FILE,VINE_CACHE_LEVEL_TASK,0755,totalsize,0,stop-start);
 		vine_cache_addfile(cache, transfer_path, meta, dirname);
 	} else {
 		// Remove the file if there's any problem with getting it.
@@ -366,12 +370,15 @@ int vine_transfer_get_file(struct link *lnk, struct vine_cache *cache, const cha
 		time_t stoptime)
 {
 	char *transfer_path = vine_cache_transfer_path(cache, cachename);
+
+	timestamp_t start = timestamp_get();
 	int r = vine_transfer_get_file_internal(lnk, transfer_path, length, mode, stoptime);
+	timestamp_t stop = timestamp_get();
+
 	if (r) {
 		// XXX fill in the proper cachelevel
 		// XXX fill in the proper mtime
-		// XXX fill in the transfer time
-		struct vine_cache_meta *meta = vine_cache_meta_create(VINE_FILE,VINE_CACHE_LEVEL_TASK,mode,length,0,0);
+		struct vine_cache_meta *meta = vine_cache_meta_create(VINE_FILE,VINE_CACHE_LEVEL_TASK,mode,length,0,stop-start);
 		vine_cache_addfile(cache, transfer_path, meta, cachename);
 	} else {
 		// Remove the file if there's any problem with getting it.
@@ -392,12 +399,14 @@ int vine_transfer_get_any(struct link *lnk, struct vine_cache *cache, const char
 	
 	send_message(lnk, "get %s\n", source_path);
 
+	timestamp_t start = timestamp_get();
 	int r = vine_transfer_get_any_internal(lnk, transfer_dir, &totalsize, stoptime);
+	timestamp_t stop = timestamp_get();
+
 	if (r) {
 		// XXX fill in the proper cachelevel
 		// XXX fill in the proper mtime
-		// XXX fill in the transfer time
-		struct vine_cache_meta *meta = vine_cache_meta_create(VINE_FILE,VINE_CACHE_LEVEL_TASK,0755,totalsize,0,0);
+		struct vine_cache_meta *meta = vine_cache_meta_create(VINE_FILE,VINE_CACHE_LEVEL_TASK,0755,totalsize,0,stop-start);
 		vine_cache_addfile(cache, transfer_path, meta, cachename);
 	} else {
 		if (unlink_recursive(transfer_path) < 0) {
