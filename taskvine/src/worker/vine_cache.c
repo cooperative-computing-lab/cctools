@@ -391,9 +391,9 @@ If that succeeds, then ingest the file into the proper cache_path.
 --stderr Send errors to /dev/stdout so that they are observed by popen.
 */
 
-static int do_curl_transfer(struct vine_cache *c, const char *source_url, const char *transfer_path, const char *cache_path, char **error_message)
+static int do_curl_transfer(struct vine_cache *c, struct vine_cache_file *f, const char *transfer_path, const char *cache_path, char **error_message)
 {
-	char *command = string_format("curl -sSL --stderr /dev/stdout -o \"%s\" \"%s\"", transfer_path, source_url);
+	char *command = string_format("curl -sSL --stderr /dev/stdout -o \"%s\" \"%s\"", transfer_path, f->source);
 	int result = do_internal_command(c, command, error_message);
 	free(command);
 
@@ -442,8 +442,7 @@ static int do_mini_task(struct vine_cache *c, struct vine_cache_file *f, char **
 Transfer a single input file from a worker url to a local file name.
 
 */
-static int do_worker_transfer(
-		struct vine_cache *c, const char *source_url, const char *cachename, char **error_message)
+static int do_worker_transfer( struct vine_cache *c, struct vine_cache_file *f, const char *cachename, char **error_message)
 {
 	int port_num;
 	char addr[VINE_LINE_MAX], source_path[VINE_LINE_MAX];
@@ -451,8 +450,8 @@ static int do_worker_transfer(
 	struct link *worker_link;
 
 	// expect the form: worker://addr:port/path/to/file
-	sscanf(source_url, "worker://%99[^:]:%d/%s", addr, &port_num, source_path);
-	debug(D_VINE, "Setting up worker transfer file %s", source_url);
+	sscanf(f->source, "worker://%99[^:]:%d/%s", addr, &port_num, source_path);
+	debug(D_VINE, "Setting up worker transfer file %s", f->source);
 
 	stoptime = time(0) + 15;
 	worker_link = link_connect(addr, port_num, stoptime);
@@ -473,11 +472,8 @@ static int do_worker_transfer(
 
 	/* XXX A fixed timeout of 900 certainly can't be right! */
 
-	// XXX pass in mtime here
-	// XXX select cache_level here
-	int mtime = 0;
-	if (!vine_transfer_get_any(worker_link, c, source_path, cachename, VINE_CACHE_LEVEL_TASK, mtime, time(0) + 900)) {
-		*error_message = string_format("Could not transfer file from %s", source_url);
+	if (!vine_transfer_get_any(worker_link, c, source_path, cachename, f->cache_level, f->mtime, time(0) + 900)) {
+		*error_message = string_format("Could not transfer file from %s", f->source);
 		link_close(worker_link);
 		return 0;
 	}
@@ -496,17 +492,17 @@ Use a temporary transfer path while downloading,
 and then rename it into the proper place.
 */
 
-static int do_transfer(struct vine_cache *c, const char *source_url, const char *cachename, char **error_message)
+static int do_transfer(struct vine_cache *c, struct vine_cache_file *f, const char *cachename, char **error_message)
 {
 	char *transfer_path = vine_cache_transfer_path(c,cachename);
 	char *cache_path = vine_cache_data_path(c,cachename);
 
 	int result = 0;
 
-	if (strncmp(source_url, "worker://", 9) == 0) {
-		result = do_worker_transfer(c, source_url, cachename, error_message);
+	if (strncmp(f->source, "worker://", 9) == 0) {
+		result = do_worker_transfer(c, f, cachename, error_message);
 	} else {
-		result = do_curl_transfer(c, source_url, transfer_path, cache_path, error_message);
+		result = do_curl_transfer(c, f, transfer_path, cache_path, error_message);
 	}
 
 	if (!result)
@@ -533,7 +529,7 @@ static void vine_cache_worker_process(struct vine_cache_file *f, struct vine_cac
 		result = 1;
 		break;
 	case VINE_CACHE_TRANSFER:
-		result = do_transfer(c, f->source, cachename, &error_message);
+		result = do_transfer(c, f, cachename, &error_message);
 		break;
 	case VINE_CACHE_MINI_TASK:
 		result = do_mini_task(c, f, &error_message);
