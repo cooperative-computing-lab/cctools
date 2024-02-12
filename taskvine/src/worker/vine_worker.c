@@ -1671,6 +1671,9 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 	/* Stop the transfer server from serving the cache directory. */
 	vine_transfer_server_stop();
 
+	/* Remove all cached files of workflow or less. */
+	vine_cache_prune(cache_manager,VINE_CACHE_LEVEL_WORKFLOW);
+	
 	/* Stop the cache manager. */
 	vine_cache_delete(cache_manager);
 	cache_manager = 0;

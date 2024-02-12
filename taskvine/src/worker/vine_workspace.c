@@ -154,11 +154,7 @@ void vine_workspace_delete(struct vine_workspace *w)
 {
 	printf("vine_worker: deleting workspace %s\n", w->workspace_dir);
 
-	/*
-	Note that we cannot use trash_file here because the trash dir is inside the
-	workspace. The whole workspace is being deleted anyway.
-	*/
-	unlink_recursive(w->workspace_dir);
+	// XXX instead do a cache scan to clean up
 
 	free(w->workspace_dir);
 	free(w->transfer_dir);

@@ -156,6 +156,22 @@ void vine_cache_scan(struct vine_cache *c, struct link *manager)
 }
 
 /*
+Remove all entries with a cache level <= level.
+*/
+
+void vine_cache_prune(struct vine_cache *c, vine_cache_level_t level)
+{
+	struct vine_cache_file *f;
+	char *cachename;
+	HASH_TABLE_ITERATE(c->table, cachename, f)
+	{
+		if(f->meta->cache_level <= level) {
+			vine_cache_remove(c,cachename,0);
+		}
+	}
+}
+
+/*
 Kill off any process associated with this file object.
 Used by both vine_cache_remove and vine_cache_delete.
 */
