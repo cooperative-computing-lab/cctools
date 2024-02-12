@@ -140,11 +140,17 @@ struct vine_file *vine_file_clone(struct vine_file *f)
 
 /* Return the contents of the file, if available. */
 
-const char *vine_file_contents(struct vine_file *f) { return f->data; }
+const char *vine_file_contents(struct vine_file *f)
+{
+	return f->data;
+}
 
 /* Return the size of any kind of file. */
 
-size_t vine_file_size(struct vine_file *f) { return f->size; }
+size_t vine_file_size(struct vine_file *f)
+{
+	return f->size;
+}
 
 struct vine_file *vine_file_local(const char *source, vine_file_flags_t flags)
 {

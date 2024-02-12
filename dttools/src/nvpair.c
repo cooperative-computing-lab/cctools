@@ -175,7 +175,10 @@ void nvpair_insert_float(struct nvpair *n, const char *name, double fvalue)
 	nvpair_insert_string(n, name, (char *)value);
 }
 
-const char *nvpair_lookup_string(struct nvpair *n, const char *name) { return hash_table_lookup(n->table, name); }
+const char *nvpair_lookup_string(struct nvpair *n, const char *name)
+{
+	return hash_table_lookup(n->table, name);
+}
 
 INT64_T nvpair_lookup_integer(struct nvpair *n, const char *name)
 {
@@ -208,7 +211,10 @@ void nvpair_export(struct nvpair *nv)
 	}
 }
 
-void nvpair_first_item(struct nvpair *nv) { hash_table_firstkey(nv->table); }
+void nvpair_first_item(struct nvpair *nv)
+{
+	hash_table_firstkey(nv->table);
+}
 
 int nvpair_next_item(struct nvpair *nv, char **name, char **value)
 {

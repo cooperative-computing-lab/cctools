@@ -311,9 +311,15 @@ void debug_config(const char *name)
 	strncpy(debug_program_name, path_basename(name), sizeof(debug_program_name) - 1);
 }
 
-void debug_config_file_size(off_t size) { debug_file_size(size); }
+void debug_config_file_size(off_t size)
+{
+	debug_file_size(size);
+}
 
-void debug_config_getpid(pid_t (*getpidf)(void)) { debug_getpid = getpidf; }
+void debug_config_getpid(pid_t (*getpidf)(void))
+{
+	debug_getpid = getpidf;
+}
 
 int64_t debug_flags_clear()
 {
@@ -322,9 +328,15 @@ int64_t debug_flags_clear()
 	return result;
 }
 
-void debug_flags_restore(int64_t fl) { debug_flags = fl; }
+void debug_flags_restore(int64_t fl)
+{
+	debug_flags = fl;
+}
 
-void debug_rename(const char *suffix) { debug_file_rename(suffix); }
+void debug_rename(const char *suffix)
+{
+	debug_file_rename(suffix);
+}
 
 void debug_reopen(void)
 {
@@ -332,6 +344,9 @@ void debug_reopen(void)
 		fatal("could not reopen debug log: %s", strerror(errno));
 }
 
-void debug_close(void) { debug_file_close(); }
+void debug_close(void)
+{
+	debug_file_close();
+}
 
 /* vim: set noexpandtab tabstop=8: */

@@ -78,7 +78,10 @@ int text_list_append(struct text_list *t, const char *str)
 	return t->used_length++;
 }
 
-int text_list_size(struct text_list *t) { return t->used_length; }
+int text_list_size(struct text_list *t)
+{
+	return t->used_length;
+}
 
 void text_list_delete(struct text_list *t)
 {

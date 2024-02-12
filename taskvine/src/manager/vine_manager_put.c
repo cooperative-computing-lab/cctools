@@ -551,7 +551,10 @@ vine_result_code_t vine_manager_put_task(struct vine_manager *q, struct vine_wor
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
 	 * set_*, if used. */
 	char *var;
-	LIST_ITERATE(t->env_list, var) { vine_manager_send(q, w, "env %zu\n%s\n", strlen(var), var); }
+	LIST_ITERATE(t->env_list, var)
+	{
+		vine_manager_send(q, w, "env %zu\n%s\n", strlen(var), var);
+	}
 
 	if (t->input_mounts) {
 		struct vine_mount *m;

@@ -77,7 +77,10 @@ struct hash_table *info_of_resource_table = NULL;
 
 /* Using this very cheap hash function, as we only use it for the small set of
  * resources */
-unsigned hash_fn(const char *key) { return (key[0] << 8) + strlen(key); }
+unsigned hash_fn(const char *key)
+{
+	return (key[0] << 8) + strlen(key);
+}
 
 static const struct resource_info *info_of_resource(const char *resource_name)
 {
@@ -125,7 +128,10 @@ size_t rmsummary_resource_offset(const char *resource_name)
 	return info->offset;
 }
 
-double rmsummary_get_by_offset(const struct rmsummary *s, size_t offset) { return (*((double *)((char *)s + offset))); }
+double rmsummary_get_by_offset(const struct rmsummary *s, size_t offset)
+{
+	return (*((double *)((char *)s + offset)));
+}
 
 void rmsummary_set_by_offset(struct rmsummary *s, size_t offset, double value)
 {
@@ -198,7 +204,10 @@ static int set_meta_int_field(struct rmsummary *s, const char *key, int64_t valu
 	return 0;
 }
 
-size_t rmsummary_num_resources() { return sizeof(resources_info) / sizeof(resources_info[0]); }
+size_t rmsummary_num_resources()
+{
+	return sizeof(resources_info) / sizeof(resources_info[0]);
+}
 
 double rmsummary_get(const struct rmsummary *s, const char *resource)
 {
@@ -710,7 +719,10 @@ void rmsummary_read_env_vars(struct rmsummary *s)
 	}
 
 /* Copy the value for all the fields in src > -1 to dest */
-static inline double override_field(double d, double s) { return (s > -1) ? s : d; }
+static inline double override_field(double d, double s)
+{
+	return (s > -1) ? s : d;
+}
 
 void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *src)
 {
@@ -817,7 +829,10 @@ static void merge_limits(struct rmsummary *dest, const struct rmsummary *src)
 }
 
 /* Select the max of the fields */
-static inline double max_field(double d, double s) { return (d > s) ? d : s; }
+static inline double max_field(double d, double s)
+{
+	return (d > s) ? d : s;
+}
 
 /* Select the min of the fields, ignoring negative numbers */
 static inline double min_field(double d, double s)

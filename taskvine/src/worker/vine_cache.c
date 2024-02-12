@@ -707,6 +707,9 @@ int vine_cache_wait(struct vine_cache *c, struct link *manager)
 {
 	struct vine_cache_file *f;
 	char *cachename;
-	HASH_TABLE_ITERATE(c->table, cachename, f) { vine_cache_wait_for_file(c, f, cachename, manager); }
+	HASH_TABLE_ITERATE(c->table, cachename, f)
+	{
+		vine_cache_wait_for_file(c, f, cachename, manager);
+	}
 	return 1;
 }

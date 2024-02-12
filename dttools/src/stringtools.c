@@ -919,7 +919,10 @@ char *string_trim(char *s, int func(int))
 	return s;
 }
 
-char *string_trim_spaces(char *s) { return string_trim(s, isspace); }
+char *string_trim_spaces(char *s)
+{
+	return string_trim(s, isspace);
+}
 
 char *string_trim_quotes(char *s)
 {
@@ -946,7 +949,10 @@ int string_istrue(const char *str)
 	return (strcasecmp(str, "true") == 0) || (strcasecmp(str, "yes") == 0) || (atoi(str) > 0);
 }
 
-int string_equal(const char *str1, const char *str2) { return !strcmp(str1, str2); }
+int string_equal(const char *str1, const char *str2)
+{
+	return !strcmp(str1, str2);
+}
 
 char *string_wrap_command(const char *command, const char *wrapper_command)
 {

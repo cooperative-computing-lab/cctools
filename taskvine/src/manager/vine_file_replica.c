@@ -16,4 +16,7 @@ struct vine_file_replica *vine_file_replica_create(int64_t size, time_t mtime)
 	return rinfo;
 }
 
-void vine_file_replica_delete(struct vine_file_replica *rinfo) { free(rinfo); }
+void vine_file_replica_delete(struct vine_file_replica *rinfo)
+{
+	free(rinfo);
+}

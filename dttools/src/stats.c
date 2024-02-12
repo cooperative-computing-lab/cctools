@@ -58,7 +58,10 @@ static size_t log2b(uint64_t n)
 	return i;
 }
 
-void stats_enable() { stats_enabled = 1; }
+void stats_enable()
+{
+	stats_enabled = 1;
+}
 
 void stats_unset(const char *name)
 {

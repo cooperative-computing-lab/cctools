@@ -120,7 +120,10 @@ void vine_current_transfers_print_table(struct vine_manager *q)
 	char *id;
 	struct vine_transfer_pair *t;
 	debug(D_VINE, "-----------------TRANSFER-TABLE--------------------");
-	HASH_TABLE_ITERATE(q->current_transfer_table, id, t) { debug(D_VINE, "%s : source=%s", id, t->source); }
+	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
+	{
+		debug(D_VINE, "%s : source=%s", id, t->source);
+	}
 	debug(D_VINE, "-----------------END-------------------------------");
 }
 
