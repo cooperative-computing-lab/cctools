@@ -32,12 +32,11 @@ typedef enum {
 	VINE_TEMP,		    /**< A temporary file created as an output of a task. */
 	VINE_BUFFER,                /**< A file obtained from data in the manager's memory space. */
 	VINE_MINI_TASK,             /**< A file obtained by executing a Unix command line. */
-	VINE_EMPTY_DIR,              /**< An empty directory to create in the task sandbox. */
 } vine_file_type_t;
 
 typedef enum {
-        VINE_FILE_STATE_PENDING, /**< This file has not yet been created by a task. */
-	VINE_FILE_STATE_CREATED   /**< This file has been created at some point.  (although it might have been lost!) */
+  VINE_FILE_STATE_PENDING, /**< This file has not yet been created by a task. */
+  VINE_FILE_STATE_CREATED   /**< This file has been created at some point.  (although it might have been lost!) */
 } vine_file_state_t;
 
 struct vine_file {
@@ -66,7 +65,6 @@ struct vine_file *vine_file_local( const char *source, vine_file_flags_t flags )
 struct vine_file *vine_file_url( const char *source, vine_file_flags_t flags );
 struct vine_file *vine_file_temp();
 struct vine_file *vine_file_buffer( const char *buffer, size_t size, vine_file_flags_t flags );
-struct vine_file *vine_file_empty_dir( );
 struct vine_file *vine_file_mini_task( struct vine_task *t, const char *name, vine_file_flags_t flags );
 struct vine_file *vine_file_untar( struct vine_file *f, vine_file_flags_t flags );
 struct vine_file *vine_file_poncho( struct vine_file *f, vine_file_flags_t flags );
