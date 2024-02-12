@@ -343,71 +343,34 @@ static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname,
 	return 0;
 }
 
-int vine_transfer_get_dir(struct link *lnk, struct vine_cache *cache, const char *dirname, time_t stoptime)
-{
-	int64_t totalsize = 0;
-	char *transfer_path = vine_cache_transfer_path(cache, dirname);
-
-	timestamp_t start = timestamp_get();
-	int r = vine_transfer_get_dir_internal(lnk, transfer_path, &totalsize, stoptime);
-	timestamp_t stop = timestamp_get();
-
-	if (r) {
-		// XXX need the proper cachelevel
-		// XXX need the proper mtime
-		// XXX need the proper mode
-		vine_cache_add_file(cache, dirname, transfer_path, VINE_CACHE_LEVEL_TASK,0755,totalsize,0,stop-start);
-	} else {
-		trash_file(transfer_path);
-	}
-	free(transfer_path);
-	return r;
-}
-
-int vine_transfer_get_file(struct link *lnk, struct vine_cache *cache, const char *cachename, int64_t length, int mode,
-		time_t stoptime)
-{
-	char *transfer_path = vine_cache_transfer_path(cache, cachename);
-
-	timestamp_t start = timestamp_get();
-	int r = vine_transfer_get_file_internal(lnk, transfer_path, length, mode, stoptime);
-	timestamp_t stop = timestamp_get();
-
-	if (r) {
-		// XXX fill in the proper cachelevel
-		// XXX fill in the proper mtime
-		vine_cache_add_file(cache, cachename, transfer_path, VINE_CACHE_LEVEL_TASK, mode, length, 0, stop-start);
-	} else {
-		trash_file(transfer_path);
-	}
-	free(transfer_path);
-	return r;
-}
-
-int vine_transfer_get_any(struct link *lnk, struct vine_cache *cache, const char *source_path, const char *cachename, time_t stoptime)
+int vine_transfer_receive_any(struct link *lnk, struct vine_cache *cache, const char *cachename, vine_cache_level_t cache_level, int64_t length, int mtime, time_t stoptime)
 {
 	int64_t totalsize = 0;
 
 	char *transfer_dir = vine_cache_transfer_path(cache, ".");
-	char *transfer_path = vine_cache_transfer_path(cache,cachename);
-	
-	send_message(lnk, "get %s\n", source_path);
+	char *transfer_path = vine_cache_transfer_path(cache, cachename);
 
 	timestamp_t start = timestamp_get();
 	int r = vine_transfer_get_any_internal(lnk, transfer_dir, &totalsize, stoptime);
 	timestamp_t stop = timestamp_get();
 
+	// XXX pull the mode out of the prior call
+	int mode = 755;
+	
 	if (r) {
-		// XXX could be a URL fetch not a plain file
-		// XXX fill in the proper cachelevel
-		// XXX fill in the proper mode
-		// XXX fill in the proper mtime
-		vine_cache_add_file(cache, cachename, transfer_path, VINE_CACHE_LEVEL_TASK, 0755, totalsize, 0, stop-start);
+		vine_cache_add_file(cache, cachename, transfer_path, cache_level, mode, totalsize, mtime, stop-start);
 	} else {
 		trash_file(transfer_path);
 	}
-	free(transfer_dir);
+
 	free(transfer_path);
-	
+	free(transfer_dir);
+
 	return r;
+}
+
+int vine_transfer_get_any(struct link *lnk, struct vine_cache *cache, const char *request_path, const char *cachename, vine_cache_level_t cache_level, int64_t length, int mtime, time_t stoptime)
+{
+	send_message(lnk, "get %s\n", request_path);
+	return vine_transfer_receive_any(lnk,cache,cachename,cache_level,length,mtime,stoptime);
 }
