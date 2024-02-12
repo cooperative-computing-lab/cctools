@@ -244,22 +244,25 @@ and writing out the metadata to the proper location.
 
 int vine_cache_add_file(struct vine_cache *c, const char *cachename, const char *transfer_path, vine_cache_level_t level, int mode, uint64_t size, time_t mtime, timestamp_t transfer_time )
 {
-	struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
-	if (f) {
-		debug(D_VINE,"cache: attempt to add cachename %s twice failed!",cachename);
-		return 0;
-	}
-
-	int result = 0;
-	
 	char *data_path = vine_cache_data_path(c,cachename);
 	char *meta_path = vine_cache_meta_path(c,cachename);
 
+	int result = 0;
+	
 	if(rename(transfer_path,data_path)==0) {
-		// XXX source should come from metadata
-		f = vine_cache_file_create(VINE_CACHE_FILE, "manager", vine_cache_meta_create(VINE_FILE,level,mode,size,mtime,transfer_time), 0);
-		hash_table_insert(c->table, cachename, f);
-
+		struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
+		if (f) {
+			/* If the file object is already present, we are providing the missing data. */
+			f->meta->cache_level = level;
+			f->meta->mode = mode;
+			f->meta->size = size;
+			f->meta->transfer_time = transfer_time;
+		} else {
+			/* If not, we are declaring a completely new file. */
+			f = vine_cache_file_create(VINE_CACHE_FILE, "manager", vine_cache_meta_create(VINE_FILE,level,mode,size,mtime,transfer_time), 0);
+			hash_table_insert(c->table, cachename, f);
+		}
+		
 		vine_cache_meta_save(f->meta,meta_path);
 
 		f->status = VINE_CACHE_STATUS_READY;

@@ -398,6 +398,7 @@ int vine_transfer_get_any(struct link *lnk, struct vine_cache *cache, const char
 	timestamp_t stop = timestamp_get();
 
 	if (r) {
+		// XXX could be a URL fetch not a plain file
 		// XXX fill in the proper cachelevel
 		// XXX fill in the proper mode
 		// XXX fill in the proper mtime
