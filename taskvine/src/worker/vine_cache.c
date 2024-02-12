@@ -242,7 +242,7 @@ Add a file to the cache manager by renaming it from its current location
 and writing out the metadata to the proper location.
 */
 
-int vine_cache_addfile(struct vine_cache *c, const char *transfer_path, struct vine_cache_meta *meta, const char *cachename)
+int vine_cache_add_file(struct vine_cache *c, const char *cachename, const char *transfer_path, vine_cache_level_t level, int mode, uint64_t size, time_t mtime, timestamp_t transfer_time )
 {
 	struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
 	if (f) {
@@ -256,11 +256,11 @@ int vine_cache_addfile(struct vine_cache *c, const char *transfer_path, struct v
 	char *meta_path = vine_cache_meta_path(c,cachename);
 
 	if(rename(transfer_path,data_path)==0) {
-		vine_cache_meta_save(meta,meta_path);
-
 		// XXX source should come from metadata
-		f = vine_cache_file_create(VINE_CACHE_FILE, "manager", meta, 0);
+		f = vine_cache_file_create(VINE_CACHE_FILE, "manager", vine_cache_meta_create(VINE_FILE,level,mode,size,mtime,transfer_time), 0);
 		hash_table_insert(c->table, cachename, f);
+
+		vine_cache_meta_save(f->meta,meta_path);
 
 		f->status = VINE_CACHE_STATUS_READY;
 
@@ -289,16 +289,16 @@ Queue a remote file transfer to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */
 
-int vine_cache_queue_transfer(
-		struct vine_cache *c, const char *source, const char *cachename, struct vine_cache_meta *meta, int flags)
+int vine_cache_add_transfer( struct vine_cache *c, const char *cachename, const char *source, vine_cache_level_t level, int mode, uint64_t size, vine_cache_flags_t flags )
 {
-	struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_TRANSFER, source, meta, 0);
+	struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_TRANSFER, source, vine_cache_meta_create(VINE_URL,level,mode,size,0,0), 0);
 	hash_table_insert(c->table, cachename, f);
-	char *meta_path = vine_cache_meta_path(c,cachename);
-	vine_cache_meta_save(meta,meta_path);
-	free(meta_path);
+
+	// XXX metadata should be saved when transfer complete
+
 	if (flags & VINE_CACHE_FLAGS_NOW)
 		vine_cache_ensure(c, cachename);
+
 	return 1;
 }
 
@@ -307,14 +307,13 @@ Queue a mini-task to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */
 
-int vine_cache_queue_mini_task(struct vine_cache *c, struct vine_task *mini_task, const char *source,
-		const char *cachename, struct vine_cache_meta *meta )
+int vine_cache_add_mini_task( struct vine_cache *c, const char *cachename, const char *source, struct vine_task *mini_task, vine_cache_level_t level, int mode, uint64_t size )
 {
-	struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_MINI_TASK, source, meta, mini_task);
+	struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_MINI_TASK, source, vine_cache_meta_create(VINE_URL,level,mode,size,0,0), mini_task);
 	hash_table_insert(c->table, cachename, f);
-	char *meta_path = vine_cache_meta_path(c,cachename);
-	vine_cache_meta_save(meta,meta_path);
-	free(meta_path);
+
+	// XXX metadata should be written when minitask is complete.
+
 	return 1;
 }
 

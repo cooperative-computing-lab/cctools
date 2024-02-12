@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "unlink_recursive.h"
 #include "url_encode.h"
+#include "trash.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -354,13 +355,10 @@ int vine_transfer_get_dir(struct link *lnk, struct vine_cache *cache, const char
 	if (r) {
 		// XXX need the proper cachelevel
 		// XXX need the proper mtime
-		struct vine_cache_meta *meta = vine_cache_meta_create(VINE_FILE,VINE_CACHE_LEVEL_TASK,0755,totalsize,0,stop-start);
-		vine_cache_addfile(cache, transfer_path, meta, dirname);
+		// XXX need the proper mode
+		vine_cache_add_file(cache, dirname, transfer_path, VINE_CACHE_LEVEL_TASK,0755,totalsize,0,stop-start);
 	} else {
-		// Remove the file if there's any problem with getting it.
-		if (unlink_recursive(transfer_path) < 0) {
-			debug(D_VINE, "Can't remove invalid file %s: (%s)", transfer_path, strerror(errno));
-		}
+		trash_file(transfer_path);
 	}
 	free(transfer_path);
 	return r;
@@ -378,13 +376,9 @@ int vine_transfer_get_file(struct link *lnk, struct vine_cache *cache, const cha
 	if (r) {
 		// XXX fill in the proper cachelevel
 		// XXX fill in the proper mtime
-		struct vine_cache_meta *meta = vine_cache_meta_create(VINE_FILE,VINE_CACHE_LEVEL_TASK,mode,length,0,stop-start);
-		vine_cache_addfile(cache, transfer_path, meta, cachename);
+		vine_cache_add_file(cache, cachename, transfer_path, VINE_CACHE_LEVEL_TASK, mode, length, 0, stop-start);
 	} else {
-		// Remove the file if there's any problem with getting it.
-		if (unlink_recursive(transfer_path) < 0) {
-			debug(D_VINE, "Can't remove invalid file %s: (%s)", transfer_path, strerror(errno));
-		}
+		trash_file(transfer_path);
 	}
 	free(transfer_path);
 	return r;
@@ -405,13 +399,11 @@ int vine_transfer_get_any(struct link *lnk, struct vine_cache *cache, const char
 
 	if (r) {
 		// XXX fill in the proper cachelevel
+		// XXX fill in the proper mode
 		// XXX fill in the proper mtime
-		struct vine_cache_meta *meta = vine_cache_meta_create(VINE_FILE,VINE_CACHE_LEVEL_TASK,0755,totalsize,0,stop-start);
-		vine_cache_addfile(cache, transfer_path, meta, cachename);
+		vine_cache_add_file(cache, cachename, transfer_path, VINE_CACHE_LEVEL_TASK, 0755, totalsize, 0, stop-start);
 	} else {
-		if (unlink_recursive(transfer_path) < 0) {
-			debug(D_VINE, "Can't remove invalid any %s: (%s)", transfer_path, strerror(errno));
-		}
+		trash_file(transfer_path);
 	}
 	free(transfer_dir);
 	free(transfer_path);

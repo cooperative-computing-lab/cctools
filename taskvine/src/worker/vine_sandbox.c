@@ -152,8 +152,10 @@ static int stage_output_file(struct vine_process *p, struct vine_mount *m, struc
 	struct vine_cache_meta *meta = vine_cache_meta_measure( f, sandbox_path );
 	if(meta) {
 		debug(D_VINE, "output: moving %s to %s", sandbox_path, cache_path);
-		if(vine_cache_addfile(cache, sandbox_path, meta, f->cached_name)) {
-			vine_worker_send_cache_update(manager, f->cached_name, meta->size, 0, 0);
+		// XXX get cache level from file object
+		timestamp_t transfer_time = p->execution_end - p->execution_start;
+		if(vine_cache_add_file(cache, f->cached_name, sandbox_path, VINE_CACHE_LEVEL_TASK, meta->mode, meta->size, meta->mtime, transfer_time)) {
+			vine_worker_send_cache_update(manager, f->cached_name, meta->size, meta->transfer_time, p->execution_start);
 			result = 1;
 		} else {
 			debug(D_VINE, "could not move output file %s to %s: %s",

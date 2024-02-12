@@ -809,10 +809,8 @@ Accept a url specification and queue it for later transfer.
 
 static int do_put_url(const char *cache_name, int64_t size, int mode, const char *source)
 {
-	// XXX need to know cache level!
-	// XXX need cache lavel and mtime
-	struct vine_cache_meta *meta = vine_cache_meta_create(VINE_URL,VINE_CACHE_LEVEL_TASK,mode,size,0,0);
-	return vine_cache_queue_transfer(cache_manager, source, cache_name, meta, VINE_CACHE_FLAGS_NOW);
+	// XXX fill in proper cache level
+	return vine_cache_add_transfer(cache_manager, cache_name, source, VINE_CACHE_LEVEL_TASK, mode, size, VINE_CACHE_FLAGS_ON_TASK );
 }
 
 /*
@@ -822,9 +820,7 @@ Accept a url specification and transfer immediately.
 static int do_put_url_now(const char *cache_name, int64_t size, int mode, const char *source)
 {
 	// XXX need to know cache level!
-	// XXX need cache lavel and mtime
-	struct vine_cache_meta *meta = vine_cache_meta_create(VINE_URL,VINE_CACHE_LEVEL_TASK,mode,size,0,0);
-	return vine_cache_queue_transfer(cache_manager, source, cache_name, meta, VINE_CACHE_FLAGS_NOW);
+	return vine_cache_add_transfer(cache_manager, cache_name, source, VINE_CACHE_LEVEL_TASK, mode, size, VINE_CACHE_FLAGS_NOW );
 }
 
 /*
@@ -836,14 +832,13 @@ static int do_put_mini_task(struct link *manager, time_t stoptime, const char *c
 		const char *source)
 {
 	mini_task_id++;
+
 	struct vine_task *mini_task = do_task_body(manager, mini_task_id, stoptime);
 	if (!mini_task)
 		return 0;
 
-	// XXX we need the mtime and the cache level
-	struct vine_cache_meta *meta = vine_cache_meta_create(VINE_MINI_TASK,VINE_CACHE_LEVEL_TASK,mode,size,0,0);
-
-	return vine_cache_queue_mini_task(cache_manager, mini_task, source, cache_name, meta);
+	// XXX fill in the proper cache level
+	return vine_cache_add_mini_task(cache_manager, cache_name, source, mini_task, VINE_CACHE_LEVEL_TASK, mode, size );
 }
 
 /*

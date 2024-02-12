@@ -53,9 +53,10 @@ char *vine_cache_data_path( struct vine_cache *c, const char *cachename );
 char *vine_cache_meta_path( struct vine_cache *c, const char *cachename );
 char *vine_cache_transfer_path( struct vine_cache *c, const char *cachename );
 
-int vine_cache_addfile( struct vine_cache *c, const char *transfer_path, struct vine_cache_meta *meta, const char *cachename );
-int vine_cache_queue_transfer( struct vine_cache *c, const char *source, const char *cachename, struct vine_cache_meta *meta, int flags );
-int vine_cache_queue_mini_task( struct vine_cache *c, struct vine_task *minitask, const char *source, const char *cachename, struct vine_cache_meta *meta );
+int vine_cache_measure_and_add_file( struct vine_cache *c, const char *cachename, const char *transfer_path, vine_cache_level_t level, int mode, uint64_t size, time_t mtime, timestamp_t transfer_time );
+int vine_cache_add_file( struct vine_cache *c, const char *cachename, const char *transfer_path, vine_cache_level_t level, int mode, uint64_t size, time_t mtime, timestamp_t transfer_time );
+int vine_cache_add_transfer( struct vine_cache *c, const char *cachename, const char *source, vine_cache_level_t level, int mode, uint64_t size, vine_cache_flags_t flags );
+int vine_cache_add_mini_task( struct vine_cache *c, const char *cachename, const char *source, struct vine_task *mini_task, vine_cache_level_t level, int mode, uint64_t size );
 
 vine_cache_status_t vine_cache_ensure( struct vine_cache *c, const char *cachename);
 int vine_cache_remove( struct vine_cache *c, const char *cachename, struct link *manager );
