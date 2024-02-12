@@ -474,11 +474,9 @@ static int do_worker_transfer(
 	/* XXX A fixed timeout of 900 certainly can't be right! */
 
 	// XXX pass in mtime here
-	// XXX pass in length here
 	// XXX select cache_level here
-	int length = 0;
 	int mtime = 0;
-	if (!vine_transfer_get_any(worker_link, c, source_path, cachename, VINE_CACHE_LEVEL_TASK, length, mtime, time(0) + 900)) {
+	if (!vine_transfer_get_any(worker_link, c, source_path, cachename, VINE_CACHE_LEVEL_TASK, mtime, time(0) + 900)) {
 		*error_message = string_format("Could not transfer file from %s", source_url);
 		link_close(worker_link);
 		return 0;

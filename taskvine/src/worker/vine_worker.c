@@ -1081,7 +1081,7 @@ static int handle_manager(struct link *manager)
 			r = do_task(manager, task_id, time(0) + options->active_timeout);
 		} else if (sscanf(line, "put %s %d %"SCNd64" %d", filename_encoded, &cache_level, &length, &mtime)==4) {
 			url_decode(filename_encoded, filename, sizeof(filename));
-			r = vine_transfer_receive_any(manager,cache_manager,filename,cache_level,length,mtime,time(0) + options->active_timeout);
+			r = vine_transfer_receive_any(manager,cache_manager,filename,cache_level,mtime,time(0) + options->active_timeout);
 			reset_idle_timer();
 		} else if (sscanf(line,
 					   "puturl %s %s %d %" SCNd64 " %d %o %s",

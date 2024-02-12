@@ -343,7 +343,7 @@ static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname,
 	return 0;
 }
 
-int vine_transfer_receive_any(struct link *lnk, struct vine_cache *cache, const char *cachename, vine_cache_level_t cache_level, int64_t length, int mtime, time_t stoptime)
+int vine_transfer_receive_any(struct link *lnk, struct vine_cache *cache, const char *cachename, vine_cache_level_t cache_level, int mtime, time_t stoptime)
 {
 	int64_t totalsize = 0;
 
@@ -369,8 +369,8 @@ int vine_transfer_receive_any(struct link *lnk, struct vine_cache *cache, const 
 	return r;
 }
 
-int vine_transfer_get_any(struct link *lnk, struct vine_cache *cache, const char *request_path, const char *cachename, vine_cache_level_t cache_level, int64_t length, int mtime, time_t stoptime)
+int vine_transfer_get_any(struct link *lnk, struct vine_cache *cache, const char *request_path, const char *cachename, vine_cache_level_t cache_level, int mtime, time_t stoptime)
 {
 	send_message(lnk, "get %s\n", request_path);
-	return vine_transfer_receive_any(lnk,cache,cachename,cache_level,length,mtime,stoptime);
+	return vine_transfer_receive_any(lnk,cache,cachename,cache_level,mtime,stoptime);
 }
