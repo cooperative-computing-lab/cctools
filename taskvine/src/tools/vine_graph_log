@@ -127,7 +127,7 @@ def sort_time(log_entries):
 def pout(file, str):
     file.write("{}\n".format(str).encode('utf-8'))
 
-class WQPlot:
+class VinePlot:
     def __init__(self, title, ylabel, fields, labels=None, x_units = x_units, y_units = x_units, range = x_range, stack = False):
         self.title   = title
         self.fields  = fields
@@ -226,9 +226,9 @@ set style line 7 pt 1   lc rgb '#a6761d' pointinterval {6}
             exit(1)
 
 
-class WQPlotLog(WQPlot):
+class VinePlotLog(VinePlot):
     def preamble(self, file):
-        WQPlot.preamble(self, file)
+        VinePlot.preamble(self, file)
         pout(file, 'set logscale y')
         pout(file, '')
 
@@ -331,47 +331,47 @@ if __name__ == '__main__':
             times       = sort_time(log_entries)
 
         plots = {}
-        plots['workers'] = WQPlot(x_units = x_units, ylabel = 'workers', range = x_range,
+        plots['workers'] = VinePlot(x_units = x_units, ylabel = 'workers', range = x_range,
                 title = "workers instantaneous counts",
                 fields = ['workers_connected', 'workers_idle', 'workers_busy'],
                 labels = ['connected', 'idle', 'busy'])
 
-        plots['workers-accum'] = WQPlot(x_units = x_units, ylabel = 'workers', range = x_range,
+        plots['workers-accum'] = VinePlot(x_units = x_units, ylabel = 'workers', range = x_range,
                 title = "workers cumulative counts",
                 fields = ['workers_joined', 'workers_removed', 'workers_released', 'workers_slow', 'workers_idled_out', 'workers_lost'],
                 labels = ['joined', 'removed', 'released', 'slow', 'idled out,', 'lost'])
 
-        plots['tasks'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
+        plots['tasks'] = VinePlot(x_units = x_units, ylabel = 'tasks', range = x_range,
                 title = "tasks instantaneous counts",
                 fields = ['tasks_waiting', 'tasks_on_workers', 'tasks_running', 'tasks_with_results'],
                 labels = ['waiting', 'on workers', 'running', 'with results'])
 
-        plots['tasks-capacities'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
+        plots['tasks-capacities'] = VinePlot(x_units = x_units, ylabel = 'tasks', range = x_range,
                 title = "tasks instantaneous capacities",
                 fields = ['tasks_running', 'capacity_instantaneous', 'capacity_weighted'],
                 labels = ['tasks running', 'tasks capacity raw', 'tasks capacity weighted'])
 
-        plots['tasks-accum'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
+        plots['tasks-accum'] = VinePlot(x_units = x_units, ylabel = 'tasks', range = x_range,
                 title = "tasks cumulative counts",
                 fields = ['tasks_submitted', 'tasks_dispatched', 'tasks_done', 'tasks_failed', 'tasks_cancelled', 'tasks_exhausted_attempts'],
                 labels = ['submitted', 'dispatched', 'done', 'failed', 'cancelled', 'exhausted attempts'])
 
-        plots['time-manager'] = WQPlot(x_units = x_units, ylabel = unit_labels[x_units], range = x_range,
+        plots['time-manager'] = VinePlot(x_units = x_units, ylabel = unit_labels[x_units], range = x_range,
             title = "cumulative times at the manager",
             fields = ['time_send', 'time_receive', 'time_polling', 'time_status_msgs', 'time_internal', 'time_application'],
             labels = ['send', 'receive', 'manager polling', 'manager status msgs', 'manager internal', 'manager application'])
 
-        plots['time-workers'] = WQPlot(x_units = x_units, y_units = 'h', ylabel = unit_labels['h'], range = x_range,
+        plots['time-workers'] = VinePlot(x_units = x_units, y_units = 'h', ylabel = unit_labels['h'], range = x_range,
             title = "cumulative times at workers",
             fields = ['time_execute', 'time_execute_good', 'time_execute_exhaustion'],
             labels = ['execute', 'execute good', 'execute exhaustion'])
 
-        plots['transfer'] = WQPlot(x_units = x_units, y_units = 'GB', ylabel = 'GB', range = x_range,
+        plots['transfer'] = VinePlot(x_units = x_units, y_units = 'GB', ylabel = 'GB', range = x_range,
             title = "manager data transfer",
             fields = ['bytes_sent', 'bytes_received'],
             labels = ['sent', 'received'])
 
-        plots['times-stacked'] = WQPlot(x_units = x_units, y_units = 's', ylabel = 'utilization per time sample (%)', range = x_range, stack = True,
+        plots['times-stacked'] = VinePlot(x_units = x_units, y_units = 's', ylabel = 'utilization per time sample (%)', range = x_range, stack = True,
                 title = 'manager time proportions',
                 fields = ['stack_time_other', 'stack_time_application', 'stack_time_receive', 'stack_time_send', 'stack_time_polling', 'stack_time_internal', 'stack_time_status_msgs'],
                 labels = ['other', 'application', 'receive', 'send', 'polling', 'internal', 'status msgs'])

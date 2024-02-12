@@ -25,7 +25,8 @@ void vine_fair_write_workflow_info(struct vine_manager *m)
 	}
 
 	if (m->monitor_mode != VINE_MON_DISABLED) {
-		rmonitor_measure_process_update_to_peak(m->measured_local_resources, getpid());
+		rmonitor_measure_process_update_to_peak(
+				m->measured_local_resources, getpid(), /* do not include disk */ 0);
 
 		if (!m->measured_local_resources->exit_type) {
 			m->measured_local_resources->exit_type = xxstrdup("normal");

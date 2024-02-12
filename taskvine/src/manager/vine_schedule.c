@@ -25,14 +25,14 @@ int check_fixed_location_worker(struct vine_manager *m, struct vine_worker_info 
 {
 	int all_present = 1;
 	struct vine_mount *mt;
-	struct vine_file_replica *remote_info;
+	struct vine_file_replica *replica;
 
 	if (t->has_fixed_locations) {
 		LIST_ITERATE(t->input_mounts, mt)
 		{
 			if (mt->file->flags & VINE_FIXED_LOCATION) {
-				remote_info = hash_table_lookup(w->current_files, mt->file->cached_name);
-				if (!remote_info) {
+				replica = hash_table_lookup(w->current_files, mt->file->cached_name);
+				if (!replica) {
 					all_present = 0;
 					break;
 				}
@@ -256,7 +256,7 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 	int64_t most_task_cached_bytes = 0;
 	int64_t task_cached_bytes;
 	uint8_t has_all_files;
-	struct vine_file_replica *remote_info;
+	struct vine_file_replica *replica;
 	struct vine_mount *m;
 
 	int ramp_down = vine_schedule_in_ramp_down(q);
@@ -269,10 +269,10 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 
 			LIST_ITERATE(t->input_mounts, m)
 			{
-				remote_info = hash_table_lookup(w->current_files, m->file->cached_name);
+				replica = hash_table_lookup(w->current_files, m->file->cached_name);
 
-				if (remote_info && m->file->type == VINE_FILE) {
-					task_cached_bytes += remote_info->size;
+				if (replica && m->file->type == VINE_FILE) {
+					task_cached_bytes += replica->size;
 				} else if ((m->file->flags & (VINE_CACHE | VINE_CACHE_ALWAYS))) {
 					has_all_files = 0;
 				}
