@@ -154,8 +154,6 @@ void vine_workspace_delete(struct vine_workspace *w)
 {
 	printf("vine_worker: deleting workspace %s\n", w->workspace_dir);
 
-	// XXX instead do a cache scan to clean up
-
 	free(w->workspace_dir);
 	free(w->transfer_dir);
 	free(w->cache_dir);
