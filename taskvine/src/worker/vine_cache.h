@@ -19,11 +19,17 @@ for file transfers to occur asynchronously of the manager.
 */
 
 #include <stdint.h>
-#include "vine_file.h"
-#include "vine_cache_meta.h"
 
-struct link;
-struct vine_cache_file;
+#include "vine_file.h"
+
+#include "link.h"
+
+typedef enum {
+	VINE_CACHE_LEVEL_TASK=0,
+	VINE_CACHE_LEVEL_WORKFLOW=1,
+	VINE_CACHE_LEVEL_WORKER=2,
+	VINE_CACHE_LEVEL_FOREVER=3
+} vine_cache_level_t;
 
 typedef enum {
 	VINE_CACHE_FILE,
@@ -53,7 +59,6 @@ char *vine_cache_data_path( struct vine_cache *c, const char *cachename );
 char *vine_cache_meta_path( struct vine_cache *c, const char *cachename );
 char *vine_cache_transfer_path( struct vine_cache *c, const char *cachename );
 
-int vine_cache_measure_and_add_file( struct vine_cache *c, const char *cachename, const char *transfer_path, vine_cache_level_t level, int mode, uint64_t size, time_t mtime, timestamp_t transfer_time );
 int vine_cache_add_file( struct vine_cache *c, const char *cachename, const char *transfer_path, vine_cache_level_t level, int mode, uint64_t size, time_t mtime, timestamp_t transfer_time );
 int vine_cache_add_transfer( struct vine_cache *c, const char *cachename, const char *source, vine_cache_level_t level, int mode, uint64_t size, vine_cache_flags_t flags );
 int vine_cache_add_mini_task( struct vine_cache *c, const char *cachename, const char *source, struct vine_task *mini_task, vine_cache_level_t level, int mode, uint64_t size );

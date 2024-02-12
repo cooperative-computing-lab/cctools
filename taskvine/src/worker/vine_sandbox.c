@@ -132,12 +132,31 @@ int vine_sandbox_stagein(struct vine_process *p, struct vine_cache *cache)
 	return result;
 }
 
+/* Observe the mode, size, and mtime of a file or directory tree. */
+
+static int measure_metadata( const char *path, int *mode, int64_t *size, int *mtime )
+{
+	struct stat info;
+	int64_t nfiles=0;
+
+	/* Get the basic metadata. */
+	int result = stat(path,&info);
+	if(result<0) return 0;
+
+	/* Measure the size of the item recursively, if a directory. */
+	result = path_disk_size_info_get(path,size,&nfiles);
+	if(result<0) return 0;
+
+	*mode = info.st_mode;
+	*mtime = info.st_mtime;
+	
+	return 1;
+}
+
+
 /*
-Move a given output file back to the target cache location.
-First attempt a cheap rename.
-If that does not work (perhaps due to crossing filesystems)
-then attempt a recursive copy.
-Inform the cache of the added file.
+Move a given output file back to the target cache location
+and inform the manager of the added file.
 */
 
 static int stage_output_file(struct vine_process *p, struct vine_mount *m, struct vine_file *f,
@@ -147,25 +166,25 @@ static int stage_output_file(struct vine_process *p, struct vine_mount *m, struc
 	char *sandbox_path = vine_sandbox_full_path(p, m->remote_name);
 
 	int result = 0;
+	int mode, mtime;
+	int64_t size;
 	
+	timestamp_t transfer_time = p->execution_end - p->execution_start;
+
 	debug(D_VINE, "output: measuring %s", sandbox_path);
-	struct vine_cache_meta *meta = vine_cache_meta_measure( f, sandbox_path );
-	if(meta) {
+	if(measure_metadata(sandbox_path,&mode,&size,&mtime)) {
+
+		// XXX fill in cache level from file object
 		debug(D_VINE, "output: moving %s to %s", sandbox_path, cache_path);
-		// XXX get cache level from file object
-		timestamp_t transfer_time = p->execution_end - p->execution_start;
-		if(vine_cache_add_file(cache, f->cached_name, sandbox_path, VINE_CACHE_LEVEL_TASK, meta->mode, meta->size, meta->mtime, transfer_time)) {
-			vine_worker_send_cache_update(manager, f->cached_name, meta->size, meta->transfer_time, p->execution_start);
+		if(vine_cache_add_file(cache,f->cached_name,sandbox_path,VINE_CACHE_LEVEL_TASK,mode,size,mtime,transfer_time)) {
+			vine_worker_send_cache_update(manager, f->cached_name, f->size, transfer_time, p->execution_start);
 			result = 1;
 		} else {
-			debug(D_VINE, "could not move output file %s to %s: %s",
-				sandbox_path,
-				cache_path,
-				strerror(errno));
+			debug(D_VINE,"output: unable to move %s to %s: %s\n",sandbox_path,cache_path,strerror(errno));
 			result = 0;
 		}
 	} else {
-		debug(D_VINE,"output: failed to measure %s: %s", sandbox_path, strerror(errno));
+		debug(D_VINE,"output: unable to measure size of %s: %s\n", sandbox_path, strerror(errno));
 		result = 0;
 	}
 
@@ -185,7 +204,10 @@ manager.  The manager will handle the consequences of missing output files.
 int vine_sandbox_stageout(struct vine_process *p, struct vine_cache *cache, struct link *manager)
 {
 	struct vine_mount *m;
-	LIST_ITERATE(p->task->output_mounts, m) { stage_output_file(p, m, m->file, cache, manager); }
+	LIST_ITERATE(p->task->output_mounts, m)
+	{
+		stage_output_file(p, m, m->file, cache, manager);
+	}
 
 	return 1;
 }
