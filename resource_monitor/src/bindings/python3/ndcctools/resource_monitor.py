@@ -187,7 +187,7 @@ class ResourceInternalError(Exception):
 
 
 def __measure_update_to_peak(pid, old_summary=None):
-    new_summary = rmonitor_measure_process(pid)
+    new_summary = rmonitor_measure_process(pid, 1)
 
     if old_summary is None:
         return new_summary
