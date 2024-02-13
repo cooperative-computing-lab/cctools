@@ -25,13 +25,6 @@ for file transfers to occur asynchronously of the manager.
 #include "link.h"
 
 typedef enum {
-	VINE_CACHE_LEVEL_TASK=0,
-	VINE_CACHE_LEVEL_WORKFLOW=1,
-	VINE_CACHE_LEVEL_WORKER=2,
-	VINE_CACHE_LEVEL_FOREVER=3
-} vine_cache_level_t;
-
-typedef enum {
 	VINE_CACHE_FILE,
 	VINE_CACHE_TRANSFER,
 	VINE_CACHE_MINI_TASK,

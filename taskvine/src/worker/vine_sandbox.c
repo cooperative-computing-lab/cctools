@@ -158,7 +158,7 @@ static int stage_output_file(struct vine_process *p, struct vine_mount *m, struc
 		debug(D_VINE, "output: moving %s to %s", sandbox_path, cache_path);
 		if(vine_cache_add_file(cache,f->cached_name,sandbox_path,VINE_CACHE_LEVEL_TASK,mode,size,mtime,transfer_time)) {
 			// XXX fill in cache level from file object
-			vine_worker_send_cache_update(manager, f->cached_name, f->type, VINE_CACHE_LEVEL_TASK, f->size, transfer_time, p->execution_start);
+			vine_worker_send_cache_update(manager, f->cached_name, f->type, VINE_CACHE_LEVEL_TASK, f->size, mode, transfer_time, p->execution_start);
 			result = 1;
 		} else {
 			debug(D_VINE,"output: unable to move %s to %s: %s\n",sandbox_path,cache_path,strerror(errno));

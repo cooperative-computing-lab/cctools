@@ -369,22 +369,14 @@ Send an asynchronmous message to the manager indicating that an item was success
 its size in bytes and transfer time in usec.
 */
 
-void vine_worker_send_cache_update(struct link *manager, const char *cachename, vine_file_type_t type, vine_cache_level_t cache_level, int64_t size, timestamp_t transfer_time, timestamp_t transfer_start)
+void vine_worker_send_cache_update(struct link *manager, const char *cachename, vine_file_type_t type, vine_cache_level_t cache_level, int64_t size, time_t mtime, timestamp_t transfer_time, timestamp_t transfer_start)
 {
 	char *transfer_id = hash_table_remove(current_transfers, cachename);
 	if (!transfer_id) {
 		transfer_id = xxstrdup("X");
 	}
 
-	send_message(manager,
-			"cache-update %s %d %d %lld %lld %lld %s\n",
-			cachename,
-		     type,
-		     cache_level,
-		     (long long)size,
-			(long long)transfer_time,
-			(long long)transfer_start,
-			transfer_id);
+	send_message(manager, "cache-update %s %d %d %lld %lld %lld %lld %s\n", cachename, type, cache_level, (long long)size, (long long)mtime, (long long)transfer_time, (long long)transfer_start, transfer_id);
 
 	free(transfer_id);
 }
