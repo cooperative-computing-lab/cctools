@@ -321,9 +321,10 @@ Remove a named item from the cache, regardless of its type.
 
 int vine_cache_remove(struct vine_cache *c, const char *cachename, struct link *manager)
 {
-	struct vine_cache_file *f = hash_table_remove(c->table, cachename);
-	if (!f)
-		return 0;
+	/* Careful: Don't remove the item rightaway, otherwise the cachename key becomes invalid. */
+	
+	struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
+	if (!f) return 0;
 
 	/* Ensure that any child process associated with the entry is stopped. */
 	vine_cache_kill(c, f, cachename, manager);
@@ -337,8 +338,9 @@ int vine_cache_remove(struct vine_cache *c, const char *cachename, struct link *
 	free(meta_path);
 
 	/* Now we can remove the data structure. */
+	f = hash_table_remove(c->table,cachename);
 	vine_cache_file_delete(f);
-
+	
 	return 1;
 }
 
@@ -671,8 +673,7 @@ static void vine_cache_check_outputs(
 		debug(D_VINE, "cache: measuring %s", transfer_path);
 		if(vine_cache_file_measure_metadata(transfer_path,&mode,&size,&mtime)) {
 			debug(D_VINE,"cache: created %s with size %lld in %lld usec",cachename,(long long)size,(long long)transfer_time);
-			// XXX fill in cache level from file object
-			if(vine_cache_add_file(c,cachename,transfer_path,VINE_CACHE_LEVEL_TASK,mode,size,mtime,transfer_time)) {
+			if(vine_cache_add_file(c,cachename,transfer_path,f->cache_level,mode,size,mtime,transfer_time)) {
 				f->status = VINE_CACHE_STATUS_READY;
 			} else {
 				debug(D_VINE,"cache: unable to move %s to %s: %s\n",transfer_path,cache_path,strerror(errno));
