@@ -1111,28 +1111,26 @@ static int handle_manager(struct link *manager)
 			r = do_put(manager,filename,cache_level,length);
 			reset_idle_timer();
 		} else if (sscanf(line,
-					   "puturl %s %s %d %" SCNd64 " %d %o %s",
+					   "puturl %s %s %d %" SCNd64 " %o %s",
 					   source_encoded,
 					   filename_encoded,
 					   &cache_level,
 					   &length,
-						&mtime,
-						&mode,
-					   transfer_id) == 7) {
+			                   &mode,
+					   transfer_id) == 6) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			url_decode(source_encoded, source, sizeof(source));
 			r = do_put_url(filename, cache_level, length, mode, source);
 			reset_idle_timer();
 			hash_table_insert(current_transfers, strdup(filename), strdup(transfer_id));
 		} else if (sscanf(line,
-					   "puturl_now %s %s %d %" SCNd64 " %d %o %s",
+					   "puturl_now %s %s %d %" SCNd64 " %o %s",
 					   source_encoded,
 					   filename_encoded,
 				  &cache_level,
 				  &length,
-						&mtime,
 					   &mode,
-					   transfer_id) == 7) {
+					   transfer_id) == 6) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			url_decode(source_encoded, source, sizeof(source));
 			r = do_put_url_now(filename, cache_level, length, mode, source);

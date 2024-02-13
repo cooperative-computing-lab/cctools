@@ -217,9 +217,13 @@ may be an estimate at this point and will be updated by return
 message once the object is actually loaded into the cache.
 */
 
-vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_worker_info *w, const char *source,
-		const char *cachename, long long size)
+vine_result_code_t vine_manager_put_url_now( struct vine_manager *q, struct vine_worker_info *w, const char *source, const char *cachename, long long size )
 {
+	// XXX pass cache level in appropriately
+	vine_cache_level_t cache_level = VINE_CACHE_LEVEL_TASK;
+	// XXX pass mode in appropriately
+	int mode = 0755;
+	
 	char source_encoded[VINE_LINE_MAX];
 	char cached_name_encoded[VINE_LINE_MAX];
 
@@ -229,11 +233,12 @@ vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_
 	char *transfer_id = vine_current_transfers_add(q, w, cachename);
 	int result = vine_manager_send(q,
 			w,
-			"puturl_now %s %s %lld %o %s\n",
+			"puturl_now %s %s %d %lld 0%o %s\n",
 			source_encoded,
 			cached_name_encoded,
+			cache_level,
 			size,
-			0777,
+			mode,
 			transfer_id);
 
 	free(transfer_id);
@@ -247,9 +252,11 @@ may be an estimate at this point and will be updated by return
 message once the object is actually loaded into the cache.
 */
 
-static vine_result_code_t vine_manager_put_url(
-		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f)
+vine_result_code_t vine_manager_put_url(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f )
 {
+	// XXX pass mode in appropriately.
+	int mode = 0755;
+	
 	char source_encoded[VINE_LINE_MAX];
 	char cached_name_encoded[VINE_LINE_MAX];
 
@@ -259,11 +266,12 @@ static vine_result_code_t vine_manager_put_url(
 	char *transfer_id = vine_current_transfers_add(q, w, f->source);
 	vine_manager_send(q,
 			w,
-			"puturl %s %s %lld %o %s\n",
+			"puturl %s %s %d %lld 0%o %s\n",
 			source_encoded,
 			cached_name_encoded,
+			f->cache_level,
 			(long long)f->size,
-			0777,
+			mode,
 			transfer_id);
 
 	free(transfer_id);
@@ -303,13 +311,13 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 	switch (f->type) {
 	case VINE_FILE:
 		debug(D_VINE, "%s (%s) needs file %s as %s", w->hostname, w->addrport, f->source, m->remote_name);
-		vine_manager_send(q, w, "put %s %d %"PRId64, f->cached_name, f->cache_level, f->size);
+		vine_manager_send(q, w, "put %s %d %"PRId64"\n", f->cached_name, f->cache_level, f->size);
 		result = vine_manager_put_file_or_dir(q, w, t, f->source, f->cached_name, &total_bytes, 1);
 		break;
 
 	case VINE_BUFFER:
 		debug(D_VINE, "%s (%s) needs buffer as %s", w->hostname, w->addrport, m->remote_name);
-		vine_manager_send(q, w, "put %s %d %"PRId64, f->cached_name, f->cache_level, f->size);
+		vine_manager_send(q, w, "put %s %d %"PRId64"\n", f->cached_name, f->cache_level, f->size);
 		result = vine_manager_put_buffer(q, w, t, f, &total_bytes);
 		break;
 
