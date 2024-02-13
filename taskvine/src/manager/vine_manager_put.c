@@ -95,7 +95,7 @@ static int vine_manager_put_file(struct vine_manager *q, struct vine_worker_info
 	url_encode(remotename, remotename_encoded, sizeof(remotename_encoded));
 
 	stoptime = time(0) + vine_manager_transfer_time(q, w, length);
-	vine_manager_send(q, w, "file %s %" PRId64 " 0%o\n", remotename_encoded, length, mode);
+	vine_manager_send(q, w, "file %s %" PRId64 " 0%o %lld\n", remotename_encoded, length, mode, (long long)info.st_mtime);
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
 
@@ -126,6 +126,12 @@ and then an "end" marker.
 static vine_result_code_t vine_manager_put_directory(struct vine_manager *q, struct vine_worker_info *w,
 		struct vine_task *t, const char *localname, const char *remotename, int64_t *total_bytes)
 {
+	struct stat info;
+	if(stat(localname,&info)!=0) {
+		debug(D_NOTICE, "Cannot stat dir %s: %s", localname,strerror(errno));
+		return VINE_APP_FAILURE;
+	}
+	
 	DIR *dir = opendir(localname);
 	if (!dir) {
 		debug(D_NOTICE, "Cannot open dir %s: %s", localname, strerror(errno));
@@ -137,7 +143,7 @@ static vine_result_code_t vine_manager_put_directory(struct vine_manager *q, str
 	char remotename_encoded[VINE_LINE_MAX];
 	url_encode(remotename, remotename_encoded, sizeof(remotename_encoded));
 
-	vine_manager_send(q, w, "dir %s\n", remotename_encoded);
+	vine_manager_send(q, w, "dir %s %0o %lld\n", remotename_encoded,info.st_mode,(long long)info.st_mtime);
 
 	struct dirent *d;
 	while ((d = readdir(dir))) {
@@ -270,7 +276,7 @@ vine_result_code_t vine_manager_put_buffer(struct vine_manager *q, struct vine_w
 		struct vine_file *f, int64_t *total_bytes)
 {
 	time_t stoptime = time(0) + vine_manager_transfer_time(q, w, f->size);
-	vine_manager_send(q, w, "file %s %lld %o\n", f->cached_name, (long long)f->size, 0777);
+	vine_manager_send(q, w, "file %s %lld 0755 0\n", f->cached_name, (long long)f->size);
 	int64_t actual = link_putlstring(w->link, f->data, f->size, stoptime);
 	if (actual >= 0 && (size_t)actual == f->size) {
 		*total_bytes = actual;
@@ -297,11 +303,13 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 	switch (f->type) {
 	case VINE_FILE:
 		debug(D_VINE, "%s (%s) needs file %s as %s", w->hostname, w->addrport, f->source, m->remote_name);
+		vine_manager_send(q, w, "put %s %d %"PRId64, f->cached_name, f->cache_level, f->size);
 		result = vine_manager_put_file_or_dir(q, w, t, f->source, f->cached_name, &total_bytes, 1);
 		break;
 
 	case VINE_BUFFER:
 		debug(D_VINE, "%s (%s) needs buffer as %s", w->hostname, w->addrport, m->remote_name);
+		vine_manager_send(q, w, "put %s %d %"PRId64, f->cached_name, f->cache_level, f->size);
 		result = vine_manager_put_buffer(q, w, t, f, &total_bytes);
 		break;
 

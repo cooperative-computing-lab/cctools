@@ -46,14 +46,15 @@ static vine_result_code_t vine_manager_get_buffer(struct vine_manager *q, struct
 	int64_t size;
 	int mode;
 	int errornum;
-
+	int mtime;
+	
 	vine_result_code_t r = VINE_WORKER_FAILURE;
 
 	vine_msg_code_t mcode = vine_manager_recv(q, w, line, sizeof(line));
 	if (mcode != VINE_MSG_NOT_PROCESSED)
 		return VINE_WORKER_FAILURE;
 
-	if (sscanf(line, "file %s %" SCNd64 " 0%o", name_encoded, &size, &mode) == 3) {
+	if (sscanf(line, "file %s %" SCNd64 " 0%o %d", name_encoded, &size, &mode, &mtime) == 4) {
 
 		f->size = size;
 		debug(D_VINE,
@@ -231,6 +232,7 @@ static vine_result_code_t vine_manager_get_any(struct vine_manager *q, struct vi
 	char name[VINE_LINE_MAX];
 	int64_t size;
 	int mode;
+	int mtime;
 	int errornum;
 
 	vine_result_code_t r = VINE_WORKER_FAILURE;
@@ -271,7 +273,7 @@ static vine_result_code_t vine_manager_get_any(struct vine_manager *q, struct vi
 		if (r == VINE_SUCCESS)
 			*totalsize += size;
 
-	} else if (sscanf(line, "dir %s", name_encoded) == 1) {
+	} else if (sscanf(line, "dir %s %o %d", name_encoded, &mode, &mtime) == 1) {
 
 		url_decode(name_encoded, name, sizeof(name));
 
