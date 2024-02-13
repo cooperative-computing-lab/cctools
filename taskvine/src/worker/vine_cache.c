@@ -146,11 +146,11 @@ static void vine_cache_kill(
 		struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager)
 {
 	while (f->status == VINE_CACHE_STATUS_PROCESSING) {
-		debug(D_VINE, "killing pending transfer process %d...", f->pid);
+		debug(D_VINE, "cache: killing pending transfer process %d...", f->pid);
 		kill(f->pid, SIGKILL);
 		vine_cache_wait_for_file(c, f, cachename, manager);
 		if (f->status == VINE_CACHE_STATUS_PROCESSING) {
-			debug(D_VINE, "still not killed, trying again!");
+			debug(D_VINE, "cache:still not killed, trying again!");
 			sleep(1);
 		}
 	}
@@ -358,7 +358,7 @@ static int do_internal_command(struct vine_cache *c, const char *command, char *
 	int result = 0;
 	*error_message = 0;
 
-	debug(D_VINE, "executing: %s", command);
+	debug(D_VINE, "cache: executing: %s", command);
 
 	FILE *stream = popen(command, "r");
 	if (stream) {
@@ -371,7 +371,7 @@ static int do_internal_command(struct vine_cache *c, const char *command, char *
 			}
 			result = 1;
 		} else {
-			debug(D_VINE, "command failed with output: %s", *error_message);
+			debug(D_VINE, "cache: command failed with output: %s", *error_message);
 			result = 0;
 		}
 	} else {
@@ -434,7 +434,7 @@ static int do_worker_transfer( struct vine_cache *c, struct vine_cache_file *f, 
 
 	// expect the form: worker://addr:port/path/to/file
 	sscanf(f->source, "worker://%99[^:]:%d/%s", addr, &port_num, source_path);
-	debug(D_VINE, "Setting up worker transfer file %s", f->source);
+	debug(D_VINE, "cache: setting up worker transfer file %s", f->source);
 
 	stoptime = time(0) + 15;
 	worker_link = link_connect(addr, port_num, stoptime);
@@ -528,7 +528,7 @@ static void vine_cache_worker_process(struct vine_cache_file *f, struct vine_cac
 
 	// XXX We need a way to pull out the error message and return to the manager.
 	if (error_message) {
-		debug(D_VINE, "An error occured when creating %s via mini task: %s", cachename, error_message);
+		debug(D_VINE, "cache: error when creating %s via mini task: %s", cachename, error_message);
 		free(error_message);
 	}
 
@@ -583,12 +583,12 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 
 	f->start_time = timestamp_get();
 
-	debug(D_VINE, "forking transfer process to create %s", cachename);
+	debug(D_VINE, "cache: forking transfer process to create %s", cachename);
 
 	if (f->cache_type == VINE_CACHE_MINI_TASK) {
 		struct vine_process *p = vine_process_create(f->mini_task, VINE_PROCESS_TYPE_MINI_TASK);
 		if (!vine_sandbox_stagein(p, c)) {
-			debug(D_VINE, "Can't stage input files for task %d.", p->task->task_id);
+			debug(D_VINE, "cache: can't stage input files for task %d.", p->task->task_id);
 			p->task = 0;
 			vine_process_delete(p);
 			f->status = VINE_CACHE_STATUS_FAILED;
@@ -600,7 +600,7 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 	f->pid = fork();
 
 	if (f->pid < 0) {
-		debug(D_VINE, "failed to fork transfer process");
+		debug(D_VINE, "cache: failed to fork transfer process");
 		f->status = VINE_CACHE_STATUS_FAILED;
 		return f->status;
 	} else if (f->pid > 0) {
@@ -718,20 +718,20 @@ static void vine_cache_handle_exit_status(struct vine_cache *c, struct vine_cach
 
 	if (!WIFEXITED(status)) {
 		int sig = WTERMSIG(status);
-		debug(D_VINE, "transfer process (pid %d) exited abnormally with signal %d", f->pid, sig);
+		debug(D_VINE, "cache: transfer process (pid %d) exited abnormally with signal %d", f->pid, sig);
 		f->status = VINE_CACHE_STATUS_FAILED;
 	} else {
 		int exit_code = WEXITSTATUS(status);
 		debug(D_VINE,
-				"transfer process for %s (pid %d) exited normally with exit code %d",
+				"cache: transfer process for %s (pid %d) exited normally with exit code %d",
 				cachename,
 				f->pid,
 				exit_code);
 		if (exit_code == 0) {
-			debug(D_VINE, "transfer process for %s completed", cachename);
+			debug(D_VINE, "cache: transfer process for %s completed", cachename);
 			f->status = VINE_CACHE_STATUS_TRANSFERRED;
 		} else {
-			debug(D_VINE, "transfer process for %s failed", cachename);
+			debug(D_VINE, "cache: transfer process for %s failed", cachename);
 			f->status = VINE_CACHE_STATUS_FAILED;
 		}
 	}
@@ -753,7 +753,7 @@ static void vine_cache_wait_for_file(
 		if (result == 0) {
 			// process still executing
 		} else if (result < 0) {
-			debug(D_VINE, "wait4 on pid %d returned an error: %s", (int)f->pid, strerror(errno));
+			debug(D_VINE, "cache: wait4 on pid %d returned an error: %s", (int)f->pid, strerror(errno));
 		} else if (result > 0) {
 			vine_cache_handle_exit_status(c, f, cachename, status, manager);
 			vine_cache_check_outputs(c, f, cachename, manager);
