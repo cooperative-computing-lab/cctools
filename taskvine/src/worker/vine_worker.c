@@ -804,6 +804,37 @@ static int do_task(struct link *manager, int task_id, time_t stoptime)
 }
 
 /*
+Handle a request to put a file by receiving the file stream
+into a temporary transfer path, and then (if successful)
+add the file to the cache manager.
+*/
+
+static int do_put( struct link *manager, const char *cachename, vine_cache_level_t cache_level, int64_t expected_size, int mode, int mtime )
+{
+	int64_t actual_size = 0;
+
+	char *transfer_dir = vine_cache_transfer_path(cache_manager, ".");
+	char *transfer_path = vine_cache_transfer_path(cache_manager, cachename);
+
+	timestamp_t start = timestamp_get();
+	int r = vine_transfer_get_any(manager, transfer_dir, &actual_size, time(0)+options->active_timeout);
+	timestamp_t stop = timestamp_get();
+
+	/* XXX actual_size should equal expected size, but only for a simple file, not a dir. */
+
+	if(r) {
+		vine_cache_add_file(cache_manager, cachename, transfer_path, cache_level, mode, actual_size, mtime, stop-start);
+	} else {
+		trash_file(transfer_path);
+	}
+
+	free(transfer_path);
+	free(transfer_dir);
+
+	return r;
+}
+
+/*
 Accept a url specification and queue it for later transfer.
 */
 
@@ -1075,13 +1106,13 @@ static int handle_manager(struct link *manager)
 	int mtime;
 	int r = 0;
 	int cache_level;
-	
+
 	if (recv_message(manager, line, sizeof(line), options->idle_stoptime)) {
 		if (sscanf(line, "task %" SCNd64, &task_id) == 1) {
 			r = do_task(manager, task_id, time(0) + options->active_timeout);
-		} else if (sscanf(line, "put %s %d %"SCNd64" %d", filename_encoded, &cache_level, &length, &mtime)==4) {
+		} else if (sscanf(line, "put %s %d %"SCNd64" %o %d", filename_encoded, &cache_level, &length, &mode, &mtime)==5) {
 			url_decode(filename_encoded, filename, sizeof(filename));
-			r = vine_transfer_receive_any(manager,cache_manager,filename,cache_level,mtime,time(0) + options->active_timeout);
+			r = do_put(manager,filename,cache_level,length,mode,mtime);
 			reset_idle_timer();
 		} else if (sscanf(line,
 					   "puturl %s %s %d %" SCNd64 " %d %o %s",

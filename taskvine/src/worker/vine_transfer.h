@@ -28,27 +28,22 @@ int vine_transfer_put_any( struct link *lnk, struct vine_cache *cache, const cha
 
 /** Receive any named filesystem item (file, directory, symlink) using the recursive transfer protocol.
 @param lnk The network link to use.
-@param cache The cache object where the file is located.
-@param cachename The name of the entry in the local cache.
-@param cache_level How long to cache the object.
-@param mtime The modfication time from the source.
+@param dirname The directory in which to place the object.
+@param totalsize To be filled in with the total size of the transfer.
 @param stoptime The absolute Unix time at which to stop and accept failure.
 @return Non-zero on success, zero on failure.
 */
 
-int vine_transfer_receive_any(struct link *lnk, struct vine_cache *cache, const char *cachename, vine_cache_level_t cache_level, int mtime, time_t stoptime);
+int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totalsize, time_t stoptime);
 
 /** Fetch any named item by requesting its name and then reading it back on the socket using the recursive transfer protocol.
 @param lnk The network link to use.
-@param cache The cache object where the file is located.
-@param cachename The name of the entry in the local cache.
-@param cache_level How long to cache the object.
-@param length The expected length in bytes.
-@param mtime The modfication time from the source.
+@param dirname The directory in which to place the object.
+@param totalsize To be filled in with the total size of the transfer.
 @param stoptime The absolute Unix time at which to stop and accept failure.
 @return Non-zero on success, zero on failure.
 */
 
-int vine_transfer_get_any(struct link *lnk, struct vine_cache *cache, const char *request_path, const char *cachename, vine_cache_level_t cache_level, int mtime, time_t stoptime);
+int vine_transfer_request_any(struct link *lnk, const char *request_name, const char *dirname, int64_t *totalsize, time_t stoptime);
 
 #endif

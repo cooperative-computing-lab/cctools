@@ -257,7 +257,7 @@ Returns 1 on successful transfer of one item.
 Returns 2 on successful receipt of "end" of list.
 */
 
-static int vine_transfer_get_any_internal(struct link *lnk, const char *dirname, int64_t *totalsize, time_t stoptime)
+int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totalsize, time_t stoptime)
 {
 	char line[VINE_LINE_MAX];
 	char name_encoded[VINE_LINE_MAX];
@@ -327,7 +327,7 @@ static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname,
 	}
 
 	while (1) {
-		int r = vine_transfer_get_any_internal(lnk, dirname, totalsize, stoptime);
+		int r = vine_transfer_get_any(lnk, dirname, totalsize, stoptime);
 		if (r == 1) {
 			// Successfully received one item.
 			continue;
@@ -343,34 +343,8 @@ static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname,
 	return 0;
 }
 
-int vine_transfer_receive_any(struct link *lnk, struct vine_cache *cache, const char *cachename, vine_cache_level_t cache_level, int mtime, time_t stoptime)
-{
-	int64_t totalsize = 0;
-
-	char *transfer_dir = vine_cache_transfer_path(cache, ".");
-	char *transfer_path = vine_cache_transfer_path(cache, cachename);
-
-	timestamp_t start = timestamp_get();
-	int r = vine_transfer_get_any_internal(lnk, transfer_dir, &totalsize, stoptime);
-	timestamp_t stop = timestamp_get();
-
-	// XXX pull the mode out of the prior call
-	int mode = 755;
-	
-	if (r) {
-		vine_cache_add_file(cache, cachename, transfer_path, cache_level, mode, totalsize, mtime, stop-start);
-	} else {
-		trash_file(transfer_path);
-	}
-
-	free(transfer_path);
-	free(transfer_dir);
-
-	return r;
-}
-
-int vine_transfer_get_any(struct link *lnk, struct vine_cache *cache, const char *request_path, const char *cachename, vine_cache_level_t cache_level, int mtime, time_t stoptime)
+int vine_transfer_request_any(struct link *lnk, const char *request_path, const char *dirname, int64_t *totalsize, time_t stoptime)
 {
 	send_message(lnk, "get %s\n", request_path);
-	return vine_transfer_receive_any(lnk,cache,cachename,cache_level,mtime,stoptime);
+	return vine_transfer_get_any(lnk,dirname,totalsize,stoptime);
 }

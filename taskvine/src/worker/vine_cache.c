@@ -117,7 +117,7 @@ void vine_cache_scan(struct vine_cache *c, struct link *manager)
 	HASH_TABLE_ITERATE(c->table, cachename, f)
 	{
 		// XXX load and store transfer start from metadata
-		vine_worker_send_cache_update(manager, cachename, f->size, f->transfer_time, 0);
+		vine_worker_send_cache_update(manager, cachename, f->size, f->transfer_time, f->start_time);
 	}
 }
 
@@ -455,13 +455,17 @@ static int do_worker_transfer( struct vine_cache *c, struct vine_cache_file *f, 
 
 	/* XXX A fixed timeout of 900 certainly can't be right! */
 
-	// XXX do NOT do the cache rename here
-	if (!vine_transfer_get_any(worker_link, c, source_path, cachename, f->cache_level, f->mtime, time(0) + 900)) {
+	char *transfer_dir = vine_cache_transfer_path(c,".");
+	int64_t totalsize;
+	
+	if (!vine_transfer_request_any(worker_link, source_path, transfer_dir, &totalsize, time(0) + 900)) {
 		*error_message = string_format("Could not transfer file from %s", f->source);
 		link_close(worker_link);
 		return 0;
 	}
 
+	free(transfer_dir);
+	
 	/* At this point, the file is in the transfer path, but not yet in the cache. */
 	
 	link_close(worker_link);
