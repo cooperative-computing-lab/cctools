@@ -85,6 +85,7 @@ static int vine_transfer_put_internal(struct link *lnk, const char *full_name, c
 		goto access_failure;
 	}
 
+	/* Send only the normal mode bits. */
 	mode = info.st_mode & 0777;
 
 	if (S_ISREG(info.st_mode)) {
@@ -115,7 +116,7 @@ static int vine_transfer_put_internal(struct link *lnk, const char *full_name, c
 		if (!dir)
 			goto access_failure;
 
-		send_message(lnk, "dir %s %o %lld\n", relative_name_encoded,info.st_mode,(long long)info.st_mtime);
+		send_message(lnk, "dir %s %o %lld\n", relative_name_encoded,mode,(long long)info.st_mtime);
 
 		struct dirent *dent;
 		while ((dent = readdir(dir))) {
@@ -273,6 +274,9 @@ int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totals
 
 		url_decode(name_encoded, name, sizeof(name));
 
+		/* Only use the normal mode bits. */
+		*mode &= 0777;
+		
 		char *subname = string_format("%s/%s", dirname, name);
 		r = vine_transfer_get_file_internal(lnk, subname, size, *mode, *mtime, stoptime);
 		free(subname);
@@ -296,6 +300,9 @@ int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totals
 
 		url_decode(name_encoded, name, sizeof(name));
 
+		/* Only use the normal mode bits. */
+		*mode &= 0777;
+		
 		char *subname = string_format("%s/%s", dirname, name);
 		r = vine_transfer_get_dir_internal(lnk, subname, totalsize, *mode, *mtime, stoptime);
 		free(subname);
@@ -321,7 +328,7 @@ until "end" is reached.
 
 static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname, int64_t *totalsize, int mode, int mtime, time_t stoptime)
 {
-	/* ensure that mode isn't something crazy */
+	/* Only use the normal mode bits. */
 	mode &= 0777;
 	
 	int result = mkdir(dirname, mode );
