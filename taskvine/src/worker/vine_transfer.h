@@ -15,35 +15,16 @@ typedef enum {
 	VINE_TRANSFER_MODE_FILE_ONLY
 } vine_transfer_mode_t;
 
-/** Put any named filesystem item (file, directory, symlink) using the recursive transfer protocol.
-@param lnk The network link to use.
-@param cache The cache object where the file is located.
-@param filename The name of the file, relative to the cache object.
-@param mode Controls whether any item will be sent, or just a file.
-@param stoptime The absolute Unix time at which to stop and accept failure.
-@return Non-zero on success, zero on failure.
-*/
+/* Send any cached file/dir along the connection to a remote party. */
 
 int vine_transfer_put_any( struct link *lnk, struct vine_cache *cache, const char *filename, vine_transfer_mode_t mode, time_t stoptime );
 
-/** Receive any named filesystem item (file, directory, symlink) using the recursive transfer protocol.
-@param lnk The network link to use.
-@param dirname The directory in which to place the object.
-@param totalsize To be filled in with the total size of the transfer.
-@param stoptime The absolute Unix time at which to stop and accept failure.
-@return Non-zero on success, zero on failure.
-*/
+/* Receive a named file/dir from the connection to a local transfer path. */
 
-int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totalsize, time_t stoptime);
+int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totalsize, int *mode, int *mtime, time_t stoptime);
 
-/** Fetch any named item by requesting its name and then reading it back on the socket using the recursive transfer protocol.
-@param lnk The network link to use.
-@param dirname The directory in which to place the object.
-@param totalsize To be filled in with the total size of the transfer.
-@param stoptime The absolute Unix time at which to stop and accept failure.
-@return Non-zero on success, zero on failure.
-*/
+/* Request an item by name, and then receive it in the same way as vine_transfer_get_any. */
 
-int vine_transfer_request_any(struct link *lnk, const char *request_name, const char *dirname, int64_t *totalsize, time_t stoptime);
+int vine_transfer_request_any(struct link *lnk, const char *request_name, const char *dirname, int64_t *totalsize, int *mode, int *mtime, time_t stoptime);
 
 #endif
