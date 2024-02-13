@@ -768,6 +768,9 @@ struct jx *jx_eval_with_defines(struct jx *j, struct jx *context)
 /* Note that this is referenced by jx_function.c */
 int __jx_eval_external_functions_flag = 0;
 
-void jx_eval_enable_external(int enable) { __jx_eval_external_functions_flag = enable; }
+void jx_eval_enable_external(int enable)
+{
+	__jx_eval_external_functions_flag = enable;
+}
 
 /*vim: set noexpandtab tabstop=8: */

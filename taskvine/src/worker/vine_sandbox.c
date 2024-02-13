@@ -38,21 +38,21 @@ vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cach
 	struct vine_task *t = p->task;
 	vine_cache_status_t cache_status = VINE_CACHE_STATUS_READY;
 
-	if (t->input_mounts) {
-		struct vine_mount *m;
-		LIST_ITERATE(t->input_mounts, m)
-		{
-			cache_status = vine_cache_ensure(cache, m->file->cached_name);
-			if (cache_status == VINE_CACHE_STATUS_PROCESSING)
-				processing = 1;
-			if (cache_status == VINE_CACHE_STATUS_FAILED)
-				break;
-		}
+	struct vine_mount *m;
+	LIST_ITERATE(t->input_mounts, m)
+	{
+		cache_status = vine_cache_ensure(cache, m->file->cached_name);
+		if (cache_status == VINE_CACHE_STATUS_PROCESSING)
+			processing = 1;
+		if (cache_status == VINE_CACHE_STATUS_FAILED)
+			break;
 	}
+
 	if (cache_status == VINE_CACHE_STATUS_FAILED)
 		return VINE_CACHE_STATUS_FAILED;
 	if (processing)
 		return VINE_CACHE_STATUS_PROCESSING;
+
 	return VINE_CACHE_STATUS_READY;
 }
 
@@ -69,45 +69,53 @@ static int stage_input_file(struct vine_process *p, struct vine_mount *m, struct
 
 	int result = 0;
 
-	if (f->type == VINE_EMPTY_DIR) {
-		/* Special case: empty directories are not cached objects, just create in sandbox */
-		result = create_dir(sandbox_path, 0700);
-		if (!result)
-			debug(D_VINE, "couldn't create directory %s: %s", sandbox_path, strerror(errno));
-
-	} else {
-		/* All other types, link the cached object into the sandbox */
-		vine_cache_status_t status;
-		status = vine_cache_ensure(cache, f->cached_name);
-		if (status == VINE_CACHE_STATUS_READY) {
-			create_dir_parents(sandbox_path, 0777);
-			debug(D_VINE, "input: link %s -> %s", cache_path, sandbox_path);
-			if (m->flags & VINE_MOUNT_SYMLINK) {
-				/* If the user has requested a symlink, just do that b/c it is faster for large dirs. */
-				result = symlink(cache_path, sandbox_path);
-				/* Change sense of Unix result to true/false. */
-				result = !result;
-			} else {
-				/* Otherwise recursively hard-link the object into the sandbox. */
-				result = file_link_recursive(cache_path, sandbox_path, 1);
-			}
-
-			if (!result)
-				debug(D_VINE,
-						"couldn't link %s into sandbox as %s: %s",
-						cache_path,
-						sandbox_path,
-						strerror(errno));
+	vine_cache_status_t status;
+	status = vine_cache_ensure(cache, f->cached_name);
+	if (status == VINE_CACHE_STATUS_READY) {
+		create_dir_parents(sandbox_path, 0777);
+		debug(D_VINE, "input: link %s -> %s", cache_path, sandbox_path);
+		if (m->flags & VINE_MOUNT_SYMLINK) {
+			/* If the user has requested a symlink, just do that b/c it is faster for large dirs. */
+			result = symlink(cache_path, sandbox_path);
+			/* Change sense of Unix result to true/false. */
+			result = !result;
 		} else {
-			debug(D_VINE, "input: %s is not ready in the cache!", f->cached_name);
-			result = 0;
+			/* Otherwise recursively hard-link the object into the sandbox. */
+			result = file_link_recursive(cache_path, sandbox_path, 1);
 		}
+
+		if (!result)
+			debug(D_VINE,
+					"couldn't link %s into sandbox as %s: %s",
+					cache_path,
+					sandbox_path,
+					strerror(errno));
+	} else {
+		debug(D_VINE, "input: %s is not ready in the cache!", f->cached_name);
+		result = 0;
 	}
 
 	free(cache_path);
 	free(sandbox_path);
 
 	return result;
+}
+
+/* Create an empty output directory when requested by VINE_MOUNT_MKDIR */
+
+static int create_empty_output_dir(struct vine_process *p, struct vine_mount *m)
+{
+	char *sandbox_path = vine_sandbox_full_path(p, m->remote_name);
+
+	int result = mkdir(sandbox_path, 0755);
+	if (result != 0) {
+		debug(D_VINE, "sandbox: couldn't mkdir %s: %s", sandbox_path, strerror(errno));
+		free(sandbox_path);
+		return 0;
+	} else {
+		free(sandbox_path);
+		return 1;
+	}
 }
 
 /*
@@ -120,11 +128,23 @@ int vine_sandbox_stagein(struct vine_process *p, struct vine_cache *cache)
 	struct vine_task *t = p->task;
 	int result = 1;
 
-	if (t->input_mounts) {
-		struct vine_mount *m;
-		LIST_ITERATE(t->input_mounts, m)
-		{
-			result = stage_input_file(p, m, m->file, cache);
+	struct vine_mount *m;
+
+	/* For each input mount, stage it into the sandbox. */
+
+	LIST_ITERATE(t->input_mounts, m)
+	{
+		result = stage_input_file(p, m, m->file, cache);
+		if (!result)
+			break;
+	}
+
+	/* If any of the output mounts have the MKDIR flag, then create those empty dirs. */
+
+	LIST_ITERATE(t->output_mounts, m)
+	{
+		if (m->flags & VINE_MOUNT_MKDIR) {
+			result = create_empty_output_dir(p, m);
 			if (!result)
 				break;
 		}
@@ -203,7 +223,10 @@ manager.  The manager will handle the consequences of missing output files.
 int vine_sandbox_stageout(struct vine_process *p, struct vine_cache *cache, struct link *manager)
 {
 	struct vine_mount *m;
-	LIST_ITERATE(p->task->output_mounts, m) { stage_output_file(p, m, m->file, cache, manager); }
+	LIST_ITERATE(p->task->output_mounts, m)
+	{
+		stage_output_file(p, m, m->file, cache, manager);
+	}
 
 	return 1;
 }

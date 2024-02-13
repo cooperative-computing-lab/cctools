@@ -104,7 +104,10 @@ int debug_file_path(const char *path)
 	return debug_file_reopen();
 }
 
-void debug_file_size(off_t size) { file_size_max = size; }
+void debug_file_size(off_t size)
+{
+	file_size_max = size;
+}
 
 void debug_file_rename(const char *suffix)
 {

@@ -48,9 +48,15 @@ void random_init(void)
 	return;
 }
 
-int64_t random_int64(void) { return twister_genrand64_int64(); }
+int64_t random_int64(void)
+{
+	return twister_genrand64_int64();
+}
 
-double random_double(void) { return twister_genrand64_real3(); }
+double random_double(void)
+{
+	return twister_genrand64_real3();
+}
 
 void random_array(void *dest, size_t len)
 {

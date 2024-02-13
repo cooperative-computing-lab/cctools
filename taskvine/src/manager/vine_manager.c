@@ -205,7 +205,10 @@ static int workers_with_tasks(struct vine_manager *q)
 
 /* Convert a link pointer into a string that can be used as a key into a hash table. */
 
-static char *link_to_hash_key(struct link *link) { return string_format("0x%p", link); }
+static char *link_to_hash_key(struct link *link)
+{
+	return string_format("0x%p", link);
+}
 
 /*
 This function sends a message to the worker and records the time the message is
@@ -1060,7 +1063,10 @@ static void delete_worker_files(
 	if (!mount_list)
 		return;
 	struct vine_mount *m;
-	LIST_ITERATE(mount_list, m) { delete_worker_file(q, w, m->file->cached_name, m->file->flags, except_flags); }
+	LIST_ITERATE(mount_list, m)
+	{
+		delete_worker_file(q, w, m->file->cached_name, m->file->flags, except_flags);
+	}
 }
 
 /* Delete all output files of a given task. */
@@ -1846,7 +1852,10 @@ static int count_workers_for_waiting_tasks(struct vine_manager *q, const struct 
 	char *key;
 	struct vine_worker_info *w;
 
-	HASH_TABLE_ITERATE(q->worker_table, key, w) { count += check_worker_fit(w, s); }
+	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	{
+		count += check_worker_fit(w, s);
+	}
 
 	return count;
 }
@@ -2035,7 +2044,10 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_string(j, "taskvine_uuid", q->uuid);
 
 	char *name, *key;
-	HASH_TABLE_ITERATE(q->properties, name, key) { jx_insert_string(j, name, key); }
+	HASH_TABLE_ITERATE(q->properties, name, key)
+	{
+		jx_insert_string(j, name, key);
+	}
 
 	int use_ssl = 0;
 #ifdef HAS_OPENSSL
@@ -2158,7 +2170,10 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "port", vine_port(q));
 
 	char *name, *key;
-	HASH_TABLE_ITERATE(q->properties, name, key) { jx_insert_string(j, name, key); }
+	HASH_TABLE_ITERATE(q->properties, name, key)
+	{
+		jx_insert_string(j, name, key);
+	}
 
 	int use_ssl = 0;
 #ifdef HAS_OPENSSL
@@ -3651,7 +3666,10 @@ static struct vine_task *find_task_by_tag(struct vine_manager *q, const char *ta
 /************* taskvine public functions *************/
 /******************************************************/
 
-struct vine_manager *vine_create(int port) { return vine_ssl_create(port, NULL, NULL); }
+struct vine_manager *vine_create(int port)
+{
+	return vine_ssl_create(port, NULL, NULL);
+}
 
 struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert)
 {
@@ -3962,9 +3980,15 @@ void vine_set_name(struct vine_manager *q, const char *name)
 	}
 }
 
-const char *vine_get_name(struct vine_manager *q) { return q->name; }
+const char *vine_get_name(struct vine_manager *q)
+{
+	return q->name;
+}
 
-void vine_set_priority(struct vine_manager *q, int priority) { q->priority = priority; }
+void vine_set_priority(struct vine_manager *q, int priority)
+{
+	q->priority = priority;
+}
 
 void vine_set_tasks_left_count(struct vine_manager *q, int ntasks)
 {
@@ -3994,7 +4018,10 @@ void vine_set_property(struct vine_manager *m, const char *name, const char *val
 	hash_table_insert(m->properties, name, strdup(value));
 }
 
-void vine_set_password(struct vine_manager *q, const char *password) { q->password = xxstrdup(password); }
+void vine_set_password(struct vine_manager *q, const char *password)
+{
+	q->password = xxstrdup(password);
+}
 
 int vine_set_password_file(struct vine_manager *q, const char *file)
 {
@@ -4041,7 +4068,10 @@ void vine_delete(struct vine_manager *q)
 
 	char *key;
 	struct category *c;
-	HASH_TABLE_ITERATE(q->categories, key, c) { category_delete(q->categories, key); }
+	HASH_TABLE_ITERATE(q->categories, key, c)
+	{
+		category_delete(q->categories, key);
+	}
 	hash_table_delete(q->categories);
 
 	list_delete(q->ready_list);
@@ -4542,11 +4572,20 @@ void vine_block_host_with_timeout(struct vine_manager *q, const char *hostname, 
 	return vine_blocklist_block(q, hostname, timeout);
 }
 
-void vine_block_host(struct vine_manager *q, const char *hostname) { vine_blocklist_block(q, hostname, -1); }
+void vine_block_host(struct vine_manager *q, const char *hostname)
+{
+	vine_blocklist_block(q, hostname, -1);
+}
 
-void vine_unblock_host(struct vine_manager *q, const char *hostname) { vine_blocklist_unblock(q, hostname); }
+void vine_unblock_host(struct vine_manager *q, const char *hostname)
+{
+	vine_blocklist_unblock(q, hostname);
+}
 
-void vine_unblock_all(struct vine_manager *q) { vine_blocklist_unblock_all_by_time(q, -1); }
+void vine_unblock_all(struct vine_manager *q)
+{
+	vine_blocklist_unblock_all_by_time(q, -1);
+}
 
 static void print_password_warning(struct vine_manager *q)
 {
@@ -4584,7 +4623,10 @@ static void print_password_warning(struct vine_manager *q)
 		q->stats_measure->stat = 0;                                                                            \
 	}
 
-struct vine_task *vine_wait(struct vine_manager *q, int timeout) { return vine_wait_for_tag(q, NULL, timeout); }
+struct vine_task *vine_wait(struct vine_manager *q, int timeout)
+{
+	return vine_wait_for_tag(q, NULL, timeout);
+}
 
 struct vine_task *vine_wait_for_tag(struct vine_manager *q, const char *tag, int timeout)
 {
@@ -5156,9 +5198,15 @@ int vine_empty(struct vine_manager *q)
 	return 1;
 }
 
-void vine_set_keepalive_interval(struct vine_manager *q, int interval) { q->keepalive_interval = interval; }
+void vine_set_keepalive_interval(struct vine_manager *q, int interval)
+{
+	q->keepalive_interval = interval;
+}
 
-void vine_set_keepalive_timeout(struct vine_manager *q, int timeout) { q->keepalive_timeout = timeout; }
+void vine_set_keepalive_timeout(struct vine_manager *q, int timeout)
+{
+	q->keepalive_timeout = timeout;
+}
 
 void vine_set_manager_preferred_connection(struct vine_manager *q, const char *preferred_connection)
 {
@@ -5282,9 +5330,15 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	return 0;
 }
 
-void vine_manager_enable_process_shortcut(struct vine_manager *q) { q->process_pending_check = 1; }
+void vine_manager_enable_process_shortcut(struct vine_manager *q)
+{
+	q->process_pending_check = 1;
+}
 
-struct rmsummary **vine_summarize_workers(struct vine_manager *q) { return vine_manager_summarize_workers(q); }
+struct rmsummary **vine_summarize_workers(struct vine_manager *q)
+{
+	return vine_manager_summarize_workers(q);
+}
 
 void vine_set_bandwidth_limit(struct vine_manager *q, const char *bandwidth)
 {
@@ -5829,12 +5883,6 @@ struct vine_file *vine_declare_buffer(struct vine_manager *m, const char *buffer
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_empty_dir(struct vine_manager *m)
-{
-	struct vine_file *f = vine_file_empty_dir();
-	return vine_manager_declare_file(m, f);
-}
-
 struct vine_file *vine_declare_mini_task(
 		struct vine_manager *m, struct vine_task *t, const char *name, vine_file_flags_t flags)
 {
@@ -5908,17 +5956,19 @@ const char *vine_fetch_file(struct vine_manager *m, struct vine_file *f)
 			return f->data;
 		}
 		break;
-	case VINE_EMPTY_DIR:
-		/* Never anything to get. */
-		return 0;
-		break;
 	}
 
 	return 0;
 }
 
-void vine_log_debug_app(struct vine_manager *m, const char *entry) { debug(D_VINE, "APPLICATION %s", entry); }
+void vine_log_debug_app(struct vine_manager *m, const char *entry)
+{
+	debug(D_VINE, "APPLICATION %s", entry);
+}
 
-void vine_log_txn_app(struct vine_manager *m, const char *entry) { vine_txn_log_write_app_entry(m, entry); }
+void vine_log_txn_app(struct vine_manager *m, const char *entry)
+{
+	vine_txn_log_write_app_entry(m, entry);
+}
 
 /* vim: set noexpandtab tabstop=8: */

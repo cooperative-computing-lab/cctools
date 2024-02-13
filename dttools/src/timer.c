@@ -52,7 +52,10 @@ void timer_destroy()
 	FREE_AND_NULL(TimedRuns);
 }
 
-void timer_start(int i) { gettimeofday(&StartTime[i], NULL); }
+void timer_start(int i)
+{
+	gettimeofday(&StartTime[i], NULL);
+}
 
 void timer_stop(int i)
 {
@@ -69,9 +72,15 @@ void timer_reset(int i)
 	TimedRuns[i] = 0;
 }
 
-double timer_elapsed_time(int i) { return (ElapsedTime[i]); }
+double timer_elapsed_time(int i)
+{
+	return (ElapsedTime[i]);
+}
 
-double timer_average_time(int i) { return (ElapsedTime[i] / TimedRuns[i]); }
+double timer_average_time(int i)
+{
+	return (ElapsedTime[i] / TimedRuns[i]);
+}
 
 void timer_print_summary(int print_all)
 {

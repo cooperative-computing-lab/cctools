@@ -19,4 +19,7 @@ struct vine_file_replica *vine_file_replica_create(
 	return r;
 }
 
-void vine_file_replica_delete(struct vine_file_replica *r) { free(r); }
+void vine_file_replica_delete(struct vine_file_replica *rinfo)
+{
+	free(rinfo);
+}

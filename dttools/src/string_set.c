@@ -110,7 +110,10 @@ void string_set_delete(struct string_set *s)
 	free(s);
 }
 
-int string_set_size(struct string_set *s) { return s->size; }
+int string_set_size(struct string_set *s)
+{
+	return s->size;
+}
 
 int string_set_lookup(struct string_set *s, const char *element)
 {
@@ -221,7 +224,10 @@ int string_set_insert_string_set(struct string_set *s, struct string_set *s2)
 	return additions;
 }
 
-int string_set_push(struct string_set *s, const char *element) { return string_set_insert(s, element); }
+int string_set_push(struct string_set *s, const char *element)
+{
+	return string_set_insert(s, element);
+}
 
 int string_set_remove(struct string_set *s, const char *element)
 {

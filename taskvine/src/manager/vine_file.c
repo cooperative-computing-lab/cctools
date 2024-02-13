@@ -151,11 +151,17 @@ struct vine_file *vine_file_clone(struct vine_file *f)
 
 /* Return the contents of the file, if available. */
 
-const char *vine_file_contents(struct vine_file *f) { return f->data; }
+const char *vine_file_contents(struct vine_file *f)
+{
+	return f->data;
+}
 
 /* Return the size of any kind of file. */
 
-size_t vine_file_size(struct vine_file *f) { return f->size; }
+size_t vine_file_size(struct vine_file *f)
+{
+	return f->size;
+}
 
 struct vine_file *vine_file_local(const char *source, vine_file_flags_t flags)
 {
@@ -184,8 +190,6 @@ struct vine_file *vine_file_buffer(const char *data, size_t size, vine_file_flag
 {
 	return vine_file_create("buffer", 0, data, size, VINE_BUFFER, 0, flags);
 }
-
-struct vine_file *vine_file_empty_dir() { return vine_file_create("unnamed", 0, 0, 0, VINE_EMPTY_DIR, 0, 0); }
 
 struct vine_file *vine_file_mini_task(struct vine_task *t, const char *name, vine_file_flags_t flags)
 {

@@ -112,7 +112,10 @@ void *hash_cache_lookup(struct hash_cache *cache, const char *key)
 	return result;
 }
 
-void hash_cache_firstkey(struct hash_cache *cache) { hash_table_firstkey(cache->table); }
+void hash_cache_firstkey(struct hash_cache *cache)
+{
+	hash_table_firstkey(cache->table);
+}
 
 int hash_cache_nextkey(struct hash_cache *cache, char **key, void **item)
 {

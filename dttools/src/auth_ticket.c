@@ -297,7 +297,10 @@ int auth_ticket_register(void)
 	return auth_register("ticket", auth_ticket_assert, auth_ticket_accept);
 }
 
-void auth_ticket_server_callback(auth_ticket_server_callback_t sc) { server_callback = sc; }
+void auth_ticket_server_callback(auth_ticket_server_callback_t sc)
+{
+	server_callback = sc;
+}
 
 void auth_ticket_load(const char *tickets)
 {

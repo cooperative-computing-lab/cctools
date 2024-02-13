@@ -49,9 +49,15 @@ See the file COPYING for details.
 #define FULL_PIO(expr) _FULL_IO(expr, offset += chunk, chunk < 0, errno)
 #define FULL_FIO(expr) _FULL_IO(expr, (void)0, ferror(file), ferror(file))
 
-ssize_t full_read(int fd, void *buf, size_t count) { FULL_IO(read(fd, buf, count)); }
+ssize_t full_read(int fd, void *buf, size_t count)
+{
+	FULL_IO(read(fd, buf, count));
+}
 
-ssize_t full_write(int fd, const void *buf, size_t count) { FULL_IO(write(fd, buf, count)); }
+ssize_t full_write(int fd, const void *buf, size_t count)
+{
+	FULL_IO(write(fd, buf, count));
+}
 
 ssize_t full_pread64(int fd, void *buf, size_t count, int64_t offset)
 {
@@ -71,12 +77,24 @@ ssize_t full_pwrite64(int fd, const void *buf, size_t count, int64_t offset)
 #endif
 }
 
-ssize_t full_pread(int fd, void *buf, size_t count, off_t offset) { FULL_PIO(pread(fd, buf, count, offset)); }
+ssize_t full_pread(int fd, void *buf, size_t count, off_t offset)
+{
+	FULL_PIO(pread(fd, buf, count, offset));
+}
 
-ssize_t full_pwrite(int fd, const void *buf, size_t count, off_t offset) { FULL_PIO(pwrite(fd, buf, count, offset)); }
+ssize_t full_pwrite(int fd, const void *buf, size_t count, off_t offset)
+{
+	FULL_PIO(pwrite(fd, buf, count, offset));
+}
 
-ssize_t full_fread(FILE *file, void *buf, size_t count) { FULL_FIO(fread(buf, 1, count, file)); }
+ssize_t full_fread(FILE *file, void *buf, size_t count)
+{
+	FULL_FIO(fread(buf, 1, count, file));
+}
 
-ssize_t full_fwrite(FILE *file, const void *buf, size_t count) { FULL_FIO(fwrite(buf, 1, count, file)); }
+ssize_t full_fwrite(FILE *file, const void *buf, size_t count)
+{
+	FULL_FIO(fwrite(buf, 1, count, file));
+}
 
 /* vim: set noexpandtab tabstop=8: */
