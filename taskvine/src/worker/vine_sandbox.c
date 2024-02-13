@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "vine_mount.h"
 #include "vine_task.h"
 #include "vine_worker.h"
+#include "vine_cache_file.h"
 
 #include "copy_stream.h"
 #include "create_dir.h"
@@ -132,28 +133,6 @@ int vine_sandbox_stagein(struct vine_process *p, struct vine_cache *cache)
 	return result;
 }
 
-/* Observe the mode, size, and mtime of a file or directory tree. */
-
-static int measure_metadata( const char *path, int *mode, int64_t *size, int *mtime )
-{
-	struct stat info;
-	int64_t nfiles=0;
-
-	/* Get the basic metadata. */
-	int result = stat(path,&info);
-	if(result<0) return 0;
-
-	/* Measure the size of the item recursively, if a directory. */
-	result = path_disk_size_info_get(path,size,&nfiles);
-	if(result<0) return 0;
-
-	*mode = info.st_mode;
-	*mtime = info.st_mtime;
-	
-	return 1;
-}
-
-
 /*
 Move a given output file back to the target cache location
 and inform the manager of the added file.
@@ -166,13 +145,14 @@ static int stage_output_file(struct vine_process *p, struct vine_mount *m, struc
 	char *sandbox_path = vine_sandbox_full_path(p, m->remote_name);
 
 	int result = 0;
-	int mode, mtime;
+	int mode;
+	time_t mtime;
 	int64_t size;
 	
 	timestamp_t transfer_time = p->execution_end - p->execution_start;
 
 	debug(D_VINE, "output: measuring %s", sandbox_path);
-	if(measure_metadata(sandbox_path,&mode,&size,&mtime)) {
+	if(vine_cache_file_measure_metadata(sandbox_path,&mode,&size,&mtime)) {
 
 		// XXX fill in cache level from file object
 		debug(D_VINE, "output: moving %s to %s", sandbox_path, cache_path);

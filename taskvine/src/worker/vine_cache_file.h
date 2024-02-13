@@ -43,4 +43,6 @@ void vine_cache_file_delete( struct vine_cache_file *f);
 int vine_cache_file_load_metadata( struct vine_cache_file *f, const char *filename );
 int vine_cache_file_save_metadata( struct vine_cache_file *f, const char *filename );
 
+int vine_cache_file_measure_metadata( const char *path, int *mode, int64_t *size, time_t *mtime );
+
 #endif

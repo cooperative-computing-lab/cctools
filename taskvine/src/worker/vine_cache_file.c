@@ -97,3 +97,25 @@ int vine_cache_file_save_metadata( struct vine_cache_file *f, const char *filena
 	return 1;
 }
 
+/* Observe the mode, size, and mtime of a file or directory tree. */
+
+int vine_cache_file_measure_metadata( const char *path, int *mode, int64_t *size, time_t *mtime )
+{
+	struct stat info;
+	int64_t nfiles=0;
+
+	/* Get the basic metadata. */
+	int result = stat(path,&info);
+	if(result<0) return 0;
+
+	/* Measure the size of the item recursively, if a directory. */
+	result = path_disk_size_info_get(path,size,&nfiles);
+	if(result<0) return 0;
+
+	*mode = info.st_mode;
+	*mtime = info.st_mtime;
+	
+	return 1;
+}
+
+

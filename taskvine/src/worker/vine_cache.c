@@ -384,7 +384,6 @@ static int do_internal_command(struct vine_cache *c, const char *command, char *
 
 /*
 Transfer a single input file from a url to the local transfer path via curl.
-If that succeeds, then ingest the file into the proper cache_path.
 -s Do not show progress bar.  (Also disables errors.)
 -S Show errors.
 -L Follow redirects as needed.
@@ -396,21 +395,6 @@ static int do_curl_transfer(struct vine_cache *c, struct vine_cache_file *f, con
 	char *command = string_format("curl -sSL --stderr /dev/stdout -o \"%s\" \"%s\"", transfer_path, f->source);
 	int result = do_internal_command(c, command, error_message);
 	free(command);
-
-	if (result) {
-		// XXX do we drop the metadata file here as well?
-		if (rename(transfer_path, cache_path) == 0) {
-			debug(D_VINE, "cache: renamed %s to %s", transfer_path, cache_path);
-		} else {
-			debug(D_VINE,
-					"cache: failed to rename %s to %s: %s",
-					transfer_path,
-					cache_path,
-					strerror(errno));
-			result = 0;
-		}
-	}
-
 
 	return result;
 }
@@ -440,7 +424,6 @@ static int do_mini_task(struct vine_cache *c, struct vine_cache_file *f, char **
 
 /*
 Transfer a single input file from a worker url to a local file name.
-
 */
 static int do_worker_transfer( struct vine_cache *c, struct vine_cache_file *f, const char *cachename, char **error_message)
 {
@@ -472,13 +455,14 @@ static int do_worker_transfer( struct vine_cache *c, struct vine_cache_file *f, 
 
 	/* XXX A fixed timeout of 900 certainly can't be right! */
 
+	// XXX do NOT do the cache rename here
 	if (!vine_transfer_get_any(worker_link, c, source_path, cachename, f->cache_level, f->mtime, time(0) + 900)) {
 		*error_message = string_format("Could not transfer file from %s", f->source);
 		link_close(worker_link);
 		return 0;
 	}
 
-	/* If we got to this point, the file is already renamed into the cache location. */
+	/* At this point, the file is in the transfer path, but not yet in the cache. */
 	
 	link_close(worker_link);
 
@@ -535,6 +519,8 @@ static void vine_cache_worker_process(struct vine_cache_file *f, struct vine_cac
 		result = do_mini_task(c, f, &error_message);
 		break;
 	}
+
+	/* At this point the file is now in the transfer path.  The parent will move it to the cache path. */
 
 	// XXX We need a way to pull out the error message and return to the manager.
 	if (error_message) {
@@ -640,23 +626,26 @@ static void vine_cache_check_outputs(
 		struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager)
 {
 	char *cache_path = vine_cache_data_path(c, cachename);
+	char *transfer_path = vine_cache_transfer_path(c, cachename);
+
 	timestamp_t transfer_time = f->stop_time - f->start_time;
 
-	/* If this was produced by a mini task, first move the output in the cache directory. */
+	/* If a mini-task move the output from sandbox to transfer path. */
+
 	if (f->cache_type == VINE_CACHE_MINI_TASK) {
 		if (f->status == VINE_CACHE_STATUS_READY) {
 
 			char *source_path = vine_sandbox_full_path(f->process, f->source);
 
-			debug(D_VINE, "cache: extracting %s from mini-task sandbox to %s\n", f->source, cachename);
-			int result = rename(source_path, cache_path);
+			debug(D_VINE, "cache: extracting %s from mini-task sandbox to %s\n", f->source, transfer_path);
+			int result = rename(source_path, transfer_path);
 			if (result == 0) {
 				f->status = VINE_CACHE_STATUS_READY;
 			} else {
 				debug(D_VINE,
 						"cache: unable to rename %s to %s: %s\n",
 						source_path,
-						cache_path,
+						transfer_path,
 						strerror(errno));
 				f->status = VINE_CACHE_STATUS_FAILED;
 			}
@@ -671,25 +660,33 @@ static void vine_cache_check_outputs(
 		f->process = 0;
 	}
 
-	/* If the transfer was good, now evaluate the existence and size of the output. */
+	/*
+	At this point, all transfer types should result in a file at transfer path.
+	Now measure and verify the file, and move it into the cache.
+	*/
 
 	if (f->status == VINE_CACHE_STATUS_READY) {
-		int64_t nbytes, nfiles;
-		chmod(cache_path, f->mode);
-		if (path_disk_size_info_get(cache_path, &nbytes, &nfiles) == 0) {
-			f->size = nbytes;
-			debug(D_VINE,
-					"cache: created %s with size %lld in %lld usec",
-					cachename,
-					(long long)f->size,
-					(long long)transfer_time);
-		} else {
-			debug(D_VINE, "cache: command succeeded but did not create %s", cachename);
-			f->status = VINE_CACHE_STATUS_FAILED;
-		}
 
+		int mode;
+		time_t mtime;
+		int64_t size;
+		
+		chmod(cache_path, f->mode);
+
+		debug(D_VINE, "cache: measuring %s", transfer_path);
+		if(vine_cache_file_measure_metadata(transfer_path,&mode,&size,&mtime)) {
+			debug(D_VINE,"cache: created %s with size %lld in %lld usec",cachename,(long long)size,(long long)transfer_time);
+			// XXX fill in cache level from file object
+			if(vine_cache_add_file(c,cachename,transfer_path,VINE_CACHE_LEVEL_TASK,mode,size,mtime,transfer_time)) {
+				/* nothing ot do */
+			} else {
+				debug(D_VINE,"cache: unable to move %s to %s: %s\n",transfer_path,cache_path,strerror(errno));
+			}
+		} else {
+			debug(D_VINE,"cache: command succeeded but didn't create %s: %s\n", cachename, strerror(errno));
+		}
 	} else {
-		debug(D_VINE, "cache: unable to create %s", cachename);
+		debug(D_VINE, "cache: command failed to create %s", cachename);
 	}
 
 	/* Finally send a cache update message one way or the other. */
@@ -705,6 +702,7 @@ static void vine_cache_check_outputs(
 	}
 
 	free(cache_path);
+	free(transfer_path);
 }
 
 /*
@@ -729,6 +727,7 @@ static void vine_cache_handle_exit_status(struct vine_cache *c, struct vine_cach
 				exit_code);
 		if (exit_code == 0) {
 			debug(D_VINE, "transfer process for %s completed", cachename);
+			// XXX go to transfer state prior to ready
 			f->status = VINE_CACHE_STATUS_READY;
 		} else {
 			debug(D_VINE, "transfer process for %s failed", cachename);
