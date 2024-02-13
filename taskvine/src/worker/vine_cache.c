@@ -178,7 +178,10 @@ void vine_cache_delete(struct vine_cache *c)
 	/* Ensure that all child processes are killed off. */
 	char *cachename;
 	struct vine_cache_file *file;
-	HASH_TABLE_ITERATE(c->table, cachename, file) { vine_cache_kill(c, file, cachename, 0); }
+	HASH_TABLE_ITERATE(c->table, cachename, file)
+	{
+		vine_cache_kill(c, file, cachename, 0);
+	}
 
 	hash_table_clear(c->table, (void *)vine_cache_file_delete);
 	hash_table_delete(c->table);
