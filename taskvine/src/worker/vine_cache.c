@@ -166,11 +166,6 @@ void vine_cache_delete(struct vine_cache *c)
 	struct vine_cache_file *file;
 	HASH_TABLE_ITERATE(c->table, cachename, file)
 	{
-		if (strstr(cachename, "-meta-") || strstr(cachename, "-rnd-")) {
-			char *filepath = vine_cache_data_path(c, cachename);
-			trash_file(filepath);
-			free(filepath);
-		}
 		vine_cache_kill(c, file, cachename, 0);
 	}
 
