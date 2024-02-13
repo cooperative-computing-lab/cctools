@@ -117,7 +117,7 @@ void vine_cache_scan(struct vine_cache *c, struct link *manager)
 	HASH_TABLE_ITERATE(c->table, cachename, f)
 	{
 		// XXX load and store transfer start from metadata
-		vine_worker_send_cache_update(manager, cachename, f->size, f->transfer_time, f->start_time);
+		vine_worker_send_cache_update(manager, cachename, f->original_type, f->cache_level, f->size, f->transfer_time, f->start_time);
 	}
 }
 
@@ -696,7 +696,7 @@ static void vine_cache_check_outputs(
 
 	if (manager) {
 		if (f->status == VINE_CACHE_STATUS_READY) {
-			vine_worker_send_cache_update(manager, cachename, f->size, transfer_time, f->start_time);
+			vine_worker_send_cache_update(manager, cachename, f->original_type, f->cache_level, f->size, transfer_time, f->start_time);
 		} else {
 			/* XXX need to extract the output of the process for a better error message. */
 			vine_worker_send_cache_invalid(manager, cachename, "unable to fetch or create file");
