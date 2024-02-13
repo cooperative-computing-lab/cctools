@@ -43,10 +43,11 @@ typedef enum {
 } vine_cache_flags_t;
 
 typedef enum {
-	VINE_CACHE_STATUS_NOT_PRESENT,
-	VINE_CACHE_STATUS_PROCESSING,
-	VINE_CACHE_STATUS_READY,
-	VINE_CACHE_STATUS_FAILED,       
+	VINE_CACHE_STATUS_NOT_PRESENT,  /**< Not present in cache at all. */
+	VINE_CACHE_STATUS_PROCESSING,   /**< Transfer process is running now. */
+	VINE_CACHE_STATUS_TRANSFERRED,  /**< Transfer process complete, not ingested yet. */
+	VINE_CACHE_STATUS_READY,        /**< File is present and ready to use. */
+	VINE_CACHE_STATUS_FAILED,       /**< Transfer process failed. */
 } vine_cache_status_t;
 
 struct vine_cache * vine_cache_create( const char *cachedir );

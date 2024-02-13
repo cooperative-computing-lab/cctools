@@ -560,6 +560,7 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 	case VINE_CACHE_STATUS_READY:
 	case VINE_CACHE_STATUS_FAILED:
 	case VINE_CACHE_STATUS_PROCESSING:
+	case VINE_CACHE_STATUS_TRANSFERRED:
 		return f->status;
 	case VINE_CACHE_STATUS_NOT_PRESENT:
 		/* keep going */
@@ -637,20 +638,14 @@ static void vine_cache_check_outputs(
 	/* If a mini-task move the output from sandbox to transfer path. */
 
 	if (f->cache_type == VINE_CACHE_MINI_TASK) {
-		if (f->status == VINE_CACHE_STATUS_READY) {
+		if (f->status == VINE_CACHE_STATUS_TRANSFERRED) {
 
 			char *source_path = vine_sandbox_full_path(f->process, f->source);
 
 			debug(D_VINE, "cache: extracting %s from mini-task sandbox to %s\n", f->source, transfer_path);
 			int result = rename(source_path, transfer_path);
-			if (result == 0) {
-				f->status = VINE_CACHE_STATUS_READY;
-			} else {
-				debug(D_VINE,
-						"cache: unable to rename %s to %s: %s\n",
-						source_path,
-						transfer_path,
-						strerror(errno));
+			if (result != 0) {
+				debug(D_VINE,"cache: unable to rename %s to %s: %s\n",source_path,transfer_path,strerror(errno));
 				f->status = VINE_CACHE_STATUS_FAILED;
 			}
 
@@ -669,7 +664,7 @@ static void vine_cache_check_outputs(
 	Now measure and verify the file, and move it into the cache.
 	*/
 
-	if (f->status == VINE_CACHE_STATUS_READY) {
+	if (f->status == VINE_CACHE_STATUS_TRANSFERRED) {
 
 		int mode;
 		time_t mtime;
@@ -682,15 +677,18 @@ static void vine_cache_check_outputs(
 			debug(D_VINE,"cache: created %s with size %lld in %lld usec",cachename,(long long)size,(long long)transfer_time);
 			// XXX fill in cache level from file object
 			if(vine_cache_add_file(c,cachename,transfer_path,VINE_CACHE_LEVEL_TASK,mode,size,mtime,transfer_time)) {
-				/* nothing ot do */
+				f->status = VINE_CACHE_STATUS_READY;
 			} else {
 				debug(D_VINE,"cache: unable to move %s to %s: %s\n",transfer_path,cache_path,strerror(errno));
+				f->status = VINE_CACHE_STATUS_FAILED;
 			}
 		} else {
 			debug(D_VINE,"cache: command succeeded but didn't create %s: %s\n", cachename, strerror(errno));
+			f->status = VINE_CACHE_STATUS_FAILED;
 		}
 	} else {
-		debug(D_VINE, "cache: command failed to create %s", cachename);
+		debug(D_VINE, "cache: command failed to complete for %s", cachename);
+		f->status = VINE_CACHE_STATUS_FAILED;
 	}
 
 	/* Finally send a cache update message one way or the other. */
@@ -731,8 +729,7 @@ static void vine_cache_handle_exit_status(struct vine_cache *c, struct vine_cach
 				exit_code);
 		if (exit_code == 0) {
 			debug(D_VINE, "transfer process for %s completed", cachename);
-			// XXX go to transfer state prior to ready
-			f->status = VINE_CACHE_STATUS_READY;
+			f->status = VINE_CACHE_STATUS_TRANSFERRED;
 		} else {
 			debug(D_VINE, "transfer process for %s failed", cachename);
 			f->status = VINE_CACHE_STATUS_FAILED;
