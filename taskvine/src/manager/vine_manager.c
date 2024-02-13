@@ -376,12 +376,15 @@ of the file for the purposes of cache storage management.
 static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
 	char cachename[VINE_LINE_MAX];
+	int type;
+	int cache_level;
 	long long size;
+	long long mtime;
 	long long transfer_time;
 	long long start_time;
 	char id[VINE_LINE_MAX];
 
-	if (sscanf(line, "cache-update %s %lld %lld %lld %s", cachename, &size, &transfer_time, &start_time, id) == 5) {
+	if (sscanf(line, "cache-update %s %d %d %lld %lld %lld %lld %s", cachename, &type, &cache_level, &size, &mtime, &transfer_time, &start_time, id) == 8) {
 		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, cachename);
 
 		if (!replica) {
@@ -390,11 +393,14 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 			- The worker is telling us about an item from a previous run.
 			- The file was created as an output of a task.
 			*/
-			replica = vine_file_replica_create(size, 0);
+			replica = vine_file_replica_create(type,cache_level,size,mtime);
 			vine_file_replica_table_insert(w, cachename, replica);
 		}
 
+		replica->type = type;
+		replica->cache_level = cache_level;
 		replica->size = size;
+		replica->mtime = mtime;
 		replica->transfer_time = transfer_time;
 		replica->state = VINE_FILE_REPLICA_STATE_READY;
 

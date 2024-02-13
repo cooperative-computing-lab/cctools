@@ -6,14 +6,16 @@ See the file COPYING for details.
 
 #include "vine_file_replica.h"
 
-struct vine_file_replica *vine_file_replica_create(int64_t size, time_t mtime)
+struct vine_file_replica *vine_file_replica_create( vine_file_type_t type, vine_cache_level_t cache_level, int64_t size, time_t mtime)
 {
-	struct vine_file_replica *rinfo = malloc(sizeof(*rinfo));
-	rinfo->size = size;
-	rinfo->mtime = mtime;
-	rinfo->transfer_time = 0;
-	rinfo->state = VINE_FILE_REPLICA_STATE_PENDING;
-	return rinfo;
+	struct vine_file_replica *r = malloc(sizeof(*r));
+	r->type = type;
+	r->cache_level = cache_level;
+	r->size = size;
+	r->mtime = mtime;
+	r->transfer_time = 0;
+	r->state = VINE_FILE_REPLICA_STATE_PENDING;
+	return r;
 }
 
-void vine_file_replica_delete(struct vine_file_replica *rinfo) { free(rinfo); }
+void vine_file_replica_delete(struct vine_file_replica *r) { free(r); }

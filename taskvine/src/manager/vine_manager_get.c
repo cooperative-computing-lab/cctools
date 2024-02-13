@@ -426,8 +426,7 @@ vine_result_code_t vine_manager_get_output_file(struct vine_manager *q, struct v
 	if (result == VINE_SUCCESS && m->flags & VINE_CACHE) {
 		struct stat local_info;
 		if (stat(f->source, &local_info) == 0) {
-			struct vine_file_replica *replica =
-					vine_file_replica_create(local_info.st_size, local_info.st_mtime);
+			struct vine_file_replica *replica = vine_file_replica_create(f->type,f->cache_level,local_info.st_size, local_info.st_mtime);
 			vine_file_replica_table_insert(w, f->cached_name, replica);
 		} else {
 			debug(D_NOTICE, "Cannot stat file %s: %s", f->source, strerror(errno));

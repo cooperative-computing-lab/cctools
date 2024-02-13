@@ -444,7 +444,7 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 
 	/* If the send succeeded, then record it in the worker */
 	if (result == VINE_SUCCESS) {
-		struct vine_file_replica *replica = vine_file_replica_create(info.st_size, info.st_mtime);
+		struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, info.st_size, info.st_mtime);
 		vine_file_replica_table_insert(w, f->cached_name, replica);
 
 		switch (file_to_send->type) {
