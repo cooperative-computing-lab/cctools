@@ -70,7 +70,8 @@ void vine_cache_load(struct vine_cache *c)
 			if (!strcmp(d->d_name, ".."))
 				continue;
 
-			if( strcmp(string_back(d->d_name,5),".meta") ) {
+			/* If this is a .meta file, skip it, we are looking for the data files. */
+			if( !strcmp(string_back(d->d_name,5),".meta") ) {
 				continue;
 			}
 			
