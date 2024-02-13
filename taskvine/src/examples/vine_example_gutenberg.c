@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
 	struct vine_file *files[URL_COUNT];
 
 	for(i=0;i<URL_COUNT;i++) {
-		files[i] = vine_declare_url(m, urls[i], VINE_CACHE);
+		files[i] = vine_declare_url(m, urls[i], VINE_CACHE_ALWAYS);
 	}
 
 	printf("submitting tasks...\n");
