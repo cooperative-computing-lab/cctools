@@ -95,6 +95,18 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 		f->data = 0;
 	}
 
+	/* The cache level integer is kept internally for convenience, derived from the flags */
+	/* XXX consider abandoning bit flags for an explicit cache level in the API. */
+	
+	if((f->flags & VINE_CACHE_ALWAYS)==VINE_CACHE_ALWAYS) {
+		f->cache_level = VINE_CACHE_LEVEL_FOREVER;
+	} else if(f->flags & VINE_CACHE) {
+		f->cache_level = VINE_CACHE_LEVEL_WORKFLOW;
+	} else {
+		f->cache_level = VINE_CACHE_LEVEL_TASK;
+	}
+	
+	
 	if (vine_hack_do_not_compute_cached_name) {
 		/* On the worker, the source (name on disk) is already the cached name. */
 		f->cached_name = xxstrdup(f->source);

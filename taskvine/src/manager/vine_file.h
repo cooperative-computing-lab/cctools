@@ -40,10 +40,18 @@ typedef enum {
 	VINE_FILE_STATE_CREATED   /**< This file has been created at some point.  (although it might have been lost!) */
 } vine_file_state_t;
 
+typedef enum {
+	VINE_CACHE_LEVEL_TASK=0,
+	VINE_CACHE_LEVEL_WORKFLOW=1,
+	VINE_CACHE_LEVEL_WORKER=2,
+	VINE_CACHE_LEVEL_FOREVER=3
+} vine_cache_level_t;
+
 struct vine_file {
 	vine_file_type_t  type;  // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
 	vine_file_flags_t flags; // Whether or not to transfer this file between workers.
 	vine_file_state_t state; // Whether the file is PENDING or has been CREATED
+	vine_cache_level_t cache_level; // How aggressively this file should be cached.
 	char *source;       // Name of source file, url, buffer.
 	char *cached_name;  // Name of file in the worker's cache directory.
 	size_t size;        // Length of source data, if known.
