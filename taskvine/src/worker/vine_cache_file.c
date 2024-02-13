@@ -4,7 +4,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-
 #include "vine_cache_file.h"
 #include "vine_protocol.h"
 
@@ -16,11 +15,12 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <sys/stat.h>
 
-struct vine_cache_file *vine_cache_file_create( vine_cache_type_t cache_type, const char *source, struct vine_task *mini_task )
+struct vine_cache_file *vine_cache_file_create(
+		vine_cache_type_t cache_type, const char *source, struct vine_task *mini_task)
 {
 	struct vine_cache_file *f = malloc(sizeof(*f));
-	memset(f,0,sizeof(*f));
-	
+	memset(f, 0, sizeof(*f));
+
 	f->cache_type = cache_type;
 	f->source = xxstrdup(source);
 	f->mini_task = mini_task;
@@ -43,32 +43,32 @@ void vine_cache_file_delete(struct vine_cache_file *f)
 	free(f);
 }
 
-
-int vine_cache_file_load_metadata( struct vine_cache_file *f, const char *filename )
+int vine_cache_file_load_metadata(struct vine_cache_file *f, const char *filename)
 {
 	char line[VINE_LINE_MAX];
-	
-	FILE *file = fopen(filename,"r");
-	if(!file) return 0;
+
+	FILE *file = fopen(filename, "r");
+	if (!file)
+		return 0;
 
 	/* Use of sscanf is simplified by matching %lld with long long */
 	long long value;
-	
-	while(fgets(line,sizeof(line),file)) {
-		if(sscanf(line,"type %lld",&value)) {
+
+	while (fgets(line, sizeof(line), file)) {
+		if (sscanf(line, "type %lld", &value)) {
 			f->original_type = value;
-		} else if(sscanf(line,"cache_level %lld",&value)) {
+		} else if (sscanf(line, "cache_level %lld", &value)) {
 			f->cache_level = value;
-		} else if(sscanf(line,"mode %llo",&value)) {
+		} else if (sscanf(line, "mode %llo", &value)) {
 			f->mode = value;
-		} else if(sscanf(line,"size %lld",&value)) {
+		} else if (sscanf(line, "size %lld", &value)) {
 			f->size = value;
-		} else if(sscanf(line,"mtime %lld",&value)) {
+		} else if (sscanf(line, "mtime %lld", &value)) {
 			f->mtime = value;
-		} else if(sscanf(line,"transfer_time %lld",&value)) {
+		} else if (sscanf(line, "transfer_time %lld", &value)) {
 			f->transfer_time = value;
 		} else {
-			debug(D_VINE,"error in %s: %s\n",filename,line);
+			debug(D_VINE, "error in %s: %s\n", filename, line);
 			fclose(file);
 			return 0;
 		}
@@ -78,19 +78,20 @@ int vine_cache_file_load_metadata( struct vine_cache_file *f, const char *filena
 	return 1;
 }
 
-int vine_cache_file_save_metadata( struct vine_cache_file *f, const char *filename )
+int vine_cache_file_save_metadata(struct vine_cache_file *f, const char *filename)
 {
-	FILE *file = fopen(filename,"w");
-	if(!file) return 0;
+	FILE *file = fopen(filename, "w");
+	if (!file)
+		return 0;
 
-	fprintf(file,"type %d\ncache_level %d\nmode %o\nsize %lld\nmtime %lld\ntransfer_time %lld\n",
-		f->original_type,
-		f->cache_level,
-		f->mode,
-		(long long)f->size,
-		(long long)f->mtime,
-		(long long)f->transfer_time
-		);
+	fprintf(file,
+			"type %d\ncache_level %d\nmode %o\nsize %lld\nmtime %lld\ntransfer_time %lld\n",
+			f->original_type,
+			f->cache_level,
+			f->mode,
+			(long long)f->size,
+			(long long)f->mtime,
+			(long long)f->transfer_time);
 
 	fclose(file);
 
@@ -99,23 +100,23 @@ int vine_cache_file_save_metadata( struct vine_cache_file *f, const char *filena
 
 /* Observe the mode, size, and mtime of a file or directory tree. */
 
-int vine_cache_file_measure_metadata( const char *path, int *mode, int64_t *size, time_t *mtime )
+int vine_cache_file_measure_metadata(const char *path, int *mode, int64_t *size, time_t *mtime)
 {
 	struct stat info;
-	int64_t nfiles=0;
+	int64_t nfiles = 0;
 
 	/* Get the basic metadata. */
-	int result = stat(path,&info);
-	if(result<0) return 0;
+	int result = stat(path, &info);
+	if (result < 0)
+		return 0;
 
 	/* Measure the size of the item recursively, if a directory. */
-	result = path_disk_size_info_get(path,size,&nfiles);
-	if(result<0) return 0;
+	result = path_disk_size_info_get(path, size, &nfiles);
+	if (result < 0)
+		return 0;
 
 	*mode = info.st_mode;
 	*mtime = info.st_mtime;
-	
+
 	return 1;
 }
-
-

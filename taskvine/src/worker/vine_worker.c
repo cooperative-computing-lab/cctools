@@ -369,14 +369,25 @@ Send an asynchronmous message to the manager indicating that an item was success
 its size in bytes and transfer time in usec.
 */
 
-void vine_worker_send_cache_update(struct link *manager, const char *cachename, vine_file_type_t type, vine_cache_level_t cache_level, int64_t size, time_t mtime, timestamp_t transfer_time, timestamp_t transfer_start)
+void vine_worker_send_cache_update(struct link *manager, const char *cachename, vine_file_type_t type,
+		vine_cache_level_t cache_level, int64_t size, time_t mtime, timestamp_t transfer_time,
+		timestamp_t transfer_start)
 {
 	char *transfer_id = hash_table_remove(current_transfers, cachename);
 	if (!transfer_id) {
 		transfer_id = xxstrdup("X");
 	}
 
-	send_message(manager, "cache-update %s %d %d %lld %lld %lld %lld %s\n", cachename, type, cache_level, (long long)size, (long long)mtime, (long long)transfer_time, (long long)transfer_start, transfer_id);
+	send_message(manager,
+			"cache-update %s %d %d %lld %lld %lld %lld %s\n",
+			cachename,
+			type,
+			cache_level,
+			(long long)size,
+			(long long)mtime,
+			(long long)transfer_time,
+			(long long)transfer_start,
+			transfer_id);
 
 	free(transfer_id);
 }
@@ -803,7 +814,7 @@ into a temporary transfer path, and then (if successful)
 add the file to the cache manager.
 */
 
-static int do_put( struct link *manager, const char *cachename, vine_cache_level_t cache_level, int64_t expected_size )
+static int do_put(struct link *manager, const char *cachename, vine_cache_level_t cache_level, int64_t expected_size)
 {
 	int64_t actual_size = 0;
 	int mode = 0;
@@ -813,13 +824,21 @@ static int do_put( struct link *manager, const char *cachename, vine_cache_level
 	char *transfer_path = vine_cache_transfer_path(cache_manager, cachename);
 
 	timestamp_t start = timestamp_get();
-	int r = vine_transfer_get_any(manager, transfer_dir, &actual_size, &mode, &mtime, time(0)+options->active_timeout);
+	int r = vine_transfer_get_any(
+			manager, transfer_dir, &actual_size, &mode, &mtime, time(0) + options->active_timeout);
 	timestamp_t stop = timestamp_get();
 
 	/* XXX actual_size should equal expected size, but only for a simple file, not a dir. */
 
-	if(r) {
-		vine_cache_add_file(cache_manager, cachename, transfer_path, cache_level, mode, actual_size, mtime, stop-start);
+	if (r) {
+		vine_cache_add_file(cache_manager,
+				cachename,
+				transfer_path,
+				cache_level,
+				mode,
+				actual_size,
+				mtime,
+				stop - start);
 	} else {
 		trash_file(transfer_path);
 	}
@@ -834,18 +853,22 @@ static int do_put( struct link *manager, const char *cachename, vine_cache_level
 Accept a url specification and queue it for later transfer.
 */
 
-static int do_put_url(const char *cache_name, vine_cache_level_t cache_level, int64_t size, int mode, const char *source)
+static int do_put_url(
+		const char *cache_name, vine_cache_level_t cache_level, int64_t size, int mode, const char *source)
 {
-	return vine_cache_add_transfer(cache_manager, cache_name, source, cache_level, mode, size, VINE_CACHE_FLAGS_ON_TASK );
+	return vine_cache_add_transfer(
+			cache_manager, cache_name, source, cache_level, mode, size, VINE_CACHE_FLAGS_ON_TASK);
 }
 
 /*
 Accept a url specification and transfer immediately.
 */
 
-static int do_put_url_now(const char *cache_name, vine_cache_level_t cache_level, int64_t size, int mode, const char *source)
+static int do_put_url_now(
+		const char *cache_name, vine_cache_level_t cache_level, int64_t size, int mode, const char *source)
 {
-	return vine_cache_add_transfer(cache_manager, cache_name, source, cache_level, mode, size, VINE_CACHE_FLAGS_NOW );
+	return vine_cache_add_transfer(
+			cache_manager, cache_name, source, cache_level, mode, size, VINE_CACHE_FLAGS_NOW);
 }
 
 /*
@@ -853,8 +876,8 @@ Accept a mini_task that is executed on demand.
 We will then extract the file "source" from the sandbox in order to produce "cache_name".
 */
 
-static int do_put_mini_task(struct link *manager, time_t stoptime, const char *cache_name, vine_cache_level_t cache_level, int64_t size, int mode,
-		const char *source)
+static int do_put_mini_task(struct link *manager, time_t stoptime, const char *cache_name,
+		vine_cache_level_t cache_level, int64_t size, int mode, const char *source)
 {
 	mini_task_id++;
 
@@ -862,7 +885,7 @@ static int do_put_mini_task(struct link *manager, time_t stoptime, const char *c
 	if (!mini_task)
 		return 0;
 
-	return vine_cache_add_mini_task(cache_manager, cache_name, source, mini_task, cache_level, mode, size );
+	return vine_cache_add_mini_task(cache_manager, cache_name, source, mini_task, cache_level, mode, size);
 }
 
 /*
@@ -1105,9 +1128,9 @@ static int handle_manager(struct link *manager)
 	if (recv_message(manager, line, sizeof(line), options->idle_stoptime)) {
 		if (sscanf(line, "task %" SCNd64, &task_id) == 1) {
 			r = do_task(manager, task_id, time(0) + options->active_timeout);
-		} else if (sscanf(line, "put %s %d %"SCNd64, filename_encoded, &cache_level, &length)==3) {
+		} else if (sscanf(line, "put %s %d %" SCNd64, filename_encoded, &cache_level, &length) == 3) {
 			url_decode(filename_encoded, filename, sizeof(filename));
-			r = do_put(manager,filename,cache_level,length);
+			r = do_put(manager, filename, cache_level, length);
 			reset_idle_timer();
 		} else if (sscanf(line,
 					   "puturl %s %s %d %" SCNd64 " %o %s",
@@ -1115,7 +1138,7 @@ static int handle_manager(struct link *manager)
 					   filename_encoded,
 					   &cache_level,
 					   &length,
-			                   &mode,
+					   &mode,
 					   transfer_id) == 6) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			url_decode(source_encoded, source, sizeof(source));
@@ -1126,8 +1149,8 @@ static int handle_manager(struct link *manager)
 					   "puturl_now %s %s %d %" SCNd64 " %o %s",
 					   source_encoded,
 					   filename_encoded,
-				  &cache_level,
-				  &length,
+					   &cache_level,
+					   &length,
 					   &mode,
 					   transfer_id) == 6) {
 			url_decode(filename_encoded, filename, sizeof(filename));
@@ -1139,12 +1162,18 @@ static int handle_manager(struct link *manager)
 					   "mini_task %s %s %d %" SCNd64 " %o",
 					   source_encoded,
 					   filename_encoded,
-				  &cache_level,
+					   &cache_level,
 					   &length,
 					   &mode) == 5) {
 			url_decode(source_encoded, source, sizeof(source));
 			url_decode(filename_encoded, filename, sizeof(filename));
-			r = do_put_mini_task(manager, time(0) + options->active_timeout, filename, cache_level, length, mode, source);
+			r = do_put_mini_task(manager,
+					time(0) + options->active_timeout,
+					filename,
+					cache_level,
+					length,
+					mode,
+					source);
 			reset_idle_timer();
 		} else if (sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded, filename, sizeof(filename));
@@ -1685,8 +1714,8 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 	vine_transfer_server_stop();
 
 	/* Remove all cached files of workflow or less. */
-	vine_cache_prune(cache_manager,VINE_CACHE_LEVEL_WORKFLOW);
-	
+	vine_cache_prune(cache_manager, VINE_CACHE_LEVEL_WORKFLOW);
+
 	/* Stop the cache manager. */
 	vine_cache_delete(cache_manager);
 	cache_manager = 0;

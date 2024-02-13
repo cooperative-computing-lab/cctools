@@ -6,11 +6,11 @@ See the file COPYING for details.
 
 #include "vine_sandbox.h"
 #include "vine_cache.h"
+#include "vine_cache_file.h"
 #include "vine_file.h"
 #include "vine_mount.h"
 #include "vine_task.h"
 #include "vine_worker.h"
-#include "vine_cache_file.h"
 
 #include "copy_stream.h"
 #include "create_dir.h"
@@ -148,24 +148,42 @@ static int stage_output_file(struct vine_process *p, struct vine_mount *m, struc
 	int mode;
 	time_t mtime;
 	int64_t size;
-	
+
 	timestamp_t transfer_time = p->execution_end - p->execution_start;
 
 	debug(D_VINE, "output: measuring %s", sandbox_path);
-	if(vine_cache_file_measure_metadata(sandbox_path,&mode,&size,&mtime)) {
+	if (vine_cache_file_measure_metadata(sandbox_path, &mode, &size, &mtime)) {
 
 		// XXX fill in cache level from file object
 		debug(D_VINE, "output: moving %s to %s", sandbox_path, cache_path);
-		if(vine_cache_add_file(cache,f->cached_name,sandbox_path,VINE_CACHE_LEVEL_TASK,mode,size,mtime,transfer_time)) {
+		if (vine_cache_add_file(cache,
+				    f->cached_name,
+				    sandbox_path,
+				    VINE_CACHE_LEVEL_TASK,
+				    mode,
+				    size,
+				    mtime,
+				    transfer_time)) {
 			// XXX fill in cache level from file object
-			vine_worker_send_cache_update(manager, f->cached_name, f->type, VINE_CACHE_LEVEL_TASK, f->size, mode, transfer_time, p->execution_start);
+			vine_worker_send_cache_update(manager,
+					f->cached_name,
+					f->type,
+					VINE_CACHE_LEVEL_TASK,
+					f->size,
+					mode,
+					transfer_time,
+					p->execution_start);
 			result = 1;
 		} else {
-			debug(D_VINE,"output: unable to move %s to %s: %s\n",sandbox_path,cache_path,strerror(errno));
+			debug(D_VINE,
+					"output: unable to move %s to %s: %s\n",
+					sandbox_path,
+					cache_path,
+					strerror(errno));
 			result = 0;
 		}
 	} else {
-		debug(D_VINE,"output: unable to measure size of %s: %s\n", sandbox_path, strerror(errno));
+		debug(D_VINE, "output: unable to measure size of %s: %s\n", sandbox_path, strerror(errno));
 		result = 0;
 	}
 
@@ -185,10 +203,7 @@ manager.  The manager will handle the consequences of missing output files.
 int vine_sandbox_stageout(struct vine_process *p, struct vine_cache *cache, struct link *manager)
 {
 	struct vine_mount *m;
-	LIST_ITERATE(p->task->output_mounts, m)
-	{
-		stage_output_file(p, m, m->file, cache, manager);
-	}
+	LIST_ITERATE(p->task->output_mounts, m) { stage_output_file(p, m, m->file, cache, manager); }
 
 	return 1;
 }

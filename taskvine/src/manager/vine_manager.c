@@ -384,7 +384,16 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 	long long start_time;
 	char id[VINE_LINE_MAX];
 
-	if (sscanf(line, "cache-update %s %d %d %lld %lld %lld %lld %s", cachename, &type, &cache_level, &size, &mtime, &transfer_time, &start_time, id) == 8) {
+	if (sscanf(line,
+			    "cache-update %s %d %d %lld %lld %lld %lld %s",
+			    cachename,
+			    &type,
+			    &cache_level,
+			    &size,
+			    &mtime,
+			    &transfer_time,
+			    &start_time,
+			    id) == 8) {
 		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, cachename);
 
 		if (!replica) {
@@ -393,7 +402,7 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 			- The worker is telling us about an item from a previous run.
 			- The file was created as an output of a task.
 			*/
-			replica = vine_file_replica_create(type,cache_level,size,mtime);
+			replica = vine_file_replica_create(type, cache_level, size, mtime);
 			vine_file_replica_table_insert(w, cachename, replica);
 		}
 

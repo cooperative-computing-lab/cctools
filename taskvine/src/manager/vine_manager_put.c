@@ -95,7 +95,13 @@ static int vine_manager_put_file(struct vine_manager *q, struct vine_worker_info
 	url_encode(remotename, remotename_encoded, sizeof(remotename_encoded));
 
 	stoptime = time(0) + vine_manager_transfer_time(q, w, length);
-	vine_manager_send(q, w, "file %s %" PRId64 " 0%o %lld\n", remotename_encoded, length, mode, (long long)info.st_mtime);
+	vine_manager_send(q,
+			w,
+			"file %s %" PRId64 " 0%o %lld\n",
+			remotename_encoded,
+			length,
+			mode,
+			(long long)info.st_mtime);
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
 
@@ -127,11 +133,11 @@ static vine_result_code_t vine_manager_put_directory(struct vine_manager *q, str
 		struct vine_task *t, const char *localname, const char *remotename, int64_t *total_bytes)
 {
 	struct stat info;
-	if(stat(localname,&info)!=0) {
-		debug(D_NOTICE, "Cannot stat dir %s: %s", localname,strerror(errno));
+	if (stat(localname, &info) != 0) {
+		debug(D_NOTICE, "Cannot stat dir %s: %s", localname, strerror(errno));
 		return VINE_APP_FAILURE;
 	}
-	
+
 	DIR *dir = opendir(localname);
 	if (!dir) {
 		debug(D_NOTICE, "Cannot open dir %s: %s", localname, strerror(errno));
@@ -143,7 +149,7 @@ static vine_result_code_t vine_manager_put_directory(struct vine_manager *q, str
 	char remotename_encoded[VINE_LINE_MAX];
 	url_encode(remotename, remotename_encoded, sizeof(remotename_encoded));
 
-	vine_manager_send(q, w, "dir %s %0o %lld\n", remotename_encoded,info.st_mode,(long long)info.st_mtime);
+	vine_manager_send(q, w, "dir %s %0o %lld\n", remotename_encoded, info.st_mode, (long long)info.st_mtime);
 
 	struct dirent *d;
 	while ((d = readdir(dir))) {
@@ -217,13 +223,14 @@ may be an estimate at this point and will be updated by return
 message once the object is actually loaded into the cache.
 */
 
-vine_result_code_t vine_manager_put_url_now( struct vine_manager *q, struct vine_worker_info *w, const char *source, const char *cachename, long long size )
+vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_worker_info *w, const char *source,
+		const char *cachename, long long size)
 {
 	// XXX pass cache level in appropriately
 	vine_cache_level_t cache_level = VINE_CACHE_LEVEL_TASK;
 	// XXX pass mode in appropriately
 	int mode = 0755;
-	
+
 	char source_encoded[VINE_LINE_MAX];
 	char cached_name_encoded[VINE_LINE_MAX];
 
@@ -252,11 +259,12 @@ may be an estimate at this point and will be updated by return
 message once the object is actually loaded into the cache.
 */
 
-vine_result_code_t vine_manager_put_url(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f )
+vine_result_code_t vine_manager_put_url(
+		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f)
 {
 	// XXX pass mode in appropriately.
 	int mode = 0755;
-	
+
 	char source_encoded[VINE_LINE_MAX];
 	char cached_name_encoded[VINE_LINE_MAX];
 
@@ -311,13 +319,13 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 	switch (f->type) {
 	case VINE_FILE:
 		debug(D_VINE, "%s (%s) needs file %s as %s", w->hostname, w->addrport, f->source, m->remote_name);
-		vine_manager_send(q, w, "put %s %d %"PRId64"\n", f->cached_name, f->cache_level, f->size);
+		vine_manager_send(q, w, "put %s %d %" PRId64 "\n", f->cached_name, f->cache_level, f->size);
 		result = vine_manager_put_file_or_dir(q, w, t, f->source, f->cached_name, &total_bytes, 1);
 		break;
 
 	case VINE_BUFFER:
 		debug(D_VINE, "%s (%s) needs buffer as %s", w->hostname, w->addrport, m->remote_name);
-		vine_manager_send(q, w, "put %s %d %"PRId64"\n", f->cached_name, f->cache_level, f->size);
+		vine_manager_send(q, w, "put %s %d %" PRId64 "\n", f->cached_name, f->cache_level, f->size);
 		result = vine_manager_put_buffer(q, w, t, f, &total_bytes);
 		break;
 
@@ -460,7 +468,8 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 
 	/* If the send succeeded, then record it in the worker */
 	if (result == VINE_SUCCESS) {
-		struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, info.st_size, info.st_mtime);
+		struct vine_file_replica *replica =
+				vine_file_replica_create(f->type, f->cache_level, info.st_size, info.st_mtime);
 		vine_file_replica_table_insert(w, f->cached_name, replica);
 
 		switch (file_to_send->type) {
@@ -521,7 +530,7 @@ vine_result_code_t vine_manager_put_task(struct vine_manager *q, struct vine_wor
 				target->source,
 				target->cached_name,
 				target->cache_level,
-			        (long long)target->size,
+				(long long)target->size,
 				0777);
 	} else {
 		vine_manager_send(q, w, "task %lld\n", (long long)t->task_id);

@@ -5,11 +5,11 @@ See the file COPYING for details.
 */
 
 #include "vine_cache.h"
+#include "vine_cache_file.h"
 #include "vine_mount.h"
 #include "vine_process.h"
 #include "vine_sandbox.h"
 #include "vine_worker.h"
-#include "vine_cache_file.h"
 
 #include "vine_protocol.h"
 #include "vine_transfer.h"
@@ -71,35 +71,41 @@ void vine_cache_load(struct vine_cache *c)
 				continue;
 
 			/* If this is a .meta file, skip it, we are looking for the data files. */
-			if( !strcmp(string_back(d->d_name,5),".meta") ) {
+			if (!strcmp(string_back(d->d_name, 5), ".meta")) {
 				continue;
 			}
-			
-			char *meta_path = vine_cache_meta_path(c, d->d_name );
-			char *data_path = vine_cache_data_path(c, d->d_name );
+
+			char *meta_path = vine_cache_meta_path(c, d->d_name);
+			char *data_path = vine_cache_data_path(c, d->d_name);
 
 			// XXX source should come from metadata
 			// XXX great opportunity to check metadata against the file
-			struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_FILE,"manager",0);
+			struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_FILE, "manager", 0);
 
-			if(vine_cache_file_load_metadata(f,meta_path)) {
-				if(f->cache_level<VINE_CACHE_LEVEL_FOREVER) {
-					debug(D_VINE, "cache: %s has cache-level %d, deleting",d->d_name,f->cache_level);
+			if (vine_cache_file_load_metadata(f, meta_path)) {
+				if (f->cache_level < VINE_CACHE_LEVEL_FOREVER) {
+					debug(D_VINE,
+							"cache: %s has cache-level %d, deleting",
+							d->d_name,
+							f->cache_level);
 					trash_file(meta_path);
 					trash_file(data_path);
 					vine_cache_file_delete(f);
 				} else {
-					debug(D_VINE, "cache: %s has cache-level %d, keeping",d->d_name,f->cache_level);
+					debug(D_VINE,
+							"cache: %s has cache-level %d, keeping",
+							d->d_name,
+							f->cache_level);
 					hash_table_insert(c->table, d->d_name, f);
 					f->status = VINE_CACHE_STATUS_READY;
 				}
 			} else {
-				debug(D_VINE, "cache: %s has invalid metadata, deleting",d->d_name);
+				debug(D_VINE, "cache: %s has invalid metadata, deleting", d->d_name);
 				trash_file(meta_path);
 				trash_file(data_path);
 				vine_cache_file_delete(f);
 			}
-			
+
 			free(meta_path);
 			free(data_path);
 		}
@@ -118,7 +124,14 @@ void vine_cache_scan(struct vine_cache *c, struct link *manager)
 	HASH_TABLE_ITERATE(c->table, cachename, f)
 	{
 		// XXX load and store transfer start from metadata
-		vine_worker_send_cache_update(manager, cachename, f->original_type, f->cache_level, f->size, f->mode, f->transfer_time, f->start_time);
+		vine_worker_send_cache_update(manager,
+				cachename,
+				f->original_type,
+				f->cache_level,
+				f->size,
+				f->mode,
+				f->transfer_time,
+				f->start_time);
 	}
 }
 
@@ -132,8 +145,8 @@ void vine_cache_prune(struct vine_cache *c, vine_cache_level_t level)
 	char *cachename;
 	HASH_TABLE_ITERATE(c->table, cachename, f)
 	{
-		if(f->cache_level <= level) {
-			vine_cache_remove(c,cachename,0);
+		if (f->cache_level <= level) {
+			vine_cache_remove(c, cachename, 0);
 		}
 	}
 }
@@ -165,10 +178,7 @@ void vine_cache_delete(struct vine_cache *c)
 	/* Ensure that all child processes are killed off. */
 	char *cachename;
 	struct vine_cache_file *file;
-	HASH_TABLE_ITERATE(c->table, cachename, file)
-	{
-		vine_cache_kill(c, file, cachename, 0);
-	}
+	HASH_TABLE_ITERATE(c->table, cachename, file) { vine_cache_kill(c, file, cachename, 0); }
 
 	hash_table_clear(c->table, (void *)vine_cache_file_delete);
 	hash_table_delete(c->table);
@@ -204,20 +214,21 @@ Add a file to the cache manager by renaming it from its current location
 and writing out the metadata to the proper location.
 */
 
-int vine_cache_add_file(struct vine_cache *c, const char *cachename, const char *transfer_path, vine_cache_level_t level, int mode, uint64_t size, time_t mtime, timestamp_t transfer_time )
+int vine_cache_add_file(struct vine_cache *c, const char *cachename, const char *transfer_path,
+		vine_cache_level_t level, int mode, uint64_t size, time_t mtime, timestamp_t transfer_time)
 {
-	char *data_path = vine_cache_data_path(c,cachename);
-	char *meta_path = vine_cache_meta_path(c,cachename);
+	char *data_path = vine_cache_data_path(c, cachename);
+	char *meta_path = vine_cache_meta_path(c, cachename);
 
 	int result = 0;
-	
-	if(rename(transfer_path,data_path)==0) {
+
+	if (rename(transfer_path, data_path) == 0) {
 		struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
 		if (f) {
 			/* If the file object is already present, we are providing the missing data. */
 		} else {
 			/* If not, we are declaring a completely new file. */
-			f = vine_cache_file_create(VINE_CACHE_FILE, "manager",0);
+			f = vine_cache_file_create(VINE_CACHE_FILE, "manager", 0);
 			hash_table_insert(c->table, cachename, f);
 		}
 
@@ -231,7 +242,7 @@ int vine_cache_add_file(struct vine_cache *c, const char *cachename, const char 
 		/* File has data and is ready to use. */
 		f->status = VINE_CACHE_STATUS_READY;
 
-		vine_cache_file_save_metadata(f,meta_path);
+		vine_cache_file_save_metadata(f, meta_path);
 
 		result = 1;
 	} else {
@@ -240,7 +251,7 @@ int vine_cache_add_file(struct vine_cache *c, const char *cachename, const char 
 
 	free(data_path);
 	free(meta_path);
-	
+
 	return result;
 }
 
@@ -258,23 +269,24 @@ Queue a remote file transfer to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */
 
-int vine_cache_add_transfer( struct vine_cache *c, const char *cachename, const char *source, vine_cache_level_t level, int mode, uint64_t size, vine_cache_flags_t flags )
+int vine_cache_add_transfer(struct vine_cache *c, const char *cachename, const char *source, vine_cache_level_t level,
+		int mode, uint64_t size, vine_cache_flags_t flags)
 {
 	/* Has this transfer already been queued? */
 	struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
-	if(f) {
+	if (f) {
 		/* The transfer is already queued up. */
 		return 0;
 	}
-	
+
 	/* Create the object and fill in the metadata. */
-	
+
 	f = vine_cache_file_create(VINE_CACHE_TRANSFER, source, 0);
-	f->original_type = VINE_URL;  // XXX this isn't right
+	f->original_type = VINE_URL; // XXX this isn't right
 	f->cache_level = level;
 	f->mode = mode;
 	f->size = size;
-	f->mtime = 0; // XXX not sure what this means here
+	f->mtime = 0;	      // XXX not sure what this means here
 	f->transfer_time = 0; // XXX transfer time isn't set yet.
 
 	hash_table_insert(c->table, cachename, f);
@@ -292,18 +304,19 @@ Queue a mini-task to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */
 
-int vine_cache_add_mini_task( struct vine_cache *c, const char *cachename, const char *source, struct vine_task *mini_task, vine_cache_level_t level, int mode, uint64_t size )
+int vine_cache_add_mini_task(struct vine_cache *c, const char *cachename, const char *source,
+		struct vine_task *mini_task, vine_cache_level_t level, int mode, uint64_t size)
 {
 	/* Has this minitask already been queued? */
 	struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
-	if(f) {
+	if (f) {
 		/* The minitask is already queued up. */
 		return 0;
 	}
 
 	/* Create the object and fill in the metadata. */
-	
-	f = vine_cache_file_create(VINE_CACHE_MINI_TASK, source, mini_task );
+
+	f = vine_cache_file_create(VINE_CACHE_MINI_TASK, source, mini_task);
 	f->original_type = VINE_MINI_TASK;
 	f->cache_level = level;
 	f->mode = mode;
@@ -323,9 +336,10 @@ Remove a named item from the cache, regardless of its type.
 int vine_cache_remove(struct vine_cache *c, const char *cachename, struct link *manager)
 {
 	/* Careful: Don't remove the item rightaway, otherwise the cachename key becomes invalid. */
-	
+
 	struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
-	if (!f) return 0;
+	if (!f)
+		return 0;
 
 	/* Ensure that any child process associated with the entry is stopped. */
 	vine_cache_kill(c, f, cachename, manager);
@@ -339,9 +353,9 @@ int vine_cache_remove(struct vine_cache *c, const char *cachename, struct link *
 	free(meta_path);
 
 	/* Now we can remove the data structure. */
-	f = hash_table_remove(c->table,cachename);
+	f = hash_table_remove(c->table, cachename);
 	vine_cache_file_delete(f);
-	
+
 	return 1;
 }
 
@@ -388,7 +402,8 @@ Transfer a single input file from a url to the local transfer path via curl.
 --stderr Send errors to /dev/stdout so that they are observed by popen.
 */
 
-static int do_curl_transfer(struct vine_cache *c, struct vine_cache_file *f, const char *transfer_path, const char *cache_path, char **error_message)
+static int do_curl_transfer(struct vine_cache *c, struct vine_cache_file *f, const char *transfer_path,
+		const char *cache_path, char **error_message)
 {
 	char *command = string_format("curl -sSL --stderr /dev/stdout -o \"%s\" \"%s\"", transfer_path, f->source);
 	int result = do_internal_command(c, command, error_message);
@@ -423,7 +438,8 @@ static int do_mini_task(struct vine_cache *c, struct vine_cache_file *f, char **
 /*
 Transfer a single input file from a worker url to a local file name.
 */
-static int do_worker_transfer( struct vine_cache *c, struct vine_cache_file *f, const char *cachename, char **error_message)
+static int do_worker_transfer(
+		struct vine_cache *c, struct vine_cache_file *f, const char *cachename, char **error_message)
 {
 	int port_num;
 	char addr[VINE_LINE_MAX], source_path[VINE_LINE_MAX];
@@ -453,20 +469,21 @@ static int do_worker_transfer( struct vine_cache *c, struct vine_cache_file *f, 
 
 	/* XXX A fixed timeout of 900 certainly can't be right! */
 
-	char *transfer_dir = vine_cache_transfer_path(c,".");
+	char *transfer_dir = vine_cache_transfer_path(c, ".");
 	int64_t totalsize;
 	int mode, mtime;
-	
-	if (!vine_transfer_request_any(worker_link, source_path, transfer_dir, &totalsize, &mode, &mtime, time(0) + 900)) {
+
+	if (!vine_transfer_request_any(
+			    worker_link, source_path, transfer_dir, &totalsize, &mode, &mtime, time(0) + 900)) {
 		*error_message = string_format("Could not transfer file from %s", f->source);
 		link_close(worker_link);
 		return 0;
 	}
 
 	free(transfer_dir);
-	
+
 	/* At this point, the file is in the transfer path, but not yet in the cache. */
-	
+
 	link_close(worker_link);
 
 	return 1;
@@ -481,8 +498,8 @@ and then rename it into the proper place.
 
 static int do_transfer(struct vine_cache *c, struct vine_cache_file *f, const char *cachename, char **error_message)
 {
-	char *transfer_path = vine_cache_transfer_path(c,cachename);
-	char *cache_path = vine_cache_data_path(c,cachename);
+	char *transfer_path = vine_cache_transfer_path(c, cachename);
+	char *cache_path = vine_cache_data_path(c, cachename);
 
 	int result = 0;
 
@@ -497,7 +514,7 @@ static int do_transfer(struct vine_cache *c, struct vine_cache_file *f, const ch
 
 	free(transfer_path);
 	free(cache_path);
-	
+
 	return result;
 }
 
@@ -644,7 +661,11 @@ static void vine_cache_check_outputs(
 			debug(D_VINE, "cache: extracting %s from mini-task sandbox to %s\n", f->source, transfer_path);
 			int result = rename(source_path, transfer_path);
 			if (result != 0) {
-				debug(D_VINE,"cache: unable to rename %s to %s: %s\n",source_path,transfer_path,strerror(errno));
+				debug(D_VINE,
+						"cache: unable to rename %s to %s: %s\n",
+						source_path,
+						transfer_path,
+						strerror(errno));
 				f->status = VINE_CACHE_STATUS_FAILED;
 			}
 
@@ -668,20 +689,38 @@ static void vine_cache_check_outputs(
 		int mode;
 		time_t mtime;
 		int64_t size;
-		
+
 		chmod(cache_path, f->mode);
 
 		debug(D_VINE, "cache: measuring %s", transfer_path);
-		if(vine_cache_file_measure_metadata(transfer_path,&mode,&size,&mtime)) {
-			debug(D_VINE,"cache: created %s with size %lld in %lld usec",cachename,(long long)size,(long long)transfer_time);
-			if(vine_cache_add_file(c,cachename,transfer_path,f->cache_level,mode,size,mtime,transfer_time)) {
+		if (vine_cache_file_measure_metadata(transfer_path, &mode, &size, &mtime)) {
+			debug(D_VINE,
+					"cache: created %s with size %lld in %lld usec",
+					cachename,
+					(long long)size,
+					(long long)transfer_time);
+			if (vine_cache_add_file(c,
+					    cachename,
+					    transfer_path,
+					    f->cache_level,
+					    mode,
+					    size,
+					    mtime,
+					    transfer_time)) {
 				f->status = VINE_CACHE_STATUS_READY;
 			} else {
-				debug(D_VINE,"cache: unable to move %s to %s: %s\n",transfer_path,cache_path,strerror(errno));
+				debug(D_VINE,
+						"cache: unable to move %s to %s: %s\n",
+						transfer_path,
+						cache_path,
+						strerror(errno));
 				f->status = VINE_CACHE_STATUS_FAILED;
 			}
 		} else {
-			debug(D_VINE,"cache: command succeeded but didn't create %s: %s\n", cachename, strerror(errno));
+			debug(D_VINE,
+					"cache: command succeeded but didn't create %s: %s\n",
+					cachename,
+					strerror(errno));
 			f->status = VINE_CACHE_STATUS_FAILED;
 		}
 	} else {
@@ -694,7 +733,14 @@ static void vine_cache_check_outputs(
 
 	if (manager) {
 		if (f->status == VINE_CACHE_STATUS_READY) {
-			vine_worker_send_cache_update(manager, cachename, f->original_type, f->cache_level, f->size, f->mode, transfer_time, f->start_time);
+			vine_worker_send_cache_update(manager,
+					cachename,
+					f->original_type,
+					f->cache_level,
+					f->size,
+					f->mode,
+					transfer_time,
+					f->start_time);
 		} else {
 			/* XXX need to extract the output of the process for a better error message. */
 			vine_worker_send_cache_invalid(manager, cachename, "unable to fetch or create file");
