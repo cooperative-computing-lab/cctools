@@ -270,7 +270,7 @@ int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totals
 
 	int r = 0;
 
-	if (sscanf(line, "file %s %" SCNd64 " 0%o %d", name_encoded, &size, mode, mtime) == 4) {
+	if (sscanf(line, "file %s %" SCNd64 " %o %d", name_encoded, &size, mode, mtime) == 4) {
 
 		url_decode(name_encoded, name, sizeof(name));
 
@@ -296,7 +296,7 @@ int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totals
 		*mtime = 0;
 		*mode = 0777;
 
-	} else if (sscanf(line, "dir %s %d %d", name_encoded,mode,mtime) == 3) {
+	} else if (sscanf(line, "dir %s %o %d", name_encoded,mode,mtime) == 3) {
 
 		url_decode(name_encoded, name, sizeof(name));
 

@@ -54,7 +54,7 @@ static vine_result_code_t vine_manager_get_buffer(struct vine_manager *q, struct
 	if (mcode != VINE_MSG_NOT_PROCESSED)
 		return VINE_WORKER_FAILURE;
 
-	if (sscanf(line, "file %s %" SCNd64 " 0%o %d", name_encoded, &size, &mode, &mtime) == 4) {
+	if (sscanf(line, "file %s %" SCNd64 " %o %d", name_encoded, &size, &mode, &mtime) == 4) {
 
 		f->size = size;
 		debug(D_VINE,
@@ -241,7 +241,7 @@ static vine_result_code_t vine_manager_get_any(struct vine_manager *q, struct vi
 	if (mcode != VINE_MSG_NOT_PROCESSED)
 		return VINE_WORKER_FAILURE;
 
-	if (sscanf(line, "file %s %" SCNd64 " 0%o", name_encoded, &size, &mode) == 3) {
+	if (sscanf(line, "file %s %" SCNd64 " %o", name_encoded, &size, &mode) == 3) {
 
 		url_decode(name_encoded, name, sizeof(name));
 
