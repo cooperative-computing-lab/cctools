@@ -49,7 +49,7 @@ void trash_file(const char *filename)
 	string_cookie(cookie, TRASH_COOKIE_LENGTH);
 
 	char *trashname = string_format("%s/%s.%" PRIu64, trashdir, cookie, timestamp_get());
-	debug(D_WQ, "trashing file %s to %s", filename, trashname);
+	debug(D_DEBUG, "trashing file %s to %s", filename, trashname);
 
 	/* Move the file to the trash directory. */
 	result = rename(filename, trashname);
