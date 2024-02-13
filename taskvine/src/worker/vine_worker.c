@@ -1099,7 +1099,6 @@ static int handle_manager(struct link *manager)
 	int64_t length;
 	int64_t task_id = 0;
 	int mode, n;
-	int mtime;
 	int r = 0;
 	int cache_level;
 
