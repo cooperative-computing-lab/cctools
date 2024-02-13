@@ -55,7 +55,7 @@ int vine_cache_file_load_metadata( struct vine_cache_file *f, const char *filena
 	long long value;
 	
 	while(fgets(line,sizeof(line),file)) {
-		if(sscanf(line,"type %lldd",&value)) {
+		if(sscanf(line,"type %lld",&value)) {
 			f->original_type = value;
 		} else if(sscanf(line,"cache_level %lld",&value)) {
 			f->cache_level = value;
