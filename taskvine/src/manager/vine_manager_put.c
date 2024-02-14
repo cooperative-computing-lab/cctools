@@ -319,13 +319,13 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 	switch (f->type) {
 	case VINE_FILE:
 		debug(D_VINE, "%s (%s) needs file %s as %s", w->hostname, w->addrport, f->source, m->remote_name);
-		vine_manager_send(q, w, "put %s %d %" PRId64 "\n", f->cached_name, f->cache_level, f->size);
+		vine_manager_send(q, w, "put %s %d %lld\n", f->cached_name, f->cache_level, (long long) f->size);
 		result = vine_manager_put_file_or_dir(q, w, t, f->source, f->cached_name, &total_bytes, 1);
 		break;
 
 	case VINE_BUFFER:
 		debug(D_VINE, "%s (%s) needs buffer as %s", w->hostname, w->addrport, m->remote_name);
-		vine_manager_send(q, w, "put %s %d %" PRId64 "\n", f->cached_name, f->cache_level, f->size);
+		vine_manager_send(q, w, "put %s %d %lld\n", f->cached_name, f->cache_level, (long long)f->size);
 		result = vine_manager_put_buffer(q, w, t, f, &total_bytes);
 		break;
 
