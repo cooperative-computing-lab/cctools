@@ -70,8 +70,9 @@ int vine_cache_file_load_metadata(struct vine_cache_file *f, const char *filenam
 			f->transfer_time = value;
 		} else if (sscanf(line, "transfer_start %lld", &value)) {
 			f->start_time = value;
-		} else if (sscanf(line, "source %[^\n]\n",source)) {
-			if(f->source) free(f->source);
+		} else if (sscanf(line, "source %[^\n]\n", source)) {
+			if (f->source)
+				free(f->source);
 			f->source = strdup(source);
 		} else {
 			debug(D_VINE, "error in %s: %s\n", filename, line);
@@ -90,17 +91,17 @@ int vine_cache_file_save_metadata(struct vine_cache_file *f, const char *filenam
 	if (!file)
 		return 0;
 
-	fprintf(file,"type %d\n",f->original_type);
-	fprintf(file,"cache_level %d\n",f->cache_level);
-	fprintf(file,"mode 0%o\n",f->mode);
-	fprintf(file,"size %lld\n",(long long)f->size);
-	fprintf(file,"mtime %lld\n",(long long)f->mtime);
-	fprintf(file,"transfer_time %lld\n",(long long)f->transfer_time);
-	fprintf(file,"transfer_start %lld\n",(long long)f->start_time);
-	if(f->source) {
-		fprintf(file,"source %s\n",f->source);
+	fprintf(file, "type %d\n", f->original_type);
+	fprintf(file, "cache_level %d\n", f->cache_level);
+	fprintf(file, "mode 0%o\n", f->mode);
+	fprintf(file, "size %lld\n", (long long)f->size);
+	fprintf(file, "mtime %lld\n", (long long)f->mtime);
+	fprintf(file, "transfer_time %lld\n", (long long)f->transfer_time);
+	fprintf(file, "transfer_start %lld\n", (long long)f->start_time);
+	if (f->source) {
+		fprintf(file, "source %s\n", f->source);
 	}
-	
+
 	fclose(file);
 
 	return 1;
