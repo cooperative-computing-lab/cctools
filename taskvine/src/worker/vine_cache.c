@@ -202,9 +202,6 @@ char *vine_cache_meta_path(struct vine_cache *c, const char *cachename)
 	return string_format("%s/%s.meta", c->cache_dir, cachename);
 }
 
-// XXX hack pass this one in
-extern struct vine_workspace *workspace;
-
 char *vine_cache_transfer_path(struct vine_cache *c, const char *cachename)
 {
 	return string_format("%s/%s", workspace->transfer_dir, cachename);
