@@ -223,7 +223,8 @@ may be an estimate at this point and will be updated by return
 message once the object is actually loaded into the cache.
 */
 
-vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_worker_info *w, const char *source, struct vine_file *f )
+vine_result_code_t vine_manager_put_url_now(
+		struct vine_manager *q, struct vine_worker_info *w, const char *source, struct vine_file *f)
 {
 	// XXX pass mode in appropriately
 	int mode = 0755;
@@ -241,7 +242,7 @@ vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_
 			source_encoded,
 			cached_name_encoded,
 			f->cache_level,
-			(long long) f->size,
+			(long long)f->size,
 			mode,
 			transfer_id);
 
@@ -316,7 +317,7 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 	switch (f->type) {
 	case VINE_FILE:
 		debug(D_VINE, "%s (%s) needs file %s as %s", w->hostname, w->addrport, f->source, m->remote_name);
-		vine_manager_send(q, w, "put %s %d %lld\n", f->cached_name, f->cache_level, (long long) f->size);
+		vine_manager_send(q, w, "put %s %d %lld\n", f->cached_name, f->cache_level, (long long)f->size);
 		result = vine_manager_put_file_or_dir(q, w, t, f->source, f->cached_name, &total_bytes, 1);
 		break;
 

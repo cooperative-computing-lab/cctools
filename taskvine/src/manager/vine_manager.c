@@ -349,7 +349,7 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 At this point we have received a cache update for a temp file. If q->temp_replica_count > 0 then tell up to that
 many workers to get the file from worker w.
 */
-static void replicate_temp_file( struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f )
+static void replicate_temp_file(struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f)
 {
 	if (!q->temp_replica_count)
 		return;
@@ -362,7 +362,8 @@ static void replicate_temp_file( struct vine_manager *q, struct vine_worker_info
 
 	for (int i = 0; i < found; i++) {
 		struct vine_worker_info *peer = workers[i];
-		char *worker_source = string_format("worker://%s:%d/%s", w->transfer_addr, w->transfer_port, f->cached_name);
+		char *worker_source =
+				string_format("worker://%s:%d/%s", w->transfer_addr, w->transfer_port, f->cached_name);
 		vine_manager_put_url_now(q, peer, worker_source, f);
 		free(worker_source);
 	}
@@ -420,15 +421,15 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 		vine_txn_log_write_cache_update(q, w, size, transfer_time, start_time, cachename);
 
 		/* If the replica corresponds to a declared file. */
-		
+
 		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
 		if (f) {
 			/* We know it exists and how large it is now. */
 			f->state = VINE_FILE_STATE_CREATED;
 			f->size = size;
-			
+
 			/* And if the file is a newly created temporary. replicate it. */
-			if(f->type==VINE_TEMP && *id=='X') {
+			if (f->type == VINE_TEMP && *id == 'X') {
 				replicate_temp_file(q, w, f);
 			}
 		}
