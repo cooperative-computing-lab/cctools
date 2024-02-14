@@ -83,8 +83,7 @@ class DaskVine(Manager):
     #                       (use the value of 'resources' above), 'max througput',
     #                       'max' (for maximum values seen), 'min_waste', 'greedy bucketing'
     #                       or 'exhaustive bucketing'. This is done per function type in dsk.
-    # @param task_mode     Create tasks as either PythonTasks('tasks') or Function Calls
-    #                      ('function-calls')
+    # @param task_mode     Create tasks as either as tasks (using PythonTasks) or 'function-calls' (using FunctionCalls)
     # @param retries       Number of times to attempt a task. Default is 5.
     # @param submit_per_cycle Maximum number of tasks to serialize per wait call. If None, or less than 1, then all
     #                         tasks are serialized as they are available.
@@ -317,12 +316,6 @@ class DaskVineFile:
 
     def load(self):
         if not self._loaded:
-
-            if self._task_mode == 'tasks':
-                with open(self.staging_path, "rb") as f:
-                    self._load = cloudpickle.load(f)
-                    self._loaded = True
-
             if self._task_mode == 'function-calls':
                 output = cloudpickle.loads(self._file.contents())
                 self._loaded = True
@@ -330,16 +323,16 @@ class DaskVineFile:
                     self._load = output['Result']
                 else:
                     self._load = output['Reason']
+            else:
+                with open(self.source(), "rb") as f:
+                    self._load = cloudpickle.load(f)
+                    self._loaded = True
 
         return self._load
 
     @property
     def file(self):
         return self._file
-
-    @property
-    def staging_path(self):
-        return self._file.source()
 
     def is_temp(self):
         return self._file.file_type() == VINE_TEMP
