@@ -187,24 +187,32 @@ void vine_cache_delete(struct vine_cache *c)
 	free(c);
 }
 
-/*
-Get the full path to a file name within the cache.
-This result must be freed.
-*/
+/* Get the full path to the data of a cached file. This result must be freed. */
 
 char *vine_cache_data_path(struct vine_cache *c, const char *cachename)
 {
 	return string_format("%s/%s", c->cache_dir, cachename);
 }
 
+/* Get the full path to the metadata of a cached file. This result must be freed. */
+
 char *vine_cache_meta_path(struct vine_cache *c, const char *cachename)
 {
 	return string_format("%s/%s.meta", c->cache_dir, cachename);
 }
 
+/* Get the full path to the transfer location of a cached file. This result must be freed. */
+
 char *vine_cache_transfer_path(struct vine_cache *c, const char *cachename)
 {
 	return string_format("%s/%s", workspace->transfer_dir, cachename);
+}
+
+/* Get the full path to the error message from a transfer.  This result must be freed. */
+
+char *vine_cache_error_path(struct vine_cache *c, const char *cachename)
+{
+	return string_format("%s/%s.error", workspace->transfer_dir, cachename);
 }
 
 /*
@@ -547,9 +555,18 @@ static void vine_cache_worker_process(struct vine_cache_file *f, struct vine_cac
 
 	/* At this point the file is now in the transfer path.  The parent will move it to the cache path. */
 
-	// XXX We need a way to pull out the error message and return to the manager.
+	/* If an error message was generated, save it to {transfer_path}.error for recovery by the parent process. */
+
 	if (error_message) {
 		debug(D_VINE, "cache: error when creating %s via mini task: %s", cachename, error_message);
+
+		char *error_path = vine_cache_error_path(c,cachename);
+		FILE *file = fopen(error_path,"w");
+		if(file) {
+			fprintf(file,"error creating file at worker: %s\n",error_message);
+			fclose(file);
+		}
+		free(error_path);
 		free(error_message);
 	}
 
@@ -747,8 +764,22 @@ static void vine_cache_check_outputs(
 					transfer_time,
 					f->start_time);
 		} else {
-			/* XXX need to extract the output of the process for a better error message. */
-			vine_worker_send_cache_invalid(manager, cachename, "unable to fetch or create file");
+			char *error_path = vine_cache_error_path(c,cachename);
+			char *error_message;
+			size_t  error_length;
+			
+			if(copy_file_to_buffer(error_path,&error_message,&error_length)) {
+				/* got a message string */
+			} else {
+				error_message = strdup("unknown error");
+			}
+
+			vine_worker_send_cache_invalid(manager, cachename, error_message);
+
+			trash_file(error_path);
+			
+			free(error_message);
+			free(error_path);
 		}
 	}
 
