@@ -122,7 +122,6 @@ void vine_cache_scan(struct vine_cache *c, struct link *manager)
 	char *cachename;
 	HASH_TABLE_ITERATE(c->table, cachename, f)
 	{
-		// XXX load and store transfer start from metadata
 		vine_worker_send_cache_update(manager,
 				cachename,
 				f->original_type,

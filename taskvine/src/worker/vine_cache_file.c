@@ -68,6 +68,8 @@ int vine_cache_file_load_metadata(struct vine_cache_file *f, const char *filenam
 			f->mtime = value;
 		} else if (sscanf(line, "transfer_time %lld", &value)) {
 			f->transfer_time = value;
+		} else if (sscanf(line, "transfer_start %lld", &value)) {
+			f->start_time = value;
 		} else if (sscanf(line, "source %[^\n]\n",source)) {
 			if(f->source) free(f->source);
 			f->source = strdup(source);
@@ -94,6 +96,7 @@ int vine_cache_file_save_metadata(struct vine_cache_file *f, const char *filenam
 	fprintf(file,"size %lld\n",(long long)f->size);
 	fprintf(file,"mtime %lld\n",(long long)f->mtime);
 	fprintf(file,"transfer_time %lld\n",(long long)f->transfer_time);
+	fprintf(file,"transfer_start %lld\n",(long long)f->start_time);
 	if(f->source) {
 		fprintf(file,"source %s\n",f->source);
 	}
