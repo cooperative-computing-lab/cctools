@@ -223,11 +223,8 @@ may be an estimate at this point and will be updated by return
 message once the object is actually loaded into the cache.
 */
 
-vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_worker_info *w, const char *source,
-		const char *cachename, long long size)
+vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_worker_info *w, const char *source, struct vine_file *f )
 {
-	// XXX pass cache level in appropriately
-	vine_cache_level_t cache_level = VINE_CACHE_LEVEL_TASK;
 	// XXX pass mode in appropriately
 	int mode = 0755;
 
@@ -235,16 +232,16 @@ vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_
 	char cached_name_encoded[VINE_LINE_MAX];
 
 	url_encode(source, source_encoded, sizeof(source_encoded));
-	url_encode(cachename, cached_name_encoded, sizeof(cached_name_encoded));
+	url_encode(f->cached_name, cached_name_encoded, sizeof(cached_name_encoded));
 
-	char *transfer_id = vine_current_transfers_add(q, w, cachename);
+	char *transfer_id = vine_current_transfers_add(q, w, source);
 	int result = vine_manager_send(q,
 			w,
 			"puturl_now %s %s %d %lld 0%o %s\n",
 			source_encoded,
 			cached_name_encoded,
-			cache_level,
-			size,
+			f->cache_level,
+			(long long) f->size,
 			mode,
 			transfer_id);
 

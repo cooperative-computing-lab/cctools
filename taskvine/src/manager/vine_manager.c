@@ -349,22 +349,21 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 At this point we have received a cache update for a temp file. If q->temp_replica_count > 0 then tell up to that
 many workers to get the file from worker w.
 */
-static void replicate_temp_file(
-		struct vine_manager *q, struct vine_worker_info *w, const char *cachename, long long size)
+static void replicate_temp_file( struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f )
 {
 	if (!q->temp_replica_count)
 		return;
 
 	int found = 0;
 	struct vine_worker_info **workers;
-	workers = vine_file_replica_table_find_replication_targets(q, w, cachename, &found);
+	workers = vine_file_replica_table_find_replication_targets(q, w, f->cached_name, &found);
 
-	debug(D_VINE, "Found %d available workers to replicate %s", found, cachename);
+	debug(D_VINE, "Found %d available workers to replicate %s", found, f->cached_name);
 
 	for (int i = 0; i < found; i++) {
 		struct vine_worker_info *peer = workers[i];
-		char *worker_source = string_format("worker://%s:%d/%s", w->transfer_addr, w->transfer_port, cachename);
-		vine_manager_put_url_now(q, peer, worker_source, cachename, size);
+		char *worker_source = string_format("worker://%s:%d/%s", w->transfer_addr, w->transfer_port, f->cached_name);
+		vine_manager_put_url_now(q, peer, worker_source, f);
 		free(worker_source);
 	}
 	free(workers);
@@ -420,15 +419,17 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 
 		vine_txn_log_write_cache_update(q, w, size, transfer_time, start_time, cachename);
 
-		/* If the replica corresponds to a declared file, then mark it as existing. */
+		/* If the replica corresponds to a declared file. */
 		
 		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
 		if (f) {
+			/* We know it exists and how large it is now. */
 			f->state = VINE_FILE_STATE_CREATED;
-
+			f->size = size;
+			
 			/* And if the file is a newly created temporary. replicate it. */
 			if(f->type==VINE_TEMP && *id=='X') {
-				replicate_temp_file(q, w, cachename, size);
+				replicate_temp_file(q, w, f);
 			}
 		}
 	}
