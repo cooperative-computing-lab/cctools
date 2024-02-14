@@ -226,7 +226,7 @@ message once the object is actually loaded into the cache.
 vine_result_code_t vine_manager_put_url_now(
 		struct vine_manager *q, struct vine_worker_info *w, const char *source, struct vine_file *f)
 {
-	// XXX pass mode in appropriately
+	/* XXX The API does not allow the user to choose the mode bits of the target file, so we make it permissive here.*/
 	int mode = 0755;
 
 	char source_encoded[VINE_LINE_MAX];
@@ -260,7 +260,7 @@ message once the object is actually loaded into the cache.
 vine_result_code_t vine_manager_put_url(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f)
 {
-	// XXX pass mode in appropriately.
+	/* XXX The API does not allow the user to choose the mode bits of the target file, so we make it permissive here.*/
 	int mode = 0755;
 
 	char source_encoded[VINE_LINE_MAX];
