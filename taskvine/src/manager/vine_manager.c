@@ -4045,11 +4045,14 @@ void vine_delete(struct vine_manager *q)
 	vine_current_transfers_clear(q);
 	hash_table_delete(q->current_transfer_table);
 
-	hash_table_clear(q->file_table, (void *)vine_file_delete);
-	hash_table_delete(q->file_table);
-
 	itable_clear(q->tasks, (void *)vine_task_delete);
 	itable_delete(q->tasks);
+
+	/* delete files after deleting tasks so that rc are correctly updated.
+	 * we make more than one pass to the file_table to make deal with
+	 * reference counts of unlink_when_done files associated with declare_temp outputs */
+	hash_table_clear(q->file_table, (void *)vine_file_delete);
+	hash_table_delete(q->file_table);
 
 	char *key;
 	struct category *c;
@@ -5774,18 +5777,13 @@ void vine_undeclare_file(struct vine_manager *m, struct vine_file *f)
 
 	/*
 	Special case: If the manager has already been gc'ed
-	(e.g. by python exiting), we can still delete the
-	file object itself, which may have further cleanup
-	side effects.
+	(e.g. by python exiting), do nothing. Any memory or unlink_when_done files were gc'ed by vine_delete.
 	*/
-
 	if (!m) {
-		vine_file_delete(f);
 		return;
 	}
 
 	const char *filename = f->cached_name;
-
 	/*
 	If this is not a file that should be cached forever,
 	delete all of the replicas present at remote workers.
