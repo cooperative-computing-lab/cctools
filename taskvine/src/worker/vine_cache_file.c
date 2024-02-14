@@ -46,6 +46,7 @@ void vine_cache_file_delete(struct vine_cache_file *f)
 int vine_cache_file_load_metadata(struct vine_cache_file *f, const char *filename)
 {
 	char line[VINE_LINE_MAX];
+	char source[VINE_LINE_MAX];
 
 	FILE *file = fopen(filename, "r");
 	if (!file)
@@ -67,6 +68,9 @@ int vine_cache_file_load_metadata(struct vine_cache_file *f, const char *filenam
 			f->mtime = value;
 		} else if (sscanf(line, "transfer_time %lld", &value)) {
 			f->transfer_time = value;
+		} else if (sscanf(line, "source %[^\n]\n",source)) {
+			if(f->source) free(f->source);
+			f->source = strdup(source);
 		} else {
 			debug(D_VINE, "error in %s: %s\n", filename, line);
 			fclose(file);
@@ -84,15 +88,16 @@ int vine_cache_file_save_metadata(struct vine_cache_file *f, const char *filenam
 	if (!file)
 		return 0;
 
-	fprintf(file,
-			"type %d\ncache_level %d\nmode %o\nsize %lld\nmtime %lld\ntransfer_time %lld\n",
-			f->original_type,
-			f->cache_level,
-			f->mode,
-			(long long)f->size,
-			(long long)f->mtime,
-			(long long)f->transfer_time);
-
+	fprintf(file,"type %d\n",f->original_type);
+	fprintf(file,"cache_level %d\n",f->cache_level);
+	fprintf(file,"mode 0%o\n",f->mode);
+	fprintf(file,"size %lld\n",(long long)f->size);
+	fprintf(file,"mtime %lld\n",(long long)f->mtime);
+	fprintf(file,"transfer_time %lld\n",(long long)f->transfer_time);
+	if(f->source) {
+		fprintf(file,"source %s\n",f->source);
+	}
+	
 	fclose(file);
 
 	return 1;

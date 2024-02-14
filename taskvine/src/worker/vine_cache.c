@@ -78,8 +78,7 @@ void vine_cache_load(struct vine_cache *c)
 			char *meta_path = vine_cache_meta_path(c, d->d_name);
 			char *data_path = vine_cache_data_path(c, d->d_name);
 
-			// XXX source should come from metadata
-			// XXX great opportunity to check metadata against the file
+			/* Note that the type and source here may be updated by metadata load. */
 			struct vine_cache_file *f = vine_cache_file_create(VINE_CACHE_FILE, "manager", 0);
 
 			if (vine_cache_file_load_metadata(f, meta_path)) {
