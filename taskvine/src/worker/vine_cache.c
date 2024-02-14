@@ -280,12 +280,19 @@ int vine_cache_add_transfer(struct vine_cache *c, const char *cachename, const c
 	/* Create the object and fill in the metadata. */
 
 	f = vine_cache_file_create(VINE_CACHE_TRANSFER, source, 0);
-	f->original_type = VINE_URL; // XXX this isn't right
+
+	/*
+	XXX Note that VINE_URL may not be right b/c puturl may be used to
+	perform a worker-to-worker transfer of an object that was originally
+	some other type.  We don't have that type here, and maybe we should.
+	*/
+	
+	f->original_type = VINE_URL;
 	f->cache_level = level;
 	f->mode = mode;
 	f->size = size;
-	f->mtime = 0;	      // XXX not sure what this means here
-	f->transfer_time = 0; // XXX transfer time isn't set yet.
+	f->mtime = 0;
+	f->transfer_time = 0;
 
 	hash_table_insert(c->table, cachename, f);
 
@@ -555,8 +562,8 @@ static void vine_cache_worker_process(struct vine_cache_file *f, struct vine_cac
 /*
 Ensure that a given cached entry is fully materialized in the cache,
 downloading files or executing commands as needed.  If complete, return
-VINE_CACHE_STATUS_READY, If downloading return VINE_CACHE_STATUS_PROCESSING.
-On failure return VINE_CACHE_STATUS_FAILED.
+VINE_CACHE_STATUS_READY, If downloading return VINE_CACHE_STATUS_PROCESSING
+or VINE_CACHE_STATUS_TRANSFERRED. On failure return VINE_CACHE_STATUS_FAILED.
 */
 
 vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachename)
