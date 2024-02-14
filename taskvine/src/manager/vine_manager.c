@@ -416,17 +416,20 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 		replica->transfer_time = transfer_time;
 		replica->state = VINE_FILE_REPLICA_STATE_READY;
 
-		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
-		if (f)
-			f->state = VINE_FILE_STATE_CREATED;
-
 		vine_current_transfers_remove(q, id);
 
 		vine_txn_log_write_cache_update(q, w, size, transfer_time, start_time, cachename);
 
-		// If the file was not a url, eg. 'X', and it is a temp
-		if (*id == 'X' && strncmp(cachename, "temp-rnd-", 9) == 0) {
-			replicate_temp_file(q, w, cachename, size);
+		/* If the replica corresponds to a declared file, then mark it as existing. */
+		
+		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
+		if (f) {
+			f->state = VINE_FILE_STATE_CREATED;
+
+			/* And if the file is a newly created temporary. replicate it. */
+			if(f->type==VINE_TEMP && *id=='X') {
+				replicate_temp_file(q, w, cachename, size);
+			}
 		}
 	}
 
