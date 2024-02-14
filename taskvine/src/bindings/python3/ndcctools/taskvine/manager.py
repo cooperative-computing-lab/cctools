@@ -129,6 +129,10 @@ class Manager(object):
             if name:
                 cvine.vine_set_name(self._taskvine, name)
 
+            self._function_buffers = {}
+            for d in ['outputs', 'arguments', 'functions']:
+                pathlib.Path.mkdir(pathlib.Path(self.staging_directory, d), exist_ok=True)
+
             try:
                 if init_fn:
                     init_fn(self)
