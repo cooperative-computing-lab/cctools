@@ -173,22 +173,19 @@ static int stage_output_file(struct vine_process *p, struct vine_mount *m, struc
 
 	debug(D_VINE, "output: measuring %s", sandbox_path);
 	if (vine_cache_file_measure_metadata(sandbox_path, &mode, &size, &mtime)) {
-
-		// XXX fill in cache level from file object
 		debug(D_VINE, "output: moving %s to %s", sandbox_path, cache_path);
 		if (vine_cache_add_file(cache,
 				    f->cached_name,
 				    sandbox_path,
-				    VINE_CACHE_LEVEL_TASK,
+  				    f->cache_level,
 				    mode,
 				    size,
 				    mtime,
 				    transfer_time)) {
-			// XXX fill in cache level from file object
 			vine_worker_send_cache_update(manager,
 					f->cached_name,
 					f->type,
-					VINE_CACHE_LEVEL_TASK,
+  				        f->cache_level,
 					f->size,
 					mode,
 					transfer_time,
