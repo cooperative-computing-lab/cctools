@@ -84,7 +84,7 @@ class DaskVine(Manager):
     #                       'max' (for maximum values seen), 'min_waste', 'greedy bucketing'
     #                       or 'exhaustive bucketing'. This is done per function type in dsk.
     # @param task_mode     Create tasks as either PythonTasks('tasks') or Function Calls
-    #                      ('function_calls')
+    #                      ('function-calls')
     # @param retries       Number of times to attempt a task. Default is 5.
     # @param submit_per_cycle Maximum number of tasks to serialize per wait call. If None, or less than 1, then all
     #                         tasks are serialized as they are available.
@@ -166,8 +166,8 @@ class DaskVine(Manager):
         dag = DaskVineDag(dsk, low_memory_mode=self.low_memory_mode)
         tag = f"dag-{id(dag)}"
 
-        # create Library if using 'function_calls' task mode.
-        if self.task_mode == 'function_calls':
+        # create Library if using 'function-calls' task mode.
+        if self.task_mode == 'function-calls':
             libtask = self.create_library_from_functions('Dask-Library',
                                                          execute_graph_vertex,
                                                          poncho_env=self.lib_environment,
@@ -316,7 +316,7 @@ class DaskVineFile:
                     self._load = cloudpickle.load(f)
                     self._loaded = True
 
-            if self._task_mode == 'function_calls':
+            if self._task_mode == 'function-calls':
                 output = cloudpickle.loads(self._file.contents())
                 self._loaded = True
                 if output['Success']:

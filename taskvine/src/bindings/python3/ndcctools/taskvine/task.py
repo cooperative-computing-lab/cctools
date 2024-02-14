@@ -1028,14 +1028,14 @@ class FunctionCall(Task):
     #
     # @param self 	Reference to the current python task object
     # @param manager Manager to which the task was submitted
-    def submit_finalize(self, manager):
-        super().submit_finalize(manager)
-        self._input_buffer = manager.declare_buffer(cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
+    def submit_finalize(self):
+        super().submit_finalize()
+        self._input_buffer = self.manager.declare_buffer(cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
         self.add_input(self._input_buffer, "infile")
         if self._tmp_output_enabled:
-            self._output_file = manager.declare_temp()
+            self._output_file = self.manager.declare_temp()
         else:
-            self._output_file = manager.declare_buffer(cache=False, peer_transfer=False)
+            self._output_file = self.manager.declare_buffer(cache=False, peer_transfer=False)
         self.add_output(self._output_file, "outfile")
 
     ##
@@ -1093,9 +1093,9 @@ class FunctionCall(Task):
                 self._input_buffer = None
 
             if self._output_file:
-                # Do not delete temp files out on cluster when task is deleted. For now...
-                self._manager.undeclare_file(self._output_file)
-                self._output_file = None
+                if not self._tmp_output_enabled:
+                    self._manager.undeclare_file(self._output_file)
+                    self._output_file = None
 
             super().__del__()
         except TypeError:
