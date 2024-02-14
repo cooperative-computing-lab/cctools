@@ -32,23 +32,27 @@ typedef enum {
 	VINE_TEMP,		    /**< A temporary file created as an output of a task. */
 	VINE_BUFFER,                /**< A file obtained from data in the manager's memory space. */
 	VINE_MINI_TASK,             /**< A file obtained by executing a Unix command line. */
-	VINE_EMPTY_DIR,              /**< An empty directory to create in the task sandbox. */
-} vine_file_t;
+} vine_file_type_t;
+
+typedef enum {
+  VINE_FILE_STATE_PENDING, /**< This file has not yet been created by a task. */
+  VINE_FILE_STATE_CREATED   /**< This file has been created at some point.  (although it might have been lost!) */
+} vine_file_state_t;
 
 struct vine_file {
-	vine_file_t type;   // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
-	vine_file_flags_t flags; // whether or not to transfer this file between workers.
+	vine_file_type_t  type;  // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
+	vine_file_flags_t flags; // Whether or not to transfer this file between workers.
+	vine_file_state_t state; // Whether the file is PENDING or has been CREATED
 	char *source;       // Name of source file, url, buffer.
 	char *cached_name;  // Name of file in the worker's cache directory.
 	size_t size;        // Length of source data, if known.
 	char *data;         // Raw data for an input or output buffer.
 	struct vine_task *mini_task; // Mini task used to generate the desired output file.
 	struct vine_task *recovery_task; // For temp files, a copy of the task that created it.
-	int created;        // File has been created at least once.
 	int refcount;       // Number of references from a task object, delete when zero.
 };
 
-struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task, vine_file_flags_t flags);
+struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_type_t type, struct vine_task *mini_task, vine_file_flags_t flags);
 
 struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source );
 
@@ -61,7 +65,6 @@ struct vine_file *vine_file_local( const char *source, vine_file_flags_t flags )
 struct vine_file *vine_file_url( const char *source, vine_file_flags_t flags );
 struct vine_file *vine_file_temp();
 struct vine_file *vine_file_buffer( const char *buffer, size_t size, vine_file_flags_t flags );
-struct vine_file *vine_file_empty_dir( );
 struct vine_file *vine_file_mini_task( struct vine_task *t, const char *name, vine_file_flags_t flags );
 struct vine_file *vine_file_untar( struct vine_file *f, vine_file_flags_t flags );
 struct vine_file *vine_file_poncho( struct vine_file *f, vine_file_flags_t flags );

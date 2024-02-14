@@ -67,7 +67,10 @@ int unlinkat_recursive(int dirfd, const char *path)
 	}
 }
 
-int unlink_recursive(const char *path) { return unlinkat_recursive(AT_FDCWD, path); }
+int unlink_recursive(const char *path)
+{
+	return unlinkat_recursive(AT_FDCWD, path);
+}
 
 int unlink_dir_contents(const char *path)
 {

@@ -79,9 +79,15 @@ int load_average_get_cpus()
 
 #else
 
-void load_average_get(double *avg) { avg[0] = avg[1] = avg[2] = 0; }
+void load_average_get(double *avg)
+{
+	avg[0] = avg[1] = avg[2] = 0;
+}
 
-int load_average_get_cpus() { return 1; }
+int load_average_get_cpus()
+{
+	return 1;
+}
 
 #endif
 

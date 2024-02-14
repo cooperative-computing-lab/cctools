@@ -125,7 +125,9 @@ but we want the current system call to abort.  To accomplish this, we
 send SIGPIPE to a dummy function instead of just blocking or ignoring it.
 */
 
-static void signal_swallow(int num) {}
+static void signal_swallow(int num)
+{
+}
 
 static int link_squelch()
 {
@@ -174,7 +176,10 @@ int link_nonblocking(struct link *link, int onoff)
 	return 1;
 }
 
-int link_buffer_empty(struct link *link) { return link->buffer_length > 0 ? 0 : 1; }
+int link_buffer_empty(struct link *link)
+{
+	return link->buffer_length > 0 ? 0 : 1;
+}
 
 int errno_is_temporary(int e)
 {
@@ -373,7 +378,10 @@ void sockaddr_set_port(struct sockaddr_storage *addr, int port)
 	}
 }
 
-struct link *link_serve(int port) { return link_serve_address(0, port); }
+struct link *link_serve(int port)
+{
+	return link_serve_address(0, port);
+}
 
 #ifdef HAS_OPENSSL
 static int _ssl_errors_cb(const char *str, size_t len, void *use_warn)
@@ -1110,7 +1118,10 @@ void link_detach(struct link *link)
 	}
 }
 
-int link_fd(struct link *link) { return link->fd; }
+int link_fd(struct link *link)
+{
+	return link->fd;
+}
 
 int link_using_ssl(struct link *link)
 {

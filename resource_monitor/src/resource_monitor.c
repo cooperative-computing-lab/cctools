@@ -1303,7 +1303,10 @@ int rmonitor_final_summary()
  * cleanup of processes in the zombie state.
  ***/
 
-int ping_process(pid_t pid) { return (kill(pid, 0) == 0); }
+int ping_process(pid_t pid)
+{
+	return (kill(pid, 0) == 0);
+}
 
 // if 1 pid was added anew to the tracking table, 0 otherwise (was already there, or could not be added).
 int rmonitor_track_process(pid_t pid)
@@ -1595,7 +1598,10 @@ void rmonitor_check_child(const int signal)
 	free(tr_usg);
 }
 
-void cleanup_library() { unlink(lib_helper_name); }
+void cleanup_library()
+{
+	unlink(lib_helper_name);
+}
 
 void rmonitor_final_cleanup()
 {

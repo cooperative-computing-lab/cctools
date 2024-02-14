@@ -56,7 +56,10 @@ out:
 	return RCUNIX(rc);
 }
 
-int mkdir_recursive(const char *path, mode_t mode) { return mkdirat_recursive(AT_FDCWD, path, mode); }
+int mkdir_recursive(const char *path, mode_t mode)
+{
+	return mkdirat_recursive(AT_FDCWD, path, mode);
+}
 
 int mkdirat_recursive_parents(int fd, const char *path, mode_t mode)
 {
@@ -80,6 +83,9 @@ out:
 	return RCUNIX(rc);
 }
 
-int mkdir_recursive_parents(const char *path, mode_t mode) { return mkdirat_recursive_parents(AT_FDCWD, path, mode); }
+int mkdir_recursive_parents(const char *path, mode_t mode)
+{
+	return mkdirat_recursive_parents(AT_FDCWD, path, mode);
+}
 
 /* vim: set noexpandtab tabstop=8: */

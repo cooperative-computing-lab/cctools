@@ -101,7 +101,10 @@ void set_delete(struct set *s)
 	free(s);
 }
 
-int set_size(struct set *s) { return s->size; }
+int set_size(struct set *s)
+{
+	return s->size;
+}
 
 int set_lookup(struct set *s, void *element)
 {
@@ -219,7 +222,10 @@ int set_insert_list(struct set *s, struct list *l)
 	return additions;
 }
 
-int set_push(struct set *s, const void *element) { return set_insert(s, element); }
+int set_push(struct set *s, const void *element)
+{
+	return set_insert(s, element);
+}
 
 int set_remove(struct set *s, const void *element)
 {

@@ -103,7 +103,10 @@ void *hash_table_lookup(struct hash_table *h, const char *key)
 	return 0;
 }
 
-int hash_table_size(struct hash_table *h) { return h->size; }
+int hash_table_size(struct hash_table *h)
+{
+	return h->size;
+}
 
 static int hash_table_double_buckets(struct hash_table *h)
 {
@@ -395,6 +398,9 @@ static ub4 jenkins_hash(register const ub1 *k, register ub4 length, register ub4
 	return c;
 }
 
-unsigned hash_string(const char *s) { return jenkins_hash((const ub1 *)s, strlen(s), 0); }
+unsigned hash_string(const char *s)
+{
+	return jenkins_hash((const ub1 *)s, strlen(s), 0);
+}
 
 /* vim: set noexpandtab tabstop=8: */

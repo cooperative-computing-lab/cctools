@@ -221,7 +221,10 @@ int rmonitor_get_int_attribute(FILE *fstatus, char *attribute, uint64_t *value, 
 	return not_found;
 }
 
-uint64_t clicks_to_usecs(uint64_t clicks) { return ((clicks * ONE_SECOND) / sysconf(_SC_CLK_TCK)); }
+uint64_t clicks_to_usecs(uint64_t clicks)
+{
+	return ((clicks * ONE_SECOND) / sysconf(_SC_CLK_TCK));
+}
 
 /***
  * Low level resource monitor functions.
@@ -380,7 +383,10 @@ int rmonitor_get_ctxsw_usage(pid_t pid, struct rmonitor_ctxsw_info *switches)
 	return notfound;
 }
 
-void acc_ctxsw_usage(struct rmonitor_ctxsw_info *acc, struct rmonitor_ctxsw_info *other) { acc->delta += other->delta; }
+void acc_ctxsw_usage(struct rmonitor_ctxsw_info *acc, struct rmonitor_ctxsw_info *other)
+{
+	acc->delta += other->delta;
+}
 
 int rmonitor_get_loadavg(struct rmonitor_load_info *load)
 {
@@ -866,7 +872,7 @@ void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_in
 	tr->machine_cpus = p->load.cpus;
 }
 
-struct rmsummary *rmonitor_measure_process(pid_t pid)
+struct rmsummary *rmonitor_measure_process(pid_t pid, int include_disk)
 {
 	int err;
 
@@ -880,20 +886,23 @@ struct rmsummary *rmonitor_measure_process(pid_t pid)
 	if (err != 0)
 		return NULL;
 
-	char cwd_link[PATH_MAX];
-	char cwd_org[PATH_MAX];
-
 	struct rmonitor_wdir_info *d = NULL;
-	snprintf(cwd_link, PATH_MAX, "/proc/%d/cwd", pid);
-	ssize_t n = readlink(cwd_link, cwd_org, PATH_MAX - 1);
 
-	if (n != -1) {
-		cwd_org[n] = '\0';
-		d = malloc(sizeof(struct rmonitor_wdir_info));
-		d->path = cwd_org;
-		d->state = NULL;
+	if (include_disk) {
+		char cwd_link[PATH_MAX];
+		char cwd_org[PATH_MAX];
 
-		rmonitor_poll_wd_once(d, -1);
+		snprintf(cwd_link, PATH_MAX, "/proc/%d/cwd", pid);
+		ssize_t n = readlink(cwd_link, cwd_org, PATH_MAX - 1);
+
+		if (n != -1) {
+			cwd_org[n] = '\0';
+			d = malloc(sizeof(struct rmonitor_wdir_info));
+			d->path = cwd_org;
+			d->state = NULL;
+
+			rmonitor_poll_wd_once(d, -1);
+		}
 	}
 
 	uint64_t start;
@@ -912,13 +921,14 @@ struct rmsummary *rmonitor_measure_process(pid_t pid)
 	return tr;
 }
 
-int rmonitor_measure_process_update_to_peak(struct rmsummary *tr, pid_t pid)
+int rmonitor_measure_process_update_to_peak(struct rmsummary *tr, pid_t pid, int include_disk)
 {
 
-	struct rmsummary *now = rmonitor_measure_process(pid);
+	struct rmsummary *now = rmonitor_measure_process(pid, include_disk);
 
-	if (!now)
+	if (!now) {
 		return 0;
+	}
 
 	rmsummary_merge_max(tr, now);
 

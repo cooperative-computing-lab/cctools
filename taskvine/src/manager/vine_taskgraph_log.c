@@ -89,4 +89,7 @@ void vine_taskgraph_log_write_file(struct vine_manager *q, struct vine_file *f)
 	vine_taskgraph_log_write_mini_task(q, f->mini_task, f->source, f->cached_name);
 }
 
-void vine_taskgraph_log_write_footer(struct vine_manager *q) { fprintf(q->graph_logfile, "}\n"); }
+void vine_taskgraph_log_write_footer(struct vine_manager *q)
+{
+	fprintf(q->graph_logfile, "}\n");
+}

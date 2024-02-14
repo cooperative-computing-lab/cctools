@@ -80,7 +80,10 @@ int histogram_size(struct histogram *h)
 	return count;
 }
 
-double histogram_bucket_size(struct histogram *h) { return h->bucket_size; }
+double histogram_bucket_size(struct histogram *h)
+{
+	return h->bucket_size;
+}
 
 /* buckets are: (start, end], with end as the key. */
 uint64_t bucket_of(struct histogram *h, double value)
@@ -124,7 +127,10 @@ double end_of(struct histogram *h, uint64_t b)
 }
 
 /* return the largest value of the bucket that test_value would fall in*/
-double histogram_round_up(struct histogram *h, double test_value) { return end_of(h, bucket_of(h, test_value)); }
+double histogram_round_up(struct histogram *h, double test_value)
+{
+	return end_of(h, bucket_of(h, test_value));
+}
 
 int histogram_insert(struct histogram *h, double value)
 {
@@ -247,10 +253,22 @@ void *histogram_get_data(struct histogram *h, double value)
 	return box->data;
 }
 
-int histogram_total_count(struct histogram *h) { return h->total_count; }
+int histogram_total_count(struct histogram *h)
+{
+	return h->total_count;
+}
 
-double histogram_max_value(struct histogram *h) { return h->max_value; }
+double histogram_max_value(struct histogram *h)
+{
+	return h->max_value;
+}
 
-double histogram_min_value(struct histogram *h) { return h->min_value; }
+double histogram_min_value(struct histogram *h)
+{
+	return h->min_value;
+}
 
-double histogram_mode(struct histogram *h) { return h->mode; }
+double histogram_mode(struct histogram *h)
+{
+	return h->mode;
+}
