@@ -1150,7 +1150,7 @@ static int handle_manager(struct link *manager)
 			url_decode(source_encoded, source, sizeof(source));
 			r = do_put_url(filename, cache_level, length, mode, source);
 			reset_idle_timer();
-			hash_table_insert(current_transfers, strdup(filename), strdup(transfer_id));
+			hash_table_insert(current_transfers, filename, strdup(transfer_id));
 		} else if (sscanf(line,
 					   "puturl_now %s %s %d %" SCNd64 " %o %s",
 					   source_encoded,
@@ -1163,7 +1163,7 @@ static int handle_manager(struct link *manager)
 			url_decode(source_encoded, source, sizeof(source));
 			r = do_put_url_now(filename, cache_level, length, mode, source);
 			reset_idle_timer();
-			hash_table_insert(current_transfers, strdup(filename), strdup(transfer_id));
+			hash_table_insert(current_transfers, filename, strdup(transfer_id));
 		} else if (sscanf(line,
 					   "mini_task %s %s %d %" SCNd64 " %o",
 					   source_encoded,
