@@ -14,7 +14,6 @@ from .task import FunctionCall
 from .dask_dag import DaskVineDag
 
 import cloudpickle
-import shutil
 import os
 from uuid import uuid4
 
