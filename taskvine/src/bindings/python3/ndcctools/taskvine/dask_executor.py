@@ -146,7 +146,7 @@ class DaskVine(Manager):
             self.tune("max-retrievals", 10)
 
             if self.env_per_task:
-                self.environment_file = self.declare_file(environment)
+                self.environment_file = self.declare_file(environment, cache=True)
                 self.environment_name = os.path.basename(environment)
                 self.environment = None
 
