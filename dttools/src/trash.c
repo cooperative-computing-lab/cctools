@@ -17,7 +17,7 @@ static char *trashdir = 0;
 void trash_setup(const char *dir)
 {
 	if (trashdir) {
-		if(!strcmp(dir,trashdir)) {
+		if (!strcmp(dir, trashdir)) {
 			/* same directory, no problem */
 		} else {
 			notice(D_NOTICE, "Trash directory already setup to %s. Ignoring setup for %s.", trashdir, dir);
