@@ -29,31 +29,39 @@ char *vine_sandbox_full_path(struct vine_process *p, const char *sandbox_name)
 }
 
 /*
-Ensures that each input file is present.
+Determine whether all the files needed by this process are present.
+Return VINE_STATUS_READY if all are present.
+Return VINE_STATUS_PROCESSING if some are not ready.
+Return VINE_STATUS_FAILED if some have definitely failed.
 */
 
 vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cache *cache, struct link *manager)
 {
 	int processing = 0;
-	struct vine_task *t = p->task;
-	vine_cache_status_t cache_status = VINE_CACHE_STATUS_READY;
 
 	struct vine_mount *m;
-	LIST_ITERATE(t->input_mounts, m)
+	LIST_ITERATE(p->task->input_mounts, m)
 	{
-		cache_status = vine_cache_ensure(cache, m->file->cached_name);
+		vine_cache_status_t cache_status = vine_cache_ensure(cache, m->file->cached_name);
+
+		/* If transfer process is running now. */
 		if (cache_status == VINE_CACHE_STATUS_PROCESSING)
 			processing = 1;
+
+		/* If transfer complete but not ingested. */
+		if (cache_status == VINE_CACHE_STATUS_TRANSFERRED)
+			processing = 1;
+
+		/* If transfer definitely failed. */
 		if (cache_status == VINE_CACHE_STATUS_FAILED)
-			break;
+			return VINE_CACHE_STATUS_FAILED;
 	}
 
-	if (cache_status == VINE_CACHE_STATUS_FAILED)
-		return VINE_CACHE_STATUS_FAILED;
-	if (processing)
+	if (processing) {
 		return VINE_CACHE_STATUS_PROCESSING;
-
-	return VINE_CACHE_STATUS_READY;
+	} else {
+		return VINE_CACHE_STATUS_READY;
+	}
 }
 
 /*
