@@ -434,8 +434,16 @@ void send_http_response( struct link *l, int code, const char *message, const ch
 	link_printf(l,stoptime, "Server: catalog_server\n");
 	link_printf(l,stoptime, "Connection: close\n");
 	link_printf(l,stoptime, "Access-Control-Allow-Origin: *\n");
-	link_printf(l,stoptime, "Content-type: %s\n\n",content_type);
+	link_printf(l,stoptime, "Content-type: %s; charset=utf-8\n\n",content_type);
 	link_flush_output(l);
+}
+
+void send_html_header( struct link *l, time_t stoptime )
+{
+	link_printf(l,stoptime, "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">\n");
+	link_printf(l,stoptime, "<head>\n");
+	link_printf(l,stoptime, "<title>%s catalog server</title>\n", preferred_hostname);
+	link_printf(l,stoptime, "</head>\n");
 }
 
 static void handle_query( struct link *ql, time_t st )
@@ -606,7 +614,7 @@ static void handle_query( struct link *ql, time_t st )
 			const char *name = jx_lookup_string(j, "name");
 			if(!name)
 				name = "unknown";
-			link_printf(ql,st, "<title>%s catalog server: %s</title>\n", preferred_hostname, name);
+			send_html_header(ql,st);
 			link_printf(ql,st, "<center>\n");
 			link_printf(ql,st, "<h1>%s catalog server</h1>\n", preferred_hostname);
 			link_printf(ql,st, "<h2>%s</h2>\n", name);
@@ -618,7 +626,7 @@ static void handle_query( struct link *ql, time_t st )
 			catalog_export_html_solo(j, ql,st);
 			link_printf(ql,st, "</center>\n");
 		} else {
-			link_printf(ql,st, "<title>%s catalog server</title>\n", preferred_hostname);
+			send_html_header(ql,st);
 			link_printf(ql,st, "<center>\n");
 			link_printf(ql,st, "<h1>%s catalog server</h1>\n", preferred_hostname);
 			link_printf(ql,st, "<h2>Unknown Item!</h2>\n");
@@ -632,7 +640,7 @@ static void handle_query( struct link *ql, time_t st )
 		INT64_T sum_devices = 0;
 
 		send_http_response(ql,200,"OK","text/html",st);
-		link_printf(ql,st, "<title>%s catalog server</title>\n", preferred_hostname);
+		send_html_header(ql,st);
 		link_printf(ql,st, "<center>\n");
 		link_printf(ql,st, "<h1>%s catalog server</h1>\n", preferred_hostname);
 		if (timestamp) {
