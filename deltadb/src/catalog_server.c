@@ -477,10 +477,12 @@ static void handle_query( struct link *ql, time_t st )
 
 		// Consume the rest of the query
 		while(1) {
+			/* If we read to end-of-stream on the request, that's ok. */
 			if(!link_readline(ql, line, LINE_MAX, time(0) + HANDLE_QUERY_TIMEOUT)) {
-				return;
+				break;
 			}
 
+			/* If we get a blank line separator, proceed to respond. */
 			if(line[0] == 0) {
 				break;
 			}
