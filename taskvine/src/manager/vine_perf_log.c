@@ -43,6 +43,7 @@ void vine_perf_log_write_header(struct vine_manager *q)
 			" committed_cores committed_memory committed_disk"
 			" max_cores max_memory max_disk"
 			" min_cores min_memory min_disk"
+			" inuse_cache"
 			// end with a newline
 			"\n");
 }
@@ -144,6 +145,8 @@ void vine_perf_log_write_update(struct vine_manager *q, int force)
 	buffer_printf(&B, " %" PRId64, s.min_cores);
 	buffer_printf(&B, " %" PRId64, s.min_memory);
 	buffer_printf(&B, " %" PRId64, s.min_disk);
+
+	buffer_printf(&B, " %" PRId64, s.inuse_cache);
 
 	fprintf(q->perf_logfile, "%s\n", buffer_tostring(&B));
 

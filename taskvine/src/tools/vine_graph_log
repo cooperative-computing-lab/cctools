@@ -11,21 +11,22 @@ import getopt
 from subprocess import Popen, PIPE, check_output
 from functools import reduce
 
-gnuplot_cmd   = 'gnuplot'
-format        = 'svg'
-extension     = format
-resolution    = 30          # this many seconds to one log entry. Default is 30 seconds.
-x_range       = None        # If unspecified, then plot all the valid range.
-geometry      = "600,480"   # width,height in pixels
+gnuplot_cmd = 'gnuplot'
+format = 'svg'
+extension = format
+resolution = 30          # this many seconds to one log entry. Default is 30 seconds.
+x_range = None        # If unspecified, then plot all the valid range.
+geometry = "600,480"   # width,height in pixels
 
-log_entries   = None
-times         = None
+log_entries = None
+times = None
 
-unit_labels   = {'s' : 'seconds', 'm' : 'minutes', 'h' : 'hours', 'd' : 'days', 'GB' : 'GB', 'i' : '' }
-unit_factors  = {'s' : 1, 'm' : 60, 'h' : 3600, 'd' : 86400, 'GB' : 1073741824}
-x_units       = 'm'          # Default is minutes.
+unit_labels = {'s': 'seconds', 'm': 'minutes', 'h': 'hours', 'd': 'days', 'GB': 'GB', 'i': ''}
+unit_factors = {None: 1, 's': 1, 'm': 60, 'h': 3600, 'd': 86400, 'KB': 1024, 'GB': 1073741824}
+x_units = 'm'          # Default is minutes.
 
-def read_fields(file, lines_patience = 10):
+
+def read_fields(file, lines_patience=10):
     for line in file:
         if line[0] != '#':
             lines_patience = lines_patience - 1
@@ -36,15 +37,18 @@ def read_fields(file, lines_patience = 10):
     sys.stderr.write("Could not find fields descriptions (a line such as # timestamp workers_....)\n")
     sys.exit(1)
 
+
 def time_to_resolution(t):
     return (t - (t % (resolution * 1000000))) / 1000000
+
 
 def time_field_p(field):
     return re.search('^time_.*$', field)
 
+
 def read_log_entries(file, fields):
     log_entries = {}
-    idxs  = range(0, len(fields))
+    idxs = range(0, len(fields))
     pairs = list(zip(idxs, fields))
     epoch = None
     count_lines = 0
@@ -54,7 +58,7 @@ def read_log_entries(file, fields):
         count_lines = count_lines + 1
         try:
             numbers = [float(x) for x in line.split()]
-            record  = {}
+            record = {}
 
             for (i, field) in pairs:
                 if field == 'timestamp':
@@ -72,39 +76,49 @@ def read_log_entries(file, fields):
 
             log_entries[record['timestamp']] = record
 
-            if(prev_line is None):
+            if (prev_line is None):
                 prev_line = record
 
             delta = {}
             for key in record.keys():
-                delta[key] = record[key] - prev_line[key];
+                delta[key] = record[key] - prev_line[key]
 
-            total_time = reduce( lambda x,y: x+y, [ delta[m] for m in ['time_status_msgs', 'time_internal', 'time_polling', 'time_send', 'time_receive', 'time_application']])
+            total_time = reduce(lambda x, y: x+y, [delta[m] for m in ['time_status_msgs',
+                                'time_internal', 'time_polling', 'time_send', 'time_receive', 'time_application']])
 
             # One of time_* may be larger than the given resolution, and here we force everything to the same height
             delta['timestamp'] = total_time
 
-            res_factor = 100;
+            res_factor = 100
             if delta['timestamp'] > 0:
                 record['stack_time_status_msgs'] = res_factor * (delta['time_status_msgs'] / delta['timestamp'])
-                record['stack_time_internal']    = res_factor * (delta['time_internal']    / delta['timestamp']) + record['stack_time_status_msgs']
-                record['stack_time_polling']     = res_factor * (delta['time_polling']     / delta['timestamp']) + record['stack_time_internal']
-                record['stack_time_send']        = res_factor * (delta['time_send']        / delta['timestamp']) + record['stack_time_polling']
-                record['stack_time_receive']     = res_factor * (delta['time_receive']     / delta['timestamp']) + record['stack_time_send']
-                record['stack_time_application'] = res_factor * (delta['time_application'] / delta['timestamp']) + record['stack_time_receive']
-                record['stack_time_other']       = res_factor
+                record['stack_time_internal'] = res_factor * \
+                    (delta['time_internal'] / delta['timestamp']) + record['stack_time_status_msgs']
+                record['stack_time_polling'] = res_factor * \
+                    (delta['time_polling'] / delta['timestamp']) + record['stack_time_internal']
+                record['stack_time_send'] = res_factor * \
+                    (delta['time_send'] / delta['timestamp']) + record['stack_time_polling']
+                record['stack_time_receive'] = res_factor * \
+                    (delta['time_receive'] / delta['timestamp']) + record['stack_time_send']
+                record['stack_time_application'] = res_factor * \
+                    (delta['time_application'] / delta['timestamp']) + record['stack_time_receive']
+                record['stack_time_other'] = res_factor
             else:
                 record['stack_time_status_msgs'] = 0
-                record['stack_time_internal']    = 0
-                record['stack_time_polling']     = 0
-                record['stack_time_send']        = 0
-                record['stack_time_receive']     = 0
+                record['stack_time_internal'] = 0
+                record['stack_time_polling'] = 0
+                record['stack_time_send'] = 0
+                record['stack_time_receive'] = 0
                 record['stack_time_application'] = 0
-                record['stack_time_other']       = 0
+                record['stack_time_other'] = 0
 
             record['bytes_sent'] /= unit_factors['GB']
             record['bytes_received'] /= unit_factors['GB']
             record['bytes_transfered'] = record['bytes_sent'] + record['bytes_received']
+
+            record['total_disk'] /= unit_factors['KB']       # MB to GB
+            record['committed_disk'] /= unit_factors['KB']   # MB to GB
+            record['inuse_cache'] /= unit_factors['KB']      # MB to GB
 
             prev_line = record
 
@@ -117,6 +131,7 @@ def read_log_entries(file, fields):
 
     return log_entries
 
+
 def sort_time(log_entries):
     times = []
     for k in log_entries.keys():
@@ -124,40 +139,46 @@ def sort_time(log_entries):
     times.sort()
     return times
 
+
 def pout(file, str):
     file.write("{}\n".format(str).encode('utf-8'))
 
+
 class VinePlot:
-    def __init__(self, title, ylabel, fields, labels=None, x_units = x_units, y_units = x_units, range = x_range, stack = False):
-        self.title   = title
-        self.fields  = fields
-        self.labels  = labels or self.fields
+    def __init__(self, title, ylabel, fields, labels=None, x_units=x_units, y_units=None, range=x_range, stack=False):
+        self.title = title
+        self.fields = fields
+        self.labels = labels or self.fields
         self.x_units = x_units
         self.y_units = y_units
-        self.ylabel  = ylabel
-        self.range   = range
-        self.stack   = stack
+        self.ylabel = ylabel
+        self.range = range
+        self.stack = stack
 
     def preamble(self, file):
         self.__preamble_common(file)
 
     def __preamble_common(self, file):
+        units = ""
+        if self.y_units:
+            units = f" ({self.y_units})"
+
         pout(file, """
 set term {fmt} size {geo} butt linewidth 1
 set title  '{title}'
 set xlabel 'manager lifetime in {x_units}'
-set ylabel '{y_units}'
+set ylabel '{y_label}{y_units}'
 set yrange [0:]
 set noborder
 set tics nomirror out
-""".format(fmt=format, geo=geometry, title=self.title, x_units=unit_labels[self.x_units], y_units=self.ylabel))
+""".format(fmt=format, geo=geometry, title=self.title, x_units=unit_labels[self.x_units], y_label=self.ylabel, y_units=units))
 
         if self.stack:
             pout(file, "set key below\n")
         else:
             pout(file, "set key left top\n")
 
-        intervals = [len(log_entries.keys())/x for x in [19,17,13,11,7,5,3]]
+        intervals = [len(log_entries.keys())/x for x in [19, 17, 13, 11, 7, 5, 3]]
 
         pout(file, """
 set style line 1 pt 5   lc rgb '#1b9e77' pointinterval {0}
@@ -187,10 +208,10 @@ set style line 7 pt 1   lc rgb '#a6761d' pointinterval {6}
         pout(file, 'EOF')
 
     def plot_line(self, label, place):
-        return "'-' using 1:2 title '%s' with linespoints ls %d lw 3" % (label,place+1)
+        return "'-' using 1:2 title '%s' with linespoints ls %d lw 3" % (label, place+1)
 
     def plot_stack(self, label, place):
-        return "'-' using 1:2 title '%s' with fillsteps fs solid 1.0 noborder ls %d" % (label,place+1)
+        return "'-' using 1:2 title '%s' with fillsteps fs solid 1.0 noborder ls %d" % (label, place+1)
 
     def write_plot(self, file):
         self.preamble(file)
@@ -210,19 +231,20 @@ set style line 7 pt 1   lc rgb '#a6761d' pointinterval {6}
     def __plot_internal(self, output, command):
         sys.stdout.write("Generating '%s'.\n" % (output,))
         fout = open(output, 'w')
-        gnuplot = Popen(command, stdin = PIPE, stdout = fout)
+        gnuplot = Popen(command, stdin=PIPE, stdout=fout)
         self.write_plot(gnuplot.stdin)
         gnuplot.stdin.close()
         gnuplot.wait()
 
     def plot(self, output):
         try:
-            self.__plot_internal(output, command = gnuplot_cmd)
+            self.__plot_internal(output, command=gnuplot_cmd)
         except IOError:
             sys.stderr.write("Could not generate file %s.\n" % (output,))
             exit(1)
         except OSError:
-            sys.stderr.write("Could not execute '%s'. Please try again specifying -c <gnuplot-path>, or -Ttext\n" % (gnuplot_cmd, ))
+            sys.stderr.write(
+                "Could not execute '%s'. Please try again specifying -c <gnuplot-path>, or -Ttext\n" % (gnuplot_cmd, ))
             exit(1)
 
 
@@ -230,27 +252,31 @@ class VinePlotLog(VinePlot):
     def preamble(self, file):
         VinePlot.preamble(self, file)
         pout(file, 'set logscale y')
+        pout(file, 'set format y "10^{%L}"')
         pout(file, '')
 
+
 def check_gnuplot_version(gnuplot_cmd):
-        try:
-            version = check_output([gnuplot_cmd, '--version'])
-            version = version.decode("utf-8")
-            result = re.match('gnuplot\s+(\d+\.\d+)\D', version)
+    try:
+        version = check_output([gnuplot_cmd, '--version'])
+        version = version.decode("utf-8")
+        result = re.match('gnuplot\s+(\d+\.\d+)\D', version)
 
-            if not result:
-                sys.stderr.write("Could not determine gnuplot version.")
-                exit(1)
-
-            version = result.group(1)
-
-            if float(version) < 4.6:
-                sys.stderr.write("gnuplot is version %s, at least version 4.6 is required." % (version,))
-                exit(1)
-
-        except OSError:
-            sys.stderr.write("Could not execute '%s'. Please try again specifying -c <gnuplot-path>, or -Ttext\n" % (gnuplot_cmd, ))
+        if not result:
+            sys.stderr.write("Could not determine gnuplot version.")
             exit(1)
+
+        version = result.group(1)
+
+        if float(version) < 4.6:
+            sys.stderr.write("gnuplot is version %s, at least version 4.6 is required." % (version,))
+            exit(1)
+
+    except OSError:
+        sys.stderr.write(
+            "Could not execute '%s'. Please try again specifying -c <gnuplot-path>, or -Ttext\n" % (gnuplot_cmd, ))
+        exit(1)
+
 
 def show_usage():
     usage_string = """
@@ -261,7 +287,7 @@ def show_usage():
         -o <prefix-output>  Generate prefix-output.{{workers,workers-accum,
                                                     tasks,tasks-accum,
                                                     time-manager,time-workers,
-                                                    transfer,cores}}.{format}
+                                                    transfer,workers-disk}}.{format}
                             Default is <work-queue-log>.
         -r <range>          Range of time to plot, in time units (see -u) from
                             the start of execution. Of the form: min:max,
@@ -291,10 +317,10 @@ if __name__ == '__main__':
         sys.exit(1)
 
     logname = args[0]
-    prefix  = logname
+    prefix = logname
 
     for opt, arg in optlist:
-        if   opt == '-c':
+        if opt == '-c':
             gnuplot_cmd = arg
         elif opt == '-o':
             prefix = arg
@@ -310,15 +336,15 @@ if __name__ == '__main__':
         elif opt == '-T':
             if arg == 'text':
                 gnuplot_cmd = 'cat'
-                extension   = format + '.gnuplot'
+                extension = format + '.gnuplot'
             else:
-                format    = arg
+                format = arg
                 extension = format
         elif opt == '-u':
             if arg in unit_factors:
                 x_units = arg
             else:
-                sys.stderr.write("Time scale factor '%s' is not valid. Options: s,m,h or d.\n"  % (arg,))
+                sys.stderr.write("Time scale factor '%s' is not valid. Options: s,m,h or d.\n" % (arg,))
                 exit(1)
 
     try:
@@ -328,56 +354,65 @@ if __name__ == '__main__':
 
         with open(logname) as file:
             log_entries = read_log_entries(file, read_fields(file))
-            times       = sort_time(log_entries)
+            times = sort_time(log_entries)
 
         plots = {}
-        plots['workers'] = VinePlot(x_units = x_units, ylabel = 'workers', range = x_range,
-                title = "workers instantaneous counts",
-                fields = ['workers_connected', 'workers_idle', 'workers_busy'],
-                labels = ['connected', 'idle', 'busy'])
+        plots['workers'] = VinePlot(x_units=x_units, ylabel='number of workers', range=x_range,
+                                    title="workers instantaneous counts",
+                                    fields=['workers_connected', 'workers_idle', 'workers_busy'],
+                                    labels=['connected', 'idle', 'busy'])
 
-        plots['workers-accum'] = VinePlot(x_units = x_units, ylabel = 'workers', range = x_range,
-                title = "workers cumulative counts",
-                fields = ['workers_joined', 'workers_removed', 'workers_released', 'workers_slow', 'workers_idled_out', 'workers_lost'],
-                labels = ['joined', 'removed', 'released', 'slow', 'idled out,', 'lost'])
+        plots['workers-accum'] = VinePlot(x_units=x_units, ylabel='number of workers', range=x_range,
+                                          title="workers cumulative counts",
+                                          fields=['workers_joined', 'workers_removed', 'workers_released',
+                                                  'workers_slow', 'workers_idled_out', 'workers_lost'],
+                                          labels=['joined', 'removed', 'released', 'slow', 'idled out,', 'lost'])
 
-        plots['tasks'] = VinePlot(x_units = x_units, ylabel = 'tasks', range = x_range,
-                title = "tasks instantaneous counts",
-                fields = ['tasks_waiting', 'tasks_on_workers', 'tasks_running', 'tasks_with_results'],
-                labels = ['waiting', 'on workers', 'running', 'with results'])
+        plots['workers-disk'] = VinePlotLog(x_units=x_units, y_units='GB', ylabel='disk space', range=x_range,
+                                            title='workers disk utilization',
+                                            fields=['total_disk', 'committed_disk', 'inuse_cache'],
+                                            labels=['total', 'committed to tasks', 'used by cache'])
 
-        plots['tasks-capacities'] = VinePlot(x_units = x_units, ylabel = 'tasks', range = x_range,
-                title = "tasks instantaneous capacities",
-                fields = ['tasks_running', 'capacity_instantaneous', 'capacity_weighted'],
-                labels = ['tasks running', 'tasks capacity raw', 'tasks capacity weighted'])
+        plots['tasks'] = VinePlot(x_units=x_units, ylabel='number of tasks', range=x_range,
+                                  title="tasks instantaneous counts",
+                                  fields=['tasks_waiting', 'tasks_on_workers', 'tasks_running', 'tasks_with_results'],
+                                  labels=['waiting', 'on workers', 'running', 'with results'])
 
-        plots['tasks-accum'] = VinePlot(x_units = x_units, ylabel = 'tasks', range = x_range,
-                title = "tasks cumulative counts",
-                fields = ['tasks_submitted', 'tasks_dispatched', 'tasks_done', 'tasks_failed', 'tasks_cancelled', 'tasks_exhausted_attempts'],
-                labels = ['submitted', 'dispatched', 'done', 'failed', 'cancelled', 'exhausted attempts'])
+        plots['tasks-capacities'] = VinePlot(x_units=x_units, ylabel='number of tasks', range=x_range,
+                                             title="tasks instantaneous capacities",
+                                             fields=['tasks_running', 'capacity_instantaneous', 'capacity_weighted'],
+                                             labels=['tasks running', 'tasks capacity raw', 'tasks capacity weighted'])
 
-        plots['time-manager'] = VinePlot(x_units = x_units, ylabel = unit_labels[x_units], range = x_range,
-            title = "cumulative times at the manager",
-            fields = ['time_send', 'time_receive', 'time_polling', 'time_status_msgs', 'time_internal', 'time_application'],
-            labels = ['send', 'receive', 'manager polling', 'manager status msgs', 'manager internal', 'manager application'])
+        plots['tasks-accum'] = VinePlot(x_units=x_units, ylabel='number of tasks', range=x_range,
+                                        title="tasks cumulative counts",
+                                        fields=['tasks_submitted', 'tasks_dispatched', 'tasks_done',
+                                                'tasks_failed', 'tasks_cancelled', 'tasks_exhausted_attempts'],
+                                        labels=['submitted', 'dispatched', 'done', 'failed', 'cancelled', 'exhausted attempts'])
 
-        plots['time-workers'] = VinePlot(x_units = x_units, y_units = 'h', ylabel = unit_labels['h'], range = x_range,
-            title = "cumulative times at workers",
-            fields = ['time_execute', 'time_execute_good', 'time_execute_exhaustion'],
-            labels = ['execute', 'execute good', 'execute exhaustion'])
+        plots['time-manager'] = VinePlot(x_units=x_units, ylabel="cumulative time", y_units=x_units, range=x_range,
+                                         title="cumulative times at the manager",
+                                         fields=['time_send', 'time_receive', 'time_polling',
+                                                 'time_status_msgs', 'time_internal', 'time_application'],
+                                         labels=['send', 'receive', 'manager polling', 'manager status msgs', 'manager internal', 'manager application'])
 
-        plots['transfer'] = VinePlot(x_units = x_units, y_units = 'GB', ylabel = 'GB', range = x_range,
-            title = "manager data transfer",
-            fields = ['bytes_sent', 'bytes_received'],
-            labels = ['sent', 'received'])
+        plots['time-workers'] = VinePlot(x_units=x_units, y_units='h', ylabel="cumulative time", range=x_range,
+                                         title="cumulative times at workers",
+                                         fields=['time_execute', 'time_execute_good', 'time_execute_exhaustion'],
+                                         labels=['execute', 'execute good', 'execute exhaustion'])
 
-        plots['times-stacked'] = VinePlot(x_units = x_units, y_units = 's', ylabel = 'utilization per time sample (%)', range = x_range, stack = True,
-                title = 'manager time proportions',
-                fields = ['stack_time_other', 'stack_time_application', 'stack_time_receive', 'stack_time_send', 'stack_time_polling', 'stack_time_internal', 'stack_time_status_msgs'],
-                labels = ['other', 'application', 'receive', 'send', 'polling', 'internal', 'status msgs'])
+        plots['transfer'] = VinePlot(x_units=x_units, y_units='GB', ylabel='size', range=x_range,
+                                     title="manager data transfer",
+                                     fields=['bytes_sent', 'bytes_received'],
+                                     labels=['sent', 'received'])
+
+        plots['times-stacked'] = VinePlot(x_units=x_units, y_units='%', ylabel='utilization per time sample', range=x_range, stack=True,
+                                          title='manager time proportions',
+                                          fields=['stack_time_other', 'stack_time_application', 'stack_time_receive',
+                                                  'stack_time_send', 'stack_time_polling', 'stack_time_internal', 'stack_time_status_msgs'],
+                                          labels=['other', 'application', 'receive', 'send', 'polling', 'internal', 'status msgs'])
 
         for name in plots.keys():
-            plots[name].plot(prefix     + '.' + name + '.' + extension)
+            plots[name].plot(prefix + '.' + name + '.' + extension)
 
     except IOError:
         sys.stderr.write("Could not open file %s\n" % (logname,))
