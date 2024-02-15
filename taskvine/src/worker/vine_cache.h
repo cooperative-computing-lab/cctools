@@ -25,14 +25,14 @@ for file transfers to occur asynchronously of the manager.
 #include "link.h"
 
 typedef enum {
-	VINE_CACHE_FILE,
-	VINE_CACHE_TRANSFER,
-	VINE_CACHE_MINI_TASK,
+	VINE_CACHE_FILE,               /**< A normal file provided by the manager. */
+	VINE_CACHE_TRANSFER,           /**< Obtain the file by performing a transfer. */
+	VINE_CACHE_MINI_TASK,          /**< Obtain the file by executing a mini-task. */
 } vine_cache_type_t;
 
 typedef enum {
-	VINE_CACHE_FLAGS_ON_TASK = 1,
-	VINE_CACHE_FLAGS_NOW = 2,
+	VINE_CACHE_FLAGS_ON_TASK = 1,   /**< Do this transfer as needed for task. */
+	VINE_CACHE_FLAGS_NOW = 2,       /**< Start this transfer now for replication. */
 } vine_cache_flags_t;
 
 typedef enum {
