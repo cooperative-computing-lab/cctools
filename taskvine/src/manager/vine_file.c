@@ -16,11 +16,11 @@ See the file COPYING for details.
 #include "unlink_recursive.h"
 #include "xxmalloc.h"
 
+#include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 /* Internal use: when the worker uses the client library, do not recompute cached names. */
 int vine_hack_do_not_compute_cached_name = 0;
@@ -170,7 +170,7 @@ Return true if the source of this file has changed since it was first used.
 This should not happen, it indicates a violation of the workflow semantics.
 */
 
-int vine_file_has_changed( struct vine_file *f )
+int vine_file_has_changed(struct vine_file *f)
 {
 	if (f->type == VINE_FILE) {
 
@@ -182,14 +182,16 @@ int vine_file_has_changed( struct vine_file *f )
 			return 1;
 		}
 
-		if(f->mtime==0) {
+		if (f->mtime == 0) {
 			/* If we have not observed time and size before, capture it now. */
 			f->mtime = info.st_mtime;
-			f->size  = info.st_size;
+			f->size = info.st_size;
 		} else {
 			/* If we have seen it before, it should not have changed. */
-			if( f->mtime!=info.st_mtime || ((int64_t)f->size)!=((int64_t)info.st_size) ) {
-				debug(D_VINE|D_NOTICE,"input file %s was modified by someone in the middle of the workflow!\n",f->source);
+			if (f->mtime != info.st_mtime || ((int64_t)f->size) != ((int64_t)info.st_size)) {
+				debug(D_VINE | D_NOTICE,
+						"input file %s was modified by someone in the middle of the workflow!\n",
+						f->source);
 				return 1;
 			}
 		}

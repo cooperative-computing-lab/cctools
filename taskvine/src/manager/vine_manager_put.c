@@ -401,14 +401,14 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 		struct vine_task *t, struct vine_mount *m, struct vine_file *f)
 {
 	/* If the file source has changed, it's a violation of the workflow. */
-	
-	if(vine_file_has_changed(f)) {
+
+	if (vine_file_has_changed(f)) {
 		vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
 		return VINE_APP_FAILURE;
 	}
-	
+
 	/* Every file must have a cached name, which should have been computed earlier. */
-	
+
 	if (!f->cached_name) {
 		debug(D_NOTICE | D_VINE, "Cache name could not be generated for input file %s", f->source);
 		vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
@@ -420,7 +420,7 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 	/* If the file has already been replicated to this worker, no need to send it. */
 
 	struct vine_file_replica *replica = vine_file_replica_table_lookup(w, f->cached_name);
-	if(replica) {
+	if (replica) {
 		if (!(f->flags & VINE_CACHE)) {
 			debug(D_VINE,
 					"File %s is not marked as a cachable file, but it is used by more than one task. Marking as cachable.",
