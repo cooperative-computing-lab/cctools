@@ -141,7 +141,8 @@ struct category *vine_category_lookup_or_create(struct vine_manager *q, const ch
 
 void vine_disable_monitoring(struct vine_manager *q);
 static void aggregate_workers_resources(struct vine_manager *q, struct vine_resources *rtotal,
-		struct vine_resources *rmin, struct vine_resources *rmax, struct hash_table *features);
+		struct vine_resources *rmin, struct vine_resources *rmax, int64_t *inuse_cache,
+		struct hash_table *features);
 static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout, const char *tag, int task_id);
 static void release_all_workers(struct vine_manager *q);
 
@@ -2104,6 +2105,8 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "bytes_sent", info.bytes_sent);
 	jx_insert_integer(j, "bytes_received", info.bytes_received);
 
+	jx_insert_integer(j, "inuse_cache", info.inuse_cache);
+
 	jx_insert_integer(j, "capacity_tasks", info.capacity_tasks);
 	jx_insert_integer(j, "capacity_cores", info.capacity_cores);
 	jx_insert_integer(j, "capacity_memory", info.capacity_memory);
@@ -2114,7 +2117,8 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 
 	// Add the resources computed from tributary workers.
 	struct vine_resources r, rmin, rmax;
-	aggregate_workers_resources(q, &r, &rmin, &rmax, NULL);
+	int64_t inuse_cache = 0;
+	aggregate_workers_resources(q, &r, &rmin, &rmax, &inuse_cache, NULL);
 	vine_resources_add_to_jx(&r, j);
 
 	// add the stats per category
@@ -2126,6 +2130,7 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "tasks_total_memory", total->memory);
 	jx_insert_integer(j, "tasks_total_disk", total->disk);
 	jx_insert_integer(j, "tasks_total_gpus", total->gpus);
+
 	rmsummary_delete(total);
 
 	return j;
@@ -5364,7 +5369,8 @@ void vine_get_stats(struct vine_manager *q, struct vine_stats *s)
 	// info about resources
 	s->bandwidth = vine_get_effective_bandwidth(q);
 	struct vine_resources rtotal, rmin, rmax;
-	aggregate_workers_resources(q, &rtotal, &rmin, &rmax, NULL);
+	int64_t inuse_cache = 0;
+	aggregate_workers_resources(q, &rtotal, &rmin, &rmax, &inuse_cache, NULL);
 
 	s->total_cores = rtotal.cores.total;
 	s->total_memory = rtotal.memory.total;
@@ -5375,6 +5381,8 @@ void vine_get_stats(struct vine_manager *q, struct vine_stats *s)
 	s->committed_memory = rtotal.memory.inuse;
 	s->committed_disk = rtotal.disk.inuse;
 	s->committed_gpus = rtotal.gpus.inuse;
+
+	s->inuse_cache = inuse_cache;
 
 	s->min_cores = rmin.cores.total;
 	s->max_cores = rmax.cores.total;
@@ -5426,7 +5434,8 @@ Used to summarize queue state for vine_get_stats().
 */
 
 static void aggregate_workers_resources(struct vine_manager *q, struct vine_resources *total,
-		struct vine_resources *rmin, struct vine_resources *rmax, struct hash_table *features)
+		struct vine_resources *rmin, struct vine_resources *rmax, int64_t *inuse_cache,
+		struct hash_table *features)
 {
 	struct vine_worker_info *w;
 	char *key;
@@ -5435,6 +5444,7 @@ static void aggregate_workers_resources(struct vine_manager *q, struct vine_reso
 	bzero(total, sizeof(*total));
 	bzero(rmin, sizeof(*rmin));
 	bzero(rmax, sizeof(*rmax));
+	*inuse_cache = 0;
 
 	if (hash_table_size(q->worker_table) == 0) {
 		return;
@@ -5454,6 +5464,8 @@ static void aggregate_workers_resources(struct vine_manager *q, struct vine_reso
 
 		/* Sum up the total and inuse values in total. */
 		vine_resources_add(total, r);
+
+		*inuse_cache += w->inuse_cache;
 
 		/* Add all available features to the features table */
 		if (features) {
@@ -5481,6 +5493,9 @@ static void aggregate_workers_resources(struct vine_manager *q, struct vine_reso
 			vine_resources_max(rmax, r);
 		}
 	}
+
+	// vine_stats wants MB
+	*inuse_cache = (int64_t)ceil(*inuse_cache / (1.0 * MEGA));
 }
 
 /* This simple wrapper function allows us to hide the debug.h interface from the end user. */
