@@ -125,7 +125,11 @@ def read_log_entries(file, fields, reset_until_dispatch=False):
 
             record['total_disk'] /= unit_factors['KB']       # MB to GB
             record['committed_disk'] /= unit_factors['KB']   # MB to GB
-            record['inuse_cache'] /= unit_factors['KB']      # MB to GB
+
+            try:
+                record['inuse_cache'] /= unit_factors['KB']      # MB to GB
+            except KeyError:
+                record['inuse_cache'] = 0                        # inuse_cache is not a stat that all logs have
 
             prev_line = record
 
