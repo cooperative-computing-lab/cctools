@@ -409,10 +409,14 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 	cache-update messages.
 	*/
 	if (replica) {
-		if (f->type == VINE_FILE && (info.st_size != replica->size || ((info.st_mtime != replica->mtime) &&
-											      (replica->mtime != 0)))) {
-			debug(D_NOTICE | D_VINE, "File %s has changed since it was first cached!", f->source);
-			debug(D_NOTICE | D_VINE, "You may be getting inconsistent results.");
+		/* Disabling this out until the check is fixed */
+		if (0) {
+			if (f->type == VINE_FILE &&
+					(info.st_size != replica->size ||
+							((info.st_mtime != replica->mtime) && (replica->mtime != 0)))) {
+				debug(D_NOTICE | D_VINE, "File %s has changed since it was first cached!", f->source);
+				debug(D_NOTICE | D_VINE, "You may be getting inconsistent results.");
+			}
 		}
 
 		if (!(f->flags & VINE_CACHE)) {
