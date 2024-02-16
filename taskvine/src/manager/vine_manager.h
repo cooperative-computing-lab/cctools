@@ -252,6 +252,9 @@ int64_t overcommitted_resource_total(struct vine_manager *q, int64_t total);
 /* Internal: Enable checking and sending library tasks as necessary. Needed for @vine_schedule.c to check if a worker is compatible to a function task. */
 int vine_manager_check_worker_can_run_function_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 
+/* Internal: Shut down a specific worker. */
+int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_info *w);
+
 /* The expected format of files created by the resource monitor.*/
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-task-%d"
 #define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"

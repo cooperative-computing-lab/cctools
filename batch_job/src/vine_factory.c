@@ -27,6 +27,7 @@ See the file COPYING for details.
 #include "path.h"
 #include "buffer.h"
 #include "rmsummary.h"
+#include "username.h"
 
 #include "jx.h"
 #include "jx_parse.h"
@@ -698,6 +699,12 @@ struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submit
 	}
 	jx_insert(j, jx_string("foremen"), fs);
 
+	char username[USERNAME_MAX];
+	if(username_get(username)) {
+		jx_insert_string(j,"owner",username);
+	}
+	jx_insert_string(j,"version",CCTOOLS_VERSION);
+	
 	return j;
 }
 

@@ -5,6 +5,7 @@ SOURCES = \
 	vine_manager.c \
 	vine_manager_get.c \
 	vine_manager_put.c \
+	vine_manager_factory.c \
 	vine_manager_summarize.c \
 	vine_schedule.c \
 	vine_worker_info.c \

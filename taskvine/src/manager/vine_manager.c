@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "vine_file.h"
 #include "vine_file_replica.h"
 #include "vine_file_replica_table.h"
+#include "vine_manager_factory.h"
 #include "vine_manager_get.h"
 #include "vine_manager_put.h"
 #include "vine_manager_summarize.h"
@@ -106,7 +107,6 @@ double vine_option_blocklist_slow_workers_timeout = 900;
 static void handle_failure(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, vine_result_code_t fail_type);
 static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason);
-static int shut_down_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 static void reap_task_from_worker(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, vine_task_state_t new_state);
@@ -141,7 +141,8 @@ struct category *vine_category_lookup_or_create(struct vine_manager *q, const ch
 
 void vine_disable_monitoring(struct vine_manager *q);
 static void aggregate_workers_resources(struct vine_manager *q, struct vine_resources *rtotal,
-		struct vine_resources *rmin, struct vine_resources *rmax, struct hash_table *features);
+		struct vine_resources *rmin, struct vine_resources *rmax, int64_t *inuse_cache,
+		struct hash_table *features);
 static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout, const char *tag, int task_id);
 static void release_all_workers(struct vine_manager *q);
 
@@ -282,7 +283,7 @@ static void handle_worker_timeout(struct vine_manager *q, struct vine_worker_inf
 	if (itable_size(w->current_tasks) == 0) {
 		debug(D_VINE, "Accepting timeout request from worker %s (%s).", w->hostname, w->addrport);
 		q->stats->workers_idled_out++;
-		shut_down_worker(q, w);
+		vine_manager_shut_down_worker(q, w);
 	}
 
 	return;
@@ -330,13 +331,7 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 	} else if (string_prefix_is(field, "worker-end-time")) {
 		w->end_time = MAX(0, atoll(value));
 	} else if (string_prefix_is(field, "from-factory")) {
-		q->fetch_factory = 1;
-		w->factory_name = xxstrdup(value);
-
-		struct vine_factory_info *f = vine_factory_info_lookup(q, w->factory_name);
-		if (f->connected_workers + 1 > f->max_workers) {
-			shut_down_worker(q, w);
-		}
+		vine_manager_factory_worker_arrive(q, w, value);
 	} else if (string_prefix_is(field, "library-update")) {
 		handle_library_update(q, w, value);
 	}
@@ -679,125 +674,15 @@ int vine_manager_transfer_time(struct vine_manager *q, struct vine_worker_info *
 	return timeout;
 }
 
-/*
-Remove idle workers associated with a given factory, so as to scale down
-cleanly by not cancelling active work.
-*/
+/* Read from the catalog if fetch_factory is enabled. */
 
-static int factory_trim_workers(struct vine_manager *q, struct vine_factory_info *f)
+static void update_read_catalog(struct vine_manager *q)
 {
-	if (!f)
-		return 0;
-	assert(f->name);
+	time_t stoptime = time(0) + 5; // Short timeout for query
 
-	// Iterate through all workers and shut idle ones down
-	struct vine_worker_info *w;
-	char *key;
-	int trimmed_workers = 0;
-
-	struct hash_table *idle_workers = hash_table_create(0, 0);
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
-	{
-		if (f->connected_workers - trimmed_workers <= f->max_workers)
-			break;
-		if (w->factory_name && !strcmp(f->name, w->factory_name) && itable_size(w->current_tasks) < 1) {
-			hash_table_insert(idle_workers, key, w);
-			trimmed_workers++;
-		}
+	if (q->fetch_factory) {
+		vine_manager_factory_update_all(q, stoptime);
 	}
-
-	HASH_TABLE_ITERATE(idle_workers, key, w)
-	{
-		hash_table_remove(idle_workers, key);
-		hash_table_firstkey(idle_workers);
-		shut_down_worker(q, w);
-	}
-	hash_table_delete(idle_workers);
-
-	debug(D_VINE, "Trimmed %d workers from %s", trimmed_workers, f->name);
-	return trimmed_workers;
-}
-
-/*
-Given a JX description of a factory, update our internal vine_factory_info
-records to match that description.  If the description indicates that
-we have more workers than desired, trim the workers associated with that
-factory.
-*/
-
-static void update_factory(struct vine_manager *q, struct jx *j)
-{
-	const char *name = jx_lookup_string(j, "factory_name");
-	if (!name)
-		return;
-
-	struct vine_factory_info *f = vine_factory_info_lookup(q, name);
-
-	f->seen_at_catalog = 1;
-	int found = 0;
-	struct jx *m = jx_lookup_guard(j, "max_workers", &found);
-	if (found) {
-		int old_max_workers = f->max_workers;
-		f->max_workers = m->u.integer_value;
-		// Trim workers if max_workers reduced.
-		if (f->max_workers < old_max_workers) {
-			factory_trim_workers(q, f);
-		}
-	}
-}
-
-/*
-Query the catalog to discover what factories are feeding this manager.
-Update our internal state with the data returned.
-*/
-
-static void update_read_catalog_factory(struct vine_manager *q, time_t stoptime)
-{
-	struct catalog_query *cq;
-	struct jx *jexpr = NULL;
-	struct jx *j;
-
-	// Iterate through factory_table to create a query filter.
-	int first_name = 1;
-	buffer_t filter;
-	buffer_init(&filter);
-	char *factory_name = NULL;
-	struct vine_factory_info *f = NULL;
-	buffer_putfstring(&filter, "type == \"vine_factory\" && (");
-
-	HASH_TABLE_ITERATE(q->factory_table, factory_name, f)
-	{
-		buffer_putfstring(&filter, "%sfactory_name == \"%s\"", first_name ? "" : " || ", factory_name);
-		first_name = 0;
-		f->seen_at_catalog = 0;
-	}
-	buffer_putfstring(&filter, ")");
-	jexpr = jx_parse_string(buffer_tolstring(&filter, NULL));
-	buffer_free(&filter);
-
-	// Query the catalog server
-	debug(D_VINE, "Retrieving factory info from catalog server(s) at %s ...", q->catalog_hosts);
-	if ((cq = catalog_query_create(q->catalog_hosts, jexpr, stoptime))) {
-		// Update the table
-		while ((j = catalog_query_read(cq, stoptime))) {
-			update_factory(q, j);
-			jx_delete(j);
-		}
-		catalog_query_delete(cq);
-	} else {
-		debug(D_VINE, "Failed to retrieve factory info from catalog server(s) at %s.", q->catalog_hosts);
-	}
-
-	// Remove outdated factories
-	struct list *outdated_factories = list_create();
-	HASH_TABLE_ITERATE(q->factory_table, factory_name, f)
-	{
-		if (!f->seen_at_catalog && f->connected_workers < 1) {
-			list_push_tail(outdated_factories, f);
-		}
-	}
-	list_clear(outdated_factories, (void *)vine_factory_info_delete);
-	list_delete(outdated_factories);
 }
 
 /*
@@ -829,17 +714,6 @@ static void update_write_catalog(struct vine_manager *q)
 	// Clean up.
 	free(str);
 	jx_delete(j);
-}
-
-/* Read from the catalog if fetch_factory is enabled. */
-
-static void update_read_catalog(struct vine_manager *q)
-{
-	time_t stoptime = time(0) + 5; // Short timeout for query
-
-	if (q->fetch_factory) {
-		update_read_catalog_factory(q, stoptime);
-	}
 }
 
 /* Send and receive updates from the catalog server as needed. */
@@ -960,12 +834,7 @@ static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vi
 	hash_table_remove(q->workers_with_available_results, w->hashkey);
 
 	record_removed_worker_stats(q, w);
-
-	if (w->factory_name) {
-		struct vine_factory_info *f = vine_factory_info_lookup(q, w->factory_name);
-		if (f)
-			f->connected_workers--;
-	}
+	vine_manager_factory_worker_leave(q, w);
 
 	vine_worker_delete(w);
 
@@ -2124,6 +1993,8 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "bytes_sent", info.bytes_sent);
 	jx_insert_integer(j, "bytes_received", info.bytes_received);
 
+	jx_insert_integer(j, "inuse_cache", info.inuse_cache);
+
 	jx_insert_integer(j, "capacity_tasks", info.capacity_tasks);
 	jx_insert_integer(j, "capacity_cores", info.capacity_cores);
 	jx_insert_integer(j, "capacity_memory", info.capacity_memory);
@@ -2134,7 +2005,8 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 
 	// Add the resources computed from tributary workers.
 	struct vine_resources r, rmin, rmax;
-	aggregate_workers_resources(q, &r, &rmin, &rmax, NULL);
+	int64_t inuse_cache = 0;
+	aggregate_workers_resources(q, &r, &rmin, &rmax, &inuse_cache, NULL);
 	vine_resources_add_to_jx(&r, j);
 
 	// add the stats per category
@@ -2146,6 +2018,7 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "tasks_total_memory", total->memory);
 	jx_insert_integer(j, "tasks_total_disk", total->disk);
 	jx_insert_integer(j, "tasks_total_gpus", total->gpus);
+
 	rmsummary_delete(total);
 
 	return j;
@@ -3256,21 +3129,6 @@ static int send_one_task(struct vine_manager *q)
 	return 0;
 }
 
-static int prune_worker(struct vine_manager *q, struct vine_worker_info *w)
-{
-	// Shutdown worker if appropriate.
-	if (w->factory_name) {
-		struct vine_factory_info *f = vine_factory_info_lookup(q, w->factory_name);
-		if (f && f->connected_workers > f->max_workers && itable_size(w->current_tasks) < 1) {
-			debug(D_VINE, "Final task received from worker %s, shutting down.", w->hostname);
-			shut_down_worker(q, w);
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
 /*
 Finding a worker that has tasks waiting to be retrieved, then fetch the outputs
 of those tasks. Returns the number of tasks received.
@@ -3321,7 +3179,8 @@ static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_
 		}
 	}
 
-	prune_worker(q, w);
+	/* Consider removing the worker if it is empty. */
+	vine_manager_factory_worker_prune(q, w);
 
 	return tasks_received;
 }
@@ -3340,8 +3199,9 @@ static int receive_one_task(struct vine_manager *q)
 		struct vine_worker_info *w = t->worker;
 		/* Attempt to fetch from this worker. */
 		if (fetch_output_from_worker(q, w, t->task_id)) {
-			/* If we got one, then we are done. */
-			prune_worker(q, w);
+			/* Consider whether this worker should be removed. */
+			vine_manager_factory_worker_prune(q, w);
+			/* If we got a task, then we are done. */
 			return 1;
 		} else {
 			/* But if not, the worker pointer is no longer valid. */
@@ -3537,7 +3397,7 @@ static int disconnect_slow_workers(struct vine_manager *q)
 
 /* Forcibly shutdown a worker by telling it to exit, then disconnect it. */
 
-static int shut_down_worker(struct vine_manager *q, struct vine_worker_info *w)
+int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
 	if (!w)
 		return 0;
@@ -3560,7 +3420,7 @@ static int shutdown_drained_workers(struct vine_manager *q)
 	{
 		if (w->draining && itable_size(w->current_tasks) == 0) {
 			removed++;
-			shut_down_worker(q, w);
+			vine_manager_shut_down_worker(q, w);
 		}
 	}
 
@@ -4065,11 +3925,14 @@ void vine_delete(struct vine_manager *q)
 	vine_current_transfers_clear(q);
 	hash_table_delete(q->current_transfer_table);
 
-	hash_table_clear(q->file_table, (void *)vine_file_delete);
-	hash_table_delete(q->file_table);
-
 	itable_clear(q->tasks, (void *)vine_task_delete);
 	itable_delete(q->tasks);
+
+	/* delete files after deleting tasks so that rc are correctly updated.
+	 * we make more than one pass to the file_table to make deal with
+	 * reference counts of unlink_when_done files associated with declare_temp outputs */
+	hash_table_clear(q->file_table, (void *)vine_file_delete);
+	hash_table_delete(q->file_table);
 
 	char *key;
 	struct category *c;
@@ -5090,9 +4953,9 @@ int vine_workers_shutdown(struct vine_manager *q, int n)
 		if (i >= n)
 			break;
 		if (itable_size(w->current_tasks) == 0) {
-			shut_down_worker(q, w);
+			vine_manager_shut_down_worker(q, w);
 
-			/* shut_down_worker alters the table, so we reset it here. */
+			/* vine_manager_shut_down_worker alters the table, so we reset it here. */
 			hash_table_firstkey(q->worker_table);
 			i++;
 		}
@@ -5381,7 +5244,8 @@ void vine_get_stats(struct vine_manager *q, struct vine_stats *s)
 	// info about resources
 	s->bandwidth = vine_get_effective_bandwidth(q);
 	struct vine_resources rtotal, rmin, rmax;
-	aggregate_workers_resources(q, &rtotal, &rmin, &rmax, NULL);
+	int64_t inuse_cache = 0;
+	aggregate_workers_resources(q, &rtotal, &rmin, &rmax, &inuse_cache, NULL);
 
 	s->total_cores = rtotal.cores.total;
 	s->total_memory = rtotal.memory.total;
@@ -5392,6 +5256,8 @@ void vine_get_stats(struct vine_manager *q, struct vine_stats *s)
 	s->committed_memory = rtotal.memory.inuse;
 	s->committed_disk = rtotal.disk.inuse;
 	s->committed_gpus = rtotal.gpus.inuse;
+
+	s->inuse_cache = inuse_cache;
 
 	s->min_cores = rmin.cores.total;
 	s->max_cores = rmax.cores.total;
@@ -5443,7 +5309,8 @@ Used to summarize queue state for vine_get_stats().
 */
 
 static void aggregate_workers_resources(struct vine_manager *q, struct vine_resources *total,
-		struct vine_resources *rmin, struct vine_resources *rmax, struct hash_table *features)
+		struct vine_resources *rmin, struct vine_resources *rmax, int64_t *inuse_cache,
+		struct hash_table *features)
 {
 	struct vine_worker_info *w;
 	char *key;
@@ -5452,6 +5319,7 @@ static void aggregate_workers_resources(struct vine_manager *q, struct vine_reso
 	bzero(total, sizeof(*total));
 	bzero(rmin, sizeof(*rmin));
 	bzero(rmax, sizeof(*rmax));
+	*inuse_cache = 0;
 
 	if (hash_table_size(q->worker_table) == 0) {
 		return;
@@ -5471,6 +5339,8 @@ static void aggregate_workers_resources(struct vine_manager *q, struct vine_reso
 
 		/* Sum up the total and inuse values in total. */
 		vine_resources_add(total, r);
+
+		*inuse_cache += w->inuse_cache;
 
 		/* Add all available features to the features table */
 		if (features) {
@@ -5498,6 +5368,9 @@ static void aggregate_workers_resources(struct vine_manager *q, struct vine_reso
 			vine_resources_max(rmax, r);
 		}
 	}
+
+	// vine_stats wants MB
+	*inuse_cache = (int64_t)ceil(*inuse_cache / (1.0 * MEGA));
 }
 
 /* This simple wrapper function allows us to hide the debug.h interface from the end user. */
@@ -5794,18 +5667,13 @@ void vine_undeclare_file(struct vine_manager *m, struct vine_file *f)
 
 	/*
 	Special case: If the manager has already been gc'ed
-	(e.g. by python exiting), we can still delete the
-	file object itself, which may have further cleanup
-	side effects.
+	(e.g. by python exiting), do nothing. Any memory or unlink_when_done files were gc'ed by vine_delete.
 	*/
-
 	if (!m) {
-		vine_file_delete(f);
 		return;
 	}
 
 	const char *filename = f->cached_name;
-
 	/*
 	If this is not a file that should be cached forever,
 	delete all of the replicas present at remote workers.
