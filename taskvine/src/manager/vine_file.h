@@ -54,6 +54,7 @@ struct vine_file {
 	char *source;       // Name of source file, url, buffer.
 	char *cached_name;  // Name of file in the worker's cache directory.
 	size_t size;        // Length of source data, if known.
+	time_t mtime;       // Modification time of source data, if known.
 	char *data;         // Raw data for an input or output buffer.
 	struct vine_task *mini_task; // Mini task used to generate the desired output file.
 	struct vine_task *recovery_task; // For temp files, a copy of the task that created it.
@@ -68,6 +69,8 @@ struct vine_file *vine_file_clone( struct vine_file *f );
 
 /* Decreases reference count of file, and frees if zero. */
 int vine_file_delete( struct vine_file *f );
+
+int vine_file_has_changed( struct vine_file *f );
 
 struct vine_file *vine_file_local( const char *source, vine_file_flags_t flags );
 struct vine_file *vine_file_url( const char *source, vine_file_flags_t flags );

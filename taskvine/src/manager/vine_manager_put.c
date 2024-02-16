@@ -400,45 +400,27 @@ If already cached, check that the file has not changed.
 static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_manager *q, struct vine_worker_info *w,
 		struct vine_task *t, struct vine_mount *m, struct vine_file *f)
 {
-	struct stat info;
-
-	if (f->type == VINE_FILE) {
-		/* If a regular file, check its status on the local filesystem. */
-		int result = lstat(f->source, &info);
-		if (result != 0) {
-			debug(D_NOTICE | D_VINE, "Couldn't access input file %s: %s", f->source, strerror(errno));
-			vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
-			return VINE_APP_FAILURE;
-		}
-	} else if (!f->cached_name) {
+	/* If the file source has changed, it's a violation of the workflow. */
+	
+	if(vine_file_has_changed(f)) {
+		vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
+		return VINE_APP_FAILURE;
+	}
+	
+	/* Every file must have a cached name, which should have been computed earlier. */
+	
+	if (!f->cached_name) {
 		debug(D_NOTICE | D_VINE, "Cache name could not be generated for input file %s", f->source);
 		vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
 		if (f->type == VINE_URL)
 			t->exit_code = 1;
 		return VINE_APP_FAILURE;
-	} else {
-		/* Any other type, just record dummy values for size and time, until we know better. */
-		info.st_size = f->size;
-		info.st_mtime = time(0);
 	}
 
-	/* Has this file already been sent and cached? */
+	/* If the file has already been replicated to this worker, no need to send it. */
+
 	struct vine_file_replica *replica = vine_file_replica_table_lookup(w, f->cached_name);
-
-	/*
-	If so, check that it hasn't changed, and return success.
-	XXX The mtime might not be set (0) if the file was cached
-	from a previous session.  This would work better if the
-	mtime was sent in file transfers, and then returned by
-	cache-update messages.
-	*/
-	if (replica) {
-		if (f->type == VINE_FILE && (info.st_size != replica->size || ((info.st_mtime != replica->mtime) &&
-											      (replica->mtime != 0)))) {
-			debug(D_NOTICE | D_VINE, "File %s has changed since it was first cached!", f->source);
-			debug(D_NOTICE | D_VINE, "You may be getting inconsistent results.");
-		}
-
+	if(replica) {
 		if (!(f->flags & VINE_CACHE)) {
 			debug(D_VINE,
 					"File %s is not marked as a cachable file, but it is used by more than one task. Marking as cachable.",
@@ -446,7 +428,6 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 			f->flags |= VINE_CACHE;
 		}
 
-		/* If the file is already cached, don't send it. */
 		return VINE_SUCCESS;
 	}
 
@@ -463,7 +444,7 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 	/* If the send succeeded, then record it in the worker */
 	if (result == VINE_SUCCESS) {
 		struct vine_file_replica *replica =
-				vine_file_replica_create(f->type, f->cache_level, info.st_size, info.st_mtime);
+				vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
 		vine_file_replica_table_insert(w, f->cached_name, replica);
 
 		switch (file_to_send->type) {

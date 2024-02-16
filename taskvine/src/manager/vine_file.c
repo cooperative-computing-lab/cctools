@@ -19,6 +19,8 @@ See the file COPYING for details.
 #include <limits.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
+#include <sys/stat.h>
 
 /* Internal use: when the worker uses the client library, do not recompute cached names. */
 int vine_hack_do_not_compute_cached_name = 0;
@@ -161,6 +163,39 @@ const char *vine_file_contents(struct vine_file *f)
 size_t vine_file_size(struct vine_file *f)
 {
 	return f->size;
+}
+
+/*
+Return true if the source of this file has changed since it was first used.
+This should not happen, it indicates a violation of the workflow semantics.
+*/
+
+int vine_file_has_changed( struct vine_file *f )
+{
+	if (f->type == VINE_FILE) {
+
+		struct stat info;
+
+		int result = lstat(f->source, &info);
+		if (result != 0) {
+			debug(D_NOTICE | D_VINE, "input file %s couldn't be accessed: %s", f->source, strerror(errno));
+			return 1;
+		}
+
+		if(f->mtime==0) {
+			/* If we have not observed time and size before, capture it now. */
+			f->mtime = info.st_mtime;
+			f->size  = info.st_size;
+		} else {
+			/* If we have seen it before, it should not have changed. */
+			if( f->mtime!=info.st_mtime || ((int64_t)f->size)!=((int64_t)info.st_size) ) {
+				debug(D_VINE|D_NOTICE,"input file %s was modified by someone in the middle of the workflow!\n",f->source);
+				return 1;
+			}
+		}
+	}
+
+	return 0;
 }
 
 struct vine_file *vine_file_local(const char *source, vine_file_flags_t flags)
