@@ -60,8 +60,6 @@ is consistent and avoids conflicts adequately. For directories, which are a subs
 it is important that the directory is hashed from its contents. This can be done by using a variation of a merkle tree.
 That is, each hash of a directory is a hash of the hashes of the files with the directory. This can be done recursively.
 
-VINE_EMPTY_DIR - Are there cases where an empty directory needs to be unique?
-
 VINE_URL - With files possibly hosted on remote machines, We generally dont have access to the contents unless one
 transfers the entire file to the site of the manager which is somewhat antithetical to the use case for VINE_URLs. Here,
 our general strategy is to only retrieve the header of the file from the server. With the information in the header,
@@ -312,9 +310,6 @@ char *vine_random_name(const struct vine_file *f, ssize_t *totalsize)
 	case VINE_FILE:
 		name = string_format("file-rnd-%s", random);
 		break;
-	case VINE_EMPTY_DIR:
-		name = string_format("empty");
-		break;
 	case VINE_MINI_TASK:
 		name = string_format("task-rnd-%s", random);
 		break;
@@ -356,10 +351,6 @@ char *vine_cached_name(const struct vine_file *f, ssize_t *totalsize)
 			/* A pending file gets a random name. */
 			name = vine_random_name(f, totalsize);
 		}
-		break;
-	case VINE_EMPTY_DIR:
-		/* All empty dirs have the same content! */
-		name = string_format("empty");
 		break;
 	case VINE_MINI_TASK:
 		/* A mini task is idenfied by the task properties. */

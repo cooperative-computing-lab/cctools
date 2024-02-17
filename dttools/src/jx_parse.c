@@ -82,7 +82,10 @@ struct jx_parser {
 
 static bool static_mode = false;
 
-void jx_parse_set_static_mode(bool mode) { static_mode = mode; }
+void jx_parse_set_static_mode(bool mode)
+{
+	static_mode = mode;
+}
 
 struct jx_parser *jx_parser_create(bool strict_mode)
 {
@@ -93,9 +96,15 @@ struct jx_parser *jx_parser_create(bool strict_mode)
 	return p;
 }
 
-void jx_parser_read_stream(struct jx_parser *p, FILE *file) { p->source_file = file; }
+void jx_parser_read_stream(struct jx_parser *p, FILE *file)
+{
+	p->source_file = file;
+}
 
-void jx_parser_read_string(struct jx_parser *p, const char *str) { p->source_string = str; }
+void jx_parser_read_string(struct jx_parser *p, const char *str)
+{
+	p->source_string = str;
+}
 
 void jx_parser_read_link(struct jx_parser *p, struct link *l, time_t stoptime)
 {
@@ -103,9 +112,15 @@ void jx_parser_read_link(struct jx_parser *p, struct link *l, time_t stoptime)
 	p->stoptime = stoptime;
 }
 
-int jx_parser_errors(struct jx_parser *p) { return p->errors; }
+int jx_parser_errors(struct jx_parser *p)
+{
+	return p->errors;
+}
 
-const char *jx_parser_error_string(struct jx_parser *p) { return p->error_string; }
+const char *jx_parser_error_string(struct jx_parser *p)
+{
+	return p->error_string;
+}
 
 void jx_parser_delete(struct jx_parser *p)
 {
@@ -132,7 +147,10 @@ static void jx_parse_error_a(struct jx_parser *p, char *str)
 Same as above, but accepts a constant string that will not be freed.
 */
 
-static void jx_parse_error_c(struct jx_parser *p, const char *str) { jx_parse_error_a(p, strdup(str)); }
+static void jx_parse_error_c(struct jx_parser *p, const char *str)
+{
+	jx_parse_error_a(p, strdup(str));
+}
 
 static struct jx *jx_add_lineno(struct jx_parser *p, struct jx *j)
 {

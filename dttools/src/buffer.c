@@ -49,9 +49,15 @@ void buffer_ubuf(buffer_t *b, char *buf, size_t len)
 	}
 }
 
-void buffer_max(buffer_t *b, size_t max) { b->max = max; }
+void buffer_max(buffer_t *b, size_t max)
+{
+	b->max = max;
+}
 
-void buffer_abortonfailure(buffer_t *b, int abortonfailure) { b->abort_on_failure = abortonfailure; }
+void buffer_abortonfailure(buffer_t *b, int abortonfailure)
+{
+	b->abort_on_failure = abortonfailure;
+}
 
 void buffer_free(buffer_t *b)
 {
@@ -178,7 +184,10 @@ const char *buffer_tolstring(buffer_t *b, size_t *size)
 	return b->buf;
 }
 
-size_t buffer_pos(buffer_t *b) { return inuse(b); }
+size_t buffer_pos(buffer_t *b)
+{
+	return inuse(b);
+}
 
 void buffer_rewind(buffer_t *b, size_t n)
 {

@@ -23,6 +23,9 @@ void sleep_until(time_t stoptime)
 	}
 }
 
-void sleep_for(time_t interval) { sleep_until(time(0) + interval); }
+void sleep_for(time_t interval)
+{
+	sleep_until(time(0) + interval);
+}
 
 /* vim: set noexpandtab tabstop=8: */

@@ -139,4 +139,7 @@ void vine_transfer_server_stop()
 	transfer_link = 0;
 }
 
-void vine_transfer_server_address(char *addr, int *port) { link_address_local(transfer_link, addr, port); }
+void vine_transfer_server_address(char *addr, int *port)
+{
+	link_address_local(transfer_link, addr, port);
+}

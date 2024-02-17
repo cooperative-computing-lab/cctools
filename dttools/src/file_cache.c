@@ -104,7 +104,10 @@ static int wait_for_running_txn(struct file_cache *c, const char *path)
 	}
 }
 
-static int mkdir_or_exists(const char *path, mode_t mode) { return mkdir(path, mode) == 0 || errno == EEXIST; }
+static int mkdir_or_exists(const char *path, mode_t mode)
+{
+	return mkdir(path, mode) == 0 || errno == EEXIST;
+}
 
 struct file_cache *file_cache_init(const char *root)
 {

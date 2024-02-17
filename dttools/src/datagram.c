@@ -67,7 +67,10 @@ failure:
 	return 0;
 }
 
-struct datagram *datagram_create(int port) { return datagram_create_address(NULL, port); }
+struct datagram *datagram_create(int port)
+{
+	return datagram_create_address(NULL, port);
+}
 
 void datagram_delete(struct datagram *d)
 {
@@ -155,6 +158,9 @@ int datagram_send(struct datagram *d, const char *data, int length, const char *
 	return result;
 }
 
-int datagram_fd(struct datagram *d) { return d->fd; }
+int datagram_fd(struct datagram *d)
+{
+	return d->fd;
+}
 
 /* vim: set noexpandtab tabstop=8: */

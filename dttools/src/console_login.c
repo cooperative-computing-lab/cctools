@@ -91,6 +91,9 @@ int console_login(const char *service, char *name, int namelen, char *pass, int 
 	return result;
 }
 
-int console_input(const char *prompt, char *buf, int buflen) { return do_getline(prompt, buf, buflen, 0); }
+int console_input(const char *prompt, char *buf, int buflen)
+{
+	return do_getline(prompt, buf, buflen, 0);
+}
 
 /* vim: set noexpandtab tabstop=8: */

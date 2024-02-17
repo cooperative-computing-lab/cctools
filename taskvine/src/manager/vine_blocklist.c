@@ -19,7 +19,10 @@ struct vine_blocklist_info *vine_blocklist_info_create()
 	return info;
 }
 
-void vine_blocklist_info_delete(struct vine_blocklist_info *info) { free(info); }
+void vine_blocklist_info_delete(struct vine_blocklist_info *info)
+{
+	free(info);
+}
 
 void vine_blocklist_unblock(struct vine_manager *q, const char *host)
 {

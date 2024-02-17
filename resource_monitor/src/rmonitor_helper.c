@@ -181,11 +181,20 @@ pid_t fork()
 	return pid;
 }
 
-pid_t __fork() { return fork(); }
+pid_t __fork()
+{
+	return fork();
+}
 
-pid_t vfork() { return fork(); }
+pid_t vfork()
+{
+	return fork();
+}
 
-pid_t __vfork() { return fork(); }
+pid_t __vfork()
+{
+	return fork();
+}
 
 int chdir(const char *path)
 {
@@ -550,7 +559,10 @@ ssize_t recvmsg(int fd, struct msghdr *mg, int flags)
 
 /* dummy handler. In RH5, SIGCONT is ignored by sigprocmask/sigtimedwait,
  * unless handler is different than SIG_IGN. */
-void exit_signal_handler(int signum) { return; }
+void exit_signal_handler(int signum)
+{
+	return;
+}
 
 void exit_wrapper_preamble(int status)
 {
@@ -710,7 +722,10 @@ pid_t waitpid(pid_t pid, int *status, int options)
 	return pidb;
 }
 
-pid_t wait(int *status) { return waitpid(-1, status, 0); }
+pid_t wait(int *status)
+{
+	return waitpid(-1, status, 0);
+}
 
 #if defined(__clang__) || defined(__GNUC__)
 

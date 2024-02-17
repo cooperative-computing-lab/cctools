@@ -191,11 +191,11 @@ void catalog_export_html_datetime_picker( struct link *l, time_t stoptime, time_
 		"}"
 	"</script>"
 	"<p>"
-		"<a href='/history/%ld' style='padding: 0 10px' title='Move backward one day'><</a>"
-		"<input type='date' id='day' name='day' value='%d-%02d-%02d' />"
-		"<input type='time' id='time' name='time' value='%02d:%02d'/>"
+		"<a href='/history/%ld' style='padding: 0 10px' title='Move backward one day'></a>"
+		"<input type='date' id='day' name='day' value='%d-%02d-%02d'>"
+		"<input type='time' id='time' name='time' value='%02d:%02d'>"
 		"<button type='button' onclick='redirect()'>Go To</button>"
-		"<a href='/history/%ld' style='padding: 0 10px' title='Move foreward one day'>></a>"
+		"<a href='/history/%ld' style='padding: 0 10px' title='Move forward one day'></a>"
 	"</p>",
 	yesterday, year, month, day, hour, minute, tomorrow);
 }

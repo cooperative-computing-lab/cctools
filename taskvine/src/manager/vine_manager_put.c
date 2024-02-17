@@ -315,12 +315,6 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 		result = vine_manager_put_url(q, w, t, f);
 		break;
 
-	case VINE_EMPTY_DIR:
-		debug(D_VINE, "%s (%s) will create directory %s", w->hostname, w->addrport, m->remote_name);
-		// Do nothing.  Empty directories are handled by the task specification, while recursive directories are
-		// implemented as VINE_FILEs
-		break;
-
 	case VINE_TEMP:
 		debug(D_VINE, "%s (%s) will use temp file %s", w->hostname, w->addrport, f->source);
 		// Do nothing.  Temporary files are created and used in place.
@@ -415,10 +409,14 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 	cache-update messages.
 	*/
 	if (replica) {
-		if (f->type == VINE_FILE && (info.st_size != replica->size || ((info.st_mtime != replica->mtime) &&
-											      (replica->mtime != 0)))) {
-			debug(D_NOTICE | D_VINE, "File %s has changed since it was first cached!", f->source);
-			debug(D_NOTICE | D_VINE, "You may be getting inconsistent results.");
+		/* Disabling this out until the check is fixed */
+		if (0) {
+			if (f->type == VINE_FILE &&
+					(info.st_size != replica->size ||
+							((info.st_mtime != replica->mtime) && (replica->mtime != 0)))) {
+				debug(D_NOTICE | D_VINE, "File %s has changed since it was first cached!", f->source);
+				debug(D_NOTICE | D_VINE, "You may be getting inconsistent results.");
+			}
 		}
 
 		if (!(f->flags & VINE_CACHE)) {
@@ -450,7 +448,6 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 		switch (file_to_send->type) {
 		case VINE_URL:
 		case VINE_TEMP:
-		case VINE_EMPTY_DIR:
 			/* For these types, a cache-update will arrive when the replica actually exists. */
 			replica->state = VINE_FILE_REPLICA_STATE_PENDING;
 			break;
@@ -558,24 +555,19 @@ vine_result_code_t vine_manager_put_task(struct vine_manager *q, struct vine_wor
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
 	 * set_*, if used. */
 	char *var;
-	LIST_ITERATE(t->env_list, var) { vine_manager_send(q, w, "env %zu\n%s\n", strlen(var), var); }
+	LIST_ITERATE(t->env_list, var)
+	{
+		vine_manager_send(q, w, "env %zu\n%s\n", strlen(var), var);
+	}
 
 	if (t->input_mounts) {
 		struct vine_mount *m;
 		LIST_ITERATE(t->input_mounts, m)
 		{
-			if (m->file->type == VINE_EMPTY_DIR) {
-				vine_manager_send(q, w, "dir %s\n", m->remote_name);
-			} else {
-				char remote_name_encoded[PATH_MAX];
-				url_encode(m->remote_name, remote_name_encoded, PATH_MAX);
-				vine_manager_send(q,
-						w,
-						"infile %s %s %d\n",
-						m->file->cached_name,
-						remote_name_encoded,
-						m->flags);
-			}
+			char remote_name_encoded[PATH_MAX];
+			url_encode(m->remote_name, remote_name_encoded, PATH_MAX);
+			vine_manager_send(
+					q, w, "infile %s %s %d\n", m->file->cached_name, remote_name_encoded, m->flags);
 		}
 	}
 

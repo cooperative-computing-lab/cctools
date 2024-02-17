@@ -943,7 +943,10 @@ const struct rmsummary *category_task_min_resources(
 	return internal;
 }
 
-int category_in_steady_state(struct category *c) { return c->steady_state; }
+int category_in_steady_state(struct category *c)
+{
+	return c->steady_state;
+}
 
 void category_tune_bucket_size(const char *resource, int64_t size)
 {

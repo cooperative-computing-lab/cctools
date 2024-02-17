@@ -47,7 +47,8 @@ typedef enum {
 	VINE_FAILURE_ONLY = 4,    /**< Only return this output file if the task failed.  (Useful for returning large log files.) */
 	VINE_SUCCESS_ONLY = 8,    /**< Only return this output file if the task succeeded. */
 	VINE_RETRACT_ON_RESET = 16,  /**< Remove this file from the mount lists if the task is reset. (TaskVine internal use only.) */
-	VINE_MOUNT_SYMLINK = 32   /**< Permit this directory to be mounted via symlink instead of hardlink. */
+	VINE_MOUNT_SYMLINK = 32,   /**< Permit this directory to be mounted via symlink instead of hardlink. */
+	VINE_MOUNT_MKDIR = 64     /**< Create this empty output directory in the task sandbox prior to execution. */
 } vine_mount_flags_t;
 
 /** Control caching and sharing behavior of file objects.
@@ -212,6 +213,8 @@ struct vine_stats {
 	int64_t min_memory;       /**< The smallest memory size in MB observed among the connected workers. */
 	int64_t min_disk;         /**< The smallest disk space in MB observed among the connected workers. */
 	int64_t min_gpus;         /**< The smallest number of gpus observed among the connected workers. */
+
+	int64_t inuse_cache;     /**< Used disk space of declared files in MB aggregated across the connected workers. */
 };
 
 /** @name Functions - Tasks */
@@ -714,19 +717,6 @@ workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
 @return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
 */
 struct vine_file * vine_declare_buffer( struct vine_manager *m, const char *buffer, size_t size, vine_file_flags_t flags );
-
-
-/** Create a file object representing an empty directory.
-This is very occasionally needed for applications that expect
-certain directories to exist in the working directory, prior to producing output.
-This function does not transfer any data to the task, but just creates
-a directory in its working sandbox.  If you want to transfer an entire
-directory worth of data to a task, use @ref vine_declare_file and give a
-directory name.
-@param m A manager object
-@return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
-*/
-struct vine_file * vine_declare_empty_dir( struct vine_manager *m );
 
 
 /** Create a file object produced from a mini-task

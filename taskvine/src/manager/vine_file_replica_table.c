@@ -18,6 +18,7 @@ See the file COPYING for details.
 // add a file to the remote file table.
 int vine_file_replica_table_insert(struct vine_worker_info *w, const char *cachename, struct vine_file_replica *replica)
 {
+	w->inuse_cache += replica->size;
 	hash_table_insert(w->current_files, cachename, replica);
 	return 1;
 }
@@ -25,7 +26,12 @@ int vine_file_replica_table_insert(struct vine_worker_info *w, const char *cache
 // remove a file from the remote file table.
 struct vine_file_replica *vine_file_replica_table_remove(struct vine_worker_info *w, const char *cachename)
 {
-	return hash_table_remove(w->current_files, cachename);
+	struct vine_file_replica *replica = hash_table_remove(w->current_files, cachename);
+	if (replica) {
+		w->inuse_cache -= replica->size;
+	}
+
+	return replica;
 }
 
 // lookup a file in posession of a specific worker

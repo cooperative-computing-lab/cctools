@@ -12,7 +12,10 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <unistd.h>
 
-int username_is_super() { return !getuid(); }
+int username_is_super()
+{
+	return !getuid();
+}
 
 int username_get(char *name)
 {

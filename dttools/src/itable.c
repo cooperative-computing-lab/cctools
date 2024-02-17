@@ -78,7 +78,10 @@ void itable_delete(struct itable *h)
 	free(h);
 }
 
-int itable_size(struct itable *h) { return h->size; }
+int itable_size(struct itable *h)
+{
+	return h->size;
+}
 
 void *itable_lookup(struct itable *h, UINT64_T key)
 {

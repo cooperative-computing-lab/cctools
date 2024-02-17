@@ -224,7 +224,10 @@ out:
 	return RCUNIX(rc);
 }
 
-int elf_get_interp(int fd, char *interp) { return elf_interp(fd, 0, interp); }
+int elf_get_interp(int fd, char *interp)
+{
+	return elf_interp(fd, 0, interp);
+}
 
 int elf_set_interp(int fd, const char *interp)
 {

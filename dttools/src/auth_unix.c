@@ -26,11 +26,20 @@ static char challenge_dir[AUTH_LINE_MAX] = "/tmp";
 static char alternate_passwd_file[AUTH_LINE_MAX] = "\0";
 static int challenge_timeout = 5;
 
-void auth_unix_challenge_dir(const char *path) { strcpy(challenge_dir, path); }
+void auth_unix_challenge_dir(const char *path)
+{
+	strcpy(challenge_dir, path);
+}
 
-void auth_unix_passwd_file(const char *path) { strcpy(alternate_passwd_file, path); }
+void auth_unix_passwd_file(const char *path)
+{
+	strcpy(alternate_passwd_file, path);
+}
 
-void auth_unix_timeout_set(int secs) { challenge_timeout = secs; }
+void auth_unix_timeout_set(int secs)
+{
+	challenge_timeout = secs;
+}
 
 static int auth_unix_assert(struct link *link, time_t stoptime)
 {
