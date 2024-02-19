@@ -23,25 +23,25 @@ def my_sum(x, y, negate=False):
 
 
 def main():
-    # Create Executor
-    executor = vine.Executor(port=9123, manager_name='vine_matrtix_build_test', factory=False)
+    executor = vine.FuturesExecutor(
+        port=9123, manager_name="vine_matrtix_build_test", factory=False
+    )
     print("listening on port {}".format(executor.manager.port))
     with open(port_file, "w") as f:
         f.write(str(executor.manager.port))
 
-
     # Submit several tasks for execution:
     print("submitting tasks...")
 
-    t1 = executor.future_pythontask(my_sum, 7, 4)
+    t1 = executor.future_task(my_sum, 7, 4)
     t1.set_cores(1)
     a = executor.submit(t1)
 
-    t2 = executor.future_pythontask(my_sum, a, a)
+    t2 = executor.future_task(my_sum, a, a)
     t2.set_cores(1)
     b = executor.submit(t2)
 
-    t3 = executor.future_pythontask(my_sum, a, b)
+    t3 = executor.future_task(my_sum, a, b)
     t3.set_cores(1)
     c = executor.submit(t3)
 
@@ -56,7 +56,7 @@ def main():
     assert res == c
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
 
 
