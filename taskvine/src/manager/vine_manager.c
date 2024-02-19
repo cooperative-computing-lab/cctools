@@ -768,7 +768,6 @@ static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vi
 	hash_table_remove(q->worker_table, w->hashkey);
 	hash_table_remove(q->workers_with_available_results, w->hashkey);
 
-	record_removed_worker_stats(q, w);
 	vine_manager_factory_worker_leave(q, w);
 
 	vine_worker_delete(w);
