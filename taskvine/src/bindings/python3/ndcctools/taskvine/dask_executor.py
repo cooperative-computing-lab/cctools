@@ -12,6 +12,7 @@ from .manager import Manager
 from .task import PythonTask
 from .task import FunctionCall
 from .dask_dag import DaskVineDag
+from .cvine import VINE_TEMP
 
 import cloudpickle
 import os
@@ -82,8 +83,7 @@ class DaskVine(Manager):
     #                       (use the value of 'resources' above), 'max througput',
     #                       'max' (for maximum values seen), 'min_waste', 'greedy bucketing'
     #                       or 'exhaustive bucketing'. This is done per function type in dsk.
-    # @param task_mode     Create tasks as either PythonTasks('tasks') or Function Calls
-    #                      ('function-calls')
+    # @param task_mode     Create tasks as either as tasks (using PythonTasks) or 'function-calls' (using FunctionCalls)
     # @param retries       Number of times to attempt a task. Default is 5.
     # @param submit_per_cycle Maximum number of tasks to serialize per wait call. If None, or less than 1, then all
     #                         tasks are serialized as they are available.
@@ -204,8 +204,11 @@ class DaskVine(Manager):
                     print(f"{t.key} ran on {t.hostname}")
 
                 if t.successful():
-                    rs = dag.set_result(t.key, DaskVineFile(t._output_file, t.key, self.task_mode))
+                    result_file = DaskVineFile(t.output_file, t.key, dag, self.task_mode)
+                    rs = dag.set_result(t.key, result_file)
                     self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
+
+                    result_file.garbage_collect_children(self)
                 else:
                     retries_left = t.decrement_retry()
                     print(f"task id {t.id} key {t.key} failed: {t.result}. {retries_left} attempts left.\n{t.std_output}")
@@ -298,21 +301,21 @@ class DaskVine(Manager):
 
 
 class DaskVineFile:
-    def __init__(self, file, key, task_mode):
+    def __init__(self, file, key, dag, task_mode):
         self._file = file
+        self._key = key
         self._loaded = False
         self._load = None
         self._task_mode = task_mode
+        self._dag = dag
+        self._is_target = key in dag.get_targets()
+
+        self._checkpointed = False
+
         assert file
 
     def load(self):
         if not self._loaded:
-
-            if self._task_mode == 'tasks':
-                with open(self.staging_path, "rb") as f:
-                    self._load = cloudpickle.load(f)
-                    self._loaded = True
-
             if self._task_mode == 'function-calls':
                 output = cloudpickle.loads(self._file.contents())
                 self._loaded = True
@@ -320,6 +323,10 @@ class DaskVineFile:
                     self._load = output['Result']
                 else:
                     self._load = output['Reason']
+            else:
+                with open(self.source(), "rb") as f:
+                    self._load = cloudpickle.load(f)
+                    self._loaded = True
 
         return self._load
 
@@ -327,9 +334,34 @@ class DaskVineFile:
     def file(self):
         return self._file
 
-    @property
-    def staging_path(self):
-        return self._file.source()
+    def is_temp(self):
+        return self._file.file_type() == VINE_TEMP
+
+    def ready_for_gc(self):
+        # file on disk ready to be gc if the keys that needed as an input for computation are themselves ready.
+        if not self._ready_for_gc:
+            self._ready_for_gc = all(f.ready_for_gc() for f in self._dag.get_parents().values())
+        return self._ready_for_gc
+
+    def garbage_collect_children(self, manager):
+        if self._checkpointed:
+            return
+
+        if self.is_temp():
+            # do nothing until all the nodes that need this result have been completed and have been checkpointed
+            for p in self._dag.get_parents(self._key):
+                if not (self._dag.has_result(p) and self._dag.get_result(p)._checkpointed):
+                    return
+            self._checkpointed = True
+        else:
+            # files that are not temporary are immediately considered checkpointed
+            self._checkpointed = True
+
+        for c in self._dag.get_children(self._key):
+            r = self._dag.get_result(c)
+            r.garbage_collect_children(manager)
+            if r._checkpointed and not r._is_target:
+                manager.undeclare_file(r._file)
 
 
 ##
@@ -382,7 +414,11 @@ class PythonTaskDask(PythonTask):
         self._retries_left = retries
 
         args_raw = {k: dag.get_result(k) for k in dag.get_children(key)}
-        args = {k: f"{uuid4()}.p" for k, v in args_raw.items() if isinstance(v, DaskVineFile)}
+        args = {
+            k: f"{uuid4()}.p"
+            for k, v in args_raw.items()
+            if isinstance(v, DaskVineFile)
+        }
 
         keys_of_files = list(args.keys())
         args = args_raw | args
@@ -398,8 +434,6 @@ class PythonTaskDask(PythonTask):
             self.set_category(category)
         if lazy_transfers:
             self.enable_temp_output()
-        else:
-            self.set_output_name(f"{m.staging_directory}/{uuid4()}.p")
         if environment:
             self.add_environment(environment)
         if extra_files:
@@ -547,7 +581,6 @@ def set_at_indices(lst, indices, value):
 
 
 # Returns a list of tuples [(k, (i,j,...)] where (i,j,...) are the indices of k in lists.
-
 def find_in_lists(lists, predicate=lambda s: True, indices=None):
     if not indices:
         indices = []

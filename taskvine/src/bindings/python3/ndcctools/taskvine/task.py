@@ -13,9 +13,7 @@ from .file import File
 
 import copy
 import os
-import shutil
 import sys
-import tempfile
 import textwrap
 import uuid
 import cloudpickle
@@ -776,15 +774,15 @@ class PythonTask(Task):
         self._output_loaded = False
         self._output = None
         self._stdout = None
-        self._tmpdir = None
 
         self._id = str(uuid.uuid4())
-        self._func_file = f"function_{self._id}.p"
-        self._args_file = f"args_{self._id}.p"
-        self._out_name_file = f"out_{self._id}.p"
-        self._stdout_file = f"stdout_{self._id}.p"
-        self._wrapper = f"pytask_wrapper_{self._id}.py"
+        self._func_file = None
+        self._args_file = None
+        self._wrapper_file = None
+        self._output_file = None
         self._serialize_output = True
+
+        self._out_name_file = self._id
 
         self._command = self._python_function_command()
 
@@ -809,10 +807,6 @@ class PythonTask(Task):
     # @param manager Manager to which the task was submitted
     def submit_finalize(self):
         super().submit_finalize()
-        self._tmpdir = tempfile.mkdtemp(dir=self.manager.staging_directory)
-        self._serialize_python_function(*self._fn_def)
-        self._fn_def = None  # avoid possible memory leak
-        self._create_wrapper()
         self._add_IO_files()
 
     # remove any temp files generated
@@ -820,8 +814,12 @@ class PythonTask(Task):
     # then temp files will be deleted in the atexit of the manager staging directory
     def __del__(self):
         try:
-            if self._tmpdir:
-                shutil.rmtree(self._tmpdir, ignore_errors=True)
+            if self._func_file:
+                self.manager.undeclare_file(self._func_file)
+            if self._args_file:
+                self.manager.undeclare_file(self._args_file)
+            if self._wrapper_file:
+                self.manager.undeclare_file(self._wrapper_file)
             super().__del__()
         except TypeError:
             # in case the interpreter is shuting down. staging files will be deleted by manager atexit function.
@@ -889,7 +887,7 @@ class PythonTask(Task):
         if not self._output_loaded:
             if self.successful():
                 try:
-                    with open(os.path.join(self._tmpdir, self._out_name_file), "rb") as f:
+                    with open(self._output_file.source(), "rb") as f:
                         if self._serialize_output:
                             self._output = cloudpickle.load(f)
                         else:
@@ -902,16 +900,6 @@ class PythonTask(Task):
             self._output_loaded = True
         return self._output
 
-    @property
-    def std_output(self):
-        try:
-            if not self._stdout:
-                with open(os.path.join(self._tmpdir, self._stdout_file), "r") as f:
-                    self._stdout = str(f.read())
-            return self._stdout
-        except Exception:
-            return None
-
     ##
     # Disables serialization of results to disk when writing to a file for transmission.
     # WARNING: Only do this if the function itself encodes the output in a way amenable
@@ -921,41 +909,47 @@ class PythonTask(Task):
     def disable_output_serialization(self):
         self._serialize_output = False
 
-    def _serialize_python_function(self, func, args, kwargs):
-        with open(os.path.join(self._tmpdir, self._func_file), "wb") as wf:
-            cloudpickle.dump(func, wf)
-        with open(os.path.join(self._tmpdir, self._args_file), "wb") as wf:
-            cloudpickle.dump([args, kwargs], wf)
-
     def _python_function_command(self, remote_env_dir=None):
         if remote_env_dir:
             py_exec = "python"
         else:
             py_exec = f"python{sys.version_info[0]}"
 
-        command = f"{py_exec} {self._wrapper} {self._func_file} {self._args_file} {self._id} > {self._stdout_file} 2>&1"
+        command = f"{py_exec} w_{self._id} f_{self._id} a_{self._id} o_{self._id}"
         return command
 
     def _add_IO_files(self):
-        def source(name):
-            return os.path.join(self._tmpdir, name)
-        for name in [self._wrapper, self._func_file, self._args_file]:
-            f = self.manager.declare_file(source(name))
-            self.add_input(f, name)
+        func, args, kwargs = self._fn_def
+        self._fn_def = None
 
-        f = self.manager.declare_file(source(self._stdout_file))
-        self.add_output(f, self._stdout_file)
+        name = os.path.join(self.manager.staging_directory, "functions", self._id)
+        with open(name, "wb") as wf:
+            cloudpickle.dump(func, wf)
+        self._func_file = self.manager.declare_file(name, unlink_when_done=True)
+        self.add_input(self._func_file, f"f_{self._id}")
+
+        name = os.path.join(self.manager.staging_directory, "arguments", self._id)
+        with open(name, "wb") as wf:
+            cloudpickle.dump([args, kwargs], wf)
+        self._args_file = self.manager.declare_file(name, unlink_when_done=True)
+        self.add_input(self._args_file, f"a_{self._id}")
+
+        name = os.path.join(self.manager.staging_directory, "functions", f"w_{self._id}")
+        self._create_wrapper(name)
+        self._wrapper_file = self.manager.declare_file(name, unlink_when_done=True)
+        self.add_input(self._wrapper_file, f"w_{self._id}")
 
         if self._tmp_output_enabled:
             self._output_file = self.manager.declare_temp()
         else:
-            self._output_file = self.manager.declare_file(source(self._out_name_file), cache=self._cache_output)
-        self.add_output(self._output_file, self._id)
+            name = os.path.join(self.manager.staging_directory, "outputs", self._out_name_file)
+            self._output_file = self.manager.declare_file(name, cache=self._cache_output, unlink_when_done=True)
+        self.add_output(self._output_file, f"o_{self._id}")
 
     ##
     # creates the wrapper script which will execute the function. pickles output.
-    def _create_wrapper(self):
-        with open(os.path.join(self._tmpdir, self._wrapper), "w") as f:
+    def _create_wrapper(self, filename):
+        with open(filename, "w") as f:
             f.write(
                 textwrap.dedent(
                     f"""
