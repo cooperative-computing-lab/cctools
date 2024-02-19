@@ -588,7 +588,7 @@ class TxnPlot:
         ticks = sorted(list(set(ticks)))
         return ticks
     
-    def show_events(self, fig, manager):
+    def show_app_log(self, fig, manager):
         line_label_sep = 0.005
         for t, msg in manager.phases.items():
             fig.axvline(x=t, color='black', linestyle='-')
@@ -612,7 +612,8 @@ class TxnPlot:
             s.set_xlabel("time")
             s.tick_params(axis='both', which='major', labelsize=15)
             self.plot(s, m)
-            self.show_events(s, m)
+            if not self.opts.noapp:
+                self.show_app_log(s, m)
             self.set_legend(s)
 
         if self.opts.output:
@@ -625,7 +626,7 @@ class TxnPlot:
         if self.opts.legend != 'none':
             handles = [mpl.patches.Patch(color=c, label=l) for l,c in self.legend.items()]
             fig.legend(loc=self.opts.legend, handles=handles, fontsize=args.fontsize)
- 
+
     def plot(self, fig, manager):
         return NotImplemented
 
@@ -891,6 +892,7 @@ if __name__ == "__main__":
     parser.add_argument('--height', nargs='?', type=float, help='height in inches. Default is 2/3 of width', default=None)
     parser.add_argument('--dpi', nargs='?', type=int, help='output image resoulution', default=300)
     parser.add_argument('--tex', action='store_true', help='use tex fonts')
+    parser.add_argument('--noapp', action='store_true', help='do not show custom application lines')
     parser.add_argument('--nograph', action='store_true', help='do not show a matplotlib window')
     parser.add_argument('--dask-colors', action='store_true', help='color palette aligns with Dask\'s')
     parser.add_argument('--fontsize', nargs='?', type=str, help='set fontsize of figure legend', default='medium')
