@@ -27,12 +27,12 @@ except Exception:
 
 
 ##
-# \class Executor
+# \class FuturesExecutor
 #
-# TaskVine Executor object
+# TaskVine FuturesExecutor object
 #
 # This class acts as an interface for the creation of Futures
-class Executor(Executor):
+class FuturesExecutor(Executor):
     def __init__(self, port=9123, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull, factory=True, opts={}):
         self.manager = Manager(port=port)
         self.port = self.manager.port
@@ -65,10 +65,10 @@ class Executor(Executor):
             self.manager.submit(fn)
             self.task_table.append(fn)
             return fn._future
-        future_pythontask = self.future_pythontask(fn, *args, **kwargs)
-        self.submit(future_pythontask)
+        future_task = self.future_task(fn, *args, **kwargs)
+        self.submit(future_task)
 
-    def future_pythontask(self, fn, *args, **kwargs):
+    def future_task(self, fn, *args, **kwargs):
         return FuturePythonTask(self.manager, False, fn, *args, **kwargs)
 
     def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True, import_modules=None):
