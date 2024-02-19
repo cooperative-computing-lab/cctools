@@ -133,6 +133,8 @@ static void handle_library_update(struct vine_manager *q, struct vine_worker_inf
 static struct jx *manager_to_jx(struct vine_manager *q);
 static struct jx *manager_lean_to_jx(struct vine_manager *q);
 
+static struct vine_task *find_library_on_worker_for_task(struct vine_worker_info *w, const char *library_name);
+
 char *vine_monitor_wrap(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *limits);
 
@@ -2652,6 +2654,7 @@ static void commit_task_to_worker(struct vine_manager *q, struct vine_worker_inf
 	 * If the manager fails to send this function task to the worker however,
 	 * then the count will be decremented properly in @handle_failure() below. */
 	if (t->needs_library) {
+		t->library_task = find_library_on_worker_for_task(w, t->needs_library);
 		t->library_task->function_slots_inuse++;
 	}
 

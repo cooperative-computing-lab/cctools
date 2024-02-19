@@ -1017,8 +1017,9 @@ class FunctionCall(Task):
         self._event["fn_args"] = args
         self.set_time_max(900)     # maximum run time for function calls is 900s by default.
         self.needs_library(library_name)
+        self._tmp_output_enabled = False
         self._input_buffer = None
-        self._output_buffer = None
+        self._output_file = None
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -1026,12 +1027,16 @@ class FunctionCall(Task):
     # execution.
     #
     # @param self 	Reference to the current python task object
+    # @param manager Manager to which the task was submitted
     def submit_finalize(self):
         super().submit_finalize()
-        self._input_buffer = self.manager.declare_buffer(buffer=cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
+        self._input_buffer = self.manager.declare_buffer(cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
         self.add_input(self._input_buffer, "infile")
-        self._output_buffer = self.manager.declare_buffer(buffer=None, cache=False, peer_transfer=False)
-        self.add_output(self._output_buffer, "outfile")
+        if self._tmp_output_enabled:
+            self._output_file = self.manager.declare_temp()
+        else:
+            self._output_file = self.manager.declare_buffer(cache=False, peer_transfer=False)
+        self.add_output(self._output_file, "outfile")
 
     ##
     # Specify function arguments. Accepts arrays and dictionaries. This
@@ -1055,15 +1060,24 @@ class FunctionCall(Task):
             remote_task_exec_method = "fork"
         self._event["remote_task_exec_method"] = remote_task_exec_method
 
+    def set_output_cache(self, cache=False):
+        self._cache_output = cache
+
+    def enable_temp_output(self):
+        self._tmp_output_enabled = True
+
+    def disable_temp_output(self):
+        self._tmp_output_enabled = False
+
     ##
     # Retrieve output, handles cleanup, and returns result or failure reason.
     @property
     def output(self):
-        output = cloudpickle.loads(self._output_buffer.contents())
-        self.manager.undeclare_file(self._input_buffer)
+        output = cloudpickle.loads(self._output_file.contents())
+        self._manager.undeclare_file(self._input_buffer)
         self._input_buffer = None
-        self.manager.undeclare_file(self._output_buffer)
-        self._output_buffer = None
+        self._manager.undeclare_file(self._output_file)
+        self._output_file = None
 
         if output['Success']:
             return output['Result']
@@ -1077,9 +1091,12 @@ class FunctionCall(Task):
             if self._input_buffer:
                 self.manager.undeclare_file(self._input_buffer)
                 self._input_buffer = None
-            if self._output_buffer:
-                self.manager.undeclare_file(self._output_buffer)
-                self._output_buffer = None
+
+            if self._output_file:
+                if not self._tmp_output_enabled:
+                    self._manager.undeclare_file(self._output_file)
+                    self._output_file = None
+
             super().__del__()
         except TypeError:
             pass
