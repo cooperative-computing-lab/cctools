@@ -58,6 +58,7 @@ struct vine_file {
 	char *data;         // Raw data for an input or output buffer.
 	struct vine_task *mini_task; // Mini task used to generate the desired output file.
 	struct vine_task *recovery_task; // For temp files, a copy of the task that created it.
+	int change_message_shown; // True if error message already shown.
 	int refcount;       // Number of references from a task object, delete when zero.
 };
 

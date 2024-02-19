@@ -189,9 +189,12 @@ int vine_file_has_changed(struct vine_file *f)
 		} else {
 			/* If we have seen it before, it should not have changed. */
 			if (f->mtime != info.st_mtime || ((int64_t)f->size) != ((int64_t)info.st_size)) {
-				debug(D_VINE | D_NOTICE,
-						"input file %s was modified by someone in the middle of the workflow!\n",
-						f->source);
+				if (!f->change_message_shown) {
+					debug(D_VINE | D_NOTICE,
+							"input file %s was modified by someone in the middle of the workflow!\n",
+							f->source);
+					f->change_message_shown++;
+				}
 				return 1;
 			}
 		}
