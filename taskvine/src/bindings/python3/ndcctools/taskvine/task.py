@@ -770,16 +770,11 @@ class PythonTask(Task):
     # @param args	arguments used in function to be executed by task
     # @param kwargs	keyword arguments used in function to be executed by task
     def __init__(self, func, *args, **kwargs):
-        self._pp_run = None
+        self._id = str(uuid.uuid4())
+
         self._output_loaded = False
         self._output = None
-        self._stdout = None
 
-        self._id = str(uuid.uuid4())
-        self._func_file = None
-        self._args_file = None
-        self._wrapper_file = None
-        self._output_file = None
         self._serialize_output = True
 
         self._out_name_file = self._id
@@ -791,6 +786,9 @@ class PythonTask(Task):
 
         # vine File object that will contain the output of this function
         self._output_file = None
+
+        # vine File object with the serialized arguments to the function
+        self._args_file = None
 
         # we delay any PythonTask initialization until the task is submitted to
         # a manager. This is because we don't know the staging directory where
@@ -807,19 +805,16 @@ class PythonTask(Task):
     # @param manager Manager to which the task was submitted
     def submit_finalize(self):
         super().submit_finalize()
-        self._add_IO_files()
+        self._add_inputs_outputs(self.manager, *self._fn_def)
+        self._fn_def = None  # avoid possible memory leak
 
-    # remove any temp files generated
+    # remove any ancillary files generated
     # if __del__ is never called, or called too late (e.g. on interpreter shutdown),
     # then temp files will be deleted in the atexit of the manager staging directory
     def __del__(self):
         try:
-            if self._func_file:
-                self.manager.undeclare_file(self._func_file)
             if self._args_file:
                 self.manager.undeclare_file(self._args_file)
-            if self._wrapper_file:
-                self.manager.undeclare_file(self._wrapper_file)
             super().__del__()
         except TypeError:
             # in case the interpreter is shuting down. staging files will be deleted by manager atexit function.
@@ -918,71 +913,61 @@ class PythonTask(Task):
         command = f"{py_exec} w_{self._id} f_{self._id} a_{self._id} o_{self._id}"
         return command
 
-    def _add_IO_files(self):
-        func, args, kwargs = self._fn_def
-        self._fn_def = None
+    def _add_inputs_outputs(self, manager, func, args, kwargs):
+        self.add_input(self._fn_wrapper(manager, self._serialize_output), f"w_{self._id}")
+        self.add_input(self._fn_buffer(manager, func), f"f_{self._id}")
 
-        name = os.path.join(self.manager.staging_directory, "functions", self._id)
-        with open(name, "wb") as wf:
-            cloudpickle.dump(func, wf)
-        self._func_file = self.manager.declare_file(name, unlink_when_done=True)
-        self.add_input(self._func_file, f"f_{self._id}")
-
-        name = os.path.join(self.manager.staging_directory, "arguments", self._id)
+        name = os.path.join(manager.staging_directory, "arguments", self._id)
         with open(name, "wb") as wf:
             cloudpickle.dump([args, kwargs], wf)
-        self._args_file = self.manager.declare_file(name, unlink_when_done=True)
-        self.add_input(self._args_file, f"a_{self._id}")
-
-        name = os.path.join(self.manager.staging_directory, "functions", f"w_{self._id}")
-        self._create_wrapper(name)
-        self._wrapper_file = self.manager.declare_file(name, unlink_when_done=True)
-        self.add_input(self._wrapper_file, f"w_{self._id}")
+        f = manager.declare_file(name, unlink_when_done=True)
+        self.add_input(f, f"a_{self._id}")
 
         if self._tmp_output_enabled:
             self._output_file = self.manager.declare_temp()
         else:
-            name = os.path.join(self.manager.staging_directory, "outputs", self._out_name_file)
-            self._output_file = self.manager.declare_file(name, cache=self._cache_output, unlink_when_done=True)
+            name = os.path.join(manager.staging_directory, "outputs", self._id)
+            self._output_file = manager.declare_file(name, cache=self._cache_output, unlink_when_done=False)
         self.add_output(self._output_file, f"o_{self._id}")
 
-    ##
-    # creates the wrapper script which will execute the function. pickles output.
-    def _create_wrapper(self, filename):
-        with open(filename, "w") as f:
-            f.write(
-                textwrap.dedent(
-                    f"""
-                try:
-                    import sys
-                    import cloudpickle
-                except ImportError as e:
-                    print("Could not execute PythonTask function because a module was not available at the worker.")
-                    raise
+    def _fn_wrapper(self, manager, serialize):
+        base = f"py_wrapper_{int(bool(serialize))}"
+        if base not in manager._function_buffers:
+            name = os.path.join(manager.staging_directory, base)
+            with open(name, "w") as f:
+                f.write(textwrap.dedent(f"""
+                                        import sys
+                                        import cloudpickle
+                                        fn, args, out = sys.argv[1:]
 
-                (fn, args, out) = sys.argv[1], sys.argv[2], sys.argv[3]
-                with open (fn , 'rb') as f:
-                    exec_function = cloudpickle.load(f)
-                with open(args, 'rb') as f:
-                    args, kwargs = cloudpickle.load(f)
+                                        with open(fn, "rb") as f:
+                                            exec_function = cloudpickle.load(f)
+                                        with open(args, "rb") as f:
+                                            args, kwargs = cloudpickle.load(f)
 
-                status = 0
-                try:
-                    exec_out = exec_function(*args, **kwargs)
-                except Exception as e:
-                    exec_out = e
-                    status = 1
+                                        error = 0
+                                        try:
+                                            exec_out = exec_function(*args, **kwargs)
+                                        except Exception as e:
+                                            exec_out = e
+                                            error = e
+                                        finally:
+                                            with open(out, "wb") as f:
+                                                if {serialize}:
+                                                    cloudpickle.dump(exec_out, f)
+                                                else:
+                                                    f.write(exec_out)
+                                            if error:
+                                                raise error
+                                        """))
+                manager._function_buffers[base] = manager.declare_file(name, cache=True)
+        return manager._function_buffers[base]
 
-                with open(out, 'wb') as f:
-                    if {self._serialize_output}:
-                        cloudpickle.dump(exec_out, f)
-                    else:
-                        f.write(exec_out)
-
-                sys.exit(status)
-                """
-                )
-            )
+    def _fn_buffer(self, manager, fn):
+        if fn not in manager._function_buffers:
+            load = cloudpickle.dumps(fn)
+            manager._function_buffers[fn] = manager.declare_buffer(load, cache=True)
+        return manager._function_buffers[fn]
 
 
 class PythonTaskNoResult(Exception):
@@ -1021,7 +1006,6 @@ class FunctionCall(Task):
     # execution.
     #
     # @param self 	Reference to the current python task object
-    # @param manager Manager to which the task was submitted
     def submit_finalize(self):
         super().submit_finalize()
         self._input_buffer = self.manager.declare_buffer(cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
