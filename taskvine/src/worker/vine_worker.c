@@ -220,18 +220,17 @@ void deliver_async_messages(struct link *l)
 	int messages = list_size(pending_async_messages);
 	int visited;
 	char *message;
-	
-	for(visited = 0; visited < messages; visited++)
-	{
-			message = list_pop_head(pending_async_messages);
-			int message_size = strlen(message);
-			if(message_size < bytes_available){
-					bytes_available -= message_size;
-					debug(D_VINE, "tx: %s", message);
-					link_printf(l, time(0) + options->active_timeout, message);
-			} else {
-					list_push_tail(pending_async_messages, message);
-			}
+
+	for (visited = 0; visited < messages; visited++) {
+		message = list_pop_head(pending_async_messages);
+		int message_size = strlen(message);
+		if (message_size < bytes_available) {
+			bytes_available -= message_size;
+			debug(D_VINE, "tx: %s", message);
+			link_printf(l, time(0) + options->active_timeout, message);
+		} else {
+			list_push_tail(pending_async_messages, message);
+		}
 	}
 }
 
@@ -245,10 +244,9 @@ void send_async_message(struct link *l, const char *fmt, ...)
 	va_start(va, fmt);
 	vsprintf(message, fmt, va);
 	va_end(va);
-	
+
 	list_push_tail(pending_async_messages, message);
 	deliver_async_messages(l); // attempt to deliver message, will be delivered later if buffer is full.
-
 }
 
 /* Send asynchronous task completion messages for current complete processes */
@@ -259,18 +257,17 @@ void send_complete_tasks(struct link *l)
 	int visited;
 	struct vine_process *p;
 
-	for(visited = 0; visited < size; visited++){
+	for (visited = 0; visited < size; visited++) {
 		p = itable_pop(procs_complete);
 		send_async_message(l,
-            "complete %d %d %llu %llu %d\n",
-            p->result,
-            p->exit_code,
-            (unsigned long long)p->execution_start,
-            (unsigned long long)p->execution_end,
-            p->task->task_id);
+				"complete %d %d %llu %llu %d\n",
+				p->result,
+				p->exit_code,
+				(unsigned long long)p->execution_start,
+				(unsigned long long)p->execution_end,
+				p->task->task_id);
 
 		itable_insert(procs_complete, p->task->task_id, p);
-
 	}
 }
 
@@ -1580,7 +1577,7 @@ static void vine_worker_serve_manager(struct link *manager)
 
 		/* Check all known libraries if they are ready to execute functions. */
 		check_libraries_ready();
-		
+
 		/* deliver queued asynchronous messages if available */
 		deliver_async_messages(manager);
 
@@ -1628,7 +1625,6 @@ static void vine_worker_serve_manager(struct link *manager)
 		}
 	}
 }
-
 
 /* Attempt to connect, authenticate, and work with the manager at this specific host and port. */
 

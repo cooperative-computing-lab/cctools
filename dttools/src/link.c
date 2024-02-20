@@ -19,13 +19,12 @@ See the file COPYING for details.
 #include <netinet/tcp.h>
 #include <poll.h>
 #include <sys/file.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <sys/utsname.h>
-#include <sys/ioctl.h>
-#include <asm/termbits.h>
 
 #include <fcntl.h>
 #include <netdb.h>
@@ -1434,6 +1433,5 @@ int get_link_buffer_bytes(struct link *link)
 	ioctl(link->fd, TIOCOUTQ, &bytes);
 	return bytes;
 }
-
 
 /* vim: set noexpandtab tabstop=8: */
