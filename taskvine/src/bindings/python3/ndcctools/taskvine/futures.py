@@ -182,13 +182,13 @@ class FutureTask(PythonTask):
     def add_future_dep(self, arg):
         self.add_input(arg._task._output_file, str('outfile-' + str(arg._task.id)))
 
-    def submit_finalize(self, manager):
+    def submit_finalize(self):
         func, args, kwargs = self._fn_def
         for arg in args:
             if isinstance(arg, VineFuture):
                 self.add_future_dep(arg)
         args = [{"VineFutureFile": str('outfile-' + str(arg._task.id))} if isinstance(arg, VineFuture) else arg for arg in args]
-        self._add_inputs_outputs(manager, func, args, kwargs)
+        self._add_inputs_outputs(self.manager, func, args, kwargs)
 
     def add_environment(self, f):
         self._envs.append(f)

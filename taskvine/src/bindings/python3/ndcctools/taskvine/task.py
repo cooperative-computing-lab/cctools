@@ -803,9 +803,9 @@ class PythonTask(Task):
     #
     # @param self 	Reference to the current python task object
     # @param manager Manager to which the task was submitted
-    def submit_finalize(self, manager):
-        super().submit_finalize(manager)
-        self._add_inputs_outputs(manager, *self._fn_def)
+    def submit_finalize(self):
+        super().submit_finalize()
+        self._add_inputs_outputs(self.manager, *self._fn_def)
         self._fn_def = None  # avoid possible memory leak
 
     # remove any ancillary files generated
@@ -1006,7 +1006,6 @@ class FunctionCall(Task):
     # execution.
     #
     # @param self 	Reference to the current python task object
-    # @param manager Manager to which the task was submitted
     def submit_finalize(self):
         super().submit_finalize()
         self._input_buffer = self.manager.declare_buffer(cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
