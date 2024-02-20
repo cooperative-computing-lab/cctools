@@ -44,7 +44,7 @@ from .manager import (
     Factory,
 )
 from .futures import (
-    FutureExecutor,
+    FuturesExecutor,
     FuturePythonTask,
     FutureFunctionCall,
     VineFuture,
@@ -80,7 +80,7 @@ __all__ = [
     "Factory",
     "LibraryTask",
     "FunctionCall",
-    "FutureExecutor",
+    "FuturesExecutor",
     "FuturePythonTask",
     "FutureFunctionCall",
     "VineFuture",
