@@ -94,6 +94,9 @@ static struct itable *procs_running = NULL;
 /* These are additional pointers into procs_table and should not be deleted */
 static struct list *procs_waiting = NULL;
 
+/* List of asynchronous messages pending to be sent to the manager */
+static struct list *pending_async_messages = NULL;
+
 /* Table of all processes with results to be sent back, indexed by task_id. */
 /* These are additional pointers into procs_table and should not be deleted */
 static struct itable *procs_complete = NULL;
@@ -206,6 +209,46 @@ __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const ch
 	link_vprintf(l, time(0) + options->active_timeout, fmt, va);
 
 	va_end(va);
+}
+
+/* Send messages from list of asychronous messages available*/
+
+void deliver_async_messages(struct link *l)
+{
+	int bytes_in_buffer = get_link_buffer_bytes(l);
+	int bytes_available = VINE_MAX_BUFFER_SIZE - bytes_in_buffer;
+	int messages = list_size(pending_async_messages);
+	int visited;
+	char *message;
+	
+	for(visited = 0; visited < messages; visited++)
+	{
+			message = list_pop_head(pending_async_messages);
+			int message_size = strlen(message);
+			if(message_size < bytes_available){
+					bytes_available -= message_size;
+					debug(D_VINE, "tx: %s", message);
+					link_printf(l, time(0) + options->active_timeout, message);
+			} else {
+					list_push_tail(pending_async_messages, message);
+			}
+	}
+}
+
+/* Buffer an asynchronous message to be sent to the manager */
+
+void send_async_message(struct link *l, const char *fmt, ...)
+{
+	va_list va;
+	char message[VINE_LINE_MAX];
+
+	va_start(va, fmt);
+	vsprintf(message, fmt, va);
+	va_end(va);
+	
+	list_push_tail(pending_async_messages, message);
+	deliver_async_messages(l); // attempt to deliver message, will be delivered later if buffer is full.
+
 }
 
 /* Receive a single-line message from the current manager. */
@@ -352,7 +395,8 @@ Send a message to the manager with my current statistics information.
 
 static void send_stats_update(struct link *manager)
 {
-	send_message(manager, "info tasks_running %lld\n", (long long)itable_size(procs_running));
+	//send_message(manager, "info tasks_running %lld\n", (long long)itable_size(procs_running));
+	send_async_message(manager, "info tasks_running %lld\n", (long long)itable_size(procs_running));
 }
 
 /*
@@ -1977,6 +2021,7 @@ void vine_worker_create_structures()
 	procs_table = itable_create(0);
 	procs_running = itable_create(0);
 	procs_waiting = list_create();
+	pending_async_messages = list_create();
 	procs_complete = itable_create(0);
 
 	current_transfers = hash_table_create(0, 0);

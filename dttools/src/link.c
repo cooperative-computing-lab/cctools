@@ -24,6 +24,8 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/un.h>
 #include <sys/utsname.h>
+#include <sys/ioctl.h>
+#include <asm/termbits.h>
 
 #include <fcntl.h>
 #include <netdb.h>
@@ -1425,5 +1427,13 @@ int link_poll(struct link_info *links, int nlinks, int msec)
 
 	return result;
 }
+
+int get_link_buffer_bytes(struct link *link)
+{
+	int bytes;
+	ioctl(link->fd, TIOCOUTQ, &bytes);
+	return bytes;
+}
+
 
 /* vim: set noexpandtab tabstop=8: */
