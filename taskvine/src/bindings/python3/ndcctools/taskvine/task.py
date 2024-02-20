@@ -13,9 +13,7 @@ from .file import File
 
 import copy
 import os
-import shutil
 import sys
-import tempfile
 import textwrap
 import uuid
 import cloudpickle
