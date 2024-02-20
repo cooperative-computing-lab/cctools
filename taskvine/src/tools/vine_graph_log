@@ -46,7 +46,7 @@ def time_field_p(field):
     return re.search('^time_.*$', field)
 
 
-def read_log_entries(file, fields):
+def read_log_entries(file, fields, reset_until_dispatch=False):
     log_entries = {}
     idxs = range(0, len(fields))
     pairs = list(zip(idxs, fields))
@@ -70,6 +70,13 @@ def read_log_entries(file, fields):
                     record[field] = numbers[i]/1000000
                 else:
                     record[field] = numbers[i]
+
+            if reset_until_dispatch:
+                if record['tasks_dispatched'] > 0:
+                    reset_until_dispatch = False
+                else:
+                    epoch = None
+                    continue
 
             if prev_line and record['time_step'] == prev_line['time_step']:
                 continue
@@ -118,7 +125,11 @@ def read_log_entries(file, fields):
 
             record['total_disk'] /= unit_factors['KB']       # MB to GB
             record['committed_disk'] /= unit_factors['KB']   # MB to GB
-            record['inuse_cache'] /= unit_factors['KB']      # MB to GB
+
+            try:
+                record['inuse_cache'] /= unit_factors['KB']      # MB to GB
+            except KeyError:
+                record['inuse_cache'] = 0                        # inuse_cache is not a stat that all logs have
 
             prev_line = record
 
@@ -284,6 +295,8 @@ def show_usage():
         -h                  This message.
         -c <gnuplot-path>   Specify the location of the gnuplot executable.
                             Default is gnuplot.
+        -l                  Graph y-axis with logscale.
+        -D                  Start plots when the first task is dispatched.
         -o <prefix-output>  Generate prefix-output.{{workers,workers-accum,
                                                     tasks,tasks-accum,
                                                     time-manager,time-workers,
@@ -306,7 +319,7 @@ def show_usage():
 if __name__ == '__main__':
 
     try:
-        optlist, args = getopt.getopt(sys.argv[1:], 'c:g:ho:r:s:T:u:')
+        optlist, args = getopt.getopt(sys.argv[1:], 'c:Dg:hlo:r:s:T:u:')
     except getopt.GetoptError as e:
         sys.stderr.write(str(e) + '\n')
         show_usage()
@@ -318,6 +331,8 @@ if __name__ == '__main__':
 
     logname = args[0]
     prefix = logname
+    reset_until_dispatch = False
+    logscale = False
 
     for opt, arg in optlist:
         if opt == '-c':
@@ -346,6 +361,10 @@ if __name__ == '__main__':
             else:
                 sys.stderr.write("Time scale factor '%s' is not valid. Options: s,m,h or d.\n" % (arg,))
                 exit(1)
+        elif opt == '-D':
+            reset_until_dispatch = True
+        elif opt == '-l':
+            logscale = True
 
     try:
 
@@ -353,54 +372,58 @@ if __name__ == '__main__':
             check_gnuplot_version(gnuplot_cmd)
 
         with open(logname) as file:
-            log_entries = read_log_entries(file, read_fields(file))
+            log_entries = read_log_entries(file, read_fields(file), reset_until_dispatch)
             times = sort_time(log_entries)
 
+        constructor = VinePlot
+        if logscale:
+            constructor = VinePlotLog
+
         plots = {}
-        plots['workers'] = VinePlot(x_units=x_units, ylabel='number of workers', range=x_range,
+        plots['workers'] = constructor(x_units=x_units, ylabel='number of workers', range=x_range,
                                     title="workers instantaneous counts",
                                     fields=['workers_connected', 'workers_idle', 'workers_busy'],
                                     labels=['connected', 'idle', 'busy'])
 
-        plots['workers-accum'] = VinePlot(x_units=x_units, ylabel='number of workers', range=x_range,
+        plots['workers-accum'] = constructor(x_units=x_units, ylabel='number of workers', range=x_range,
                                           title="workers cumulative counts",
                                           fields=['workers_joined', 'workers_removed', 'workers_released',
                                                   'workers_slow', 'workers_idled_out', 'workers_lost'],
                                           labels=['joined', 'removed', 'released', 'slow', 'idled out,', 'lost'])
 
-        plots['workers-disk'] = VinePlotLog(x_units=x_units, y_units='GB', ylabel='disk space', range=x_range,
+        plots['workers-disk'] = constructor(x_units=x_units, y_units='GB', ylabel='disk space', range=x_range,
                                             title='workers disk utilization',
                                             fields=['total_disk', 'committed_disk', 'inuse_cache'],
                                             labels=['total', 'committed to tasks', 'used by cache'])
 
-        plots['tasks'] = VinePlot(x_units=x_units, ylabel='number of tasks', range=x_range,
+        plots['tasks'] = constructor(x_units=x_units, ylabel='number of tasks', range=x_range,
                                   title="tasks instantaneous counts",
                                   fields=['tasks_waiting', 'tasks_on_workers', 'tasks_running', 'tasks_with_results'],
                                   labels=['waiting', 'on workers', 'running', 'with results'])
 
-        plots['tasks-capacities'] = VinePlot(x_units=x_units, ylabel='number of tasks', range=x_range,
+        plots['tasks-capacities'] = constructor(x_units=x_units, ylabel='number of tasks', range=x_range,
                                              title="tasks instantaneous capacities",
                                              fields=['tasks_running', 'capacity_instantaneous', 'capacity_weighted'],
                                              labels=['tasks running', 'tasks capacity raw', 'tasks capacity weighted'])
 
-        plots['tasks-accum'] = VinePlot(x_units=x_units, ylabel='number of tasks', range=x_range,
+        plots['tasks-accum'] = constructor(x_units=x_units, ylabel='number of tasks', range=x_range,
                                         title="tasks cumulative counts",
                                         fields=['tasks_submitted', 'tasks_dispatched', 'tasks_done',
                                                 'tasks_failed', 'tasks_cancelled', 'tasks_exhausted_attempts'],
                                         labels=['submitted', 'dispatched', 'done', 'failed', 'cancelled', 'exhausted attempts'])
 
-        plots['time-manager'] = VinePlot(x_units=x_units, ylabel="cumulative time", y_units=x_units, range=x_range,
+        plots['time-manager'] = constructor(x_units=x_units, ylabel="cumulative time", y_units=x_units, range=x_range,
                                          title="cumulative times at the manager",
                                          fields=['time_send', 'time_receive', 'time_polling',
                                                  'time_status_msgs', 'time_internal', 'time_application'],
                                          labels=['send', 'receive', 'manager polling', 'manager status msgs', 'manager internal', 'manager application'])
 
-        plots['time-workers'] = VinePlot(x_units=x_units, y_units='h', ylabel="cumulative time", range=x_range,
+        plots['time-workers'] = constructor(x_units=x_units, y_units='h', ylabel="cumulative time", range=x_range,
                                          title="cumulative times at workers",
                                          fields=['time_execute', 'time_execute_good', 'time_execute_exhaustion'],
                                          labels=['execute', 'execute good', 'execute exhaustion'])
 
-        plots['transfer'] = VinePlot(x_units=x_units, y_units='GB', ylabel='size', range=x_range,
+        plots['transfer'] = constructor(x_units=x_units, y_units='GB', ylabel='size', range=x_range,
                                      title="manager data transfer",
                                      fields=['bytes_sent', 'bytes_received'],
                                      labels=['sent', 'received'])

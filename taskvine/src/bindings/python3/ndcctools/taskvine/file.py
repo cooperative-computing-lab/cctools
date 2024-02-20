@@ -27,12 +27,23 @@ class File(object):
         # to false.
         return True
 
+    ##
+    # Return the path of the file if a regular file, else None.
+    #
+    # @param self       A file object.
     def source(self):
-        file_type = getattr(self._file, "type")
-        if file_type == cvine.VINE_FILE:
+        if self.file_type() == cvine.VINE_FILE:
             return getattr(self._file, "source")
         else:
             return None
+
+    ##
+    # Return the enum type of this file. (e.g., VINE_FILE, VINE_TEMP, etc.)
+    # Typically used to return the contents of an output buffer.
+    #
+    # @param self       A file object.
+    def file_type(self):
+        return getattr(self._file, "type")
 
     ##
     # Return the contents of a file object as a string.

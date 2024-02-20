@@ -78,20 +78,24 @@ static void vine_resource_debug(struct vine_resource *r, const char *name)
 static void vine_resource_send(struct link *manager, struct vine_resource *r, const char *name, time_t stoptime)
 {
 	vine_resource_debug(r, name);
-	link_printf(manager, stoptime, "resource %s %" PRId64 "\n", name, r->total);
+	link_printf(manager, stoptime, "%s %" PRId64 "\n", name, r->total);
 }
 
 void vine_resources_send(struct link *manager, struct vine_resources *r, time_t stoptime)
 {
 	debug(D_VINE, "Sending resource description to manager:");
-	vine_resource_send(manager, &r->workers, "workers", stoptime);
-	vine_resource_send(manager, &r->disk, "disk", stoptime);
-	vine_resource_send(manager, &r->memory, "memory", stoptime);
-	vine_resource_send(manager, &r->gpus, "gpus", stoptime);
-	vine_resource_send(manager, &r->cores, "cores", stoptime);
 
-	/* send the tag last, the manager knows when the resource update is complete */
-	link_printf(manager, stoptime, "resource tag %" PRId64 "\n", r->tag);
+	link_printf(manager, stoptime, "resources\n");
+
+	vine_resource_send(manager, &r->cores, "cores", stoptime);
+	vine_resource_send(manager, &r->memory, "memory", stoptime);
+	vine_resource_send(manager, &r->disk, "disk", stoptime);
+	vine_resource_send(manager, &r->gpus, "gpus", stoptime);
+	vine_resource_send(manager, &r->workers, "workers", stoptime);
+
+	link_printf(manager, stoptime, "tag %" PRId64 "\n", r->tag);
+
+	link_printf(manager, stoptime, "end\n");
 }
 
 void vine_resources_debug(struct vine_resources *r)

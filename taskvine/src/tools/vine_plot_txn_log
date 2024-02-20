@@ -66,6 +66,9 @@ class Manager:
         # [worker_id] -> hostport
         self.last_host_port = {}
 
+        # [time] -> label
+        self.phases = defaultdict(str)
+
         self.tasks = None
         self.workers = None
         self.transfers = None
@@ -353,7 +356,6 @@ class ParseTxn:
 
     def _parse_task(self, time, manager_pid, task_id, event, arg):
         task_id = int(task_id)
-
         if task_id in self.library_ids:
             return 
         
@@ -400,6 +402,10 @@ class ParseTxn:
                 self.cm.tasks_attempts[task_id][la]["DISCONNECTION"] = pd.NA
         elif event == "DONE":
             pass
+    
+    def _parse_application(self, time, manager_pid, *msg):
+        message = ' '.join(msg)
+        self.cm.phases[time] = message
 
     def _parse(self):
         for (time, manager_pid, subject, target, event, arg) in self._next_line():
@@ -418,7 +424,7 @@ class ParseTxn:
             elif subject == "TASK":
                 self._parse_task(time, manager_pid, target, event, arg)
             elif subject == "APPLICATION":
-                continue
+                self._parse_application(time, manager_pid, target, event, arg)
 
         if self.cm:
             # if self.cm still assigned, then END record missing. Here we force
@@ -581,6 +587,12 @@ class TxnPlot:
         ticks.extend(x - plot_origin for x in self.opts.time_tick)
         ticks = sorted(list(set(ticks)))
         return ticks
+    
+    def show_app_log(self, fig, manager):
+        line_label_sep = 0.005
+        for t, msg in manager.phases.items():
+            fig.axvline(x=t, color='black', linestyle='-')
+            fig.text(t + line_label_sep, 0, msg, rotation=90, fontsize=5)
 
     def display_plot(self):
         plt.title(self.opts.title)
@@ -599,8 +611,9 @@ class TxnPlot:
             s.xaxis.set_major_formatter(plticker.FuncFormatter(partial(self.make_tick_time, plot_origin, plot_end)))
             s.set_xlabel("time")
             s.tick_params(axis='both', which='major', labelsize=15)
-
             self.plot(s, m)
+            if not self.opts.noapp:
+                self.show_app_log(s, m)
             self.set_legend(s)
 
         if self.opts.output:
@@ -727,7 +740,6 @@ class TxnPlotWorkers(TxnPlot):
             pass
 
         self.bh(fig, dt["slot"], dt["time_worker_start"], dt["time_worker_end"]-dt["time_worker_start"], self.legend["tasks executing"])
-
         self.bh(fig, dt["slot"], dt["time_worker_end"], dt["RETRIEVED"]-dt["time_worker_end"], self.legend["results waiting retrieval"])
 
         ft = dt[(dt["reason"] != "SUCCESS") | ((dt["reason"] == "SUCCESS") & (dt["exit_code"] != 0))]
@@ -781,7 +793,7 @@ class TxnPlotWorkers(TxnPlot):
         fig.set_ylabel("workers")
         fig.set_yticks((0, base_slot))
         fig.set_yticklabels(["0", str(gs.ngroups)])  # ytick number of workers
-
+         
         if not args.dask_colors and not self.opts.expand_waiting:
             del self.legend["tasks waiting at worker"]
 
@@ -880,6 +892,7 @@ if __name__ == "__main__":
     parser.add_argument('--height', nargs='?', type=float, help='height in inches. Default is 2/3 of width', default=None)
     parser.add_argument('--dpi', nargs='?', type=int, help='output image resoulution', default=300)
     parser.add_argument('--tex', action='store_true', help='use tex fonts')
+    parser.add_argument('--noapp', action='store_true', help='do not show custom application lines')
     parser.add_argument('--nograph', action='store_true', help='do not show a matplotlib window')
     parser.add_argument('--dask-colors', action='store_true', help='color palette aligns with Dask\'s')
     parser.add_argument('--fontsize', nargs='?', type=str, help='set fontsize of figure legend', default='medium')
