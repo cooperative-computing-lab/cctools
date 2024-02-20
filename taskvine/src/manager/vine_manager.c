@@ -547,6 +547,8 @@ static vine_msg_code_t vine_manager_recv_no_retry(
 		result = handle_transfer_address(q, w, line);
 	} else if (sscanf(line, "GET %s HTTP/%*d.%*d", path) == 1) {
 		result = handle_http_request(q, w, path, stoptime);
+	} else if (string_prefix_is(line, "complete")) {
+		result = VINE_MSG_PROCESSED;
 	} else {
 		// Message is not a status update: return it to the user.
 		result = VINE_MSG_NOT_PROCESSED;

@@ -251,6 +251,29 @@ void send_async_message(struct link *l, const char *fmt, ...)
 
 }
 
+/* Send asynchronous task completion messages for current complete processes */
+
+void send_complete_tasks(struct link *l)
+{
+	int size = itable_size(procs_complete);
+	int visited;
+	struct vine_process *p;
+
+	for(visited = 0; visited < size; visited++){
+		p = itable_pop(procs_complete);
+		send_async_message(l,
+            "complete %d %d %llu %llu %d\n",
+            p->result,
+            p->exit_code,
+            (unsigned long long)p->execution_start,
+            (unsigned long long)p->execution_end,
+            p->task->task_id);
+
+		itable_insert(procs_complete, p->task->task_id, p);
+
+	}
+}
+
 /* Receive a single-line message from the current manager. */
 
 int recv_message(struct link *l, char *line, int length, time_t stoptime)
@@ -1587,6 +1610,7 @@ static void vine_worker_serve_manager(struct link *manager)
 		if (ok && !results_to_be_sent_msg) {
 			if (vine_watcher_check(watcher) || itable_size(procs_complete) > 0) {
 				send_async_message(manager, "available_results\n");
+				send_complete_tasks(manager);
 				results_to_be_sent_msg = 1;
 			}
 
@@ -1605,6 +1629,7 @@ static void vine_worker_serve_manager(struct link *manager)
 		}
 	}
 }
+
 
 /* Attempt to connect, authenticate, and work with the manager at this specific host and port. */
 
