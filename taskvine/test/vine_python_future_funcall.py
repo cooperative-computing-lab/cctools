@@ -23,27 +23,30 @@ def my_sum(x, y, negate=False):
 
 
 def main():
-    # Create Executor
-    executor = vine.Executor(port=9123, manager_name='test-executor', factory=False)
+    executor = vine.FuturesExecutor(
+        port=9123, manager_name="test-executor", factory=False
+    )
     print("listening on port {}".format(executor.port))
     with open(port_file, "w") as f:
         f.write(str(executor.port))
 
     # Create library task
     print("creating library from functions...")
-    libtask = executor.create_library_from_functions('test-library', my_sum, import_modules=None, add_env=False)
+    libtask = executor.create_library_from_functions(
+        "test-library", my_sum, import_modules=None, add_env=False
+    )
 
     # Install library on executor.manager
     executor.install_library(libtask)
 
     # Submit several tasks for execution
-    t1 = executor.future_funcall('test-library', 'my_sum', 7, 4)
+    t1 = executor.future_funcall("test-library", "my_sum", 7, 4)
     a = executor.submit(t1)
 
-    t2 = executor.future_funcall('test-library', 'my_sum', a, a)
+    t2 = executor.future_funcall("test-library", "my_sum", a, a)
     b = executor.submit(t2)
 
-    t3 = executor.future_funcall('test-library', 'my_sum', b, a)
+    t3 = executor.future_funcall("test-library", "my_sum", b, a)
     c = executor.submit(t3)
 
     print("waiting for result...")
@@ -57,7 +60,7 @@ def main():
     assert res == c
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
 
 

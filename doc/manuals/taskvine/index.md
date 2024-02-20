@@ -1470,84 +1470,6 @@ conda install -y -p my-env -c conda-forge conda-pack
 conda run -p my-env conda-pack
 ```
 
-### Futures
-
-TaskVine provides a futures executor model which is a subclass
-of Python's concurrent futures executor. A function along with its
-arguments are submitted to the executor to be executed. A future is 
-returned whose value will be resolved at some later point.
-
-To create a future, an Executor object must first be created. Tasks can 
-then be submitted through the `submit` function. This will return 
-a Future object. The result of the task can retrieved by calling `future.result()`
-
-=== "Python"
-
-    ```python
-    import ndcctools.taskvine as vine
-
-    def my_sum(x, y):
-	return x + y
-
-    s = vine.Executor(manager_name='my_manager')
-    f = s.submit(my_sum, 3, 4)
-    print(f.result())
-    ```
-
-
-The Executor supports two kinds tasks, the `FuturePythonTask` and the `FutureFunctionCall` task. The `Executor.submit` with return an instance of `Future`, which can be used to retrieve the result that was computed on remote workers. 
-
-`Future`s can be passed as arguments to other tasks using the executor. In this case, relevant files will be transported between workers when necessary. 
-
-In case of `FuturePythonTask`, Users can interaface with future python tasks themselves by calling the `future_pythontask` function from the future executor. 
-
-=== "Python"
-    ```python
-    import ndcctools.taskvine as vine
-
-    def my_sum(x, y):
-        return x + y
-
-    e = vine.Executor(manager_name='my_manager')
-    t = e.future_pythontask(my_sum, 3, 4)
-    t.set_cores(1)
-    f = e.submit(t)
-    print(f.result())
-    ```
-
-Or, uses can also directly send the function along with its arguments to `submit` function from the executor. This returns a `FuturePythonTask` which can also be submitted to the future executor. The benefit of doing this is allowing users to add additional input files and task specifications before submission.
-
-=== "Python"
-    ```python
-    import ndcctools.taskvine as vine
-
-    def my_sum(x, y):
-        return x + y
-
-    s = vine.Executor(manager_name='my_manager')
-    a = s.submit(my_sum, 3, 4)
-    b = s.submit(my_sum, 5, 2)
-    c = s.submit(my_sum, a, b)
-    print(c.result())
-    ```
-
-In case of `FutureFunctionCall`, users can invoke `future_funcall` from the future executor to construct an instance of `FutureFunctionCall` by giving the name and arguments of their function, the behavior of submitting tasks and retrieving results aligns with that of `FuturePythonTask`.
-
-=== "Python"
-    ```python
-    import ndcctools.taskvine as vine
-
-    def my_sum(x, y):
-        return x + y
-
-    libtask = executor.create_library_from_functions('test-library', my_sum)
-    executor.install_library(libtask)
-    t = executor.future_funcall('test-library', 'my_sum', 7, 4)
-    a = executor.submit(t)
-    print(a.result())
-    ```
-
-
 ### Serverless Computing
 
 TaskVine offers a serverless computing model which is
@@ -1656,6 +1578,79 @@ and when it is returned, the result is present as `t.output`:
 Note that both library tasks and function invocations consume
 resources at the worker, and the number of running tasks will be
 constrained by the available resources in the same way as normal tasks.
+
+### Futures
+
+TaskVine provides a futures executor model which is a subclass
+of Python's concurrent futures executor. A function along with its
+arguments are submitted to the executor to be executed. A future is 
+returned whose value will be resolved at some later point.
+
+To create a future, a `FuturesExecutor` object must first be created. Tasks can 
+then be submitted through the `submit` function. This will return 
+a Future object. The result of the task can retrieved by calling `future.result()`
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+
+    def my_sum(x, y):
+        return x + y
+
+    m = vine.FuturesExecutor(manager_name='my_manager')
+
+    a = m.submit(my_sum, 3, 4)
+    b = m.submit(my_sum, 5, 2)
+    c = m.submit(my_sum, a, b)  # note that the futures a and b are
+                                # a passed as any other argument.
+
+    print(c.result())
+    ```
+
+If the tasks need to be configured in some way, for example to specify maximum
+resources allowed, the method `future_task` returns a `FuturePythonTask` that
+can be tailored as any other task:
+
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+
+    def my_sum(x, y):
+        return x + y
+
+    m = vine.FutureExecutor(manager_name='my_manager')
+
+    t = m.future_task(my_sum, 3, 4)
+    t.set_cores(1)
+
+    f = m.submit(t)
+
+    print(f.result())
+    ```
+
+Instead of tasks, the futures may also executed using [function calls](serverless-computing) with the `future_funcall` method:
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+
+    def my_sum(x, y):
+        return x + y
+
+    m = vine.FutureExecutor(manager_name='my_manager')
+
+    libtask = m.create_library_from_functions('test-library', my_sum)
+    m.install_library(libtask)
+
+    t = m.future_funcall('test-library', 'my_sum', 7, 4)
+
+    a = m.submit(t)
+
+    print(a.result())
+    ```
+
+
 
 ### Functional Abstractions
 
