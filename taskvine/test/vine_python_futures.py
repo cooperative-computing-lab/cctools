@@ -23,7 +23,7 @@ def my_sum(x, y, negate=False):
 
 
 # Create Executor
-executor = vine.Executor(port=9123, manager_name='vine_matrtix_build_test', factory=False)
+executor = vine.Executor(port=[9123,9129], manager_name='vine_matrtix_build_test', factory=False)
 print("listening on port {}".format(executor.manager.port))
 with open(port_file, "w") as f:
     f.write(str(executor.manager.port))

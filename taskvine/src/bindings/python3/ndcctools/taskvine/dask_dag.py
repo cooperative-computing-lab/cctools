@@ -181,7 +181,6 @@ class DaskVineDag:
         cons = type(sexpr)
 
         for arg in sexpr:
-            print(arg)
             if DaskVineDag.symbolp(arg):
                 nargs.append(arg)
             else:
@@ -203,12 +202,13 @@ class DaskVineDag:
             raise DaskVineNoResult(key)
 
     def get_children(self, key):
-        """ Sets new result and propagates in the DaskVineDag. Returns a list of [key, (fn, *args)]
-        of computations that become ready to be executed """
-        try:
-            return self._children_of[key]
-        except KeyError:
-            raise DaskVineNoResult(key)
+        return self._children_of[key]
+
+    def get_missing_children(self, key):
+        return self._missing_of[key]
+
+    def get_parents(self, key):
+        return self._parents_of[key]
 
     def set_targets(self, keys):
         """ Values of keys that need to be computed. """

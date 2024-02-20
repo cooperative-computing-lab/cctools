@@ -56,12 +56,14 @@ struct vine_worker_info {
 	/* Resources and features that describe this worker. */
 	struct vine_resources *resources;
 	struct hash_table     *features;
-	struct vine_stats     *stats;
 
 	/* Current files and tasks that have been transfered to this worker */
 	struct hash_table   *current_files;
 	struct itable       *current_tasks;
 
+	/* The number of tasks running last reported by the worker */
+	int         dynamic_tasks_running;
+	
 	/* Accumulated stats about tasks about this worker. */
 	int         finished_tasks;
 	int64_t     total_tasks_complete;

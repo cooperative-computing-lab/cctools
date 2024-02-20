@@ -13,7 +13,7 @@ worker, and catalog, but should not be visible to the public user API.
 #ifndef VINE_PROTOCOL_H
 #define VINE_PROTOCOL_H
 
-#define VINE_PROTOCOL_VERSION 6
+#define VINE_PROTOCOL_VERSION 7
 
 #define VINE_LINE_MAX 4096       /**< Maximum length of a vine message line. */
 #define VINE_MAX_BUFFER_SIZE 65536 /** Maximum amount of bytes in the async output buffer */
