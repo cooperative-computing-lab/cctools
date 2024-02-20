@@ -227,7 +227,7 @@ void deliver_async_messages(struct link *l)
 		if (message_size < bytes_available) {
 			bytes_available -= message_size;
 			debug(D_VINE, "tx: %s", message);
-			link_printf(l, time(0) + options->active_timeout, message);
+			link_printf(l, time(0) + options->active_timeout, "%s", message);
 		} else {
 			list_push_tail(pending_async_messages, message);
 		}
