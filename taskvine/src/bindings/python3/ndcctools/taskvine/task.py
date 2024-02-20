@@ -13,7 +13,9 @@ from .file import File
 
 import copy
 import os
+import shutil
 import sys
+import tempfile
 import textwrap
 import uuid
 import cloudpickle
@@ -774,15 +776,15 @@ class PythonTask(Task):
         self._output_loaded = False
         self._output = None
         self._stdout = None
+        self._tmpdir = None
 
         self._id = str(uuid.uuid4())
-        self._func_file = None
-        self._args_file = None
-        self._wrapper_file = None
-        self._output_file = None
+        self._func_file = f"function_{self._id}.p"
+        self._args_file = f"args_{self._id}.p"
+        self._out_name_file = f"out_{self._id}.p"
+        self._stdout_file = f"stdout_{self._id}.p"
+        self._wrapper = f"pytask_wrapper_{self._id}.py"
         self._serialize_output = True
-
-        self._out_name_file = self._id
 
         self._command = self._python_function_command()
 
@@ -807,6 +809,10 @@ class PythonTask(Task):
     # @param manager Manager to which the task was submitted
     def submit_finalize(self):
         super().submit_finalize()
+        self._tmpdir = tempfile.mkdtemp(dir=self.manager.staging_directory)
+        self._serialize_python_function(*self._fn_def)
+        self._fn_def = None  # avoid possible memory leak
+        self._create_wrapper()
         self._add_IO_files()
 
     # remove any temp files generated
@@ -814,12 +820,8 @@ class PythonTask(Task):
     # then temp files will be deleted in the atexit of the manager staging directory
     def __del__(self):
         try:
-            if self._func_file:
-                self.manager.undeclare_file(self._func_file)
-            if self._args_file:
-                self.manager.undeclare_file(self._args_file)
-            if self._wrapper_file:
-                self.manager.undeclare_file(self._wrapper_file)
+            if self._tmpdir:
+                shutil.rmtree(self._tmpdir, ignore_errors=True)
             super().__del__()
         except TypeError:
             # in case the interpreter is shuting down. staging files will be deleted by manager atexit function.
@@ -887,7 +889,7 @@ class PythonTask(Task):
         if not self._output_loaded:
             if self.successful():
                 try:
-                    with open(self._output_file.source(), "rb") as f:
+                    with open(os.path.join(self._tmpdir, self._out_name_file), "rb") as f:
                         if self._serialize_output:
                             self._output = cloudpickle.load(f)
                         else:
@@ -900,6 +902,16 @@ class PythonTask(Task):
             self._output_loaded = True
         return self._output
 
+    @property
+    def std_output(self):
+        try:
+            if not self._stdout:
+                with open(os.path.join(self._tmpdir, self._stdout_file), "r") as f:
+                    self._stdout = str(f.read())
+            return self._stdout
+        except Exception:
+            return None
+
     ##
     # Disables serialization of results to disk when writing to a file for transmission.
     # WARNING: Only do this if the function itself encodes the output in a way amenable
@@ -909,47 +921,42 @@ class PythonTask(Task):
     def disable_output_serialization(self):
         self._serialize_output = False
 
+    def _serialize_python_function(self, func, args, kwargs):
+        with open(os.path.join(self._tmpdir, self._func_file), "wb") as wf:
+            cloudpickle.dump(func, wf)
+        with open(os.path.join(self._tmpdir, self._args_file), "wb") as wf:
+            cloudpickle.dump([args, kwargs], wf)
+
     def _python_function_command(self, remote_env_dir=None):
         if remote_env_dir:
             py_exec = "python"
         else:
             py_exec = f"python{sys.version_info[0]}"
 
-        command = f"{py_exec} w_{self._id} f_{self._id} a_{self._id} o_{self._id}"
+        command = f"{py_exec} {self._wrapper} {self._func_file} {self._args_file} {self._id} > {self._stdout_file} 2>&1"
         return command
 
     def _add_IO_files(self):
-        func, args, kwargs = self._fn_def
-        self._fn_def = None
+        def source(name):
+            return os.path.join(self._tmpdir, name)
 
-        name = os.path.join(self.manager.staging_directory, "functions", self._id)
-        with open(name, "wb") as wf:
-            cloudpickle.dump(func, wf)
-        self._func_file = self.manager.declare_file(name, unlink_when_done=True)
-        self.add_input(self._func_file, f"f_{self._id}")
+        for name in [self._wrapper, self._func_file, self._args_file]:
+            f = self.manager.declare_file(source(name))
+            self.add_input(f, name)
 
-        name = os.path.join(self.manager.staging_directory, "arguments", self._id)
-        with open(name, "wb") as wf:
-            cloudpickle.dump([args, kwargs], wf)
-        self._args_file = self.manager.declare_file(name, unlink_when_done=True)
-        self.add_input(self._args_file, f"a_{self._id}")
-
-        name = os.path.join(self.manager.staging_directory, "functions", f"w_{self._id}")
-        self._create_wrapper(name)
-        self._wrapper_file = self.manager.declare_file(name, unlink_when_done=True)
-        self.add_input(self._wrapper_file, f"w_{self._id}")
+        f = self.manager.declare_file(source(self._stdout_file))
+        self.add_output(f, self._stdout_file)
 
         if self._tmp_output_enabled:
             self._output_file = self.manager.declare_temp()
         else:
-            name = os.path.join(self.manager.staging_directory, "outputs", self._out_name_file)
-            self._output_file = self.manager.declare_file(name, cache=self._cache_output, unlink_when_done=True)
-        self.add_output(self._output_file, f"o_{self._id}")
+            self._output_file = self.manager.declare_file(source(self._out_name_file), cache=self._cache_output)
+        self.add_output(self._output_file, self._id)
 
     ##
     # creates the wrapper script which will execute the function. pickles output.
-    def _create_wrapper(self, filename):
-        with open(filename, "w") as f:
+    def _create_wrapper(self):
+        with open(os.path.join(self._tmpdir, self._wrapper), "w") as f:
             f.write(
                 textwrap.dedent(
                     f"""
@@ -1007,13 +1014,30 @@ class FunctionCall(Task):
     def __init__(self, library_name, fn, *args, **kwargs):
         Task.__init__(self, fn)
         self._event = {}
-        self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
+        self._event["fn_kwargs"] = kwargs
         self.set_time_max(900)     # maximum run time for function calls is 900s by default.
         self.needs_library(library_name)
-        self._tmp_output_enabled = False
         self._input_buffer = None
+        self._output_buffer = None
+        self._cache_enabled = False    # if cache is enabled, output will be stored in task class
+        self._cached_output = None
+        # vine File object that will contain the output of this function
         self._output_file = None
+        self._tmp_output_enabled = False
+
+    def enable_temp_output(self):
+        self._tmp_output_enabled = True
+
+    def disable_temp_output(self):
+        self._tmp_output_enabled = False
+
+    ##
+    # Returns the ndcctools.taskvine.file.File object that
+    # represents the output of this task.
+    @property
+    def output_file(self):
+        return self._output_file
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -1021,16 +1045,16 @@ class FunctionCall(Task):
     # execution.
     #
     # @param self 	Reference to the current python task object
-    # @param manager Manager to which the task was submitted
     def submit_finalize(self):
         super().submit_finalize()
-        self._input_buffer = self.manager.declare_buffer(cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
+        self._input_buffer = self.manager.declare_buffer(buffer=cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
         self.add_input(self._input_buffer, "infile")
         if self._tmp_output_enabled:
             self._output_file = self.manager.declare_temp()
+            self.add_output(self._output_file, "outfile")
         else:
-            self._output_file = self.manager.declare_buffer(cache=False, peer_transfer=False)
-        self.add_output(self._output_file, "outfile")
+            self._output_buffer = self.manager.declare_buffer(buffer=None, cache=False, peer_transfer=False)
+            self.add_output(self._output_buffer, "outfile")
 
     ##
     # Specify function arguments. Accepts arrays and dictionaries. This
@@ -1039,8 +1063,8 @@ class FunctionCall(Task):
     # @param args             An array of positional args to be passed to the function
     # @param kwargs           A dictionary of keyword arguments to be passed to the function
     def set_fn_args(self, args=[], kwargs={}):
-        self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
+        self._event["fn_kwargs"] = kwargs
 
     ##
     # Specify how the remote task should execute
@@ -1054,24 +1078,15 @@ class FunctionCall(Task):
             remote_task_exec_method = "fork"
         self._event["remote_task_exec_method"] = remote_task_exec_method
 
-    def set_output_cache(self, cache=False):
-        self._cache_output = cache
-
-    def enable_temp_output(self):
-        self._tmp_output_enabled = True
-
-    def disable_temp_output(self):
-        self._tmp_output_enabled = False
-
     ##
     # Retrieve output, handles cleanup, and returns result or failure reason.
     @property
     def output(self):
-        output = cloudpickle.loads(self._output_file.contents())
-        self._manager.undeclare_file(self._input_buffer)
+        output = cloudpickle.loads(self._output_buffer.contents())
+        self.manager.undeclare_file(self._input_buffer)
         self._input_buffer = None
-        self._manager.undeclare_file(self._output_file)
-        self._output_file = None
+        self.manager.undeclare_file(self._output_buffer)
+        self._output_buffer = None
 
         if output['Success']:
             return output['Result']
@@ -1080,20 +1095,22 @@ class FunctionCall(Task):
 
     ##
     # Remove input and output buffers under some circumstances `output` is not called
+
     def __del__(self):
         try:
             if self._input_buffer:
                 self.manager.undeclare_file(self._input_buffer)
                 self._input_buffer = None
-
-            if self._output_file:
-                if not self._tmp_output_enabled:
-                    self._manager.undeclare_file(self._output_file)
-                    self._output_file = None
-
+            if self._output_buffer:
+                self.manager.undeclare_file(self._output_buffer)
+                self._output_buffer = None
             super().__del__()
         except TypeError:
             pass
+
+
+class FunctionCallNoResult(Exception):
+    pass
 
 
 ##
