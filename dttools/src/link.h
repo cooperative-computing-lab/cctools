@@ -385,7 +385,7 @@ int link_poll(struct link_info *array, int nlinks, int msec);
 @param link The link to examine.
 @return The number of bytes in the output buffer of a link.
 */
-int get_link_buffer_bytes(struct link *link);
+int link_get_buffer_bytes(struct link *link);
 
 
 int errno_is_temporary(int e);

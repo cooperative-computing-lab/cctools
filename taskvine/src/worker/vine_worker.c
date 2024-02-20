@@ -215,21 +215,28 @@ __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const ch
 
 void deliver_async_messages(struct link *l)
 {
-	int bytes_in_buffer = get_link_buffer_bytes(l);
-	int bytes_available = VINE_MAX_BUFFER_SIZE - bytes_in_buffer;
+	int recv_window;
+	int send_window;
+	link_window_get(l, &send_window, &recv_window);
+
+	int bytes_in_buffer = link_get_buffer_bytes(l);
+	int bytes_available = send_window - bytes_in_buffer;
+
 	int messages = list_size(pending_async_messages);
 	int visited;
 	char *message;
 
 	for (visited = 0; visited < messages; visited++) {
-		message = list_pop_head(pending_async_messages);
+		message = list_peek_head(pending_async_messages);
 		int message_size = strlen(message);
 		if (message_size < bytes_available) {
+			message = list_pop_head(pending_async_messages);
 			bytes_available -= message_size;
 			debug(D_VINE, "tx: %s", message);
 			link_printf(l, time(0) + options->active_timeout, "%s", message);
+			free(message);
 		} else {
-			list_push_tail(pending_async_messages, message);
+			break;
 		}
 	}
 }
@@ -239,8 +246,7 @@ void deliver_async_messages(struct link *l)
 void send_async_message(struct link *l, const char *fmt, ...)
 {
 	va_list va;
-	char message[VINE_LINE_MAX];
-
+	char *message = malloc(VINE_LINE_MAX);
 	va_start(va, fmt);
 	vsprintf(message, fmt, va);
 	va_end(va);

@@ -1427,7 +1427,7 @@ int link_poll(struct link_info *links, int nlinks, int msec)
 	return result;
 }
 
-int get_link_buffer_bytes(struct link *link)
+int link_get_buffer_bytes(struct link *link)
 {
 	int bytes;
 	ioctl(link->fd, TIOCOUTQ, &bytes);
