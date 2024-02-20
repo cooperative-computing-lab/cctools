@@ -2455,6 +2455,50 @@ Save this file as `parsl_vine_example.py`. Running
 `python parsl_vine_example.py`
 will automatically spawn a local worker to execute the function call.
 
+In order to use the TaskVineExecutor with remote resources, you will need to create a configuration as shown below. Using the TaskVine Factory is the simplest way of deploying remote workers. Here a configuration for HTCondor is shown. It is necessary to include a `project_name` in the `TaskVineManagerConfig` in order for the Factory to find the manager.
+
+=== "Python"
+    ```python
+
+    import parsl
+    from parsl import python_app
+    from parsl.config import Config
+    from parsl.executors.taskvine import TaskVineExecutor
+    from parsl.executors.taskvine import TaskVineFactoryConfig
+    from parsl.executors.taskvine import TaskVineManagerConfig
+
+    config = Config(
+        executors=[
+            TaskVineExecutor(
+                factory_config=TaskVineFactoryConfig(
+                    batch_type="condor",
+                    min_workers=1,
+                    max_workers=1,
+                    cores=12,
+                ),
+                manager_config=TaskVineManagerConfig(
+                    project_name="taskvine_parsl",
+                )
+            )
+        ]
+    )
+
+    parsl.load(Config)
+
+    l = ["Cooperative", "Computing", "Lab"]
+
+    @python_app
+    def hello_taskvine(x, l=l):
+    return l[x]
+
+    futures = []
+    for i in range(3):
+        futures.append(hello_taskvine(i))
+
+    for i in futures:
+        print(i.result())
+    ```
+
 For more details on how to configure Parsl+TaskVine to scale applications 
 with compute resources of 
 local clusters and various performance optimizations, please refer to 
