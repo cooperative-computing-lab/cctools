@@ -368,7 +368,7 @@ static void send_features(struct link *manager)
 	{
 		char feature_encoded[VINE_LINE_MAX];
 		url_encode(f, feature_encoded, VINE_LINE_MAX);
-		send_message(manager, "feature %s\n", feature_encoded);
+		send_async_message(manager, "feature %s\n", feature_encoded);
 	}
 }
 
@@ -395,8 +395,7 @@ Send a message to the manager with my current statistics information.
 
 static void send_stats_update(struct link *manager)
 {
-	//send_message(manager, "info tasks_running %lld\n", (long long)itable_size(procs_running));
-	send_async_message(manager, "info tasks_running %lld\n", (long long)itable_size(procs_running));
+	send_message(manager, "info tasks_running %lld\n", (long long)itable_size(procs_running));
 }
 
 /*
@@ -406,7 +405,7 @@ think that the worker has crashed and gone away.
 
 static int send_keepalive(struct link *manager, int force_resources)
 {
-	send_message(manager, "alive\n");
+	send_async_message(manager, "alive\n");
 	send_resource_update(manager);
 	return 1;
 }
@@ -424,7 +423,7 @@ void vine_worker_send_cache_update(struct link *manager, const char *cachename, 
 		transfer_id = xxstrdup("X");
 	}
 
-	send_message(manager,
+	send_async_message(manager,
 			"cache-update %s %lld %lld %lld %s\n",
 			cachename,
 			(long long)size,
@@ -445,10 +444,10 @@ void vine_worker_send_cache_invalid(struct link *manager, const char *cachename,
 	char *transfer_id = hash_table_remove(current_transfers, cachename);
 	if (transfer_id) {
 		debug(D_VINE, "Sending Cache invalid transfer id: %s", transfer_id);
-		send_message(manager, "cache-invalid %s %d %s\n", cachename, length, transfer_id);
+		send_async_message(manager, "cache-invalid %s %d %s\n", cachename, length, transfer_id);
 		free(transfer_id);
 	} else {
-		send_message(manager, "cache-invalid %s %d\n", cachename, length);
+		send_async_message(manager, "cache-invalid %s %d\n", cachename, length);
 	}
 	link_write(manager, message, length, time(0) + options->active_timeout);
 }
@@ -462,7 +461,7 @@ static void send_transfer_address(struct link *manager)
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 	vine_transfer_server_address(addr, &port);
-	send_message(manager, "transfer-address %s %d\n", addr, port);
+	send_async_message(manager, "transfer-address %s %d\n", addr, port);
 }
 
 /*
@@ -482,7 +481,7 @@ static void report_worker_ready(struct link *manager)
 		strcpy(hostname, "unknown");
 	}
 
-	send_message(manager,
+	send_async_message(manager,
 			"taskvine %d %s %s %s %d.%d.%d\n",
 			VINE_PROTOCOL_VERSION,
 			hostname,
@@ -491,17 +490,17 @@ static void report_worker_ready(struct link *manager)
 			CCTOOLS_VERSION_MAJOR,
 			CCTOOLS_VERSION_MINOR,
 			CCTOOLS_VERSION_MICRO);
-	send_message(manager, "info worker-id %s\n", worker_id);
+	send_async_message(manager, "info worker-id %s\n", worker_id);
 	vine_cache_scan(cache_manager, manager);
 
 	send_features(manager);
 	send_transfer_address(manager);
-	send_message(manager,
+	send_async_message(manager,
 			"info worker-end-time %" PRId64 "\n",
 			(int64_t)DIV_INT_ROUND_UP(options->end_time, USECOND));
 
 	if (options->factory_name) {
-		send_message(manager, "info from-factory %s\n", options->factory_name);
+		send_async_message(manager, "info from-factory %s\n", options->factory_name);
 	}
 
 	send_keepalive(manager, 1);
@@ -1559,6 +1558,9 @@ static void vine_worker_serve_manager(struct link *manager)
 
 		/* Check all known libraries if they are ready to execute functions. */
 		check_libraries_ready();
+		
+		/* deliver queued asynchronous messages if available */
+		deliver_async_messages(manager);
 
 		int task_event = 0;
 		if (ok) {
@@ -1584,7 +1586,7 @@ static void vine_worker_serve_manager(struct link *manager)
 
 		if (ok && !results_to_be_sent_msg) {
 			if (vine_watcher_check(watcher) || itable_size(procs_complete) > 0) {
-				send_message(manager, "available_results\n");
+				send_async_message(manager, "available_results\n");
 				results_to_be_sent_msg = 1;
 			}
 
@@ -1700,7 +1702,7 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 	vine_worker_serve_manager(manager);
 
 	if (abort_signal_received) {
-		send_message(manager, "info vacating %d\n", abort_signal_received);
+		send_async_message(manager, "info vacating %d\n", abort_signal_received);
 	}
 
 	last_task_received = 0;
