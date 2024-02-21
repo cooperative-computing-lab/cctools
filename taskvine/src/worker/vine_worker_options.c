@@ -5,12 +5,12 @@
 #include "catalog_query.h"
 #include "cctools.h"
 #include "copy_stream.h"
+#include "create_dir.h"
 #include "debug.h"
 #include "hash_table.h"
 #include "macros.h"
 #include "path.h"
 #include "stringtools.h"
-#include "create_dir.h"
 
 #include "getopt.h"
 #include "getopt_aux.h"
@@ -111,7 +111,8 @@ void vine_worker_options_show_help(const char *cmd, struct vine_worker_options *
 	printf(" %-30s of the value in uname (%s).\n", "", options->arch_name);
 	printf(" %-30s Set operating system string for the worker to report to manager instead\n", "-O,--os=<os>");
 	printf(" %-30s of the value in uname (%s).\n", "", options->os_name);
-	printf(" %-30s Set the workspace dir for this worker. (default is /tmp/worker-UID-PID)\n", "-s,--workspace=<path>");
+	printf(" %-30s Set the workspace dir for this worker. (default is /tmp/worker-UID-PID)\n",
+			"-s,--workspace=<path>");
 	printf(" %-30s Keep (do not delete) the workspace dir when worker exits.\n", "   --keep-workspace");
 	printf(" %-30s Set the number of cores reported by this worker. If not given, or less than 1,\n",
 			"--cores=<n>");
@@ -288,14 +289,16 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 		case LONG_OPT_WORKSPACE:
 		case 's': {
 			char temp_abs_path[PATH_MAX];
-			create_dir(optarg,0755);
+			create_dir(optarg, 0755);
 			path_absolute(optarg, temp_abs_path, 1);
 			options->workspace_dir = xxstrdup(temp_abs_path);
 			break;
 		}
 		case LONG_OPT_KEEP_WORKSPACE:
-			if(!options->workspace_dir) {
-				fprintf(stderr,"%s: error: --keep-workspace also requires explicit --workspace argument.\n",argv[0]);
+			if (!options->workspace_dir) {
+				fprintf(stderr,
+						"%s: error: --keep-workspace also requires explicit --workspace argument.\n",
+						argv[0]);
 				exit(EXIT_FAILURE);
 			}
 			options->keep_workspace_at_exit = 1;
