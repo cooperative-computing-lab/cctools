@@ -110,7 +110,8 @@ void vine_worker_options_show_help(const char *cmd, struct vine_worker_options *
 	printf(" %-30s of the value in uname (%s).\n", "", options->arch_name);
 	printf(" %-30s Set operating system string for the worker to report to manager instead\n", "-O,--os=<os>");
 	printf(" %-30s of the value in uname (%s).\n", "", options->os_name);
-	printf(" %-30s Set the location for creating the working directory of the worker.\n", "-s,--workdir=<path>");
+	printf(" %-30s Set the workspace dir for this worker. (default is /tmp/worker-UID-PID)\n", "-s,--workspace=<path>");
+	printf(" %-30s Keep (do not delete) the workspace dir when worker exits.\n", "   --keep-workspace");
 	printf(" %-30s Set the number of cores reported by this worker. If not given, or less than 1,\n",
 			"--cores=<n>");
 	printf(" %-30s then try to detect cores available.\n", "");
@@ -162,7 +163,9 @@ enum {
 	LONG_OPT_USE_SSL,
 	LONG_OPT_PYTHON_FUNCTION,
 	LONG_OPT_FROM_FACTORY,
-	LONG_OPT_TRANSFER_PORT
+	LONG_OPT_TRANSFER_PORT,
+	LONG_OPT_WORKSPACE,
+	LONG_OPT_KEEP_WORKSPACE,
 };
 
 static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
@@ -184,7 +187,9 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"memory-threshold", required_argument, 0, LONG_OPT_MEMORY_THRESHOLD},
 		{"arch", required_argument, 0, 'A'},
 		{"os", required_argument, 0, 'O'},
-		{"workdir", required_argument, 0, 's'},
+		{"workdir", required_argument, 0, 's'}, // backwards compatibility
+		{"workspace", required_argument, 0, LONG_OPT_WORKSPACE},
+		{"keep-workspace", required_argument, 0, LONG_OPT_KEEP_WORKSPACE},
 		{"bandwidth", required_argument, 0, LONG_OPT_BANDWIDTH},
 		{"cores", required_argument, 0, LONG_OPT_CORES},
 		{"memory", required_argument, 0, LONG_OPT_MEMORY},
@@ -279,12 +284,20 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 		case 'O':
 			options->os_name = xxstrdup(optarg);
 			break;
+		case LONG_OPT_WORKSPACE:
 		case 's': {
 			char temp_abs_path[PATH_MAX];
 			path_absolute(optarg, temp_abs_path, 1);
 			options->workspace_dir = xxstrdup(temp_abs_path);
 			break;
 		}
+		case LONG_OPT_KEEP_WORKSPACE:
+			if(!options->workspace_dir) {
+				fprintf(stderr,"%s: error: --keep-workspace also requires explicit --workspace argument.\n",argv[0]);
+				exit(EXIT_FAILURE);
+			}
+			options->keep_workspace_at_exit = 1;
+			break;
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
 			exit(EXIT_SUCCESS);

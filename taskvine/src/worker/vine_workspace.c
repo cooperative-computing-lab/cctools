@@ -1,6 +1,8 @@
 
 #include "vine_workspace.h"
 #include "vine_protocol.h"
+#include "vine_worker_options.h"
+#include "vine_worker.h"
 
 #include "create_dir.h"
 #include "debug.h"
@@ -152,8 +154,13 @@ int vine_workspace_cleanup(struct vine_workspace *w)
 
 void vine_workspace_delete(struct vine_workspace *w)
 {
-	printf("vine_worker: deleting workspace %s\n", w->workspace_dir);
-
+	if(options->keep_workspace_at_exit) {
+		printf("vine_worker: keeping workspace %s for future use...\n", w->workspace_dir);
+	} else {
+		printf("vine_worker: deleting workspace %s\n", w->workspace_dir);
+		unlink_recursive(w->workspace_dir);
+	}
+			
 	free(w->workspace_dir);
 	free(w->transfer_dir);
 	free(w->cache_dir);
