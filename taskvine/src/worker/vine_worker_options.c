@@ -10,6 +10,7 @@
 #include "macros.h"
 #include "path.h"
 #include "stringtools.h"
+#include "create_dir.h"
 
 #include "getopt.h"
 #include "getopt_aux.h"
@@ -189,7 +190,7 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"os", required_argument, 0, 'O'},
 		{"workdir", required_argument, 0, 's'}, // backwards compatibility
 		{"workspace", required_argument, 0, LONG_OPT_WORKSPACE},
-		{"keep-workspace", required_argument, 0, LONG_OPT_KEEP_WORKSPACE},
+		{"keep-workspace", no_argument, 0, LONG_OPT_KEEP_WORKSPACE},
 		{"bandwidth", required_argument, 0, LONG_OPT_BANDWIDTH},
 		{"cores", required_argument, 0, LONG_OPT_CORES},
 		{"memory", required_argument, 0, LONG_OPT_MEMORY},
@@ -287,6 +288,7 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 		case LONG_OPT_WORKSPACE:
 		case 's': {
 			char temp_abs_path[PATH_MAX];
+			create_dir(optarg,0755);
 			path_absolute(optarg, temp_abs_path, 1);
 			options->workspace_dir = xxstrdup(temp_abs_path);
 			break;

@@ -20,23 +20,27 @@
 
 /* Create a new workspace object and sub-paths */
 
-struct vine_workspace *vine_workspace_create(const char *manual_tmpdir)
+struct vine_workspace *vine_workspace_create(const char *manual_workspace_dir)
 {
+	char *workspace_dir = 0;
 	char absolute[VINE_LINE_MAX];
-
-	const char *tmpdir = system_tmp_dir(manual_tmpdir);
-
-	char *workspace = string_format("%s/worker-%d-%d", tmpdir, (int)getuid(), (int)getpid());
-
-	printf("vine_worker: creating workspace %s\n", workspace);
-
-	if (!create_dir(workspace, 0777)) {
-		free(workspace);
+	
+	if(manual_workspace_dir) {
+		workspace_dir = strdup(manual_workspace_dir);
+	} else {
+		const char *tmpdir = system_tmp_dir(0);
+		workspace_dir = string_format("%s/worker-%d-%d", tmpdir, (int)getuid(), (int)getpid());
+	}
+	
+	printf("vine_worker: creating workspace %s\n", workspace_dir);
+	if (!create_dir(workspace_dir, 0777)) {
+		free(workspace_dir);
 		return 0;
 	}
 
-	path_absolute(workspace, absolute, 1);
-	free(workspace);
+	/* Convert to absolute dir since we will eventually chdir. */
+	path_absolute(workspace_dir, absolute, 1);
+	free(workspace_dir);
 
 	struct vine_workspace *w = malloc(sizeof(*w));
 
