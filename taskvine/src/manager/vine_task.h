@@ -77,6 +77,7 @@ struct vine_task {
 
 	vine_result_t result;          /**< The result of the task (see @ref vine_result_t */
 	int exit_code;               /**< The exit code of the command line. */
+	int64_t output_length;       /**< length of the standard output of a task */
 	char *output;                /**< The standard output of the task. */
 	char *addrport;              /**< The address and port of the host on which it ran. */
 	char *hostname;              /**< The name of the host on which it ran. */
@@ -112,6 +113,7 @@ struct vine_task {
 		
 	int has_fixed_locations;                               /**< Whether at least one file was added with the VINE_FIXED_LOCATION flag. Task fails immediately if no
 															 worker can satisfy all the strict inputs of the task. */
+	int light;                   			       /**< IF this is flag is set omit retrieving outputs and set task to retrieved */
 
 	int refcount;                                          /**< Number of remaining references to this object. */
 };

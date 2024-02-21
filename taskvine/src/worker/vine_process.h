@@ -68,6 +68,9 @@ struct vine_process {
 	/* disk size and number of files found in the process sandbox. */
 	int64_t sandbox_size;
 	int64_t sandbox_file_count;
+	
+	/* size of the process' stdout file */
+	int64_t output_length;
 
 	/* state between complete disk measurements. */
 	struct path_disk_size_info *disk_measurement_state;

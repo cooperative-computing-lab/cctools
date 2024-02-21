@@ -266,9 +266,10 @@ void send_complete_tasks(struct link *l)
 	for (visited = 0; visited < size; visited++) {
 		p = itable_pop(procs_complete);
 		send_async_message(l,
-				"complete %d %d %llu %llu %d\n",
+				"complete %d %d %lld %llu %llu %d\n",
 				p->result,
 				p->exit_code,
+				(long long)p->output_length,
 				(unsigned long long)p->execution_start,
 				(unsigned long long)p->execution_end,
 				p->task->task_id);
@@ -611,6 +612,20 @@ static void reap_process(struct vine_process *p, struct link *manager)
 
 	itable_remove(procs_running, p->task->task_id);
 	itable_insert(procs_complete, p->task->task_id, p);
+
+	int output_file = open(p->output_file_name, O_RDONLY);
+	if (output_file >= 0) {
+        struct stat info;
+        fstat(output_file, &info);
+        p->output_length = info.st_size;
+		close(output_file);
+    } else {
+        p->output_length = 0;
+    }
+
+	total_task_execution_time += (p->execution_end - p->execution_start);
+    total_tasks_executed++;
+
 }
 
 /*
@@ -1131,6 +1146,29 @@ static void disconnect_manager(struct link *manager)
 	}
 }
 
+void send_stdout(struct link *l, int64_t task_id)
+{	
+	struct vine_process *p = itable_lookup(procs_table, task_id);
+	if(!p){
+			send_message(l, "failure %ld\n", task_id);
+			return;
+	}
+
+	int output_file = open(p->output_file_name, O_RDONLY);
+    if (output_file < 0) {
+			send_message(l, "failure %ld\n", task_id);
+			return;
+	}
+
+	send_message(l, "stdout %ld %lld\n",task_id, (long long)p->output_length);
+
+    if (output_file >= 0) {
+        link_stream_from_fd(l, output_file, p->output_length, time(0) + options->active_timeout);
+        close(output_file);
+    }
+	return;
+}
+
 /* Handle the next incoming message from the currently connected manager. */
 
 static int handle_manager(struct link *manager)
@@ -1234,6 +1272,9 @@ static int handle_manager(struct link *manager)
 		} else if (sscanf(line, "send_results %d", &n) == 1) {
 			report_tasks_complete(manager);
 			r = 1;
+		} else if (sscanf(line, "send_stdout %ld", &task_id) == 1) {
+			send_stdout(manager, task_id);
+			r = 1;
 		} else {
 			debug(D_VINE, "Unrecognized manager message: %s.\n", line);
 			r = 0;
@@ -1245,6 +1286,8 @@ static int handle_manager(struct link *manager)
 
 	return r;
 }
+
+
 
 /*
 Return true if this task can run with the resources currently available.

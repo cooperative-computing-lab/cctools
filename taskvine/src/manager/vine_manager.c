@@ -149,6 +149,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 static void release_all_workers(struct vine_manager *q);
 
 static int vine_manager_check_inputs_available(struct vine_manager *q, struct vine_task *t);
+static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 
 static void delete_worker_file(
 		struct vine_manager *q, struct vine_worker_info *w, const char *filename, int flags, int except_flags);
@@ -474,6 +475,187 @@ static int handle_transfer_address(struct vine_manager *q, struct vine_worker_in
 	}
 }
 
+void exit_alert(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	if (t->result == VINE_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
+                switch (t->exit_code) {
+                case (126):
+                        warn(D_VINE,
+                                        "Task %d ran for a very short time and exited with code %d.\n",
+                                        t->task_id,
+                                        t->exit_code);
+                        warn(D_VINE, "This usually means that the task's command is not an executable,\n");
+                        warn(D_VINE, "or that the worker's scratch directory is on a no-exec partition.\n");
+                        break;
+                case (127):
+                        warn(D_VINE,
+                                        "Task %d ran for a very short time and exited with code %d.\n",
+                                        t->task_id,
+                                        t->exit_code);
+                        warn(D_VINE, "This usually means that the task's command could not be found, or that\n");
+                        warn(D_VINE, "it uses a shared library not available at the worker, or that\n");
+                        warn(D_VINE, "it uses a version of the glibc different than the one at the worker.\n");
+                        break;
+                case (139):
+                        warn(D_VINE,
+                                        "Task %d ran for a very short time and exited with code %d.\n",
+                                        t->task_id,
+                                        t->exit_code);
+                        warn(D_VINE, "This usually means that the task's command had a segmentation fault,\n");
+                        warn(D_VINE, "either because it has a memory access error (segfault), or because\n");
+                        warn(D_VINE, "it uses a version of a shared library different from the one at the worker.\n");
+                        break;
+                default:
+                        break;
+                }
+        }
+
+        vine_task_info_add(q, t);
+
+        debug(D_VINE,
+                        "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
+                        w->hostname,
+                        w->addrport,
+                        (t->time_when_done - t->time_when_commit_start) / 1000000.0,
+                        (long long)w->total_tasks_complete,
+                        w->total_task_time / w->total_tasks_complete / 1000000.0);
+
+	return;
+}
+
+static vine_result_code_t get_completion_result(struct vine_manager *q, struct vine_worker_info *w, const char *line)
+{
+	if (!q || !w || !line)
+		return VINE_WORKER_FAILURE;
+
+	struct vine_task *t;
+
+	int task_status, exit_status;
+	uint64_t task_id;
+	int64_t output_length;
+	timestamp_t execution_time, start_time, end_time;
+	timestamp_t observed_execution_time;
+	timestamp_t effective_stoptime = 0;
+	time_t stoptime;
+
+	// Format: task completion status, exit status (exit code or signal), output length, execution time, task_id
+
+	int n = sscanf(line,
+			"complete %d %d %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 "",
+			&task_status,
+			&exit_status,
+			&output_length,
+			&start_time,
+			&end_time,
+			&task_id);
+
+	if (n < 6) {
+		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
+		return VINE_WORKER_FAILURE;
+	}
+
+	execution_time = end_time - start_time;
+
+	t = itable_lookup(w->current_tasks, task_id);
+	if(t->state == VINE_TASK_WAITING_RETRIEVAL){
+		// we already retrieved an completion message on this outputs should be retrieved later...
+		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
+		return VINE_SUCCESS;
+	}
+	if (!t) {
+		debug(D_VINE,
+				"Unknown task result from worker %s (%s): no task %" PRId64
+				" assigned to worker.  Ignoring result.",
+				w->hostname,
+				w->addrport,
+				task_id);
+		stoptime = time(0) + vine_manager_transfer_time(q, w, output_length);
+		link_soak(w->link, output_length, stoptime);
+		return VINE_SUCCESS;
+	}
+
+	if (task_status == VINE_RESULT_FORSAKEN) {
+		itable_remove(q->running_table, t->task_id);
+		vine_task_set_result(t, VINE_RESULT_FORSAKEN);
+		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
+		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
+		return VINE_SUCCESS;
+	}
+
+	observed_execution_time = timestamp_get() - t->time_when_commit_end;
+
+	t->time_workers_execute_last =
+			observed_execution_time > execution_time ? execution_time : observed_execution_time;
+	t->time_workers_execute_last_start = start_time;
+	t->time_workers_execute_last_end = end_time;
+
+	t->time_workers_execute_all += t->time_workers_execute_last;
+
+	t->output_length = output_length;
+
+	t->result = task_status;
+	t->exit_code = exit_status;
+
+	q->stats->time_workers_execute += t->time_workers_execute_last;
+
+	w->finished_tasks++;
+
+	// Convert resource_monitor status into taskvine status if needed.
+	if (q->monitor_mode) {
+		if (t->exit_code == RM_OVERFLOW) {
+			vine_task_set_result(t, VINE_RESULT_RESOURCE_EXHAUSTION);
+		} else if (t->exit_code == RM_TIME_EXPIRE) {
+			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
+		}
+	}
+
+	if (!t->light) {
+		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
+		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
+	} else {
+		t->time_when_retrieval = timestamp_get();
+		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
+		vine_manager_send(q, w, "kill %d\n", t->task_id);
+		delete_uncacheable_files(q, w, t);
+		t->time_when_done = timestamp_get();
+		reap_task_from_worker(q, w, t, VINE_TASK_RETRIEVED);
+		vine_accumulate_task(q, t);
+        	w->finished_tasks--;
+        	w->total_tasks_complete++;
+		w->alarm_slow_worker = 0;
+		exit_alert(q, w, t);
+	}
+
+	itable_remove(q->running_table, t->task_id);
+
+	if (q->bandwidth_limit) {
+		effective_stoptime = (output_length / q->bandwidth_limit) * 1000000 + timestamp_get();
+	}
+	timestamp_t current_time = timestamp_get();
+
+        if (effective_stoptime && effective_stoptime > current_time) {
+        	usleep(effective_stoptime - current_time);
+        }
+
+	return VINE_SUCCESS;
+
+}
+
+
+/*
+A completion message is an asynchronous message that indicates a task has completed.
+The manager decides how to handle completion based on the task.
+*/
+
+static vine_msg_code_t handle_complete(struct vine_manager *q, struct vine_worker_info *w, const char *line)
+{
+	vine_result_code_t result = get_completion_result(q, w, line);
+	if(result == VINE_SUCCESS){
+		return VINE_MSG_PROCESSED;
+	}
+	return VINE_MSG_NOT_PROCESSED;
+}
+
 /*
 This function receives a message from worker and records the time a message is successfully
 received. This timestamp is used in keepalive timeout computations.
@@ -531,7 +713,7 @@ static vine_msg_code_t vine_manager_recv_no_retry(
 	} else if (sscanf(line, "GET %s HTTP/%*d.%*d", path) == 1) {
 		result = handle_http_request(q, w, path, stoptime);
 	} else if (string_prefix_is(line, "complete")) {
-		result = VINE_MSG_PROCESSED;
+		result = handle_complete(q, w, line);
 	} else {
 		// Message is not a status update: return it to the user.
 		result = VINE_MSG_NOT_PROCESSED;
@@ -969,6 +1151,122 @@ static void resource_monitor_compress_logs(struct vine_manager *q, struct vine_t
 	free(series);
 	free(debug_log);
 	free(command);
+}
+
+static int get_outputs_from_worker(struct vine_manager *q, struct vine_worker_info *w, int task_id)
+{
+	struct vine_task *t;
+	vine_result_code_t result = VINE_SUCCESS;
+
+	t = itable_lookup(w->current_tasks, task_id);
+	if (!t) {
+		debug(D_VINE, "Failed to find task %d at worker %s (%s).", task_id, w->hostname, w->addrport);
+		handle_failure(q, w, t, VINE_WORKER_FAILURE);
+		return 0;
+	}
+	t->time_when_retrieval = timestamp_get();
+
+	/* Determine what subset of outputs to retrieve based on status. */
+
+	switch (t->result) {
+	case VINE_RESULT_INPUT_MISSING:
+	case VINE_RESULT_FORSAKEN:
+		/* If the worker didn't run the task don't bother fetching outputs. */
+		result = VINE_SUCCESS;
+		break;
+	case VINE_RESULT_RESOURCE_EXHAUSTION:
+		/* On resource exhaustion, just get the monitor files to figure out what happened. */
+		result = vine_manager_get_monitor_output_file(q, w, t);
+		break;
+	default:
+		/* Otherwise get all of the output files. */
+		result = vine_manager_get_output_files(q, w, t);
+		break;
+	}
+
+	if (result != VINE_SUCCESS) {
+		debug(D_VINE, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
+		handle_failure(q, w, t, result);
+	}
+
+	if (result == VINE_WORKER_FAILURE) {
+		t->time_when_done = timestamp_get();
+		return 0;
+	}
+	result = vine_manager_get_stdout(q, w, t);
+	delete_uncacheable_files(q, w, t);
+
+	/* if q is monitoring, update t->resources_measured, and delete the task
+	 * summary. */
+	if (q->monitor_mode) {
+		read_measured_resources(q, t);
+
+		/* Further, if we got debug and series files, gzip them. */
+		if (q->monitor_mode & VINE_MON_FULL)
+			resource_monitor_compress_logs(q, t);
+	}
+
+	// Finish receiving output.
+	t->time_when_done = timestamp_get();
+
+	vine_accumulate_task(q, t);
+
+	// At this point, a task is completed.
+	reap_task_from_worker(q, w, t, VINE_TASK_RETRIEVED);
+
+	w->finished_tasks--;
+	w->total_tasks_complete++;
+
+	// At least one task has finished without triggering a slow worker disconnect, thus we
+	// now have evidence that worker is not slow (e.g., it was probably the
+	// previous task that was slow).
+	w->alarm_slow_worker = 0;
+	
+	/* print warnings if the task ran for a very short time (1s) and exited with common non-zero status */
+	if (t->result == VINE_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
+		switch (t->exit_code) {
+		case (126):
+			warn(D_VINE,
+					"Task %d ran for a very short time and exited with code %d.\n",
+					t->task_id,
+					t->exit_code);
+			warn(D_VINE, "This usually means that the task's command is not an executable,\n");
+			warn(D_VINE, "or that the worker's scratch directory is on a no-exec partition.\n");
+			break;
+		case (127):
+			warn(D_VINE,
+					"Task %d ran for a very short time and exited with code %d.\n",
+					t->task_id,
+					t->exit_code);
+			warn(D_VINE, "This usually means that the task's command could not be found, or that\n");
+			warn(D_VINE, "it uses a shared library not available at the worker, or that\n");
+			warn(D_VINE, "it uses a version of the glibc different than the one at the worker.\n");
+			break;
+		case (139):
+			warn(D_VINE,
+					"Task %d ran for a very short time and exited with code %d.\n",
+					t->task_id,
+					t->exit_code);
+			warn(D_VINE, "This usually means that the task's command had a segmentation fault,\n");
+			warn(D_VINE, "either because it has a memory access error (segfault), or because\n");
+			warn(D_VINE, "it uses a version of a shared library different from the one at the worker.\n");
+			break;
+		default:
+			break;
+		}
+	}
+
+	vine_task_info_add(q, t);
+
+	debug(D_VINE,
+			"%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
+			w->hostname,
+			w->addrport,
+			(t->time_when_done - t->time_when_commit_start) / 1000000.0,
+			(long long)w->total_tasks_complete,
+			w->total_task_time / w->total_tasks_complete / 1000000.0);
+
+	return 1;
 }
 
 /*

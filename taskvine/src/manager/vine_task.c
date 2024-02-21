@@ -92,6 +92,7 @@ void vine_task_clean(struct vine_task *t)
 
 	free(t->output);
 	t->output = NULL;
+	t->output_length = 0;
 
 	free(t->hostname);
 	t->hostname = NULL;

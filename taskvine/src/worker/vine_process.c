@@ -89,6 +89,7 @@ struct vine_process *vine_process_create(struct vine_task *task, vine_process_ty
 	p->sandbox = string_format("%s/%s.%d", workspace->workspace_dir, dirtype, p->task->task_id);
 	p->tmpdir = string_format("%s/.taskvine.tmp", p->sandbox);
 	p->output_file_name = string_format("%s/.taskvine.stdout", p->sandbox);
+	p->output_length = 0;
 
 	p->functions_running = 0;
 	p->library_ready = 0;
