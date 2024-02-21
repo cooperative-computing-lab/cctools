@@ -1774,6 +1774,7 @@ class Factory(object):
             # since the manager may cleanup before the factory terminates,
             # we need to use some other directory.
             self._opts["scratch-dir"] = os.path.dirname(manager.staging_directory)
+            pathlib.Path.mkdir(pathlib.Path(self._opts["scratch_dir"]), exist_ok=True, parents=True)
 
     def _stop(self):
         if self._factory_proc is not None:
@@ -1902,7 +1903,7 @@ class Factory(object):
                 candidate = os.environ.get("TMPDIR", "/tmp")
             candidate = os.path.join(candidate, f"vine-factory-{os.getuid()}")
             if not os.path.exists(candidate):
-                os.makedirs(candidate)
+                os.makedirs(candidate, exist_ok=True)
             self.scratch_dir = candidate
 
         # specialize scratch_dir for this run
