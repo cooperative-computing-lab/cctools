@@ -324,7 +324,7 @@ class DaskVineFile:
                 else:
                     self._load = output['Reason']
             else:
-                with open(self.source(), "rb") as f:
+                with open(self._file.source(), "rb") as f:
                     self._load = cloudpickle.load(f)
                     self._loaded = True
 
