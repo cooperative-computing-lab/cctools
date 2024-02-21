@@ -994,7 +994,6 @@ class FunctionCall(Task):
         self._event = {}
         self._event["fn_args"] = args
         self._event["fn_kwargs"] = kwargs
-        self.set_time_max(900)     # maximum run time for function calls is 900s by default.
         self.needs_library(library_name)
         self._input_buffer = None
         self._output_buffer = None
