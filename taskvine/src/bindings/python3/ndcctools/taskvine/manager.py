@@ -1946,11 +1946,11 @@ class Factory(object):
         return self.start()
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.stop()
+        self._stop()
 
     def __del__(self):
         try:
-            self.stop()
+            self._stop()
         except TypeError:
             pass
 
