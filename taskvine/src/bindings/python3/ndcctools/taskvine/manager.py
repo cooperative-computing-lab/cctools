@@ -1774,7 +1774,7 @@ class Factory(object):
             # since the manager may cleanup before the factory terminates,
             # we need to use some other directory.
             self._opts["scratch-dir"] = os.path.dirname(manager.staging_directory)
-            pathlib.Path.mkdir(pathlib.Path(self._opts["scratch_dir"]), exist_ok=True, parents=True)
+            pathlib.Path.mkdir(pathlib.Path(self._opts["scratch-dir"]), exist_ok=True, parents=True)
 
     def _stop(self):
         if self._factory_proc is not None:

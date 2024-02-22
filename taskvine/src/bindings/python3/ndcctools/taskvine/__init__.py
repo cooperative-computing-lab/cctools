@@ -57,6 +57,7 @@ from .task import (
     LibraryTask,
     FunctionCall,
 )
+from .dask_dag import DaskVineDag
 
 try:
     from .dask_executor import DaskVine
