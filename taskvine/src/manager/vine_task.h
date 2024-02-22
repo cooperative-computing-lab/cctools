@@ -139,6 +139,7 @@ void vine_task_check_consistency( struct vine_task *t );
 
 /* If the task produces watched output files, truncate them. */
 void vine_task_truncate_watched_outputs(struct vine_task *t);
+void vine_task_light(struct vine_task *t);
 
 const char *vine_task_state_to_string( vine_task_state_t task_state );
 

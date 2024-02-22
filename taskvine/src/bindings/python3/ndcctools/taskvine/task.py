@@ -162,6 +162,9 @@ class Task(object):
     def submit_finalize(self):
         pass
 
+    def light_task(self):
+        return cvine.vine_task_light(self._task)
+
     @property
     def manager(self):
         return self._manager

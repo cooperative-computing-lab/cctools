@@ -672,9 +672,9 @@ static void report_tasks_complete(struct link *manager)
 {
 	struct vine_process *p;
 
-	while ((p = itable_pop(procs_complete))) {
-		report_task_complete(manager, p);
-	}
+	//while ((p = itable_pop(procs_complete))) {
+	//	report_task_complete(manager, p);
+	//}
 
 	vine_watcher_send_changes(watcher, manager, time(0) + options->active_timeout);
 	send_message(manager, "end\n");

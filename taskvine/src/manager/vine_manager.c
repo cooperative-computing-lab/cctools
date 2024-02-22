@@ -557,22 +557,31 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	execution_time = end_time - start_time;
 
 	t = itable_lookup(w->current_tasks, task_id);
-	if(t->state == VINE_TASK_WAITING_RETRIEVAL){
-		// we already retrieved an completion message on this outputs should be retrieved later...
-		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
-		return VINE_SUCCESS;
-	}
+
 	if (!t) {
 		debug(D_VINE,
-				"Unknown task result from worker %s (%s): no task %" PRId64
+				"Unknown task completion or acknowledged from worker %s (%s): no task %" PRId64
 				" assigned to worker.  Ignoring result.",
 				w->hostname,
 				w->addrport,
 				task_id);
-		stoptime = time(0) + vine_manager_transfer_time(q, w, output_length);
-		link_soak(w->link, output_length, stoptime);
 		return VINE_SUCCESS;
 	}
+
+	switch (t->state) {
+		// Handle completion
+		case VINE_TASK_RUNNING:
+			break;
+		// Task has already been marked as complete. likely worker has not killed task yet...
+		case VINE_TASK_WAITING_RETRIEVAL:
+		case VINE_TASK_RETRIEVED:
+		case VINE_TASK_DONE:
+			return VINE_SUCCESS;
+		// May want check if there is a case where task state changed to one of these before worker has killed it. 
+		case VINE_TASK_INITIAL:     
+		case VINE_TASK_READY:
+			return VINE_WORKER_FAILURE;
+        }
 
 	if (task_status == VINE_RESULT_FORSAKEN) {
 		itable_remove(q->running_table, t->task_id);
@@ -1153,7 +1162,7 @@ static void resource_monitor_compress_logs(struct vine_manager *q, struct vine_t
 	free(command);
 }
 
-static int get_outputs_from_worker(struct vine_manager *q, struct vine_worker_info *w, int task_id)
+static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_info *w, int task_id)
 {
 	struct vine_task *t;
 	vine_result_code_t result = VINE_SUCCESS;
@@ -1180,7 +1189,8 @@ static int get_outputs_from_worker(struct vine_manager *q, struct vine_worker_in
 		break;
 	default:
 		/* Otherwise get all of the output files. */
-		result = vine_manager_get_output_files(q, w, t);
+		result = vine_manager_get_stdout(q, w, t);
+		result &= vine_manager_get_output_files(q, w, t);
 		break;
 	}
 
@@ -1193,7 +1203,6 @@ static int get_outputs_from_worker(struct vine_manager *q, struct vine_worker_in
 		t->time_when_done = timestamp_get();
 		return 0;
 	}
-	result = vine_manager_get_stdout(q, w, t);
 	delete_uncacheable_files(q, w, t);
 
 	/* if q is monitoring, update t->resources_measured, and delete the task
@@ -1846,11 +1855,13 @@ static vine_result_code_t get_available_results(struct vine_manager *q, struct v
 			break;
 		}
 
-		if (string_prefix_is(line, "result")) {
-			result = get_result(q, w, line);
-			if (result != VINE_SUCCESS)
-				break;
-		} else if (string_prefix_is(line, "update")) {
+		// TODO REPLACE
+		//if (string_prefix_is(line, "result")) {
+		//	result = get_result(q, w, line);
+		//	if (result != VINE_SUCCESS)
+		//		break;
+
+		if (string_prefix_is(line, "update")) {
 			result = get_update(q, w, line);
 			if (result != VINE_SUCCESS)
 				break;
@@ -3417,7 +3428,7 @@ static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_
 		/* If the task is waiting to be retrieved... */
 		if (t->state == VINE_TASK_WAITING_RETRIEVAL) {
 			/* Attempt to fetch it. */
-			if (fetch_output_from_worker(q, w, task_id)) {
+			if (fetch_outputs_from_worker(q, w, task_id)) {
 				/* If it was fetched, update stats and keep going. */
 				tasks_received++;
 
@@ -3450,7 +3461,7 @@ static int receive_one_task(struct vine_manager *q)
 	if ((t = list_peek_head(q->waiting_retrieval_list))) {
 		struct vine_worker_info *w = t->worker;
 		/* Attempt to fetch from this worker. */
-		if (fetch_output_from_worker(q, w, t->task_id)) {
+		if (fetch_outputs_from_worker(q, w, t->task_id)) {
 			/* Consider whether this worker should be removed. */
 			vine_manager_factory_worker_prune(q, w);
 			/* If we got a task, then we are done. */
