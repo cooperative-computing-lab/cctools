@@ -317,18 +317,13 @@ class DaskVineFile:
 
     def load(self):
         if not self._loaded:
+            self._load = self._file.contents(cloudpickle.load)
             if self._task_mode == 'function-calls':
-                output = cloudpickle.loads(self._file.contents())
-                self._loaded = True
-                if output['Success']:
-                    self._load = output['Result']
+                if self._load['Success']:
+                    self._load = self._load['Result']
                 else:
-                    self._load = output['Reason']
-            else:
-                with open(self._file.source(), "rb") as f:
-                    self._load = cloudpickle.load(f)
-                    self._loaded = True
-
+                    self._load = self._load['Reason']
+            self._loaded = True
         return self._load
 
     @property
