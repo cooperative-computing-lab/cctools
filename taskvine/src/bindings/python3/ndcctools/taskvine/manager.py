@@ -1776,10 +1776,6 @@ class Factory(object):
             self._opts["scratch-dir"] = os.path.dirname(manager.staging_directory)
             pathlib.Path.mkdir(pathlib.Path(self._opts["scratch-dir"]), exist_ok=True, parents=True)
 
-    def _stop(self):
-        if self._factory_proc is not None:
-            self.stop()
-
     def _set_manager(self, batch_type, manager, manager_host_port, manager_name):
         if not (manager or manager_host_port or manager_name):
             raise ValueError("Either manager, manager_host_port, or manager_name or manager should be specified.")
@@ -1935,10 +1931,9 @@ class Factory(object):
     ##
     # Stop the factory process.
     def stop(self):
-        if self._factory_proc is None:
-            raise RuntimeError("Factory not yet started")
-        self._factory_proc.terminate()
-        self._factory_proc.wait()
+        if self._factory_proc is not None:
+            self._factory_proc.terminate()
+            self._factory_proc.wait()
         self._factory_proc = None
         self._config_file = None
 
@@ -1946,11 +1941,11 @@ class Factory(object):
         return self.start()
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self._stop()
+        self.stop()
 
     def __del__(self):
         try:
-            self._stop()
+            self.stop()
         except TypeError:
             pass
 
