@@ -359,10 +359,9 @@ class DaskVineFile:
 
         for c in self._dag.get_children(self._key):
             r = self._dag.get_result(c)
-            if isinstance(r, DaskVineFile):
-                r.garbage_collect_children(manager)
-                if r._checkpointed and not r._is_target:
-                    manager.undeclare_file(r._file)
+            r.garbage_collect_children(manager)
+            if r._checkpointed and not r._is_target:
+                manager.undeclare_file(r._file)
 
 
 ##
