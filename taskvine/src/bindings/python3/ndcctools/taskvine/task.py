@@ -1069,9 +1069,6 @@ class FunctionCall(PythonTask):
             self.manager.undeclare_file(self._input_file)
             self._input_file = None
 
-            self.manager.undeclare_file(self._output_file)
-            self._output_file = None
-
             self._output_loaded = True
         return self._output
 
@@ -1081,9 +1078,6 @@ class FunctionCall(PythonTask):
             if self._input_file:
                 self.manager.undeclare_file(self._input_file)
                 self._input_file = None
-            if self._output_file:
-                self.manager.undeclare_file(self._output_file)
-                self._output_file = None
             super().__del__()
         except TypeError:
             pass
