@@ -992,13 +992,29 @@ class FunctionCall(Task):
     def __init__(self, library_name, fn, *args, **kwargs):
         Task.__init__(self, fn)
         self._event = {}
-        self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
-        self.set_time_max(900)     # maximum run time for function calls is 900s by default.
+        self._event["fn_kwargs"] = kwargs
         self.needs_library(library_name)
-        self._tmp_output_enabled = False
         self._input_buffer = None
+        self._output_buffer = None
+        self._cache_enabled = False    # if cache is enabled, output will be stored in task class
+        self._cached_output = None
+        # vine File object that will contain the output of this function
         self._output_file = None
+        self._tmp_output_enabled = False
+
+    def enable_temp_output(self):
+        self._tmp_output_enabled = True
+
+    def disable_temp_output(self):
+        self._tmp_output_enabled = False
+
+    ##
+    # Returns the ndcctools.taskvine.file.File object that
+    # represents the output of this task.
+    @property
+    def output_file(self):
+        return self._output_file
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -1008,13 +1024,14 @@ class FunctionCall(Task):
     # @param self 	Reference to the current python task object
     def submit_finalize(self):
         super().submit_finalize()
-        self._input_buffer = self.manager.declare_buffer(cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
+        self._input_buffer = self.manager.declare_buffer(buffer=cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
         self.add_input(self._input_buffer, "infile")
         if self._tmp_output_enabled:
             self._output_file = self.manager.declare_temp()
+            self.add_output(self._output_file, "outfile")
         else:
-            self._output_file = self.manager.declare_buffer(cache=False, peer_transfer=False)
-        self.add_output(self._output_file, "outfile")
+            self._output_buffer = self.manager.declare_buffer(buffer=None, cache=False, peer_transfer=False)
+            self.add_output(self._output_buffer, "outfile")
 
     ##
     # Specify function arguments. Accepts arrays and dictionaries. This
@@ -1023,8 +1040,8 @@ class FunctionCall(Task):
     # @param args             An array of positional args to be passed to the function
     # @param kwargs           A dictionary of keyword arguments to be passed to the function
     def set_fn_args(self, args=[], kwargs={}):
-        self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
+        self._event["fn_kwargs"] = kwargs
 
     ##
     # Specify how the remote task should execute
@@ -1038,24 +1055,15 @@ class FunctionCall(Task):
             remote_task_exec_method = "fork"
         self._event["remote_task_exec_method"] = remote_task_exec_method
 
-    def set_output_cache(self, cache=False):
-        self._cache_output = cache
-
-    def enable_temp_output(self):
-        self._tmp_output_enabled = True
-
-    def disable_temp_output(self):
-        self._tmp_output_enabled = False
-
     ##
     # Retrieve output, handles cleanup, and returns result or failure reason.
     @property
     def output(self):
-        output = cloudpickle.loads(self._output_file.contents())
-        self._manager.undeclare_file(self._input_buffer)
+        output = cloudpickle.loads(self._output_buffer.contents())
+        self.manager.undeclare_file(self._input_buffer)
         self._input_buffer = None
-        self._manager.undeclare_file(self._output_file)
-        self._output_file = None
+        self.manager.undeclare_file(self._output_buffer)
+        self._output_buffer = None
 
         if output['Success']:
             return output['Result']
@@ -1064,20 +1072,22 @@ class FunctionCall(Task):
 
     ##
     # Remove input and output buffers under some circumstances `output` is not called
+
     def __del__(self):
         try:
             if self._input_buffer:
                 self.manager.undeclare_file(self._input_buffer)
                 self._input_buffer = None
-
-            if self._output_file:
-                if not self._tmp_output_enabled:
-                    self._manager.undeclare_file(self._output_file)
-                    self._output_file = None
-
+            if self._output_buffer:
+                self.manager.undeclare_file(self._output_buffer)
+                self._output_buffer = None
             super().__del__()
         except TypeError:
             pass
+
+
+class FunctionCallNoResult(Exception):
+    pass
 
 
 ##

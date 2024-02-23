@@ -216,6 +216,7 @@ class DaskVine(Manager):
                         self._enqueue_dask_calls(dag, tag, [(t.key, t.sexpr)], retries_left, enqueued_calls)
                     else:
                         raise Exception(f"tasks for key {t.key} failed permanently")
+                t = None  # drop task reference
         return self._load_results(dag, indices, keys)
 
     def category_name(self, sexpr):
@@ -324,7 +325,7 @@ class DaskVineFile:
                 else:
                     self._load = output['Reason']
             else:
-                with open(self.source(), "rb") as f:
+                with open(self._file.source(), "rb") as f:
                     self._load = cloudpickle.load(f)
                     self._loaded = True
 
