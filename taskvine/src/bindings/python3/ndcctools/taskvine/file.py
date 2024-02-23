@@ -10,6 +10,7 @@
 #
 
 from . import cvine
+import io
 
 
 ##
@@ -49,9 +50,25 @@ class File(object):
     # Return the contents of a file object as a string.
     # Typically used to return the contents of an output buffer.
     #
-    # @param self       A file object.
-    def contents(self):
-        return cvine.vine_file_contents_as_bytes(self._file)
+    # @param self         A file object.
+    # @param unserializer A function to interpret file contents (e.g. cloudpickle.load)
+    def contents(self, unserializer=None):
+        def identity_read(x):
+            return x.read()
+
+        if not unserializer:
+            unserializer = identity_read
+
+        ftype = self.file_type()
+
+        if ftype == cvine.VINE_BUFFER:
+            with io.BytesIO(cvine.vine_file_contents_as_bytes(self._file)) as f:
+                return unserializer(f)
+        elif ftype == cvine.VINE_FILE:
+            with open(self.source(), "rb") as f:
+                return unserializer(f)
+        else:
+            raise ValueError("File does not have local contents", self.file_type())
 
     ##
     # Return the size of a file object, in bytes.

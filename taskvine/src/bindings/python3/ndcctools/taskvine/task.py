@@ -788,7 +788,7 @@ class PythonTask(Task):
         self._output_file = None
 
         # vine File object with the serialized arguments to the function
-        self._args_file = None
+        self._input_file = None
 
         # we delay any PythonTask initialization until the task is submitted to
         # a manager. This is because we don't know the staging directory where
@@ -813,8 +813,8 @@ class PythonTask(Task):
     # then temp files will be deleted in the atexit of the manager staging directory
     def __del__(self):
         try:
-            if self._args_file:
-                self.manager.undeclare_file(self._args_file)
+            if self._input_file:
+                self.manager.undeclare_file(self._input_file)
             super().__del__()
         except TypeError:
             # in case the interpreter is shuting down. staging files will be deleted by manager atexit function.
@@ -980,7 +980,7 @@ class PythonTaskNoResult(Exception):
 # TaskVine FunctionCall object
 #
 # This class represents a task specialized to execute functions in a Library running on a worker.
-class FunctionCall(Task):
+class FunctionCall(PythonTask):
     ##
     # Create a new FunctionCall specification.
     #
@@ -990,31 +990,17 @@ class FunctionCall(Task):
     # @param args       positional arguments used in function to be executed by task. Can be mixed with kwargs
     # @param kwargs	keyword arguments used in function to be executed by task.
     def __init__(self, library_name, fn, *args, **kwargs):
-        Task.__init__(self, fn)
+        super().__init__(self, None)
+
+        # function calls at worker only need the name of the function.
+        self.set_command(fn)
+
         self._event = {}
         self._event["fn_args"] = args
         self._event["fn_kwargs"] = kwargs
+
+        self._saved_output = None
         self.needs_library(library_name)
-        self._input_buffer = None
-        self._output_buffer = None
-        self._cache_enabled = False    # if cache is enabled, output will be stored in task class
-        self._cached_output = None
-        # vine File object that will contain the output of this function
-        self._output_file = None
-        self._tmp_output_enabled = False
-
-    def enable_temp_output(self):
-        self._tmp_output_enabled = True
-
-    def disable_temp_output(self):
-        self._tmp_output_enabled = False
-
-    ##
-    # Returns the ndcctools.taskvine.file.File object that
-    # represents the output of this task.
-    @property
-    def output_file(self):
-        return self._output_file
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -1023,15 +1009,15 @@ class FunctionCall(Task):
     #
     # @param self 	Reference to the current python task object
     def submit_finalize(self):
-        super().submit_finalize()
-        self._input_buffer = self.manager.declare_buffer(buffer=cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
-        self.add_input(self._input_buffer, "infile")
+        self._input_file = self.manager.declare_buffer(buffer=cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
+        self.add_input(self._input_file, "infile")
+
         if self._tmp_output_enabled:
             self._output_file = self.manager.declare_temp()
-            self.add_output(self._output_file, "outfile")
         else:
-            self._output_buffer = self.manager.declare_buffer(buffer=None, cache=False, peer_transfer=False)
-            self.add_output(self._output_buffer, "outfile")
+            self._output_file = self.manager.declare_buffer(buffer=None, cache=self._cache_output, peer_transfer=False)
+
+        self.add_output(self._output_file, "outfile")
 
     ##
     # Specify function arguments. Accepts arrays and dictionaries. This
@@ -1059,28 +1045,39 @@ class FunctionCall(Task):
     # Retrieve output, handles cleanup, and returns result or failure reason.
     @property
     def output(self):
-        output = cloudpickle.loads(self._output_buffer.contents())
-        self.manager.undeclare_file(self._input_buffer)
-        self._input_buffer = None
-        self.manager.undeclare_file(self._output_buffer)
-        self._output_buffer = None
+        if self._tmp_output_enabled:
+            raise ValueError("temp output was enabled for this task, thus its output is not available locallly.")
 
-        if output['Success']:
-            return output['Result']
-        else:
-            return output['Reason']
+        if not self._output_loaded:
+            if self.successful():
+                try:
+                    output = self._output_file.contents()
+                    if self._serialize_output:
+                        output = cloudpickle.loads(output)
+                except Exception as e:
+                    self._output = e
 
-    ##
+                if output['Success']:
+                    self._output = output['Result']
+                else:
+                    self._output = output['Reason']
+
+            else:
+                self._output = FunctionCallNoResult()
+                print(self.std_output)
+
+            self.manager.undeclare_file(self._input_file)
+            self._input_file = None
+
+            self._output_loaded = True
+        return self._output
+
     # Remove input and output buffers under some circumstances `output` is not called
-
     def __del__(self):
         try:
-            if self._input_buffer:
-                self.manager.undeclare_file(self._input_buffer)
-                self._input_buffer = None
-            if self._output_buffer:
-                self.manager.undeclare_file(self._output_buffer)
-                self._output_buffer = None
+            if self._input_file:
+                self.manager.undeclare_file(self._input_file)
+                self._input_file = None
             super().__del__()
         except TypeError:
             pass
