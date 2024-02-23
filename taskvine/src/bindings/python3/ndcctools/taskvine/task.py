@@ -998,6 +998,8 @@ class FunctionCall(PythonTask):
         self._event = {}
         self._event["fn_args"] = args
         self._event["fn_kwargs"] = kwargs
+
+        self._saved_output = None
         self.needs_library(library_name)
 
     ##
