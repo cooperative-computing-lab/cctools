@@ -57,6 +57,7 @@ from .task import (
     LibraryTask,
     FunctionCall,
 )
+from .dask_dag import DaskVineDag
 
 try:
     from .dask_executor import DaskVine
@@ -88,6 +89,7 @@ __all__ = [
     "PythonTask",
     "PythonTaskNoResult",
     "DaskVine",
+    "DaskVineDag",
 ]
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
