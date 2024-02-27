@@ -177,14 +177,14 @@ class FutureFunctionCall(FunctionCall):
 
         # for retrievee task: wait for retriever to get result
         if not self._is_retriever:
-            if self._cached_output:
-                return self._cached_output
-            self._cached_output = self._retriever.output(timeout=timeout)
+            if self._saved_output:
+                return self._saved_output
+            self._saved_output = self._retriever.output(timeout=timeout)
             if not self._ran_functions:
                 for fn in self._future._callback_fns:
                     fn(self._output)
                 self._ran_functions = True
-            return self._cached_output
+            return self._saved_output
 
         # for retriever task: fetch the result of its retrievee on completion
         if self._is_retriever:
@@ -192,20 +192,20 @@ class FutureFunctionCall(FunctionCall):
                 result = self._manager.wait_for_task_id(self.id, timeout=timeout)
                 if result:
                     self._has_retrieved = True
-            if not self._cached_output and self._has_retrieved:
+            if not self._saved_output and self._has_retrieved:
                 if self.successful():
                     try:
-                        output = cloudpickle.loads(self._output_buffer.contents())
+                        output = cloudpickle.loads(self._output_file.contents())
                         if output['Success']:
-                            self._cached_output = output['Result']
+                            self._saved_output = output['Result']
                         else:
-                            self._cached_output = output['Reason']
+                            self._saved_output = output['Reason']
 
                     except Exception as e:
-                        self._cached_output = e
+                        self._saved_output = e
                 else:
-                    self._cached_output = FunctionCallNoResult()
-            return self._cached_output
+                    self._saved_output = FunctionCallNoResult()
+            return self._saved_output
 
     # gather results from preceding tasks to use as inputs for this specific task
     def submit_finalize(self):

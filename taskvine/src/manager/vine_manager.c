@@ -106,6 +106,7 @@ double vine_option_blocklist_slow_workers_timeout = 900;
 
 static void handle_failure(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, vine_result_code_t fail_type);
+static void handle_worker_failure(struct vine_manager *q, struct vine_worker_info *w);
 static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason);
 
 static void reap_task_from_worker(
@@ -1029,12 +1030,16 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 
 	if (result != VINE_SUCCESS) {
 		debug(D_VINE, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
-		handle_failure(q, w, t, result);
-	}
 
-	if (result == VINE_WORKER_FAILURE) {
-		t->time_when_done = timestamp_get();
-		return 0;
+		if (result == VINE_WORKER_FAILURE) {
+			handle_worker_failure(q, w);
+			t->time_when_done = timestamp_get();
+			return 0;
+		}
+
+		if (t->time_when_commit_end > 0) {
+			delete_task_output_files(q, w, t);
+		}
 	}
 
 	delete_uncacheable_files(q, w, t);
