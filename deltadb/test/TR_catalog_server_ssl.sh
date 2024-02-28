@@ -52,7 +52,8 @@ run()
 
 	echo "killing the catalog server"
 	kill -9 $pid
-
+	wait $pid
+	
 	if [ $result != 0 ]
 	then
 		echo "contents of catalog.log:"
