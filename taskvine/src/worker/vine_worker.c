@@ -94,6 +94,9 @@ static struct itable *procs_running = NULL;
 /* These are additional pointers into procs_table and should not be deleted */
 static struct list *procs_waiting = NULL;
 
+/* List of asynchronous messages pending to be sent to the manager */
+static struct list *pending_async_messages = NULL;
+
 /* Table of all processes with results to be sent back, indexed by task_id. */
 /* These are additional pointers into procs_table and should not be deleted */
 static struct itable *procs_complete = NULL;
@@ -206,6 +209,72 @@ __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const ch
 	link_vprintf(l, time(0) + options->active_timeout, fmt, va);
 
 	va_end(va);
+}
+
+/* Send messages from list of asychronous messages available*/
+
+void deliver_async_messages(struct link *l)
+{
+	int recv_window;
+	int send_window;
+	link_window_get(l, &send_window, &recv_window);
+
+	int bytes_in_buffer = link_get_buffer_bytes(l);
+	int bytes_available = send_window - bytes_in_buffer;
+
+	int messages = list_size(pending_async_messages);
+	int visited;
+	char *message;
+
+	for (visited = 0; visited < messages; visited++) {
+		message = list_peek_head(pending_async_messages);
+		int message_size = strlen(message);
+		if (message_size < bytes_available) {
+			message = list_pop_head(pending_async_messages);
+			bytes_available -= message_size;
+			debug(D_VINE, "tx: %s", message);
+			link_printf(l, time(0) + options->active_timeout, "%s", message);
+			free(message);
+		} else {
+			break;
+		}
+	}
+}
+
+/* Buffer an asynchronous message to be sent to the manager */
+
+void send_async_message(struct link *l, const char *fmt, ...)
+{
+	va_list va;
+	char *message = malloc(VINE_LINE_MAX);
+	va_start(va, fmt);
+	vsprintf(message, fmt, va);
+	va_end(va);
+
+	list_push_tail(pending_async_messages, message);
+	deliver_async_messages(l); // attempt to deliver message, will be delivered later if buffer is full.
+}
+
+/* Send asynchronous task completion messages for current complete processes */
+
+void send_complete_tasks(struct link *l)
+{
+	int size = itable_size(procs_complete);
+	int visited;
+	struct vine_process *p;
+
+	for (visited = 0; visited < size; visited++) {
+		p = itable_pop(procs_complete);
+		send_async_message(l,
+				"complete %d %d %llu %llu %d\n",
+				p->result,
+				p->exit_code,
+				(unsigned long long)p->execution_start,
+				(unsigned long long)p->execution_end,
+				p->task->task_id);
+
+		itable_insert(procs_complete, p->task->task_id, p);
+	}
 }
 
 /* Receive a single-line message from the current manager. */
@@ -325,7 +394,7 @@ static void send_features(struct link *manager)
 	{
 		char feature_encoded[VINE_LINE_MAX];
 		url_encode(f, feature_encoded, VINE_LINE_MAX);
-		send_message(manager, "feature %s\n", feature_encoded);
+		send_async_message(manager, "feature %s\n", feature_encoded);
 	}
 }
 
@@ -361,7 +430,7 @@ think that the worker has crashed and gone away.
 
 static int send_keepalive(struct link *manager, int force_resources)
 {
-	send_message(manager, "alive\n");
+	send_async_message(manager, "alive\n");
 	send_resource_update(manager);
 	return 1;
 }
@@ -379,7 +448,7 @@ void vine_worker_send_cache_update(struct link *manager, const char *cachename, 
 		transfer_id = xxstrdup("X");
 	}
 
-	send_message(manager,
+	send_async_message(manager,
 			"cache-update %s %lld %lld %lld %s\n",
 			cachename,
 			(long long)size,
@@ -400,10 +469,10 @@ void vine_worker_send_cache_invalid(struct link *manager, const char *cachename,
 	char *transfer_id = hash_table_remove(current_transfers, cachename);
 	if (transfer_id) {
 		debug(D_VINE, "Sending Cache invalid transfer id: %s", transfer_id);
-		send_message(manager, "cache-invalid %s %d %s\n", cachename, length, transfer_id);
+		send_async_message(manager, "cache-invalid %s %d %s\n", cachename, length, transfer_id);
 		free(transfer_id);
 	} else {
-		send_message(manager, "cache-invalid %s %d\n", cachename, length);
+		send_async_message(manager, "cache-invalid %s %d\n", cachename, length);
 	}
 	link_write(manager, message, length, time(0) + options->active_timeout);
 }
@@ -417,7 +486,7 @@ static void send_transfer_address(struct link *manager)
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 	vine_transfer_server_address(addr, &port);
-	send_message(manager, "transfer-address %s %d\n", addr, port);
+	send_async_message(manager, "transfer-address %s %d\n", addr, port);
 }
 
 /*
@@ -437,7 +506,7 @@ static void report_worker_ready(struct link *manager)
 		strcpy(hostname, "unknown");
 	}
 
-	send_message(manager,
+	send_async_message(manager,
 			"taskvine %d %s %s %s %d.%d.%d\n",
 			VINE_PROTOCOL_VERSION,
 			hostname,
@@ -446,17 +515,17 @@ static void report_worker_ready(struct link *manager)
 			CCTOOLS_VERSION_MAJOR,
 			CCTOOLS_VERSION_MINOR,
 			CCTOOLS_VERSION_MICRO);
-	send_message(manager, "info worker-id %s\n", worker_id);
+	send_async_message(manager, "info worker-id %s\n", worker_id);
 	vine_cache_scan(cache_manager, manager);
 
 	send_features(manager);
 	send_transfer_address(manager);
-	send_message(manager,
+	send_async_message(manager,
 			"info worker-end-time %" PRId64 "\n",
 			(int64_t)DIV_INT_ROUND_UP(options->end_time, USECOND));
 
 	if (options->factory_name) {
-		send_message(manager, "info from-factory %s\n", options->factory_name);
+		send_async_message(manager, "info from-factory %s\n", options->factory_name);
 	}
 
 	send_keepalive(manager, 1);
@@ -1515,6 +1584,9 @@ static void vine_worker_serve_manager(struct link *manager)
 		/* Check all known libraries if they are ready to execute functions. */
 		check_libraries_ready();
 
+		/* deliver queued asynchronous messages if available */
+		deliver_async_messages(manager);
+
 		int task_event = 0;
 		if (ok) {
 			struct vine_process *p;
@@ -1539,7 +1611,8 @@ static void vine_worker_serve_manager(struct link *manager)
 
 		if (ok && !results_to_be_sent_msg) {
 			if (vine_watcher_check(watcher) || itable_size(procs_complete) > 0) {
-				send_message(manager, "available_results\n");
+				send_async_message(manager, "available_results\n");
+				send_complete_tasks(manager);
 				results_to_be_sent_msg = 1;
 			}
 
@@ -1655,7 +1728,7 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 	vine_worker_serve_manager(manager);
 
 	if (abort_signal_received) {
-		send_message(manager, "info vacating %d\n", abort_signal_received);
+		send_async_message(manager, "info vacating %d\n", abort_signal_received);
 	}
 
 	last_task_received = 0;
@@ -1976,6 +2049,7 @@ void vine_worker_create_structures()
 	procs_table = itable_create(0);
 	procs_running = itable_create(0);
 	procs_waiting = list_create();
+	pending_async_messages = list_create();
 	procs_complete = itable_create(0);
 
 	current_transfers = hash_table_create(0, 0);
