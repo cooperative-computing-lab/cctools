@@ -424,7 +424,7 @@ vine_result_code_t vine_manager_get_output_file(struct vine_manager *q, struct v
 	}
 
 	// If the transfer was successful, make a record of it in the cache.
-	if (result == VINE_SUCCESS && m->flags & VINE_CACHE) {
+	if (result == VINE_SUCCESS && (f->cache_level > VINE_CACHE_LEVEL_TASK)) {
 		struct stat local_info;
 		if (stat(f->source, &local_info) == 0) {
 			struct vine_file_replica *replica = vine_file_replica_create(

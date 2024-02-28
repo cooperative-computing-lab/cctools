@@ -39,13 +39,6 @@ typedef enum {
   VINE_FILE_STATE_CREATED   /**< This file has been created at some point.  (although it might have been lost!) */
 } vine_file_state_t;
 
-typedef enum {
-	VINE_CACHE_LEVEL_TASK=0,
-	VINE_CACHE_LEVEL_WORKFLOW=1,
-	VINE_CACHE_LEVEL_WORKER=2,
-	VINE_CACHE_LEVEL_FOREVER=3
-} vine_cache_level_t;
-
 struct vine_file {
 	vine_file_type_t  type;  // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
 	vine_file_flags_t flags; // Whether or not to transfer this file between workers.
@@ -62,7 +55,7 @@ struct vine_file {
 	int refcount;       // Number of references from a task object, delete when zero.
 };
 
-struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_type_t type, struct vine_task *mini_task, vine_file_flags_t flags);
+struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_type_t type, struct vine_task *mini_task, vine_cache_level_t cache_level, vine_file_flags_t flags);
 
 struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source );
 
@@ -73,15 +66,15 @@ int vine_file_delete( struct vine_file *f );
 
 int vine_file_has_changed( struct vine_file *f );
 
-struct vine_file *vine_file_local( const char *source, vine_file_flags_t flags );
-struct vine_file *vine_file_url( const char *source, vine_file_flags_t flags );
+struct vine_file *vine_file_local( const char *source, vine_cache_level_t cache, vine_file_flags_t flags );
+struct vine_file *vine_file_url( const char *source, vine_cache_level_t cache, vine_file_flags_t flags );
 struct vine_file *vine_file_temp();
-struct vine_file *vine_file_buffer( const char *buffer, size_t size, vine_file_flags_t flags );
-struct vine_file *vine_file_mini_task( struct vine_task *t, const char *name, vine_file_flags_t flags );
-struct vine_file *vine_file_untar( struct vine_file *f, vine_file_flags_t flags );
-struct vine_file *vine_file_poncho( struct vine_file *f, vine_file_flags_t flags );
-struct vine_file *vine_file_starch( struct vine_file *f, vine_file_flags_t flags );
-struct vine_file *vine_file_xrootd( const char *source, struct vine_file *proxy, struct vine_file *env, vine_file_flags_t flags );
-struct vine_file *vine_file_chirp( const char *server, const char *source, struct vine_file *ticket, struct vine_file *env, vine_file_flags_t flags );
+struct vine_file *vine_file_buffer( const char *buffer, size_t size, vine_cache_level_t cache, vine_file_flags_t flags );
+struct vine_file *vine_file_mini_task( struct vine_task *t, const char *name, vine_cache_level_t cache, vine_file_flags_t flags );
+struct vine_file *vine_file_untar( struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags );
+struct vine_file *vine_file_poncho( struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags );
+struct vine_file *vine_file_starch( struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags );
+struct vine_file *vine_file_xrootd( const char *source, struct vine_file *proxy, struct vine_file *env, vine_cache_level_t cache, vine_file_flags_t flags );
+struct vine_file *vine_file_chirp( const char *server, const char *source, struct vine_file *ticket, struct vine_file *env, vine_cache_level_t cache, vine_file_flags_t flags );
 
 #endif
