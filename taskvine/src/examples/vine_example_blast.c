@@ -101,15 +101,15 @@ int main(int argc, char *argv[])
 	//For files that should be only kept per workflow, use VINE_CACHE.
 	//These declarations only register the files with the manager, but do not
 	//associate them with any task (yet).
-	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL, VINE_CACHE_ALWAYS);
-	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL, VINE_CACHE_ALWAYS);
+	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL, VINE_CACHE_LEVEL_FOREVER, 0);
+	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL, VINE_CACHE_LEVEL_FOREVER, 0);
 
 	//An untar declaration is an example of a mini task. The untar declaration
 	//takes as an input another file (int this case an url), and unpacks it.
 	//The name of the directory to which it appears in each task sandbox is set
 	//by the task.
-	struct vine_file *software = vine_declare_untar(m, blast_url, VINE_CACHE_ALWAYS);
-	struct vine_file *database = vine_declare_untar(m, landm_url, VINE_CACHE_ALWAYS);
+	struct vine_file *software = vine_declare_untar(m, blast_url, VINE_CACHE_LEVEL_FOREVER, 0);
+	struct vine_file *database = vine_declare_untar(m, landm_url, VINE_CACHE_LEVEL_FOREVER, 0);
 
 
 	printf("Declaring tasks...");
@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
 		//A query is particular to a task, and will be used only for its tasks,
 		//therefore we marked with VINE_CACHE_NEVER. It will be deleted from
 		//the worker as soon as the task's results are retrieved.
-		struct vine_file *query = vine_declare_buffer(m, query_string, strlen(query_string), VINE_CACHE_NEVER);
+		struct vine_file *query = vine_declare_buffer(m, query_string, strlen(query_string), VINE_CACHE_LEVEL_TASK, 0);
 
 		//The buffer makes a copy of the string, thus the memory associated
 		//with it should be freed.

@@ -16,8 +16,10 @@ See the file COPYING for details.
 #include "unlink_recursive.h"
 #include "xxmalloc.h"
 
+#include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 /* Internal use: when the worker uses the client library, do not recompute cached names. */
@@ -73,7 +75,8 @@ int vine_file_delete(struct vine_file *f)
 
 /* Create a new file object with the given properties. */
 struct vine_file *vine_file_create(const char *source, const char *cached_name, const char *data, size_t size,
-		vine_file_type_t type, struct vine_task *mini_task, vine_file_flags_t flags)
+		vine_file_type_t type, struct vine_task *mini_task, vine_cache_level_t cache_level,
+		vine_file_flags_t flags)
 {
 	struct vine_file *f = xxmalloc(sizeof(*f));
 	memset(f, 0, sizeof(*f));
@@ -84,6 +87,7 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 	f->mini_task = mini_task;
 	f->recovery_task = 0;
 	f->state = VINE_FILE_STATE_PENDING;
+	f->cache_level = cache_level;
 	f->flags = flags;
 
 	if (data) {
@@ -105,7 +109,7 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 		/* Otherwise we need to figure it out ourselves from the content. */
 		/* This may give us the actual size of the object along the way. */
 		ssize_t totalsize = 0;
-		if ((f->flags & VINE_CACHE_ALWAYS) == VINE_CACHE_ALWAYS) {
+		if (f->cache_level >= VINE_CACHE_LEVEL_FOREVER) {
 			f->cached_name = vine_cached_name(f, &totalsize);
 		} else {
 			if (f->type == VINE_FILE) {
@@ -152,62 +156,101 @@ size_t vine_file_size(struct vine_file *f)
 	return f->size;
 }
 
-struct vine_file *vine_file_local(const char *source, vine_file_flags_t flags)
+/*
+Return true if the source of this file has changed since it was first used.
+This should not happen, it indicates a violation of the workflow semantics.
+*/
+
+int vine_file_has_changed(struct vine_file *f)
 {
-	return vine_file_create(source, 0, 0, 0, VINE_FILE, 0, flags);
+	if (f->type == VINE_FILE) {
+
+		struct stat info;
+
+		int result = lstat(f->source, &info);
+		if (result != 0) {
+			debug(D_NOTICE | D_VINE, "input file %s couldn't be accessed: %s", f->source, strerror(errno));
+			return 1;
+		}
+
+		if (f->mtime == 0) {
+			/* If we have not observed time and size before, capture it now. */
+			f->mtime = info.st_mtime;
+			f->size = info.st_size;
+		} else {
+			/* If we have seen it before, it should not have changed. */
+			if (f->mtime != info.st_mtime || ((int64_t)f->size) != ((int64_t)info.st_size)) {
+				if (!f->change_message_shown) {
+					debug(D_VINE | D_NOTICE,
+							"input file %s was modified by someone in the middle of the workflow!\n",
+							f->source);
+					f->change_message_shown++;
+				}
+				return 1;
+			}
+		}
+	}
+
+	return 0;
 }
 
-struct vine_file *vine_file_url(const char *source, vine_file_flags_t flags)
+struct vine_file *vine_file_local(const char *source, vine_cache_level_t cache, vine_file_flags_t flags)
 {
-	return vine_file_create(source, 0, 0, 0, VINE_URL, 0, flags);
+	return vine_file_create(source, 0, 0, 0, VINE_FILE, 0, cache, flags);
+}
+
+struct vine_file *vine_file_url(const char *source, vine_cache_level_t cache, vine_file_flags_t flags)
+{
+	return vine_file_create(source, 0, 0, 0, VINE_URL, 0, cache, flags);
 }
 
 struct vine_file *vine_file_substitute_url(struct vine_file *f, const char *source)
 {
-	return vine_file_create(source, f->cached_name, 0, f->size, VINE_URL, 0, 0);
+	return vine_file_create(source, f->cached_name, 0, f->size, VINE_URL, 0, 0, 0);
 }
 
 struct vine_file *vine_file_temp()
 {
 	// temp files are always cached at workers until explicitely removed.
-	vine_file_flags_t flags = VINE_CACHE;
+	vine_cache_level_t cache = VINE_CACHE_LEVEL_WORKFLOW;
 
-	return vine_file_create("temp", 0, 0, 0, VINE_TEMP, 0, flags);
+	return vine_file_create("temp", 0, 0, 0, VINE_TEMP, 0, cache, 0);
 }
 
-struct vine_file *vine_file_buffer(const char *data, size_t size, vine_file_flags_t flags)
+struct vine_file *vine_file_buffer(const char *data, size_t size, vine_cache_level_t cache, vine_file_flags_t flags)
 {
-	return vine_file_create("buffer", 0, data, size, VINE_BUFFER, 0, flags);
+	return vine_file_create("buffer", 0, data, size, VINE_BUFFER, 0, cache, flags);
 }
 
-struct vine_file *vine_file_mini_task(struct vine_task *t, const char *name, vine_file_flags_t flags)
+struct vine_file *vine_file_mini_task(
+		struct vine_task *t, const char *name, vine_cache_level_t cache, vine_file_flags_t flags)
 {
 	flags |= VINE_PEER_NOSHARE; // we don't know how to share mini tasks yet.
-	return vine_file_create(name, 0, 0, 0, VINE_MINI_TASK, t, flags);
+	return vine_file_create(name, 0, 0, 0, VINE_MINI_TASK, t, cache, flags);
 }
 
-struct vine_file *vine_file_untar(struct vine_file *f, vine_file_flags_t flags)
+struct vine_file *vine_file_untar(struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags)
 {
 	struct vine_task *t = vine_task_create("mkdir output && tar xf input -C output");
 	vine_task_add_input(t, f, "input", 0);
-	return vine_file_mini_task(t, "output", flags);
+	return vine_file_mini_task(t, "output", cache, flags);
 }
 
-struct vine_file *vine_file_poncho(struct vine_file *f, vine_file_flags_t flags)
+struct vine_file *vine_file_poncho(struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags)
 {
 	char *cmd = string_format("mkdir output && tar xf package.tar.gz -C output && output/bin/run_in_env");
 	struct vine_task *t = vine_task_create(cmd);
 	free(cmd);
 
 	vine_task_add_input(t, f, "package.tar.gz", 0);
-	return vine_file_mini_task(t, "output", flags);
+	return vine_file_mini_task(t, "output", cache, flags);
 }
 
-struct vine_file *vine_file_starch(struct vine_file *f, vine_file_flags_t flags)
+struct vine_file *vine_file_starch(struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags)
 {
 	struct vine_task *t = vine_task_create("SFX_DIR=output SFX_EXTRACT_ONLY=1 ./package.sfx");
 	vine_task_add_input(t, f, "package.sfx", 0);
-	return vine_file_mini_task(t, "output", flags);
+	return vine_file_mini_task(t, "output", cache, flags);
 }
 
 static char *find_x509_proxy()
@@ -232,13 +275,13 @@ static char *find_x509_proxy()
 	return NULL;
 }
 
-struct vine_file *vine_file_xrootd(
-		const char *source, struct vine_file *proxy, struct vine_file *env, vine_file_flags_t flags)
+struct vine_file *vine_file_xrootd(const char *source, struct vine_file *proxy, struct vine_file *env,
+		vine_cache_level_t cache, vine_file_flags_t flags)
 {
 	if (!proxy) {
 		char *proxy_filename = find_x509_proxy();
 		if (proxy_filename) {
-			proxy = vine_file_local(proxy_filename, VINE_CACHE);
+			proxy = vine_file_local(proxy_filename, VINE_CACHE_LEVEL_WORKFLOW, 0);
 			free(proxy_filename);
 		}
 	}
@@ -257,11 +300,11 @@ struct vine_file *vine_file_xrootd(
 
 	free(command);
 
-	return vine_file_mini_task(t, "output.root", flags);
+	return vine_file_mini_task(t, "output.root", cache, flags);
 }
 
 struct vine_file *vine_file_chirp(const char *server, const char *source, struct vine_file *ticket,
-		struct vine_file *env, vine_file_flags_t flags)
+		struct vine_file *env, vine_cache_level_t cache, vine_file_flags_t flags)
 {
 	char *command = string_format("chirp_get %s %s %s output.chirp",
 			ticket ? "--auth=ticket --tickets=ticket.chirp" : "",
@@ -280,7 +323,7 @@ struct vine_file *vine_file_chirp(const char *server, const char *source, struct
 
 	free(command);
 
-	return vine_file_mini_task(t, "output.chirp", flags);
+	return vine_file_mini_task(t, "output.chirp", cache, flags);
 }
 
 /* vim: set noexpandtab tabstop=8: */

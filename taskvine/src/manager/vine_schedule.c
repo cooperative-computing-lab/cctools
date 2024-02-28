@@ -273,7 +273,7 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 
 				if (replica && m->file->type == VINE_FILE) {
 					task_cached_bytes += replica->size;
-				} else if ((m->file->flags & (VINE_CACHE | VINE_CACHE_ALWAYS))) {
+				} else if (m->file->cache_level > VINE_CACHE_LEVEL_TASK) {
 					has_all_files = 0;
 				}
 			}

@@ -23,10 +23,10 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	struct vine_file *script = vine_declare_file(m, "script_example_for_poncho.py", VINE_CACHE);
+	struct vine_file *script = vine_declare_file(m, "script_example_for_poncho.py", VINE_CACHE_LEVEL_WORKFLOW, 0);
 
-	struct vine_file *tarball = vine_declare_file(m, "package.tar.gz", VINE_CACHE);
-	struct vine_file *package = vine_declare_poncho(m, tarball, VINE_CACHE);
+	struct vine_file *tarball = vine_declare_file(m, "package.tar.gz", VINE_CACHE_LEVEL_WORKFLOW, 0);
+	struct vine_file *package = vine_declare_poncho(m, tarball, VINE_CACHE_LEVEL_WORKFLOW, 0);
 
 	for(i=0;i<5;i++) {
 

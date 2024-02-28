@@ -46,8 +46,8 @@ f = m.declare_url("https://www.gutenberg.org/cache/epub/2600/pg2600.txt")
 g = m.declare_file("myoutput.txt")
 
 t = Task("grep needle warandpeace.txt > output.txt")
-t.add_input(f,"warandpeace.txt")
-t.add_output(g,"outfile.txt")
+t.add_input(f, "warandpeace.txt")
+t.add_output(g, "outfile.txt")
 ```
 
 Tasks share a common set of options.  Each task can be labelled with the resources
@@ -174,7 +174,7 @@ to specify zero to indicated any available port:
     ```
     /* Create a new manager listening on any port */
     struct taskvine *m = vine_create(0);
-    printf("listening on port %d\n",vine_port(m));
+    printf("listening on port %d\n", vine_port(m));
 
     ```
 
@@ -194,11 +194,11 @@ The following are examples of basic file descriptions:
     ```
 === "C"
     ```
-    struct vine_file *a = vine_declare_file(m,"mydata.txt",VINE_CACHE);
-    struct vine_file *d = vine_declare_file(m,"dataset/",VINE_CACHE);
-    struct vine_file *u = vine_declare_url(m,"https://ftp.ncbi.nlm.nih.gov/blast/db/human_genome.00.tar.gz",VINE_CACHE);
-    struct vine_file *b = vine_declare_buffer(m,"These words are the contents of the file.",VINE_CACHE);
-    struct vine_file *t = vine_declare_temp(m,VINE_CACHE);
+    struct vine_file *a = vine_declare_file(m, "mydata.txt", VINE_CACHE_LEVEL_WORKFLOW, 0);
+    struct vine_file *d = vine_declare_file(m, "dataset/", VINE_CACHE_LEVEL_WORKFLOW, 0);
+    struct vine_file *u = vine_declare_url(m, "https://ftp.ncbi.nlm.nih.gov/blast/db/human_genome.00.tar.gz", VINE_CACHE_LEVEL_WORKFLOW, 0);
+    struct vine_file *b = vine_declare_buffer(m, "These words are the contents of the file.", VINE_CACHE_LEVEL_WORKFLOW, 0);
+    struct vine_file *t = vine_declare_temp(m);
     ```
 
 `declare_file` indicates a file in the manager's local filesystem
@@ -247,8 +247,8 @@ tasks at once:
 
 === "C"
     ```C
-    struct vine_file *u = vine_declare_url(m,"https://ftp.ncbi.nlm.nih.gov/blast/db/human_genome.00.tar.gz",VINE_CACHE);
-    struct vine_file *x = vine_declare_untar(m,u);
+    struct vine_file *u = vine_declare_url(m, "https://ftp.ncbi.nlm.nih.gov/blast/db/human_genome.00.tar.gz", VINE_CACHE_LEVEL_WORKFLOW, 0);
+    struct vine_file *x = vine_declare_untar(m, u);
     ```
 
 `declare_untar` is an example of a [MiniTask](#MiniTasks), which is explained further below.
@@ -272,15 +272,15 @@ which will read the file `mydata` and produce `mydata.gz` as an output:
 === "Python"
     ```python
     t = vine.Task("gzip < mydata > mydata.gz")
-    t.add_input(a,"mydata")
-    t.add_output(b,"mydata.gz")
+    t.add_input(a, "mydata")
+    t.add_output(b, "mydata.gz")
     ```
 
 === "C"
     ```C
     struct vine_task *t = vine_task_create("gzip < mydata > mydata.gz");
-    vine_task_add_input(t,a,"mydata",0)
-    vine_task_add_output(t,b,"mydata.gz",0)
+    vine_task_add_input(t, a, "mydata", 0)
+    vine_task_add_output(t, b, "mydata.gz", 0)
     ```
 
 Note that each task will execute in a private sandbox at a worker.
@@ -355,9 +355,9 @@ when the task is complete.
 
 === "C"
     ```C
-    vine_task_set_cores(t,2);
-    vine_task_set_memory(t,4096);
-    vine_task_set_tag(t,"config-4.5.0");
+    vine_task_set_cores(t, 2);
+    vine_task_set_memory(t, 4096);
+    vine_task_set_tag(t, "config-4.5.0");
     ```
 
 ### Managing Tasks
@@ -373,7 +373,7 @@ to a task:
 
 === "C"
     ```C
-    int taskid = vine_submit(m,t);
+    int taskid = vine_submit(m, t);
     ```
 
 Once all tasks are submitted, use `wait` to wait until a task completes,
@@ -399,7 +399,7 @@ If no task completes within the timeout, it returns null.
 === "C"
     ```C
     while(!vine_empty(q)) {
-        struct vine_task *t = vine_wait(m,5);
+        struct vine_task *t = vine_wait(m, 5);
         if(t) {
             printf("Task %d has returned!\n", t->taskid);
             int result = vine_task_get_result(t);
@@ -700,26 +700,31 @@ between workers to share them efficiently.
 
 If necessary, you can control the caching behavior of files individually.
 
-- A cache value of **never** indicates that the file should be deleted as
+- A cache value of **task** indicates that the file should be deleted as
 soon as it is consumed by a task.  This is appropriate for input files
 that are specific to one task, and one task only.
 - A cache value of **workflow** (the default) indicates that the file
 should be retained as long as the workflow runs, and then deleted at the end.
+- A cache value of **worker** indicates that the file should be retained
+by the worker until the worker's end-of-life.
 - A cache value of **always** indicates that the file should be retained
 by the worker, even across workflows.  This is appropriate for widely used
-software packages and reference datasets.
+software packages and reference datasets. This level of cache leaves files on
+the execution sites even when workers terminate, thus use with care.
 
 === "Python"
     ```python
-    f = m.declare_file("myfile.txt",cache="never") # (default)
-    f = m.declare_file("myfile.txt",cache="workflow") 
-    f = m.declare_file("myfile.txt",cache="always")
+    f = m.declare_file("myfile.txt", cache="task")       # (default, same as cache=False)
+    f = m.declare_file("myfile.txt", cache="workflow")   # (same as cache=True)
+    f = m.declare_file("myfile.txt", cache="worker")
+    f = m.declare_file("myfile.txt", cache="forever")
     ```
 === "C"
     ```
-    vine_declare_file(m,"myfile.txt",VINE_CACHE_NEVER)
-    vine_declare_file(m,"myfile.txt",VINE_CACHE)
-    vine_declare_file(m,"myfile.txt",VINE_CACHE_ALWAYS)
+    vine_declare_file(m, "myfile.txt", VINE_CACHE_LEVEL_TASK, 0)
+    vine_declare_file(m, "myfile.txt", VINE_CACHE_LEVEL_WORKFLOW, 0)
+    vine_declare_file(m, "myfile.txt", VINE_CACHE_LEVEL_WORKER, 0)
+    vine_declare_file(m, "myfile.txt", VINE_CACHE_LEVEL_FOREVER, 0)
     ```
 
 TaskVine generally assumes that a file created on one worker can always
@@ -730,11 +735,11 @@ that peer transfers are not permitted:
 
 === "Python"
     ```python
-    f = m.declare_file("myfile.txt",cache="never",peer_transfer=False)
+    f = m.declare_file("myfile.txt", cache="task", peer_transfer=False)
     ```
 === "C"
     ```
-    vine_declare_file(m,"myfile.txt",VINE_CACHE|VINE_PEER_NOSHARE)
+    vine_declare_file(m, "myfile.txt", VINE_CACHE_LEVEL_WORKFLOW, VINE_PEER_NOSHARE)
     ```
 Automatic sharing of files between workers, or peer transfers, are enabled by default
 in TaskVine. If communication between workers is not possible or not desired, peer transfers
@@ -776,10 +781,10 @@ like the input to be the result of a query to a database.
     # use cpio to expand archives coming from a url
     t = Task("cpio -iD output_dir < archive.cpio")
 
-    my_url = m.declare_url("http://somewhere.com/archive.cpio", cache=True)
+    my_url = m.declare_url("http://somewhere.com/archive.cpio", cache="workflow")
     t.add_input(my_url, "archive.cpio")
 
-    mini_task = m.declare_mini_task(t,"output_dir")
+    mini_task = m.declare_mini_task(t, "output_dir")
 
     # regular tasks can use the mini task as input # the output of the mini
     # task is mounted in the regular task sandbox
@@ -797,10 +802,10 @@ like the input to be the result of a query to a database.
     // use cpio to expand archives coming from a url
     struct vine_task *t = vine_task_create("cpio -iD output_dir < archive.cpio")
 
-    struct vine_file *my_url = vine_declare_url("http://somewhere.com/archive.cpio", VINE_CACHE);
+    struct vine_file *my_url = vine_declare_url("http://somewhere.com/archive.cpio", VINE_CACHE_LEVEL_WORKFLOW, 0);
     vine_task_add_input(my_url, "archive.cpio", 0);
 
-    struct vine_file *mini_task = m.declare_mini_task(t,"output_dir")
+    struct vine_file *mini_task = m.declare_mini_task(t, "output_dir")
 
     // regular tasks can use the mini task as input
     // the output of the mini task is mounted in the regular task sandbox
@@ -856,12 +861,12 @@ Attach the package to the task:
     # my task that requires python and numpy
     t = Task("python my_numpy_script.py")
 
-    s = m.declare_file("my_numpy_script.py", cache=True)
+    s = m.declare_file("my_numpy_script.py", cache="workflow")
     t.add_input(s, "my_numpy_script.py")
 
     # declare the package and its input file
-    poncho_file = m.declare_file("my_poncho_pkg.tar.gz", cache=True)
-    poncho_pkg = m.declare_poncho(poncho_file, cache=True)
+    poncho_file = m.declare_file("my_poncho_pkg.tar.gz", cache="workflow")
+    poncho_pkg = m.declare_poncho(poncho_file, cache="workflow")
 
     # attach the package to the task
     t.add_poncho_package(poncho_pkg)
@@ -874,15 +879,15 @@ Attach the package to the task:
     // my task that requires python and numpy
     struct vine_task *t = vine_task_create("python my_numpy_script.py");
 
-    struct vine_file *s = vine_declare_file("my_numpy_script.py", VINE_CACHE);
+    struct vine_file *s = vine_declare_file("my_numpy_script.py", VINE_CACHE_LEVEL_WORKFLOW, 0);
     vine_task_add_input(t, "my_numpy_script.py", 0);
 
     // declare the package and its input file
-    struct vine_file *poncho_file = vine_declare_file("my_poncho_pkg.tar.gz", cache=True);
-    struct vine_file *poncho_pkg  = vine_declare_poncho(poncho_file, cache=True)
+    struct vine_file *poncho_file = vine_declare_file("my_poncho_pkg.tar.gz", cache="workflow");
+    struct vine_file *poncho_pkg  = vine_declare_poncho(poncho_file, cache="workflow")
 
     # attach the package to the task
-    vine_task_add_poncho_package(t,poncho_pkg);
+    vine_task_add_poncho_package(t, poncho_pkg);
 
     vine_submit(m, t);
     ```
@@ -940,7 +945,7 @@ Now we are ready to declare the execution context from its local directory "my_c
     ```python
     t = Task("/bin/echo from inside apptainer!")
 
-    ctx = m.declare_file("my_ctx", cache=True)
+    ctx = m.declare_file("my_ctx", cache="workflow")
     t.add_execution_context(ctx)
 
     m.submit(t)
@@ -950,7 +955,7 @@ Now we are ready to declare the execution context from its local directory "my_c
     ```C
     struct vine_task *t = vine_task_create("/bin/echo from inside apptainer!");
 
-    struct vine_file *ctx = vine_declare_file(m, "my_ctx", VINE_CACHE);
+    struct vine_file *ctx = vine_declare_file(m, "my_ctx", VINE_CACHE_LEVEL_WORKFLOW, 0);
     vine_task_add_execution_context(ctx);
 
     vine_submit(t);
@@ -971,14 +976,14 @@ mini task to construct the execution context directly on the workers.
     # create the environment structure, thus we use the command ":" as no-op.
     mt = Task(":")
 
-    runner = m.declare_file("run_command_in_apptainer.sh", cache=True)
-    image  = m.declare_file("path/to/my_image.img", cache=True)
+    runner = m.declare_file("run_command_in_apptainer.sh", cache="workflow")
+    image  = m.declare_file("path/to/my_image.img", cache="workflow")
 
     mt.add_input(runner, "ctx/bin/run_in_env")
     mt.add_input(image,  "ctx/image.img")
 
     # the mini task will extract the environment directory
-    ctx = m.declare_mini_task(mt,"ctx")
+    ctx = m.declare_mini_task(mt, "ctx")
 
     # now we define our regular task, and attach the environment to it.
     t = Task("/bin/echo from inside apptainer!")
@@ -1017,13 +1022,13 @@ only be returned when the task fails:
 
 === "Python"
     ```python
-    my_debug = m.declare_file("debug.out", cache=False)
+    my_debug = m.declare_file("debug.out", cache="task")
     t.add_output(my_debug, "debug.out", failure_only=True)
     ```
 
 === "C"
     ```C
-    struct vine_file *my_debug = vine_declare_file("debug.out", VINE_CACHE_NEVER);
+    struct vine_file *my_debug = vine_declare_file("debug.out", VINE_CACHE_LEVEL_TASK, 0);
     vine_task_add_output(t, "debug.out", VINE_FAILURE_ONLY);
     ```
 
@@ -1031,13 +1036,13 @@ In a similar way, files can be marked to indicate that they should be returned o
 
 === "Python"
     ```python
-    my_debug = m.declare_file("debug.out", cache=False)
+    my_debug = m.declare_file("debug.out", cache="task")
     t.add_output(my_debug, "debug.out", success_only=True)
     ```
 
 === "C"
     ```C
-    struct vine_file *my_debug = vine_declare_file("debug.out", VINE_CACHE_NEVER);
+    struct vine_file *my_debug = vine_declare_file("debug.out", VINE_CACHE_LEVEL_TASK, 0);
     vine_task_add_output(t, "debug.out", VINE_SUCCESS_ONLY);
     ```
 ## Advanced Task Handling
@@ -1079,7 +1084,7 @@ Then, modify your manager program to use the password:
 
 === "C"
     ```C
-    vine_set_password_file(m,"vine.password");
+    vine_set_password_file(m, "vine.password");
     ```
 
 
@@ -1287,13 +1292,13 @@ corresponding to the resolved file name. For example:
 
 === "Python"
     ```python
-    my_exec = m.declare_file("my-executable.$OS.$ARCH",  cache=True)
+    my_exec = m.declare_file("my-executable.$OS.$ARCH",  cache="workflow")
     t.add_input_input(my_exec, "my_exe")
     ```
 
 === "C"
     ```C
-    struct vine_file *my_exec = vine_declare_file(m, "my-executable.$OS.$ARCH",  VINE_CACHE);
+    struct vine_file *my_exec = vine_declare_file(m, "my-executable.$OS.$ARCH",  VINE_CACHE_LEVEL_WORKFLOW, 0);
     add_input_input(my_exec, "my_exe", 0);
     ```
 
@@ -1438,7 +1443,7 @@ You can examine the result of a PythonTask like this:
         t = m.wait(5)
         if t:
             x = t.output
-            if isinstance(x,Exception):
+            if isinstance(x, Exception):
                 print("Exception: {}".format(x))
             else:
                 print("Result: {}".format(x))
@@ -1558,7 +1563,7 @@ that invoke the library and functions by name:
 
 === "Python"
     ```python
-    t = vine.FunctionCall("my_library","my_mul",20,30);
+    t = vine.FunctionCall("my_library", "my_mul", 20, 30);
     t.set_cores(1)
     t.set_memory(100)
     t.set_disk(100)
@@ -1763,13 +1768,13 @@ as in the following example:
 
 === "C"
     ```C
-    vine_task_set_cores(t,1)             # task needs one core
-    vine_task_set_memory(t,1024)         # task needs 1024 MB of memory
-    vine_task_set_disk(t,4096)           # task needs 4096 MB of disk space
-    vine_task_set_gpus(t,0)              # task does not need a gpu
-    vine_task_set_run_time_max(t,100)    # task is allowed to run in 100 seconds
-    vine_task_set_run_time_min(t,10)     # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
-    vine_task_add_feature(t,"NVIDIA RTX A2000")  # task requires this specific GPU type
+    vine_task_set_cores(t, 1)             # task needs one core
+    vine_task_set_memory(t, 1024)         # task needs 1024 MB of memory
+    vine_task_set_disk(t, 4096)           # task needs 4096 MB of disk space
+    vine_task_set_gpus(t, 0)              # task does not need a gpu
+    vine_task_set_run_time_max(t, 100)    # task is allowed to run in 100 seconds
+    vine_task_set_run_time_min(t, 10)     # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
+    vine_task_add_feature(t, "NVIDIA RTX A2000")  # task requires this specific GPU type
     ```
 
 When the maximum running time is specified, TaskVine will kill any task that
@@ -1944,7 +1949,7 @@ To describe a task that can only run on a specific GPU type, use `add_feature`:
 
 === "C"
     ```C
-    vine_task_add_feature(t,"NVIDIA RTX A2000") # task requires worker with this feature
+    vine_task_add_feature(t, "NVIDIA RTX A2000") # task requires worker with this feature
     ```
 
 (Note that the GPU feature is automatically reported by the worker
@@ -1989,25 +1994,25 @@ these limits. You can enable monitoring and enforcement as follows:
     # series are written to the logs directory `vine-logs/time-series`.
     # Use with caution, as time series for long running tasks may be in the
     # order of gigabytes. 
-    m.enable_monitoring(m,watchdog=False,time_series=True)
+    m.enable_monitoring(m, watchdog=False, time_series=True)
     ```
 
 === "C"
     ```C
     /* Measure the resources used by tasks, and terminate tasks that go above their
     resources: */
-    vine_enable_monitoring(m,1,0)
+    vine_enable_monitoring(m, 1, 0)
 
     /* Measure the resources used by tasks, but do not terminate tasks that go above
     declared resources: */
-    vine_enable_monitoring(m,0,0)
+    vine_enable_monitoring(m, 0, 0)
 
     /* Measure the resources used by tasks, but do not terminate tasks that go
     above # declared resources, and generate a time series per task. These time
     series are written to the logs directory `vine-logs/time-series`.
     Use with caution, as time series for long running tasks may be in the
     order of gigabytes. */
-    vine_enable_monitoring(m,0,1)
+    vine_enable_monitoring(m, 0, 1)
     ```
 
 When monitoring is enabled, you can explore the resources measured when a task
@@ -2031,7 +2036,7 @@ returns:
 
 === "C"
     ```C
-    vine_task *t = vine_wait(m,5);
+    vine_task *t = vine_wait(m, 5);
     if(t) {
         const struct rmsummary *measured  = vine_task_get_resources(t, "measured");
         const struct rmsummary *requested = vine_task_get_resources(t, "requested");
@@ -2135,7 +2140,7 @@ compute some efficient defaults. To assign a task to a category:
 
 === "C"
     ```C
-    vine_task_set_category(t,"my-category-a")
+    vine_task_set_category(t, "my-category-a")
     ```
 When a category leaves some resource unspecified, then TaskVine tries to find
 some reasonable defaults in the same way described before in the section
@@ -2183,7 +2188,7 @@ Automatic resource management is enabled per category as follows:
 
 === "C"
     ```C
-    vine_enable_monitoring(m,0,0);
+    vine_enable_monitoring(m, 0, 0);
     vine_set_category_resources_max(m, "my-category-a", NULL);
     vine_set_category_mode(m, "my-category-a", VINE_ALLOCATION_MODE_MAX_THROUGHPUT);
 
@@ -2210,7 +2215,7 @@ automatic resource computation will never go below the values set:
     ```C
     struct rmsummary *r = rmsummary_create(-1);
     r->memory = 512;
-    vine_set_category_resources_min(m,"my-category-a", r);
+    vine_set_category_resources_min(m, "my-category-a", r);
     rmsummary_delete(r);
     ```
 

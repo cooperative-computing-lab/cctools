@@ -43,16 +43,19 @@ struct vine_file {
 	vine_file_type_t  type;  // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
 	vine_file_flags_t flags; // Whether or not to transfer this file between workers.
 	vine_file_state_t state; // Whether the file is PENDING or has been CREATED
+	vine_cache_level_t cache_level; // How aggressively this file should be cached.
 	char *source;       // Name of source file, url, buffer.
 	char *cached_name;  // Name of file in the worker's cache directory.
 	size_t size;        // Length of source data, if known.
+	time_t mtime;       // Modification time of source data, if known.
 	char *data;         // Raw data for an input or output buffer.
 	struct vine_task *mini_task; // Mini task used to generate the desired output file.
 	struct vine_task *recovery_task; // For temp files, a copy of the task that created it.
+	int change_message_shown; // True if error message already shown.
 	int refcount;       // Number of references from a task object, delete when zero.
 };
 
-struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_type_t type, struct vine_task *mini_task, vine_file_flags_t flags);
+struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_type_t type, struct vine_task *mini_task, vine_cache_level_t cache_level, vine_file_flags_t flags);
 
 struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source );
 
@@ -61,15 +64,17 @@ struct vine_file *vine_file_clone( struct vine_file *f );
 /* Decreases reference count of file, and frees if zero. */
 int vine_file_delete( struct vine_file *f );
 
-struct vine_file *vine_file_local( const char *source, vine_file_flags_t flags );
-struct vine_file *vine_file_url( const char *source, vine_file_flags_t flags );
+int vine_file_has_changed( struct vine_file *f );
+
+struct vine_file *vine_file_local( const char *source, vine_cache_level_t cache, vine_file_flags_t flags );
+struct vine_file *vine_file_url( const char *source, vine_cache_level_t cache, vine_file_flags_t flags );
 struct vine_file *vine_file_temp();
-struct vine_file *vine_file_buffer( const char *buffer, size_t size, vine_file_flags_t flags );
-struct vine_file *vine_file_mini_task( struct vine_task *t, const char *name, vine_file_flags_t flags );
-struct vine_file *vine_file_untar( struct vine_file *f, vine_file_flags_t flags );
-struct vine_file *vine_file_poncho( struct vine_file *f, vine_file_flags_t flags );
-struct vine_file *vine_file_starch( struct vine_file *f, vine_file_flags_t flags );
-struct vine_file *vine_file_xrootd( const char *source, struct vine_file *proxy, struct vine_file *env, vine_file_flags_t flags );
-struct vine_file *vine_file_chirp( const char *server, const char *source, struct vine_file *ticket, struct vine_file *env, vine_file_flags_t flags );
+struct vine_file *vine_file_buffer( const char *buffer, size_t size, vine_cache_level_t cache, vine_file_flags_t flags );
+struct vine_file *vine_file_mini_task( struct vine_task *t, const char *name, vine_cache_level_t cache, vine_file_flags_t flags );
+struct vine_file *vine_file_untar( struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags );
+struct vine_file *vine_file_poncho( struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags );
+struct vine_file *vine_file_starch( struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags );
+struct vine_file *vine_file_xrootd( const char *source, struct vine_file *proxy, struct vine_file *env, vine_cache_level_t cache, vine_file_flags_t flags );
+struct vine_file *vine_file_chirp( const char *server, const char *source, struct vine_file *ticket, struct vine_file *env, vine_cache_level_t cache, vine_file_flags_t flags );
 
 #endif

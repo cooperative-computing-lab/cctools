@@ -46,6 +46,7 @@ static vine_result_code_t vine_manager_get_buffer(struct vine_manager *q, struct
 	int64_t size;
 	int mode;
 	int errornum;
+	int mtime;
 
 	vine_result_code_t r = VINE_WORKER_FAILURE;
 
@@ -53,8 +54,7 @@ static vine_result_code_t vine_manager_get_buffer(struct vine_manager *q, struct
 	if (mcode != VINE_MSG_NOT_PROCESSED)
 		return VINE_WORKER_FAILURE;
 
-	if (sscanf(line, "file %s %" SCNd64 " 0%o", name_encoded, &size, &mode) == 3) {
-
+	if (sscanf(line, "file %s %" SCNd64 " %o %d", name_encoded, &size, &mode, &mtime) == 4) {
 		f->size = size;
 		debug(D_VINE,
 				"Receiving buffer %s (size: %" PRId64 " bytes) from %s (%s) ...",
@@ -231,6 +231,7 @@ static vine_result_code_t vine_manager_get_any(struct vine_manager *q, struct vi
 	char name[VINE_LINE_MAX];
 	int64_t size;
 	int mode;
+	int mtime;
 	int errornum;
 
 	vine_result_code_t r = VINE_WORKER_FAILURE;
@@ -239,7 +240,7 @@ static vine_result_code_t vine_manager_get_any(struct vine_manager *q, struct vi
 	if (mcode != VINE_MSG_NOT_PROCESSED)
 		return VINE_WORKER_FAILURE;
 
-	if (sscanf(line, "file %s %" SCNd64 " 0%o", name_encoded, &size, &mode) == 3) {
+	if (sscanf(line, "file %s %" SCNd64 " %o", name_encoded, &size, &mode) == 3) {
 
 		url_decode(name_encoded, name, sizeof(name));
 
@@ -271,7 +272,7 @@ static vine_result_code_t vine_manager_get_any(struct vine_manager *q, struct vi
 		if (r == VINE_SUCCESS)
 			*totalsize += size;
 
-	} else if (sscanf(line, "dir %s", name_encoded) == 1) {
+	} else if (sscanf(line, "dir %s %o %d", name_encoded, &mode, &mtime) == 3) {
 
 		url_decode(name_encoded, name, sizeof(name));
 
@@ -423,11 +424,11 @@ vine_result_code_t vine_manager_get_output_file(struct vine_manager *q, struct v
 	}
 
 	// If the transfer was successful, make a record of it in the cache.
-	if (result == VINE_SUCCESS && m->flags & VINE_CACHE) {
+	if (result == VINE_SUCCESS && (f->cache_level > VINE_CACHE_LEVEL_TASK)) {
 		struct stat local_info;
 		if (stat(f->source, &local_info) == 0) {
-			struct vine_file_replica *replica =
-					vine_file_replica_create(local_info.st_size, local_info.st_mtime);
+			struct vine_file_replica *replica = vine_file_replica_create(
+					f->type, f->cache_level, local_info.st_size, local_info.st_mtime);
 			vine_file_replica_table_insert(w, f->cached_name, replica);
 		} else {
 			debug(D_NOTICE, "Cannot stat file %s: %s", f->source, strerror(errno));

@@ -60,6 +60,9 @@ struct vine_worker_options {
 
 	/* Manual option given by the user to control the location of the workspace. */
 	char *workspace_dir;
+
+	/* Keep contents of workspace after exit, for future reuse. */
+	int keep_workspace_at_exit;
 	
 	/* Table of user-specified features. The key represents the name of the feature. */
 	/* The corresponding value is just a pointer to feature_dummy and can be ignored. */

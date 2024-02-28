@@ -7,6 +7,7 @@ LOCAL_CCFLAGS=-I ${CCTOOLS_HOME}/taskvine/src/manager
 SOURCES = \
 	vine_sandbox.c \
 	vine_cache.c \
+	vine_cache_file.c \
 	vine_transfer.c \
 	vine_transfer_server.c \
 	vine_process.c \

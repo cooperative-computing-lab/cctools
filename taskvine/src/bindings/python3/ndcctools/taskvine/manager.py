@@ -1395,16 +1395,17 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param path    The path to the local file
     # @param cache   If True or 'workflow', cache the file at workers for reuse
-    #                until the end of the workflow. If 'always', the file is cache until the
-    #                end-of-life of the worker. Default is False (file is not cache).
+    #                until the end of the workflow. If 'worker', the file is cache until the
+    #                end-of-life of the worker. If 'forever', the file is cached beyond the end-of-life of the worker. Default is False (file is not cached).
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
     # @param unlink_when_done   Whether to delete the file when its reference count is 0. (Warning: Only use on files produced by the application, and never on irreplaceable input files.)
     # @return
     # A file object to use in @ref ndcctools.taskvine.task.Task.add_input or @ref ndcctools.taskvine.task.Task.add_output
     def declare_file(self, path, cache=False, peer_transfer=True, unlink_when_done=False):
-        flags = Task._determine_file_flags(cache, peer_transfer, unlink_when_done)
-        f = cvine.vine_declare_file(self._taskvine, path, flags)
+        flags = Task._determine_file_flags(peer_transfer, unlink_when_done)
+        cache_level = Task._determine_cache_level(cache)
+        f = cvine.vine_declare_file(self._taskvine, path, cache_level, flags)
         return File(f)
 
     ##
@@ -1413,7 +1414,6 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param file    The file object
     # @return The contents of the file as a strong.
-
     def fetch_file(self, file):
         return cvine.vine_fetch_file(self._taskvine, file._file)
 
@@ -1462,18 +1462,19 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param url     The url of the file.
     # @param cache   If True or 'workflow', cache the file at workers for reuse
-    #                until the end of the workflow. If 'always', the file is cache until the
-    #                end-of-life of the worker. Default is False (file is not cache).
+    #                until the end of the workflow. If 'worker', the file is cache until the
+    #                end-of-life of the worker. If 'forever', the file is cached beyond the end-of-life of the worker. Default is False (file is not cached).
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
     # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
     def declare_url(self, url, cache=False, peer_transfer=True):
-        flags = Task._determine_file_flags(cache, peer_transfer)
+        flags = Task._determine_file_flags(peer_transfer)
+        cache_level = Task._determine_cache_level(cache)
 
         if not isinstance(url, str):
             raise TypeError(f"url {url} is not a str")
 
-        f = cvine.vine_declare_url(self._taskvine, url, flags)
+        f = cvine.vine_declare_url(self._taskvine, url, cache_level, flags)
         return File(f)
 
     ##
@@ -1482,8 +1483,8 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param buffer  The contents of the buffer, or None for an empty output buffer
     # @param cache   If True or 'workflow', cache the file at workers for reuse
-    #                until the end of the workflow. If 'always', the file is cache until the
-    #                end-of-life of the worker. Default is False (file is not cache).
+    #                until the end of the workflow. If 'worker', the file is cache until the
+    #                end-of-life of the worker. If 'forever', the file is cached beyond the end-of-life of the worker. Default is False (file is not cached).
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
     # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
@@ -1499,9 +1500,10 @@ class Manager(object):
         # because of the swig typemap, vine_declare_buffer(m, buffer, size) is changed
         # to a function with just two arguments.
         flags = Task._determine_file_flags(cache, peer_transfer)
+        cache_level = Task._determine_cache_level(cache)
         if isinstance(buffer, str):
             buffer = bytes(buffer, "utf-8")
-        f = cvine.vine_declare_buffer(self._taskvine, buffer, flags)
+        f = cvine.vine_declare_buffer(self._taskvine, buffer, cache_level, flags)
         return File(f)
 
     ##
@@ -1511,8 +1513,8 @@ class Manager(object):
     # @param minitask The task to execute in order to produce a file
     # @param source   The name of the file to extract from the task's sandbox.
     # @param cache   If True or 'workflow', cache the file at workers for reuse
-    #                until the end of the workflow. If 'always', the file is cache until the
-    #                end-of-life of the worker. Default is False (file is not cache).
+    #                until the end of the workflow. If 'worker', the file is cache until the
+    #                end-of-life of the worker. If 'forever', the file is cached beyond the end-of-life of the worker. Default is False (file is not cached).
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
     # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
@@ -1524,7 +1526,8 @@ class Manager(object):
 
         # Then proceed to attach the task to the mini-task file object.
         flags = Task._determine_file_flags(cache, peer_transfer)
-        f = cvine.vine_declare_mini_task(self._taskvine, minitask._task, source, flags)
+        cache_level = Task._determine_cache_level(cache)
+        f = cvine.vine_declare_mini_task(self._taskvine, minitask._task, source, cache_level, flags)
 
         # minitasks are freed when the manager frees its related file structure
         minitask._manager_will_free = True
@@ -1537,14 +1540,15 @@ class Manager(object):
     # @param self      The manager to register this file
     # @param tarball    The file object to un-tar
     # @param cache   If True or 'workflow', cache the file at workers for reuse
-    #                until the end of the workflow. If 'always', the file is cache until the
-    #                end-of-life of the worker. Default is False (file is not cache).
+    #                until the end of the workflow. If 'worker', the file is cache until the
+    #                end-of-life of the worker. If 'forever', the file is cached beyond the end-of-life of the worker. Default is False (file is not cached).
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
     # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
     def declare_untar(self, tarball, cache=False, peer_transfer=True):
         flags = Task._determine_file_flags(cache, peer_transfer)
-        f = cvine.vine_declare_untar(self._taskvine, tarball._file, flags)
+        cache_level = Task._determine_cache_level(cache)
+        f = cvine.vine_declare_untar(self._taskvine, tarball._file, cache_level, flags)
         return File(f)
 
     ##
@@ -1554,8 +1558,8 @@ class Manager(object):
     # @param package The poncho environment tarball. Either a vine file or a
     #                string representing a local file.
     # @param cache   If True or 'workflow', cache the file at workers for reuse
-    #                until the end of the workflow. If 'always', the file is cache until the
-    #                end-of-life of the worker. Default is False (file is not cache).
+    #                until the end of the workflow. If 'worker', the file is cache until the
+    #                end-of-life of the worker. If 'forever', the file is cached beyond the end-of-life of the worker. Default is False (file is not cached).
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
     # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
@@ -1564,7 +1568,8 @@ class Manager(object):
             package = self.declare_file(package, cache=True)
 
         flags = Task._determine_file_flags(cache, peer_transfer)
-        f = cvine.vine_declare_poncho(self._taskvine, package._file, flags)
+        cache_level = Task._determine_cache_level(cache)
+        f = cvine.vine_declare_poncho(self._taskvine, package._file, cache_level, flags)
         return File(f)
 
     ##
@@ -1574,8 +1579,8 @@ class Manager(object):
     # @param starch  The startch .sfx file. Either a vine file or a string
     #                representing a local file.
     # @param cache   If True or 'workflow', cache the file at workers for reuse
-    #                until the end of the workflow. If 'always', the file is cache until the
-    #                end-of-life of the worker. Default is False (file is not cache).
+    #                until the end of the workflow. If 'worker', the file is cache until the
+    #                end-of-life of the worker. If 'forever', the file is cached beyond the end-of-life of the worker. Default is False (file is not cached).
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
     # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
@@ -1584,7 +1589,8 @@ class Manager(object):
             starch = self.declare_file(starch, cache=True)
 
         flags = Task._determine_file_flags(cache, peer_transfer)
-        f = cvine.vine_declare_starch(self._taskvine, starch._file, flags)
+        cache_level = Task._determine_cache_level(cache)
+        f = cvine.vine_declare_starch(self._taskvine, starch._file, cache_level, flags)
         return File(f)
 
     ##
@@ -1599,9 +1605,9 @@ class Manager(object):
     # @param env    If not None, an environment file (e.g poncho or starch, see ndcctools.taskvine.task.Task.add_environment)
     #               that contains the xrootd executables. Otherwise assume xrootd is available
     #               at the worker.
-    # @param cache  If True or 'workflow', cache the file at workers for reuse
-    #               until the end of the workflow. If 'always', the file is cache until the
-    #               end-of-life of the worker. Default is False (file is not cache).
+    # @param cache   If True or 'workflow', cache the file at workers for reuse
+    #                until the end of the workflow. If 'worker', the file is cache until the
+    #                end-of-life of the worker. If 'forever', the file is cached beyond the end-of-life of the worker. Default is False (file is not cached).
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
     # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
@@ -1615,7 +1621,8 @@ class Manager(object):
             env_c = env._file
 
         flags = Task._determine_file_flags(cache, peer_transfer)
-        f = cvine.vine_declare_xrootd(self._taskvine, source, proxy_c, env_c, flags)
+        cache_level = Task._determine_cache_level(cache)
+        f = cvine.vine_declare_xrootd(self._taskvine, source, proxy_c, env_c, cache_level, flags)
         return File(f)
 
     ##
@@ -1629,8 +1636,8 @@ class Manager(object):
     #               that contains the chirp executables. Otherwise assume chirp is available
     #               at the worker.
     # @param cache   If True or 'workflow', cache the file at workers for reuse
-    #                until the end of the workflow. If 'always', the file is cache until the
-    #                end-of-life of the worker. Default is False (file is not cache).
+    #                until the end of the workflow. If 'worker', the file is cache until the
+    #                end-of-life of the worker. If 'forever', the file is cached beyond the end-of-life of the worker. Default is False (file is not cached).
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref ndcctools.taskvine.manager.Manager.enable_peer_transfers). Default is True.
     # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input
@@ -1644,7 +1651,8 @@ class Manager(object):
             env_c = env._file
 
         flags = Task._determine_file_flags(cache, peer_transfer)
-        f = cvine.vine_declare_chirp(self._taskvine, server, source, ticket_c, env_c, flags)
+        cache_level = Task._determine_cache_level(cache)
+        f = cvine.vine_declare_chirp(self._taskvine, server, source, ticket_c, env_c, cache_level, flags)
         return File(f)
 
     ##

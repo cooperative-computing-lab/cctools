@@ -1,6 +1,8 @@
 
 #include "vine_workspace.h"
 #include "vine_protocol.h"
+#include "vine_worker.h"
+#include "vine_worker_options.h"
 
 #include "create_dir.h"
 #include "debug.h"
@@ -18,36 +20,35 @@
 
 /* Create a new workspace object and sub-paths */
 
-struct vine_workspace *vine_workspace_create(const char *manual_tmpdir)
+struct vine_workspace *vine_workspace_create(const char *manual_workspace_dir)
 {
+	char *workspace_dir = 0;
 	char absolute[VINE_LINE_MAX];
 
-	const char *tmpdir = system_tmp_dir(manual_tmpdir);
+	if (manual_workspace_dir) {
+		workspace_dir = strdup(manual_workspace_dir);
+	} else {
+		const char *tmpdir = system_tmp_dir(0);
+		workspace_dir = string_format("%s/worker-%d-%d", tmpdir, (int)getuid(), (int)getpid());
+	}
 
-	char *workspace = string_format("%s/worker-%d-%d", tmpdir, (int)getuid(), (int)getpid());
-
-	printf("vine_worker: creating workspace %s\n", workspace);
-
-	if (!create_dir(workspace, 0777)) {
-		free(workspace);
+	printf("vine_worker: creating workspace %s\n", workspace_dir);
+	if (!create_dir(workspace_dir, 0777)) {
+		free(workspace_dir);
 		return 0;
 	}
 
-	path_absolute(workspace, absolute, 1);
-	free(workspace);
+	/* Convert to absolute dir since we will eventually chdir. */
+	path_absolute(workspace_dir, absolute, 1);
+	free(workspace_dir);
 
 	struct vine_workspace *w = malloc(sizeof(*w));
 
 	w->workspace_dir = xxstrdup(absolute);
 	w->cache_dir = string_format("%s/cache", w->workspace_dir);
+	w->transfer_dir = string_format("%s/transfer", w->workspace_dir);
 	w->temp_dir = string_format("%s/temp", w->workspace_dir);
 	w->trash_dir = string_format("%s/trash", w->workspace_dir);
-
-	/* On first startup, delete the cache directory. */
-	/* XXX This is holdover from WQ, is it correct? */
-
-	printf("vine_worker: cleaning up cache directory %s\n", w->cache_dir);
-	unlink_recursive(w->cache_dir);
 
 	return w;
 }
@@ -105,6 +106,11 @@ int vine_workspace_prepare(struct vine_workspace *w)
 		return 0;
 	}
 
+	if (!create_dir(w->transfer_dir, 0777)) {
+		debug(D_VINE, "couldn't create %s: %s", w->transfer_dir, strerror(errno));
+		return 0;
+	}
+
 	if (!create_dir(w->temp_dir, 0777)) {
 		debug(D_VINE, "couldn't create %s: %s", w->cache_dir, strerror(errno));
 		return 0;
@@ -152,15 +158,15 @@ int vine_workspace_cleanup(struct vine_workspace *w)
 
 void vine_workspace_delete(struct vine_workspace *w)
 {
-	printf("vine_worker: deleting workspace %s\n", w->workspace_dir);
-
-	/*
-	Note that we cannot use trash_file here because the trash dir is inside the
-	workspace. The whole workspace is being deleted anyway.
-	*/
-	unlink_recursive(w->workspace_dir);
+	if (options->keep_workspace_at_exit) {
+		printf("vine_worker: keeping workspace %s for future use...\n", w->workspace_dir);
+	} else {
+		printf("vine_worker: deleting workspace %s\n", w->workspace_dir);
+		unlink_recursive(w->workspace_dir);
+	}
 
 	free(w->workspace_dir);
+	free(w->transfer_dir);
 	free(w->cache_dir);
 	free(w->trash_dir);
 	free(w->temp_dir);

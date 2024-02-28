@@ -151,8 +151,8 @@ static void release_all_workers(struct vine_manager *q);
 
 static int vine_manager_check_inputs_available(struct vine_manager *q, struct vine_task *t);
 
-static void delete_worker_file(
-		struct vine_manager *q, struct vine_worker_info *w, const char *filename, int flags, int except_flags);
+static void delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename,
+		vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
 
 static struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
@@ -328,22 +328,22 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 At this point we have received a cache update for a temp file. If q->temp_replica_count > 0 then tell up to that
 many workers to get the file from worker w.
 */
-static void replicate_temp_file(
-		struct vine_manager *q, struct vine_worker_info *w, const char *cachename, long long size)
+static void replicate_temp_file(struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f)
 {
 	if (!q->temp_replica_count)
 		return;
 
 	int found = 0;
 	struct vine_worker_info **workers;
-	workers = vine_file_replica_table_find_replication_targets(q, w, cachename, &found);
+	workers = vine_file_replica_table_find_replication_targets(q, w, f->cached_name, &found);
 
-	debug(D_VINE, "Found %d available workers to replicate %s", found, cachename);
+	debug(D_VINE, "Found %d available workers to replicate %s", found, f->cached_name);
 
 	for (int i = 0; i < found; i++) {
 		struct vine_worker_info *peer = workers[i];
-		char *worker_source = string_format("worker://%s:%d/%s", w->transfer_addr, w->transfer_port, cachename);
-		vine_manager_put_url_now(q, peer, worker_source, cachename, size);
+		char *worker_source =
+				string_format("worker://%s:%d/%s", w->transfer_addr, w->transfer_port, f->cached_name);
+		vine_manager_put_url_now(q, peer, worker_source, f);
 		free(worker_source);
 	}
 	free(workers);
@@ -358,12 +358,24 @@ of the file for the purposes of cache storage management.
 static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
 	char cachename[VINE_LINE_MAX];
+	int type;
+	int cache_level;
 	long long size;
+	long long mtime;
 	long long transfer_time;
 	long long start_time;
 	char id[VINE_LINE_MAX];
 
-	if (sscanf(line, "cache-update %s %lld %lld %lld %s", cachename, &size, &transfer_time, &start_time, id) == 5) {
+	if (sscanf(line,
+			    "cache-update %s %d %d %lld %lld %lld %lld %s",
+			    cachename,
+			    &type,
+			    &cache_level,
+			    &size,
+			    &mtime,
+			    &transfer_time,
+			    &start_time,
+			    id) == 8) {
 		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, cachename);
 
 		if (!replica) {
@@ -372,25 +384,33 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 			- The worker is telling us about an item from a previous run.
 			- The file was created as an output of a task.
 			*/
-			replica = vine_file_replica_create(size, 0);
+			replica = vine_file_replica_create(type, cache_level, size, mtime);
 			vine_file_replica_table_insert(w, cachename, replica);
 		}
 
+		replica->type = type;
+		replica->cache_level = cache_level;
 		replica->size = size;
+		replica->mtime = mtime;
 		replica->transfer_time = transfer_time;
 		replica->state = VINE_FILE_REPLICA_STATE_READY;
-
-		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
-		if (f)
-			f->state = VINE_FILE_STATE_CREATED;
 
 		vine_current_transfers_remove(q, id);
 
 		vine_txn_log_write_cache_update(q, w, size, transfer_time, start_time, cachename);
 
-		// If the file was not a url, eg. 'X', and it is a temp
-		if (*id == 'X' && strncmp(cachename, "temp-rnd-", 9) == 0) {
-			replicate_temp_file(q, w, cachename, size);
+		/* If the replica corresponds to a declared file. */
+
+		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
+		if (f) {
+			/* We know it exists and how large it is now. */
+			f->state = VINE_FILE_STATE_CREATED;
+			f->size = size;
+
+			/* And if the file is a newly created temporary. replicate it. */
+			if (f->type == VINE_TEMP && *id == 'X') {
+				replicate_temp_file(q, w, f);
+			}
 		}
 	}
 
@@ -746,7 +766,7 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 		// yet.
 		if (f) {
 			// delete all files, but those meant to stay at the worker
-			delete_worker_file(q, w, f->cached_name, f->flags, (~VINE_CACHE & VINE_CACHE_ALWAYS));
+			delete_worker_file(q, w, f->cached_name, f->cache_level, VINE_CACHE_LEVEL_TASK);
 		}
 	}
 }
@@ -853,12 +873,12 @@ static void add_worker(struct vine_manager *q)
 	hash_table_insert(q->worker_table, w->hashkey, w);
 }
 
-/* Delete a single file on a remote worker. */
+/* Delete a single file on a remote worker except those with greater delete_upto_level cache level */
 
-static void delete_worker_file(
-		struct vine_manager *q, struct vine_worker_info *w, const char *filename, int flags, int except_flags)
+static void delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename,
+		vine_cache_level_t cache_flags, vine_cache_level_t delete_upto_level)
 {
-	if (!(flags & except_flags)) {
+	if (cache_flags <= delete_upto_level) {
 		vine_manager_send(q, w, "unlink %s\n", filename);
 		struct vine_file_replica *replica;
 		replica = vine_file_replica_table_remove(w, filename);
@@ -866,17 +886,17 @@ static void delete_worker_file(
 	}
 }
 
-/* Delete all files in a list except those that match one or more of the "except_flags" */
+/* Delete all files in a list except those with greater delete_upto_level cache level */
 
-static void delete_worker_files(
-		struct vine_manager *q, struct vine_worker_info *w, struct list *mount_list, int except_flags)
+static void delete_worker_files(struct vine_manager *q, struct vine_worker_info *w, struct list *mount_list,
+		vine_cache_level_t delete_upto_level)
 {
 	if (!mount_list)
 		return;
 	struct vine_mount *m;
 	LIST_ITERATE(mount_list, m)
 	{
-		delete_worker_file(q, w, m->file->cached_name, m->file->flags, except_flags);
+		delete_worker_file(q, w, m->file->cached_name, m->file->cache_level, delete_upto_level);
 	}
 }
 
@@ -890,8 +910,8 @@ static void delete_task_output_files(struct vine_manager *q, struct vine_worker_
 /* Delete only the uncacheable output files of a given task. */
 static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	delete_worker_files(q, w, t->input_mounts, VINE_CACHE);
-	delete_worker_files(q, w, t->output_mounts, VINE_CACHE);
+	delete_worker_files(q, w, t->input_mounts, VINE_CACHE_LEVEL_TASK);
+	delete_worker_files(q, w, t->output_mounts, VINE_CACHE_LEVEL_TASK);
 }
 
 /* Determine the resource monitor file name that should be associated with this task. */
@@ -2838,7 +2858,7 @@ static int vine_manager_transfer_capacity_available(
 		m->substitute = NULL;
 
 		/* Provide a substitute file object to describe the peer. */
-		if (!(m->file->flags & VINE_PEER_NOSHARE) && (m->file->flags & (VINE_CACHE | VINE_CACHE_ALWAYS))) {
+		if (!(m->file->flags & VINE_PEER_NOSHARE) && (m->file->cache_level > VINE_CACHE_LEVEL_WORKFLOW)) {
 			if ((peer = vine_file_replica_table_find_worker(q, m->file->cached_name))) {
 				char *peer_source = string_format("worker://%s:%d/%s",
 						peer->transfer_addr,
@@ -3440,10 +3460,10 @@ static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vin
 				w->addrport);
 
 		// Delete any input files that are not to be cached.
-		delete_worker_files(q, w, t->input_mounts, VINE_CACHE);
+		delete_worker_files(q, w, t->input_mounts, VINE_CACHE_LEVEL_TASK);
 
 		// Delete all output files since they are not needed as the task was cancelled.
-		delete_worker_files(q, w, t->output_mounts, 0);
+		delete_worker_files(q, w, t->output_mounts, VINE_CACHE_LEVEL_FOREVER);
 
 		// Collect task structure from worker.
 		// Note that this calls change_task_state internally.
@@ -3712,7 +3732,7 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 		return 0;
 	}
 
-	q->monitor_exe = vine_declare_file(q, exe, VINE_CACHE);
+	q->monitor_exe = vine_declare_file(q, exe, VINE_CACHE_LEVEL_WORKFLOW, 0);
 	free(exe);
 
 	if (q->measured_local_resources) {
@@ -3988,7 +4008,7 @@ void vine_monitor_add_files(struct vine_manager *q, struct vine_task *t)
 
 	char *summary = monitor_file_name(q, t, ".summary", 0);
 	vine_task_add_output(t,
-			vine_declare_file(q, summary, VINE_CACHE_NEVER),
+			vine_declare_file(q, summary, VINE_CACHE_LEVEL_TASK, 0),
 			RESOURCE_MONITOR_REMOTE_NAME ".summary",
 			VINE_RETRACT_ON_RESET);
 	free(summary);
@@ -3998,11 +4018,11 @@ void vine_monitor_add_files(struct vine_manager *q, struct vine_task *t)
 		char *series = monitor_file_name(q, t, ".series", 1);
 
 		vine_task_add_output(t,
-				vine_declare_file(q, debug, VINE_CACHE_NEVER),
+				vine_declare_file(q, debug, VINE_CACHE_LEVEL_TASK, 0),
 				RESOURCE_MONITOR_REMOTE_NAME ".debug",
 				VINE_RETRACT_ON_RESET);
 		vine_task_add_output(t,
-				vine_declare_file(q, series, VINE_CACHE_NEVER),
+				vine_declare_file(q, series, VINE_CACHE_LEVEL_TASK, 0),
 				RESOURCE_MONITOR_REMOTE_NAME ".series",
 				VINE_RETRACT_ON_RESET);
 
@@ -5635,8 +5655,7 @@ void vine_undeclare_file(struct vine_manager *m, struct vine_file *f)
 	If this is not a file that should be cached forever,
 	delete all of the replicas present at remote workers.
 	*/
-
-	if ((f->flags & VINE_CACHE_ALWAYS) != VINE_CACHE_ALWAYS) {
+	if (f->cache_level < VINE_CACHE_LEVEL_FOREVER) {
 		char *key;
 		struct vine_worker_info *w;
 		HASH_TABLE_ITERATE(m->worker_table, key, w)
@@ -5689,15 +5708,17 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 	return f;
 }
 
-struct vine_file *vine_declare_file(struct vine_manager *m, const char *source, vine_file_flags_t flags)
+struct vine_file *vine_declare_file(
+		struct vine_manager *m, const char *source, vine_cache_level_t cache, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_local(source, flags);
+	struct vine_file *f = vine_file_local(source, cache, flags);
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_url(struct vine_manager *m, const char *source, vine_file_flags_t flags)
+struct vine_file *vine_declare_url(
+		struct vine_manager *m, const char *source, vine_cache_level_t cache, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_url(source, flags);
+	struct vine_file *f = vine_file_url(source, cache, flags);
 	return vine_manager_declare_file(m, f);
 }
 
@@ -5707,48 +5728,52 @@ struct vine_file *vine_declare_temp(struct vine_manager *m)
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_buffer(struct vine_manager *m, const char *buffer, size_t size, vine_file_flags_t flags)
+struct vine_file *vine_declare_buffer(struct vine_manager *m, const char *buffer, size_t size, vine_cache_level_t cache,
+		vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_buffer(buffer, size, flags);
+	struct vine_file *f = vine_file_buffer(buffer, size, cache, flags);
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_mini_task(
-		struct vine_manager *m, struct vine_task *t, const char *name, vine_file_flags_t flags)
+struct vine_file *vine_declare_mini_task(struct vine_manager *m, struct vine_task *t, const char *name,
+		vine_cache_level_t cache, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_mini_task(t, name, flags);
+	struct vine_file *f = vine_file_mini_task(t, name, cache, flags);
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_untar(struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags)
+struct vine_file *vine_declare_untar(
+		struct vine_manager *m, struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags)
 {
-	struct vine_file *t = vine_file_untar(f, flags);
+	struct vine_file *t = vine_file_untar(f, cache, flags);
 	return vine_manager_declare_file(m, t);
 }
 
-struct vine_file *vine_declare_poncho(struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags)
+struct vine_file *vine_declare_poncho(
+		struct vine_manager *m, struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags)
 {
-	struct vine_file *t = vine_file_poncho(f, flags);
+	struct vine_file *t = vine_file_poncho(f, cache, flags);
 	return vine_manager_declare_file(m, t);
 }
 
-struct vine_file *vine_declare_starch(struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags)
+struct vine_file *vine_declare_starch(
+		struct vine_manager *m, struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags)
 {
-	struct vine_file *t = vine_file_starch(f, flags);
+	struct vine_file *t = vine_file_starch(f, cache, flags);
 	return vine_manager_declare_file(m, t);
 }
 
 struct vine_file *vine_declare_xrootd(struct vine_manager *m, const char *source, struct vine_file *proxy,
-		struct vine_file *env, vine_file_flags_t flags)
+		struct vine_file *env, vine_cache_level_t cache, vine_file_flags_t flags)
 {
-	struct vine_file *t = vine_file_xrootd(source, proxy, env, flags);
+	struct vine_file *t = vine_file_xrootd(source, proxy, env, cache, flags);
 	return vine_manager_declare_file(m, t);
 }
 
 struct vine_file *vine_declare_chirp(struct vine_manager *m, const char *server, const char *source,
-		struct vine_file *ticket, struct vine_file *env, vine_file_flags_t flags)
+		struct vine_file *ticket, struct vine_file *env, vine_cache_level_t cache, vine_file_flags_t flags)
 {
-	struct vine_file *t = vine_file_chirp(server, source, ticket, env, flags);
+	struct vine_file *t = vine_file_chirp(server, source, ticket, env, cache, flags);
 	return vine_manager_declare_file(m, t);
 }
 

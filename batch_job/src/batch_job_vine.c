@@ -19,7 +19,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 
-static struct vine_file * declare_once( struct batch_queue *q, const char *name, vine_file_flags_t flags )
+static struct vine_file *declare_once( struct batch_queue *q, const char *name, vine_cache_level_t cache, vine_file_flags_t flags )
 {
 	struct vine_file *f;
 
@@ -27,13 +27,13 @@ static struct vine_file * declare_once( struct batch_queue *q, const char *name,
 
 	f = hash_table_lookup(q->tv_file_table,name);
 	if(!f) {
-		f = vine_declare_file(q->tv_manager,name,flags);
+		f = vine_declare_file(q->tv_manager,name,cache,flags);
 		hash_table_insert(q->tv_file_table,name,f);
 	}
 	return f;
 }
 
-static void specify_files( struct batch_queue *q, struct vine_task *t, const char *input_files, const char *output_files, vine_file_flags_t flags )
+static void specify_files( struct batch_queue *q, struct vine_task *t, const char *input_files, const char *output_files, vine_cache_level_t cache, vine_file_flags_t flags )
 {
 	char *files;       // Copy of string list of files.
 	char *local_name;  // Name of file at manager.
@@ -48,11 +48,11 @@ static void specify_files( struct batch_queue *q, struct vine_task *t, const cha
 			remote_name = strchr(local_name, '=');
 			if(remote_name) {
 				*remote_name = 0;
-				f = declare_once(q,local_name,flags);
+				f = declare_once(q,local_name,cache,flags);
 				vine_task_add_input(t,f,remote_name+1,0);
 				*remote_name = '=';
 			} else {
-				f = declare_once(q,local_name,flags);
+				f = declare_once(q,local_name,cache,flags);
 				vine_task_add_input(t,f,local_name,0);
 			}
 			local_name = strtok(0, " \t,");
@@ -67,11 +67,11 @@ static void specify_files( struct batch_queue *q, struct vine_task *t, const cha
 			remote_name = strchr(local_name, '=');
 			if(remote_name) {
 				*remote_name = 0;
-				f = declare_once(q,local_name,flags);
+				f = declare_once(q,local_name,cache,flags);
 				vine_task_add_output(t,f,remote_name+1,0);
 				*remote_name = '=';
 			} else {
-				f = declare_once(q,local_name,flags);
+				f = declare_once(q,local_name,cache,flags);
 				vine_task_add_output(t,f,local_name,0);
 			}
 			local_name = strtok(0, " \t,");
@@ -94,22 +94,24 @@ static batch_job_id_t batch_job_vine_submit (struct batch_queue * q, const char 
 {
 	struct vine_task *t;
 
-	int caching_flag = VINE_CACHE;
+	vine_cache_level_t caching_flag = VINE_CACHE_LEVEL_WORKFLOW;
 
 	const char *caching_option = hash_table_lookup(q->options,"caching");
-	if(!strcmp(caching_option,"never")) {
-		caching_flag = VINE_CACHE_NEVER;
+	if(!strcmp(caching_option,"task")) {
+		caching_flag = VINE_CACHE_LEVEL_TASK;
 	} else if(!strcmp(caching_option,"workflow")) {
-		caching_flag = VINE_CACHE;
+		caching_flag = VINE_CACHE_LEVEL_WORKFLOW;
+	} else if(!strcmp(caching_option,"worker")) {
+		caching_flag = VINE_CACHE_LEVEL_WORKER;
 	} else if(!strcmp(caching_option,"forever")) {
-		caching_flag = VINE_CACHE_ALWAYS;
+		caching_flag = VINE_CACHE_LEVEL_FOREVER;
 	} else {
-		caching_flag = VINE_CACHE;
+		caching_flag = VINE_CACHE_LEVEL_WORKFLOW;
 	}
 
 	t = vine_task_create(cmd);
 
-	specify_files(q, t, extra_input_files, extra_output_files, caching_flag);
+	specify_files(q, t, extra_input_files, extra_output_files, caching_flag, 0);
 	specify_envlist(t,envlist);
 
 	if(envlist) {
