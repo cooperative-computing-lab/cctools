@@ -159,7 +159,9 @@ class Task(object):
             cache_level = cvine.VINE_CACHE_LEVEL_WORKER
         elif cache == "forever":
             cache_level = cvine.VINE_CACHE_LEVEL_FOREVER
-        elif cache:
+        elif not cache or cache == "task":
+            cache_level = cvine.VINE_CACHE_LEVEL_TASK
+        else:
             raise ValueError(f"{cache} is not a valid cache level")
 
         return cache_level
