@@ -1,9 +1,8 @@
 #! /usr/bin/env python
 
 import ndcctools.taskvine as vine
-
-import subprocess
 import argparse
+
 
 def ctx_from_image(manager, image_path, run_script="run_command_in_apptainer.sh"):
     # construct the mini task. We only need the mini task for its sandbox to
@@ -11,7 +10,7 @@ def ctx_from_image(manager, image_path, run_script="run_command_in_apptainer.sh"
     mt = vine.Task(":")
 
     runner = m.declare_file(run_script, cache=True)
-    image  = m.declare_file(image_path, cache=True)
+    image = m.declare_file(image_path, cache=True)
 
     mt.add_input(runner, "ctx/bin/run_in_env")
     mt.add_input(image,  "ctx/image.sif")
@@ -42,7 +41,7 @@ if __name__ == "__main__":
     t = vine.Task("/bin/echo 'from inside apptainer!'")
     t.set_cores(1)
     t.add_execution_context(ctx)
-    
+
     m.submit(t)
 
     factory = vine.Factory(manager=m)
@@ -60,5 +59,3 @@ if __name__ == "__main__":
                 print(f"task {t.id} completed: {t.std_output}")
             else:
                 print(f"task {t.id} failed. return status: {t.result_string}. exit code: {t.exit_code}")
-
-
