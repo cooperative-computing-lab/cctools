@@ -83,7 +83,8 @@ struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 	{
 		if (found == q->temp_replica_count)
 			break;
-		if (skip_workers--)
+		skip_workers--;
+		if (skip_workers > 0)
 			continue;
 		if (!peer->transfer_port_active)
 			continue;
