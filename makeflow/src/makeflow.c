@@ -190,7 +190,7 @@ static int skip_file_check = 0;
 
 /*
 Control caching within the underlying batch system, if supported.
-May be "never", "worklow", or "forever".
+May be "task", "workflow", or "worker", or "forever".
 */
 
 static const char *cache_mode = "workflow";
@@ -1878,7 +1878,7 @@ int main(int argc, char *argv[])
 				cache_mode = optarg;
 				break;
 			case LONG_OPT_DISABLE_BATCH_CACHE:
-				cache_mode = "never";
+				cache_mode = "task";
 				break;
 			case LONG_OPT_DISABLE_HEARTBEAT:
 				batch_job_disable_heartbeat = 1;
