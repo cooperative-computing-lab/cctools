@@ -151,8 +151,8 @@ static void release_all_workers(struct vine_manager *q);
 
 static int vine_manager_check_inputs_available(struct vine_manager *q, struct vine_task *t);
 
-static void delete_worker_file(
-		struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
+static void delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename,
+		vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
 
 static struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
@@ -875,8 +875,8 @@ static void add_worker(struct vine_manager *q)
 
 /* Delete a single file on a remote worker except those with greater delete_upto_level cache level */
 
-static void delete_worker_file(
-		struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_flags, vine_cache_level_t delete_upto_level)
+static void delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename,
+		vine_cache_level_t cache_flags, vine_cache_level_t delete_upto_level)
 {
 	if (cache_flags <= delete_upto_level) {
 		vine_manager_send(q, w, "unlink %s\n", filename);
@@ -888,8 +888,8 @@ static void delete_worker_file(
 
 /* Delete all files in a list except those with greater delete_upto_level cache level */
 
-static void delete_worker_files(
-		struct vine_manager *q, struct vine_worker_info *w, struct list *mount_list, vine_cache_level_t delete_upto_level)
+static void delete_worker_files(struct vine_manager *q, struct vine_worker_info *w, struct list *mount_list,
+		vine_cache_level_t delete_upto_level)
 {
 	if (!mount_list)
 		return;
@@ -5708,13 +5708,15 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 	return f;
 }
 
-struct vine_file *vine_declare_file(struct vine_manager *m, const char *source, vine_cache_level_t cache, vine_file_flags_t flags)
+struct vine_file *vine_declare_file(
+		struct vine_manager *m, const char *source, vine_cache_level_t cache, vine_file_flags_t flags)
 {
 	struct vine_file *f = vine_file_local(source, cache, flags);
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_url(struct vine_manager *m, const char *source, vine_cache_level_t cache, vine_file_flags_t flags)
+struct vine_file *vine_declare_url(
+		struct vine_manager *m, const char *source, vine_cache_level_t cache, vine_file_flags_t flags)
 {
 	struct vine_file *f = vine_file_url(source, cache, flags);
 	return vine_manager_declare_file(m, f);
@@ -5726,32 +5728,36 @@ struct vine_file *vine_declare_temp(struct vine_manager *m)
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_buffer(struct vine_manager *m, const char *buffer, size_t size, vine_cache_level_t cache, vine_file_flags_t flags)
+struct vine_file *vine_declare_buffer(struct vine_manager *m, const char *buffer, size_t size, vine_cache_level_t cache,
+		vine_file_flags_t flags)
 {
 	struct vine_file *f = vine_file_buffer(buffer, size, cache, flags);
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_mini_task(
-		struct vine_manager *m, struct vine_task *t, const char *name, vine_cache_level_t cache, vine_file_flags_t flags)
+struct vine_file *vine_declare_mini_task(struct vine_manager *m, struct vine_task *t, const char *name,
+		vine_cache_level_t cache, vine_file_flags_t flags)
 {
 	struct vine_file *f = vine_file_mini_task(t, name, cache, flags);
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_untar(struct vine_manager *m, struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags)
+struct vine_file *vine_declare_untar(
+		struct vine_manager *m, struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags)
 {
 	struct vine_file *t = vine_file_untar(f, cache, flags);
 	return vine_manager_declare_file(m, t);
 }
 
-struct vine_file *vine_declare_poncho(struct vine_manager *m, struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags)
+struct vine_file *vine_declare_poncho(
+		struct vine_manager *m, struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags)
 {
 	struct vine_file *t = vine_file_poncho(f, cache, flags);
 	return vine_manager_declare_file(m, t);
 }
 
-struct vine_file *vine_declare_starch(struct vine_manager *m, struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags)
+struct vine_file *vine_declare_starch(
+		struct vine_manager *m, struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags)
 {
 	struct vine_file *t = vine_file_starch(f, cache, flags);
 	return vine_manager_declare_file(m, t);

@@ -75,7 +75,8 @@ int vine_file_delete(struct vine_file *f)
 
 /* Create a new file object with the given properties. */
 struct vine_file *vine_file_create(const char *source, const char *cached_name, const char *data, size_t size,
-		vine_file_type_t type, struct vine_task *mini_task, vine_cache_level_t cache_level, vine_file_flags_t flags)
+		vine_file_type_t type, struct vine_task *mini_task, vine_cache_level_t cache_level,
+		vine_file_flags_t flags)
 {
 	struct vine_file *f = xxmalloc(sizeof(*f));
 	memset(f, 0, sizeof(*f));
@@ -221,7 +222,8 @@ struct vine_file *vine_file_buffer(const char *data, size_t size, vine_cache_lev
 	return vine_file_create("buffer", 0, data, size, VINE_BUFFER, 0, cache, flags);
 }
 
-struct vine_file *vine_file_mini_task(struct vine_task *t, const char *name, vine_cache_level_t cache, vine_file_flags_t flags)
+struct vine_file *vine_file_mini_task(
+		struct vine_task *t, const char *name, vine_cache_level_t cache, vine_file_flags_t flags)
 {
 	flags |= VINE_PEER_NOSHARE; // we don't know how to share mini tasks yet.
 	return vine_file_create(name, 0, 0, 0, VINE_MINI_TASK, t, cache, flags);
@@ -273,8 +275,8 @@ static char *find_x509_proxy()
 	return NULL;
 }
 
-struct vine_file *vine_file_xrootd(
-		const char *source, struct vine_file *proxy, struct vine_file *env, vine_cache_level_t cache, vine_file_flags_t flags)
+struct vine_file *vine_file_xrootd(const char *source, struct vine_file *proxy, struct vine_file *env,
+		vine_cache_level_t cache, vine_file_flags_t flags)
 {
 	if (!proxy) {
 		char *proxy_filename = find_x509_proxy();
