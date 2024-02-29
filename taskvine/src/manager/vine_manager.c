@@ -4637,6 +4637,9 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	int result;
 	struct vine_task *t = NULL;
 
+	// used for q->prefer_dispatch. If 0 and there is a task retrieved, then return task to app.
+	int sent_in_previous_cycle = 1;
+
 	// time left?
 	while ((stoptime == 0) || (time(0) < stoptime)) {
 		BEGIN_ACCUM_TIME(q, time_internal);
@@ -4659,7 +4662,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				END_ACCUM_TIME(q, time_internal);
 			}
 
-			if (t && (!q->prefer_dispatch || list_size(q->ready_list) == 0 || q->busy_waiting_flag)) {
+			if (t && (!q->prefer_dispatch || list_size(q->ready_list) == 0 || !sent_in_previous_cycle)) {
 				break;
 			}
 		}
@@ -4728,6 +4731,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			continue;
 		}
 
+		sent_in_previous_cycle = 0;
 		if (q->wait_for_workers <= hash_table_size(q->worker_table)) {
 			if (q->wait_for_workers > 0) {
 				debug(D_VINE, "Target number of workers reached (%d).", q->wait_for_workers);
@@ -4740,6 +4744,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			if (result) {
 				// sent at least one task
 				events++;
+				sent_in_previous_cycle = 1;
 				continue;
 			}
 		}
