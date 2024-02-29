@@ -96,6 +96,11 @@ class Manager:
             for attempt in attempts.values():
                 all_tasks.append(attempt)
         tasks_df = pd.DataFrame.from_records(all_tasks)
+
+        #  fix time_worker_start 0 bug
+        tasks_df["time_worker_start"] = tasks_df[
+            ["time_worker_start", "time_commit_end"]
+        ].max(axis=1)
         try:
             tasks_df["measured_wall_time"] = (
                 tasks_df["time_worker_end"] - tasks_df["time_worker_start"]
