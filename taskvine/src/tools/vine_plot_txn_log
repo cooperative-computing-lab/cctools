@@ -501,7 +501,7 @@ class TxnPlot:
             if spec == "done-last-task":
                 end = m.tasks["last_state_time"].max()
             if spec == "disconnected-last-worker":
-                origin = m.workers["DISCONNECTION"].max()
+                end = m.workers["DISCONNECTION"].max()
             if spec == "end-manager":
                 end = m.termination
         except KeyError:
