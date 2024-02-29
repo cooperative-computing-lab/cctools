@@ -142,7 +142,6 @@ class DaskVine(Manager):
             self.tune("prefer-dispatch", 1)
             self.tune("ramp-down-heuristic", 1)
             self.tune("immediate-recovery", 1)
-            self.tune("max-retrievals", 10)
 
             if self.env_per_task:
                 self.environment_file = self.declare_file(environment, cache=True)
