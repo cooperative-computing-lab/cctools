@@ -246,6 +246,11 @@ int vine_process_invoke_function(struct vine_process *p)
 			"%ld\n%s",
 			strlen(buffer),
 			buffer);
+
+	// conservatively assume that the function starts executing as soon as we send it to the library.
+	// XXX Alternatively, the library could report when the function started.
+	p->execution_start = timestamp_get();
+
 	free(buffer);
 
 	if (result < 0) {
