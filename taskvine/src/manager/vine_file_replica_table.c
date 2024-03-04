@@ -78,14 +78,11 @@ struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 	struct vine_worker_info **workers = malloc(sizeof(struct vine_worker_info) * (q->temp_replica_count));
 
 	// some random distribution
-	int skip_workers = (rand() % hash_table_size(q->worker_table)) + 1;
-	HASH_TABLE_ITERATE(q->worker_table, id, peer)
+	int offset_bookkeep;
+	HASH_TABLE_ITERATE_RANDOM_START(q->worker_table, offset_bookkeep, id, peer)
 	{
 		if (found == q->temp_replica_count)
 			break;
-		skip_workers--;
-		if (skip_workers > 0)
-			continue;
 		if (!peer->transfer_port_active)
 			continue;
 
