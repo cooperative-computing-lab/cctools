@@ -2858,7 +2858,7 @@ static int vine_manager_transfer_capacity_available(
 		m->substitute = NULL;
 
 		/* Provide a substitute file object to describe the peer. */
-		if (!(m->file->flags & VINE_PEER_NOSHARE) && (m->file->cache_level > VINE_CACHE_LEVEL_WORKFLOW)) {
+		if (!(m->file->flags & VINE_PEER_NOSHARE) && (m->file->cache_level > VINE_CACHE_LEVEL_TASK)) {
 			if ((peer = vine_file_replica_table_find_worker(q, m->file->cached_name))) {
 				char *peer_source = string_format("worker://%s:%d/%s",
 						peer->transfer_addr,
