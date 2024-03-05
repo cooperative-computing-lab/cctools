@@ -58,7 +58,7 @@ static vine_result_code_t vine_manager_get_buffer(struct vine_manager *q, struct
 		f->size = size;
 		debug(D_VINE,
 				"Receiving buffer %s (size: %" PRId64 " bytes) from %s (%s) ...",
-				f->source,
+				f->cached_name,
 				(int64_t)f->size,
 				w->addrport,
 				w->hostname);
@@ -88,7 +88,7 @@ static vine_result_code_t vine_manager_get_buffer(struct vine_manager *q, struct
 				"%s (%s): could not access buffer %s (%s)",
 				w->hostname,
 				w->addrport,
-				f->source,
+				f->cached_name,
 				strerror(errornum));
 		/* Mark the task as missing an output, but return success to keep going. */
 		vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
@@ -431,7 +431,7 @@ vine_result_code_t vine_manager_get_output_file(struct vine_manager *q, struct v
 					f->type, f->cache_level, local_info.st_size, local_info.st_mtime);
 			vine_file_replica_table_insert(w, f->cached_name, replica);
 		} else {
-			debug(D_NOTICE, "Cannot stat file %s: %s", f->source, strerror(errno));
+			debug(D_NOTICE, "Cannot stat file %s(%s): %s", f->cached_name, f->source, strerror(errno));
 		}
 	}
 
