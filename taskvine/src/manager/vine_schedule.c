@@ -253,6 +253,7 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 	char *key;
 	struct vine_worker_info *w;
 	struct vine_worker_info *best_worker = 0;
+	int offset_bookkeep;
 	int64_t most_task_cached_bytes = 0;
 	int64_t task_cached_bytes;
 	uint8_t has_all_files;
@@ -261,7 +262,7 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 
 	int ramp_down = vine_schedule_in_ramp_down(q);
 
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	HASH_TABLE_ITERATE_RANDOM_START(q->worker_table, offset_bookkeep, key, w)
 	{
 		if (check_worker_against_task(q, w, t)) {
 			task_cached_bytes = 0;
@@ -327,6 +328,8 @@ static struct vine_worker_info *find_worker_by_random(struct vine_manager *q, st
 	int random_worker;
 	struct list *valid_workers = list_create();
 
+	// avoid the temptation to use HASH_TABLE_ITERATE_RANDOM_START for this loop.
+	// HASH_TABLE_ITERATE_RANDOM_START would give preference to workers that appear first in a bucket.
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
 		if (check_worker_against_task(q, w, t)) {

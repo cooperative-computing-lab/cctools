@@ -249,6 +249,56 @@ int hash_table_nextkey(struct hash_table *h, char **key, void **value)
 	}
 }
 
+void hash_table_randomkey(struct hash_table *h, int *offset_bookkeep)
+{
+	h->ientry = 0;
+	int ibucket_start = random() % h->bucket_count;
+
+	for (h->ibucket = ibucket_start; h->ibucket < h->bucket_count; h->ibucket++) {
+		h->ientry = h->buckets[h->ibucket];
+		if (h->ientry) {
+			*offset_bookkeep = h->ibucket;
+			return;
+		}
+	}
+
+	for (h->ibucket = 0; h->ibucket < ibucket_start; h->ibucket++) {
+		h->ientry = h->buckets[h->ibucket];
+		if (h->ientry) {
+			*offset_bookkeep = h->ibucket;
+			return;
+		}
+	}
+}
+
+int hash_table_nextkey_with_offset(struct hash_table *h, int offset_bookkeep, char **key, void **value)
+{
+	if (h->bucket_count < 1) {
+		return 0;
+	}
+
+	offset_bookkeep = offset_bookkeep % h->bucket_count;
+
+	if (h->ientry) {
+		*key = h->ientry->key;
+		*value = h->ientry->value;
+
+		h->ientry = h->ientry->next;
+		if (!h->ientry) {
+			h->ibucket = (h->ibucket + 1) % h->bucket_count;
+			for (; h->ibucket != offset_bookkeep; h->ibucket = (h->ibucket + 1) % h->bucket_count) {
+				h->ientry = h->buckets[h->ibucket];
+				if (h->ientry) {
+					break;
+				}
+			}
+		}
+		return 1;
+	}
+
+	return 0;
+}
+
 typedef unsigned long int ub4; /* unsigned 4-byte quantities */
 typedef unsigned char ub1;     /* unsigned 1-byte quantities */
 
