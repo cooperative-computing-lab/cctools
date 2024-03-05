@@ -24,7 +24,7 @@ def my_sum(x, y, negate=False):
 
 def main():
     executor = vine.FuturesExecutor(
-        port=9123, manager_name="vine_matrtix_build_test", factory=False
+        port=[9123, 9129], manager_name="vine_matrtix_build_test", factory=False
     )
     print("listening on port {}".format(executor.manager.port))
     with open(port_file, "w") as f:
