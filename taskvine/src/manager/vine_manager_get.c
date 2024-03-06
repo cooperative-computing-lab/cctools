@@ -58,7 +58,7 @@ static vine_result_code_t vine_manager_get_buffer(struct vine_manager *q, struct
 		f->size = size;
 		debug(D_VINE,
 				"Receiving buffer %s (size: %" PRId64 " bytes) from %s (%s) ...",
-				f->source,
+				f->cached_name,
 				(int64_t)f->size,
 				w->addrport,
 				w->hostname);
@@ -88,7 +88,7 @@ static vine_result_code_t vine_manager_get_buffer(struct vine_manager *q, struct
 				"%s (%s): could not access buffer %s (%s)",
 				w->hostname,
 				w->addrport,
-				f->source,
+				f->cached_name,
 				strerror(errornum));
 		/* Mark the task as missing an output, but return success to keep going. */
 		vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
@@ -425,13 +425,28 @@ vine_result_code_t vine_manager_get_output_file(struct vine_manager *q, struct v
 
 	// If the transfer was successful, make a record of it in the cache.
 	if (result == VINE_SUCCESS && (f->cache_level > VINE_CACHE_LEVEL_TASK)) {
-		struct stat local_info;
-		if (stat(f->source, &local_info) == 0) {
-			struct vine_file_replica *replica = vine_file_replica_create(
-					f->type, f->cache_level, local_info.st_size, local_info.st_mtime);
-			vine_file_replica_table_insert(w, f->cached_name, replica);
+		struct vine_file_replica *replica = NULL;
+
+		if (f->type == VINE_BUFFER) {
+			replica = vine_file_replica_create(
+					f->type, f->cache_level, total_bytes, /* no mtime available */ 0);
 		} else {
-			debug(D_NOTICE, "Cannot stat file %s: %s", f->source, strerror(errno));
+			struct stat local_info;
+
+			if (stat(f->source, &local_info) == 0) {
+				replica = vine_file_replica_create(
+						f->type, f->cache_level, total_bytes, local_info.st_mtime);
+			} else {
+				debug(D_NOTICE,
+						"Cannot stat file %s(%s): %s",
+						f->cached_name,
+						f->source,
+						strerror(errno));
+			}
+		}
+
+		if (replica) {
+			vine_file_replica_table_insert(w, f->cached_name, replica);
 		}
 	}
 
