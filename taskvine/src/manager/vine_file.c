@@ -179,7 +179,8 @@ int vine_file_has_changed(struct vine_file *f)
 			f->size = info.st_size;
 		} else {
 			/* If we have seen it before, it should not have changed. */
-			if (f->mtime != info.st_mtime || ((int64_t)f->size) != ((int64_t)info.st_size)) {
+			if (f->mtime != info.st_mtime ||
+					(!S_ISDIR(info.st_mode) && ((int64_t)f->size) != ((int64_t)info.st_size))) {
 				if (!f->change_message_shown) {
 					debug(D_VINE | D_NOTICE,
 							"input file %s was modified by someone in the middle of the workflow!\n",
