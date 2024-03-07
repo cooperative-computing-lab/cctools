@@ -135,7 +135,7 @@ int vine_file_replica_table_exists_somewhere(struct vine_manager *q, const char 
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
 		r = hash_table_lookup(w->current_files, cachename);
-		if (r)
+		if (r && r->state == VINE_FILE_REPLICA_STATE_READY)
 			return 1;
 	}
 
