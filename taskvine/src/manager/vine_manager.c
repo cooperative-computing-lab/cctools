@@ -430,18 +430,16 @@ set up their own input sandboxes.
 static int handle_cache_invalid(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
 	char cachename[VINE_LINE_MAX];
-	char id[VINE_LINE_MAX];
+	char transfer_id[VINE_LINE_MAX];
 	int length;
 
-	if (sscanf(line,
-			    "cache-invalid %s %d %8s-%4s-%4s-%4s-%12s",
-			    cachename,
-			    &length,
-			    id,
-			    &id[8],
-			    &id[12],
-			    &id[16],
-			    &id[20]) == 7) {
+	/* The third field (transfer_id) is optional. */
+	int n = sscanf(line, "cache-invalid %s %d %s", cachename, &length, transfer_id);
+
+	/* If we got two or more fields... */
+	if (n >= 2) {
+
+		/* Read back the error message following. */
 
 		char *message = malloc(length + 1);
 		time_t stoptime = time(0) + q->long_timeout;
@@ -456,26 +454,22 @@ static int handle_cache_invalid(struct vine_manager *q, struct vine_worker_info 
 		debug(D_VINE, "%s (%s) invalidated %s with error: %s", w->hostname, w->addrport, cachename, message);
 		free(message);
 
+		/* Remove the replica from our records. */
 		struct vine_file_replica *replica = vine_file_replica_table_remove(w, cachename);
-		vine_current_transfers_remove(q, id);
 		if (replica)
 			vine_file_replica_delete(replica);
-	} else if (sscanf(line, "cache-invalid %s %d", cachename, &length) == 2) {
 
-		char *message = malloc(length + 1);
-		time_t stoptime = time(0) + q->long_timeout;
-
-		int actual = link_read(w->link, message, length, stoptime);
-		if (actual != length) {
-			free(message);
-			return VINE_MSG_FAILURE;
+		/* If the third argument was given, also remove the transfer record */
+		if (n >= 3) {
+			vine_current_transfers_remove(q, transfer_id);
 		}
 
-		message[length] = 0;
-		debug(D_VINE, "%s (%s) invalidated %s with error: %s", w->hostname, w->addrport, cachename, message);
-		free(message);
+		/* Successfully processed this message. */
+		return VINE_MSG_PROCESSED;
+	} else {
+		/* Otherwise this is an invalid message format. */
+		return VINE_MSG_FAILURE;
 	}
-	return VINE_MSG_PROCESSED;
 }
 
 /*
