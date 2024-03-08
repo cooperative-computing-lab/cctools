@@ -2668,6 +2668,7 @@ static void commit_task_to_worker(struct vine_manager *q, struct vine_worker_inf
 	t->time_when_commit_end = timestamp_get();
 
 	itable_insert(w->current_tasks, t->task_id, t);
+	t->worker = w;
 
 	/* Increment the function count if this is a function task.
 	 * If the manager fails to send this function task to the worker however,
@@ -2675,9 +2676,8 @@ static void commit_task_to_worker(struct vine_manager *q, struct vine_worker_inf
 	if (t->needs_library) {
 		t->library_task = find_library_on_worker_for_task(w, t->needs_library);
 		t->library_task->function_slots_inuse++;
+		vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
 	}
-
-	t->worker = w;
 
 	change_task_state(q, t, VINE_TASK_RUNNING);
 
@@ -4345,9 +4345,6 @@ static struct vine_task *send_library_to_worker(struct vine_manager *q, struct v
 
 	/* Send the task to the worker in the usual way. */
 	commit_task_to_worker(q, w, t);
-
-	/* Make the special log recordings for the library. */
-	vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
 
 	return t;
 }
