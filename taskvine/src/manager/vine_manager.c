@@ -4142,6 +4142,9 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 		list_push_head(q->waiting_retrieval_list, t);
 		break;
 	case VINE_TASK_RETRIEVED:
+		if (t->type == VINE_TASK_TYPE_LIBRARY) {
+			vine_task_set_result(t, VINE_RESULT_LIBRARY_EXIT);
+		}
 		list_push_head(q->retrieved_list, t);
 		break;
 	case VINE_TASK_DONE:
@@ -4210,6 +4213,9 @@ const char *vine_result_string(vine_result_t result)
 		break;
 	case VINE_RESULT_CANCELLED:
 		str = "CANCELLED";
+		break;
+	case VINE_RESULT_LIBRARY_EXIT:
+		str = "LIBRARY_EXIT";
 		break;
 	}
 
