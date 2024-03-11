@@ -446,7 +446,7 @@ vine_result_code_t vine_manager_get_output_file(struct vine_manager *q, struct v
 		}
 
 		if (replica) {
-			vine_file_replica_table_insert(w, f->cached_name, replica);
+			vine_file_replica_table_insert(q, w, f->cached_name, replica);
 		}
 	}
 

@@ -17,9 +17,9 @@ See the file COPYING for details.
 #include "vine_file_replica.h"
 #include "vine_worker_info.h"
 
-int vine_file_replica_table_insert(struct vine_worker_info *w, const char *cachename, struct vine_file_replica *replica);
+int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_info *w, const char *cachename, struct vine_file_replica *replica);
 
-struct vine_file_replica *vine_file_replica_table_remove(struct vine_worker_info *w, const char *cachename);
+struct vine_file_replica *vine_file_replica_table_remove(struct vine_manager *m, struct vine_worker_info *w, const char *cachename);
 
 struct vine_file_replica *vine_file_replica_table_lookup(struct vine_worker_info *w, const char *cachename);
 

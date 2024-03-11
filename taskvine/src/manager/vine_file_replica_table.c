@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "vine_file_replica_table.h"
+#include "set.h"
 #include "vine_current_transfers.h"
 #include "vine_file.h"
 #include "vine_file_replica.h"
@@ -16,19 +17,39 @@ See the file COPYING for details.
 #include "debug.h"
 
 // add a file to the remote file table.
-int vine_file_replica_table_insert(struct vine_worker_info *w, const char *cachename, struct vine_file_replica *replica)
+int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_info *w, const char *cachename,
+		struct vine_file_replica *replica)
 {
 	w->inuse_cache += replica->size;
 	hash_table_insert(w->current_files, cachename, replica);
+
+	struct set *workers = hash_table_lookup(m->file_worker_table, cachename);
+	if (!workers) {
+		workers = set_create(4);
+		hash_table_insert(m->file_worker_table, cachename, workers);
+	}
+
+	set_insert(workers, w);
+
 	return 1;
 }
 
 // remove a file from the remote file table.
-struct vine_file_replica *vine_file_replica_table_remove(struct vine_worker_info *w, const char *cachename)
+struct vine_file_replica *vine_file_replica_table_remove(
+		struct vine_manager *m, struct vine_worker_info *w, const char *cachename)
 {
 	struct vine_file_replica *replica = hash_table_remove(w->current_files, cachename);
 	if (replica) {
 		w->inuse_cache -= replica->size;
+	}
+
+	struct set *workers = hash_table_lookup(m->file_worker_table, cachename);
+	if (workers) {
+		set_remove(workers, w);
+		if (set_size(workers) < 1) {
+			hash_table_remove(m->file_worker_table, cachename);
+			set_delete(workers);
+		}
 	}
 
 	return replica;
@@ -40,14 +61,29 @@ struct vine_file_replica *vine_file_replica_table_lookup(struct vine_worker_info
 	return hash_table_lookup(w->current_files, cachename);
 }
 
-// find a worker in posession of a specific file, and is ready to transfer it.
+// find a worker (randomly) in posession of a specific file, and is ready to transfer it.
 struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager *q, const char *cachename)
 {
-	char *id;
-	struct vine_worker_info *peer;
-	struct vine_file_replica *replica;
-	HASH_TABLE_ITERATE(q->worker_table, id, peer)
+	struct set *workers = hash_table_lookup(q->file_worker_table, cachename);
+	if (!workers) {
+		return 0;
+	}
+
+	int total_count = set_size(workers);
+	if (total_count < 1) {
+		return 0;
+	}
+
+	int random_index = random() % total_count;
+
+	struct vine_worker_info *peer = NULL;
+	struct vine_worker_info *peer_selected = NULL;
+	struct vine_file_replica *replica = NULL;
+
+	int offset_bookkeep;
+	SET_ITERATE_RANDOM_START(workers, offset_bookkeep, peer)
 	{
+		random_index--;
 		if (!peer->transfer_port_active)
 			continue;
 
@@ -57,15 +93,19 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 				replica->state == VINE_FILE_REPLICA_STATE_READY) {
 			if (vine_current_transfers_worker_in_use(q, peer_addr) < q->worker_source_max_transfers) {
 				free(peer_addr);
-				return peer;
+				peer_selected = peer;
+				if (random_index < 0) {
+					return peer_selected;
+				}
 			}
 		}
 		free(peer_addr);
 	}
-	return 0;
+
+	return peer_selected;
 }
 
-// return a set of up to q->temp_replica_count workers that do not have the file cachename
+// return an array of up to q->temp_replica_count workers that do not have the file cachename
 // and are not on the same host as worker w.
 struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 		struct vine_manager *q, struct vine_worker_info *w, const char *cachename, int *count)
@@ -75,7 +115,14 @@ struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 	struct vine_file_replica *replica;
 
 	int found = 0;
-	struct vine_worker_info **workers = malloc(sizeof(struct vine_worker_info) * (q->temp_replica_count));
+
+	struct set *workers = hash_table_lookup(q->file_worker_table, cachename);
+	struct vine_worker_info **filtered = malloc(sizeof(struct vine_worker_info) * (q->temp_replica_count));
+
+	if (!workers) {
+		*count = 0;
+		return filtered;
+	}
 
 	// some random distribution
 	int offset_bookkeep;
@@ -93,14 +140,14 @@ struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 					(vine_current_transfers_dest_in_use(q, peer) <
 							q->worker_source_max_transfers)) {
 				debug(D_VINE, "found replication target : %s", peer->transfer_addr);
-				workers[found] = peer;
+				filtered[found] = peer;
 				found++;
 			}
 		}
 		free(peer_addr);
 	}
 	*count = found;
-	return workers;
+	return filtered;
 }
 
 /*
@@ -110,29 +157,26 @@ XXX Note that this implementation is another inefficient linear search.
 
 int vine_file_replica_table_count_replicas(struct vine_manager *q, const char *cachename)
 {
-	char *key;
-	struct vine_worker_info *w;
-	struct vine_file_replica *r;
-	int c = 0;
-
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
-	{
-		r = hash_table_lookup(w->current_files, cachename);
-		if (r)
-			c++;
+	struct set *workers = hash_table_lookup(q->file_worker_table, cachename);
+	if (!workers) {
+		return 0;
 	}
-	return c;
+
+	return set_size(workers);
 }
 
 /*
  */
 int vine_file_replica_table_exists_somewhere(struct vine_manager *q, const char *cachename)
 {
-	char *key;
+	struct set *workers = hash_table_lookup(q->file_worker_table, cachename);
+	if (!workers) {
+		return 0;
+	}
+
 	struct vine_worker_info *w;
 	struct vine_file_replica *r;
-
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	SET_ITERATE(workers, w)
 	{
 		r = hash_table_lookup(w->current_files, cachename);
 		if (r && r->state == VINE_FILE_REPLICA_STATE_READY)

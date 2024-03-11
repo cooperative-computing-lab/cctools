@@ -54,6 +54,7 @@ See the file COPYING for details.
 #include "rmonitor.h"
 #include "rmonitor_poll.h"
 #include "rmonitor_types.h"
+#include "set.h"
 #include "shell.h"
 #include "stringtools.h"
 #include "unlink_recursive.h"
@@ -385,7 +386,7 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 			- The file was created as an output of a task.
 			*/
 			replica = vine_file_replica_create(type, cache_level, size, mtime);
-			vine_file_replica_table_insert(w, cachename, replica);
+			vine_file_replica_table_insert(q, w, cachename, replica);
 		}
 
 		replica->type = type;
@@ -455,7 +456,7 @@ static int handle_cache_invalid(struct vine_manager *q, struct vine_worker_info 
 		free(message);
 
 		/* Remove the replica from our records. */
-		struct vine_file_replica *replica = vine_file_replica_table_remove(w, cachename);
+		struct vine_file_replica *replica = vine_file_replica_table_remove(q, w, cachename);
 		if (replica)
 			vine_file_replica_delete(replica);
 
@@ -875,7 +876,7 @@ static void delete_worker_file(struct vine_manager *q, struct vine_worker_info *
 	if (cache_flags <= delete_upto_level) {
 		vine_manager_send(q, w, "unlink %s\n", filename);
 		struct vine_file_replica *replica;
-		replica = vine_file_replica_table_remove(w, filename);
+		replica = vine_file_replica_table_remove(q, w, filename);
 		vine_file_replica_delete(replica);
 	}
 }
@@ -3591,6 +3592,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->libraries = hash_table_create(0, 0);
 
 	q->worker_table = hash_table_create(0, 0);
+	q->file_worker_table = hash_table_create(0, 0);
 	q->worker_blocklist = hash_table_create(0, 0);
 
 	q->file_table = hash_table_create(0, 0);
@@ -3886,6 +3888,9 @@ void vine_delete(struct vine_manager *q)
 
 	hash_table_clear(q->worker_table, (void *)vine_worker_delete);
 	hash_table_delete(q->worker_table);
+
+	hash_table_clear(q->file_worker_table, (void *)set_delete);
+	hash_table_delete(q->file_worker_table);
 
 	hash_table_clear(q->factory_table, (void *)vine_factory_info_delete);
 	hash_table_delete(q->factory_table);
