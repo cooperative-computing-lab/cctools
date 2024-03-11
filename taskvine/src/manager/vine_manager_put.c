@@ -445,7 +445,7 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 	if (result == VINE_SUCCESS) {
 		struct vine_file_replica *replica =
 				vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
-		vine_file_replica_table_insert(w, f->cached_name, replica);
+		vine_file_replica_table_insert(q, w, f->cached_name, replica);
 
 		switch (file_to_send->type) {
 		case VINE_URL:
