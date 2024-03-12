@@ -183,14 +183,5 @@ int vine_file_replica_table_exists_somewhere(struct vine_manager *q, const char 
 		return 0;
 	}
 
-	struct vine_worker_info *w;
-	struct vine_file_replica *r;
-	SET_ITERATE(workers, w)
-	{
-		r = hash_table_lookup(w->current_files, cachename);
-		if (r && r->state == VINE_FILE_REPLICA_STATE_READY)
-			return 1;
-	}
-
-	return 0;
+	return set_size(workers) > 0;
 }
