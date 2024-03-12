@@ -154,21 +154,28 @@ struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 
 /*
 Count number of replicas of a file in the system.
-XXX Note that this implementation is another inefficient linear search.
 */
-
-int vine_file_replica_table_count_replicas(struct vine_manager *q, const char *cachename)
+int vine_file_replica_table_count_replicas(
+		struct vine_manager *q, const char *cachename, vine_file_replica_state_t state)
 {
+	struct vine_worker_info *w;
+	struct vine_file_replica *r;
+	int count = 0;
+
 	struct set *workers = hash_table_lookup(q->file_worker_table, cachename);
-	if (!workers) {
-		return 0;
+	if (workers) {
+		SET_ITERATE(workers, w)
+		{
+			r = hash_table_lookup(w->current_files, cachename);
+			if (r && r->state == state) {
+				count++;
+			}
+		}
 	}
 
-	return set_size(workers);
+	return count;
 }
 
-/*
- */
 int vine_file_replica_table_exists_somewhere(struct vine_manager *q, const char *cachename)
 {
 	struct set *workers = hash_table_lookup(q->file_worker_table, cachename);

@@ -269,10 +269,8 @@ static void handle_worker_timeout(struct vine_manager *q, struct vine_worker_inf
 	// debug(D_VINE, "Handling timeout request");
 	HASH_TABLE_ITERATE(w->current_files, cachename, replica)
 	{
-		//	debug(D_VINE, "Looking at file %s", cachename);
 		if (strncmp(cachename, "temp-rnd-", 9) == 0) {
-			int c = vine_file_replica_table_count_replicas(q, cachename);
-			//		debug(D_VINE, "Temp file found with %d replicas", c);
+			int c = vine_file_replica_table_count_replicas(q, cachename, VINE_FILE_REPLICA_STATE_READY);
 			if (c == 1) {
 				debug(D_VINE,
 						"Rejecting timeout request from worker %s (%s). Has unique file %s",
