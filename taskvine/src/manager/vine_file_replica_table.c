@@ -86,10 +86,13 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 		random_index--;
 		if (!peer->transfer_port_active)
 			continue;
+		
+		timestamp_t current_time = timestamp_get();
+		if(((current_time - peer->last_transfer_failure) / 1000000) < 5) 
+			continue;
 
 		if ((replica = hash_table_lookup(peer->current_files, cachename)) &&
 				replica->state == VINE_FILE_REPLICA_STATE_READY) {
-
 			// generate a peer address stub as it would appear in the transfer table
 			char *peer_addr = string_format("worker://%s:%d", peer->transfer_addr, peer->transfer_port);
 			int current_transfers = vine_current_transfers_source_in_use(q, peer);
