@@ -92,7 +92,7 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 
 			// generate a peer address stub as it would appear in the transfer table
 			char *peer_addr = string_format("worker://%s:%d", peer->transfer_addr, peer->transfer_port);
-			int current_transfers = vine_current_transfers_worker_in_use(q, peer_addr);
+			int current_transfers = vine_current_transfers_source_in_use(q, peer);
 			free(peer_addr);
 
 			if (current_transfers < q->worker_source_max_transfers) {
@@ -135,10 +135,9 @@ struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 		if (!peer->transfer_port_active)
 			continue;
 
-		char *peer_addr = string_format("worker://%s:%d", peer->transfer_addr, peer->transfer_port);
 		if (!(replica = hash_table_lookup(peer->current_files, cachename)) &&
 				(strcmp(w->hostname, peer->hostname))) {
-			if ((vine_current_transfers_worker_in_use(q, peer_addr) < q->worker_source_max_transfers) &&
+			if ((vine_current_transfers_source_in_use(q, peer) < q->worker_source_max_transfers) &&
 					(vine_current_transfers_dest_in_use(q, peer) <
 							q->worker_source_max_transfers)) {
 				debug(D_VINE, "found replication target : %s", peer->transfer_addr);
@@ -146,7 +145,6 @@ struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 				found++;
 			}
 		}
-		free(peer_addr);
 	}
 	*count = found;
 	return filtered;

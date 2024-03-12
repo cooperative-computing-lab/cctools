@@ -235,8 +235,15 @@ vine_result_code_t vine_manager_put_url_now(
 
 	url_encode(source, source_encoded, sizeof(source_encoded));
 	url_encode(f->cached_name, cached_name_encoded, sizeof(cached_name_encoded));
+	
+	char *transfer_id = 0;
+	if(f->source_worker)
+	{
+		transfer_id = vine_current_transfers_add(q, w, f->source_worker);
+	} else {
+		transfer_id = vine_current_transfers_add(q, w, f->source);
+	}
 
-	char *transfer_id = vine_current_transfers_add(q, w, source);
 	int result = vine_manager_send(q,
 			w,
 			"puturl_now %s %s %d %lld 0%o %s\n",
@@ -270,8 +277,15 @@ vine_result_code_t vine_manager_put_url(
 
 	url_encode(f->source, source_encoded, sizeof(source_encoded));
 	url_encode(f->cached_name, cached_name_encoded, sizeof(cached_name_encoded));
+	
+	char *transfer_id = 0;
+	if(f->source_worker)
+	{
+		transfer_id = vine_current_transfers_add(q, w, f->source_worker);
+	} else {
+		transfer_id = vine_current_transfers_add(q, w, f->source);
+	}
 
-	char *transfer_id = vine_current_transfers_add(q, w, f->source);
 	vine_manager_send(q,
 			w,
 			"puturl %s %s %d %lld 0%o %s\n",

@@ -10,11 +10,13 @@ See the file COPYING for details.
 #define VINE_FILE_SOURCE_MAX_TRANSFERS 1
 #define VINE_WORKER_SOURCE_MAX_TRANSFERS 3 // static 1 until if/when multiple transfer ports are opened up on worker transfer server
 
-char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info *to, const char *source);
+char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info *to, void *source);
 
 int vine_current_transfers_remove(struct vine_manager *q, const char *id);
 
-int vine_current_transfers_source_in_use(struct vine_manager *q,const char *source);
+int vine_current_transfers_source_in_use(struct vine_manager *q, struct vine_worker_info *source);
+
+int vine_current_transfers_url_in_use(struct vine_manager *q, const char *source);
 
 int vine_current_transfers_dest_in_use(struct vine_manager *q,struct vine_worker_info *w);
 

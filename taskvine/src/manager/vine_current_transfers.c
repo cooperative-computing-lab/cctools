@@ -11,27 +11,26 @@ See the file COPYING for details.
 
 struct vine_transfer_pair {
 	struct vine_worker_info *to;
-	char *source;
+	void *source;
 };
 
-static struct vine_transfer_pair *vine_transfer_pair_create(struct vine_worker_info *to, const char *source)
+static struct vine_transfer_pair *vine_transfer_pair_create(struct vine_worker_info *to, struct vine_worker_info *source)
 {
 	struct vine_transfer_pair *t = malloc(sizeof(struct vine_transfer_pair));
 	t->to = to;
-	t->source = strdup(source);
+	t->source = source;
 	return t;
 }
 
 static void vine_transfer_pair_delete(struct vine_transfer_pair *p)
 {
 	if (p) {
-		free(p->source);
 		free(p);
 	}
 }
 
 // add a current transaction to the transfer table
-char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info *to, const char *source)
+char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info *to, void *source)
 {
 	cctools_uuid_t uuid;
 	cctools_uuid_create(&uuid);
@@ -57,14 +56,28 @@ int vine_current_transfers_remove(struct vine_manager *q, const char *id)
 }
 
 // count the number transfers coming from a specific source
-int vine_current_transfers_source_in_use(struct vine_manager *q, const char *source)
+int vine_current_transfers_source_in_use(struct vine_manager *q, struct vine_worker_info *source)
 {
 	char *id;
 	struct vine_transfer_pair *t;
 	int c = 0;
 	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
 	{
-		if (strcmp(source, t->source) == 0)
+		if (source == t->source)
+			c++;
+	}
+	return c;
+}
+
+// count the number transfers coming from a specific remote url (not a worker)
+int vine_current_transfers_url_in_use(struct vine_manager *q, const char *source)
+{
+	char *id;
+	struct vine_transfer_pair *t;
+	int c = 0;
+	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
+	{
+		if (source == t->source)
 			c++;
 	}
 	return c;
@@ -79,21 +92,6 @@ int vine_current_transfers_dest_in_use(struct vine_manager *q, struct vine_worke
 	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
 	{
 		if (t->to == w)
-			c++;
-	}
-	return c;
-}
-
-int vine_current_transfers_worker_in_use(struct vine_manager *q, const char *peer_addr)
-{
-	char *id;
-	struct vine_transfer_pair *t;
-	int c = 0;
-
-	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
-	{
-
-		if (strstr(t->source, peer_addr))
 			c++;
 	}
 	return c;
@@ -119,10 +117,12 @@ void vine_current_transfers_print_table(struct vine_manager *q)
 {
 	char *id;
 	struct vine_transfer_pair *t;
+	struct vine_worker_info *w;
 	debug(D_VINE, "-----------------TRANSFER-TABLE--------------------");
 	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
 	{
-		debug(D_VINE, "%s : source=%s", id, t->source);
+		w = t->source;
+		debug(D_VINE, "%s : source=%s:%d", id, w->transfer_addr, w->transfer_port);
 	}
 	debug(D_VINE, "-----------------END-------------------------------");
 }
