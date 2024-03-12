@@ -269,7 +269,7 @@ static void handle_worker_timeout(struct vine_manager *q, struct vine_worker_inf
 	// debug(D_VINE, "Handling timeout request");
 	HASH_TABLE_ITERATE(w->current_files, cachename, replica)
 	{
-		if (strncmp(cachename, "temp-rnd-", 9) == 0) {
+		if (replica->type == VINE_TEMP) {
 			int c = vine_file_replica_table_count_replicas(q, cachename, VINE_FILE_REPLICA_STATE_READY);
 			if (c == 1) {
 				debug(D_VINE,
