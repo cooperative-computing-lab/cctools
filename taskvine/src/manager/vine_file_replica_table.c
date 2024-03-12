@@ -86,9 +86,9 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 		random_index--;
 		if (!peer->transfer_port_active)
 			continue;
-		
+
 		timestamp_t current_time = timestamp_get();
-		if(((current_time - peer->last_transfer_failure) / 1000000) < 5) 
+		if (((current_time - peer->last_transfer_failure) / 1000000) < 5)
 			continue;
 
 		if ((replica = hash_table_lookup(peer->current_files, cachename)) &&
