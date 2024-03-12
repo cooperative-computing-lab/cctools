@@ -1012,6 +1012,10 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 		/* If the worker didn't run the task don't bother fetching outputs. */
 		result = VINE_SUCCESS;
 		break;
+	case VINE_RESULT_TRANSFER_MISSING:
+		/* If the worker didn't run the task don't bother fetching outputs. */
+		result = VINE_TRANSIENT_FAILURE;
+		break;
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
 		/* On resource exhaustion, just get the monitor files to figure out what happened. */
 		result = vine_manager_get_monitor_output_file(q, w, t);
@@ -1056,13 +1060,32 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 	// At this point, a task is completed.
 	reap_task_from_worker(q, w, t, VINE_TASK_RETRIEVED);
 
-	w->finished_tasks--;
-	w->total_tasks_complete++;
+	switch (t->result) {
+	case VINE_RESULT_INPUT_MISSING:
+	case VINE_RESULT_FORSAKEN:
+	case VINE_RESULT_TRANSFER_MISSING:
+		/* do not count tasks that didn't execute as complete, or finished tasks */
+		break;
+	default:
+		w->finished_tasks--;
+		w->total_tasks_complete++;
 
-	// At least one task has finished without triggering a slow worker disconnect, thus we
-	// now have evidence that worker is not slow (e.g., it was probably the
-	// previous task that was slow).
-	w->alarm_slow_worker = 0;
+		// At least one task has finished without triggering a slow worker disconnect, thus we
+		// now have evidence that worker is not slow (e.g., it was probably the
+		// previous task that was slow).
+		w->alarm_slow_worker = 0;
+
+		vine_task_info_add(q, t);
+		debug(D_VINE,
+				"%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
+				w->hostname,
+				w->addrport,
+				(t->time_when_done - t->time_when_commit_start) / 1000000.0,
+				(long long)w->total_tasks_complete,
+				w->total_task_time / w->total_tasks_complete / 1000000.0);
+
+		break;
+	}
 
 	/* print warnings if the task ran for a very short time (1s) and exited with common non-zero status */
 	if (t->result == VINE_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
@@ -1097,16 +1120,6 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 			break;
 		}
 	}
-
-	vine_task_info_add(q, t);
-
-	debug(D_VINE,
-			"%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
-			w->hostname,
-			w->addrport,
-			(t->time_when_done - t->time_when_commit_start) / 1000000.0,
-			(long long)w->total_tasks_complete,
-			w->total_task_time / w->total_tasks_complete / 1000000.0);
 
 	return 1;
 }
@@ -2760,6 +2773,10 @@ static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
 		return resubmit_task_on_exhaustion(q, w, t);
 		break;
+	case VINE_RESULT_TRANSFER_MISSING:
+		change_task_state(q, t, VINE_TASK_READY);
+		return 1;
+		break;
 	default:
 		/* by default tasks are not resumitted */
 		return 0;
@@ -4233,6 +4250,9 @@ const char *vine_result_string(vine_result_t result)
 		break;
 	case VINE_RESULT_LIBRARY_EXIT:
 		str = "LIBRARY_EXIT";
+		break;
+	case VINE_RESULT_TRANSFER_MISSING:
+		str = "TRANSFER_MISSING";
 		break;
 	}
 
