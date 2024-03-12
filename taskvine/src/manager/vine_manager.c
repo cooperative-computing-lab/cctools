@@ -3055,7 +3055,8 @@ static int send_one_task(struct vine_manager *q)
 	struct vine_worker_info *w = NULL;
 
 	int tasks_considered = 0;
-	timestamp_t now = timestamp_get();
+	timestamp_t now_usecs = timestamp_get();
+	double now_secs = ((double)now_usecs) / ONE_SECOND;
 
 	int tasks_to_consider = MIN(list_size(q->ready_list), q->attempt_schedule_depth);
 
@@ -3065,7 +3066,7 @@ static int send_one_task(struct vine_manager *q)
 		}
 
 		// Skip task if min requested start time not met.
-		if (t->resources_requested->start > now) {
+		if (t->resources_requested->start > now_secs) {
 			continue;
 		}
 
