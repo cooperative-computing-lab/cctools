@@ -14,7 +14,8 @@ struct vine_transfer_pair {
 	void *source;
 };
 
-static struct vine_transfer_pair *vine_transfer_pair_create(struct vine_worker_info *to, struct vine_worker_info *source)
+static struct vine_transfer_pair *vine_transfer_pair_create(
+		struct vine_worker_info *to, struct vine_worker_info *source)
 {
 	struct vine_transfer_pair *t = malloc(sizeof(struct vine_transfer_pair));
 	t->to = to;
