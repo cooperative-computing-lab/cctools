@@ -87,19 +87,21 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 		if (!peer->transfer_port_active)
 			continue;
 
-		// generate a peer address stub as it would appear in the transfer table
-		char *peer_addr = string_format("worker://%s:%d", peer->transfer_addr, peer->transfer_port);
 		if ((replica = hash_table_lookup(peer->current_files, cachename)) &&
 				replica->state == VINE_FILE_REPLICA_STATE_READY) {
-			if (vine_current_transfers_worker_in_use(q, peer_addr) < q->worker_source_max_transfers) {
-				free(peer_addr);
+
+			// generate a peer address stub as it would appear in the transfer table
+			char *peer_addr = string_format("worker://%s:%d", peer->transfer_addr, peer->transfer_port);
+			int current_transfers = vine_current_transfers_worker_in_use(q, peer_addr);
+			free(peer_addr);
+
+			if (current_transfers < q->worker_source_max_transfers) {
 				peer_selected = peer;
 				if (random_index < 0) {
 					return peer_selected;
 				}
 			}
 		}
-		free(peer_addr);
 	}
 
 	return peer_selected;
