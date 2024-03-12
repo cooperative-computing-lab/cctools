@@ -760,8 +760,8 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 		// may correspond to a cache-update of a file that has not been declared
 		// yet.
 		if (f) {
-			// delete all files, but those meant to stay at the worker
-			delete_worker_file(q, w, f->cached_name, f->cache_level, VINE_CACHE_LEVEL_TASK);
+			// delete all files, but those meant to stay at the worker after disconnection
+			delete_worker_file(q, w, f->cached_name, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW);
 		}
 	}
 }
