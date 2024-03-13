@@ -82,6 +82,7 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 	memset(f, 0, sizeof(*f));
 
 	f->source = source ? xxstrdup(source) : 0;
+	f->source_worker = 0;
 	f->type = type;
 	f->size = size;
 	f->mini_task = mini_task;
