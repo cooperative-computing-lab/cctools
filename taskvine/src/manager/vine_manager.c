@@ -5085,7 +5085,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		q->minimum_transfer_timeout = (int)value;
 
 	} else if (!strcmp(name, "transfer-retry-interval")) {
-		q->transfer_retry_inteval = MAX(0, (int)value);
+		q->transfer_retry_interval = MAX(0, (int)value);
 
 	} else if (!strcmp(name, "default-transfer-rate")) {
 		q->default_transfer_rate = value;
