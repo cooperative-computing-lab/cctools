@@ -172,6 +172,7 @@ struct vine_manager {
 	int file_source_max_transfers;
 	int temp_replica_count;
 	int worker_source_max_transfers;
+	int transfer_retry_interval;
 	/* Various performance knobs that can be tuned. */
 
 	int short_timeout;            /* Timeout in seconds to send/recv a brief message from worker */

@@ -88,7 +88,7 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 			continue;
 
 		timestamp_t current_time = timestamp_get();
-		if (((current_time - peer->last_transfer_failure) / 1000000) < 5)
+		if (((current_time - peer->last_transfer_failure) / 1000000) < q->transfer_retry_interval)
 			continue;
 
 		if ((replica = hash_table_lookup(peer->current_files, cachename)) &&
@@ -141,8 +141,7 @@ struct vine_worker_info **vine_file_replica_table_find_replication_targets(
 		if (!(replica = hash_table_lookup(peer->current_files, cachename)) &&
 				(strcmp(w->hostname, peer->hostname))) {
 			if ((vine_current_transfers_source_in_use(q, peer) < q->worker_source_max_transfers) &&
-					(vine_current_transfers_dest_in_use(q, peer) <
-							q->worker_source_max_transfers)) {
+					(vine_current_transfers_dest_in_use(q, w) < q->worker_source_max_transfers)) {
 				debug(D_VINE, "found replication target : %s", peer->transfer_addr);
 				filtered[found] = peer;
 				found++;
