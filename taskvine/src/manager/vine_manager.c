@@ -152,7 +152,7 @@ static void release_all_workers(struct vine_manager *q);
 
 static int vine_manager_check_inputs_available(struct vine_manager *q, struct vine_task *t);
 
-static void delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename,
+static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename,
 		vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
 
 static struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
@@ -716,6 +716,11 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 {
 	int i = 0;
 	int nfiles = hash_table_size(w->current_files);
+
+	if (nfiles < 1) {
+		return;
+	}
+
 	char *cached_name = NULL;
 	struct vine_file_replica *replica = NULL;
 	char **cached_names = malloc(nfiles * sizeof(char *));
@@ -733,15 +738,11 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 		// check that the manager actually knows about that file, as the file
 		// may correspond to a cache-update of a file that has not been declared
 		// yet.
-		if (f) {
-			// delete all files, but those meant to stay at the worker after disconnection
-			delete_worker_file(q, w, f->cached_name, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW);
-		}
-
-		// in case the replica was not delete above (e.g., not a known file, or stronger cache)
-		replica = vine_file_replica_table_remove(q, w, cached_name);
-		if (replica) {
-			vine_file_replica_delete(replica);
+		if (!f || !delete_worker_file(q, w, f->cached_name, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW)) {
+			replica = vine_file_replica_table_remove(q, w, cached_name);
+			if (replica) {
+				vine_file_replica_delete(replica);
+			}
 		}
 	}
 
@@ -890,7 +891,7 @@ static void add_worker(struct vine_manager *q)
 
 /* Delete a single file on a remote worker except those with greater delete_upto_level cache level */
 
-static void delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename,
+static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename,
 		vine_cache_level_t cache_flags, vine_cache_level_t delete_upto_level)
 {
 	if (cache_flags <= delete_upto_level) {
@@ -898,7 +899,10 @@ static void delete_worker_file(struct vine_manager *q, struct vine_worker_info *
 		struct vine_file_replica *replica;
 		replica = vine_file_replica_table_remove(q, w, filename);
 		vine_file_replica_delete(replica);
+		return 1;
 	}
+
+	return 0;
 }
 
 /* Delete all files in a list except those with greater delete_upto_level cache level */
