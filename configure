@@ -1352,7 +1352,7 @@ else
 	# Appending "-Og" to various compiler flags to have some optimizations and
 	# still be able to debug in most cases.
 	# "-O0" is a common but suboptimal choice.
-	debug_flags=" -g -Og "
+	debug_flags=" -g "
 fi
 
 ccflags_append "$debug_flags"
