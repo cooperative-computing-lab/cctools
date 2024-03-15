@@ -307,6 +307,10 @@ void *set_next_element(struct set *s)
 void set_random_element(struct set *s, int *offset_bookkeep)
 {
 	s->ientry = 0;
+	if (s->bucket_count < 1) {
+		return;
+	}
+
 	int ibucket_start = random() % s->bucket_count;
 
 	for (s->ibucket = ibucket_start; s->ibucket < s->bucket_count; s->ibucket++) {
