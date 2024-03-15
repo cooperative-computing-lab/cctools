@@ -99,6 +99,9 @@ See the file COPYING for details.
 /* Default value for how frequently to check for tasks that do not fit any worker. */
 #define VINE_LARGE_TASK_CHECK_INTERVAL 180000000 // 3 minutes in usecs
 
+/* Default value for how long to avoid a resource after a failure. */
+#define VINE_DEFAULT_LAST_FAILURE_RETRY_INTERVAL 5 // 5 seconds
+
 /* Default timeout for slow workers to come back to the pool, can be set prior to creating a manager. */
 double vine_option_blocklist_slow_workers_timeout = 900;
 
@@ -3674,7 +3677,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->minimum_transfer_timeout = 60;
 	q->transfer_outlier_factor = 10;
 	q->default_transfer_rate = 1 * MEGABYTE;
-	q->transfer_retry_interval = 5;
+	q->last_failure_retry_interval = VINE_DEFAULT_LAST_FAILURE_RETRY_INTERVAL;
 	q->disk_avail_threshold = 100;
 
 	q->update_interval = VINE_UPDATE_INTERVAL;
@@ -5084,8 +5087,8 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "min-transfer-timeout")) {
 		q->minimum_transfer_timeout = (int)value;
 
-	} else if (!strcmp(name, "transfer-retry-interval")) {
-		q->transfer_retry_interval = MAX(0, (int)value);
+	} else if (!strcmp(name, "last-failure-retry-interval")) {
+		q->last_failure_retry_interval = MAX(0, (int)value);
 
 	} else if (!strcmp(name, "default-transfer-rate")) {
 		q->default_transfer_rate = value;
