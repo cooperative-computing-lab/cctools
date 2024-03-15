@@ -252,6 +252,10 @@ int hash_table_nextkey(struct hash_table *h, char **key, void **value)
 void hash_table_randomkey(struct hash_table *h, int *offset_bookkeep)
 {
 	h->ientry = 0;
+	if (h->bucket_count < 1) {
+		return;
+	}
+
 	int ibucket_start = random() % h->bucket_count;
 
 	for (h->ibucket = ibucket_start; h->ibucket < h->bucket_count; h->ibucket++) {
