@@ -138,6 +138,17 @@ This function returns the next key and value in the iteration.
 
 int hash_table_nextkey_with_offset(struct hash_table *h, int offset_bookkeep, char **key, void **value);
 
+/** Begin iteration at the given key.
+Invoke @ref hash_table_nextkey to retrieve each value in order.
+Note that subsequent calls to this functions may result in different iteration orders as the hash_table may have been
+resized.
+@param h A pointer to a hash table.
+@param key A string key to search for.
+@return Zero if key not in hash table, one otherwise.
+*/
+
+int hash_table_fromkey(struct hash_table *h, const char *key);
+
 /** A default hash function.
 @param s A string to hash.
 @return An integer hash of the string.
@@ -162,5 +173,11 @@ HASH_TABLE_ITERATE(table,key,value) {
 #define HASH_TABLE_ITERATE( table, key, value ) hash_table_firstkey(table); while(hash_table_nextkey(table,&key,(void**)&value))
 
 #define HASH_TABLE_ITERATE_RANDOM_START( table, offset_bookkeep, key, value ) hash_table_randomkey(table, &offset_bookkeep); while(hash_table_nextkey_with_offset(table, offset_bookkeep, &key, (void **)&value))
+
+#define HASH_TABLE_ITERATE_FROM_KEY( table, iter_control, iter_count_var, key_start, key, value ) \
+	iter_control = 0; \
+	iter_count_var = 0; \
+  hash_table_fromkey(table, key_start); \
+	while(iter_count_var < hash_table_size(table) && (iter_count_var+=1 && (hash_table_nextkey(table, &key, (void **)&value) || (!iter_control && (iter_control+=1) && hash_table_fromkey(table, NULL) && hash_table_nextkey(table, &key, (void **)&value)))))
 
 #endif
