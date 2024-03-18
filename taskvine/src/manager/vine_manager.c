@@ -324,31 +324,6 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 }
 
 /*
-At this point we have received a cache update for a temp file. If q->temp_replica_count > 0 then tell up to that
-many workers to get the file from worker w.
-*/
-static void replicate_temp_file(struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f)
-{
-	if (!q->temp_replica_count)
-		return;
-
-	int found = 0;
-	struct vine_worker_info **workers;
-	workers = vine_file_replica_table_find_replication_targets(q, w, f->cached_name, &found);
-
-	debug(D_VINE, "Found %d available workers to replicate %s", found, f->cached_name);
-
-	for (int i = 0; i < found; i++) {
-		struct vine_worker_info *peer = workers[i];
-		char *worker_source =
-				string_format("worker://%s:%d/%s", w->transfer_addr, w->transfer_port, f->cached_name);
-		vine_manager_put_url_now(q, peer, worker_source, f);
-		free(worker_source);
-	}
-	free(workers);
-}
-
-/*
 A cache-update message coming from the worker means that a requested
 remote transfer or command was successful, and know we know the size
 of the file for the purposes of cache storage management.
@@ -408,7 +383,7 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 
 			/* And if the file is a newly created temporary. replicate it. */
 			if (f->type == VINE_TEMP && *id == 'X') {
-				replicate_temp_file(q, w, f);
+				vine_file_replica_table_replicate(q, f);
 			}
 		}
 	}
