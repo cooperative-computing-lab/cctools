@@ -182,9 +182,6 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 			vine_manager_put_url_now(m, peer, source_addr, f);
 
-			replica = vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
-			vine_file_replica_table_insert(m, peer, f->cached_name, replica);
-
 			source_in_use++;
 			found_per_source++;
 			found++;
