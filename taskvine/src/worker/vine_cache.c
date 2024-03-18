@@ -282,7 +282,7 @@ int vine_cache_add_transfer(struct vine_cache *c, const char *cachename, const c
 	struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
 	if (f) {
 		/* The transfer is already queued up. */
-		return 0;
+		return 1;
 	}
 
 	/* Create the object and fill in the metadata. */
