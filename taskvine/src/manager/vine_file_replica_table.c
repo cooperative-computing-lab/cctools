@@ -151,12 +151,12 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		int offset_bookkeep;
 		HASH_TABLE_ITERATE_RANDOM_START(m->worker_table, offset_bookkeep, id, peer)
 		{
-			/* XXX: commenting this check for now, as otherwise only one replica is created.
-			 * We need to create replicas during wait_internal too.
 			if (found_per_source >= MIN(m->file_source_max_transfers, to_find)) {
-				break;
+				/* XXX: commenting this check for now, as otherwise only one replica is created.
+				 * We need to create replicas during wait_internal too.
+					break;
+				*/
 			}
-			*/
 
 			if (source_in_use >= m->worker_source_max_transfers) {
 				break;
