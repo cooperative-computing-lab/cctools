@@ -186,4 +186,11 @@ This function returns the next element in the iteration.
 
 void *set_next_element_with_offset(struct set *s, int offset_bookkeep);
 
+/** A set_size(s) array of the current elements in the set in a random order.
+Caller should free the array.
+@param s A pointer to a set.
+@return An array of pointers. NULL if there are no elements in the set.
+*/
+void **set_values(struct set *s);
+
 #endif

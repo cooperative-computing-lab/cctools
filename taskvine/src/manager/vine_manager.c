@@ -155,7 +155,7 @@ static void release_all_workers(struct vine_manager *q);
 
 static int vine_manager_check_inputs_available(struct vine_manager *q, struct vine_task *t);
 
-static void delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename,
+static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename,
 		vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
 
 static struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
@@ -272,10 +272,8 @@ static void handle_worker_timeout(struct vine_manager *q, struct vine_worker_inf
 	// debug(D_VINE, "Handling timeout request");
 	HASH_TABLE_ITERATE(w->current_files, cachename, replica)
 	{
-		//	debug(D_VINE, "Looking at file %s", cachename);
-		if (strncmp(cachename, "temp-rnd-", 9) == 0) {
-			int c = vine_file_replica_table_count_replicas(q, cachename);
-			//		debug(D_VINE, "Temp file found with %d replicas", c);
+		if (replica->type == VINE_TEMP) {
+			int c = vine_file_replica_table_count_replicas(q, cachename, VINE_FILE_REPLICA_STATE_READY);
 			if (c == 1) {
 				debug(D_VINE,
 						"Rejecting timeout request from worker %s (%s). Has unique file %s",
@@ -326,31 +324,6 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 
 	// Note we always mark info messages as processed, as they are optional.
 	return VINE_MSG_PROCESSED;
-}
-
-/*
-At this point we have received a cache update for a temp file. If q->temp_replica_count > 0 then tell up to that
-many workers to get the file from worker w.
-*/
-static void replicate_temp_file(struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f)
-{
-	if (!q->temp_replica_count)
-		return;
-
-	int found = 0;
-	struct vine_worker_info **workers;
-	workers = vine_file_replica_table_find_replication_targets(q, w, f->cached_name, &found);
-
-	debug(D_VINE, "Found %d available workers to replicate %s", found, f->cached_name);
-
-	for (int i = 0; i < found; i++) {
-		struct vine_worker_info *peer = workers[i];
-		char *worker_source =
-				string_format("worker://%s:%d/%s", w->transfer_addr, w->transfer_port, f->cached_name);
-		vine_manager_put_url_now(q, peer, worker_source, f);
-		free(worker_source);
-	}
-	free(workers);
 }
 
 /*
@@ -413,7 +386,7 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 
 			/* And if the file is a newly created temporary. replicate it. */
 			if (f->type == VINE_TEMP && *id == 'X') {
-				replicate_temp_file(q, w, f);
+				vine_file_replica_table_replicate(q, f);
 			}
 		}
 	}
@@ -717,8 +690,44 @@ static void update_catalog(struct vine_manager *q, int force_update)
 	q->catalog_last_update_time = time(0);
 }
 
-/* Remove all tasks and other associated state from a given worker. */
+static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info *w)
+{
+	int i = 0;
+	int nfiles = hash_table_size(w->current_files);
 
+	if (nfiles < 1) {
+		return;
+	}
+
+	char *cached_name = NULL;
+	struct vine_file_replica *replica = NULL;
+	char **cached_names = malloc(nfiles * sizeof(char *));
+
+	HASH_TABLE_ITERATE(w->current_files, cached_name, replica)
+	{
+		cached_names[i] = cached_name;
+		i++;
+	}
+
+	for (i = 0; i < nfiles; i++) {
+		cached_name = cached_names[i];
+		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
+
+		// check that the manager actually knows about that file, as the file
+		// may correspond to a cache-update of a file that has not been declared
+		// yet.
+		if (!f || !delete_worker_file(q, w, f->cached_name, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW)) {
+			replica = vine_file_replica_table_remove(q, w, cached_name);
+			if (replica) {
+				vine_file_replica_delete(replica);
+			}
+		}
+	}
+
+	free(cached_names);
+}
+
+/* Remove all tasks and other associated state from a given worker. */
 static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
 	struct vine_task *t;
@@ -753,20 +762,7 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 
 	w->finished_tasks = 0;
 
-	char *cached_name = NULL;
-	struct vine_file_replica *info = NULL;
-	HASH_TABLE_ITERATE(w->current_files, cached_name, info)
-	{
-		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
-
-		// check that the manager actually knows about that file, as the file
-		// may correspond to a cache-update of a file that has not been declared
-		// yet.
-		if (f) {
-			// delete all files, but those meant to stay at the worker after disconnection
-			delete_worker_file(q, w, f->cached_name, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW);
-		}
-	}
+	cleanup_worker_files(q, w);
 }
 
 /* Remove a worker from this master by removing all remote state, all local state, and disconnecting. */
@@ -873,7 +869,7 @@ static void add_worker(struct vine_manager *q)
 
 /* Delete a single file on a remote worker except those with greater delete_upto_level cache level */
 
-static void delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename,
+static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename,
 		vine_cache_level_t cache_flags, vine_cache_level_t delete_upto_level)
 {
 	if (cache_flags <= delete_upto_level) {
@@ -881,7 +877,10 @@ static void delete_worker_file(struct vine_manager *q, struct vine_worker_info *
 		struct vine_file_replica *replica;
 		replica = vine_file_replica_table_remove(q, w, filename);
 		vine_file_replica_delete(replica);
+		return 1;
 	}
+
+	return 0;
 }
 
 /* Delete all files in a list except those with greater delete_upto_level cache level */

@@ -226,6 +226,12 @@ message once the object is actually loaded into the cache.
 vine_result_code_t vine_manager_put_url_now(
 		struct vine_manager *q, struct vine_worker_info *w, const char *source, struct vine_file *f)
 {
+	if (vine_file_replica_table_lookup(w, f->cached_name)) {
+		/* do nothing, file already at worker */
+		debug(D_NOTICE, "cannot puturl_now %s at %s. Already at worker.", f->cached_name, w->addrport);
+		return VINE_SUCCESS;
+	}
+
 	/* XXX The API does not allow the user to choose the mode bits of the target file, so we make it permissive
 	 * here.*/
 	int mode = 0755;
@@ -248,8 +254,11 @@ vine_result_code_t vine_manager_put_url_now(
 			mode,
 			transfer_id);
 
+	struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
+	vine_file_replica_table_insert(q, w, f->cached_name, replica);
+
 	free(transfer_id);
-	return result;
+	return VINE_SUCCESS;
 }
 
 /*
@@ -262,6 +271,12 @@ message once the object is actually loaded into the cache.
 vine_result_code_t vine_manager_put_url(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f)
 {
+	if (vine_file_replica_table_lookup(w, f->cached_name)) {
+		/* do nothing, file already at worker */
+		debug(D_NOTICE, "cannot puturl %s at %s. Already at worker.", f->cached_name, w->addrport);
+		return VINE_SUCCESS;
+	}
+
 	/* XXX The API does not allow the user to choose the mode bits of the target file, so we make it permissive
 	 * here.*/
 	int mode = 0755;
@@ -283,6 +298,9 @@ vine_result_code_t vine_manager_put_url(
 			(long long)f->size,
 			mode,
 			transfer_id);
+
+	struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
+	vine_file_replica_table_insert(q, w, f->cached_name, replica);
 
 	free(transfer_id);
 	return VINE_SUCCESS;
@@ -495,6 +513,17 @@ This allows it to be used for both regular tasks and mini tasks.
 vine_result_code_t vine_manager_put_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t,
 		const char *command_line, struct rmsummary *limits, struct vine_file *target)
 {
+	if (target) {
+		if (vine_file_replica_table_lookup(w, target->cached_name)) {
+			/* do nothing, file already at worker */
+			debug(D_NOTICE,
+					"cannot put mini_task %s at %s. Already at worker.",
+					target->cached_name,
+					w->addrport);
+			return VINE_SUCCESS;
+		}
+	}
+
 	vine_result_code_t result = vine_manager_put_input_files(q, w, t);
 	if (result != VINE_SUCCESS)
 		return result;
@@ -597,6 +626,12 @@ vine_result_code_t vine_manager_put_task(struct vine_manager *q, struct vine_wor
 
 	int r = vine_manager_send(q, w, "end\n");
 	if (r >= 0) {
+		if (target) {
+			struct vine_file_replica *replica = vine_file_replica_create(
+					target->type, target->cache_level, target->size, target->mtime);
+			vine_file_replica_table_insert(q, w, target->cached_name, replica);
+		}
+
 		return VINE_SUCCESS;
 	} else {
 		return VINE_WORKER_FAILURE;

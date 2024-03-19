@@ -307,6 +307,10 @@ void *set_next_element(struct set *s)
 void set_random_element(struct set *s, int *offset_bookkeep)
 {
 	s->ientry = 0;
+	if (s->bucket_count < 1) {
+		return;
+	}
+
 	int ibucket_start = random() % s->bucket_count;
 
 	for (s->ibucket = ibucket_start; s->ibucket < s->bucket_count; s->ibucket++) {
@@ -354,6 +358,26 @@ void *set_next_element_with_offset(struct set *s, int offset_bookkeep)
 	}
 
 	return 0;
+}
+
+void **set_values(struct set *s)
+{
+	if (s->size < 1) {
+		return NULL;
+	}
+
+	void **elements = malloc(sizeof(void *) * s->size);
+
+	int offset_bookkeep;
+	void *element;
+	int i = 0;
+	SET_ITERATE_RANDOM_START(s, offset_bookkeep, element)
+	{
+		elements[i] = element;
+		i++;
+	}
+
+	return elements;
 }
 
 /* vim: set noexpandtab tabstop=8: */

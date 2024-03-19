@@ -218,6 +218,29 @@ void *hash_table_remove(struct hash_table *h, const char *key)
 	return 0;
 }
 
+int hash_table_fromkey(struct hash_table *h, const char *key)
+{
+	if (!key) {
+		/* treat NULL as a special case equivalent to firstkey */
+		hash_table_firstkey(h);
+		return 1;
+	}
+
+	unsigned hash = h->hash_func(key);
+	h->ibucket = hash % h->bucket_count;
+	h->ientry = h->buckets[h->ibucket];
+
+	while (h->ientry) {
+		if (hash == h->ientry->hash && !strcmp(key, h->ientry->key)) {
+			return 1;
+		}
+		h->ientry = h->ientry->next;
+	}
+
+	hash_table_firstkey(h);
+	return 0;
+}
+
 void hash_table_firstkey(struct hash_table *h)
 {
 	h->ientry = 0;
@@ -252,6 +275,10 @@ int hash_table_nextkey(struct hash_table *h, char **key, void **value)
 void hash_table_randomkey(struct hash_table *h, int *offset_bookkeep)
 {
 	h->ientry = 0;
+	if (h->bucket_count < 1) {
+		return;
+	}
+
 	int ibucket_start = random() % h->bucket_count;
 
 	for (h->ibucket = ibucket_start; h->ibucket < h->bucket_count; h->ibucket++) {
