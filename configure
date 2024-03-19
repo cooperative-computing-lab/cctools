@@ -1347,7 +1347,7 @@ ccflags_append_define \
 
 # If debug flag is on, turn on compiler for debugging experience.
 if [ "$optdebug" = 1 ]; then
-	debug_flags=" -g3 -O3 -ggdb3 "
+	debug_flags=" -g3 -O0 -ggdb3 "
 else
 	# Appending "-Og" to various compiler flags to have some optimizations and
 	# still be able to debug in most cases.
