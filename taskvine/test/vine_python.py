@@ -266,6 +266,7 @@ if __name__ == "__main__":
 
     # generate an invalid remote input file, should get an input missing error.
     t = vine.Task("wc -l infile")
+    t.set_retries(1)
     url = q.declare_url("https://pretty-sure-this-is-not-a-valid-url.com")
     t.add_input(url, "infile")
     q.submit(t)
