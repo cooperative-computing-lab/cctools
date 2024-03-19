@@ -89,8 +89,10 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 
 		timestamp_t current_time = timestamp_get();
 		if (((current_time - peer->last_transfer_failure) / 1000000) <
-				(long unsigned int)q->last_failure_retry_interval)
+				(long unsigned int)q->last_failure_retry_interval) {
+			debug(D_VINE, "Skipping worker source after recent failure : %s", peer->transfer_addr);
 			continue;
+		}
 
 		if ((replica = hash_table_lookup(peer->current_files, cachename)) &&
 				replica->state == VINE_FILE_REPLICA_STATE_READY) {
