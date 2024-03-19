@@ -463,7 +463,7 @@ static int do_worker_transfer(
 	sscanf(f->source, "worker://%99[^:]:%d/%s", addr, &port_num, source_path);
 	debug(D_VINE, "cache: setting up worker transfer file %s", f->source);
 
-	stoptime = time(0) + 15;
+	stoptime = time(0) + 60;
 	worker_link = link_connect(addr, port_num, stoptime);
 
 	if (worker_link == NULL) {
