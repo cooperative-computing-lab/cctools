@@ -150,7 +150,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 		char *source_addr = string_format(
 				"worker://%s:%d/%s", source->transfer_addr, source->transfer_port, f->cached_name);
-		int source_in_use = vine_current_transfers_worker_in_use(m, source);
+		int source_in_use = vine_current_transfers_source_in_use(m, source);
 
 		char *id;
 		struct vine_worker_info *peer;

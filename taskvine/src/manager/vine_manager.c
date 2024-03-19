@@ -100,7 +100,7 @@ See the file COPYING for details.
 #define VINE_LARGE_TASK_CHECK_INTERVAL 180000000 // 3 minutes in usecs
 
 /* Default value for how long to avoid a resource after a failure. */
-#define VINE_DEFAULT_LAST_FAILURE_RETRY_INTERVAL 5 // 5 seconds
+#define VINE_DEFAULT_LAST_FAILURE_RETRY_INTERVAL 10 // 10 seconds
 
 /* Default timeout for slow workers to come back to the pool, can be set prior to creating a manager. */
 double vine_option_blocklist_slow_workers_timeout = 900;

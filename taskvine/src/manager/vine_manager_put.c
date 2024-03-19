@@ -244,7 +244,7 @@ vine_result_code_t vine_manager_put_url_now(
 
 	char *transfer_id = vine_current_transfers_add(q, w, f->source_worker, source);
 
-	int result = vine_manager_send(q,
+	vine_manager_send(q,
 			w,
 			"puturl_now %s %s %d %lld 0%o %s\n",
 			source_encoded,
