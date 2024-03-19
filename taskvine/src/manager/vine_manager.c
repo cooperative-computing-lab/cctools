@@ -2778,8 +2778,13 @@ static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w
 		return resubmit_task_on_exhaustion(q, w, t);
 		break;
 	case VINE_RESULT_TRANSFER_MISSING:
-		change_task_state(q, t, VINE_TASK_READY);
-		return 1;
+		if (t->max_retries > 0 && t->try_count > t->max_retries) {
+			t->result = VINE_RESULT_INPUT_MISSING;
+			return 0;
+		} else {
+			change_task_state(q, t, VINE_TASK_READY);
+			return 1;
+		}
 		break;
 	default:
 		/* by default tasks are not resumitted */
