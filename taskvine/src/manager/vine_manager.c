@@ -2749,8 +2749,7 @@ static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w
 	}
 
 	if (t->max_retries > 0 && t->try_count > t->max_retries) {
-		/* XXX: should task be returned with the last result or with max retries? */
-		// vine_task_set_result(t, VINE_RESULT_MAX_RETRIES);
+		// tasks returns to user with the VINE_RESULT_* of the last attempt
 		return 0;
 	}
 

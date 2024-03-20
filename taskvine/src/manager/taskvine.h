@@ -91,7 +91,7 @@ typedef enum {
 	VINE_RESULT_MAX_END_TIME        = 3 << 3, /**< The task ran after the specified (absolute since epoch) end time. **/
 	VINE_RESULT_UNKNOWN             = 4 << 3, /**< The result could not be classified. **/
 	VINE_RESULT_FORSAKEN            = 5 << 3, /**< The task failed, but it was not a task error **/
-	VINE_RESULT_MAX_RETRIES         = 6 << 3, /**< The task could not be completed successfully in the given number of retries. **/
+	VINE_RESULT_MAX_RETRIES         = 6 << 3, /**< Currently unused. **/
 	VINE_RESULT_MAX_WALL_TIME       = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
 	VINE_RESULT_RMONITOR_ERROR      = 8 << 3, /**< The task failed because the monitor did not produce a summary report. **/
 	VINE_RESULT_OUTPUT_TRANSFER_ERROR = 9 << 3,  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
