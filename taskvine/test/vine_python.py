@@ -271,7 +271,7 @@ if __name__ == "__main__":
     t.add_input(url, "infile")
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, "input missing", 1)
+    report_task(t, "transfer missing", 1)
 
     # create a temporary output file, and then fetch its contents manually.
     t = vine.Task("echo howdy > output")
