@@ -3095,7 +3095,7 @@ static int send_one_task(struct vine_manager *q)
 
 	timestamp_t now_usecs = timestamp_get();
 	double now_secs = ((double)now_usecs) / ONE_SECOND;
-	timestamp_t time_failure_range = now_usecs - VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL * ONE_SECOND;
+	timestamp_t time_failure_range = now_usecs - q->transient_error_interval * ONE_SECOND;
 
 	int tasks_to_consider = MIN(list_size(q->ready_list), q->attempt_schedule_depth);
 
@@ -3722,6 +3722,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->update_interval = VINE_UPDATE_INTERVAL;
 	q->resource_management_interval = VINE_RESOURCE_MEASUREMENT_INTERVAL;
+	q->transient_error_interval = VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL;
 	q->max_task_stdout_storage = MAX_TASK_STDOUT_STORAGE;
 	q->max_new_workers = MAX_NEW_WORKERS;
 	q->large_task_check_interval = VINE_LARGE_TASK_CHECK_INTERVAL;
@@ -5221,6 +5222,13 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "option-blocklist-slow-workers-timeout")) {
 		q->option_blocklist_slow_workers_timeout = MAX(0, value); /*todo: confirm 0 or 1*/
+
+	} else if (!strcmp(name, "transient-error-interval")) {
+		if (value < 1) {
+			q->transient_error_interval = VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL;
+		} else {
+			q->transient_error_interval = value;
+		}
 
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);

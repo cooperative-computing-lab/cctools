@@ -2408,6 +2408,7 @@ change.
 | hungry-minimum          | Smallest number of waiting tasks in the manager before declaring it hungry | 10 |
 | hungry-minimum-factor   | Queue is hungry if number of waiting tasks is less than hungry-minumum-factor x (number of workers) | 2 |
 | ramp-down-heuristic     | If set to 1 and there are more workers than tasks waiting, then tasks are allocated all the free resources of a worker large enough to run them. If monitoring watchdog is not enabled, then this heuristic has no effect. | 0 |
+| transient-error-interval | Seconds between new attempts on task rescheduling and using a file replica as source after a failure. | 15 |
 | immediate-recovery    | If set to 1, create recovery tasks for temporary files as soon as their worker disconnects. Otherwise, create recovery tasks only if the temporary files are used as input when trying to dispatch another task. | 0 |
 | temp-replica-count    | Number of temp file replicas created across workers | 0 |
 | monitor-interval        | Maximum number of seconds between resource monitor measurements. If less than 1, use default. | 5 |
