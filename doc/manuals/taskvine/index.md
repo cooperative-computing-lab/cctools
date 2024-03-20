@@ -764,6 +764,10 @@ If peer transfers have been disabled, they may be re-enabled accordingly:
     vine_enable_peer_transfers(m);
     ```
 
+Transfers between workers may be impacted by transient issues which may cause intermittent transfer failures. In these situations we take note of the 
+failure that occured, and avoid using the same worker as a source for a period of time. This time period has a default value of 10 seconds.
+It may be changed by the user using `vine_tune` with the parameter `last-failure-retry-interval`. 
+
 ### MiniTasks
 
 A task can be used to perform custom fetch operations for input data. TaskVine
