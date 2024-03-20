@@ -90,6 +90,9 @@ See the file COPYING for details.
 /* Default value for keepalive timeout in seconds. */
 #define VINE_DEFAULT_KEEPALIVE_TIMEOUT 900
 
+/* Default value to before entity is considered again after last failure */
+#define VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL 15
+
 /* Default value for maximum size of standard output from task.  (If larger, send to a separate file.) */
 #define MAX_TASK_STDOUT_STORAGE (1 * GIGABYTE)
 
@@ -1012,6 +1015,10 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 		/* If the worker didn't run the task don't bother fetching outputs. */
 		result = VINE_SUCCESS;
 		break;
+	case VINE_RESULT_TRANSFER_MISSING:
+		/* If the worker didn't run the task don't bother fetching outputs. */
+		result = VINE_TRANSIENT_FAILURE;
+		break;
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
 		/* On resource exhaustion, just get the monitor files to figure out what happened. */
 		result = vine_manager_get_monitor_output_file(q, w, t);
@@ -1024,6 +1031,7 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 
 	if (result != VINE_SUCCESS) {
 		debug(D_VINE, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
+		t->time_when_last_failure = timestamp_get();
 
 		if (result == VINE_WORKER_FAILURE) {
 			handle_worker_failure(q, w);
@@ -1056,13 +1064,32 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 	// At this point, a task is completed.
 	reap_task_from_worker(q, w, t, VINE_TASK_RETRIEVED);
 
-	w->finished_tasks--;
-	w->total_tasks_complete++;
+	switch (t->result) {
+	case VINE_RESULT_INPUT_MISSING:
+	case VINE_RESULT_FORSAKEN:
+	case VINE_RESULT_TRANSFER_MISSING:
+		/* do not count tasks that didn't execute as complete, or finished tasks */
+		break;
+	default:
+		w->finished_tasks--;
+		w->total_tasks_complete++;
 
-	// At least one task has finished without triggering a slow worker disconnect, thus we
-	// now have evidence that worker is not slow (e.g., it was probably the
-	// previous task that was slow).
-	w->alarm_slow_worker = 0;
+		// At least one task has finished without triggering a slow worker disconnect, thus we
+		// now have evidence that worker is not slow (e.g., it was probably the
+		// previous task that was slow).
+		w->alarm_slow_worker = 0;
+
+		vine_task_info_add(q, t);
+		debug(D_VINE,
+				"%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
+				w->hostname,
+				w->addrport,
+				(t->time_when_done - t->time_when_commit_start) / 1000000.0,
+				(long long)w->total_tasks_complete,
+				w->total_task_time / w->total_tasks_complete / 1000000.0);
+
+		break;
+	}
 
 	/* print warnings if the task ran for a very short time (1s) and exited with common non-zero status */
 	if (t->result == VINE_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
@@ -1097,16 +1124,6 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 			break;
 		}
 	}
-
-	vine_task_info_add(q, t);
-
-	debug(D_VINE,
-			"%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
-			w->hostname,
-			w->addrport,
-			(t->time_when_done - t->time_when_commit_start) / 1000000.0,
-			(long long)w->total_tasks_complete,
-			w->total_task_time / w->total_tasks_complete / 1000000.0);
 
 	return 1;
 }
@@ -2760,6 +2777,15 @@ static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
 		return resubmit_task_on_exhaustion(q, w, t);
 		break;
+	case VINE_RESULT_TRANSFER_MISSING:
+		if (t->max_retries > 0 && t->try_count > t->max_retries) {
+			t->result = VINE_RESULT_INPUT_MISSING;
+			return 0;
+		} else {
+			change_task_state(q, t, VINE_TASK_READY);
+			return 1;
+		}
+		break;
 	default:
 		/* by default tasks are not resumitted */
 		return 0;
@@ -3066,8 +3092,10 @@ static int send_one_task(struct vine_manager *q)
 	struct vine_worker_info *w = NULL;
 
 	int tasks_considered = 0;
+
 	timestamp_t now_usecs = timestamp_get();
 	double now_secs = ((double)now_usecs) / ONE_SECOND;
+	timestamp_t time_failure_range = now_usecs - q->transient_error_interval * ONE_SECOND;
 
 	int tasks_to_consider = MIN(list_size(q->ready_list), q->attempt_schedule_depth);
 
@@ -3078,6 +3106,11 @@ static int send_one_task(struct vine_manager *q)
 
 		// Skip task if min requested start time not met.
 		if (t->resources_requested->start > now_secs) {
+			continue;
+		}
+
+		// Skip if this task failed recently
+		if (time_failure_range > t->time_when_last_failure) {
 			continue;
 		}
 
@@ -3689,6 +3722,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->update_interval = VINE_UPDATE_INTERVAL;
 	q->resource_management_interval = VINE_RESOURCE_MEASUREMENT_INTERVAL;
+	q->transient_error_interval = VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL;
 	q->max_task_stdout_storage = MAX_TASK_STDOUT_STORAGE;
 	q->max_new_workers = MAX_NEW_WORKERS;
 	q->large_task_check_interval = VINE_LARGE_TASK_CHECK_INTERVAL;
@@ -4233,6 +4267,9 @@ const char *vine_result_string(vine_result_t result)
 		break;
 	case VINE_RESULT_LIBRARY_EXIT:
 		str = "LIBRARY_EXIT";
+		break;
+	case VINE_RESULT_TRANSFER_MISSING:
+		str = "TRANSFER_MISSING";
 		break;
 	}
 
@@ -5185,6 +5222,13 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "option-blocklist-slow-workers-timeout")) {
 		q->option_blocklist_slow_workers_timeout = MAX(0, value); /*todo: confirm 0 or 1*/
+
+	} else if (!strcmp(name, "transient-error-interval")) {
+		if (value < 1) {
+			q->transient_error_interval = VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL;
+		} else {
+			q->transient_error_interval = value;
+		}
 
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);

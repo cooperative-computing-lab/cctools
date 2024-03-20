@@ -61,6 +61,8 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->result = VINE_RESULT_UNKNOWN;
 	t->exit_code = -1;
 
+	t->time_when_last_failure = -1;
+
 	/* In the absence of additional information, a task consumes an entire worker. */
 	t->resources_requested = rmsummary_create(-1);
 	t->resources_measured = rmsummary_create(-1);
