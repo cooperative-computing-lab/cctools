@@ -1178,9 +1178,10 @@ limit on the number of retries:
     vine_set_retries(t, 5)
     ```
 
-When a task cannot be completed in the set number of tries,
-then the task result is set to `"max retries"` in python and
-`VINE_RESULT_MAX_RETRIES` in C.
+When a task cannot be completed in the set number of tries, then the its result
+is set to the result of the last attempt (e.g. `"resource exhaustion"` in python,
+or `VINE_RESULT_RESOURCE_EXHAUSTION` in C).
+
 
 ### Pipelined Submission
 

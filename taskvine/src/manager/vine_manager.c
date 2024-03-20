@@ -1133,14 +1133,11 @@ static int expire_waiting_tasks(struct vine_manager *q)
 			list_remove(q->ready_list, t);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			expired++;
-		} else if (t->max_retries > 0 && t->try_count > t->max_retries) {
-			vine_task_set_result(t, VINE_RESULT_MAX_RETRIES);
-			list_remove(q->ready_list, t);
-			change_task_state(q, t, VINE_TASK_RETRIEVED);
-			expired++;
 		}
+
 		tasks_considered++;
 	}
+
 	return expired;
 }
 
@@ -2741,15 +2738,30 @@ static int resubmit_task_on_exhaustion(struct vine_manager *q, struct vine_worke
 
 static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
+	/* in this function, any change_task_state should only be to VINE_TASK_READY */
+
+	if (t->result == VINE_RESULT_FORSAKEN) {
+		/* forsaken tasks are always resubmitted. they also get a retry back as they are victims of circumstance
+		 */
+		t->try_count -= 1;
+		change_task_state(q, t, VINE_TASK_READY);
+		return 1;
+	}
+
+	if (t->max_retries > 0 && t->try_count > t->max_retries) {
+		// tasks returns to user with the VINE_RESULT_* of the last attempt
+		return 0;
+	}
+
+	/* special handlings per result. note that most results are terminal, that is tasks are not retried even if they
+	 * have not reached max_retries. max_retries is only used for transient errors, or for modified tasks (such as a
+	 * change in the resource request). */
 	switch (t->result) {
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
 		return resubmit_task_on_exhaustion(q, w, t);
 		break;
-	case VINE_RESULT_FORSAKEN:
-		change_task_state(q, t, VINE_TASK_READY);
-		return 1;
-		break;
 	default:
+		/* by default tasks are not resumitted */
 		return 0;
 	}
 }
