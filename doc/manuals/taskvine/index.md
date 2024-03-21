@@ -766,7 +766,7 @@ If peer transfers have been disabled, they may be re-enabled accordingly:
 
 Transfers between workers may be impacted by transient issues which may cause intermittent transfer failures. In these situations we take note of the 
 failure that occured, and avoid using the same worker as a source for a period of time. This time period has a default value of 10 seconds.
-It may be changed by the user using `vine_tune` with the parameter `last-failure-retry-interval`. 
+It may be changed by the user using `vine_tune` with the parameter `transient-error-interval`. 
 
 ### MiniTasks
 
@@ -2419,7 +2419,7 @@ change.
 | max-retrievals | Sets the max number of tasks to retrieve per manager wait(). If less than 1, the manager prefers to retrieve all completed tasks before dispatching new tasks to workers. | 1 |
 | prefer-dispatch | If 1, try to dispatch tasks even if there are retrieved tasks ready to be reportedas done. | 0 |
 | worker-retrievals | If 1, retrieve all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |
-| last-failure-retry-interval | Time to wait in seconds after a resource failure before attempting to use it again | 5 |
+| transient-error-interval | Time to wait in seconds after a resource failure before attempting to use it again | 5 |
 
 
 === "Python"

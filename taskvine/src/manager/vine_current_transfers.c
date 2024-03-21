@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "vine_current_transfers.h"
 #include "vine_manager.h"
+#include "xxmalloc.h"
 
 #include "debug.h"
 
@@ -21,7 +22,7 @@ static struct vine_transfer_pair *vine_transfer_pair_create(
 	struct vine_transfer_pair *t = malloc(sizeof(struct vine_transfer_pair));
 	t->to = to;
 	t->source_worker = source_worker;
-	t->source_url = source_url ? strdup(source_url) : 0;
+	t->source_url = source_url ? xxstrdup(source_url) : 0;
 	return t;
 }
 

@@ -91,7 +91,7 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 
 		timestamp_t current_time = timestamp_get();
 		if (((current_time - peer->last_transfer_failure) / 1000000) <
-				(long unsigned int)q->last_failure_retry_interval) {
+				(long unsigned int)q->transient_error_interval) {
 			debug(D_VINE, "Skipping worker source after recent failure : %s", peer->transfer_addr);
 			continue;
 		}

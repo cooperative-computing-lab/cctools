@@ -1247,7 +1247,7 @@ void vine_set_manager_preferred_connection(struct vine_manager *m, const char *p
  - "monitor-interval" Parameter to change how frequently the resource monitor records resource consumption of a task in a times series, if this feature is enabled. See @ref vine_enable_monitoring.
  - "update_interval"  Seconds between updates to the catalog. (default=60)
  - "temp-replica-count" Degree of replication across workers for remote temp files (default=0)
- - "last-failure-retry-interval" Time to wait in seconds after a resource failure before attempting to use it again (default=10)
+ - "transient-error-interval" Time to wait in seconds after a resource failure before attempting to use it again (default=10)
  - "resource_management_interval" Seconds between measurement of manager local resources. (default=30)
  - "max_task_stdout_storage" Maximum size of standard output from task.  (If larger, send to a separate file.) (default=1*GIGABYTE)
  - "max_new_workers" Maximum number of workers to add in a single cycle before dealing with other matters. (default=10)
