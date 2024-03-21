@@ -26,6 +26,7 @@ typedef enum {
 	VINE_WORKER_FAILURE,
 	VINE_APP_FAILURE,
 	VINE_MGR_FAILURE,
+	VINE_TRANSIENT_FAILURE,
 	VINE_END_OF_LIST,
 } vine_result_code_t;
 
@@ -206,6 +207,7 @@ struct vine_manager {
 
 	int update_interval;			/* Seconds between updates to the catalog. */
 	int resource_management_interval;	/* Seconds between measurement of manager local resources. */
+	int transient_error_interval; /* Seconds between new attempts on task rescheduling and using a file replica as source after a failure. */
 
 	/*todo: confirm datatype. int or int64*/
 	int max_task_stdout_storage;	/* Maximum size of standard output from task.  (If larger, send to a separate file.) */
