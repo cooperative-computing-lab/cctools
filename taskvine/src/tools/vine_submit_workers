@@ -28,6 +28,7 @@ condor_show_help()
     echo "  -r,--requirements <reqs>  Condor requirements expression."
     echo "  --class-ad <ad>           Extra condor class ad. May be specified multiple times."
     echo "  --autosize                Condor will automatically size the worker to the slot."
+    echo "  --spool                   Spool required input files."
     echo "  --docker-universe <image> Run worker inside <image> using condor's docker universe."
     echo ""
 }
@@ -130,6 +131,10 @@ condor_parse_arguments()
                 disk="ifThenElse($disk > TotalSlotDisk, $disk, TotalSlotDisk)"
             ;;
 
+            --spool)
+            spool="--spool"
+            ;;
+
             --docker-universe)
             shift
             docker_universe="$1"
@@ -211,7 +216,7 @@ EOF
 
     echo "queue $count" >> condor_submit_file
 
-    condor_submit condor_submit_file
+    condor_submit ${spool} condor_submit_file
 }
 
 # SLURM specific
