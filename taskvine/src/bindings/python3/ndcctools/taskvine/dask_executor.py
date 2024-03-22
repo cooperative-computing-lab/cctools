@@ -164,7 +164,7 @@ class DaskVine(Manager):
         if self.task_mode == 'function-calls':
             libtask = self.create_library_from_functions('Dask-Library',
                                                          execute_graph_vertex,
-                                                         poncho_env=self.environment,
+                                                         poncho_env="dummy-value",
                                                          add_env=False,
                                                          init_command=self.lib_command,
                                                          import_modules=self.import_modules)
