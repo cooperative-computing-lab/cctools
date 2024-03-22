@@ -1772,7 +1772,7 @@ static struct list *interfaces_to_list(const char *addr, int port, struct jx *if
 			}
 
 			struct manager_address *m = calloc(1, sizeof(*m));
-			strncpy(m->host, ifa_addr, LINK_ADDRESS_MAX);
+			strncpy(m->host, ifa_addr, LINK_ADDRESS_MAX - 1);
 			m->port = port;
 
 			list_push_tail(l, m);
@@ -1787,7 +1787,7 @@ static struct list *interfaces_to_list(const char *addr, int port, struct jx *if
 		/* We get here if no interfaces were defined, or if addr was not found in the interfaces. */
 
 		struct manager_address *m = calloc(1, sizeof(*m));
-		strncpy(m->host, addr, LINK_ADDRESS_MAX);
+		strncpy(m->host, addr, LINK_ADDRESS_MAX - 1);
 		m->port = port;
 
 		list_push_tail(l, m);
@@ -2009,7 +2009,7 @@ struct list *parse_manager_addresses(const char *specs, int default_port)
 		}
 
 		struct manager_address *m = calloc(1, sizeof(*m));
-		strncpy(m->host, next_manager, LINK_ADDRESS_MAX);
+		strncpy(m->host, next_manager, LINK_ADDRESS_MAX - 1);
 		m->port = port;
 
 		if (port_str) {
