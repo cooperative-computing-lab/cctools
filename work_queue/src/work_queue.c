@@ -74,7 +74,7 @@ See the file COPYING for details.
 // Seconds between measurement of manager local resources
 #define WORK_QUEUE_RESOURCE_MEASUREMENT_INTERVAL 30
 
-#define WORKER_ADDRPORT_MAX 64
+#define WORKER_ADDRPORT_MAX 512
 #define WORKER_HASHKEY_MAX 32
 
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "wq-%d-task-%d"
