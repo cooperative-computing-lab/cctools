@@ -44,17 +44,18 @@ vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cach
 	{
 		vine_cache_status_t cache_status = vine_cache_ensure(cache, m->file->cached_name);
 
-		/* If transfer process is running now. */
-		if (cache_status == VINE_CACHE_STATUS_PROCESSING)
-			processing = 1;
-
-		/* If transfer complete but not ingested. */
-		if (cache_status == VINE_CACHE_STATUS_TRANSFERRED)
-			processing = 1;
-
-		/* If transfer definitely failed. */
-		if (cache_status == VINE_CACHE_STATUS_FAILED)
+		switch(cache_status){
+		case VINE_CACHE_STATUS_PENDING:
+		case VINE_CACHE_STATUS_PROCESSING:
+		case VINE_CACHE_STATUS_TRANSFERRED:	
+			processing++;
+			break;
+		case VINE_CACHE_STATUS_READY:
+			break;
+		case VINE_CACHE_STATUS_UNKNOWN:
+		case VINE_CACHE_STATUS_FAILED:
 			return VINE_CACHE_STATUS_FAILED;
+		}
 	}
 
 	if (processing) {

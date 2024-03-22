@@ -1305,9 +1305,27 @@ static int process_ready_to_run_now(struct vine_process *p, struct vine_cache *c
 Return true if this process can run eventually, supposing that other processes will complete.
 */
 
-static int process_can_run_eventually(struct vine_process *p)
+static int process_can_run_eventually(struct vine_process *p, struct vine_cache *cache, struct link *manager )
 {
-	return task_resources_fit_eventually(p->task);
+	if (!task_resources_fit_eventually(p->task))
+		return 0;
+
+	if (p->task->needs_library) {
+		p->library_process = find_library_for_function(p->task->needs_library);
+		if (!p->library_process)
+			return 0;
+	}
+
+	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager);
+	switch(status) {
+	case VINE_CACHE_STATUS_FAILED:
+	case VINE_CACHE_STATUS_UNKNOWN:
+		return 0;
+	default:
+		break;
+	}
+
+	return 1;
 }
 
 void forsake_waiting_process(struct link *manager, struct vine_process *p)
@@ -1580,7 +1598,7 @@ static void vine_worker_serve_manager(struct link *manager)
 				} else if (process_ready_to_run_now(p, cache_manager, manager)) {
 					start_process(p, manager);
 					task_event++;
-				} else if (process_can_run_eventually(p)) {
+				} else if (process_can_run_eventually(p, cache_manager, manager)) {
 					list_push_tail(procs_waiting, p);
 				} else {
 					forsake_waiting_process(manager, p);
