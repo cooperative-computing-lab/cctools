@@ -76,7 +76,6 @@ class DaskVine(Manager):
     #                      to set maximum resource usage per task.
     # @param lib_resources A dictionary with optional keys of cores, memory and disk (MB)
     # @param lib_command A command to be prefixed to the execution of a Library task.
-    # @param lib_environment path to environent file for a Library (string).
     # @param import_modules Hoist these module imports for the DaskVine Library.
     # @param env_per_task execute each task
     # @param resources_mode Automatically resize allocation per task. One of 'fixed'
@@ -103,7 +102,6 @@ class DaskVine(Manager):
             verbose=False,
             lib_resources=None,
             lib_command=None,
-            lib_environment=None,
             import_modules=None,
             task_mode='tasks',
             env_per_task=False,
@@ -129,7 +127,6 @@ class DaskVine(Manager):
             self.verbose = verbose
             self.lib_resources = lib_resources
             self.lib_command = lib_command
-            self.lib_environment = lib_environment
             self.import_modules = import_modules
             self.task_mode = task_mode
             self.env_per_task = env_per_task
@@ -167,10 +164,13 @@ class DaskVine(Manager):
         if self.task_mode == 'function-calls':
             libtask = self.create_library_from_functions('Dask-Library',
                                                          execute_graph_vertex,
-                                                         poncho_env=self.lib_environment,
+                                                         poncho_env="dummy-value",
                                                          add_env=False,
                                                          init_command=self.lib_command,
                                                          import_modules=self.import_modules)
+
+            if self.environment:
+                libtask.add_environment(self.environment)
 
             if self.lib_resources:
                 if 'cores' in self.lib_resources:
