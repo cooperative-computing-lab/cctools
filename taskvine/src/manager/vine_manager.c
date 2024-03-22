@@ -2669,7 +2669,7 @@ then updating all auxiliary data structures to note the
 assignment and the new task state.
 */
 
-static void commit_task_to_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	/* Kill empty libraries to reclaim resources. Match the assumption of
 	 * @vine.schedule.c:check_worker_have_enough_resources() */
@@ -2704,6 +2704,8 @@ static void commit_task_to_worker(struct vine_manager *q, struct vine_worker_inf
 		debug(D_VINE, "Failed to send task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
 	}
+
+	return result;
 }
 
 /* 1 if task resubmitted, 0 otherwise */
@@ -3070,9 +3072,8 @@ int vine_manager_check_worker_can_run_function_task(
 	struct vine_task *library = find_library_on_worker_for_task(w, t->needs_library);
 	if (!library) {
 		library = send_library_to_worker(q, w, t->needs_library);
-	}
-	if (!library) {
-		return 0;
+		/* Careful: If this failed, then the worker object may longer be valid! */
+		if (!library) return 0;
 	}
 
 	// Mark that this function task will be run on this library.
@@ -4404,9 +4405,15 @@ static struct vine_task *send_library_to_worker(struct vine_manager *q, struct v
 	itable_insert(q->tasks, t->task_id, vine_task_clone(t));
 
 	/* Send the task to the worker in the usual way. */
-	commit_task_to_worker(q, w, t);
+	vine_result_code_t result = commit_task_to_worker(q, w, t);
 
-	return t;
+	/* Careful: If this failed, then the worker object may longer be valid! */
+
+	if(result==VINE_SUCCESS) {
+		return t;
+	} else {
+		return 0;
+	}
 }
 
 struct vine_task *vine_manager_find_library_on_worker(
