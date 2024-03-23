@@ -3073,7 +3073,8 @@ int vine_manager_check_worker_can_run_function_task(
 	if (!library) {
 		library = send_library_to_worker(q, w, t->needs_library);
 		/* Careful: If this failed, then the worker object may longer be valid! */
-		if (!library) return 0;
+		if (!library)
+			return 0;
 	}
 
 	// Mark that this function task will be run on this library.
@@ -4409,7 +4410,7 @@ static struct vine_task *send_library_to_worker(struct vine_manager *q, struct v
 
 	/* Careful: If this failed, then the worker object may longer be valid! */
 
-	if(result==VINE_SUCCESS) {
+	if (result == VINE_SUCCESS) {
 		return t;
 	} else {
 		return 0;
