@@ -119,17 +119,19 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		return found;
 	}
 
-	int to_find = m->temp_replica_count - set_size(sources);
+	int nsources = set_size(sources);
+	int to_find = m->temp_replica_count - nsources;
 	if (to_find < 1) {
 		return found;
 	}
+
+	debug(D_VINE, "Found %d available workers to replicate %s, %d replicas needed", nsources, f->cached_name, to_find);
 
 	/* get the elements of set so we can insert new replicas to sources */
 	struct vine_worker_info **sources_frozen = (struct vine_worker_info **)set_values(sources);
 	struct vine_worker_info *source;
 
 	int i = 0;
-	int nsources = set_size(sources);
 	for (source = sources_frozen[i]; i < nsources; i++) {
 		if (found >= to_find) {
 			break;
@@ -146,6 +148,10 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 				"worker://%s:%d/%s", source->transfer_addr, source->transfer_port, f->cached_name);
 		int source_in_use = vine_current_transfers_worker_in_use(m, source_addr);
 
+		if (source_in_use >= m->worker_source_max_transfers) {
+			continue;
+		}
+
 		char *id;
 		struct vine_worker_info *peer;
 		int offset_bookkeep;
@@ -158,9 +164,6 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 				*/
 			}
 
-			if (source_in_use >= m->worker_source_max_transfers) {
-				break;
-			}
 
 			if (!peer->transfer_port_active) {
 				continue;
@@ -171,6 +174,10 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 			}
 
 			if (vine_current_transfers_dest_in_use(m, peer) >= m->worker_source_max_transfers) {
+				continue;
+			}
+
+			if(vine_current_file_worker_receiving(peer, f->cached_name)){
 				continue;
 			}
 

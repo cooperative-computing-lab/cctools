@@ -84,6 +84,22 @@ int vine_current_transfers_dest_in_use(struct vine_manager *q, struct vine_worke
 	return c;
 }
 
+// return true if worker w is currently a receiving file cachename, else false
+int vine_current_file_worker_receiving(struct vine_manager *q, struct vine_worker_info *w, const char *cachename){
+
+	char *id;
+	struct vine_transfer_pair *t;
+
+	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
+	{
+		if (t->to == w && strstr(t->source, cachename))
+			return 1;
+	}
+
+	return 0;
+
+}
+
 int vine_current_transfers_worker_in_use(struct vine_manager *q, const char *peer_addr)
 {
 	char *id;
