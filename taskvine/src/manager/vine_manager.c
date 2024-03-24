@@ -771,13 +771,27 @@ static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker
 	char *cached_name = NULL;
 	struct vine_file_replica *info = NULL;
 
+
 	// Iterate over files we want might want to recover 
 	HASH_TABLE_ITERATE(w->current_files, cached_name, info)
 	{	
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
 
 		if (f && f->type == VINE_TEMP) { // replicate temp files
-			vine_file_replica_table_replicate(q, f);
+
+			struct set *workers = hash_table_lookup(q->file_worker_table, cached_name);
+
+			if (workers) {
+				set_remove(workers, w);
+				if (set_size(workers) < 1) {
+					hash_table_remove(m->file_worker_table, cachename);
+					set_delete(workers);
+					continue;
+				}
+
+				vine_file_replica_table_replicate(q, f);
+			}
+
 		}
 
 	}
