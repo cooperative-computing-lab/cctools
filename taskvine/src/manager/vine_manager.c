@@ -765,6 +765,24 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	cleanup_worker_files(q, w);
 }
 
+/* Recover and replicate temp files of to be removed worker to reach threshold n */
+
+static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker_info *w){
+	char *cached_name = NULL;
+	struct vine_file_replica *info = NULL;
+
+	// Iterate over files we want might want to recover 
+	HASH_TABLE_ITERATE(w->current_files, cached_name, info)
+	{	
+		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
+
+		if (f && f->type == VINE_TEMP) { // replicate temp files
+			vine_file_replica_table_replicate(q, f);
+		}
+
+	}
+}
+
 /* Remove a worker from this master by removing all remote state, all local state, and disconnecting. */
 
 static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason)
@@ -780,10 +798,12 @@ static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vi
 
 	vine_txn_log_write_worker(q, w, 1, reason);
 
-	cleanup_worker(q, w);
-
 	hash_table_remove(q->worker_table, w->hashkey);
 	hash_table_remove(q->workers_with_available_results, w->hashkey);
+
+	recover_worker_temp_files(q, w);
+
+	cleanup_worker(q, w);
 
 	vine_manager_factory_worker_leave(q, w);
 
