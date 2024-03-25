@@ -4388,6 +4388,19 @@ static struct vine_task *send_library_to_worker(struct vine_manager *q, struct v
 	if (!original)
 		return 0;
 
+	/*
+	If an instance of this library has recently failed,
+	don't send another right away.  This is a rather late (and inefficient)
+	point at which to notice this, but we don't know that we are starting
+	a new library until the moment of scheduling a function to that worker.
+	*/
+
+	timestamp_t lastfail = original->time_when_last_failure;
+	timestamp_t current = timestamp_get();
+	if(current < (lastfail + q->transient_error_interval*ONE_SECOND)) {
+		return 0;
+	}
+	
 	/* Duplicate the original task */
 	struct vine_task *t = vine_task_copy(original);
 
