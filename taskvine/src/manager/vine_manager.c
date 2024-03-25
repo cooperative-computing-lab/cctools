@@ -779,14 +779,14 @@ static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker
 
 		if (f && f->type == VINE_TEMP) { // replicate temp files
 
-				if(!vine_file_worker_table_remove(q, w, cached_name)){
-					continue;
-				}
-
-				vine_file_replica_table_replicate(q, f);
+			if (!vine_file_worker_table_remove(q, w, cached_name)) {
+				continue;
 			}
+
+			vine_file_replica_table_replicate(q, f);
 		}
 	}
+}
 }
 
 /* Remove a worker from this master by removing all remote state, all local state, and disconnecting. */

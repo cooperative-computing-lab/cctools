@@ -37,9 +37,10 @@ int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_in
 }
 
 // remove a file from the file worker table.
-int vine_file_worker_table_remove(struct vine_manager *m, struct vine_worker_info *w, const char *cachename){
+int vine_file_worker_table_remove(struct vine_manager *m, struct vine_worker_info *w, const char *cachename)
+{
 	struct set *workers = hash_table_lookup(m->file_worker_table, cachename);
-	
+
 	if (workers) {
 		set_remove(workers, w);
 		if (set_size(workers) < 1) {
@@ -65,7 +66,6 @@ struct vine_file_replica *vine_file_replica_table_remove(
 
 	return replica;
 }
-
 
 // lookup a file in posession of a specific worker
 struct vine_file_replica *vine_file_replica_table_lookup(struct vine_worker_info *w, const char *cachename)
