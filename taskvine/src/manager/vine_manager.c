@@ -779,7 +779,7 @@ static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker
 
 		if (f && f->type == VINE_TEMP) { // replicate temp files
 
-			if (!vine_file_worker_table_remove(q, w, cached_name)) {
+			if (!vine_file_worker_table_remove(q, w, cached_name)) { // if current lost worker is the only worker that has file, we can't do anything about it
 				continue;
 			}
 
