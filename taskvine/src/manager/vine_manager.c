@@ -789,7 +789,6 @@ static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker
 		}
 	}
 }
-}
 
 /* Remove a worker from this master by removing all remote state, all local state, and disconnecting. */
 
