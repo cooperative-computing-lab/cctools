@@ -1549,6 +1549,17 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		}
 	}
 
+	/*
+	A library should not ordinarily exit by any means.
+	If it does, count that as a failure in the original object,
+	which will cause future dispatches of the library to be throttled.
+	*/
+
+	if(t->provides_library) {
+		struct vine_task *original = hash_table_lookup(q->libraries,t->provides_library);
+		if(original) original->time_when_last_failure = timestamp_get();
+	}
+	
 	itable_remove(q->running_table, t->task_id);
 	change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
 
