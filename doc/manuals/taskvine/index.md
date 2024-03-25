@@ -764,9 +764,9 @@ If peer transfers have been disabled, they may be re-enabled accordingly:
     vine_enable_peer_transfers(m);
     ```
 
-Transfers between workers may be impacted by transient issues which may cause intermittent transfer failures. In these situations we take note of the 
-failure that occured, and avoid using the same worker as a source for a period of time. This time period has a default value of 10 seconds.
-It may be changed by the user using `vine_tune` with the parameter `transient-error-interval`. 
+Transfers between workers may be impacted by transient issues which may cause intermittent transfer failures. In these situations we take note of the
+failure that occured, and avoid using the same worker as a source for a period of time. This time period has a default value of 15 seconds.
+It may be changed by the user using `vine_tune` with the parameter `transient-error-interval`.
 
 ### MiniTasks
 
@@ -2418,10 +2418,9 @@ change.
 | ramp-down-heuristic     | If set to 1 and there are more workers than tasks waiting, then tasks are allocated all the free resources of a worker large enough to run them. If monitoring watchdog is not enabled, then this heuristic has no effect. | 0 |
 | resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
 | temp-replica-count    | Number of temp file replicas created across workers | 0 |
-| transient-error-interval | Seconds between new attempts on task rescheduling and using a file replica as source after a failure. | 15 |
+| transient-error-interval | Time to wait in seconds after a resource failure before attempting to use it again | 15 |
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
 | worker-retrievals | If 1, retrieve all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |
-| transient-error-interval | Time to wait in seconds after a resource failure before attempting to use it again | 5 |
 
 === "Python"
     ```python
