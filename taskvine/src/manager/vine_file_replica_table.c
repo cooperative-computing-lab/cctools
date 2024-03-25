@@ -125,7 +125,11 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		return found;
 	}
 
-	debug(D_VINE, "Found %d available workers to replicate %s, %d replicas needed", nsources, f->cached_name, to_find);
+	debug(D_VINE,
+			"Found %d available workers to replicate %s, %d replicas needed",
+			nsources,
+			f->cached_name,
+			to_find);
 
 	/* get the elements of set so we can insert new replicas to sources */
 	struct vine_worker_info **sources_frozen = (struct vine_worker_info **)set_values(sources);
@@ -152,7 +156,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		struct vine_worker_info *peer;
 		int offset_bookkeep;
 		HASH_TABLE_ITERATE_RANDOM_START(m->worker_table, offset_bookkeep, id, peer)
-		{	
+		{
 
 			if (found_per_source >= MIN(m->file_source_max_transfers, to_find)) {
 				/* XXX: commenting this check for now, as otherwise only one replica is created.
@@ -177,7 +181,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 				continue;
 			}
 
-			if(vine_current_file_worker_receiving(m, peer, f->cached_name)){
+			if (vine_current_file_worker_receiving(m, peer, f->cached_name)) {
 				continue;
 			}
 

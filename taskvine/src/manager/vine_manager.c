@@ -767,14 +767,14 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 
 /* Recover and replicate temp files of to be removed worker to reach threshold n */
 
-static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker_info *w){
+static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker_info *w)
+{
 	char *cached_name = NULL;
 	struct vine_file_replica *info = NULL;
 
-
-	// Iterate over files we want might want to recover 
+	// Iterate over files we want might want to recover
 	HASH_TABLE_ITERATE(w->current_files, cached_name, info)
-	{	
+	{
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
 
 		if (f && f->type == VINE_TEMP) { // replicate temp files
@@ -791,9 +791,7 @@ static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker
 
 				vine_file_replica_table_replicate(q, f);
 			}
-
 		}
-
 	}
 }
 
