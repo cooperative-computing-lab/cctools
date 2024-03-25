@@ -1782,11 +1782,14 @@ static struct list *interfaces_to_list(const char *canonical_host_or_addr, int p
 	}
 
 	if (host_aliases && !found_canonical) {
-		warn(D_NOTICE, "Did not find the manager address '%s' in the list of interfaces.", canonical_host_or_addr);
+		warn(D_NOTICE,
+				"Did not find the manager address '%s' in the list of interfaces.",
+				canonical_host_or_addr);
 	}
 
 	if (!found_canonical) {
-		/* We get here if no interfaces were defined, or if canonical_host_or_addr was not found in the interfaces. */
+		/* We get here if no interfaces were defined, or if canonical_host_or_addr was not found in the
+		 * interfaces. */
 
 		struct manager_address *m = calloc(1, sizeof(*m));
 		strncpy(m->host, canonical_host_or_addr, DOMAIN_NAME_MAX - 1);
