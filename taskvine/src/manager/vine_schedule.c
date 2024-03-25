@@ -166,6 +166,7 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	/* If this is a function task, check if the worker can run it.
 	 * May require the manager to send a library to the worker first. */
 	if (t->needs_library && !vine_manager_check_worker_can_run_function_task(q, w, t)) {
+		/* Careful: If this failed, then the worker object may longer be valid! */
 		return 0;
 	}
 
@@ -264,6 +265,7 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 
 	HASH_TABLE_ITERATE_RANDOM_START(q->worker_table, offset_bookkeep, key, w)
 	{
+		/* Careful: If check_worker_against task fails, then w may no longer be valid. */
 		if (check_worker_against_task(q, w, t)) {
 			task_cached_bytes = 0;
 			has_all_files = 1;
@@ -308,6 +310,7 @@ static struct vine_worker_info *find_worker_by_fcfs(struct vine_manager *q, stru
 	struct vine_worker_info *w;
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
+		/* Careful: If check_worker_against task fails, then w may no longer be valid. */
 		if (check_worker_against_task(q, w, t)) {
 			return w;
 		}
@@ -332,6 +335,7 @@ static struct vine_worker_info *find_worker_by_random(struct vine_manager *q, st
 	// HASH_TABLE_ITERATE_RANDOM_START would give preference to workers that appear first in a bucket.
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
+		/* Careful: If check_worker_against task fails, then w may no longer be valid. */
 		if (check_worker_against_task(q, w, t)) {
 			list_push_tail(valid_workers, w);
 		}
@@ -365,7 +369,7 @@ static struct vine_worker_info *find_worker_by_worst_fit(struct vine_manager *q,
 
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
-
+		/* Careful: If check_worker_against task fails, then w may no longer be valid. */
 		if (check_worker_against_task(q, w, t)) {
 			if (!best_worker || candidate_has_worse_fit(best_worker, w)) {
 				best_worker = w;
@@ -391,6 +395,7 @@ static struct vine_worker_info *find_worker_by_time(struct vine_manager *q, stru
 
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
+		/* Careful: If check_worker_against task fails, then w may no longer be valid. */
 		if (check_worker_against_task(q, w, t)) {
 			if (w->total_tasks_complete > 0) {
 				double t = (w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
