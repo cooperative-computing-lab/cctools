@@ -21,6 +21,7 @@ struct vine_file_replica {
 	int64_t           size;
 	time_t            mtime;
 	timestamp_t       transfer_time;
+	timestamp_t       last_failure_time;
 	vine_file_replica_state_t state;
 };
 

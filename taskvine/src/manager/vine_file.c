@@ -82,6 +82,7 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 	memset(f, 0, sizeof(*f));
 
 	f->source = source ? xxstrdup(source) : 0;
+	f->source_worker = 0;
 	f->type = type;
 	f->size = size;
 	f->mini_task = mini_task;
@@ -205,9 +206,11 @@ struct vine_file *vine_file_url(const char *source, vine_cache_level_t cache, vi
 	return vine_file_create(source, 0, 0, 0, VINE_URL, 0, cache, flags);
 }
 
-struct vine_file *vine_file_substitute_url(struct vine_file *f, const char *source)
+struct vine_file *vine_file_substitute_url(struct vine_file *f, const char *source, struct vine_worker_info *w)
 {
-	return vine_file_create(source, f->cached_name, 0, f->size, VINE_URL, 0, 0, 0);
+	struct vine_file *sub = vine_file_create(source, f->cached_name, 0, f->size, VINE_URL, 0, 0, 0);
+	sub->source_worker = w;
+	return sub;
 }
 
 struct vine_file *vine_file_temp()

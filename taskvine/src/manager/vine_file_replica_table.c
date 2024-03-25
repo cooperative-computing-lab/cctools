@@ -99,12 +99,18 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 		if (!peer->transfer_port_active)
 			continue;
 
+		timestamp_t current_time = timestamp_get();
+		if (((current_time - peer->last_transfer_failure) / 1000000) <
+				(long unsigned int)q->transient_error_interval) {
+			debug(D_VINE, "Skipping worker source after recent failure : %s", peer->transfer_addr);
+			continue;
+		}
+
 		if ((replica = hash_table_lookup(peer->current_files, cachename)) &&
 				replica->state == VINE_FILE_REPLICA_STATE_READY) {
-
 			// generate a peer address stub as it would appear in the transfer table
 			char *peer_addr = string_format("worker://%s:%d", peer->transfer_addr, peer->transfer_port);
-			int current_transfers = vine_current_transfers_worker_in_use(q, peer_addr);
+			int current_transfers = vine_current_transfers_source_in_use(q, peer);
 			free(peer_addr);
 
 			if (current_transfers < q->worker_source_max_transfers) {
@@ -160,7 +166,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 		char *source_addr = string_format(
 				"worker://%s:%d/%s", source->transfer_addr, source->transfer_port, f->cached_name);
-		int source_in_use = vine_current_transfers_worker_in_use(m, source_addr);
+		int source_in_use = vine_current_transfers_source_in_use(m, source);
 
 		char *id;
 		struct vine_worker_info *peer;

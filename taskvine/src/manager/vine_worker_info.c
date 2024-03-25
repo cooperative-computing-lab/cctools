@@ -38,6 +38,7 @@ struct vine_worker_info *vine_worker_create(struct link *lnk)
 	w->end_time = -1;
 
 	w->last_update_msg_time = w->start_time;
+	w->last_transfer_failure = 0;
 
 	return w;
 }
