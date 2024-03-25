@@ -1260,15 +1260,15 @@ static int task_resources_fit_eventually(struct vine_task *t)
 }
 
 /*
-Find a suitable library process that provides the given library name and is ready to be invoked
+Find a suitable library process that provides the given library name in the given table.
 */
 
-struct vine_process *find_library_for_function(const char *library_name)
+static struct vine_process *find_library_for_function(struct itable *table, const char *library_name)
 {
 	uint64_t task_id;
 	struct vine_process *p;
 
-	ITABLE_ITERATE(procs_running, task_id, p)
+	ITABLE_ITERATE(table, task_id, p)
 	{
 		if (p->task->provides_library && !strcmp(p->task->provides_library, library_name)) {
 			if (p->library_ready && p->functions_running < p->task->function_slots) {
@@ -1277,6 +1277,20 @@ struct vine_process *find_library_for_function(const char *library_name)
 		}
 	}
 	return 0;
+}
+
+/* Find a process that is running NOW with the given library name. */
+
+static struct vine_process *find_running_library_for_function(const char *library_name)
+{
+	return find_library_for_function(procs_running, library_name);
+}
+
+/* Find a process that is running or ready with the given library name. */
+
+static struct vine_process *find_any_library_for_function(const char *library_name)
+{
+	return find_library_for_function(procs_table, library_name);
 }
 
 /*
@@ -1289,7 +1303,8 @@ static int process_ready_to_run_now(struct vine_process *p, struct vine_cache *c
 		return 0;
 
 	if (p->task->needs_library) {
-		p->library_process = find_library_for_function(p->task->needs_library);
+		/* Here is where we attach a function to a specific library. */
+		p->library_process = find_running_library_for_function(p->task->needs_library);
 		if (!p->library_process)
 			return 0;
 	}
@@ -1311,9 +1326,10 @@ static int process_can_run_eventually(struct vine_process *p, struct vine_cache 
 		return 0;
 
 	if (p->task->needs_library) {
-		p->library_process = find_library_for_function(p->task->needs_library);
-		if (!p->library_process)
+		/* Note that we check for *some* library but do not bind to it. */
+		if (!find_any_library_for_function(p->task->needs_library)) {
 			return 0;
+		}
 	}
 
 	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager);
