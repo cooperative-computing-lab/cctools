@@ -1771,6 +1771,8 @@ static struct list *interfaces_to_list(const char *addr, int port, struct jx *if
 				found_canonical = 1;
 			}
 
+			// copy ip addr to hostname to work as if the user had entered a particular ip
+			// for the manager.
 			struct manager_address *m = calloc(1, sizeof(*m));
 			strncpy(m->host, ifa_addr, DOMAIN_NAME_MAX - 1);
 			m->port = port;
