@@ -1029,6 +1029,9 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 		break;
 	}
 
+	/* Regardless of the exit status, remove the task and sandbox from the worker. */
+	vine_manager_send(q, w, "kill %d\n", t->task_id);
+
 	if (result != VINE_SUCCESS) {
 		debug(D_VINE, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
 		t->time_when_last_failure = timestamp_get();
