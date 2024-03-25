@@ -44,10 +44,10 @@ vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cach
 	{
 		vine_cache_status_t cache_status = vine_cache_ensure(cache, m->file->cached_name);
 
-		switch(cache_status){
+		switch (cache_status) {
 		case VINE_CACHE_STATUS_PENDING:
 		case VINE_CACHE_STATUS_PROCESSING:
-		case VINE_CACHE_STATUS_TRANSFERRED:	
+		case VINE_CACHE_STATUS_TRANSFERRED:
 			processing++;
 			break;
 		case VINE_CACHE_STATUS_READY:

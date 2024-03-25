@@ -1305,7 +1305,7 @@ static int process_ready_to_run_now(struct vine_process *p, struct vine_cache *c
 Return true if this process can run eventually, supposing that other processes will complete.
 */
 
-static int process_can_run_eventually(struct vine_process *p, struct vine_cache *cache, struct link *manager )
+static int process_can_run_eventually(struct vine_process *p, struct vine_cache *cache, struct link *manager)
 {
 	if (!task_resources_fit_eventually(p->task))
 		return 0;
@@ -1317,7 +1317,7 @@ static int process_can_run_eventually(struct vine_process *p, struct vine_cache 
 	}
 
 	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager);
-	switch(status) {
+	switch (status) {
 	case VINE_CACHE_STATUS_FAILED:
 	case VINE_CACHE_STATUS_UNKNOWN:
 		return 0;
