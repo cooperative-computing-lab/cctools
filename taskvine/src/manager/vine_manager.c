@@ -813,7 +813,9 @@ static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vi
 	hash_table_remove(q->worker_table, w->hashkey);
 	hash_table_remove(q->workers_with_available_results, w->hashkey);
 
-	recover_worker_temp_files(q, w);
+	if(q->transfer_temps_recovery){
+		recover_worker_temp_files(q, w);
+	}
 
 	cleanup_worker(q, w);
 
