@@ -15,6 +15,7 @@ struct vine_file_replica *vine_file_replica_create(
 	r->size = size;
 	r->mtime = mtime;
 	r->transfer_time = 0;
+	r->last_failure_time = 0;
 	r->state = VINE_FILE_REPLICA_STATE_PENDING;
 	return r;
 }

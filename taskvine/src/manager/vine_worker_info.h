@@ -72,6 +72,7 @@ struct vine_worker_info {
 
 	timestamp_t total_task_time;
 	timestamp_t total_transfer_time;
+	timestamp_t last_transfer_failure;
 	timestamp_t start_time;
 	timestamp_t last_msg_recv_time;
 	timestamp_t last_update_msg_time;

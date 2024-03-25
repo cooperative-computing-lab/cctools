@@ -2896,7 +2896,7 @@ static int vine_manager_transfer_capacity_available(
 						peer->transfer_addr,
 						peer->transfer_port,
 						m->file->cached_name);
-				m->substitute = vine_file_substitute_url(m->file, peer_source);
+				m->substitute = vine_file_substitute_url(m->file, peer_source, peer);
 				free(peer_source);
 				found_match = 1;
 			}
@@ -2914,7 +2914,7 @@ static int vine_manager_transfer_capacity_available(
 		*/
 		if (m->file->type == VINE_URL) {
 			/* For a URL transfer, we can fall back to the original if capacity is available. */
-			if (vine_current_transfers_source_in_use(q, m->file->source) >= q->file_source_max_transfers) {
+			if (vine_current_transfers_url_in_use(q, m->file->source) >= q->file_source_max_transfers) {
 				return 0;
 			} else {
 				/* keep going */
