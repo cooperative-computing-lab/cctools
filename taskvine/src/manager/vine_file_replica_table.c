@@ -159,7 +159,6 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 				 * We need to create replicas during wait_internal too.
 					break;
 				*/
-				break;
 			}
 
 			if (source_in_use >= m->worker_source_max_transfers) {
