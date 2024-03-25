@@ -784,7 +784,7 @@ static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker
 			if (workers) {
 				set_remove(workers, w);
 				if (set_size(workers) < 1) {
-					hash_table_remove(m->file_worker_table, cachename);
+					hash_table_remove(q->file_worker_table, cached_name);
 					set_delete(workers);
 					continue;
 				}
