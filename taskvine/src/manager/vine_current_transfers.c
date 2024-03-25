@@ -85,7 +85,7 @@ int vine_current_transfers_dest_in_use(struct vine_manager *q, struct vine_worke
 }
 
 // return true if worker w is currently a receiving file cachename, else false
-int vine_current_transfer_file_worker_recv(struct vine_manager *q, struct vine_worker_info *w, const char *cachename)
+int vine_current_transfers_file_worker_recv(struct vine_manager *q, struct vine_worker_info *w, const char *cachename)
 {
 
 	char *id;
