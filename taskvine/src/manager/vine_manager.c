@@ -813,7 +813,7 @@ static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vi
 	hash_table_remove(q->worker_table, w->hashkey);
 	hash_table_remove(q->workers_with_available_results, w->hashkey);
 
-	if(q->transfer_temps_recovery){
+	if (q->transfer_temps_recovery) {
 		recover_worker_temp_files(q, w);
 	}
 
@@ -5222,7 +5222,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "immediate-recovery")) {
 		q->immediate_recovery = !!((int)value);
-		
+
 	} else if (!strcmp(name, "transfer_temps_recovery")) {
 		q->transfer_temps_recovery = !!((int)value);
 
