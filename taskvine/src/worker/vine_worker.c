@@ -1756,38 +1756,43 @@ static int vine_worker_serve_manager_by_hostport_list(struct list *manager_addre
 	return result;
 }
 
-static struct list *interfaces_to_list(const char *addr, int port, struct jx *ifas)
+static struct list *interfaces_to_list(const char *canonical_host_or_addr, int port, struct jx *host_aliases)
 {
 	struct list *l = list_create();
-	struct jx *ifa;
+	struct jx *host_alias;
 
 	int found_canonical = 0;
 
-	if (ifas) {
-		for (void *i = NULL; (ifa = jx_iterate_array(ifas, &i));) {
-			const char *ifa_addr = jx_lookup_string(ifa, "host");
+	if (host_aliases) {
+		for (void *i = NULL; (host_alias = jx_iterate_array(host_aliases, &i));) {
+			const char *address = jx_lookup_string(host_alias, "address");
 
-			if (ifa_addr && strcmp(addr, ifa_addr) == 0) {
+			if (address && strcmp(canonical_host_or_addr, address) == 0) {
 				found_canonical = 1;
 			}
 
+			// copy ip addr to hostname to work as if the user had entered a particular ip
+			// for the manager.
 			struct manager_address *m = calloc(1, sizeof(*m));
-			strncpy(m->host, ifa_addr, LINK_ADDRESS_MAX);
+			strncpy(m->host, address, DOMAIN_NAME_MAX - 1);
 			m->port = port;
 
 			list_push_tail(l, m);
 		}
 	}
 
-	if (ifas && !found_canonical) {
-		warn(D_NOTICE, "Did not find the manager address '%s' in the list of interfaces.", addr);
+	if (host_aliases && !found_canonical) {
+		warn(D_NOTICE,
+				"Did not find the manager address '%s' in the list of interfaces.",
+				canonical_host_or_addr);
 	}
 
 	if (!found_canonical) {
-		/* We get here if no interfaces were defined, or if addr was not found in the interfaces. */
+		/* We get here if no interfaces were defined, or if canonical_host_or_addr was not found in the
+		 * interfaces. */
 
 		struct manager_address *m = calloc(1, sizeof(*m));
-		strncpy(m->host, addr, LINK_ADDRESS_MAX);
+		strncpy(m->host, canonical_host_or_addr, DOMAIN_NAME_MAX - 1);
 		m->port = port;
 
 		list_push_tail(l, m);
@@ -1823,7 +1828,7 @@ static int vine_worker_serve_manager_by_name(const char *catalog_hosts, const ch
 		const char *name = jx_lookup_string(jx, "name");
 		const char *addr = jx_lookup_string(jx, "address");
 		const char *pref = jx_lookup_string(jx, "manager_preferred_connection");
-		struct jx *ifas = jx_lookup(jx, "network_interfaces");
+		struct jx *host_aliases = jx_lookup(jx, "network_interfaces");
 		int port = jx_lookup_integer(jx, "port");
 		int use_ssl = jx_lookup_boolean(jx, "ssl");
 
@@ -1872,7 +1877,7 @@ static int vine_worker_serve_manager_by_name(const char *catalog_hosts, const ch
 			manager_addresses = interfaces_to_list(addr, port, NULL);
 		} else {
 			debug(D_VINE, "selected manager with project=%s addr=%s port=%d", project, addr, port);
-			manager_addresses = interfaces_to_list(addr, port, ifas);
+			manager_addresses = interfaces_to_list(addr, port, host_aliases);
 		}
 
 		result = vine_worker_serve_manager_by_hostport_list(manager_addresses, use_ssl);
@@ -2009,7 +2014,7 @@ struct list *parse_manager_addresses(const char *specs, int default_port)
 		}
 
 		struct manager_address *m = calloc(1, sizeof(*m));
-		strncpy(m->host, next_manager, LINK_ADDRESS_MAX);
+		strncpy(m->host, next_manager, DOMAIN_NAME_MAX - 1);
 		m->port = port;
 
 		if (port_str) {
