@@ -181,7 +181,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 				continue;
 			}
 
-			if (vine_current_file_worker_receiving(m, peer, f->cached_name)) {
+			if (vine_current_transfer_file_worker_recv(m, peer, f->cached_name)) {
 				continue;
 			}
 
