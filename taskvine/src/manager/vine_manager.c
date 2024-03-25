@@ -3743,6 +3743,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->perf_log_interval = VINE_PERF_LOG_INTERVAL;
 
 	q->temp_replica_count = 0;
+	q->transfer_temps_recovery = 0;
 
 	q->resource_submit_multiplier = 1.0;
 
