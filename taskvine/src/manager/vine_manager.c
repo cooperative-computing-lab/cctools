@@ -90,8 +90,8 @@ See the file COPYING for details.
 /* Default value for keepalive timeout in seconds. */
 #define VINE_DEFAULT_KEEPALIVE_TIMEOUT 900
 
-/* Default value to before entity is considered again after last failure */
-#define VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL 15
+/* Default value to before entity is considered again after last failure, in usecs */
+#define VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL (15 * ONE_SECOND)
 
 /* Default value for maximum size of standard output from task.  (If larger, send to a separate file.) */
 #define MAX_TASK_STDOUT_STORAGE (1 * GIGABYTE)
@@ -3130,7 +3130,7 @@ static int send_one_task(struct vine_manager *q)
 
 	timestamp_t now_usecs = timestamp_get();
 	double now_secs = ((double)now_usecs) / ONE_SECOND;
-	timestamp_t time_failure_range = now_usecs - q->transient_error_interval * ONE_SECOND;
+	timestamp_t time_failure_range = now_usecs - q->transient_error_interval;
 
 	int tasks_to_consider = MIN(list_size(q->ready_list), q->attempt_schedule_depth);
 
@@ -4432,7 +4432,7 @@ static struct vine_task *send_library_to_worker(struct vine_manager *q, struct v
 
 	timestamp_t lastfail = original->time_when_last_failure;
 	timestamp_t current = timestamp_get();
-	if (current < (lastfail + q->transient_error_interval * ONE_SECOND)) {
+	if (current < lastfail + q->transient_error_interval) {
 		return 0;
 	}
 
@@ -5281,7 +5281,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		if (value < 1) {
 			q->transient_error_interval = VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL;
 		} else {
-			q->transient_error_interval = value;
+			q->transient_error_interval = value * ONE_SECOND;
 		}
 
 	} else {
