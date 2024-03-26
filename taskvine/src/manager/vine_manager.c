@@ -433,8 +433,12 @@ static int handle_cache_invalid(struct vine_manager *q, struct vine_worker_info 
 
 		/* Remove the replica from our records. */
 		struct vine_file_replica *replica = vine_file_replica_table_remove(q, w, cachename);
-		if (replica)
+		if (replica) {
 			vine_file_replica_delete(replica);
+		}
+
+		/* throttle workers that could transfer a file */
+		w->last_failure_time = timestamp_get();
 
 		/* If the third argument was given, also remove the transfer record */
 		if (n >= 3) {
