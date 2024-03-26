@@ -1263,7 +1263,7 @@ static int task_resources_fit_eventually(struct vine_task *t)
 Find a suitable library process that can provide a slot to run this library right NOW.
 */
 
-static struct vine_process *find_running_library_for_function( const char *library_name)
+static struct vine_process *find_running_library_for_function(const char *library_name)
 {
 	uint64_t task_id;
 	struct vine_process *p;
@@ -1306,7 +1306,7 @@ static int process_ready_to_run_now(struct vine_process *p, struct vine_cache *c
 Find a suitable library process that could serve this function in the future.
 */
 
-static struct vine_process *find_future_library_for_function( const char *library_name )
+static struct vine_process *find_future_library_for_function(const char *library_name)
 {
 	uint64_t task_id;
 	struct vine_process *p;
