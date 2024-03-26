@@ -295,7 +295,7 @@ slurm_submit_workers_command()
         sbatch="echo sbatch"
         echo "######## worker.sh ########"
         echo "#!/bin/sh"
-        echo "vine_worker $arguments $host $port"
+        echo "${submit_dir}"/vine_worker $arguments $host $port
         echo "####################################"
     fi
 
@@ -305,7 +305,7 @@ slurm_submit_workers_command()
         to_submit=$((to_submit-1))
         ${sbatch} --job-name vineWorker --ntasks=1 --nodes=1 $slurm_parameters <<EOF
 #!/bin/sh
-vine_worker $arguments $host $port
+"${submit_dir}"/vine_worker $arguments $host $port
 EOF
     done
 
