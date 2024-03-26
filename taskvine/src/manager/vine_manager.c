@@ -1538,6 +1538,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 
 	/* If the task was forsaken by the worker or couldn't exeute, it didn't really complete, so short circuit. */
 	if (task_status == VINE_RESULT_FORSAKEN) {
+		t->forsaken_count++;
 		itable_remove(q->running_table, t->task_id);
 		vine_task_set_result(t, task_status);
 		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
@@ -2795,10 +2796,12 @@ static int resubmit_task_on_exhaustion(struct vine_manager *q, struct vine_worke
 static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	/* in this function, any change_task_state should only be to VINE_TASK_READY */
-
 	if (t->result == VINE_RESULT_FORSAKEN) {
-		/* forsaken tasks are always resubmitted. they also get a retry back as they are victims of circumstance
-		 */
+		if (t->max_forsaken > -1 && t->forsaken_count > t->max_forsaken) {
+			return 0;
+		}
+
+		/* forsaken tasks get a retry back as they are victims of circumstance */
 		t->try_count -= 1;
 		change_task_state(q, t, VINE_TASK_READY);
 		return 1;
@@ -2810,8 +2813,7 @@ static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w
 	}
 
 	/* special handlings per result. note that most results are terminal, that is tasks are not retried even if they
-	 * have not reached max_retries. max_retries is only used for transient errors, or for modified tasks (such as a
-	 * change in the resource request). */
+	 * have not reached max_retries. */
 	switch (t->result) {
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
 		return resubmit_task_on_exhaustion(q, w, t);
@@ -3125,7 +3127,6 @@ static int send_one_task(struct vine_manager *q)
 
 	timestamp_t now_usecs = timestamp_get();
 	double now_secs = ((double)now_usecs) / ONE_SECOND;
-	timestamp_t time_failure_range = now_usecs - q->transient_error_interval;
 
 	int tasks_to_consider = MIN(list_size(q->ready_list), q->attempt_schedule_depth);
 
@@ -3140,7 +3141,7 @@ static int send_one_task(struct vine_manager *q)
 		}
 
 		// Skip if this task failed recently
-		if (time_failure_range > t->time_when_last_failure) {
+		if (t->time_when_last_failure + q->transient_error_interval > now_usecs) {
 			continue;
 		}
 

@@ -423,9 +423,17 @@ class Task(object):
     # Indicate the number of times the task should be retried. If 0 (the
     # default), the task is tried indefinitely. A task that did not succeed
     # after the given number of retries is returned with result
-    # "result_max_retries".
+    # "max retries".
     def set_retries(self, max_retries):
         return cvine.vine_task_set_retries(self._task, max_retries)
+
+    ##
+    # Indicate the number of times the task can be returned to the manager
+    # without being executed. If 0 default), the task is tried indefinitely.
+    # A task that did not succeed after the given number of retries is returned
+    # with result "forsaken".
+    def set_max_forsaken(self, max_forsaken):
+        return cvine.vine_task_set_max_forsaken(self._task, max_forsaken)
 
     ##
     # Indicate the number of cores required by this task.
