@@ -1532,6 +1532,10 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		return VINE_SUCCESS;
 	}
 
+	if (task_status != VINE_RESULT_SUCCESS) {
+		w->last_failure_time = timestamp_get();
+	}
+
 	/* If the task was forsaken by the worker or couldn't exeute, it didn't really complete, so short circuit. */
 	if (task_status == VINE_RESULT_FORSAKEN || task_status == VINE_RESULT_TRANSFER_MISSING) {
 		itable_remove(q->running_table, t->task_id);
