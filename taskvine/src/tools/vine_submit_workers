@@ -355,7 +355,7 @@ sge_submit_workers_command()
     cat >worker.sh <<EOF
 #!/bin/sh
 
-../worker/vine_worker $arguments $host $port
+"${submit_dir}"/vine_worker $arguments $host $port
 EOF
 
     chmod 755 worker.sh
@@ -649,7 +649,7 @@ set_up_working_directory()
         then
             submit_dir=/tmp/"${USER}"-workers
         else
-            submit_dir="${USER}"-workers
+            submit_dir="${PWD}/${USER}"-workers
         fi
     fi
 
