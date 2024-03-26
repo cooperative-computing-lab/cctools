@@ -50,7 +50,7 @@ int vine_file_worker_table_remove(struct vine_manager *m, struct vine_worker_inf
 		}
 	}
 
-	return set_size(workers);
+	return workers ? set_size(workers) : 0;
 }
 
 // remove a file from the remote file table.
