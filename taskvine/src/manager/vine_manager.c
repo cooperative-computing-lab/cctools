@@ -1016,10 +1016,6 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 		/* If the worker didn't run the task don't bother fetching outputs. */
 		result = VINE_SUCCESS;
 		break;
-	case VINE_RESULT_TRANSFER_MISSING:
-		/* If the worker didn't run the task don't bother fetching outputs. */
-		result = VINE_TRANSIENT_FAILURE;
-		break;
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
 		/* On resource exhaustion, just get the monitor files to figure out what happened. */
 		result = vine_manager_get_monitor_output_file(q, w, t);
@@ -1071,7 +1067,6 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 	switch (t->result) {
 	case VINE_RESULT_INPUT_MISSING:
 	case VINE_RESULT_FORSAKEN:
-	case VINE_RESULT_TRANSFER_MISSING:
 		/* do not count tasks that didn't execute as complete, or finished tasks */
 		break;
 	default:
@@ -1537,7 +1532,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	}
 
 	/* If the task was forsaken by the worker or couldn't exeute, it didn't really complete, so short circuit. */
-	if (task_status == VINE_RESULT_FORSAKEN || task_status == VINE_RESULT_TRANSFER_MISSING) {
+	if (task_status == VINE_RESULT_FORSAKEN) {
 		itable_remove(q->running_table, t->task_id);
 		vine_task_set_result(t, task_status);
 		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
@@ -2815,15 +2810,6 @@ static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w
 	switch (t->result) {
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
 		return resubmit_task_on_exhaustion(q, w, t);
-		break;
-	case VINE_RESULT_TRANSFER_MISSING:
-		if (t->max_retries > 0 && t->try_count > t->max_retries) {
-			t->result = VINE_RESULT_INPUT_MISSING;
-			return 0;
-		} else {
-			change_task_state(q, t, VINE_TASK_READY);
-			return 1;
-		}
 		break;
 	default:
 		/* by default tasks are not resumitted */
@@ -4306,9 +4292,6 @@ const char *vine_result_string(vine_result_t result)
 		break;
 	case VINE_RESULT_LIBRARY_EXIT:
 		str = "LIBRARY_EXIT";
-		break;
-	case VINE_RESULT_TRANSFER_MISSING:
-		str = "TRANSFER_MISSING";
 		break;
 	}
 

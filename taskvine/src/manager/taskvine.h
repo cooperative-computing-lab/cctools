@@ -97,8 +97,7 @@ typedef enum {
 	VINE_RESULT_OUTPUT_TRANSFER_ERROR = 9 << 3,  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
 	VINE_RESULT_FIXED_LOCATION_MISSING = 10 << 3, /**< The task failed because no worker could satisfy the fixed location input file requirements. */
 	VINE_RESULT_CANCELLED = 11<<3, /**< The task was cancelled by the caller. */
-	VINE_RESULT_LIBRARY_EXIT        = 12 << 3, /**< Task is a library that has terminated. **/
-	VINE_RESULT_TRANSFER_MISSING    = 13 << 3, /**< Task failed because a worker could not fetch a file. **/
+	VINE_RESULT_LIBRARY_EXIT        = 12 << 3 /**< Task is a library that has terminated. **/
 } vine_result_t;
 
 /** Select how to allocate resources for similar tasks with @ref vine_set_category_mode */
