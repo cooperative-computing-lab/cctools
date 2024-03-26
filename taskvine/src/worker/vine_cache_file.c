@@ -25,7 +25,7 @@ struct vine_cache_file *vine_cache_file_create(
 	f->source = xxstrdup(source);
 	f->mini_task = mini_task;
 
-	f->status = VINE_CACHE_STATUS_NOT_PRESENT;
+	f->status = VINE_CACHE_STATUS_PENDING;
 
 	/* Remaining items default to zero. */
 	return f;
