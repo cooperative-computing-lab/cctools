@@ -61,6 +61,23 @@ int vine_current_transfers_remove(struct vine_manager *q, const char *id)
 	}
 }
 
+int vine_current_transfers_set_failure(struct vine_manager *q, char *id)
+{
+	struct vine_transfer_pair *p = hash_table_lookup(q->current_transfer_table, id);
+	struct vine_worker_info *source_worker = p->source_worker;
+
+	if (source_worker) {
+		source_worker->last_transfer_failure = timestamp_get();
+		debug(D_VINE,
+				"Setting transfer failure timestamp on worker: %s:%d",
+				source_worker->hostname,
+				source_worker->transfer_port);
+		return 1;
+	}
+
+	return 0;
+}
+
 // count the number transfers coming from a specific source
 int vine_current_transfers_source_in_use(struct vine_manager *q, struct vine_worker_info *source_worker)
 {
