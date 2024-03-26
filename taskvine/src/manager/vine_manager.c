@@ -1529,6 +1529,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 
 	if (task_status != VINE_RESULT_SUCCESS) {
 		w->last_failure_time = timestamp_get();
+		t->time_when_last_failure = w->last_failure_time;
 	}
 
 	/* If the task was forsaken by the worker or couldn't exeute, it didn't really complete, so short circuit. */
