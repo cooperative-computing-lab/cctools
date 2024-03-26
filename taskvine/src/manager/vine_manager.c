@@ -1532,10 +1532,10 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		return VINE_SUCCESS;
 	}
 
-	/* If the task was forsaken by the worker, it didn't really complete, so short circuit. */
-	if (task_status == VINE_RESULT_FORSAKEN) {
+	/* If the task was forsaken by the worker or couldn't exeute, it didn't really complete, so short circuit. */
+	if (task_status == VINE_RESULT_FORSAKEN || task_status == VINE_RESULT_TRANSFER_MISSING) {
 		itable_remove(q->running_table, t->task_id);
-		vine_task_set_result(t, VINE_RESULT_FORSAKEN);
+		vine_task_set_result(t, task_status);
 		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
 		return VINE_SUCCESS;
 	}
