@@ -61,6 +61,8 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->result = VINE_RESULT_UNKNOWN;
 	t->exit_code = -1;
 
+	t->max_forsaken = -1;
+
 	t->time_when_last_failure = -1;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
@@ -311,7 +313,7 @@ void vine_task_set_retries(struct vine_task *t, int64_t max_retries)
 void vine_task_set_max_forsaken(struct vine_task *t, int64_t max_forsaken)
 {
 	if (max_forsaken < 0) {
-		t->max_retries = -1;
+		t->max_forsaken = -1;
 	} else {
 		t->max_forsaken = max_forsaken;
 	}
