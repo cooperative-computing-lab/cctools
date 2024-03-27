@@ -127,16 +127,24 @@ int vine_current_transfers_dest_in_use(struct vine_manager *q, struct vine_worke
 // intentionally
 int vine_current_transfers_wipe_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
+	debug(D_VINE, "Removing instances of worker from transfer table");
+
+	int removed = 0;
+	if (!w) {
+		return removed;
+	}
+
 	char *id;
 	struct vine_transfer_pair *t;
-	debug(D_VINE, "Removing instances of worker from transfer table");
 	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
 	{
-		if (t->to == w) {
+		if (t->to == w || t->source_worker == w ) {
 			vine_current_transfers_remove(q, id);
+			removed++;
 		}
 	}
-	return 1;
+
+	return removed;
 }
 
 void vine_current_transfers_print_table(struct vine_manager *q)
