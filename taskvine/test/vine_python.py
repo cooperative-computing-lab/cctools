@@ -81,6 +81,7 @@ if __name__ == "__main__":
     os.chmod(path.join(test_dir, exec_name), stat.S_IRWXU)
 
     q = vine.Manager(port=0, ssl=(args.ssl_key, args.ssl_cert))
+    q.tune("transient-error-interval", 1)
 
     exec_file = q.declare_file(path.join(test_dir, exec_name), cache=True)
     input_file = q.declare_file(path.join(test_dir, input_name), cache=True)
@@ -281,13 +282,20 @@ if __name__ == "__main__":
     t = q.wait(wait_time)
     report_task(t, "success", 0)
 
-    data = q.fetch_file(temp)
-    if(data == "howdy\n"):
-        print("correct data returned from temp file")
-    else:
-        print("INCORRECT data returned from temp file: {}".format(data))
+    got_file = False
+    for i in range(3):
+        data = q.fetch_file(temp)
+        if data == "howdy\n":
+            print("correct data returned from temp file")
+            got_file = True
+            break
+        else:
+            print("INCORRECT data returned from temp file: {}".format(data))
+            print("Trying again...")
+            time.sleep(1)
+    if not got_file:
         error = True
-    
+
     if error:
         sys.exit(1)
 
