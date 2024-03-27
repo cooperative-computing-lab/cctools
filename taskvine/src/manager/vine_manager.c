@@ -90,8 +90,11 @@ See the file COPYING for details.
 /* Default value for keepalive timeout in seconds. */
 #define VINE_DEFAULT_KEEPALIVE_TIMEOUT 900
 
-/* Default value to before entity is considered again after last failure, in usecs */
+/* Default value before entity is considered again after last failure, in usecs */
 #define VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL (15 * ONE_SECOND)
+
+/* Default value before disconnecting a worker that keeps forsaking tasks without any completions */
+#define VINE_DEFAULT_MAX_FORSAKEN_PER_WORKER 10
 
 /* Default value for maximum size of standard output from task.  (If larger, send to a separate file.) */
 #define MAX_TASK_STDOUT_STORAGE (1 * GIGABYTE)
@@ -1126,6 +1129,13 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 		default:
 			break;
 		}
+	}
+
+	/* XXX: temp fix. Make this a tunable parameter and/or make it more sophisticated */
+	if (w->forsaken_tasks > VINE_DEFAULT_MAX_FORSAKEN_PER_WORKER && w->total_tasks_complete == 0) {
+		debug(D_VINE, "Disconnecting worker that keeps forsaking tasks %s (%s).", w->hostname, w->addrport);
+		handle_failure(q, w, t, VINE_WORKER_FAILURE);
+		return 0;
 	}
 
 	return 1;
