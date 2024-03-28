@@ -780,12 +780,11 @@ static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker
 		if (f && f->type == VINE_TEMP) { // replicate temp files
 
 			struct vine_file_replica *replica = vine_file_replica_table_remove(q, w, cached_name);
-			if (replica) 
+			if (replica)
 				vine_file_replica_delete(replica);
-			
-			if(vine_file_replica_table_count_replicas(q, cached_name, VINE_FILE_REPLICA_STATE_READY) > 0)
+
+			if (vine_file_replica_table_count_replicas(q, cached_name, VINE_FILE_REPLICA_STATE_READY) > 0)
 				vine_file_replica_table_replicate(q, f);
-			
 		}
 	}
 }
