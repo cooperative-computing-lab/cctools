@@ -779,13 +779,13 @@ static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker
 
 		if (f && f->type == VINE_TEMP) { // replicate temp files
 
-			if (!vine_file_worker_table_remove(
-					    q, w, cached_name)) { // if current lost worker is the only worker that has
-								  // file, we can't do anything about it
-				continue;
-			}
-
-			vine_file_replica_table_replicate(q, f);
+			struct vine_file_replica *replica = vine_file_replica_table_remove(q, w, cached_name);
+			if (replica) 
+				vine_file_replica_delete(replica);
+			
+			if(vine_file_replica_table_count_replicas(q, cached_name, VINE_FILE_REPLICA_STATE_READY) > 0)
+				vine_file_replica_table_replicate(q, f);
+			
 		}
 	}
 }
@@ -5227,7 +5227,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "immediate-recovery")) {
 		q->immediate_recovery = !!((int)value);
 
-	} else if (!strcmp(name, "transfer_temps_recovery")) {
+	} else if (!strcmp(name, "transfer-temps-recovery")) {
 		q->transfer_temps_recovery = !!((int)value);
 
 	} else if (!strcmp(name, "file-source-max-transfers")) {
