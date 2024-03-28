@@ -420,7 +420,7 @@ class Task(object):
         return cvine.vine_task_add_environment(self._task, f._file)
 
     ##
-    # Indicate the number of times the task should be retried. If 0 (the
+    # Indicate the number of times the task should be retried. If less than 1 (the
     # default), the task is tried indefinitely. A task that did not succeed
     # after the given number of retries is returned with result
     # "max retries".
@@ -429,7 +429,7 @@ class Task(object):
 
     ##
     # Indicate the number of times the task can be returned to the manager
-    # without being executed. If 0 default), the task is tried indefinitely.
+    # without being executed. If less than 0 (the default), the task is tried indefinitely.
     # A task that did not succeed after the given number of retries is returned
     # with result "forsaken".
     def set_max_forsaken(self, max_forsaken):
