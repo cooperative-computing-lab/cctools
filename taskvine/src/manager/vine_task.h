@@ -61,6 +61,7 @@ struct vine_task {
 	vine_schedule_t worker_selection_algorithm; /**< How to choose worker to run the task. */
 	double priority;             /**< The priority of this task relative to others in the queue: higher number run earlier. */
 	int max_retries;             /**< Number of times the task is tried to be executed on some workers until success. If less than one, the task is retried indefinitely. See try_count below.*/
+	int max_forsaken;            /**< Number of times the task is submitted to workers without being executed. If less than one, the task is retried indefinitely. See forsaken_count below.*/
 	int64_t min_running_time;    /**< Minimum time (in seconds) the task needs to run. (see vine_worker --wall-time)*/
 
 	/***** Internal state of task as it works towards completion. *****/
@@ -68,10 +69,12 @@ struct vine_task {
 	vine_task_state_t state;       /**< Current state of task: READY, RUNNING, etc */
 	struct vine_worker_info *worker;    /**< Worker to which this task has been dispatched. */
         struct vine_task* library_task; /**< Library task to which a function task has been matched. */
-	int try_count;               /**< The number of times the task has been dispatched to a worker. If larger than max_retries, the task failes with @ref VINE_RESULT_MAX_RETRIES. */
-	int exhausted_attempts;      /**< Number of times the task failed given exhausted resources. */
-	int workers_slow;            /**< Number of times this task has been terminated for running too long. */
-	int function_slots_inuse;    /**< If a library, the number of functions currently running. */
+	int try_count;               /**< The number of times the task has been dispatched to a worker without being forsaken. If larger than max_retries, return with result of last attempt. */
+	int forsaken_count;         /**< The number of times the task has been dispatched to a worker. If larger than max_forsaken, return with VINE_RESULT_FORSAKEN. */
+	int exhausted_attempts;     /**< Number of times the task failed given exhausted resources. */
+	int forsaken_attempts;      /**< Number of times the task was submitted to a worker but failed to start execution. */
+	int workers_slow;           /**< Number of times this task has been terminated for running too long. */
+	int function_slots_inuse;   /**< If a library, the number of functions currently running. */
 		
 	/***** Results of task once it has reached completion. *****/
 

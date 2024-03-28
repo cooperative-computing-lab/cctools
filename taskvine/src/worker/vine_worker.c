@@ -480,7 +480,7 @@ static int start_process(struct vine_process *p, struct link *manager)
 	/* Create the sandbox environment for the task. */
 	if (!vine_sandbox_stagein(p, cache_manager)) {
 		p->execution_start = p->execution_end = timestamp_get();
-		p->result = VINE_RESULT_TRANSFER_MISSING;
+		p->result = VINE_RESULT_FORSAKEN;
 		p->exit_code = 1;
 		itable_insert(procs_complete, p->task->task_id, p);
 		return 0;

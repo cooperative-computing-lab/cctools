@@ -203,7 +203,7 @@ if __name__ == "__main__":
     report_task(t, "success", 0)
 
     # should fail in the alloted time
-    t = vine.Task("/bin/sleep 10")
+    t = vine.Task("/bin/sleep 100")
     t.set_time_max(1)
     q.submit(t)
     t = q.wait(wait_time)
@@ -266,13 +266,13 @@ if __name__ == "__main__":
     report_task(t, "success", 0)
 
     # generate an invalid remote input file, should get an input missing error.
-    t = vine.Task("wc -l infile")
-    t.set_retries(1)
+    t = vine.Task("wc -l infile_for_forsaken")
+    t.set_max_forsaken(1)
     url = q.declare_url("https://pretty-sure-this-is-not-a-valid-url.com")
-    t.add_input(url, "infile")
+    t.add_input(url, "infile_for_forsaken")
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, "transfer missing", 1)
+    report_task(t, "forsaken", -1)
 
     # create a temporary output file, and then fetch its contents manually.
     t = vine.Task("echo howdy > output")
