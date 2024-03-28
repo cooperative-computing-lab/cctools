@@ -248,7 +248,7 @@ EOF
         condor_submit_cmd=condor_submit
     fi
 
-    ${condor_submit_cmd} "${condor_spool}" ${condor_parameters} condor_submit_file
+    ${condor_submit_cmd} ${condor_spool} ${condor_parameters} condor_submit_file
 }
 
 # SLURM specific
