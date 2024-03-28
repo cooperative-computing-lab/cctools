@@ -200,6 +200,8 @@ struct vine_manager {
 	int immediate_recovery;       /* If true, recovery tasks for tmp files are created as soon as the worker that had them
 																	 disconnects. Otherwise, create them only when a tasks needs then as inputs (this is
 																	 the default). */
+	int transfer_temps_recovery;  /* If true, attempt to recover temp files from lost worker to reach threshold required */
+
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
 	int disk_avail_threshold; /* Ensure this minimum amount of available disk space. (in MB) */

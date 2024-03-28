@@ -773,6 +773,30 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	cleanup_worker_files(q, w);
 }
 
+/* Recover and replicate temp files of to be removed worker to reach threshold n */
+
+static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker_info *w)
+{
+	char *cached_name = NULL;
+	struct vine_file_replica *info = NULL;
+
+	// Iterate over files we want might want to recover
+	HASH_TABLE_ITERATE(w->current_files, cached_name, info)
+	{
+		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
+
+		if (f && f->type == VINE_TEMP) { // replicate temp files
+
+			struct vine_file_replica *replica = vine_file_replica_table_remove(q, w, cached_name);
+			if (replica)
+				vine_file_replica_delete(replica);
+
+			if (vine_file_replica_table_count_replicas(q, cached_name, VINE_FILE_REPLICA_STATE_READY) > 0)
+				vine_file_replica_table_replicate(q, f);
+		}
+	}
+}
+
 /* Remove a worker from this master by removing all remote state, all local state, and disconnecting. */
 
 static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason)
@@ -788,10 +812,14 @@ static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vi
 
 	vine_txn_log_write_worker(q, w, 1, reason);
 
-	cleanup_worker(q, w);
-
 	hash_table_remove(q->worker_table, w->hashkey);
 	hash_table_remove(q->workers_with_available_results, w->hashkey);
+
+	if (q->transfer_temps_recovery) {
+		recover_worker_temp_files(q, w);
+	}
+
+	cleanup_worker(q, w);
 
 	vine_manager_factory_worker_leave(q, w);
 
@@ -3753,6 +3781,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->perf_log_interval = VINE_PERF_LOG_INTERVAL;
 
 	q->temp_replica_count = 0;
+	q->transfer_temps_recovery = 0;
 
 	q->resource_submit_multiplier = 1.0;
 
@@ -5245,6 +5274,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "immediate-recovery")) {
 		q->immediate_recovery = !!((int)value);
+
+	} else if (!strcmp(name, "transfer-temps-recovery")) {
+		q->transfer_temps_recovery = !!((int)value);
 
 	} else if (!strcmp(name, "file-source-max-transfers")) {
 		q->file_source_max_transfers = MAX(1, (int)value);
