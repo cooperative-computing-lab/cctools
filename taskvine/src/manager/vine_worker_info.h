@@ -68,6 +68,7 @@ struct vine_worker_info {
 	int         finished_tasks;
 	int64_t     total_tasks_complete;
 	int64_t     total_bytes_transferred;
+	int         forsaken_tasks;
 	int64_t     inuse_cache;
 
 	timestamp_t total_task_time;
@@ -76,6 +77,7 @@ struct vine_worker_info {
 	timestamp_t start_time;
 	timestamp_t last_msg_recv_time;
 	timestamp_t last_update_msg_time;
+	timestamp_t last_failure_time;
 };
 
 struct vine_worker_info * vine_worker_create( struct link * lnk );

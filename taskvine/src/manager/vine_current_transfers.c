@@ -61,6 +61,38 @@ int vine_current_transfers_remove(struct vine_manager *q, const char *id)
 	}
 }
 
+int vine_current_transfers_set_failure(struct vine_manager *q, char *id)
+{
+	struct vine_transfer_pair *p = hash_table_lookup(q->current_transfer_table, id);
+
+	int throttled = 0;
+
+	if (!p)
+		return throttled;
+
+	struct vine_worker_info *source_worker = p->source_worker;
+	if (source_worker) {
+		source_worker->last_transfer_failure = timestamp_get();
+		debug(D_VINE,
+				"Setting transfer failure timestamp on source worker: %s:%d",
+				source_worker->hostname,
+				source_worker->transfer_port);
+		throttled++;
+	}
+
+	struct vine_worker_info *to = p->to;
+	if (to) {
+		to->last_transfer_failure = timestamp_get();
+		debug(D_VINE,
+				"Setting transfer failure timestamp on destination worker: %s:%d",
+				to->hostname,
+				to->transfer_port);
+		throttled++;
+	}
+
+	return throttled;
+}
+
 // count the number transfers coming from a specific source
 int vine_current_transfers_source_in_use(struct vine_manager *q, struct vine_worker_info *source_worker)
 {
@@ -123,16 +155,24 @@ int vine_current_transfers_file_worker_recv(struct vine_manager *q, struct vine_
 // intentionally
 int vine_current_transfers_wipe_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
+	debug(D_VINE, "Removing instances of worker from transfer table");
+
+	int removed = 0;
+	if (!w) {
+		return removed;
+	}
+
 	char *id;
 	struct vine_transfer_pair *t;
-	debug(D_VINE, "Removing instances of worker from transfer table");
 	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
 	{
-		if (t->to == w) {
+		if (t->to == w || t->source_worker == w) {
 			vine_current_transfers_remove(q, id);
+			removed++;
 		}
 	}
-	return 1;
+
+	return removed;
 }
 
 void vine_current_transfers_print_table(struct vine_manager *q)

@@ -29,7 +29,7 @@ struct jx *interfaces_of_host()
 {
 	struct ifaddrs *ifa, *head_if;
 
-	char host[IP_ADDRESS_MAX];
+	char address[IP_ADDRESS_MAX];
 
 	if (getifaddrs(&head_if) == -1) {
 		warn(D_NOTICE, "Could not get network interfaces information: %s", strerror(errno));
@@ -54,7 +54,7 @@ struct jx *interfaces_of_host()
 			continue;
 		}
 
-		int result = address_from_sockaddr(host, ifa->ifa_addr);
+		int result = address_from_sockaddr(address, ifa->ifa_addr);
 		if (!result) {
 			warn(D_NOTICE,
 					"Could not determine address of interface '%s': %s",
@@ -70,7 +70,7 @@ struct jx *interfaces_of_host()
 		struct jx *jf = jx_object(0);
 
 		jx_insert_string(jf, "interface", ifa->ifa_name);
-		jx_insert_string(jf, "host", host);
+		jx_insert_string(jf, "address", address);
 
 		switch (family) {
 		case AF_INET:
