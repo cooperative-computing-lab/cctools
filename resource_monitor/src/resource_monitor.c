@@ -179,6 +179,8 @@ char *template_path = NULL; /* Prefix of all output files names */
 int debug_active = 0;	/* 1 if ACTIVATE_DEBUG_FILE exists. If 1, debug info goes to ACTIVATE_DEBUG_FILE ".log" */
 int enforce_limits = 1; /* 0 if monitor should only measure, 1 if enforcing resources limits. */
 
+char hostname[DOMAIN_NAME_MAX];     /* current hostname */
+
 struct jx *verbatim_summary_fields; /* fields added to the summary without change */
 
 int rmonitor_queue_fd = -1; /* File descriptor of a datagram socket to which (great)
@@ -404,14 +406,25 @@ void add_verbatim_field(const char *str)
 	free(pair);
 }
 
-void add_snapshots()
-{
-	if (!snapshots) {
-		return;
+void find_hostname() {
+	char *host_info = NULL;
+	if (domain_name_cache_guess(hostname)) {
+		host_info = string_format("host:%s", hostname);
+		add_verbatim_field(host_info);
+		free(host_info);
 	}
+}
 
-	summary->snapshots_count = list_size(snapshots);
-	summary->snapshots = calloc(summary->snapshots_count, sizeof(struct rmsummary *));
+void find_version() {
+	char *monitor_self_info = string_format("monitor_version:%9s %d.%d.%d.%.8s",
+			"",
+			CCTOOLS_VERSION_MAJOR,
+			CCTOOLS_VERSION_MINOR,
+			CCTOOLS_VERSION_MICRO,
+			CCTOOLS_COMMIT);
+	add_verbatim_field(monitor_self_info);
+	free(monitor_self_info);
+}
 
 	struct rmsummary *s;
 	int count = 0;
@@ -1224,26 +1237,6 @@ int rmonitor_final_summary()
 {
 	decode_zombie_status(summary, first_process_sigchild_status);
 
-	char *monitor_self_info = string_format("monitor_version:%9s %d.%d.%d.%.8s",
-			"",
-			CCTOOLS_VERSION_MAJOR,
-			CCTOOLS_VERSION_MINOR,
-			CCTOOLS_VERSION_MICRO,
-			CCTOOLS_COMMIT);
-	add_verbatim_field(monitor_self_info);
-
-	char hostname[DOMAIN_NAME_MAX];
-
-	char *host_info = NULL;
-	if (domain_name_cache_guess(hostname)) {
-		host_info = string_format("host:%s", hostname);
-		add_verbatim_field(host_info);
-	}
-
-	if (snapshots && list_size(snapshots) > 0) {
-		add_snapshots();
-	}
-
 	if (summary->wall_time > 0) {
 		summary->cores_avg = summary->cpu_time / summary->wall_time;
 	}
@@ -1279,14 +1272,7 @@ int rmonitor_final_summary()
 
 	rmsummary_print(log_summary, summary, pprint_summaries, verbatim_summary_fields);
 
-	if (monitor_self_info)
-		free(monitor_self_info);
-
-	if (host_info)
-		free(host_info);
-
 	int status;
-
 	if (summary->limits_exceeded && enforce_limits) {
 		status = RM_OVERFLOW;
 	} else if (summary->exit_status != 0) {
@@ -2452,6 +2438,9 @@ int main(int argc, char **argv)
 		show_help(argv[0]);
 		return 1;
 	}
+
+	find_hostname();
+	find_version();
 
 	if (first_pid_manually_set) {
 		if (!ping_process(first_process_pid)) {
