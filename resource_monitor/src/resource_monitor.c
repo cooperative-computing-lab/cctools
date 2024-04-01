@@ -236,7 +236,7 @@ char *snapshot_watch_events_file =
 			 snapshot", "max_count":1}, "FILENAME2" : ... ] } A snapshot is generated when pattern matches a
 			 line in the file FILENAME. */
 
-struct list *snapshots = NULL; /* list of snapshots, as struct rmsummary's . */
+size_t snapshots_allocated = 0;  /* dynamic number of snapshot slots allocated */
 
 struct list *snapshot_labels = NULL; /* list of labels for current snapshot. */
 
@@ -426,13 +426,18 @@ void find_version() {
 	free(monitor_self_info);
 }
 
-	struct rmsummary *s;
-	int count = 0;
-	list_first_item(snapshots);
-	while ((s = list_pop_head(snapshots))) {
-		summary->snapshots[count] = s;
-		count++;
+void add_snapshot(struct rmsummary *s) {
+	summary->snapshots_count++;
+
+	if (summary->snapshots_count > snapshots_allocated) {
+		while (summary->snapshots_count > snapshots_allocated) {
+			snapshots_allocated = MAX(4, snapshots_allocated * 2);
+		}
+
+		summary->snapshots = realloc(summary->snapshots, snapshots_allocated * sizeof(struct rmsummary *));
 	}
+
+	summary->snapshots[summary->snapshots_count - 1] = s;
 }
 
 int rmonitor_determine_exec_type(const char *executable)
@@ -1077,17 +1082,13 @@ int record_snapshot(struct rmsummary *tr)
 		free(str);
 	}
 
-	if (!snapshots) {
-		snapshots = list_create();
-	}
-
 	struct rmsummary *freeze = rmsummary_copy(snapshot, 0);
 
 	freeze->end = ((double)usecs_since_epoch() / ONE_SECOND);
 	freeze->wall_time = snapshot->end - snapshot->start;
 	freeze->snapshot_name = xxstrdup(buffer_tostring(&b));
 
-	char *output_file = string_format("%s.snapshot.%02d", template_path, list_size(snapshots));
+	char *output_file = string_format("%s.snapshot.%02ld", template_path, summary->snapshots_count);
 	FILE *snap_f = fopen(output_file, "w");
 
 	if (!snap_f) {
@@ -1097,7 +1098,7 @@ int record_snapshot(struct rmsummary *tr)
 		fclose(snap_f);
 	}
 
-	list_push_tail(snapshots, freeze);
+	add_snapshot(freeze);
 
 	free(output_file);
 
