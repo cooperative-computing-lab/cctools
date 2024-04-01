@@ -3748,6 +3748,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	// peer transfers enabled by default
 	q->peer_transfers_enabled = 1;
 
+	q->ld_from_shared_fs_enabled = 0;
+
 	q->file_source_max_transfers = VINE_FILE_SOURCE_MAX_TRANSFERS;
 	q->worker_source_max_transfers = VINE_WORKER_SOURCE_MAX_TRANSFERS;
 	q->perf_log_interval = VINE_PERF_LOG_INTERVAL;
@@ -5255,6 +5257,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "temp-replica-count")) {
 		q->temp_replica_count = MAX(0, (int)value);
 
+	} else if(!strcmp(name, "load-from-shared-filesystem")){
+		q->ld_from_shared_fs_enabled = !!((int)value);
+	
 	} else if (!strcmp(name, "perf-log-interval")) {
 		q->perf_log_interval = MAX(1, (int)value);
 
@@ -5831,7 +5836,16 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 struct vine_file *vine_declare_file(
 		struct vine_manager *m, const char *source, vine_cache_level_t cache, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_local(source, cache, flags);
+	struct vine_file *f;
+
+	if(m->ld_from_shared_fs_enabled){
+		char *file_url = vine_file_make_url(source);
+		f = vine_file_url(file_url, cache, flags);
+		free(file_url);
+		
+	} else
+		f = vine_file_local(source, cache, flags);
+
 	return vine_manager_declare_file(m, f);
 }
 

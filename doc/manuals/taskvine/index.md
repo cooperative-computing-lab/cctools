@@ -2488,6 +2488,7 @@ change.
 | ramp-down-heuristic     | If set to 1 and there are more workers than tasks waiting, then tasks are allocated all the free resources of a worker large enough to run them. If monitoring watchdog is not enabled, then this heuristic has no effect. | 0 |
 | resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
 | temp-replica-count    | Number of temp file replicas created across workers | 0 |
+| load-from-shared-filesystem | If set to 1, workers can load in data to their caches from the shared filesystem | 0 |
 | transient-error-interval | Time to wait in seconds after a resource failure before attempting to use it again | 15 |
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
 | worker-retrievals | If 1, retrieve all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |

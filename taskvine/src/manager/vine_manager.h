@@ -191,6 +191,7 @@ struct vine_manager {
                                      than 1, prefer to receive all completed tasks before submitting new tasks. */
 	int worker_retrievals;        /* retrieve all completed tasks from a worker as opposed to recieving one of any completed task*/
 	int prefer_dispatch;          /* try to dispatch tasks even if there are retrieved tasks ready to return  */
+	int ld_from_shared_fs_enabled;/* Allow worker to load file from shared filesytem instead of through manager */
 
 	int fetch_factory;            /* If true, manager queries catalog for factory configuration. */
 	int proportional_resources;   /* If true, tasks divide worker resources proportionally. */
