@@ -5257,9 +5257,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "temp-replica-count")) {
 		q->temp_replica_count = MAX(0, (int)value);
 
-	} else if(!strcmp(name, "load-from-shared-filesystem")){
+	} else if (!strcmp(name, "load-from-shared-filesystem")) {
 		q->ld_from_shared_fs_enabled = !!((int)value);
-	
+
 	} else if (!strcmp(name, "perf-log-interval")) {
 		q->perf_log_interval = MAX(1, (int)value);
 
@@ -5838,11 +5838,11 @@ struct vine_file *vine_declare_file(
 {
 	struct vine_file *f;
 
-	if(m->ld_from_shared_fs_enabled){
+	if (m->ld_from_shared_fs_enabled) {
 		char *file_url = vine_file_make_url(source);
 		f = vine_file_url(file_url, cache, flags);
 		free(file_url);
-		
+
 	} else
 		f = vine_file_local(source, cache, flags);
 
