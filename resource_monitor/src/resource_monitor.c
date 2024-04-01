@@ -171,16 +171,16 @@ See the file COPYING for details.
 uint64_t interval = DEFAULT_INTERVAL;
 
 char *summary_path = NULL; /* name of the summary file */
-FILE *log_summary = NULL; /* Final statistics are written to this file (FILE * to summary_path). */
-FILE *log_series = NULL;  /* Resource events and samples are written to this file. */
-FILE *log_inotify = NULL; /* List of opened files is written to this file. */
+FILE *log_summary = NULL;  /* Final statistics are written to this file (FILE * to summary_path). */
+FILE *log_series = NULL;   /* Resource events and samples are written to this file. */
+FILE *log_inotify = NULL;  /* List of opened files is written to this file. */
 
 char *template_path = NULL; /* Prefix of all output files names */
 
 int debug_active = 0;	/* 1 if ACTIVATE_DEBUG_FILE exists. If 1, debug info goes to ACTIVATE_DEBUG_FILE ".log" */
 int enforce_limits = 1; /* 0 if monitor should only measure, 1 if enforcing resources limits. */
 
-char hostname[DOMAIN_NAME_MAX];     /* current hostname */
+char hostname[DOMAIN_NAME_MAX]; /* current hostname */
 
 struct jx *verbatim_summary_fields; /* fields added to the summary without change */
 
@@ -237,7 +237,7 @@ char *snapshot_watch_events_file =
 			 snapshot", "max_count":1}, "FILENAME2" : ... ] } A snapshot is generated when pattern matches a
 			 line in the file FILENAME. */
 
-size_t snapshots_allocated = 0;  /* dynamic number of snapshot slots allocated */
+size_t snapshots_allocated = 0; /* dynamic number of snapshot slots allocated */
 
 struct list *snapshot_labels = NULL; /* list of labels for current snapshot. */
 
@@ -410,7 +410,8 @@ void add_verbatim_field(const char *str)
 	free(pair);
 }
 
-void find_hostname() {
+void find_hostname()
+{
 	char *host_info = NULL;
 	if (domain_name_cache_guess(hostname)) {
 		host_info = string_format("host:%s", hostname);
@@ -419,7 +420,8 @@ void find_hostname() {
 	}
 }
 
-void find_version() {
+void find_version()
+{
 	char *monitor_self_info = string_format("monitor_version:%9s %d.%d.%d.%.8s",
 			"",
 			CCTOOLS_VERSION_MAJOR,
@@ -430,7 +432,8 @@ void find_version() {
 	free(monitor_self_info);
 }
 
-void add_snapshot(struct rmsummary *s) {
+void add_snapshot(struct rmsummary *s)
+{
 	summary->snapshots_count++;
 
 	if (summary->snapshots_count > snapshots_allocated) {
@@ -1241,7 +1244,8 @@ int rmonitor_file_io_summaries()
 	return 0;
 }
 
-void write_summary(int exited) {
+void write_summary(int exited)
+{
 	if (!exited && last_summary_write + interval * ONE_SECOND > timestamp_get()) {
 		return;
 	}
