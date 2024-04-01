@@ -1008,6 +1008,9 @@ void rmonitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
 		return;
 
 	rmsummary_merge_max_w_time(result, tr);
+	if (result->wall_time > 0) {
+		result->cores_avg = result->cpu_time / result->wall_time;
+	}
 
 	/* if we are running with the --sh option, we subtract one process (the sh process). */
 	if (sh_cmd_line) {
