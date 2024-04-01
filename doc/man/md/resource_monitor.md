@@ -142,7 +142,7 @@ disk                      current size of working directories in the tree, in MB
 - **--catalog=_&lt;catalog&gt;_**<br />Use catalog server _&lt;catalog&gt;_. (default=catalog.cse.nd.edu:9097).
 - **--catalog-interval=_&lt;interval&gt;_**<br />Send update to catalog every _&lt;interval&gt;_ seconds. (default=30).
 - **--catalog-interval=_&lt;interval&gt;_**<br />Send update to catalog every _&lt;interval&gt;_ seconds. (default=30).
-
+- **--update-summary**<br />Update resource summary file every measurement interval.
 
 
 The limits file should contain lines of the form:
