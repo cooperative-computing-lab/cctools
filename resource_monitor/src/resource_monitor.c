@@ -170,7 +170,8 @@ See the file COPYING for details.
 
 uint64_t interval = DEFAULT_INTERVAL;
 
-FILE *log_summary = NULL; /* Final statistics are written to this file. */
+char *summary_path = NULL; /* name of the summary file */
+FILE *log_summary = NULL; /* Final statistics are written to this file (FILE * to summary_path). */
 FILE *log_series = NULL;  /* Resource events and samples are written to this file. */
 FILE *log_inotify = NULL; /* List of opened files is written to this file. */
 
@@ -261,6 +262,9 @@ uint64_t catalog_interval = 0;
 uint64_t catalog_last_update_time = 0;
 
 int64_t catalog_interval_default = 30;
+
+timestamp_t last_summary_write = 0;
+int update_summary_file = 0;
 
 /***
  * Utility functions (open log files, proc files, measure time)
@@ -1237,6 +1241,27 @@ int rmonitor_file_io_summaries()
 	return 0;
 }
 
+void write_summary(int exited) {
+	if (!exited && last_summary_write + interval * ONE_SECOND > timestamp_get()) {
+		return;
+	}
+
+	if (!exited) {
+		summary->exit_type = xxstrdup("running");
+	}
+
+	log_summary = open_log_file(summary_path);
+	rmsummary_print(log_summary, summary, pprint_summaries, verbatim_summary_fields);
+	fclose(log_summary);
+
+	if (!exited) {
+		free(summary->exit_type);
+		summary->exit_type = NULL;
+	}
+
+	last_summary_write = timestamp_get();
+}
+
 int rmonitor_final_summary()
 {
 	decode_zombie_status(summary, first_process_sigchild_status);
@@ -1274,7 +1299,7 @@ int rmonitor_final_summary()
 		rmonitor_file_io_summaries();
 	}
 
-	rmsummary_print(log_summary, summary, pprint_summaries, verbatim_summary_fields);
+	write_summary(1);
 
 	int status;
 	if (summary->limits_exceeded && enforce_limits) {
@@ -1628,8 +1653,6 @@ void rmonitor_final_cleanup()
 	status = rmonitor_final_summary();
 
 	send_catalog_update(summary, 1);
-
-	fclose(log_summary);
 
 	if (log_series)
 		fclose(log_series);
@@ -2060,6 +2083,8 @@ static void show_help(const char *cmd)
 			"--catalog-interval=<interval>",
 			catalog_interval_default);
 	fprintf(stdout, "\n");
+	fprintf(stdout, "%-30s Update resource summary file every measurement interval.\n", "--update-summary");
+	fprintf(stdout, "\n");
 	fprintf(stdout, "%-30s Do not pretty-print summaries.\n", "--no-pprint");
 	fprintf(stdout, "\n");
 	fprintf(stdout,
@@ -2120,6 +2145,10 @@ int rmonitor_resources(long int interval /*in seconds */)
 			snapshot->start = ((double)usecs_since_epoch()) / ONE_SECOND;
 		}
 
+		if (update_summary_file) {
+			write_summary(0);
+		}
+
 		send_catalog_update(resources_now, 0);
 
 		// If no more process are alive, break out of loop.
@@ -2155,7 +2184,6 @@ int main(int argc, char **argv)
 	char *executable;
 	int64_t c;
 
-	char *summary_path = NULL;
 	char *series_path = NULL;
 	char *opened_path = NULL;
 
@@ -2225,6 +2253,7 @@ int main(int argc, char **argv)
 		LONG_OPT_CATALOG_SERVER,
 		LONG_OPT_CATALOG_PROJECT,
 		LONG_OPT_CATALOG_INTERVAL,
+		LONG_OPT_UPDATE_SUMMARY,
 		LONG_OPT_PID,
 		LONG_OPT_MEASURE_ONLY
 	};
@@ -2261,6 +2290,8 @@ int main(int argc, char **argv)
 			{"catalog", required_argument, 0, LONG_OPT_CATALOG_SERVER},
 			{"catalog-project", required_argument, 0, LONG_OPT_CATALOG_PROJECT},
 			{"catalog-interval", required_argument, 0, LONG_OPT_CATALOG_INTERVAL},
+
+			{"update-summary", no_argument, 0, LONG_OPT_UPDATE_SUMMARY},
 
 			{0, 0, 0, 0}};
 
@@ -2372,6 +2403,9 @@ int main(int argc, char **argv)
 			if (catalog_interval < 1) {
 				debug(D_FATAL, "--catalog-interval cannot be less than 1.");
 			}
+			break;
+		case LONG_OPT_UPDATE_SUMMARY:
+			update_summary_file = 1;
 			break;
 		default:
 			show_help(argv[0]);
@@ -2505,7 +2539,6 @@ int main(int argc, char **argv)
 	if (use_inotify)
 		opened_path = default_opened_name(template_path);
 
-	log_summary = open_log_file(summary_path);
 	log_series = open_log_file(series_path);
 	log_inotify = open_log_file(opened_path);
 
