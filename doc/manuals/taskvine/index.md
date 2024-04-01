@@ -80,8 +80,34 @@ conda install -c conda-forge ndcctools
 
 Using a text editor, create a manager program called `quickstart.py` like this:
 
-```
---8<-- "taskvine/examples/quickstart.py"
+```python
+# quickstart.py
+
+import ndcctools.taskvine as vine
+
+# Create a new manager
+m = vine.Manager([9123, 9129])
+print(f"Listening on port {m.port}")
+
+# Declare a common input file to be shared by multiple tasks.
+f = m.declare_url("https://www.gutenberg.org/cache/epub/2600/pg2600.txt", cache="workflow")
+
+# Submit several tasks using that file.
+print("Submitting tasks...")
+for keyword in ['needle', 'house', 'water']:
+    task = vine.Task(f"grep {keyword} warandpeace.txt | wc")
+    task.add_input(f, "warandpeace.txt")
+    task.set_cores(1)
+    m.submit(task)
+
+# As they complete, display the results:
+print("Waiting for tasks to complete...")
+while not m.empty():
+    task = m.wait(5)
+    if task:
+        print(f"Task {task.id} completed with result {task.output}")
+
+print("All tasks done.")
 ```
 
 Run the manager program at the command line like this:
@@ -923,7 +949,16 @@ mounts the task's sandbox as the home directory:
 
 **run_command_in_apptainer.sh**
 ```shell
---8<-- "taskvine/examples/run_command_in_apptainer.sh"
+#! /bin/sh
+
+# Wrap tasks with an Apptainer container
+
+# get the directory that contains the execution context from the location of this script
+ctx_dir=$(dirname $( cd -- "$( dirname -- "$0" )" > /dev/null 2>&1 && pwd ))
+
+# execute the command line with the container image "image.img"
+exec apptainer exec --home "${VINE_SANDBOX:-${PWD}}" "${ctx_dir}/image.sif" "$@"
+
 ```
 
 To start, we can manually construct in the command line the needed directory
@@ -1713,8 +1748,43 @@ m.treeReduce(fn, arry, chunk_size)
 
 Below is an example of all three abstractions, and their expected output:
 
-```
---8<-- "taskvine/examples/functional.py"
+```python
+# abstractions.py
+
+import ndcctools.taskvine as vine
+
+def main():
+    # Set up queue
+    q = vine.Manager(port=9123)
+
+    # map - similar to Python's own map function, but uses a taskvine worker
+    # to complete computation. Returns sequence with the results from the given function
+    # [result] = q.map(func, sequence)
+    # Example: (returns [1, 4, 9, 16])
+    results = q.map(lambda x: x*x, [1, 2, 3, 4])
+    print(results)
+
+    # pair - similar to map function, but uses the function for every pair between
+    # the two sequences. Returns sequence of results of each pair.
+    # [result] = q.pair(func, sequence1, sequence2)
+    # Example: (returns [1, 2, 3, 4, 2, 4, 6, 8, 3, 6, 9, 12, 4, 8, 12, 16])
+    results = q.pair(lambda x, y: x*y, [1, 2, 3, 4], [1, 2, 3, 4])
+    print(results)
+
+    # tree_reduce - combines pairs of values using a given function, and then returns
+    # to a single final number after reducing the sequence.
+    # result = q.tree_reduce(func, sequence)
+    # Example (even): (returns 24)
+    results = q.tree_reduce(lambda x, y: x*y, [1, 2, 3, 4])
+    print(results)
+
+    # Example (odd): (returns 120)
+    results = q.tree_reduce(lambda x, y: x*y, [1, 2, 3, 4, 5])
+    print(results)
+
+
+if __name__ == "__main__":
+    main()
 ```
 
 Run:

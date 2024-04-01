@@ -61,6 +61,8 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->result = VINE_RESULT_UNKNOWN;
 	t->exit_code = -1;
 
+	t->max_forsaken = -1;
+
 	t->time_when_last_failure = -1;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
@@ -129,6 +131,7 @@ void vine_task_reset(struct vine_task *t)
 
 	t->resource_request = CATEGORY_ALLOCATION_FIRST;
 	t->try_count = 0;
+	t->forsaken_count = 0;
 	t->exhausted_attempts = 0;
 	t->workers_slow = 0;
 
@@ -226,6 +229,7 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 	vine_task_set_scheduler(new, task->worker_selection_algorithm);
 	vine_task_set_priority(new, task->priority);
 	vine_task_set_retries(new, task->max_retries);
+	vine_task_set_max_forsaken(new, task->max_forsaken);
 	vine_task_set_time_min(new, task->min_running_time);
 
 	/* Internal state of task is cleared from vine_task_create */
@@ -303,6 +307,15 @@ void vine_task_set_retries(struct vine_task *t, int64_t max_retries)
 		t->max_retries = 0;
 	} else {
 		t->max_retries = max_retries;
+	}
+}
+
+void vine_task_set_max_forsaken(struct vine_task *t, int64_t max_forsaken)
+{
+	if (max_forsaken < 0) {
+		t->max_forsaken = -1;
+	} else {
+		t->max_forsaken = max_forsaken;
 	}
 }
 

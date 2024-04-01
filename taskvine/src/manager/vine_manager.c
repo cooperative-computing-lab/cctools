@@ -90,8 +90,11 @@ See the file COPYING for details.
 /* Default value for keepalive timeout in seconds. */
 #define VINE_DEFAULT_KEEPALIVE_TIMEOUT 900
 
-/* Default value to before entity is considered again after last failure */
-#define VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL 15
+/* Default value before entity is considered again after last failure, in usecs */
+#define VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL (15 * ONE_SECOND)
+
+/* Default value before disconnecting a worker that keeps forsaking tasks without any completions */
+#define VINE_DEFAULT_MAX_FORSAKEN_PER_WORKER 10
 
 /* Default value for maximum size of standard output from task.  (If larger, send to a separate file.) */
 #define MAX_TASK_STDOUT_STORAGE (1 * GIGABYTE)
@@ -433,11 +436,16 @@ static int handle_cache_invalid(struct vine_manager *q, struct vine_worker_info 
 
 		/* Remove the replica from our records. */
 		struct vine_file_replica *replica = vine_file_replica_table_remove(q, w, cachename);
-		if (replica)
+		if (replica) {
 			vine_file_replica_delete(replica);
+		}
+
+		/* throttle workers that could transfer a file */
+		w->last_failure_time = timestamp_get();
 
 		/* If the third argument was given, also remove the transfer record */
 		if (n >= 3) {
+			vine_current_transfers_set_failure(q, transfer_id);
 			vine_current_transfers_remove(q, transfer_id);
 		}
 
@@ -1043,10 +1051,6 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 		/* If the worker didn't run the task don't bother fetching outputs. */
 		result = VINE_SUCCESS;
 		break;
-	case VINE_RESULT_TRANSFER_MISSING:
-		/* If the worker didn't run the task don't bother fetching outputs. */
-		result = VINE_TRANSIENT_FAILURE;
-		break;
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
 		/* On resource exhaustion, just get the monitor files to figure out what happened. */
 		result = vine_manager_get_monitor_output_file(q, w, t);
@@ -1056,6 +1060,9 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 		result = vine_manager_get_output_files(q, w, t);
 		break;
 	}
+
+	/* Regardless of the exit status, remove the task and sandbox from the worker. */
+	vine_manager_send(q, w, "kill %d\n", t->task_id);
 
 	if (result != VINE_SUCCESS) {
 		debug(D_VINE, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
@@ -1095,7 +1102,6 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 	switch (t->result) {
 	case VINE_RESULT_INPUT_MISSING:
 	case VINE_RESULT_FORSAKEN:
-	case VINE_RESULT_TRANSFER_MISSING:
 		/* do not count tasks that didn't execute as complete, or finished tasks */
 		break;
 	default:
@@ -1151,6 +1157,13 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 		default:
 			break;
 		}
+	}
+
+	/* XXX: temp fix. Make this a tunable parameter and/or make it more sophisticated */
+	if (w->forsaken_tasks > VINE_DEFAULT_MAX_FORSAKEN_PER_WORKER && w->total_tasks_complete == 0) {
+		debug(D_VINE, "Disconnecting worker that keeps forsaking tasks %s (%s).", w->hostname, w->addrport);
+		handle_failure(q, w, t, VINE_WORKER_FAILURE);
+		return 0;
 	}
 
 	return 1;
@@ -1401,75 +1414,17 @@ static vine_result_code_t get_update(struct vine_manager *q, struct vine_worker_
 }
 
 /*
-Failure to store result is treated as success so we continue to retrieve the
-output files of the task.
+Get the standard output of a task, as part of retrieving the result.
+This seems awfully complicated and could be simplified.
 */
 
-static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_info *w, const char *line)
+static vine_result_code_t get_stdout(
+		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t output_length)
 {
-
-	if (!q || !w || !line)
-		return VINE_WORKER_FAILURE;
-
-	struct vine_task *t;
-
-	int task_status, exit_status;
-	uint64_t task_id;
-	int64_t output_length, retrieved_output_length;
-	timestamp_t execution_time, start_time, end_time;
-
-	int64_t actual;
-
-	timestamp_t observed_execution_time;
+	int64_t retrieved_output_length;
 	timestamp_t effective_stoptime = 0;
 	time_t stoptime;
-
-	// Format: task completion status, exit status (exit code or signal), output length, execution time, task_id
-
-	int n = sscanf(line,
-			"result %d %d %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 "",
-			&task_status,
-			&exit_status,
-			&output_length,
-			&start_time,
-			&end_time,
-			&task_id);
-
-	if (n < 6) {
-		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
-		return VINE_WORKER_FAILURE;
-	}
-
-	execution_time = end_time - start_time;
-
-	t = itable_lookup(w->current_tasks, task_id);
-	if (!t) {
-		debug(D_VINE,
-				"Unknown task result from worker %s (%s): no task %" PRId64
-				" assigned to worker.  Ignoring result.",
-				w->hostname,
-				w->addrport,
-				task_id);
-		stoptime = time(0) + vine_manager_transfer_time(q, w, output_length);
-		link_soak(w->link, output_length, stoptime);
-		return VINE_SUCCESS;
-	}
-
-	if (task_status == VINE_RESULT_FORSAKEN) {
-		itable_remove(q->running_table, t->task_id);
-		vine_task_set_result(t, VINE_RESULT_FORSAKEN);
-		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
-		return VINE_SUCCESS;
-	}
-
-	observed_execution_time = timestamp_get() - t->time_when_commit_end;
-
-	t->time_workers_execute_last =
-			observed_execution_time > execution_time ? execution_time : observed_execution_time;
-	t->time_workers_execute_last_start = start_time;
-	t->time_workers_execute_last_end = end_time;
-
-	t->time_workers_execute_all += t->time_workers_execute_last;
+	int64_t actual;
 
 	if (q->bandwidth_limit) {
 		effective_stoptime = (output_length / q->bandwidth_limit) * 1000000 + timestamp_get();
@@ -1480,9 +1435,9 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	} else {
 		retrieved_output_length = q->max_task_stdout_storage;
 		fprintf(stderr,
-				"warning: stdout of task %" PRId64
+				"warning: stdout of task %d"
 				" requires %2.2lf GB of storage. This exceeds maximum supported size of %d GB. Only %d GB will be retrieved.\n",
-				task_id,
+				t->task_id,
 				((double)output_length) / q->max_task_stdout_storage,
 				q->max_task_stdout_storage / GIGABYTE,
 				q->max_task_stdout_storage / GIGABYTE);
@@ -1493,9 +1448,9 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	if (t->output == NULL) {
 		fprintf(stderr,
 				"error: allocating memory of size %" PRId64
-				" bytes failed for storing stdout of task %" PRId64 ".\n",
+				" bytes failed for storing stdout of task %d.\n",
 				retrieved_output_length,
-				task_id);
+				t->task_id);
 		// drop the entire length of stdout on the link
 		stoptime = time(0) + vine_manager_transfer_time(q, w, output_length);
 		link_soak(w->link, output_length, stoptime);
@@ -1505,8 +1460,8 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 
 	if (retrieved_output_length > 0) {
 		debug(D_VINE,
-				"Receiving stdout of task %" PRId64 " (size: %" PRId64 " bytes) from %s (%s) ...",
-				task_id,
+				"Receiving stdout of task %d (size: %" PRId64 " bytes) from %s (%s) ...",
+				t->task_id,
 				retrieved_output_length,
 				w->addrport,
 				w->hostname);
@@ -1528,10 +1483,10 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		// Then read the bytes we need to throw away.
 		if (output_length > retrieved_output_length) {
 			debug(D_VINE,
-					"Dropping the remaining %" PRId64 " bytes of the stdout of task %" PRId64
+					"Dropping the remaining %" PRId64 " bytes of the stdout of task %d"
 					" since stdout length is limited to %d bytes.\n",
 					(output_length - q->max_task_stdout_storage),
-					task_id,
+					t->task_id,
 					q->max_task_stdout_storage);
 			stoptime = time(0) +
 				   vine_manager_transfer_time(q, w, (output_length - retrieved_output_length));
@@ -1561,14 +1516,94 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	if (t->output)
 		t->output[actual] = 0;
 
+	return VINE_SUCCESS;
+}
+
+/*
+Failure to store result is treated as success so we continue to retrieve the
+output files of the task.
+*/
+
+static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_info *w, const char *line)
+{
+
+	if (!q || !w || !line)
+		return VINE_WORKER_FAILURE;
+
+	int task_status, exit_status;
+	uint64_t task_id;
+	int64_t output_length;
+
+	timestamp_t execution_time, start_time, end_time;
+	timestamp_t observed_execution_time;
+
+	// Format: task completion status, exit status (exit code or signal), output length, execution time, task_id
+
+	int n = sscanf(line,
+			"result %d %d %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 "",
+			&task_status,
+			&exit_status,
+			&output_length,
+			&start_time,
+			&end_time,
+			&task_id);
+
+	if (n < 6) {
+		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
+		return VINE_WORKER_FAILURE;
+	}
+
+	execution_time = end_time - start_time;
+
+	/* If the worker sent back a task we have never heard of, then discard the following data. */
+	struct vine_task *t = itable_lookup(w->current_tasks, task_id);
+	if (!t) {
+		debug(D_VINE,
+				"Unknown task result from worker %s (%s): no task %" PRId64
+				" assigned to worker.  Ignoring result.",
+				w->hostname,
+				w->addrport,
+				task_id);
+		time_t stoptime = time(0) + vine_manager_transfer_time(q, w, output_length);
+		link_soak(w->link, output_length, stoptime);
+		return VINE_SUCCESS;
+	}
+
+	if (task_status != VINE_RESULT_SUCCESS) {
+		w->last_failure_time = timestamp_get();
+		t->time_when_last_failure = w->last_failure_time;
+	}
+
+	/* If the task was forsaken by the worker or couldn't exeute, it didn't really complete, so short circuit. */
+	if (task_status == VINE_RESULT_FORSAKEN) {
+		t->forsaken_count++;
+		itable_remove(q->running_table, t->task_id);
+		vine_task_set_result(t, task_status);
+		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
+		return VINE_SUCCESS;
+	}
+
+	/* Consume the stdout data immediately following this message. */
+	get_stdout(q, w, t, output_length);
+
+	/* Update task stats for this completion. */
+	observed_execution_time = timestamp_get() - t->time_when_commit_end;
+
+	t->time_workers_execute_last =
+			observed_execution_time > execution_time ? execution_time : observed_execution_time;
+	t->time_workers_execute_last_start = start_time;
+	t->time_workers_execute_last_end = end_time;
+	t->time_workers_execute_all += t->time_workers_execute_last;
 	t->result = task_status;
 	t->exit_code = exit_status;
 
+	/* Update queue stats for this completion. */
 	q->stats->time_workers_execute += t->time_workers_execute_last;
 
+	/* Update worker stats for this completion. */
 	w->finished_tasks++;
 
-	// Convert resource_monitor status into taskvine status if needed.
+	/* Convert resource_monitor status into taskvine status if needed. */
 	if (q->monitor_mode) {
 		if (t->exit_code == RM_OVERFLOW) {
 			vine_task_set_result(t, VINE_RESULT_RESOURCE_EXHAUSTION);
@@ -1577,6 +1612,19 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		}
 	}
 
+	/*
+	A library should not ordinarily exit by any means.
+	If it does, count that as a failure in the original object,
+	which will cause future dispatches of the library to be throttled.
+	*/
+
+	if (t->provides_library) {
+		struct vine_task *original = hash_table_lookup(q->libraries, t->provides_library);
+		if (original)
+			original->time_when_last_failure = timestamp_get();
+	}
+
+	/* Finally update data structures to reflect the completion. */
 	itable_remove(q->running_table, t->task_id);
 	change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
 
@@ -2786,10 +2834,12 @@ static int resubmit_task_on_exhaustion(struct vine_manager *q, struct vine_worke
 static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	/* in this function, any change_task_state should only be to VINE_TASK_READY */
-
 	if (t->result == VINE_RESULT_FORSAKEN) {
-		/* forsaken tasks are always resubmitted. they also get a retry back as they are victims of circumstance
-		 */
+		if (t->max_forsaken > -1 && t->forsaken_count > t->max_forsaken) {
+			return 0;
+		}
+
+		/* forsaken tasks get a retry back as they are victims of circumstance */
 		t->try_count -= 1;
 		change_task_state(q, t, VINE_TASK_READY);
 		return 1;
@@ -2801,20 +2851,10 @@ static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w
 	}
 
 	/* special handlings per result. note that most results are terminal, that is tasks are not retried even if they
-	 * have not reached max_retries. max_retries is only used for transient errors, or for modified tasks (such as a
-	 * change in the resource request). */
+	 * have not reached max_retries. */
 	switch (t->result) {
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
 		return resubmit_task_on_exhaustion(q, w, t);
-		break;
-	case VINE_RESULT_TRANSFER_MISSING:
-		if (t->max_retries > 0 && t->try_count > t->max_retries) {
-			t->result = VINE_RESULT_INPUT_MISSING;
-			return 0;
-		} else {
-			change_task_state(q, t, VINE_TASK_READY);
-			return 1;
-		}
 		break;
 	default:
 		/* by default tasks are not resumitted */
@@ -3125,7 +3165,6 @@ static int send_one_task(struct vine_manager *q)
 
 	timestamp_t now_usecs = timestamp_get();
 	double now_secs = ((double)now_usecs) / ONE_SECOND;
-	timestamp_t time_failure_range = now_usecs - q->transient_error_interval * ONE_SECOND;
 
 	int tasks_to_consider = MIN(list_size(q->ready_list), q->attempt_schedule_depth);
 
@@ -3140,7 +3179,7 @@ static int send_one_task(struct vine_manager *q)
 		}
 
 		// Skip if this task failed recently
-		if (time_failure_range > t->time_when_last_failure) {
+		if (t->time_when_last_failure + q->transient_error_interval > now_usecs) {
 			continue;
 		}
 
@@ -4299,9 +4338,6 @@ const char *vine_result_string(vine_result_t result)
 	case VINE_RESULT_LIBRARY_EXIT:
 		str = "LIBRARY_EXIT";
 		break;
-	case VINE_RESULT_TRANSFER_MISSING:
-		str = "TRANSFER_MISSING";
-		break;
 	}
 
 	return str;
@@ -4418,6 +4454,19 @@ static struct vine_task *send_library_to_worker(struct vine_manager *q, struct v
 	struct vine_task *original = hash_table_lookup(q->libraries, name);
 	if (!original)
 		return 0;
+
+	/*
+	If an instance of this library has recently failed,
+	don't send another right away.  This is a rather late (and inefficient)
+	point at which to notice this, but we don't know that we are starting
+	a new library until the moment of scheduling a function to that worker.
+	*/
+
+	timestamp_t lastfail = original->time_when_last_failure;
+	timestamp_t current = timestamp_get();
+	if (current < lastfail + q->transient_error_interval) {
+		return 0;
+	}
 
 	/* Duplicate the original task */
 	struct vine_task *t = vine_task_copy(original);
@@ -5267,7 +5316,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		if (value < 1) {
 			q->transient_error_interval = VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL;
 		} else {
-			q->transient_error_interval = value;
+			q->transient_error_interval = value * ONE_SECOND;
 		}
 
 	} else {

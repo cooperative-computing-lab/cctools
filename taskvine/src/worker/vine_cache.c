@@ -591,16 +591,17 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 	struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
 	if (!f) {
 		debug(D_VINE, "cache: %s is unknown, perhaps it failed to transfer earlier?", cachename);
-		return VINE_CACHE_STATUS_FAILED;
+		return VINE_CACHE_STATUS_UNKNOWN;
 	}
 
 	switch (f->status) {
-	case VINE_CACHE_STATUS_READY:
-	case VINE_CACHE_STATUS_FAILED:
 	case VINE_CACHE_STATUS_PROCESSING:
 	case VINE_CACHE_STATUS_TRANSFERRED:
+	case VINE_CACHE_STATUS_READY:
+	case VINE_CACHE_STATUS_FAILED:
+	case VINE_CACHE_STATUS_UNKNOWN:
 		return f->status;
-	case VINE_CACHE_STATUS_NOT_PRESENT:
+	case VINE_CACHE_STATUS_PENDING:
 		/* keep going */
 		break;
 	}

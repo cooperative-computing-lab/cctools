@@ -480,7 +480,7 @@ static int start_process(struct vine_process *p, struct link *manager)
 	/* Create the sandbox environment for the task. */
 	if (!vine_sandbox_stagein(p, cache_manager)) {
 		p->execution_start = p->execution_end = timestamp_get();
-		p->result = VINE_RESULT_TRANSFER_MISSING;
+		p->result = VINE_RESULT_FORSAKEN;
 		p->exit_code = 1;
 		itable_insert(procs_complete, p->task->task_id, p);
 		return 0;
@@ -1260,10 +1260,10 @@ static int task_resources_fit_eventually(struct vine_task *t)
 }
 
 /*
-Find a suitable library process that provides the given library name and is ready to be invoked
+Find a suitable library process that can provide a slot to run this library right NOW.
 */
 
-struct vine_process *find_library_for_function(const char *library_name)
+static struct vine_process *find_running_library_for_function(const char *library_name)
 {
 	uint64_t task_id;
 	struct vine_process *p;
@@ -1289,7 +1289,8 @@ static int process_ready_to_run_now(struct vine_process *p, struct vine_cache *c
 		return 0;
 
 	if (p->task->needs_library) {
-		p->library_process = find_library_for_function(p->task->needs_library);
+		/* Here is where we attach a function to a specific library. */
+		p->library_process = find_running_library_for_function(p->task->needs_library);
 		if (!p->library_process)
 			return 0;
 	}
@@ -1302,12 +1303,49 @@ static int process_ready_to_run_now(struct vine_process *p, struct vine_cache *c
 }
 
 /*
+Find a suitable library process that could serve this function in the future.
+*/
+
+static struct vine_process *find_future_library_for_function(const char *library_name)
+{
+	uint64_t task_id;
+	struct vine_process *p;
+
+	ITABLE_ITERATE(procs_table, task_id, p)
+	{
+		if (p->task->provides_library && !strcmp(p->task->provides_library, library_name)) {
+			return p;
+		}
+	}
+	return 0;
+}
+
+/*
 Return true if this process can run eventually, supposing that other processes will complete.
 */
 
-static int process_can_run_eventually(struct vine_process *p)
+static int process_can_run_eventually(struct vine_process *p, struct vine_cache *cache, struct link *manager)
 {
-	return task_resources_fit_eventually(p->task);
+	if (!task_resources_fit_eventually(p->task))
+		return 0;
+
+	if (p->task->needs_library) {
+		/* Note that we check for *some* library but do not bind to it. */
+		if (!find_future_library_for_function(p->task->needs_library)) {
+			return 0;
+		}
+	}
+
+	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager);
+	switch (status) {
+	case VINE_CACHE_STATUS_FAILED:
+	case VINE_CACHE_STATUS_UNKNOWN:
+		return 0;
+	default:
+		break;
+	}
+
+	return 1;
 }
 
 void forsake_waiting_process(struct link *manager, struct vine_process *p)
@@ -1580,7 +1618,7 @@ static void vine_worker_serve_manager(struct link *manager)
 				} else if (process_ready_to_run_now(p, cache_manager, manager)) {
 					start_process(p, manager);
 					task_event++;
-				} else if (process_can_run_eventually(p)) {
+				} else if (process_can_run_eventually(p, cache_manager, manager)) {
 					list_push_tail(procs_waiting, p);
 				} else {
 					forsake_waiting_process(manager, p);
@@ -1756,38 +1794,43 @@ static int vine_worker_serve_manager_by_hostport_list(struct list *manager_addre
 	return result;
 }
 
-static struct list *interfaces_to_list(const char *addr, int port, struct jx *ifas)
+static struct list *interfaces_to_list(const char *canonical_host_or_addr, int port, struct jx *host_aliases)
 {
 	struct list *l = list_create();
-	struct jx *ifa;
+	struct jx *host_alias;
 
 	int found_canonical = 0;
 
-	if (ifas) {
-		for (void *i = NULL; (ifa = jx_iterate_array(ifas, &i));) {
-			const char *ifa_addr = jx_lookup_string(ifa, "host");
+	if (host_aliases) {
+		for (void *i = NULL; (host_alias = jx_iterate_array(host_aliases, &i));) {
+			const char *address = jx_lookup_string(host_alias, "address");
 
-			if (ifa_addr && strcmp(addr, ifa_addr) == 0) {
+			if (address && strcmp(canonical_host_or_addr, address) == 0) {
 				found_canonical = 1;
 			}
 
+			// copy ip addr to hostname to work as if the user had entered a particular ip
+			// for the manager.
 			struct manager_address *m = calloc(1, sizeof(*m));
-			strncpy(m->host, ifa_addr, LINK_ADDRESS_MAX);
+			strncpy(m->host, address, DOMAIN_NAME_MAX - 1);
 			m->port = port;
 
 			list_push_tail(l, m);
 		}
 	}
 
-	if (ifas && !found_canonical) {
-		warn(D_NOTICE, "Did not find the manager address '%s' in the list of interfaces.", addr);
+	if (host_aliases && !found_canonical) {
+		warn(D_NOTICE,
+				"Did not find the manager address '%s' in the list of interfaces.",
+				canonical_host_or_addr);
 	}
 
 	if (!found_canonical) {
-		/* We get here if no interfaces were defined, or if addr was not found in the interfaces. */
+		/* We get here if no interfaces were defined, or if canonical_host_or_addr was not found in the
+		 * interfaces. */
 
 		struct manager_address *m = calloc(1, sizeof(*m));
-		strncpy(m->host, addr, LINK_ADDRESS_MAX);
+		strncpy(m->host, canonical_host_or_addr, DOMAIN_NAME_MAX - 1);
 		m->port = port;
 
 		list_push_tail(l, m);
@@ -1823,7 +1866,7 @@ static int vine_worker_serve_manager_by_name(const char *catalog_hosts, const ch
 		const char *name = jx_lookup_string(jx, "name");
 		const char *addr = jx_lookup_string(jx, "address");
 		const char *pref = jx_lookup_string(jx, "manager_preferred_connection");
-		struct jx *ifas = jx_lookup(jx, "network_interfaces");
+		struct jx *host_aliases = jx_lookup(jx, "network_interfaces");
 		int port = jx_lookup_integer(jx, "port");
 		int use_ssl = jx_lookup_boolean(jx, "ssl");
 
@@ -1872,7 +1915,7 @@ static int vine_worker_serve_manager_by_name(const char *catalog_hosts, const ch
 			manager_addresses = interfaces_to_list(addr, port, NULL);
 		} else {
 			debug(D_VINE, "selected manager with project=%s addr=%s port=%d", project, addr, port);
-			manager_addresses = interfaces_to_list(addr, port, ifas);
+			manager_addresses = interfaces_to_list(addr, port, host_aliases);
 		}
 
 		result = vine_worker_serve_manager_by_hostport_list(manager_addresses, use_ssl);
@@ -2009,7 +2052,7 @@ struct list *parse_manager_addresses(const char *specs, int default_port)
 		}
 
 		struct manager_address *m = calloc(1, sizeof(*m));
-		strncpy(m->host, next_manager, LINK_ADDRESS_MAX);
+		strncpy(m->host, next_manager, DOMAIN_NAME_MAX - 1);
 		m->port = port;
 
 		if (port_str) {

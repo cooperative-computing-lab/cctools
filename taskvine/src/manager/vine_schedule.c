@@ -142,6 +142,11 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		return 0;
 	}
 
+	/* Don't send tasks if a task recently failed at this worker. */
+	if (w->last_failure_time + q->transient_error_interval > timestamp_get()) {
+		return 0;
+	}
+
 	/* Don't send tasks if the factory is used and has too many connected workers. */
 	if (w->factory_name) {
 		struct vine_factory_info *f = vine_factory_info_lookup(q, w->factory_name);
