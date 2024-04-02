@@ -70,9 +70,10 @@ struct link *link_connect(const char *addr, int port, time_t stoptime);
 
 /** Wrap a connect link with an ssl context and state
 @param link A link returned from @ref link_connect
+@param sni_hostname Optional domain name for tls routing.
 @return 0 on failure, 1 on success
 */
-int link_ssl_wrap_connect(struct link *link);
+int link_ssl_wrap_connect(struct link *link, const char *sni_hostname);
 
 /** Turn a FILE* into a link.  Useful when trying to poll both remote and local connections using @ref link_poll
 @param file File to create the link from.

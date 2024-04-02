@@ -252,7 +252,7 @@ struct list* do_direct_query( const char *manager_host, int manager_port )
 	}
 
 	if(manual_ssl_option) {
-		if(link_ssl_wrap_connect(l) < 1) {
+		if(link_ssl_wrap_connect(l, manager_host) < 1) {
 			fprintf(stderr,"vine_factory: could not setup ssl connection.\n");
 			link_close(l);
 			return 0;

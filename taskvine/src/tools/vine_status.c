@@ -486,7 +486,7 @@ int do_direct_query( const char *manager_host, int manager_port, time_t stoptime
 		return 1;
 	}
 
-	if(manual_ssl_option && link_ssl_wrap_connect(l) < 1) {
+	if(manual_ssl_option && link_ssl_wrap_connect(l, manager_host) < 1) {
 		fprintf(stderr,"could not setup ssl connection.\n");
 		return 1;
 	}
