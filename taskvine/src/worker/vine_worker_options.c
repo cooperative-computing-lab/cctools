@@ -49,6 +49,8 @@ struct vine_worker_options *vine_worker_options_create()
 
 	self->initial_ppid = 0;
 
+	self->tls_sni = NULL;
+
 	return self;
 }
 
@@ -143,6 +145,10 @@ void vine_worker_options_show_help(const char *cmd, struct vine_worker_options *
 	printf(" %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
 	printf(" %-30s Listening port for worker-worker transfers. (default: any)\n", "--transfer-port");
+
+	printf(" %-30s Enable tls connection to manager (manager should support it).\n", "--ssl");
+	printf(" %-30s SNI domain name if different from manager hostname. Implies --ssl.\n",
+			"--tls-sni=<domain name>");
 }
 
 enum {
@@ -163,6 +169,7 @@ enum {
 	LONG_OPT_PARENT_DEATH,
 	LONG_OPT_CONN_MODE,
 	LONG_OPT_USE_SSL,
+	LONG_OPT_TLS_SNI,
 	LONG_OPT_PYTHON_FUNCTION,
 	LONG_OPT_FROM_FACTORY,
 	LONG_OPT_TRANSFER_PORT,
@@ -205,6 +212,7 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"parent-death", no_argument, 0, LONG_OPT_PARENT_DEATH},
 		{"connection-mode", required_argument, 0, LONG_OPT_CONN_MODE},
 		{"ssl", no_argument, 0, LONG_OPT_USE_SSL},
+		{"tls-sni", required_argument, 0, LONG_OPT_TLS_SNI},
 		{"from-factory", required_argument, 0, LONG_OPT_FROM_FACTORY},
 		{"transfer-port", required_argument, 0, LONG_OPT_TRANSFER_PORT},
 		{0, 0, 0, 0}};
@@ -388,6 +396,11 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 			}
 			break;
 		case LONG_OPT_USE_SSL:
+			options->ssl_requested = 1;
+			break;
+		case LONG_OPT_TLS_SNI:
+			free(options->tls_sni);
+			options->tls_sni = xxstrdup(optarg);
 			options->ssl_requested = 1;
 			break;
 		case LONG_OPT_FROM_FACTORY:

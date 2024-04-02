@@ -2054,7 +2054,7 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 		link_close(manager);
 		return 0;
 	} else if(manual_ssl_option || use_ssl) {
-		if(link_ssl_wrap_connect(manager) < 1) {
+		if(link_ssl_wrap_connect(manager, host) < 1) {
 			fprintf(stderr,"work_queue_worker: could not setup ssl connection.\n");
 			link_close(manager);
 			return 0;

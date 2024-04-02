@@ -1686,7 +1686,12 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 		link_close(manager);
 		return 0;
 	} else if (options->ssl_requested || use_ssl) {
-		if (link_ssl_wrap_connect(manager) < 1) {
+		const char *sni_host = options->tls_sni;
+		if (!sni_host) {
+			sni_host = host;
+		}
+
+		if (link_ssl_wrap_connect(manager, sni_host) < 1) {
 			fprintf(stderr, "vine_worker: could not setup ssl connection.\n");
 			link_close(manager);
 			return 0;
