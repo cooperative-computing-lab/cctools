@@ -586,9 +586,10 @@ int link_ssl_wrap_connect(struct link *link, const char *sni_hostname)
 	// set hostname for SNI
 	const char *name = link->raddr;
 	if (sni_hostname) {
-	    name = sni_hostname;
+		name = sni_hostname;
 	}
 
+	debug(D_SSL, "Setting SNI to: %s", name);
 	SSL_set_tlsext_host_name(link->ssl, name);
 
 	int result;
