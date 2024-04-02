@@ -82,6 +82,8 @@ Also configurable through environment variables **CCTOOLS_TEMP** or **TMPDIR**
 - **-d**,**--debug=_&lt;subsystem&gt;_**<br /> Enable debugging for this subsystem.
 - **-o**,**--debug-file=_&lt;file&gt;_**<br /> Send debugging to this file.
 - **-O**,**--debug-file-size=_&lt;mb&gt;_**<br /> Specify the size of the debug file.
+- **--ssl**<br />Enable tls connection to manager (manager should support it).
+- **--tls-sni=_&lt;&gt;_**<br />SNI domain name if different from manager hostname. Implies --ssl.
 - **-v**,**--version**<br /> Show the version string.
 - **-h**,**--help**<br /> Show this screen.
 

@@ -122,6 +122,9 @@ struct batch_queue *queue = 0;
 // announces it is using SSL, then SSL is used regardless of manual_ssl_option.
 int manual_ssl_option = 0;
 
+// Change the name presented in tls routing
+static char *manual_tls_sni = NULL;
+
 //Environment variables to pass along in batch_job_submit
 struct jx *batch_env = NULL;
 
@@ -252,7 +255,12 @@ struct list* do_direct_query( const char *manager_host, int manager_port )
 	}
 
 	if(manual_ssl_option) {
-		if(link_ssl_wrap_connect(l, manager_host) < 1) {
+		const char *sni_host = manual_tls_sni;
+		if (!sni_host) {
+			sni_host = manager_host;
+		}
+
+		if(link_ssl_wrap_connect(l, sni_host) < 1) {
 			fprintf(stderr,"vine_factory: could not setup ssl connection.\n");
 			link_close(l);
 			return 0;
@@ -1148,6 +1156,8 @@ static void show_help(const char *cmd)
 	printf(" %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
 	printf(" %-30s Specify the size of the debug file.\n", "-O,--debug-file-size=<mb>");
 	printf(" %-30s Workers should use SSL to connect to managers. (Not needed if project names.)", "--ssl");
+	printf(" %-30s SNI domain name if different from manager hostname. Implies --ssl.\n", "--tls-sni=<domain name>");
+
 	printf(" %-30s Show the version string.\n", "-v,--version");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 
@@ -1212,6 +1222,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_PARENT_DEATH,
 		LONG_OPT_PONCHO_ENV,
 		LONG_OPT_USE_SSL,
+		LONG_OPT_TLS_SNI,
 		LONG_OPT_FACTORY_NAME,
 		LONG_OPT_DEBUG_WORKERS,
 		LONG_OPT_DISABLE_AFS_CHECK,
@@ -1261,6 +1272,7 @@ static const struct option long_options[] = {
 	{"wrapper",required_argument, 0, LONG_OPT_WRAPPER},
 	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 	{"ssl",no_argument, 0, LONG_OPT_USE_SSL},
+	{"tls-sni", required_argument, 0, LONG_OPT_TLS_SNI},
 	{"factory-name",required_argument, 0, LONG_OPT_FACTORY_NAME},
 	{0,0,0,0}
 };
@@ -1443,6 +1455,11 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_USE_SSL:
 				manual_ssl_option=1;
+				break;
+			case LONG_OPT_TLS_SNI:
+				free(manual_tls_sni);
+				manual_tls_sni = xxstrdup(optarg);
+				manual_ssl_option = 1;
 				break;
 			case LONG_OPT_FACTORY_NAME:
 				factory_name = xxstrdup(optarg);
