@@ -58,6 +58,11 @@ struct vine_worker_options {
 	*/
 	int ssl_requested;
 
+	/*
+	If SNI tls is different from hostname. Implies ssl_requested.
+	*/
+	char *tls_sni;
+
 	/* Manual option given by the user to control the location of the workspace. */
 	char *workspace_dir;
 
