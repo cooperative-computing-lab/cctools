@@ -60,6 +60,8 @@ OPTION_FLAG_LONG(parent-death) Exit if parent process dies.
 OPTION_ARG(d,debug,subsystem) Enable debugging for this subsystem.
 OPTION_ARG(o,debug-file,file) Send debugging to this file.
 OPTION_ARG(O,debug-file-size,mb) Specify the size of the debug file.
+OPTION_FLAG_LONG(ssl)Enable tls connection to manager (manager should support it).
+OPTION_ARG_LONG(tls-sni)SNI domain name if different from manager hostname. Implies --ssl.
 OPTION_FLAG(v,version) Show the version string.
 OPTION_FLAG(h,help) Show this screen.
 OPTIONS_END

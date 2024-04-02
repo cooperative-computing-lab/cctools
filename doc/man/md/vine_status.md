@@ -64,6 +64,8 @@ more detailed information about tasks and workers.
 - **-O**,**--debug-rotate-max=_&lt;bytes&gt;_**<br />Rotate debug file once it reaches this size.
 - **-v**,**--version**<br />Show vine_status version.
 - **-h**,**--help**<br />Show this help message.
+- **--ssl**<br />Enable tls connection to manager (manager should support it).
+- **--tls-sni=_&lt;&gt;_**<br />SNI domain name if different from manager hostname. Implies --ssl.
 
 
 ## EXAMPLES

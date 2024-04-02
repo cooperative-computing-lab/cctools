@@ -570,7 +570,7 @@ int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert)
 	return 0;
 }
 
-int link_ssl_wrap_connect(struct link *link)
+int link_ssl_wrap_connect(struct link *link, const char *sni_hostname)
 {
 #ifdef HAS_OPENSSL
 
@@ -584,7 +584,13 @@ int link_ssl_wrap_connect(struct link *link)
 	SSL_set_fd(link->ssl, link->fd);
 
 	// set hostname for SNI
-	SSL_set_tlsext_host_name(link->ssl, link->raddr);
+	const char *name = link->raddr;
+	if (sni_hostname) {
+		name = sni_hostname;
+	}
+
+	debug(D_SSL, "Setting SNI to: %s", name);
+	SSL_set_tlsext_host_name(link->ssl, name);
 
 	int result;
 	while ((result = SSL_connect(link->ssl)) <= 0) {
