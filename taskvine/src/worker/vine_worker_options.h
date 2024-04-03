@@ -100,6 +100,10 @@ struct vine_worker_options {
 
 	/* The parent process pid, to detect when the parent has exited. */
 	pid_t initial_ppid;
+
+	/* Range of ports allowed to set the server for transfers between workers. */
+	int transfer_port_min;
+	int transfer_port_max;
 };
 
 struct vine_worker_options * vine_worker_options_create();

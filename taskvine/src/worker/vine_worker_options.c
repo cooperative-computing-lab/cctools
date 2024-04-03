@@ -51,6 +51,9 @@ struct vine_worker_options *vine_worker_options_create()
 
 	self->tls_sni = NULL;
 
+	self->transfer_port_min = 0;
+	self->transfer_port_max = 0;
+
 	return self;
 }
 
@@ -144,7 +147,8 @@ void vine_worker_options_show_help(const char *cmd, struct vine_worker_options *
 
 	printf(" %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
-	printf(" %-30s Listening port for worker-worker transfers. (default: any)\n", "--transfer-port");
+	printf(" %-30s Listening port for worker-worker transfers. Either port or port_min:port_max (default: any)\n",
+			"--transfer-port");
 
 	printf(" %-30s Enable tls connection to manager (manager should support it).\n", "--ssl");
 	printf(" %-30s SNI domain name if different from manager hostname. Implies --ssl.\n",
@@ -234,6 +238,32 @@ static void vine_worker_options_get_envs(struct vine_worker_options *options)
 	vine_worker_options_get_env("MEMORY", &options->memory_total);
 	vine_worker_options_get_env("DISK", &options->disk_total);
 	vine_worker_options_get_env("GPUS", &options->gpus_total);
+}
+
+void set_min_max_ports(struct vine_worker_options *options, const char *range)
+{
+	char *r = xxstrdup(range);
+	char *ptr;
+
+	ptr = strtok(r, ":");
+	options->transfer_port_min = atoi(ptr);
+	options->transfer_port_max = options->transfer_port_min;
+
+	ptr = strtok(NULL, ":");
+	if (ptr) {
+		options->transfer_port_max = atoi(ptr);
+	}
+
+	ptr = strtok(NULL, ":");
+	if (ptr) {
+		fatal("Malformed port range. Expected either a PORT or PORT_MIN:PORT_MAX");
+	}
+
+	if (options->transfer_port_min > options->transfer_port_max) {
+		fatal("Malformed port range. PORT_MIN > PORT_MAX");
+	}
+
+	free(r);
 }
 
 void vine_worker_options_get(struct vine_worker_options *options, int argc, char *argv[])
@@ -407,7 +437,7 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 			options->factory_name = xxstrdup(optarg);
 			break;
 		case LONG_OPT_TRANSFER_PORT:
-			vine_transfer_server_port = atoi(optarg);
+			set_min_max_ports(options, optarg);
 			break;
 		default:
 			vine_worker_options_show_help(argv[0], options);

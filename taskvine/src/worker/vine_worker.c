@@ -1741,7 +1741,7 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 	vine_cache_load(cache_manager);
 
 	/* Start the transfer server, which serves up the cache directory. */
-	vine_transfer_server_start(cache_manager);
+	vine_transfer_server_start(cache_manager, options->transfer_port_min, options->transfer_port_max);
 
 	measure_worker_resources();
 
