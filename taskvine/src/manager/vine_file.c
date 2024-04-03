@@ -154,6 +154,8 @@ char *vine_file_make_url(const char *source)
 
 	char *result = path_join_two_strings(start_and_path, source, NULL);
 
+	free(start_and_path);
+
 	return result;
 }
 
