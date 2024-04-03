@@ -5839,7 +5839,7 @@ struct vine_file *vine_declare_file(
 	struct vine_file *f;
 
 	if (m->ld_from_shared_fs_enabled) {
-		char *file_url = vine_file_make_url(source);
+		char *file_url = vine_file_make_file_url(source);
 		f = vine_file_url(file_url, cache, flags);
 		free(file_url);
 
