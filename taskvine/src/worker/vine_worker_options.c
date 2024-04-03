@@ -147,7 +147,8 @@ void vine_worker_options_show_help(const char *cmd, struct vine_worker_options *
 
 	printf(" %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
-	printf(" %-30s Listening port for worker-worker transfers. Either port or port_min:port_max (default: any)\n", "--transfer-port");
+	printf(" %-30s Listening port for worker-worker transfers. Either port or port_min:port_max (default: any)\n",
+			"--transfer-port");
 
 	printf(" %-30s Enable tls connection to manager (manager should support it).\n", "--ssl");
 	printf(" %-30s SNI domain name if different from manager hostname. Implies --ssl.\n",
@@ -239,7 +240,8 @@ static void vine_worker_options_get_envs(struct vine_worker_options *options)
 	vine_worker_options_get_env("GPUS", &options->gpus_total);
 }
 
-void set_min_max_ports(struct vine_worker_options *options, const char *range) {
+void set_min_max_ports(struct vine_worker_options *options, const char *range)
+{
 	char *r = xxstrdup(range);
 	char *ptr;
 
