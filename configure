@@ -342,13 +342,13 @@ And SYSTEM may be:
 	chirp
 	doc
 	ftp-lite
-    grow
+	grow
 	makeflow
 	parrot
-    poncho
+	poncho
 	resource_monitor
 	taskvine
-    work_queue
+	work_queue
 EOF
 			exit 0
 			;;
