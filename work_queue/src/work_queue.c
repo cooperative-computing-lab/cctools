@@ -6456,13 +6456,47 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 	work_queue_task_state_t old_state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
 	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
 
+	struct category *c = work_queue_category_lookup_or_create(q, t->category);
+
+	/* XXX: update manager task count in the same way */
+	switch(old_state) {
+		case WORK_QUEUE_TASK_UNKNOWN:
+			break;
+		case WORK_QUEUE_TASK_READY:
+			c->wq_stats->tasks_waiting--;
+			break;
+		case WORK_QUEUE_TASK_RUNNING:
+			c->wq_stats->tasks_running--;
+			break;
+		case WORK_QUEUE_TASK_WAITING_RETRIEVAL:
+			c->wq_stats->tasks_with_results--;
+			break;
+		case WORK_QUEUE_TASK_RETRIEVED:
+			break;
+		case WORK_QUEUE_TASK_DONE:
+			break;
+		case WORK_QUEUE_TASK_CANCELED:
+			break;
+	}
+
 	// insert to corresponding table
 	debug(D_WQ, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, task_state_str(old_state), old_state, task_state_str(new_state), new_state);
 
 	switch(new_state) {
+		case WORK_QUEUE_TASK_UNKNOWN:
+			break;
 		case WORK_QUEUE_TASK_READY:
+			c->wq_stats->tasks_waiting++;
 			update_task_result(t, WORK_QUEUE_RESULT_UNKNOWN);
 			push_task_to_ready_list(q, t);
+			break;
+		case WORK_QUEUE_TASK_RUNNING:
+			c->wq_stats->tasks_running++;
+			break;
+		case WORK_QUEUE_TASK_WAITING_RETRIEVAL:
+			c->wq_stats->tasks_with_results++;
+			break;
+		case WORK_QUEUE_TASK_RETRIEVED:
 			break;
 		case WORK_QUEUE_TASK_DONE:
 		case WORK_QUEUE_TASK_CANCELED:
@@ -6470,10 +6504,10 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 			fill_deprecated_tasks_stats(t);
 			itable_remove(q->tasks, t->taskid);
 			break;
-		default:
-			/* do nothing */
-			break;
 	}
+
+	c->wq_stats->tasks_on_workers = c->wq_stats->tasks_running + c->wq_stats->tasks_with_results;
+	c->wq_stats->tasks_submitted = c->total_tasks + c->wq_stats->tasks_waiting + c->wq_stats->tasks_on_workers;
 
 	log_queue_stats(q, 0);
 	write_transaction_task(q, t);
@@ -7670,13 +7704,6 @@ void work_queue_get_stats_category(struct work_queue *q, const char *category, s
 	struct category *c = work_queue_category_lookup_or_create(q, category);
 	struct work_queue_stats *cs = c->wq_stats;
 	memcpy(s, cs, sizeof(*s));
-
-	//info about tasks
-	s->tasks_waiting      = task_state_count(q, category, WORK_QUEUE_TASK_READY);
-	s->tasks_running      = task_state_count(q, category, WORK_QUEUE_TASK_RUNNING);
-	s->tasks_with_results = task_state_count(q, category, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-	s->tasks_on_workers   = s->tasks_running + s->tasks_with_results;
-	s->tasks_submitted    = c->total_tasks + s->tasks_waiting + s->tasks_on_workers;
 
 	s->workers_able  = count_workers_for_waiting_tasks(q, largest_seen_resources(q, c->name));
 }
