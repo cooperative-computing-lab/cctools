@@ -957,6 +957,13 @@ int work_queue_specify_draining_by_hostname(struct work_queue *q, const char *ho
 */
 int work_queue_specify_category_mode(struct work_queue *q, const char *category, work_queue_category_mode_t mode);
 
+/** Set a maximum number of tasks of this category that can execute concurrently. If less than 0, unlimited (this is the default).
+@param q A work queue object.
+@param category A category name.
+@param max_concurrent Number of maximum concurrent tasks.
+*/
+void work_queue_specify_category_max_concurrent(struct work_queue *q, const char *category, int max_concurrent);
+
 /** Turn on or off first-allocation labeling for a given category and resource. This function should be use to fine-tune the defaults from @ref work_queue_specify_category_mode.
 @param q A work queue object.
 @param category A category name.

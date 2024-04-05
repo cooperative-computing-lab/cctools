@@ -4597,6 +4597,11 @@ static int send_one_task( struct work_queue *q )
 			continue;
 		}
 
+		struct category *c = work_queue_category_lookup_or_create(q, t->category);
+		if (c->max_concurrent > -1 && c->max_concurrent < c->wq_stats->tasks_running) {
+			continue;
+		}
+
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
 
@@ -8163,6 +8168,12 @@ int work_queue_specify_category_mode(struct work_queue *q, const char *category,
 	}
 
 	return 1;
+}
+
+void work_queue_specify_category_max_concurrent(struct work_queue *q, const char *category, int max_concurrent) {
+	struct category *c = work_queue_category_lookup_or_create(q, category);
+
+	c->max_concurrent = MAX(-1, max_concurrent);
 }
 
 int work_queue_enable_category_resource(struct work_queue *q, const char *category, const char *resource, int autolabel) {
