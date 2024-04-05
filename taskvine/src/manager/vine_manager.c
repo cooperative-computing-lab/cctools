@@ -3155,6 +3155,12 @@ static int send_one_task(struct vine_manager *q)
 			continue;
 		}
 
+		// Skip if category already running maximum allowed tasks
+		struct category *c = vine_category_lookup_or_create(q, t->category);
+		if (c->max_concurrent > -1 && c->max_concurrent < c->vine_stats->tasks_running) {
+			continue;
+		}
+
 		// Skip task if temp input files have not been materialized.
 		if (!vine_manager_check_inputs_available(q, t)) {
 			continue;
@@ -5687,6 +5693,13 @@ int vine_set_category_mode(struct vine_manager *q, const char *category, vine_ca
 	}
 
 	return 1;
+}
+
+void vine_set_category_max_concurrent(struct vine_manager *m, const char *category, int max_concurrent)
+{
+	struct category *c = vine_category_lookup_or_create(m, category);
+
+	c->max_concurrent = MAX(-1, max_concurrent);
 }
 
 int vine_enable_category_resource(struct vine_manager *q, const char *category, const char *resource, int autolabel)
