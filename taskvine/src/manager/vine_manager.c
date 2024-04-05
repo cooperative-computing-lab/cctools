@@ -4219,6 +4219,31 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 			vine_task_state_to_string(new_state),
 			new_state);
 
+	struct category *c = vine_category_lookup_or_create(q, t->category);
+
+	/* XXX: update manager task count in the same way */
+	switch (old_state) {
+	case VINE_TASK_INITIAL:
+		break;
+	case VINE_TASK_READY:
+		c->vine_stats->tasks_waiting--;
+		break;
+	case VINE_TASK_RUNNING:
+		c->vine_stats->tasks_running--;
+		break;
+	case VINE_TASK_WAITING_RETRIEVAL:
+		c->vine_stats->tasks_with_results--;
+		break;
+	case VINE_TASK_RETRIEVED:
+		break;
+	case VINE_TASK_DONE:
+		break;
+	}
+
+	c->vine_stats->tasks_on_workers = c->vine_stats->tasks_running + c->vine_stats->tasks_with_results;
+	c->vine_stats->tasks_submitted =
+			c->total_tasks + c->vine_stats->tasks_waiting + c->vine_stats->tasks_on_workers;
+
 	switch (new_state) {
 	case VINE_TASK_INITIAL:
 		/* should not happen, do nothing */
@@ -4226,12 +4251,15 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 	case VINE_TASK_READY:
 		vine_task_set_result(t, VINE_RESULT_UNKNOWN);
 		push_task_to_ready_list(q, t);
+		c->vine_stats->tasks_waiting++;
 		break;
 	case VINE_TASK_RUNNING:
 		itable_insert(q->running_table, t->task_id, t);
+		c->vine_stats->tasks_running++;
 		break;
 	case VINE_TASK_WAITING_RETRIEVAL:
 		list_push_head(q->waiting_retrieval_list, t);
+		c->vine_stats->tasks_with_results++;
 		break;
 	case VINE_TASK_RETRIEVED:
 		if (t->type == VINE_TASK_TYPE_LIBRARY) {
@@ -5373,13 +5401,6 @@ void vine_get_stats_category(struct vine_manager *q, const char *category, struc
 	struct category *c = vine_category_lookup_or_create(q, category);
 	struct vine_stats *cs = c->vine_stats;
 	memcpy(s, cs, sizeof(*s));
-
-	// info about tasks
-	s->tasks_waiting = task_state_count(q, category, VINE_TASK_READY);
-	s->tasks_running = task_state_count(q, category, VINE_TASK_RUNNING);
-	s->tasks_with_results = task_state_count(q, category, VINE_TASK_WAITING_RETRIEVAL);
-	s->tasks_on_workers = s->tasks_running + s->tasks_with_results;
-	s->tasks_submitted = c->total_tasks + s->tasks_waiting + s->tasks_on_workers;
 
 	s->workers_able = count_workers_for_waiting_tasks(q, largest_seen_resources(q, c->name));
 }
