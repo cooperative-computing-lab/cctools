@@ -165,10 +165,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		{
 
 			if (found_per_source >= MIN(m->file_source_max_transfers, to_find)) {
-				/* XXX: commenting this check for now, as otherwise only one replica is created.
-				 * We need to create replicas during wait_internal too.
-					break;
-				*/
+				break;
 			}
 
 			if (source_in_use >= m->worker_source_max_transfers) {
