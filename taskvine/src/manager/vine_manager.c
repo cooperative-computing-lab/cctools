@@ -389,7 +389,7 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 
 			/* And if the file is a newly created temporary. replicate it. */
 			if (f->type == VINE_TEMP && *id == 'X') {
-				vine_file_replica_table_replicate(q, f);
+				hash_table_insert(q->temp_files_to_repilicate, f->cached_name, NULL);
 			}
 		}
 	}
