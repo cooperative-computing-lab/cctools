@@ -58,6 +58,11 @@ struct vine_worker_options {
 	*/
 	int ssl_requested;
 
+	/*
+	If SNI tls is different from hostname. Implies ssl_requested.
+	*/
+	char *tls_sni;
+
 	/* Manual option given by the user to control the location of the workspace. */
 	char *workspace_dir;
 
@@ -95,6 +100,10 @@ struct vine_worker_options {
 
 	/* The parent process pid, to detect when the parent has exited. */
 	pid_t initial_ppid;
+
+	/* Range of ports allowed to set the server for transfers between workers. */
+	int transfer_port_min;
+	int transfer_port_max;
 };
 
 struct vine_worker_options * vine_worker_options_create();

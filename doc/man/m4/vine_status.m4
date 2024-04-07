@@ -42,6 +42,8 @@ OPTION_ARG(o, debug-file, file)Send debugging to this file. (can also be :stderr
 OPTION_ARG(O, debug-rotate-max, bytes)Rotate debug file once it reaches this size.
 OPTION_FLAG(v,version)Show vine_status version.
 OPTION_FLAG(h,help)Show this help message.
+OPTION_FLAG_LONG(ssl)Enable tls connection to manager (manager should support it).
+OPTION_ARG_LONG(tls-sni)SNI domain name if different from manager hostname. Implies --ssl.
 OPTIONS_END
 
 SECTION(EXAMPLES)

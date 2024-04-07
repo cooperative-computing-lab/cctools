@@ -70,9 +70,10 @@ struct link *link_connect(const char *addr, int port, time_t stoptime);
 
 /** Wrap a connect link with an ssl context and state
 @param link A link returned from @ref link_connect
+@param sni_hostname Optional domainame for tls routing.
 @return 0 on failure, 1 on success
 */
-int link_ssl_wrap_connect(struct link *link);
+int link_ssl_wrap_connect(struct link *link, const char *sni_hostname);
 
 /** Turn a FILE* into a link.  Useful when trying to poll both remote and local connections using @ref link_poll
 @param file File to create the link from.
@@ -110,6 +111,15 @@ Functions like @ref link_serve, except that the server will only be visible on t
 @return link A server endpoint that can be passed to @ref link_accept, or null on failure.
 */
 struct link *link_serve_address(const char *addr, int port);
+
+
+/** Prepare to accept connections on one network interface.
+Functions like @ref link_serve, except that the server will only be visible on the given network interface.
+@param low The low port in a range to listen on (inclusive).
+@param high The high port in a range to listen on (inclusive).
+@return link A server endpoint that can be passed to @ref link_accept, or null on failure.
+*/
+struct link *link_serve_address_range(const char *addr, int low, int high);
 
 /** Prepare to accept connections on one network interface.
 Functions like @ref link_serve, except that the server will only be visible on the given network interface and allows for a port range.

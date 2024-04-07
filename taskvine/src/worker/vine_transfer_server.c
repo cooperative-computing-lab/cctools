@@ -100,9 +100,9 @@ static void vine_transfer_process(struct vine_cache *cache)
 	}
 }
 
-void vine_transfer_server_start(struct vine_cache *cache)
+void vine_transfer_server_start(struct vine_cache *cache, int port_min, int port_max)
 {
-	transfer_link = link_serve(vine_transfer_server_port);
+	transfer_link = link_serve_range(port_min, port_max);
 
 	if (!transfer_link) {
 		fatal("unable to find a port to start a transfer server.");
