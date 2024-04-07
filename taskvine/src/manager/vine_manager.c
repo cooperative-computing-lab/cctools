@@ -4962,16 +4962,14 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		}
 
 		// Check if any temp files need replication and start replicating
-		if (q->transfer_temps_recovery) {
-			BEGIN_ACCUM_TIME(q, time_internal);
-			result = recover_temp_files(q);
-			END_ACCUM_TIME(q, time_internal);
+		BEGIN_ACCUM_TIME(q, time_internal);
+		result = recover_temp_files(q);
+		END_ACCUM_TIME(q, time_internal);
 
-			if (result) {
-				// recovered at least one temp file
-				events++;
-				continue;
-			}
+		if (result) {
+			// recovered at least one temp file
+			events++;
+			continue;
 		}
 
 		// return if manager is empty and something interesting already happened
