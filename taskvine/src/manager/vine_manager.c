@@ -773,7 +773,31 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	cleanup_worker_files(q, w);
 }
 
-/* Recover and replicate temp files of to be removed worker to reach threshold n */
+static int recover_temp_files(struct vine_manager *q) {
+	char *cached_name = NULL;
+	void *empty_val = NULL;
+	int total_replication_count = 0;
+
+	HASH_TABLE_ITERATE(q->temp_files_to_repilicate, cached_name, empty_val)
+	{
+		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
+		
+		if (f) { 
+			int curr_file_replication_cnt = vine_file_replica_table_replicate(q, f);
+
+			if(!curr_file_replication_cnt) {
+				hash_table_remove(q->temp_files_to_repilicate, cached_name);
+			}
+
+			total_replication_count += curr_file_replication_cnt;
+		}
+
+	}
+
+	return total_replication_count;
+}
+
+/* Insert into hashtable temp files that may need replication. */
 
 static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker_info *w)
 {
@@ -785,14 +809,8 @@ static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker
 	{
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
 
-		if (f && f->type == VINE_TEMP) { // replicate temp files
-
-			struct vine_file_replica *replica = vine_file_replica_table_remove(q, w, cached_name);
-			if (replica)
-				vine_file_replica_delete(replica);
-
-			if (vine_file_replica_table_count_replicas(q, cached_name, VINE_FILE_REPLICA_STATE_READY) > 0)
-				vine_file_replica_table_replicate(q, f);
+		if (f && f->type == VINE_TEMP) { 
+			hash_table_insert(q->temp_files_to_repilicate, cached_name, NULL);
 		}
 	}
 }
@@ -3707,6 +3725,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->worker_table = hash_table_create(0, 0);
 	q->file_worker_table = hash_table_create(0, 0);
+	q->temp_files_to_repilicate = hash_table_create(0, 0);
 	q->worker_blocklist = hash_table_create(0, 0);
 
 	q->file_table = hash_table_create(0, 0);
@@ -4007,6 +4026,8 @@ void vine_delete(struct vine_manager *q)
 
 	hash_table_clear(q->file_worker_table, (void *)set_delete);
 	hash_table_delete(q->file_worker_table);
+
+	hash_table_delete(q->temp_files_to_repilicate);
 
 	hash_table_clear(q->factory_table, (void *)vine_factory_info_delete);
 	hash_table_delete(q->factory_table);
@@ -4939,6 +4960,20 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				break;
 			}
 		}
+
+		// Check if any temp files need replication and start replicating
+		if(q->transfer_temps_recovery) {
+			BEGIN_ACCUM_TIME(q, time_internal);
+			result = recover_temp_files(q);
+			END_ACCUM_TIME(q, time_internal);
+
+			if(result) {
+				// recovered at least one temp file
+				events++;
+				continue;
+			}
+		}
+
 
 		// return if manager is empty and something interesting already happened
 		// in this wait.
