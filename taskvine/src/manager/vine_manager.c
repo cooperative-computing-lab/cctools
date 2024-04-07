@@ -773,7 +773,8 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	cleanup_worker_files(q, w);
 }
 
-static int recover_temp_files(struct vine_manager *q) {
+static int recover_temp_files(struct vine_manager *q)
+{
 	char *cached_name = NULL;
 	void *empty_val = NULL;
 	int total_replication_count = 0;
@@ -781,17 +782,16 @@ static int recover_temp_files(struct vine_manager *q) {
 	HASH_TABLE_ITERATE(q->temp_files_to_repilicate, cached_name, empty_val)
 	{
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
-		
-		if (f) { 
+
+		if (f) {
 			int curr_file_replication_cnt = vine_file_replica_table_replicate(q, f);
 
-			if(!curr_file_replication_cnt) {
+			if (!curr_file_replication_cnt) {
 				hash_table_remove(q->temp_files_to_repilicate, cached_name);
 			}
 
 			total_replication_count += curr_file_replication_cnt;
 		}
-
 	}
 
 	return total_replication_count;
@@ -809,7 +809,7 @@ static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker
 	{
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
 
-		if (f && f->type == VINE_TEMP) { 
+		if (f && f->type == VINE_TEMP) {
 			hash_table_insert(q->temp_files_to_repilicate, cached_name, NULL);
 		}
 	}
@@ -4962,18 +4962,17 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		}
 
 		// Check if any temp files need replication and start replicating
-		if(q->transfer_temps_recovery) {
+		if (q->transfer_temps_recovery) {
 			BEGIN_ACCUM_TIME(q, time_internal);
 			result = recover_temp_files(q);
 			END_ACCUM_TIME(q, time_internal);
 
-			if(result) {
+			if (result) {
 				// recovered at least one temp file
 				events++;
 				continue;
 			}
 		}
-
 
 		// return if manager is empty and something interesting already happened
 		// in this wait.
