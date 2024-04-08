@@ -22,7 +22,6 @@ int vine_current_transfers_url_in_use(struct vine_manager *q, const char *source
 
 int vine_current_transfers_dest_in_use(struct vine_manager *q,struct vine_worker_info *w);
 
-int vine_current_transfers_file_worker_recv(struct vine_manager *q, struct vine_worker_info *w, const char *cachename);
 
 int vine_current_transfers_wipe_worker(struct vine_manager *q, struct vine_worker_info *w);
 

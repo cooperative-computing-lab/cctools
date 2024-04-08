@@ -135,22 +135,6 @@ int vine_current_transfers_dest_in_use(struct vine_manager *q, struct vine_worke
 	return c;
 }
 
-// return true if worker w is currently a receiving file cachename, else false
-int vine_current_transfers_file_worker_recv(struct vine_manager *q, struct vine_worker_info *w, const char *cachename)
-{
-
-	char *id;
-	struct vine_transfer_pair *t;
-
-	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
-	{
-		if (t->to == w && strstr(t->source_url, cachename))
-			return 1;
-	}
-
-	return 0;
-}
-
 // remove all transactions involving a worker from the transfer table - if a worker failed or is being deleted
 // intentionally
 int vine_current_transfers_wipe_worker(struct vine_manager *q, struct vine_worker_info *w)

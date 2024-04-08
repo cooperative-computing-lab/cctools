@@ -184,10 +184,6 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 				continue;
 			}
 
-			if (vine_current_transfers_file_worker_recv(m, peer, f->cached_name)) {
-				continue;
-			}
-
 			if (strcmp(source->hostname, peer->hostname) == 0) {
 				continue;
 			}

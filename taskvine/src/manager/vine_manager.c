@@ -773,6 +773,8 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	cleanup_worker_files(q, w);
 }
 
+/* Start replicating files that may need replication */
+
 static int recover_temp_files(struct vine_manager *q)
 {
 	char *cached_name = NULL;
@@ -4794,6 +4796,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	   - drain workers from factories
 	   - new workers?                                             Yes: connect max_new_workers and to to S
 	   - send all libraries to all workers
+	   - replicate temp files
 	   - manager empty?                                           Yes: break
 	   - mark as busy-waiting and go to S
 	*/
