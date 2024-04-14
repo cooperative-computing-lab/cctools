@@ -70,7 +70,7 @@ def library_network_code():
             if libc_path:
                 return ctypes.CDLL(libc_path)
             return None
-        
+
         def __enter__(self):
             # Set thread limits
             for controller in self.lib_controllers:
@@ -231,7 +231,6 @@ def library_network_code():
                 # also set related environment variables, not necessary for some situations
                 cores_env = str(library_cores // function_slots)
                 os.environ['OMP_NUM_THREADS'] = cores_env
-                os.environ['CORES'] = cores_env
                 os.environ['CORES'] = cores_env
                 os.environ['OPENBLAS_NUM_THREADS'] = cores_env
                 os.environ['VECLIB_NUM_THREADS'] = cores_env
