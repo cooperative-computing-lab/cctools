@@ -10,7 +10,6 @@
 # function and run on a worker as a pilot task. Upcoming Python
 # Function Calls will be executed by this pilot task.
 def library_network_code():
-
     # import relevant libraries.
     import json
     import os
@@ -20,6 +19,128 @@ def library_network_code():
     import cloudpickle
     import select
     import signal
+    import ctypes
+    from ctypes.util import find_library
+    from contextlib import ContextDecorator
+
+    class CLibController:
+        def __init__(self, category, lib_paths, set_func_names, get_func_names):
+            self.category = category
+            self.lib = None
+            for path in lib_paths:
+                try:
+                    self.lib = ctypes.CDLL(path)
+                    break
+                except OSError:
+                    continue
+            if not self.lib:
+                raise ValueError(f"Failed to load library for category '{self.category}' from paths: {lib_paths}")
+
+            self.set_num_threads_func = self._find_valid_func(set_func_names)
+            self.get_num_threads_func = self._find_valid_func(get_func_names)
+
+            if not self.set_num_threads_func or not self.get_num_threads_func:
+                raise ValueError(f"Failed to find valid set/get thread functions for category '{self.category}'.")
+
+        def _find_valid_func(self, func_names):
+            for name in func_names:
+                func = getattr(self.lib, name, None)
+                if func:
+                    return func
+            return None
+
+        def set_num_threads(self, num_threads):
+            if self.set_num_threads_func:
+                self.set_num_threads_func(num_threads)
+
+        def get_num_threads(self):
+            if self.get_num_threads_func:
+                return self.get_num_threads_func()
+            return None
+
+    class ThreadpoolLimits(ContextDecorator):
+        def __init__(self, limits=1):
+            self.limits = limits
+            self.lib_controllers = []
+            self.original_limits = {}
+            self._init_controllers()
+
+        def _get_libc(self):
+            libc_path = find_library("c")
+            if libc_path:
+                return ctypes.CDLL(libc_path)
+            return None
+        
+        def __enter__(self):
+            # Set thread limits
+            for controller in self.lib_controllers:
+                if controller.lib is not None:
+                    original_num = controller.get_num_threads()
+                    if original_num is not None:
+                        self.original_limits[controller] = original_num
+                        controller.set_num_threads(self.limits)
+            return self
+
+        def __exit__(self, *exc):
+            # Restore original thread limits
+            for controller, original_num in self.original_limits.items():
+                if controller.lib is not None:
+                    controller.set_num_threads(original_num)
+            return False
+
+        def _init_controllers(self):
+            lib_definitions = [
+                {
+                    "category": "openblas",
+                    "prefixes": ["openblas", "libopenblas", "libblas"],
+                    "set_funcs": ["openblas_set_num_threads", "openblas_set_num_threads64_"],
+                    "get_funcs": ["openblas_get_num_threads", "openblas_get_num_threads64_"]
+                },
+                {
+                    "category": "blis",
+                    "prefixes": ["blis", "libblis", "libblas"],
+                    "set_funcs": ["bli_thread_set_num_threads"],
+                    "get_funcs": ["bli_thread_get_num_threads"]
+                },
+                {
+                    "category": "flexiblas",
+                    "prefixes": ["flexiblas", "libflexiblas"],
+                    "set_funcs": ["flexiblas_set_num_threads"],
+                    "get_funcs": ["flexiblas_get_num_threads"]
+                },
+                {
+                    "category": "mkl",
+                    "prefixes": ["mkl_rt", "libmkl_rt", "mkl_core", "libmkl_rt", "libblas"],
+                    "set_funcs": ["MKL_Set_Num_Threads", "mkl_set_num_threads"],
+                    "get_funcs": ["MKL_Get_Max_Threads", "mkl_get_max_threads"]
+                },
+                {
+                    "category": "openmp",
+                    "prefixes": ["gomp", "libgomp", "iomp5", "libiomp5", "libomp", "vcomp", "vcomp140"],
+                    "set_funcs": ["omp_set_num_threads"],
+                    "get_funcs": ["omp_get_max_threads", "omp_get_num_procs"]
+                }
+            ]
+
+            for lib_def in lib_definitions:
+                matched_paths = []
+                for prefix in lib_def["prefixes"]:
+                    lib_path = find_library(prefix)
+                    if lib_path:
+                        matched_paths.append(lib_path)
+                        break
+
+                if matched_paths:
+                    try:
+                        controller = CLibController(
+                            category=lib_def["category"],
+                            lib_paths=matched_paths,
+                            set_func_names=lib_def["set_funcs"],
+                            get_func_names=lib_def["get_funcs"]
+                        )
+                        self.lib_controllers.append(controller)
+                    except ValueError as e:
+                        print(f"Error initializing controller for category '{lib_def['category']}': {e}")
 
     # self-pipe to turn a sigchld signal when a child finishes execution
     # into an I/O event.
@@ -84,7 +205,7 @@ def library_network_code():
         os.writev(w, [b'a'])
 
     # Read data from worker, start function, and dump result to `outfile`.
-    def start_function(in_pipe_fd):
+    def start_function(in_pipe_fd, library_cores, function_slots):
         # read length of buffer to read
         buffer_len = b''
         while True:
@@ -106,50 +227,60 @@ def library_network_code():
         if function_name:
             # exec method for now is fork only, direct will be supported later
             exec_method = 'fork'
-            if exec_method == "direct":
-                library_sandbox = os.getcwd()
-                try:
-                    os.chdir(function_sandbox)
+            with ThreadpoolLimits(limits=library_cores // function_slots):
+                # also set related environment variables, not necessary for some situations
+                cores_env = str(library_cores // function_slots)
+                os.environ['OMP_NUM_THREADS'] = cores_env
+                os.environ['CORES'] = cores_env
+                os.environ['CORES'] = cores_env
+                os.environ['OPENBLAS_NUM_THREADS'] = cores_env
+                os.environ['VECLIB_NUM_THREADS'] = cores_env
+                os.environ['MKL_NUM_THREADS'] = cores_env
+                os.environ['NUMEXPR_NUM_THREADS'] = cores_env
+                if exec_method == "direct":
+                    library_sandbox = os.getcwd()
+                    try:
+                        os.chdir(function_sandbox)
 
-                    # parameters are represented as infile.
-                    os.chdir(function_sandbox)
-                    with open('infile', 'rb') as f:
-                        event = cloudpickle.load(f)
+                        # parameters are represented as infile.
+                        os.chdir(function_sandbox)
+                        with open('infile', 'rb') as f:
+                            event = cloudpickle.load(f)
 
-                    # output of execution should be dumped to outfile.
-                    with open('outfile', 'wb') as f:
-                        cloudpickle.dump(globals()[function_name](event), f)
+                        # output of execution should be dumped to outfile.
+                        with open('outfile', 'wb') as f:
+                            cloudpickle.dump(globals()[function_name](event), f)
 
-                except Exception as e:
-                    print(f'Library code: Function call failed due to {e}', file=sys.stderr)
-                    sys.exit(1)
-                finally:
-                    os.chdir(library_sandbox)
-            else:
-                p = os.fork()
-                if p == 0:
-                    # setup stdout/err for a function call so we can capture them.
-                    stdout_capture_fd = os.open(function_stdout_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
-                    os.dup2(stdout_capture_fd, sys.stdout.fileno())
-                    os.dup2(stdout_capture_fd, sys.stderr.fileno())
-
-                    # parameters are represented as infile.
-                    os.chdir(function_sandbox)
-                    with open('infile', 'rb') as f:
-                        event = cloudpickle.load(f)
-
-                    # output of execution should be dumped to outfile.
-                    with open('outfile', 'wb') as f:
-                        cloudpickle.dump(globals()[function_name](event), f)
-                    os.close(stdout_capture_fd)
-                    os._exit(0)
-                elif p < 0:
-                    print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)
-                    return -1
-
-                # return pid and function id of child process to parent.
+                    except Exception as e:
+                        print(f'Library code: Function call failed due to {e}', file=sys.stderr)
+                        sys.exit(1)
+                    finally:
+                        os.chdir(library_sandbox)
                 else:
-                    return p, function_id
+                    p = os.fork()
+                    if p == 0:
+                        # setup stdout/err for a function call so we can capture them.
+                        stdout_capture_fd = os.open(function_stdout_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
+                        os.dup2(stdout_capture_fd, sys.stdout.fileno())
+                        os.dup2(stdout_capture_fd, sys.stderr.fileno())
+
+                        # parameters are represented as infile.
+                        os.chdir(function_sandbox)
+                        with open('infile', 'rb') as f:
+                            event = cloudpickle.load(f)
+
+                        # output of execution should be dumped to outfile.
+                        with open('outfile', 'wb') as f:
+                            cloudpickle.dump(globals()[function_name](event), f)
+                        os.close(stdout_capture_fd)
+                        os._exit(0)
+                    elif p < 0:
+                        print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)
+                        return -1
+
+                    # return pid and function id of child process to parent.
+                    else:
+                        return p, function_id
         else:
             # malformed message from worker so we exit
             print('malformed message from worker. Exiting..', file=sys.stderr)
@@ -169,6 +300,9 @@ def library_network_code():
         parser = argparse.ArgumentParser('Parse input and output file descriptors this process should use. The relevant fds should already be prepared by the vine_worker.')
         parser.add_argument('--input-fd', required=True, type=int, help='input fd to receive messages from the vine_worker via a pipe')
         parser.add_argument('--output-fd', required=True, type=int, help='output fd to send messages to the vine_worker via a pipe')
+        parser.add_argument('--task-id', required=True, type=int, help='task id of this library task')
+        parser.add_argument('--library-cores', required=True, type=int, help='number of cores to use for library functions')
+        parser.add_argument('--function-slots', required=True, type=int, help='number of function slots to use for library functions')
         parser.add_argument('--worker-pid', required=True, type=int, help='pid of main vine worker to send sigchild to let it know theres some result.')
         args = parser.parse_args()
 
@@ -205,7 +339,9 @@ def library_network_code():
             for re in rlist:
                 # worker has a function, run it
                 if re == in_pipe_fd:
-                    pid, func_id = start_function(in_pipe_fd)
+                    library_cores = args.library_cores
+                    function_slots = args.function_slots
+                    pid, func_id = start_function(in_pipe_fd, library_cores, function_slots)
                     pid_to_func_id[pid] = func_id
                 else:
                     # at least 1 child exits, reap all.

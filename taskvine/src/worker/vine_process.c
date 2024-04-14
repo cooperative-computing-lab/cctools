@@ -403,10 +403,13 @@ int vine_process_execute(struct vine_process *p)
 		if (p->type != VINE_PROCESS_TYPE_LIBRARY) {
 			execl("/bin/sh", "sh", "-c", p->task->command_line, (char *)0);
 		} else {
-			char *final_command = string_format("%s --input-fd %d --output-fd %d --worker-pid %d",
+			char *final_command = string_format("%s --input-fd %d --output-fd %d --task-id %d --library-cores %d --function-slots %d --worker-pid %d",
 					p->task->command_line,
 					in_pipe_fd,
 					out_pipe_fd,
+					p->task->task_id,
+					(int)p->task->resources_requested->cores,
+					p->task->function_slots,
 					getppid());
 			execl("/bin/sh", "sh", "-c", final_command, (char *)0);
 		}
