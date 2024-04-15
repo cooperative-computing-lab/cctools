@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "taskvine.h"
 #include "vine_resources.h"
 
+#include "domain_name.h"
 #include "hash_table.h"
 #include "link.h"
 #include "itable.h"
@@ -42,7 +43,7 @@ struct vine_worker_info {
 	char *hashkey;
 
 	/* Address and port where this worker will accept transfers from peers. */
-	char transfer_addr[LINK_ADDRESS_MAX];
+	char transfer_addr[DOMAIN_NAME_MAX];
 	int  transfer_port;
 	int  transfer_port_active;
 

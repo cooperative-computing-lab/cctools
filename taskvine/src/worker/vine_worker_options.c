@@ -2,11 +2,13 @@
 #include "vine_catalog.h"
 #include "vine_transfer_server.h"
 
+#include "address.h"
 #include "catalog_query.h"
 #include "cctools.h"
 #include "copy_stream.h"
 #include "create_dir.h"
 #include "debug.h"
+#include "domain_name.h"
 #include "hash_table.h"
 #include "macros.h"
 #include "path.h"
@@ -54,11 +56,14 @@ struct vine_worker_options *vine_worker_options_create()
 	self->transfer_port_min = 0;
 	self->transfer_port_max = 0;
 
+	self->contact_address = 0;
+
 	return self;
 }
 
 void vine_worker_options_delete(struct vine_worker_options *self)
 {
+	/* XXX: if part not needed here, free(NULL) is legal */
 	if (self->os_name)
 		free(self->os_name);
 	if (self->arch_name)
@@ -69,6 +74,8 @@ void vine_worker_options_delete(struct vine_worker_options *self)
 		free(self->catalog_hosts);
 	if (self->factory_name)
 		free(self->factory_name);
+	if (self->contact_address)
+		free(self->contact_address);
 
 	hash_table_delete(self->features);
 	free(self);
@@ -149,6 +156,8 @@ void vine_worker_options_show_help(const char *cmd, struct vine_worker_options *
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
 	printf(" %-30s Listening port for worker-worker transfers. Either port or port_min:port_max (default: any)\n",
 			"--transfer-port");
+	printf(" %-30s Explicit contact address for worker-worker transfers. (default: :<transfer_port>)\n",
+			"--contact-address");
 
 	printf(" %-30s Enable tls connection to manager (manager should support it).\n", "--ssl");
 	printf(" %-30s SNI domain name if different from manager hostname. Implies --ssl.\n",
@@ -177,6 +186,7 @@ enum {
 	LONG_OPT_PYTHON_FUNCTION,
 	LONG_OPT_FROM_FACTORY,
 	LONG_OPT_TRANSFER_PORT,
+	LONG_OPT_CONTACT_ADDRESS,
 	LONG_OPT_WORKSPACE,
 	LONG_OPT_KEEP_WORKSPACE,
 };
@@ -219,6 +229,7 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"tls-sni", required_argument, 0, LONG_OPT_TLS_SNI},
 		{"from-factory", required_argument, 0, LONG_OPT_FROM_FACTORY},
 		{"transfer-port", required_argument, 0, LONG_OPT_TRANSFER_PORT},
+		{"contact-address", required_argument, 0, LONG_OPT_CONTACT_ADDRESS},
 		{0, 0, 0, 0}};
 
 static void vine_worker_options_get_env(const char *name, int64_t *manual_option)
@@ -238,6 +249,40 @@ static void vine_worker_options_get_envs(struct vine_worker_options *options)
 	vine_worker_options_get_env("MEMORY", &options->memory_total);
 	vine_worker_options_get_env("DISK", &options->disk_total);
 	vine_worker_options_get_env("GPUS", &options->gpus_total);
+}
+
+void set_contact_address(struct vine_worker_options *options, const char *hostport)
+{
+	int error = 0;
+
+	free(options->contact_address);
+	options->contact_address = NULL;
+
+	if (!hostport) {
+		error = 1;
+	} else if (strlen(hostport) == 0) {
+		error = 1;
+	} else if (hostport[0] == ':') {
+		char *end = NULL;
+		errno = 0;
+		options->contact_port = strtoll((hostport + 1), &end, 10);
+		if (options->contact_port == 0 && error != 0) {
+			error = 1;
+		}
+	} else {
+		int port;
+		char host[DOMAIN_NAME_MAX];
+		if (address_parse_hostport(hostport, host, &port, 0)) {
+			options->contact_address = xxstrdup(host);
+			options->contact_port = port;
+		} else {
+			error = 1;
+		}
+	}
+
+	if (error) {
+		fatal("contact address not of the form HOSTNAME:PORT or :PORT");
+	}
 }
 
 void set_min_max_ports(struct vine_worker_options *options, const char *range)
@@ -438,6 +483,9 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 			break;
 		case LONG_OPT_TRANSFER_PORT:
 			set_min_max_ports(options, optarg);
+			break;
+		case LONG_OPT_CONTACT_ADDRESS:
+			set_contact_address(options, optarg);
 			break;
 		default:
 			vine_worker_options_show_help(argv[0], options);
