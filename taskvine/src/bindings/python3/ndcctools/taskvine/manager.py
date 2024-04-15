@@ -329,6 +329,13 @@ class Manager(object):
         return workers
 
     ##
+    # Send update to catalog server.
+    #
+    # @param self 	Reference to the current manager object.
+    def update_catalog(self):
+        cvine.vine_update_catalog(self._taskvine)
+
+    ##
     # Turn on or off first-allocation labeling for a given category. By
     # default, only cores, memory, and disk are labeled, and gpus are unlabeled.
     # NOTE: autolabeling is only meaningfull when task monitoring is enabled
