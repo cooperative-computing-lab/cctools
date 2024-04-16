@@ -30,7 +30,7 @@ int check_fixed_location_worker(struct vine_manager *m, struct vine_worker_info 
 	if (t->has_fixed_locations) {
 		LIST_ITERATE(t->input_mounts, mt)
 		{
-			if (mt->file->flags & VINE_FIXED_LOCATION) {
+			if (mt->flags & VINE_FIXED_LOCATION) {
 				replica = hash_table_lookup(w->current_files, mt->file->cached_name);
 				if (!replica) {
 					all_present = 0;
@@ -613,6 +613,6 @@ int vine_schedule_check_fixed_location(struct vine_manager *q, struct vine_task 
 			return 1;
 		}
 	}
-
+	debug(D_VINE, "Missing fixed_location dependencies for task: %d", t->task_id);
 	return 0;
 }
