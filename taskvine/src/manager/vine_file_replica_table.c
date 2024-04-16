@@ -226,5 +226,14 @@ int vine_file_replica_table_exists_somewhere(struct vine_manager *q, const char 
 		return 0;
 	}
 
-	return set_size(workers) > 0;
+	struct vine_worker_info *peer;
+
+	SET_ITERATE(workers, peer)
+	{
+		if (peer->transfer_port_active) {
+			return 1;
+		}
+	}
+
+	return 0;
 }

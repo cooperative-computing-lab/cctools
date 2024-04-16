@@ -473,6 +473,8 @@ static int handle_transfer_address(struct vine_manager *q, struct vine_worker_in
 		return VINE_MSG_FAILURE;
 	}
 
+	w->transfer_port_active = 1;
+
 	if (!explicit) {
 		link_address_remote(w->link, w->transfer_addr, &dummy_port);
 	}
