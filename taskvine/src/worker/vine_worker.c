@@ -421,19 +421,21 @@ static void send_transfer_address(struct link *manager)
 {
 	char addr[LINK_ADDRESS_MAX];
 	int port;
+	int explicit_addr = 0;
 
 	vine_transfer_server_address(addr, &port);
 
 	char *addr_to_send = addr;
 	if (options->contact_address) {
 		addr_to_send = options->contact_address;
+		explicit_addr = 1;
 	}
 
 	if (options->contact_port > 0) {
 		port = options->contact_port;
 	}
 
-	send_message(manager, "transfer-address %s %d\n", addr_to_send, port);
+	send_message(manager, "transfer-address %d %s %d\n", explicit_addr, addr_to_send, port);
 }
 
 /*

@@ -46,6 +46,7 @@ struct vine_worker_info {
 	char transfer_addr[DOMAIN_NAME_MAX];
 	int  transfer_port;
 	int  transfer_port_active;
+	char *transfer_addr_url;       /* worker(ip)?://transfer_addr:transfer_port */
 
 	/* Worker condition that may affect task start or cancellation. */
 	int  draining;                          // if 1, worker does not accept anymore tasks. It is shutdown if no task running.

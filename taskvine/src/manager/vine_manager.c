@@ -49,6 +49,7 @@ See the file COPYING for details.
 #include "load_average.h"
 #include "macros.h"
 #include "path.h"
+#include "pattern.h"
 #include "process.h"
 #include "random.h"
 #include "rmonitor.h"
@@ -465,13 +466,23 @@ on its own port to receive get requests from other workers.
 static int handle_transfer_address(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
 	int dummy_port;
-	if (sscanf(line, "transfer-address %s %d", w->transfer_addr, &w->transfer_port)) {
-		w->transfer_port_active = 1;
-		link_address_remote(w->link, w->transfer_addr, &dummy_port);
-		return VINE_MSG_PROCESSED;
-	} else {
+	int explicit;
+
+	int n = sscanf(line, "transfer-address %d %s %d", &explicit, w->transfer_addr, &w->transfer_port);
+	if (n != 3) {
 		return VINE_MSG_FAILURE;
 	}
+
+	if (!explicit) {
+		link_address_remote(w->link, w->transfer_addr, &dummy_port);
+	}
+
+	int is_ip = pattern_match(w->transfer_addr, "^%d+%.%d+%.%d+%.%d+$") != -1;
+
+	free(w->transfer_addr_url);
+	w->transfer_addr_url = string_format("worker%s://%s:%d", is_ip ? "ip" : "", w->transfer_addr, w->transfer_port);
+
+	return VINE_MSG_PROCESSED;
 }
 
 /*
@@ -2934,10 +2945,8 @@ static int vine_manager_transfer_capacity_available(
 		/* Provide a substitute file object to describe the peer. */
 		if (!(m->file->flags & VINE_PEER_NOSHARE) && (m->file->cache_level > VINE_CACHE_LEVEL_TASK)) {
 			if ((peer = vine_file_replica_table_find_worker(q, m->file->cached_name))) {
-				char *peer_source = string_format("worker://%s:%d/%s",
-						peer->transfer_addr,
-						peer->transfer_port,
-						m->file->cached_name);
+				char *peer_source =
+						string_format("%s/%s", peer->transfer_addr_url, m->file->cached_name);
 				m->substitute = vine_file_substitute_url(m->file, peer_source, peer);
 				free(peer_source);
 				found_match = 1;
