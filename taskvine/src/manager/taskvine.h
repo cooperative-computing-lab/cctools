@@ -1129,6 +1129,11 @@ void vine_set_tasks_left_count(struct vine_manager *m, int ntasks);
 */
 void vine_set_catalog_servers(struct vine_manager *m, const char *hosts);
 
+/* Send updates to the catalog server.
+@param m A manager object
+*/
+void vine_update_catalog(struct vine_manager *m);
+
 /** Add a global property to the manager which will be included in periodic
 reports to the catalog server and other telemetry destinations.
 This is helpful for distinguishing higher level information about the entire run,

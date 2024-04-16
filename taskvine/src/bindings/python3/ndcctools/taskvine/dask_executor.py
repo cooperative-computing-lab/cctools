@@ -149,6 +149,8 @@ class DaskVine(Manager):
         except Exception as e:
             # unhandled exceptions for now
             raise e
+        finally:
+            self.update_catalog()
 
     def __call__(self, *args, **kwargs):
         return self.get(*args, **kwargs)
