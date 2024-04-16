@@ -460,12 +460,13 @@ static int rewrite_source_to_ip(struct vine_cache_file *f, char **error_message)
 	sscanf(f->source, "worker://%256[^:]:%d/%s", host, &port_num, source_path);
 
 	if (!domain_name_cache_lookup(host, addr)) {
-		*error_message = string_format("Couldn't resolve hostname %s", host);
+		*error_message = string_format("Couldn't resolve hostname %s for %s", host, source_path);
+		debug(D_VINE, "%s", *error_message);
 		return 0;
 	}
 
 	free(f->source);
-	f->source = string_format("worker://%s:%d/%s", addr, port_num, source_path);
+	f->source = string_format("workerip://%s:%d/%s", addr, port_num, source_path);
 
 	return 1;
 }
