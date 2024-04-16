@@ -698,6 +698,13 @@ static void update_catalog(struct vine_manager *q, int force_update)
 	q->catalog_last_update_time = time(0);
 }
 
+void vine_update_catalog(struct vine_manager *m)
+{
+	if (m) {
+		update_catalog(m, 1);
+	}
+}
+
 static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info *w)
 {
 	int i = 0;
