@@ -157,7 +157,7 @@ void vine_worker_options_show_help(const char *cmd, struct vine_worker_options *
 	printf(" %-30s Listening port for worker-worker transfers. Either port or port_min:port_max (default: any)\n",
 			"--transfer-port");
 	printf(" %-30s Explicit contact address for worker-worker transfers. (default: :<transfer_port>)\n",
-			"--contact-address");
+			"--transfer-address");
 
 	printf(" %-30s Enable tls connection to manager (manager should support it).\n", "--ssl");
 	printf(" %-30s SNI domain name if different from manager hostname. Implies --ssl.\n",
@@ -229,7 +229,7 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"tls-sni", required_argument, 0, LONG_OPT_TLS_SNI},
 		{"from-factory", required_argument, 0, LONG_OPT_FROM_FACTORY},
 		{"transfer-port", required_argument, 0, LONG_OPT_TRANSFER_PORT},
-		{"contact-address", required_argument, 0, LONG_OPT_CONTACT_ADDRESS},
+		{"transfer-address", required_argument, 0, LONG_OPT_CONTACT_ADDRESS},
 		{0, 0, 0, 0}};
 
 static void vine_worker_options_get_env(const char *name, int64_t *manual_option)
