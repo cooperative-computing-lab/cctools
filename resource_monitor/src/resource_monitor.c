@@ -170,14 +170,17 @@ See the file COPYING for details.
 
 uint64_t interval = DEFAULT_INTERVAL;
 
-FILE *log_summary = NULL; /* Final statistics are written to this file. */
-FILE *log_series = NULL;  /* Resource events and samples are written to this file. */
-FILE *log_inotify = NULL; /* List of opened files is written to this file. */
+char *summary_path = NULL; /* name of the summary file */
+FILE *log_summary = NULL;  /* Final statistics are written to this file (FILE * to summary_path). */
+FILE *log_series = NULL;   /* Resource events and samples are written to this file. */
+FILE *log_inotify = NULL;  /* List of opened files is written to this file. */
 
 char *template_path = NULL; /* Prefix of all output files names */
 
 int debug_active = 0;	/* 1 if ACTIVATE_DEBUG_FILE exists. If 1, debug info goes to ACTIVATE_DEBUG_FILE ".log" */
 int enforce_limits = 1; /* 0 if monitor should only measure, 1 if enforcing resources limits. */
+
+char hostname[DOMAIN_NAME_MAX]; /* current hostname */
 
 struct jx *verbatim_summary_fields; /* fields added to the summary without change */
 
@@ -234,7 +237,7 @@ char *snapshot_watch_events_file =
 			 snapshot", "max_count":1}, "FILENAME2" : ... ] } A snapshot is generated when pattern matches a
 			 line in the file FILENAME. */
 
-struct list *snapshots = NULL; /* list of snapshots, as struct rmsummary's . */
+size_t snapshots_allocated = 0; /* dynamic number of snapshot slots allocated */
 
 struct list *snapshot_labels = NULL; /* list of labels for current snapshot. */
 
@@ -259,6 +262,9 @@ uint64_t catalog_interval = 0;
 uint64_t catalog_last_update_time = 0;
 
 int64_t catalog_interval_default = 30;
+
+timestamp_t last_summary_write = 0;
+int update_summary_file = 0;
 
 /***
  * Utility functions (open log files, proc files, measure time)
@@ -404,22 +410,41 @@ void add_verbatim_field(const char *str)
 	free(pair);
 }
 
-void add_snapshots()
+void find_hostname()
 {
-	if (!snapshots) {
-		return;
+	char *host_info = NULL;
+	if (domain_name_cache_guess(hostname)) {
+		host_info = string_format("host:%s", hostname);
+		add_verbatim_field(host_info);
+		free(host_info);
+	}
+}
+
+void find_version()
+{
+	char *monitor_self_info = string_format("monitor_version:%9s %d.%d.%d.%.8s",
+			"",
+			CCTOOLS_VERSION_MAJOR,
+			CCTOOLS_VERSION_MINOR,
+			CCTOOLS_VERSION_MICRO,
+			CCTOOLS_COMMIT);
+	add_verbatim_field(monitor_self_info);
+	free(monitor_self_info);
+}
+
+void add_snapshot(struct rmsummary *s)
+{
+	summary->snapshots_count++;
+
+	if (summary->snapshots_count > snapshots_allocated) {
+		while (summary->snapshots_count > snapshots_allocated) {
+			snapshots_allocated = MAX(4, snapshots_allocated * 2);
+		}
+
+		summary->snapshots = realloc(summary->snapshots, snapshots_allocated * sizeof(struct rmsummary *));
 	}
 
-	summary->snapshots_count = list_size(snapshots);
-	summary->snapshots = calloc(summary->snapshots_count, sizeof(struct rmsummary *));
-
-	struct rmsummary *s;
-	int count = 0;
-	list_first_item(snapshots);
-	while ((s = list_pop_head(snapshots))) {
-		summary->snapshots[count] = s;
-		count++;
-	}
+	summary->snapshots[summary->snapshots_count - 1] = s;
 }
 
 int rmonitor_determine_exec_type(const char *executable)
@@ -995,6 +1020,9 @@ void rmonitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
 		return;
 
 	rmsummary_merge_max_w_time(result, tr);
+	if (result->wall_time > 0) {
+		result->cores_avg = result->cpu_time / result->wall_time;
+	}
 
 	/* if we are running with the --sh option, we subtract one process (the sh process). */
 	if (sh_cmd_line) {
@@ -1061,17 +1089,13 @@ int record_snapshot(struct rmsummary *tr)
 		free(str);
 	}
 
-	if (!snapshots) {
-		snapshots = list_create();
-	}
-
 	struct rmsummary *freeze = rmsummary_copy(snapshot, 0);
 
 	freeze->end = ((double)usecs_since_epoch() / ONE_SECOND);
 	freeze->wall_time = snapshot->end - snapshot->start;
 	freeze->snapshot_name = xxstrdup(buffer_tostring(&b));
 
-	char *output_file = string_format("%s.snapshot.%02d", template_path, list_size(snapshots));
+	char *output_file = string_format("%s.snapshot.%02ld", template_path, summary->snapshots_count);
 	FILE *snap_f = fopen(output_file, "w");
 
 	if (!snap_f) {
@@ -1081,7 +1105,7 @@ int record_snapshot(struct rmsummary *tr)
 		fclose(snap_f);
 	}
 
-	list_push_tail(snapshots, freeze);
+	add_snapshot(freeze);
 
 	free(output_file);
 
@@ -1220,29 +1244,31 @@ int rmonitor_file_io_summaries()
 	return 0;
 }
 
+void write_summary(int exited)
+{
+	if (!exited && last_summary_write + interval * ONE_SECOND > timestamp_get()) {
+		return;
+	}
+
+	if (!exited) {
+		summary->exit_type = xxstrdup("running");
+	}
+
+	log_summary = open_log_file(summary_path);
+	rmsummary_print(log_summary, summary, pprint_summaries, verbatim_summary_fields);
+	fclose(log_summary);
+
+	if (!exited) {
+		free(summary->exit_type);
+		summary->exit_type = NULL;
+	}
+
+	last_summary_write = timestamp_get();
+}
+
 int rmonitor_final_summary()
 {
 	decode_zombie_status(summary, first_process_sigchild_status);
-
-	char *monitor_self_info = string_format("monitor_version:%9s %d.%d.%d.%.8s",
-			"",
-			CCTOOLS_VERSION_MAJOR,
-			CCTOOLS_VERSION_MINOR,
-			CCTOOLS_VERSION_MICRO,
-			CCTOOLS_COMMIT);
-	add_verbatim_field(monitor_self_info);
-
-	char hostname[DOMAIN_NAME_MAX];
-
-	char *host_info = NULL;
-	if (domain_name_cache_guess(hostname)) {
-		host_info = string_format("host:%s", hostname);
-		add_verbatim_field(host_info);
-	}
-
-	if (snapshots && list_size(snapshots) > 0) {
-		add_snapshots();
-	}
 
 	if (summary->wall_time > 0) {
 		summary->cores_avg = summary->cpu_time / summary->wall_time;
@@ -1277,16 +1303,9 @@ int rmonitor_final_summary()
 		rmonitor_file_io_summaries();
 	}
 
-	rmsummary_print(log_summary, summary, pprint_summaries, verbatim_summary_fields);
-
-	if (monitor_self_info)
-		free(monitor_self_info);
-
-	if (host_info)
-		free(host_info);
+	write_summary(1);
 
 	int status;
-
 	if (summary->limits_exceeded && enforce_limits) {
 		status = RM_OVERFLOW;
 	} else if (summary->exit_status != 0) {
@@ -1638,8 +1657,6 @@ void rmonitor_final_cleanup()
 	status = rmonitor_final_summary();
 
 	send_catalog_update(summary, 1);
-
-	fclose(log_summary);
 
 	if (log_series)
 		fclose(log_series);
@@ -2070,6 +2087,8 @@ static void show_help(const char *cmd)
 			"--catalog-interval=<interval>",
 			catalog_interval_default);
 	fprintf(stdout, "\n");
+	fprintf(stdout, "%-30s Update resource summary file every measurement interval.\n", "--update-summary");
+	fprintf(stdout, "\n");
 	fprintf(stdout, "%-30s Do not pretty-print summaries.\n", "--no-pprint");
 	fprintf(stdout, "\n");
 	fprintf(stdout,
@@ -2130,6 +2149,10 @@ int rmonitor_resources(long int interval /*in seconds */)
 			snapshot->start = ((double)usecs_since_epoch()) / ONE_SECOND;
 		}
 
+		if (update_summary_file) {
+			write_summary(0);
+		}
+
 		send_catalog_update(resources_now, 0);
 
 		// If no more process are alive, break out of loop.
@@ -2165,7 +2188,6 @@ int main(int argc, char **argv)
 	char *executable;
 	int64_t c;
 
-	char *summary_path = NULL;
 	char *series_path = NULL;
 	char *opened_path = NULL;
 
@@ -2235,6 +2257,7 @@ int main(int argc, char **argv)
 		LONG_OPT_CATALOG_SERVER,
 		LONG_OPT_CATALOG_PROJECT,
 		LONG_OPT_CATALOG_INTERVAL,
+		LONG_OPT_UPDATE_SUMMARY,
 		LONG_OPT_PID,
 		LONG_OPT_MEASURE_ONLY
 	};
@@ -2271,6 +2294,8 @@ int main(int argc, char **argv)
 			{"catalog", required_argument, 0, LONG_OPT_CATALOG_SERVER},
 			{"catalog-project", required_argument, 0, LONG_OPT_CATALOG_PROJECT},
 			{"catalog-interval", required_argument, 0, LONG_OPT_CATALOG_INTERVAL},
+
+			{"update-summary", no_argument, 0, LONG_OPT_UPDATE_SUMMARY},
 
 			{0, 0, 0, 0}};
 
@@ -2383,6 +2408,9 @@ int main(int argc, char **argv)
 				debug(D_FATAL, "--catalog-interval cannot be less than 1.");
 			}
 			break;
+		case LONG_OPT_UPDATE_SUMMARY:
+			update_summary_file = 1;
+			break;
 		default:
 			show_help(argv[0]);
 			return 1;
@@ -2453,6 +2481,9 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	find_hostname();
+	find_version();
+
 	if (first_pid_manually_set) {
 		if (!ping_process(first_process_pid)) {
 			debug(D_FATAL, "Process with pid %d could not be found.", first_process_pid);
@@ -2512,7 +2543,6 @@ int main(int argc, char **argv)
 	if (use_inotify)
 		opened_path = default_opened_name(template_path);
 
-	log_summary = open_log_file(summary_path);
 	log_series = open_log_file(series_path);
 	log_inotify = open_log_file(opened_path);
 
