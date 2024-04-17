@@ -51,6 +51,7 @@ struct category *category_create(const char *name)
 	c->fast_abort = -1;
 
 	c->total_tasks = 0;
+	c->max_concurrent = -1;
 
 	c->first_allocation = NULL;
 	c->max_allocation = rmsummary_create(-1);
