@@ -1091,6 +1091,13 @@ int vine_set_draining_by_hostname(struct vine_manager *m, const char *hostname, 
 */
 int vine_set_category_mode(struct vine_manager *m, const char *category, vine_category_mode_t mode);
 
+/** Set a maximum number of tasks of this category that can execute concurrently. If less than 0, unlimited (this is the default).
+@param q A manager object.
+@param category A category name.
+@param max_concurrent Number of maximum concurrent tasks.
+*/
+void vine_set_category_max_concurrent(struct vine_manager *m, const char *category, int max_concurrent);
+
 /** Turn on or off first-allocation labeling for a given category and resource. This function should be use to fine-tune the defaults from @ref vine_set_category_mode.
 @param m A manager object
 @param category A category name.
