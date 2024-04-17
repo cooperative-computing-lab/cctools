@@ -57,7 +57,7 @@ void vine_worker_delete(struct vine_worker_info *w)
 	free(w->workerid);
 	free(w->addrport);
 	free(w->hashkey);
-	free(w->transfer_addr_url);
+	free(w->transfer_url);
 
 	vine_resources_delete(w->resources);
 	hash_table_clear(w->features, 0);

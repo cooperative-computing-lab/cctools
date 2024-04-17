@@ -91,7 +91,7 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 
 		timestamp_t current_time = timestamp_get();
 		if (current_time - peer->last_transfer_failure < q->transient_error_interval) {
-			debug(D_VINE, "Skipping worker source after recent failure : %s", peer->transfer_addr);
+			debug(D_VINE, "Skipping worker source after recent failure : %s", peer->transfer_host);
 			continue;
 		}
 
@@ -143,7 +143,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 			continue;
 		}
 
-		char *source_addr = string_format("%s/%s", source->transfer_addr_url, f->cached_name);
+		char *source_addr = string_format("%s/%s", source->transfer_url, f->cached_name);
 		int source_in_use = vine_current_transfers_source_in_use(m, source);
 
 		char *id;

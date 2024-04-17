@@ -172,7 +172,7 @@ void vine_current_transfers_print_table(struct vine_manager *q)
 			debug(D_VINE,
 					"%s : source: %s:%d url: %s",
 					id,
-					w->transfer_addr,
+					w->transfer_host,
 					w->transfer_port,
 					t->source_url);
 		} else {
