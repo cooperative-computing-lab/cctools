@@ -16,6 +16,7 @@ See the file COPYING for details.
 
 #include "copy_stream.h"
 #include "debug.h"
+#include "domain_name_cache.h"
 #include "hash_table.h"
 #include "link.h"
 #include "link_auth.h"
@@ -448,6 +449,28 @@ static int do_mini_task(struct vine_cache *c, struct vine_cache_file *f, char **
 	}
 }
 
+// rewrite hostname of source as seen from this worker
+static int rewrite_source_to_ip(struct vine_cache_file *f, char **error_message)
+{
+	int port_num;
+	char host[VINE_LINE_MAX], source_path[VINE_LINE_MAX];
+	char addr[LINK_ADDRESS_MAX];
+
+	// expect the form: worker://host:port/path/to/file
+	sscanf(f->source, "worker://%256[^:]:%d/%s", host, &port_num, source_path);
+
+	if (!domain_name_cache_lookup(host, addr)) {
+		*error_message = string_format("Couldn't resolve hostname %s for %s", host, source_path);
+		debug(D_VINE, "%s", *error_message);
+		return 0;
+	}
+
+	free(f->source);
+	f->source = string_format("workerip://%s:%d/%s", addr, port_num, source_path);
+
+	return 1;
+}
+
 /*
 Transfer a single input file from a worker url to a local file name.
 */
@@ -459,8 +482,9 @@ static int do_worker_transfer(
 	int stoptime;
 	struct link *worker_link;
 
-	// expect the form: worker://addr:port/path/to/file
-	sscanf(f->source, "worker://%99[^:]:%d/%s", addr, &port_num, source_path);
+	// expect the form: workerip://host:port/path/to/file
+	sscanf(f->source, "workerip://%256[^:]:%d/%s", addr, &port_num, source_path);
+
 	debug(D_VINE, "cache: setting up worker transfer file %s", f->source);
 
 	stoptime = time(0) + 15;
@@ -516,8 +540,13 @@ static int do_transfer(struct vine_cache *c, struct vine_cache_file *f, const ch
 
 	int result = 0;
 
-	if (strncmp(f->source, "worker://", 9) == 0) {
+	if (strncmp(f->source, "workerip://", 11) == 0) {
 		result = do_worker_transfer(c, f, cachename, error_message);
+	} else if (strncmp(f->source, "worker://", 9) == 0) {
+		result = rewrite_source_to_ip(f, error_message);
+		if (result) {
+			result = do_worker_transfer(c, f, cachename, error_message);
+		}
 	} else {
 		result = do_curl_transfer(c, f, transfer_path, cache_path, error_message);
 	}

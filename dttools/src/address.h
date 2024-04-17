@@ -21,5 +21,6 @@ int address_from_sockaddr( char *str, struct sockaddr *saddr );
 int address_parse_hostport( const char *hostport, char *host, int *port, int default_port );
 int address_check_mode( struct addrinfo *info );
 char *address_get_tlq_url( int port, const char *log_path );
+int address_is_valid_ip( const char *addr );
 
 #endif

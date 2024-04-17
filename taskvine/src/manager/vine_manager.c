@@ -28,6 +28,7 @@ See the file COPYING for details.
 #include "vine_txn_log.h"
 #include "vine_worker_info.h"
 
+#include "address.h"
 #include "buffer.h"
 #include "catalog_query.h"
 #include "category_internal.h"
@@ -49,6 +50,7 @@ See the file COPYING for details.
 #include "load_average.h"
 #include "macros.h"
 #include "path.h"
+#include "pattern.h"
 #include "process.h"
 #include "random.h"
 #include "rmonitor.h"
@@ -458,20 +460,48 @@ static int handle_cache_invalid(struct vine_manager *q, struct vine_worker_info 
 }
 
 /*
-A transfer-address message indicates that the worker is listening
+A transfer-port message indicates that the worker is listening
 on its own port to receive get requests from other workers.
 */
 
-static int handle_transfer_address(struct vine_manager *q, struct vine_worker_info *w, const char *line)
+static int handle_transfer_port(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
 	int dummy_port;
-	if (sscanf(line, "transfer-address %s %d", w->transfer_addr, &w->transfer_port)) {
-		w->transfer_port_active = 1;
-		link_address_remote(w->link, w->transfer_addr, &dummy_port);
-		return VINE_MSG_PROCESSED;
-	} else {
+
+	int n = sscanf(line, "transfer-port %d", &w->transfer_port);
+	if (n != 1) {
 		return VINE_MSG_FAILURE;
 	}
+
+	w->transfer_port_active = 1;
+	link_address_remote(w->link, w->transfer_host, &dummy_port);
+
+	free(w->transfer_url);
+	w->transfer_url = string_format("workerip://%s:%d", w->transfer_host, w->transfer_port);
+
+	return VINE_MSG_PROCESSED;
+}
+
+/*
+A transfer-hostport message indicates that the worker is listening
+on one address, but the connections are made to an explicitely set
+host and port, because of rerouting.
+*/
+
+static int handle_transfer_hostport(struct vine_manager *q, struct vine_worker_info *w, const char *line)
+{
+	int n = sscanf(line, "transfer-hostport %s %d", w->transfer_host, &w->transfer_port);
+	if (n != 2) {
+		return VINE_MSG_FAILURE;
+	}
+
+	w->transfer_port_active = 1;
+
+	int is_ip = address_is_valid_ip(w->transfer_host);
+	free(w->transfer_url);
+	w->transfer_url = string_format("worker%s://%s:%d", is_ip ? "ip" : "", w->transfer_host, w->transfer_port);
+
+	return VINE_MSG_PROCESSED;
 }
 
 /*
@@ -526,8 +556,10 @@ static vine_msg_code_t vine_manager_recv_no_retry(
 		result = handle_cache_update(q, w, line);
 	} else if (string_prefix_is(line, "cache-invalid")) {
 		result = handle_cache_invalid(q, w, line);
-	} else if (string_prefix_is(line, "transfer-address")) {
-		result = handle_transfer_address(q, w, line);
+	} else if (string_prefix_is(line, "transfer-hostport")) {
+		result = handle_transfer_hostport(q, w, line);
+	} else if (string_prefix_is(line, "transfer-port")) {
+		result = handle_transfer_port(q, w, line);
 	} else if (sscanf(line, "GET %s HTTP/%*d.%*d", path) == 1) {
 		result = handle_http_request(q, w, path, stoptime);
 	} else {
@@ -2941,10 +2973,7 @@ static int vine_manager_transfer_capacity_available(
 		/* Provide a substitute file object to describe the peer. */
 		if (!(m->file->flags & VINE_PEER_NOSHARE) && (m->file->cache_level > VINE_CACHE_LEVEL_TASK)) {
 			if ((peer = vine_file_replica_table_find_worker(q, m->file->cached_name))) {
-				char *peer_source = string_format("worker://%s:%d/%s",
-						peer->transfer_addr,
-						peer->transfer_port,
-						m->file->cached_name);
+				char *peer_source = string_format("%s/%s", peer->transfer_url, m->file->cached_name);
 				m->substitute = vine_file_substitute_url(m->file, peer_source, peer);
 				free(peer_source);
 				found_match = 1;
