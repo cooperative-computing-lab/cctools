@@ -152,7 +152,7 @@ const char *vine_file_make_file_url(const char *source)
 
 	const char *result = string_format("file:%s/%s", abs_path, source);
 
-	free((void *) abs_path);
+	free((void *)abs_path);
 
 	return result;
 }
