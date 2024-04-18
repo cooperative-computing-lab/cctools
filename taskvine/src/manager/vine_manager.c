@@ -806,6 +806,8 @@ static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker
 	char *cached_name = NULL;
 	struct vine_file_replica *info = NULL;
 
+	debug(D_VINE, "worker %s (%s) removed, recovering its temp files", w->hostname, w->addrport);
+
 	// Iterate over files we want might want to recover
 	HASH_TABLE_ITERATE(w->current_files, cached_name, info)
 	{
