@@ -148,11 +148,11 @@ struct vine_file *vine_file_clone(struct vine_file *f)
 const char *vine_file_make_file_url(const char *source)
 {
 
-	char *abs_path = path_getcwd();
+	const char *abs_path = path_getcwd();
 
-	char *result = string_format("file:%s/%s", abs_path, source);
+	const char *result = string_format("file:%s/%s", abs_path, source);
 
-	free(abs_path);
+	free((void *) abs_path);
 
 	return result;
 }
