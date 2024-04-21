@@ -120,6 +120,10 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 {
 	int found = 0;
 
+	if(vine_current_transfers_get_table_size(m) >= hash_table_size(m->worker_table) * m->worker_source_max_transfers) {
+		return found;
+	}
+
 	struct set *sources = hash_table_lookup(m->file_worker_table, f->cached_name);
 	if (!sources) {
 		return found;
