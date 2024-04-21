@@ -120,7 +120,8 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 {
 	int found = 0;
 
-	if(vine_current_transfers_get_table_size(m) >= hash_table_size(m->worker_table) * m->worker_source_max_transfers) {
+	if (vine_current_transfers_get_table_size(m) >=
+			hash_table_size(m->worker_table) * m->worker_source_max_transfers) {
 		return found;
 	}
 
@@ -135,11 +136,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		return found;
 	}
 
-	debug(D_VINE,
-			"Found %d available workers to replicate %s, %d replicas needed",
-			nsources,
-			f->cached_name,
-			to_find);
+	debug(D_VINE, "Found %d workers to holding %s, %d replicas needed", nsources, f->cached_name, to_find);
 
 	/* get the elements of set so we can insert new replicas to sources */
 	struct vine_worker_info **sources_frozen = (struct vine_worker_info **)set_values(sources);
