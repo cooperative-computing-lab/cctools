@@ -389,7 +389,7 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 
 			/* And if the file is a newly created temporary. replicate it. */
 			if (f->type == VINE_TEMP && *id == 'X') {
-				hash_table_insert(q->temp_files_to_repilicate, f->cached_name, NULL);
+				hash_table_insert(q->temp_files_to_replicate, f->cached_name, NULL);
 			}
 		}
 	}
@@ -781,7 +781,7 @@ static int recover_temp_files(struct vine_manager *q)
 	void *empty_val = NULL;
 	int total_replication_count = 0;
 
-	HASH_TABLE_ITERATE(q->temp_files_to_repilicate, cached_name, empty_val)
+	HASH_TABLE_ITERATE(q->temp_files_to_replicate, cached_name, empty_val)
 	{
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
 
@@ -789,7 +789,7 @@ static int recover_temp_files(struct vine_manager *q)
 			int curr_file_replication_cnt = vine_file_replica_table_replicate(q, f);
 
 			if (!curr_file_replication_cnt) {
-				hash_table_remove(q->temp_files_to_repilicate, cached_name);
+				hash_table_remove(q->temp_files_to_replicate, cached_name);
 			}
 
 			total_replication_count += curr_file_replication_cnt;
@@ -801,7 +801,7 @@ static int recover_temp_files(struct vine_manager *q)
 
 /* Insert into hashtable temp files that may need replication. */
 
-static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker_info *w)
+static void recall_worker_lost_temp_files(struct vine_manager *q, struct vine_worker_info *w)
 {
 	char *cached_name = NULL;
 	struct vine_file_replica *info = NULL;
@@ -814,7 +814,7 @@ static void recover_worker_temp_files(struct vine_manager *q, struct vine_worker
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
 
 		if (f && f->type == VINE_TEMP) {
-			hash_table_insert(q->temp_files_to_repilicate, cached_name, NULL);
+			hash_table_insert(q->temp_files_to_replicate, cached_name, NULL);
 		}
 	}
 }
@@ -838,7 +838,7 @@ static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vi
 	hash_table_remove(q->workers_with_available_results, w->hashkey);
 
 	if (q->transfer_temps_recovery) {
-		recover_worker_temp_files(q, w);
+		recall_worker_lost_temp_files(q, w);
 	}
 
 	cleanup_worker(q, w);
@@ -3729,7 +3729,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->worker_table = hash_table_create(0, 0);
 	q->file_worker_table = hash_table_create(0, 0);
-	q->temp_files_to_repilicate = hash_table_create(0, 0);
+	q->temp_files_to_replicate = hash_table_create(0, 0);
 	q->worker_blocklist = hash_table_create(0, 0);
 
 	q->file_table = hash_table_create(0, 0);
@@ -4031,7 +4031,8 @@ void vine_delete(struct vine_manager *q)
 	hash_table_clear(q->file_worker_table, (void *)set_delete);
 	hash_table_delete(q->file_worker_table);
 
-	hash_table_delete(q->temp_files_to_repilicate);
+	hash_table_clear(q->temp_files_to_replicate, 0);
+	hash_table_delete(q->temp_files_to_replicate);
 
 	hash_table_clear(q->factory_table, (void *)vine_factory_info_delete);
 	hash_table_delete(q->factory_table);
