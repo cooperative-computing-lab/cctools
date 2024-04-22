@@ -46,6 +46,7 @@ struct vine_file_replica *vine_file_replica_table_remove(
 	}
 
 	struct set *workers = hash_table_lookup(m->file_worker_table, cachename);
+
 	if (workers) {
 		set_remove(workers, w);
 		if (set_size(workers) < 1) {
@@ -115,22 +116,29 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 {
 	int found = 0;
 
+	if (vine_current_transfers_get_table_size(m) >=
+			hash_table_size(m->worker_table) * m->worker_source_max_transfers) {
+		return found;
+	}
+
 	struct set *sources = hash_table_lookup(m->file_worker_table, f->cached_name);
 	if (!sources) {
 		return found;
 	}
 
-	int to_find = m->temp_replica_count - set_size(sources);
+	int nsources = set_size(sources);
+	int to_find = m->temp_replica_count - nsources;
 	if (to_find < 1) {
 		return found;
 	}
+
+	debug(D_VINE, "Found %d workers to holding %s, %d replicas needed", nsources, f->cached_name, to_find);
 
 	/* get the elements of set so we can insert new replicas to sources */
 	struct vine_worker_info **sources_frozen = (struct vine_worker_info **)set_values(sources);
 	struct vine_worker_info *source;
 
 	int i = 0;
-	int nsources = set_size(sources);
 	for (source = sources_frozen[i]; i < nsources; i++) {
 		if (found >= to_find) {
 			break;
@@ -151,11 +159,9 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		int offset_bookkeep;
 		HASH_TABLE_ITERATE_RANDOM_START(m->worker_table, offset_bookkeep, id, peer)
 		{
+
 			if (found_per_source >= MIN(m->file_source_max_transfers, to_find)) {
-				/* XXX: commenting this check for now, as otherwise only one replica is created.
-				 * We need to create replicas during wait_internal too.
-					break;
-				*/
+				break;
 			}
 
 			if (source_in_use >= m->worker_source_max_transfers) {
