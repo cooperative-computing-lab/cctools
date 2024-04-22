@@ -3,7 +3,7 @@ include ../../rules.mk
 
 LIBRARIES = libbatch_job.a
 
-PROGRAMS = work_queue_factory work_queue_pool vine_factory
+PROGRAMS = work_queue_factory work_queue_pool vine_factory condor_chaos_monkey.py
 
 ifeq ($(CCTOOLS_CHIRP),chirp)
 CHIRP_LIB=${CCTOOLS_HOME}/chirp/src/libchirp.a

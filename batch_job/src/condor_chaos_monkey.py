@@ -1,0 +1,190 @@
+#! /usr/bin/env python
+import subprocess
+import os
+import argparse
+import time
+from typing import Union
+import random
+
+
+def get_subproccess_command_output(command: Union[str, list]) -> str:
+    output = subprocess.check_output(command)
+    output = output.decode("utf-8")
+    
+    return output
+
+
+def parse_condor_q_output(condor_q_output: str) -> dict:
+    lines = condor_q_output.strip().split('\n')
+
+    header_index = 1
+    footer_index = lines.index("")
+
+    data_lines = lines[header_index + 1: footer_index]
+    results = {}
+
+    for line in data_lines:
+        parts = line.split()
+
+        owner = parts[0]
+        batch_name = parts[2]
+        done = parts[5]
+        run = parts[6]
+        idle = parts[7]
+    
+        if owner not in results:
+            results[owner] = list()
+        
+        results[owner].append((batch_name, (done, run, idle)))
+
+    
+    return results
+
+
+def filter_cluster_data_by_job_status(cluster_data_user: list, job_status: str) -> list:
+    job_status_index = { "DONE": 0, "RUN": 1, "IDLE": 2 }
+
+    def job_status_match(tup):
+        _, job_stat_tup =  tup
+        job_status_value = job_stat_tup[job_status_index[job_status]]
+
+        return job_status_value != "_" and int(job_status_value) > 0
+    
+    filtered_cluster_data = list(filter(job_status_match, cluster_data_user))
+
+    return filtered_cluster_data
+
+
+def remove_jobs_for_cycle(filtered_cluster_data: list, job_count_data: tuple) -> int:
+    cmd_condor_rm = "condor_rm"
+    jobs_removed = 0
+
+    for i in range(min(job_count_data)):
+        job_tuple = random.choice(filtered_cluster_data)
+
+        index = filtered_cluster_data.index(job_tuple)
+
+        job_to_be_removed, _ = filtered_cluster_data.pop(index)
+
+        cmd_output = get_subproccess_command_output([cmd_condor_rm, str(job_to_be_removed)])
+
+        print(cmd_output)
+        
+        jobs_removed += 1
+
+    return jobs_removed
+
+
+def run(args: argparse.Namespace):
+    cmd_condor_q = "condor_q"
+    nbr_jobs_removed_total = 0
+    nbr_jobs_to_remove = args.remove_n
+    cycle_count = 0
+
+    time.sleep(args.start_delay)
+
+    while nbr_jobs_removed_total < nbr_jobs_to_remove:
+
+        condor_q_output = get_subproccess_command_output(cmd_condor_q)
+
+        cluster_data = parse_condor_q_output(condor_q_output)
+
+        if not cluster_data:
+            print("No jobs in the cluster.")
+            return
+
+        try:
+            cluster_data_user = cluster_data[args.user]
+        except KeyError:
+            print(f"'{args.user}' not found.")
+            return
+
+        filtered_cluster_data = filter_cluster_data_by_job_status(cluster_data_user, args.job_status)
+        print(f"There are {len(filtered_cluster_data)} in {args.job_status} status.")
+        print()
+
+        nbr_jobs_in_clust = len(filtered_cluster_data)
+
+        nbr_jobs_left_to_remove = nbr_jobs_to_remove - nbr_jobs_removed_total
+
+        job_count_data = (args.per_cycle_remove_n, nbr_jobs_left_to_remove, nbr_jobs_in_clust)
+
+        print(f"Job removal per cycle: {args.per_cycle_remove_n}.")
+        print(f"Number of jobs left to remove: {nbr_jobs_left_to_remove}.")
+        print(f"Number of jobs left in the cluster: {nbr_jobs_in_clust}.")
+        print()
+
+        nbr_jobs_removed_in_cycle = remove_jobs_for_cycle(filtered_cluster_data, job_count_data)
+        nbr_jobs_removed_total += nbr_jobs_removed_in_cycle
+
+        print(f"{nbr_jobs_removed_in_cycle} removed in cycle {cycle_count}.")
+        print(f"{nbr_jobs_removed_total} removed total.")
+        print()
+
+        cycle_count += 1 
+
+        time.sleep(args.remove_delay)
+
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog="condor_rm_random.py",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description="Removes a given random number of jobs from the condor cluster given access to.",
+    )
+
+    parser.add_argument(
+        "--remove-delay",
+        nargs="?",
+        type=float,
+        help="Time delay in (s) between each cycle for job removal",
+        default=2,
+    )
+
+    parser.add_argument(
+        "--start-delay",
+        nargs="?",
+        type=float,
+        help="Time delay in (s) before starting to remove jobs",
+        default=0,
+    )
+
+    parser.add_argument(
+        "--remove-n",
+        nargs="?",
+        type=int,
+        help="Total number of jobs we want to remove",
+        default=1,
+    )
+
+    parser.add_argument(
+        "--per-cycle-remove-n",
+        nargs="?",
+        type=int,
+        help="Number of jobs we want to remove per cycle",
+        default=1,
+    )
+
+    parser.add_argument(
+        "--user",
+        nargs="?",
+        type=str,
+        help="Name of user",
+        default=os.environ['USER'],
+    )
+
+    parser.add_argument(
+        "--job-status",
+        nargs="?",
+        help="Job status of jobs we want to remove",
+        choices="DONE RUN IDLE".split(),
+        default="RUN",
+    )
+
+    args = parser.parse_args()
+
+    run(args)
+
+
+    
