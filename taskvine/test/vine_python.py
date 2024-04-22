@@ -81,6 +81,7 @@ if __name__ == "__main__":
     os.chmod(path.join(test_dir, exec_name), stat.S_IRWXU)
 
     q = vine.Manager(port=0, ssl=(args.ssl_key, args.ssl_cert))
+    q.tune("transient-error-interval", 1)
 
     exec_file = q.declare_file(path.join(test_dir, exec_name), cache=True)
     input_file = q.declare_file(path.join(test_dir, input_name), cache=True)
@@ -202,7 +203,7 @@ if __name__ == "__main__":
     report_task(t, "success", 0)
 
     # should fail in the alloted time
-    t = vine.Task("/bin/sleep 10")
+    t = vine.Task("/bin/sleep 100")
     t.set_time_max(1)
     q.submit(t)
     t = q.wait(wait_time)
@@ -265,12 +266,13 @@ if __name__ == "__main__":
     report_task(t, "success", 0)
 
     # generate an invalid remote input file, should get an input missing error.
-    t = vine.Task("wc -l infile")
-    url = q.declare_url("https://pretty-sure-this-is-not-a-valid-url.com", "infile")
-    t.add_input(url, "infile")
+    t = vine.Task("wc -l infile_for_forsaken")
+    t.set_max_forsaken(1)
+    url = q.declare_url("https://pretty-sure-this-is-not-a-valid-url.com")
+    t.add_input(url, "infile_for_forsaken")
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, "input missing", 1)
+    report_task(t, "forsaken", -1)
 
     # create a temporary output file, and then fetch its contents manually.
     t = vine.Task("echo howdy > output")
@@ -280,13 +282,20 @@ if __name__ == "__main__":
     t = q.wait(wait_time)
     report_task(t, "success", 0)
 
-    data = q.fetch_file(temp)
-    if(data == "howdy\n"):
-        print("correct data returned from temp file")
-    else:
-        print("INCORRECT data returned from temp file: {}".format(data))
+    got_file = False
+    for i in range(3):
+        data = q.fetch_file(temp)
+        if data == "howdy\n":
+            print("correct data returned from temp file")
+            got_file = True
+            break
+        else:
+            print("INCORRECT data returned from temp file: {}".format(data))
+            print("Trying again...")
+            time.sleep(1)
+    if not got_file:
         error = True
-    
+
     if error:
         sys.exit(1)
 

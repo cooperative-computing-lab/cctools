@@ -79,7 +79,8 @@ grid or cloud computing environments such as SGE, PBS, SLURM, and HTCondor using
 - **-b**,**--max-backoff=_&lt;time&gt;_**<br />Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
 - **-A**,**--arch=_&lt;arch&gt;_**<br />Set the architecture string the worker reports to its supervisor. (default=the value reported by uname)
 - **-O**,**--os=_&lt;os&gt;_**<br />Set the operating system string the worker reports to its supervisor. (default=the value reported by uname)
-- **-s**,**--workdir=_&lt;path&gt;_**<br />Set the location where the worker should create its working directory. (default=/tmp). Also configurable through environment variables **CCTOOLS_TEMP** or **TMPDIR**.
+- **--workspace=_&lt;path&gt;_**<br /> Set the workspace directory where the worker keeps its cache, task sandboxes, performs data transfers, etc.  By default, this directory is **/tmp/worker-UID-PID** and is deleted when the worker exits.
+OPTION_LONG(keep-workspace) Do not delete the contents of the workspace on worker exit.  This permits the worker to restart at a later time and recover the contents of its cache directory.
 - **--cores=_&lt;n&gt;_**<br />Set the number of cores this worker should use.  Set it to 0 to have the worker use all of the available resources. (default=1)
 - **--gpus=_&lt;n&gt;_**<br />Set the number of GPUs this worker should use. If less than 0 or not given, try to detect gpus available.
 - **--memory=_&lt;mb&gt;_**<br />Manually set the amount of memory (in MB) reported by this worker.
@@ -89,6 +90,10 @@ grid or cloud computing environments such as SGE, PBS, SLURM, and HTCondor using
 - **--volatility=_&lt;chance&gt;_**<br />Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).
 - **--connection-mode=_&lt;mode&gt;_**<br />When using -M, override manager preference to resolve its address. One of by_ip, by_hostname, or by_apparent_ip. Default is set by manager.
 - **--transfer-port=_&lt;port&gt;_**<br /> Listening port for worker-worker transfers.  (default: any))
+- **--contact-hostport=_&lt;hostport&gt;_**<br /> Explicit contact host:port for worker-worker transfers, e.g., when routing is used. (default: :<transfer_port>)
+
+- **--ssl**<br />Enable tls connection to manager (manager should support it).
+- **--tls-sni=_&lt;&gt;_**<br />SNI domain name if different from manager hostname. Implies --ssl.
 
 
 

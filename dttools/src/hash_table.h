@@ -117,6 +117,38 @@ This function returns the next key and value in the iteration.
 
 int hash_table_nextkey(struct hash_table *h, char **key, void **value);
 
+/** Begin iteration over all keys from a random offset.
+This function begins a new iteration over a hash table,
+allowing you to visit every key and value in the table.
+Next, invoke @ref hash_table_nextkey_with_offset to retrieve each value in order.
+@param h A pointer to a hash table.
+@param offset_bookkeep An integer to pointer where the origin to the iteration is recorded.
+*/
+
+void hash_table_randomkey(struct hash_table *h, int *offset_bookkeep);
+
+/** Continue iteration over all keys from an arbitray offset.
+This function returns the next key and value in the iteration.
+@param h A pointer to a hash table.
+@param offset_bookkeep The origin for this iteration. See @ref hash_table_randomkey
+@param key A pointer to a key pointer.
+@param value A pointer to a value pointer.
+@return Zero if there are no more elements to visit, one otherwise.
+*/
+
+int hash_table_nextkey_with_offset(struct hash_table *h, int offset_bookkeep, char **key, void **value);
+
+/** Begin iteration at the given key.
+Invoke @ref hash_table_nextkey to retrieve each value in order.
+Note that subsequent calls to this functions may result in different iteration orders as the hash_table may have been
+resized.
+@param h A pointer to a hash table.
+@param key A string key to search for.
+@return Zero if key not in hash table, one otherwise.
+*/
+
+int hash_table_fromkey(struct hash_table *h, const char *key);
+
 /** A default hash function.
 @param s A string to hash.
 @return An integer hash of the string.
@@ -139,5 +171,13 @@ HASH_TABLE_ITERATE(table,key,value) {
 */
 
 #define HASH_TABLE_ITERATE( table, key, value ) hash_table_firstkey(table); while(hash_table_nextkey(table,&key,(void**)&value))
+
+#define HASH_TABLE_ITERATE_RANDOM_START( table, offset_bookkeep, key, value ) hash_table_randomkey(table, &offset_bookkeep); while(hash_table_nextkey_with_offset(table, offset_bookkeep, &key, (void **)&value))
+
+#define HASH_TABLE_ITERATE_FROM_KEY( table, iter_control, iter_count_var, key_start, key, value ) \
+	iter_control = 0; \
+	iter_count_var = 0; \
+  hash_table_fromkey(table, key_start); \
+	while(iter_count_var < hash_table_size(table) && (iter_count_var+=1 && (hash_table_nextkey(table, &key, (void **)&value) || (!iter_control && (iter_control+=1) && hash_table_fromkey(table, NULL) && hash_table_nextkey(table, &key, (void **)&value)))))
 
 #endif

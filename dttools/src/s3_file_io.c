@@ -422,17 +422,17 @@ static int s3_do_check ( char * const signature,
 
 static char* __aws_sign ( char * const str )
 {
-  HMAC_CTX ctx;
+  HMAC_CTX *ctx;
   unsigned char MD[256];
   unsigned len;
 
   __debug("StrToSign:%s", str );
 
-  HMAC_CTX_init(&ctx);
-  HMAC_Init(&ctx, awsKey, strlen(awsKey), EVP_sha1());
-  HMAC_Update(&ctx,(unsigned char*)str, strlen(str));
-  HMAC_Final(&ctx,(unsigned char*)MD,&len);
-  HMAC_CTX_cleanup(&ctx);
+  ctx = HMAC_CTX_new();
+  HMAC_Init(ctx, awsKey, strlen(awsKey), EVP_sha1());
+  HMAC_Update(ctx,(unsigned char*)str, strlen(str));
+  HMAC_Final(ctx,(unsigned char*)MD,&len);
+  HMAC_CTX_free(ctx);
 
   char * b64 = __b64_encode (MD,len);
   __debug("Signature:  %s", b64 );

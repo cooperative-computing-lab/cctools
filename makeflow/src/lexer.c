@@ -515,12 +515,15 @@ int lexer_read_filename_recursive(struct lexer *lx)
 	if(count < 1)
 		return count;
 
-	if(lexer_next_peek(lx) == '-' && !lexer_peek_remote_rename_syntax(lx)) {
+	/* Check for any number of dashes not followed by a > */
+	while(lexer_next_peek(lx) == '-' && !lexer_peek_remote_rename_syntax(lx)) {
 		lexer_add_to_lexeme(lx, '-');
 		lexer_next_char(lx);
 		count++;
-		count += lexer_read_filename_recursive(lx);
 	}
+
+	/* If there is more, keep adding it to this filename. */
+	count += lexer_read_filename_recursive(lx);
 
 	return count;
 }

@@ -76,14 +76,13 @@ class DaskVine(Manager):
     #                      to set maximum resource usage per task.
     # @param lib_resources A dictionary with optional keys of cores, memory and disk (MB)
     # @param lib_command A command to be prefixed to the execution of a Library task.
-    # @param lib_environment path to environent file for a Library (string).
     # @param import_modules Hoist these module imports for the DaskVine Library.
     # @param env_per_task execute each task
     # @param resources_mode Automatically resize allocation per task. One of 'fixed'
     #                       (use the value of 'resources' above), 'max througput',
     #                       'max' (for maximum values seen), 'min_waste', 'greedy bucketing'
     #                       or 'exhaustive bucketing'. This is done per function type in dsk.
-    # @param task_mode     Create tasks as either as tasks (using PythonTasks) or 'function-calls' (using FunctionCalls)
+    # @param task_mode     Create tasks as either as 'tasks' (using PythonTasks) or 'function-calls' (using FunctionCalls)
     # @param retries       Number of times to attempt a task. Default is 5.
     # @param submit_per_cycle Maximum number of tasks to serialize per wait call. If None, or less than 1, then all
     #                         tasks are serialized as they are available.
@@ -103,7 +102,6 @@ class DaskVine(Manager):
             verbose=False,
             lib_resources=None,
             lib_command=None,
-            lib_environment=None,
             import_modules=None,
             task_mode='tasks',
             env_per_task=False,
@@ -129,7 +127,6 @@ class DaskVine(Manager):
             self.verbose = verbose
             self.lib_resources = lib_resources
             self.lib_command = lib_command
-            self.lib_environment = lib_environment
             self.import_modules = import_modules
             self.task_mode = task_mode
             self.env_per_task = env_per_task
@@ -142,7 +139,6 @@ class DaskVine(Manager):
             self.tune("prefer-dispatch", 1)
             self.tune("ramp-down-heuristic", 1)
             self.tune("immediate-recovery", 1)
-            self.tune("max-retrievals", 10)
 
             if self.env_per_task:
                 self.environment_file = self.declare_file(environment, cache=True)
@@ -153,6 +149,8 @@ class DaskVine(Manager):
         except Exception as e:
             # unhandled exceptions for now
             raise e
+        finally:
+            self.update_catalog()
 
     def __call__(self, *args, **kwargs):
         return self.get(*args, **kwargs)
@@ -168,10 +166,13 @@ class DaskVine(Manager):
         if self.task_mode == 'function-calls':
             libtask = self.create_library_from_functions('Dask-Library',
                                                          execute_graph_vertex,
-                                                         poncho_env=self.lib_environment,
+                                                         poncho_env="dummy-value",
                                                          add_env=False,
                                                          init_command=self.lib_command,
                                                          import_modules=self.import_modules)
+
+            if self.environment:
+                libtask.add_environment(self.environment)
 
             if self.lib_resources:
                 if 'cores' in self.lib_resources:
@@ -216,6 +217,7 @@ class DaskVine(Manager):
                         self._enqueue_dask_calls(dag, tag, [(t.key, t.sexpr)], retries_left, enqueued_calls)
                     else:
                         raise Exception(f"tasks for key {t.key} failed permanently")
+                t = None  # drop task reference
         return self._load_results(dag, indices, keys)
 
     def category_name(self, sexpr):
@@ -316,18 +318,13 @@ class DaskVineFile:
 
     def load(self):
         if not self._loaded:
+            self._load = self._file.contents(cloudpickle.load)
             if self._task_mode == 'function-calls':
-                output = cloudpickle.loads(self._file.contents())
-                self._loaded = True
-                if output['Success']:
-                    self._load = output['Result']
+                if self._load['Success']:
+                    self._load = self._load['Result']
                 else:
-                    self._load = output['Reason']
-            else:
-                with open(self.source(), "rb") as f:
-                    self._load = cloudpickle.load(f)
-                    self._loaded = True
-
+                    self._load = self._load['Reason']
+            self._loaded = True
         return self._load
 
     @property
@@ -359,9 +356,10 @@ class DaskVineFile:
 
         for c in self._dag.get_children(self._key):
             r = self._dag.get_result(c)
-            r.garbage_collect_children(manager)
-            if r._checkpointed and not r._is_target:
-                manager.undeclare_file(r._file)
+            if isinstance(r, DaskVineFile):
+                r.garbage_collect_children(manager)
+                if r._checkpointed and not r._is_target:
+                    manager.undeclare_file(r._file)
 
 
 ##

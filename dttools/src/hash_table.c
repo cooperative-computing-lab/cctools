@@ -218,6 +218,29 @@ void *hash_table_remove(struct hash_table *h, const char *key)
 	return 0;
 }
 
+int hash_table_fromkey(struct hash_table *h, const char *key)
+{
+	if (!key) {
+		/* treat NULL as a special case equivalent to firstkey */
+		hash_table_firstkey(h);
+		return 1;
+	}
+
+	unsigned hash = h->hash_func(key);
+	h->ibucket = hash % h->bucket_count;
+	h->ientry = h->buckets[h->ibucket];
+
+	while (h->ientry) {
+		if (hash == h->ientry->hash && !strcmp(key, h->ientry->key)) {
+			return 1;
+		}
+		h->ientry = h->ientry->next;
+	}
+
+	hash_table_firstkey(h);
+	return 0;
+}
+
 void hash_table_firstkey(struct hash_table *h)
 {
 	h->ientry = 0;
@@ -247,6 +270,60 @@ int hash_table_nextkey(struct hash_table *h, char **key, void **value)
 	} else {
 		return 0;
 	}
+}
+
+void hash_table_randomkey(struct hash_table *h, int *offset_bookkeep)
+{
+	h->ientry = 0;
+	if (h->bucket_count < 1) {
+		return;
+	}
+
+	int ibucket_start = random() % h->bucket_count;
+
+	for (h->ibucket = ibucket_start; h->ibucket < h->bucket_count; h->ibucket++) {
+		h->ientry = h->buckets[h->ibucket];
+		if (h->ientry) {
+			*offset_bookkeep = h->ibucket;
+			return;
+		}
+	}
+
+	for (h->ibucket = 0; h->ibucket < ibucket_start; h->ibucket++) {
+		h->ientry = h->buckets[h->ibucket];
+		if (h->ientry) {
+			*offset_bookkeep = h->ibucket;
+			return;
+		}
+	}
+}
+
+int hash_table_nextkey_with_offset(struct hash_table *h, int offset_bookkeep, char **key, void **value)
+{
+	if (h->bucket_count < 1) {
+		return 0;
+	}
+
+	offset_bookkeep = offset_bookkeep % h->bucket_count;
+
+	if (h->ientry) {
+		*key = h->ientry->key;
+		*value = h->ientry->value;
+
+		h->ientry = h->ientry->next;
+		if (!h->ientry) {
+			h->ibucket = (h->ibucket + 1) % h->bucket_count;
+			for (; h->ibucket != offset_bookkeep; h->ibucket = (h->ibucket + 1) % h->bucket_count) {
+				h->ientry = h->buckets[h->ibucket];
+				if (h->ientry) {
+					break;
+				}
+			}
+		}
+		return 1;
+	}
+
+	return 0;
 }
 
 typedef unsigned long int ub4; /* unsigned 4-byte quantities */

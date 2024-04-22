@@ -14,6 +14,7 @@ show_help()
 {
 	echo "  -r,--requirements <reqs>  Condor requirements expression."
 	echo "  --class-ad <ad>           Extra condor class ad. May be specified multiple times."
+    echo "  --spool                   Spool required input files."
 	echo "  --autosize                Condor will automatically size the worker to the slot."
     echo "  --docker-universe <image> Run worker inside <image> using condor's docker universe"
 }
@@ -24,6 +25,7 @@ show_help()
 
 requirements=""
 class_ads=""
+spool=""
 transfer_input_files="work_queue_worker"
 submit_dir=/tmp/${USER}-workers
 parse_arguments()
@@ -56,6 +58,10 @@ parse_arguments()
 				memory="ifThenElse($memory > TotalSlotMemory, $memory, TotalSlotMemory)"
 				disk="ifThenElse($disk > TotalSlotDisk, $disk, TotalSlotDisk)"
 			;;
+
+            --spool)
+                spool="--spool"
+            ;;
 
             --docker-universe)
             shift
@@ -140,7 +146,7 @@ EOF
 
 	echo "queue $count" >> condor_submit_file
 
-	condor_submit condor_submit_file
+	condor_submit ${spool} condor_submit_file
 }
 
 submit_workers "$@"

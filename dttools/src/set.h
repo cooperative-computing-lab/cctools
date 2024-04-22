@@ -41,6 +41,10 @@ while(element = set_next_element(s)) {
 
 */
 
+#define SET_ITERATE( set, element ) set_first_element(set); while((element = set_next_element(set)))
+
+#define SET_ITERATE_RANDOM_START( set, offset_bookkeep, element ) set_random_element(set, &offset_bookkeep); while((element = set_next_element_with_offset(set, offset_bookkeep)))
+
 /** Create a new set.
 @param buckets The number of elements in the set.  If zero, a default element will be used. Increases dynamically as needed.
 @return A pointer to a new set.
@@ -163,5 +167,30 @@ This function returns the next element in the iteration.
 */
 
 void *set_next_element(struct set *s);
+
+/** Begin iteration over all elements from a random offset.
+This function begins a new iteration over a set,
+allowing you to visit every element in the set.
+Next, invoke @ref set_next_element_with_offset to retrieve each value in order.
+@param s A pointer to a set.
+@param offset_bookkeep An integer to pointer where the origin to the iteration is recorded.
+*/
+
+void set_random_element(struct set *s, int *offset_bookkeep);
+
+/** Continue iteration over all elements from an arbitray offset.
+This function returns the next element in the iteration.
+@param s A pointer to a set.
+@param offset_bookkeep The origin for this iteration. See @ref set_random_element
+*/
+
+void *set_next_element_with_offset(struct set *s, int offset_bookkeep);
+
+/** A set_size(s) array of the current elements in the set in a random order.
+Caller should free the array.
+@param s A pointer to a set.
+@return An array of pointers. NULL if there are no elements in the set.
+*/
+void **set_values(struct set *s);
 
 #endif

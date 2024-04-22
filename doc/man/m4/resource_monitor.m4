@@ -120,7 +120,7 @@ OPTION_ARG_LONG(catalog-project,project)Set project name of catalog update to PA
 OPTION_ARG_LONG(catalog,catalog)Use catalog server PARAM(catalog). (default=catalog.cse.nd.edu:9097).
 OPTION_ARG_LONG(catalog-interval,interval)Send update to catalog every PARAM(interval) seconds. (default=30).
 OPTION_ARG_LONG(catalog-interval,interval)Send update to catalog every PARAM(interval) seconds. (default=30).
-
+OPTION_FLAG_LONG(update-summary)Update resource summary file every measurement interval.
 OPTIONS_END
 
 The limits file should contain lines of the form:

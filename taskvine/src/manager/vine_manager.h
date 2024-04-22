@@ -26,6 +26,7 @@ typedef enum {
 	VINE_WORKER_FAILURE,
 	VINE_APP_FAILURE,
 	VINE_MGR_FAILURE,
+	VINE_TRANSIENT_FAILURE,
 	VINE_END_OF_LIST,
 } vine_result_code_t;
 
@@ -119,7 +120,10 @@ struct vine_manager {
 
 	/* Primary data structures for tracking files. */
 
-    	struct hash_table *file_table;      /* Maps fileid -> struct vine_file.* */
+	struct hash_table *file_table;      /* Maps fileid -> struct vine_file.* */
+	struct hash_table *file_worker_table; /* Maps cachename -> struct set of workers with a replica of the file.* */
+	struct hash_table *temp_files_to_replicate; /* Maps cachename -> NULL. Used as a set of temp files to be replicated */
+
 
 	/* Primary scheduling controls. */
 
@@ -198,12 +202,15 @@ struct vine_manager {
 	int immediate_recovery;       /* If true, recovery tasks for tmp files are created as soon as the worker that had them
 																	 disconnects. Otherwise, create them only when a tasks needs then as inputs (this is
 																	 the default). */
+	int transfer_temps_recovery;  /* If true, attempt to recover temp files from lost worker to reach threshold required */
+
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
 	int disk_avail_threshold; /* Ensure this minimum amount of available disk space. (in MB) */
 
 	int update_interval;			/* Seconds between updates to the catalog. */
 	int resource_management_interval;	/* Seconds between measurement of manager local resources. */
+	timestamp_t transient_error_interval; /* microseconds between new attempts on task rescheduling and using a file replica as source after a failure. */
 
 	/*todo: confirm datatype. int or int64*/
 	int max_task_stdout_storage;	/* Maximum size of standard output from task.  (If larger, send to a separate file.) */

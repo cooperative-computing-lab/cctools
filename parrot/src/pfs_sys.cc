@@ -237,12 +237,12 @@ char * pfs_getcwd( char *path, pfs_size_t size )
 int pfs_mount( const char *path, const char *device, const char *mode )
 {
 	BEGIN
-	debug(D_LIBCALL,"mount %s %s %s",path,device,mode);
-
 	if(!path && !device) {
+		debug(D_LIBCALL,"mount n/a n/a n/a");
 		pfs_resolve_seal_ns();
 		result = 0;
 	} else {
+		debug(D_LIBCALL,"mount %s %s %s",path,device,mode);
 		if(path[0]!='/') {
 			result = -1;
 			errno = EINVAL;
@@ -449,10 +449,10 @@ extern int pfs_main_timeout;
 int pfs_timeout( const char *str )
 {
 	BEGIN
-	debug(D_LIBCALL, "timeout %s", str);
 	if(str) pfs_main_timeout = string_time_parse(str);
 	else if(isatty(0)) pfs_main_timeout = 300;
 	else pfs_main_timeout = 3600;
+	debug(D_LIBCALL, "timeout %d", pfs_main_timeout);
 	result = pfs_main_timeout;
 	END
 }

@@ -1,0 +1,21 @@
+#
+# Test various configurations of multiple dashes in filenames.
+# Note that any sequence of dashes is permitted, but the
+# characters -> indicate a remote rename operation.
+#
+
+ab:
+	echo hello > ab
+
+a-b: ab
+	cat ab > a-b
+
+a--b: a-b
+	cat a-b > a--b
+
+a---b: a--b
+	cat a--b > a---b
+
+a----b: a---b
+	cat a---b > a----b
+

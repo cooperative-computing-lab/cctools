@@ -342,13 +342,13 @@ And SYSTEM may be:
 	chirp
 	doc
 	ftp-lite
-    grow
+	grow
 	makeflow
 	parrot
-    poncho
+	poncho
 	resource_monitor
 	taskvine
-    work_queue
+	work_queue
 EOF
 			exit 0
 			;;
@@ -1345,7 +1345,16 @@ ccflags_append_define \
 	"_GNU_SOURCE" \
 	"_REENTRANT"
 
-debug_flags="-g"
+# If debug flag is on, turn on compiler for debugging experience.
+if [ "$optdebug" = 1 ]; then
+	debug_flags=" -g3 -O0 -ggdb3 "
+else
+	# Appending "-Og" to various compiler flags to have some optimizations and
+	# still be able to debug in most cases.
+	# "-O0" is a common but suboptimal choice.
+	debug_flags=" -g "
+fi
+
 ccflags_append "$debug_flags"
 ldflags="${ldflags} ${debug_flags}"
 
@@ -1432,17 +1441,6 @@ then
 		echo "*** building inside a conda environment without linking static openssl."
 		echo "*** probably this is not what you want. binaries may not work outside the environment"
 	fi
-fi
-
-# If debug flag is on, turn on compiler optimization for debugging experience.
-# Appending "-Og" to various compiler flags ensures that.
-# Only applied to base cctools flags.
-# "-O0" is a common but suboptimal choice.
-if [ "$optdebug" = 1 ]; then
-	ccflags+=" -Og "
-	internal_ccflags+=" -Og "
-	c_only_flags+=" -Og "
-	
 fi
 
 cat <<EOF >>config.mk

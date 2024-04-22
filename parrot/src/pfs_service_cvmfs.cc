@@ -1136,7 +1136,7 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 
 	memcpy(xpath, path, sizeof(pfs_name));
 	xpath->rest[0] = '\0';
-	strncpy(path_tail, path->rest, PFS_PATH_MAX);
+	strncpy(path_tail, path->rest, PFS_PATH_MAX - 1);
 
 	do
 	{
@@ -1175,9 +1175,9 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 					char path_relative[PFS_PATH_MAX];
 					*(last_d + 1) = '\0';
 
-					strncat(xpath->rest, link_target, PFS_PATH_MAX);
+					strncat(xpath->rest, link_target, PFS_PATH_MAX - 1);
 					path_collapse(xpath->rest, path_relative, 1);
-					string_nformat(link_target, PFS_PATH_MAX, "/cvmfs/%s%s",
+					string_nformat(link_target, PFS_PATH_MAX - 1, "/cvmfs/%s%s",
 						 xpath->host, path_relative);
 				}
 			}

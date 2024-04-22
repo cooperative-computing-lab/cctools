@@ -17,7 +17,12 @@ static char *trashdir = 0;
 void trash_setup(const char *dir)
 {
 	if (trashdir) {
-		notice(D_NOTICE, "Trash directory already setup to %s. Ignoring setup for %s.", trashdir, dir);
+		if (!strcmp(dir, trashdir)) {
+			/* same directory, no problem */
+		} else {
+			notice(D_NOTICE, "Trash directory already setup to %s. Ignoring setup for %s.", trashdir, dir);
+		}
+		return;
 	}
 
 	trashdir = strdup(dir);
@@ -49,7 +54,7 @@ void trash_file(const char *filename)
 	string_cookie(cookie, TRASH_COOKIE_LENGTH);
 
 	char *trashname = string_format("%s/%s.%" PRIu64, trashdir, cookie, timestamp_get());
-	debug(D_WQ, "trashing file %s to %s", filename, trashname);
+	debug(D_DEBUG, "trashing file %s", filename);
 
 	/* Move the file to the trash directory. */
 	result = rename(filename, trashname);

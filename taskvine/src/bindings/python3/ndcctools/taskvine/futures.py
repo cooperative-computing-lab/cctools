@@ -1,10 +1,13 @@
 
 from . import cvine
+import hashlib
 from concurrent.futures import Executor
 from concurrent.futures import Future
 from .task import (
     PythonTask,
+    FunctionCall,
     PythonTaskNoResult,
+    FunctionCallNoResult,
 )
 from .manager import (
     Factory,
@@ -24,16 +27,19 @@ except Exception:
 
 
 ##
-# \class Executor
+# \class FuturesExecutor
 #
-# TaskVine Executor object
+# TaskVine FuturesExecutor object
 #
 # This class acts as an interface for the creation of Futures
-class Executor(Executor):
+class FuturesExecutor(Executor):
     def __init__(self, port=9123, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull, factory=True, opts={}):
         self.manager = Manager(port=port)
+        self.port = self.manager.port
         if manager_name:
             self.manager.set_name(manager_name)
+        self.manager_name = manager_name
+        self.task_table = []
         if factory:
             self.factory = Factory(
                 batch_type=batch_type,
@@ -52,15 +58,27 @@ class Executor(Executor):
             self.factory = None
 
     def submit(self, fn, *args, **kwargs):
-        if isinstance(fn, FutureTask):
+        if isinstance(fn, FuturePythonTask):
             self.manager.submit(fn)
             return fn._future
-        future_task = FutureTask(self.manager, False, fn, *args, **kwargs)
-        self.manager.submit(future_task)
-        return future_task._future
+        if isinstance(fn, FutureFunctionCall):
+            self.manager.submit(fn)
+            self.task_table.append(fn)
+            return fn._future
+        future_task = self.future_task(fn, *args, **kwargs)
+        self.submit(future_task)
 
-    def task(self, fn, *args, **kwargs):
-        return FutureTask(self.manager, False, fn, *args, **kwargs)
+    def future_task(self, fn, *args, **kwargs):
+        return FuturePythonTask(self.manager, False, fn, *args, **kwargs)
+
+    def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True, import_modules=None):
+        return self.manager.create_library_from_functions(name, *function_list, poncho_env=poncho_env, init_command=init_command, add_env=add_env, import_modules=import_modules)
+
+    def install_library(self, libtask):
+        self.manager.install_library(libtask)
+
+    def future_funcall(self, library_name, fn, *args, **kwargs):
+        return FutureFunctionCall(self.manager, False, library_name, fn, *args, **kwargs)
 
     def set(self, name, value):
         if self.factory:
@@ -69,6 +87,13 @@ class Executor(Executor):
     def get(self, name):
         if self.factory:
             return self.factory.__getattr__(name)
+
+    def __del__(self):
+        for task in self.task_table:
+            if hasattr(task, '_retriever') and task._retriever:
+                task._retriever.__del__()
+            task.__del__()
+        self.manager.__del__()
 
 
 ##
@@ -114,12 +139,107 @@ class VineFuture(Future):
 
 
 ##
-# \class FutureTask
+# \class FutureFunctionCall
 #
-# TaskVine Futuretask object
+# TaskVine FutureFunctionCall object
+#
+# This class is a sublcass of FunctionCall that is specialized for future execution
+
+class FutureFunctionCall(FunctionCall):
+    def __init__(self, manager, is_retriever, library_name, fn, *args, **kwargs):
+        super().__init__(library_name, fn, *args, **kwargs)
+        self.enable_temp_output()
+        self.manager = manager
+        self.library_name = library_name
+        self._envs = []
+
+        self._future = VineFuture(self)
+        self._is_retriever = is_retriever
+        self._has_retrieved = False
+        self._retriever = None
+        self._ran_functions = False
+
+    # Set a retriever for this task, it has to disable temp_output b/c
+    # it aims to bring the remote output back to the manager
+    def set_retriever(self):
+        self._retriever = FutureFunctionCall(self.manager, True, self.library_name, 'retrieve_output', self._future)
+        self._retriever.disable_temp_output()
+        self.manager.submit(self._retriever)
+
+    # Given that every designated task stores its outcome in a temp file,
+    # this function is invoked through `VineFuture.result()` to trigger its retriever
+    # to bring that output back to the manager.
+    def output(self, timeout="wait_forever"):
+
+        # when output() is called, set a retriever task to bring back the on-worker output
+        if not self._is_retriever and not self._retriever:
+            self.set_retriever()
+
+        # for retrievee task: wait for retriever to get result
+        if not self._is_retriever:
+            if self._saved_output:
+                return self._saved_output
+            self._saved_output = self._retriever.output(timeout=timeout)
+            if not self._ran_functions:
+                for fn in self._future._callback_fns:
+                    fn(self._output)
+                self._ran_functions = True
+            return self._saved_output
+
+        # for retriever task: fetch the result of its retrievee on completion
+        if self._is_retriever:
+            if not self._has_retrieved:
+                result = self._manager.wait_for_task_id(self.id, timeout=timeout)
+                if result:
+                    self._has_retrieved = True
+            if not self._saved_output and self._has_retrieved:
+                if self.successful():
+                    try:
+                        output = cloudpickle.loads(self._output_file.contents())
+                        if output['Success']:
+                            self._saved_output = output['Result']
+                        else:
+                            self._saved_output = output['Reason']
+
+                    except Exception as e:
+                        self._saved_output = e
+                else:
+                    self._saved_output = FunctionCallNoResult()
+            return self._saved_output
+
+    # gather results from preceding tasks to use as inputs for this specific task
+    def submit_finalize(self):
+        new_fn_args = []
+        arg_id = 0
+        for arg in self._event['fn_args']:
+            arg_id += 1
+            if isinstance(arg, VineFuture):
+                # for the task where the input comes from the output of a prior task, add that output file as its input
+                # the purpose of using hash digest is to avoid using the name for multiple input files
+                input_filename = str(arg_id) + str(arg._task.id) + str(self.id)
+                input_filename = hashlib.md5(input_filename.encode()).hexdigest()
+                self.add_input(arg._task._output_file, input_filename)
+                # create a special format {'VineFutureFile': 'outfile-x'} to indicate loading input from a tempfile
+                new_fn_args.append({"VineFutureFile": input_filename})
+            else:
+                new_fn_args.append(arg)
+        self._event['fn_args'] = tuple(new_fn_args)
+
+        super().submit_finalize()
+
+    def __del__(self):
+        super().__del__()
+
+
+##
+# \class FuturePythonTask
+#
+# TaskVine FuturePythonTask object
 #
 # This class is a sublcass of PythonTask that is specialized for futures
-class FutureTask(PythonTask):
+
+class FuturePythonTask(PythonTask):
+
     ##
     # Creates a new Future Task
     #
@@ -128,30 +248,30 @@ class FutureTask(PythonTask):
     # @param args
     # @param kwargs
     def __init__(self, manager, rf, func, *args, **kwargs):
-        super(FutureTask, self).__init__(func, *args, **kwargs)
+        super(FuturePythonTask, self).__init__(func, *args, **kwargs)
         self.enable_temp_output()
         self._module_manager = manager
         self._future = VineFuture(self)
         self._envs = []
-        self._future_resolved = False
+        self._has_retrieved = False
         self._ran_functions = False
-        self._retrieval_future = rf
-        self._retrieval_task = None
+        self._is_retriever = rf
+        self._retriever = None
 
     def output(self, timeout="wait_forever"):
         def retrieve_output(arg):
             return arg
-        if not self._retrieval_future and not self._retrieval_task:
-            self._retrieval_task = FutureTask(self._module_manager, True, retrieve_output, self._future)
-            self._retrieval_task.set_cores(1)
+        if not self._is_retriever and not self._retriever:
+            self._retriever = FuturePythonTask(self._module_manager, True, retrieve_output, self._future)
+            self._retriever.set_cores(1)
             for env in self._envs:
-                self._retrieval_task.add_environment(env)
-            self._retrieval_task.disable_temp_output()
-            self._module_manager.submit(self._retrieval_task)
+                self._retriever.add_environment(env)
+            self._retriever.disable_temp_output()
+            self._module_manager.submit(self._retriever)
 
-        if not self._retrieval_future:
+        if not self._is_retriever:
             if not self._output_loaded:
-                self._output = self._retrieval_task._future.result(timeout=timeout)
+                self._output = self._retriever._future.result(timeout=timeout)
                 self._output_loaded = True
             if not self._ran_functions:
                 for fn in self._future._callback_fns:
@@ -160,11 +280,11 @@ class FutureTask(PythonTask):
             return self._output
 
         else:
-            if not self._future_resolved:
+            if not self._has_retrieved:
                 result = self._module_manager.wait_for_task_id(self.id, timeout=timeout)
                 if result:
-                    self._future_resolved = True
-            if not self._output_loaded and self._future_resolved:
+                    self._has_retrieved = True
+            if not self._output_loaded and self._has_retrieved:
                 if self.successful():
                     try:
                         with open(self._output_file.source(), "rb") as f:
@@ -179,16 +299,25 @@ class FutureTask(PythonTask):
                 self._output_loaded = True
             return self._output
 
-    def add_future_dep(self, arg):
-        self.add_input(arg._task._output_file, str('outfile-' + str(arg._task.id)))
-
     def submit_finalize(self):
         func, args, kwargs = self._fn_def
+
+        new_fn_args = []
+        arg_id = 0
         for arg in args:
+            arg_id += 1
             if isinstance(arg, VineFuture):
-                self.add_future_dep(arg)
-        args = [{"VineFutureFile": str('outfile-' + str(arg._task.id))} if isinstance(arg, VineFuture) else arg for arg in args]
-        self._add_inputs_outputs(self.manager, func, args, kwargs)
+                input_filename = str(arg_id) + str(arg._task.id) + str(self.id)
+                input_filename = hashlib.md5(input_filename.encode()).hexdigest()
+                self.add_input(arg._task._output_file, input_filename)
+                new_fn_args.append({"VineFutureFile": input_filename})
+            else:
+                new_fn_args.append(arg)
+
+        args = new_fn_args
+        self._fn_def = (func, args, kwargs)
+
+        super().submit_finalize()
 
     def add_environment(self, f):
         self._envs.append(f)

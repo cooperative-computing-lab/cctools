@@ -30,7 +30,7 @@ int check_fixed_location_worker(struct vine_manager *m, struct vine_worker_info 
 	if (t->has_fixed_locations) {
 		LIST_ITERATE(t->input_mounts, mt)
 		{
-			if (mt->file->flags & VINE_FIXED_LOCATION) {
+			if (mt->flags & VINE_FIXED_LOCATION) {
 				replica = hash_table_lookup(w->current_files, mt->file->cached_name);
 				if (!replica) {
 					all_present = 0;
@@ -142,6 +142,11 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		return 0;
 	}
 
+	/* Don't send tasks if a task recently failed at this worker. */
+	if (w->last_failure_time + q->transient_error_interval > timestamp_get()) {
+		return 0;
+	}
+
 	/* Don't send tasks if the factory is used and has too many connected workers. */
 	if (w->factory_name) {
 		struct vine_factory_info *f = vine_factory_info_lookup(q, w->factory_name);
@@ -166,6 +171,7 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	/* If this is a function task, check if the worker can run it.
 	 * May require the manager to send a library to the worker first. */
 	if (t->needs_library && !vine_manager_check_worker_can_run_function_task(q, w, t)) {
+		/* Careful: If this failed, then the worker object may longer be valid! */
 		return 0;
 	}
 
@@ -253,6 +259,7 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 	char *key;
 	struct vine_worker_info *w;
 	struct vine_worker_info *best_worker = 0;
+	int offset_bookkeep;
 	int64_t most_task_cached_bytes = 0;
 	int64_t task_cached_bytes;
 	uint8_t has_all_files;
@@ -261,8 +268,9 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 
 	int ramp_down = vine_schedule_in_ramp_down(q);
 
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	HASH_TABLE_ITERATE_RANDOM_START(q->worker_table, offset_bookkeep, key, w)
 	{
+		/* Careful: If check_worker_against task fails, then w may no longer be valid. */
 		if (check_worker_against_task(q, w, t)) {
 			task_cached_bytes = 0;
 			has_all_files = 1;
@@ -273,7 +281,7 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 
 				if (replica && m->file->type == VINE_FILE) {
 					task_cached_bytes += replica->size;
-				} else if ((m->file->flags & (VINE_CACHE | VINE_CACHE_ALWAYS))) {
+				} else if (m->file->cache_level > VINE_CACHE_LEVEL_TASK) {
 					has_all_files = 0;
 				}
 			}
@@ -307,6 +315,7 @@ static struct vine_worker_info *find_worker_by_fcfs(struct vine_manager *q, stru
 	struct vine_worker_info *w;
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
+		/* Careful: If check_worker_against task fails, then w may no longer be valid. */
 		if (check_worker_against_task(q, w, t)) {
 			return w;
 		}
@@ -327,8 +336,11 @@ static struct vine_worker_info *find_worker_by_random(struct vine_manager *q, st
 	int random_worker;
 	struct list *valid_workers = list_create();
 
+	// avoid the temptation to use HASH_TABLE_ITERATE_RANDOM_START for this loop.
+	// HASH_TABLE_ITERATE_RANDOM_START would give preference to workers that appear first in a bucket.
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
+		/* Careful: If check_worker_against task fails, then w may no longer be valid. */
 		if (check_worker_against_task(q, w, t)) {
 			list_push_tail(valid_workers, w);
 		}
@@ -362,7 +374,7 @@ static struct vine_worker_info *find_worker_by_worst_fit(struct vine_manager *q,
 
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
-
+		/* Careful: If check_worker_against task fails, then w may no longer be valid. */
 		if (check_worker_against_task(q, w, t)) {
 			if (!best_worker || candidate_has_worse_fit(best_worker, w)) {
 				best_worker = w;
@@ -388,6 +400,7 @@ static struct vine_worker_info *find_worker_by_time(struct vine_manager *q, stru
 
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
+		/* Careful: If check_worker_against task fails, then w may no longer be valid. */
 		if (check_worker_against_task(q, w, t)) {
 			if (w->total_tasks_complete > 0) {
 				double t = (w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
@@ -600,6 +613,6 @@ int vine_schedule_check_fixed_location(struct vine_manager *q, struct vine_task 
 			return 1;
 		}
 	}
-
+	debug(D_VINE, "Missing fixed_location dependencies for task: %d", t->task_id);
 	return 0;
 }

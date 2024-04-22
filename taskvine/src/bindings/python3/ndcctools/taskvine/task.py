@@ -141,17 +141,30 @@ class Task(object):
         return flags
 
     @staticmethod
-    def _determine_file_flags(cache=False, peer_transfer=False, unlink_when_done=False):
-        flags = cvine.VINE_CACHE_NEVER
-        if cache is True or cache == "workflow":
-            flags |= cvine.VINE_CACHE
-        if cache == "always":
-            flags |= cvine.VINE_CACHE_ALWAYS
+    def _determine_file_flags(peer_transfer=False, unlink_when_done=False):
+        flags = 0
         if not peer_transfer:
             flags |= cvine.VINE_PEER_NOSHARE
         if unlink_when_done:
             flags |= cvine.VINE_UNLINK_WHEN_DONE
         return flags
+
+    @staticmethod
+    def _determine_cache_level(cache=False):
+        cache_level = cvine.VINE_CACHE_LEVEL_TASK
+
+        if cache is True or cache == "workflow":
+            cache_level = cvine.VINE_CACHE_LEVEL_WORKFLOW
+        elif cache == "worker":
+            cache_level = cvine.VINE_CACHE_LEVEL_WORKER
+        elif cache == "forever":
+            cache_level = cvine.VINE_CACHE_LEVEL_FOREVER
+        elif not cache or cache == "task":
+            cache_level = cvine.VINE_CACHE_LEVEL_TASK
+        else:
+            raise ValueError(f"{cache} is not a valid cache level")
+
+        return cache_level
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -410,12 +423,20 @@ class Task(object):
         return cvine.vine_task_add_environment(self._task, f._file)
 
     ##
-    # Indicate the number of times the task should be retried. If 0 (the
+    # Indicate the number of times the task should be retried. If less than 1 (the
     # default), the task is tried indefinitely. A task that did not succeed
     # after the given number of retries is returned with result
-    # "result_max_retries".
+    # "max retries".
     def set_retries(self, max_retries):
         return cvine.vine_task_set_retries(self._task, max_retries)
+
+    ##
+    # Indicate the number of times the task can be returned to the manager
+    # without being executed. If less than 0 (the default), the task is tried indefinitely.
+    # A task that did not succeed after the given number of retries is returned
+    # with result "forsaken".
+    def set_max_forsaken(self, max_forsaken):
+        return cvine.vine_task_set_max_forsaken(self._task, max_forsaken)
 
     ##
     # Indicate the number of cores required by this task.
@@ -791,7 +812,7 @@ class PythonTask(Task):
         self._output_file = None
 
         # vine File object with the serialized arguments to the function
-        self._args_file = None
+        self._input_file = None
 
         # we delay any PythonTask initialization until the task is submitted to
         # a manager. This is because we don't know the staging directory where
@@ -816,8 +837,8 @@ class PythonTask(Task):
     # then temp files will be deleted in the atexit of the manager staging directory
     def __del__(self):
         try:
-            if self._args_file:
-                self.manager.undeclare_file(self._args_file)
+            if self._input_file:
+                self.manager.undeclare_file(self._input_file)
             super().__del__()
         except TypeError:
             # in case the interpreter is shuting down. staging files will be deleted by manager atexit function.
@@ -983,7 +1004,7 @@ class PythonTaskNoResult(Exception):
 # TaskVine FunctionCall object
 #
 # This class represents a task specialized to execute functions in a Library running on a worker.
-class FunctionCall(Task):
+class FunctionCall(PythonTask):
     ##
     # Create a new FunctionCall specification.
     #
@@ -993,15 +1014,17 @@ class FunctionCall(Task):
     # @param args       positional arguments used in function to be executed by task. Can be mixed with kwargs
     # @param kwargs	keyword arguments used in function to be executed by task.
     def __init__(self, library_name, fn, *args, **kwargs):
-        Task.__init__(self, fn)
+        super().__init__(self, None)
+
+        # function calls at worker only need the name of the function.
+        self.set_command(fn)
+
         self._event = {}
-        self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
-        self.set_time_max(900)     # maximum run time for function calls is 900s by default.
+        self._event["fn_kwargs"] = kwargs
+
+        self._saved_output = None
         self.needs_library(library_name)
-        self._tmp_output_enabled = False
-        self._input_buffer = None
-        self._output_file = None
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -1010,13 +1033,14 @@ class FunctionCall(Task):
     #
     # @param self 	Reference to the current python task object
     def submit_finalize(self):
-        super().submit_finalize()
-        self._input_buffer = self.manager.declare_buffer(cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
-        self.add_input(self._input_buffer, "infile")
+        self._input_file = self.manager.declare_buffer(buffer=cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
+        self.add_input(self._input_file, "infile")
+
         if self._tmp_output_enabled:
             self._output_file = self.manager.declare_temp()
         else:
-            self._output_file = self.manager.declare_buffer(cache=False, peer_transfer=False)
+            self._output_file = self.manager.declare_buffer(buffer=None, cache=self._cache_output, peer_transfer=False)
+
         self.add_output(self._output_file, "outfile")
 
     ##
@@ -1026,8 +1050,8 @@ class FunctionCall(Task):
     # @param args             An array of positional args to be passed to the function
     # @param kwargs           A dictionary of keyword arguments to be passed to the function
     def set_fn_args(self, args=[], kwargs={}):
-        self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
+        self._event["fn_kwargs"] = kwargs
 
     ##
     # Specify how the remote task should execute
@@ -1041,46 +1065,50 @@ class FunctionCall(Task):
             remote_task_exec_method = "fork"
         self._event["remote_task_exec_method"] = remote_task_exec_method
 
-    def set_output_cache(self, cache=False):
-        self._cache_output = cache
-
-    def enable_temp_output(self):
-        self._tmp_output_enabled = True
-
-    def disable_temp_output(self):
-        self._tmp_output_enabled = False
-
     ##
     # Retrieve output, handles cleanup, and returns result or failure reason.
     @property
     def output(self):
-        output = cloudpickle.loads(self._output_file.contents())
-        self._manager.undeclare_file(self._input_buffer)
-        self._input_buffer = None
-        self._manager.undeclare_file(self._output_file)
-        self._output_file = None
+        if self._tmp_output_enabled:
+            raise ValueError("temp output was enabled for this task, thus its output is not available locallly.")
 
-        if output['Success']:
-            return output['Result']
-        else:
-            return output['Reason']
+        if not self._output_loaded:
+            if self.successful():
+                try:
+                    output = self._output_file.contents()
+                    if self._serialize_output:
+                        output = cloudpickle.loads(output)
+                except Exception as e:
+                    self._output = e
 
-    ##
+                if output['Success']:
+                    self._output = output['Result']
+                else:
+                    self._output = output['Reason']
+
+            else:
+                self._output = FunctionCallNoResult()
+                print(self.std_output)
+
+            self.manager.undeclare_file(self._input_file)
+            self._input_file = None
+
+            self._output_loaded = True
+        return self._output
+
     # Remove input and output buffers under some circumstances `output` is not called
     def __del__(self):
         try:
-            if self._input_buffer:
-                self.manager.undeclare_file(self._input_buffer)
-                self._input_buffer = None
-
-            if self._output_file:
-                if not self._tmp_output_enabled:
-                    self._manager.undeclare_file(self._output_file)
-                    self._output_file = None
-
+            if self._input_file:
+                self.manager.undeclare_file(self._input_file)
+                self._input_file = None
             super().__del__()
         except TypeError:
             pass
+
+
+class FunctionCallNoResult(Exception):
+    pass
 
 
 ##

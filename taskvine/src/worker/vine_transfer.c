@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "link.h"
 #include "path.h"
 #include "stringtools.h"
+#include "trash.h"
 #include "unlink_recursive.h"
 #include "url_encode.h"
 
@@ -84,13 +85,19 @@ static int vine_transfer_put_internal(struct link *lnk, const char *full_name, c
 		goto access_failure;
 	}
 
+	/* Send only the normal mode bits. */
 	mode = info.st_mode & 0777;
 
 	if (S_ISREG(info.st_mode)) {
 		int fd = open(full_name, O_RDONLY, 0);
 		if (fd >= 0) {
 			length = info.st_size;
-			send_message(lnk, "file %s %" PRId64 " 0%o\n", relative_name_encoded, length, mode);
+			send_message(lnk,
+					"file %s %" PRId64 " 0%o %lld\n",
+					relative_name_encoded,
+					length,
+					mode,
+					(long long)info.st_mtime);
 			actual = link_stream_from_fd(lnk, fd, length, stoptime);
 			close(fd);
 			if (actual != length)
@@ -114,7 +121,7 @@ static int vine_transfer_put_internal(struct link *lnk, const char *full_name, c
 		if (!dir)
 			goto access_failure;
 
-		send_message(lnk, "dir %s 0\n", relative_name_encoded);
+		send_message(lnk, "dir %s %o %lld\n", relative_name_encoded, mode, (long long)info.st_mtime);
 
 		struct dirent *dent;
 		while ((dent = readdir(dir))) {
@@ -169,7 +176,7 @@ Send a cached object of any type down the wire.
 int vine_transfer_put_any(struct link *lnk, struct vine_cache *cache, const char *filename,
 		vine_transfer_mode_t xfer_mode, time_t stoptime)
 {
-	char *cached_path = vine_cache_full_path(cache, filename);
+	char *cached_path = vine_cache_data_path(cache, filename);
 	int r = vine_transfer_put_internal(lnk, cached_path, path_basename(filename), xfer_mode, stoptime);
 	free(cached_path);
 	return r;
@@ -213,7 +220,7 @@ name for validity.
 */
 
 static int vine_transfer_get_file_internal(
-		struct link *lnk, const char *filename, int64_t length, int mode, time_t stoptime)
+		struct link *lnk, const char *filename, int64_t length, int mode, int mtime, time_t stoptime)
 {
 	if (!check_disk_space_for_filesize(".", length, 0)) {
 		debug(D_VINE,
@@ -247,7 +254,8 @@ static int vine_transfer_get_file_internal(
 	return 1;
 }
 
-static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname, int64_t *totalsize, time_t stoptime);
+static int vine_transfer_get_dir_internal(
+		struct link *lnk, const char *dirname, int64_t *totalsize, int mode, int mtime, time_t stoptime);
 
 /*
 Receive a single item of unknown type into the directory "dirname".
@@ -256,13 +264,13 @@ Returns 1 on successful transfer of one item.
 Returns 2 on successful receipt of "end" of list.
 */
 
-static int vine_transfer_get_any_internal(struct link *lnk, const char *dirname, int64_t *totalsize, time_t stoptime)
+int vine_transfer_get_any(
+		struct link *lnk, const char *dirname, int64_t *totalsize, int *mode, int *mtime, time_t stoptime)
 {
 	char line[VINE_LINE_MAX];
 	char name_encoded[VINE_LINE_MAX];
 	char name[VINE_LINE_MAX];
 	int64_t size;
-	int mode;
 	int errornum;
 
 	if (!recv_message(lnk, line, sizeof(line), stoptime))
@@ -270,12 +278,15 @@ static int vine_transfer_get_any_internal(struct link *lnk, const char *dirname,
 
 	int r = 0;
 
-	if (sscanf(line, "file %s %" SCNd64 " 0%o", name_encoded, &size, &mode) == 3) {
+	if (sscanf(line, "file %s %" SCNd64 " %o %d", name_encoded, &size, mode, mtime) == 4) {
 
 		url_decode(name_encoded, name, sizeof(name));
 
+		/* Only use the normal mode bits. */
+		*mode &= 0777;
+
 		char *subname = string_format("%s/%s", dirname, name);
-		r = vine_transfer_get_file_internal(lnk, subname, size, mode, stoptime);
+		r = vine_transfer_get_file_internal(lnk, subname, size, *mode, *mtime, stoptime);
 		free(subname);
 
 		*totalsize += size;
@@ -288,14 +299,20 @@ static int vine_transfer_get_any_internal(struct link *lnk, const char *dirname,
 		r = vine_transfer_get_symlink_internal(lnk, subname, size, stoptime);
 		free(subname);
 
+		// The symlink doesn't really have an inherent mtime or mode
 		*totalsize += size;
+		*mtime = 0;
+		*mode = 0777;
 
-	} else if (sscanf(line, "dir %s", name_encoded) == 1) {
+	} else if (sscanf(line, "dir %s %o %d", name_encoded, mode, mtime) == 3) {
 
 		url_decode(name_encoded, name, sizeof(name));
 
+		/* Only use the normal mode bits. */
+		*mode &= 0777;
+
 		char *subname = string_format("%s/%s", dirname, name);
-		r = vine_transfer_get_dir_internal(lnk, subname, totalsize, stoptime);
+		r = vine_transfer_get_dir_internal(lnk, subname, totalsize, *mode, *mtime, stoptime);
 		free(subname);
 
 	} else if (sscanf(line, "error %s %d", name_encoded, &errornum) == 2) {
@@ -317,16 +334,23 @@ and now we process "file" and "dir" commands within the list
 until "end" is reached.
 */
 
-static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname, int64_t *totalsize, time_t stoptime)
+static int vine_transfer_get_dir_internal(
+		struct link *lnk, const char *dirname, int64_t *totalsize, int mode, int mtime, time_t stoptime)
 {
-	int result = mkdir(dirname, 0777);
+	/* Only use the normal mode bits. */
+	mode &= 0777;
+
+	int result = mkdir(dirname, mode);
 	if (result < 0) {
 		debug(D_VINE, "unable to create %s: %s", dirname, strerror(errno));
 		return 0;
 	}
 
 	while (1) {
-		int r = vine_transfer_get_any_internal(lnk, dirname, totalsize, stoptime);
+		/* dummy values that won't get used. */
+		int temp_mode, temp_mtime;
+
+		int r = vine_transfer_get_any(lnk, dirname, totalsize, &temp_mode, &temp_mtime, stoptime);
 		if (r == 1) {
 			// Successfully received one item.
 			continue;
@@ -342,56 +366,9 @@ static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname,
 	return 0;
 }
 
-int vine_transfer_get_dir(struct link *lnk, struct vine_cache *cache, const char *dirname, time_t stoptime)
+int vine_transfer_request_any(struct link *lnk, const char *request_path, const char *dirname, int64_t *totalsize,
+		int *mode, int *mtime, time_t stoptime)
 {
-	int64_t totalsize = 0;
-	char *cached_path = vine_cache_full_path(cache, dirname);
-	int r = vine_transfer_get_dir_internal(lnk, cached_path, &totalsize, stoptime);
-	if (r) {
-		vine_cache_addfile(cache, totalsize, 0755, dirname);
-	} else {
-		// Remove the file if there's any problem with getting it.
-		if (unlink_recursive(cached_path) < 0) {
-			debug(D_VINE, "Can't remove invalid file %s: (%s)", cached_path, strerror(errno));
-		}
-	}
-	free(cached_path);
-	return r;
-}
-
-int vine_transfer_get_file(struct link *lnk, struct vine_cache *cache, const char *filename, int64_t length, int mode,
-		time_t stoptime)
-{
-	char *cached_path = vine_cache_full_path(cache, filename);
-	int r = vine_transfer_get_file_internal(lnk, cached_path, length, mode, stoptime);
-	if (r) {
-		vine_cache_addfile(cache, length, mode, filename);
-	} else {
-		// Remove the file if there's any problem with getting it.
-		if (unlink_recursive(cached_path) < 0) {
-			debug(D_VINE, "Can't remove invalid file %s: (%s)", cached_path, strerror(errno));
-		}
-	}
-	free(cached_path);
-	return r;
-}
-
-int vine_transfer_get_any(struct link *lnk, struct vine_cache *cache, const char *filename, time_t stoptime)
-{
-	int64_t totalsize = 0;
-	send_message(lnk, "get %s\n", filename);
-	char *cache_root = vine_cache_full_path(cache, "");
-	int r = vine_transfer_get_any_internal(lnk, cache_root, &totalsize, stoptime);
-	if (r) {
-		vine_cache_addfile(cache, totalsize, 0755, filename);
-	} else {
-		// Remove the file or directory if there's any problem with getting it.
-		char *cached_path = string_format("%s/%s", cache_root, filename);
-		if (unlink_recursive(cached_path) < 0) {
-			debug(D_VINE, "Can't remove invalid any %s: (%s)", cached_path, strerror(errno));
-		}
-		free(cached_path);
-	}
-	free(cache_root);
-	return r;
+	send_message(lnk, "get %s\n", request_path);
+	return vine_transfer_get_any(lnk, dirname, totalsize, mode, mtime, stoptime);
 }

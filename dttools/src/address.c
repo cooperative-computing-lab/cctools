@@ -162,4 +162,13 @@ int address_parse_hostport(const char *hostport, char *host, int *port, int defa
 	}
 }
 
+int address_is_valid_ip(const char *str)
+{
+	struct sockaddr_storage addr;
+	SOCKLEN_T length;
+	int dummy_port = 0;
+
+	return address_to_sockaddr(str, dummy_port, &addr, &length);
+}
+
 /* vim: set noexpandtab tabstop=8: */

@@ -304,4 +304,80 @@ void *set_next_element(struct set *s)
 	}
 }
 
+void set_random_element(struct set *s, int *offset_bookkeep)
+{
+	s->ientry = 0;
+	if (s->bucket_count < 1) {
+		return;
+	}
+
+	int ibucket_start = random() % s->bucket_count;
+
+	for (s->ibucket = ibucket_start; s->ibucket < s->bucket_count; s->ibucket++) {
+		s->ientry = s->buckets[s->ibucket];
+		if (s->ientry) {
+			*offset_bookkeep = s->ibucket;
+			return;
+		}
+	}
+
+	for (s->ibucket = 0; s->ibucket < ibucket_start; s->ibucket++) {
+		s->ientry = s->buckets[s->ibucket];
+		if (s->ientry) {
+			*offset_bookkeep = s->ibucket;
+			return;
+		}
+	}
+}
+
+void *set_next_element_with_offset(struct set *s, int offset_bookkeep)
+{
+	if (s->bucket_count < 1) {
+		return 0;
+	}
+
+	void *element = NULL;
+
+	offset_bookkeep = offset_bookkeep % s->bucket_count;
+
+	if (s->ientry) {
+		element = (void *)s->ientry->element;
+
+		s->ientry = s->ientry->next;
+		if (!s->ientry) {
+			s->ibucket = (s->ibucket + 1) % s->bucket_count;
+			for (; s->ibucket != offset_bookkeep; s->ibucket = (s->ibucket + 1) % s->bucket_count) {
+				s->ientry = s->buckets[s->ibucket];
+				if (s->ientry) {
+					break;
+				}
+			}
+		}
+
+		return element;
+	}
+
+	return 0;
+}
+
+void **set_values(struct set *s)
+{
+	if (s->size < 1) {
+		return NULL;
+	}
+
+	void **elements = malloc(sizeof(void *) * s->size);
+
+	int offset_bookkeep;
+	void *element;
+	int i = 0;
+	SET_ITERATE_RANDOM_START(s, offset_bookkeep, element)
+	{
+		elements[i] = element;
+		i++;
+	}
+
+	return elements;
+}
+
 /* vim: set noexpandtab tabstop=8: */

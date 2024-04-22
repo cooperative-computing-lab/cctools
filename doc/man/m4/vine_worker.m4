@@ -57,7 +57,8 @@ OPTION_ARG(i, min-backoff, time)Set initial value for backoff interval when work
 OPTION_ARG(b, max-backoff, time)Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
 OPTION_ARG(A, arch, arch)Set the architecture string the worker reports to its supervisor. (default=the value reported by uname)
 OPTION_ARG(O, os, os)Set the operating system string the worker reports to its supervisor. (default=the value reported by uname)
-OPTION_ARG(s, workdir, path)Set the location where the worker should create its working directory. (default=/tmp). Also configurable through environment variables BOLD(CCTOOLS_TEMP) or BOLD(TMPDIR).
+OPTION_ARG_LONG(workspace, path) Set the workspace directory where the worker keeps its cache, task sandboxes, performs data transfers, etc.  By default, this directory is CODE(/tmp/worker-UID-PID) and is deleted when the worker exits.
+OPTION_LONG(keep-workspace) Do not delete the contents of the workspace on worker exit.  This permits the worker to restart at a later time and recover the contents of its cache directory.
 OPTION_ARG_LONG(cores, n)Set the number of cores this worker should use.  Set it to 0 to have the worker use all of the available resources. (default=1)
 OPTION_ARG_LONG(gpus, n)Set the number of GPUs this worker should use. If less than 0 or not given, try to detect gpus available.
 OPTION_ARG_LONG(memory, mb)Manually set the amount of memory (in MB) reported by this worker.
@@ -67,6 +68,10 @@ OPTION_ARG_LONG(feature, feature)Specifies a user-defined feature the worker pro
 OPTION_ARG_LONG(volatility, chance)Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).
 OPTION_ARG_LONG(connection-mode, mode)When using -M, override manager preference to resolve its address. One of by_ip, by_hostname, or by_apparent_ip. Default is set by manager.
 OPTION_ARG_LONG(transfer-port,port) Listening port for worker-worker transfers.  (default: any))
+OPTION_ARG_LONG(contact-hostport,hostport) Explicit contact host:port for worker-worker transfers, e.g., when routing is used. (default: :<transfer_port>)
+
+OPTION_FLAG_LONG(ssl)Enable tls connection to manager (manager should support it).
+OPTION_ARG_LONG(tls-sni)SNI domain name if different from manager hostname. Implies --ssl.
 
 OPTIONS_END
 

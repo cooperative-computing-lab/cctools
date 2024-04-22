@@ -61,6 +61,10 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->result = VINE_RESULT_UNKNOWN;
 	t->exit_code = -1;
 
+	t->max_forsaken = -1;
+
+	t->time_when_last_failure = -1;
+
 	/* In the absence of additional information, a task consumes an entire worker. */
 	t->resources_requested = rmsummary_create(-1);
 	t->resources_measured = rmsummary_create(-1);
@@ -135,6 +139,7 @@ void vine_task_reset(struct vine_task *t)
 
 	t->resource_request = CATEGORY_ALLOCATION_FIRST;
 	t->try_count = 0;
+	t->forsaken_count = 0;
 	t->exhausted_attempts = 0;
 	t->workers_slow = 0;
 
@@ -232,6 +237,7 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 	vine_task_set_scheduler(new, task->worker_selection_algorithm);
 	vine_task_set_priority(new, task->priority);
 	vine_task_set_retries(new, task->max_retries);
+	vine_task_set_max_forsaken(new, task->max_forsaken);
 	vine_task_set_time_min(new, task->min_running_time);
 
 	/* Internal state of task is cleared from vine_task_create */
@@ -309,6 +315,15 @@ void vine_task_set_retries(struct vine_task *t, int64_t max_retries)
 		t->max_retries = 0;
 	} else {
 		t->max_retries = max_retries;
+	}
+}
+
+void vine_task_set_max_forsaken(struct vine_task *t, int64_t max_forsaken)
+{
+	if (max_forsaken < 0) {
+		t->max_forsaken = -1;
+	} else {
+		t->max_forsaken = max_forsaken;
 	}
 }
 
@@ -543,7 +558,7 @@ int vine_task_add_output(struct vine_task *t, struct vine_file *f, const char *r
 int vine_task_add_input_file(
 		struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
 {
-	struct vine_file *f = vine_file_local(local_name, 0);
+	struct vine_file *f = vine_file_local(local_name, VINE_CACHE_LEVEL_TASK, 0);
 	int r = vine_task_add_input(t, f, remote_name, flags);
 	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
 	return r;
@@ -552,7 +567,7 @@ int vine_task_add_input_file(
 int vine_task_add_output_file(
 		struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
 {
-	struct vine_file *f = vine_file_local(local_name, 0);
+	struct vine_file *f = vine_file_local(local_name, VINE_CACHE_LEVEL_TASK, 0);
 	int r = vine_task_add_output(t, f, remote_name, flags);
 	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
 	return r;
@@ -561,7 +576,7 @@ int vine_task_add_output_file(
 int vine_task_add_input_url(
 		struct vine_task *t, const char *file_url, const char *remote_name, vine_mount_flags_t flags)
 {
-	struct vine_file *f = vine_file_url(file_url, 0);
+	struct vine_file *f = vine_file_url(file_url, VINE_CACHE_LEVEL_TASK, 0);
 	int r = vine_task_add_input(t, f, remote_name, flags);
 	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
 	return r;
@@ -570,7 +585,7 @@ int vine_task_add_input_url(
 int vine_task_add_input_buffer(
 		struct vine_task *t, const char *data, int length, const char *remote_name, vine_mount_flags_t flags)
 {
-	struct vine_file *f = vine_file_buffer(data, length, 0);
+	struct vine_file *f = vine_file_buffer(data, length, VINE_CACHE_LEVEL_TASK, 0);
 	int r = vine_task_add_input(t, f, remote_name, flags);
 	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
 	return r;
@@ -580,7 +595,7 @@ int vine_task_add_input_mini_task(
 		struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_mount_flags_t flags)
 {
 	/* XXX mini task must have a single output file */
-	struct vine_file *f = vine_file_mini_task(mini_task, "minitask", 0);
+	struct vine_file *f = vine_file_mini_task(mini_task, "minitask", VINE_CACHE_LEVEL_TASK, 0);
 	int r = vine_task_add_input(t, f, remote_name, flags);
 	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
 	return r;

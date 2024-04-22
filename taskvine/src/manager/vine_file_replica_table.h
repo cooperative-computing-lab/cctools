@@ -17,19 +17,21 @@ See the file COPYING for details.
 #include "vine_file_replica.h"
 #include "vine_worker_info.h"
 
-int vine_file_replica_table_insert(struct vine_worker_info *w, const char *cachename, struct vine_file_replica *replica);
+int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_info *w, const char *cachename, struct vine_file_replica *replica);
 
-struct vine_file_replica *vine_file_replica_table_remove(struct vine_worker_info *w, const char *cachename);
+struct vine_file_replica *vine_file_replica_table_remove(struct vine_manager *m, struct vine_worker_info *w, const char *cachename);
+
+int vine_file_worker_table_remove(struct vine_manager *m, struct vine_worker_info *w, const char *cachename);
 
 struct vine_file_replica *vine_file_replica_table_lookup(struct vine_worker_info *w, const char *cachename);
 
 struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager *q, const char *cachename);
 
-struct vine_worker_info **vine_file_replica_table_find_replication_targets(struct vine_manager *q, struct vine_worker_info *w, const char *cachename, int *count);
+int vine_file_replica_table_replicate(struct vine_manager *q, struct vine_file *f);
 
 int vine_file_replica_table_exists_somewhere( struct vine_manager *q, const char *cachename );
 
-int vine_file_replica_table_count_replicas( struct vine_manager *q, const char *cachename );
+int vine_file_replica_table_count_replicas( struct vine_manager *q, const char *cachename, vine_file_replica_state_t state );
 
 
 #endif

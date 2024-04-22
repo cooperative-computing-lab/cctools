@@ -38,6 +38,8 @@ struct vine_worker_info *vine_worker_create(struct link *lnk)
 	w->end_time = -1;
 
 	w->last_update_msg_time = w->start_time;
+	w->last_transfer_failure = 0;
+	w->last_failure_time = 0;
 
 	return w;
 }
@@ -55,6 +57,7 @@ void vine_worker_delete(struct vine_worker_info *w)
 	free(w->workerid);
 	free(w->addrport);
 	free(w->hashkey);
+	free(w->transfer_url);
 
 	vine_resources_delete(w->resources);
 	hash_table_clear(w->features, 0);

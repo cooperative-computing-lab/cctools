@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "vine_sandbox.h"
 #include "vine_cache.h"
+#include "vine_cache_file.h"
 #include "vine_file.h"
 #include "vine_mount.h"
 #include "vine_task.h"
@@ -28,31 +29,40 @@ char *vine_sandbox_full_path(struct vine_process *p, const char *sandbox_name)
 }
 
 /*
-Ensures that each input file is present.
+Determine whether all the files needed by this process are present.
+Return VINE_STATUS_READY if all are present.
+Return VINE_STATUS_PROCESSING if some are not ready.
+Return VINE_STATUS_FAILED if some have definitely failed.
 */
 
 vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cache *cache, struct link *manager)
 {
 	int processing = 0;
-	struct vine_task *t = p->task;
-	vine_cache_status_t cache_status = VINE_CACHE_STATUS_READY;
 
 	struct vine_mount *m;
-	LIST_ITERATE(t->input_mounts, m)
+	LIST_ITERATE(p->task->input_mounts, m)
 	{
-		cache_status = vine_cache_ensure(cache, m->file->cached_name);
-		if (cache_status == VINE_CACHE_STATUS_PROCESSING)
-			processing = 1;
-		if (cache_status == VINE_CACHE_STATUS_FAILED)
+		vine_cache_status_t cache_status = vine_cache_ensure(cache, m->file->cached_name);
+
+		switch (cache_status) {
+		case VINE_CACHE_STATUS_PENDING:
+		case VINE_CACHE_STATUS_PROCESSING:
+		case VINE_CACHE_STATUS_TRANSFERRED:
+			processing++;
 			break;
+		case VINE_CACHE_STATUS_READY:
+			break;
+		case VINE_CACHE_STATUS_UNKNOWN:
+		case VINE_CACHE_STATUS_FAILED:
+			return VINE_CACHE_STATUS_FAILED;
+		}
 	}
 
-	if (cache_status == VINE_CACHE_STATUS_FAILED)
-		return VINE_CACHE_STATUS_FAILED;
-	if (processing)
+	if (processing) {
 		return VINE_CACHE_STATUS_PROCESSING;
-
-	return VINE_CACHE_STATUS_READY;
+	} else {
+		return VINE_CACHE_STATUS_READY;
+	}
 }
 
 /*
@@ -63,7 +73,7 @@ and then link it into the sandbox at the desired location.
 
 static int stage_input_file(struct vine_process *p, struct vine_mount *m, struct vine_file *f, struct vine_cache *cache)
 {
-	char *cache_path = vine_cache_full_path(cache, f->cached_name);
+	char *cache_path = vine_cache_data_path(cache, f->cached_name);
 	char *sandbox_path = vine_sandbox_full_path(p, m->remote_name);
 
 	int result = 0;
@@ -153,66 +163,58 @@ int vine_sandbox_stagein(struct vine_process *p, struct vine_cache *cache)
 }
 
 /*
-Move a given output file back to the target cache location.
-First attempt a cheap rename.
-If that does not work (perhaps due to crossing filesystems)
-then attempt a recursive copy.
-Inform the cache of the added file.
+Move a given output file back to the target cache location
+and inform the manager of the added file.
 */
 
 static int stage_output_file(struct vine_process *p, struct vine_mount *m, struct vine_file *f,
 		struct vine_cache *cache, struct link *manager)
 {
-	char *cache_path = vine_cache_full_path(cache, f->cached_name);
+	char *cache_path = vine_cache_data_path(cache, f->cached_name);
 	char *sandbox_path = vine_sandbox_full_path(p, m->remote_name);
 
 	int result = 0;
+	int mode;
+	time_t mtime;
+	int64_t size;
 
-	debug(D_VINE, "output: moving %s to %s", sandbox_path, cache_path);
-	if (rename(sandbox_path, cache_path) < 0) {
-		debug(D_VINE,
-				"output: move failed, attempting copy of %s to %s: %s",
-				sandbox_path,
-				cache_path,
-				strerror(errno));
-		if (copy_file_to_file(sandbox_path, cache_path) == -1) {
+	timestamp_t transfer_time = p->execution_end - p->execution_start;
+
+	debug(D_VINE, "output: measuring %s", sandbox_path);
+	if (vine_cache_file_measure_metadata(sandbox_path, &mode, &size, &mtime)) {
+		debug(D_VINE, "output: moving %s to %s", sandbox_path, cache_path);
+		if (vine_cache_add_file(cache,
+				    f->cached_name,
+				    sandbox_path,
+				    f->cache_level,
+				    mode,
+				    size,
+				    mtime,
+				    transfer_time)) {
+			vine_worker_send_cache_update(manager,
+					f->cached_name,
+					f->type,
+					f->cache_level,
+					f->size,
+					mode,
+					transfer_time,
+					p->execution_start);
+			result = 1;
+		} else {
 			debug(D_VINE,
-					"could not move or copy output file %s to %s: %s",
+					"output: unable to move %s to %s: %s\n",
 					sandbox_path,
 					cache_path,
 					strerror(errno));
 			result = 0;
-		} else {
-			result = 1;
 		}
 	} else {
-		result = 1;
+		debug(D_VINE, "output: unable to measure size of %s: %s\n", sandbox_path, strerror(errno));
+		result = 0;
 	}
 
-	if (result) {
-		struct stat info;
-		if (stat(cache_path, &info) == 0) {
-			if (S_ISDIR(info.st_mode)) {
-				struct path_disk_size_info *state = NULL;
-				path_disk_size_info_get_r(cache_path, -1, &state);
-				int64_t measured_size = state->last_byte_size_complete;
-
-				vine_cache_addfile(cache, measured_size, info.st_mode, f->cached_name);
-				vine_worker_send_cache_update(manager, f->cached_name, measured_size, 0, 0);
-				path_disk_size_info_delete_state(state);
-			} else {
-				vine_cache_addfile(cache, info.st_size, info.st_mode, f->cached_name);
-				vine_worker_send_cache_update(manager, f->cached_name, info.st_mode, 0, 0);
-			}
-		} else {
-			// This seems implausible given that the rename/copy succeded, but we still have to check...
-			debug(D_VINE, "output: failed to stat %s: %s", cache_path, strerror(errno));
-			result = 0;
-		}
-	}
-
-	free(sandbox_path);
 	free(cache_path);
+	free(sandbox_path);
 
 	return result;
 }

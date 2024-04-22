@@ -379,6 +379,11 @@ void sockaddr_set_port(struct sockaddr_storage *addr, int port)
 	}
 }
 
+struct link *link_serve_range(int low, int high)
+{
+	return link_serve_address_range(0, low, high);
+}
+
 struct link *link_serve(int port)
 {
 	return link_serve_address(0, port);
@@ -453,13 +458,18 @@ static void _set_ssl_keys(SSL_CTX *ctx, const char *ssl_key, const char *ssl_cer
 
 struct link *link_serve_address(const char *addr, int port)
 {
+	return link_serve_address_range(addr, port, port);
+}
+
+struct link *link_serve_address_range(const char *addr, int low, int high)
+{
 	struct link *link = 0;
 	struct sockaddr_storage address;
 	SOCKLEN_T address_length;
 	int success;
 	int value;
 
-	if (!address_to_sockaddr(addr, port, &address, &address_length)) {
+	if (!address_to_sockaddr(addr, /* port to be set */ 0, &address, &address_length)) {
 		goto failure;
 	}
 
@@ -483,22 +493,29 @@ struct link *link_serve_address(const char *addr, int port)
 
 	link_window_configure(link);
 
-	int low = TCP_LOW_PORT_DEFAULT;
-	int high = TCP_HIGH_PORT_DEFAULT;
-	if (port < 1) {
+	if (low < 1) {
 		const char *lowstr = getenv("TCP_LOW_PORT");
-		if (lowstr)
+		if (lowstr) {
 			low = atoi(lowstr);
-		const char *highstr = getenv("TCP_HIGH_PORT");
-		if (highstr)
-			high = atoi(highstr);
-	} else {
-		low = high = port;
+		} else {
+			low = TCP_LOW_PORT_DEFAULT;
+		}
 	}
 
-	if (high < low)
-		fatal("high port %d is less than low port %d in range", high, low);
+	if (high < 1) {
+		const char *highstr = getenv("TCP_HIGH_PORT");
+		if (highstr) {
+			high = atoi(highstr);
+		} else {
+			high = TCP_HIGH_PORT_DEFAULT;
+		}
+	}
 
+	if (high < low) {
+		fatal("high port %d is less than low port %d in range", high, low);
+	}
+
+	int port;
 	for (port = low; port <= high; port++) {
 		sockaddr_set_port(&address, port);
 		success = bind(link->fd, (struct sockaddr *)&address, address_length);
@@ -571,7 +588,7 @@ int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert)
 	return 0;
 }
 
-int link_ssl_wrap_connect(struct link *link)
+int link_ssl_wrap_connect(struct link *link, const char *sni_hostname)
 {
 #ifdef HAS_OPENSSL
 
@@ -585,7 +602,13 @@ int link_ssl_wrap_connect(struct link *link)
 	SSL_set_fd(link->ssl, link->fd);
 
 	// set hostname for SNI
-	SSL_set_tlsext_host_name(link->ssl, link->raddr);
+	const char *name = link->raddr;
+	if (sni_hostname) {
+		name = sni_hostname;
+	}
+
+	debug(D_SSL, "Setting SNI to: %s", name);
+	SSL_set_tlsext_host_name(link->ssl, name);
 
 	int result;
 	while ((result = SSL_connect(link->ssl)) <= 0) {

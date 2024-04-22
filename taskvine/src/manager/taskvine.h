@@ -51,22 +51,23 @@ typedef enum {
 	VINE_MOUNT_MKDIR = 64     /**< Create this empty output directory in the task sandbox prior to execution. */
 } vine_mount_flags_t;
 
-/** Control caching and sharing behavior of file objects.
-Note that these bit fields overlap.
-To see if file should be cached, use: (flags & VINE_CACHE).
-To see if file should remain at worker after disconnection, use ((flags & VINE_CACHE_ALWAYS) == VINE_CACHE_ALWAYS).
-**/
-
+/** Control caching and sharing behavior of file objects. **/
 typedef enum {
-	VINE_CACHE_NEVER = 0,  /**< Do not cache file at execution site. (default) */
-	VINE_CACHE = 1,        /**< File remains in cache until workflow ends. */
-	VINE_CACHE_ALWAYS = 3, /**< File remains in cache until the worker teminates. **/
-	VINE_PEER_NOSHARE = 4,  /**< Schedule this file to be shared between peers where available. See @ref vine_enable_peer_transfers **/
-	VINE_UNLINK_WHEN_DONE = 8  /**< Whether to delete the file when its reference count is 0. (Warning: Only use on files produced by the application, and never on irreplaceable input files.) */
+	VINE_CACHE_LEVEL_TASK=0,      /**< Do not cache file at worker. (default) */
+	VINE_CACHE_LEVEL_WORKFLOW=1,  /**< File remains in cache of worker until workflow ends. */
+	VINE_CACHE_LEVEL_WORKER=2,    /**< File remains in cache of worker until worker terminates. */
+	VINE_CACHE_LEVEL_FOREVER=3    /**< File remains at execution site when worker terminates. (use with caution) */
+} vine_cache_level_t;
+
+
+/** Control sharing and garbage collection behavior of file objects. **/
+typedef enum {
+	VINE_PEER_NOSHARE = 1,     /**< Schedule this file to be shared between peers where available. See @ref vine_enable_peer_transfers **/
+	VINE_UNLINK_WHEN_DONE = 2  /**< Whether to delete the file when its reference count is 0. (Warning: Only use on files produced by the application, and never on irreplaceable input files.) */
 } vine_file_flags_t;
 
-/** Select overall scheduling algorithm for matching tasks to workers. */
 
+/** Select overall scheduling algorithm for matching tasks to workers. */
 typedef enum {
 	VINE_SCHEDULE_UNSET = 0, /**< Internal use only. */
 	VINE_SCHEDULE_FCFS,      /**< Select worker on a first-come-first-serve basis. */
@@ -90,12 +91,13 @@ typedef enum {
 	VINE_RESULT_MAX_END_TIME        = 3 << 3, /**< The task ran after the specified (absolute since epoch) end time. **/
 	VINE_RESULT_UNKNOWN             = 4 << 3, /**< The result could not be classified. **/
 	VINE_RESULT_FORSAKEN            = 5 << 3, /**< The task failed, but it was not a task error **/
-	VINE_RESULT_MAX_RETRIES         = 6 << 3, /**< The task could not be completed successfully in the given number of retries. **/
+	VINE_RESULT_MAX_RETRIES         = 6 << 3, /**< Currently unused. **/
 	VINE_RESULT_MAX_WALL_TIME       = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
 	VINE_RESULT_RMONITOR_ERROR      = 8 << 3, /**< The task failed because the monitor did not produce a summary report. **/
 	VINE_RESULT_OUTPUT_TRANSFER_ERROR = 9 << 3,  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
 	VINE_RESULT_FIXED_LOCATION_MISSING = 10 << 3, /**< The task failed because no worker could satisfy the fixed location input file requirements. */
 	VINE_RESULT_CANCELLED = 11<<3, /**< The task was cancelled by the caller. */
+	VINE_RESULT_LIBRARY_EXIT        = 12 << 3 /**< Task is a library that has terminated. **/
 } vine_result_t;
 
 /** Select how to allocate resources for similar tasks with @ref vine_set_category_mode */
@@ -283,12 +285,19 @@ int vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *r
 
 int vine_task_add_output( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_mount_flags_t flags );
 
-/** Specify the number of times this task is retried on worker errors. If less than one, the task is retried indefinitely (this the default). A task that did not succeed after the given number of retries is returned with result VINE_RESULT_MAX_RETRIES.
+/** Specify the number of times this task is retried on worker errors. If less than one, the task is retried indefinitely (this the default). A task that did not succeed after the given number of retries is returned with the result of its last attempt.
 @param t A task object.
 @param max_retries The number of retries.
 */
 
 void vine_task_set_retries( struct vine_task *t, int64_t max_retries );
+
+/** Specify the total number of times this task can be return to the manager without being executed. If less than zero, the task is tried indefinitely (this the default). A task that did not succeed after the given number is returned with the result VINE_RESULT_FORSAKEN.
+@param t A task object.
+@param max_retries The number of retries.
+*/
+
+void vine_task_set_max_forsaken( struct vine_task *t, int64_t max_forsaken );
 
 /** Specify the amount of disk space required by a task.
 @param t A task object.
@@ -637,31 +646,31 @@ const char * vine_file_contents( struct vine_file *f );
 */
 size_t vine_file_size( struct vine_file *f );
 
-
 /** Declare a file object from a local file
 @param m A manager object
 @param source The path of the file on the local filesystem
-@param flags Whether to never cache the file at the workers (VINE_CACHE_NEVER,
-the default), to cache it only for the current manager (VINE_CACHE), or to
-cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be
-or'ed (|) with VINE_PEER_NOSHARE if the file should not be transferred among
-workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
+@param cache Method for caching file at the workers: never, the default (VINE_CACHE_LEVEL_TASK), to cache only for the
+current manager (VINE_CACHE_LEVEL_WORKFLOW), to cache for the lifetime of the worker (VINE_CACHE_LEVEL_WORKER), or to
+cache at execution site even when worker terminates (VINE_CACHE_LEVEL_FOREVER).
+@param flags Flags that can be or'ed (|) to indicate whether a file should not be transferred among
+workers (VINE_PEER_NOSHARE) when peer transfers are enabled (@ref vine_enable_peer_transfers), or whether a file should
+be delete at the manager's site after it is not needed by the workflow (@ref vine_undeclare_file).
 @return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
 */
-struct vine_file * vine_declare_file( struct vine_manager *m, const char *source, vine_file_flags_t flags );
+struct vine_file * vine_declare_file( struct vine_manager *m, const char *source, vine_cache_level_t cache, vine_file_flags_t flags );
 
 /** Declare a file object from a remote URL.
 @param m A manager object
 @param url The URL address of the object in text form.
-@param flags Whether to never cache the file at the workers (VINE_CACHE_NEVER,
-the default), to cache it only for the current manager (VINE_CACHE), or to
-cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be
-or'ed (|) with VINE_PEER_NOSHARE if the file should not be transferred among
-workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
+@param cache Method for caching file at the workers: never, the default (VINE_CACHE_LEVEL_TASK), to cache only for the
+current manager (VINE_CACHE_LEVEL_WORKFLOW), to cache for the lifetime of the worker (VINE_CACHE_LEVEL_WORKER), or to
+cache at execution site even when worker terminates (VINE_CACHE_LEVEL_FOREVER).
+@param flags Flags that can be or'ed (|) to indicate whether a file should not be transferred among
+workers (VINE_PEER_NOSHARE) when peer transfers are enabled (@ref vine_enable_peer_transfers), or whether a file should
+be delete at the manager's site after it is not needed by the workflow (@ref vine_undeclare_file).
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_declare_url( struct vine_manager *m, const char *url, vine_file_flags_t flags );
-
+struct vine_file * vine_declare_url( struct vine_manager *m, const char *url, vine_cache_level_t cache, vine_file_flags_t flags );
 
 /** Create a file object of a remote file accessible from an xrootd server.
 @param m A manager object
@@ -669,31 +678,34 @@ struct vine_file * vine_declare_url( struct vine_manager *m, const char *url, vi
 @param proxy A proxy file object (e.g. from @ref vine_declare_file) of a X509 proxy to use. If NULL, the
 environment variable X509_USER_PROXY and the file "$TMPDIR/$UID" are considered
 in that order. If no proxy is present, the transfer is tried without authentication.
-@param env    If not NULL, an environment file (e.g poncho or starch, see @ref vine_task_add_environment) that contains the xrootd executables. Otherwise assume xrootd is available at the worker.
-@param flags Whether to never cache the file at the workers (VINE_CACHE_NEVER,
-the default), to cache it only for the current manager (VINE_CACHE), or to
-cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be
-or'ed (|) with VINE_PEER_NOSHARE if the file should not be transferred among
-workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
+@param env    If not NULL, an environment file (e.g poncho or starch, see @ref vine_task_add_environment) that contains
+the xrootd executables. Otherwise assume xrootd is available at the worker.
+@param cache Method for caching file at the workers: never, the default (VINE_CACHE_LEVEL_TASK), to cache only for the
+current manager (VINE_CACHE_LEVEL_WORKFLOW), to cache for the lifetime of the worker (VINE_CACHE_LEVEL_WORKER), or to
+cache at execution site even when worker terminates (VINE_CACHE_LEVEL_FOREVER).
+@param flags Flags that can be or'ed (|) to indicate whether a file should not be transferred among
+workers (VINE_PEER_NOSHARE) when peer transfers are enabled (@ref vine_enable_peer_transfers), or whether a file should
+be delete at the manager's site after it is not needed by the workflow (@ref vine_undeclare_file).
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy, struct vine_file *env, vine_file_flags_t flags );
-
+struct vine_file * vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy, struct vine_file *env, vine_cache_level_t cache, vine_file_flags_t flags );
 
 /** Create a file object of a remote file accessible from a chirp server.
 @param m A manager object
 @param server The chirp server address of the form "hostname[:port"]"
 @param source The name of the file in the server
 @param ticket If not NULL, a file object that provides a chirp an authentication ticket
-@param env    If not NULL, an environment file (e.g poncho or starch, see @ref vine_task_add_environment) that contains the chirp executables. Otherwise assume chirp is available at the worker.
-@param flags Whether to never cache the file at the workers (VINE_CACHE_NEVER,
-the default), to cache it only for the current manager (VINE_CACHE), or to
-cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be
-or'ed (|) with VINE_PEER_NOSHARE if the file should not be transferred among
-workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
+@param env    If not NULL, an environment file (e.g poncho or starch, see @ref vine_task_add_environment) that contains
+the chirp executables. Otherwise assume chirp is available at the worker.
+@param cache Method for caching file at the workers: never, the default (VINE_CACHE_LEVEL_TASK), to cache only for the
+current manager (VINE_CACHE_LEVEL_WORKFLOW), to cache for the lifetime of the worker (VINE_CACHE_LEVEL_WORKER), or to
+cache at execution site even when worker terminates (VINE_CACHE_LEVEL_FOREVER).
+@param flags Flags that can be or'ed (|) to indicate whether a file should not be transferred among
+workers (VINE_PEER_NOSHARE) when peer transfers are enabled (@ref vine_enable_peer_transfers), or whether a file should
+be delete at the manager's site after it is not needed by the workflow (@ref vine_undeclare_file).
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_declare_chirp( struct vine_manager *m, const char *server, const char *source, struct vine_file *ticket, struct vine_file *env, vine_file_flags_t flags );
+struct vine_file * vine_declare_chirp( struct vine_manager *m, const char *server, const char *source, struct vine_file *ticket, struct vine_file *env, vine_cache_level_t cache, vine_file_flags_t flags );
 
 
 /** Create a scratch file object.
@@ -704,20 +716,19 @@ as the output of a task, and may be consumed by other tasks.
 */
 struct vine_file * vine_declare_temp( struct vine_manager *m );
 
-
 /** Create a file object from a data buffer.
 @param m A manager object
 @param buffer The contents of the buffer.
 @param size The length of the buffer, in bytes.
-@param flags Whether to never cache the file at the workers (VINE_CACHE_NEVER,
-the default), to cache it only for the current manager (VINE_CACHE), or to
-cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be
-or'ed (|) with VINE_PEER_NOSHARE if the file should not be transferred among
-workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
+@param cache Method for caching file at the workers: never, the default (VINE_CACHE_LEVEL_TASK), to cache only for the
+current manager (VINE_CACHE_LEVEL_WORKFLOW), to cache for the lifetime of the worker (VINE_CACHE_LEVEL_WORKER), or to
+cache at execution site even when worker terminates (VINE_CACHE_LEVEL_FOREVER).
+@param flags Flags that can be or'ed (|) to indicate whether a file should not be transferred among
+workers (VINE_PEER_NOSHARE) when peer transfers are enabled (@ref vine_enable_peer_transfers), or whether a file should
+be delete at the manager's site after it is not needed by the workflow (@ref vine_undeclare_file).
 @return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
 */
-struct vine_file * vine_declare_buffer( struct vine_manager *m, const char *buffer, size_t size, vine_file_flags_t flags );
-
+struct vine_file * vine_declare_buffer( struct vine_manager *m, const char *buffer, size_t size, vine_cache_level_t cache, vine_file_flags_t flags );
 
 /** Create a file object produced from a mini-task
 Attaches a task definition to produce an input file by running a Unix command.
@@ -728,54 +739,56 @@ activity with minimal resource consumption.
 @param m A manager object
 @param mini_task The task which produces the file
 @param name The name of the file in the task's sandbox to extract.
-@param flags Whether to never cache the output of the mini task at the workers (VINE_CACHE_NEVER,
-the default), to cache it only for the current manager (VINE_CACHE), or to
-cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be
-or'ed (|) with VINE_PEER_NOSHARE if the file should not be transfered among
-workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
+@param cache Method for caching file at the workers: never, the default (VINE_CACHE_LEVEL_TASK), to cache only for the
+current manager (VINE_CACHE_LEVEL_WORKFLOW), to cache for the lifetime of the worker (VINE_CACHE_LEVEL_WORKER), or to
+cache at execution site even when worker terminates (VINE_CACHE_LEVEL_FOREVER).
+@param flags Flags that can be or'ed (|) to indicate whether a file should not be transferred among
+workers (VINE_PEER_NOSHARE) when peer transfers are enabled (@ref vine_enable_peer_transfers), or whether a file should
+be delete at the manager's site after it is not needed by the workflow (@ref vine_undeclare_file).
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *mini_task, const char *name, vine_file_flags_t flags);
-
+struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *mini_task, const char *name, vine_cache_level_t cache, vine_file_flags_t flags);
 
 /** Create a file object by unpacking a tar archive.
 The archive may be compressed in any of the ways supported
 by tar, and so this function supports extensions .tar, .tar.gz, .tgz, tar.bz2, and so forth.
 @param m A manager object
 @param f A file object corresponding to an archive packed by the tar command.
-@param flags Whether to never cache the output directory of untar at the workers (VINE_CACHE_NEVER,
-the default), to cache it only for the current manager (VINE_CACHE), or to
-cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). VINE_PEER_NOSHARE
-has no meaning for this declaration, as the output directory is never transferred among workers.
+@param cache Method for caching file at the workers: never, the default (VINE_CACHE_LEVEL_TASK), to cache only for the
+current manager (VINE_CACHE_LEVEL_WORKFLOW), to cache for the lifetime of the worker (VINE_CACHE_LEVEL_WORKER), or to
+cache at execution site even when worker terminates (VINE_CACHE_LEVEL_FOREVER).
+@param flags Flags that can be or'ed (|) to indicate whether a file should not be transferred among
+workers (VINE_PEER_NOSHARE) when peer transfers are enabled (@ref vine_enable_peer_transfers), or whether a file should
+be delete at the manager's site after it is not needed by the workflow (@ref vine_undeclare_file).
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_declare_untar( struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags);
-
+struct vine_file * vine_declare_untar( struct vine_manager *m, struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags);
 
 /** Create a file object by unpacking a poncho package
 @param m A manager object
 @param f A file object corresponding to poncho or conda-pack tarball
-@param flags Whether to never cache the expanded poncho environment at the workers (VINE_CACHE_NEVER,
-the default), to cache it only for the current manager (VINE_CACHE), or to
-cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). VINE_PEER_NOSHARE
-has no meaning for this declaration, as the expanded environment is never
-transferred among workers.
+@param cache Method for caching file at the workers: never, the default (VINE_CACHE_LEVEL_TASK), to cache only for the
+current manager (VINE_CACHE_LEVEL_WORKFLOW), to cache for the lifetime of the worker (VINE_CACHE_LEVEL_WORKER), or to
+cache at execution site even when worker terminates (VINE_CACHE_LEVEL_FOREVER).
+@param flags Flags that can be or'ed (|) to indicate whether a file should not be transferred among
+workers (VINE_PEER_NOSHARE) when peer transfers are enabled (@ref vine_enable_peer_transfers), or whether a file should
+be delete at the manager's site after it is not needed by the workflow (@ref vine_undeclare_file).
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_declare_poncho( struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags );
-
+struct vine_file * vine_declare_poncho( struct vine_manager *m, struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags );
 
 /** Create a file object by unpacking a starch package.
 @param m A manager object
 @param f A file object representing a sfx archive.
-@param flags Whether to never cache the expanded starch archive at the workers (VINE_CACHE_NEVER,
-the default), to cache it only for the current manager (VINE_CACHE), or to
-cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). VINE_PEER_NOSHARE
-has no meaning for this declaration, as the expanded starch archive is never
-transferred among workers.
+@param cache Method for caching file at the workers: never, the default (VINE_CACHE_LEVEL_TASK), to cache only for the
+current manager (VINE_CACHE_LEVEL_WORKFLOW), to cache for the lifetime of the worker (VINE_CACHE_LEVEL_WORKER), or to
+cache at execution site even when worker terminates (VINE_CACHE_LEVEL_FOREVER).
+@param flags Flags that can be or'ed (|) to indicate whether a file should not be transferred among
+workers (VINE_PEER_NOSHARE) when peer transfers are enabled (@ref vine_enable_peer_transfers), or whether a file should
+be delete at the manager's site after it is not needed by the workflow (@ref vine_undeclare_file).
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_declare_starch( struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags );
+struct vine_file * vine_declare_starch( struct vine_manager *m, struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags );
 
 /** Fetch the contents of a file.
 The contents of the given file will be loaded from disk or pulled back from the cluster
@@ -1078,6 +1091,13 @@ int vine_set_draining_by_hostname(struct vine_manager *m, const char *hostname, 
 */
 int vine_set_category_mode(struct vine_manager *m, const char *category, vine_category_mode_t mode);
 
+/** Set a maximum number of tasks of this category that can execute concurrently. If less than 0, unlimited (this is the default).
+@param q A manager object.
+@param category A category name.
+@param max_concurrent Number of maximum concurrent tasks.
+*/
+void vine_set_category_max_concurrent(struct vine_manager *m, const char *category, int max_concurrent);
+
 /** Turn on or off first-allocation labeling for a given category and resource. This function should be use to fine-tune the defaults from @ref vine_set_category_mode.
 @param m A manager object
 @param category A category name.
@@ -1115,6 +1135,11 @@ void vine_set_tasks_left_count(struct vine_manager *m, int ntasks);
 @param hosts The catalog servers given as a comma delimited list of hostnames or hostname:port
 */
 void vine_set_catalog_servers(struct vine_manager *m, const char *hosts);
+
+/* Send updates to the catalog server.
+@param m A manager object
+*/
+void vine_update_catalog(struct vine_manager *m);
 
 /** Add a global property to the manager which will be included in periodic
 reports to the catalog server and other telemetry destinations.
@@ -1241,6 +1266,7 @@ void vine_set_manager_preferred_connection(struct vine_manager *m, const char *p
  - "monitor-interval" Parameter to change how frequently the resource monitor records resource consumption of a task in a times series, if this feature is enabled. See @ref vine_enable_monitoring.
  - "update_interval"  Seconds between updates to the catalog. (default=60)
  - "temp-replica-count" Degree of replication across workers for remote temp files (default=0)
+ - "transient-error-interval" Time to wait in seconds after a resource failure before attempting to use it again (default=15)
  - "resource_management_interval" Seconds between measurement of manager local resources. (default=30)
  - "max_task_stdout_storage" Maximum size of standard output from task.  (If larger, send to a separate file.) (default=1*GIGABYTE)
  - "max_new_workers" Maximum number of workers to add in a single cycle before dealing with other matters. (default=10)

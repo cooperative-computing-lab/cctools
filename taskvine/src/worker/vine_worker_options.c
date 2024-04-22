@@ -2,10 +2,13 @@
 #include "vine_catalog.h"
 #include "vine_transfer_server.h"
 
+#include "address.h"
 #include "catalog_query.h"
 #include "cctools.h"
 #include "copy_stream.h"
+#include "create_dir.h"
 #include "debug.h"
+#include "domain_name.h"
 #include "hash_table.h"
 #include "macros.h"
 #include "path.h"
@@ -48,11 +51,19 @@ struct vine_worker_options *vine_worker_options_create()
 
 	self->initial_ppid = 0;
 
+	self->tls_sni = NULL;
+
+	self->transfer_port_min = 0;
+	self->transfer_port_max = 0;
+
+	self->reported_transfer_host = 0;
+
 	return self;
 }
 
 void vine_worker_options_delete(struct vine_worker_options *self)
 {
+	/* XXX: if part not needed here, free(NULL) is legal */
 	if (self->os_name)
 		free(self->os_name);
 	if (self->arch_name)
@@ -63,6 +74,8 @@ void vine_worker_options_delete(struct vine_worker_options *self)
 		free(self->catalog_hosts);
 	if (self->factory_name)
 		free(self->factory_name);
+	if (self->reported_transfer_host)
+		free(self->reported_transfer_host);
 
 	hash_table_delete(self->features);
 	free(self);
@@ -110,7 +123,9 @@ void vine_worker_options_show_help(const char *cmd, struct vine_worker_options *
 	printf(" %-30s of the value in uname (%s).\n", "", options->arch_name);
 	printf(" %-30s Set operating system string for the worker to report to manager instead\n", "-O,--os=<os>");
 	printf(" %-30s of the value in uname (%s).\n", "", options->os_name);
-	printf(" %-30s Set the location for creating the working directory of the worker.\n", "-s,--workdir=<path>");
+	printf(" %-30s Set the workspace dir for this worker. (default is /tmp/worker-UID-PID)\n",
+			"-s,--workspace=<path>");
+	printf(" %-30s Keep (do not delete) the workspace dir when worker exits.\n", "   --keep-workspace");
 	printf(" %-30s Set the number of cores reported by this worker. If not given, or less than 1,\n",
 			"--cores=<n>");
 	printf(" %-30s then try to detect cores available.\n", "");
@@ -139,7 +154,14 @@ void vine_worker_options_show_help(const char *cmd, struct vine_worker_options *
 
 	printf(" %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
-	printf(" %-30s Listening port for worker-worker transfers. (default: any)\n", "--transfer-port");
+	printf(" %-30s Listening port for worker-worker transfers. Either port or port_min:port_max (default: any)\n",
+			"--transfer-port");
+	printf(" %-30s Explicit contact host:port for worker-worker transfers, e.g., when routing is used. (default: :<transfer_port>)\n",
+			"--contact-hostport");
+
+	printf(" %-30s Enable tls connection to manager (manager should support it).\n", "--ssl");
+	printf(" %-30s SNI domain name if different from manager hostname. Implies --ssl.\n",
+			"--tls-sni=<domain name>");
 }
 
 enum {
@@ -160,9 +182,13 @@ enum {
 	LONG_OPT_PARENT_DEATH,
 	LONG_OPT_CONN_MODE,
 	LONG_OPT_USE_SSL,
+	LONG_OPT_TLS_SNI,
 	LONG_OPT_PYTHON_FUNCTION,
 	LONG_OPT_FROM_FACTORY,
-	LONG_OPT_TRANSFER_PORT
+	LONG_OPT_TRANSFER_PORT,
+	LONG_OPT_CONTACT_HOSTPORT,
+	LONG_OPT_WORKSPACE,
+	LONG_OPT_KEEP_WORKSPACE,
 };
 
 static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
@@ -184,7 +210,9 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"memory-threshold", required_argument, 0, LONG_OPT_MEMORY_THRESHOLD},
 		{"arch", required_argument, 0, 'A'},
 		{"os", required_argument, 0, 'O'},
-		{"workdir", required_argument, 0, 's'},
+		{"workdir", required_argument, 0, 's'}, // backwards compatibility
+		{"workspace", required_argument, 0, LONG_OPT_WORKSPACE},
+		{"keep-workspace", no_argument, 0, LONG_OPT_KEEP_WORKSPACE},
 		{"bandwidth", required_argument, 0, LONG_OPT_BANDWIDTH},
 		{"cores", required_argument, 0, LONG_OPT_CORES},
 		{"memory", required_argument, 0, LONG_OPT_MEMORY},
@@ -198,8 +226,10 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"parent-death", no_argument, 0, LONG_OPT_PARENT_DEATH},
 		{"connection-mode", required_argument, 0, LONG_OPT_CONN_MODE},
 		{"ssl", no_argument, 0, LONG_OPT_USE_SSL},
+		{"tls-sni", required_argument, 0, LONG_OPT_TLS_SNI},
 		{"from-factory", required_argument, 0, LONG_OPT_FROM_FACTORY},
 		{"transfer-port", required_argument, 0, LONG_OPT_TRANSFER_PORT},
+		{"contact-hostport", required_argument, 0, LONG_OPT_CONTACT_HOSTPORT},
 		{0, 0, 0, 0}};
 
 static void vine_worker_options_get_env(const char *name, int64_t *manual_option)
@@ -219,6 +249,64 @@ static void vine_worker_options_get_envs(struct vine_worker_options *options)
 	vine_worker_options_get_env("MEMORY", &options->memory_total);
 	vine_worker_options_get_env("DISK", &options->disk_total);
 	vine_worker_options_get_env("GPUS", &options->gpus_total);
+}
+
+void set_transfer_host(struct vine_worker_options *options, const char *hostport)
+{
+	int error = 0;
+
+	free(options->reported_transfer_host);
+	options->reported_transfer_host = NULL;
+
+	if (!hostport || (strlen(hostport) == 0)) {
+		error = 1;
+	} else if (hostport[0] == ':') {
+		char *end = NULL;
+		errno = 0;
+		options->reported_transfer_port = strtoll((hostport + 1), &end, 10);
+		if (options->reported_transfer_port == 0 && error != 0) {
+			error = 1;
+		}
+	} else {
+		int port;
+		char host[DOMAIN_NAME_MAX];
+		if (address_parse_hostport(hostport, host, &port, 0)) {
+			options->reported_transfer_host = xxstrdup(host);
+			options->reported_transfer_port = port;
+		} else {
+			error = 1;
+		}
+	}
+
+	if (error) {
+		fatal("transfer host not of the form HOSTNAME:PORT or :PORT");
+	}
+}
+
+void set_min_max_ports(struct vine_worker_options *options, const char *range)
+{
+	char *r = xxstrdup(range);
+	char *ptr;
+
+	ptr = strtok(r, ":");
+	options->transfer_port_min = atoi(ptr);
+	options->transfer_port_max = options->transfer_port_min;
+
+	ptr = strtok(NULL, ":");
+	if (ptr) {
+		options->transfer_port_max = atoi(ptr);
+	}
+
+	ptr = strtok(NULL, ":");
+	if (ptr) {
+		fatal("Malformed port range. Expected either a PORT or PORT_MIN:PORT_MAX");
+	}
+
+	if (options->transfer_port_min > options->transfer_port_max) {
+		fatal("Malformed port range. PORT_MIN > PORT_MAX");
+	}
+
+	free(r);
 }
 
 void vine_worker_options_get(struct vine_worker_options *options, int argc, char *argv[])
@@ -279,12 +367,23 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 		case 'O':
 			options->os_name = xxstrdup(optarg);
 			break;
+		case LONG_OPT_WORKSPACE:
 		case 's': {
 			char temp_abs_path[PATH_MAX];
+			create_dir(optarg, 0755);
 			path_absolute(optarg, temp_abs_path, 1);
 			options->workspace_dir = xxstrdup(temp_abs_path);
 			break;
 		}
+		case LONG_OPT_KEEP_WORKSPACE:
+			if (!options->workspace_dir) {
+				fprintf(stderr,
+						"%s: error: --keep-workspace also requires explicit --workspace argument.\n",
+						argv[0]);
+				exit(EXIT_FAILURE);
+			}
+			options->keep_workspace_at_exit = 1;
+			break;
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
 			exit(EXIT_SUCCESS);
@@ -372,11 +471,19 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 		case LONG_OPT_USE_SSL:
 			options->ssl_requested = 1;
 			break;
+		case LONG_OPT_TLS_SNI:
+			free(options->tls_sni);
+			options->tls_sni = xxstrdup(optarg);
+			options->ssl_requested = 1;
+			break;
 		case LONG_OPT_FROM_FACTORY:
 			options->factory_name = xxstrdup(optarg);
 			break;
 		case LONG_OPT_TRANSFER_PORT:
-			vine_transfer_server_port = atoi(optarg);
+			set_min_max_ports(options, optarg);
+			break;
+		case LONG_OPT_CONTACT_HOSTPORT:
+			set_transfer_host(options, optarg);
 			break;
 		default:
 			vine_worker_options_show_help(argv[0], options);
