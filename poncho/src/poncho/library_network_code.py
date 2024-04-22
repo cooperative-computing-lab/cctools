@@ -20,6 +20,7 @@ def library_network_code():
     import cloudpickle
     import select
     import signal
+    from threadpoolctl import threadpool_limits
 
     # self-pipe to turn a sigchld signal when a child finishes execution
     # into an I/O event.
@@ -84,7 +85,7 @@ def library_network_code():
         os.writev(w, [b'a'])
 
     # Read data from worker, start function, and dump result to `outfile`.
-    def start_function(in_pipe_fd):
+    def start_function(in_pipe_fd, thread_limit=1):
         # read length of buffer to read
         buffer_len = b''
         while True:
@@ -103,7 +104,12 @@ def library_network_code():
         function_id, function_name, function_sandbox, function_stdout_file = line.split(" ", maxsplit=3)
         function_id = int(function_id)
 
-        if function_name:
+        if not function_name:
+            # malformed message from worker so we exit
+            print('malformed message from worker. Exiting..', file=sys.stderr)
+            exit(1)
+        
+        with threadpool_limits(limits=thread_limit):
             # exec method for now is fork only, direct will be supported later
             exec_method = 'fork'
             if exec_method == "direct":
@@ -150,10 +156,6 @@ def library_network_code():
                 # return pid and function id of child process to parent.
                 else:
                     return p, function_id
-        else:
-            # malformed message from worker so we exit
-            print('malformed message from worker. Exiting..', file=sys.stderr)
-            exit(1)
 
         return -1
 
@@ -169,8 +171,23 @@ def library_network_code():
         parser = argparse.ArgumentParser('Parse input and output file descriptors this process should use. The relevant fds should already be prepared by the vine_worker.')
         parser.add_argument('--input-fd', required=True, type=int, help='input fd to receive messages from the vine_worker via a pipe')
         parser.add_argument('--output-fd', required=True, type=int, help='output fd to send messages to the vine_worker via a pipe')
+        parser.add_argument('--task-id', required=False, type=int, default=-1, help='task id for this library.')
+        parser.add_argument('--library-cores', required=False, type=int, default=1, help='number of cores of this library')
+        parser.add_argument('--function-slots', required=False, type=int, default=1, help='number of function slots of this library')
         parser.add_argument('--worker-pid', required=True, type=int, help='pid of main vine worker to send sigchild to let it know theres some result.')
         args = parser.parse_args()
+
+        # check if library cores and function slots are valid
+        if args.function_slots > args.library_cores:
+            print('Library code: function slots cannot be more than library cores', file=sys.stderr)
+            exit(1)
+        elif args.function_slots < 1:
+            print('Library code: function slots cannot be less than 1', file=sys.stderr)
+            exit(1)
+        elif args.library_cores < 1:
+            print('Library code: library cores cannot be less than 1', file=sys.stderr)
+            exit(1)
+        thread_limit = args.library_cores // args.function_slots
 
         # Open communication pipes to vine_worker.
         # The file descriptors are inherited from the vine_worker parent process
@@ -205,7 +222,7 @@ def library_network_code():
             for re in rlist:
                 # worker has a function, run it
                 if re == in_pipe_fd:
-                    pid, func_id = start_function(in_pipe_fd)
+                    pid, func_id = start_function(in_pipe_fd, thread_limit)
                     pid_to_func_id[pid] = func_id
                 else:
                     # at least 1 child exits, reap all.
