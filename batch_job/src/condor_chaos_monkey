@@ -55,11 +55,11 @@ def filter_cluster_data_by_job_status(cluster_data_user: list, job_status: str) 
     return filtered_cluster_data
 
 
-def remove_jobs_for_cycle(filtered_cluster_data: list, job_count_data: tuple) -> int:
+def remove_jobs_for_cycle(filtered_cluster_data: list, nbr_jobs_to_remove_in_cycle: int) -> int:
     cmd_condor_rm = "condor_rm"
     jobs_removed = 0
 
-    for i in range(min(job_count_data)):
+    for i in range(nbr_jobs_to_remove_in_cycle):
         job_tuple = random.choice(filtered_cluster_data)
 
         index = filtered_cluster_data.index(job_tuple)
@@ -114,7 +114,8 @@ def run(args: argparse.Namespace):
         print(f"Number of jobs left in the cluster: {nbr_jobs_in_clust}.")
         print()
 
-        nbr_jobs_removed_in_cycle = remove_jobs_for_cycle(filtered_cluster_data, job_count_data)
+        nbr_jobs_to_remove_in_cycle = min(job_count_data)
+        nbr_jobs_removed_in_cycle = remove_jobs_for_cycle(filtered_cluster_data, nbr_jobs_to_remove_in_cycle)
         nbr_jobs_removed_total += nbr_jobs_removed_in_cycle
 
         print(f"{nbr_jobs_removed_in_cycle} removed in cycle {cycle_count}.")
