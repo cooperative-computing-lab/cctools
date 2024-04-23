@@ -829,23 +829,32 @@ class Manager(object):
     #
     # @param self  Reference to the current manager object.
     # @param name  The name fo the parameter to tune. Can be one of following:
-    # - "resource-submit-multiplier" Treat each worker as having ({cores,memory,gpus} * multiplier) when submitting tasks. This allows for tasks to wait at a worker rather than the manager. (default = 1.0)
-    # - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=10)
-    # - "foreman-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a foreman. (default=3600)
-    # - "transfer-outlier-factor" Transfer that are this many times slower than the average will be terminated.  (default=10x)
+    # - "attempt-schedule-depth" The amount of tasks to attempt scheduling on each pass of send_one_task in the main loop. (default=100)
+    # - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
     # - "default-transfer-rate" The assumed network bandwidth used until sufficient data has been collected.  (1MB/s)
     # - "disconnect-slow-workers-factor" Set the multiplier of the average task time at which point to disconnect a worker; disabled if less than 1. (default=0)
+    # - "hungry-minimum" Mimimum number of tasks to consider manager not hungry. (default=10)
+    # - "hungry-minimum-factor" Queue is hungry if number of waiting tasks is less than hungry-minumum-factor x (number of workers) | 2 |
+    # - "immediate-recovery" If set to 1, create recovery tasks for temporary files as soon as their worker disconnects. Otherwise, create recovery tasks only if the temporary files are used as input when trying to dispatch another task.
     # - "keepalive-interval" Set the minimum number of seconds to wait before sending new keepalive checks to workers. (default=300)
     # - "keepalive-timeout" Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. (default=30)
-    # - "short-timeout" Set the minimum timeout when sending a brief message to a single worker. (default=5s)
-    # - "long-timeout" Set the minimum timeout when sending a brief message to a foreman. (default=1h)
-    # - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
-    # - "hungry-minimum" Mimimum number of tasks to consider manager not hungry. (default=10)
-    # - monitor-interval Maximum number of seconds between resource monitor measurements. If less than 1, use default (5s).
-    # - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
-    # - "attempt-schedule-depth" The amount of tasks to attempt scheduling on each pass of send_one_task in the main loop. (default=100)
-    # - "wait_retrieve_many" Parameter to alter how vine_wait works. If set to 0, cvine.vine_wait breaks out of the while loop whenever a task changes to "task_done" (wait_retrieve_one mode). If set to 1, vine_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
+    # - "long-timeout" Set the minimum timeout in seconds when sending a large message to a single worker. (default=3600)
+    # - "max-retrievals" Sets the max number of tasks to retrieve per manager wait(). If less than 1, the manager prefers to retrieve all completed tasks before dispatching new tasks to workers. (default=1)
+    # - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=10)
     # - "monitor-interval" Parameter to change how frequently the resource monitor records resource consumption of a task in a times series, if this feature is enabled. See @ref enable_monitoring.
+    # - "prefer-dispatch" If 1, try to dispatch tasks even if there are retrieved tasks ready to be reportedas done. (default=0)
+    # - "proportional-resources" If set to 0, do not assign resources proportionally to tasks. The default is to use proportions.
+    # - "proportional-whole-tasks" Round up resource proportions such that only an integer number of tasks could be fit in the worker. The default is to use proportions.
+    # - "ramp-down-heuristic" If set to 1 and there are more workers than tasks waiting, then tasks are allocated all the free resources of a worker large enough to run them. If monitoring watchdog is not enabled, then this heuristic has no effect. (default=0)
+    # - "resource-submit-multiplier" Treat each worker as having ({cores,memory,gpus} * multiplier) when submitting tasks. This allows for tasks to wait at a worker rather than the manager. (default = 1.0)
+    # - "short-timeout" Set the minimum timeout when sending a brief message to a single worker. (default=5s)
+    # - "transfer-outlier-factor" Transfer that are this many times slower than the average will be terminated.  (default=10x)
+    # - "transfer-replica-per-cycle" Number of replicas to schedule per file per iteration. (default=1)
+    # - "transfer-temps-recovery" If 1, try to replicate temp files to reach threshold on worker removal. (default=0)
+    # - "transient-error-interval" Time to wait in seconds after a resource failure before attempting to use it again. (default=15)
+    # - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
+    # - "wait-retrieve-many" If set to 0, cvine.vine_wait breaks out of the while loop whenever a task changes to "task_done" (wait_retrieve_one mode). If set to 1, vine_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
+    # - "worker-retrievals" If 1, retrieve all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. (default=1)
     # @param value The value to set the parameter to.
     # @return 0 on succes, -1 on failure.
     #
