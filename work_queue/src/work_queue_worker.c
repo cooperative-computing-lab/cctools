@@ -2270,7 +2270,7 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 
 void set_worker_id()
 {
-	srand(time(NULL));
+	srand(worker_start_time);
 
 	char *salt_and_pepper = string_format("%d%d%d", getpid(), getppid(), rand());
 	unsigned char digest[MD5_DIGEST_LENGTH];
