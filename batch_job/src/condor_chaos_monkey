@@ -130,7 +130,7 @@ def run(args: argparse.Namespace):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog="condor_rm_random.py",
+        prog="condor_rm_random",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description="Removes a given random number of jobs from the condor cluster given access to.",
     )
