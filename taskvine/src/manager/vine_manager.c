@@ -2825,8 +2825,10 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 	 * If the manager fails to send this function task to the worker however,
 	 * then the count will be decremented properly in @handle_failure() below. */
 	if (t->needs_library) {
-		t->library_task = find_library_on_worker_for_task(w, t->needs_library);
 		t->library_task->function_slots_inuse++;
+	}
+
+	if (t->provides_library) {
 		vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
 	}
 
