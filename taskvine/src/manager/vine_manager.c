@@ -3202,9 +3202,6 @@ int vine_manager_check_worker_can_run_function_task(
 		if (!library)
 			return 0;
 	}
-
-	// Mark that this function task will be run on this library.
-	t->library_task = library;
 	return 1;
 }
 
