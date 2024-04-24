@@ -184,6 +184,14 @@ class DaskVine(Manager):
                     libtask.set_disk(self.lib_resources['disk'])
                 if 'slots' in self.lib_resources:
                     libtask.set_function_slots(self.lib_resources['slots'])
+                if self.env_vars:
+                    for k, v in self.env_vars.items():
+                        if callable(v):
+                            s = v(m, self)
+                        else:
+                            s = v
+                        libtask.set_env_var(k, s)
+
             self.install_library(libtask)
 
         enqueued_calls = []
