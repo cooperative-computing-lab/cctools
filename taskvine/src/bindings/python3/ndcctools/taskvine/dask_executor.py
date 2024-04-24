@@ -187,7 +187,7 @@ class DaskVine(Manager):
                 if self.env_vars:
                     for k, v in self.env_vars.items():
                         if callable(v):
-                            s = v(m, self)
+                            s = v(self, libtask)
                         else:
                             s = v
                         libtask.set_env_var(k, s)
