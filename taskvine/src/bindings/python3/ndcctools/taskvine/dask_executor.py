@@ -191,6 +191,9 @@ class DaskVine(Manager):
                         else:
                             s = v
                         libtask.set_env_var(k, s)
+                if self.extra_files:
+                    for f, name in self.extra_files.items():
+                        libtask.add_input(f, name)
 
             self.install_library(libtask)
 
