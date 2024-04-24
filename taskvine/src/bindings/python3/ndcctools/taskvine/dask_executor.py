@@ -177,12 +177,21 @@ class DaskVine(Manager):
             if self.lib_resources:
                 if 'cores' in self.lib_resources:
                     libtask.set_cores(self.lib_resources['cores'])
+                    libtask.set_function_slots(self.lib_resources['cores'])  # use cores as  fallback for slots
                 if 'memory' in self.lib_resources:
                     libtask.set_memory(self.lib_resources['memory'])
                 if 'disk' in self.lib_resources:
                     libtask.set_disk(self.lib_resources['disk'])
                 if 'slots' in self.lib_resources:
                     libtask.set_function_slots(self.lib_resources['slots'])
+                if self.env_vars:
+                    for k, v in self.env_vars.items():
+                        if callable(v):
+                            s = v(self, libtask)
+                        else:
+                            s = v
+                        libtask.set_env_var(k, s)
+
             self.install_library(libtask)
 
         enqueued_calls = []
