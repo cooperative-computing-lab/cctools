@@ -622,6 +622,7 @@ int vine_task_add_execution_context(struct vine_task *t, struct vine_file *conte
 	vine_task_set_command(t, new_cmd);
 
 	free(env_name);
+	free(new_cmd);
 
 	return 1;
 }
