@@ -2017,7 +2017,7 @@ static void vine_worker_serve_managers()
 
 static char *make_worker_id()
 {
-	srand(time(NULL));
+	srand(worker_start_time);
 
 	char *salt_and_pepper = string_format("%d%d%d", getpid(), getppid(), rand());
 
