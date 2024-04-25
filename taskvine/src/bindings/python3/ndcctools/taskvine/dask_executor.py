@@ -104,6 +104,7 @@ class DaskVine(Manager):
             lib_command=None,
             import_modules=None,
             task_mode='tasks',
+            light_tasks=False,
             env_per_task=False,
             ):
         try:
