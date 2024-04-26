@@ -383,6 +383,61 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 }
 
 /*
+Find the worker that has the largest quantity of cached data needed
+by this task, so as to minimize transfer work that must be done
+by the manager.
+*/
+
+static struct vine_worker_info *find_worker_by_task_groups(struct vine_manager *q, struct vine_task *t)
+{
+	char *key;
+	struct vine_worker_info *w;
+	struct vine_worker_info *best_worker = 0;
+	int offset_bookkeep;
+	int64_t most_task_cached_bytes = 0;
+	int64_t task_cached_bytes;
+	uint8_t has_all_files;
+	struct vine_file_replica *replica;
+	struct vine_mount *m;
+
+	int ramp_down = vine_schedule_in_ramp_down(q);
+
+	HASH_TABLE_ITERATE_RANDOM_START(q->worker_table, offset_bookkeep, key, w)
+	{
+		/* Careful: If check_worker_against task fails, then w may no longer be valid. */
+		if (check_worker_against_task(q, w, t)) {
+			task_cached_bytes = 0;
+			has_all_files = 1;
+
+			LIST_ITERATE(t->input_mounts, m)
+			{
+				replica = hash_table_lookup(w->current_files, m->file->cached_name);
+
+				if (replica && m->file->type == VINE_FILE) {
+					task_cached_bytes += replica->size;
+				} else if (m->file->cache_level > VINE_CACHE_LEVEL_TASK) {
+					has_all_files = 0;
+				}
+			}
+
+			/* Return the worker if it was in possession of all cacheable files */
+			if (has_all_files && !ramp_down) {
+				return w;
+			}
+
+			if (!best_worker || task_cached_bytes > most_task_cached_bytes ||
+					(ramp_down && task_cached_bytes == most_task_cached_bytes &&
+							candidate_has_worse_fit(best_worker, w))) {
+				best_worker = w;
+				most_task_cached_bytes = task_cached_bytes;
+			}
+		}
+	}
+
+	return best_worker;
+}
+
+/*
 Find the first available worker in first-come, first-served order.
 Since the order of workers in the hashtable is somewhat arbitrary,
 this amounts to simply "find the first available worker".
@@ -521,6 +576,8 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 		return find_worker_by_worst_fit(q, t);
 	case VINE_SCHEDULE_FCFS:
 		return find_worker_by_fcfs(q, t);
+	case VINE_SCHEDULE_GROUPS:
+		return find_worker_by_task_groups(q, t);
 	case VINE_SCHEDULE_RAND:
 	default:
 		return find_worker_by_random(q, t);

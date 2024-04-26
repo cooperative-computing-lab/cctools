@@ -24,6 +24,7 @@ See the file COPYING for details.
 #include "vine_runtime_dir.h"
 #include "vine_schedule.h"
 #include "vine_task.h"
+#include "vine_task_groups.h"
 #include "vine_task_info.h"
 #include "vine_taskgraph_log.h"
 #include "vine_txn_log.h"
@@ -2827,6 +2828,41 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	return result;
 }
 
+/*
+Start one task on a given worker by specializing the task to the worker,
+sending the appropriate input files, and then sending the details of the task.
+Note that the "infile" and "outfile" components of the task refer to
+files that have already been uploaded into the worker's cache by the manager.
+*/
+
+static vine_result_code_t start_group_task(
+		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct list *l)
+{
+	vine_result_code_t result = 0;
+	struct vine_task *lt;
+	LIST_ITERATE(l, lt)
+	{
+		struct rmsummary *limits = vine_manager_choose_resources_for_task(q, w, t);
+		char *command_line;
+
+		if (q->monitor_mode && !t->needs_library) {
+			command_line = vine_monitor_wrap(q, w, t, limits);
+		} else {
+			command_line = xxstrdup(t->command_line);
+		}
+		result = vine_manager_put_task(q, w, lt, command_line, limits, 0);
+		free(command_line);
+		if (result == VINE_SUCCESS) {
+			t->current_resource_box = limits;
+			rmsummary_merge_override_basic(t->resources_allocated, limits);
+			debug(D_VINE, "%s (%s) busy on group '%s'", w->hostname, w->addrport, t->command_line);
+		} else {
+			rmsummary_delete(limits);
+		}
+	}
+	return result;
+}
+
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
 	w->resources->cores.inuse = 0;
@@ -2969,7 +3005,16 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 	t->addrport = xxstrdup(w->addrport);
 
 	t->time_when_commit_start = timestamp_get();
-	result = start_one_task(q, w, t);
+	vine_result_code_t result;
+	struct list *l = 0;
+	if (t->group_id) {
+		l = hash_table_lookup(q->task_group_table, t->group_id);
+	}
+	if (l && list_size(l) > 1) {
+		result = start_group_task(q, w, t, l);
+	} else {
+		result = start_one_task(q, w, t);
+	}
 	t->time_when_commit_end = timestamp_get();
 
 	itable_insert(w->current_tasks, t->task_id, t);
@@ -3943,6 +3988,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->factory_table = hash_table_create(0, 0);
 	q->current_transfer_table = hash_table_create(0, 0);
+	q->task_group_table = hash_table_create(0, 0);
 	q->fetch_factory = 0;
 
 	q->measured_local_resources = rmsummary_create(-1);
@@ -4665,6 +4711,9 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 	/* Ensure category structure is created. */
 	vine_category_lookup_or_create(q, t->category);
+
+	/* Attemp to group this task based on temp dependencies. */
+	vine_task_groups_assign_task(q, t);
 
 	change_task_state(q, t, VINE_TASK_READY);
 
