@@ -42,7 +42,7 @@ struct vine_worker_info *vine_worker_create(struct link *lnk)
 	w->last_transfer_failure = 0;
 	w->last_failure_time = 0;
 
-	vine_counters.worker.create++;
+	vine_counters.worker.created++;
 
 	return w;
 }
@@ -72,7 +72,7 @@ void vine_worker_delete(struct vine_worker_info *w)
 
 	free(w);
 
-	vine_counters.worker.delete ++;
+	vine_counters.worker.deleted++;
 }
 
 static void current_tasks_to_jx(struct jx *j, struct vine_worker_info *w)

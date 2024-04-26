@@ -17,9 +17,9 @@ that is access directly by vine_task_create/delete() and similar functions.
 */
 
 struct vine_counter {
-	uint32_t create;
-	uint32_t clone;
-	uint32_t delete;
+	uint32_t created;
+	uint32_t cloned;
+	uint32_t deleted;
 };
 
 struct vine_counters {

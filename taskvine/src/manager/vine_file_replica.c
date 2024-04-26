@@ -19,12 +19,12 @@ struct vine_file_replica *vine_file_replica_create(
 	r->last_failure_time = 0;
 	r->state = VINE_FILE_REPLICA_STATE_PENDING;
 
-	vine_counters.replica.create++;
+	vine_counters.replica.created++;
 	return r;
 }
 
 void vine_file_replica_delete(struct vine_file_replica *r)
 {
 	free(r);
-	vine_counters.replica.delete ++;
+	vine_counters.replica.deleted++;
 }

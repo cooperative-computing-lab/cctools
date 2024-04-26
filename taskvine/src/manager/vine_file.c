@@ -32,7 +32,7 @@ int vine_file_delete(struct vine_file *f)
 	if (f) {
 		f->refcount--;
 
-		vine_counters.file.delete ++;
+		vine_counters.file.deleted++;
 
 		if (f->refcount == 1 && f->recovery_task) {
 			/* delete the recovery task for this file, if any, to break the refcount cycle.
@@ -132,7 +132,7 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 	}
 
 	f->refcount = 1;
-	vine_counters.file.create++;
+	vine_counters.file.created++;
 
 	return f;
 }
@@ -144,7 +144,7 @@ struct vine_file *vine_file_clone(struct vine_file *f)
 	if (!f)
 		return 0;
 	f->refcount++;
-	vine_counters.file.clone++;
+	vine_counters.file.cloned++;
 	return f;
 }
 

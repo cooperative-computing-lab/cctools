@@ -74,7 +74,7 @@ struct vine_task *vine_task_create(const char *command_line)
 
 	t->refcount = 1;
 
-	vine_counters.task.create++;
+	vine_counters.task.created++;
 
 	return t;
 }
@@ -188,7 +188,7 @@ struct vine_task *vine_task_clone(struct vine_task *t)
 	if (!t)
 		return 0;
 	t->refcount++;
-	vine_counters.task.clone++;
+	vine_counters.task.cloned++;
 	return t;
 }
 
@@ -705,7 +705,7 @@ void vine_task_delete(struct vine_task *t)
 		return;
 
 	t->refcount--;
-	vine_counters.task.delete ++;
+	vine_counters.task.deleted++;
 
 	if (t->refcount > 0)
 		return;
