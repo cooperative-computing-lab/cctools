@@ -18,6 +18,7 @@ End user may only use the API described in taskvine.h
 
 #include "list.h"
 #include "category.h"
+#include "uuid.h"
 
 #include <stdint.h>
 
@@ -134,6 +135,7 @@ struct vine_task {
 		
 	int has_fixed_locations;                               /**< Whether at least one file was added with the VINE_FIXED_LOCATION flag. Task fails immediately if no
 															 worker can satisfy all the strict inputs of the task. */
+	char *group_id;
 
 	int refcount;                                          /**< Number of remaining references to this object. */
 };
