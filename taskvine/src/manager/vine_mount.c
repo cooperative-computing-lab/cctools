@@ -31,7 +31,7 @@ struct vine_mount *vine_mount_create(
 	m->substitute = vine_file_clone(substitute);
 
 	vine_counters.mount.create++;
-	
+
 	return m;
 }
 
@@ -42,7 +42,7 @@ void vine_mount_delete(struct vine_mount *m)
 	vine_file_delete(m->file);
 	free(m->remote_name);
 	free(m);
-	vine_counters.mount.delete++;
+	vine_counters.mount.delete ++;
 }
 
 struct vine_mount *vine_mount_copy(struct vine_mount *m)

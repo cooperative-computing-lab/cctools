@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "vine_manager.h"
 #include "vine_blocklist.h"
+#include "vine_counters.h"
 #include "vine_current_transfers.h"
 #include "vine_factory_info.h"
 #include "vine_fair.h"
@@ -27,7 +28,6 @@ See the file COPYING for details.
 #include "vine_taskgraph_log.h"
 #include "vine_txn_log.h"
 #include "vine_worker_info.h"
-#include "vine_counters.h"
 
 #include "address.h"
 #include "buffer.h"

@@ -6,8 +6,8 @@ See the file COPYING for details.
 
 #include "vine_file.h"
 #include "vine_cached_name.h"
-#include "vine_task.h"
 #include "vine_counters.h"
+#include "vine_task.h"
 
 #include "copy_stream.h"
 #include "debug.h"
@@ -32,7 +32,7 @@ int vine_file_delete(struct vine_file *f)
 	if (f) {
 		f->refcount--;
 
-		vine_counters.file.delete++;
+		vine_counters.file.delete ++;
 
 		if (f->refcount == 1 && f->recovery_task) {
 			/* delete the recovery task for this file, if any, to break the refcount cycle.
@@ -133,7 +133,7 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 
 	f->refcount = 1;
 	vine_counters.file.create++;
-	
+
 	return f;
 }
 
