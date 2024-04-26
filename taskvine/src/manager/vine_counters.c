@@ -7,6 +7,8 @@ See the file COPYING for details.
 
 #include "vine_counters.h"
 
+#include "debug.h"
+
 #include <stdio.h>
 
 struct vine_counters vine_counters = {0};
