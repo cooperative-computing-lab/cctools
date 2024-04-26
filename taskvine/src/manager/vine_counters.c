@@ -15,12 +15,11 @@ struct vine_counters vine_counters = {{0}, {0}, {0}, {0}, {0}};
 
 static void vine_counter_print(const char *name, struct vine_counter *c)
 {
-	printf("%8s %8d %8d %8d ", name, c->create, c->clone, c->delete);
 	int nleaked = c->create + c->clone - c->delete;
 	if (nleaked == 0) {
-		printf("ok\n");
+		printf("%8s %8d %8d %8d ok", name, c->create, c->clone, c->delete);
 	} else {
-		printf("leaked %d\n", nleaked);
+		printf("%8s %8d %8d %8d leaked %d", name, c->create, c->clone, c->delete, nleaked);
 	}
 }
 
@@ -38,12 +37,11 @@ void vine_counters_print()
 
 static void vine_counter_debug(const char *name, struct vine_counter *c)
 {
-	debug(D_VINE, "%8s %8d %8d %8d ", name, c->create, c->clone, c->delete);
 	int nleaked = c->create + c->clone - c->delete;
 	if (nleaked == 0) {
-		debug(D_VINE, "ok\n");
+		debug(D_VINE,"%8s %8d %8d %8d ok", name, c->create, c->clone, c->delete);
 	} else {
-		debug(D_VINE, "leaked %d\n", nleaked);
+		debug(D_VINE,"%8s %8d %8d %8d leaked %d", name, c->create, c->clone, c->delete, nleaked);
 	}
 }
 
