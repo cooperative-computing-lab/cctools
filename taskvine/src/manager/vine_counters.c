@@ -11,7 +11,7 @@ See the file COPYING for details.
 
 #include <stdio.h>
 
-struct vine_counters vine_counters = {{0},{0},{0},{0},{0}};
+struct vine_counters vine_counters = {{0}, {0}, {0}, {0}, {0}};
 
 static void vine_counter_print(const char *name, struct vine_counter *c)
 {
