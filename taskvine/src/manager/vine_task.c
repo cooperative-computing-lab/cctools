@@ -705,6 +705,8 @@ void vine_task_delete(struct vine_task *t)
 		return;
 
 	t->refcount--;
+	vine_counters.task.delete ++;
+
 	if (t->refcount > 0)
 		return;
 
@@ -744,8 +746,6 @@ void vine_task_delete(struct vine_task *t)
 	rmsummary_delete(t->current_resource_box);
 
 	free(t);
-
-	vine_counters.task.delete ++;
 }
 
 const char *vine_task_get_command(struct vine_task *t)
