@@ -5,6 +5,8 @@ See the file COPYING for details.
 */
 
 #include "vine_mount.h"
+#include "vine_counters.h"
+
 #include "debug.h"
 
 #include <stdlib.h>
@@ -28,6 +30,8 @@ struct vine_mount *vine_mount_create(
 	m->flags = flags;
 	m->substitute = vine_file_clone(substitute);
 
+	vine_counters.mount.created++;
+
 	return m;
 }
 
@@ -38,6 +42,7 @@ void vine_mount_delete(struct vine_mount *m)
 	vine_file_delete(m->file);
 	free(m->remote_name);
 	free(m);
+	vine_counters.mount.deleted++;
 }
 
 struct vine_mount *vine_mount_copy(struct vine_mount *m)

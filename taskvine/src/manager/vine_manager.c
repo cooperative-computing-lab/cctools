@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "vine_manager.h"
 #include "vine_blocklist.h"
+#include "vine_counters.h"
 #include "vine_current_transfers.h"
 #include "vine_factory_info.h"
 #include "vine_fair.h"
@@ -4156,6 +4157,8 @@ void vine_delete(struct vine_manager *q)
 	free(q->stats);
 	free(q->stats_disconnected_workers);
 	free(q->stats_measure);
+
+	vine_counters_debug();
 
 	debug(D_VINE, "manager end\n");
 

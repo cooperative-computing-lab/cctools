@@ -1337,7 +1337,10 @@ void vine_log_debug_app(struct vine_manager *q, const char *entry);
 */
 void vine_log_txn_app(struct vine_manager *q, const char *entry);
 
+/** Display internal reference counts for troubleshooting purposes.
+*/
 
+void vine_counters_print();
 
 //@}
 

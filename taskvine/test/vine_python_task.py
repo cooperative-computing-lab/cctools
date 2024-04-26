@@ -59,5 +59,7 @@ while not queue.empty():
         print("task {} completed with result '{}': {}".format(task.id, task.result, task.output))
         negative_sum += task.output
 
+task = None
+
 assert positive_sum == (-1 * negative_sum)
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
