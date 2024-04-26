@@ -27,6 +27,7 @@ See the file COPYING for details.
 #include "vine_taskgraph_log.h"
 #include "vine_txn_log.h"
 #include "vine_worker_info.h"
+#include "vine_counters.h"
 
 #include "address.h"
 #include "buffer.h"
@@ -4156,6 +4157,8 @@ void vine_delete(struct vine_manager *q)
 	free(q->stats);
 	free(q->stats_disconnected_workers);
 	free(q->stats_measure);
+
+	vine_counters_debug();
 
 	debug(D_VINE, "manager end\n");
 

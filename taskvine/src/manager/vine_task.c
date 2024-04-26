@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "vine_manager.h"
 #include "vine_mount.h"
 #include "vine_worker_info.h"
+#include "vine_counters.h"
 
 #include "debug.h"
 #include "list.h"
@@ -73,6 +74,8 @@ struct vine_task *vine_task_create(const char *command_line)
 
 	t->refcount = 1;
 
+	vine_counters.task.create++;
+	
 	return t;
 }
 
@@ -185,6 +188,7 @@ struct vine_task *vine_task_clone(struct vine_task *t)
 	if (!t)
 		return 0;
 	t->refcount++;
+	vine_counters.task.clone++;
 	return t;
 }
 
@@ -740,6 +744,8 @@ void vine_task_delete(struct vine_task *t)
 	rmsummary_delete(t->current_resource_box);
 
 	free(t);
+
+	vine_counters.task.delete++;
 }
 
 const char *vine_task_get_command(struct vine_task *t)
