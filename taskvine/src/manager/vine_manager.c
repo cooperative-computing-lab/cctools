@@ -144,8 +144,6 @@ static void handle_library_update(struct vine_manager *q, struct vine_worker_inf
 static struct jx *manager_to_jx(struct vine_manager *q);
 static struct jx *manager_lean_to_jx(struct vine_manager *q);
 
-static struct vine_task *find_library_on_worker_for_task(struct vine_worker_info *w, const char *library_name);
-
 char *vine_monitor_wrap(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *limits);
 
@@ -163,8 +161,6 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 
 static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename,
 		vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
-
-static struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
@@ -2826,9 +2822,8 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 	 * If the manager fails to send this function task to the worker however,
 	 * then the count will be decremented properly in @handle_failure() below. */
 	if (t->needs_library) {
-		t->library_task = find_library_on_worker_for_task(w, t->needs_library);
+		t->library_task = vine_schedule_find_library(w, t->needs_library);
 		t->library_task->function_slots_inuse++;
-		vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
 	}
 
 	change_task_state(q, t, VINE_TASK_RUNNING);
@@ -3168,43 +3163,6 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 			}
 		}
 	}
-	return 1;
-}
-
-/* Find a library task running on a specific worker that has an available slot.
- * @return pointer to the library task if there's one, 0 otherwise. */
-
-static struct vine_task *find_library_on_worker_for_task(struct vine_worker_info *w, const char *library_name)
-{
-	uint64_t task_id;
-	struct vine_task *task;
-
-	ITABLE_ITERATE(w->current_tasks, task_id, task)
-	{
-		if (task->provides_library && !strcmp(task->provides_library, library_name) &&
-				task->function_slots_inuse < task->function_slots) {
-			return task;
-		}
-	}
-
-	return 0;
-}
-
-/* Check if this worker can run the function task.
- * @return 1 if it can, 0 otherwise.
- */
-int vine_manager_check_worker_can_run_function_task(
-		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
-{
-	struct vine_task *library = find_library_on_worker_for_task(w, t->needs_library);
-	if (!library) {
-		library = send_library_to_worker(q, w, t->needs_library);
-		/* Careful: If this failed, then the worker object may longer be valid! */
-		if (!library) {
-			return 0;
-		}
-	}
-
 	return 1;
 }
 
@@ -4545,13 +4503,19 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
  * @param name The name of the library to be sent.
  * @return pointer to the library task if the operation succeeds, 0 otherwise.
  */
-
-static struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name)
+struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name)
 {
+	struct vine_task *library = vine_schedule_find_library(w, name);
+	if (library) {
+		/* worker already has this library, not sending again. */
+		return library;
+	}
+
 	/* Find the original prototype library task by name, if it exists. */
 	struct vine_task *original = hash_table_lookup(q->libraries, name);
-	if (!original)
+	if (!original) {
 		return 0;
+	}
 
 	/*
 	If an instance of this library has recently failed,
@@ -4559,7 +4523,6 @@ static struct vine_task *send_library_to_worker(struct vine_manager *q, struct v
 	point at which to notice this, but we don't know that we are starting
 	a new library until the moment of scheduling a function to that worker.
 	*/
-
 	timestamp_t lastfail = original->time_when_last_failure;
 	timestamp_t current = timestamp_get();
 	if (current < lastfail + q->transient_error_interval) {
@@ -4585,28 +4548,12 @@ static struct vine_task *send_library_to_worker(struct vine_manager *q, struct v
 	vine_result_code_t result = commit_task_to_worker(q, w, t);
 
 	/* Careful: If this failed, then the worker object may longer be valid! */
-
 	if (result == VINE_SUCCESS) {
+		vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
 		return t;
 	} else {
 		return 0;
 	}
-}
-
-struct vine_task *vine_manager_find_library_on_worker(
-		struct vine_manager *q, struct vine_worker_info *w, const char *library_name)
-{
-	uint64_t task_id;
-	struct vine_task *task;
-
-	ITABLE_ITERATE(w->current_tasks, task_id, task)
-	{
-		if (task->provides_library && !strcmp(task->provides_library, library_name)) {
-			return task;
-		}
-	}
-
-	return 0;
 }
 
 void vine_manager_install_library(struct vine_manager *q, struct vine_task *t, const char *name)
@@ -4625,9 +4572,9 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 
 	HASH_TABLE_ITERATE(q->worker_table, worker_key, w)
 	{
-		struct vine_task *t = vine_manager_find_library_on_worker(q, w, name);
-		if (t) {
-			reset_task_to_state(q, t, VINE_TASK_RETRIEVED);
+		struct vine_task *library = vine_schedule_find_library(w, name);
+		if (library) {
+			reset_task_to_state(q, library, VINE_TASK_RETRIEVED);
 		}
 	}
 	hash_table_remove(q->libraries, name);
