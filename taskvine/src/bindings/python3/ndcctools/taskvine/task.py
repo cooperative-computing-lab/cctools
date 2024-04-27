@@ -1123,6 +1123,7 @@ class LibraryTask(Task):
     # @param name       The name of this Library.
     def __init__(self, fn, name):
         Task.__init__(self, fn)
+        self._manager_will_free = True
         self.provides_library(name)
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
