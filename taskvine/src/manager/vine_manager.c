@@ -3200,12 +3200,11 @@ int vine_manager_check_worker_can_run_function_task(
 	if (!library) {
 		library = send_library_to_worker(q, w, t->needs_library);
 		/* Careful: If this failed, then the worker object may longer be valid! */
-		if (!library)
+		if (!library) {
 			return 0;
+		}
 	}
 
-	// Mark that this function task will be run on this library.
-	t->library_task = library;
 	return 1;
 }
 
