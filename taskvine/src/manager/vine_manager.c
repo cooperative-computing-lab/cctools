@@ -4089,9 +4089,10 @@ void vine_delete(struct vine_manager *q)
 	itable_clear(q->tasks, (void *)vine_task_delete);
 	itable_delete(q->tasks);
 
-	/* delete files after deleting tasks so that rc are correctly updated.
-	 * we make more than one pass to the file_table to make deal with
-	 * reference counts of unlink_when_done files associated with declare_temp outputs */
+	hash_table_clear(q->libraries, (void *)vine_task_delete);
+	hash_table_delete(q->libraries);
+
+	/* delete files after deleting tasks so that rc are correctly updated. */
 	hash_table_clear(q->file_table, (void *)vine_file_delete);
 	hash_table_delete(q->file_table);
 
@@ -4107,7 +4108,6 @@ void vine_delete(struct vine_manager *q)
 	itable_delete(q->running_table);
 	list_delete(q->waiting_retrieval_list);
 	list_delete(q->retrieved_list);
-	hash_table_delete(q->libraries);
 	hash_table_delete(q->workers_with_available_results);
 
 	list_clear(q->task_info_list, (void *)vine_task_info_delete);
