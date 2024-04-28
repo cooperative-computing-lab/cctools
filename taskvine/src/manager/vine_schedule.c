@@ -233,7 +233,6 @@ struct vine_task *vine_schedule_find_library(struct vine_worker_info *w, const c
 	ITABLE_ITERATE(w->current_tasks, task_id, task)
 	{
 		if (task->provides_library && !strcmp(task->provides_library, library_name)) {
-			notice(D_VINE, "%s %s", task->provides_library, library_name);
 			return task;
 		}
 	}
