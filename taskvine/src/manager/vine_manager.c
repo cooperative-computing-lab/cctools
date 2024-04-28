@@ -4523,12 +4523,6 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
  */
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name)
 {
-	struct vine_task *library = vine_schedule_find_library(w, name);
-	if (library) {
-		/* worker already has this library, not sending again. */
-		return library;
-	}
-
 	/* Find the original prototype library task by name, if it exists. */
 	struct vine_task *original = hash_table_lookup(q->libraries, name);
 	if (!original) {
