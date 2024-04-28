@@ -20,7 +20,7 @@ void cctools_version_print(FILE *stream, const char *cmd)
 	fprintf(stream, "\tConfiguration: %s\n", CCTOOLS_CONFIGURE_ARGUMENTS);
 }
 
-char *cctools_version_string(FILE *stream, const char *cmd)
+char *cctools_version_string()
 {
 	return string_format("%d.%d.%d", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
 }
