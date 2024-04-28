@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "cctools.h"
 #include "debug.h"
+#include "stringtools.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -17,6 +18,11 @@ void cctools_version_print(FILE *stream, const char *cmd)
 	fprintf(stream, "\tBuilt by %s@%s on %s\n", BUILD_USER, BUILD_HOST, BUILD_DATE);
 	fprintf(stream, "\tSystem: %s\n", CCTOOLS_SYSTEM_INFORMATION);
 	fprintf(stream, "\tConfiguration: %s\n", CCTOOLS_CONFIGURE_ARGUMENTS);
+}
+
+char *cctools_version_string(FILE *stream, const char *cmd)
+{
+	return string_format("%d.%d.%d", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
 }
 
 void cctools_version_debug(uint64_t type, const char *cmd)
