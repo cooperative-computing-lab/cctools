@@ -4005,6 +4005,24 @@ int vine_set_password_file(struct vine_manager *q, const char *file)
 	return copy_file_to_buffer(file, &q->password, NULL) > 0;
 }
 
+static void delete_task_at_exit(struct vine_task *t)
+{
+	if (!t) {
+		return;
+	}
+
+	if (t->type == VINE_TASK_TYPE_LIBRARY) {
+		/* library tasks should not survive the manager. */
+		int rc = t->refcount;
+		while (rc > 0) {
+			rc--;
+			vine_task_delete(t);
+		}
+	} else {
+		vine_task_delete(t);
+	}
+}
+
 void vine_delete(struct vine_manager *q)
 {
 	if (!q)
@@ -4043,7 +4061,7 @@ void vine_delete(struct vine_manager *q)
 	vine_current_transfers_clear(q);
 	hash_table_delete(q->current_transfer_table);
 
-	itable_clear(q->tasks, (void *)vine_task_delete);
+	itable_clear(q->tasks, (void *)delete_task_at_exit);
 	itable_delete(q->tasks);
 
 	hash_table_clear(q->libraries, (void *)vine_task_delete);
