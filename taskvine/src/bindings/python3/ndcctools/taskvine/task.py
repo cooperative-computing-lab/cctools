@@ -1085,20 +1085,25 @@ class FunctionCall(PythonTask):
 
             else:
                 self._output = FunctionCallNoResult()
-                print(self.std_output)
 
             self.manager.undeclare_file(self._input_file)
             self._input_file = None
 
+            self.manager.undeclare_file(self._output_file)
+            self._output_file = None
+
             self._output_loaded = True
         return self._output
 
-    # Remove input and output buffers under some circumstances `output` is not called
+    # Remove input and output buffers if self.output was not called.
     def __del__(self):
         try:
             if self._input_file:
                 self.manager.undeclare_file(self._input_file)
                 self._input_file = None
+            if self._output_file and not self._tmp_output_enabled:
+                self.manager.undeclare_file(self._output_file)
+                self._output_file = None
             super().__del__()
         except TypeError:
             pass
@@ -1123,6 +1128,7 @@ class LibraryTask(Task):
     # @param name       The name of this Library.
     def __init__(self, fn, name):
         Task.__init__(self, fn)
+        self._manager_will_free = True
         self.provides_library(name)
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
