@@ -24,6 +24,7 @@ See the file COPYING for details.
 #include "vine_runtime_dir.h"
 #include "vine_schedule.h"
 #include "vine_task.h"
+#include "vine_task_groups.h"
 #include "vine_task_info.h"
 #include "vine_taskgraph_log.h"
 #include "vine_txn_log.h"
@@ -2809,39 +2810,50 @@ assignment and the new task state.
 
 static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	/* Kill empty libraries to reclaim resources. Match the assumption of
-	 * @vine.schedule.c:check_worker_have_enough_resources() */
-	kill_empty_libraries_on_worker(q, w, t);
-	t->hostname = xxstrdup(w->hostname);
-	t->addrport = xxstrdup(w->addrport);
+	vine_result_code_t result = 0;
+	struct list *l = 0;
+	l = hash_table_lookup(q->task_group_table, t->group_id);
+	int counter = 0;
+	do {	
+		/* Kill empty libraries to reclaim resources. Match the assumption of
+		 * @vine.schedule.c:check_worker_have_enough_resources() */
+		kill_empty_libraries_on_worker(q, w, t);
+		t->hostname = xxstrdup(w->hostname);
+		t->addrport = xxstrdup(w->addrport);
 
-	t->time_when_commit_start = timestamp_get();
-	vine_result_code_t result = start_one_task(q, w, t);
-	t->time_when_commit_end = timestamp_get();
+		t->time_when_commit_start = timestamp_get();
+		result = start_one_task(q, w, t);
+		t->time_when_commit_end = timestamp_get();
 
-	itable_insert(w->current_tasks, t->task_id, t);
-	t->worker = w;
+		itable_insert(w->current_tasks, t->task_id, t);
+		t->worker = w;
 
-	/* Increment the function count if this is a function task.
-	 * If the manager fails to send this function task to the worker however,
-	 * then the count will be decremented properly in @handle_failure() below. */
-	if (t->needs_library) {
-		t->library_task = find_library_on_worker_for_task(w, t->needs_library);
-		t->library_task->function_slots_inuse++;
-		vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
-	}
+		/* Increment the function count if this is a function task.
+		 * If the manager fails to send this function task to the worker however,
+		 * then the count will be decremented properly in @handle_failure() below. */
+		if (t->needs_library) {
+			t->library_task = find_library_on_worker_for_task(w, t->needs_library);
+			t->library_task->function_slots_inuse++;
+			vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
+		}
 
-	change_task_state(q, t, VINE_TASK_RUNNING);
+		change_task_state(q, t, VINE_TASK_RUNNING);
 
-	t->try_count += 1;
-	q->stats->tasks_dispatched += 1;
+		t->try_count += 1;
+		q->stats->tasks_dispatched += 1;
 
-	count_worker_resources(q, w);
+		count_worker_resources(q, w);
 
-	if (result != VINE_SUCCESS) {
-		debug(D_VINE, "Failed to send task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
-		handle_failure(q, w, t, result);
-	}
+		if (result != VINE_SUCCESS) {
+			debug(D_VINE, "Failed to send task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
+			handle_failure(q, w, t, result);
+		}
+
+		counter++;
+	
+	} while((t = list_next_item(l)));
+
+	debug(D_VINE, "Sent batch of %d tasks to worker %s", counter, w->hostname);
 
 	return result;
 }
@@ -3779,6 +3791,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->factory_table = hash_table_create(0, 0);
 	q->current_transfer_table = hash_table_create(0, 0);
+	q->task_group_table = hash_table_create(0, 0);
 	q->fetch_factory = 0;
 
 	q->measured_local_resources = rmsummary_create(-1);
@@ -4524,6 +4537,9 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 	/* Ensure category structure is created. */
 	vine_category_lookup_or_create(q, t->category);
+
+	/* Attemp to group this task based on temp dependencies. */
+	vine_task_groups_assign_task(q, t);
 
 	change_task_state(q, t, VINE_TASK_READY);
 
