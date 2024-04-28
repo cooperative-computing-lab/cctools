@@ -2828,41 +2828,6 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	return result;
 }
 
-/*
-Start one task on a given worker by specializing the task to the worker,
-sending the appropriate input files, and then sending the details of the task.
-Note that the "infile" and "outfile" components of the task refer to
-files that have already been uploaded into the worker's cache by the manager.
-*/
-
-static vine_result_code_t start_group_task(
-		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct list *l)
-{
-	vine_result_code_t result = 0;
-	struct vine_task *lt;
-	LIST_ITERATE(l, lt)
-	{
-		struct rmsummary *limits = vine_manager_choose_resources_for_task(q, w, t);
-		char *command_line;
-
-		if (q->monitor_mode && !t->needs_library) {
-			command_line = vine_monitor_wrap(q, w, t, limits);
-		} else {
-			command_line = xxstrdup(t->command_line);
-		}
-		result = vine_manager_put_task(q, w, lt, command_line, limits, 0);
-		free(command_line);
-		if (result == VINE_SUCCESS) {
-			t->current_resource_box = limits;
-			rmsummary_merge_override_basic(t->resources_allocated, limits);
-			debug(D_VINE, "%s (%s) busy on group '%s'", w->hostname, w->addrport, t->command_line);
-		} else {
-			rmsummary_delete(limits);
-		}
-	}
-	return result;
-}
-
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
 	w->resources->cores.inuse = 0;
@@ -2968,6 +2933,7 @@ task/worker back into the proper state.
 
 static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
+<<<<<<< HEAD
 	vine_result_code_t result = VINE_SUCCESS;
 
 	/* Kill unused libraries on this worker to reclaim resources. */
@@ -3006,31 +2972,52 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 
 	t->time_when_commit_start = timestamp_get();
 	vine_result_code_t result;
+=======
+	vine_result_code_t result = 0;
+>>>>>>> 5ab8af678 (add worker code)
 	struct list *l = 0;
-	if (t->group_id) {
-		l = hash_table_lookup(q->task_group_table, t->group_id);
-	}
-	if (l && list_size(l) > 1) {
-		result = start_group_task(q, w, t, l);
-	} else {
+	l = hash_table_lookup(q->task_group_table, t->group_id);
+	int counter = 0;
+	do {	
+		/* Kill empty libraries to reclaim resources. Match the assumption of
+		 * @vine.schedule.c:check_worker_have_enough_resources() */
+		kill_empty_libraries_on_worker(q, w, t);
+		t->hostname = xxstrdup(w->hostname);
+		t->addrport = xxstrdup(w->addrport);
+
+		t->time_when_commit_start = timestamp_get();
 		result = start_one_task(q, w, t);
-	}
-	t->time_when_commit_end = timestamp_get();
+		t->time_when_commit_end = timestamp_get();
 
-	itable_insert(w->current_tasks, t->task_id, t);
-	t->worker = w;
+		itable_insert(w->current_tasks, t->task_id, t);
+		t->worker = w;
 
-	change_task_state(q, t, VINE_TASK_RUNNING);
+		/* Increment the function count if this is a function task.
+		 * If the manager fails to send this function task to the worker however,
+		 * then the count will be decremented properly in @handle_failure() below. */
+		if (t->needs_library) {
+			t->library_task = find_library_on_worker_for_task(w, t->needs_library);
+			t->library_task->function_slots_inuse++;
+			vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
+		}
 
-	t->try_count += 1;
-	q->stats->tasks_dispatched += 1;
+		change_task_state(q, t, VINE_TASK_RUNNING);
 
-	count_worker_resources(q, w);
+		t->try_count += 1;
+		q->stats->tasks_dispatched += 1;
 
-	if (result != VINE_SUCCESS) {
-		debug(D_VINE, "Failed to send task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
-		handle_failure(q, w, t, result);
-	}
+		count_worker_resources(q, w);
+
+		if (result != VINE_SUCCESS) {
+			debug(D_VINE, "Failed to send task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
+			handle_failure(q, w, t, result);
+		}
+
+		counter++;
+	
+	} while((t = list_next_item(l)));
+
+	debug(D_VINE, "Sent batch of %d tasks to worker %s", counter, w->hostname);
 
 	return result;
 }

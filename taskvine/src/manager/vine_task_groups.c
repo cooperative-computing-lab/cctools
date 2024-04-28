@@ -19,7 +19,7 @@ static int vine_task_groups_create_group(struct vine_manager *q, struct vine_tas
 
 	t->group_id = id;
 
-	struct vine_task *tc = vine_task_copy(t);
+	struct vine_task *tc = vine_task_clone(t);
 
 	list_push_head(l, tc);
 	hash_table_insert(q->task_group_table, id, l);
@@ -33,13 +33,18 @@ static int vine_task_groups_add_to_group(struct vine_manager *q, struct vine_tas
 	char *id;
 	HASH_TABLE_ITERATE(q->task_group_table, id, l)
 	{
-		struct vine_file *f;
-		LIST_ITERATE(l, f)
+		struct vine_task *lt;
+		LIST_ITERATE(l, lt)
 		{
-			if (f == m->file) {
-				struct vine_task *tc = vine_task_copy(t);
-				list_push_tail(l, tc);
-				return 1;
+			struct vine_mount *lm;
+			LIST_ITERATE(lt->output_mounts, lm)
+			{
+				if (m->file == lm->file) {
+					t->group_id = lt->group_id; 
+					struct vine_task *tc = vine_task_clone(t);
+					list_push_tail(l, tc);
+					return 1;
+				}
 			}
 		}
 	}
@@ -78,8 +83,10 @@ int vine_task_groups_assign_task(struct vine_manager *q, struct vine_task *t)
 	// could also be inputs_present && outputs_present
 	if (inputs_present) {
 		vine_task_groups_add_to_group(q, t, input_mount);
+		debug(D_VINE, "Assigned task to group %s", t->group_id);
 	} else if (outputs_present) {
 		vine_task_groups_create_group(q, t, output_mount);
+		debug(D_VINE, "Create task with group %s", t->group_id);
 	}
 
 	return inputs_present || outputs_present;
