@@ -2523,14 +2523,13 @@ below is a simple Parsl application executing a function remotely.
     from parsl import python_app
     from parsl.configs.vineex_local import config
 
-    parsl.load(config)
-
     @python_app
     def double(x):
-    return x*2
+        return x*2
 
-    future = double(1)
-    assert future.result() == 2
+    with parsl.load(config=config) as dfk:
+        future = double(1)
+        assert future.result() == 2
     ```
 Save this file as `parsl_vine_example.py`. Running 
 `python parsl_vine_example.py`
@@ -2564,20 +2563,19 @@ In order to use the TaskVineExecutor with remote resources, you will need to cre
         ]
     )
 
-    parsl.load(Config)
-
     l = ["Cooperative", "Computing", "Lab"]
 
     @python_app
     def hello_taskvine(x, l=l):
-    return l[x]
+        return l[x]
 
-    futures = []
-    for i in range(3):
-        futures.append(hello_taskvine(i))
+    with parsl.load(config=config) as dfk:
+        futures = []
+        for i in range(3):
+            futures.append(hello_taskvine(i))
 
-    for i in futures:
-        print(i.result())
+        for i in futures:
+            print(i.result())
     ```
 
 For more details on how to configure Parsl+TaskVine to scale applications 
