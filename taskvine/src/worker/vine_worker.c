@@ -2017,8 +2017,6 @@ static void vine_worker_serve_managers()
 
 static char *make_worker_id()
 {
-	srand(worker_start_time);
-
 	char *salt_and_pepper = string_format("%d%d%d", getpid(), getppid(), rand());
 
 	unsigned char digest[MD5_DIGEST_LENGTH];
@@ -2134,6 +2132,9 @@ int main(int argc, char *argv[])
 	/* Start the clock on the worker operation. */
 	worker_start_time = timestamp_get();
 
+	/* The random number generator must be initialized exactly once at startup. */
+	random_init();
+
 	/* Allocate all of the data structures to track tasks an files. */
 	vine_worker_create_structures();
 
@@ -2171,9 +2172,6 @@ int main(int argc, char *argv[])
 	signal(SIGUSR1, handle_abort);
 	signal(SIGUSR2, handle_abort);
 	signal(SIGCHLD, handle_sigchld);
-
-	/* The random number generator must be initialized exactly once at startup. */
-	random_init();
 
 	/* Create the workspace directory and move there. */
 	workspace = vine_workspace_create(options->workspace_dir);
