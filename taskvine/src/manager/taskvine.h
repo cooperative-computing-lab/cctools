@@ -249,13 +249,25 @@ void vine_task_set_command( struct vine_task *t, const char *cmd );
 @param t A task object.
 @param name The name of the library coprocess name that will be used by this task.
 */
-void vine_task_needs_library( struct vine_task *t, const char *name );
+void vine_task_set_library_required( struct vine_task *t, const char *name );
+
+/** Get the library name required by this task.
+@param t A task object.
+@return The name of the library coprocess name that will be used by this task.
+*/
+const char *vine_task_get_library_required( struct vine_task *t );
 
 /** Set the library name provided by this task.
 @param t A task object.
 @param name The name of the library coprocess that this task implements.
 */
-void vine_task_provides_library( struct vine_task *t, const char *name );
+void vine_task_set_library_provided( struct vine_task *t, const char *name );
+
+/** Get the library name provided by this task.
+@param t A task object.
+@return The name of the library coprocess name that will be used by this task.
+*/
+const char *vine_task_get_library_provided( struct vine_task *t );
 
 
 /** Set the number of concurrent functions a library can run.

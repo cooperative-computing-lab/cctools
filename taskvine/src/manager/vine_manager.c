@@ -4614,7 +4614,7 @@ void vine_manager_install_library(struct vine_manager *q, struct vine_task *t, c
 {
 	t->type = VINE_TASK_TYPE_LIBRARY;
 	t->task_id = -1;
-	vine_task_provides_library(t, name);
+	vine_task_set_library_provided(t, name);
 	hash_table_insert(q->libraries, name, t);
 	t->time_when_submitted = timestamp_get();
 }
