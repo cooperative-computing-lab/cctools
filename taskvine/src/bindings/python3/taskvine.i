@@ -9,6 +9,7 @@
 %}
 
 %{
+	#include "cctools.h"
 	#include "int_sizes.h"
 	#include "timestamp.h"
 	#include "taskvine.h"
@@ -30,6 +31,7 @@ long long int is guaranteed to be at least 64bit. */
 %newobject vine_get_status;
 %newobject vine_get_runtime_path_staging;
 %newobject vine_get_runtime_path_caching;
+%newobject cctools_version_string;
 
 /* These return pointers to lists defined in list.h. We aren't
  * wrapping methods in list.h and so ignore these. */
@@ -78,4 +80,5 @@ into a swig function f(data) */
 %include "vine_task.h"
 %include "vine_file.h"
 %include "vine_runtime_dir.h"
+%include "cctools.h"
 

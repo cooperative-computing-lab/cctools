@@ -42,6 +42,8 @@ import atexit
 import time
 import math
 
+__version__ = cctools_version_string()
+
 
 def set_debug_flag(*flags):
     for flag in flags:

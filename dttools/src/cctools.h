@@ -21,6 +21,13 @@ See the file COPYING for details.
   */
 void cctools_version_print (FILE *stream, const char *cmd);
 
+
+/** Return a string with MAJOR.MINOR.MICRO version.
+ * It is the responsibility of the caller to free the string.
+@return version string
+*/
+char *cctools_version_string();
+
 /** Create a new buffer.
 	@param type   The debug type.
 	@param cmd    The name of the program running (argv[0]).
