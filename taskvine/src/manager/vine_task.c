@@ -183,12 +183,12 @@ static struct list *vine_task_string_list_copy(struct list *string_list)
 	return new;
 }
 
-struct vine_task *vine_task_clone(struct vine_task *t)
+struct vine_task *vine_task_addref(struct vine_task *t)
 {
 	if (!t)
 		return 0;
 	t->refcount++;
-	vine_counters.task.cloned++;
+	vine_counters.task.refadded++;
 	return t;
 }
 

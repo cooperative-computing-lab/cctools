@@ -20,7 +20,7 @@ struct vine_mount *vine_mount_create(
 	struct vine_mount *m = malloc(sizeof(*m));
 
 	/* Add a reference each time a file is connected. */
-	m->file = vine_file_clone(file);
+	m->file = vine_file_addref(file);
 
 	if (remote_name) {
 		m->remote_name = xxstrdup(remote_name);
@@ -28,7 +28,7 @@ struct vine_mount *vine_mount_create(
 		m->remote_name = 0;
 	}
 	m->flags = flags;
-	m->substitute = vine_file_clone(substitute);
+	m->substitute = vine_file_addref(substitute);
 
 	vine_counters.mount.created++;
 
