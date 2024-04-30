@@ -4011,14 +4011,10 @@ static void delete_task_at_exit(struct vine_task *t)
 		return;
 	}
 
-	if (t->type == VINE_TASK_TYPE_LIBRARY) {
-		/* library tasks should not survive the manager. */
-		int rc = t->refcount;
-		while (rc > 0) {
-			rc--;
-			vine_task_delete(t);
-		}
-	} else {
+	vine_task_delete(t);
+
+	if (t->type == VINE_TASK_TYPE_LIBRARY) { /* change to VINE_TASK_LIBRARY_INSTANCE */
+		/* manager created this task, so it is not the API caller's reponsibility. */
 		vine_task_delete(t);
 	}
 }
