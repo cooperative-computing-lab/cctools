@@ -229,7 +229,7 @@ class Task(object):
     # Get the name of the library at the worker that should execute the task's command.
     #
     # @param self Reference to the current task object.
-    def get_libray_required(self, library):
+    def get_libray_required(self):
         return cvine.vine_task_get_library_required(self._task)
 
     ##
@@ -254,7 +254,7 @@ class Task(object):
     # Get the name of the library at the worker that should execute the task's command.
     #
     # @param self Reference to the current task object.
-    def get_libray_provided(self, library):
+    def get_libray_provided(self):
         return cvine.vine_task_get_library_provided(self._task)
 
     ##
