@@ -4553,13 +4553,15 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	itable_insert(q->tasks, t->task_id, vine_task_clone(t));
 
 	/* Send the task to the worker in the usual way. */
+	/* Careful: If this failed, then the worker object or task object may no longer be valid! */
 	vine_result_code_t result = commit_task_to_worker(q, w, t);
 
-	/* Careful: If this failed, then the worker object may longer be valid! */
+	/* Careful again: If commit_task_to_worker failed the worker object or task object may no longer be valid! */
 	if (result == VINE_SUCCESS) {
 		vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
 		return t;
 	} else {
+		/* if failure, tasks was handled by handle_failure(...) according to result. */
 		return 0;
 	}
 }
