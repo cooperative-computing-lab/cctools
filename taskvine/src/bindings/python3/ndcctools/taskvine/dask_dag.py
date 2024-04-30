@@ -85,6 +85,9 @@ class DaskVineDag:
 
         self.initialize_graph()
 
+    def left_to_compute(self):
+        return len(self._working_graph) - len(self._result_of)
+
     def graph_keyp(self, s):
         if DaskVineDag.keyp(s):
             return s in self._working_graph
