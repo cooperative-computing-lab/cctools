@@ -462,7 +462,7 @@ vine_result_code_t vine_manager_get_output_files(
 		LIST_ITERATE(t->output_mounts, m)
 		{
 			// non-file objects are handled by the worker.
-			if (m->file->type != VINE_FILE && m->file->type != VINE_BUFFER)
+			if (m->file->type != VINE_FILE && m->file->type != VINE_BUFFER && m->file->type != VINE_TEMP)
 				continue;
 
 			// skip failure-only files on success
@@ -473,8 +473,17 @@ vine_result_code_t vine_manager_get_output_files(
 			if (m->flags & VINE_SUCCESS_ONLY && !task_succeeded)
 				continue;
 
-			// otherwise, get the file.
-			vine_result_code_t result_single_file = vine_manager_get_output_file(q, w, t, m, m->file);
+			vine_result_code_t result_single_file = VINE_SUCCESS;
+			if (m->file->type == VINE_TEMP) {
+				// if temp, check that we got a cache update message.
+				struct vine_file *f = hash_table_lookup(q->file_table, m->file->cached_name);
+				if (!f || f->state != VINE_FILE_STATE_CREATED) {
+					result_single_file = VINE_APP_FAILURE;
+				}
+			} else {
+				// otherwise, get the file.
+				result_single_file = vine_manager_get_output_file(q, w, t, m, m->file);
+			}
 
 			// if success or app-level failure, continue to get other files.
 			// if worker failure, return.
