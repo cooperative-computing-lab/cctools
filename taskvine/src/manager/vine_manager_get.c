@@ -415,12 +415,6 @@ vine_result_code_t vine_manager_get_output_file(struct vine_manager *q, struct v
 				w->hostname,
 				f->cached_name,
 				f->source);
-
-		if (result == VINE_APP_FAILURE) {
-			vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
-		} else if (result == VINE_MGR_FAILURE) {
-			vine_task_set_result(t, VINE_RESULT_OUTPUT_TRANSFER_ERROR);
-		}
 	}
 
 	// If the transfer was successful, make a record of it in the cache.
