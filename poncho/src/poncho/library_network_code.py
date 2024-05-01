@@ -123,9 +123,14 @@ def library_network_code():
                         event = cloudpickle.load(f)
 
                     # output of execution should be dumped to outfile.
-                    with open('outfile', 'wb') as f:
-                        cloudpickle.dump(globals()[function_name](event), f)
-
+                    result = globals()[function_name](event)
+                    try:
+                        with open('outfile', 'wb') as f:
+                            cloudpickle.dump(result, f)
+                    except Exception:
+                        if os.path.exits('outfile'):
+                            os.remove('outfile')
+                        raise
                 except Exception as e:
                     print(f'Library code: Function call failed due to {e}', file=sys.stderr)
                     sys.exit(1)
@@ -145,10 +150,21 @@ def library_network_code():
                         event = cloudpickle.load(f)
 
                     # output of execution should be dumped to outfile.
-                    with open('outfile', 'wb') as f:
-                        cloudpickle.dump(globals()[function_name](event), f)
+                    exit_status = 0
+                    try:
+                        result = globals()[function_name](event)
+                        try:
+                            with open('outfile', 'wb') as f:
+                                cloudpickle.dump(result, f)
+                        except Exception:
+                            if os.path.exits('outfile'):
+                                os.remove('outfile')
+                            raise
+                    except Exception:
+                        exit_status = 1
+
                     os.close(stdout_capture_fd)
-                    os._exit(0)
+                    os._exit(exit_status)
                 elif p < 0:
                     print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)
                     return -1
