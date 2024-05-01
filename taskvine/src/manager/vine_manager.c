@@ -1681,7 +1681,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	*/
 
 	if (t->provides_library) {
-		struct vine_task *original = hash_table_lookup(q->libraries, t->provides_library);
+		struct vine_task *original = hash_table_lookup(q->library_templates, t->provides_library);
 		if (original)
 			original->time_when_last_failure = timestamp_get();
 	}
@@ -3771,7 +3771,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->retrieved_list = list_create();
 
 	q->tasks = itable_create(0);
-	q->libraries = hash_table_create(0, 0);
+	q->library_templates = hash_table_create(0, 0);
 
 	q->worker_table = hash_table_create(0, 0);
 	q->file_worker_table = hash_table_create(0, 0);
@@ -4092,8 +4092,8 @@ void vine_delete(struct vine_manager *q)
 	itable_clear(q->tasks, (void *)vine_task_delete);
 	itable_delete(q->tasks);
 
-	hash_table_clear(q->libraries, (void *)vine_task_delete);
-	hash_table_delete(q->libraries);
+	hash_table_clear(q->library_templates, (void *)vine_task_delete);
+	hash_table_delete(q->library_templates);
 
 	/* delete files after deleting tasks so that rc are correctly updated. */
 	hash_table_clear(q->file_table, (void *)vine_file_delete);
@@ -4542,7 +4542,7 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 }
 
 /* Send a given library by name to the target worker.
- * This involves duplicating the prototype task in q->libraries
+ * This involves duplicating the prototype task in q->library_templates
  * and then sending the copy as a (mostly) normal task.
  * @param q The manager structure.
  * @param w The worker info structure.
@@ -4553,7 +4553,7 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 static struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name)
 {
 	/* Find the original prototype library task by name, if it exists. */
-	struct vine_task *original = hash_table_lookup(q->libraries, name);
+	struct vine_task *original = hash_table_lookup(q->library_templates, name);
 	if (!original)
 		return 0;
 
@@ -4618,7 +4618,7 @@ void vine_manager_install_library(struct vine_manager *q, struct vine_task *t, c
 	t->type = VINE_TASK_TYPE_LIBRARY;
 	t->task_id = -1;
 	vine_task_provides_library(t, name);
-	hash_table_insert(q->libraries, name, t);
+	hash_table_insert(q->library_templates, name, t);
 	t->time_when_submitted = timestamp_get();
 }
 
@@ -4632,9 +4632,10 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 		struct vine_task *t = vine_manager_find_library_on_worker(q, w, name);
 		if (t) {
 			reset_task_to_state(q, t, VINE_TASK_RETRIEVED);
+			t->refcount--;
 		}
 	}
-	hash_table_remove(q->libraries, name);
+	hash_table_remove(q->library_templates, name);
 }
 
 static void handle_library_update(struct vine_manager *q, struct vine_worker_info *w, const char *line)
