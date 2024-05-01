@@ -226,13 +226,11 @@ created, we still want the task to be marked as completed and sent back to the
 manager.  The manager will handle the consequences of missing output files.
 */
 
-int vine_sandbox_stageout(struct vine_process *p, struct vine_cache *cache, struct link *manager)
+void vine_sandbox_stageout(struct vine_process *p, struct vine_cache *cache, struct link *manager)
 {
 	struct vine_mount *m;
 	LIST_ITERATE(p->task->output_mounts, m)
 	{
 		stage_output_file(p, m, m->file, cache, manager);
 	}
-
-	return 1;
 }
