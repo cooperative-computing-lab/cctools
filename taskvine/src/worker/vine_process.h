@@ -83,7 +83,7 @@ void  vine_process_delete( struct vine_process *p );
 
 int   vine_process_execute_and_wait( struct vine_process *p );
 
-int   vine_process_library_get_result( struct vine_process *p, uint64_t *done_task_id );
+int   vine_process_library_get_result( struct vine_process *p, uint64_t *done_task_id, int *exit_code );
 
 void  vine_process_compute_disk_needed( struct vine_process *p );
 int   vine_process_measure_disk(struct vine_process *p, int max_time_on_measurement);
