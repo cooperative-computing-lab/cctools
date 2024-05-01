@@ -120,24 +120,23 @@ class DaskVineDag:
         This call should be used only for
         bootstrapping. Further calls should use DaskVineDag.set_result to discover
         the new computations that become ready to be executed. """
-        rs = []
+        rs = {}
         for (key, cs) in self._missing_of.items():
             if self.has_result(key) or cs:
                 continue
             sexpr = self._working_graph[key]
             if self.graph_keyp(sexpr):
-                rs.extend(self.set_result(key, self.get_result(sexpr)))
+                rs.update(self.set_result(key, self.get_result(sexpr)))
             elif self.symbolp(sexpr):
-                rs.extend(self.set_result(key, sexpr))
+                rs.update(self.set_result(key, sexpr))
             else:
-                rs.append((key, sexpr))
-        return rs
+                rs[key] = (key, sexpr)
+        return rs.values()
 
     def set_result(self, key, value):
         """ Sets new result and propagates in the DaskVineDag. Returns a list of [(key, sexpr),...]
         of computations that become ready to be executed """
-
-        rs = []
+        rs = {}
         self._result_of[key] = value
         for p in self._parents_of[key]:
             self._missing_of[p].discard(key)
@@ -147,14 +146,14 @@ class DaskVineDag:
 
             sexpr = self._working_graph[p]
             if self.graph_keyp(sexpr):
-                rs.extend(
+                rs.update(
                     self.set_result(p, self.get_result(sexpr))
                 )  # case e.g, "x": "y", and we just set the value of "y"
             elif self.symbolp(sexpr):
-                rs.extend(self.set_result(p, sexpr))
+                rs.update(self.set_result(p, sexpr))
             else:
-                rs.append((p, sexpr))
-        return rs
+                rs[p] = (p, sexpr)
+        return rs.values()
 
     def _flatten_graph(self):
         """ Recursively decomposes a sexpr associated with key, so that its arguments, if any
