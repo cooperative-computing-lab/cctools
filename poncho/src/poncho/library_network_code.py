@@ -189,8 +189,8 @@ def library_network_code():
         return -1
 
     # Send result of a function execution to worker. Wake worker up to do work with SIGCHLD.
-    def send_result(out_pipe_fd, task_id, worker_pid):
-        buff = bytes(str(task_id), 'utf-8')
+    def send_result(out_pipe_fd, worker_pid, task_id, exit_code):
+        buff = bytes(f"{task_id} {exit_code}", 'utf-8')
         buff = bytes(str(len(buff)), "utf-8") + b"\n" + buff
         os.writev(out_pipe_fd, [buff])
         os.kill(worker_pid, signal.SIGCHLD)
@@ -262,7 +262,7 @@ def library_network_code():
                     while len(pid_to_func_id) > 0:
                         c_pid, c_exit_status = os.waitpid(-1, os.WNOHANG)
                         if c_pid > 0:
-                            send_result(out_pipe_fd, pid_to_func_id[c_pid], args.worker_pid)
+                            send_result(out_pipe_fd, args.worker_pid, pid_to_func_id[c_pid], c_exit_status)
                             del pid_to_func_id[c_pid]
                         # no exited child to reap, break
                         else:
