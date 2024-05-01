@@ -67,7 +67,7 @@ int vine_file_delete( struct vine_file *f );
 
 int vine_file_has_changed( struct vine_file *f );
 
-const char * vine_file_make_file_url( const char * source);
+char * vine_file_make_file_url( const char * source);
 
 struct vine_file *vine_file_local( const char *source, vine_cache_level_t cache, vine_file_flags_t flags );
 struct vine_file *vine_file_url( const char *source, vine_cache_level_t cache, vine_file_flags_t flags );

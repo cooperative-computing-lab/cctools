@@ -145,14 +145,14 @@ struct vine_file *vine_file_clone(struct vine_file *f)
 
 /* Make a URL reference to a file source*/
 
-const char *vine_file_make_file_url(const char *source)
+char *vine_file_make_file_url(const char *source)
 {
 
-	const char *abs_path = path_getcwd();
+	char *abs_path = path_getcwd();
 
-	const char *result = string_format("file:%s/%s", abs_path, source);
+	char *result = string_format("file:%s/%s", abs_path, source);
 
-	free((void *)abs_path);
+	free(abs_path);
 
 	return result;
 }

@@ -5839,9 +5839,9 @@ struct vine_file *vine_declare_file(
 	struct vine_file *f;
 
 	if (m->load_from_shared_fs_enabled) {
-		const char *file_url = vine_file_make_file_url(source);
+		char *file_url = vine_file_make_file_url(source);
 		f = vine_file_url(file_url, cache, flags);
-		free((void *)file_url);
+		free(file_url);
 
 	} else {
 		f = vine_file_local(source, cache, flags);
