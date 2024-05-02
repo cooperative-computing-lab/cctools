@@ -150,7 +150,7 @@ char *vine_file_make_file_url(const char *source)
 
 	char *abs_path = path_getcwd();
 
-	char *result = string_format("file:%s/%s", abs_path, source);
+	char *result = string_format("file://%s/%s", abs_path, source);
 
 	free(abs_path);
 
