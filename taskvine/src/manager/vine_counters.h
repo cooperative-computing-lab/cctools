@@ -11,14 +11,14 @@ See the file COPYING for details.
 
 /*
 For internal troubleshooting and profiling purposes, track the number of
-creates/clones/deletes of objects of various types, so they can be
+creates, added references and deleted of objects of various types, so they can be
 displayed at the end of a run.  vine_counters is a global object
 that is access directly by vine_task_create/delete() and similar functions. 
 */
 
 struct vine_counter {
 	uint32_t created;
-	uint32_t cloned;
+	uint32_t ref_added;
 	uint32_t deleted;
 };
 

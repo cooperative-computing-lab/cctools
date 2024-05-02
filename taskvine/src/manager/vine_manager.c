@@ -3091,7 +3091,7 @@ static void vine_manager_create_recovery_tasks(struct vine_manager *q, struct vi
 				recovery_task->type = VINE_TASK_TYPE_RECOVERY;
 			}
 
-			m->file->recovery_task = vine_task_clone(recovery_task);
+			m->file->recovery_task = vine_task_addref(recovery_task);
 		}
 	}
 
@@ -4345,7 +4345,7 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 		list_push_head(q->retrieved_list, t);
 		break;
 	case VINE_TASK_DONE:
-		/* Task was cloned when entered into our own table, so delete a reference on removal. */
+		/* Task was added a reference when entered into our own table, so delete a reference on removal. */
 		if (t->has_fixed_locations) {
 			q->fixed_location_in_queue--;
 		}
@@ -4497,7 +4497,7 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	vine_task_truncate_watched_outputs(t);
 
 	/* Add reference to task when adding it to primary table. */
-	itable_insert(q->tasks, t->task_id, vine_task_clone(t));
+	itable_insert(q->tasks, t->task_id, vine_task_addref(t));
 
 	/* Ensure category structure is created. */
 	vine_category_lookup_or_create(q, t->category);
@@ -4556,7 +4556,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	t->task_id = q->next_task_id++;
 
 	/* Add reference to task when adding it to primary table. */
-	itable_insert(q->tasks, t->task_id, vine_task_clone(t));
+	itable_insert(q->tasks, t->task_id, vine_task_addref(t));
 
 	/* Send the task to the worker in the usual way. */
 	/* Careful: If this failed, then the worker object or task object may no longer be valid! */
@@ -5922,7 +5922,7 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 	if (previous) {
 		/* If declared before, use the previous instance. */
 		vine_file_delete(f);
-		f = vine_file_clone(previous);
+		f = vine_file_addref(previous);
 	} else {
 		/* Otherwise add it to the table. */
 		hash_table_insert(m->file_table, f->cached_name, f);

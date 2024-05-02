@@ -124,7 +124,7 @@ struct vine_task {
 
 void vine_task_delete(struct vine_task *t);
 /* Add a reference to an existing task object, return the same object. */
-struct vine_task * vine_task_clone( struct vine_task *t );
+struct vine_task * vine_task_addref( struct vine_task *t );
 
 /* Deep-copy an existing task object, return a pointer to a new object. */
 struct vine_task * vine_task_copy( const struct vine_task *t );
