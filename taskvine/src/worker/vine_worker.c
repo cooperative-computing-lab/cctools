@@ -641,6 +641,7 @@ static int handle_completed_tasks(struct link *manager)
 	struct vine_process *fp;
 	uint64_t task_id;
 	uint64_t done_task_id;
+	int done_exit_code;
 
 	ITABLE_ITERATE(procs_running, task_id, p)
 	{
@@ -655,9 +656,10 @@ static int handle_completed_tasks(struct link *manager)
 
 		/* If p is a library, check to see if any results waiting. */
 
-		while (vine_process_library_get_result(p, &done_task_id)) {
+		while (vine_process_library_get_result(p, &done_task_id, &done_exit_code)) {
 			fp = itable_lookup(procs_table, done_task_id);
 			if (fp) {
+				fp->exit_code = done_exit_code;
 				reap_process(fp, manager);
 				result_retrieved++;
 			}

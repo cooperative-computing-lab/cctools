@@ -211,7 +211,6 @@ def serverize_library_from_code(
         "taskvine",
         import_modules=import_modules,
     )
-
     # remove the temp library file
     os.remove(tmp_library_path)
 
