@@ -139,47 +139,66 @@ def library_network_code():
                         raise
 
                 except Exception as e:
-                    print(f'Library code: Function call failed due to {e}', file=sys.stderr)
+                    print(
+                        f"Library code: Function call failed due to {e}",
+                        file=sys.stderr,
+                    )
                     sys.exit(1)
                 finally:
                     os.chdir(library_sandbox)
             else:
                 p = os.fork()
                 if p == 0:
-                    # setup stdout/err for a function call so we can capture them.
-                    stdout_capture_fd = os.open(function_stdout_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
-                    os.dup2(stdout_capture_fd, sys.stdout.fileno())
-                    os.dup2(stdout_capture_fd, sys.stderr.fileno())
-
-                    # parameters are represented as infile.
-                    os.chdir(function_sandbox)
-                    with open('infile', 'rb') as f:
-                        event = cloudpickle.load(f)
-
-                    # output of execution should be dumped to outfile.
-                    exit_status = 0
                     try:
-                        result = globals()[function_name](event)
+                        exit_status = 1
+                        # setup stdout/err for a function call so we can capture them.
+                        stdout_capture_fd = os.open(
+                            function_stdout_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+                        )
+                        os.dup2(stdout_capture_fd, sys.stdout.fileno())
+                        os.dup2(stdout_capture_fd, sys.stderr.fileno())
+                        os.chdir(function_sandbox)
+
                         try:
-                            with open('outfile', 'wb') as f:
+                            # parameters are represented as infile.
+                            with open("infile", "rb") as f:
+                                event = cloudpickle.load(f)
+                        except Exception:
+                            exit_status = 2
+                            raise
+
+                        try:
+                            result = globals()[function_name](event)
+                        except Exception:
+                            exit_status = 3
+                            raise
+
+                        try:
+                            with open("outfile", "wb") as f:
                                 cloudpickle.dump(result, f)
                         except Exception:
-                            if os.path.exits('outfile'):
-                                os.remove('outfile')
+                            exit_status = 4
+                            if os.path.exits("outfile"):
+                                os.remove("outfile")
                             raise
-                    except Exception:
-                        exit_status = 1
 
-                    try:
-                        if not result["Success"]:
-                            exit_status = 1
-                    except Exception:
-                        exit_status = 1
+                        try:
+                            if not result["Success"]:
+                                exit_status = 5
+                        except Exception:
+                            exit_status = 5
+                            raise
 
-                    os.close(stdout_capture_fd)
-                    os._exit(exit_status)
+                        # nothing failed
+                        exit_status = 0
+                    finally:
+                        os.close(stdout_capture_fd)
+                        os._exit(exit_status)
                 elif p < 0:
-                    print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)
+                    print(
+                        f"Library code: unable to fork to execute {function_name}",
+                        file=sys.stderr,
+                    )
                     return -1
 
                 # return pid and function id of child process to parent.
