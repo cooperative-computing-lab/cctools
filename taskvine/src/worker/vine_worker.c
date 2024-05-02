@@ -732,9 +732,9 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 			debug(D_VINE, "rx: %s", cmd);
 			free(cmd);
 		} else if (sscanf(line, "needs_library %s", library_name) == 1) {
-			vine_task_needs_library(task, library_name);
+			vine_task_set_library_required(task, library_name);
 		} else if (sscanf(line, "provides_library %s", library_name) == 1) {
-			vine_task_provides_library(task, library_name);
+			vine_task_set_library_provided(task, library_name);
 		} else if (sscanf(line, "function_slots %" PRId64, &n) == 1) {
 			vine_task_set_function_slots(task, n);
 		} else if (sscanf(line, "infile %s %s %d", localname, taskname_encoded, &flags)) {
