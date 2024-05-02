@@ -16,6 +16,7 @@ dependencies:
  - packaging            # required for Poncho packaging
  - cloudpickle          # required for WorkQueue/TaskVine remote function invocation
  - threadpoolctl        # required for WorkQueue/TaskVine remote function invocation
+ - rich                 # optional for Taskvine Dask executor
  - gdb                  # optional debugger to match compiler
  - flake8               # optional to lint and format Python code
  - clang-format         # optional to lint and format C code
