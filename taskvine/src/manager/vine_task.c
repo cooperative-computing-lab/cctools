@@ -206,9 +206,9 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 
 	/* Static features of task are copied. */
 	if (task->needs_library)
-		vine_task_needs_library(new, task->needs_library);
+		vine_task_set_library_required(new, task->needs_library);
 	if (task->provides_library)
-		vine_task_provides_library(new, task->provides_library);
+		vine_task_set_library_provided(new, task->provides_library);
 	if (task->tag)
 		vine_task_set_tag(new, task->tag);
 	if (task->category)
@@ -258,7 +258,7 @@ void vine_task_set_command(struct vine_task *t, const char *cmd)
 	t->command_line = xxstrdup(cmd);
 }
 
-void vine_task_needs_library(struct vine_task *t, const char *library_name)
+void vine_task_set_library_required(struct vine_task *t, const char *library_name)
 {
 	if (t->needs_library) {
 		free(t->needs_library);
@@ -266,6 +266,11 @@ void vine_task_needs_library(struct vine_task *t, const char *library_name)
 	}
 
 	if (library_name) {
+		if (t->provides_library) {
+			fatal("A task cannot simultaneously provide (%s) and require a library (%s)",
+					t->provides_library,
+					library_name);
+		}
 		t->needs_library = xxstrdup(library_name);
 	}
 
@@ -278,7 +283,12 @@ void vine_task_needs_library(struct vine_task *t, const char *library_name)
 	vine_task_set_gpus(t, 0);
 }
 
-void vine_task_provides_library(struct vine_task *t, const char *library_name)
+const char *vine_task_get_library_required(struct vine_task *t)
+{
+	return t->needs_library;
+}
+
+void vine_task_set_library_provided(struct vine_task *t, const char *library_name)
 {
 	if (t->provides_library) {
 		free(t->provides_library);
@@ -286,8 +296,18 @@ void vine_task_provides_library(struct vine_task *t, const char *library_name)
 	}
 
 	if (library_name) {
+		if (t->needs_library) {
+			fatal("A task cannot simultaneously provide (%s) and require a library (%s)",
+					library_name,
+					t->needs_library);
+		}
 		t->provides_library = xxstrdup(library_name);
 	}
+}
+
+const char *vine_task_get_library_provided(struct vine_task *t)
+{
+	return t->provides_library;
 }
 
 void vine_task_set_function_slots(struct vine_task *t, int nslots)

@@ -544,11 +544,7 @@ static void reap_process(struct vine_process *p, struct link *manager)
 	gpus_allocated -= p->task->resources_requested->gpus;
 
 	vine_gpus_free(p->task->task_id);
-
-	if (!vine_sandbox_stageout(p, cache_manager, manager)) {
-		p->result = VINE_RESULT_OUTPUT_MISSING;
-		p->exit_code = 1;
-	}
+	vine_sandbox_stageout(p, cache_manager, manager);
 
 	if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
 		p->library_process->functions_running--;
@@ -736,9 +732,9 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 			debug(D_VINE, "rx: %s", cmd);
 			free(cmd);
 		} else if (sscanf(line, "needs_library %s", library_name) == 1) {
-			vine_task_needs_library(task, library_name);
+			vine_task_set_library_required(task, library_name);
 		} else if (sscanf(line, "provides_library %s", library_name) == 1) {
-			vine_task_provides_library(task, library_name);
+			vine_task_set_library_provided(task, library_name);
 		} else if (sscanf(line, "function_slots %" PRId64, &n) == 1) {
 			vine_task_set_function_slots(task, n);
 		} else if (sscanf(line, "infile %s %s %d", localname, taskname_encoded, &flags)) {
