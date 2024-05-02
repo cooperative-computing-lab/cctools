@@ -188,7 +188,7 @@ struct vine_task *vine_task_addref(struct vine_task *t)
 	if (!t)
 		return 0;
 	t->refcount++;
-	vine_counters.task.refadded++;
+	vine_counters.task.ref_added++;
 	return t;
 }
 

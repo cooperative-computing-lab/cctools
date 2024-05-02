@@ -15,17 +15,17 @@ struct vine_counters vine_counters = {{0}, {0}, {0}, {0}, {0}};
 
 static void vine_counter_print(const char *name, struct vine_counter *c)
 {
-	int nleaked = c->created + c->refadded - c->deleted;
+	int nleaked = c->created + c->ref_added - c->deleted;
 	if (nleaked == 0) {
-		printf("%8s %8d %8d %8d ok", name, c->created, c->refadded, c->deleted);
+		printf("%8s %8d %8d %8d ok", name, c->created, c->ref_added, c->deleted);
 	} else {
-		printf("%8s %8d %8d %8d leaked %d", name, c->created, c->refadded, c->deleted, nleaked);
+		printf("%8s %8d %8d %8d leaked %d", name, c->created, c->ref_added, c->deleted, nleaked);
 	}
 }
 
 void vine_counters_print()
 {
-	printf("  object  created   refadded  deleted\n");
+	printf("  object  created   ref_added  deleted\n");
 	printf("-----------------------------------\n");
 
 	vine_counter_print("tasks", &vine_counters.task);
@@ -37,17 +37,17 @@ void vine_counters_print()
 
 static void vine_counter_debug(const char *name, struct vine_counter *c)
 {
-	int nleaked = c->created + c->refadded - c->deleted;
+	int nleaked = c->created + c->ref_added - c->deleted;
 	if (nleaked == 0) {
-		debug(D_VINE, "%8s %8d %8d %8d ok", name, c->created, c->refadded, c->deleted);
+		debug(D_VINE, "%8s %8d %8d %8d ok", name, c->created, c->ref_added, c->deleted);
 	} else {
-		debug(D_VINE, "%8s %8d %8d %8d leaked %d", name, c->created, c->refadded, c->deleted, nleaked);
+		debug(D_VINE, "%8s %8d %8d %8d leaked %d", name, c->created, c->ref_added, c->deleted, nleaked);
 	}
 }
 
 void vine_counters_debug()
 {
-	debug(D_VINE, "  object  created   refadded  deleted\n");
+	debug(D_VINE, "  object  created   ref_added  deleted\n");
 	debug(D_VINE, "-----------------------------------\n");
 
 	vine_counter_debug("tasks", &vine_counters.task);
