@@ -833,7 +833,8 @@ static int recover_temp_files(struct vine_manager *q)
 				hash_table_remove(q->temp_files_to_replicate, cached_name);
 			} else {
 				if (iter_count_var > q->attempt_schedule_depth) {
-					strncpy(key_start, cached_name, PATH_MAX);
+					strncpy(key_start, cached_name, PATH_MAX - 1);
+					key_start[PATH_MAX - 1] = '\0';
 					break;
 				}
 			}
