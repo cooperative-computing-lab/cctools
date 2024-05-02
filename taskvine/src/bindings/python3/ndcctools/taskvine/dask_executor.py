@@ -231,8 +231,8 @@ class DaskVine(Manager):
                 submitted = 0
                 while (
                     enqueued_calls
-                    and (not self.submit_per_cycle or self.submit_per_cycle < submitted)
-                    and (not self.max_pending or self.max_pending < pending)
+                    and (not self.submit_per_cycle or submitted < self.submit_per_cycle)
+                    and (not self.max_pending or pending < self.max_pending)
                 ):
                     self.submit(enqueued_calls.pop())
                     submitted += 1
