@@ -127,7 +127,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 	}
 
 	int nsources = set_size(sources);
-	int to_find = m->temp_replica_count - nsources;
+	int to_find = MIN(m->temp_replica_count - nsources, m->transfer_replica_per_cycle);
 	if (to_find < 1) {
 		return found;
 	}

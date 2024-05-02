@@ -817,15 +817,26 @@ static int recover_temp_files(struct vine_manager *q)
 	void *empty_val = NULL;
 	int total_replication_count = 0;
 
-	HASH_TABLE_ITERATE(q->temp_files_to_replicate, cached_name, empty_val)
+	static char key_start[PATH_MAX] = "random init";
+	int iter_control;
+	int iter_count_var;
+
+	HASH_TABLE_ITERATE_FROM_KEY(
+			q->temp_files_to_replicate, iter_control, iter_count_var, key_start, cached_name, empty_val)
 	{
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
 
 		if (f) {
 			int curr_file_replication_cnt = vine_file_replica_table_replicate(q, f);
 
-			if (!curr_file_replication_cnt) {
+			if (curr_file_replication_cnt < 1) {
 				hash_table_remove(q->temp_files_to_replicate, cached_name);
+			} else {
+				if (iter_count_var > q->attempt_schedule_depth) {
+					strncpy(key_start, cached_name, PATH_MAX - 1);
+					key_start[PATH_MAX - 1] = '\0';
+					break;
+				}
 			}
 
 			total_replication_count += curr_file_replication_cnt;
@@ -3811,6 +3822,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->temp_replica_count = 0;
 	q->transfer_temps_recovery = 0;
+	q->transfer_replica_per_cycle = 10;
 
 	q->resource_submit_multiplier = 1.0;
 
@@ -4990,6 +5002,16 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			continue;
 		}
 
+		// Check if any temp files need replication and start replicating
+		BEGIN_ACCUM_TIME(q, time_internal);
+		result = recover_temp_files(q);
+		END_ACCUM_TIME(q, time_internal);
+		if (result) {
+			// recovered at least one temp file
+			events++;
+			continue;
+		}
+
 		if (q->process_pending_check) {
 
 			BEGIN_ACCUM_TIME(q, time_internal);
@@ -5000,17 +5022,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				events++;
 				break;
 			}
-		}
-
-		// Check if any temp files need replication and start replicating
-		BEGIN_ACCUM_TIME(q, time_internal);
-		result = recover_temp_files(q);
-		END_ACCUM_TIME(q, time_internal);
-
-		if (result) {
-			// recovered at least one temp file
-			events++;
-			continue;
 		}
 
 		// return if manager is empty and something interesting already happened
@@ -5284,35 +5295,17 @@ void vine_set_manager_preferred_connection(struct vine_manager *q, const char *p
 int vine_tune(struct vine_manager *q, const char *name, double value)
 {
 
-	if (!strcmp(name, "resource-submit-multiplier") || !strcmp(name, "asynchrony-multiplier")) {
-		q->resource_submit_multiplier = MAX(value, 1.0);
+	if (!strcmp(name, "attempt-schedule-depth")) {
+		q->attempt_schedule_depth = MAX(1, (int)value);
 
-	} else if (!strcmp(name, "min-transfer-timeout")) {
-		q->minimum_transfer_timeout = (int)value;
+	} else if (!strcmp(name, "category-steady-n-tasks")) {
+		category_tune_bucket_size("category-steady-n-tasks", (int)value);
 
 	} else if (!strcmp(name, "default-transfer-rate")) {
 		q->default_transfer_rate = value;
 
-	} else if (!strcmp(name, "transfer-outlier-factor")) {
-		q->transfer_outlier_factor = value;
-
 	} else if (!strcmp(name, "disconnect-slow-worker-factor")) {
 		vine_enable_disconnect_slow_workers(q, value);
-
-	} else if (!strcmp(name, "keepalive-interval")) {
-		q->keepalive_interval = MAX(0, (int)value);
-
-	} else if (!strcmp(name, "keepalive-timeout")) {
-		q->keepalive_timeout = MAX(0, (int)value);
-
-	} else if (!strcmp(name, "short-timeout")) {
-		q->short_timeout = MAX(1, (int)value);
-
-	} else if (!strcmp(name, "long-timeout")) {
-		q->long_timeout = MAX(1, (int)value);
-
-	} else if (!strcmp(name, "category-steady-n-tasks")) {
-		category_tune_bucket_size("category-steady-n-tasks", (int)value);
 
 	} else if (!strcmp(name, "hungry-minimum")) {
 		q->hungry_minimum = MAX(1, (int)value);
@@ -5320,17 +5313,27 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "hungry-minimum-factor")) {
 		q->hungry_minimum_factor = MAX(1, (int)value);
 
-	} else if (!strcmp(name, "wait-for-workers")) {
-		q->wait_for_workers = MAX(0, (int)value);
+	} else if (!strcmp(name, "immediate-recovery")) {
+		q->immediate_recovery = !!((int)value);
 
-	} else if (!strcmp(name, "attempt-schedule-depth")) {
-		q->attempt_schedule_depth = MAX(1, (int)value);
+	} else if (!strcmp(name, "keepalive-interval")) {
+		q->keepalive_interval = MAX(0, (int)value);
+
+	} else if (!strcmp(name, "keepalive-timeout")) {
+		q->keepalive_timeout = MAX(0, (int)value);
+
+	} else if (!strcmp(name, "long-timeout")) {
+		q->long_timeout = MAX(1, (int)value);
 
 	} else if (!strcmp(name, "max-retrievals")) {
 		q->max_retrievals = MAX(-1, (int)value);
 
-	} else if (!strcmp(name, "worker-retrievals")) {
-		q->worker_retrievals = MAX(0, (int)value);
+	} else if (!strcmp(name, "min-transfer-timeout")) {
+		q->minimum_transfer_timeout = (int)value;
+
+	} else if (!strcmp(name, "monitor-interval")) {
+		/* 0 means use monitor's default */
+		q->monitor_interval = MAX(0, (int)value);
 
 	} else if (!strcmp(name, "prefer-dispatch")) {
 		q->prefer_dispatch = !!((int)value);
@@ -5345,11 +5348,36 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "ramp-down-heuristic")) {
 		q->ramp_down_heuristic = MAX(0, (int)value);
 
-	} else if (!strcmp(name, "immediate-recovery")) {
-		q->immediate_recovery = !!((int)value);
+	} else if (!strcmp(name, "resource-submit-multiplier") || !strcmp(name, "asynchrony-multiplier")) {
+		q->resource_submit_multiplier = MAX(value, 1.0);
+
+	} else if (!strcmp(name, "short-timeout")) {
+		q->short_timeout = MAX(1, (int)value);
+
+	} else if (!strcmp(name, "temp-replica-count")) {
+		q->temp_replica_count = MAX(0, (int)value);
+
+	} else if (!strcmp(name, "transfer-outlier-factor")) {
+		q->transfer_outlier_factor = value;
+
+	} else if (!strcmp(name, "transfer-replica-per-cycle")) {
+		q->transfer_replica_per_cycle = MAX(1, (int)value);
 
 	} else if (!strcmp(name, "transfer-temps-recovery")) {
 		q->transfer_temps_recovery = !!((int)value);
+
+	} else if (!strcmp(name, "transient-error-interval")) {
+		if (value < 1) {
+			q->transient_error_interval = VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL;
+		} else {
+			q->transient_error_interval = value * ONE_SECOND;
+		}
+
+	} else if (!strcmp(name, "wait-for-workers")) {
+		q->wait_for_workers = MAX(0, (int)value);
+
+	} else if (!strcmp(name, "worker-retrievals")) {
+		q->worker_retrievals = MAX(0, (int)value);
 
 	} else if (!strcmp(name, "file-source-max-transfers")) {
 		q->file_source_max_transfers = MAX(1, (int)value);
@@ -5357,15 +5385,8 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "worker-source-max-transfers")) {
 		q->worker_source_max_transfers = MAX(1, (int)value);
 
-	} else if (!strcmp(name, "temp-replica-count")) {
-		q->temp_replica_count = MAX(0, (int)value);
-
 	} else if (!strcmp(name, "perf-log-interval")) {
 		q->perf_log_interval = MAX(1, (int)value);
-
-	} else if (!strcmp(name, "monitor-interval")) {
-		/* 0 means use monitor's default */
-		q->monitor_interval = MAX(0, (int)value);
 
 	} else if (!strcmp(name, "update-interval")) {
 		q->update_interval = MAX(1, (int)value);
@@ -5384,13 +5405,6 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "option-blocklist-slow-workers-timeout")) {
 		q->option_blocklist_slow_workers_timeout = MAX(0, value); /*todo: confirm 0 or 1*/
-
-	} else if (!strcmp(name, "transient-error-interval")) {
-		if (value < 1) {
-			q->transient_error_interval = VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL;
-		} else {
-			q->transient_error_interval = value * ONE_SECOND;
-		}
 
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);

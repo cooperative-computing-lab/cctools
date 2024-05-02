@@ -172,10 +172,9 @@ struct vine_manager {
 	/* Peer Transfer Configuration */
 	int peer_transfers_enabled;
 	int file_source_max_transfers;
-	int temp_replica_count;
 	int worker_source_max_transfers;
-	/* Various performance knobs that can be tuned. */
 
+	/* Various performance knobs that can be tuned. */
 	int short_timeout;            /* Timeout in seconds to send/recv a brief message from worker */
 	int long_timeout;             /* Timeout if in the middle of an incomplete message. */
 	int minimum_transfer_timeout; /* Minimum number of seconds to allow for a manager<-> worker file transfer. */
@@ -202,6 +201,8 @@ struct vine_manager {
 																	 disconnects. Otherwise, create them only when a tasks needs then as inputs (this is
 																	 the default). */
 	int transfer_temps_recovery;  /* If true, attempt to recover temp files from lost worker to reach threshold required */
+	int transfer_replica_per_cycle;  /* Maximum number of replica to request per temp file per iteration */
+	int temp_replica_count;       /* Number of replicas per temp file */
 
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
