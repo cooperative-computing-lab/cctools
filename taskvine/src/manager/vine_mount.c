@@ -5,6 +5,8 @@ See the file COPYING for details.
 */
 
 #include "vine_mount.h"
+#include "vine_counters.h"
+
 #include "debug.h"
 
 #include <stdlib.h>
@@ -18,7 +20,7 @@ struct vine_mount *vine_mount_create(
 	struct vine_mount *m = malloc(sizeof(*m));
 
 	/* Add a reference each time a file is connected. */
-	m->file = vine_file_clone(file);
+	m->file = vine_file_addref(file);
 
 	if (remote_name) {
 		m->remote_name = xxstrdup(remote_name);
@@ -26,7 +28,9 @@ struct vine_mount *vine_mount_create(
 		m->remote_name = 0;
 	}
 	m->flags = flags;
-	m->substitute = vine_file_clone(substitute);
+	m->substitute = vine_file_addref(substitute);
+
+	vine_counters.mount.created++;
 
 	return m;
 }
@@ -38,6 +42,7 @@ void vine_mount_delete(struct vine_mount *m)
 	vine_file_delete(m->file);
 	free(m->remote_name);
 	free(m);
+	vine_counters.mount.deleted++;
 }
 
 struct vine_mount *vine_mount_copy(struct vine_mount *m)

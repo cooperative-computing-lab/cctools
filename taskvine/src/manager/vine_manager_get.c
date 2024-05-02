@@ -415,12 +415,6 @@ vine_result_code_t vine_manager_get_output_file(struct vine_manager *q, struct v
 				w->hostname,
 				f->cached_name,
 				f->source);
-
-		if (result == VINE_APP_FAILURE) {
-			vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
-		} else if (result == VINE_MGR_FAILURE) {
-			vine_task_set_result(t, VINE_RESULT_OUTPUT_TRANSFER_ERROR);
-		}
 	}
 
 	// If the transfer was successful, make a record of it in the cache.
@@ -458,17 +452,18 @@ vine_result_code_t vine_manager_get_output_file(struct vine_manager *q, struct v
 vine_result_code_t vine_manager_get_output_files(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	vine_result_code_t result = VINE_SUCCESS;
+
+	int task_succeeded = (t->result == VINE_RESULT_SUCCESS && t->exit_code == 0);
+
+	vine_result_code_t result_all_files = VINE_SUCCESS;
 
 	if (t->output_mounts) {
 		struct vine_mount *m;
 		LIST_ITERATE(t->output_mounts, m)
 		{
 			// non-file objects are handled by the worker.
-			if (m->file->type != VINE_FILE && m->file->type != VINE_BUFFER)
+			if (m->file->type != VINE_FILE && m->file->type != VINE_BUFFER && m->file->type != VINE_TEMP)
 				continue;
-
-			int task_succeeded = (t->result == VINE_RESULT_SUCCESS && t->exit_code == 0);
 
 			// skip failure-only files on success
 			if (m->flags & VINE_FAILURE_ONLY && task_succeeded)
@@ -478,18 +473,30 @@ vine_result_code_t vine_manager_get_output_files(
 			if (m->flags & VINE_SUCCESS_ONLY && !task_succeeded)
 				continue;
 
-			// otherwise, get the file.
-			result = vine_manager_get_output_file(q, w, t, m, m->file);
+			vine_result_code_t result_single_file = VINE_SUCCESS;
+			if (m->file->type == VINE_TEMP) {
+				// if temp, check that we got a cache update message.
+				struct vine_file *f = hash_table_lookup(q->file_table, m->file->cached_name);
+				if (!f || f->state != VINE_FILE_STATE_CREATED) {
+					result_single_file = VINE_APP_FAILURE;
+				}
+			} else {
+				// otherwise, get the file.
+				result_single_file = vine_manager_get_output_file(q, w, t, m, m->file);
+			}
 
 			// if success or app-level failure, continue to get other files.
 			// if worker failure, return.
-			if (result == VINE_WORKER_FAILURE) {
+			if (result_single_file == VINE_WORKER_FAILURE || result_single_file == VINE_MGR_FAILURE) {
+				result_all_files = result_single_file;
 				break;
+			} else if (result_single_file == VINE_APP_FAILURE) {
+				result_all_files = result_single_file;
 			}
 		}
 	}
 
-	return result;
+	return result_all_files;
 }
 
 /*

@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "vine_task.h"
+#include "vine_counters.h"
 #include "vine_file.h"
 #include "vine_manager.h"
 #include "vine_mount.h"
@@ -72,6 +73,8 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->current_resource_box = 0;
 
 	t->refcount = 1;
+
+	vine_counters.task.created++;
 
 	return t;
 }
@@ -180,11 +183,12 @@ static struct list *vine_task_string_list_copy(struct list *string_list)
 	return new;
 }
 
-struct vine_task *vine_task_clone(struct vine_task *t)
+struct vine_task *vine_task_addref(struct vine_task *t)
 {
 	if (!t)
 		return 0;
 	t->refcount++;
+	vine_counters.task.ref_added++;
 	return t;
 }
 
@@ -202,9 +206,9 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 
 	/* Static features of task are copied. */
 	if (task->needs_library)
-		vine_task_needs_library(new, task->needs_library);
+		vine_task_set_library_required(new, task->needs_library);
 	if (task->provides_library)
-		vine_task_provides_library(new, task->provides_library);
+		vine_task_set_library_provided(new, task->provides_library);
 	if (task->tag)
 		vine_task_set_tag(new, task->tag);
 	if (task->category)
@@ -254,7 +258,7 @@ void vine_task_set_command(struct vine_task *t, const char *cmd)
 	t->command_line = xxstrdup(cmd);
 }
 
-void vine_task_needs_library(struct vine_task *t, const char *library_name)
+void vine_task_set_library_required(struct vine_task *t, const char *library_name)
 {
 	if (t->needs_library) {
 		free(t->needs_library);
@@ -262,6 +266,11 @@ void vine_task_needs_library(struct vine_task *t, const char *library_name)
 	}
 
 	if (library_name) {
+		if (t->provides_library) {
+			fatal("A task cannot simultaneously provide (%s) and require a library (%s)",
+					t->provides_library,
+					library_name);
+		}
 		t->needs_library = xxstrdup(library_name);
 	}
 
@@ -274,7 +283,12 @@ void vine_task_needs_library(struct vine_task *t, const char *library_name)
 	vine_task_set_gpus(t, 0);
 }
 
-void vine_task_provides_library(struct vine_task *t, const char *library_name)
+const char *vine_task_get_library_required(struct vine_task *t)
+{
+	return t->needs_library;
+}
+
+void vine_task_set_library_provided(struct vine_task *t, const char *library_name)
 {
 	if (t->provides_library) {
 		free(t->provides_library);
@@ -282,8 +296,18 @@ void vine_task_provides_library(struct vine_task *t, const char *library_name)
 	}
 
 	if (library_name) {
+		if (t->needs_library) {
+			fatal("A task cannot simultaneously provide (%s) and require a library (%s)",
+					library_name,
+					t->needs_library);
+		}
 		t->provides_library = xxstrdup(library_name);
 	}
+}
+
+const char *vine_task_get_library_provided(struct vine_task *t)
+{
+	return t->provides_library;
 }
 
 void vine_task_set_function_slots(struct vine_task *t, int nslots)
@@ -622,6 +646,7 @@ int vine_task_add_execution_context(struct vine_task *t, struct vine_file *conte
 	vine_task_set_command(t, new_cmd);
 
 	free(env_name);
+	free(new_cmd);
 
 	return 1;
 }
@@ -700,6 +725,8 @@ void vine_task_delete(struct vine_task *t)
 		return;
 
 	t->refcount--;
+	vine_counters.task.deleted++;
+
 	if (t->refcount > 0)
 		return;
 

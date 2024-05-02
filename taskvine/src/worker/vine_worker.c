@@ -421,8 +421,17 @@ static void send_transfer_address(struct link *manager)
 {
 	char addr[LINK_ADDRESS_MAX];
 	int port;
+
 	vine_transfer_server_address(addr, &port);
-	send_message(manager, "transfer-address %s %d\n", addr, port);
+	if (options->reported_transfer_port > 0) {
+		port = options->reported_transfer_port;
+	}
+
+	if (options->reported_transfer_host) {
+		send_message(manager, "transfer-hostport %s %d\n", options->reported_transfer_host, port);
+	} else {
+		send_message(manager, "transfer-port %d\n", port);
+	}
 }
 
 /*
@@ -535,11 +544,7 @@ static void reap_process(struct vine_process *p, struct link *manager)
 	gpus_allocated -= p->task->resources_requested->gpus;
 
 	vine_gpus_free(p->task->task_id);
-
-	if (!vine_sandbox_stageout(p, cache_manager, manager)) {
-		p->result = VINE_RESULT_OUTPUT_MISSING;
-		p->exit_code = 1;
-	}
+	vine_sandbox_stageout(p, cache_manager, manager);
 
 	if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
 		p->library_process->functions_running--;
@@ -636,6 +641,7 @@ static int handle_completed_tasks(struct link *manager)
 	struct vine_process *fp;
 	uint64_t task_id;
 	uint64_t done_task_id;
+	int done_exit_code;
 
 	ITABLE_ITERATE(procs_running, task_id, p)
 	{
@@ -650,9 +656,10 @@ static int handle_completed_tasks(struct link *manager)
 
 		/* If p is a library, check to see if any results waiting. */
 
-		while (vine_process_library_get_result(p, &done_task_id)) {
+		while (vine_process_library_get_result(p, &done_task_id, &done_exit_code)) {
 			fp = itable_lookup(procs_table, done_task_id);
 			if (fp) {
+				fp->exit_code = done_exit_code;
 				reap_process(fp, manager);
 				result_retrieved++;
 			}
@@ -727,9 +734,9 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 			debug(D_VINE, "rx: %s", cmd);
 			free(cmd);
 		} else if (sscanf(line, "needs_library %s", library_name) == 1) {
-			vine_task_needs_library(task, library_name);
+			vine_task_set_library_required(task, library_name);
 		} else if (sscanf(line, "provides_library %s", library_name) == 1) {
-			vine_task_provides_library(task, library_name);
+			vine_task_set_library_provided(task, library_name);
 		} else if (sscanf(line, "function_slots %" PRId64, &n) == 1) {
 			vine_task_set_function_slots(task, n);
 		} else if (sscanf(line, "infile %s %s %d", localname, taskname_encoded, &flags)) {
@@ -2008,8 +2015,6 @@ static void vine_worker_serve_managers()
 
 static char *make_worker_id()
 {
-	srand(time(NULL));
-
 	char *salt_and_pepper = string_format("%d%d%d", getpid(), getppid(), rand());
 
 	unsigned char digest[MD5_DIGEST_LENGTH];
@@ -2125,6 +2130,9 @@ int main(int argc, char *argv[])
 	/* Start the clock on the worker operation. */
 	worker_start_time = timestamp_get();
 
+	/* The random number generator must be initialized exactly once at startup. */
+	random_init();
+
 	/* Allocate all of the data structures to track tasks an files. */
 	vine_worker_create_structures();
 
@@ -2162,9 +2170,6 @@ int main(int argc, char *argv[])
 	signal(SIGUSR1, handle_abort);
 	signal(SIGUSR2, handle_abort);
 	signal(SIGCHLD, handle_sigchld);
-
-	/* The random number generator must be initialized exactly once at startup. */
-	random_init();
 
 	/* Create the workspace directory and move there. */
 	workspace = vine_workspace_create(options->workspace_dir);

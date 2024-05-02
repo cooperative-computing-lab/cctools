@@ -90,6 +90,7 @@ OPTION_LONG(keep-workspace) Do not delete the contents of the workspace on worke
 - **--volatility=_&lt;chance&gt;_**<br />Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).
 - **--connection-mode=_&lt;mode&gt;_**<br />When using -M, override manager preference to resolve its address. One of by_ip, by_hostname, or by_apparent_ip. Default is set by manager.
 - **--transfer-port=_&lt;port&gt;_**<br /> Listening port for worker-worker transfers.  (default: any))
+- **--contact-hostport=_&lt;hostport&gt;_**<br /> Explicit contact host:port for worker-worker transfers, e.g., when routing is used. (default: :<transfer_port>)
 
 - **--ssl**<br />Enable tls connection to manager (manager should support it).
 - **--tls-sni=_&lt;&gt;_**<br />SNI domain name if different from manager hostname. Implies --ssl.

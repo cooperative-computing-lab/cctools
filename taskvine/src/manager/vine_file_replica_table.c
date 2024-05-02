@@ -46,6 +46,7 @@ struct vine_file_replica *vine_file_replica_table_remove(
 	}
 
 	struct set *workers = hash_table_lookup(m->file_worker_table, cachename);
+
 	if (workers) {
 		set_remove(workers, w);
 		if (set_size(workers) < 1) {
@@ -91,17 +92,13 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 
 		timestamp_t current_time = timestamp_get();
 		if (current_time - peer->last_transfer_failure < q->transient_error_interval) {
-			debug(D_VINE, "Skipping worker source after recent failure : %s", peer->transfer_addr);
+			debug(D_VINE, "Skipping worker source after recent failure : %s", peer->transfer_host);
 			continue;
 		}
 
 		if ((replica = hash_table_lookup(peer->current_files, cachename)) &&
 				replica->state == VINE_FILE_REPLICA_STATE_READY) {
-			// generate a peer address stub as it would appear in the transfer table
-			char *peer_addr = string_format("worker://%s:%d", peer->transfer_addr, peer->transfer_port);
 			int current_transfers = vine_current_transfers_source_in_use(q, peer);
-			free(peer_addr);
-
 			if (current_transfers < q->worker_source_max_transfers) {
 				peer_selected = peer;
 				if (random_index < 0) {
@@ -119,22 +116,29 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 {
 	int found = 0;
 
+	if (vine_current_transfers_get_table_size(m) >=
+			hash_table_size(m->worker_table) * m->worker_source_max_transfers) {
+		return found;
+	}
+
 	struct set *sources = hash_table_lookup(m->file_worker_table, f->cached_name);
 	if (!sources) {
 		return found;
 	}
 
-	int to_find = m->temp_replica_count - set_size(sources);
+	int nsources = set_size(sources);
+	int to_find = MIN(m->temp_replica_count - nsources, m->transfer_replica_per_cycle);
 	if (to_find < 1) {
 		return found;
 	}
+
+	debug(D_VINE, "Found %d workers to holding %s, %d replicas needed", nsources, f->cached_name, to_find);
 
 	/* get the elements of set so we can insert new replicas to sources */
 	struct vine_worker_info **sources_frozen = (struct vine_worker_info **)set_values(sources);
 	struct vine_worker_info *source;
 
 	int i = 0;
-	int nsources = set_size(sources);
 	for (source = sources_frozen[i]; i < nsources; i++) {
 		if (found >= to_find) {
 			break;
@@ -147,8 +151,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 			continue;
 		}
 
-		char *source_addr = string_format(
-				"worker://%s:%d/%s", source->transfer_addr, source->transfer_port, f->cached_name);
+		char *source_addr = string_format("%s/%s", source->transfer_url, f->cached_name);
 		int source_in_use = vine_current_transfers_source_in_use(m, source);
 
 		char *id;
@@ -156,11 +159,9 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		int offset_bookkeep;
 		HASH_TABLE_ITERATE_RANDOM_START(m->worker_table, offset_bookkeep, id, peer)
 		{
+
 			if (found_per_source >= MIN(m->file_source_max_transfers, to_find)) {
-				/* XXX: commenting this check for now, as otherwise only one replica is created.
-				 * We need to create replicas during wait_internal too.
-					break;
-				*/
+				break;
 			}
 
 			if (source_in_use >= m->worker_source_max_transfers) {
@@ -231,5 +232,14 @@ int vine_file_replica_table_exists_somewhere(struct vine_manager *q, const char 
 		return 0;
 	}
 
-	return set_size(workers) > 0;
+	struct vine_worker_info *peer;
+
+	SET_ITERATE(workers, peer)
+	{
+		if (peer->transfer_port_active) {
+			return 1;
+		}
+	}
+
+	return 0;
 }

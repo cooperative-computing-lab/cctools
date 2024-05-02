@@ -26,7 +26,6 @@ typedef enum {
 	VINE_WORKER_FAILURE,
 	VINE_APP_FAILURE,
 	VINE_MGR_FAILURE,
-	VINE_TRANSIENT_FAILURE,
 	VINE_END_OF_LIST,
 } vine_result_code_t;
 
@@ -122,6 +121,8 @@ struct vine_manager {
 
 	struct hash_table *file_table;      /* Maps fileid -> struct vine_file.* */
 	struct hash_table *file_worker_table; /* Maps cachename -> struct set of workers with a replica of the file.* */
+	struct hash_table *temp_files_to_replicate; /* Maps cachename -> NULL. Used as a set of temp files to be replicated */
+
 
 	/* Primary scheduling controls. */
 
@@ -171,10 +172,9 @@ struct vine_manager {
 	/* Peer Transfer Configuration */
 	int peer_transfers_enabled;
 	int file_source_max_transfers;
-	int temp_replica_count;
 	int worker_source_max_transfers;
-	/* Various performance knobs that can be tuned. */
 
+	/* Various performance knobs that can be tuned. */
 	int short_timeout;            /* Timeout in seconds to send/recv a brief message from worker */
 	int long_timeout;             /* Timeout if in the middle of an incomplete message. */
 	int minimum_transfer_timeout; /* Minimum number of seconds to allow for a manager<-> worker file transfer. */
@@ -201,6 +201,10 @@ struct vine_manager {
 	int immediate_recovery;       /* If true, recovery tasks for tmp files are created as soon as the worker that had them
 																	 disconnects. Otherwise, create them only when a tasks needs then as inputs (this is
 																	 the default). */
+	int transfer_temps_recovery;  /* If true, attempt to recover temp files from lost worker to reach threshold required */
+	int transfer_replica_per_cycle;  /* Maximum number of replica to request per temp file per iteration */
+	int temp_replica_count;       /* Number of replicas per temp file */
+
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
 	int disk_avail_threshold; /* Ensure this minimum amount of available disk space. (in MB) */
@@ -258,6 +262,8 @@ int vine_manager_check_worker_can_run_function_task(struct vine_manager *q, stru
 
 /* Internal: Shut down a specific worker. */
 int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_info *w);
+
+struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
 /* The expected format of files created by the resource monitor.*/
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-task-%d"

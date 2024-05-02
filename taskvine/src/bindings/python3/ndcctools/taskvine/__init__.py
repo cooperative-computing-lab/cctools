@@ -59,6 +59,8 @@ from .task import (
 )
 from .dask_dag import DaskVineDag
 
+from . import cvine
+
 try:
     from .dask_executor import DaskVine
 except ImportError as e:
@@ -91,5 +93,7 @@ __all__ = [
     "DaskVine",
     "DaskVineDag",
 ]
+
+__version__ = cvine.cctools_version_string()
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:

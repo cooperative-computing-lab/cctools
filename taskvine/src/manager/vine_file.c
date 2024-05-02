@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "vine_file.h"
 #include "vine_cached_name.h"
+#include "vine_counters.h"
 #include "vine_task.h"
 
 #include "copy_stream.h"
@@ -30,6 +31,8 @@ int vine_file_delete(struct vine_file *f)
 {
 	if (f) {
 		f->refcount--;
+
+		vine_counters.file.deleted++;
 
 		if (f->refcount == 1 && f->recovery_task) {
 			/* delete the recovery task for this file, if any, to break the refcount cycle.
@@ -104,7 +107,7 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 		/* On the worker, the source (name on disk) is already the cached name. */
 		f->cached_name = xxstrdup(f->source);
 	} else if (cached_name) {
-		/* If the cached name is provided, just use it.  (Likely a cloned object.) */
+		/* If the cached name is provided, just use it.  (Likely a referenced object.) */
 		f->cached_name = xxstrdup(cached_name);
 	} else {
 		/* Otherwise we need to figure it out ourselves from the content. */
@@ -129,17 +132,19 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 	}
 
 	f->refcount = 1;
+	vine_counters.file.created++;
 
 	return f;
 }
 
 /* Make a reference counted copy of a file object. */
 
-struct vine_file *vine_file_clone(struct vine_file *f)
+struct vine_file *vine_file_addref(struct vine_file *f)
 {
 	if (!f)
 		return 0;
 	f->refcount++;
+	vine_counters.file.ref_added++;
 	return f;
 }
 

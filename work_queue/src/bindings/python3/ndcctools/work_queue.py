@@ -42,6 +42,8 @@ import atexit
 import time
 import math
 
+__version__ = cctools_version_string()
+
 
 def set_debug_flag(*flags):
     for flag in flags:
@@ -1703,6 +1705,21 @@ class WorkQueue(object):
         for k in rmd:
             setattr(rm, k, rmd[k])
         return work_queue_specify_category_first_allocation_guess(self._work_queue, category, rm)
+
+    ##
+    # Specifies the maximum resources allowed for the given category.
+    #
+    # @param self      Reference to the current work queue object.
+    # @param category  Name of the category.
+    # @param max_concurrent Number of maximum concurrent tasks. Less then 0 means unlimited (this is the default).
+    # For example:
+    # @code
+    # >>> # Do not run more than 5 tasks of "my_category" concurrently:
+    # >>> q.specify_category_max_concurrent("my_category", 5)
+    # @endcode
+    def specify_category_max_concurrent(self, category, max_concurrent):
+        return work_queue_specify_category_max_concurrent(self._work_queue, category, max_concurrent)
+
 
     ##
     # Initialize first value of categories

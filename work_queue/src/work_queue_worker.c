@@ -2270,8 +2270,6 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 
 void set_worker_id()
 {
-	srand(time(NULL));
-
 	char *salt_and_pepper = string_format("%d%d%d", getpid(), getppid(), rand());
 	unsigned char digest[MD5_DIGEST_LENGTH];
 
@@ -2496,6 +2494,8 @@ int main(int argc, char *argv[])
 	catalog_hosts = CATALOG_HOST;
 
 	features = hash_table_create(4, 0);
+
+	random_init();
 
 	worker_start_time = timestamp_get();
 
@@ -2809,8 +2809,6 @@ int main(int argc, char *argv[])
 	signal(SIGUSR1, handle_abort);
 	signal(SIGUSR2, handle_abort);
 	signal(SIGCHLD, handle_sigchld);
-
-	random_init();
 
 	if(!workspace_create()) {
 		fprintf(stderr, "work_queue_worker: failed to setup workspace at %s.\n", workspace);

@@ -60,7 +60,7 @@ struct vine_file * vine_file_create( const char *source, const char *cached_name
 
 struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source, struct vine_worker_info *w );
 
-struct vine_file *vine_file_clone( struct vine_file *f );
+struct vine_file *vine_file_addref( struct vine_file *f );
 
 /* Decreases reference count of file, and frees if zero. */
 int vine_file_delete( struct vine_file *f );

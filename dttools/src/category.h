@@ -85,10 +85,14 @@ struct category {
     /* manager for bucketing mode, if applicable */
     bucketing_manager_t* bucketing_manager;
 
+  /* number of tasks completed */
 	int64_t total_tasks;
 
 	/* completions since last time first-allocation was updated. */
 	int64_t completions_since_last_reset;
+
+  /* maximum number of tasks of this category allowed to be running concurrently. If less than 0, unlimited. */
+  int64_t max_concurrent;
 
 	/* category is somewhat confident of the maximum seen value. */
 	int steady_state;

@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "taskvine.h"
 #include "vine_resources.h"
 
+#include "domain_name.h"
 #include "hash_table.h"
 #include "link.h"
 #include "itable.h"
@@ -41,10 +42,11 @@ struct vine_worker_info {
 	/* Hash key used to locally identify this worker. */
 	char *hashkey;
 
-	/* Address and port where this worker will accept transfers from peers. */
-	char transfer_addr[LINK_ADDRESS_MAX];
+	/* Host (address or hostname) and port where this worker will accept transfers from peers. */
+	char transfer_host[DOMAIN_NAME_MAX];
 	int  transfer_port;
 	int  transfer_port_active;
+	char *transfer_url;       /* worker(ip)?://transfer_addr:transfer_port */
 
 	/* Worker condition that may affect task start or cancellation. */
 	int  draining;                          // if 1, worker does not accept anymore tasks. It is shutdown if no task running.

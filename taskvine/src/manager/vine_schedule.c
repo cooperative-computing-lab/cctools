@@ -30,7 +30,7 @@ int check_fixed_location_worker(struct vine_manager *m, struct vine_worker_info 
 	if (t->has_fixed_locations) {
 		LIST_ITERATE(t->input_mounts, mt)
 		{
-			if (mt->file->flags & VINE_FIXED_LOCATION) {
+			if (mt->flags & VINE_FIXED_LOCATION) {
 				replica = hash_table_lookup(w->current_files, mt->file->cached_name);
 				if (!replica) {
 					all_present = 0;
@@ -168,13 +168,6 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	}
 	rmsummary_delete(l);
 
-	/* If this is a function task, check if the worker can run it.
-	 * May require the manager to send a library to the worker first. */
-	if (t->needs_library && !vine_manager_check_worker_can_run_function_task(q, w, t)) {
-		/* Careful: If this failed, then the worker object may longer be valid! */
-		return 0;
-	}
-
 	// if worker's end time has not been received
 	if (w->end_time < 0) {
 		return 0;
@@ -211,7 +204,37 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		}
 	}
 
+	/* do this check last! otherwise the library is sent to workers that can't fit it. */
+	if (t->needs_library) {
+		struct vine_task *library = vine_schedule_find_library(w, t->needs_library);
+		if (!library) {
+			/* XXX: checking for matches should not modify the state of workers. */
+			library = send_library_to_worker(q, w, t->needs_library);
+			/* Careful: If this failed, then the worker object may longer be valid! */
+			if (!library) {
+				return 0;
+			}
+		}
+	}
+
 	return 1;
+}
+
+/* Find a library task running on a specific worker that has an available slot.
+ * @return pointer to the library task if there's one, 0 otherwise. */
+struct vine_task *vine_schedule_find_library(struct vine_worker_info *w, const char *library_name)
+{
+	uint64_t task_id;
+	struct vine_task *task;
+	ITABLE_ITERATE(w->current_tasks, task_id, task)
+	{
+		if (task->provides_library && !strcmp(task->provides_library, library_name) &&
+				(task->function_slots_inuse < task->function_slots)) {
+			return task;
+		}
+	}
+
+	return 0;
 }
 
 // 0 if current_best has more free resources than candidate, 1 else.
@@ -613,6 +636,6 @@ int vine_schedule_check_fixed_location(struct vine_manager *q, struct vine_task 
 			return 1;
 		}
 	}
-
+	debug(D_VINE, "Missing fixed_location dependencies for task: %d", t->task_id);
 	return 0;
 }

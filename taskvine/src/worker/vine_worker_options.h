@@ -104,6 +104,10 @@ struct vine_worker_options {
 	/* Range of ports allowed to set the server for transfers between workers. */
 	int transfer_port_min;
 	int transfer_port_max;
+
+  /* Explicit contact host (address or hostname) for transfers bewteen workers. */
+  char *reported_transfer_host;
+  int reported_transfer_port;
 };
 
 struct vine_worker_options * vine_worker_options_create();

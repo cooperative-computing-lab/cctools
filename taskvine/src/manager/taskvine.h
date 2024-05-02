@@ -249,13 +249,25 @@ void vine_task_set_command( struct vine_task *t, const char *cmd );
 @param t A task object.
 @param name The name of the library coprocess name that will be used by this task.
 */
-void vine_task_needs_library( struct vine_task *t, const char *name );
+void vine_task_set_library_required( struct vine_task *t, const char *name );
+
+/** Get the library name required by this task.
+@param t A task object.
+@return The name of the library coprocess name that will be used by this task.
+*/
+const char *vine_task_get_library_required( struct vine_task *t );
 
 /** Set the library name provided by this task.
 @param t A task object.
 @param name The name of the library coprocess that this task implements.
 */
-void vine_task_provides_library( struct vine_task *t, const char *name );
+void vine_task_set_library_provided( struct vine_task *t, const char *name );
+
+/** Get the library name provided by this task.
+@param t A task object.
+@return The name of the library coprocess name that will be used by this task.
+*/
+const char *vine_task_get_library_provided( struct vine_task *t );
 
 
 /** Set the number of concurrent functions a library can run.
@@ -1091,6 +1103,13 @@ int vine_set_draining_by_hostname(struct vine_manager *m, const char *hostname, 
 */
 int vine_set_category_mode(struct vine_manager *m, const char *category, vine_category_mode_t mode);
 
+/** Set a maximum number of tasks of this category that can execute concurrently. If less than 0, unlimited (this is the default).
+@param q A manager object.
+@param category A category name.
+@param max_concurrent Number of maximum concurrent tasks.
+*/
+void vine_set_category_max_concurrent(struct vine_manager *m, const char *category, int max_concurrent);
+
 /** Turn on or off first-allocation labeling for a given category and resource. This function should be use to fine-tune the defaults from @ref vine_set_category_mode.
 @param m A manager object
 @param category A category name.
@@ -1128,6 +1147,11 @@ void vine_set_tasks_left_count(struct vine_manager *m, int ntasks);
 @param hosts The catalog servers given as a comma delimited list of hostnames or hostname:port
 */
 void vine_set_catalog_servers(struct vine_manager *m, const char *hosts);
+
+/* Send updates to the catalog server.
+@param m A manager object
+*/
+void vine_update_catalog(struct vine_manager *m);
 
 /** Add a global property to the manager which will be included in periodic
 reports to the catalog server and other telemetry destinations.
@@ -1325,7 +1349,10 @@ void vine_log_debug_app(struct vine_manager *q, const char *entry);
 */
 void vine_log_txn_app(struct vine_manager *q, const char *entry);
 
+/** Display internal reference counts for troubleshooting purposes.
+*/
 
+void vine_counters_print();
 
 //@}
 
