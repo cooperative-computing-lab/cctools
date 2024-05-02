@@ -267,7 +267,8 @@ class DaskVine(Manager):
                                    lazy_transfers=lazy)
 
                 if self.env_per_task:
-                    t.set_command(f"mkdir envdir && tar -xf {self._environment_name} -C envdir && envdir/bin/run_in_env {t._command}")
+                    t.set_command(
+                        f"mkdir envdir && tar -xf {self._environment_name} -C envdir && envdir/bin/run_in_env {t._command}")
                     t.add_input(self.environment_file, self.environment_name)
 
                 t.set_tag(tag)  # tag that identifies this dag
