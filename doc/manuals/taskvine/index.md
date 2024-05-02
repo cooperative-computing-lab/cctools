@@ -2485,6 +2485,7 @@ change.
 | immediate-recovery    | If set to 1, create recovery tasks for temporary files as soon as their worker disconnects. Otherwise, create recovery tasks only if the temporary files are used as input when trying to dispatch another task. | 0 |
 | keepalive-interval | Set the minimum number of seconds to wait before sending new keepalive checks to workers. | 300 |
 | keepalive-timeout | Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. | 30 |
+| load-from-shared-filesystem | If set to 1, workers can load in data to their caches from the shared filesystem | 0 |
 | long-timeout | Set the minimum timeout in seconds when sending a large message to a single worker. | 3600 |
 | max-retrievals | Sets the max number of tasks to retrieve per manager wait(). If less than 1, the manager prefers to retrieve all completed tasks before dispatching new tasks to workers. | 1 |
 | min-transfer-timeout | Set the minimum number of seconds to wait for files to be transferred to or from a worker. | 10 |

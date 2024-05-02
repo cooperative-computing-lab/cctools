@@ -148,6 +148,20 @@ struct vine_file *vine_file_addref(struct vine_file *f)
 	return f;
 }
 
+/* Make a URL reference to a file source*/
+
+char *vine_file_make_file_url(const char *source)
+{
+
+	char *abs_path = path_getcwd();
+
+	char *result = string_format("file://%s/%s", abs_path, source);
+
+	free(abs_path);
+
+	return result;
+}
+
 /* Return the contents of the file, if available. */
 
 const char *vine_file_contents(struct vine_file *f)
