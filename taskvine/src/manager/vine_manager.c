@@ -1123,6 +1123,12 @@ static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_i
 		break;
 	}
 
+	if (result == VINE_APP_FAILURE) {
+		vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
+	} else if (result == VINE_MGR_FAILURE) {
+		vine_task_set_result(t, VINE_RESULT_OUTPUT_TRANSFER_ERROR);
+	}
+
 	/* Regardless of the exit status, remove the task and sandbox from the worker. */
 	vine_manager_send(q, w, "kill %d\n", t->task_id);
 
