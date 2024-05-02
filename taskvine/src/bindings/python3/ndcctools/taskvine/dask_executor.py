@@ -91,8 +91,10 @@ class DaskVine(Manager):
     #                       or 'exhaustive bucketing'. This is done per function type in dsk.
     # @param task_mode     Create tasks as either as 'tasks' (using PythonTasks) or 'function-calls' (using FunctionCalls)
     # @param retries       Number of times to attempt a task. Default is 5.
-    # @param submit_per_cycle Maximum number of tasks to serialize per wait call. If None, or less than 1, then all
-    #                         tasks are serialized as they are available.
+    # @param submit_per_cycle Maximum number of tasks to submit to scheduler at once. If None, or less than 1, then all
+    #                         tasks are submitted as they are available.
+    # @param max_pending   Maximum number of tasks without a result before new ones are submitted to the scheduler.
+    #                      If None, or less than 1, then no limit is set.
     # @param verbose       if true, emit additional debugging information.
     # @param env_per_task  if true, each task individually expands its own environment. Must use environment option as a str.
     # @param progress_disable If True, disable progress bar
@@ -107,6 +109,7 @@ class DaskVine(Manager):
             resources=None,
             resources_mode=None,
             submit_per_cycle=None,
+            max_pending=None,
             retries=5,
             verbose=False,
             lib_resources=None,
@@ -144,7 +147,13 @@ class DaskVine(Manager):
             self.progress_disable = progress_disable
             self.progress_label = progress_label
 
+            if submit_per_cycle is not None and submit_per_cycle < 1:
+                submit_per_cycle = None
             self.submit_per_cycle = submit_per_cycle
+
+            if max_pending is not None and max_pending < 1:
+                max_pending = None
+            self.max_pending = max_pending
 
             self._categories_known = set()
 
@@ -214,20 +223,24 @@ class DaskVine(Manager):
         rs = dag.set_targets(keys_flatten)
         self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
 
+        pending = 0
+
         (bar_progress, bar_update) = self._make_progress_bar(dag.left_to_compute())
         with bar_progress:
             while not self.empty() or enqueued_calls:
                 submitted = 0
-                while enqueued_calls and (
-                    not self.submit_per_cycle
-                    or self.submit_per_cycle < 0
-                    or submitted < self.submit_per_cycle
+                while (
+                    enqueued_calls
+                    and (not self.submit_per_cycle or self.submit_per_cycle < submitted)
+                    and (not self.max_pending or self.max_pending < pending)
                 ):
-                    submitted += 1
                     self.submit(enqueued_calls.pop())
+                    submitted += 1
+                    pending += 1
 
                 t = self.wait_for_tag(tag, 5)
                 if t:
+                    pending -= 1
                     if self.verbose:
                         print(f"{t.key} ran on {t.hostname}")
 
