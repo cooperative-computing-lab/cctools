@@ -100,6 +100,10 @@ class DaskVine(Manager):
     # @param env_per_task  if true, each task individually expands its own environment. Must use environment option as a str.
     # @param progress_disable If True, disable progress bar
     # @param progress_label Label to use in progress bar
+    # @param wrapper       Function to wrap dask calls. It should take as arguments (key, fn, *args). It should execute
+    #                      fn(*args) at some point during its execution to produce the dask task result.
+    #                      Should return a tuple of (wrapper result, dask call result). Use for debugging.
+    # @param wrapper_proc  Function to process results from wrapper on completion. (default is print)
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
@@ -121,6 +125,8 @@ class DaskVine(Manager):
             env_per_task=False,
             progress_disable=False,
             progress_label="[green]tasks",
+            wrapper=None,
+            wrapper_proc=print,
             import_modules=None  # Deprecated, use lib_modules
             ):
         try:
@@ -153,6 +159,8 @@ class DaskVine(Manager):
             self.env_per_task = env_per_task
             self.progress_disable = progress_disable
             self.progress_label = progress_label
+            self.wrapper = wrapper
+            self.wrapper_proc = wrapper_proc
 
             if submit_per_cycle is not None and submit_per_cycle < 1:
                 submit_per_cycle = None
@@ -193,7 +201,9 @@ class DaskVine(Manager):
 
         # create Library if using 'function-calls' task mode.
         if self.task_mode == 'function-calls':
-            functions = [execute_graph_vertex]
+            functions = [wrapped_execute_graph_vertex, execute_graph_vertex]
+            if self.wrapper:
+                functions.extend([wrapped_execute_graph_vertex, self.wrapper])
             if self.lib_extra_functions:
                 functions.extend(self.lib_extra_functions)
             libtask = self.create_library_from_functions('Dask-Library',
@@ -258,6 +268,9 @@ class DaskVine(Manager):
                         result_file = DaskVineFile(t.output_file, t.key, dag, self.task_mode)
                         rs = dag.set_result(t.key, result_file)
                         self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
+
+                        if self.wrapper:
+                            self.wrapper_proc(t.load_wrapper_output(self))
 
                         result_file.garbage_collect_children(self)
 
@@ -329,7 +342,8 @@ class DaskVine(Manager):
                                    extra_files=self.extra_files,
                                    env_vars=self.env_vars,
                                    retries=retries,
-                                   lazy_transfers=lazy)
+                                   lazy_transfers=lazy,
+                                   wrapper=self.wrapper)
 
                 if self.env_per_task:
                     t.set_command(
@@ -483,11 +497,14 @@ class PythonTaskDask(PythonTask):
                  extra_files=None,
                  env_vars=None,
                  retries=5,
-                 lazy_transfers=False):
+                 lazy_transfers=False,
+                 wrapper=None):
         self._key = key
         self._sexpr = sexpr
 
         self._retries_left = retries
+        self._wrapper_output_file = None
+        self._wrapper_output = None
 
         args_raw = {k: dag.get_result(k) for k in dag.get_children(key)}
         args = {
@@ -499,7 +516,14 @@ class PythonTaskDask(PythonTask):
         keys_of_files = list(args.keys())
         args = args_raw | args
 
-        super().__init__(execute_graph_vertex, sexpr, args, keys_of_files)
+        if wrapper:
+            super().__init__(wrapped_execute_graph_vertex, wrapper, key, sexpr, args, keys_of_files)
+            wo = m.declare_buffer()
+            self.add_output(wo, "wrapper.output")
+            self._wrapper_output_file = wo
+        else:
+            super().__init__(execute_graph_vertex, sexpr, args, keys_of_files)
+
         self.set_output_cache(cache=True)
 
         for k, f in args_raw.items():
@@ -537,6 +561,14 @@ class PythonTaskDask(PythonTask):
 
     def set_output_name(self, filename):
         self._out_name_file = filename
+
+    def load_wrapper_output(self, manager):
+        if not self._wrapper_output:
+            if self._wrapper_output_file:
+                self._wrapper_output = self._wrapper_output_file.contents(cloudpickle.load)
+                manager.undeclare_file(self._wrapper_output_file)
+                self._wrapper_output_file = None
+        return self._wrapper_output
 
 ##
 # @class ndcctools.taskvine.dask_executor.FunctionCallDask
@@ -611,6 +643,23 @@ class FunctionCallDask(FunctionCall):
 
     def set_output_name(self, filename):
         self._out_name_file = filename
+
+
+def wrapped_execute_graph_vertex(wrapper, key, sexpr, args, keys_of_files):
+    import cloudpickle
+    try:
+        (wrapper_result, call_result) = wrapper(key, execute_graph_vertex, sexpr, args, keys_of_files)
+        return call_result
+    except Exception:
+        print(f"Wrapped call for {key} failed.")
+        raise
+    finally:
+        try:
+            with open("wrapper.output", "wb") as f:
+                cloudpickle.dump(wrapper_result, f)
+        except Exception:
+            print(f"Wrapped call for {key} failed to write output.")
+            raise
 
 
 def execute_graph_vertex(sexpr, args, keys_of_files):
