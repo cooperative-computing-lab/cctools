@@ -81,9 +81,10 @@ class DaskVine(Manager):
     #                      to the manager.
     # @param resources     A dictionary with optional keys of cores, memory and disk (MB)
     #                      to set maximum resource usage per task.
-    # @param lib_resources A dictionary with optional keys of cores, memory and disk (MB)
-    # @param lib_command A command to be prefixed to the execution of a Library task.
-    # @param import_modules Hoist these module imports for the DaskVine Library.
+    # @param lib_extra_functions Additional functions to include in execution library (function-calls task_mode)
+    # @param lib_resources A dictionary with optional keys of cores, memory and disk in MB (function-calls task_mode)
+    # @param lib_command A command to be prefixed to the execution of a Library task (function-calls task_mode)
+    # @param lib_modules Hoist these module imports for the execution library (function-calls task_mode)
     # @param env_per_task execute each task
     # @param resources_mode Automatically resize allocation per task. One of 'fixed'
     #                       (use the value of 'resources' above), 'max througput',
@@ -112,13 +113,15 @@ class DaskVine(Manager):
             max_pending=None,
             retries=5,
             verbose=False,
+            lib_extra_functions=None,
             lib_resources=None,
             lib_command=None,
-            import_modules=None,
+            lib_modules=None,
             task_mode='tasks',
             env_per_task=False,
             progress_disable=False,
             progress_label="[green]tasks",
+            import_modules=None  # Deprecated, use lib_modules
             ):
         try:
             self.set_property("framework", "dask")
@@ -139,9 +142,13 @@ class DaskVine(Manager):
             self.resources_mode = resources_mode
             self.retries = retries
             self.verbose = verbose
+            self.lib_extra_functions = lib_extra_functions
             self.lib_resources = lib_resources
             self.lib_command = lib_command
-            self.import_modules = import_modules
+            if lib_modules:
+                self.lib_modules = lib_modules
+            else:
+                self.lib_modules = import_modules  # Deprecated
             self.task_mode = task_mode
             self.env_per_task = env_per_task
             self.progress_disable = progress_disable
@@ -186,12 +193,15 @@ class DaskVine(Manager):
 
         # create Library if using 'function-calls' task mode.
         if self.task_mode == 'function-calls':
+            functions = [execute_graph_vertex]
+            if self.lib_extra_functions:
+                functions.extend(self.lib_extra_functions)
             libtask = self.create_library_from_functions('Dask-Library',
-                                                         execute_graph_vertex,
+                                                         *functions,
                                                          poncho_env="dummy-value",
                                                          add_env=False,
                                                          init_command=self.lib_command,
-                                                         import_modules=self.import_modules)
+                                                         import_modules=self.lib_modules)
 
             if self.environment:
                 libtask.add_environment(self.environment)
