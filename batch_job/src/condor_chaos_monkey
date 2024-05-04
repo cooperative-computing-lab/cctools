@@ -122,9 +122,10 @@ def run(args: argparse.Namespace):
         print(f"{nbr_jobs_removed_total} removed total.")
         print()
 
-        cycle_count += 1 
+        cycle_count += 1
 
-        time.sleep(args.remove_delay)
+        if nbr_jobs_removed_total < nbr_jobs_to_remove:
+            time.sleep(args.remove_delay)
 
 
 
