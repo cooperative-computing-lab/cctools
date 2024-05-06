@@ -130,6 +130,7 @@ class DaskVine(Manager):
             self.lib_command = lib_command
             self.import_modules = import_modules
             self.task_mode = task_mode
+            self.light_tasks=light_tasks
             self.env_per_task = env_per_task
 
             self.submit_per_cycle = submit_per_cycle
@@ -254,6 +255,8 @@ class DaskVine(Manager):
                                    env_vars=self.env_vars,
                                    retries=retries,
                                    lazy_transfers=lazy)
+                if self.light_tasks:
+                    t.light_task()
 
                 if self.env_per_task:
                     t.set_command(f"mkdir envdir && tar -xf {self._environment_name} -C envdir && envdir/bin/run_in_env {t._command}")
@@ -271,6 +274,10 @@ class DaskVine(Manager):
                                      lazy_transfers=lazy)
 
                 t.set_tag(tag)  # tag that identifies this dag
+
+                if self.light_tasks:
+                    t.light_task()
+
                 enqueued_calls.append(t)
 
     def _load_results(self, dag, key_indices, keys):

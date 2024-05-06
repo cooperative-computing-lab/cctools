@@ -1337,6 +1337,7 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 
 	// At this point, a task is completed.
 	reap_task_from_worker(q, w, t, VINE_TASK_RETRIEVED);
+	vine_manager_send(q, w, "kill %d\n", t->task_id);
 
 	w->finished_tasks--;
 	w->total_tasks_complete++;
