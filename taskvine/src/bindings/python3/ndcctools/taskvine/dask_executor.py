@@ -239,7 +239,7 @@ class DaskVine(Manager):
                     submitted += 1
                     pending += 1
 
-                t = self.wait(tag, timeout)
+                t = self.wait_for_tag(tag, timeout)
                 if t:
                     timeout = 0
                     pending -= 1
