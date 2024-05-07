@@ -203,11 +203,13 @@ int vine_file_has_changed(struct vine_file *f)
 					(!S_ISDIR(info.st_mode) && ((int64_t)f->size) != ((int64_t)info.st_size))) {
 				if (!f->change_message_shown) {
 					debug(D_VINE | D_NOTICE,
-							"input file %s was modified by someone in the middle of the workflow!\n",
+							"input file %s was modified by someone in the middle of the workflow! Workers may use different versions of the file.\n",
 							f->source);
 					f->change_message_shown++;
 				}
-				return 1;
+				// XXX: do nothing for now, as some workflows break after
+				// updating the file times without modifying its contents.
+				return 0;
 			}
 		}
 	}
