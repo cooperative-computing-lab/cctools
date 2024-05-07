@@ -4688,37 +4688,11 @@ struct vine_task *vine_wait(struct vine_manager *q, int timeout)
 
 struct vine_task *vine_wait_for_tag(struct vine_manager *q, const char *tag, int timeout)
 {
-	if (timeout == 0) {
-		// re-establish old, if unintended behavior, where 0 would wait at
-		// least a second. With 0, we would like the loop to be executed at
-		// least once, but right now we cannot enforce that. Making it 1, we
-		// guarantee that the wait loop is executed once.
-		timeout = 1;
-	}
-
-	if (timeout != VINE_WAIT_FOREVER && timeout < 0) {
-		debug(D_NOTICE | D_VINE, "Invalid wait timeout value '%d'. Waiting for 5 seconds.", timeout);
-		timeout = 5;
-	}
-
 	return vine_wait_internal(q, timeout, tag, -1);
 }
 
 struct vine_task *vine_wait_for_task_id(struct vine_manager *q, int task_id, int timeout)
 {
-	if (timeout == 0) {
-		// re-establish old, if unintended behavior, where 0 would wait at
-		// least a second. With 0, we would like the loop to be executed at
-		// least once, but right now we cannot enforce that. Making it 1, we
-		// guarantee that the wait loop is executed once.
-		timeout = 1;
-	}
-
-	if (timeout != VINE_WAIT_FOREVER && timeout < 0) {
-		debug(D_NOTICE | D_VINE, "Invalid wait timeout value '%d'. Waiting for 5 seconds.", timeout);
-		timeout = 5;
-	}
-
 	return vine_wait_internal(q, timeout, NULL, task_id);
 }
 
@@ -4854,8 +4828,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	   - mark as busy-waiting and go to S
 	*/
 
-	int events = 0;
-
 	// account for time we spend outside vine_wait
 	if (q->time_last_wait > 0) {
 		q->stats->time_application += timestamp_get() - q->time_last_wait;
@@ -4863,6 +4835,17 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		q->stats->time_application += timestamp_get() - q->stats->time_when_started;
 	}
 
+	if (timeout == 0) {
+		// if timeout is 0, just return any completed task if one available.
+		return vine_manager_no_wait(q, NULL, task_id);
+	}
+
+	if (timeout != VINE_WAIT_FOREVER && timeout < 0) {
+		debug(D_NOTICE | D_VINE, "Invalid wait timeout value '%d'. Waiting for 5 seconds.", timeout);
+		timeout = 5;
+	}
+
+	int events = 0;
 	print_password_warning(q);
 
 	// compute stoptime
@@ -5066,7 +5049,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	return t;
 }
 
-struct vine_task *vine_wait_no_wait(struct vine_manager *q, const char *tag, int task_id)
+struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, int task_id)
 {
 	BEGIN_ACCUM_TIME(q, time_internal);
 	struct vine_task *t = find_task_to_return(q, tag, task_id);

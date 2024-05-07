@@ -265,6 +265,10 @@ int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_inf
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
+/** Return any completed task without doing any manager work. */
+struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, int task_id);
+
+
 /* The expected format of files created by the resource monitor.*/
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-task-%d"
 #define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
