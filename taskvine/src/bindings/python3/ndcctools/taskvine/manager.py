@@ -1024,6 +1024,7 @@ class Manager(object):
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.  Use an integer to set the timeout or the value
     #                   "wait_forever" to block until a task has completed.
+    #                   If 0, return immediately with a complete task if one available, or None otherwise.
     def wait(self, timeout="wait_forever"):
         if timeout == "wait_forever":
             timeout = get_c_constant("wait_forever")
@@ -1039,6 +1040,7 @@ class Manager(object):
     # @param tag        Desired tag. If None, then it is equivalent to self.wait(timeout)
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.
+    #                   If 0, return immediately with a complete task if one available, or None otherwise.
     def wait_for_tag(self, tag, timeout="wait_forever"):
         if timeout == "wait_forever":
             timeout = get_c_constant("wait_forever")
@@ -1064,26 +1066,13 @@ class Manager(object):
     # @param self       Reference to the current manager object.
     # @param task_id    Desired task_id. If -1, then it is equivalent to self.wait(timeout)
     # @param timeout    The number of seconds to wait for a completed task
-    #                   before returning.
+    #                   before returning. If 0, return immediately with a complete task if one available,
+    #                   or None otherwise.
     def wait_for_task_id(self, task_id, timeout="wait_forever"):
         if timeout == "wait_forever":
             timeout = get_c_constant("wait_forever")
 
         task_pointer = cvine.vine_wait_for_task_id(self._taskvine, task_id, timeout)
-        if task_pointer:
-            task = self._task_table[cvine.vine_task_get_id(task_pointer)]
-            del self._task_table[cvine.vine_task_get_id(task_pointer)]
-            return task
-        return None
-
-    ##
-    # Return any completed task without doing any manager work.
-    # If there is not a completed task, then it returns without any wait.
-    # @param task_id The desired task_id. If -1, then tasks are returned regardless of their task_id.
-    # @param tag The desired tag. If NULL, then tasks are returned regardless of their tag.
-    # @returns A completed task description, or None if there is not one.
-    def wait_no_wait(self, tag=None, task_id=-1):
-        task_pointer = cvine.vine_wait_no_wait(self._taskvine, tag, task_id)
         if task_pointer:
             task = self._task_table[cvine.vine_task_get_id(task_pointer)]
             del self._task_table[cvine.vine_task_get_id(task_pointer)]
