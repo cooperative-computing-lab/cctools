@@ -924,6 +924,8 @@ Similar to @ref vine_wait, but guarantees that the returned task has the specifi
 */
 struct vine_task *vine_wait_for_task_id(struct vine_manager *m, int task_id, int timeout);
 
+struct vine_task *vine_wait_no_wait(struct vine_manager *q, const char *tag, int task_id);
+
 /** Determine whether the manager is 'hungry' for more tasks.
 While the manager can handle a very large number of tasks,
 it runs most efficiently when the number of tasks is slightly

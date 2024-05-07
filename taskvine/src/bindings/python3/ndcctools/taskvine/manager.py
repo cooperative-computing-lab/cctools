@@ -1076,6 +1076,15 @@ class Manager(object):
             return task
         return None
 
+
+    def wait_no_wait(self, tag=None, task_id=-1):
+        task_pointer = cvine.vine_wait_no_wait(self._taskvine, tag, task_id)
+        if task_pointer:
+            task = self._task_table[cvine.vine_task_get_id(task_pointer)]
+            del self._task_table[cvine.vine_task_get_id(task_pointer)]
+            return task
+        return None
+
     ##
     # Should return a dictionary with information for the status display.
     # This method is meant to be overriden by custom applications.

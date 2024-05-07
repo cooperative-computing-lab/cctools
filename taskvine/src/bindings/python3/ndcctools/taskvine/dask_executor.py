@@ -223,6 +223,7 @@ class DaskVine(Manager):
         rs = dag.set_targets(keys_flatten)
         self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
 
+        timeout = 5
         pending = 0
 
         (bar_progress, bar_update) = self._make_progress_bar(dag.left_to_compute())
@@ -238,8 +239,9 @@ class DaskVine(Manager):
                     submitted += 1
                     pending += 1
 
-                t = self.wait_for_tag(tag, 5)
+                t = self.wait_maybe_not_wait(tag, timeout)
                 if t:
+                    timeout = 0
                     pending -= 1
                     if self.verbose:
                         print(f"{t.key} ran on {t.hostname}")
@@ -261,7 +263,15 @@ class DaskVine(Manager):
                         else:
                             raise Exception(f"tasks for key {t.key} failed permanently")
                     t = None  # drop task reference
+                else:
+                    timeout = 5
             return self._load_results(dag, indices, keys)
+
+    def wait_maybe_not_wait(self, tag, timeout):
+        if timeout > 0:
+            return self.wait_for_tag(tag, 5)
+        else:
+            return self.wait_no_wait(tag)
 
     def _make_progress_bar(self, total):
         if rich:
