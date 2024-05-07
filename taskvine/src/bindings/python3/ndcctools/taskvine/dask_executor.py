@@ -648,6 +648,7 @@ class FunctionCallDask(FunctionCall):
 def wrapped_execute_graph_vertex(wrapper, key, sexpr, args, keys_of_files):
     import cloudpickle
     try:
+        wrapper_result = None
         (wrapper_result, call_result) = wrapper(key, execute_graph_vertex, sexpr, args, keys_of_files)
         return call_result
     except Exception:
@@ -660,7 +661,6 @@ def wrapped_execute_graph_vertex(wrapper, key, sexpr, args, keys_of_files):
         except Exception:
             print(f"Wrapped call for {key} failed to write output.")
             raise
-
 
 def execute_graph_vertex(sexpr, args, keys_of_files):
     import traceback
