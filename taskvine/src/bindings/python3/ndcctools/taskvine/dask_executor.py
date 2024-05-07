@@ -206,7 +206,7 @@ class DaskVine(Manager):
                 functions.extend([wrapped_execute_graph_vertex, self.wrapper])
             if self.lib_extra_functions:
                 functions.extend(self.lib_extra_functions)
-            libtask = self.create_library_from_functions('Dask-Library',
+            libtask = self.create_library_from_functions(f'Dask-Library-{id(dag)}',
                                                          *functions,
                                                          poncho_env="dummy-value",
                                                          add_env=False,
@@ -613,7 +613,7 @@ class FunctionCallDask(FunctionCall):
         keys_of_files = list(args.keys())
         args = args_raw | args
 
-        super().__init__('Dask-Library', 'execute_graph_vertex', sexpr, args, keys_of_files)
+        super().__init__(f'Dask-Library-{id(dag)}', 'execute_graph_vertex', sexpr, args, keys_of_files)
 
         self.set_output_cache(cache=True)
 
