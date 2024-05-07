@@ -24,7 +24,6 @@
 
 import fcntl
 import functools
-import json
 import multiprocessing
 import os
 import signal
@@ -234,6 +233,8 @@ def __read_pids_file(pids_file):
 
 
 _watchman_counter = 0
+
+
 def _watchman(results_queue, limits, callback, interval, function, args, kwargs):
     try:
         # child_finished is set when the process running function exits
