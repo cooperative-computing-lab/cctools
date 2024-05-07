@@ -421,8 +421,8 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 		struct vine_task *t, struct vine_mount *m, struct vine_file *f)
 {
 	/* If the file source has changed, it's a violation of the workflow. */
-
 	if (vine_file_has_changed(f)) {
+		// XXX: For now the check only returns true if the file does not exist!
 		vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
 		return VINE_APP_FAILURE;
 	}
