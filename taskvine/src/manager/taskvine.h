@@ -924,6 +924,12 @@ Similar to @ref vine_wait, but guarantees that the returned task has the specifi
 */
 struct vine_task *vine_wait_for_task_id(struct vine_manager *m, int task_id, int timeout);
 
+/** Return any completed task without doing any manager work.
+If there is not a completed task, then it returns without any wait.
+@param task_id The desired task_id. If -1, then tasks are returned regardless of their task_id.
+@param tag The desired tag. If NULL, then tasks are returned regardless of their tag.
+@returns A completed task description, or null if there is not one.
+*/
 struct vine_task *vine_wait_no_wait(struct vine_manager *q, const char *tag, int task_id);
 
 /** Determine whether the manager is 'hungry' for more tasks.

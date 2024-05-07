@@ -1076,7 +1076,12 @@ class Manager(object):
             return task
         return None
 
-
+    ##
+    # Return any completed task without doing any manager work.
+    # If there is not a completed task, then it returns without any wait.
+    # @param task_id The desired task_id. If -1, then tasks are returned regardless of their task_id.
+    # @param tag The desired tag. If NULL, then tasks are returned regardless of their tag.
+    # @returns A completed task description, or None if there is not one.
     def wait_no_wait(self, tag=None, task_id=-1):
         task_pointer = cvine.vine_wait_no_wait(self._taskvine, tag, task_id)
         if task_pointer:
