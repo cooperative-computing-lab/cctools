@@ -233,6 +233,7 @@ def __read_pids_file(pids_file):
                 rmonitor_minimonitor(MINIMONITOR_REMOVE_PID, -pid)
 
 
+_watchman_counter = 0
 def _watchman(results_queue, limits, callback, interval, function, args, kwargs):
     try:
         # child_finished is set when the process running function exits
@@ -246,7 +247,10 @@ def _watchman(results_queue, limits, callback, interval, function, args, kwargs)
         fun_proc = multiprocessing.Process(target=_wrap_function(local_results, function, args, kwargs))
 
         # unique name for this function invocation
-        fun_id = str(hash(json.dumps({'args': args, 'kwargs': kwargs}, sort_keys=True)))
+        # fun_id = str(hash(json.dumps({'args': args, 'kwargs': kwargs}, sort_keys=True)))
+        global _watchman_counter
+        _watchman_counter += 1
+        fun_id = str(hash(_watchman_counter))
 
         # convert limits to the structure the minimonitor accepts
         if limits:
