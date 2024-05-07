@@ -2997,7 +2997,7 @@ static void reap_task_from_worker(
 		change_task_state(q, t, VINE_TASK_RETRIEVED);
 		break;
 		return;
-	
+
 	case VINE_TASK_TYPE_LIBRARY_TEMPLATE:
 		/* A library template should not be scheduled... */
 		change_task_state(q, t, VINE_TASK_RETRIEVED);
