@@ -5066,7 +5066,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	return t;
 }
 
-
 struct vine_task *vine_wait_no_wait(struct vine_manager *q, const char *tag, int task_id)
 {
 	BEGIN_ACCUM_TIME(q, time_internal);
@@ -5075,8 +5074,6 @@ struct vine_task *vine_wait_no_wait(struct vine_manager *q, const char *tag, int
 
 	return t;
 }
-
-
 
 // check if workers' resources are available to execute more tasks queue should
 // have at least MAX(hungry_minimum, hungry_minimum_factor * number of workers) ready tasks
