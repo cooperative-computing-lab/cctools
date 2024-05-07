@@ -239,7 +239,7 @@ class DaskVine(Manager):
                     submitted += 1
                     pending += 1
 
-                t = self.wait_maybe_not_wait(tag, timeout)
+                t = self.wait(tag, timeout)
                 if t:
                     timeout = 0
                     pending -= 1
@@ -266,12 +266,6 @@ class DaskVine(Manager):
                 else:
                     timeout = 5
             return self._load_results(dag, indices, keys)
-
-    def wait_maybe_not_wait(self, tag, timeout):
-        if timeout > 0:
-            return self.wait_for_tag(tag, 5)
-        else:
-            return self.wait_no_wait(tag)
 
     def _make_progress_bar(self, total):
         if rich:
