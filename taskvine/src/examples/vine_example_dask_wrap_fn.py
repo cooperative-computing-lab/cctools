@@ -4,9 +4,8 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-# This example shows TaskVine executing a manually constructed dask graph.
-# See vine_example_dask_delayed.py for an example where the graph
-# is constructed by dask.
+# This example shows TaskVine executing a dask graph using a wrapper
+# to debug memory usage.
 
 import ndcctools.taskvine as vine
 import argparse
@@ -81,8 +80,37 @@ is constructed by dask.""")
         print(f"dask graph example is:\n{dsk_graph}")
         print(f"desired keys are {desired_keys}")
 
+        def wrapper(key, fn, *args):
+            import tracemalloc
+            tracemalloc.start()
+            before = tracemalloc.get_traced_memory()
+            b = fn(*args)
+            after = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            memory_used = (after[1] - before[1])/1000
+            a = (key, memory_used)
+
+            return (a, b)
+
+        max_memory = 0
+        def accum_wrapper(arg):
+            global max_memory
+            (key, memory) = arg
+            if memory > max_memory:
+                max_memory = memory
+                print(f"new max with key {key}: {memory} KB")
+
         try:
-            results = m.get(dsk_graph, desired_keys, lazy_transfers=True, checkpoint_fn=checkpoint, resources={"cores": 1})  # 1 core per step
+            results = m.get(
+                dsk_graph,
+                desired_keys,
+                wrapper=wrapper,
+                wrapper_proc=accum_wrapper,
+                lazy_transfers=True,
+                checkpoint_fn=checkpoint,
+                resources={"cores": 1},
+            )  # 1 core per step
             print({k: v for k, v in zip(desired_keys, results)})
         except Exception:
             traceback.print_exc()
