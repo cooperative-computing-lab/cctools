@@ -4837,7 +4837,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 	if (timeout == 0) {
 		// if timeout is 0, just return any completed task if one available.
-		return vine_manager_no_wait(q, NULL, task_id);
+		return vine_manager_no_wait(q, tag, task_id);
 	}
 
 	if (timeout != VINE_WAIT_FOREVER && timeout < 0) {
