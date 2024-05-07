@@ -662,6 +662,7 @@ def wrapped_execute_graph_vertex(wrapper, key, sexpr, args, keys_of_files):
             print(f"Wrapped call for {key} failed to write output.")
             raise
 
+
 def execute_graph_vertex(sexpr, args, keys_of_files):
     import traceback
     import cloudpickle
