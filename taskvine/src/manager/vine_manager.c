@@ -3096,9 +3096,10 @@ static void vine_manager_create_recovery_tasks(struct vine_manager *q, struct vi
 	struct vine_mount *m;
 	struct vine_task *recovery_task = 0;
 
-	/* Don't recursively create recovery tasks for recovery tasks! */
-	if (t->type == VINE_TASK_TYPE_RECOVERY)
+	/* Only regular tasks get recovery tasks */
+	if (t->type != VINE_TASK_TYPE_STANDARD) {
 		return;
+	}
 
 	LIST_ITERATE(t->output_mounts, m)
 	{
