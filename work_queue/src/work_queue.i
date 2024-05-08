@@ -13,6 +13,7 @@
 	#include "int_sizes.h"
 	#include "timestamp.h"
 	#include "work_queue.h"
+	#include "cctools.h"
 %}
 
 /* We compile with -D__LARGE64_FILES, thus off_t is at least 64bit.
@@ -25,6 +26,7 @@ long long int is guaranteed to be at least 64bit. */
 
 /* returns a char*, enable automatic free */
 %newobject work_queue_status;
+%newobject cctools_version_string;
 
 /* These return pointers to lists defined in list.h. We aren't
  * wrapping methods in list.h and so ignore these. */
@@ -37,4 +39,5 @@ long long int is guaranteed to be at least 64bit. */
 %include "int_sizes.h"
 %include "timestamp.h"
 %include "work_queue.h"
+%include "cctools.h"
 

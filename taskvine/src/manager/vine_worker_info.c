@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "vine_worker_info.h"
+#include "vine_counters.h"
 #include "vine_file_replica.h"
 #include "vine_protocol.h"
 #include "vine_resources.h"
@@ -41,6 +42,8 @@ struct vine_worker_info *vine_worker_create(struct link *lnk)
 	w->last_transfer_failure = 0;
 	w->last_failure_time = 0;
 
+	vine_counters.worker.created++;
+
 	return w;
 }
 
@@ -68,6 +71,8 @@ void vine_worker_delete(struct vine_worker_info *w)
 	itable_delete(w->current_tasks);
 
 	free(w);
+
+	vine_counters.worker.deleted++;
 }
 
 static void current_tasks_to_jx(struct jx *j, struct vine_worker_info *w)

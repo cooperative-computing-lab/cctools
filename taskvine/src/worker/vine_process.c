@@ -404,10 +404,14 @@ int vine_process_execute(struct vine_process *p)
 		if (p->type != VINE_PROCESS_TYPE_LIBRARY) {
 			execl("/bin/sh", "sh", "-c", p->task->command_line, (char *)0);
 		} else {
-			char *final_command = string_format("%s --input-fd %d --output-fd %d --worker-pid %d",
+			char *final_command = string_format(
+					"%s --input-fd %d --output-fd %d --task-id %d --library-cores %d --function-slots %d --worker-pid %d",
 					p->task->command_line,
 					in_pipe_fd,
 					out_pipe_fd,
+					p->task->task_id,
+					(int)p->task->resources_requested->cores,
+					p->task->function_slots,
 					getppid());
 			execl("/bin/sh", "sh", "-c", final_command, (char *)0);
 		}
@@ -470,10 +474,10 @@ int vine_process_wait(struct vine_process *p)
 /* Receive a message containing a function call id from the library without blocking.
  * @param p			The vine process encapsulating the function call.
  * @param done_task_id          Pointer to location to store completed task id.
+ * @param done_exit_code        Pointer to location to the completed task exit code.
  * return 			1 if the operation succeeds, 0 otherwise.
  */
-
-int vine_process_library_get_result(struct vine_process *p, uint64_t *done_task_id)
+int vine_process_library_get_result(struct vine_process *p, uint64_t *done_task_id, int *done_exit_code)
 {
 	/* If this is not a library process, don't check. */
 	if (p->type != VINE_PROCESS_TYPE_LIBRARY)
@@ -506,9 +510,8 @@ int vine_process_library_get_result(struct vine_process *p, uint64_t *done_task_
 
 	/* null terminate the buffer before treating it as a string. */
 	buffer_data[ok] = 0;
-
-	*done_task_id = (uint64_t)strtoul(buffer_data, NULL, 10);
-	debug(D_VINE, "Received result for function %" PRIu64, *done_task_id);
+	sscanf(buffer_data, "%" SCNu64 " %d", done_task_id, done_exit_code);
+	debug(D_VINE, "Received result for function %" PRIu64 ", exit code %d", *done_task_id, *done_exit_code);
 
 	return ok;
 }

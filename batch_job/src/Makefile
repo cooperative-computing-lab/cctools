@@ -4,6 +4,7 @@ include ../../rules.mk
 LIBRARIES = libbatch_job.a
 
 PROGRAMS = work_queue_factory work_queue_pool vine_factory
+SCRIPTS = condor_chaos_monkey
 
 ifeq ($(CCTOOLS_CHIRP),chirp)
 CHIRP_LIB=${CCTOOLS_HOME}/chirp/src/libchirp.a
@@ -42,7 +43,7 @@ PUBLIC_HEADERS = batch_job.h
 
 OBJECTS = $(SOURCES:%.c=%.o)
 
-all: $(LIBRARIES) $(PROGRAMS)
+all: $(LIBRARIES) $(PROGRAMS) $(SCRIPTS)
 
 libbatch_job.a: $(OBJECTS)
 
@@ -53,9 +54,12 @@ vine_factory: vine_factory.o libbatch_job.a $(WQ_LIB) $(VINE_LIB) $(EXTERNAL_LIB
 work_queue_pool: work_queue_factory
 	cp $< $@
 
+condor_chaos_monkey:
+	chmod 755 condor_chaos_monkey
+
 install:
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
-	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin
+	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
 	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools

@@ -14,9 +14,16 @@ from .task import FunctionCall
 from .dask_dag import DaskVineDag
 from .cvine import VINE_TEMP
 
+import contextlib
 import cloudpickle
 import os
 from uuid import uuid4
+
+try:
+    import rich
+    from rich import print
+except ImportError:
+    rich = None
 
 ##
 # @class ndcctools.taskvine.dask_executor.DaskVine
@@ -74,9 +81,10 @@ class DaskVine(Manager):
     #                      to the manager.
     # @param resources     A dictionary with optional keys of cores, memory and disk (MB)
     #                      to set maximum resource usage per task.
-    # @param lib_resources A dictionary with optional keys of cores, memory and disk (MB)
-    # @param lib_command A command to be prefixed to the execution of a Library task.
-    # @param import_modules Hoist these module imports for the DaskVine Library.
+    # @param lib_extra_functions Additional functions to include in execution library (function-calls task_mode)
+    # @param lib_resources A dictionary with optional keys of cores, memory and disk in MB (function-calls task_mode)
+    # @param lib_command A command to be prefixed to the execution of a Library task (function-calls task_mode)
+    # @param lib_modules Hoist these module imports for the execution library (function-calls task_mode)
     # @param env_per_task execute each task
     # @param resources_mode Automatically resize allocation per task. One of 'fixed'
     #                       (use the value of 'resources' above), 'max througput',
@@ -84,10 +92,18 @@ class DaskVine(Manager):
     #                       or 'exhaustive bucketing'. This is done per function type in dsk.
     # @param task_mode     Create tasks as either as 'tasks' (using PythonTasks) or 'function-calls' (using FunctionCalls)
     # @param retries       Number of times to attempt a task. Default is 5.
-    # @param submit_per_cycle Maximum number of tasks to serialize per wait call. If None, or less than 1, then all
-    #                         tasks are serialized as they are available.
+    # @param submit_per_cycle Maximum number of tasks to submit to scheduler at once. If None, or less than 1, then all
+    #                         tasks are submitted as they are available.
+    # @param max_pending   Maximum number of tasks without a result before new ones are submitted to the scheduler.
+    #                      If None, or less than 1, then no limit is set.
     # @param verbose       if true, emit additional debugging information.
     # @param env_per_task  if true, each task individually expands its own environment. Must use environment option as a str.
+    # @param progress_disable If True, disable progress bar
+    # @param progress_label Label to use in progress bar
+    # @param wrapper       Function to wrap dask calls. It should take as arguments (key, fn, *args). It should execute
+    #                      fn(*args) at some point during its execution to produce the dask task result.
+    #                      Should return a tuple of (wrapper result, dask call result). Use for debugging.
+    # @param wrapper_proc  Function to process results from wrapper on completion. (default is print)
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
@@ -98,14 +114,21 @@ class DaskVine(Manager):
             resources=None,
             resources_mode=None,
             submit_per_cycle=None,
+            max_pending=None,
             retries=5,
             verbose=False,
+            lib_extra_functions=None,
             lib_resources=None,
             lib_command=None,
-            import_modules=None,
+            lib_modules=None,
             task_mode='tasks',
             light_tasks=False,
             env_per_task=False,
+            progress_disable=False,
+            progress_label="[green]tasks",
+            wrapper=None,
+            wrapper_proc=print,
+            import_modules=None  # Deprecated, use lib_modules
             ):
         try:
             self.set_property("framework", "dask")
@@ -126,14 +149,28 @@ class DaskVine(Manager):
             self.resources_mode = resources_mode
             self.retries = retries
             self.verbose = verbose
+            self.lib_extra_functions = lib_extra_functions
             self.lib_resources = lib_resources
             self.lib_command = lib_command
-            self.import_modules = import_modules
+            if lib_modules:
+                self.lib_modules = lib_modules
+            else:
+                self.lib_modules = import_modules  # Deprecated
             self.task_mode = task_mode
             self.light_tasks=light_tasks
             self.env_per_task = env_per_task
+            self.progress_disable = progress_disable
+            self.progress_label = progress_label
+            self.wrapper = wrapper
+            self.wrapper_proc = wrapper_proc
 
+            if submit_per_cycle is not None and submit_per_cycle < 1:
+                submit_per_cycle = None
             self.submit_per_cycle = submit_per_cycle
+
+            if max_pending is not None and max_pending < 1:
+                max_pending = None
+            self.max_pending = max_pending
 
             self._categories_known = set()
 
@@ -166,12 +203,17 @@ class DaskVine(Manager):
 
         # create Library if using 'function-calls' task mode.
         if self.task_mode == 'function-calls':
-            libtask = self.create_library_from_functions('Dask-Library',
-                                                         execute_graph_vertex,
+            functions = [wrapped_execute_graph_vertex, execute_graph_vertex]
+            if self.wrapper:
+                functions.extend([wrapped_execute_graph_vertex, self.wrapper])
+            if self.lib_extra_functions:
+                functions.extend(self.lib_extra_functions)
+            libtask = self.create_library_from_functions(f'Dask-Library-{id(dag)}',
+                                                         *functions,
                                                          poncho_env="dummy-value",
                                                          add_env=False,
                                                          init_command=self.lib_command,
-                                                         import_modules=self.import_modules)
+                                                         import_modules=self.lib_modules)
 
             if self.environment:
                 libtask.add_environment(self.environment)
@@ -179,48 +221,100 @@ class DaskVine(Manager):
             if self.lib_resources:
                 if 'cores' in self.lib_resources:
                     libtask.set_cores(self.lib_resources['cores'])
+                    libtask.set_function_slots(self.lib_resources['cores'])  # use cores as  fallback for slots
                 if 'memory' in self.lib_resources:
                     libtask.set_memory(self.lib_resources['memory'])
                 if 'disk' in self.lib_resources:
                     libtask.set_disk(self.lib_resources['disk'])
                 if 'slots' in self.lib_resources:
                     libtask.set_function_slots(self.lib_resources['slots'])
+                if self.env_vars:
+                    for k, v in self.env_vars.items():
+                        if callable(v):
+                            s = v(self, libtask)
+                        else:
+                            s = v
+                        libtask.set_env_var(k, s)
+                if self.extra_files:
+                    for f, name in self.extra_files.items():
+                        libtask.add_input(f, name)
+
             self.install_library(libtask)
 
         enqueued_calls = []
         rs = dag.set_targets(keys_flatten)
         self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
 
-        while not self.empty() or enqueued_calls:
-            submitted = 0
-            while enqueued_calls and (
-                not self.submit_per_cycle
-                or self.submit_per_cycle < 0
-                or submitted < self.submit_per_cycle
-            ):
-                submitted += 1
-                self.submit(enqueued_calls.pop())
+        timeout = 5
+        pending = 0
 
-            t = self.wait_for_tag(tag, 5)
-            if t:
-                if self.verbose:
-                    print(f"{t.key} ran on {t.hostname}")
+        (bar_progress, bar_update) = self._make_progress_bar(dag.left_to_compute())
+        with bar_progress:
+            while not self.empty() or enqueued_calls:
+                submitted = 0
+                while (
+                    enqueued_calls
+                    and (not self.submit_per_cycle or submitted < self.submit_per_cycle)
+                    and (not self.max_pending or pending < self.max_pending)
+                ):
+                    self.submit(enqueued_calls.pop())
+                    submitted += 1
+                    pending += 1
 
-                if t.successful():
-                    result_file = DaskVineFile(t.output_file, t.key, dag, self.task_mode)
-                    rs = dag.set_result(t.key, result_file)
-                    self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
+                t = self.wait_for_tag(tag, timeout)
+                if t:
+                    timeout = 0
+                    pending -= 1
+                    if self.verbose:
+                        print(f"{t.key} ran on {t.hostname}")
 
-                    result_file.garbage_collect_children(self)
-                else:
-                    retries_left = t.decrement_retry()
-                    print(f"task id {t.id} key {t.key} failed: {t.result}. {retries_left} attempts left.\n{t.std_output}")
-                    if retries_left > 0:
-                        self._enqueue_dask_calls(dag, tag, [(t.key, t.sexpr)], retries_left, enqueued_calls)
+                    if t.successful():
+                        result_file = DaskVineFile(t.output_file, t.key, dag, self.task_mode)
+                        rs = dag.set_result(t.key, result_file)
+                        self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
+
+                        if self.wrapper:
+                            self.wrapper_proc(t.load_wrapper_output(self))
+
+                        result_file.garbage_collect_children(self)
+
+                        if t.key in dsk:
+                            bar_update(advance=1)
                     else:
-                        raise Exception(f"tasks for key {t.key} failed permanently")
-                t = None  # drop task reference
-        return self._load_results(dag, indices, keys)
+                        retries_left = t.decrement_retry()
+                        print(f"task id {t.id} key {t.key} failed: {t.result}. {retries_left} attempts left.\n{t.std_output}")
+                        if retries_left > 0:
+                            self._enqueue_dask_calls(dag, tag, [(t.key, t.sexpr)], retries_left, enqueued_calls)
+                        else:
+                            raise Exception(f"tasks for key {t.key} failed permanently")
+                    t = None  # drop task reference
+                else:
+                    timeout = 5
+            return self._load_results(dag, indices, keys)
+
+    def _make_progress_bar(self, total):
+        if rich:
+            from rich.progress import Progress, TextColumn, BarColumn, MofNCompleteColumn, TimeRemainingColumn
+
+            progress = Progress(
+                TextColumn(self.progress_label),
+                BarColumn(),
+                MofNCompleteColumn(),
+                TimeRemainingColumn(),
+                disable=self.progress_disable,
+            )
+            graph_bar = progress.add_task(self.progress_label, total=total)
+
+            def update(*args, **kwargs):
+                progress.update(graph_bar, *args, **kwargs)
+
+        else:
+            progress = contextlib.nullcontext()
+
+            def update(*args, **kwargs):
+                pass
+
+        return (progress, update)
 
     def category_name(self, sexpr):
         if DaskVineDag.taskp(sexpr):
@@ -255,11 +349,12 @@ class DaskVine(Manager):
                                    env_vars=self.env_vars,
                                    retries=retries,
                                    lazy_transfers=lazy)
-                if self.light_tasks:
-                    t.light_task()
+                                   lazy_transfers=lazy,
+                                   wrapper=self.wrapper)
 
                 if self.env_per_task:
-                    t.set_command(f"mkdir envdir && tar -xf {self._environment_name} -C envdir && envdir/bin/run_in_env {t._command}")
+                    t.set_command(
+                        f"mkdir envdir && tar -xf {self._environment_name} -C envdir && envdir/bin/run_in_env {t._command}")
                     t.add_input(self.environment_file, self.environment_name)
 
                 t.set_tag(tag)  # tag that identifies this dag
@@ -413,11 +508,14 @@ class PythonTaskDask(PythonTask):
                  extra_files=None,
                  env_vars=None,
                  retries=5,
-                 lazy_transfers=False):
+                 lazy_transfers=False,
+                 wrapper=None):
         self._key = key
         self._sexpr = sexpr
 
         self._retries_left = retries
+        self._wrapper_output_file = None
+        self._wrapper_output = None
 
         args_raw = {k: dag.get_result(k) for k in dag.get_children(key)}
         args = {
@@ -429,7 +527,14 @@ class PythonTaskDask(PythonTask):
         keys_of_files = list(args.keys())
         args = args_raw | args
 
-        super().__init__(execute_graph_vertex, sexpr, args, keys_of_files)
+        if wrapper:
+            super().__init__(wrapped_execute_graph_vertex, wrapper, key, sexpr, args, keys_of_files)
+            wo = m.declare_buffer()
+            self.add_output(wo, "wrapper.output")
+            self._wrapper_output_file = wo
+        else:
+            super().__init__(execute_graph_vertex, sexpr, args, keys_of_files)
+
         self.set_output_cache(cache=True)
 
         for k, f in args_raw.items():
@@ -467,6 +572,14 @@ class PythonTaskDask(PythonTask):
 
     def set_output_name(self, filename):
         self._out_name_file = filename
+
+    def load_wrapper_output(self, manager):
+        if not self._wrapper_output:
+            if self._wrapper_output_file:
+                self._wrapper_output = self._wrapper_output_file.contents(cloudpickle.load)
+                manager.undeclare_file(self._wrapper_output_file)
+                self._wrapper_output_file = None
+        return self._wrapper_output
 
 ##
 # @class ndcctools.taskvine.dask_executor.FunctionCallDask
@@ -511,7 +624,7 @@ class FunctionCallDask(FunctionCall):
         keys_of_files = list(args.keys())
         args = args_raw | args
 
-        super().__init__('Dask-Library', 'execute_graph_vertex', sexpr, args, keys_of_files)
+        super().__init__(f'Dask-Library-{id(dag)}', 'execute_graph_vertex', sexpr, args, keys_of_files)
 
         self.set_output_cache(cache=True)
 
@@ -541,6 +654,24 @@ class FunctionCallDask(FunctionCall):
 
     def set_output_name(self, filename):
         self._out_name_file = filename
+
+
+def wrapped_execute_graph_vertex(wrapper, key, sexpr, args, keys_of_files):
+    import cloudpickle
+    try:
+        wrapper_result = None
+        (wrapper_result, call_result) = wrapper(key, execute_graph_vertex, sexpr, args, keys_of_files)
+        return call_result
+    except Exception:
+        print(f"Wrapped call for {key} failed.")
+        raise
+    finally:
+        try:
+            with open("wrapper.output", "wb") as f:
+                cloudpickle.dump(wrapper_result, f)
+        except Exception:
+            print(f"Wrapped call for {key} failed to write output.")
+            raise
 
 
 def execute_graph_vertex(sexpr, args, keys_of_files):

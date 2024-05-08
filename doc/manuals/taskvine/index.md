@@ -2476,19 +2476,30 @@ change.
 
 | Parameter | Description | Default Value |
 |-----------|-------------|---------------|
-| category-steady-n-tasks | Minimum number of successful tasks to use a sample for automatic resource allocation modes<br>after encountering a new resource maximum. | 25 |
+| attempt-schedule-depth | The amount of tasks to attempt scheduling on each pass of send_one_task in the main loop. | 100 |
+| category-steady-n-tasks | Minimum number of successful tasks to use a sample for automatic resource allocation modes after encountering a new resource maximum. | 25 |
+| default-transfer-rate | The assumed network bandwidth used until sufficient data has been collected.  (1MB/s)
+| disconnect-slow-workers-factor | Set the multiplier of the average task time at which point to disconnect a worker; disabled if less than 1. (default=0)
 | hungry-minimum          | Smallest number of waiting tasks in the manager before declaring it hungry | 10 |
 | hungry-minimum-factor   | Queue is hungry if number of waiting tasks is less than hungry-minumum-factor x (number of workers) | 2 |
 | immediate-recovery    | If set to 1, create recovery tasks for temporary files as soon as their worker disconnects. Otherwise, create recovery tasks only if the temporary files are used as input when trying to dispatch another task. | 0 |
+| keepalive-interval | Set the minimum number of seconds to wait before sending new keepalive checks to workers. | 300 |
+| keepalive-timeout | Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. | 30 |
+| load-from-shared-filesystem | If set to 1, workers can load in data to their caches from the shared filesystem | 0 |
+| long-timeout | Set the minimum timeout in seconds when sending a large message to a single worker. | 3600 |
 | max-retrievals | Sets the max number of tasks to retrieve per manager wait(). If less than 1, the manager prefers to retrieve all completed tasks before dispatching new tasks to workers. | 1 |
+| min-transfer-timeout | Set the minimum number of seconds to wait for files to be transferred to or from a worker. | 10 |
 | monitor-interval        | Maximum number of seconds between resource monitor measurements. If less than 1, use default. | 5 |
 | prefer-dispatch | If 1, try to dispatch tasks even if there are retrieved tasks ready to be reportedas done. | 0 |
-| transfer-temps-recovery | If 1, try to replicate temp files to reach threshold on worker removal. | 0 |
 | proportional-resources | If set to 0, do not assign resources proportionally to tasks. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
 | proportional-whole-tasks | Round up resource proportions such that only an integer number of tasks could be fit in the worker. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
 | ramp-down-heuristic     | If set to 1 and there are more workers than tasks waiting, then tasks are allocated all the free resources of a worker large enough to run them. If monitoring watchdog is not enabled, then this heuristic has no effect. | 0 |
 | resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
+| short-timeout | Set the minimum timeout in seconds when sending a brief message to a single worker. | 5 |
 | temp-replica-count    | Number of temp file replicas created across workers | 0 |
+| transfer-outlier-factor | Transfer that are this many times slower than the average will be terminated. | 10 |
+| transfer-replica-per-cycle | Number of replicas to schedule per file per iteration. | 1 |
+| transfer-temps-recovery | If 1, try to replicate temp files to reach threshold on worker removal. | 0 |
 | transient-error-interval | Time to wait in seconds after a resource failure before attempting to use it again | 15 |
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
 | worker-retrievals | If 1, retrieve all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |
@@ -2523,14 +2534,13 @@ below is a simple Parsl application executing a function remotely.
     from parsl import python_app
     from parsl.configs.vineex_local import config
 
-    parsl.load(config)
-
     @python_app
     def double(x):
-    return x*2
+        return x*2
 
-    future = double(1)
-    assert future.result() == 2
+    with parsl.load(config=config) as dfk:
+        future = double(1)
+        assert future.result() == 2
     ```
 Save this file as `parsl_vine_example.py`. Running 
 `python parsl_vine_example.py`
@@ -2564,20 +2574,19 @@ In order to use the TaskVineExecutor with remote resources, you will need to cre
         ]
     )
 
-    parsl.load(Config)
-
     l = ["Cooperative", "Computing", "Lab"]
 
     @python_app
     def hello_taskvine(x, l=l):
-    return l[x]
+        return l[x]
 
-    futures = []
-    for i in range(3):
-        futures.append(hello_taskvine(i))
+    with parsl.load(config=config) as dfk:
+        futures = []
+        for i in range(3):
+            futures.append(hello_taskvine(i))
 
-    for i in futures:
-        print(i.result())
+        for i in futures:
+            print(i.result())
     ```
 
 For more details on how to configure Parsl+TaskVine to scale applications 

@@ -26,7 +26,6 @@ typedef enum {
 	VINE_WORKER_FAILURE,
 	VINE_APP_FAILURE,
 	VINE_MGR_FAILURE,
-	VINE_TRANSIENT_FAILURE,
 	VINE_END_OF_LIST,
 } vine_result_code_t;
 
@@ -108,7 +107,7 @@ struct vine_manager {
 	struct list   *retrieved_list;      /* List of vine_task that have been retrieved. */
 	struct list   *task_info_list;  /* List of last N vine_task_infos for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */
-	struct hash_table *libraries;      /* Maps library name -> vine_task of library with that name. */
+	struct hash_table *library_templates; /* Maps library name -> vine_task of library with that name. */
 
 	/* Primary data structures for tracking worker state. */
 
@@ -173,10 +172,9 @@ struct vine_manager {
 	/* Peer Transfer Configuration */
 	int peer_transfers_enabled;
 	int file_source_max_transfers;
-	int temp_replica_count;
 	int worker_source_max_transfers;
-	/* Various performance knobs that can be tuned. */
 
+	/* Various performance knobs that can be tuned. */
 	int short_timeout;            /* Timeout in seconds to send/recv a brief message from worker */
 	int long_timeout;             /* Timeout if in the middle of an incomplete message. */
 	int minimum_transfer_timeout; /* Minimum number of seconds to allow for a manager<-> worker file transfer. */
@@ -193,6 +191,7 @@ struct vine_manager {
                                      than 1, prefer to receive all completed tasks before submitting new tasks. */
 	int worker_retrievals;        /* retrieve all completed tasks from a worker as opposed to recieving one of any completed task*/
 	int prefer_dispatch;          /* try to dispatch tasks even if there are retrieved tasks ready to return  */
+	int load_from_shared_fs_enabled;/* Allow worker to load file from shared filesytem instead of through manager */
 
 	int fetch_factory;            /* If true, manager queries catalog for factory configuration. */
 	int proportional_resources;   /* If true, tasks divide worker resources proportionally. */
@@ -203,6 +202,8 @@ struct vine_manager {
 																	 disconnects. Otherwise, create them only when a tasks needs then as inputs (this is
 																	 the default). */
 	int transfer_temps_recovery;  /* If true, attempt to recover temp files from lost worker to reach threshold required */
+	int transfer_replica_per_cycle;  /* Maximum number of replica to request per temp file per iteration */
+	int temp_replica_count;       /* Number of replicas per temp file */
 
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
@@ -261,6 +262,12 @@ int vine_manager_check_worker_can_run_function_task(struct vine_manager *q, stru
 
 /* Internal: Shut down a specific worker. */
 int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_info *w);
+
+struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
+
+/** Return any completed task without doing any manager work. */
+struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, int task_id);
+
 
 /* The expected format of files created by the resource monitor.*/
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-task-%d"

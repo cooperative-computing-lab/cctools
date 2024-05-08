@@ -49,8 +49,8 @@ class Task(object):
             raise Exception("Unable to create internal Task structure")
 
         attributes = [
-            "needs_library_name",
-            "provides_library_name",
+            "library_required",
+            "library_provided",
             "scheduler", "tag", "category",
             "snapshot_file", "retries", "cores", "memory",
             "disk", "gpus", "priority", "time_end",
@@ -208,10 +208,37 @@ class Task(object):
     # This is not needed for regular tasks.
     #
     # @param self Reference to the current task object.
-    # @param library_name The name of the library
-    def needs_library(self, library_name):
-        self.needs_library_name = library_name
-        return cvine.vine_task_needs_library(self._task, library_name)
+    # @param library The library or name of the library
+    def set_library_required(self, library):
+        library_name = None
+        if isinstance(library, Task):
+            try:
+                library_name = library.provides_library()
+            except Exception:
+                pass
+        else:
+            library_name = library
+
+        if not isinstance(library, str):
+            raise ValueError(f"{library} is not a valid library")
+
+        if self.get_libray_provided():
+            raise ValueError(
+                f"A task cannot both provide ({self.get_libray_provided()}) and require ({library_name}) a library."
+            )
+        return cvine.vine_task_set_library_required(self._task, library_name)
+
+    ##
+    # Get the name of the library at the worker that should execute the task's command.
+    #
+    # @param self Reference to the current task object.
+    def get_libray_required(self):
+        return cvine.vine_task_get_library_required(self._task)
+
+    ##
+    # Deprecated, see set_library_required
+    def needs_library(self, library):
+        return self.set_library_required(library)
 
     ##
     # Set the library name provided by this task.
@@ -219,9 +246,24 @@ class Task(object):
     #
     # @param self Reference to the current task object.
     # @param library_name The name of the library.
-    def provides_library(self, library_name):
-        self.provides_library_name = library_name
-        return cvine.vine_task_provides_library(self._task, library_name)
+    def set_library_provided(self, library_name):
+        if self.get_libray_required():
+            raise ValueError(
+                f"A task cannot both provide ({library_name}) and require ({self.get_libray_required()}) a library."
+            )
+        return cvine.vine_task_set_library_provided(self._task, library_name)
+
+    ##
+    # Get the name of the library at the worker that should execute the task's command.
+    #
+    # @param self Reference to the current task object.
+    def get_libray_provided(self):
+        return cvine.vine_task_get_library_provided(self._task)
+
+    ##
+    # Deprecated, see set_library_provided
+    def provides_library(self, library):
+        return self.set_library_provided(library)
 
     ##
     # Set the number of concurrent functions a library can run.
@@ -1009,11 +1051,11 @@ class FunctionCall(PythonTask):
     # Create a new FunctionCall specification.
     #
     # @param self       Reference to the current FunctionCall object.
-    # @param library_name The name of the library which has the function you wish to execute.
+    # @param library    The library, or name of the library which has the function you wish to execute.
     # @param fn         The name of the function to be executed on the library.
     # @param args       positional arguments used in function to be executed by task. Can be mixed with kwargs
     # @param kwargs	keyword arguments used in function to be executed by task.
-    def __init__(self, library_name, fn, *args, **kwargs):
+    def __init__(self, library, fn, *args, **kwargs):
         super().__init__(self, None)
 
         # function calls at worker only need the name of the function.
@@ -1024,7 +1066,7 @@ class FunctionCall(PythonTask):
         self._event["fn_kwargs"] = kwargs
 
         self._saved_output = None
-        self.needs_library(library_name)
+        self.set_library_required(library)
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -1088,20 +1130,25 @@ class FunctionCall(PythonTask):
 
             else:
                 self._output = FunctionCallNoResult()
-                print(self.std_output)
 
             self.manager.undeclare_file(self._input_file)
             self._input_file = None
 
+            self.manager.undeclare_file(self._output_file)
+            self._output_file = None
+
             self._output_loaded = True
         return self._output
 
-    # Remove input and output buffers under some circumstances `output` is not called
+    # Remove input and output buffers if self.output was not called.
     def __del__(self):
         try:
             if self._input_file:
                 self.manager.undeclare_file(self._input_file)
                 self._input_file = None
+            if self._output_file and not self._tmp_output_enabled:
+                self.manager.undeclare_file(self._output_file)
+                self._output_file = None
             super().__del__()
         except TypeError:
             pass
@@ -1126,6 +1173,7 @@ class LibraryTask(Task):
     # @param name       The name of this Library.
     def __init__(self, fn, name):
         Task.__init__(self, fn)
+        self._manager_will_free = True
         self.provides_library(name)
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:

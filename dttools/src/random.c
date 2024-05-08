@@ -7,6 +7,7 @@
 #include "random.h"
 #include "debug.h"
 #include "full_io.h"
+#include "timestamp.h"
 #include "twister.h"
 
 #include <fcntl.h>
@@ -17,7 +18,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 void random_init(void)
 {
@@ -38,7 +38,7 @@ void random_init(void)
 		uint64_t seed;
 	nasty_fallback:
 		debug(D_NOTICE, "warning: falling back to low-quality entropy");
-		seed = (uint64_t)getpid() ^ (uint64_t)time(NULL);
+		seed = (uint64_t)getpid() ^ (uint64_t)timestamp_get();
 		seed |= (((uint64_t)(uintptr_t)&seed) << 32); /* using ASLR */
 		srand(seed);
 		twister_init_genrand64(seed);

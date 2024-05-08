@@ -10,6 +10,7 @@ SOURCES = \
 	vine_schedule.c \
 	vine_worker_info.c \
 	vine_catalog.c \
+	vine_counters.c \
 	vine_resources.c \
 	vine_task.c \
 	vine_file.c \
