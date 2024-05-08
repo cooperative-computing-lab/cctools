@@ -201,9 +201,7 @@ class DaskVine(Manager):
 
         # create Library if using 'function-calls' task mode.
         if self.task_mode == 'function-calls':
-            functions = [wrapped_execute_graph_vertex, execute_graph_vertex]
-            if self.wrapper:
-                functions.extend([wrapped_execute_graph_vertex, self.wrapper])
+            functions = [execute_graph_vertex]
             if self.lib_extra_functions:
                 functions.extend(self.lib_extra_functions)
             libtask = self.create_library_from_functions(f'Dask-Library-{id(dag)}',
@@ -363,7 +361,8 @@ class DaskVine(Manager):
                                      category=cat,
                                      extra_files=self.extra_files,
                                      retries=retries,
-                                     lazy_transfers=lazy)
+                                     lazy_transfers=lazy,
+                                     wrapper=self.wrapper)
 
                 t.set_tag(tag)  # tag that identifies this dag
                 enqueued_calls.append(t)
@@ -493,6 +492,7 @@ class PythonTaskDask(PythonTask):
     # @param env_vars       A dictionary of environment variables.
     # @param retries        Number of times to retry failed task.
     # @param lazy_transfers If true, do not return outputs to manager until required.
+    # @param wrapper
     #
     def __init__(self, m,
                  dag, key, sexpr, *,
@@ -520,13 +520,11 @@ class PythonTaskDask(PythonTask):
         keys_of_files = list(args.keys())
         args = args_raw | args
 
+        super().__init__(execute_graph_vertex, wrapper, key, sexpr, args, keys_of_files)
         if wrapper:
-            super().__init__(wrapped_execute_graph_vertex, wrapper, key, sexpr, args, keys_of_files)
             wo = m.declare_buffer()
             self.add_output(wo, "wrapper.output")
             self._wrapper_output_file = wo
-        else:
-            super().__init__(execute_graph_vertex, sexpr, args, keys_of_files)
 
         self.set_output_cache(cache=True)
 
@@ -604,7 +602,8 @@ class FunctionCallDask(FunctionCall):
                  resources=None,
                  extra_files=None,
                  retries=5,
-                 lazy_transfers=False):
+                 lazy_transfers=False,
+                 wrapper=None):
 
         self._key = key
         self.resources = resources
@@ -617,7 +616,14 @@ class FunctionCallDask(FunctionCall):
         keys_of_files = list(args.keys())
         args = args_raw | args
 
-        super().__init__(f'Dask-Library-{id(dag)}', 'execute_graph_vertex', sexpr, args, keys_of_files)
+        self._wrapper_output_file = None
+        self._wrapper_output = None
+
+        super().__init__(f'Dask-Library-{id(dag)}', 'execute_graph_vertex', wrapper, key, sexpr, args, keys_of_files)
+        if wrapper:
+            wo = m.declare_buffer()
+            self.add_output(wo, "wrapper.output")
+            self._wrapper_output_file = wo
 
         self.set_output_cache(cache=True)
 
@@ -648,26 +654,16 @@ class FunctionCallDask(FunctionCall):
     def set_output_name(self, filename):
         self._out_name_file = filename
 
-
-def wrapped_execute_graph_vertex(wrapper, key, sexpr, args, keys_of_files):
-    import cloudpickle
-    try:
-        wrapper_result = None
-        (wrapper_result, call_result) = wrapper(key, execute_graph_vertex, sexpr, args, keys_of_files)
-        return call_result
-    except Exception:
-        print(f"Wrapped call for {key} failed.")
-        raise
-    finally:
-        try:
-            with open("wrapper.output", "wb") as f:
-                cloudpickle.dump(wrapper_result, f)
-        except Exception:
-            print(f"Wrapped call for {key} failed to write output.")
-            raise
+    def load_wrapper_output(self, manager):
+        if not self._wrapper_output:
+            if self._wrapper_output_file:
+                self._wrapper_output = self._wrapper_output_file.contents(cloudpickle.load)
+                manager.undeclare_file(self._wrapper_output_file)
+                self._wrapper_output_file = None
+        return self._wrapper_output
 
 
-def execute_graph_vertex(sexpr, args, keys_of_files):
+def execute_graph_vertex(wrapper, key, sexpr, args, keys_of_files):
     import traceback
     import cloudpickle
     from ndcctools.taskvine import DaskVineDag
@@ -694,7 +690,23 @@ def execute_graph_vertex(sexpr, args, keys_of_files):
             raise
 
     try:
-        return rec_call(sexpr)
+        if wrapper:
+            try:
+                wrapper_result = None
+                (wrapper_result, call_result) = wrapper(key, rec_call, sexpr)
+                return call_result
+            except Exception:
+                print(f"Wrapped call for {key} failed.")
+                raise
+            finally:
+                try:
+                    with open("wrapper.output", "wb") as f:
+                        cloudpickle.dump(wrapper_result, f)
+                except Exception:
+                    print(f"Wrapped call for {key} failed to write output.")
+                    raise
+        else:
+            return rec_call(sexpr)
     except Exception:
         print(traceback.format_exc())
         raise
