@@ -174,7 +174,6 @@ class DaskVine(Manager):
 
             self.tune("category-steady-n-tasks", 1)
             self.tune("prefer-dispatch", 1)
-            self.tune("ramp-down-heuristic", 1)
             self.tune("immediate-recovery", 1)
 
             if self.env_per_task:
