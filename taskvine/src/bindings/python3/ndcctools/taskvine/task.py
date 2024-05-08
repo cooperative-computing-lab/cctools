@@ -1072,14 +1072,19 @@ class FunctionCall(PythonTask):
     #
     # @param self 	Reference to the current python task object
     def submit_finalize(self):
-        self._input_file = self.manager.declare_buffer(buffer=cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
-        self.add_input(self._input_file, "infile")
-
         if self._tmp_output_enabled:
+            # output survives task, writing input to disk to reduce mem usage.
+            name = os.path.join(self.manager.staging_directory, "arguments", self._id)
+            with open(name, "wb") as wf:
+                cloudpickle.dump(self._event, wf)
+            self._input_file = self.manager.declare_file(name, unlink_when_done=True, cache=False, peer_transfer=True)
             self._output_file = self.manager.declare_temp()
         else:
+            self._input_file = self.manager.declare_buffer(buffer=cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
             self._output_file = self.manager.declare_buffer(buffer=None, cache=self._cache_output, peer_transfer=False)
 
+        self._event = None  # free args memory. Once in a file they are not needed anymore.
+        self.add_input(self._input_file, "infile")
         self.add_output(self._output_file, "outfile")
 
     ##
