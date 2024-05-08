@@ -4565,6 +4565,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 
 	/* Duplicate the original task */
 	struct vine_task *t = vine_task_copy(original);
+	t->type = VINE_TASK_TYPE_LIBRARY_INSTANCE;
 
 	/* Check if this library task can fit in this worker. */
 	if (!check_worker_against_task(q, w, t)) {
@@ -4594,7 +4595,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 
 void vine_manager_install_library(struct vine_manager *q, struct vine_task *t, const char *name)
 {
-	t->type = VINE_TASK_TYPE_LIBRARY_INSTANCE;
+	t->type = VINE_TASK_TYPE_LIBRARY_TEMPLATE;
 	t->task_id = -1;
 	vine_task_set_library_provided(t, name);
 	hash_table_insert(q->library_templates, name, t);
