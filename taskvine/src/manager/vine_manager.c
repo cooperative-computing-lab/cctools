@@ -3096,9 +3096,10 @@ static void vine_manager_create_recovery_tasks(struct vine_manager *q, struct vi
 	struct vine_mount *m;
 	struct vine_task *recovery_task = 0;
 
-	/* Don't recursively create recovery tasks for recovery tasks! */
-	if (t->type == VINE_TASK_TYPE_RECOVERY)
+	/* Only regular tasks get recovery tasks */
+	if (t->type != VINE_TASK_TYPE_STANDARD) {
 		return;
+	}
 
 	LIST_ITERATE(t->output_mounts, m)
 	{
@@ -4565,6 +4566,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 
 	/* Duplicate the original task */
 	struct vine_task *t = vine_task_copy(original);
+	t->type = VINE_TASK_TYPE_LIBRARY_INSTANCE;
 
 	/* Check if this library task can fit in this worker. */
 	if (!check_worker_against_task(q, w, t)) {
@@ -4594,7 +4596,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 
 void vine_manager_install_library(struct vine_manager *q, struct vine_task *t, const char *name)
 {
-	t->type = VINE_TASK_TYPE_LIBRARY_INSTANCE;
+	t->type = VINE_TASK_TYPE_LIBRARY_TEMPLATE;
 	t->task_id = -1;
 	vine_task_set_library_provided(t, name);
 	hash_table_insert(q->library_templates, name, t);

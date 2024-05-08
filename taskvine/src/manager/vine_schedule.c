@@ -228,7 +228,8 @@ struct vine_task *vine_schedule_find_library(struct vine_worker_info *w, const c
 	struct vine_task *task;
 	ITABLE_ITERATE(w->current_tasks, task_id, task)
 	{
-		if (task->provides_library && !strcmp(task->provides_library, library_name) &&
+		if (task->type == VINE_TASK_TYPE_LIBRARY_INSTANCE && task->provides_library &&
+				!strcmp(task->provides_library, library_name) &&
 				(task->function_slots_inuse < task->function_slots)) {
 			return task;
 		}
