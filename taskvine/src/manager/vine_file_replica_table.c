@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "vine_file_replica_table.h"
 #include "set.h"
+#include "vine_blocklist.h"
 #include "vine_current_transfers.h"
 #include "vine_file.h"
 #include "vine_file_replica.h"
@@ -236,7 +237,7 @@ int vine_file_replica_table_exists_somewhere(struct vine_manager *q, const char 
 
 	SET_ITERATE(workers, peer)
 	{
-		if (peer->transfer_port_active) {
+		if (peer->transfer_port_active && !vine_blocklist_is_blocked(q, peer->addrport)) {
 			return 1;
 		}
 	}

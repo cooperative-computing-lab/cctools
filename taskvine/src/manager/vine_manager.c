@@ -374,6 +374,7 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 		replica->transfer_time = transfer_time;
 		replica->state = VINE_FILE_REPLICA_STATE_READY;
 
+		vine_current_transfers_set_success(q, id);
 		vine_current_transfers_remove(q, id);
 
 		vine_txn_log_write_cache_update(q, w, size, transfer_time, start_time, cachename);
@@ -439,13 +440,13 @@ static int handle_cache_invalid(struct vine_manager *q, struct vine_worker_info 
 			vine_file_replica_delete(replica);
 		}
 
-		/* throttle workers that could transfer a file */
-		w->last_failure_time = timestamp_get();
-
 		/* If the third argument was given, also remove the transfer record */
 		if (n >= 3) {
 			vine_current_transfers_set_failure(q, transfer_id);
 			vine_current_transfers_remove(q, transfer_id);
+		} else {
+			/* throttle workers that could transfer a file */
+			w->last_failure_time = timestamp_get();
 		}
 
 		/* Successfully processed this message. */

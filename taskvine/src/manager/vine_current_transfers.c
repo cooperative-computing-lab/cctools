@@ -5,6 +5,8 @@ See the file COPYING for details.
 */
 
 #include "vine_current_transfers.h"
+#include "macros.h"
+#include "vine_blocklist.h"
 #include "vine_manager.h"
 #include "xxmalloc.h"
 
@@ -61,6 +63,59 @@ int vine_current_transfers_remove(struct vine_manager *q, const char *id)
 	}
 }
 
+void set_throttles(struct vine_manager *m, struct vine_worker_info *w, int is_destination)
+{
+	if (!w) {
+		return;
+	}
+
+	int good = w->xfer_total_good_counter;
+	int bad = w->xfer_total_bad_counter;
+
+	debug(D_VINE,
+			"Setting transfer failure timestamp on %s worker: %s:%d",
+			is_destination ? "destination" : "source",
+			w->hostname,
+			w->transfer_port);
+
+	w->last_transfer_failure = timestamp_get();
+
+	/* first errors treat as a normal errors */
+	if (w->xfer_streak_counter >= -5) {
+		return;
+	}
+
+	if (good > 2 * bad) {
+		/* this worker has worked as peer more often than not. Do nothing as it may be going through a rough
+		 * patch. */
+		return;
+	}
+
+	/* reset streak to give worker a chance to recover */
+	w->xfer_streak_counter = 0;
+
+	/* Else worker is suspicious. Turn it off if a repeat offender. */
+	int blocked = vine_blocklist_times_blocked(m, w->addrport);
+	if (blocked > 5 && bad > 2 * good) {
+		/* this worker has failed more often than not. Turning off its peer capabilities. */
+		w->transfer_port_active = 0;
+		notice(D_VINE,
+				"Turning off peer transfer of worker %s because of repeated transfer failures: %d/%d",
+				w->addrport,
+				bad,
+				bad + good);
+		return;
+	}
+
+	/* Or just block it for a while so that recovery tasks and other peers can kick in */
+	/* sources are blocked for shorter times to allow them to serve other workers. Otherwise the same pairs of
+	 * workers that can't talk to each other are tried repeteadly together.
+	 */
+	debug(D_VINE, "Temporarily blocking worker %s because of consecutive transfer failures.", w->addrport);
+	int destination_penalty = is_destination ? m->transient_error_interval : 0;
+	vine_block_host_with_timeout(m, w->addrport, m->transient_error_interval + destination_penalty);
+}
+
 int vine_current_transfers_set_failure(struct vine_manager *q, char *id)
 {
 	struct vine_transfer_pair *p = hash_table_lookup(q->current_transfer_table, id);
@@ -72,25 +127,61 @@ int vine_current_transfers_set_failure(struct vine_manager *q, char *id)
 
 	struct vine_worker_info *source_worker = p->source_worker;
 	if (source_worker) {
-		source_worker->last_transfer_failure = timestamp_get();
-		debug(D_VINE,
-				"Setting transfer failure timestamp on source worker: %s:%d",
-				source_worker->hostname,
-				source_worker->transfer_port);
 		throttled++;
+
+		if (source_worker->xfer_streak_counter > 0) {
+			source_worker->xfer_streak_counter = 0;
+		}
+		source_worker->xfer_streak_counter--;
+		source_worker->xfer_total_bad_counter--;
 	}
 
 	struct vine_worker_info *to = p->to;
 	if (to) {
-		to->last_transfer_failure = timestamp_get();
-		debug(D_VINE,
-				"Setting transfer failure timestamp on destination worker: %s:%d",
-				to->hostname,
-				to->transfer_port);
 		throttled++;
+
+		if (to->xfer_streak_counter > 0) {
+			to->xfer_streak_counter = 0;
+		}
+		to->xfer_streak_counter--;
+		to->xfer_total_bad_counter--;
 	}
 
+	set_throttles(q, source_worker, 0);
+	set_throttles(q, to, 1);
+
 	return throttled;
+}
+
+void vine_current_transfers_set_success(struct vine_manager *q, char *id)
+{
+	struct vine_transfer_pair *p = hash_table_lookup(q->current_transfer_table, id);
+
+	if (!p) {
+		return;
+	}
+
+	struct vine_worker_info *source = p->source_worker;
+	if (source) {
+		if (source->xfer_streak_counter < 0) {
+			source->xfer_streak_counter = 0;
+		}
+		vine_blocklist_unblock(q, source->addrport);
+
+		source->xfer_streak_counter++;
+		source->xfer_total_good_counter++;
+	}
+
+	struct vine_worker_info *to = p->to;
+	if (to) {
+		if (to->xfer_streak_counter < 0) {
+			to->xfer_streak_counter = 0;
+		}
+		vine_blocklist_unblock(q, to->addrport);
+
+		to->xfer_streak_counter++;
+		to->xfer_total_good_counter++;
+	}
 }
 
 // count the number transfers coming from a specific source
