@@ -178,7 +178,7 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 
 	// if wall time for worker is specified and there's not enough time for task, then not ok
 	if (w->end_time > 0) {
-		double current_time = timestamp_get() / ONE_SECOND;
+		double current_time = ((double) timestamp_get()) / ONE_SECOND;
 		if (t->resources_requested->end > 0 && w->end_time < t->resources_requested->end) {
 			return 0;
 		}

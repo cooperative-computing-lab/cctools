@@ -4548,7 +4548,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	}
 
 	/* Check if this library task can fit in this worker. */
-	/* check_worker_against_task needs original to check whether a previous attempts failed. */
+	/* check_worker_against_task does not, and should not, modify the task */
 	if (!check_worker_against_task(q, w, original)) {
 		return 0;
 	}
