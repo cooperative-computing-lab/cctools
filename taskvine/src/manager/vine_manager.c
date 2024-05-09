@@ -4761,7 +4761,7 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			int tasks_to_consider = list_size(q->retrieved_list);
 			while (tasks_to_consider > 0) {
 				tasks_to_consider--;
-				temp = list_peek_head(q->ready_list);
+				temp = list_peek_head(q->retrieved_list);
 				// a small hack, if task is not standard we accepted it so it can be deleted below.
 				if (temp->type != VINE_TASK_TYPE_STANDARD || task_tag_comparator(temp, tag)) {
 					// temp points to head of list
