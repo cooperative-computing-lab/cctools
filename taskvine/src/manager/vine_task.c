@@ -221,6 +221,7 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 	vine_task_mount_list_copy(new->output_mounts, task->output_mounts);
 	vine_task_string_list_copy(new->env_list, task->env_list);
 	vine_task_string_list_copy(new->feature_list, task->feature_list);
+	new->function_slots = task->function_slots;
 
 	/* Scheduling features of task are copied. */
 	new->resource_request = task->resource_request;
