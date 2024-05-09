@@ -132,6 +132,9 @@ int check_worker_have_enough_resources(
 
 int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
+	/* THIS FUNCTION SHOULD NOT MODIFY t IN ANY WAY. */
+	/* Otherwise library templates are modified during the run. */
+
 	/* worker has not reported any resources yet */
 	if (w->resources->tag < 0 || w->resources->workers.total < 1) {
 		return 0;

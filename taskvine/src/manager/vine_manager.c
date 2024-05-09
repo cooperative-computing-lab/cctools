@@ -4547,15 +4547,15 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 		return 0;
 	}
 
+	/* Check if this library task can fit in this worker. */
+	/* check_worker_against_task needs original to check whether a previous attempts failed. */
+	if (!check_worker_against_task(q, w, original)) {
+		return 0;
+	}
+
 	/* Duplicate the original task */
 	struct vine_task *t = vine_task_copy(original);
 	t->type = VINE_TASK_TYPE_LIBRARY_INSTANCE;
-
-	/* Check if this library task can fit in this worker. */
-	if (!check_worker_against_task(q, w, t)) {
-		vine_task_delete(t);
-		return 0;
-	}
 
 	/* Give it a unique taskid if library fits the worker. */
 	t->task_id = q->next_task_id++;
