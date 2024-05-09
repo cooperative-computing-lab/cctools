@@ -245,6 +245,7 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 	/* Resource requests are copied. */
 
 	if (task->resources_requested) {
+		rmsummary_delete(new->resources_requested);
 		new->resources_requested = rmsummary_copy(task->resources_requested, 0);
 	}
 
