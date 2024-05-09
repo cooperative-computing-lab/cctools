@@ -63,25 +63,35 @@ int vine_current_transfers_remove(struct vine_manager *q, const char *id)
 	}
 }
 
-void set_throttles(struct vine_manager *m, struct vine_worker_info *w, int is_destination)
+void set_throttle(struct vine_manager *m, struct vine_worker_info *w, int is_destination)
 {
 	if (!w) {
 		return;
 	}
 
-	int good = w->xfer_total_good_counter;
-	int bad = w->xfer_total_bad_counter;
+	int good;
+	int bad;
+	int streak;
+	const char *dir;
 
-	debug(D_VINE,
-			"Setting transfer failure timestamp on %s worker: %s:%d",
-			is_destination ? "destination" : "source",
-			w->hostname,
-			w->transfer_port);
+	if (is_destination) {
+		good = w->xfer_total_good_destination_counter;
+		bad = w->xfer_total_bad_destination_counter;
+		streak = w->xfer_streak_bad_destination_counter;
+		dir = "destination";
+	} else {
+		good = w->xfer_total_good_source_counter;
+		bad = w->xfer_total_bad_source_counter;
+		streak = w->xfer_streak_bad_source_counter;
+		dir = "source";
+	}
+
+	debug(D_VINE, "Setting transfer failure timestamp on %s worker: %s:%d", dir, w->hostname, w->transfer_port);
 
 	w->last_transfer_failure = timestamp_get();
 
 	/* first errors treat as a normal errors */
-	if (w->xfer_streak_counter >= -5) {
+	if (streak >= -5) {
 		return;
 	}
 
@@ -92,7 +102,11 @@ void set_throttles(struct vine_manager *m, struct vine_worker_info *w, int is_de
 	}
 
 	/* reset streak to give worker a chance to recover */
-	w->xfer_streak_counter = 0;
+	if (is_destination) {
+		w->xfer_streak_bad_destination_counter = 0;
+	} else {
+		w->xfer_streak_bad_source_counter = 0;
+	}
 
 	/* Else worker is suspicious. Turn it off if a repeat offender. */
 	int blocked = vine_blocklist_times_blocked(m, w->addrport);
@@ -100,7 +114,8 @@ void set_throttles(struct vine_manager *m, struct vine_worker_info *w, int is_de
 		/* this worker has failed more often than not. Turning off its peer capabilities. */
 		w->transfer_port_active = 0;
 		notice(D_VINE,
-				"Turning off peer transfer of worker %s because of repeated transfer failures: %d/%d",
+				"Turning off peer transfer of worker %s because of repeated %s transfer failures: %d/%d",
+				dir,
 				w->addrport,
 				bad,
 				bad + good);
@@ -111,7 +126,7 @@ void set_throttles(struct vine_manager *m, struct vine_worker_info *w, int is_de
 	/* sources are blocked for shorter times to allow them to serve other workers. Otherwise the same pairs of
 	 * workers that can't talk to each other are tried repeteadly together.
 	 */
-	debug(D_VINE, "Temporarily blocking worker %s because of consecutive transfer failures.", w->addrport);
+	debug(D_VINE, "Temporarily blocking worker %s because of consecutive %s transfer failures.", dir, w->addrport);
 	int destination_penalty = is_destination ? m->transient_error_interval : 0;
 	vine_block_host_with_timeout(m, w->addrport, m->transient_error_interval + destination_penalty);
 }
@@ -129,26 +144,20 @@ int vine_current_transfers_set_failure(struct vine_manager *q, char *id)
 	if (source_worker) {
 		throttled++;
 
-		if (source_worker->xfer_streak_counter > 0) {
-			source_worker->xfer_streak_counter = 0;
-		}
-		source_worker->xfer_streak_counter--;
-		source_worker->xfer_total_bad_counter--;
+		source_worker->xfer_streak_bad_source_counter++;
+		source_worker->xfer_total_bad_source_counter++;
 	}
 
 	struct vine_worker_info *to = p->to;
 	if (to) {
 		throttled++;
 
-		if (to->xfer_streak_counter > 0) {
-			to->xfer_streak_counter = 0;
-		}
-		to->xfer_streak_counter--;
-		to->xfer_total_bad_counter--;
+		to->xfer_streak_bad_destination_counter++;
+		to->xfer_total_bad_destination_counter++;
 	}
 
-	set_throttles(q, source_worker, 0);
-	set_throttles(q, to, 1);
+	set_throttle(q, source_worker, 0);
+	set_throttle(q, to, 1);
 
 	return throttled;
 }
@@ -163,24 +172,18 @@ void vine_current_transfers_set_success(struct vine_manager *q, char *id)
 
 	struct vine_worker_info *source = p->source_worker;
 	if (source) {
-		if (source->xfer_streak_counter < 0) {
-			source->xfer_streak_counter = 0;
-		}
 		vine_blocklist_unblock(q, source->addrport);
 
-		source->xfer_streak_counter++;
-		source->xfer_total_good_counter++;
+		source->xfer_streak_bad_source_counter = 0;
+		source->xfer_total_good_source_counter++;
 	}
 
 	struct vine_worker_info *to = p->to;
 	if (to) {
-		if (to->xfer_streak_counter < 0) {
-			to->xfer_streak_counter = 0;
-		}
 		vine_blocklist_unblock(q, to->addrport);
 
-		to->xfer_streak_counter++;
-		to->xfer_total_good_counter++;
+		to->xfer_streak_bad_destination_counter = 0;
+		to->xfer_total_good_destination_counter++;
 	}
 }
 
