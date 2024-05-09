@@ -222,11 +222,17 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 		vine_task_set_snapshot_file(new, task->monitor_snapshot_file);
 	}
 
+	list_delete(new->input_mounts);
 	new->input_mounts = vine_task_mount_list_copy(task->input_mounts);
+
+	list_delete(new->output_mounts);
 	new->output_mounts = vine_task_mount_list_copy(task->output_mounts);
+
+	list_delete(new->env_list);
 	new->env_list = vine_task_string_list_copy(task->env_list);
+
+	list_delete(new->feature_list);
 	new->feature_list = vine_task_string_list_copy(task->feature_list);
-	new->function_slots = task->function_slots;
 
 	/* Scheduling features of task are copied. */
 	new->resource_request = task->resource_request;
