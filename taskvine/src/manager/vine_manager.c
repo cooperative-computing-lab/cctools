@@ -4803,11 +4803,10 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			break;
 		case VINE_TASK_TYPE_LIBRARY_INSTANCE:
 			/* silently delete it */
-			vine_task_delete(t);
+			vine_task_delete(t); // delete as manager created this task
 			break;
 		case VINE_TASK_TYPE_LIBRARY_TEMPLATE:
-			/* A template shouldn't be scheduled but delete it anyway */
-			vine_task_delete(t);
+			/* A template shouldn't be scheduled. It's deleted when template table is deleted.*/
 			break;
 		}
 	}
