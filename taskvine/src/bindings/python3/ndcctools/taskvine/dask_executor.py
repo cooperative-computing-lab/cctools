@@ -348,7 +348,6 @@ class DaskVine(Manager):
                                    extra_files=self.extra_files,
                                    env_vars=self.env_vars,
                                    retries=retries,
-                                   lazy_transfers=lazy)
                                    lazy_transfers=lazy,
                                    wrapper=self.wrapper)
 

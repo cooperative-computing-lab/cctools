@@ -73,6 +73,7 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->current_resource_box = 0;
 
 	t->refcount = 1;
+	t->output_recieved = 0;
 	t->light = 0;
 
 	vine_counters.task.created++;

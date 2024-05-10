@@ -560,24 +560,26 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	int task_status, exit_status;
 	uint64_t task_id;
 	int64_t output_length;
+	char *output = malloc(1024 * sizeof(char) + 1);
 	timestamp_t execution_time, start_time, end_time;
 	timestamp_t observed_execution_time;
 	timestamp_t effective_stoptime = 0;
 	time_t stoptime;
 
-	// Format: task completion status, exit status (exit code or signal), output length, execution time, task_id
-
+	// Format: task completion status, exit status (exit code or signal), output length, execution time, task_id, stdout
 	int n = sscanf(line,
-			"complete %d %d %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 "",
+			"complete %d %d %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 ", %s",
 			&task_status,
 			&exit_status,
 			&output_length,
 			&start_time,
 			&end_time,
-			&task_id);
+			&task_id,
+			output);
 
-	if (n < 6) {
+	if (n < 7) {
 		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
+		free(output);
 		return VINE_WORKER_FAILURE;
 	}
 
@@ -592,6 +594,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 				w->hostname,
 				w->addrport,
 				task_id);
+		free(output);
 		return VINE_SUCCESS;
 	}
 
@@ -603,10 +606,12 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		case VINE_TASK_WAITING_RETRIEVAL:
 		case VINE_TASK_RETRIEVED:
 		case VINE_TASK_DONE:
+			free(output);
 			return VINE_SUCCESS;
 		// May want check if there is a case where task state changed to one of these before worker has killed it. 
 		case VINE_TASK_INITIAL:     
 		case VINE_TASK_READY:
+			free(output);
 			return VINE_WORKER_FAILURE;
         }
 
@@ -615,6 +620,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		vine_task_set_result(t, VINE_RESULT_FORSAKEN);
 		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
 		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
+		free(output);
 		return VINE_SUCCESS;
 	}
 
@@ -624,14 +630,16 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 			observed_execution_time > execution_time ? execution_time : observed_execution_time;
 	t->time_workers_execute_last_start = start_time;
 	t->time_workers_execute_last_end = end_time;
-
 	t->time_workers_execute_all += t->time_workers_execute_last;
-
 	t->output_length = output_length;
-
 	t->result = task_status;
 	t->exit_code = exit_status;
-
+	if(t->output_length <= 1024 && t->output_length > 0){
+		t->output = malloc(t->output_length + 1);
+		t->output_recieved = 1;
+		strcpy(t->output, output);
+		free(output);
+	}
 	q->stats->time_workers_execute += t->time_workers_execute_last;
 
 	w->finished_tasks++;
@@ -645,23 +653,8 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		}
 	}
 
-	if (!t->light) {
-		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
-		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
-	} else {
-		t->time_when_retrieval = timestamp_get();
-		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
-		vine_manager_send(q, w, "kill %d\n", t->task_id);
-		delete_uncacheable_files(q, w, t);
-		t->time_when_done = timestamp_get();
-		reap_task_from_worker(q, w, t, VINE_TASK_RETRIEVED);
-		vine_accumulate_task(q, t);
-        	w->finished_tasks--;
-        	w->total_tasks_complete++;
-		w->alarm_slow_worker = 0;
-		exit_alert(q, w, t);
-	}
-
+	change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
+	// hash_table_insert(q->workers_with_available_results, w->hashkey, w); TODO tasks are sometimes retrieved per worker.
 	itable_remove(q->running_table, t->task_id);
 
 	if (q->bandwidth_limit) {
@@ -1403,158 +1396,6 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 }
 
 /*
-Get all the relevant output data from a completed task, then clean up unneeded items.
-Return true if task was retrieved from worker (regardless of whether the task is successful.)
-Return false if the worker failed.
-*/
-
-static int fetch_output_from_worker(struct vine_manager *q, struct vine_worker_info *w, int task_id)
-{
-	struct vine_task *t;
-	vine_result_code_t result = VINE_SUCCESS;
-
-	t = itable_lookup(w->current_tasks, task_id);
-	if (!t) {
-		debug(D_VINE, "Failed to find task %d at worker %s (%s).", task_id, w->hostname, w->addrport);
-		handle_failure(q, w, t, VINE_WORKER_FAILURE);
-		return 0;
-	}
-
-	t->time_when_retrieval = timestamp_get();
-
-	/* Determine what subset of outputs to retrieve based on status. */
-
-	switch (t->result) {
-	case VINE_RESULT_INPUT_MISSING:
-	case VINE_RESULT_FORSAKEN:
-		/* If the worker didn't run the task don't bother fetching outputs. */
-		result = VINE_SUCCESS;
-		break;
-	case VINE_RESULT_RESOURCE_EXHAUSTION:
-		/* On resource exhaustion, just get the monitor files to figure out what happened. */
-		result = vine_manager_get_monitor_output_file(q, w, t);
-		break;
-	default:
-		/* Otherwise get all of the output files. */
-		result = vine_manager_get_output_files(q, w, t);
-		break;
-	}
-
-	if (result == VINE_APP_FAILURE) {
-		vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
-	} else if (result == VINE_MGR_FAILURE) {
-		vine_task_set_result(t, VINE_RESULT_OUTPUT_TRANSFER_ERROR);
-	}
-
-	/* Regardless of the exit status, remove the task and sandbox from the worker. */
-	vine_manager_send(q, w, "kill %d\n", t->task_id);
-
-	if (result != VINE_SUCCESS) {
-		debug(D_VINE, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
-		t->time_when_last_failure = timestamp_get();
-
-		if (result == VINE_WORKER_FAILURE) {
-			handle_worker_failure(q, w);
-			t->time_when_done = timestamp_get();
-			return 0;
-		}
-
-		if (t->time_when_commit_end > 0) {
-			delete_task_output_files(q, w, t);
-		}
-	}
-
-	delete_uncacheable_files(q, w, t);
-
-	/* if q is monitoring, update t->resources_measured, and delete the task
-	 * summary. */
-	if (q->monitor_mode) {
-		read_measured_resources(q, t);
-
-		/* Further, if we got debug and series files, gzip them. */
-		if (q->monitor_mode & VINE_MON_FULL)
-			resource_monitor_compress_logs(q, t);
-	}
-
-	// Finish receiving output.
-	t->time_when_done = timestamp_get();
-
-	vine_accumulate_task(q, t);
-
-	// At this point, a task is completed.
-	reap_task_from_worker(q, w, t, VINE_TASK_RETRIEVED);
-
-	switch (t->result) {
-	case VINE_RESULT_INPUT_MISSING:
-	case VINE_RESULT_FORSAKEN:
-		/* do not count tasks that didn't execute as complete, or finished tasks */
-		break;
-	default:
-		w->finished_tasks--;
-		w->total_tasks_complete++;
-
-		// At least one task has finished without triggering a slow worker disconnect, thus we
-		// now have evidence that worker is not slow (e.g., it was probably the
-		// previous task that was slow).
-		w->alarm_slow_worker = 0;
-
-		vine_task_info_add(q, t);
-		debug(D_VINE,
-				"%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
-				w->hostname,
-				w->addrport,
-				(t->time_when_done - t->time_when_commit_start) / 1000000.0,
-				(long long)w->total_tasks_complete,
-				w->total_task_time / w->total_tasks_complete / 1000000.0);
-
-		break;
-	}
-
-	/* print warnings if the task ran for a very short time (1s) and exited with common non-zero status */
-	if (t->result == VINE_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
-		switch (t->exit_code) {
-		case (126):
-			warn(D_VINE,
-					"Task %d ran for a very short time and exited with code %d.\n",
-					t->task_id,
-					t->exit_code);
-			warn(D_VINE, "This usually means that the task's command is not an executable,\n");
-			warn(D_VINE, "or that the worker's scratch directory is on a no-exec partition.\n");
-			break;
-		case (127):
-			warn(D_VINE,
-					"Task %d ran for a very short time and exited with code %d.\n",
-					t->task_id,
-					t->exit_code);
-			warn(D_VINE, "This usually means that the task's command could not be found, or that\n");
-			warn(D_VINE, "it uses a shared library not available at the worker, or that\n");
-			warn(D_VINE, "it uses a version of the glibc different than the one at the worker.\n");
-			break;
-		case (139):
-			warn(D_VINE,
-					"Task %d ran for a very short time and exited with code %d.\n",
-					t->task_id,
-					t->exit_code);
-			warn(D_VINE, "This usually means that the task's command had a segmentation fault,\n");
-			warn(D_VINE, "either because it has a memory access error (segfault), or because\n");
-			warn(D_VINE, "it uses a version of a shared library different from the one at the worker.\n");
-			break;
-		default:
-			break;
-		}
-	}
-
-	/* XXX: temp fix. Make this a tunable parameter and/or make it more sophisticated */
-	if (w->forsaken_tasks > VINE_DEFAULT_MAX_FORSAKEN_PER_WORKER && w->total_tasks_complete == 0) {
-		debug(D_VINE, "Disconnecting worker that keeps forsaking tasks %s (%s).", w->hostname, w->addrport);
-		handle_failure(q, w, t, VINE_WORKER_FAILURE);
-		return 0;
-	}
-
-	return 1;
-}
-
-/*
 Consider the set of tasks that are waiting but not running.
 Cancel those that have exceeded their expressed end time,
 exceeded the maximum number of retries, or other policy issues.
@@ -1900,118 +1741,6 @@ static vine_result_code_t get_stdout(
 
 	if (t->output)
 		t->output[actual] = 0;
-
-	return VINE_SUCCESS;
-}
-
-/*
-Failure to store result is treated as success so we continue to retrieve the
-output files of the task.
-*/
-
-static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_info *w, const char *line)
-{
-
-	if (!q || !w || !line)
-		return VINE_WORKER_FAILURE;
-
-	int task_status, exit_status;
-	uint64_t task_id;
-	int64_t output_length;
-
-	timestamp_t execution_time, start_time, end_time;
-	timestamp_t observed_execution_time;
-
-	// Format: task completion status, exit status (exit code or signal), output length, execution time, task_id
-
-	int n = sscanf(line,
-			"result %d %d %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 "",
-			&task_status,
-			&exit_status,
-			&output_length,
-			&start_time,
-			&end_time,
-			&task_id);
-
-	if (n < 6) {
-		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
-		return VINE_WORKER_FAILURE;
-	}
-
-	execution_time = end_time - start_time;
-
-	/* If the worker sent back a task we have never heard of, then discard the following data. */
-	struct vine_task *t = itable_lookup(w->current_tasks, task_id);
-	if (!t) {
-		debug(D_VINE,
-				"Unknown task result from worker %s (%s): no task %" PRId64
-				" assigned to worker.  Ignoring result.",
-				w->hostname,
-				w->addrport,
-				task_id);
-		time_t stoptime = time(0) + vine_manager_transfer_time(q, w, output_length);
-		link_soak(w->link, output_length, stoptime);
-		return VINE_SUCCESS;
-	}
-
-	if (task_status != VINE_RESULT_SUCCESS) {
-		w->last_failure_time = timestamp_get();
-		t->time_when_last_failure = w->last_failure_time;
-	}
-
-	/* If the task was forsaken by the worker or couldn't exeute, it didn't really complete, so short circuit. */
-	if (task_status == VINE_RESULT_FORSAKEN) {
-		t->forsaken_count++;
-		itable_remove(q->running_table, t->task_id);
-		vine_task_set_result(t, task_status);
-		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
-		return VINE_SUCCESS;
-	}
-
-	/* Consume the stdout data immediately following this message. */
-	get_stdout(q, w, t, output_length);
-
-	/* Update task stats for this completion. */
-	observed_execution_time = timestamp_get() - t->time_when_commit_end;
-
-	t->time_workers_execute_last =
-			observed_execution_time > execution_time ? execution_time : observed_execution_time;
-	t->time_workers_execute_last_start = start_time;
-	t->time_workers_execute_last_end = end_time;
-	t->time_workers_execute_all += t->time_workers_execute_last;
-	t->result = task_status;
-	t->exit_code = exit_status;
-
-	/* Update queue stats for this completion. */
-	q->stats->time_workers_execute += t->time_workers_execute_last;
-
-	/* Update worker stats for this completion. */
-	w->finished_tasks++;
-
-	/* Convert resource_monitor status into taskvine status if needed. */
-	if (q->monitor_mode) {
-		if (t->exit_code == RM_OVERFLOW) {
-			vine_task_set_result(t, VINE_RESULT_RESOURCE_EXHAUSTION);
-		} else if (t->exit_code == RM_TIME_EXPIRE) {
-			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
-		}
-	}
-
-	/*
-	A library should not ordinarily exit by any means.
-	If it does, count that as a failure in the original object,
-	which will cause future dispatches of the library to be throttled.
-	*/
-
-	if (t->provides_library) {
-		struct vine_task *original = hash_table_lookup(q->library_templates, t->provides_library);
-		if (original)
-			original->time_when_last_failure = timestamp_get();
-	}
-
-	/* Finally update data structures to reflect the completion. */
-	itable_remove(q->running_table, t->task_id);
-	change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
 
 	return VINE_SUCCESS;
 }
