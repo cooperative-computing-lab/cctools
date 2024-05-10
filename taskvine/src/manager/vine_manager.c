@@ -3562,21 +3562,18 @@ static int shutdown_drained_workers(struct vine_manager *q)
 
 /* Comparator function for checking if a task matches a given tag. */
 
-static int task_tag_comparator(void *t, const void *r)
+static int task_tag_comparator(struct vine_task *t, const char *tag)
 {
 
-	struct vine_task *task_in_manager = t;
-	const char *task_tag = r;
-
-	if (!task_in_manager->tag && !task_tag) {
+	if (!t->tag && !tag) {
 		return 1;
 	}
 
-	if (!task_in_manager->tag || !task_tag) {
+	if (!t->tag || !tag) {
 		return 0;
 	}
 
-	return !strcmp(task_in_manager->tag, task_tag);
+	return !strcmp(t->tag, tag);
 }
 
 /*
@@ -4441,20 +4438,6 @@ const char *vine_result_string(vine_result_t result)
 	return str;
 }
 
-static struct vine_task *task_state_any_with_tag(struct vine_manager *q, vine_task_state_t state, const char *tag)
-{
-	struct vine_task *t;
-	uint64_t task_id;
-	ITABLE_ITERATE(q->tasks, task_id, t)
-	{
-		if (t->state == state && task_tag_comparator((void *)t, (void *)tag)) {
-			return t;
-		}
-	}
-
-	return NULL;
-}
-
 static int task_state_count(struct vine_manager *q, const char *category, vine_task_state_t state)
 {
 	struct vine_task *t;
@@ -4565,15 +4548,15 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 		return 0;
 	}
 
+	/* Check if this library task can fit in this worker. */
+	/* check_worker_against_task does not, and should not, modify the task */
+	if (!check_worker_against_task(q, w, original)) {
+		return 0;
+	}
+
 	/* Duplicate the original task */
 	struct vine_task *t = vine_task_copy(original);
 	t->type = VINE_TASK_TYPE_LIBRARY_INSTANCE;
-
-	/* Check if this library task can fit in this worker. */
-	if (!check_worker_against_task(q, w, t)) {
-		vine_task_delete(t);
-		return 0;
-	}
 
 	/* Give it a unique taskid if library fits the worker. */
 	t->task_id = q->next_task_id++;
@@ -4775,12 +4758,28 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 		struct vine_task *t = NULL;
 
 		if (tag) {
-			t = task_state_any_with_tag(q, VINE_TASK_RETRIEVED, tag);
-		} else if (task_id >= 0) {
-			struct vine_task *temp = itable_lookup(q->tasks, task_id);
-			if (temp->state == VINE_TASK_RETRIEVED) {
-				t = temp;
+			struct vine_task *temp = NULL;
+			int tasks_to_consider = list_size(q->retrieved_list);
+			while (tasks_to_consider > 0) {
+				tasks_to_consider--;
+				temp = list_peek_head(q->retrieved_list);
+				// a small hack, if task is not standard we accepted it so it can be deleted below.
+				if (temp->type != VINE_TASK_TYPE_STANDARD || task_tag_comparator(temp, tag)) {
+					// temp points to head of list
+					t = list_pop_head(q->retrieved_list);
+					break;
+				} else {
+					list_rotate(q->retrieved_list);
+				}
 			}
+		} else if (task_id >= 0) {
+			// XXX: library tasks are never removed!
+			struct vine_task *temp = itable_lookup(q->tasks, task_id);
+			if (!temp || temp->state != VINE_TASK_RETRIEVED) {
+				break;
+			}
+			t = temp;
+			list_remove(q->retrieved_list, t);
 		} else if (list_size(q->retrieved_list) > 0) {
 			t = list_pop_head(q->retrieved_list);
 		}
@@ -4805,11 +4804,10 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			break;
 		case VINE_TASK_TYPE_LIBRARY_INSTANCE:
 			/* silently delete it */
-			vine_task_delete(t);
+			vine_task_delete(t); // delete as manager created this task
 			break;
 		case VINE_TASK_TYPE_LIBRARY_TEMPLATE:
-			/* A template shouldn't be scheduled but delete it anyway */
-			vine_task_delete(t);
+			/* A template shouldn't be scheduled. It's deleted when template table is deleted.*/
 			break;
 		}
 	}
