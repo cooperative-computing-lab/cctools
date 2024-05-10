@@ -313,7 +313,7 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 		handle_worker_timeout(q, w);
 	} else if (string_prefix_is(field, "worker-id")) {
 		free(w->workerid);
-		w->workerid = string_format("%s", w->hashkey);
+		w->workerid = xxstrdup(field);
 		vine_txn_log_write_worker(q, w, 0, 0);
 	} else if (string_prefix_is(field, "worker-end-time")) {
 		w->end_time = MAX(0, atoll(value));
