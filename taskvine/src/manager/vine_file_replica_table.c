@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "vine_file_replica_table.h"
 #include "set.h"
+#include "vine_blocklist.h"
 #include "vine_current_transfers.h"
 #include "vine_file.h"
 #include "vine_file_replica.h"

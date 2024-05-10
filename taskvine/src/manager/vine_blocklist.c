@@ -111,3 +111,13 @@ int vine_blocklist_is_blocked(struct vine_manager *q, const char *hostname)
 	struct vine_blocklist_info *info = hash_table_lookup(q->worker_blocklist, hostname);
 	return info && info->blocked;
 }
+
+int vine_blocklist_times_blocked(struct vine_manager *q, const char *hostname)
+{
+	struct vine_blocklist_info *info = hash_table_lookup(q->worker_blocklist, hostname);
+	if (info) {
+		return info->blocked;
+	}
+
+	return 0;
+}

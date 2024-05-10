@@ -58,7 +58,8 @@ typedef enum {
 	VINE_WORKER_DISCONNECT_STATUS_WORKER,
 	VINE_WORKER_DISCONNECT_IDLE_OUT,
  	VINE_WORKER_DISCONNECT_FAST_ABORT,
-	VINE_WORKER_DISCONNECT_FAILURE
+	VINE_WORKER_DISCONNECT_FAILURE,
+	VINE_WORKER_DISCONNECT_XFER_ERRORS
 } vine_worker_disconnect_reason_t;
 
 /* States known about libraries */
@@ -267,6 +268,8 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 
 /** Return any completed task without doing any manager work. */
 struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, int task_id);
+
+void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason);
 
 
 /* The expected format of files created by the resource monitor.*/
