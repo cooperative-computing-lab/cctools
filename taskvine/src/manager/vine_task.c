@@ -157,30 +157,25 @@ void vine_task_reset(struct vine_task *t)
 	retract_mounts_on_reset(t->output_mounts);
 }
 
-static struct list *vine_task_mount_list_copy(struct list *list)
+static void vine_task_mount_list_copy(struct list *destination, struct list *list)
 {
-	struct list *new = list_create();
 	struct vine_mount *old_mount, *new_mount;
 
 	LIST_ITERATE(list, old_mount)
 	{
 		new_mount = vine_mount_copy(old_mount);
-		list_push_tail(new, new_mount);
+		list_push_tail(destination, new_mount);
 	}
-	return new;
 }
 
-static struct list *vine_task_string_list_copy(struct list *string_list)
+static void vine_task_string_list_copy(struct list *destination, struct list *string_list)
 {
-	struct list *new = list_create();
 	char *var;
 
 	LIST_ITERATE(string_list, var)
 	{
-		list_push_tail(new, xxstrdup(var));
+		list_push_tail(destination, xxstrdup(var));
 	}
-
-	return new;
 }
 
 struct vine_task *vine_task_addref(struct vine_task *t)
@@ -222,10 +217,10 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 		vine_task_set_snapshot_file(new, task->monitor_snapshot_file);
 	}
 
-	new->input_mounts = vine_task_mount_list_copy(task->input_mounts);
-	new->output_mounts = vine_task_mount_list_copy(task->output_mounts);
-	new->env_list = vine_task_string_list_copy(task->env_list);
-	new->feature_list = vine_task_string_list_copy(task->feature_list);
+	vine_task_mount_list_copy(new->input_mounts, task->input_mounts);
+	vine_task_mount_list_copy(new->output_mounts, task->output_mounts);
+	vine_task_string_list_copy(new->env_list, task->env_list);
+	vine_task_string_list_copy(new->feature_list, task->feature_list);
 	new->function_slots = task->function_slots;
 
 	/* Scheduling features of task are copied. */
@@ -245,6 +240,7 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 	/* Resource requests are copied. */
 
 	if (task->resources_requested) {
+		rmsummary_delete(new->resources_requested);
 		new->resources_requested = rmsummary_copy(task->resources_requested, 0);
 	}
 
