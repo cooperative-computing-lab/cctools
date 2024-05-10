@@ -127,8 +127,8 @@ class DaskVine(Manager):
             progress_label="[green]tasks",
             wrapper=None,
             wrapper_proc=print,
-            import_modules=None  # Deprecated, use lib_modules
-            lazy_transfers=True, # Deprecated, use worker_tranfers
+            import_modules=None,  # Deprecated, use lib_modules
+            lazy_transfers=True,  # Deprecated, use worker_tranfers
             ):
         try:
             self.set_property("framework", "dask")
