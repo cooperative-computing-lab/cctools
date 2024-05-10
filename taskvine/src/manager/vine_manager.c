@@ -868,7 +868,8 @@ static void recall_worker_lost_temp_files(struct vine_manager *q, struct vine_wo
 
 /* Remove a worker from this master by removing all remote state, all local state, and disconnecting. */
 
-void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason)
+void vine_manager_remove_worker(
+		struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason)
 {
 	if (!q || !w)
 		return;

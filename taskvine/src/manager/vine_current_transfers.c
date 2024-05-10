@@ -73,7 +73,7 @@ void set_throttle(struct vine_manager *m, struct vine_worker_info *w, int is_des
 	int bad;
 	int streak;
 
-    int grace = 5;   // XXX: make tunable parameter: q->consecutieve_max_xfer_errors;
+	int grace = 5; // XXX: make tunable parameter: q->consecutieve_max_xfer_errors;
 	const char *dir;
 
 	if (is_destination) {
@@ -81,8 +81,9 @@ void set_throttle(struct vine_manager *m, struct vine_worker_info *w, int is_des
 		bad = w->xfer_total_bad_destination_counter;
 		streak = w->xfer_streak_bad_destination_counter;
 		dir = "destination";
-        // since worker can talk to manager, probably the issue is with sources. Give more chances to destinations.
-        grace *= 2;
+		// since worker can talk to manager, probably the issue is with sources. Give more chances to
+		// destinations.
+		grace *= 2;
 	} else {
 		good = w->xfer_total_good_source_counter;
 		bad = w->xfer_total_bad_source_counter;
@@ -90,7 +91,14 @@ void set_throttle(struct vine_manager *m, struct vine_worker_info *w, int is_des
 		dir = "source";
 	}
 
-	debug(D_VINE, "Setting transfer failure (%d,%d/%d) timestamp on %s worker: %s:%d", streak, bad, good+bad, dir, w->hostname, w->transfer_port);
+	debug(D_VINE,
+			"Setting transfer failure (%d,%d/%d) timestamp on %s worker: %s:%d",
+			streak,
+			bad,
+			good + bad,
+			dir,
+			w->hostname,
+			w->transfer_port);
 
 	w->last_transfer_failure = timestamp_get();
 
@@ -107,7 +115,7 @@ void set_throttle(struct vine_manager *m, struct vine_worker_info *w, int is_des
 				w->addrport,
 				bad,
 				bad + good);
-        vine_manager_remove_worker(m, w, VINE_WORKER_DISCONNECT_XFER_ERRORS);
+		vine_manager_remove_worker(m, w, VINE_WORKER_DISCONNECT_XFER_ERRORS);
 	}
 }
 
