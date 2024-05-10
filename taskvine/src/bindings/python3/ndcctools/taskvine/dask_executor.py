@@ -67,8 +67,8 @@ class DaskVine(Manager):
     # @param environment   A taskvine file representing an environment to run the tasks.
     # @param extra_files   A dictionary of {taskvine.File: "remote_name"} to add to each
     #                      task.
-    # @param lazy_transfers Whether to keep intermediate results only at workers (True)
-    #                      or to bring back each result to the manager (False, default).
+    # @param worker_transfers Whether to keep intermediate results only at workers (True, default)
+    #                      or to bring back each result to the manager (False).
     #                      True is more IO efficient, but runs the risk of needing to
     #                      recompute results if workers are lost.
     # @param env_vars      A dictionary of VAR=VALUE environment variables to set per task. A value
@@ -76,7 +76,7 @@ class DaskVine(Manager):
     #                      and task, and that returns a string.
     # @param low_memory_mode Split graph vertices to reduce memory needed per function call. It
     #                      removes some of the dask graph optimizations, thus proceed with care.
-    # @param  checkpoint_fn When using lazy_transfers, a predicate with arguments (dag, key)
+    # @param checkpoint_fn When using worker_transfers, a predicate with arguments (dag, key)
     #                      called before submitting a task. If True, the result is brought back
     #                      to the manager.
     # @param resources     A dictionary with optional keys of cores, memory and disk (MB)
@@ -107,7 +107,7 @@ class DaskVine(Manager):
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
-            lazy_transfers=False,
+            worker_transfers=True,
             env_vars=None,
             low_memory_mode=False,
             checkpoint_fn=None,
@@ -127,7 +127,8 @@ class DaskVine(Manager):
             progress_label="[green]tasks",
             wrapper=None,
             wrapper_proc=print,
-            import_modules=None  # Deprecated, use lib_modules
+            import_modules=None,  # Deprecated, use lib_modules
+            lazy_transfers=True,  # Deprecated, use worker_tranfers
             ):
         try:
             self.set_property("framework", "dask")
@@ -140,7 +141,7 @@ class DaskVine(Manager):
                 self.environment = environment
 
             self.extra_files = extra_files
-            self.lazy_transfers = lazy_transfers
+            self.worker_transfers = worker_transfers or lazy_transfers
             self.env_vars = env_vars
             self.low_memory_mode = low_memory_mode
             self.checkpoint_fn = checkpoint_fn
@@ -320,7 +321,7 @@ class DaskVine(Manager):
     def _enqueue_dask_calls(self, dag, tag, rs, retries, enqueued_calls):
         targets = dag.get_targets()
         for (k, sexpr) in rs:
-            lazy = self.lazy_transfers and k not in targets
+            lazy = self.worker_transfers and k not in targets
             if lazy and self.checkpoint_fn:
                 lazy = self.checkpoint_fn(dag, k)
 
@@ -343,7 +344,7 @@ class DaskVine(Manager):
                                    extra_files=self.extra_files,
                                    env_vars=self.env_vars,
                                    retries=retries,
-                                   lazy_transfers=lazy,
+                                   worker_transfers=lazy,
                                    wrapper=self.wrapper)
 
                 if self.env_per_task:
@@ -360,7 +361,7 @@ class DaskVine(Manager):
                                      category=cat,
                                      extra_files=self.extra_files,
                                      retries=retries,
-                                     lazy_transfers=lazy,
+                                     worker_transfers=lazy,
                                      wrapper=self.wrapper)
 
                 t.set_tag(tag)  # tag that identifies this dag
@@ -490,7 +491,7 @@ class PythonTaskDask(PythonTask):
     # @param extra_files    Additional files to provide to the task.
     # @param env_vars       A dictionary of environment variables.
     # @param retries        Number of times to retry failed task.
-    # @param lazy_transfers If true, do not return outputs to manager until required.
+    # @param worker_transfers If true, do not return outputs to manager until required.
     # @param wrapper
     #
     def __init__(self, m,
@@ -500,7 +501,7 @@ class PythonTaskDask(PythonTask):
                  extra_files=None,
                  env_vars=None,
                  retries=5,
-                 lazy_transfers=False,
+                 worker_transfers=False,
                  wrapper=None):
         self._key = key
         self._sexpr = sexpr
@@ -533,7 +534,7 @@ class PythonTaskDask(PythonTask):
 
         if category:
             self.set_category(category)
-        if lazy_transfers:
+        if worker_transfers:
             self.enable_temp_output()
         if environment:
             self.add_environment(environment)
@@ -592,7 +593,7 @@ class FunctionCallDask(FunctionCall):
     # @param resources      Resources to be set for a FunctionCall.
     # @param extra_files    Additional files to provide to the task.
     # @param retries        Number of times to retry failed task.
-    # @param lazy_transfers If true, do not return outputs to manager until required.
+    # @param worker_transfers If true, do not return outputs to manager until required.
     #
 
     def __init__(self, m,
@@ -601,7 +602,7 @@ class FunctionCallDask(FunctionCall):
                  resources=None,
                  extra_files=None,
                  retries=5,
-                 lazy_transfers=False,
+                 worker_transfers=False,
                  wrapper=None):
 
         self._key = key
@@ -632,7 +633,7 @@ class FunctionCallDask(FunctionCall):
 
         if category:
             self.set_category(category)
-        if lazy_transfers:
+        if worker_transfers:
             self.enable_temp_output()
         if extra_files:
             for f, name in extra_files.items():

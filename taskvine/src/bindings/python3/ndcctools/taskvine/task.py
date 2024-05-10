@@ -878,6 +878,7 @@ class PythonTask(Task):
         try:
             if self._input_file:
                 self.manager.undeclare_file(self._input_file)
+                self._input_file = None
             super().__del__()
         except TypeError:
             # in case the interpreter is shuting down. staging files will be deleted by manager atexit function.
@@ -1133,26 +1134,17 @@ class FunctionCall(PythonTask):
             else:
                 self._output = FunctionCallNoResult()
 
-            self.manager.undeclare_file(self._input_file)
-            self._input_file = None
-
-            self.manager.undeclare_file(self._output_file)
-            self._output_file = None
-
             self._output_loaded = True
         return self._output
 
-    # Remove input and output buffers if self.output was not called.
     def __del__(self):
         try:
             if self._input_file:
                 self.manager.undeclare_file(self._input_file)
                 self._input_file = None
-            if self._output_file and not self._tmp_output_enabled:
-                self.manager.undeclare_file(self._output_file)
-                self._output_file = None
             super().__del__()
         except TypeError:
+            # in case the interpreter is shuting down. staging files will be deleted by manager atexit function.
             pass
 
 
