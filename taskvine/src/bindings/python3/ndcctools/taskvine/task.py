@@ -881,6 +881,7 @@ class PythonTask(Task):
         try:
             if self._input_file:
                 self.manager.undeclare_file(self._input_file)
+                self._input_file = None
             super().__del__()
         except TypeError:
             # in case the interpreter is shuting down. staging files will be deleted by manager atexit function.
@@ -1075,14 +1076,19 @@ class FunctionCall(PythonTask):
     #
     # @param self 	Reference to the current python task object
     def submit_finalize(self):
-        self._input_file = self.manager.declare_buffer(buffer=cloudpickle.dumps(self._event), cache=False, peer_transfer=True)
-        self.add_input(self._input_file, "infile")
+        name = os.path.join(self.manager.staging_directory, "arguments", self._id)
+        with open(name, "wb") as wf:
+            cloudpickle.dump(self._event, wf)
+        self._input_file = self.manager.declare_file(name, unlink_when_done=True, cache=False, peer_transfer=True)
 
         if self._tmp_output_enabled:
             self._output_file = self.manager.declare_temp()
         else:
-            self._output_file = self.manager.declare_buffer(buffer=None, cache=self._cache_output, peer_transfer=False)
+            name = os.path.join(self.manager.staging_directory, "outputs", self._id)
+            self._output_file = self.manager.declare_file(name, cache=self._cache_output, unlink_when_done=False)
 
+        self._event = None  # free args memory. Once in a file they are not needed anymore.
+        self.add_input(self._input_file, "infile")
         self.add_output(self._output_file, "outfile")
 
     ##
@@ -1131,26 +1137,17 @@ class FunctionCall(PythonTask):
             else:
                 self._output = FunctionCallNoResult()
 
-            self.manager.undeclare_file(self._input_file)
-            self._input_file = None
-
-            self.manager.undeclare_file(self._output_file)
-            self._output_file = None
-
             self._output_loaded = True
         return self._output
 
-    # Remove input and output buffers if self.output was not called.
     def __del__(self):
         try:
             if self._input_file:
                 self.manager.undeclare_file(self._input_file)
                 self._input_file = None
-            if self._output_file and not self._tmp_output_enabled:
-                self.manager.undeclare_file(self._output_file)
-                self._output_file = None
             super().__del__()
         except TypeError:
+            # in case the interpreter is shuting down. staging files will be deleted by manager atexit function.
             pass
 
 

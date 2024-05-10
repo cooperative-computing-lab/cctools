@@ -5,6 +5,8 @@ See the file COPYING for details.
 */
 
 #include "vine_current_transfers.h"
+#include "macros.h"
+#include "vine_blocklist.h"
 #include "vine_manager.h"
 #include "xxmalloc.h"
 
@@ -61,6 +63,62 @@ int vine_current_transfers_remove(struct vine_manager *q, const char *id)
 	}
 }
 
+void set_throttle(struct vine_manager *m, struct vine_worker_info *w, int is_destination)
+{
+	if (!w) {
+		return;
+	}
+
+	int good;
+	int bad;
+	int streak;
+
+	int grace = 5; // XXX: make tunable parameter: q->consecutieve_max_xfer_errors;
+	const char *dir;
+
+	if (is_destination) {
+		good = w->xfer_total_good_destination_counter;
+		bad = w->xfer_total_bad_destination_counter;
+		streak = w->xfer_streak_bad_destination_counter;
+		dir = "destination";
+		// since worker can talk to manager, probably the issue is with sources. Give more chances to
+		// destinations.
+		grace *= 2;
+	} else {
+		good = w->xfer_total_good_source_counter;
+		bad = w->xfer_total_bad_source_counter;
+		streak = w->xfer_streak_bad_source_counter;
+		dir = "source";
+	}
+
+	debug(D_VINE,
+			"Setting transfer failure (%d,%d/%d) timestamp on %s worker: %s:%d",
+			streak,
+			bad,
+			good + bad,
+			dir,
+			w->hostname,
+			w->transfer_port);
+
+	w->last_transfer_failure = timestamp_get();
+
+	/* first error treat as a normal error */
+	if (streak < grace) {
+		return;
+	}
+
+	if (good <= bad) {
+		/* this worker has failed more often than not, release it. */
+		notice(D_VINE,
+				"Releasing worker %s because of repeated %s transfer failures: %d/%d",
+				dir,
+				w->addrport,
+				bad,
+				bad + good);
+		vine_manager_remove_worker(m, w, VINE_WORKER_DISCONNECT_XFER_ERRORS);
+	}
+}
+
 int vine_current_transfers_set_failure(struct vine_manager *q, char *id)
 {
 	struct vine_transfer_pair *p = hash_table_lookup(q->current_transfer_table, id);
@@ -72,25 +130,49 @@ int vine_current_transfers_set_failure(struct vine_manager *q, char *id)
 
 	struct vine_worker_info *source_worker = p->source_worker;
 	if (source_worker) {
-		source_worker->last_transfer_failure = timestamp_get();
-		debug(D_VINE,
-				"Setting transfer failure timestamp on source worker: %s:%d",
-				source_worker->hostname,
-				source_worker->transfer_port);
 		throttled++;
+
+		source_worker->xfer_streak_bad_source_counter++;
+		source_worker->xfer_total_bad_source_counter++;
 	}
 
 	struct vine_worker_info *to = p->to;
 	if (to) {
-		to->last_transfer_failure = timestamp_get();
-		debug(D_VINE,
-				"Setting transfer failure timestamp on destination worker: %s:%d",
-				to->hostname,
-				to->transfer_port);
 		throttled++;
+
+		to->xfer_streak_bad_destination_counter++;
+		to->xfer_total_bad_destination_counter++;
 	}
 
+	set_throttle(q, source_worker, 0);
+	set_throttle(q, to, 1);
+
 	return throttled;
+}
+
+void vine_current_transfers_set_success(struct vine_manager *q, char *id)
+{
+	struct vine_transfer_pair *p = hash_table_lookup(q->current_transfer_table, id);
+
+	if (!p) {
+		return;
+	}
+
+	struct vine_worker_info *source = p->source_worker;
+	if (source) {
+		vine_blocklist_unblock(q, source->addrport);
+
+		source->xfer_streak_bad_source_counter = 0;
+		source->xfer_total_good_source_counter++;
+	}
+
+	struct vine_worker_info *to = p->to;
+	if (to) {
+		vine_blocklist_unblock(q, to->addrport);
+
+		to->xfer_streak_bad_destination_counter = 0;
+		to->xfer_total_good_destination_counter++;
+	}
 }
 
 // count the number transfers coming from a specific source

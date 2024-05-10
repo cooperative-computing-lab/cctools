@@ -36,7 +36,7 @@ void vine_txn_log_write_header(struct vine_manager *q)
 	fprintf(q->txn_logfile, "# time manager_pid MANAGER manager_pid START|END time_from_origin\n");
 	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id CONNECTION host:port\n");
 	fprintf(q->txn_logfile,
-			"# time manager_pid WORKER worker_id DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT)\n");
+			"# time manager_pid WORKER worker_id DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT|XFER_ERRORS)\n");
 	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id RESOURCES {resources}\n");
 	fprintf(q->txn_logfile,
 			"# time manager_pid WORKER worker_id CACHE_UPDATE filename size_in_mb wall_time_us start_time_us\n");
@@ -264,6 +264,9 @@ void vine_txn_log_write_worker(struct vine_manager *q, struct vine_worker_info *
 			break;
 		case VINE_WORKER_DISCONNECT_EXPLICIT:
 			buffer_printf(&B, " EXPLICIT");
+			break;
+		case VINE_WORKER_DISCONNECT_XFER_ERRORS:
+			buffer_printf(&B, " XFER_ERRORS");
 			break;
 		case VINE_WORKER_DISCONNECT_UNKNOWN:
 		default:

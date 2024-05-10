@@ -117,7 +117,6 @@ double vine_option_blocklist_slow_workers_timeout = 900;
 static void handle_failure(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, vine_result_code_t fail_type);
 static void handle_worker_failure(struct vine_manager *q, struct vine_worker_info *w);
-static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason);
 
 static void reap_task_from_worker(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, vine_task_state_t new_state);
@@ -375,6 +374,7 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 		replica->transfer_time = transfer_time;
 		replica->state = VINE_FILE_REPLICA_STATE_READY;
 
+		vine_current_transfers_set_success(q, id);
 		vine_current_transfers_remove(q, id);
 
 		vine_txn_log_write_cache_update(q, w, size, transfer_time, start_time, cachename);
@@ -440,13 +440,13 @@ static int handle_cache_invalid(struct vine_manager *q, struct vine_worker_info 
 			vine_file_replica_delete(replica);
 		}
 
-		/* throttle workers that could transfer a file */
-		w->last_failure_time = timestamp_get();
-
 		/* If the third argument was given, also remove the transfer record */
 		if (n >= 3) {
 			vine_current_transfers_set_failure(q, transfer_id);
 			vine_current_transfers_remove(q, transfer_id);
+		} else {
+			/* throttle workers that could transfer a file */
+			w->last_failure_time = timestamp_get();
 		}
 
 		/* Successfully processed this message. */
@@ -1054,7 +1054,8 @@ static void recall_worker_lost_temp_files(struct vine_manager *q, struct vine_wo
 
 /* Remove a worker from this master by removing all remote state, all local state, and disconnecting. */
 
-static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason)
+void vine_manager_remove_worker(
+		struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason)
 {
 	if (!q || !w)
 		return;
@@ -1095,7 +1096,7 @@ static int release_worker(struct vine_manager *q, struct vine_worker_info *w)
 
 	vine_manager_send(q, w, "release\n");
 
-	remove_worker(q, w, VINE_WORKER_DISCONNECT_EXPLICIT);
+	vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_EXPLICIT);
 
 	q->stats->workers_released++;
 
@@ -1483,7 +1484,7 @@ we remove the worker and retry the tasks dispatched to it elsewhere.
 
 static void handle_worker_failure(struct vine_manager *q, struct vine_worker_info *w)
 {
-	remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
+	vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
 	return;
 }
 
@@ -2513,20 +2514,20 @@ static vine_result_code_t handle_worker(struct vine_manager *q, struct link *l)
 
 	case VINE_MSG_PROCESSED_DISCONNECT:
 		// A status query was received and processed, so disconnect.
-		remove_worker(q, w, VINE_WORKER_DISCONNECT_STATUS_WORKER);
+		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_STATUS_WORKER);
 		return VINE_SUCCESS;
 
 	case VINE_MSG_NOT_PROCESSED:
 		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		q->stats->workers_lost++;
-		remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
+		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
 		return VINE_WORKER_FAILURE;
 		break;
 
 	case VINE_MSG_FAILURE:
 		debug(D_VINE, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
 		q->stats->workers_lost++;
-		remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
+		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
 		return VINE_WORKER_FAILURE;
 	}
 
@@ -3137,9 +3138,10 @@ static void vine_manager_create_recovery_tasks(struct vine_manager *q, struct vi
 	struct vine_mount *m;
 	struct vine_task *recovery_task = 0;
 
-	/* Don't recursively create recovery tasks for recovery tasks! */
-	if (t->type == VINE_TASK_TYPE_RECOVERY)
+	/* Only regular tasks get recovery tasks */
+	if (t->type != VINE_TASK_TYPE_STANDARD) {
 		return;
+	}
 
 	LIST_ITERATE(t->output_mounts, m)
 	{
@@ -3553,7 +3555,7 @@ static int disconnect_slow_workers(struct vine_manager *q)
 							average_task_time / 1000000.0);
 					vine_block_host_with_timeout(
 							q, w->hostname, q->option_blocklist_slow_workers_timeout);
-					remove_worker(q, w, VINE_WORKER_DISCONNECT_FAST_ABORT);
+					vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAST_ABORT);
 
 					q->stats->workers_slow++;
 					removed++;
@@ -3575,7 +3577,7 @@ int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_inf
 		return 0;
 
 	vine_manager_send(q, w, "exit\n");
-	remove_worker(q, w, VINE_WORKER_DISCONNECT_EXPLICIT);
+	vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_EXPLICIT);
 	q->stats->workers_released++;
 
 	return 1;
@@ -3601,21 +3603,18 @@ static int shutdown_drained_workers(struct vine_manager *q)
 
 /* Comparator function for checking if a task matches a given tag. */
 
-static int task_tag_comparator(void *t, const void *r)
+static int task_tag_comparator(struct vine_task *t, const char *tag)
 {
 
-	struct vine_task *task_in_manager = t;
-	const char *task_tag = r;
-
-	if (!task_in_manager->tag && !task_tag) {
+	if (!t->tag && !tag) {
 		return 1;
 	}
 
-	if (!task_in_manager->tag || !task_tag) {
+	if (!t->tag || !tag) {
 		return 0;
 	}
 
-	return !strcmp(task_in_manager->tag, task_tag);
+	return !strcmp(t->tag, tag);
 }
 
 /*
@@ -4480,20 +4479,6 @@ const char *vine_result_string(vine_result_t result)
 	return str;
 }
 
-static struct vine_task *task_state_any_with_tag(struct vine_manager *q, vine_task_state_t state, const char *tag)
-{
-	struct vine_task *t;
-	uint64_t task_id;
-	ITABLE_ITERATE(q->tasks, task_id, t)
-	{
-		if (t->state == state && task_tag_comparator((void *)t, (void *)tag)) {
-			return t;
-		}
-	}
-
-	return NULL;
-}
-
 static int task_state_count(struct vine_manager *q, const char *category, vine_task_state_t state)
 {
 	struct vine_task *t;
@@ -4604,14 +4589,15 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 		return 0;
 	}
 
-	/* Duplicate the original task */
-	struct vine_task *t = vine_task_copy(original);
-
 	/* Check if this library task can fit in this worker. */
-	if (!check_worker_against_task(q, w, t)) {
-		vine_task_delete(t);
+	/* check_worker_against_task does not, and should not, modify the task */
+	if (!check_worker_against_task(q, w, original)) {
 		return 0;
 	}
+
+	/* Duplicate the original task */
+	struct vine_task *t = vine_task_copy(original);
+	t->type = VINE_TASK_TYPE_LIBRARY_INSTANCE;
 
 	/* Give it a unique taskid if library fits the worker. */
 	t->task_id = q->next_task_id++;
@@ -4635,7 +4621,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 
 void vine_manager_install_library(struct vine_manager *q, struct vine_task *t, const char *name)
 {
-	t->type = VINE_TASK_TYPE_LIBRARY_INSTANCE;
+	t->type = VINE_TASK_TYPE_LIBRARY_TEMPLATE;
 	t->task_id = -1;
 	vine_task_set_library_provided(t, name);
 	hash_table_insert(q->library_templates, name, t);
@@ -4813,12 +4799,28 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 		struct vine_task *t = NULL;
 
 		if (tag) {
-			t = task_state_any_with_tag(q, VINE_TASK_RETRIEVED, tag);
-		} else if (task_id >= 0) {
-			struct vine_task *temp = itable_lookup(q->tasks, task_id);
-			if (temp->state == VINE_TASK_RETRIEVED) {
-				t = temp;
+			struct vine_task *temp = NULL;
+			int tasks_to_consider = list_size(q->retrieved_list);
+			while (tasks_to_consider > 0) {
+				tasks_to_consider--;
+				temp = list_peek_head(q->retrieved_list);
+				// a small hack, if task is not standard we accepted it so it can be deleted below.
+				if (temp->type != VINE_TASK_TYPE_STANDARD || task_tag_comparator(temp, tag)) {
+					// temp points to head of list
+					t = list_pop_head(q->retrieved_list);
+					break;
+				} else {
+					list_rotate(q->retrieved_list);
+				}
 			}
+		} else if (task_id >= 0) {
+			// XXX: library tasks are never removed!
+			struct vine_task *temp = itable_lookup(q->tasks, task_id);
+			if (!temp || temp->state != VINE_TASK_RETRIEVED) {
+				break;
+			}
+			t = temp;
+			list_remove(q->retrieved_list, t);
 		} else if (list_size(q->retrieved_list) > 0) {
 			t = list_pop_head(q->retrieved_list);
 		}
@@ -4843,11 +4845,10 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			break;
 		case VINE_TASK_TYPE_LIBRARY_INSTANCE:
 			/* silently delete it */
-			vine_task_delete(t);
+			vine_task_delete(t); // delete as manager created this task
 			break;
 		case VINE_TASK_TYPE_LIBRARY_TEMPLATE:
-			/* A template shouldn't be scheduled but delete it anyway */
-			vine_task_delete(t);
+			/* A template shouldn't be scheduled. It's deleted when template table is deleted.*/
 			break;
 		}
 	}

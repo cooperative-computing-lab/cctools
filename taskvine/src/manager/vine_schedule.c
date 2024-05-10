@@ -132,6 +132,9 @@ int check_worker_have_enough_resources(
 
 int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
+	/* THIS FUNCTION SHOULD NOT MODIFY t IN ANY WAY. */
+	/* Otherwise library templates are modified during the run. */
+
 	/* worker has not reported any resources yet */
 	if (w->resources->tag < 0 || w->resources->workers.total < 1) {
 		return 0;
@@ -175,7 +178,7 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 
 	// if wall time for worker is specified and there's not enough time for task, then not ok
 	if (w->end_time > 0) {
-		double current_time = timestamp_get() / ONE_SECOND;
+		double current_time = ((double)timestamp_get()) / ONE_SECOND;
 		if (t->resources_requested->end > 0 && w->end_time < t->resources_requested->end) {
 			return 0;
 		}
@@ -228,7 +231,8 @@ struct vine_task *vine_schedule_find_library(struct vine_worker_info *w, const c
 	struct vine_task *task;
 	ITABLE_ITERATE(w->current_tasks, task_id, task)
 	{
-		if (task->provides_library && !strcmp(task->provides_library, library_name) &&
+		if (task->type == VINE_TASK_TYPE_LIBRARY_INSTANCE && task->provides_library &&
+				!strcmp(task->provides_library, library_name) &&
 				(task->function_slots_inuse < task->function_slots)) {
 			return task;
 		}

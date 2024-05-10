@@ -27,6 +27,7 @@ void       vine_blocklist_block( struct vine_manager *q, const char *hostname, t
 void       vine_blocklist_unblock_all_by_time(struct vine_manager *q, time_t deadline);
 void       vine_blocklist_unblock( struct vine_manager *q, const char *host );
 int        vine_blocklist_is_blocked( struct vine_manager *q, const char *host );
+int        vine_blocklist_times_blocked(struct vine_manager *q, const char *hostname);
 struct jx *vine_blocklist_to_jx( struct vine_manager *q );
 
 #endif

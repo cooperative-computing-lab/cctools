@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "vine_file_replica_table.h"
 #include "set.h"
+#include "vine_blocklist.h"
 #include "vine_current_transfers.h"
 #include "vine_file.h"
 #include "vine_file_replica.h"
@@ -132,7 +133,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		return found;
 	}
 
-	debug(D_VINE, "Found %d workers to holding %s, %d replicas needed", nsources, f->cached_name, to_find);
+	debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsources, f->cached_name, to_find);
 
 	/* get the elements of set so we can insert new replicas to sources */
 	struct vine_worker_info **sources_frozen = (struct vine_worker_info **)set_values(sources);

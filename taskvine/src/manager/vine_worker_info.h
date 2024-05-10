@@ -80,6 +80,18 @@ struct vine_worker_info {
 	timestamp_t last_msg_recv_time;
 	timestamp_t last_update_msg_time;
 	timestamp_t last_failure_time;
+
+	/* consecutive failed peer transfers with worker serving as source or destination */
+	int xfer_streak_bad_source_counter;
+
+	/* consecutive failed peer transfers with worker serving as destination or destination */
+	int xfer_streak_bad_destination_counter;
+
+	/* total transfers */
+	int xfer_total_good_source_counter;
+	int xfer_total_bad_source_counter;
+	int xfer_total_good_destination_counter;
+	int xfer_total_bad_destination_counter;
 };
 
 struct vine_worker_info * vine_worker_create( struct link * lnk );
