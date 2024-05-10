@@ -117,7 +117,6 @@ double vine_option_blocklist_slow_workers_timeout = 900;
 static void handle_failure(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, vine_result_code_t fail_type);
 static void handle_worker_failure(struct vine_manager *q, struct vine_worker_info *w);
-static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason);
 
 static void reap_task_from_worker(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, vine_task_state_t new_state);
@@ -869,7 +868,7 @@ static void recall_worker_lost_temp_files(struct vine_manager *q, struct vine_wo
 
 /* Remove a worker from this master by removing all remote state, all local state, and disconnecting. */
 
-static void remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason)
+void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason)
 {
 	if (!q || !w)
 		return;
@@ -910,7 +909,7 @@ static int release_worker(struct vine_manager *q, struct vine_worker_info *w)
 
 	vine_manager_send(q, w, "release\n");
 
-	remove_worker(q, w, VINE_WORKER_DISCONNECT_EXPLICIT);
+	vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_EXPLICIT);
 
 	q->stats->workers_released++;
 
@@ -1333,7 +1332,7 @@ we remove the worker and retry the tasks dispatched to it elsewhere.
 
 static void handle_worker_failure(struct vine_manager *q, struct vine_worker_info *w)
 {
-	remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
+	vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
 	return;
 }
 
@@ -2473,20 +2472,20 @@ static vine_result_code_t handle_worker(struct vine_manager *q, struct link *l)
 
 	case VINE_MSG_PROCESSED_DISCONNECT:
 		// A status query was received and processed, so disconnect.
-		remove_worker(q, w, VINE_WORKER_DISCONNECT_STATUS_WORKER);
+		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_STATUS_WORKER);
 		return VINE_SUCCESS;
 
 	case VINE_MSG_NOT_PROCESSED:
 		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		q->stats->workers_lost++;
-		remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
+		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
 		return VINE_WORKER_FAILURE;
 		break;
 
 	case VINE_MSG_FAILURE:
 		debug(D_VINE, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
 		q->stats->workers_lost++;
-		remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
+		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
 		return VINE_WORKER_FAILURE;
 	}
 
@@ -3514,7 +3513,7 @@ static int disconnect_slow_workers(struct vine_manager *q)
 							average_task_time / 1000000.0);
 					vine_block_host_with_timeout(
 							q, w->hostname, q->option_blocklist_slow_workers_timeout);
-					remove_worker(q, w, VINE_WORKER_DISCONNECT_FAST_ABORT);
+					vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAST_ABORT);
 
 					q->stats->workers_slow++;
 					removed++;
@@ -3536,7 +3535,7 @@ int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_inf
 		return 0;
 
 	vine_manager_send(q, w, "exit\n");
-	remove_worker(q, w, VINE_WORKER_DISCONNECT_EXPLICIT);
+	vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_EXPLICIT);
 	q->stats->workers_released++;
 
 	return 1;

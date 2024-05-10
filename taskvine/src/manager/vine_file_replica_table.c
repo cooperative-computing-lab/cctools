@@ -237,7 +237,7 @@ int vine_file_replica_table_exists_somewhere(struct vine_manager *q, const char 
 
 	SET_ITERATE(workers, peer)
 	{
-		if (peer->transfer_port_active && !vine_blocklist_is_blocked(q, peer->addrport)) {
+		if (peer->transfer_port_active) {
 			return 1;
 		}
 	}
