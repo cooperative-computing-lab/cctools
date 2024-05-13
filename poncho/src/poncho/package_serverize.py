@@ -103,11 +103,6 @@ def create_library_code(path, funcs, dest, version, import_modules=None):
             output_file.write("@remote_execute\n")
             output_file.write(function_code)
             output_file.write("\n")
-        
-        # write a retriever function for retriever tasks used in FutureFunctionCall tasks
-        output_file.write("@remote_execute\n")
-        output_file.write("def retrieve_output(arg):\n")
-        output_file.write("    return arg\n")
 
         output_file.write(init_function)
 
@@ -203,6 +198,7 @@ def serverize_library_from_code(
         temp_source_file.write("".join([inspect.getsource(fnc) for fnc in functions]))
         temp_source_file.write(f"def name():\n\treturn '{name}'")
 
+    print(functions)
     # create the final library code from that temporary file
     create_library_code(
         tmp_library_path,

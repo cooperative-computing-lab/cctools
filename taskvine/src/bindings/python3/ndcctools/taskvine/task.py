@@ -1185,6 +1185,9 @@ class LibraryTask(Task):
     def set_function_names(self, function_names):
         self.function_names = function_names
 
+    def append_function_name(self, function_name):
+        self.function_names.append(function_name)
+
     def get_function_names(self):
         return self.function_names
 
