@@ -122,6 +122,10 @@ static void reap_task_from_worker(
 		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, vine_task_state_t new_state);
 static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state);
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w);
+static vine_result_code_t get_stdout(
+                struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t output_length);
+static vine_result_code_t retrieve_output(
+		 struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 
 static void find_max_worker(struct vine_manager *q);
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w);
@@ -556,74 +560,60 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		return VINE_WORKER_FAILURE;
 
 	struct vine_task *t;
-
 	int task_status, exit_status;
 	uint64_t task_id;
 	int64_t output_length;
-	char *output = malloc(1024 * sizeof(char) + 1);
+	
 	timestamp_t execution_time, start_time, end_time;
 	timestamp_t observed_execution_time;
-	timestamp_t effective_stoptime = 0;
-	time_t stoptime;
 
-	// Format: task completion status, exit status (exit code or signal), output length, execution time, task_id, stdout
+	// Format: task completion status, exit status (exit code or signal), output length, execution time, task_id
 	int n = sscanf(line,
-			"complete %d %d %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 ", %s",
+			"complete %d %d %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 "",
 			&task_status,
 			&exit_status,
 			&output_length,
 			&start_time,
 			&end_time,
-			&task_id,
-			output);
+			&task_id);
 
-	if (n < 7) {
+	if (n < 6) {
 		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
-		free(output);
 		return VINE_WORKER_FAILURE;
 	}
 
 	execution_time = end_time - start_time;
 
-	t = itable_lookup(w->current_tasks, task_id);
 
+	/* If the worker sent back a task we have never heard of, then discard the following data. */
+	t = itable_lookup(w->current_tasks, task_id);
 	if (!t) {
 		debug(D_VINE,
-				"Unknown task completion or acknowledged from worker %s (%s): no task %" PRId64
-				" assigned to worker.  Ignoring result.",
+				"Unknown task completion from worker %s (%s): no task %" PRId64
+				" assigned to worker. Ignoring result.",
 				w->hostname,
 				w->addrport,
 				task_id);
-		free(output);
+
+		time_t stoptime = time(0) + vine_manager_transfer_time(q, w, output_length);
+		link_soak(w->link, output_length, stoptime);
 		return VINE_SUCCESS;
 	}
 
-	switch (t->state) {
-		// Handle completion
-		case VINE_TASK_RUNNING:
-			break;
-		// Task has already been marked as complete. likely worker has not killed task yet...
-		case VINE_TASK_WAITING_RETRIEVAL:
-		case VINE_TASK_RETRIEVED:
-		case VINE_TASK_DONE:
-			free(output);
-			return VINE_SUCCESS;
-		// May want check if there is a case where task state changed to one of these before worker has killed it. 
-		case VINE_TASK_INITIAL:     
-		case VINE_TASK_READY:
-			free(output);
-			return VINE_WORKER_FAILURE;
-        }
+	if (task_status != VINE_RESULT_SUCCESS) {
+		w->last_failure_time = timestamp_get();
+		t->time_when_last_failure = w->last_failure_time;
+	}
 
+	/* If the task was forsaken by the worker or couldn't exeute, it didn't really complete, so short circuit. */
 	if (task_status == VINE_RESULT_FORSAKEN) {
 		itable_remove(q->running_table, t->task_id);
 		vine_task_set_result(t, VINE_RESULT_FORSAKEN);
 		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
-		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
-		free(output);
 		return VINE_SUCCESS;
 	}
 
+	/* Update task stats for this completion. */
 	observed_execution_time = timestamp_get() - t->time_when_commit_end;
 
 	t->time_workers_execute_last =
@@ -634,14 +624,22 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	t->output_length = output_length;
 	t->result = task_status;
 	t->exit_code = exit_status;
-	if(t->output_length <= 1024 && t->output_length > 0){
-		t->output = malloc(t->output_length + 1);
+
+	/* If output is less than 1KB stdout is sent along with completion msg. retrieve it. */
+	if(t->output_length <= 1024 && t->output_length > 0) {
+		get_stdout(q, w, t, t->output_length);
 		t->output_recieved = 1;
-		strcpy(t->output, output);
-		free(output);
+
+	/* If output length is 0 mark outout as recived as to not make connection with worker later if not needed. */
+	} else if(t->output_length == 0) {
+		t->output_recieved = 1;
+
 	}
+
+	/* Update queue stats for this completion. */
 	q->stats->time_workers_execute += t->time_workers_execute_last;
 
+	/* Update worker stats for this completion. */
 	w->finished_tasks++;
 
 	// Convert resource_monitor status into taskvine status if needed.
@@ -653,18 +651,9 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		}
 	}
 
+	/* Finally update data structures to reflect the completion. */
 	change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
-	// hash_table_insert(q->workers_with_available_results, w->hashkey, w); TODO tasks are sometimes retrieved per worker.
 	itable_remove(q->running_table, t->task_id);
-
-	if (q->bandwidth_limit) {
-		effective_stoptime = (output_length / q->bandwidth_limit) * 1000000 + timestamp_get();
-	}
-	timestamp_t current_time = timestamp_get();
-
-        if (effective_stoptime && effective_stoptime > current_time) {
-        	usleep(effective_stoptime - current_time);
-        }
 
 	return VINE_SUCCESS;
 
@@ -1306,7 +1295,7 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 		break;
 	default:
 		/* Otherwise get all of the output files. */
-		result = vine_manager_get_stdout(q, w, t);
+		if(!t->output_recieved){ result &= retrieve_output(q, w, t); }
 		result &= vine_manager_get_output_files(q, w, t);
 		break;
 	}
@@ -1640,6 +1629,53 @@ static vine_result_code_t get_update(struct vine_manager *q, struct vine_worker_
 	return VINE_SUCCESS;
 }
 
+/* 
+make a synchronus connection with a worker to retrieve the stdout of a task
+*/
+
+static vine_result_code_t retrieve_output(
+		 struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	int64_t output_length;
+        uint64_t task_id;
+        char line[VINE_LINE_MAX];
+
+	vine_manager_send(q, w, "send_stdout %d\n", t->task_id);
+
+	vine_result_code_t result = VINE_SUCCESS;
+        vine_msg_code_t mcode;
+        mcode = vine_manager_recv(q, w, line, sizeof(line));
+
+        if (mcode != VINE_MSG_NOT_PROCESSED) {
+                return VINE_WORKER_FAILURE;
+        }
+        if (string_prefix_is(line, "failure")) {
+                return VINE_WORKER_FAILURE;
+
+        } else if (string_prefix_is(line, "stdout")) {
+                result = VINE_SUCCESS;
+        } else {
+                debug(D_VINE,
+                                "%s (%s): sent invalid response to send_stdout: %s",
+                                 w->hostname,
+                                 w->addrport,
+                                 line);
+                return VINE_WORKER_FAILURE;
+        }
+
+        int n = sscanf(line,
+                        "stdout  %" SCNd64 " %" SCNd64 "",
+                        &task_id,
+                        &output_length);
+
+	if (n < 2) {
+                debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
+                return VINE_WORKER_FAILURE;
+        }
+	result = get_stdout(q, w, t, output_length);
+	return result;
+}
+
 /*
 Get the standard output of a task, as part of retrieving the result.
 This seems awfully complicated and could be simplified.
@@ -1739,7 +1775,6 @@ static vine_result_code_t get_stdout(
 	} else {
 		actual = 0;
 	}
-
 	if (t->output)
 		t->output[actual] = 0;
 
@@ -1769,13 +1804,6 @@ static vine_result_code_t get_available_results(struct vine_manager *q, struct v
 			result = VINE_WORKER_FAILURE;
 			break;
 		}
-
-		// TODO REPLACE
-		//if (string_prefix_is(line, "result")) {
-		//	result = get_result(q, w, line);
-		//	if (result != VINE_SUCCESS)
-		//		break;
-
 		if (string_prefix_is(line, "update")) {
 			result = get_update(q, w, line);
 			if (result != VINE_SUCCESS)

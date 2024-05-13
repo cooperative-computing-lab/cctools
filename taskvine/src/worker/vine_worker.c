@@ -263,32 +263,36 @@ void send_complete_tasks(struct link *l)
 	int size = itable_size(procs_complete);
 	int visited;
 	struct vine_process *p;
-	char *output;
 	for (visited = 0; visited < size; visited++) {
 		p = itable_pop(procs_complete);
-		if(p->output_length <= 1024 && p->output_length > 0)
-		{
+		if(p->output_length <= 1024 && p->output_length > 0){
+
+				char *output;
 			   	int output_file = open(p->output_file_name, O_RDONLY);
 				output = malloc(p->output_length + 1);
 				full_read(output_file, output, p->output_length);
-		}
-		else{
-				output=malloc(sizeof(char)*2);
-				output[0] = 'X';
-				output[1] = '\0';
-		}
-		send_async_message(l,
-				"complete %d %d %lld %llu %llu %d %s\n",
-				p->result,
-				p->exit_code,
-				(long long)p->output_length,
-				(unsigned long long)p->execution_start,
-				(unsigned long long)p->execution_end,
-				p->task->task_id,
-				output);
+				close(output_file);
+				send_async_message(l,
+						"complete %d %d %lld %llu %llu %d\n%s",
+						p->result,
+						p->exit_code,
+						(long long)p->output_length,
+						(unsigned long long)p->execution_start,
+						(unsigned long long)p->execution_end,
+						p->task->task_id,
+						output);
+				free(output);
+		} else {
+				send_async_message(l,
+						"complete %d %d %lld %llu %llu %d\n",
+						p->result,
+						p->exit_code,
+						(long long)p->output_length,
+						(unsigned long long)p->execution_start,
+						(unsigned long long)p->execution_end,
+						p->task->task_id);
 
-		itable_insert(procs_complete, p->task->task_id, p);
-		free(output);
+		}
 	}
 }
 
@@ -1289,7 +1293,6 @@ static int handle_manager(struct link *manager)
 			fprintf(stderr, "vine_worker: this manager requires a password. (use the -P option)\n");
 			r = 0;
 		} else if (sscanf(line, "send_results %d", &n) == 1) {
-			//	report_tasks_complete(manager); TODO: delete
 			r = 1;
 		} else if (sscanf(line, "send_stdout %ld", &task_id) == 1) {
 			send_stdout(manager, task_id);
@@ -1709,8 +1712,7 @@ static void vine_worker_serve_manager(struct link *manager)
 			}
 		}
 
-		printf("hello\n");
-		if (ok && !results_to_be_sent_msg) {
+		if (ok) {
 			if (vine_watcher_check(watcher)) {
 				send_async_message(manager, "available_results\n");
 			}
@@ -1720,7 +1722,6 @@ static void vine_worker_serve_manager(struct link *manager)
 			if (task_event > 0) {
 				send_stats_update(manager);
 			}
-			results_to_be_sent_msg = 1;
 		}
 
 		if (!ok) {
