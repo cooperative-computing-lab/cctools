@@ -198,7 +198,6 @@ def serverize_library_from_code(
         temp_source_file.write("".join([inspect.getsource(fnc) for fnc in functions]))
         temp_source_file.write(f"def name():\n\treturn '{name}'")
 
-    print(functions)
     # create the final library code from that temporary file
     create_library_code(
         tmp_library_path,
