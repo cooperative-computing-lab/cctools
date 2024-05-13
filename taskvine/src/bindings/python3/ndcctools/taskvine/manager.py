@@ -869,6 +869,10 @@ class Manager(object):
     # @param self   Reference to the current manager object.
     # @param task   A task description created from @ref ndcctools.taskvine.task.Task.
     def submit(self, task):
+        # if a FunctionCall task, check the names of library and function are valid
+        if isinstance(task, FunctionCall):
+            self.check_funcall_validity(task)
+
         task.manager = self
         task.submit_finalize()
         task_id = cvine.vine_submit(self._taskvine, task._task)
@@ -877,6 +881,23 @@ class Manager(object):
         else:
             self._task_table[task_id] = task
             return task_id
+
+    ##
+    # Check the validity of a FunctionCall task
+    # The name of library should exist, and the function to be executed should exist on that library, too
+    #
+    # @param self    Reference to the current manager object.
+    # @param task    A FunctionCall task
+    def check_funcall_validity(self, task):
+        library_name = task.get_library_name()
+        available_library_names = [library_name for library_name in self._library_table.keys()]
+        if library_name not in available_library_names:
+            raise ValueError(f"invalid library name \'{library_name}\', available libraries are {available_library_names}")
+        library_task = self._library_table[library_name]
+        function_names_on_library = library_task.get_function_names()
+        function_name_to_be_called = task.get_function_name()
+        if function_name_to_be_called not in function_names_on_library:
+            raise ValueError(f"invalid function name \'{function_name_to_be_called}\', available libraries are {function_names_on_library}")
 
     ##
     # Submit a library to install on all connected workers
@@ -907,20 +928,20 @@ class Manager(object):
     # so dynamically generated functions won't work (e.g., lambda, interactive).
     #
     # @param self            Reference to the current manager object.
-    # @param name            Name of the Library to be created
+    # @param library_name    Name of the Library to be created
     # @param function_list   List of all functions to be included in the library
     # @param poncho_env      Name of an already prepared poncho environment
     # @param init_command    A string describing a shell command to execute before the library task is run
     # @param add_env         Whether to automatically create and/or add environment to the library
     # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
     # @param import_modules  A list of modules to be imported at the preamble of library
-    def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True, import_modules=None):
+    def create_library_from_functions(self, library_name, *function_list, poncho_env=None, init_command=None, add_env=True, import_modules=None):
         # Delay loading of poncho until here, to avoid bringing in poncho dependencies unless needed.
         # Ensure poncho python library is available.
         try:
             from ndcctools.poncho import package_serverize
         except ImportError:
-            raise ModuleNotFoundError(f"The poncho module is not available. Cannot create library {name}.")
+            raise ModuleNotFoundError(f"The poncho module is not available. Cannot create library {library_name}.")
 
         # Positional arguments are the list of functions to include in the library.
         # Create a unique hash of a combination of function names and bodies.
@@ -949,16 +970,18 @@ class Manager(object):
                 need_pack = False
 
             # create library code and environment, if appropriate
-            package_serverize.serverize_library_from_code(library_cache_path, function_list, name, need_pack=need_pack, import_modules=import_modules)
+            package_serverize.serverize_library_from_code(library_cache_path, function_list, library_name, need_pack=need_pack, import_modules=import_modules)
 
             # enable correct permissions for library code
             os.chmod(library_code_path, 0o775)
 
         # Create Task to execute the Library and prepend it with some setup code if needed.
         if init_command:
-            t = LibraryTask(f"{init_command} python ./library_code.py", name)
+            t = LibraryTask(f"{init_command} python ./library_code.py", library_name)
         else:
-            t = LibraryTask("python ./library_code.py", name)
+            t = LibraryTask("python ./library_code.py", library_name)
+        function_names = [function.__name__ for function in function_list]
+        t.set_function_names(function_names)
 
         # Declare the environment if needed.
         if add_env:
@@ -974,14 +997,14 @@ class Manager(object):
     # Turn Library code created with poncho_package_serverize into a Library Task
     #
     # @param self            Reference to the current manager object.
-    # @param name            Name that identifies this library to the FunctionCalls
+    # @param library_name    Name that identifies this library to the FunctionCalls
     # @param library_path    Filename of the library (i.e., the output of poncho_package_serverize)
     # @param env             Environment to run the library. Either a vine file
     #                        that expands to an environment (see @ref ndcctools.taskvine.task.Task.add_environment), or a path
     #                        to a poncho environment.
     # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
-    def create_library_from_serverized_files(self, name, library_path, env=None):
-        t = LibraryTask("python ./library_code.py", name)
+    def create_library_from_serverized_files(self, library_name, library_path, env=None):
+        t = LibraryTask("python ./library_code.py", library_name)
         if env:
             if isinstance(env, str):
                 env = self.declare_poncho(env, cache=True)

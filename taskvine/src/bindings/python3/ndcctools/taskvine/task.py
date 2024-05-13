@@ -204,21 +204,9 @@ class Task(object):
     # Set the name of the library at the worker that should execute the task's command.
     # This is not needed for regular tasks.
     #
-    # @param self Reference to the current task object.
-    # @param library The library or name of the library
-    def set_library_required(self, library):
-        library_name = None
-        if isinstance(library, Task):
-            try:
-                library_name = library.provides_library()
-            except Exception:
-                pass
-        else:
-            library_name = library
-
-        if not isinstance(library, str):
-            raise ValueError(f"{library} is not a valid library")
-
+    # @param self          Reference to the current task object.
+    # @param library_name  The name of the library
+    def set_library_required(self, library_name):
         if self.get_libray_provided():
             raise ValueError(
                 f"A task cannot both provide ({self.get_libray_provided()}) and require ({library_name}) a library."
@@ -229,7 +217,7 @@ class Task(object):
     # Get the name of the library at the worker that should execute the task's command.
     #
     # @param self Reference to the current task object.
-    def get_libray_required(self):
+    def get_library_required(self):
         return cvine.vine_task_get_library_required(self._task)
 
     ##
@@ -244,9 +232,9 @@ class Task(object):
     # @param self Reference to the current task object.
     # @param library_name The name of the library.
     def set_library_provided(self, library_name):
-        if self.get_libray_required():
+        if self.get_library_required():
             raise ValueError(
-                f"A task cannot both provide ({library_name}) and require ({self.get_libray_required()}) a library."
+                f"A task cannot both provide ({library_name}) and require ({self.get_library_required()}) a library."
             )
         return cvine.vine_task_set_library_provided(self._task, library_name)
 
@@ -1059,12 +1047,34 @@ class FunctionCall(PythonTask):
         # function calls at worker only need the name of the function.
         self.set_command(fn)
 
+        self._library = library
+        self._library_name = self.get_library_name()
+        self._function_name = fn
+
         self._event = {}
         self._event["fn_args"] = args
         self._event["fn_kwargs"] = kwargs
 
         self._saved_output = None
-        self.set_library_required(library)
+        self.set_library_required(self._library_name)
+
+    def get_library_name(self):
+        library_name = None
+        if isinstance(self._library, Task):
+            try:
+                library_name = self._library.provides_library()
+            except Exception:
+                pass
+        else:
+            library_name = self._library
+
+        if not isinstance(self._library, str):
+            raise ValueError(f"{self._library} is not a valid library")
+
+        return library_name
+
+    def get_function_name(self):
+        return self._function_name
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -1162,12 +1172,20 @@ class LibraryTask(Task):
     ##
     # Create a new LibraryTask task specification.
     #
-    # @param self       Reference to the current remote task object.
-    # @param fn         The command for this LibraryTask to run
-    # @param name       The name of this Library.
-    def __init__(self, fn, name):
+    # @param self           Reference to the current remote task object.
+    # @param fn             The command for this LibraryTask to run
+    # @param library_name   The name of this Library.
+    def __init__(self, fn, library_name):
         Task.__init__(self, fn)
+        self.library_name = library_name
+        self.function_names = []
         self._manager_will_free = True
-        self.provides_library(name)
+        self.provides_library(self.library_name)
+
+    def set_function_names(self, function_names):
+        self.function_names = function_names
+
+    def get_function_names(self):
+        return self.function_names
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
