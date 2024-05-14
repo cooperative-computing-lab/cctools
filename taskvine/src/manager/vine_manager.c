@@ -605,8 +605,9 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 
 	/* If the task was forsaken by the worker or couldn't exeute, it didn't really complete, so short circuit. */
 	if (task_status == VINE_RESULT_FORSAKEN) {
+		t->forsaken_count++;
 		itable_remove(q->running_table, t->task_id);
-		vine_task_set_result(t, VINE_RESULT_FORSAKEN);
+		vine_task_set_result(t, task_status);
 		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
 		return VINE_SUCCESS;
 	}
