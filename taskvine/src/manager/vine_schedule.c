@@ -215,7 +215,7 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 			/* If the library is already running on this worker, then it's ok. */
 			return 1;
 		} else if (status == LIBRARY_TASK_FOUND_NO_AVAILABLE_SLOT) {
-			/* If the library is already running on this worker, but there are no available slots, then it's not ok. */
+			/* If the library exists, but there are no available slots, then it's not ok. */
 			return 0;
 		} else if (status == LIBRARY_TASK_NOT_FOUND) {
 			/* XXX: checking for matches should not modify the state of workers. */
