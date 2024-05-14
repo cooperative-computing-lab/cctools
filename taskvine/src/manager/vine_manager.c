@@ -2840,7 +2840,8 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 	 * If the manager fails to send this function task to the worker however,
 	 * then the count will be decremented properly in @handle_failure() below. */
 	if (t->needs_library) {
-		t->library_task = vine_schedule_find_library(w, t->needs_library);
+		int status;
+		t->library_task = vine_schedule_find_library(w, t->needs_library, &status);
 		t->library_task->function_slots_inuse++;
 	}
 
@@ -4535,7 +4536,6 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	if (!original) {
 		return 0;
 	}
-
 	/*
 	If an instance of this library has recently failed,
 	don't send another right away.  This is a rather late (and inefficient)
@@ -4594,7 +4594,8 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 
 	HASH_TABLE_ITERATE(q->worker_table, worker_key, w)
 	{
-		struct vine_task *library = vine_schedule_find_library(w, name);
+		int status;
+		struct vine_task *library = vine_schedule_find_library(w, name, &status);
 		if (library) {
 			reset_task_to_state(q, library, VINE_TASK_RETRIEVED);
 			library->refcount--;

@@ -284,6 +284,7 @@ static void measure_worker_resources()
 	struct vine_resources *r = total_resources;
 
 	vine_resources_measure_locally(r, workspace->workspace_dir);
+	printf("cores total = %ld\n", r->cores.total);
 
 	if (options->cores_total > 0)
 		r->cores.total = options->cores_total;

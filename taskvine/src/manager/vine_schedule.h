@@ -18,10 +18,14 @@ This module is private to the manager and should not be invoked by the end user.
 #include "vine_task.h"
 #include "vine_worker_info.h"
 
+#define LIBRARY_TASK_FOUND_WITH_AVAILABLE_SLOT 1
+#define LIBRARY_TASK_FOUND_NO_AVAILABLE_SLOT 0
+#define LIBRARY_TASK_NOT_FOUND -1
+
 struct vine_worker_info *vine_schedule_task_to_worker( struct vine_manager *q, struct vine_task *t );
 void vine_schedule_check_for_large_tasks( struct vine_manager *q );
 int vine_schedule_check_fixed_location(struct vine_manager *q, struct vine_task *t);
 int vine_schedule_in_ramp_down(struct vine_manager *q);
-struct vine_task *vine_schedule_find_library(struct vine_worker_info *w, const char *library_name);
+struct vine_task *vine_schedule_find_library(struct vine_worker_info *w, const char *library_name, int *status);
 int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 #endif
