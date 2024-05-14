@@ -1083,6 +1083,9 @@ class FunctionCall(PythonTask):
     #
     # @param self 	Reference to the current python task object
     def submit_finalize(self):
+        library_name = self.get_library_name()
+        if not self.manager.check_library_exists(library_name):
+            raise ValueError(f"invalid library name \'{library_name}\'")
         name = os.path.join(self.manager.staging_directory, "arguments", self._id)
         with open(name, "wb") as wf:
             cloudpickle.dump(self._event, wf)
@@ -1175,19 +1178,9 @@ class LibraryTask(Task):
     # @param self               Reference to the current remote task object.
     # @param fn                 The command for this LibraryTask to run
     # @param library_name       The name of this Library.
-    # @param function_list      A list of functions to be added to the library (used for create_library_from_functions).
-    # @param library_code_path  The path to the library code.
-    def __init__(self, fn, library_name, function_list=None, library_code_path=None):
+    def __init__(self, fn, library_name):
         Task.__init__(self, fn)
-        self.library_name = library_name
-        self.function_list = function_list
-        self.library_code_path = library_code_path
         self._manager_will_free = True
-        self.provides_library(self.library_name)
-
-    def get_function_names(self):
-        if self.function_list:
-            return [f.__name__ for f in self.function_list]
-        return None
+        self.provides_library(library_name)
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:

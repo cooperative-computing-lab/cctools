@@ -869,10 +869,6 @@ class Manager(object):
     # @param self   Reference to the current manager object.
     # @param task   A task description created from @ref ndcctools.taskvine.task.Task.
     def submit(self, task):
-        # if a FunctionCall task, check the names of library and function are valid
-        if isinstance(task, FunctionCall):
-            self.check_funcall_validity(task)
-
         task.manager = self
         task.submit_finalize()
         task_id = cvine.vine_submit(self._taskvine, task._task)
@@ -881,20 +877,6 @@ class Manager(object):
         else:
             self._task_table[task_id] = task
             return task_id
-
-    ##
-    # Check the validity of a FunctionCall task
-    # The name of library should exist, and the function to be executed should exist on that library, too
-    #
-    # @param self    Reference to the current manager object.
-    # @param task    A FunctionCall task
-    def check_funcall_validity(self, task):
-        library_name = task.get_library_name()
-        if library_name not in [library_name for library_name in self._library_table.keys()]:
-            raise ValueError(f"invalid library name \'{library_name}\'")
-        library_task = self._library_table[library_name]
-        if task.get_function_name() not in library_task.get_function_names():
-            raise ValueError(f"invalid function name \'{task.get_function_name()}\'")
 
     ##
     # Submit a library to install on all connected workers
@@ -917,6 +899,14 @@ class Manager(object):
     def remove_library(self, name):
         del self._library_table[name]
         cvine.vine_manager_remove_library(self._taskvine, name)
+
+    ##
+    # Check whether a libray exists on the manager or not
+    #    
+    # @param self           Reference to the current manager object.
+    # @param library_name   Name of the library to be checked
+    def check_library_exists(self, library_name):
+        return cvine.vine_manager_check_library_exists(self._taskvine, library_name)
 
     ##
     # Turn a list of python functions into a Library Task.
@@ -974,9 +964,9 @@ class Manager(object):
 
         # Create Task to execute the Library and prepend it with some setup code if needed.
         if init_command:
-            t = LibraryTask(f"{init_command} python ./library_code.py", library_name, function_list=function_list, library_code_path=library_code_path)
+            t = LibraryTask(f"{init_command} python ./library_code.py", library_name)
         else:
-            t = LibraryTask("python ./library_code.py", library_name, function_list=function_list, library_code_path=library_code_path)
+            t = LibraryTask("python ./library_code.py", library_name)
 
         # Declare the environment if needed.
         if add_env:

@@ -4603,6 +4603,14 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 	hash_table_remove(q->library_templates, name);
 }
 
+int vine_manager_check_library_exists(struct vine_manager *q, const char *library_name)
+{
+	if (hash_table_lookup(q->library_templates, library_name)) {
+		return 1;
+	}
+	return 0;
+}
+
 static void handle_library_update(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
 	int library_id = 0;
