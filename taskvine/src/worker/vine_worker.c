@@ -28,6 +28,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "domain_name_cache.h"
 #include "envtools.h"
+#include "full_io.h"
 #include "gpu_info.h"
 #include "hash_cache.h"
 #include "hash_table.h"
@@ -42,7 +43,6 @@ See the file COPYING for details.
 #include "link_auth.h"
 #include "list.h"
 #include "load_average.h"
-#include "full_io.h"
 #include "macros.h"
 #include "md5.h"
 #include "path.h"
@@ -265,33 +265,32 @@ void send_complete_tasks(struct link *l)
 	struct vine_process *p;
 	for (visited = 0; visited < size; visited++) {
 		p = itable_pop(procs_complete);
-		if(p->output_length <= 1024 && p->output_length > 0){
+		if (p->output_length <= 1024 && p->output_length > 0) {
 
-				char *output;
-			   	int output_file = open(p->output_file_name, O_RDONLY);
-				output = malloc(p->output_length + 1);
-				full_read(output_file, output, p->output_length);
-				close(output_file);
-				send_async_message(l,
-						"complete %d %d %lld %llu %llu %d\n%s",
-						p->result,
-						p->exit_code,
-						(long long)p->output_length,
-						(unsigned long long)p->execution_start,
-						(unsigned long long)p->execution_end,
-						p->task->task_id,
-						output);
-				free(output);
+			char *output;
+			int output_file = open(p->output_file_name, O_RDONLY);
+			output = malloc(p->output_length + 1);
+			full_read(output_file, output, p->output_length);
+			close(output_file);
+			send_async_message(l,
+					"complete %d %d %lld %llu %llu %d\n%s",
+					p->result,
+					p->exit_code,
+					(long long)p->output_length,
+					(unsigned long long)p->execution_start,
+					(unsigned long long)p->execution_end,
+					p->task->task_id,
+					output);
+			free(output);
 		} else {
-				send_async_message(l,
-						"complete %d %d %lld %llu %llu %d\n",
-						p->result,
-						p->exit_code,
-						(long long)p->output_length,
-						(unsigned long long)p->execution_start,
-						(unsigned long long)p->execution_end,
-						p->task->task_id);
-
+			send_async_message(l,
+					"complete %d %d %lld %llu %llu %d\n",
+					p->result,
+					p->exit_code,
+					(long long)p->output_length,
+					(unsigned long long)p->execution_start,
+					(unsigned long long)p->execution_end,
+					p->task->task_id);
 		}
 	}
 }
@@ -643,17 +642,16 @@ static void reap_process(struct vine_process *p, struct link *manager)
 
 	int output_file = open(p->output_file_name, O_RDONLY);
 	if (output_file >= 0) {
-        struct stat info;
-        fstat(output_file, &info);
-        p->output_length = info.st_size;
+		struct stat info;
+		fstat(output_file, &info);
+		p->output_length = info.st_size;
 		close(output_file);
-    } else {
-        p->output_length = 0;
-    }
+	} else {
+		p->output_length = 0;
+	}
 
 	total_task_execution_time += (p->execution_end - p->execution_start);
-    total_tasks_executed++;
-
+	total_tasks_executed++;
 }
 
 /*
@@ -1170,25 +1168,25 @@ static void disconnect_manager(struct link *manager)
 }
 
 void send_stdout(struct link *l, int64_t task_id)
-{	
+{
 	struct vine_process *p = itable_lookup(procs_table, task_id);
-	if(!p){
-			send_message(l, "failure %ld\n", task_id);
-			return;
+	if (!p) {
+		send_message(l, "failure %ld\n", task_id);
+		return;
 	}
 
 	int output_file = open(p->output_file_name, O_RDONLY);
-    if (output_file < 0) {
-			send_message(l, "failure %ld\n", task_id);
-			return;
+	if (output_file < 0) {
+		send_message(l, "failure %ld\n", task_id);
+		return;
 	}
 
-	send_message(l, "stdout %ld %lld\n",task_id, (long long)p->output_length);
+	send_message(l, "stdout %ld %lld\n", task_id, (long long)p->output_length);
 
-    if (output_file >= 0) {
-        link_stream_from_fd(l, output_file, p->output_length, time(0) + options->active_timeout);
-        close(output_file);
-    }
+	if (output_file >= 0) {
+		link_stream_from_fd(l, output_file, p->output_length, time(0) + options->active_timeout);
+		close(output_file);
+	}
 	return;
 }
 
@@ -1308,8 +1306,6 @@ static int handle_manager(struct link *manager)
 
 	return r;
 }
-
-
 
 /*
 Return true if this task can run with the resources currently available.

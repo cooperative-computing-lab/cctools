@@ -121,7 +121,6 @@ struct vine_task {
 		
 	int has_fixed_locations;                               /**< Whether at least one file was added with the VINE_FIXED_LOCATION flag. Task fails immediately if no
 															 worker can satisfy all the strict inputs of the task. */
-	int light;                   			       /**< IF this is flag is set omit retrieving outputs and set task to retrieved */
 
 	int refcount;                                          /**< Number of remaining references to this object. */
 };
@@ -147,7 +146,6 @@ void vine_task_check_consistency( struct vine_task *t );
 
 /* If the task produces watched output files, truncate them. */
 void vine_task_truncate_watched_outputs(struct vine_task *t);
-void vine_task_light(struct vine_task *t);
 
 const char *vine_task_state_to_string( vine_task_state_t task_state );
 

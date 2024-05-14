@@ -123,9 +123,8 @@ static void reap_task_from_worker(
 static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state);
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w);
 static vine_result_code_t get_stdout(
-                struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t output_length);
-static vine_result_code_t retrieve_output(
-		 struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
+		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t output_length);
+static vine_result_code_t retrieve_output(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 
 static void find_max_worker(struct vine_manager *q);
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w);
@@ -509,47 +508,47 @@ static int handle_transfer_hostport(struct vine_manager *q, struct vine_worker_i
 void exit_alert(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	if (t->result == VINE_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
-                switch (t->exit_code) {
-                case (126):
-                        warn(D_VINE,
-                                        "Task %d ran for a very short time and exited with code %d.\n",
-                                        t->task_id,
-                                        t->exit_code);
-                        warn(D_VINE, "This usually means that the task's command is not an executable,\n");
-                        warn(D_VINE, "or that the worker's scratch directory is on a no-exec partition.\n");
-                        break;
-                case (127):
-                        warn(D_VINE,
-                                        "Task %d ran for a very short time and exited with code %d.\n",
-                                        t->task_id,
-                                        t->exit_code);
-                        warn(D_VINE, "This usually means that the task's command could not be found, or that\n");
-                        warn(D_VINE, "it uses a shared library not available at the worker, or that\n");
-                        warn(D_VINE, "it uses a version of the glibc different than the one at the worker.\n");
-                        break;
-                case (139):
-                        warn(D_VINE,
-                                        "Task %d ran for a very short time and exited with code %d.\n",
-                                        t->task_id,
-                                        t->exit_code);
-                        warn(D_VINE, "This usually means that the task's command had a segmentation fault,\n");
-                        warn(D_VINE, "either because it has a memory access error (segfault), or because\n");
-                        warn(D_VINE, "it uses a version of a shared library different from the one at the worker.\n");
-                        break;
-                default:
-                        break;
-                }
-        }
+		switch (t->exit_code) {
+		case (126):
+			warn(D_VINE,
+					"Task %d ran for a very short time and exited with code %d.\n",
+					t->task_id,
+					t->exit_code);
+			warn(D_VINE, "This usually means that the task's command is not an executable,\n");
+			warn(D_VINE, "or that the worker's scratch directory is on a no-exec partition.\n");
+			break;
+		case (127):
+			warn(D_VINE,
+					"Task %d ran for a very short time and exited with code %d.\n",
+					t->task_id,
+					t->exit_code);
+			warn(D_VINE, "This usually means that the task's command could not be found, or that\n");
+			warn(D_VINE, "it uses a shared library not available at the worker, or that\n");
+			warn(D_VINE, "it uses a version of the glibc different than the one at the worker.\n");
+			break;
+		case (139):
+			warn(D_VINE,
+					"Task %d ran for a very short time and exited with code %d.\n",
+					t->task_id,
+					t->exit_code);
+			warn(D_VINE, "This usually means that the task's command had a segmentation fault,\n");
+			warn(D_VINE, "either because it has a memory access error (segfault), or because\n");
+			warn(D_VINE, "it uses a version of a shared library different from the one at the worker.\n");
+			break;
+		default:
+			break;
+		}
+	}
 
-        vine_task_info_add(q, t);
+	vine_task_info_add(q, t);
 
-        debug(D_VINE,
-                        "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
-                        w->hostname,
-                        w->addrport,
-                        (t->time_when_done - t->time_when_commit_start) / 1000000.0,
-                        (long long)w->total_tasks_complete,
-                        w->total_task_time / w->total_tasks_complete / 1000000.0);
+	debug(D_VINE,
+			"%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
+			w->hostname,
+			w->addrport,
+			(t->time_when_done - t->time_when_commit_start) / 1000000.0,
+			(long long)w->total_tasks_complete,
+			w->total_task_time / w->total_tasks_complete / 1000000.0);
 
 	return;
 }
@@ -563,7 +562,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	int task_status, exit_status;
 	uint64_t task_id;
 	int64_t output_length;
-	
+
 	timestamp_t execution_time, start_time, end_time;
 	timestamp_t observed_execution_time;
 
@@ -583,7 +582,6 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	}
 
 	execution_time = end_time - start_time;
-
 
 	/* If the worker sent back a task we have never heard of, then discard the following data. */
 	t = itable_lookup(w->current_tasks, task_id);
@@ -625,15 +623,10 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	t->result = task_status;
 	t->exit_code = exit_status;
 
-	/* If output is less than 1KB stdout is sent along with completion msg. retrieve it. */
-	if(t->output_length <= 1024 && t->output_length > 0) {
+	/* If output is less than 1KB stdout is sent along with completion msg. retrieve it from the link. */
+	if (t->output_length <= 1024) {
 		get_stdout(q, w, t, t->output_length);
 		t->output_recieved = 1;
-
-	/* If output length is 0 mark outout as recived as to not make connection with worker later if not needed. */
-	} else if(t->output_length == 0) {
-		t->output_recieved = 1;
-
 	}
 
 	/* Update queue stats for this completion. */
@@ -656,9 +649,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	itable_remove(q->running_table, t->task_id);
 
 	return VINE_SUCCESS;
-
 }
-
 
 /*
 A completion message is an asynchronous message that indicates a task has completed.
@@ -668,7 +659,7 @@ The manager decides how to handle completion based on the task.
 static vine_msg_code_t handle_complete(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
 	vine_result_code_t result = get_completion_result(q, w, line);
-	if(result == VINE_SUCCESS){
+	if (result == VINE_SUCCESS) {
 		return VINE_MSG_PROCESSED;
 	}
 	return VINE_MSG_NOT_PROCESSED;
@@ -1295,7 +1286,10 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 		break;
 	default:
 		/* Otherwise get all of the output files. */
-		if(!t->output_recieved){ result &= retrieve_output(q, w, t); }
+		if (!t->output_recieved) {
+			result &= retrieve_output(q, w, t);
+			t->output_recieved = 1;
+		}
 		result &= vine_manager_get_output_files(q, w, t);
 		break;
 	}
@@ -1337,7 +1331,7 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 	// now have evidence that worker is not slow (e.g., it was probably the
 	// previous task that was slow).
 	w->alarm_slow_worker = 0;
-	
+
 	/* print warnings if the task ran for a very short time (1s) and exited with common non-zero status */
 	if (t->result == VINE_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
 		switch (t->exit_code) {
@@ -1629,49 +1623,41 @@ static vine_result_code_t get_update(struct vine_manager *q, struct vine_worker_
 	return VINE_SUCCESS;
 }
 
-/* 
+/*
 make a synchronus connection with a worker to retrieve the stdout of a task
 */
 
-static vine_result_code_t retrieve_output(
-		 struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+static vine_result_code_t retrieve_output(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	int64_t output_length;
-        uint64_t task_id;
-        char line[VINE_LINE_MAX];
+	uint64_t task_id;
+	char line[VINE_LINE_MAX];
 
 	vine_manager_send(q, w, "send_stdout %d\n", t->task_id);
 
 	vine_result_code_t result = VINE_SUCCESS;
-        vine_msg_code_t mcode;
-        mcode = vine_manager_recv(q, w, line, sizeof(line));
+	vine_msg_code_t mcode;
+	mcode = vine_manager_recv(q, w, line, sizeof(line));
 
-        if (mcode != VINE_MSG_NOT_PROCESSED) {
-                return VINE_WORKER_FAILURE;
-        }
-        if (string_prefix_is(line, "failure")) {
-                return VINE_WORKER_FAILURE;
+	if (mcode != VINE_MSG_NOT_PROCESSED) {
+		return VINE_WORKER_FAILURE;
+	}
+	if (string_prefix_is(line, "failure")) {
+		return VINE_WORKER_FAILURE;
 
-        } else if (string_prefix_is(line, "stdout")) {
-                result = VINE_SUCCESS;
-        } else {
-                debug(D_VINE,
-                                "%s (%s): sent invalid response to send_stdout: %s",
-                                 w->hostname,
-                                 w->addrport,
-                                 line);
-                return VINE_WORKER_FAILURE;
-        }
+	} else if (string_prefix_is(line, "stdout")) {
+		result = VINE_SUCCESS;
+	} else {
+		debug(D_VINE, "%s (%s): sent invalid response to send_stdout: %s", w->hostname, w->addrport, line);
+		return VINE_WORKER_FAILURE;
+	}
 
-        int n = sscanf(line,
-                        "stdout  %" SCNd64 " %" SCNd64 "",
-                        &task_id,
-                        &output_length);
+	int n = sscanf(line, "stdout  %" SCNd64 " %" SCNd64 "", &task_id, &output_length);
 
 	if (n < 2) {
-                debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
-                return VINE_WORKER_FAILURE;
-        }
+		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
+		return VINE_WORKER_FAILURE;
+	}
 	result = get_stdout(q, w, t, output_length);
 	return result;
 }

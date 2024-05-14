@@ -122,7 +122,6 @@ class DaskVine(Manager):
             lib_command=None,
             lib_modules=None,
             task_mode='tasks',
-            light_tasks=False,
             env_per_task=False,
             progress_disable=False,
             progress_label="[green]tasks",
@@ -158,7 +157,6 @@ class DaskVine(Manager):
             else:
                 self.lib_modules = import_modules  # Deprecated
             self.task_mode = task_mode
-            self.light_tasks=light_tasks
             self.env_per_task = env_per_task
             self.progress_disable = progress_disable
             self.progress_label = progress_label
@@ -368,8 +366,6 @@ class DaskVine(Manager):
 
                 t.set_tag(tag)  # tag that identifies this dag
 
-                if self.light_tasks:
-                    t.light_task()
 
                 enqueued_calls.append(t)
 

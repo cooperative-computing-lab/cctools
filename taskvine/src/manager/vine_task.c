@@ -74,7 +74,6 @@ struct vine_task *vine_task_create(const char *command_line)
 
 	t->refcount = 1;
 	t->output_recieved = 0;
-	t->light = 0;
 
 	vine_counters.task.created++;
 
@@ -129,12 +128,6 @@ static void retract_mounts_on_reset(struct list *mount_list)
 
 		list_push_tail(mount_list, m);
 	}
-}
-
-void vine_task_light(struct vine_task *t)
-{
-	t->light = 1;
-	return;
 }
 
 void vine_task_reset(struct vine_task *t)
