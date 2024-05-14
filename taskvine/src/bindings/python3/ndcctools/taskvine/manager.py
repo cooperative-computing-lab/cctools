@@ -977,7 +977,7 @@ class Manager(object):
         if init_command:
             t = LibraryTask(f"{init_command} python ./library_code.py", library_name, function_list=function_list, library_code_path=library_code_path)
         else:
-            t = LibraryTask("python ./library_code.py", library_name, function_list, function_list=function_list, library_code_path=library_code_path)
+            t = LibraryTask("python ./library_code.py", library_name, function_list=function_list, library_code_path=library_code_path)
 
         # Declare the environment if needed.
         if add_env:
