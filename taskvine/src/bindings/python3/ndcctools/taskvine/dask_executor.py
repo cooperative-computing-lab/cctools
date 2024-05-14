@@ -366,7 +366,6 @@ class DaskVine(Manager):
 
                 t.set_tag(tag)  # tag that identifies this dag
 
-
                 enqueued_calls.append(t)
 
     def _load_results(self, dag, key_indices, keys):
