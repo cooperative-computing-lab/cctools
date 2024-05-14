@@ -902,7 +902,7 @@ class Manager(object):
 
     ##
     # Check whether a libray exists on the manager or not
-    #    
+    #
     # @param self           Reference to the current manager object.
     # @param library_name   Name of the library to be checked
     def check_library_exists(self, library_name):
