@@ -1172,23 +1172,22 @@ class LibraryTask(Task):
     ##
     # Create a new LibraryTask task specification.
     #
-    # @param self           Reference to the current remote task object.
-    # @param fn             The command for this LibraryTask to run
-    # @param library_name   The name of this Library.
-    def __init__(self, fn, library_name):
+    # @param self               Reference to the current remote task object.
+    # @param fn                 The command for this LibraryTask to run
+    # @param library_name       The name of this Library.
+    # @param function_list      A list of functions to be added to the library (used for create_library_from_functions).
+    # @param library_code_path  The path to the library code.
+    def __init__(self, fn, library_name, function_list=None, library_code_path=None):
         Task.__init__(self, fn)
         self.library_name = library_name
-        self.function_names = []
+        self.function_list = function_list
+        self.library_code_path = library_code_path
         self._manager_will_free = True
         self.provides_library(self.library_name)
 
-    def set_function_names(self, function_names):
-        self.function_names = function_names
-
-    def append_function_name(self, function_name):
-        self.function_names.append(function_name)
-
     def get_function_names(self):
-        return self.function_names
+        if not self.function_list is None:
+            return [f.__name__ for f in self.function_list]
+        return None
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:

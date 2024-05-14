@@ -890,14 +890,12 @@ class Manager(object):
     # @param task    A FunctionCall task
     def check_funcall_validity(self, task):
         library_name = task.get_library_name()
-        available_library_names = [library_name for library_name in self._library_table.keys()]
-        if library_name not in available_library_names:
-            raise ValueError(f"invalid library name \'{library_name}\', available libraries are {available_library_names}")
+        if library_name not in [library_name for library_name in self._library_table.keys()]:
+            raise ValueError(f"invalid library name \'{library_name}\'")
         library_task = self._library_table[library_name]
-        function_names_on_library = library_task.get_function_names()
         function_name_to_be_called = task.get_function_name()
-        if function_name_to_be_called not in function_names_on_library:
-            raise ValueError(f"invalid function name \'{function_name_to_be_called}\', available libraries are {function_names_on_library}")
+        if function_name_to_be_called not in library_task.get_function_names():
+            raise ValueError(f"invalid function name \'{function_name_to_be_called}\'")
 
     ##
     # Submit a library to install on all connected workers
@@ -977,11 +975,9 @@ class Manager(object):
 
         # Create Task to execute the Library and prepend it with some setup code if needed.
         if init_command:
-            t = LibraryTask(f"{init_command} python ./library_code.py", library_name)
+            t = LibraryTask(f"{init_command} python ./library_code.py", library_name, function_list=function_list, library_code_path=library_code_path)
         else:
-            t = LibraryTask("python ./library_code.py", library_name)
-        function_names = [function.__name__ for function in function_list]
-        t.set_function_names(function_names)
+            t = LibraryTask("python ./library_code.py", library_name, function_list, function_list=function_list, library_code_path=library_code_path)
 
         # Declare the environment if needed.
         if add_env:
