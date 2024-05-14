@@ -28,6 +28,7 @@ struct vine_worker_options *vine_worker_options_create()
 	struct vine_worker_options *self = malloc(sizeof(*self));
 	memset(self, 0, sizeof(*self));
 
+	self->cores_total = 0;
 	self->gpus_total = -1;
 	self->idle_timeout = 900;
 	self->connect_timeout = 900;
