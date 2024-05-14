@@ -1171,17 +1171,17 @@ void send_stdout(struct link *l, int64_t task_id)
 {
 	struct vine_process *p = itable_lookup(procs_table, task_id);
 	if (!p) {
-		send_message(l, "failure %ld\n", task_id);
+		send_message(l, "failure %" SCNd64 "\n", task_id);
 		return;
 	}
 
 	int output_file = open(p->output_file_name, O_RDONLY);
 	if (output_file < 0) {
-		send_message(l, "failure %ld\n", task_id);
+		send_message(l, "failure %" SCNd64 "\n", task_id);
 		return;
 	}
 
-	send_message(l, "stdout %ld %lld\n", task_id, (long long)p->output_length);
+	send_message(l, "stdout %" SCNd64 " %lld\n", task_id, (long long)p->output_length);
 
 	if (output_file >= 0) {
 		link_stream_from_fd(l, output_file, p->output_length, time(0) + options->active_timeout);
@@ -1292,7 +1292,7 @@ static int handle_manager(struct link *manager)
 			r = 0;
 		} else if (sscanf(line, "send_results %d", &n) == 1) {
 			r = 1;
-		} else if (sscanf(line, "send_stdout %ld", &task_id) == 1) {
+		} else if (sscanf(line, "send_stdout %" SCNd64 "", &task_id) == 1) {
 			send_stdout(manager, task_id);
 			r = 1;
 		} else {
