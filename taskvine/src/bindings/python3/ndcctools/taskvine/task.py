@@ -1186,7 +1186,7 @@ class LibraryTask(Task):
         self.provides_library(self.library_name)
 
     def get_function_names(self):
-        if not self.function_list is None:
+        if not self.function_list:
             return [f.__name__ for f in self.function_list]
         return None
 
