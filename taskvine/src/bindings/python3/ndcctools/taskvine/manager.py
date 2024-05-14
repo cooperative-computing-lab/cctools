@@ -893,9 +893,8 @@ class Manager(object):
         if library_name not in [library_name for library_name in self._library_table.keys()]:
             raise ValueError(f"invalid library name \'{library_name}\'")
         library_task = self._library_table[library_name]
-        function_name_to_be_called = task.get_function_name()
-        if function_name_to_be_called not in library_task.get_function_names():
-            raise ValueError(f"invalid function name \'{function_name_to_be_called}\'")
+        if task.get_function_name() not in library_task.get_function_names():
+            raise ValueError(f"invalid function name \'{task.get_function_name()}\'")
 
     ##
     # Submit a library to install on all connected workers
