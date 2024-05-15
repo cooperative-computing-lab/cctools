@@ -229,7 +229,7 @@ class Task(object):
         library_name = self._compute_library_name(library)
         if self.get_libray_provided():
             raise ValueError(
-                f"A task cannot both provide ({self.get_libray_provided()}) and require ({library_name}) a library."
+                f"A task cannot both provide ({library_name}) and require ({library_name}) a library."
             )
         return cvine.vine_task_set_library_required(self._task, library_name)
 
@@ -1081,8 +1081,10 @@ class FunctionCall(PythonTask):
     #
     # @param self 	Reference to the current python task object
     def submit_finalize(self):
-        if not self.manager.check_library_exists(self._library_name):
-            raise ValueError(f"invalid library name \'{self._library_name}\'")
+        library_name = self.get_library_required()
+        if not self.manager.check_library_exists(library_name):
+            raise ValueError(f"invalid library name \'{library_name}\'")
+        
         name = os.path.join(self.manager.staging_directory, "arguments", self._id)
         with open(name, "wb") as wf:
             cloudpickle.dump(self._event, wf)

@@ -906,6 +906,8 @@ class Manager(object):
     # @param self           Reference to the current manager object.
     # @param library_name   Name of the library to be checked
     def check_library_exists(self, library_name):
+        if not isinstance(library_name, str):
+            raise TypeError(f"library_name should be str, not {type(library_name)}")
         return cvine.vine_manager_get_library(self._taskvine, library_name) is not None
 
     ##
