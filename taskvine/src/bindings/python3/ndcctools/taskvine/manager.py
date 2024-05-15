@@ -906,7 +906,7 @@ class Manager(object):
     # @param self           Reference to the current manager object.
     # @param library_name   Name of the library to be checked
     def check_library_exists(self, library_name):
-        return cvine.vine_manager_get_library(self._taskvine, library_name)
+        return cvine.vine_manager_get_library(self._taskvine, library_name) is not None
 
     ##
     # Turn a list of python functions into a Library Task.

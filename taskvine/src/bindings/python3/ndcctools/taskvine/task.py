@@ -201,12 +201,31 @@ class Task(object):
         return cvine.vine_task_set_command(self._task, command)
 
     ##
+    # Compute the name of a given library
+    # @param self          Reference to the current task object.
+    # @param library       The library or the name of the library
+    def _compute_library_name(self, library):
+        library_name = None
+        if isinstance(library, Task):
+            try:
+                library_name = library.provides_library()
+            except Exception:
+                pass
+        else:
+            library_name = library
+
+        if not isinstance(library, str):
+            raise ValueError(f"{library} is not a valid library")
+
+        return library_name
+    ##
     # Set the name of the library at the worker that should execute the task's command.
     # This is not needed for regular tasks.
     #
     # @param self          Reference to the current task object.
-    # @param library_name  The name of the library
-    def set_library_required(self, library_name):
+    # @param library       The library or the name of the library
+    def set_library_required(self, library):
+        library_name = self._compute_library_name(library)
         if self.get_libray_provided():
             raise ValueError(
                 f"A task cannot both provide ({self.get_libray_provided()}) and require ({library_name}) a library."
@@ -1047,36 +1066,12 @@ class FunctionCall(PythonTask):
         # function calls at worker only need the name of the function.
         self.set_command(fn)
 
-        self._library_name = self._compute_library_name(library)
-        self._function_name = fn
-
         self._event = {}
         self._event["fn_args"] = args
         self._event["fn_kwargs"] = kwargs
 
         self._saved_output = None
-        self.set_library_required(self._library_name)
-
-    def get_library_name(self):
-        return self._library_name
-
-    def _compute_library_name(self, library):
-        library_name = None
-        if isinstance(library, Task):
-            try:
-                library_name = library.provides_library()
-            except Exception:
-                pass
-        else:
-            library_name = library
-
-        if not isinstance(library, str):
-            raise ValueError(f"{library} is not a valid library")
-
-        return library_name
-
-    def get_function_name(self):
-        return self._function_name
+        self.set_library_required(library)
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
