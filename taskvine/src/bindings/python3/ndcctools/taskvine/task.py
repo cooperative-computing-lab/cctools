@@ -1084,7 +1084,7 @@ class FunctionCall(PythonTask):
         library_name = self.get_library_required()
         if not self.manager.check_library_exists(library_name):
             raise ValueError(f"invalid library name \'{library_name}\'")
-        
+
         name = os.path.join(self.manager.staging_directory, "arguments", self._id)
         with open(name, "wb") as wf:
             cloudpickle.dump(self._event, wf)
