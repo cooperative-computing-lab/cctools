@@ -218,6 +218,7 @@ class Task(object):
             raise ValueError(f"{library} is not a valid library")
 
         return library_name
+
     ##
     # Set the name of the library at the worker that should execute the task's command.
     # This is not needed for regular tasks.
