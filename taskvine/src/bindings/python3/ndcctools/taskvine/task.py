@@ -1047,8 +1047,7 @@ class FunctionCall(PythonTask):
         # function calls at worker only need the name of the function.
         self.set_command(fn)
 
-        self._library = library
-        self._library_name = self.get_library_name()
+        self._library_name = self._compute_library_name(library)
         self._function_name = fn
 
         self._event = {}
@@ -1059,17 +1058,20 @@ class FunctionCall(PythonTask):
         self.set_library_required(self._library_name)
 
     def get_library_name(self):
+        return self._library_name
+
+    def _compute_library_name(self, library):
         library_name = None
-        if isinstance(self._library, Task):
+        if isinstance(library, Task):
             try:
-                library_name = self._library.provides_library()
+                library_name = library.provides_library()
             except Exception:
                 pass
         else:
-            library_name = self._library
+            library_name = library
 
-        if not isinstance(self._library, str):
-            raise ValueError(f"{self._library} is not a valid library")
+        if not isinstance(library, str):
+            raise ValueError(f"{library} is not a valid library")
 
         return library_name
 
@@ -1083,9 +1085,8 @@ class FunctionCall(PythonTask):
     #
     # @param self 	Reference to the current python task object
     def submit_finalize(self):
-        library_name = self.get_library_name()
-        if not self.manager.check_library_exists(library_name):
-            raise ValueError(f"invalid library name \'{library_name}\'")
+        if not self.manager.check_library_exists(self._library_name):
+            raise ValueError(f"invalid library name \'{self._library_name}\'")
         name = os.path.join(self.manager.staging_directory, "arguments", self._id)
         with open(name, "wb") as wf:
             cloudpickle.dump(self._event, wf)

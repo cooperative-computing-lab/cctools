@@ -271,8 +271,8 @@ struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, 
 
 void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason);
 
-/* Check if a given library name exists on the manager */
-int vine_manager_check_library_exists(struct vine_manager *q, const char *library_name);
+/* Get the library task on a worker */
+struct vine_task *vine_manager_get_library(struct vine_manager *q, const char *library_name);
 
 /* The expected format of files created by the resource monitor.*/
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-task-%d"

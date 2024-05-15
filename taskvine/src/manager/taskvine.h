@@ -889,11 +889,11 @@ void vine_manager_install_library( struct vine_manager *m, struct vine_task *t, 
 */
 void vine_manager_remove_library( struct vine_manager *m, const char *name );
 
-/** Check if a given library name exists on the manager.
+/** Get the library task with the given name, return null if not found.
 @param m A manager object
-@param library_name The library name to be checked
+@param library_name The library name
 */
-int vine_manager_check_library_exists(struct vine_manager *m, const char *library_name);
+struct vine_task *vine_manager_get_library(struct vine_manager *m, const char *library_name);
 
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the manager is empty.
