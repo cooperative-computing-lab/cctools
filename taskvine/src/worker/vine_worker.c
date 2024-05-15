@@ -271,6 +271,7 @@ void send_complete_tasks(struct link *l)
 			int output_file = open(p->output_file_name, O_RDONLY);
 			output = malloc(p->output_length + 1);
 			full_read(output_file, output, p->output_length);
+			output[p->output_length] = '\0';
 			close(output_file);
 			send_async_message(l,
 					"complete %d %d %lld %llu %llu %d\n%s",
