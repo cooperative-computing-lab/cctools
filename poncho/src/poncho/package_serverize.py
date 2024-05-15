@@ -103,11 +103,6 @@ def create_library_code(path, funcs, dest, version, import_modules=None):
             output_file.write("@remote_execute\n")
             output_file.write(function_code)
             output_file.write("\n")
-        
-        # write a retriever function for retriever tasks used in FutureFunctionCall tasks
-        output_file.write("@remote_execute\n")
-        output_file.write("def retrieve_output(arg):\n")
-        output_file.write("    return arg\n")
 
         output_file.write(init_function)
 
@@ -172,18 +167,29 @@ def pack_library_code(path, envpath):
 # Python's exec or Jupyter Notebooks won't work here.
 # @param functions  A list of functions to generate the hash value from.
 # @return           a string of hex characters resulted from hashing the contents and names of functions.
-def generate_functions_hash(functions: list) -> str:
+def generate_functions_hash(functions: list, import_modules=None) -> str:
+    import re
+    import sys
+
     source_code = ""
+    if import_modules:
+        source_code += " ".join(["import " + module.__name__ + "\n" for module in import_modules])
+
     for fnc in functions:
         try:
-            source_code += fnc.__name__
-            source_code += inspect.getsource(fnc)
+            # get function source code, remove single-line comments, blank lines and excessive newlines
+            function_source = inspect.getsource(fnc)
+            function_source = re.sub(r"^\s*#.*$", "", function_source, flags=re.MULTILINE)
+            function_source = re.sub(r"^\s*$", "", function_source, flags=re.MULTILINE)
+            function_source = re.sub(r"\n{2,}", "\n", function_source)
+            source_code += function_source
         except OSError as e:
             print(
                 f"Can't retrieve source code of function {fnc.__name__}.",
                 file=sys.stderr,
             )
             raise
+
     return hashlib.md5(source_code.encode("utf-8")).hexdigest()
 
 
