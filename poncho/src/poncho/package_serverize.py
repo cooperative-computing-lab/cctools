@@ -168,29 +168,23 @@ def pack_library_code(path, envpath):
 # @param functions  A list of functions to generate the hash value from.
 # @return           a string of hex characters resulted from hashing the contents and names of functions.
 def generate_functions_hash(functions: list, import_modules=None) -> str:
-    import re
     import sys
 
-    source_code = ""
+    source_code = []
     if import_modules:
-        source_code += " ".join(["import " + module.__name__ + "\n" for module in import_modules])
+        source_code.extend(["import " + module.__name__ + "\n" for module in import_modules])
 
     for fnc in functions:
         try:
-            # get function source code, remove single-line comments, blank lines and excessive newlines
-            function_source = inspect.getsource(fnc)
-            function_source = re.sub(r"^\s*#.*$", "", function_source, flags=re.MULTILINE)
-            function_source = re.sub(r"^\s*$", "", function_source, flags=re.MULTILINE)
-            function_source = re.sub(r"\n{2,}", "\n", function_source)
-            source_code += function_source
+            source_code.append(inspect.getsource(fnc))
         except OSError as e:
             print(
                 f"Can't retrieve source code of function {fnc.__name__}.",
                 file=sys.stderr,
             )
             raise
-
-    return hashlib.md5(source_code.encode("utf-8")).hexdigest()
+    
+    return hashlib.md5(" ".join(source_code).encode("utf-8")).hexdigest()
 
 
 # Create a library file and a poncho environment tarball from a list of functions as needed.
