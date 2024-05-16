@@ -116,6 +116,7 @@ struct vine_manager {
 	struct hash_table *worker_blocklist; /* Maps hostname -> vine_blocklist_info */
 	struct hash_table *factory_table;    /* Maps factory_name -> vine_factory_info */
 	struct hash_table *workers_with_available_results;  /* Maps link -> vine_worker_info */
+	struct hash_table *workers_with_complete_tasks;  /* Maps link -> vine_worker_info */
 	struct hash_table *current_transfer_table; 	/* Maps uuid -> struct transfer_pair */
 
 	/* Primary data structures for tracking files. */

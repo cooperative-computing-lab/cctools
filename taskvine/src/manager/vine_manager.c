@@ -645,9 +645,11 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		}
 	}
 
+
 	/* Finally update data structures to reflect the completion. */
 	change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
 	itable_remove(q->running_table, t->task_id);
+	hash_table_insert(q->workers_with_complete_tasks, w->hashkey, w);
 
 	return VINE_SUCCESS;
 }
@@ -1051,6 +1053,7 @@ void vine_manager_remove_worker(
 
 	hash_table_remove(q->worker_table, w->hashkey);
 	hash_table_remove(q->workers_with_available_results, w->hashkey);
+	hash_table_remove(q->workers_with_complete_tasks, w->hashkey);
 
 	if (q->transfer_temps_recovery) {
 		recall_worker_lost_temp_files(q, w);
@@ -3318,6 +3321,20 @@ static int send_one_task(struct vine_manager *q)
 	return 0;
 }
 
+/* 
+get available results from a worker. This is typically used for signaling watched files.
+*/
+int get_results_from_worker(struct vine_manager *q, struct vine_worker_info *w)
+{
+	/* get available results from the worker, bail out if that also fails. */
+	vine_result_code_t r = get_available_results(q, w);
+	if (r != VINE_SUCCESS) {
+		handle_worker_failure(q, w);
+		return 0;
+	}
+	return 1;
+}
+
 /*
 Finding a worker that has tasks waiting to be retrieved, then fetch the outputs
 of those tasks. Returns the number of tasks received.
@@ -3337,16 +3354,9 @@ static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_
 		max_to_receive = itable_size(w->current_tasks);
 	}
 
-	/* get available results from the worker, bail out if that also fails. */
-	vine_result_code_t r = get_available_results(q, w);
-	if (r != VINE_SUCCESS) {
-		handle_worker_failure(q, w);
-		return 0;
-	}
-
 	/* Reset the available results table now that the worker is removed */
-	hash_table_remove(q->workers_with_available_results, w->hashkey);
-	hash_table_firstkey(q->workers_with_available_results);
+	hash_table_remove(q->workers_with_complete_tasks, w->hashkey);
+	hash_table_firstkey(q->workers_with_complete_tasks);
 
 	/* Now consider all tasks assigned to that worker .*/
 	ITABLE_ITERATE(w->current_tasks, task_id, t)
@@ -3825,6 +3835,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->stats_measure = calloc(1, sizeof(struct vine_stats));
 
 	q->workers_with_available_results = hash_table_create(0, 0);
+	q->workers_with_complete_tasks = hash_table_create(0, 0);
 
 	// The poll table is initially null, and will be created
 	// (and resized) as needed by build_poll_table.
@@ -4161,6 +4172,7 @@ void vine_delete(struct vine_manager *q)
 	list_delete(q->waiting_retrieval_list);
 	list_delete(q->retrieved_list);
 	hash_table_delete(q->workers_with_available_results);
+	hash_table_delete(q->workers_with_complete_tasks);
 
 	list_clear(q->task_info_list, (void *)vine_task_info_delete);
 	list_delete(q->task_info_list);
@@ -4973,8 +4985,9 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			struct vine_worker_info *w;
 
 			// consider one worker at a time
-			hash_table_firstkey(q->workers_with_available_results);
-			if (hash_table_nextkey(q->workers_with_available_results, &key, (void **)&w)) {
+
+			hash_table_firstkey(q->workers_with_complete_tasks);
+			if (hash_table_nextkey(q->workers_with_complete_tasks, &key, (void **)&w)) {
 				int retrieved_from_worker = receive_tasks_from_worker(q, w, retrieved_this_cycle);
 				retrieved_this_cycle += retrieved_from_worker;
 				events += retrieved_from_worker;
