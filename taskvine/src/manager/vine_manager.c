@@ -645,7 +645,6 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		}
 	}
 
-
 	/* Finally update data structures to reflect the completion. */
 	change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
 	itable_remove(q->running_table, t->task_id);
@@ -3321,7 +3320,7 @@ static int send_one_task(struct vine_manager *q)
 	return 0;
 }
 
-/* 
+/*
 get available results from a worker. This is typically used for signaling watched files.
 */
 int get_results_from_worker(struct vine_manager *q, struct vine_worker_info *w)
