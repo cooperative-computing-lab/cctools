@@ -4603,7 +4603,7 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 	hash_table_remove(q->library_templates, name);
 }
 
-struct vine_task *vine_manager_get_library(struct vine_manager *q, const char *library_name)
+struct vine_task *vine_manager_find_library_template(struct vine_manager *q, const char *library_name)
 {
 	return hash_table_lookup(q->library_templates, library_name);
 }

@@ -908,7 +908,7 @@ class Manager(object):
     def check_library_exists(self, library_name):
         if not isinstance(library_name, str):
             raise TypeError(f"library_name should be str, not {type(library_name)}")
-        return cvine.vine_manager_get_library(self._taskvine, library_name) is not None
+        return cvine.vine_manager_find_library_template(self._taskvine, library_name) is not None
 
     ##
     # Turn a list of python functions into a Library Task.
