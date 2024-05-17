@@ -67,6 +67,7 @@ class FuturesExecutor(Executor):
             return fn._future
         future_task = self.future_task(fn, *args, **kwargs)
         self.submit(future_task)
+        return future_task._future
 
     def future_task(self, fn, *args, **kwargs):
         return FuturePythonTask(self.manager, False, fn, *args, **kwargs)
@@ -132,10 +133,12 @@ class VineFuture(Future):
             return False
 
     def result(self, timeout="wait_forever"):
+        if timeout is None:
+            timeout = "wait_forever"
         return self._task.output(timeout=timeout)
 
     def add_done_callback(self, fn):
-        self.callback_fns.append(fn)
+        self._callback_fns.append(fn)
 
 
 ##
@@ -182,7 +185,7 @@ class FutureFunctionCall(FunctionCall):
             self._saved_output = self._retriever.output(timeout=timeout)
             if not self._ran_functions:
                 for fn in self._future._callback_fns:
-                    fn(self._output)
+                    fn(self._future)
                 self._ran_functions = True
             return self._saved_output
 
@@ -275,7 +278,7 @@ class FuturePythonTask(PythonTask):
                 self._output_loaded = True
             if not self._ran_functions:
                 for fn in self._future._callback_fns:
-                    fn(self._output)
+                    fn(self._future)
                 self._ran_functions = True
             return self._output
 
