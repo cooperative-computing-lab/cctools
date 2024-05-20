@@ -32,10 +32,12 @@ jobs:
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
-        uses: actions/checkout@v4
+	# note this should be actions/checkout@v4, however v4 doesn't work on centos7.  Change to v4 when that platform is retired.
+        uses: actions/checkout@v3
       - name: checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v4
+	# note this should be actions/checkout@v4, however v4 doesn't work on centos7.  Change to v4 when that platform is retired.
+	uses: actions/checkout@v3
         with:
           ref: ${{ github.event.inputs.tag }}
       - name: Get sha of tag
