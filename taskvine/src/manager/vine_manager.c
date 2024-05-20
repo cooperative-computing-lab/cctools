@@ -605,10 +605,9 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		t->time_when_last_failure = w->last_failure_time;
 	}
 
-	/* If the task was forsaken by the worker or couldn't exeute, it didn't really complete, so short circuit. */
+	/* If the task was forsaken by the worker or couldn't exeute, it didn't really complete.*/
 	if (task_status == VINE_RESULT_FORSAKEN) {
 		t->forsaken_count++;
-		return VINE_SUCCESS;
 
 	} else {
 
@@ -628,6 +627,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		if (bytes_sent) {
 			get_stdout(q, w, t, bytes_sent);
 			t->output_recieved = 1;
+			/* worker sent no bytes as output length is 0 */
 		} else if (!bytes_sent && !t->output_length) {
 			get_stdout(q, w, t, bytes_sent);
 			t->output_recieved = 1;
