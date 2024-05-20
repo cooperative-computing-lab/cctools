@@ -32,10 +32,10 @@ jobs:
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.tag }}
       - name: Get sha of tag
@@ -68,10 +68,10 @@ jobs:
     steps:
       - name: Checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.tag }}
       - name: Get sha of tag
@@ -115,7 +115,7 @@ jobs:
       CCTOOLS_SOURCE_PROFILE: yes
     steps:
       - name: checkout CCTools from branch head
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Get sha of tag
         id: vars
         shell: bash
@@ -152,10 +152,10 @@ jobs:
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.tag }}
       - name: lint code
