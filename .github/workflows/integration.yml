@@ -32,10 +32,10 @@ jobs:
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
-	uses: actions/checkout@v3
+        uses: actions/checkout@v3
       - name: checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
-	uses: actions/checkout@v3
+        uses: actions/checkout@v3
         with:
           ref: ${{ github.event.inputs.tag }}
       - name: Get sha of tag
