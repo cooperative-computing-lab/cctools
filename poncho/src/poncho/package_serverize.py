@@ -103,6 +103,11 @@ def create_library_code(path, funcs, dest, version, import_modules=None):
             output_file.write("@remote_execute\n")
             output_file.write(function_code)
             output_file.write("\n")
+        
+        # write a retriever function for retriever tasks used in FutureFunctionCall tasks
+        output_file.write("@remote_execute\n")
+        output_file.write("def retrieve_output(arg):\n")
+        output_file.write("    return arg\n")
 
         output_file.write(init_function)
 
@@ -167,24 +172,19 @@ def pack_library_code(path, envpath):
 # Python's exec or Jupyter Notebooks won't work here.
 # @param functions  A list of functions to generate the hash value from.
 # @return           a string of hex characters resulted from hashing the contents and names of functions.
-def generate_functions_hash(functions: list, import_modules=None) -> str:
-    import sys
-
-    source_code = []
-    if import_modules:
-        source_code.extend(["import " + module.__name__ + "\n" for module in import_modules])
-
+def generate_functions_hash(functions: list) -> str:
+    source_code = ""
     for fnc in functions:
         try:
-            source_code.append(inspect.getsource(fnc))
+            source_code += fnc.__name__
+            source_code += inspect.getsource(fnc)
         except OSError as e:
             print(
                 f"Can't retrieve source code of function {fnc.__name__}.",
                 file=sys.stderr,
             )
             raise
-    
-    return hashlib.md5(" ".join(source_code).encode("utf-8")).hexdigest()
+    return hashlib.md5(source_code.encode("utf-8")).hexdigest()
 
 
 # Create a library file and a poncho environment tarball from a list of functions as needed.
