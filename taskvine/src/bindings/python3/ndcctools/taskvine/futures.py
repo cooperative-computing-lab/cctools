@@ -26,7 +26,7 @@ except Exception:
     pythontask_available = False
 
 
-# To be installed on the library for FutureFunctionCalls
+# To be installed in the library for FutureFunctionCalls
 def retrieve_output(arg):
     return arg
 
