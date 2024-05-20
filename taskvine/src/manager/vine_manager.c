@@ -561,22 +561,24 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	struct vine_task *t;
 	int task_status, exit_status;
 	uint64_t task_id;
-	int64_t output_length;
+	int64_t output_length, bytes_sent;
 
 	timestamp_t execution_time, start_time, end_time;
 	timestamp_t observed_execution_time;
 
-	// Format: task completion status, exit status (exit code or signal), output length, execution time, task_id
+	// Format: task completion status, exit status (exit code or signal), output length, bytes_sent, execution time,
+	// task_id
 	int n = sscanf(line,
-			"complete %d %d %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 "",
+			"complete %d %d %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 "",
 			&task_status,
 			&exit_status,
 			&output_length,
+			&bytes_sent,
 			&start_time,
 			&end_time,
 			&task_id);
 
-	if (n < 6) {
+	if (n < 7) {
 		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		return VINE_WORKER_FAILURE;
 	}
@@ -606,49 +608,53 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	/* If the task was forsaken by the worker or couldn't exeute, it didn't really complete, so short circuit. */
 	if (task_status == VINE_RESULT_FORSAKEN) {
 		t->forsaken_count++;
-		itable_remove(q->running_table, t->task_id);
-		vine_task_set_result(t, task_status);
-		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
 		return VINE_SUCCESS;
-	}
 
-	/* Update task stats for this completion. */
-	observed_execution_time = timestamp_get() - t->time_when_commit_end;
+	} else {
 
-	t->time_workers_execute_last =
-			observed_execution_time > execution_time ? execution_time : observed_execution_time;
-	t->time_workers_execute_last_start = start_time;
-	t->time_workers_execute_last_end = end_time;
-	t->time_workers_execute_all += t->time_workers_execute_last;
-	t->output_length = output_length;
-	t->result = task_status;
-	t->exit_code = exit_status;
+		/* Update task stats for this completion. */
+		observed_execution_time = timestamp_get() - t->time_when_commit_end;
 
-	/* If output is less than 1KB stdout is sent along with completion msg. retrieve it from the link. */
-	if (t->output_length <= 1024) {
-		get_stdout(q, w, t, t->output_length);
-		t->output_recieved = 1;
-	}
+		t->time_workers_execute_last =
+				observed_execution_time > execution_time ? execution_time : observed_execution_time;
+		t->time_workers_execute_last_start = start_time;
+		t->time_workers_execute_last_end = end_time;
+		t->time_workers_execute_all += t->time_workers_execute_last;
+		t->output_length = output_length;
+		t->result = task_status;
+		t->exit_code = exit_status;
 
-	/* Update queue stats for this completion. */
-	q->stats->time_workers_execute += t->time_workers_execute_last;
-
-	/* Update worker stats for this completion. */
-	w->finished_tasks++;
-
-	// Convert resource_monitor status into taskvine status if needed.
-	if (q->monitor_mode) {
-		if (t->exit_code == RM_OVERFLOW) {
-			vine_task_set_result(t, VINE_RESULT_RESOURCE_EXHAUSTION);
-		} else if (t->exit_code == RM_TIME_EXPIRE) {
-			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
+		/* If output is less than 1KB stdout is sent along with completion msg. retrieve it from the link. */
+		if (bytes_sent) {
+			get_stdout(q, w, t, bytes_sent);
+			t->output_recieved = 1;
+		} else if (!bytes_sent && !t->output_length) {
+			get_stdout(q, w, t, bytes_sent);
+			t->output_recieved = 1;
 		}
+
+		/* Update queue stats for this completion. */
+		q->stats->time_workers_execute += t->time_workers_execute_last;
+
+		/* Update worker stats for this completion. */
+		w->finished_tasks++;
+
+		// Convert resource_monitor status into taskvine status if needed.
+		if (q->monitor_mode) {
+			if (t->exit_code == RM_OVERFLOW) {
+				task_status = VINE_RESULT_RESOURCE_EXHAUSTION;
+			} else if (t->exit_code == RM_TIME_EXPIRE) {
+				task_status = VINE_RESULT_MAX_END_TIME;
+			}
+		}
+
+		hash_table_insert(q->workers_with_complete_tasks, w->hashkey, w);
 	}
 
 	/* Finally update data structures to reflect the completion. */
 	change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
 	itable_remove(q->running_table, t->task_id);
-	hash_table_insert(q->workers_with_complete_tasks, w->hashkey, w);
+	vine_task_set_result(t, task_status);
 
 	return VINE_SUCCESS;
 }
@@ -1645,7 +1651,7 @@ static vine_result_code_t retrieve_output(struct vine_manager *q, struct vine_wo
 	if (mcode != VINE_MSG_NOT_PROCESSED) {
 		return VINE_WORKER_FAILURE;
 	}
-	if (string_prefix_is(line, "failure")) {
+	if (string_prefix_is(line, "error")) {
 		return VINE_WORKER_FAILURE;
 
 	} else if (string_prefix_is(line, "stdout")) {
@@ -4890,7 +4896,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	   - update catalog if appropriate
 	   - task completed or (prefer-dispatch and would busy wait)? Yes: return completed task to user
 	   - retrieve workers status messages
-	   - workers with available results?                          Yes: retrieve max_retrievals tasks from worker
+	   - retrieve available results for watched files
+	   - workers with complete tasks?                             Yes: retrieve max_retrievals tasks from worker
 	   - tasks waiting to be retrieved?                           Yes: retrieve max_retrievals
 	   - tasks expired?                                           Yes: mark as retrieved
 	   - tasks lost fixed location files?                         Yes: mark as retrieved
@@ -4969,6 +4976,18 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			// note we keep going, and we do not restart the loop as we do in
 			// further events. This is because we give top priority to
 			// returning and retrieving tasks.
+		}
+
+		// get updates for watched files.
+		if (hash_table_size(q->workers_with_available_results)) {
+
+			struct vine_worker_info *w;
+			char *key;
+			HASH_TABLE_ITERATE(q->worker_table, key, w)
+			{
+				get_available_results(q, w);
+				hash_table_remove(q->workers_with_available_results, w->hashkey);
+			}
 		}
 
 		q->busy_waiting_flag = 0;

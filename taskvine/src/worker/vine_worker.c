@@ -212,7 +212,19 @@ __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const ch
 	va_end(va);
 }
 
-/* Send messages from list of asychronous messages available*/
+/*
+Send messages from list of asychronous messages available.
+Asynchronus messages are measured and sent as to not overflow the
+TCP window (typically 64KB). This is done to avoid deadlock. Should
+the worker overflow the window, deadlock may occur in the scenario in
+which the manager requests data from the worker (files, etc.) during the
+the time in which the worker is sending data, causing the worker to block.
+This function attempts to deliver messages that have been buffered via
+the function send_async_message. We measure the size of the window and
+bytes present within the window. As we iterate though buffered messages,
+should a buffered message not overflow the the window, it is sent. Otherwise,
+we break once a message would overflow the window.
+*/
 
 void deliver_async_messages(struct link *l)
 {
@@ -274,9 +286,10 @@ void send_complete_tasks(struct link *l)
 			output[p->output_length] = '\0';
 			close(output_file);
 			send_async_message(l,
-					"complete %d %d %lld %llu %llu %d\n%s",
+					"complete %d %d %lld %lld %llu %llu %d\n%s",
 					p->result,
 					p->exit_code,
+					(long long)p->output_length,
 					(long long)p->output_length,
 					(unsigned long long)p->execution_start,
 					(unsigned long long)p->execution_end,
@@ -285,15 +298,24 @@ void send_complete_tasks(struct link *l)
 			free(output);
 		} else {
 			send_async_message(l,
-					"complete %d %d %lld %llu %llu %d\n",
+					"complete %d %d %lld %lld %llu %llu %d\n",
 					p->result,
 					p->exit_code,
 					(long long)p->output_length,
+					0,
 					(unsigned long long)p->execution_start,
 					(unsigned long long)p->execution_end,
 					p->task->task_id);
 		}
 	}
+}
+
+static void report_changes(struct link *manager)
+{
+	vine_watcher_send_changes(watcher, manager, time(0) + options->active_timeout);
+	send_message(manager, "end\n");
+
+	results_to_be_sent_msg = 0;
 }
 
 /* Receive a single-line message from the current manager. */
@@ -1170,15 +1192,18 @@ static void disconnect_manager(struct link *manager)
 
 void send_stdout(struct link *l, int64_t task_id)
 {
+	char line[VINE_LINE_MAX];
 	struct vine_process *p = itable_lookup(procs_table, task_id);
 	if (!p) {
-		send_message(l, "failure %" SCNd64 "\n", task_id);
+		strcpy(line, "process unknown: no stdout");
+		errno = ESRCH;
+		send_message(l, "error %s %d\n", line, errno);
 		return;
 	}
 
 	int output_file = open(p->output_file_name, O_RDONLY);
 	if (output_file < 0) {
-		send_message(l, "failure %" SCNd64 "\n", task_id);
+		send_message(l, "error %s %d\n", p->output_file_name, errno);
 		return;
 	}
 
@@ -1292,6 +1317,7 @@ static int handle_manager(struct link *manager)
 			fprintf(stderr, "vine_worker: this manager requires a password. (use the -P option)\n");
 			r = 0;
 		} else if (sscanf(line, "send_results %d", &n) == 1) {
+			report_changes(manager);
 			r = 1;
 		} else if (sscanf(line, "send_stdout %" SCNd64 "", &task_id) == 1) {
 			send_stdout(manager, task_id);
