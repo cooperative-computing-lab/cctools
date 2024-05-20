@@ -14,3 +14,5 @@ config.mk
 site/
 work_queue/src/work_queue_example
 dttools/src/jx_repl
+.idea/
+

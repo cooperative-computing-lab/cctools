@@ -1,0 +1,22 @@
+services:
+  program1:
+    command: "program1.sh"
+    log_file: "program1.log"
+    error_file: "program1_error.log"
+    state:
+      log:
+        ready: "program is ready"
+        complete: "program is completed"
+    depends_on:
+      program2: "ready"
+
+  program2:
+    command: "program2.sh"
+    log_file: "program2.log"
+    error_file: "program2_error.log"
+    state:
+      log:
+        ready: "program is ready"
+        complete: "program is completed"
+output:
+  state_times: "state_times.json"
