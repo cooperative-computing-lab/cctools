@@ -382,7 +382,7 @@ $postinstall_for{ubuntu}{default} = $postinstall_for{debian}{default};
 
 # finishing installation steps for all:
 my $epilogue = [
-	'python3 -m pip install cloudpickle conda-pack packaging'
+	'python3 -m pip install cloudpickle threadpoolctl conda-pack packaging'
 ];
 
 
