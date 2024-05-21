@@ -220,8 +220,6 @@ $preinstall_for{almalinux}{9} = [
 $postinstall_for{almalinux}{8} = [
 	'ln -s /usr/bin/python3 /usr/bin/python',
 	@{$builder},
-	@{$fuse},
-	@{$e2fsprogs},
 	@{$mysql}, # does not compile in alma9
 	'dnf -y clean all',
 ];
