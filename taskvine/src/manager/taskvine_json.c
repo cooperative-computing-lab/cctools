@@ -17,7 +17,7 @@ See the file COPYING for details.
 
 static const char *vine_properties[] = { "name", "port", "priority", "num_tasks_left", "next_task_id", "workingdir", "manager_link",
 	"poll_table", "poll_table_size", "tasks", "task_state_map", "ready_list", "worker_table",
-	"worker_blacklist", "worker_task_map", "categories", "workers_with_available_results",
+	"worker_blacklist", "worker_task_map", "categories", "workers_with_watched_file_updates", "workers_with_complete_tasks",
 	"stats", "stats_measure", "stats_disconnected_workers", "time_last_wait",
 	"worker_selection_algorithm", "task_ordering", "process_pending_check", "short_timeout",
 	"long_timeout", "task_reports", "asynchrony_multiplier", "asynchrony_modifier",

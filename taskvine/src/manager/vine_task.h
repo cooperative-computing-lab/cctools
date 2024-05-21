@@ -81,7 +81,7 @@ struct vine_task {
 
 	vine_result_t result;          /**< The result of the task (see @ref vine_result_t */
 	int exit_code;               /**< The exit code of the command line. */
-	int output_recieved;          /**< If the stdout of the task has been recieved. */
+	int output_received;          /**< If the stdout of the task has been received. */
 	int64_t output_length;       /**< length of the standard output of a task */
 	char *output;                /**< The standard output of the task. */
 	char *addrport;              /**< The address and port of the host on which it ran. */

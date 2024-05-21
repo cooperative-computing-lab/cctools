@@ -626,11 +626,11 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		/* If output is less than 1KB stdout is sent along with completion msg. retrieve it from the link. */
 		if (bytes_sent) {
 			get_stdout(q, w, t, bytes_sent);
-			t->output_recieved = 1;
+			t->output_received = 1;
 			/* worker sent no bytes as output length is 0 */
 		} else if (!bytes_sent && !t->output_length) {
 			get_stdout(q, w, t, bytes_sent);
-			t->output_recieved = 1;
+			t->output_received = 1;
 		}
 
 		/* Update queue stats for this completion. */
@@ -706,7 +706,7 @@ static vine_msg_code_t vine_manager_recv_no_retry(
 			string_prefix_is(line, "resources_status")) {
 		result = handle_manager_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "available_results")) {
-		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
+		hash_table_insert(q->workers_with_watched_file_updates, w->hashkey, w);
 		result = VINE_MSG_PROCESSED;
 	} else if (string_prefix_is(line, "resources")) {
 		result = handle_resources(q, w, stoptime);
@@ -1057,7 +1057,7 @@ void vine_manager_remove_worker(
 	vine_txn_log_write_worker(q, w, 1, reason);
 
 	hash_table_remove(q->worker_table, w->hashkey);
-	hash_table_remove(q->workers_with_available_results, w->hashkey);
+	hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
 	hash_table_remove(q->workers_with_complete_tasks, w->hashkey);
 
 	if (q->transfer_temps_recovery) {
@@ -1295,9 +1295,9 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 		break;
 	default:
 		/* Otherwise get all of the output files. */
-		if (!t->output_recieved) {
+		if (!t->output_received) {
 			result &= retrieve_output(q, w, t);
-			t->output_recieved = 1;
+			t->output_received = 1;
 		}
 		result &= vine_manager_get_output_files(q, w, t);
 		break;
@@ -3839,7 +3839,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->stats_disconnected_workers = calloc(1, sizeof(struct vine_stats));
 	q->stats_measure = calloc(1, sizeof(struct vine_stats));
 
-	q->workers_with_available_results = hash_table_create(0, 0);
+	q->workers_with_watched_file_updates = hash_table_create(0, 0);
 	q->workers_with_complete_tasks = hash_table_create(0, 0);
 
 	// The poll table is initially null, and will be created
@@ -4176,7 +4176,7 @@ void vine_delete(struct vine_manager *q)
 	itable_delete(q->running_table);
 	list_delete(q->waiting_retrieval_list);
 	list_delete(q->retrieved_list);
-	hash_table_delete(q->workers_with_available_results);
+	hash_table_delete(q->workers_with_watched_file_updates);
 	hash_table_delete(q->workers_with_complete_tasks);
 
 	list_clear(q->task_info_list, (void *)vine_task_info_delete);
@@ -4979,14 +4979,14 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		}
 
 		// get updates for watched files.
-		if (hash_table_size(q->workers_with_available_results)) {
+		if (hash_table_size(q->workers_with_watched_file_updates)) {
 
 			struct vine_worker_info *w;
 			char *key;
 			HASH_TABLE_ITERATE(q->worker_table, key, w)
 			{
 				get_available_results(q, w);
-				hash_table_remove(q->workers_with_available_results, w->hashkey);
+				hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
 			}
 		}
 
