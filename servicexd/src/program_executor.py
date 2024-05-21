@@ -1,3 +1,4 @@
+import os
 import subprocess
 import threading
 import time
@@ -5,25 +6,30 @@ import time
 from log_monitor import monitor_log_file
 
 
-def execute_program(command, log_file, error_file, working_dir, state_dict, service_name, dependencies, state_keywords,
-                    cond, state_times, start_time):
-    log_thread = threading.Thread(target=monitor_log_file,
-                                  args=(
-                                      log_file, state_dict, service_name, state_keywords, cond, state_times,
-                                      start_time))
-    log_thread.start()
+def execute_program(config, working_dir, state_dict, service_name, cond, state_times, start_time):
+    command = config['command']
+
+    log_file = os.path.join(working_dir, config['log_file'])
+    error_file = os.path.join(working_dir, config['error_file'])
+
+    dependencies = config.get('depends_on', {})
+    state_keywords = config.get('state', {}).get('log', {})  # todo: refactor
 
     with cond:
         for dependency, state in dependencies.items():
             while state_dict.get(dependency) != state:
                 cond.wait()
 
-    # todo: get states from config
+    log_thread = threading.Thread(target=monitor_log_file,
+                                  args=(
+                                      log_file, state_dict, service_name, state_keywords, cond, state_times,
+                                      start_time))
+    log_thread.start()
+
     local_state_times = {
         'start': time.time() - start_time,
-        'ready': None,
-        'completed': None
     }
+
     state_times[service_name] = local_state_times
 
     with open(log_file, 'w') as log, open(error_file, 'w') as err:
@@ -31,9 +37,9 @@ def execute_program(command, log_file, error_file, working_dir, state_dict, serv
         process.wait()
 
     with cond:
-        state_dict[service_name] = "completed"
+        state_dict[service_name] = "final"  # todo: name - accept?
         local_state_times = state_times[service_name]
-        local_state_times['completed'] = time.time() - start_time
+        local_state_times['final'] = time.time() - start_time
         state_times[service_name] = local_state_times
         cond.notify_all()
 

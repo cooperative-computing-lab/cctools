@@ -1,0 +1,27 @@
+services:
+  reserve_port:
+    type: "action"
+    command: "python3 reserve_ports_with_name.py ports.config 8 4600 simulator,gcs_local,gcs_remote,offboard_local,onboard_payload_local,onboard_gimbal_local,typhoon_offboard_local,gazebo_master"
+    log_file: "reserve_ports.log"
+    error_file: "reserve_ports_error.log"
+    state:
+      log:
+        complete: "ports and their PIDs written to"
+
+  copy_ports_config:
+    command: "cp ports.config /tmp/log/ports.config"
+    log_file: "copy_ports_config.log"
+    error_file: "copy_ports_config_error.log"
+    monitor_log: false
+    depends_on:
+      reserve_port: "complete"
+
+  chmod_ports_config:
+    command: "chmod +x ports.config"
+    log_file: "chmod_ports_config.log"
+    error_file: "chmod_ports_config_error.log"
+    monitor_log: false
+    depends_on:
+      reserve_port: "complete"
+output:
+  state_times: "state_times.json"

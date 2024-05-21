@@ -12,6 +12,5 @@ def main():
     service_manager = ServiceManager(config_path)
     service_manager.start_services(start_time)
 
-
 if __name__ == '__main__':
     main()

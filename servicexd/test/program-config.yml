@@ -1,6 +1,14 @@
+
 services:
+  reserve_port:
+    type: "action"
+    command: "python reserve_ports.py 4 ports.config"
+    log_file: "reserve_ports.log"
+    error_file: "reserve_ports_error.log"
+
   program1:
-    command: "program1.sh"
+    type: "action"
+    command: "./program1.sh"
     log_file: "program1.log"
     error_file: "program1_error.log"
     state:
@@ -10,13 +18,31 @@ services:
     depends_on:
       program2: "ready"
 
+  program3:
+    type: "service"
+    command: "./program1.sh"
+    log_file: "program3.log"
+    error_file: "program3_error.log"
+    state:
+      log:
+        ready: "program is ready"
+        complete: "program is completed"
+    depends_on:
+      program2: "ready"
+
   program2:
-    command: "program2.sh"
+    type: "service"
+    command: "./program2.sh"
     log_file: "program2.log"
     error_file: "program2_error.log"
     state:
       log:
         ready: "program is ready"
         complete: "program is completed"
+    depends_on:
+      reserve_port: "final"
+
 output:
   state_times: "state_times.json"
+stop_signal: "test/stop-all.txt"
+max_run_time: 60

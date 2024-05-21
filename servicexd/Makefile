@@ -11,6 +11,9 @@ run:
 
 test: run
 
+compile:
+	@echo "Compiling all Python code into a single file..."
+	$(PYTHON) concat_sources.py
 clean:
 	@echo "Cleaning up..."
 	rm -rf test/*.log test/*.json

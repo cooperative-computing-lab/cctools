@@ -49,6 +49,7 @@ def topological_sort(programs):
         visiting.remove(node)
 
     for program in graph:
+        print(program)
         dfs(program)
     return stack
 
