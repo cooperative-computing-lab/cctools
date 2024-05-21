@@ -664,8 +664,11 @@ static void reap_process(struct vine_process *p, struct link *manager)
 	itable_insert(procs_complete, p->task->task_id, p);
 
 	struct stat info;
-	stat(p->output_file_name, &info);
-	p->output_length = info.st_size;
+	if (!stat(p->output_file_name, &info)) {
+		p->output_length = info.st_size;
+	} else {
+		p->output_length = 0;
+	}
 
 	total_task_execution_time += (p->execution_end - p->execution_start);
 	total_tasks_executed++;
