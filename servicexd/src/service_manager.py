@@ -1,5 +1,6 @@
 import json
 import os
+import signal
 import threading
 import time
 from multiprocessing import Manager, Condition, Process
@@ -30,6 +31,7 @@ class ServiceManager:
         self.max_run_time = self.config.get('max_run_time', None)
         self.stop_event = threading.Event()
         self.processes = {}
+        self.pgid_dict = Manager().dict()  # Shared dictionary for PGIDs
 
     def start_services(self, start_time):
         manager = Manager()
@@ -45,7 +47,7 @@ class ServiceManager:
             state_times[service] = {}
 
             p_exec = Process(target=execute_program, args=(
-                service_config, self.working_dir, state_dict, service, cond, state_times, start_time))
+                service_config, self.working_dir, state_dict, service, cond, state_times, start_time, self.pgid_dict))
 
             p_exec.start()
             self.processes[service] = p_exec
@@ -74,22 +76,37 @@ class ServiceManager:
 
     def stop_service(self, service_name):
         if service_name in self.processes:
-            self.processes[service_name].terminate()
-            self.processes[service_name].join()
+            process = self.processes[service_name]
+            if process.is_alive():
+                pgid = self.pgid_dict.get(service_name)
+                if pgid:
+                    os.killpg(pgid, signal.SIGTERM)  # Terminate the process group
+
+                process.terminate()
+                process.join()
             print(f"Service {service_name} has been stopped.")
         else:
             print(f"Service {service_name} not found.")
 
     def stop_all_services(self):
         for service_name, process in self.processes.items():
-            process.terminate()
-            process.join()
+            if process.is_alive():
+                pgid = self.pgid_dict.get(service_name)
+                if pgid:
+                    try:
+                        os.killpg(pgid, signal.SIGTERM)  # Terminate the process group
+                    except ProcessLookupError:
+                        print(f"Process group {pgid} for service {service_name} not found.")
+                process.terminate()
+                process.join()
             print(f"Service {service_name} has been stopped.")
 
         print("All services have been stopped.")
 
     def check_stop_signal(self):
-        return os.path.exists(self.stop_signal_path)
+        if os.path.exists(self.stop_signal_path):
+            print("Received stop signal")
+            return True
 
     def check_max_run_time(self, start_time):
         if self.max_run_time:

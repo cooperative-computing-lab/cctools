@@ -18,18 +18,6 @@ services:
     depends_on:
       program2: "ready"
 
-  program3:
-    type: "service"
-    command: "./program1.sh"
-    log_file: "program3.log"
-    error_file: "program3_error.log"
-    state:
-      log:
-        ready: "program is ready"
-        complete: "program is completed"
-    depends_on:
-      program2: "ready"
-
   program2:
     type: "service"
     command: "./program2.sh"
@@ -44,5 +32,5 @@ services:
 
 output:
   state_times: "state_times.json"
-stop_signal: "test/stop-all.txt"
-max_run_time: 60
+stop_signal: "/Users/saiful/CCL/cctools/servicexd/test/stop.txt"
+max_run_time: 50

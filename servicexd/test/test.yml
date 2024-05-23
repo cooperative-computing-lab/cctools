@@ -37,5 +37,5 @@ services:
 
 output:
   state_times: "/tmp/log/state_times.json"
-stop_signal: "/tmp/log/stop-all.txt"
+stop_signal: "/tmp/log/stop.txt"
 max_run_time: 60
