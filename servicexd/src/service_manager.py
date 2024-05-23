@@ -58,7 +58,7 @@ class ServiceManager:
 
         stop_thread.join()
 
-        # todo: additonal cleanup
+        # todo: additional cleanup
         if os.path.exists(self.stop_signal_path):
             os.remove(self.stop_signal_path)
 
