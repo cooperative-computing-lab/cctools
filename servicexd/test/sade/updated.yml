@@ -1,0 +1,51 @@
+services:
+  reserve_port:
+    type: "action"
+    command: "python3 /home/user/servicexd/test/reserve_ports_with_name.py /home/user/Firmware/build/px4_sitl_default/etc/init.d-posix/ports.config 8 4600 simulator,gcs_local,gcs_remote,offboard_local,onboard_payload_local,onboard_gimbal_local,typhoon_offboard_local,gazebo_master"
+    log_file: "/tmp/log/reserve_ports.log"
+    error_file: "/tmp/log/reserve_ports_error.log"
+    state:
+      log:
+        complete: "ports and their PIDs written to"
+
+  chmod_port_config:
+    type: "action"
+    command: "chmod +x /home/user/Firmware/build/px4_sitl_default/etc/init.d-posix/ports.config"
+    log_file: "/tmp/log/chmod_port_config.log"
+    error_file: "/tmp/log/chmod_port_config_error.log"
+    depends_on:
+      reserve_port: "final"
+
+  copy_ports_config:
+    command: "cp /home/user/Firmware/build/px4_sitl_default/etc/init.d-posix/ports.config /tmp/log/ports.config"
+    log_file: "/tmp/log/copy_ports_config.log"
+    error_file: "/tmp/log/copy_ports_config_error.log"
+    monitor_log: false
+    depends_on:
+      chmod_port_config: "final"
+
+  gazebo_server:
+    type: "service"
+    command: "/tmp/start_gazebo_server.sh"
+    log_file: "/tmp/log/gazebo_server.log"
+    error_file: "/tmp/log/gazebo_server_error.log"
+    state:
+      log:
+        ready: "Connected to gazebo master"
+    depends_on:
+      chmod_port_config: "final"
+
+  px4_0:
+    type: "service"
+    command: "/tmp/start_px4.sh"
+    log_file: "/tmp/log/px4_0.log"
+    error_file: "/tmp/log/px4_0_error.log"
+    state:
+      log:
+        ready: "Startup script returned successfully"
+    depends_on:
+      gazebo_server: "ready"
+
+output:
+  state_times: "/tmp/log/state_times.json"
+stop_signal: "/tmp/log/stop.txt"

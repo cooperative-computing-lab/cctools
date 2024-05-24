@@ -24,18 +24,28 @@ services:
     depends_on:
       chmod_port_config: "final"
 
-  start_gazebo_server:
+  gazebo_server:
     type: "service"
-    command: "/home/user/start_gazebo_server.sh"
-    log_file: "/tmp/log/start_gazebo_server.log"
-    error_file: "/tmp/log/start_gazebo_server_error.log"
+    command: "/tmp/start_gazebo_server.sh"
+    log_file: "/tmp/log/gazebo_server.log"
+    error_file: "/tmp/log/gazebo_server_error.log"
     state:
       log:
         ready: "Connected to gazebo master"
     depends_on:
       chmod_port_config: "final"
 
+  px4_0:
+    type: "service"
+    command: "/tmp/start_px4.sh"
+    log_file: "/tmp/log/px4_0.log"
+    error_file: "/tmp/log/px4_0_error.log"
+    state:
+      log:
+        ready: "Startup script returned successfully"
+    depends_on:
+      gazebo_server: "ready"
+
 output:
   state_times: "/tmp/log/state_times.json"
 stop_signal: "/tmp/log/stop.txt"
-max_run_time: 60
