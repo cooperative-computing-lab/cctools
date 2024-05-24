@@ -33,7 +33,13 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
     state_times[service_name] = local_state_times
 
     with open(log_file, 'w') as log, open(error_file, 'w') as err:
+        # todo: ideas for passing env var to process
+        # env = os.environ.copy()
+        # env['GAZEBO_MASTER_URI'] = "http://localhost:10007"
+        # process = subprocess.Popen(command, shell=True, cwd=working_dir, stdout=log, stderr=err, preexec_fn=os.setsid, env = env)
+
         process = subprocess.Popen(command, shell=True, cwd=working_dir, stdout=log, stderr=err, preexec_fn=os.setsid)
+
         pgid_dict[service_name] = os.getpgid(process.pid)
         process.wait()
 

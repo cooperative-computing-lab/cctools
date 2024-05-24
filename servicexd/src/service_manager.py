@@ -1,6 +1,7 @@
 import json
 import os
 import signal
+import sys
 import threading
 import time
 from multiprocessing import Manager, Condition, Process
@@ -33,7 +34,20 @@ class ServiceManager:
         self.processes = {}
         self.pgid_dict = Manager().dict()  # Shared dictionary for PGIDs
 
+    def setup_signal_handlers(self):
+        signal.signal(signal.SIGTERM, self.signal_handler)
+        signal.signal(signal.SIGINT, self.signal_handler)
+
+    def signal_handler(self, signum, frame):
+        print(f"Received signal {signum} in pid {os.getpid()}, stopping all services...")
+        self.stop_all_services()
+        self.stop_event.set()
+
+        sys.exit(0)
+
     def start_services(self, start_time):
+        self.setup_signal_handlers()
+
         manager = Manager()
         state_dict = manager.dict()
         state_times = manager.dict()

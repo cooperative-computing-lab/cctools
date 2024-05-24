@@ -30,7 +30,19 @@ services:
     depends_on:
       reserve_port: "final"
 
+  program2-1:
+    type: "service"
+    command: "./program2.sh"
+    log_file: "program2_1.log"
+    error_file: "program2_1_error.log"
+    state:
+      log:
+        ready: "program is ready"
+        complete: "program is completed"
+    depends_on:
+      reserve_port: "final"
+
 output:
   state_times: "state_times.json"
 stop_signal: "/Users/saiful/CCL/cctools/servicexd/test/stop.txt"
-max_run_time: 50
+max_run_time: 120
