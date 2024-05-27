@@ -17,4 +17,4 @@ compile:
 	$(PYTHON) py_source_combiner.py src $(PROGRAM_NAME).py
 clean:
 	@echo "Cleaning up..."
-	rm -rf test/*.log test/*.json
+	rm -rf test/**/*.log test/**/*.json

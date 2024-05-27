@@ -1,4 +1,5 @@
 import json
+import multiprocessing
 import os
 import signal
 import sys
@@ -23,6 +24,7 @@ def save_state_times(state_times, output_file):
 
 class ServiceManager:
     def __init__(self, config_path):
+        print("DEBUG: Initializing ServiceManager")
         self.config = load_config_from_yaml(config_path)
         self.services = self.config['services']
         self.sorted_services = validate_and_sort_programs(self.config)
@@ -30,41 +32,41 @@ class ServiceManager:
         self.output = self.config['output']
         self.stop_signal_path = os.path.join(self.working_dir, self.config.get('stop_signal', ''))
         self.max_run_time = self.config.get('max_run_time', None)
-        self.stop_event = threading.Event()
+        self.stop_event = multiprocessing.Event()
+        self.pgid_dict = multiprocessing.Manager().dict()
+        self.state_dict = multiprocessing.Manager().dict()
+        self.state_times = multiprocessing.Manager().dict()
+        self.cond = multiprocessing.Condition()
         self.processes = {}
-        self.pgid_dict = Manager().dict()  # Shared dictionary for PGIDs
+        print("DEBUG: ServiceManager initialized")
 
     def setup_signal_handlers(self):
+        print("DEBUG: Setting up signal handlers")
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
 
     def signal_handler(self, signum, frame):
-        print(f"Received signal {signum} in pid {os.getpid()}, stopping all services...")
-        self.stop_all_services()
+        print(f"DEBUG: Received signal {signum} in pid {os.getpid()}, stopping all services...")
         self.stop_event.set()
 
-        sys.exit(0)
-
     def start_services(self, start_time):
+        print("DEBUG: Starting services")
         self.setup_signal_handlers()
-
-        manager = Manager()
-        state_dict = manager.dict()
-        state_times = manager.dict()
-
-        cond = Condition()
 
         for service in self.sorted_services:
             service_config = self.services[service]
 
-            state_dict[service] = "initial"
-            state_times[service] = {}
+            self.state_dict[service] = "initial"
+            self.state_times[service] = {}
 
             p_exec = Process(target=execute_program, args=(
-                service_config, self.working_dir, state_dict, service, cond, state_times, start_time, self.pgid_dict))
+                service_config, self.working_dir, self.state_dict, service, self.cond, self.state_times, start_time,
+                self.pgid_dict, self.stop_event))
 
             p_exec.start()
             self.processes[service] = p_exec
+
+        print("DEBUG: All services initialized")
 
         stop_thread = threading.Thread(target=self.check_stop_conditions, args=(start_time,))
         stop_thread.start()
@@ -74,19 +76,38 @@ class ServiceManager:
 
         stop_thread.join()
 
-        # todo: additional cleanup
         if os.path.exists(self.stop_signal_path):
             os.remove(self.stop_signal_path)
 
-        save_state_times(state_times, os.path.join(self.working_dir, self.output['state_times']))
+        save_state_times(self.state_times, os.path.join(self.working_dir, self.output['state_times']))
 
     def check_stop_conditions(self, start_time):
+        print("DEBUG: Checking stop conditions")
         while not self.stop_event.is_set():
-            if self.check_stop_signal() or self.check_max_run_time(start_time):
-                self.stop_all_services()
+            if self.check_stop_signal_file() or self.check_max_run_time(start_time):
                 self.stop_event.set()
             else:
-                self.stop_event.wait(timeout=1)  # Wait with timeout to recheck conditions
+                self.stop_event.wait(timeout=1)
+
+        self.stop_all_services()
+
+        print("DEBUG: Finished checking stop conditions")
+
+    def stop_all_services(self):
+        print("DEBUG: Stopping all services")
+        for service_name, process in self.processes.items():
+            pgid = self.pgid_dict.get(service_name)
+            if pgid:
+                try:
+                    os.killpg(pgid, signal.SIGTERM)
+                except ProcessLookupError:
+                    print(f"Process group {pgid} for service {service_name} not found.")
+            process.terminate()
+
+        for process in self.processes.values():
+            process.join()
+
+        print("DEBUG: All services have been stopped")
 
     def stop_service(self, service_name):
         if service_name in self.processes:
@@ -102,22 +123,7 @@ class ServiceManager:
         else:
             print(f"Service {service_name} not found.")
 
-    def stop_all_services(self):
-        for service_name, process in self.processes.items():
-            if process.is_alive():
-                pgid = self.pgid_dict.get(service_name)
-                if pgid:
-                    try:
-                        os.killpg(pgid, signal.SIGTERM)  # Terminate the process group
-                    except ProcessLookupError:
-                        print(f"Process group {pgid} for service {service_name} not found.")
-                process.terminate()
-                process.join()
-            print(f"Service {service_name} has been stopped.")
-
-        print("All services have been stopped.")
-
-    def check_stop_signal(self):
+    def check_stop_signal_file(self):
         if os.path.exists(self.stop_signal_path):
             print("Received stop signal")
             return True

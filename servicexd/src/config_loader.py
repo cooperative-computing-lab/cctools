@@ -6,10 +6,12 @@ import yaml
 def load_config_from_yaml(path):
     with open(path, 'r') as f:
         config = yaml.safe_load(f)
+        print(f"DEBUG: Loaded config from {path}")
         return config
 
 
 def validate_and_sort_programs(config):
+    print("DEBUG: Validating and sorting programs")
     required_keys = ['services']
 
     for key in required_keys:
@@ -24,10 +26,13 @@ def validate_and_sort_programs(config):
         if 'log_file' not in details:
             raise ValueError(f"Program {service} is missing the 'log_file' key")
 
-    return topological_sort(services)
+    sorted_services = topological_sort(services)
+    print(f"DEBUG: Sorted services: {sorted_services}")
+    return sorted_services
 
 
 def topological_sort(programs):
+    print("DEBUG: Performing topological sort")
     graph = {program: details.get('depends_on', {}) for program, details in programs.items()}
 
     visited = set()
@@ -36,7 +41,7 @@ def topological_sort(programs):
 
     def dfs(node):
         if node in visiting:
-            raise ValueError(f"cycling dependency on {node}")
+            raise ValueError(f"Cyclic dependency on {node}")
 
         visiting.add(node)
 
@@ -49,8 +54,8 @@ def topological_sort(programs):
         visiting.remove(node)
 
     for program in graph:
-        print(program)
         dfs(program)
+    print(f"DEBUG: Topological sort result: {stack}")
     return stack
 
 # Example usage:

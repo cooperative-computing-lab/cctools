@@ -2,18 +2,24 @@ import time
 import os
 
 
-def monitor_log_file(log_path, state_dict, service_name, state_keywords, cond, state_times, start_time):
+def monitor_log_file(log_path, state_dict, service_name, state_keywords, cond, state_times, start_time, stop_event):
+    print(f"DEBUG: Starting to monitor log file for {service_name}")
+
     if not state_keywords:
+        print(f"DEBUG: No state keywords for {service_name}, exiting monitor")
         return
 
     while not os.path.exists(log_path):
+        if stop_event.is_set():
+            print(f"DEBUG: Stop event set, exiting monitor for {service_name}")
+            return
         time.sleep(0.1)
 
     # todo: get from user?
     final_state = list(state_keywords.keys())[-1]
 
     with open(log_path, 'r') as file:
-        while True:
+        while not stop_event.is_set():
             line = file.readline()
             if not line:
                 time.sleep(0.1)
@@ -32,10 +38,13 @@ def monitor_log_file(log_path, state_dict, service_name, state_keywords, cond, s
                         state_times[service_name] = local_state_times
                         cond.notify_all()
 
+                        print(f"DEBUG: {service_name} reached state {state} at {current_time}")
+
                         if state == final_state:
                             reached_final_state = True
                             break
 
             if reached_final_state:
-                print(f'Reached final state {final_state} for {service_name}')
+                print(f"DEBUG: Reached final state {final_state} for {service_name}")
                 break
+    print(f"DEBUG: Finished monitoring log file for {service_name}")
