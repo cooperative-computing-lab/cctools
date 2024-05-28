@@ -87,8 +87,8 @@ struct vine_process *vine_process_create(struct vine_task *task, vine_process_ty
 	const char *dirtype = vine_process_sandbox_code(p->type);
 
 	p->sandbox = string_format("%s/%s.%d", workspace->workspace_dir, dirtype, p->task->task_id);
-	p->tmpdir = string_format("%s/.taskvine.tmp", p->sandbox);
-	p->output_file_name = string_format("%s/.taskvine.stdout", p->sandbox);
+	p->tmpdir = string_format("%s/.task%d.tmp", p->sandbox, p->task->task_id);
+	p->stdout_file_path = string_format("%s/.task%d.stdout", p->sandbox, p->task->task_id);
 
 	p->functions_running = 0;
 	p->library_ready = 0;
@@ -108,8 +108,8 @@ void vine_process_delete(struct vine_process *p)
 	if (p->task)
 		vine_task_delete(p->task);
 
-	if (p->output_file_name) {
-		free(p->output_file_name);
+	if (p->stdout_file_path) {
+		free(p->stdout_file_path);
 	}
 
 	if (p->library_read_link)
@@ -244,7 +244,7 @@ int vine_process_execute_and_wait(struct vine_process *p)
 int vine_process_invoke_function(struct vine_process *p)
 {
 	char *buffer = string_format(
-			"%d %s %s %s", p->task->task_id, p->task->command_line, p->sandbox, p->output_file_name);
+			"%d %s %s %s", p->task->task_id, p->task->command_line, p->sandbox, p->stdout_file_path);
 	ssize_t result = link_printf(p->library_process->library_write_link,
 			time(0) + options->active_timeout,
 			"%ld\n%s",
@@ -311,7 +311,7 @@ int vine_process_execute(struct vine_process *p)
 
 	/* Read input from null and send output to assigned file. */
 	input_fd = open("/dev/null", O_RDONLY);
-	output_fd = open(p->output_file_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
+	output_fd = open(p->stdout_file_path, O_WRONLY | O_TRUNC | O_CREAT, 0777);
 	if (output_fd < 0) {
 		debug(D_VINE, "Could not open worker stdout: %s", strerror(errno));
 		return 0;

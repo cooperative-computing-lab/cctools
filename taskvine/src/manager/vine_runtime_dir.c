@@ -112,6 +112,12 @@ char *vine_runtime_directory_create()
 	register_staging_dir(tmp);
 	free(tmp);
 
+	tmp = string_format("%s/library-stdout", runtime_dir);
+	if (!create_dir(tmp, 0755)) {
+		return NULL;
+	}
+	free(tmp);
+
 	tmp = string_format("%s/../vine-cache", runtime_dir);
 	if (!create_dir(tmp, 0755)) {
 		return NULL;
@@ -136,6 +142,11 @@ char *vine_get_runtime_path_log(struct vine_manager *m, const char *path)
 char *vine_get_runtime_path_staging(struct vine_manager *m, const char *path)
 {
 	return string_format("%s/staging%s%s", m->runtime_directory, path ? "/" : "", path ? path : "");
+}
+
+char *vine_get_runtime_path_library_stdout(struct vine_manager *m, const char *path)
+{
+	return string_format("%s/library-stdout%s%s", m->runtime_directory, path ? "/" : "", path ? path : "");
 }
 
 char *vine_get_runtime_path_caching(struct vine_manager *m, const char *path)

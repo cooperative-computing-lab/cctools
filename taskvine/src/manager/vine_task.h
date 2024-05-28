@@ -38,9 +38,9 @@ typedef enum {
 } vine_task_state_t;
 
 struct vine_task {
-        /***** Fixed properties of task at submit time. ******/
+	/***** Fixed properties of task at submit time. ******/
 
-        int task_id;                 /**< A unique task id number. */
+	int task_id;                 /**< A unique task id number. */
 	vine_task_type_t type;       /**< The type of the task. */
 	char *command_line;          /**< The program(s) to execute, as a shell command line. */
 	char *tag;                   /**< An optional user-defined logical name for the task. */
@@ -76,7 +76,7 @@ struct vine_task {
 	int forsaken_attempts;      /**< Number of times the task was submitted to a worker but failed to start execution. */
 	int workers_slow;           /**< Number of times this task has been terminated for running too long. */
 	int function_slots_inuse;   /**< If a library, the number of functions currently running. */
-		
+
 	/***** Results of task once it has reached completion. *****/
 
 	vine_result_t result;          /**< The result of the task (see @ref vine_result_t */
@@ -98,7 +98,6 @@ struct vine_task {
 	timestamp_t time_when_retrieval;    /**< The time when output files start to be transfered back to the manager. time_done - time_when_retrieval is the time taken to transfer output files. */
 
 	timestamp_t time_when_last_failure; /**< If larger than 0, the time at which the last task failure was detected. */
-
 
 	timestamp_t time_workers_execute_last_start;           /**< The time when the last complete execution for this task started at a worker. */
 	timestamp_t time_workers_execute_last_end;             /**< The time when the last complete execution for this task ended at a worker. */

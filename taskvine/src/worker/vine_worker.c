@@ -562,7 +562,7 @@ static void report_task_complete(struct link *manager, struct vine_process *p)
 {
 	int64_t output_length;
 
-	int output_file = open(p->output_file_name, O_RDONLY);
+	int output_file = open(p->stdout_file_path, O_RDONLY);
 	if (output_file >= 0) {
 		struct stat info;
 		fstat(output_file, &info);

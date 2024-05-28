@@ -4561,12 +4561,13 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	/* Give it a unique taskid if library fits the worker. */
 	t->task_id = q->next_task_id++;
 
-	/* Add an output file to every duplicated library instance */
-	char *library_log_filename = malloc(sizeof(char) * (4 + 10 + 25 + 1));
-	sprintf(library_log_filename, "libtask%d.log", t->task_id);
-	vine_cache_level_t cache = VINE_CACHE_LEVEL_TASK;
-	struct vine_file *library_log_file = vine_declare_file(q, library_log_filename, cache, 0);
-	vine_task_add_output(t, library_log_file, library_log_filename, VINE_WATCH);
+	/* Watch the output file of every duplicated library instance */
+	char *remote_stdout_filename = string_format(".task%d.stdout", t->task_id);
+	char *local_stdout_filename = string_format("task%d.stdout", t->task_id);
+	char *local_library_stdout_path = vine_get_runtime_path_library_stdout(q, local_stdout_filename);
+	struct vine_file *library_local_stdout_file =
+			vine_declare_file(q, local_library_stdout_path, VINE_CACHE_LEVEL_TASK, 0);
+	vine_task_add_output(t, library_local_stdout_file, remote_stdout_filename, VINE_WATCH);
 
 	/* Add reference to task when adding it to primary table. */
 	itable_insert(q->tasks, t->task_id, vine_task_addref(t));

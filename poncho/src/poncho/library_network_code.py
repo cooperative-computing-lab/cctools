@@ -20,6 +20,7 @@ def library_network_code():
     import select
     import signal
     import time
+    import builtins
     from datetime import datetime
     import socket
     from threadpoolctl import threadpool_limits
@@ -27,6 +28,16 @@ def library_network_code():
     # self-pipe to turn a sigchld signal when a child finishes execution
     # into an I/O event.
     r, w = os.pipe()
+
+    # Ensure each print statement automatically flushes the stdout file,
+    # this is important of tracking the stdout timely
+    original_print = builtins.print
+
+    def flushing_print(*args, **kwargs):
+        kwargs.setdefault('flush', True)
+        original_print(*args, **kwargs)
+
+    builtins.print = flushing_print
 
     # This class captures how results from FunctionCalls are conveyed from
     # the library to the manager.
@@ -89,13 +100,13 @@ def library_network_code():
         os.writev(w, [b"a"])
 
     # Read data from worker, start function, and dump result to `outfile`.
-    def start_function(in_pipe_fd, thread_limit=1, libtask_logpath=None):
+    def start_function(in_pipe_fd, thread_limit=1):
         # read length of buffer to read
         buffer_len = b""
         while True:
             c = os.read(in_pipe_fd, 1)
             if c == b"":
-                file_write_line(libtask_logpath, f"can't get length from in_pipe_fd {in_pipe_fd}")
+                print_timed_message(f"can't get length from in_pipe_fd {in_pipe_fd}")
                 exit(1)
             elif c == b"\n":
                 break
@@ -113,20 +124,19 @@ def library_network_code():
                 function_sandbox,
                 function_stdout_file
             ) = line.split(" ", maxsplit=3)
-        except:
-            file_write_line(libtask_logpath, f"error: not enough values to unpack \
-                            from {line} (expected 4 items)\n")
+        except Exception as e:
+            print_timed_message(f"error: not enough values to unpack from {line} (expected 4 items), exception: {e}")
             exit(1)
 
         try:
             function_id = int(function_id)
-        except:
-            file_write_line(libtask_logpath, f"error: can't turn {function_id} into an integer")
+        except Exception as e:
+            print_timed_message(f"error: can't turn {function_id} into an integer, exception: {e}")
             exit(1)
 
         if not function_name:
             # malformed message from worker so we exit
-            file_write_line(libtask_logpath, "error: invalid function name, malformed message from worker")
+            print_timed_message(f"error: invalid function name, malformed message {line} from worker")
             exit(1)
 
         with threadpool_limits(limits=thread_limit):
@@ -159,7 +169,7 @@ def library_network_code():
                         raise
 
                 except Exception as e:
-                    print(
+                    print_timed_message(
                         f"Library code: Function call failed due to {e}",
                         file=sys.stderr,
                     )
@@ -167,46 +177,42 @@ def library_network_code():
                 finally:
                     os.chdir(library_sandbox)
             else:
-                file_write_line(libtask_logpath, f"set fork mode to run function {function_id}")
+                print_timed_message("forking a process to execute this function")
                 p = os.fork()
                 if p == 0:
                     try:
-                        file_write_line(libtask_logpath, f"FUNCTION{function_id} - execute in process {os.getpid()}")
-                        exit_status = 1
                         # setup stdout/err for a function call so we can capture them.
+                        # redirect the stdout of a specific FunctionCall task into its stdout file
                         stdout_capture_fd = os.open(
                             function_stdout_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC
                         )
                         os.dup2(stdout_capture_fd, sys.stdout.fileno())
                         os.dup2(stdout_capture_fd, sys.stderr.fileno())
-
-                        file_write_line(libtask_logpath, f"FUNCTION{function_id} - change the working directory to sandbox {function_sandbox}")
                         os.chdir(function_sandbox)
+
+                        exit_status = 1
 
                         try:
                             # parameters are represented as infile.
-                            file_write_line(libtask_logpath, f"FUNCTION{function_id} - load the arguments from infile")
                             with open("infile", "rb") as f:
                                 event = cloudpickle.load(f)
                         except Exception:
-                            file_write_line(libtask_logpath, f"FUNCTION{function_id} - error: can't load the arguments from infile")
+                            print_timed_message(f"FUNCTION{function_id} error: can't load the arguments from infile")
                             exit_status = 2
                             raise
 
                         try:
-                            file_write_line(libtask_logpath, f"FUNCTION{function_id} - execute function with the loaded arguments")
                             result = globals()[function_name](event)
                         except Exception:
-                            file_write_line(libtask_logpath, f"FUNCTION{function_id} - error: can't execute this function from infile")
+                            print_timed_message(f"FUNCTION{function_id} error: can't execute this function from infile")
                             exit_status = 3
                             raise
 
                         try:
-                            file_write_line(libtask_logpath, f"FUNCTION{function_id} - load the result from outfile")
                             with open("outfile", "wb") as f:
                                 cloudpickle.dump(result, f)
                         except Exception:
-                            file_write_line(libtask_logpath, f"FUNCTION{function_id} - error: can't load the result from outfile")
+                            print_timed_message(f"FUNCTION{function_id} error: can't load the result from outfile")
                             exit_status = 4
                             if os.path.exits("outfile"):
                                 os.remove("outfile")
@@ -214,23 +220,20 @@ def library_network_code():
 
                         try:
                             if not result["Success"]:
-                                file_write_line(libtask_logpath, f"FUNCTION{function_id} - error: finish without a Success status")
                                 exit_status = 5
                         except Exception:
-                            file_write_line(libtask_logpath, f"FUNCTION{function_id} - error: the result is broken")
+                            print_timed_message(f"FUNCTION{function_id} error: the result is broken")
                             exit_status = 5
                             raise
 
                         # nothing failed
                         exit_status = 0
-                        file_write_line(libtask_logpath, f"FUNCTION{function_id} - finish successfully")
                     except Exception as e:
-                        file_write_line(libtask_logpath, f"FUNCTION{function_id} - error: execution failed due to {e}")
+                        print_timed_message(f"FUNCTION{function_id} error: execution failed due to {e}")
                     finally:
                         os.close(stdout_capture_fd)
                         os._exit(exit_status)
                 elif p < 0:
-                    file_write_line(libtask_logpath, f"FUNCTION{function_id} - error: unable to fork to execute {function_name}")
                     return -1
 
                 # return pid and function id of child process to parent.
@@ -246,9 +249,10 @@ def library_network_code():
         os.writev(out_pipe_fd, [buff])
         os.kill(worker_pid, signal.SIGCHLD)
 
-    def file_write_line(libtask_logpath, message):
-        with open(libtask_logpath, "a") as f:
-            f.write(f"{time.time():.7f} {message}\n")
+    # Print the message with a timestamp
+    def print_timed_message(message):
+        timestamp = datetime.now().strftime("%m/%d/%y %H:%M:%S.%f")
+        print(f"{timestamp} {message}")
 
     def main():
         ppid = os.getppid()
@@ -296,38 +300,33 @@ def library_network_code():
         )
         args = parser.parse_args()
 
-        # Open the log file, write into real-time information while the library exists
-        # This file is tagged as WATCH so that it is automatically synchronized to the manager
-        libtask_logpath = os.path.abspath(f"libtask{args.task_id}.log")
-        file_write_line(libtask_logpath, f"{time.time()} library task starts running")
-        libtask_info = f"general information:\n" + \
-                       f"    start time     : {datetime.now().strftime("%D %H:%M:%S")}\n" + \
-                       f"    hostname       : {socket.gethostname()}\n" + \
-                       f"    task id        : {args.task_id}\n" + \
-                       f"    worker pid     : {args.worker_pid}\n" + \
-                       f"    library pid    : {os.getpid()}\n" + \
-                       f"    input fd       : {args.input_fd}\n" + \
-                       f"    output fd      : {args.output_fd}\n" + \
-                       f"    library cores  : {args.library_cores}\n" + \
-                       f"    function slots : {args.function_slots}"
-        file_write_line(libtask_logpath, libtask_info)
+        print_timed_message("library task starts running")
+        print_timed_message("library description")
+        print_timed_message(f"hostname:        {socket.gethostname()}")
+        print_timed_message(f"task id:         {args.task_id}")
+        print_timed_message(f"worker pid:      {args.worker_pid}")
+        print_timed_message(f"library pid:     {os.getpid()}")
+        print_timed_message(f"input fd:        {args.input_fd}")
+        print_timed_message(f"output fd:       {args.output_fd}")
+        print_timed_message(f"library cores:   {args.library_cores}")
+        print_timed_message(f"function slots:  {args.function_slots}")
 
         # check if library cores and function slots are valid
         if args.function_slots > args.library_cores:
-            file_write_line(libtask_logpath, "error: function slots cannot be more than library cores")
+            print_timed_message("error: function slots cannot be more than library cores")
             exit(1)
         elif args.function_slots < 1:
-            file_write_line(libtask_logpath, "error: function slots cannot be less than 1")
+            print_timed_message("error: function slots cannot be less than 1")
             exit(1)
         elif args.library_cores < 1:
-            file_write_line(libtask_logpath, "error: library cores cannot be less than 1")
+            print_timed_message("error: library cores cannot be less than 1")
             exit(1)
 
         try:
             thread_limit = args.library_cores // args.function_slots
-            file_write_line(libtask_logpath, f"each thread consumes {thread_limit} cores")
+            print_timed_message(f"each thread consumes {thread_limit} cores")
         except Exception as e:
-            file_write_line(libtask_logpath, f"error: {e}")
+            print_timed_message(f"error: {e}")
             exit(1)
 
         # Open communication pipes to vine_worker.
@@ -341,10 +340,10 @@ def library_network_code():
             "name": name(),  # noqa: F821
         }
         try:
-            file_write_line(libtask_logpath, f"sending config {config} to the worker")
+            print_timed_message(f"sending config {config} to the worker")
             send_configuration(config, out_pipe_fd, args.worker_pid)
         except Exception as e:
-            file_write_line(libtask_logpath, f"error: {e}")
+            print_timed_message(f"error: {e}")
             exit(1)
 
         # mapping of child pid to function id of currently running functions
@@ -355,23 +354,30 @@ def library_network_code():
 
         # 5 seconds to wait for select, any value long enough would probably do
         timeout = 5
-        file_write_line(libtask_logpath, f"set timeout for select to {timeout} seconds")
+        print_timed_message(f"set timeout for select to {timeout} seconds")
+
+        last_check_time = time.time()
 
         while True:
             # check if parent exits
             c_ppid = os.getppid()
             if c_ppid != ppid or c_ppid == 1:
-                file_write_line(libtask_logpath, f"parent process no longer exists, exit with success")
+                print_timed_message("library exits with success")
                 exit(0)
 
             # wait for messages from worker or child to return
             rlist, wlist, xlist = select.select([in_pipe_fd, r], [], [], timeout)
 
+            # periodically log the number of concurrent functions
+            if time.time() - last_check_time > 2:
+                last_check_time = time.time()
+                print_timed_message(f"{len(pid_to_func_id)} functions running concurrently")
+
             for re in rlist:
                 # worker has a function, run it
                 if re == in_pipe_fd:
-                    file_write_line(libtask_logpath, f"received a function, start to run")
-                    pid, func_id = start_function(in_pipe_fd, thread_limit, libtask_logpath)
+                    print_timed_message("received a function from the worker")
+                    pid, func_id = start_function(in_pipe_fd, thread_limit)
                     pid_to_func_id[pid] = func_id
                 else:
                     # at least 1 child exits, reap all.
@@ -382,8 +388,7 @@ def library_network_code():
                     while len(pid_to_func_id) > 0:
                         c_pid, c_exit_status = os.waitpid(-1, os.WNOHANG)
                         if c_pid > 0:
-                            file_write_line(libtask_logpath, f"child process {c_pid} exits, " +
-                                            "send the exit status to the worker")
+                            print_timed_message(f"child process {c_pid} exits with status {c_exit_status}")
                             send_result(
                                 out_pipe_fd,
                                 args.worker_pid,
