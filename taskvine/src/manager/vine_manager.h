@@ -133,6 +133,7 @@ struct vine_manager {
 	/* Internal state modified by the manager */
 
 	int next_task_id;       /* Next integer task_id to be assigned to a created task. */
+	int duplicated_libraries;    /* The number of duplicated libraries */
 	int fixed_location_in_queue; /* Number of fixed location tasks currently being managed */
 	int num_tasks_left;    /* Optional: Number of tasks remaining, if given by user.  @ref vine_set_num_tasks */
 	int busy_waiting_flag; /* Set internally in main loop if no messages were processed -> wait longer. */
@@ -213,6 +214,8 @@ struct vine_manager {
 	int update_interval;			/* Seconds between updates to the catalog. */
 	int resource_management_interval;	/* Seconds between measurement of manager local resources. */
 	timestamp_t transient_error_interval; /* microseconds between new attempts on task rescheduling and using a file replica as source after a failure. */
+
+	int watch_library_logfiles;     /* If true, watch the output files produced by each of the library processes running on the remote workers, take them back the current logging directory */
 
 	/*todo: confirm datatype. int or int64*/
 	int max_task_stdout_storage;	/* Maximum size of standard output from task.  (If larger, send to a separate file.) */

@@ -44,7 +44,7 @@ struct vine_process {
 
 	char *sandbox;           /* The private sandbox directory to run in. */
 	char *tmpdir; 	         /* A temp dir inside the private sandbox. */
-	char *stdout_file_path;	 /* The intended standard output location. */
+	char *output_file_name;	 /* The intended standard output location. */
 	
 	/* If a normal task, the details of the task to execute. */
 	struct vine_task *task;

@@ -113,9 +113,9 @@ void work_queue_process_delete(struct work_queue_process *p)
 		close(p->output_fd);
 	}
 
-	if(p->stdout_file_path) {
-		trash_file(p->stdout_file_path);
-		free(p->stdout_file_path);
+	if(p->output_file_name) {
+		trash_file(p->output_file_name);
+		free(p->output_file_name);
 	}
 
 	if(p->sandbox) {
@@ -229,8 +229,8 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 
 	fflush(NULL);		/* why is this necessary? */
 
-	p->stdout_file_path = strdup(task_output_template);
-	p->output_fd = mkstemp(p->stdout_file_path);
+	p->output_file_name = strdup(task_output_template);
+	p->output_fd = mkstemp(p->output_file_name);
 	if(p->output_fd == -1) {
 		debug(D_WQ, "Could not open worker stdout: %s", strerror(errno));
 		return 0;
@@ -260,7 +260,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 	} else if(p->pid < 0) {
 
 		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
-		unlink(p->stdout_file_path);
+		unlink(p->output_file_name);
 		close(p->output_fd);
 		return p->pid;
 

@@ -87,8 +87,8 @@ struct vine_process *vine_process_create(struct vine_task *task, vine_process_ty
 	const char *dirtype = vine_process_sandbox_code(p->type);
 
 	p->sandbox = string_format("%s/%s.%d", workspace->workspace_dir, dirtype, p->task->task_id);
-	p->tmpdir = string_format("%s/.task%d.tmp", p->sandbox, p->task->task_id);
-	p->stdout_file_path = string_format("%s/.task%d.stdout", p->sandbox, p->task->task_id);
+	p->tmpdir = string_format("%s/.taskvine.tmp", p->sandbox);
+	p->output_file_name = string_format("%s/.taskvine.stdout", p->sandbox);
 
 	p->functions_running = 0;
 	p->library_ready = 0;
@@ -108,8 +108,8 @@ void vine_process_delete(struct vine_process *p)
 	if (p->task)
 		vine_task_delete(p->task);
 
-	if (p->stdout_file_path) {
-		free(p->stdout_file_path);
+	if (p->output_file_name) {
+		free(p->output_file_name);
 	}
 
 	if (p->library_read_link)
@@ -244,7 +244,7 @@ int vine_process_execute_and_wait(struct vine_process *p)
 int vine_process_invoke_function(struct vine_process *p)
 {
 	char *buffer = string_format(
-			"%d %s %s %s", p->task->task_id, p->task->command_line, p->sandbox, p->stdout_file_path);
+			"%d %s %s %s", p->task->task_id, p->task->command_line, p->sandbox, p->output_file_name);
 	ssize_t result = link_printf(p->library_process->library_write_link,
 			time(0) + options->active_timeout,
 			"%ld\n%s",
@@ -292,9 +292,9 @@ int vine_process_execute(struct vine_process *p)
 	/* Various file descriptors for communication between parent and child */
 	int pipe_in[2] = {-1, -1};
 	int pipe_out[2] = {-1, -1};
-	int input_fd = -1;
-	int output_fd = -1;
-	int error_fd = -1;
+	int stdin_fd = -1;
+	int stdout_fd = -1;
+	int stderr_fd = -1;
 	int in_pipe_fd = -1;  // only for library task, fd to send functions to library
 	int out_pipe_fd = -1; // only for library task, fd to receive results from library
 
@@ -310,13 +310,13 @@ int vine_process_execute(struct vine_process *p)
 	}
 
 	/* Read input from null and send output to assigned file. */
-	input_fd = open("/dev/null", O_RDONLY);
-	output_fd = open(p->stdout_file_path, O_WRONLY | O_TRUNC | O_CREAT, 0777);
-	if (output_fd < 0) {
+	stdin_fd = open("/dev/null", O_RDONLY);
+	stdout_fd = open(p->output_file_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
+	if (stdout_fd < 0) {
 		debug(D_VINE, "Could not open worker stdout: %s", strerror(errno));
 		return 0;
 	}
-	error_fd = output_fd;
+	stderr_fd = stdout_fd;
 
 	/* Start the performance clock just prior to forking the task. */
 	p->execution_start = timestamp_get();
@@ -340,9 +340,9 @@ int vine_process_execute(struct vine_process *p)
 			close(pipe_in[0]);
 			close(pipe_out[1]);
 		}
-		/* Drop the fds unused by the parent, error_fd is output_fd so close once. */
-		close(input_fd);
-		close(output_fd);
+		/* Drop the fds unused by the parent, stderr_fd is stdout_fd so close once. */
+		close(stdin_fd);
+		close(stdout_fd);
 
 		return 1;
 
@@ -354,9 +354,9 @@ int vine_process_execute(struct vine_process *p)
 		close(pipe_in[1]);
 		close(pipe_out[0]);
 		close(pipe_out[1]);
-		close(input_fd);
-		close(output_fd);
-		close(error_fd);
+		close(stdin_fd);
+		close(stdout_fd);
+		close(stderr_fd);
 
 		return 0;
 
@@ -365,22 +365,22 @@ int vine_process_execute(struct vine_process *p)
 			printf("The sandbox dir is %s", p->sandbox);
 			fatal("could not change directory into %s: %s", p->sandbox, strerror(errno));
 		}
-		int result = dup2(input_fd, STDIN_FILENO);
+		int result = dup2(stdin_fd, STDIN_FILENO);
 		if (result < 0)
 			fatal("could not dup input to stdin: %s", strerror(errno));
 
-		result = dup2(output_fd, STDOUT_FILENO);
+		result = dup2(stdout_fd, STDOUT_FILENO);
 		if (result < 0)
 			fatal("could not dup output to stdout: %s", strerror(errno));
 
-		result = dup2(error_fd, STDERR_FILENO);
+		result = dup2(stderr_fd, STDERR_FILENO);
 		if (result < 0)
 			fatal("could not dup error to stderr: %s", strerror(errno));
 
 		/* Close redundant file descriptors after dup()'ing.
-		 * Note that output_fd is the same as error_fd so it's only closed once. */
-		close(input_fd);
-		close(output_fd); // no need to close error_fd.
+		 * Note that stdout_fd is the same as stderr_fd so it's only closed once */
+		close(stdin_fd);
+		close(stdout_fd); /* No need to close stderr_fd */
 
 		/* For a library task, close the unused sides of the pipes. */
 		if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
@@ -404,7 +404,7 @@ int vine_process_execute(struct vine_process *p)
 			execl("/bin/sh", "sh", "-c", p->task->command_line, (char *)0);
 		} else {
 			char *final_command = string_format(
-					"%s --input-fd %d --output-fd %d --task-id %d --library-cores %d --function-slots %d --worker-pid %d",
+					"%s --in-pipe-fd %d --out-pipe-fd %d --task-id %d --library-cores %d --function-slots %d --worker-pid %d",
 					p->task->command_line,
 					in_pipe_fd,
 					out_pipe_fd,

@@ -122,7 +122,7 @@ def library_network_code():
                 function_id,
                 function_name,
                 function_sandbox,
-                function_stdout_file
+                function_stdout_filename
             ) = line.split(" ", maxsplit=3)
         except Exception as e:
             print_timed_message(f"error: not enough values to unpack from {line} (expected 4 items), exception: {e}")
@@ -148,7 +148,6 @@ def library_network_code():
                     os.chdir(function_sandbox)
 
                     # parameters are represented as infile.
-                    os.chdir(function_sandbox)
                     with open("infile", "rb") as f:
                         event = cloudpickle.load(f)
 
@@ -177,42 +176,52 @@ def library_network_code():
                 finally:
                     os.chdir(library_sandbox)
             else:
-                print_timed_message("forking a process to execute this function")
                 p = os.fork()
                 if p == 0:
                     try:
-                        # setup stdout/err for a function call so we can capture them.
-                        # redirect the stdout of a specific FunctionCall task into its stdout file
-                        stdout_capture_fd = os.open(
-                            function_stdout_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-                        )
-                        os.dup2(stdout_capture_fd, sys.stdout.fileno())
-                        os.dup2(stdout_capture_fd, sys.stderr.fileno())
+                        print_timed_message(f"TASK {function_id} function {function_name} arrives, starts running in process {os.getpid()}")
+                        # change the working directory to the function's sandbox
                         os.chdir(function_sandbox)
 
-                        exit_status = 1
-
                         try:
+                            exit_status = 1
                             # parameters are represented as infile.
                             with open("infile", "rb") as f:
                                 event = cloudpickle.load(f)
                         except Exception:
-                            print_timed_message(f"FUNCTION{function_id} error: can't load the arguments from infile")
+                            print_timed_message(f"TASK {function_id} error: can't load the arguments from infile")
                             exit_status = 2
                             raise
 
                         try:
+                            # setup stdout/err for a function call so we can capture them.
+                            function_stdout_fd = os.open(
+                                function_stdout_filename, os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+                            )
+                            # store the library's stdout fd
+                            library_fd = os.dup(sys.stdout.fileno())
+
+                            # only redirect the stdout of a specific FunctionCall task into its own stdout fd,
+                            # otherwise use the library's stdout
+                            os.dup2(function_stdout_fd, sys.stdout.fileno())
+                            os.dup2(function_stdout_fd, sys.stderr.fileno())
                             result = globals()[function_name](event)
+
+                            # restore to the library's stdout fd on completion
+                            os.dup2(library_fd, sys.stdout.fileno())
                         except Exception:
-                            print_timed_message(f"FUNCTION{function_id} error: can't execute this function from infile")
+                            print_timed_message(f"TASK {function_id} error: can't execute this function from infile")
                             exit_status = 3
                             raise
+                        finally:
+                            if function_stdout_fd in locals():
+                                os.close(function_stdout_fd)
 
                         try:
                             with open("outfile", "wb") as f:
                                 cloudpickle.dump(result, f)
                         except Exception:
-                            print_timed_message(f"FUNCTION{function_id} error: can't load the result from outfile")
+                            print_timed_message(f"TASK {function_id} error: can't load the result from outfile")
                             exit_status = 4
                             if os.path.exits("outfile"):
                                 os.remove("outfile")
@@ -222,18 +231,19 @@ def library_network_code():
                             if not result["Success"]:
                                 exit_status = 5
                         except Exception:
-                            print_timed_message(f"FUNCTION{function_id} error: the result is broken")
+                            print_timed_message(f"TASK {function_id} error: the result is broken")
                             exit_status = 5
                             raise
 
                         # nothing failed
+                        print_timed_message(f"TASK {function_id} finished successfully")
                         exit_status = 0
                     except Exception as e:
-                        print_timed_message(f"FUNCTION{function_id} error: execution failed due to {e}")
+                        print_timed_message(f"TASK {function_id} error: execution failed due to {e}")
                     finally:
-                        os.close(stdout_capture_fd)
                         os._exit(exit_status)
                 elif p < 0:
+                    print(f"TASK {function_id} error: unable to fork to execute {function_name}")
                     return -1
 
                 # return pid and function id of child process to parent.
@@ -252,7 +262,7 @@ def library_network_code():
     # Print the message with a timestamp
     def print_timed_message(message):
         timestamp = datetime.now().strftime("%m/%d/%y %H:%M:%S.%f")
-        print(f"{timestamp} {message}")
+        os.write(sys.stdout.fileno(), f"{timestamp} {message}\n".encode())
 
     def main():
         ppid = os.getppid()
@@ -260,13 +270,13 @@ def library_network_code():
             "Parse input and output file descriptors this process should use. The relevant fds should already be prepared by the vine_worker."
         )
         parser.add_argument(
-            "--input-fd",
+            "--in-pipe-fd",
             required=True,
             type=int,
             help="input fd to receive messages from the vine_worker via a pipe",
         )
         parser.add_argument(
-            "--output-fd",
+            "--out-pipe-fd",
             required=True,
             type=int,
             help="output fd to send messages to the vine_worker via a pipe",
@@ -300,17 +310,6 @@ def library_network_code():
         )
         args = parser.parse_args()
 
-        print_timed_message("library task starts running")
-        print_timed_message("library description")
-        print_timed_message(f"hostname:        {socket.gethostname()}")
-        print_timed_message(f"task id:         {args.task_id}")
-        print_timed_message(f"worker pid:      {args.worker_pid}")
-        print_timed_message(f"library pid:     {os.getpid()}")
-        print_timed_message(f"input fd:        {args.input_fd}")
-        print_timed_message(f"output fd:       {args.output_fd}")
-        print_timed_message(f"library cores:   {args.library_cores}")
-        print_timed_message(f"function slots:  {args.function_slots}")
-
         # check if library cores and function slots are valid
         if args.function_slots > args.library_cores:
             print_timed_message("error: function slots cannot be more than library cores")
@@ -324,23 +323,33 @@ def library_network_code():
 
         try:
             thread_limit = args.library_cores // args.function_slots
-            print_timed_message(f"each thread consumes {thread_limit} cores")
         except Exception as e:
             print_timed_message(f"error: {e}")
             exit(1)
 
+        print_timed_message("library task starts running")
+        print_timed_message("library description")
+        print_timed_message(f"hostname:        {socket.gethostname()}")
+        print_timed_message(f"task id:         {args.task_id}")
+        print_timed_message(f"worker pid:      {args.worker_pid}")
+        print_timed_message(f"library pid:     {os.getpid()}")
+        print_timed_message(f"input fd:        {args.in_pipe_fd}")
+        print_timed_message(f"output fd:       {args.out_pipe_fd}")
+        print_timed_message(f"library cores:   {args.library_cores}")
+        print_timed_message(f"function slots:  {args.function_slots}")
+        print_timed_message(f"thread limit:    {thread_limit}")
+
         # Open communication pipes to vine_worker.
         # The file descriptors are inherited from the vine_worker parent process
         # and should already be open for reads and writes.
-        in_pipe_fd = args.input_fd
-        out_pipe_fd = args.output_fd
+        in_pipe_fd = args.in_pipe_fd
+        out_pipe_fd = args.out_pipe_fd
 
         # send configuration of library, just its name for now
         config = {
             "name": name(),  # noqa: F821
         }
         try:
-            print_timed_message(f"sending config {config} to the worker")
             send_configuration(config, out_pipe_fd, args.worker_pid)
         except Exception as e:
             print_timed_message(f"error: {e}")
@@ -354,7 +363,6 @@ def library_network_code():
 
         # 5 seconds to wait for select, any value long enough would probably do
         timeout = 5
-        print_timed_message(f"set timeout for select to {timeout} seconds")
 
         last_check_time = time.time()
 
@@ -362,21 +370,20 @@ def library_network_code():
             # check if parent exits
             c_ppid = os.getppid()
             if c_ppid != ppid or c_ppid == 1:
-                print_timed_message("library exits with success")
+                print_timed_message("library finished successfully")
                 exit(0)
 
             # wait for messages from worker or child to return
             rlist, wlist, xlist = select.select([in_pipe_fd, r], [], [], timeout)
 
             # periodically log the number of concurrent functions
-            if time.time() - last_check_time > 2:
+            if time.time() - last_check_time > 5:
                 last_check_time = time.time()
                 print_timed_message(f"{len(pid_to_func_id)} functions running concurrently")
 
             for re in rlist:
                 # worker has a function, run it
                 if re == in_pipe_fd:
-                    print_timed_message("received a function from the worker")
                     pid, func_id = start_function(in_pipe_fd, thread_limit)
                     pid_to_func_id[pid] = func_id
                 else:
@@ -388,7 +395,6 @@ def library_network_code():
                     while len(pid_to_func_id) > 0:
                         c_pid, c_exit_status = os.waitpid(-1, os.WNOHANG)
                         if c_pid > 0:
-                            print_timed_message(f"child process {c_pid} exits with status {c_exit_status}")
                             send_result(
                                 out_pipe_fd,
                                 args.worker_pid,

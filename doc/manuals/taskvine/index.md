@@ -2503,6 +2503,8 @@ change.
 | transient-error-interval | Time to wait in seconds after a resource failure before attempting to use it again | 15 |
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
 | worker-retrievals | If 1, retrieve all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |
+| watch-library-logfiles | If 1, watch the output files produced by each of the library processes running on the remote workers, take 
+them back the current logging directory. | 0 |
 
 === "Python"
     ```python

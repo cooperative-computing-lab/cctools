@@ -1288,6 +1288,7 @@ void vine_set_manager_preferred_connection(struct vine_manager *m, const char *p
  - "max_new_workers" Maximum number of workers to add in a single cycle before dealing with other matters. (default=10)
  - "large_task_check_interval" How frequently to check for tasks that do not fit any worker. (default=180000000)
  - "option_blocklist_slow_workers_timeout" Timeout for slow workers to come back to the pool. (default=900)
+ - "watch-library-logfiles" If 1, watch the output files produced by each of the library processes running on the remote workers, take them back the current logging directory. (default=0)
 @param value The value to set the parameter to.
 @return 0 on succes, -1 on failure.
 */

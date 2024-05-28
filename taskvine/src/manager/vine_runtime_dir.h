@@ -26,7 +26,7 @@ char *vine_get_runtime_path_log(struct vine_manager *m, const char *path);
 char *vine_get_runtime_path_staging(struct vine_manager *m, const char *path);
 
 /* Returns path relative to the library output runtime directory */
-char *vine_get_runtime_path_library_stdout(struct vine_manager *m, const char *path);
+char *vine_get_path_library_log(struct vine_manager *m, const char *path);
 
 /* Returns path relative to the cache runtime directory */
 char *vine_get_runtime_path_caching(struct vine_manager *m, const char *path);

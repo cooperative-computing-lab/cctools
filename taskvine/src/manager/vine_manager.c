@@ -3739,6 +3739,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->uuid = strdup(local_uuid.str);
 
 	q->next_task_id = 1;
+	q->duplicated_libraries = 0;
 	q->fixed_location_in_queue = 0;
 
 	q->ready_list = list_create();
@@ -4558,16 +4559,26 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	struct vine_task *t = vine_task_copy(original);
 	t->type = VINE_TASK_TYPE_LIBRARY_INSTANCE;
 
+	/* Track the number of duplicated libraries */
+	q->duplicated_libraries += 1;
+
 	/* Give it a unique taskid if library fits the worker. */
 	t->task_id = q->next_task_id++;
 
-	/* Watch the output file of every duplicated library instance */
-	char *remote_stdout_filename = string_format(".task%d.stdout", t->task_id);
-	char *local_stdout_filename = string_format("task%d.stdout", t->task_id);
-	char *local_library_stdout_path = vine_get_runtime_path_library_stdout(q, local_stdout_filename);
-	struct vine_file *library_local_stdout_file =
-			vine_declare_file(q, local_library_stdout_path, VINE_CACHE_LEVEL_TASK, 0);
-	vine_task_add_output(t, library_local_stdout_file, remote_stdout_filename, VINE_WATCH);
+	/* If watch-library-logfiles is tuned, watch the output file of every duplicated library instance */
+	if (q->watch_library_logfiles) {
+		char *remote_stdout_filename = string_format(".taskvine.stdout");
+		char *local_library_log_filename = string_format("library-%d.debug.log", q->duplicated_libraries);
+		char *library_log_path = vine_get_path_library_log(q, local_library_log_filename);
+
+		struct vine_file *library_local_stdout_file =
+				vine_declare_file(q, library_log_path, VINE_CACHE_LEVEL_TASK, 0);
+		vine_task_add_output(t, library_local_stdout_file, remote_stdout_filename, VINE_WATCH);
+
+		free(remote_stdout_filename);
+		free(local_library_log_filename);
+		free(library_log_path);
+	}
 
 	/* Add reference to task when adding it to primary table. */
 	itable_insert(q->tasks, t->task_id, vine_task_addref(t));
@@ -5423,6 +5434,8 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "option-blocklist-slow-workers-timeout")) {
 		q->option_blocklist_slow_workers_timeout = MAX(0, value); /*todo: confirm 0 or 1*/
 
+	} else if (!strcmp(name, "watch-library-logfiles")) {
+		q->watch_library_logfiles = !!((int)value);
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
