@@ -351,4 +351,14 @@ struct vine_file *vine_file_chirp(const char *server, const char *source, struct
 	return vine_file_mini_task(t, "output.chirp", cache, flags);
 }
 
+vine_file_type_t vine_file_type(struct vine_file *f)
+{
+	return f->type;
+}
+
+const char *vine_file_source(struct vine_file *f)
+{
+	return f->source;
+}
+
 /* vim: set noexpandtab tabstop=8: */
