@@ -1367,6 +1367,25 @@ void vine_counters_print();
  */
 char *vine_version_string();
 
+/** Returns path relative to the logs runtime directory
+@param m Reference to the current manager object.
+@return A string.
+*/
+char *vine_get_path_log(struct vine_manager *m, const char *path);
+
+/** Returns path relative to the staging runtime directory
+@param m Reference to the current manager object.
+@return A string.
+*/
+char *vine_get_path_staging(struct vine_manager *m, const char *path);
+
+/** Returns path relative to the cache runtime directory
+@param m Reference to the current manager object.
+@return A string.
+*/
+char *vine_get_path_cache(struct vine_manager *m, const char *path);
+
+
 //@}
 
 #endif
