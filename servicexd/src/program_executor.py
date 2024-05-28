@@ -10,8 +10,8 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
                     stop_event):
     command = config['command']
 
-    log_file = os.path.join(working_dir, config['log_file'])
-    error_file = os.path.join(working_dir, config['error_file'])
+    stdout_path = os.path.join(working_dir, config['stdout_path'])
+    stderr_path = os.path.join(working_dir, config['stderr_path'])
 
     dependencies = config.get('dependency', {}).get('items', {})
     dependency_mode = config.get('dependency', {}).get('mode', 'all')
@@ -40,15 +40,15 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
 
     log_thread = threading.Thread(target=monitor_log_file,
                                   args=(
-                                      log_file, state_dict, service_name, state_keywords, cond, state_times,
+                                      stdout_path, state_dict, service_name, state_keywords, cond, state_times,
                                       start_time, stop_event))
     log_thread.start()
 
     local_state_times = {'start': time.time() - start_time}
     state_times[service_name] = local_state_times
 
-    with open(log_file, 'w') as log, open(error_file, 'w') as err:
-        process = subprocess.Popen(command, shell=True, cwd=working_dir, stdout=log, stderr=err, preexec_fn=os.setsid)
+    with open(stdout_path, 'w') as out, open(stderr_path, 'w') as err:
+        process = subprocess.Popen(command, shell=True, cwd=working_dir, stdout=out, stderr=err, preexec_fn=os.setsid)
 
         pgid_dict[service_name] = os.getpgid(process.pid)
         process.wait()

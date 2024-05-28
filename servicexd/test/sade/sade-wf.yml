@@ -2,8 +2,8 @@ services:
   reserve_port:
     type: "action"
     command: "python3 /tmp/sade/reserve_ports.py /home/user/Firmware/build/px4_sitl_default/etc/init.d-posix/ports.config 8 4600 simulator,gcs_local,gcs_remote,offboard_local,onboard_payload_local,onboard_gimbal_local,typhoon_offboard_local,gazebo_master"
-    log_file: "/tmp/log/reserve_ports.log"
-    error_file: "/tmp/log/reserve_ports_error.log"
+    stdout_path: "/tmp/log/reserve_ports.log"
+    stderr_path: "/tmp/log/reserve_ports_error.log"
     state:
       log:
         complete: "ports and their PIDs written to"
@@ -11,15 +11,15 @@ services:
   chmod_port_config:
     type: "action"
     command: "chmod +x /home/user/Firmware/build/px4_sitl_default/etc/init.d-posix/ports.config"
-    log_file: "/tmp/log/chmod_port_config.log"
-    error_file: "/tmp/log/chmod_port_config_error.log"
+    stdout_path: "/tmp/log/chmod_port_config.log"
+    stderr_path: "/tmp/log/chmod_port_config_error.log"
     depends_on:
       reserve_port: "final"
 
   copy_ports_config:
     command: "cp /home/user/Firmware/build/px4_sitl_default/etc/init.d-posix/ports.config /tmp/log/ports.config"
-    log_file: "/tmp/log/copy_ports_config.log"
-    error_file: "/tmp/log/copy_ports_config_error.log"
+    stdout_path: "/tmp/log/copy_ports_config.log"
+    stderr_path: "/tmp/log/copy_ports_config_error.log"
     monitor_log: false
     depends_on:
       chmod_port_config: "final"
@@ -27,8 +27,8 @@ services:
   gazebo_server:
     type: "service"
     command: "/tmp/sade/start_gazebo_server.sh"
-    log_file: "/tmp/log/gazebo_server.log"
-    error_file: "/tmp/log/gazebo_server_error.log"
+    stdout_path: "/tmp/log/gazebo_server.log"
+    stderr_path: "/tmp/log/gazebo_server_error.log"
     state:
       log:
         ready: "Connected to gazebo master"
@@ -38,8 +38,8 @@ services:
   px4_instance_0:
     type: "service"
     command: "/tmp/sade/start_px4_instance.sh 0"
-    log_file: "/tmp/log/px4_0.log"
-    error_file: "/tmp/log/px4_0_error.log"
+    stdout_path: "/tmp/log/px4_0.log"
+    stderr_path: "/tmp/log/px4_0_error.log"
     state:
       log:
         waiting_for_simulator: "Waiting for simulator to accept connection"
@@ -50,16 +50,16 @@ services:
   spawn_model_0:
     type: "service"
     command: "/tmp/sade/spawn_model.sh 0"
-    log_file: "/tmp/log/spawn_model_0.log"
-    error_file: "/tmp/log/spawn_model_0_error.log"
+    stdout_path: "/tmp/log/spawn_model_0.log"
+    stderr_path: "/tmp/log/spawn_model_0_error.log"
     depends_on:
       px4_instance_0: "waiting_for_simulator"
 
   pose_sender:
     type: "service"
     command: "/tmp/sade/start_pose_sender.sh"
-    log_file: "/tmp/log/pose_sender.log"
-    error_file: "/tmp/log/pose_sender_error.log"
+    stdout_path: "/tmp/log/pose_sender.log"
+    stderr_path: "/tmp/log/pose_sender_error.log"
     depends_on:
       px4_instance_0: "ready"
 

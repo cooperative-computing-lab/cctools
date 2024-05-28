@@ -1,3 +1,5 @@
+import os
+
 import yaml
 
 
@@ -11,14 +13,20 @@ def load_and_preprocess_config(filepath):
 
 
 def preprocess_config(config):
-    """Automatically fills in missing log_file and error_file paths."""
+    """Automatically fills in missing stdout_path and stderr_path paths."""
     services = config.get('services', {})
+    log_dir = config.get('output', {}).get('log_dir', '')
+
     for service_name, details in services.items():
         # Auto-fill log and error files if not specified
-        if 'log_file' not in details:
-            details['log_file'] = f"{service_name}_stdout.log"
-        if 'error_file' not in details:
-            details['error_file'] = f"{service_name}_stderr.log"
+        if 'stdout_path' not in details:
+            details['stdout_path'] = f"{service_name}_stdout.log"
+        if 'stderr_path' not in details:
+            details['stderr_path'] = f"{service_name}_stderr.log"
+
+        if log_dir:
+            details['stdout_path'] = os.path.join(log_dir, details['stdout_path'])
+            details['stderr_path'] = os.path.join(log_dir, details['stderr_path'])
 
 
 def validate_and_sort_programs(config):
@@ -34,8 +42,8 @@ def validate_and_sort_programs(config):
     for service, details in services.items():
         if 'command' not in details:
             raise ValueError(f"Program {service} is missing the 'command' key")
-        if 'log_file' not in details:
-            raise ValueError(f"Program {service} is missing the 'log_file' key")
+        if 'stdout_path' not in details:
+            raise ValueError(f"Program {service} is missing the 'stdout_path' key")
 
     sorted_services = topological_sort(services)
     print(f"DEBUG: Sorted services: {sorted_services}")
