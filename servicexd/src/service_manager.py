@@ -6,7 +6,7 @@ import sys
 import threading
 import time
 from multiprocessing import Manager, Condition, Process
-from config_loader import load_config_from_yaml, validate_and_sort_programs
+from config_loader import load_and_preprocess_config, validate_and_sort_programs
 from program_executor import execute_program
 
 
@@ -25,7 +25,7 @@ def save_state_times(state_times, output_file):
 class ServiceManager:
     def __init__(self, config_path):
         print("DEBUG: Initializing ServiceManager")
-        self.config = load_config_from_yaml(config_path)
+        self.config = load_and_preprocess_config(config_path)
         self.services = self.config['services']
         self.sorted_services = validate_and_sort_programs(self.config)
         self.working_dir = os.path.dirname(os.path.abspath(config_path))

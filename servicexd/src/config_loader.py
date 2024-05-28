@@ -1,11 +1,24 @@
 import yaml
 
 
-def load_config_from_yaml(path):
-    with open(path, 'r') as f:
-        config = yaml.safe_load(f)
-        print(f"DEBUG: Loaded config from {path}")
-        return config
+def load_and_preprocess_config(filepath):
+    """Loads and preprocesses configuration from a YAML file."""
+    with open(filepath, 'r') as file:
+        config = yaml.safe_load(file)
+    preprocess_config(config)  # Preprocess to auto-fill log and error file paths
+    print(f"DEBUG: Loaded and preprocessed config from {filepath}")
+    return config
+
+
+def preprocess_config(config):
+    """Automatically fills in missing log_file and error_file paths."""
+    services = config.get('services', {})
+    for service_name, details in services.items():
+        # Auto-fill log and error files if not specified
+        if 'log_file' not in details:
+            details['log_file'] = f"{service_name}_stdout.log"
+        if 'error_file' not in details:
+            details['error_file'] = f"{service_name}_stderr.log"
 
 
 def validate_and_sort_programs(config):

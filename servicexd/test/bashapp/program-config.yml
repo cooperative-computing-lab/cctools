@@ -2,14 +2,10 @@ services:
   reserve_port:
     type: "action"
     command: "python reserve_ports.py 4 ports.config"
-    log_file: "reserve_ports.log"
-    error_file: "reserve_ports_error.log"
 
   program1:
     type: "action"
     command: "./program1.sh"
-    log_file: "program1.log"
-    error_file: "program1_error.log"
     state:
       log:
         ready: "program is ready"
@@ -21,8 +17,6 @@ services:
   program2:
     type: "service"
     command: "./program2.sh"
-    log_file: "program2.log"
-    error_file: "program2_error.log"
     state:
       log:
         ready: "program is ready"
@@ -36,8 +30,6 @@ services:
   program3:
     type: "service"
     command: "./program3.sh"
-    log_file: "program3.log"
-    error_file: "program3_error.log"
     state:
       log:
         ready: "program is ready"
