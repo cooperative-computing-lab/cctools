@@ -327,7 +327,7 @@ def library_network_code():
             print_timed_message(f"error: {e}")
             exit(1)
 
-        print_timed_message("library task starts running")
+        print_timed_message(f"library task starts running in process {os.getpid()}")
         print_timed_message("library description")
         print_timed_message(f"hostname:        {socket.gethostname()}")
         print_timed_message(f"task id:         {args.task_id}")
