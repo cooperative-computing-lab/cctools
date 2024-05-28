@@ -1,5 +1,3 @@
-import sys
-
 import yaml
 
 
@@ -33,7 +31,8 @@ def validate_and_sort_programs(config):
 
 def topological_sort(programs):
     print("DEBUG: Performing topological sort")
-    graph = {program: details.get('depends_on', {}) for program, details in programs.items()}
+
+    graph = {program: details.get('dependency', {}).get('items', {}) for program, details in programs.items()}
 
     visited = set()
     visiting = set()

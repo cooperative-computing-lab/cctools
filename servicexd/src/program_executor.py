@@ -13,15 +13,30 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
     log_file = os.path.join(working_dir, config['log_file'])
     error_file = os.path.join(working_dir, config['error_file'])
 
-    dependencies = config.get('depends_on', {})
-    state_keywords = config.get('state', {}).get('log', {})  # todo: refactor -> state can come from other places too
+    dependencies = config.get('dependency', {}).get('items', {})
+    dependency_mode = config.get('dependency', {}).get('mode', 'all')
 
     with cond:
-        for dependency, state in dependencies.items():
-            while state_dict.get(dependency) != state:
-                cond.wait()
+        if dependency_mode == 'all':
+            for dep_service, required_state in dependencies.items():
+                while state_dict.get(dep_service) != required_state:
+                    cond.wait()
+
+        elif dependency_mode == 'any':
+            satisfied = False
+
+            while not satisfied and not stop_event.is_set():
+                for dep_service, required_state in dependencies.items():
+                    if state_dict.get(dep_service) == required_state:
+                        satisfied = True
+                        break
+
+                if not satisfied:
+                    cond.wait()
 
     print(f"DEBUG: Starting execution of {service_name}")
+
+    state_keywords = config.get('state', {}).get('log', {})
 
     log_thread = threading.Thread(target=monitor_log_file,
                                   args=(
@@ -43,6 +58,9 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
         local_state_times = state_times[service_name]
         local_state_times['final'] = time.time() - start_time
         state_times[service_name] = local_state_times
+
+        print(f"DEBUG: {service_name} reached state 'final' at {local_state_times['final']}")
+
         cond.notify_all()
 
     log_thread.join()

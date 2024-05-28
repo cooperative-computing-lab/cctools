@@ -1,4 +1,3 @@
-
 services:
   reserve_port:
     type: "action"
@@ -15,8 +14,9 @@ services:
       log:
         ready: "program is ready"
         complete: "program is completed"
-    depends_on:
-      program2: "ready"
+    dependency:
+      items:
+        program2: "ready"
 
   program2:
     type: "service"
@@ -27,22 +27,26 @@ services:
       log:
         ready: "program is ready"
         complete: "program is completed"
-    depends_on:
-      reserve_port: "final"
+    dependency:
+      mode: "all"
+      items:
+        reserve_port: "final"
+        program3: "final"
 
-  program2-1:
+  program3:
     type: "service"
-    command: "./program2.sh"
-    log_file: "program2_1.log"
-    error_file: "program2_1_error.log"
+    command: "./program3.sh"
+    log_file: "program3.log"
+    error_file: "program3_error.log"
     state:
       log:
         ready: "program is ready"
         complete: "program is completed"
-    depends_on:
-      reserve_port: "final"
+    dependency:
+      items:
+        reserve_port: "final"
 
 output:
   state_times: "state_times.json"
-stop_signal: "/Users/saiful/CCL/cctools/servicexd/test/stop.txt"
+stop_signal: "/tmp/bashapp/stop"
 max_run_time: 120

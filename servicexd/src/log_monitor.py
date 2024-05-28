@@ -38,13 +38,13 @@ def monitor_log_file(log_path, state_dict, service_name, state_keywords, cond, s
                         state_times[service_name] = local_state_times
                         cond.notify_all()
 
-                        print(f"DEBUG: {service_name} reached state {state} at {current_time}")
+                        print(f"DEBUG: {service_name} reached state '{state}' at {current_time}")
 
                         if state == final_state:
                             reached_final_state = True
                             break
 
             if reached_final_state:
-                print(f"DEBUG: Reached final state {final_state} for {service_name}")
                 break
+
     print(f"DEBUG: Finished monitoring log file for {service_name}")
