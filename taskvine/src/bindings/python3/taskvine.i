@@ -22,6 +22,7 @@ long long int is guaranteed to be at least 64bit. */
 %newobject vine_get_status;
 %newobject vine_get_runtime_path_staging;
 %newobject vine_get_runtime_path_caching;
+%newobject vine_version_string;
 
 /* These return pointers to lists defined in list.h. We aren't
  * wrapping methods in list.h and so ignore these. */

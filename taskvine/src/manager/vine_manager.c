@@ -6089,4 +6089,9 @@ void vine_log_txn_app(struct vine_manager *m, const char *entry)
 	vine_txn_log_write_app_entry(m, entry);
 }
 
+char *vine_version_string()
+{
+	return cctools_version_string();
+}
+
 /* vim: set noexpandtab tabstop=8: */

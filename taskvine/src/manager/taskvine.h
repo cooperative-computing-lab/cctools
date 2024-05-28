@@ -1362,6 +1362,11 @@ void vine_log_txn_app(struct vine_manager *q, const char *entry);
 
 void vine_counters_print();
 
+/** Return a string with the current version of taskvine.
+@return A string.
+ */
+char *vine_version_string();
+
 //@}
 
 #endif
