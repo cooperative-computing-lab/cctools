@@ -7,15 +7,18 @@ def load_and_preprocess_config(filepath):
     """Loads and preprocesses configuration from a YAML file."""
     with open(filepath, 'r') as file:
         config = yaml.safe_load(file)
-    preprocess_config(config)  # Preprocess to auto-fill log and error file paths
+
+    preprocess_config(config, filepath)
+
     print(f"DEBUG: Loaded and preprocessed config from {filepath}")
     return config
 
 
-def preprocess_config(config):
+def preprocess_config(config, config_path):
     """Automatically fills in missing stdout_path and stderr_path paths."""
     services = config.get('services', {})
-    log_dir = config.get('output', {}).get('log_dir', '')
+    stdout_dir = config.get('output', {}).get('stdout_dir', '')
+    working_dir = os.path.dirname(os.path.abspath(config_path))
 
     for service_name, details in services.items():
         # Auto-fill log and error files if not specified
@@ -24,9 +27,14 @@ def preprocess_config(config):
         if 'stderr_path' not in details:
             details['stderr_path'] = f"{service_name}_stderr.log"
 
-        if log_dir:
-            details['stdout_path'] = os.path.join(log_dir, details['stdout_path'])
-            details['stderr_path'] = os.path.join(log_dir, details['stderr_path'])
+        if stdout_dir:
+            details['stdout_path'] = os.path.join(stdout_dir, details['stdout_path'])
+            details['stderr_path'] = os.path.join(stdout_dir, details['stderr_path'])
+
+        state_file_path = details.get('state', {}).get('file', {}).get('path', "")
+
+        if state_file_path:
+            details['state']['file']['path'] = os.path.join(working_dir, state_file_path)
 
 
 def validate_and_sort_programs(config):

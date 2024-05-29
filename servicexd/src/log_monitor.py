@@ -3,7 +3,7 @@ import os
 
 
 def monitor_log_file(log_path, state_dict, service_name, state_keywords, cond, state_times, start_time, stop_event):
-    print(f"DEBUG: Starting to monitor log file for {service_name}")
+    print(f"DEBUG: Starting to monitor file '{log_path}' for {service_name}")
 
     if not state_keywords:
         print(f"DEBUG: No state keywords for {service_name}, exiting monitor")
@@ -29,6 +29,8 @@ def monitor_log_file(log_path, state_dict, service_name, state_keywords, cond, s
 
             reached_final_state = False
 
+
+
             for state in state_keywords:
                 if state_keywords[state] in line:
                     with cond:
@@ -47,4 +49,4 @@ def monitor_log_file(log_path, state_dict, service_name, state_keywords, cond, s
             if reached_final_state:
                 break
 
-    print(f"DEBUG: Finished monitoring log file for {service_name}")
+    print(f"DEBUG: Finished monitoring file '{log_path}' for {service_name}")

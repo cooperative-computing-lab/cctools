@@ -15,6 +15,8 @@ done
 READY_TIME=$(date +%s)
 run_duration=30
 
+echo "Generated output">program1-out.log
+
 while true; do
     echo "$(date +%s) - program is running"
     sleep 0.5

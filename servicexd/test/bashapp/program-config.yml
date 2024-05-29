@@ -10,9 +10,13 @@ services:
       log:
         ready: "program is ready"
         complete: "program is completed"
+      file:
+        path: "program1-out.log"
+        states:
+          output_generated: "Generated output"
     dependency:
       items:
-        program2: "ready"
+        program3: "ready"
 
   program2:
     type: "service"
@@ -25,7 +29,7 @@ services:
       mode: "all"
       items:
         reserve_port: "final"
-        program3: "final"
+        program3: "ready"
 
   program3:
     type: "service"
@@ -40,5 +44,7 @@ services:
 
 output:
   state_times: "state_times.json"
+  stdout_dir: "."
+
 stop_signal: "/tmp/bashapp/stop"
 max_run_time: 120

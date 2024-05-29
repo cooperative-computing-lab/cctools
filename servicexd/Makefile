@@ -17,4 +17,4 @@ compile:
 	$(PYTHON) py_source_combiner.py src $(PROGRAM_NAME).py
 clean:
 	@echo "Cleaning up..."
-	rm -rf test/**/*.log test/**/*.json
+	find test -type f \( -name "*.json" -or -name "*log" \) -delete

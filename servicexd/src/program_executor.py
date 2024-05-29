@@ -36,13 +36,26 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
 
     print(f"DEBUG: Starting execution of {service_name}")
 
-    state_keywords = config.get('state', {}).get('log', {})
+    stdout_states = config.get('state', {}).get('log', {})
 
     log_thread = threading.Thread(target=monitor_log_file,
                                   args=(
-                                      stdout_path, state_dict, service_name, state_keywords, cond, state_times,
+                                      stdout_path, state_dict, service_name, stdout_states, cond, state_times,
                                       start_time, stop_event))
     log_thread.start()
+
+    file_path_to_monitor = config.get('state', {}).get('file', {}).get('path', {})
+
+    file_monitor_thread = None
+
+    if file_path_to_monitor:
+        file_states = config.get('state', {}).get('file', {}).get('states', {})
+        file_monitor_thread = threading.Thread(target=monitor_log_file,
+
+                                               args=(file_path_to_monitor, state_dict, service_name, file_states, cond,
+                                                     state_times, start_time, stop_event))
+
+        file_monitor_thread.start()
 
     local_state_times = {'start': time.time() - start_time}
     state_times[service_name] = local_state_times
@@ -64,4 +77,7 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
         cond.notify_all()
 
     log_thread.join()
+    if file_monitor_thread:
+        file_monitor_thread.join()
+
     print(f"DEBUG: Finished execution of {service_name}")

@@ -15,8 +15,6 @@ done
 READY_TIME=$(date +%s)
 run_duration=30
 
-./program3.sh &
-
 while true; do
     echo "$(date +%s) - program 2 is running"
     sleep 0.5
