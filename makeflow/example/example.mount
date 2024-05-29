@@ -1,4 +1,4 @@
 ./mycurl /usr/bin/curl
 ./myconvert /usr/bin/convert
-1.html http://ccl.cse.nd.edu/research/data/hep-case-study/case_study_redhat6_6.html
+1.html https://ccl.cse.nd.edu/research/data/hep-case-study/case_study_redhat6_6.html
 povray.umbrella https://curate.nd.edu/downloads/b5644q79k4q

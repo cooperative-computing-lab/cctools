@@ -12,7 +12,7 @@ MAKEFLOW_OUTPUTS="capitol.montage.gif"
 
 CURL=/usr/bin/curl
 CONVERT=/usr/bin/convert
-URL=http://ccl.cse.nd.edu/images/capitol.jpg
+URL=https://ccl.cse.nd.edu/images/capitol.jpg
 
 capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capital.360.jpg
 	$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
