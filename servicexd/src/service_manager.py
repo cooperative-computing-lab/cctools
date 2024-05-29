@@ -2,10 +2,10 @@ import json
 import multiprocessing
 import os
 import signal
-import sys
 import threading
 import time
-from multiprocessing import Manager, Condition, Process
+from multiprocessing import Process
+
 from config_loader import load_and_preprocess_config, validate_and_sort_programs
 from program_executor import execute_program
 

@@ -30,6 +30,9 @@ def preprocess_config(config, config_path):
         if stdout_dir:
             details['stdout_path'] = os.path.join(stdout_dir, details['stdout_path'])
             details['stderr_path'] = os.path.join(stdout_dir, details['stderr_path'])
+        else:
+            details['stdout_path'] = os.path.join(working_dir, details['stdout_path'])
+            details['stderr_path'] = os.path.join(working_dir, details['stderr_path'])
 
         state_file_path = details.get('state', {}).get('file', {}).get('path', "")
 

@@ -44,7 +44,6 @@ services:
 
 output:
   state_times: "state_times.json"
-  stdout_dir: "."
 
 stop_signal: "/tmp/bashapp/stop"
 max_run_time: 120

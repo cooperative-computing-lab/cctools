@@ -1,5 +1,5 @@
-import time
 import os
+import time
 
 
 def monitor_log_file(log_path, state_dict, service_name, state_keywords, cond, state_times, start_time, stop_event):
