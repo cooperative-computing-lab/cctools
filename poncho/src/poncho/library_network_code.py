@@ -20,7 +20,7 @@ def library_network_code():
     import select
     import signal
     import time
-    import builtins
+    import ast
     from datetime import datetime
     import socket
     from threadpoolctl import threadpool_limits
@@ -28,16 +28,6 @@ def library_network_code():
     # self-pipe to turn a sigchld signal when a child finishes execution
     # into an I/O event.
     r, w = os.pipe()
-
-    # Ensure each print statement automatically flushes the stdout file,
-    # this is important of tracking the stdout timely
-    original_print = builtins.print
-
-    def flushing_print(*args, **kwargs):
-        kwargs.setdefault('flush', True)
-        original_print(*args, **kwargs)
-
-    builtins.print = flushing_print
 
     # This class captures how results from FunctionCalls are conveyed from
     # the library to the manager.
@@ -86,6 +76,22 @@ def library_network_code():
 
         return remote_wrapper
 
+    # Parse the current library code and return the source code of installed functions
+    def get_installed_function_code():
+        with open(os.path.abspath(__file__), 'r') as f:
+            content = f.read()
+            tree = ast.parse(content)
+            all_function_code = []
+            
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    for decorator in node.decorator_list:
+                        if isinstance(decorator, ast.Name) and decorator.id == 'remote_execute':
+                            function_code = ast.get_source_segment(content, node)
+                            all_function_code.append(function_code)
+            
+        return "\n".join(all_function_code)
+
     # Self-identifying message to send back to the worker, including the name of this library.
     # Send back a SIGCHLD to interrupt worker sleep and get it to work.
     def send_configuration(config, out_pipe_fd, worker_pid):
@@ -106,7 +112,7 @@ def library_network_code():
         while True:
             c = os.read(in_pipe_fd, 1)
             if c == b"":
-                print_timed_message(f"can't get length from in_pipe_fd {in_pipe_fd}")
+                stdout_timed_message(f"can't get length from in_pipe_fd {in_pipe_fd}")
                 exit(1)
             elif c == b"\n":
                 break
@@ -125,18 +131,18 @@ def library_network_code():
                 function_stdout_filename
             ) = line.split(" ", maxsplit=3)
         except Exception as e:
-            print_timed_message(f"error: not enough values to unpack from {line} (expected 4 items), exception: {e}")
+            stdout_timed_message(f"error: not enough values to unpack from {line} (expected 4 items), exception: {e}")
             exit(1)
 
         try:
             function_id = int(function_id)
         except Exception as e:
-            print_timed_message(f"error: can't turn {function_id} into an integer, exception: {e}")
+            stdout_timed_message(f"error: can't turn {function_id} into an integer, exception: {e}")
             exit(1)
 
         if not function_name:
             # malformed message from worker so we exit
-            print_timed_message(f"error: invalid function name, malformed message {line} from worker")
+            stdout_timed_message(f"error: invalid function name, malformed message {line} from worker")
             exit(1)
 
         with threadpool_limits(limits=thread_limit):
@@ -168,7 +174,7 @@ def library_network_code():
                         raise
 
                 except Exception as e:
-                    print_timed_message(
+                    stdout_timed_message(
                         f"Library code: Function call failed due to {e}",
                         file=sys.stderr,
                     )
@@ -179,7 +185,7 @@ def library_network_code():
                 p = os.fork()
                 if p == 0:
                     try:
-                        print_timed_message(f"TASK {function_id} function {function_name} arrives, starts running in process {os.getpid()}")
+                        stdout_timed_message(f"TASK {function_id} function call {function_name} arrived, starting to run in process {os.getpid()}")
                         # change the working directory to the function's sandbox
                         os.chdir(function_sandbox)
 
@@ -189,7 +195,7 @@ def library_network_code():
                             with open("infile", "rb") as f:
                                 event = cloudpickle.load(f)
                         except Exception:
-                            print_timed_message(f"TASK {function_id} error: can't load the arguments from infile")
+                            stdout_timed_message(f"TASK {function_id} error: can't load the arguments from infile")
                             exit_status = 2
                             raise
 
@@ -210,7 +216,7 @@ def library_network_code():
                             # restore to the library's stdout fd on completion
                             os.dup2(library_fd, sys.stdout.fileno())
                         except Exception:
-                            print_timed_message(f"TASK {function_id} error: can't execute this function from infile")
+                            stdout_timed_message(f"TASK {function_id} error: can't execute this function from infile")
                             exit_status = 3
                             raise
                         finally:
@@ -221,7 +227,7 @@ def library_network_code():
                             with open("outfile", "wb") as f:
                                 cloudpickle.dump(result, f)
                         except Exception:
-                            print_timed_message(f"TASK {function_id} error: can't load the result from outfile")
+                            stdout_timed_message(f"TASK {function_id} error: can't load the result from outfile")
                             exit_status = 4
                             if os.path.exits("outfile"):
                                 os.remove("outfile")
@@ -231,15 +237,15 @@ def library_network_code():
                             if not result["Success"]:
                                 exit_status = 5
                         except Exception:
-                            print_timed_message(f"TASK {function_id} error: the result is broken")
+                            stdout_timed_message(f"TASK {function_id} error: the result is broken")
                             exit_status = 5
                             raise
 
                         # nothing failed
-                        print_timed_message(f"TASK {function_id} finished successfully")
+                        stdout_timed_message(f"TASK {function_id} finished successfully")
                         exit_status = 0
                     except Exception as e:
-                        print_timed_message(f"TASK {function_id} error: execution failed due to {e}")
+                        stdout_timed_message(f"TASK {function_id} error: execution failed due to {e}")
                     finally:
                         os._exit(exit_status)
                 elif p < 0:
@@ -259,8 +265,8 @@ def library_network_code():
         os.writev(out_pipe_fd, [buff])
         os.kill(worker_pid, signal.SIGCHLD)
 
-    # Print the message with a timestamp
-    def print_timed_message(message):
+    # Use os.write to stdout instead of print for multi-processing safety
+    def stdout_timed_message(message):
         timestamp = datetime.now().strftime("%m/%d/%y %H:%M:%S.%f")
         os.write(sys.stdout.fileno(), f"{timestamp} {message}\n".encode())
 
@@ -312,32 +318,33 @@ def library_network_code():
 
         # check if library cores and function slots are valid
         if args.function_slots > args.library_cores:
-            print_timed_message("error: function slots cannot be more than library cores")
+            stdout_timed_message("error: function slots cannot be more than library cores")
             exit(1)
         elif args.function_slots < 1:
-            print_timed_message("error: function slots cannot be less than 1")
+            stdout_timed_message("error: function slots cannot be less than 1")
             exit(1)
         elif args.library_cores < 1:
-            print_timed_message("error: library cores cannot be less than 1")
+            stdout_timed_message("error: library cores cannot be less than 1")
             exit(1)
 
         try:
             thread_limit = args.library_cores // args.function_slots
         except Exception as e:
-            print_timed_message(f"error: {e}")
+            stdout_timed_message(f"error: {e}")
             exit(1)
 
-        print_timed_message(f"library task starts running in process {os.getpid()}")
-        print_timed_message("library description")
-        print_timed_message(f"hostname:        {socket.gethostname()}")
-        print_timed_message(f"task id:         {args.task_id}")
-        print_timed_message(f"worker pid:      {args.worker_pid}")
-        print_timed_message(f"library pid:     {os.getpid()}")
-        print_timed_message(f"input fd:        {args.in_pipe_fd}")
-        print_timed_message(f"output fd:       {args.out_pipe_fd}")
-        print_timed_message(f"library cores:   {args.library_cores}")
-        print_timed_message(f"function slots:  {args.function_slots}")
-        print_timed_message(f"thread limit:    {thread_limit}")
+        stdout_timed_message(f"library task starts running in process {os.getpid()}")
+        stdout_timed_message("library description")
+        stdout_timed_message(f"hostname             {socket.gethostname()}")
+        stdout_timed_message(f"task id              {args.task_id}")
+        stdout_timed_message(f"worker pid           {args.worker_pid}")
+        stdout_timed_message(f"library pid          {os.getpid()}")
+        stdout_timed_message(f"input fd             {args.in_pipe_fd}")
+        stdout_timed_message(f"output fd            {args.out_pipe_fd}")
+        stdout_timed_message(f"library cores        {args.library_cores}")
+        stdout_timed_message(f"function slots       {args.function_slots}")
+        stdout_timed_message(f"thread limit         {thread_limit}")        
+        stdout_timed_message(f"functions installed\n{get_installed_function_code()}")
 
         # Open communication pipes to vine_worker.
         # The file descriptors are inherited from the vine_worker parent process
@@ -352,7 +359,7 @@ def library_network_code():
         try:
             send_configuration(config, out_pipe_fd, args.worker_pid)
         except Exception as e:
-            print_timed_message(f"error: {e}")
+            stdout_timed_message(f"error: {e}")
             exit(1)
 
         # mapping of child pid to function id of currently running functions
@@ -370,7 +377,7 @@ def library_network_code():
             # check if parent exits
             c_ppid = os.getppid()
             if c_ppid != ppid or c_ppid == 1:
-                print_timed_message("library finished successfully")
+                stdout_timed_message("library finished successfully")
                 exit(0)
 
             # wait for messages from worker or child to return
@@ -379,7 +386,7 @@ def library_network_code():
             # periodically log the number of concurrent functions
             if time.time() - last_check_time > 5:
                 last_check_time = time.time()
-                print_timed_message(f"{len(pid_to_func_id)} functions running concurrently")
+                stdout_timed_message(f"{len(pid_to_func_id)} functions running concurrently")
 
             for re in rlist:
                 # worker has a function, run it
