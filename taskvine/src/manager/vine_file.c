@@ -166,14 +166,22 @@ char *vine_file_make_file_url(const char *source)
 
 const char *vine_file_contents(struct vine_file *f)
 {
-	return f->data;
+	if (f) {
+		return f->data;
+	}
+
+	return NULL;
 }
 
 /* Return the size of any kind of file. */
 
 size_t vine_file_size(struct vine_file *f)
 {
-	return f->size;
+	if (f) {
+		return f->size;
+	}
+
+	return 0;
 }
 
 /*
