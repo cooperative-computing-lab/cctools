@@ -20,7 +20,7 @@
     }, 
     {
       "environment": {
-        "URL": "http://ccl.cse.nd.edu/images/capitol.jpg"
+        "URL": "https://ccl.cse.nd.edu/images/capitol.jpg"
       }, 
       "outputs": [
         "capitol.jpg"
