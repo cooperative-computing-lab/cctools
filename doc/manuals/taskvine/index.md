@@ -256,7 +256,7 @@ data to the manager.
 If a temporary file is unexpectedly lost due to the crash or failure
 of a worker, then the task that created it will be re-executed. Temp files
 may also be replicated across workers to a degree set by the `vine_tune` parameter
-`temp-replica-count'. Temp file replicas are useful if significant work
+`temp-replica-count`. Temp file replicas are useful if significant work
 is required to re-execute the task that created it. 
 The contents of a temporary file can be obtained with `fetch_file`
 
