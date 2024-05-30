@@ -5069,7 +5069,12 @@ struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, 
 {
 	BEGIN_ACCUM_TIME(q, time_internal);
 	struct vine_task *t = find_task_to_return(q, tag, task_id);
+	if (t) {
+		vine_perf_log_write_update(q, 1);
+	}
 	END_ACCUM_TIME(q, time_internal);
+
+	q->time_last_wait = timestamp_get();
 
 	return t;
 }
