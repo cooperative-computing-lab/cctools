@@ -11,10 +11,6 @@
 %{
 	#include "int_sizes.h"
 	#include "taskvine.h"
-    #include "vine_task.h"
-    #include "vine_file.h"
-    #include "vine_runtime_dir.h"
-    #include "vine_manager.h"
 %}
 
 /* We compile with -D__LARGE64_FILES, thus off_t is at least 64bit.
@@ -72,8 +68,3 @@ into a swig function f(data) */
 %include "stdint.i"
 %include "int_sizes.h"
 %include "taskvine.h"
-%include "vine_task.h"
-%include "vine_file.h"
-%include "vine_runtime_dir.h"
-%include "cctools.h"
-%include "vine_manager.h"

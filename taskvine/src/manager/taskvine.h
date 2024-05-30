@@ -92,16 +92,20 @@ typedef enum {
 	VINE_RESULT_STDOUT_MISSING = 4, /**< The task ran but its stdout has been truncated **/
 	VINE_RESULT_SIGNAL = 1 << 3,	/**< The task was terminated with a signal **/
 	VINE_RESULT_RESOURCE_EXHAUSTION = 2 << 3, /**< The task used more resources than requested **/
-	VINE_RESULT_MAX_END_TIME        = 3 << 3, /**< The task ran after the specified (absolute since epoch) end time. **/
-	VINE_RESULT_UNKNOWN             = 4 << 3, /**< The result could not be classified. **/
-	VINE_RESULT_FORSAKEN            = 5 << 3, /**< The task failed, but it was not a task error **/
-	VINE_RESULT_MAX_RETRIES         = 6 << 3, /**< Currently unused. **/
-	VINE_RESULT_MAX_WALL_TIME       = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
-	VINE_RESULT_RMONITOR_ERROR      = 8 << 3, /**< The task failed because the monitor did not produce a summary report. **/
-	VINE_RESULT_OUTPUT_TRANSFER_ERROR = 9 << 3,  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
-	VINE_RESULT_FIXED_LOCATION_MISSING = 10 << 3, /**< The task failed because no worker could satisfy the fixed location input file requirements. */
-	VINE_RESULT_CANCELLED = 11 << 3, /**< The task was cancelled by the caller. */
-	VINE_RESULT_LIBRARY_EXIT      = 12 << 3, /**< Task is a library that has exited unexpected. **/
+	VINE_RESULT_MAX_END_TIME = 3 << 3,  /**< The task ran after the specified (absolute since epoch) end time. **/
+	VINE_RESULT_UNKNOWN = 4 << 3,	    /**< The result could not be classified. **/
+	VINE_RESULT_FORSAKEN = 5 << 3,	    /**< The task failed, but it was not a task error **/
+	VINE_RESULT_MAX_RETRIES = 6 << 3,   /**< Currently unused. **/
+	VINE_RESULT_MAX_WALL_TIME = 7 << 3, /**< The task ran for more than the specified time (relative since running
+					       in a worker). **/
+	VINE_RESULT_RMONITOR_ERROR =
+			8 << 3, /**< The task failed because the monitor did not produce a summary report. **/
+	VINE_RESULT_OUTPUT_TRANSFER_ERROR = 9 << 3,   /**< The task failed because an output could be transfered to the
+							 manager (not enough disk space, incorrect write permissions). */
+	VINE_RESULT_FIXED_LOCATION_MISSING = 10 << 3, /**< The task failed because no worker could satisfy the fixed
+							 location input file requirements. */
+	VINE_RESULT_CANCELLED = 11 << 3,	      /**< The task was cancelled by the caller. */
+	VINE_RESULT_LIBRARY_EXIT = 12 << 3	      /**< Task is a library that has terminated. **/
 } vine_result_t;
 
 /** Select how to allocate resources for similar tasks with @ref vine_set_category_mode */
@@ -963,12 +967,6 @@ void vine_manager_remove_library(struct vine_manager *m, const char *name);
 */
 struct vine_task *vine_manager_find_library_template(struct vine_manager *q, const char *library_name);
 
-/** Find a library template on the manager
-@param m A manager object
-@param name The name of the library of interest
-*/
-struct vine_task *vine_manager_find_library_template(struct vine_manager *q, const char *library_name);
-
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the manager is empty.
 If a task has completed, the corresponding task object will be returned by this function.
@@ -1162,9 +1160,9 @@ vine_enable_disconnect_slow_workers_category was not explicitely called.
 */
 int vine_enable_disconnect_slow_workers(struct vine_manager *m, double multiplier);
 
-/** Enable disconnect slow workers functionality for a given category. As @ref vine_enable_disconnect_slow_workers, but for a single
-task category.
-(Note: vine_enable_disconnect_slow_workers_category(q, "default", n) is the same as vine_enable_disconnect_slow_workers(q, n).)
+/** Enable disconnect slow workers functionality for a given category. As @ref vine_enable_disconnect_slow_workers, but
+for a single task category. (Note: vine_enable_disconnect_slow_workers_category(q, "default", n) is the same as
+vine_enable_disconnect_slow_workers(q, n).)
 @param m A manager object
 @param category A category name.
 @param multiplier The multiplier of the average task time at which point to disconnect; If less than one (default), use

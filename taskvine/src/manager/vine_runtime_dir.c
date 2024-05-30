@@ -139,11 +139,6 @@ char *vine_get_path_log(struct vine_manager *m, const char *path)
 	return string_format("%s/vine-logs%s%s", m->runtime_directory, path ? "/" : "", path ? path : "");
 }
 
-char *vine_get_path_library_log(struct vine_manager *m, const char *path)
-{
-	return string_format("%s/library_logs%s%s", m->runtime_directory, path ? "/" : "", path ? path : "");
-}
-
 char *vine_get_path_staging(struct vine_manager *m, const char *path)
 {
 	return string_format("%s/staging%s%s", m->runtime_directory, path ? "/" : "", path ? path : "");
