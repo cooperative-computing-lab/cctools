@@ -85,7 +85,10 @@ static const char *ssl_cert_filename = 0;
 /* Filename containing the SSL private key. */
 static const char *ssl_key_filename = 0;
 
-/* The file for writing out the port number. */
+/* The file for writing out the SSL port number. */
+const char *ssl_port_file = 0;
+
+/* The file for writing out the query port number. */
 const char *port_file = 0;
 
 /* The preferred hostname set on the command line. */
@@ -762,6 +765,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Send status updates at this interval.\n", "-U,--update-interval=<time>");
 	fprintf(stdout, " %-30s (default is 5m)\n", "");
 	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
+	fprintf(stdout, " %-30s Select SSL port at random and write it to\n", "-Y,--ssl-port-file=<file>");
 	fprintf(stdout, " %-30s Select port at random and write it to\n", "-Z,--port-file=<file>");
 	fprintf(stdout, " %-30s this file. (default: disabled)\n", "");
 }
@@ -806,6 +810,7 @@ int main(int argc, char *argv[])
 		{"update-host", required_argument, 0, 'u'},
 		{"update-interval", required_argument, 0, 'U'},
 		{"version", no_argument, 0, 'v'},
+		{"ssl-port-file", required_argument, 0, 'Y'},
 		{"port-file", required_argument, 0, 'Z'},
 		{0,0,0,0}};
 
@@ -881,6 +886,10 @@ int main(int argc, char *argv[])
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
 				return 0;
+			case 'Y':
+				ssl_port_file = optarg;
+				ssl_port = 0;
+				break;
 			case 'Z':
 				port_file = optarg;
 				port = 0;
@@ -946,7 +955,6 @@ int main(int argc, char *argv[])
 
 	if(ssl_port || ssl_key_filename || ssl_cert_filename) {
 
-		if(!ssl_port) fatal("--ssl-port is also required for SSL.");
 		if(!ssl_key_filename) fatal("--ssl-key is also required for SSL.");
 		if(!ssl_cert_filename) fatal("--ssl-cert is also required for SSL.");
 
@@ -983,6 +991,7 @@ int main(int argc, char *argv[])
 	}
 
 	opts_write_port_file(port_file,port);
+	opts_write_port_file(ssl_port_file,ssl_port);
 
 	while(1) {
 		fd_set rfds;
