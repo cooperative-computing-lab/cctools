@@ -889,6 +889,12 @@ void vine_manager_install_library( struct vine_manager *m, struct vine_task *t, 
 */
 void vine_manager_remove_library( struct vine_manager *m, const char *name );
 
+/** Find a library template on the manager
+@param m A manager object
+@param name The name of the library of interest
+*/
+struct vine_task *vine_manager_find_library_template(struct vine_manager *q, const char *library_name);
+
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the manager is empty.
 If a task has completed, the corresponding task object will be returned by this function.
@@ -908,7 +914,6 @@ task, or there is completed child process (call @ref process_wait to retrieve th
 process).
 */
 struct vine_task *vine_wait(struct vine_manager *m, int timeout);
-
 
 /** Wait for a task with a given task to complete.
 Similar to @ref vine_wait, but guarantees that the returned task has the specified tag.
@@ -1076,7 +1081,6 @@ vine_enable_disconnect_slow_workers_category was not explicitely called.
 @returns 0 if activated, 1 if deactivated.
 */
 int vine_enable_disconnect_slow_workers(struct vine_manager *m, double multiplier);
-
 
 /** Enable disconnect slow workers functionality for a given category. As @ref vine_enable_disconnect_slow_workers, but for a single
 task category.
