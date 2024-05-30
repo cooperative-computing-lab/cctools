@@ -886,13 +886,9 @@ int main(int argc, char *argv[])
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
 				return 0;
-			case 'X':
+			case 'Y':
 				ssl_port_file = optarg;
 				ssl_port = 0;
-				break;
-			case 'Y':
-				update_port_file = optarg;
-				update_port = 0;
 				break;
 			case 'Z':
 				port_file = optarg;
