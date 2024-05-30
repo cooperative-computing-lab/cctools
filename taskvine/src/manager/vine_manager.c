@@ -1027,9 +1027,9 @@ static char *monitor_file_name(struct vine_manager *q, struct vine_task *t, cons
 		dir = xxstrdup(t->monitor_output_directory);
 	} else {
 		if (series) {
-			dir = vine_get_runtime_path_log(q, "time-series");
+			dir = vine_get_path_log(q, "time-series");
 		} else {
-			dir = vine_get_runtime_path_staging(q, NULL);
+			dir = vine_get_path_staging(q, NULL);
 		}
 	}
 
@@ -3874,7 +3874,7 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 		return 0;
 
 	if (series) {
-		char *series_file = vine_get_runtime_path_log(q, "time-series");
+		char *series_file = vine_get_path_log(q, "time-series");
 		if (!create_dir(series_file, 0777)) {
 			warn(D_VINE,
 					"could not create monitor output directory - %s (%s)",
@@ -4109,7 +4109,7 @@ void vine_delete(struct vine_manager *q)
 	list_clear(q->task_info_list, (void *)vine_task_info_delete);
 	list_delete(q->task_info_list);
 
-	char *staging = vine_get_runtime_path_staging(q, NULL);
+	char *staging = vine_get_path_staging(q, NULL);
 	if (!access(staging, F_OK)) {
 		debug(D_VINE, "deleting %s", staging);
 		unlink_recursive(staging);
@@ -5612,7 +5612,7 @@ int vine_enable_debug_log(const char *logfile)
 
 int vine_enable_perf_log(struct vine_manager *q, const char *filename)
 {
-	char *logpath = vine_get_runtime_path_log(q, filename);
+	char *logpath = vine_get_path_log(q, filename);
 	q->perf_logfile = fopen(logpath, "w");
 	free(logpath);
 
@@ -5629,7 +5629,7 @@ int vine_enable_perf_log(struct vine_manager *q, const char *filename)
 
 int vine_enable_transactions_log(struct vine_manager *q, const char *filename)
 {
-	char *logpath = vine_get_runtime_path_log(q, filename);
+	char *logpath = vine_get_path_log(q, filename);
 	q->txn_logfile = fopen(logpath, "w");
 	free(logpath);
 
@@ -5646,7 +5646,7 @@ int vine_enable_transactions_log(struct vine_manager *q, const char *filename)
 
 int vine_enable_taskgraph_log(struct vine_manager *q, const char *filename)
 {
-	char *logpath = vine_get_runtime_path_log(q, filename);
+	char *logpath = vine_get_path_log(q, filename);
 	q->graph_logfile = fopen(logpath, "w");
 	free(logpath);
 
@@ -6092,6 +6092,11 @@ void vine_log_debug_app(struct vine_manager *m, const char *entry)
 void vine_log_txn_app(struct vine_manager *m, const char *entry)
 {
 	vine_txn_log_write_app_entry(m, entry);
+}
+
+char *vine_version_string()
+{
+	return cctools_version_string();
 }
 
 /* vim: set noexpandtab tabstop=8: */

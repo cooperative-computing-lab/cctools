@@ -773,23 +773,23 @@ class Task(object):
     # @endcode
     @property
     def resources_measured(self):
-        if not self._task.resources_measured:
+        if not self._task:
             return None
-
-        return self._task.resources_measured
+        return cvine.vine_task_get_resources(self._task, "measured")
 
     ##
     # Get the resources the task exceeded. For valid field see @ref ndcctools.taskvine.task.Task.resources_measured.
     #
     @property
     def limits_exceeded(self):
-        if not self._task.resources_measured:
+        if not self._task:
             return None
 
-        if not self._task.resources_measured.limits_exceeded:
+        measured = cvine.vine_task_get_resources(self._task, "measured")
+        if not measured:
             return None
 
-        return self._task.resources_measured.limits_exceeded
+        return measured.limits_exceeded
 
     ##
     # Get the resources the task requested to run. For valid fields see
@@ -797,9 +797,9 @@ class Task(object):
     #
     @property
     def resources_requested(self):
-        if not self._task.resources_requested:
+        if not self._task:
             return None
-        return self._task.resources_requested
+        return cvine.vine_task_get_resources(self._task, "requested")
 
     ##
     # Get the resources allocated to the task in its latest attempt. For valid
@@ -807,9 +807,9 @@ class Task(object):
     #
     @property
     def resources_allocated(self):
-        if not self._task.resources_allocated:
+        if not self._task:
             return None
-        return self._task.resources_allocated
+        return cvine.vine_task_get_resources(self._task, "allocated")
 
     ##
     # Adds inputs for nopen library and rules file and sets LD_PRELOAD

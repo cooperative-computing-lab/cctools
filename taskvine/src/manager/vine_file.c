@@ -166,14 +166,22 @@ char *vine_file_make_file_url(const char *source)
 
 const char *vine_file_contents(struct vine_file *f)
 {
-	return f->data;
+	if (f) {
+		return f->data;
+	}
+
+	return NULL;
 }
 
 /* Return the size of any kind of file. */
 
 size_t vine_file_size(struct vine_file *f)
 {
-	return f->size;
+	if (f) {
+		return f->size;
+	}
+
+	return 0;
 }
 
 /*
@@ -349,6 +357,16 @@ struct vine_file *vine_file_chirp(const char *server, const char *source, struct
 	free(command);
 
 	return vine_file_mini_task(t, "output.chirp", cache, flags);
+}
+
+vine_file_type_t vine_file_type(struct vine_file *f)
+{
+	return f->type;
+}
+
+const char *vine_file_source(struct vine_file *f)
+{
+	return f->source;
 }
 
 /* vim: set noexpandtab tabstop=8: */

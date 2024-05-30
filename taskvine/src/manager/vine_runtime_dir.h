@@ -19,13 +19,4 @@ This module is private to the manager and should not be invoked by the end user.
  */
 char *vine_runtime_directory_create();
 
-/* Returns path relative to the logs runtime directory */
-char *vine_get_runtime_path_log(struct vine_manager *m, const char *path);
-
-/* Returns path relative to the staging runtime directory */
-char *vine_get_runtime_path_staging(struct vine_manager *m, const char *path);
-
-/* Returns path relative to the cache runtime directory */
-char *vine_get_runtime_path_caching(struct vine_manager *m, const char *path);
-
 #endif

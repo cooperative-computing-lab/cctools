@@ -233,7 +233,7 @@ class Manager(object):
     # Get the logs directory of the manager
     @property
     def logging_directory(self):
-        return cvine.vine_get_runtime_path_log(self._taskvine, None)
+        return cvine.vine_get_path_log(self._taskvine, None)
 
     ##
     # Get the staging directory of the manager
@@ -245,13 +245,13 @@ class Manager(object):
                 path.mkdir(parents=True, exist_ok=True)
             return self._staging_explicit
         else:
-            return cvine.vine_get_runtime_path_staging(self._taskvine, None)
+            return cvine.vine_get_path_staging(self._taskvine, None)
 
     ##
     # Get the caching directory of the manager
     @property
     def cache_directory(self):
-        return cvine.vine_get_runtime_path_caching(self._taskvine, None)
+        return cvine.vine_get_path_staging(self._taskvine, None)
 
     ##
     # Get manager statistics.
