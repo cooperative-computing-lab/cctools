@@ -427,7 +427,7 @@ class DaskVineFile:
         return self._file
 
     def is_temp(self):
-        return self._file.file_type() == VINE_TEMP
+        return self._file.type() == VINE_TEMP
 
     def ready_for_gc(self):
         # file on disk ready to be gc if the keys that needed as an input for computation are themselves ready.
