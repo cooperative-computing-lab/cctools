@@ -1,4 +1,4 @@
-name: servicexd_env
+name: shepherd_env
 channels:
   - conda-forge
   - defaults

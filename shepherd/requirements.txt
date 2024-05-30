@@ -1,1 +1,2 @@
 pyyaml
+jinja2
