@@ -11,7 +11,7 @@ prepare()
 run()
 {
 	echo "starting the catalog server"
-	../src/catalog_server -d all -o catalog.log --port-file catalog.port &
+	../src/catalog_server -d all -o catalog.log --port-file catalog.port --port 9097 &
 	pid=$!
 
 	echo "waiting for catalog server to start"
@@ -19,10 +19,10 @@ run()
 
 	port=`cat catalog.port`
 	
-	echo "sending udp updates to the server"
+	echo "sending updates to the server"
 	for i in 1 2 3 4 5
 	do
-		../../dttools/src/catalog_update --catalog localhost:$port --file update.json -d all
+		../../dttools/src/catalog_update --catalog localhost:$port --file update.json
 		sleep 1
 	done
 

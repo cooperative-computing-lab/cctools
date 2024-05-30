@@ -23,7 +23,7 @@ prepare()
 run()
 {
 	echo "starting the catalog server"
-	../src/catalog_server -d all -o catalog.log --port-file catalog.port --ssl-port-file catalog.ssl.port --ssl-cert cert.pem --ssl-key key.pem &
+	../src/catalog_server -d all -o catalog.log --port-file catalog.port --port 9197 --ssl-port-file catalog.ssl.port --ssl-port 9199 --ssl-cert cert.pem --ssl-key key.pem &
 	pid=$!
 
 	echo "waiting for catalog server to start"
@@ -33,7 +33,7 @@ run()
 	port=`cat catalog.port`
 	ssl_port=`cat catalog.ssl.port`
 	
-	echo "sending udp updates to the server"
+	echo "sending updates to the server"
 	for i in 1 2 3 4 5
 	do
 		../../dttools/src/catalog_update --catalog localhost:$port --file update.json
