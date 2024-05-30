@@ -1056,7 +1056,7 @@ static char *monitor_file_name(struct vine_manager *q, struct vine_task *t, cons
 		if (series) {
 			dir = vine_get_runtime_path_log(q, "time-series");
 		} else {
-			dir = vine_get_runtime_path_staging(q, NULL);
+			dir = vine_get_path_staging(q, NULL);
 		}
 	}
 
@@ -4138,7 +4138,7 @@ void vine_delete(struct vine_manager *q)
 	list_clear(q->task_info_list, (void *)vine_task_info_delete);
 	list_delete(q->task_info_list);
 
-	char *staging = vine_get_runtime_path_staging(q, NULL);
+	char *staging = vine_get_path_staging(q, NULL);
 	if (!access(staging, F_OK)) {
 		debug(D_VINE, "deleting %s", staging);
 		unlink_recursive(staging);

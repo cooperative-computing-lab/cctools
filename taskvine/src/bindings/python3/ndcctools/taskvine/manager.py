@@ -245,7 +245,7 @@ class Manager(object):
                 path.mkdir(parents=True, exist_ok=True)
             return self._staging_explicit
         else:
-            return cvine.vine_get_runtime_path_staging(self._taskvine, None)
+            return cvine.vine_get_path_staging(self._taskvine, None)
 
     ##
     # Get the caching directory of the manager
