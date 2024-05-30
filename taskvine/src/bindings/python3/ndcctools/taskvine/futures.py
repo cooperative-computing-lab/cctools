@@ -26,6 +26,11 @@ except Exception:
     pythontask_available = False
 
 
+# To be installed in the library for FutureFunctionCalls
+def retrieve_output(arg):
+    return arg
+
+
 ##
 # \class FuturesExecutor
 #
@@ -73,7 +78,7 @@ class FuturesExecutor(Executor):
         return FuturePythonTask(self.manager, False, fn, *args, **kwargs)
 
     def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True, import_modules=None):
-        return self.manager.create_library_from_functions(name, *function_list, poncho_env=poncho_env, init_command=init_command, add_env=add_env, import_modules=import_modules)
+        return self.manager.create_library_from_functions(name, *function_list, retrieve_output, poncho_env=poncho_env, init_command=init_command, add_env=add_env, import_modules=import_modules)
 
     def install_library(self, libtask):
         self.manager.install_library(libtask)

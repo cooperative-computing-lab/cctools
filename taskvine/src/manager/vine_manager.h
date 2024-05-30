@@ -248,8 +248,8 @@ int vine_manager_transfer_time( struct vine_manager *q, struct vine_worker_info 
 const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, struct vine_task *t);
 const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, struct vine_task *t);
 
-/* Internal: Find a library task running on a specific worker by name. */
-struct vine_task *vine_manager_find_library_on_worker( struct vine_manager *q, struct vine_worker_info *w, const char *library_name);
+/* Find a library template on the manager */
+struct vine_task *vine_manager_find_library_template(struct vine_manager *q, const char *library_name);
 
 /* Internal: Enable shortcut of main loop upon child process completion. Needed for Makeflow to interleave local and remote execution. */
 void vine_manager_enable_process_shortcut(struct vine_manager *q);
@@ -257,9 +257,6 @@ void vine_manager_enable_process_shortcut(struct vine_manager *q);
 struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t );
 
 int64_t overcommitted_resource_total(struct vine_manager *q, int64_t total);
-
-/* Internal: Enable checking and sending library tasks as necessary. Needed for @vine_schedule.c to check if a worker is compatible to a function task. */
-int vine_manager_check_worker_can_run_function_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 
 /* Internal: Shut down a specific worker. */
 int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_info *w);
@@ -270,7 +267,6 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, int task_id);
 
 void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason);
-
 
 /* The expected format of files created by the resource monitor.*/
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-task-%d"

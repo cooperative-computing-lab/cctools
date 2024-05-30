@@ -201,12 +201,10 @@ class Task(object):
         return cvine.vine_task_set_command(self._task, command)
 
     ##
-    # Set the name of the library at the worker that should execute the task's command.
-    # This is not needed for regular tasks.
-    #
-    # @param self Reference to the current task object.
-    # @param library The library or name of the library
-    def set_library_required(self, library):
+    # Compute the name of a given library
+    # @param self          Reference to the current task object.
+    # @param library       The library or the name of the library
+    def _compute_library_name(self, library):
         library_name = None
         if isinstance(library, Task):
             try:
@@ -219,9 +217,19 @@ class Task(object):
         if not isinstance(library, str):
             raise ValueError(f"{library} is not a valid library")
 
+        return library_name
+
+    ##
+    # Set the name of the library at the worker that should execute the task's command.
+    # This is not needed for regular tasks.
+    #
+    # @param self          Reference to the current task object.
+    # @param library       The library or the name of the library
+    def set_library_required(self, library):
+        library_name = self._compute_library_name(library)
         if self.get_libray_provided():
             raise ValueError(
-                f"A task cannot both provide ({self.get_libray_provided()}) and require ({library_name}) a library."
+                f"A task cannot both provide ({library_name}) and require ({library_name}) a library."
             )
         return cvine.vine_task_set_library_required(self._task, library_name)
 
@@ -229,7 +237,7 @@ class Task(object):
     # Get the name of the library at the worker that should execute the task's command.
     #
     # @param self Reference to the current task object.
-    def get_libray_required(self):
+    def get_library_required(self):
         return cvine.vine_task_get_library_required(self._task)
 
     ##
@@ -244,9 +252,9 @@ class Task(object):
     # @param self Reference to the current task object.
     # @param library_name The name of the library.
     def set_library_provided(self, library_name):
-        if self.get_libray_required():
+        if self.get_library_required():
             raise ValueError(
-                f"A task cannot both provide ({library_name}) and require ({self.get_libray_required()}) a library."
+                f"A task cannot both provide ({library_name}) and require ({self.get_library_required()}) a library."
             )
         return cvine.vine_task_set_library_provided(self._task, library_name)
 
@@ -1073,6 +1081,10 @@ class FunctionCall(PythonTask):
     #
     # @param self 	Reference to the current python task object
     def submit_finalize(self):
+        library_name = self.get_library_required()
+        if not self.manager.check_library_exists(library_name):
+            raise ValueError(f"invalid library name \'{library_name}\'")
+
         name = os.path.join(self.manager.staging_directory, "arguments", self._id)
         with open(name, "wb") as wf:
             cloudpickle.dump(self._event, wf)
@@ -1162,12 +1174,12 @@ class LibraryTask(Task):
     ##
     # Create a new LibraryTask task specification.
     #
-    # @param self       Reference to the current remote task object.
-    # @param fn         The command for this LibraryTask to run
-    # @param name       The name of this Library.
-    def __init__(self, fn, name):
+    # @param self               Reference to the current remote task object.
+    # @param fn                 The command for this LibraryTask to run
+    # @param library_name       The name of this Library.
+    def __init__(self, fn, library_name):
         Task.__init__(self, fn)
         self._manager_will_free = True
-        self.provides_library(name)
+        self.provides_library(library_name)
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
