@@ -380,7 +380,7 @@ int vine_process_execute(struct vine_process *p)
 		/* Close redundant file descriptors after dup()'ing.
 		 * Note that stdout_fd is the same as stderr_fd so it's only closed once */
 		close(stdin_fd);
-		close(stdout_fd); /* No need to close stderr_fd */
+		close(stdout_fd);       /* No need to close stderr_fd */
 
 		/* For a library task, close the unused sides of the pipes. */
 		if (p->type == VINE_PROCESS_TYPE_LIBRARY) {

@@ -327,6 +327,31 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 	return VINE_MSG_PROCESSED;
 }
 
+static vine_msg_code_t handle_failed_library(struct vine_manager *q, struct vine_worker_info *w, char *line)
+{
+	int task_id;
+	char library_name[VINE_LINE_MAX];
+	int n = sscanf(line, "failed_library %d %s", &task_id, library_name);
+
+	if (n != 2) {
+		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
+	}
+
+	struct vine_task *t = itable_lookup(w->current_tasks, task_id);
+	if (!t) {
+		debug(D_VINE, "worker %s (%s) reported a failutre for unassigned library task %d", w->hostname, w->addrport, task_id);
+	}
+	if (t->type != VINE_TASK_TYPE_LIBRARY_INSTANCE) {
+		debug(D_VINE, "worker %s (%s) reported a failutre for non-library task %d", w->hostname, w->addrport, task_id);
+	}
+
+	/* Remove the library template as well as the instances */
+	vine_manager_remove_library(q, library_name);
+
+
+	return VINE_MSG_PROCESSED;
+}
+
 /*
 A cache-update message coming from the worker means that a requested
 remote transfer or command was successful, and know we know the size
@@ -559,7 +584,9 @@ static vine_msg_code_t vine_manager_recv_no_retry(
 		result = handle_transfer_port(q, w, line);
 	} else if (sscanf(line, "GET %s HTTP/%*d.%*d", path) == 1) {
 		result = handle_http_request(q, w, path, stoptime);
-	} else {
+	} else if (string_prefix_is(line, "failed_library")) {
+		result = handle_failed_library(q, w, line);
+ 	} else {
 		// Message is not a status update: return it to the user.
 		result = VINE_MSG_NOT_PROCESSED;
 	}
@@ -1436,6 +1463,7 @@ static vine_result_code_t get_update(struct vine_manager *q, struct vine_worker_
 
 	int n = sscanf(line, "update %" PRId64 " %s %" PRId64 " %" PRId64, &task_id, path, &offset, &length);
 	if (n != 4) {
+		debug(D_VINE, "WHAT?");
 		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		return VINE_WORKER_FAILURE;
 	}
@@ -4613,10 +4641,12 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 
 	HASH_TABLE_ITERATE(q->worker_table, worker_key, w)
 	{
+		/* A worker might contain multiple library instances */
 		struct vine_task *library = vine_schedule_find_library(w, name);
-		if (library) {
+		while (library) {
 			reset_task_to_state(q, library, VINE_TASK_RETRIEVED);
 			library->refcount--;
+			library = vine_schedule_find_library(w, name);
 		}
 	}
 	hash_table_remove(q->library_templates, name);

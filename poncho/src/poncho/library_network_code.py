@@ -146,6 +146,7 @@ def library_network_code():
             exit(1)
 
         with threadpool_limits(limits=thread_limit):
+            
             # exec method for now is fork only, direct will be supported later
             exec_method = "fork"
             if exec_method == "direct":
@@ -272,6 +273,7 @@ def library_network_code():
 
     def main():
         ppid = os.getppid()
+        s
         parser = argparse.ArgumentParser(
             "Parse input and output file descriptors this process should use. The relevant fds should already be prepared by the vine_worker."
         )
@@ -315,7 +317,7 @@ def library_network_code():
             help="pid of main vine worker to send sigchild to let it know theres some result.",
         )
         args = parser.parse_args()
-
+        
         # check if library cores and function slots are valid
         if args.function_slots > args.library_cores:
             stdout_timed_message("error: function slots cannot be more than library cores")

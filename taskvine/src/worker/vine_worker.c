@@ -98,6 +98,9 @@ static struct list *procs_waiting = NULL;
 /* These are additional pointers into procs_table and should not be deleted */
 static struct itable *procs_complete = NULL;
 
+/* Table of all failed processes, indexed by task_id. */
+static struct itable *procs_failed = NULL;
+
 /* Table of current transfers and their id. */
 static struct hash_table *current_transfers = NULL;
 
@@ -580,29 +583,47 @@ static void report_task_complete(struct link *manager, struct vine_process *p)
 			(unsigned long long)p->execution_end,
 			p->task->task_id);
 
+	total_task_execution_time += (p->execution_end - p->execution_start);
+	total_tasks_executed++;
+
 	if (output_file >= 0) {
 		link_stream_from_fd(manager, output_file, output_length, time(0) + options->active_timeout);
 		close(output_file);
 	}
 
-	total_task_execution_time += (p->execution_end - p->execution_start);
-	total_tasks_executed++;
 }
 
 /*
-For every unreported complete task and watched file,
-send the results to the manager.
+Report the status of a failed library task on the worker
 */
 
-static void report_tasks_complete(struct link *manager)
+static void report_task_failed(struct link *manager, struct vine_process *p)
+{
+	if (p->type == VINE_PROCESS_TYPE_LIBRARY)
+	{
+		send_message(manager, "failed_library %d %s\n", p->task->task_id, p->task->provides_library);
+	}
+}
+
+/*
+For every unreported complete/failed task and watched file,
+send the results or status to the manager.
+*/
+
+static void report_results_available(struct link *manager)
 {
 	struct vine_process *p;
+
+	vine_watcher_send_changes(watcher, manager, time(0) + options->active_timeout);
 
 	while ((p = itable_pop(procs_complete))) {
 		report_task_complete(manager, p);
 	}
-
-	vine_watcher_send_changes(watcher, manager, time(0) + options->active_timeout);
+	
+	while ((p = itable_pop(procs_failed))) {
+		report_task_failed(manager, p);
+	}
+	
 	send_message(manager, "end\n");
 
 	results_to_be_sent_msg = 0;
@@ -937,6 +958,8 @@ static int do_kill(int task_id)
 		return 1;
 	}
 
+	list_remove(procs_waiting, p);
+
 	if (itable_remove(procs_running, task_id)) {
 		vine_process_kill_and_wait(p);
 
@@ -948,7 +971,7 @@ static int do_kill(int task_id)
 	}
 
 	itable_remove(procs_complete, p->task->task_id);
-	list_remove(procs_waiting, p);
+	itable_remove(procs_failed, p->task->task_id);
 
 	vine_watcher_remove_process(watcher, p);
 
@@ -978,6 +1001,7 @@ static void kill_all_tasks()
 	assert(itable_size(procs_table) == 0);
 	assert(itable_size(procs_running) == 0);
 	assert(itable_size(procs_complete) == 0);
+	assert(itable_size(procs_failed) == 0);
 	assert(list_size(procs_waiting) == 0);
 	assert(cores_allocated == 0);
 	assert(memory_allocated == 0);
@@ -1222,7 +1246,7 @@ static int handle_manager(struct link *manager)
 			fprintf(stderr, "vine_worker: this manager requires a password. (use the -P option)\n");
 			r = 0;
 		} else if (sscanf(line, "send_results %d", &n) == 1) {
-			report_tasks_complete(manager);
+			report_results_available(manager);
 			r = 1;
 		} else {
 			debug(D_VINE, "Unrecognized manager message: %s.\n", line);
@@ -1338,7 +1362,8 @@ static int process_can_run_eventually(struct vine_process *p, struct vine_cache 
 
 	if (p->task->needs_library) {
 		/* Note that we check for *some* library but do not bind to it. */
-		if (!find_future_library_for_function(p->task->needs_library)) {
+		struct vine_process *p_future = find_future_library_for_function(p->task->needs_library);
+		if (!p || p_future->result == VINE_RESULT_LIBRARY_EXIT) {
 			return 0;
 		}
 	}
@@ -1479,11 +1504,53 @@ static int check_library_startup(struct vine_process *p)
 	return ok;
 }
 
+/*
+Kill a failed library process.
+This library process may either not existent or no longer responses.
+*/
+
+static void handle_failed_library_process(struct vine_process *p, struct link *manager)
+{
+	if (p->type != VINE_PROCESS_TYPE_LIBRARY) {
+		return;
+	}
+	
+	p->exit_code = 1;
+	p->execution_start = p->execution_end = timestamp_get();
+	p->result = VINE_RESULT_LIBRARY_EXIT;
+
+	cores_allocated -= p->task->resources_requested->cores;
+	memory_allocated -= p->task->resources_requested->memory;
+	disk_allocated -= p->task->resources_requested->disk;
+	gpus_allocated -= p->task->resources_requested->gpus;
+	vine_gpus_free(p->task->task_id);
+
+	itable_remove(procs_running, p->task->task_id);
+	itable_insert(procs_failed, p->task->task_id, p);
+
+	/* Forsake the tasks that are waiting for this library */
+
+	struct vine_process *p_waiting;
+	int visited;
+	int waiting = list_size(procs_waiting);
+
+	for (visited = 0; visited < waiting; visited++) {
+		p_waiting = list_pop_head(procs_waiting);
+		if (!p_waiting) {
+			break;
+		} else if (p_waiting->task->needs_library && !strcmp(p_waiting->task->needs_library, p->task->provides_library)) {
+			forsake_waiting_process(manager, p_waiting);
+		}
+	}
+
+	vine_process_kill(p);
+}
+
 /* Check whether all known libraries are ready to execute functions.
  * A library starts up and tells the vine_worker it's ready by reporting
  * back its library name. */
 
-static void check_libraries_ready()
+static void check_libraries_ready(struct link *manager)
 {
 	uint64_t library_task_id;
 	struct vine_process *library_process;
@@ -1502,15 +1569,21 @@ static void check_libraries_ready()
 			if (link_poll(&library_link_info, 1, 0) && (library_link_info.revents & LINK_READ)) {
 				if (check_library_startup(library_process)) {
 					debug(D_VINE,
-							"Library %s reports ready to execute functions.",
-							library_process->task->provides_library);
+							"Library %s task id %ld reports ready to execute functions.",
+							library_process->task->provides_library, library_task_id);
 					library_process->library_ready = 1;
 				} else {
 					/* Kill library if the name reported back doesn't match its name or
 					 * if there's any problem. */
-					debug(D_VINE, "Library verification failed. Killing it.");
-					vine_process_kill(library_process);
+					debug(D_VINE, "Library %s task id %ld verification failed. Killing it.",
+							library_process->task->provides_library, library_task_id);
+					handle_failed_library_process(library_process, manager);
 				}
+			} else {
+				/* The library process is no longer running */
+				debug(D_VINE, "Library %s task id %ld verification failed. Killing it.",
+							library_process->task->provides_library, library_task_id);
+				handle_failed_library_process(library_process, manager);
 			}
 			library_link_info.revents = 0;
 		}
@@ -1610,7 +1683,7 @@ static void vine_worker_serve_manager(struct link *manager)
 		}
 
 		/* Check all known libraries if they are ready to execute functions. */
-		check_libraries_ready();
+		check_libraries_ready(manager);
 
 		int task_event = 0;
 		if (ok) {
@@ -1627,7 +1700,9 @@ static void vine_worker_serve_manager(struct link *manager)
 					task_event++;
 				} else if (process_can_run_eventually(p, cache_manager, manager)) {
 					list_push_tail(procs_waiting, p);
-				} else {
+				} 
+				else {
+					debug(D_VINE, "No suitable library found for task %d", p->task->task_id);
 					forsake_waiting_process(manager, p);
 					task_event++;
 				}
@@ -1635,7 +1710,7 @@ static void vine_worker_serve_manager(struct link *manager)
 		}
 
 		if (ok && !results_to_be_sent_msg) {
-			if (vine_watcher_check(watcher) || itable_size(procs_complete) > 0) {
+			if (vine_watcher_check(watcher) || itable_size(procs_complete) > 0 || itable_size(procs_failed) > 0) {
 				send_message(manager, "available_results\n");
 				results_to_be_sent_msg = 1;
 			}
@@ -1650,7 +1725,8 @@ static void vine_worker_serve_manager(struct link *manager)
 		}
 
 		// Reset options->idle_stoptime if something interesting is happening at this worker.
-		if (list_size(procs_waiting) > 0 || itable_size(procs_table) > 0 || itable_size(procs_complete) > 0) {
+		if (list_size(procs_waiting) > 0 || itable_size(procs_table) > 0 || 
+			itable_size(procs_complete) > 0 || itable_size(procs_failed) > 0 ) {
 			reset_idle_timer();
 		}
 	}
@@ -2085,6 +2161,7 @@ void vine_worker_create_structures()
 	procs_running = itable_create(0);
 	procs_waiting = list_create();
 	procs_complete = itable_create(0);
+	procs_failed = itable_create(0);
 
 	current_transfers = hash_table_create(0, 0);
 
@@ -2115,6 +2192,8 @@ static void vine_worker_delete_structures()
 		itable_delete(procs_running);
 	if (procs_complete)
 		itable_delete(procs_complete);
+	if (procs_failed)
+		itable_delete(procs_failed);
 	if (procs_waiting)
 		list_delete(procs_waiting);
 }
