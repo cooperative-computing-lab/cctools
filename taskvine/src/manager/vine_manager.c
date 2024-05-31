@@ -1029,7 +1029,7 @@ static char *monitor_file_name(struct vine_manager *q, struct vine_task *t, cons
 		dir = xxstrdup(t->monitor_output_directory);
 	} else {
 		if (series) {
-			dir = vine_get_runtime_path_log(q, "time-series");
+			dir = vine_get_path_log(q, "time-series");
 		} else {
 			dir = vine_get_path_staging(q, NULL);
 		}
@@ -3900,7 +3900,7 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 		return 0;
 
 	if (series) {
-		char *series_file = vine_get_runtime_path_log(q, "time-series");
+		char *series_file = vine_get_path_log(q, "time-series");
 		if (!create_dir(series_file, 0777)) {
 			warn(D_VINE,
 					"could not create monitor output directory - %s (%s)",
@@ -4672,6 +4672,11 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 	debug(D_VINE, "All instances and the template for library %s have been removed", name);
 }
 
+struct vine_task *vine_manager_find_library_template(struct vine_manager *q, const char *library_name)
+{
+	return hash_table_lookup(q->library_templates, library_name);
+}
+
 static void handle_library_update(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
 	int library_id = 0;
@@ -5133,7 +5138,12 @@ struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, 
 {
 	BEGIN_ACCUM_TIME(q, time_internal);
 	struct vine_task *t = find_task_to_return(q, tag, task_id);
+	if (t) {
+		vine_perf_log_write_update(q, 1);
+	}
 	END_ACCUM_TIME(q, time_internal);
+
+	q->time_last_wait = timestamp_get();
 
 	return t;
 }
@@ -5673,7 +5683,7 @@ int vine_enable_debug_log(const char *logfile)
 
 int vine_enable_perf_log(struct vine_manager *q, const char *filename)
 {
-	char *logpath = vine_get_runtime_path_log(q, filename);
+	char *logpath = vine_get_path_log(q, filename);
 	q->perf_logfile = fopen(logpath, "w");
 	free(logpath);
 
@@ -5690,7 +5700,7 @@ int vine_enable_perf_log(struct vine_manager *q, const char *filename)
 
 int vine_enable_transactions_log(struct vine_manager *q, const char *filename)
 {
-	char *logpath = vine_get_runtime_path_log(q, filename);
+	char *logpath = vine_get_path_log(q, filename);
 	q->txn_logfile = fopen(logpath, "w");
 	free(logpath);
 
@@ -5707,7 +5717,7 @@ int vine_enable_transactions_log(struct vine_manager *q, const char *filename)
 
 int vine_enable_taskgraph_log(struct vine_manager *q, const char *filename)
 {
-	char *logpath = vine_get_runtime_path_log(q, filename);
+	char *logpath = vine_get_path_log(q, filename);
 	q->graph_logfile = fopen(logpath, "w");
 	free(logpath);
 
@@ -6153,6 +6163,11 @@ void vine_log_debug_app(struct vine_manager *m, const char *entry)
 void vine_log_txn_app(struct vine_manager *m, const char *entry)
 {
 	vine_txn_log_write_app_entry(m, entry);
+}
+
+char *vine_version_string()
+{
+	return cctools_version_string();
 }
 
 /* vim: set noexpandtab tabstop=8: */

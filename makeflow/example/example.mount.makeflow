@@ -8,7 +8,7 @@
 CURL=./mycurl
 CONVERT=./myconvert
 
-URL=http://ccl.cse.nd.edu/images/capitol.jpg
+URL=https://ccl.cse.nd.edu/images/capitol.jpg
 
 MAKEFLOW_INPUTS=
 MAKEFLOW_OUTPUTS=capitol.montage.gif

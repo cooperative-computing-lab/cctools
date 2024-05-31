@@ -31,5 +31,4 @@ char *vine_get_path_library_log(struct vine_manager *m, const char *path);
 /* Returns path relative to the cache runtime directory */
 char *vine_get_runtime_path_caching(struct vine_manager *m, const char *path);
 
-
 #endif

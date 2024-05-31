@@ -7,7 +7,7 @@
 # textual substitutions:
 CURL=/usr/bin/curl
 CONVERT=/usr/bin/convert
-URL="http://ccl.cse.nd.edu/images/capitol.jpg"
+URL="https://ccl.cse.nd.edu/images/capitol.jpg"
 
 # We specify the set of inputs and outputs. This is not required, but strongly
 # recommended. MAKEFLOW_INPUTS files should exist in the local filesystem, but
