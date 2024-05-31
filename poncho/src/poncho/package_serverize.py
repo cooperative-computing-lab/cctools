@@ -103,11 +103,6 @@ def create_library_code(path, funcs, dest, version, import_modules=None):
             output_file.write("@remote_execute\n")
             output_file.write(function_code)
             output_file.write("\n")
-        
-        # write a retriever function for retriever tasks used in FutureFunctionCall tasks
-        output_file.write("@remote_execute\n")
-        output_file.write("def retrieve_output(arg):\n")
-        output_file.write("    return arg\n")
 
         output_file.write(init_function)
 
