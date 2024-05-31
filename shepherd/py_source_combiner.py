@@ -22,40 +22,56 @@ def extract_imports(file_content, source_dir):
     return imports, other_lines
 
 
-def combine_files(source_dir, output_file):
+def combine_files(source_dir, output_file, file_list=None, compact=False):
     all_imports = set()
     combined_code = []
     main_blocks = []
 
-    for root, _, files in os.walk(source_dir):
-        for file in sorted(files):
-            if file.endswith('.py'):
-                filepath = os.path.join(root, file)
-                with open(filepath) as infile:
-                    file_content = infile.read()
-                    imports, code = extract_imports(file_content, source_dir)
-                    all_imports.update(imports)
+    if file_list is None or len(file_list) == 0:
+        file_list = os.listdir(source_dir)
+        file_list.sort()
 
-                    code_blocks = ""
-                    inside_main = False
+    for file in sorted(file_list):
+        if file.endswith('.py'):
+            filepath = os.path.join(source_dir, file)
+            with open(filepath) as infile:
+                file_content = infile.read()
+                imports, code = extract_imports(file_content, source_dir)
+                all_imports.update(imports)
 
-                    for line in code:
-                        if line.strip().startswith("if __name__"):
-                            inside_main = True
-                        if inside_main:
-                            main_blocks.append(line)
-                        else:
-                            code_blocks += line + "\n"
+                code_blocks = ""
+                inside_main = False
 
-                    combined_code.append(f"# --- {file} ---\n")
-                    combined_code.append(code_blocks.strip())
+                for line in code:
+                    if compact and line.strip() == '':
+                        continue
+
+                    if line.strip().startswith("if __name__"):
+                        inside_main = True
+                    if inside_main:
+                        main_blocks.append(line)
+                    else:
+                        code_blocks += line + "\n"
+
+                combined_code.append(f"# --- {file} ---")
+
+                if not compact:
+                    combined_code.append("\n")
+
+                combined_code.append(code_blocks.strip())
+
+                if not compact:
                     combined_code.append("\n")
 
     with open(output_file, 'w') as outfile:
         for imp in sorted(all_imports):
             outfile.write(f"{imp}\n")
-        outfile.write("\n")
+
+        if not compact:
+            outfile.write("\n")
+
         outfile.write("\n".join(combined_code))
+
         if main_blocks:
             outfile.write("\n")
             outfile.write("# --- Main Execution Block ---\n")
@@ -63,12 +79,16 @@ def combine_files(source_dir, output_file):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python py_source_combiner.py <source_directory> <output_file>")
+    if len(sys.argv) < 3:
+        print("Usage: python py_source_combiner.py <source_directory> <output_file> [--compact] [<file1> <file2>]")
         sys.exit(1)
 
     source_dir = sys.argv[1]
     output_file = sys.argv[2]
 
-    combine_files(source_dir, output_file)
+    compact = '--compact' in sys.argv
+    file_list = [arg for arg in sys.argv[3:] if arg != '--compact' and not arg.startswith('--')]
+
+    combine_files(source_dir, output_file, file_list, compact)
+
     print(f"Combined file created: {output_file}")

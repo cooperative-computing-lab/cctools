@@ -89,6 +89,3 @@ def topological_sort(programs):
     print(f"DEBUG: Topological sort result: {stack}")
     return stack
 
-# Example usage:
-# config = load_config_from_yaml('config.yml')
-# sorted_programs = validate_and_sort_programs(config)

@@ -2,7 +2,10 @@
 CONFIG_PATH = test/bashapp/program-config.yml
 PYTHON = python3
 MAIN_SCRIPT = src/main.py
-PROGRAM_NAME = sxd
+PROGRAM_NAME = shepherd
+SRC_DIR=src
+SRC=config_loader.py log_monitor.py program_executor.py service_manager.py main.py
+FLAGS =
 
 all: test
 
@@ -12,9 +15,9 @@ run:
 
 test: run
 
-compile:
+onefile:
 	@echo "Compiling all Python code into a single file..."
-	$(PYTHON) py_source_combiner.py src $(PROGRAM_NAME).py
+	$(PYTHON) py_source_combiner.py $(SRC_DIR) $(PROGRAM_NAME).py ${FLAGS} $(SRC)
 clean:
 	@echo "Cleaning up..."
 	find test -type f \( -name "*.json" -or -name "*log" \) -delete
