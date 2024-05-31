@@ -1676,9 +1676,9 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		original->time_when_last_failure = timestamp_get();
 		printf("Library %s failed on worker %s (%s)", t->provides_library, w->hostname, w->addrport);
 		if (q->watch_library_logfiles)
-			printf(", please check the library log file %s\n", t->library_log_path);
+			printf(", check the library log file %s\n", t->library_log_path);
 		else
-			printf(", please enable watch-library-logfiles for debug\n");
+			printf(", enable watch-library-logfiles for debug\n");
 		return VINE_SUCCESS;
 	}
 
