@@ -82,14 +82,14 @@ def library_network_code():
             content = f.read()
             tree = ast.parse(content)
             all_function_code = []
-            
+
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef):
                     for decorator in node.decorator_list:
                         if isinstance(decorator, ast.Name) and decorator.id == 'remote_execute':
                             function_code = ast.get_source_segment(content, node)
                             all_function_code.append(function_code)
-            
+
         return "\n".join(all_function_code)
 
     # Self-identifying message to send back to the worker, including the name of this library.
@@ -146,7 +146,7 @@ def library_network_code():
             exit(1)
 
         with threadpool_limits(limits=thread_limit):
-            
+
             # exec method for now is fork only, direct will be supported later
             exec_method = "fork"
             if exec_method == "direct":
@@ -273,7 +273,7 @@ def library_network_code():
 
     def main():
         ppid = os.getppid()
-        s
+
         parser = argparse.ArgumentParser(
             "Parse input and output file descriptors this process should use. The relevant fds should already be prepared by the vine_worker."
         )
@@ -317,7 +317,7 @@ def library_network_code():
             help="pid of main vine worker to send sigchild to let it know theres some result.",
         )
         args = parser.parse_args()
-        
+
         # check if library cores and function slots are valid
         if args.function_slots > args.library_cores:
             stdout_timed_message("error: function slots cannot be more than library cores")
@@ -345,7 +345,7 @@ def library_network_code():
         stdout_timed_message(f"output fd            {args.out_pipe_fd}")
         stdout_timed_message(f"library cores        {args.library_cores}")
         stdout_timed_message(f"function slots       {args.function_slots}")
-        stdout_timed_message(f"thread limit         {thread_limit}")        
+        stdout_timed_message(f"thread limit         {thread_limit}")
         stdout_timed_message(f"functions installed\n{get_installed_function_code()}")
 
         # Open communication pipes to vine_worker.

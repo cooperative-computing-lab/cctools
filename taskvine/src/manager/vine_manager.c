@@ -157,7 +157,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 static void release_all_workers(struct vine_manager *q);
 
 static int vine_manager_check_inputs_available(struct vine_manager *q, struct vine_task *t);
-
 static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename,
 		vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
 
@@ -324,31 +323,6 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 	}
 
 	// Note we always mark info messages as processed, as they are optional.
-	return VINE_MSG_PROCESSED;
-}
-
-static vine_msg_code_t handle_failed_library(struct vine_manager *q, struct vine_worker_info *w, char *line)
-{
-	int task_id;
-	char library_name[VINE_LINE_MAX];
-	int n = sscanf(line, "failed_library %d %s", &task_id, library_name);
-
-	if (n != 2) {
-		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
-	}
-
-	struct vine_task *t = itable_lookup(w->current_tasks, task_id);
-	if (!t) {
-		debug(D_VINE, "worker %s (%s) reported a failutre for unassigned library task %d", w->hostname, w->addrport, task_id);
-	}
-	if (t->type != VINE_TASK_TYPE_LIBRARY_INSTANCE) {
-		debug(D_VINE, "worker %s (%s) reported a failutre for non-library task %d", w->hostname, w->addrport, task_id);
-	}
-
-	/* Remove the library template as well as the instances */
-	vine_manager_remove_library(q, library_name);
-
-
 	return VINE_MSG_PROCESSED;
 }
 
@@ -584,9 +558,7 @@ static vine_msg_code_t vine_manager_recv_no_retry(
 		result = handle_transfer_port(q, w, line);
 	} else if (sscanf(line, "GET %s HTTP/%*d.%*d", path) == 1) {
 		result = handle_http_request(q, w, path, stoptime);
-	} else if (string_prefix_is(line, "failed_library")) {
-		result = handle_failed_library(q, w, line);
- 	} else {
+	} else {
 		// Message is not a status update: return it to the user.
 		result = VINE_MSG_NOT_PROCESSED;
 	}
@@ -1660,6 +1632,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	execution_time = end_time - start_time;
 
 	/* If the worker sent back a task we have never heard of, then discard the following data. */
+	/* If a library task, maybe it had been previously deleted b/c another worker reported it as failed */
 	struct vine_task *t = itable_lookup(w->current_tasks, task_id);
 	if (!t) {
 		debug(D_VINE,
@@ -1690,6 +1663,15 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	/* Consume the stdout data immediately following this message. */
 	get_stdout(q, w, t, output_length);
 
+	/* If a library task fails, remove the library template and all relevant instances */
+	if (task_status == VINE_RESULT_LIBRARY_EXIT) {
+		debug(D_VINE, "Task %d library %s failed", t->task_id, t->provides_library);
+		vine_manager_remove_library(q, t->provides_library);
+		printf("\nERROR: Failed Library %s\n%s", t->provides_library, t->output);
+		printf("This library has been permanently removed from the manager\n");
+		return VINE_SUCCESS;
+	}
+
 	/* Update task stats for this completion. */
 	observed_execution_time = timestamp_get() - t->time_when_commit_end;
 
@@ -1714,18 +1696,6 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		} else if (t->exit_code == RM_TIME_EXPIRE) {
 			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
 		}
-	}
-
-	/*
-	A library should not ordinarily exit by any means.
-	If it does, count that as a failure in the original object,
-	which will cause future dispatches of the library to be throttled.
-	*/
-
-	if (t->provides_library) {
-		struct vine_task *original = hash_table_lookup(q->library_templates, t->provides_library);
-		if (original)
-			original->time_when_last_failure = timestamp_get();
 	}
 
 	/* Finally update data structures to reflect the completion. */
@@ -3220,6 +3190,17 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 }
 
 /*
+Determine whether there is a suitable library task for a function call task.
+*/
+
+static int vine_manager_check_libray_for_function_call(struct vine_manager *q, struct vine_task *t)
+{
+	if (!t->needs_library || hash_table_lookup(q->library_templates, t->needs_library))
+		return 1;
+	return 0;
+}
+
+/*
 Advance the state of the system by selecting one task available
 to run, finding the best worker for that task, and then committing
 the task to the worker.
@@ -3260,6 +3241,11 @@ static int send_one_task(struct vine_manager *q)
 
 		// Skip task if temp input files have not been materialized.
 		if (!vine_manager_check_inputs_available(q, t)) {
+			continue;
+		}
+
+		// Skip function call task if no suitable library template was installed
+		if (!vine_manager_check_libray_for_function_call(q, t)) {
 			continue;
 		}
 
@@ -4650,6 +4636,8 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 		}
 	}
 	hash_table_remove(q->library_templates, name);
+
+	debug(D_VINE, "All template and instances for %s have been removed", name);
 }
 
 static void handle_library_update(struct vine_manager *q, struct vine_worker_info *w, const char *line)
