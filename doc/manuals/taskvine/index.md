@@ -256,7 +256,7 @@ data to the manager.
 If a temporary file is unexpectedly lost due to the crash or failure
 of a worker, then the task that created it will be re-executed. Temp files
 may also be replicated across workers to a degree set by the `vine_tune` parameter
-`temp-replica-count'. Temp file replicas are useful if significant work
+`temp-replica-count`. Temp file replicas are useful if significant work
 is required to re-execute the task that created it. 
 The contents of a temporary file can be obtained with `fetch_file`
 
@@ -1664,7 +1664,7 @@ can be tailored as any other task:
     def my_sum(x, y):
         return x + y
 
-    m = vine.FutureExecutor(manager_name='my_manager')
+    m = vine.FuturesExecutor(manager_name='my_manager')
 
     t = m.future_task(my_sum, 3, 4)
     t.set_cores(1)
@@ -1683,7 +1683,7 @@ Instead of tasks, the futures may also executed using [function calls](serverles
     def my_sum(x, y):
         return x + y
 
-    m = vine.FutureExecutor(manager_name='my_manager')
+    m = vine.FuturesExecutor(manager_name='my_manager')
 
     libtask = m.create_library_from_functions('test-library', my_sum)
     m.install_library(libtask)

@@ -94,6 +94,6 @@ __all__ = [
     "DaskVineDag",
 ]
 
-__version__ = cvine.cctools_version_string()
+__version__ = cvine.vine_version_string()
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:

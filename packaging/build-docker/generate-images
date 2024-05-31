@@ -1,5 +1,6 @@
 #! /usr/bin/env perl
 
+
 # generate base apptainer and docker images for cctools
 
 use strict;
@@ -139,7 +140,7 @@ my %postinstall_for;
 $versions_of{centos} = [ qw{ 7 } ];
 $command_for{centos} = 'yum install -y';
 
-$versions_of{almalinux} = [ qw{ 8 } ];
+$versions_of{almalinux} = [ qw{ 8 9 } ];
 $command_for{almalinux} = 'dnf install -y';
 
 #$versions_of{fedora} = [ qw{ 30  } ];
@@ -154,18 +155,18 @@ $command_for{ubuntu} = 'apt-get install -y';
 # e.g., $package_for{distro}{version}{dependency} == 'package'
 my %package_for;
 
-########## CENTOS ########## 
-$package_for{centos}{default} = {
+########## almalinux ########## 
+$package_for{almalinux}{default} = {
 bzip2                    => 'bzip2',
 cc                       => 'gcc',
 cmake                    => 'cmake',
 cplusplus                => 'gcc-c++',
 curl                     => 'curl',
-cvmfs                    => [],             # from builder
+cvmfs                    => 'cvmfs-devel-0:2.10.1',             # from cern, specific versions to get libcvmfs.a
 doxygen                  => 'doxygen',
-e2fsprogs                => [],             # from builder, to get libext2fs.a
+e2fsprogs                => 'e2fsprogs-static',
 find                     => 'findutils',
-fuse                     => [],             # from builder, to get libfuse.a
+fuse                     => ['fuse3', 'fuse3-libs', 'fuse3-devel'],
 gdb                      => 'gdb',
 gettext                  => 'gettext',
 git                      => 'git',
@@ -198,6 +199,46 @@ which                    => 'which',
 xrootd                   => [],             # from builder
 zlib                     => 'zlib-devel',
 };
+
+
+$preinstall_for{almalinux}{default} = [
+	'dnf install -y "dnf-command(config-manager)"',
+	'dnf install -y epel-release',
+	'dnf install -y almalinux-release-devel',
+	'dnf install -y https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm'
+];
+
+$preinstall_for{almalinux}{8} = [
+	'dnf config-manager -y --set-enabled powertools',  # for doxygen, and groff
+];
+
+$preinstall_for{almalinux}{9} = [
+	'dnf config-manager -y --set-enabled crb',  # for doxygen, and groff
+];
+
+
+$postinstall_for{almalinux}{8} = [
+	'ln -s /usr/bin/python3 /usr/bin/python',
+	@{$builder},
+	@{$mysql}, # does not compile in alma9
+	'dnf -y clean all',
+];
+
+$postinstall_for{almalinux}{9} = [
+	'ln -s /usr/bin/python3 /usr/bin/python',
+	'dnf -y clean all',
+];
+
+$package_for{almalinux}{default}{python3}  = ['python3-devel', 'python3-setuptools', 'python3-pip'];
+$package_for{almalinux}{default}{swig}     = ['swig'];
+$extras_for{almalinux}{default} = ['glibc-devel', 'libuuid-devel', 'diffutils'];
+
+$package_for{almalinux}{9}{lsb_release} = []; # there is no redhat-lsb package for redhat9
+$package_for{almalinux}{9}{curl} = []; # curl already in base image and there is a conflict if we try to update it
+
+
+########## centos ########## 
+$package_for{centos}{default}     = { %{$package_for{almalinux}{default}} };
 
 #$package_for{centos}{6}{python3} = ['python34-devel', 'python34-setuptools'];  centos6 end-of-life
 $package_for{centos}{7}{python}   = ['python', 'python-devel', 'python-setuptools', 'python-tools'];
@@ -241,40 +282,6 @@ $postinstall_for{centos}{7} = [
 #	'ln -sf /usr/bin/python3.4 /usr/bin/python3',
 #	'ln -sf /usr/bin/python3.4-config /usr/bin/python3-config'
 #];
-
-########## almalinux ##########
-$package_for{almalinux}{default}     = { %{$package_for{centos}{default}} };
-
-$preinstall_for{almalinux}{default} = [
-	'dnf install -y "dnf-command(config-manager)"',
-	'dnf install -y epel-release',
-	'dnf install -y https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm'
-];
-
-$preinstall_for{almalinux}{8} = [
-	'dnf config-manager -y --set-enabled powertools',  # for doxygen, and groff
-];
-
-$preinstall_for{almalinux}{9} = [
-	'dnf config-manager -y --set-enabled crb',  # for doxygen, and groff
-];
-
-$postinstall_for{almalinux}{default} = [
-	'ln -s /usr/bin/python3 /usr/bin/python',
-	@{$builder},
-	@{$fuse},
-	@{$e2fsprogs},
-	@{$mysql}, # does not compile in alma9
-	'dnf -y install cvmfs-devel',
-	'dnf -y clean all',
-];
-
-$package_for{almalinux}{default}{python3}  = ['python3-devel', 'python3-setuptools', 'python3-pip'];
-$package_for{almalinux}{default}{swig}     = ['swig'];
-$extras_for{almalinux}{default} = ['glibc-devel', 'libuuid-devel', 'diffutils'];
-
-$package_for{almalinux}{9}{lsb_release} = []; # there is no redhat-lsb package for redhat9
-$package_for{almalinux}{9}{curl} = []; # curl already in base image and there is a conflict if we try to update it
 
 ########## FEDORA ##########
 $package_for{fedora}{default}     = { %{$package_for{centos}{default}} };
@@ -373,7 +380,7 @@ $postinstall_for{ubuntu}{default} = $postinstall_for{debian}{default};
 
 # finishing installation steps for all:
 my $epilogue = [
-	'python3 -m pip install cloudpickle conda-pack packaging'
+	'python3 -m pip install cloudpickle threadpoolctl conda-pack packaging'
 ];
 
 
@@ -649,16 +656,16 @@ sub generate_docker_image {
 		say "Building image from $doc_name to $tag";
 
 		my $context = catfile($output_dir, 'docker', 'context');
-		#-d $context && system(qq(sudo rm -rf $context));
-		-d $context && system(qq(rm -rf $context));
+		-d $context && system(qq(sudo rm -rf $context));
+		#-d $context && system(qq(rm -rf $context));
 
 		make_path($context, { mode => 0755 });
 		copy $doc_name,       "$context/Dockerfile";
 		copy 'drop-priviliges.c',   "$context/";
 		copy 'run-with-user', "$context/";
 
-		#-e "$img_name"     && system(qq(sudo rm -rf "$img_name"));
-		-e "$img_name"     && system(qq(rm -rf "$img_name"));
+		-e "$img_name"     && system(qq(sudo rm -rf "$img_name"));
+		#-e "$img_name"     && system(qq(rm -rf "$img_name"));
 
 		#qx(sudo docker rmi "$tag");
 		qx(docker rmi "$tag");
@@ -676,8 +683,8 @@ sub generate_docker_image {
 		qx(docker tag "$tag" "docker.io/$tag");
 
 		say "Saving image from $tag to $img_name";
-		#$exit_status = system(qq(sudo docker save --output "$img_name" "$tag"));
-		$exit_status = system(qq(docker save --output "$img_name" "$tag"));
+		$exit_status = system(qq(sudo docker save --output "$img_name" "$tag"));
+		#$exit_status = system(qq(docker save --output "$img_name" "$tag"));
 		unless($exit_status == 0) {
 			die "Could not save to $img_name\n";
 		}

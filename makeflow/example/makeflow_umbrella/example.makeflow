@@ -14,4 +14,4 @@ capitol.360.jpg: capitol.jpg
 	convert -swirl 360 capitol.jpg capitol.360.jpg
 
 capitol.jpg:
-	curl -o capitol.jpg http://ccl.cse.nd.edu/images/capitol.jpg
+	curl -o capitol.jpg https://ccl.cse.nd.edu/images/capitol.jpg
