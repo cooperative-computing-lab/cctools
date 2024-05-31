@@ -4589,7 +4589,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 				"library %s has reached the maximum failure count %d, remove this template",
 				name,
 				q->max_library_retry_time);
-		printf("library has reached the maximum failure count %d, remove this remplate\n",
+		printf("library %s has reached the maximum failure count %d, remove this remplate\n",
 				name,
 				q->max_library_retry_time);
 		return 0;
@@ -4645,6 +4645,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 void vine_manager_install_library(struct vine_manager *q, struct vine_task *t, const char *name)
 {
 	t->type = VINE_TASK_TYPE_LIBRARY_TEMPLATE;
+	t->library_failed_count = 0;
 	t->task_id = -1;
 	vine_task_set_library_provided(t, name);
 	hash_table_insert(q->library_templates, name, t);
