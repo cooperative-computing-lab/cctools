@@ -112,12 +112,6 @@ char *vine_runtime_directory_create()
 	register_staging_dir(tmp);
 	free(tmp);
 
-	tmp = string_format("%s/library_logs", runtime_dir);
-	if (!create_dir(tmp, 0755)) {
-		return NULL;
-	}
-	free(tmp);
-
 	tmp = string_format("%s/../vine-cache", runtime_dir);
 	if (!create_dir(tmp, 0755)) {
 		return NULL;

@@ -3743,6 +3743,14 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->runtime_directory = runtime_dir;
 
+	if (q->watch_library_logfiles) {
+		char *tmp = string_format("%s/library_logs", runtime_dir);
+		if (!create_dir(tmp, 0755)) {
+			return NULL;
+		}
+		free(tmp);
+	}
+
 	q->ssl_key = key ? strdup(key) : 0;
 	q->ssl_cert = cert ? strdup(cert) : 0;
 
