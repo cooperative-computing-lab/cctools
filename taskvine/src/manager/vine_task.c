@@ -134,6 +134,7 @@ void vine_task_reset(struct vine_task *t)
 
 	t->resource_request = CATEGORY_ALLOCATION_FIRST;
 	t->try_count = 0;
+	t->library_failed_count = 0;
 	t->forsaken_count = 0;
 	t->exhausted_attempts = 0;
 	t->workers_slow = 0;

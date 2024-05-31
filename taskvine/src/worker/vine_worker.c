@@ -1341,9 +1341,8 @@ static int process_can_run_eventually(struct vine_process *p, struct vine_cache 
 	if (p->task->needs_library) {
 		/* Note that we check for *some* library but do not bind to it. */
 		struct vine_process *p_future = find_future_library_for_function(p->task->needs_library);
-		if (!p || p_future->result == VINE_RESULT_LIBRARY_EXIT) {
+		if (!p || p_future->result == VINE_RESULT_LIBRARY_FAILED)
 			return 0;
-		}
 	}
 
 	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager);
@@ -1495,7 +1494,7 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 
 	p->exit_code = 1;
 	p->execution_start = p->execution_end = timestamp_get();
-	p->result = VINE_RESULT_LIBRARY_EXIT;
+	p->result = VINE_RESULT_LIBRARY_FAILED;
 
 	cores_allocated -= p->task->resources_requested->cores;
 	memory_allocated -= p->task->resources_requested->memory;
@@ -1506,19 +1505,16 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 	itable_remove(procs_running, p->task->task_id);
 	itable_insert(procs_complete, p->task->task_id, p);
 
-	/* Forsake the tasks that are waiting for this library */
+	/* Forsake the tasks that are running on this library */
+	/* It no available libraries on this worker, tasks waiting for this library will be forsaken */
 
-	struct vine_process *p_waiting;
-	int visited;
-	int waiting = list_size(procs_waiting);
+	struct vine_process *p_running;
+	uint64_t task_id;
 
-	for (visited = 0; visited < waiting; visited++) {
-		p_waiting = list_pop_head(procs_waiting);
-		if (!p_waiting) {
-			break;
-		} else if (p_waiting->task->needs_library &&
-				!strcmp(p_waiting->task->needs_library, p->task->provides_library)) {
-			forsake_waiting_process(manager, p_waiting);
+	ITABLE_ITERATE(procs_running, task_id, p_running)
+	{
+		if (p_running->library_process == p) {
+			finish_running_task(p_running, VINE_RESULT_FORSAKEN);
 		}
 	}
 

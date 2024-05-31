@@ -96,6 +96,9 @@ See the file COPYING for details.
 /* Default value before entity is considered again after last failure, in usecs */
 #define VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL (15 * ONE_SECOND)
 
+/* Define the maximum time that a library template can fail and retry, it over this number the template is removed */
+#define VINE_TASK_MAX_LIBRARY_RETRY_TIME 15
+
 /* Default value before disconnecting a worker that keeps forsaking tasks without any completions */
 #define VINE_DEFAULT_MAX_FORSAKEN_PER_WORKER 10
 
@@ -1602,7 +1605,6 @@ output files of the task.
 
 static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
-
 	if (!q || !w || !line)
 		return VINE_WORKER_FAILURE;
 
@@ -1663,12 +1665,20 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	/* Consume the stdout data immediately following this message. */
 	get_stdout(q, w, t, output_length);
 
-	/* If a library task fails, remove the library template and all relevant instances */
-	if (task_status == VINE_RESULT_LIBRARY_EXIT) {
+	/* If a library task fails, remove this instance  */
+	/* handle failed library instances */
+	if (task_status == VINE_RESULT_LIBRARY_FAILED) {
 		debug(D_VINE, "Task %d library %s failed", t->task_id, t->provides_library);
-		vine_manager_remove_library(q, t->provides_library);
-		printf("\nERROR: Failed Library %s\n%s", t->provides_library, t->output);
-		printf("This library has been permanently removed from the manager\n");
+		reset_task_to_state(q, t, VINE_TASK_RETRIEVED);
+		t->refcount--;
+		struct vine_task *original = hash_table_lookup(q->library_templates, t->provides_library);
+		original->library_failed_count++;
+		original->time_when_last_failure = timestamp_get();
+		printf("Library %s failed on worker %s (%s)", t->provides_library, w->hostname, w->addrport);
+		if (q->watch_library_logfiles)
+			printf(", please check the library log file %s\n", t->library_log_path);
+		else
+			printf(", please enable watch-library-logfiles for debug\n");
 		return VINE_SUCCESS;
 	}
 
@@ -3856,6 +3866,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->update_interval = VINE_UPDATE_INTERVAL;
 	q->resource_management_interval = VINE_RESOURCE_MEASUREMENT_INTERVAL;
 	q->transient_error_interval = VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL;
+	q->max_library_retry_time = VINE_TASK_MAX_LIBRARY_RETRY_TIME;
 	q->max_task_stdout_storage = MAX_TASK_STDOUT_STORAGE;
 	q->max_new_workers = MAX_NEW_WORKERS;
 	q->large_task_check_interval = VINE_LARGE_TASK_CHECK_INTERVAL;
@@ -4373,8 +4384,10 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 		c->vine_stats->tasks_with_results++;
 		break;
 	case VINE_TASK_RETRIEVED:
+		/* Library task can be set to RETRIEVED when it failed or was removed intentionally */
 		if (t->type == VINE_TASK_TYPE_LIBRARY_INSTANCE) {
-			vine_task_set_result(t, VINE_RESULT_LIBRARY_EXIT);
+			if (t->result != VINE_RESULT_LIBRARY_FAILED)
+				vine_task_set_result(t, VINE_RESULT_LIBRARY_CANCELLED);
 		}
 		list_push_head(q->retrieved_list, t);
 		break;
@@ -4445,8 +4458,11 @@ const char *vine_result_string(vine_result_t result)
 	case VINE_RESULT_CANCELLED:
 		str = "CANCELLED";
 		break;
-	case VINE_RESULT_LIBRARY_EXIT:
-		str = "LIBRARY_EXIT";
+	case VINE_RESULT_LIBRARY_CANCELLED:
+		str = "LIBRARY_CANCELLED";
+		break;
+	case VINE_RESULT_LIBRARY_FAILED:
+		str = "LIBRARY_FAILED";
 		break;
 	}
 
@@ -4563,6 +4579,22 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 		return 0;
 	}
 
+	/*
+	If this template had been failed for over a specific number,
+	then remove it and notify the user that this template might be broken
+	*/
+	if (original->library_failed_count > q->max_library_retry_time) {
+		vine_manager_remove_library(q, name);
+		debug(D_VINE,
+				"library %s has reached the maximum failure count %d, remove this template",
+				name,
+				q->max_library_retry_time);
+		printf("library has reached the maximum failure count %d, remove this remplate\n",
+				name,
+				q->max_library_retry_time);
+		return 0;
+	}
+
 	/* Check if this library task can fit in this worker. */
 	/* check_worker_against_task does not, and should not, modify the task */
 	if (!check_worker_against_task(q, w, original)) {
@@ -4583,15 +4615,14 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	if (q->watch_library_logfiles) {
 		char *remote_stdout_filename = string_format(".taskvine.stdout");
 		char *local_library_log_filename = string_format("library-%d.debug.log", q->duplicated_libraries);
-		char *library_log_path = vine_get_path_library_log(q, local_library_log_filename);
+		t->library_log_path = vine_get_path_library_log(q, local_library_log_filename);
 
 		struct vine_file *library_local_stdout_file =
-				vine_declare_file(q, library_log_path, VINE_CACHE_LEVEL_TASK, 0);
+				vine_declare_file(q, t->library_log_path, VINE_CACHE_LEVEL_TASK, 0);
 		vine_task_add_output(t, library_local_stdout_file, remote_stdout_filename, VINE_WATCH);
 
 		free(remote_stdout_filename);
 		free(local_library_log_filename);
-		free(library_log_path);
 	}
 
 	/* Add reference to task when adding it to primary table. */
@@ -4637,7 +4668,7 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 	}
 	hash_table_remove(q->library_templates, name);
 
-	debug(D_VINE, "All template and instances for %s have been removed", name);
+	debug(D_VINE, "All instances and the template for library %s have been removed", name);
 }
 
 static void handle_library_update(struct vine_manager *q, struct vine_worker_info *w, const char *line)

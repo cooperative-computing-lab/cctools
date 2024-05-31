@@ -214,6 +214,7 @@ struct vine_manager {
 	int update_interval;			/* Seconds between updates to the catalog. */
 	int resource_management_interval;	/* Seconds between measurement of manager local resources. */
 	timestamp_t transient_error_interval; /* microseconds between new attempts on task rescheduling and using a file replica as source after a failure. */
+	int max_library_retry_time;        /* The maximum time that a library can be failed and retry another one, if over this count the library template will be removed */
 
 	int watch_library_logfiles;     /* If true, watch the output files produced by each of the library processes running on the remote workers, take them back the current logging directory */
 

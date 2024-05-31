@@ -69,9 +69,11 @@ struct vine_task {
 
 	vine_task_state_t state;       /**< Current state of task: READY, RUNNING, etc */
 	struct vine_worker_info *worker;    /**< Worker to which this task has been dispatched. */
-        struct vine_task* library_task; /**< Library task to which a function task has been matched. */
-	int try_count;               /**< The number of times the task has been dispatched to a worker without being forsaken. If larger than max_retries, return with result of last attempt. */
+	struct vine_task* library_task;     /**< Library task to which a function task has been matched. */
+	char *library_log_path;     /**< The path of the library log file, used only for library task if set q->watch_library_logfiles */ 
+	int try_count;              /**< The number of times the task has been dispatched to a worker without being forsaken. If larger than max_retries, return with result of last attempt. */
 	int forsaken_count;         /**< The number of times the task has been dispatched to a worker. If larger than max_forsaken, return with VINE_RESULT_FORSAKEN. */
+	int library_failed_count;   /**< The number of times the duplicated library instances failed on the workers. Only count for the template.  */
 	int exhausted_attempts;     /**< Number of times the task failed given exhausted resources. */
 	int forsaken_attempts;      /**< Number of times the task was submitted to a worker but failed to start execution. */
 	int workers_slow;           /**< Number of times this task has been terminated for running too long. */
@@ -79,7 +81,7 @@ struct vine_task {
 
 	/***** Results of task once it has reached completion. *****/
 
-	vine_result_t result;          /**< The result of the task (see @ref vine_result_t */
+	vine_result_t result;          /**< The result of the task (see @ref vine_result_t) */
 	int exit_code;               /**< The exit code of the command line. */
 	char *output;                /**< The standard output of the task. */
 	char *addrport;              /**< The address and port of the host on which it ran. */
