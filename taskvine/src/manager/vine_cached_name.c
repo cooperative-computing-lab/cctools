@@ -338,17 +338,22 @@ Returns a string that must be freed with free().
 char *vine_cached_name(const struct vine_file *f, ssize_t *totalsize)
 {
 	unsigned char digest[MD5_DIGEST_LENGTH];
-	char *hash, *name;
+	char *hash = NULL;
+	char *name = NULL;
+
+	int should_compute_cash = f->cache_level >= VINE_CACHE_LEVEL_WORKER;
 
 	switch (f->type) {
 	case VINE_FILE:
-		hash = vine_checksum_any(f->source, totalsize);
+		if (should_compute_cash) {
+			hash = vine_checksum_any(f->source, totalsize);
+		}
 		if (hash) {
-			/* An existing file is identified by its content. */
+			/* An existing file that survives the wokflow at the workers is identified by its content. */
 			name = string_format("file-md5-%s", hash);
 			free(hash);
 		} else {
-			/* A pending file gets a random name. */
+			/* Otherwise it gets a random name. */
 			name = vine_random_name(f, totalsize);
 		}
 		break;
@@ -370,7 +375,7 @@ char *vine_cached_name(const struct vine_file *f, ssize_t *totalsize)
 		name = vine_random_name(f, totalsize);
 		break;
 	case VINE_BUFFER:
-		if (f->data) {
+		if (should_compute_cash && f->data) {
 			/* If the buffer exists, then checksum the content. */
 			md5_buffer(f->data, f->size, digest);
 			const char *hash = md5_to_string(digest);
@@ -383,7 +388,6 @@ char *vine_cached_name(const struct vine_file *f, ssize_t *totalsize)
 		break;
 	default:
 		fatal("invalid file type %d", f->type);
-		name = strdup("notreached");
 		break;
 	}
 
