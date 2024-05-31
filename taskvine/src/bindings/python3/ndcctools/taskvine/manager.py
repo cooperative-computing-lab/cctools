@@ -934,7 +934,7 @@ class Manager(object):
 
         # Positional arguments are the list of functions to include in the library.
         # Create a unique hash of a combination of function names and bodies.
-        functions_hash = package_serverize.generate_functions_hash(function_list)
+        functions_hash = package_serverize.generate_functions_hash(function_list, import_modules)
 
         # Create path for caching library code and environment based on function hash.
         library_cache_path = f"{self.cache_directory}/vine-library-cache/{functions_hash}"
