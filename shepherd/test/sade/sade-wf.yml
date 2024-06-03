@@ -7,22 +7,23 @@ services:
     state:
       log:
         complete: "ports and their PIDs written to"
-
   chmod_port_config:
     type: "action"
     command: "chmod +x /home/user/Firmware/build/px4_sitl_default/etc/init.d-posix/ports.config"
     stdout_path: "/tmp/log/chmod_port_config.log"
     stderr_path: "/tmp/log/chmod_port_config_error.log"
-    depends_on:
-      reserve_port: "final"
+    dependency:
+      items:
+        reserve_port: "final"
 
   copy_ports_config:
     command: "cp /home/user/Firmware/build/px4_sitl_default/etc/init.d-posix/ports.config /tmp/log/ports.config"
     stdout_path: "/tmp/log/copy_ports_config.log"
     stderr_path: "/tmp/log/copy_ports_config_error.log"
     monitor_log: false
-    depends_on:
-      chmod_port_config: "final"
+    dependency:
+      items:
+        chmod_port_config: "final"
 
   gazebo_server:
     type: "service"
@@ -32,8 +33,9 @@ services:
     state:
       log:
         ready: "Connected to gazebo master"
-    depends_on:
-      chmod_port_config: "final"
+    dependency:
+      items:
+        chmod_port_config: "final"
 
   px4_instance_0:
     type: "service"
@@ -44,26 +46,28 @@ services:
       log:
         waiting_for_simulator: "Waiting for simulator to accept connection"
         ready: "Startup script returned successfully"
-    depends_on:
-      gazebo_server: "ready"
+    dependency:
+      items:
+        gazebo_server: "ready"
 
   spawn_model_0:
     type: "service"
     command: "/tmp/sade/spawn_model.sh 0"
     stdout_path: "/tmp/log/spawn_model_0.log"
     stderr_path: "/tmp/log/spawn_model_0_error.log"
-    depends_on:
-      px4_instance_0: "waiting_for_simulator"
+    dependency:
+      items:
+        px4_instance_0: "waiting_for_simulator"
 
   pose_sender:
     type: "service"
     command: "/tmp/sade/start_pose_sender.sh"
     stdout_path: "/tmp/log/pose_sender.log"
     stderr_path: "/tmp/log/pose_sender_error.log"
-    depends_on:
-      px4_instance_0: "ready"
+    dependency:
+      items:
+        px4_instance_0: "ready"
 
 output:
   state_times: "/tmp/log/state_times.json"
 stop_signal: "/tmp/log/stop.txt"
-
