@@ -1,23 +1,35 @@
+import sys
+
 from graphviz import Digraph, Source
 
 
 def generate_dot(config):
     dot = Digraph(comment='Workflow Visualization')
 
-    # Add nodes and edges
+    colors = {
+        'service': 'lightblue',
+        'action': 'lightgreen',
+    }
+
+    # Add nodes with color based on service type
     for service, details in config['services'].items():
-        dot.node(service, service, shape='box', style='filled', color='lightblue')
+        service_type = details.get('type', 'action')  # Default to 'service' if type is not specified
+        node_color = colors.get(service_type, 'lightgrey')  # Default color if no specific type is found
+        dot.node(service, service, shape='box', style='filled', color=node_color)
+
         dependencies = details.get('dependency', {}).get('items', {})
         for dep, state in dependencies.items():
-            dot.edge(dep, service, label=state, color='grey')
+            edge_color = colors.get(state, '')
+            dot.edge(dep, service, label=state, color=edge_color, fontcolor=edge_color)
 
     return dot.source
 
 
 def render_dot(dot_source, output_filename='workflow_visualization'):
+    # Todo: try optional unflatten method
     src = Source(dot_source)
     src.format = 'png'
-    src.render(output_filename)  # 'view=True' opens the image automatically
+    src.render(output_filename, view=True)
 
 
 config = {
@@ -46,6 +58,12 @@ config = {
     }
 }
 
-dot = generate_dot(config)
-print(dot)
-render_dot(dot)
+if __name__ == '__main__':
+    from config_loader import load_and_preprocess_config
+
+    if len(sys.argv) > 1:
+        config = load_and_preprocess_config(sys.argv[1])
+
+    dot = generate_dot(config)
+    print(dot)
+    render_dot(dot)

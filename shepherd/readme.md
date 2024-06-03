@@ -20,6 +20,12 @@ on specific keywords found in these files.
 - **Service as Task:** Shepherd treats long-running services as tasks with defined initial and final states, 
 facilitating structured and predictable service management.
 
+[//]: # (# Todo)
+
+[//]: # (- Makes a workflow of services a task. Complicated workflow -> one task.)
+
+[//]: # (- Add drone workflow)
+
 - **Graceful Shutdown:** Shepherd provides three modes of shutdown: a predetermined maximum runtime, a stop signal 
 file, and response to external interrupts, ensuring a controlled and safe cessation of services.
 
@@ -75,4 +81,6 @@ stop_signal: "/tmp/bashapp/stop"
 max_run_time: 120
 
 ```
+
+## Visualization
 
