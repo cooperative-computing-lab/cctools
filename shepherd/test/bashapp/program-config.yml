@@ -1,27 +1,22 @@
 services:
-  reserve_port:
-    type: "action"
-    command: "python reserve_ports.py 4 ports.config"
-
   program1:
     type: "action"
     command: "./program1.sh"
+    stdout_path: "/tmp/log/program1_out.log"
+    stderr_path: "/tmp/log/program1_error.log"
     state:
       log:
         ready: "program is ready"
         complete: "program is completed"
       file:
-        path: "program1-out.log"
+        path: "/tmp/program_1_out_2.log"
         states:
-          output_generated: "Generated output"
-    dependency:
-      items:
-        program3: "ready"
-
+          waiting: "program is waiting for program2"
   program2:
     type: "service"
-    group: 'A'
     command: "./program2.sh"
+    stdout_path: "/tmp/log/program2_out.log"
+    stderr_path: "/tmp/log/program2_error.log"
     state:
       log:
         ready: "program is ready"
@@ -29,27 +24,18 @@ services:
     dependency:
       mode: "all"
       items:
-        reserve_port: "final"
-        program3: "ready"
-
+        program1: "ready"
   program3:
     type: "service"
-    group: 'group-1'
     command: "./program3.sh"
     state:
       log:
         ready: "program is ready"
         complete: "program is completed"
-    dependency:
-      items:
-        reserve_port: "final"
 
 output:
   state_times: "state_times.json"
-  max_concurrent_for_group:
-    group-1:
-      max: 1
-      required_state: 'ready'
+  stdout_dir: "/tmp"
 
 stop_signal: "/tmp/bashapp/stop"
 max_run_time: 120
