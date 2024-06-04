@@ -113,7 +113,7 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 		/* Otherwise we need to figure it out ourselves from the content. */
 		/* This may give us the actual size of the object along the way. */
 		ssize_t totalsize = 0;
-		if (f->cache_level >= VINE_CACHE_LEVEL_FOREVER) {
+		if (f->cache_level >= VINE_CACHE_LEVEL_WORKER) {
 			f->cached_name = vine_cached_name(f, &totalsize);
 		} else {
 			if (f->type == VINE_FILE) {
