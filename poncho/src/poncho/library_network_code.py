@@ -13,6 +13,7 @@ def library_network_code():
     # import relevant libraries.
     import json
     import os
+    import fcntl
     import sys
     import argparse
     import traceback
@@ -91,14 +92,6 @@ def library_network_code():
                             all_function_code.append(function_code)
 
         return "\n".join(all_function_code)
-
-    # Self-identifying message to send back to the worker, including the name of this library.
-    # Send back a SIGCHLD to interrupt worker sleep and get it to work.
-    def send_configuration(config, out_pipe_fd, worker_pid):
-        config_string = json.dumps(config)
-        config_cmd = f"{len(config_string)}\n{config_string}"
-        os.writev(out_pipe_fd, [bytes(config_cmd, "utf-8")])
-        os.kill(worker_pid, signal.SIGCHLD)
 
     # Handler to sigchld when child exits.
     def sigchld_handler(signum, frame):
@@ -186,7 +179,7 @@ def library_network_code():
                 p = os.fork()
                 if p == 0:
                     try:
-                        stdout_timed_message(f"TASK {function_id} function call {function_name} arrived, starting to run in process {os.getpid()}")
+                        stdout_timed_message(f"TASK {function_id} {function_name} arrives, starting to run in process {os.getpid()}")
                         # change the working directory to the function's sandbox
                         os.chdir(function_sandbox)
 
@@ -217,7 +210,7 @@ def library_network_code():
                             # restore to the library's stdout fd on completion
                             os.dup2(library_fd, sys.stdout.fileno())
                         except Exception:
-                            stdout_timed_message(f"TASK {function_id} error: can't execute this function from infile")
+                            stdout_timed_message(f"TASK {function_id} error: can't execute this function")
                             exit_status = 3
                             raise
                         finally:
@@ -238,7 +231,7 @@ def library_network_code():
                             if not result["Success"]:
                                 exit_status = 5
                         except Exception:
-                            stdout_timed_message(f"TASK {function_id} error: the result is broken")
+                            stdout_timed_message(f"TASK {function_id} error: the result is invalid")
                             exit_status = 5
                             raise
 
@@ -266,6 +259,26 @@ def library_network_code():
         os.writev(out_pipe_fd, [buff])
         os.kill(worker_pid, signal.SIGCHLD)
 
+    def send_heartbeat(sequence, heartbeat_pipe_fd, worker_pid):
+        heartbeat = {
+            "sequence": sequence,
+            "timestamp": int(time.time() * 1e6),
+            "pid": os.getpid(),
+            "status": "alive"
+        }
+        heartbeat_string = json.dumps(heartbeat)
+        heartbeat_cmd = f"{len(heartbeat_string)}\n{heartbeat_string}"
+        os.writev(heartbeat_pipe_fd, [bytes(heartbeat_cmd, "utf-8")])
+        os.kill(worker_pid, signal.SIGCHLD)
+
+    # Self-identifying message to send back to the worker, including the name of this library.
+    # Send back a SIGCHLD to interrupt worker sleep and get it to work.
+    def send_configuration(config, out_pipe_fd, worker_pid):
+        config_string = json.dumps(config)
+        config_cmd = f"{len(config_string)}\n{config_string}"
+        os.writev(out_pipe_fd, [bytes(config_cmd, "utf-8")])
+        os.kill(worker_pid, signal.SIGCHLD)
+
     # Use os.write to stdout instead of print for multi-processing safety
     def stdout_timed_message(message):
         timestamp = datetime.now().strftime("%m/%d/%y %H:%M:%S.%f")
@@ -288,6 +301,12 @@ def library_network_code():
             required=True,
             type=int,
             help="output fd to send messages to the vine_worker via a pipe",
+        )
+        parser.add_argument(
+            "--heartbeat-pipe-fd",
+            required=True,
+            type=int,
+            help="another output fd to send heartbeat messages to indicate the liveness of this process",
         )
         parser.add_argument(
             "--task-id",
@@ -317,7 +336,7 @@ def library_network_code():
             help="pid of main vine worker to send sigchild to let it know theres some result.",
         )
         args = parser.parse_args()
-
+        
         # check if library cores and function slots are valid
         if args.function_slots > args.library_cores:
             stdout_timed_message("error: function slots cannot be more than library cores")
@@ -335,8 +354,15 @@ def library_network_code():
             stdout_timed_message(f"error: {e}")
             exit(1)
 
+        # check if the in_pipe_fd and out_pipe_fd are valid
+        try:
+            fcntl.fcntl(args.in_pipe_fd, fcntl.F_GETFD)
+            fcntl.fcntl(args.out_pipe_fd, fcntl.F_GETFD)
+        except IOError as e:
+            stdout_timed_message(f"error: pipe fd closed\n{e}")
+            exit(1)
+ 
         stdout_timed_message(f"library task starts running in process {os.getpid()}")
-        stdout_timed_message("library description")
         stdout_timed_message(f"hostname             {socket.gethostname()}")
         stdout_timed_message(f"task id              {args.task_id}")
         stdout_timed_message(f"worker pid           {args.worker_pid}")
@@ -347,7 +373,7 @@ def library_network_code():
         stdout_timed_message(f"function slots       {args.function_slots}")
         stdout_timed_message(f"thread limit         {thread_limit}")
         stdout_timed_message(f"functions installed\n{get_installed_function_code()}")
-
+        
         # Open communication pipes to vine_worker.
         # The file descriptors are inherited from the vine_worker parent process
         # and should already be open for reads and writes.
@@ -358,12 +384,9 @@ def library_network_code():
         config = {
             "name": name(),  # noqa: F821
         }
-        try:
-            send_configuration(config, out_pipe_fd, args.worker_pid)
-        except Exception as e:
-            stdout_timed_message(f"error: {e}")
-            exit(1)
 
+        send_configuration(config, out_pipe_fd, args.worker_pid)
+        
         # mapping of child pid to function id of currently running functions
         pid_to_func_id = {}
 
@@ -374,7 +397,8 @@ def library_network_code():
         timeout = 5
 
         last_check_time = time.time()
-
+        sequence = 0
+        
         while True:
             # check if parent exits
             c_ppid = os.getppid()
@@ -382,13 +406,18 @@ def library_network_code():
                 stdout_timed_message("library finished successfully")
                 exit(0)
 
-            # wait for messages from worker or child to return
-            rlist, wlist, xlist = select.select([in_pipe_fd, r], [], [], timeout)
-
-            # periodically log the number of concurrent functions
-            if time.time() - last_check_time > 5:
-                last_check_time = time.time()
+            # periodically send heartbeat message and log the number of concurrent functions
+            if time.time() - last_check_time >= 5:
+                send_heartbeat(sequence, args.heartbeat_pipe_fd, args.worker_pid)
                 stdout_timed_message(f"{len(pid_to_func_id)} functions running concurrently")
+                sequence += 1
+                last_check_time = time.time()
+
+            # wait for messages from worker or child to return
+            try:
+                rlist, wlist, xlist = select.select([in_pipe_fd, r], [], [], timeout)
+            except Exception as e:
+                print(f"error unable to read from pipe {in_pipe_fd}\n{e}")
 
             for re in rlist:
                 # worker has a function, run it

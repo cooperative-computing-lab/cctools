@@ -1443,45 +1443,6 @@ static int enforce_worker_promises(struct link *manager)
 }
 
 /*
-Given a freshly started process, wait for it to initialize and send
-back the library startup message with JSON containing the name of
-the library, which should match the task's provides_library label.
-*/
-
-static int check_library_startup(struct vine_process *p)
-{
-	char buffer_len[VINE_LINE_MAX];
-	int length = 0;
-
-	/* Read a line that gives the length of the response message. */
-	if (!link_readline(p->library_read_link, buffer_len, VINE_LINE_MAX, LINK_NOWAIT)) {
-		return 0;
-	}
-	sscanf(buffer_len, "%d", &length);
-
-	/* Now read that length of message and null-terminate it. */
-	char buffer[length + 1];
-	if (link_read(p->library_read_link, buffer, length, LINK_NOWAIT) <= 0) {
-		return 0;
-	}
-	buffer[length] = 0;
-
-	/* Check that the response is JX and contains the expected name. */
-	struct jx *response = jx_parse_string(buffer);
-
-	const char *name = jx_lookup_string(response, "name");
-
-	int ok = 0;
-	if (!strcmp(name, p->task->provides_library)) {
-		ok = 1;
-	}
-	if (response) {
-		jx_delete(response);
-	}
-	return ok;
-}
-
-/*
 Kill a failed library process.
 This library process may either not existent or no longer responses.
 */
@@ -1492,15 +1453,17 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 		return;
 	}
 
+	p->library_ready = 0;
 	p->exit_code = 1;
-	p->execution_start = p->execution_end = timestamp_get();
-	p->result = VINE_RESULT_LIBRARY_FAILED;
+	p->execution_end = timestamp_get();
 
 	cores_allocated -= p->task->resources_requested->cores;
 	memory_allocated -= p->task->resources_requested->memory;
 	disk_allocated -= p->task->resources_requested->disk;
 	gpus_allocated -= p->task->resources_requested->gpus;
 	vine_gpus_free(p->task->task_id);
+
+	finish_running_task(p, VINE_RESULT_LIBRARY_FAILED);
 
 	itable_remove(procs_running, p->task->task_id);
 	itable_insert(procs_complete, p->task->task_id, p);
@@ -1517,15 +1480,46 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 			finish_running_task(p_running, VINE_RESULT_FORSAKEN);
 		}
 	}
-
-	vine_process_kill(p);
 }
 
-/* Check whether all known libraries are ready to execute functions.
- * A library starts up and tells the vine_worker it's ready by reporting
- * back its library name. */
+static int check_library_alive(struct vine_process *p)
+{
+	char buffer_len[VINE_LINE_MAX];
+	int length = 0;
 
-static void check_libraries_ready(struct link *manager)
+	/* Read a line that gives the length of the response message. */
+	if (!link_readline(p->library_heartbeat_link, buffer_len, VINE_LINE_MAX, LINK_NOWAIT)) {
+		return 0;
+	}
+	sscanf(buffer_len, "%d", &length);
+
+	/* Now read that length of message and null-terminate it. */
+	char buffer[length + 1];
+	if (link_read(p->library_heartbeat_link, buffer, length, LINK_NOWAIT) <= 0) {
+		return 0;
+	}
+	buffer[length] = 0;
+
+	/* Check that the response is JX and contains the expected name. */
+	struct jx *response = jx_parse_string(buffer);
+	p->most_recent_heartbeat = jx_lookup_integer(response, "timestamp");
+	const char *status = jx_lookup_string(response, "status");
+
+	const char *expected_status = "alive";
+
+	int ok = 0;
+	if (!strcmp(status, expected_status)) {
+		ok = 1;
+	}
+	if (response) {
+		jx_delete(response);
+	}
+	return ok;
+};
+
+/* Check whether all known libraries are alive and ready to execute functions. */
+
+static void check_libraries_alive(struct link *manager)
 {
 	uint64_t library_task_id;
 	struct vine_process *library_process;
@@ -1534,38 +1528,43 @@ static void check_libraries_ready(struct link *manager)
 	library_link_info.events = LINK_READ;
 	library_link_info.revents = 0;
 
-	/* Loop through all processes to find libraries and check if they are ready. */
+	/* Loop through all processes to find libraries and check if they are alive. */
 	ITABLE_ITERATE(procs_running, library_task_id, library_process)
 	{
-		if ((library_process->type == VINE_PROCESS_TYPE_LIBRARY) && !library_process->library_ready) {
-			library_link_info.link = library_process->library_read_link;
+		if (library_process->type != VINE_PROCESS_TYPE_LIBRARY)
+			continue;
 
-			/* Check if library has sent its startup message. */
-			if (link_poll(&library_link_info, 1, 0) && (library_link_info.revents & LINK_READ)) {
-				if (check_library_startup(library_process)) {
-					debug(D_VINE,
-							"Library %s task id %ld reports ready to execute functions.",
-							library_process->task->provides_library,
-							library_task_id);
-					library_process->library_ready = 1;
-				} else {
-					/* Kill library if the name reported back doesn't match its name or
-					 * if there's any problem. */
-					debug(D_VINE,
-							"Library %s task id %ld verification failed. Killing it.",
-							library_process->task->provides_library,
-							library_task_id);
-					handle_failed_library_process(library_process, manager);
-				}
+		/* Check if library has sent its startup message. */
+		library_link_info.link = library_process->library_heartbeat_link;
+		library_link_info.revents = 0;
+
+		if (link_poll(&library_link_info, 1, 0) && (library_link_info.revents & LINK_READ)) {
+			/* Consume all the heartbeat messages */
+			if (check_library_alive(library_process)) {
+				library_process->library_ready = 1;
+				debug(D_VINE,
+						"Library %s task id %ld reports ready to execute functions.",
+						library_process->task->provides_library,
+						library_task_id);
+				link_flush_output(library_link_info.link);
 			} else {
-				/* The library process is no longer running */
+				/* Kill library if the returned status is unexpected. */
 				debug(D_VINE,
 						"Library %s task id %ld verification failed. Killing it.",
 						library_process->task->provides_library,
 						library_task_id);
 				handle_failed_library_process(library_process, manager);
 			}
-			library_link_info.revents = 0;
+		} else {
+			/* The link has no readable data */
+			/* If this library process does not send a heartbeat within 15 seconds, we assume it failed  */
+			if (timestamp_get() - library_process->most_recent_heartbeat > 15 * 1e6) {
+				debug(D_VINE,
+						"Library %s task id %ld verification failed. Killing it.",
+						library_process->task->provides_library,
+						library_task_id);
+				handle_failed_library_process(library_process, manager);
+			}
 		}
 	}
 }
@@ -1662,8 +1661,8 @@ static void vine_worker_serve_manager(struct link *manager)
 			break;
 		}
 
-		/* Check all known libraries if they are ready to execute functions. */
-		check_libraries_ready(manager);
+		/* Check all known libraries if they are alive and ready to execute functions. */
+		check_libraries_alive(manager);
 
 		int task_event = 0;
 		if (ok) {

@@ -39,6 +39,8 @@ def main():
 
     q = vine.Manager(port=0)
 
+    q.tune('watch-library-logfiles', 1)
+
     print(f"TaskVine manager listening on port {q.port}")
 
     with open(args.port_file, "w") as f:

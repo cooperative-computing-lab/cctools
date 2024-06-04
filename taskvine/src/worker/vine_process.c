@@ -116,6 +116,8 @@ void vine_process_delete(struct vine_process *p)
 		link_close(p->library_read_link);
 	if (p->library_write_link)
 		link_close(p->library_write_link);
+	if (p->library_heartbeat_link)
+		link_close(p->library_heartbeat_link);
 
 	if (p->sandbox) {
 		trash_file(p->sandbox);
@@ -292,11 +294,13 @@ int vine_process_execute(struct vine_process *p)
 	/* Various file descriptors for communication between parent and child */
 	int pipe_in[2] = {-1, -1};
 	int pipe_out[2] = {-1, -1};
+	int pipe_heartbeat[2] = {-1, -1};   // only for library task, pipe to receive heartbeat messages
 	int stdin_fd = -1;
 	int stdout_fd = -1;
 	int stderr_fd = -1;
 	int in_pipe_fd = -1;  // only for library task, fd to send functions to library
 	int out_pipe_fd = -1; // only for library task, fd to receive results from library
+	int heartbeat_pipe_fd = -1; // only for library task, fd to receive heartbeat messages
 
 	/* Setting up input, output, and stderr for various task types. */
 	if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
@@ -305,8 +309,11 @@ int vine_process_execute(struct vine_process *p)
 			fatal("couldn't create library pipes: %s\n", strerror(errno));
 		if (pipe(pipe_out) < 0)
 			fatal("couldn't create library pipes: %s\n", strerror(errno));
+		if (pipe(pipe_heartbeat) < 0)
+			fatal("couldn't create library pipes: %s\n", strerror(errno));
 		in_pipe_fd = pipe_in[0];
 		out_pipe_fd = pipe_out[1];
+		heartbeat_pipe_fd = pipe_heartbeat[1];
 	}
 
 	/* Read input from null and send output to assigned file. */
@@ -318,8 +325,6 @@ int vine_process_execute(struct vine_process *p)
 	}
 	stderr_fd = stdout_fd;
 
-	/* Start the performance clock just prior to forking the task. */
-	p->execution_start = timestamp_get();
 	p->pid = fork();
 
 	if (p->pid > 0) {
@@ -328,6 +333,10 @@ int vine_process_execute(struct vine_process *p)
 		// This is currently used by kill_task().
 		setpgid(p->pid, 0);
 
+		/* Start the performance clock just after forking the process. */
+		p->execution_start = timestamp_get();
+		p->most_recent_heartbeat = timestamp_get();
+
 		debug(D_VINE, "started task %d pid %d: %s", p->task->task_id, p->pid, p->task->command_line);
 
 		/* If we just started a library, then retain links to communicate with it. */
@@ -335,10 +344,12 @@ int vine_process_execute(struct vine_process *p)
 
 			p->library_read_link = link_attach_to_fd(pipe_out[0]);
 			p->library_write_link = link_attach_to_fd(pipe_in[1]);
+			p->library_heartbeat_link = link_attach_to_fd(pipe_heartbeat[0]);
 
 			/* Close the ends of the pipes that the parent process won't use. */
 			close(pipe_in[0]);
 			close(pipe_out[1]);
+			close(pipe_heartbeat[1]);
 		}
 		/* Drop the fds unused by the parent, stderr_fd is stdout_fd so close once. */
 		close(stdin_fd);
@@ -354,6 +365,8 @@ int vine_process_execute(struct vine_process *p)
 		close(pipe_in[1]);
 		close(pipe_out[0]);
 		close(pipe_out[1]);
+		close(pipe_heartbeat[1]);
+		close(pipe_heartbeat[1]);
 		close(stdin_fd);
 		close(stdout_fd);
 		close(stderr_fd);
@@ -386,6 +399,7 @@ int vine_process_execute(struct vine_process *p)
 		if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
 			close(pipe_in[1]);
 			close(pipe_out[0]);
+			close(pipe_heartbeat[0]);
 		}
 
 		/* Remove undesired things from the environment. */
@@ -404,10 +418,11 @@ int vine_process_execute(struct vine_process *p)
 			execl("/bin/sh", "sh", "-c", p->task->command_line, (char *)0);
 		} else {
 			char *final_command = string_format(
-					"%s --in-pipe-fd %d --out-pipe-fd %d --task-id %d --library-cores %d --function-slots %d --worker-pid %d",
+					"%s --in-pipe-fd %d --out-pipe-fd %d --heartbeat-pipe-fd %d --task-id %d --library-cores %d --function-slots %d --worker-pid %d",
 					p->task->command_line,
 					in_pipe_fd,
 					out_pipe_fd,
+					heartbeat_pipe_fd,
 					p->task->task_id,
 					(int)p->task->resources_requested->cores,
 					p->task->function_slots,

@@ -97,7 +97,7 @@ See the file COPYING for details.
 #define VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL (15 * ONE_SECOND)
 
 /* Define the maximum time that a library template can fail and retry, it over this number the template is removed */
-#define VINE_TASK_MAX_LIBRARY_RETRY_TIME 15
+#define VINE_TASK_MAX_LIBRARY_RETRY_TIME 3
 
 /* Default value before disconnecting a worker that keeps forsaking tasks without any completions */
 #define VINE_DEFAULT_MAX_FORSAKEN_PER_WORKER 10
@@ -3743,14 +3743,6 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->runtime_directory = runtime_dir;
 
-	if (q->watch_library_logfiles) {
-		char *tmp = string_format("%s/library_logs", runtime_dir);
-		if (!create_dir(tmp, 0755)) {
-			return NULL;
-		}
-		free(tmp);
-	}
-
 	q->ssl_key = key ? strdup(key) : 0;
 	q->ssl_cert = cert ? strdup(cert) : 0;
 
@@ -4594,10 +4586,10 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	if (original->library_failed_count > q->max_library_retry_time) {
 		vine_manager_remove_library(q, name);
 		debug(D_VINE,
-				"library %s has reached the maximum failure count %d, remove this template",
+				"library %s has reached the maximum failure count %d, it has been removed",
 				name,
 				q->max_library_retry_time);
-		printf("library %s has reached the maximum failure count %d, remove this remplate\n",
+		printf("library %s has reached the maximum failure count %d, it has been removed\n",
 				name,
 				q->max_library_retry_time);
 		return 0;
@@ -5503,6 +5495,13 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		q->option_blocklist_slow_workers_timeout = MAX(0, value); /*todo: confirm 0 or 1*/
 
 	} else if (!strcmp(name, "watch-library-logfiles")) {
+		char *runtime_dir = xxstrdup(getenv("VINE_RUNTIME_INFO_DIR"));
+		char *tmp = string_format("%s/library_logs", runtime_dir);
+		if (!create_dir(tmp, 0755)) {
+			debug(D_NOTICE | D_VINE, "Warning: could not create runtime library log directory: %s\n", runtime_dir);
+			return -1;
+		}
+		free(tmp);
 		q->watch_library_logfiles = !!((int)value);
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);

@@ -55,6 +55,8 @@ struct vine_process {
 	/* If this is a library process, the links to communicate with the library. */
 	struct link *library_read_link;
 	struct link *library_write_link;
+	struct link *library_heartbeat_link;      /* The link to send heartbeats to make sure it's alive */
+	timestamp_t most_recent_heartbeat;        /* The most recent time the library reports it's alive */
 
 	/* If this is a library process, the number of functions it is currently running. */
 	int functions_running;
