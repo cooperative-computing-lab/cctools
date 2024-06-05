@@ -333,7 +333,7 @@ def library_network_code():
             help="pid of main vine worker to send sigchild to let it know theres some result.",
         )
         args = parser.parse_args()
-        
+
         # check if library cores and function slots are valid
         if args.function_slots > args.library_cores:
             stdout_timed_message("error: function slots cannot be more than library cores")
@@ -358,7 +358,7 @@ def library_network_code():
         except IOError as e:
             stdout_timed_message(f"error: pipe fd closed\n{e}")
             exit(1)
- 
+
         stdout_timed_message(f"library task starts running in process {os.getpid()}")
         stdout_timed_message(f"hostname             {socket.gethostname()}")
         stdout_timed_message(f"task id              {args.task_id}")
@@ -370,7 +370,7 @@ def library_network_code():
         stdout_timed_message(f"function slots       {args.function_slots}")
         stdout_timed_message(f"thread limit         {thread_limit}")
         stdout_timed_message(f"functions installed\n{get_installed_function_code()}")
-        
+
         # Open communication pipes to vine_worker.
         # The file descriptors are inherited from the vine_worker parent process
         # and should already be open for reads and writes.
@@ -388,7 +388,7 @@ def library_network_code():
 
         last_check_time = time.time() - 5
         sequence = 0
-        
+
         while True:
             # check if parent exits
             c_ppid = os.getppid()
