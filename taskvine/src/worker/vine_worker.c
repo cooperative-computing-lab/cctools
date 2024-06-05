@@ -1558,14 +1558,14 @@ static void check_libraries_alive(struct link *manager)
 			if (check_library_alive(library_process)) {
 				library_process->library_ready = 1;
 				debug(D_VINE,
-						"Library %s task id %ld reports ready to execute functions.",
+						"Library %s task id %lu reports ready to execute functions.",
 						library_process->task->provides_library,
 						library_task_id);
 				// link_flush_output(library_link_info.link);
 			} else {
 				/* Kill library if the returned status is unexpected. */
 				debug(D_VINE,
-						"Library %s task id %ld verification failed (unexpected response). Killing it.",
+						"Library %s task id %lu verification failed (unexpected response). Killing it.",
 						library_process->task->provides_library,
 						library_task_id);
 				handle_failed_library_process(library_process, manager);
@@ -1576,7 +1576,7 @@ static void check_libraries_alive(struct link *manager)
 			/* If this library process did not send any message within 15 seconds, we assume it failed  */
 			if (timestamp_get() - library_process->most_recent_heartbeat > 15 * 1e6) {
 				debug(D_VINE,
-						"Library %s task id %ld verification failed (no response in 30s). Killing it.",
+						"Library %s task id %lu verification failed (no response in 30s). Killing it.",
 						library_process->task->provides_library,
 						library_task_id);
 				handle_failed_library_process(library_process, manager);
