@@ -5498,7 +5498,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		char *runtime_dir = xxstrdup(getenv("VINE_RUNTIME_INFO_DIR"));
 		char *tmp = string_format("%s/library_logs", runtime_dir);
 		if (!create_dir(tmp, 0755)) {
-			debug(D_NOTICE | D_VINE, "Warning: could not create runtime library log directory: %s\n", runtime_dir);
+			debug(D_NOTICE | D_VINE,
+					"Warning: could not create runtime library log directory: %s\n",
+					runtime_dir);
 			return -1;
 		}
 		free(tmp);

@@ -112,7 +112,6 @@ def library_network_code():
             else:
                 buffer_len += c
         buffer_len = int(buffer_len)
-
         # now read the buffer to get invocation details
         line = str(os.read(in_pipe_fd, buffer_len), encoding="utf-8")
 
@@ -126,6 +125,8 @@ def library_network_code():
         except Exception as e:
             stdout_timed_message(f"error: not enough values to unpack from {line} (expected 4 items), exception: {e}")
             exit(1)
+
+        print(f"func_id = {function_id} name = {function_name} sdbx = {function_sandbox} stdout = {function_stdout_filename}")
 
         try:
             function_id = int(function_id)
@@ -180,6 +181,7 @@ def library_network_code():
                 if p == 0:
                     try:
                         stdout_timed_message(f"TASK {function_id} {function_name} arrives, starting to run in process {os.getpid()}")
+
                         # change the working directory to the function's sandbox
                         os.chdir(function_sandbox)
 
@@ -259,24 +261,19 @@ def library_network_code():
         os.writev(out_pipe_fd, [buff])
         os.kill(worker_pid, signal.SIGCHLD)
 
-    def send_heartbeat(sequence, heartbeat_pipe_fd, worker_pid):
+    # Self-identifying message to send back to the worker.
+    # Send back a SIGCHLD to interrupt worker sleep and get it to work.
+    def send_heartbeat(sequence, heartbeat_pipe_fd, current_check_time, worker_pid):
         heartbeat = {
             "sequence": sequence,
-            "timestamp": int(time.time() * 1e6),
+            "timestamp": int(current_check_time * 1e6),
             "pid": os.getpid(),
             "status": "alive"
         }
+
         heartbeat_string = json.dumps(heartbeat)
         heartbeat_cmd = f"{len(heartbeat_string)}\n{heartbeat_string}"
         os.writev(heartbeat_pipe_fd, [bytes(heartbeat_cmd, "utf-8")])
-        os.kill(worker_pid, signal.SIGCHLD)
-
-    # Self-identifying message to send back to the worker, including the name of this library.
-    # Send back a SIGCHLD to interrupt worker sleep and get it to work.
-    def send_configuration(config, out_pipe_fd, worker_pid):
-        config_string = json.dumps(config)
-        config_cmd = f"{len(config_string)}\n{config_string}"
-        os.writev(out_pipe_fd, [bytes(config_cmd, "utf-8")])
         os.kill(worker_pid, signal.SIGCHLD)
 
     # Use os.write to stdout instead of print for multi-processing safety
@@ -380,13 +377,6 @@ def library_network_code():
         in_pipe_fd = args.in_pipe_fd
         out_pipe_fd = args.out_pipe_fd
 
-        # send configuration of library, just its name for now
-        config = {
-            "name": name(),  # noqa: F821
-        }
-
-        send_configuration(config, out_pipe_fd, args.worker_pid)
-        
         # mapping of child pid to function id of currently running functions
         pid_to_func_id = {}
 
@@ -396,7 +386,7 @@ def library_network_code():
         # 5 seconds to wait for select, any value long enough would probably do
         timeout = 5
 
-        last_check_time = time.time()
+        last_check_time = time.time() - 5
         sequence = 0
         
         while True:
@@ -406,12 +396,13 @@ def library_network_code():
                 stdout_timed_message("library finished successfully")
                 exit(0)
 
-            # periodically send heartbeat message and log the number of concurrent functions
-            if time.time() - last_check_time >= 5:
-                send_heartbeat(sequence, args.heartbeat_pipe_fd, args.worker_pid)
+            # periodically send a heartbeat message and log the number of concurrent functions
+            current_check_time = time.time()
+            if current_check_time - last_check_time >= 5:
+                send_heartbeat(sequence, args.heartbeat_pipe_fd, current_check_time, args.worker_pid)
                 stdout_timed_message(f"{len(pid_to_func_id)} functions running concurrently")
                 sequence += 1
-                last_check_time = time.time()
+                last_check_time = current_check_time
 
             # wait for messages from worker or child to return
             try:

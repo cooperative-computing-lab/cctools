@@ -294,12 +294,12 @@ int vine_process_execute(struct vine_process *p)
 	/* Various file descriptors for communication between parent and child */
 	int pipe_in[2] = {-1, -1};
 	int pipe_out[2] = {-1, -1};
-	int pipe_heartbeat[2] = {-1, -1};   // only for library task, pipe to receive heartbeat messages
+	int pipe_heartbeat[2] = {-1, -1}; // only for library task, pipe to receive heartbeat messages
 	int stdin_fd = -1;
 	int stdout_fd = -1;
 	int stderr_fd = -1;
-	int in_pipe_fd = -1;  // only for library task, fd to send functions to library
-	int out_pipe_fd = -1; // only for library task, fd to receive results from library
+	int in_pipe_fd = -1;	    // only for library task, fd to send functions to library
+	int out_pipe_fd = -1;	    // only for library task, fd to receive results from library
 	int heartbeat_pipe_fd = -1; // only for library task, fd to receive heartbeat messages
 
 	/* Setting up input, output, and stderr for various task types. */
@@ -504,6 +504,9 @@ int vine_process_library_get_result(struct vine_process *p, uint64_t *done_task_
 	/* If there is no data waiting on the link, don't check. */
 	if (!link_usleep(p->library_read_link, 0, 1, 0))
 		return 0;
+
+	/* Update the library's most_recent_heartbeat as the current time*/
+	p->most_recent_heartbeat = timestamp_get();
 
 	char buffer[VINE_LINE_MAX]; // Buffer to store length of data from library.
 	int ok = 1;

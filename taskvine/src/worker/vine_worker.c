@@ -189,6 +189,13 @@ struct vine_worker_options *options = 0;
 
 extern int vine_hack_do_not_compute_cached_name;
 
+/***************************************************************/
+/*       Library Process Management Function Declarations      */
+/***************************************************************/
+static void handle_failed_library_process(struct vine_process *p, struct link *manager);
+static int check_library_alive(struct vine_process *p);
+static void check_libraries_alive(struct link *manager);
+
 /* Send a printf-formatted message to the current manager. */
 
 __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const char *fmt, ...)
@@ -544,7 +551,12 @@ static void reap_process(struct vine_process *p, struct link *manager)
 	gpus_allocated -= p->task->resources_requested->gpus;
 
 	vine_gpus_free(p->task->task_id);
-	vine_sandbox_stageout(p, cache_manager, manager);
+
+	/* For a library process, do not stageout its sandbox until the watched logfile
+	 * is updated to the manger */
+	if (p->type != VINE_PROCESS_TYPE_LIBRARY) {
+		vine_sandbox_stageout(p, cache_manager, manager);
+	}
 
 	if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
 		p->library_process->functions_running--;
@@ -651,7 +663,17 @@ static int handle_completed_tasks(struct link *manager)
 		/* Check to see if this process itself is completed. */
 
 		if (vine_process_is_complete(p)) {
-			reap_process(p, manager);
+			if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
+				/* Kill the library process if it completes. */
+				debug(D_VINE,
+						"Library %s task id %d is detected to be failed. Killing it.",
+						p->task->provides_library,
+						p->task->task_id);
+				handle_failed_library_process(p, manager);
+			} else {
+				/* Otherwise simply reap this process */
+				reap_process(p, manager);
+			}
 			result_retrieved++;
 		}
 
@@ -1455,18 +1477,11 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 
 	p->library_ready = 0;
 	p->exit_code = 1;
-	p->execution_end = timestamp_get();
 
-	cores_allocated -= p->task->resources_requested->cores;
-	memory_allocated -= p->task->resources_requested->memory;
-	disk_allocated -= p->task->resources_requested->disk;
-	gpus_allocated -= p->task->resources_requested->gpus;
-	vine_gpus_free(p->task->task_id);
+	reap_process(p, manager);
 
+	/* Mark this library as failed */
 	finish_running_task(p, VINE_RESULT_LIBRARY_FAILED);
-
-	itable_remove(procs_running, p->task->task_id);
-	itable_insert(procs_complete, p->task->task_id, p);
 
 	/* Forsake the tasks that are running on this library */
 	/* It no available libraries on this worker, tasks waiting for this library will be forsaken */
@@ -1546,24 +1561,26 @@ static void check_libraries_alive(struct link *manager)
 						"Library %s task id %ld reports ready to execute functions.",
 						library_process->task->provides_library,
 						library_task_id);
-				link_flush_output(library_link_info.link);
+				// link_flush_output(library_link_info.link);
 			} else {
 				/* Kill library if the returned status is unexpected. */
 				debug(D_VINE,
-						"Library %s task id %ld verification failed. Killing it.",
+						"Library %s task id %ld verification failed (unexpected response). Killing it.",
 						library_process->task->provides_library,
 						library_task_id);
 				handle_failed_library_process(library_process, manager);
+				itable_firstkey(procs_running);
 			}
 		} else {
 			/* The link has no readable data */
-			/* If this library process does not send a heartbeat within 15 seconds, we assume it failed  */
+			/* If this library process did not send any message within 15 seconds, we assume it failed  */
 			if (timestamp_get() - library_process->most_recent_heartbeat > 15 * 1e6) {
 				debug(D_VINE,
-						"Library %s task id %ld verification failed. Killing it.",
+						"Library %s task id %ld verification failed (no response in 30s). Killing it.",
 						library_process->task->provides_library,
 						library_task_id);
 				handle_failed_library_process(library_process, manager);
+				itable_firstkey(procs_running);
 			}
 		}
 	}
