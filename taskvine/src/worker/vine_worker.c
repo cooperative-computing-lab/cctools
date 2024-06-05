@@ -1561,7 +1561,7 @@ static void check_libraries_alive(struct link *manager)
 						"Library %s task id %" PRIu64 " reports ready to execute functions.",
 						library_process->task->provides_library,
 						library_task_id);
-				// link_flush_output(library_link_info.link);
+				link_flush_output(library_link_info.link);
 			} else {
 				/* Kill library if the returned status is unexpected. */
 				debug(D_VINE,
@@ -1574,8 +1574,8 @@ static void check_libraries_alive(struct link *manager)
 			}
 		} else {
 			/* The link has no readable data */
-			/* If this library process did not send any message within 15 seconds, we assume it failed  */
-			if (timestamp_get() - library_process->most_recent_heartbeat > 15 * 1e6) {
+			/* If this library process did not send any message within 30 seconds, we assume it failed  */
+			if (timestamp_get() - library_process->most_recent_heartbeat > 30 * 1e6) {
 				debug(D_VINE,
 						"Library %s task id %" PRIu64
 						" verification failed (no response in 30s). Killing it.",

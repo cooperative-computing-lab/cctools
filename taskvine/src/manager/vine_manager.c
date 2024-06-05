@@ -97,7 +97,7 @@ See the file COPYING for details.
 #define VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL (15 * ONE_SECOND)
 
 /* Define the maximum time that a library template can fail and retry, it over this number the template is removed */
-#define VINE_TASK_MAX_LIBRARY_RETRY_TIME 3
+#define VINE_TASK_MAX_LIBRARY_RETRIES 15
 
 /* Default value before disconnecting a worker that keeps forsaking tasks without any completions */
 #define VINE_DEFAULT_MAX_FORSAKEN_PER_WORKER 10
@@ -3866,7 +3866,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->update_interval = VINE_UPDATE_INTERVAL;
 	q->resource_management_interval = VINE_RESOURCE_MEASUREMENT_INTERVAL;
 	q->transient_error_interval = VINE_DEFAULT_TRANSIENT_ERROR_INTERVAL;
-	q->max_library_retry_time = VINE_TASK_MAX_LIBRARY_RETRY_TIME;
+	q->max_library_retries = VINE_TASK_MAX_LIBRARY_RETRIES;
 	q->max_task_stdout_storage = MAX_TASK_STDOUT_STORAGE;
 	q->max_new_workers = MAX_NEW_WORKERS;
 	q->large_task_check_interval = VINE_LARGE_TASK_CHECK_INTERVAL;
@@ -4580,18 +4580,18 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	}
 
 	/*
-	If this template had been failed for over a specific number,
+	If this template had been failed for over a specific count,
 	then remove it and notify the user that this template might be broken
 	*/
-	if (original->library_failed_count > q->max_library_retry_time) {
+	if (original->library_failed_count > q->max_library_retries) {
 		vine_manager_remove_library(q, name);
 		debug(D_VINE,
 				"library %s has reached the maximum failure count %d, it has been removed",
 				name,
-				q->max_library_retry_time);
+				q->max_library_retries);
 		printf("library %s has reached the maximum failure count %d, it has been removed\n",
 				name,
-				q->max_library_retry_time);
+				q->max_library_retries);
 		return 0;
 	}
 
