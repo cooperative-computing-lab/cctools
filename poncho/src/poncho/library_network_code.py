@@ -261,19 +261,12 @@ def library_network_code():
         os.writev(out_pipe_fd, [buff])
         os.kill(worker_pid, signal.SIGCHLD)
 
-    # Self-identifying message to send back to the worker.
+    # Self-identifying message to send back to the worker, including the name of this library.
     # Send back a SIGCHLD to interrupt worker sleep and get it to work.
-    def send_heartbeat(sequence, heartbeat_pipe_fd, current_check_time, worker_pid):
-        heartbeat = {
-            "sequence": sequence,
-            "timestamp": int(current_check_time * 1e6),
-            "pid": os.getpid(),
-            "status": "alive"
-        }
-
-        heartbeat_string = json.dumps(heartbeat)
-        heartbeat_cmd = f"{len(heartbeat_string)}\n{heartbeat_string}"
-        os.writev(heartbeat_pipe_fd, [bytes(heartbeat_cmd, "utf-8")])
+    def send_configuration(config, out_pipe_fd, worker_pid):
+        config_string = json.dumps(config)
+        config_cmd = f"{len(config_string)}\n{config_string}"
+        os.writev(out_pipe_fd, [bytes(config_cmd, "utf-8")])
         os.kill(worker_pid, signal.SIGCHLD)
 
     # Use os.write to stdout instead of print for multi-processing safety
@@ -298,12 +291,6 @@ def library_network_code():
             required=True,
             type=int,
             help="output fd to send messages to the vine_worker via a pipe",
-        )
-        parser.add_argument(
-            "--heartbeat-pipe-fd",
-            required=True,
-            type=int,
-            help="another output fd to send heartbeat messages to indicate the liveness of this process",
         )
         parser.add_argument(
             "--task-id",
@@ -380,6 +367,12 @@ def library_network_code():
         # mapping of child pid to function id of currently running functions
         pid_to_func_id = {}
 
+        # send configuration of library, just its name for now
+        config = {
+            "name": name(),  # noqa: F821
+        }
+        send_configuration(config, out_pipe_fd, args.worker_pid)
+
         # register sigchld handler to turn a sigchld signal into an I/O event
         signal.signal(signal.SIGCHLD, sigchld_handler)
 
@@ -387,21 +380,18 @@ def library_network_code():
         timeout = 5
 
         last_check_time = time.time() - 5
-        sequence = 0
 
         while True:
             # check if parent exits
             c_ppid = os.getppid()
             if c_ppid != ppid or c_ppid == 1:
-                stdout_timed_message("library finished successfully")
+                stdout_timed_message("library finished because parent exited")
                 exit(0)
 
-            # periodically send a heartbeat message and log the number of concurrent functions
+            # periodically log the number of concurrent functions
             current_check_time = time.time()
             if current_check_time - last_check_time >= 5:
-                send_heartbeat(sequence, args.heartbeat_pipe_fd, current_check_time, args.worker_pid)
                 stdout_timed_message(f"{len(pid_to_func_id)} functions running concurrently")
-                sequence += 1
                 last_check_time = current_check_time
 
             # wait for messages from worker or child to return
