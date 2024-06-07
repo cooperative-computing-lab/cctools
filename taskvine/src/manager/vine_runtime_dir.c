@@ -118,6 +118,12 @@ char *vine_runtime_directory_create()
 	}
 	free(tmp);
 
+	tmp = string_format("%s/library_logs", runtime_dir);
+	if (!create_dir(tmp, 0755)) {
+		return NULL;
+	}
+	free(tmp);
+
 	if (symlink_most_recent) {
 		char *tmp = path_concat(vine_runtime_info_path, "most-recent");
 		unlink(tmp);

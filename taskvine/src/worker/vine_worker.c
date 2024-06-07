@@ -671,7 +671,7 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 	p->exit_code = 1;
 
 	/* Mark this library as failed */
-	finish_running_task(p, VINE_RESULT_LIBRARY_FAILED);
+	finish_running_task(p, VINE_RESULT_LIBRARY_EXIT);
 
 	/* Forsake the tasks that are running on this library */
 	/* It no available libraries on this worker, tasks waiting for this library will be forsaken */
@@ -1386,7 +1386,7 @@ static int process_can_run_eventually(struct vine_process *p, struct vine_cache 
 	if (p->task->needs_library) {
 		/* Note that we check for *some* library but do not bind to it. */
 		struct vine_process *p_future = find_future_library_for_function(p->task->needs_library);
-		if (!p || p_future->result == VINE_RESULT_LIBRARY_FAILED)
+		if (!p || p_future->result == VINE_RESULT_LIBRARY_EXIT)
 			return 0;
 	}
 
