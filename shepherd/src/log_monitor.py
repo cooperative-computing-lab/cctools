@@ -22,14 +22,12 @@ def monitor_log_file(log_path, state_dict, service_name, state_keywords, cond, s
         while not stop_event.is_set():
             line = file.readline()
             if not line:
-                time.sleep(0.1)
+                time.sleep(0.001)
                 continue
 
             current_time = time.time() - start_time
 
             reached_final_state = False
-
-
 
             for state in state_keywords:
                 if state_keywords[state] in line:

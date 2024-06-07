@@ -18,6 +18,8 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
     file_path_to_monitor = config.get('state', {}).get('file', {}).get('path', '')
     file_states = config.get('state', {}).get('file', {}).get('states', {})
 
+    service_type = config.get('type', 'action')  # Default to 'action' if type is not specified
+
     try:
         with cond:
             if dependency_mode == 'all':
@@ -35,7 +37,7 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
                     if not satisfied:
                         cond.wait()
 
-        print(f"DEBUG: Starting execution of {service_name}")
+        print(f"DEBUG: Starting execution of '{service_type}' {service_name}")
 
         # Start the main log monitoring thread
         log_thread = threading.Thread(target=monitor_log_file,
@@ -59,6 +61,21 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
                                        preexec_fn=os.setsid)
             pgid_dict[service_name] = os.getpgid(process.pid)
             process.wait()
+
+        # #todo: disucss this. this was done to makeup for log monitor delay
+        time.sleep(0.01)
+
+        if service_type == 'service' and not stop_event.is_set():
+            print(f"DEBUG: Stopping execution of '{service_type}' {service_name}")
+
+            # If a service stops before receiving a stop event, mark it as failed
+            with cond:
+                state_dict[service_name] = "failure"
+                local_state_times = state_times[service_name]
+                local_state_times['failure'] = time.time() - start_time
+                state_times[service_name] = local_state_times
+                cond.notify_all()
+            print(f"ERROR: Service {service_name} stopped unexpectedly, marked as failure.")
 
         with cond:
             state_dict[service_name] = "final"

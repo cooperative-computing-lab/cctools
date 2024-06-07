@@ -13,14 +13,14 @@ while true; do
 done
 
 READY_TIME=$(date +%s)
-run_duration=30
+run_duration=5
 
 while true; do
     echo "$(date +%s) - program is running"
     sleep 0.5
 
-#    if [[ $(date +%s) -gt $((READY_TIME + run_duration)) ]]; then
-#        echo "$(date +%s) - program is completed"
-#        break
-#    fi
+    if [[ $(date +%s) -gt $((READY_TIME + run_duration)) ]]; then
+        echo "$(date +%s) - program is completed"
+        break
+    fi
 done

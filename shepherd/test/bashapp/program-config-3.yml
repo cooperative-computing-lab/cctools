@@ -1,0 +1,42 @@
+services:
+  program1:
+    type: "action"
+    command: "./program1.sh"
+    stdout_path: "/tmp/log/program1_out.log"
+    stderr_path: "/tmp/log/program1_error.log"
+    state:
+      log:
+        ready: "program is ready"
+        complete: "program is completed"
+      file:
+        path: "/tmp/program_1_out_2.log"
+        states:
+          waiting: "program is waiting for program2"
+  program2:
+    type: "service"
+    command: "./program2.sh"
+    stdout_path: "/tmp/log/program2_out.log"
+    stderr_path: "/tmp/log/program2_error.log"
+    state:
+      log:
+        ready: "program is ready"
+        complete: "program is completed"
+    dependency:
+      mode: "all"
+      items:
+        program1: "ready"
+        program3: "ready"
+  program3:
+    type: "service"
+    command: "./program3.sh"
+    state:
+      log:
+        ready: "program is ready"
+        complete: "program is completed"
+
+output:
+  state_times: "state_times.json"
+  stdout_dir: "/tmp"
+
+stop_signal: "/tmp/bashapp/stop"
+max_run_time: 120
