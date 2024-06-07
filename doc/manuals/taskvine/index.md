@@ -2480,7 +2480,7 @@ Produces an image containing the specified visualizations for each transactions 
 
 ![Example Plot Composition](images/composition.png)
 
-`vine_plot_animate` creates an animation visualizing the amount of data exchanged between worker nodes and the manager during the duration of workflow execution.
+`vine_transfer_plot_animate` creates an animation visualizing the amount of data exchanged between worker nodes and the manager during the duration of workflow execution.
 
 ```sh
 vine_plot_animate debug_log
