@@ -2468,6 +2468,29 @@ Note that very large task graphs may be impractical to graph at this level of de
     conda install -c conda-forge graphviz
     ```
 
+### Other Tools
+
+`vine_plot_compose` visualizes workflow executions in a variety of ways, creating a composition of multiple plots in a single visualiztion. This tool may be useful in 
+comparing performance across multiple executions. 
+
+```sh
+vine_plot_compose transactions_log_1 ... transactions_log_N --worker-view --task-view --worker-cache --scale --sublabels --out composition.png
+```
+Produces an image containing the specified visualizations for each transactions log included like so:
+
+![Example Plot Composition](images/composition.png)
+
+`vine_transfer_plot_animate` creates an animation visualizing the amount of data exchanged between worker nodes and the manager during the duration of workflow execution.
+
+```sh
+vine_plot_animate debug_log
+```
+produces an animation like this:
+
+![Example Animation](images/anim.gif)
+
+
+
 ### Tuning Specialized Execution Parameters
 
 The behaviour of TaskVine can be tuned by the following parameters. We advise
