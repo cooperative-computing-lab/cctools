@@ -92,20 +92,16 @@ typedef enum {
 	VINE_RESULT_STDOUT_MISSING = 4, /**< The task ran but its stdout has been truncated **/
 	VINE_RESULT_SIGNAL = 1 << 3,	/**< The task was terminated with a signal **/
 	VINE_RESULT_RESOURCE_EXHAUSTION = 2 << 3, /**< The task used more resources than requested **/
-	VINE_RESULT_MAX_END_TIME = 3 << 3,  /**< The task ran after the specified (absolute since epoch) end time. **/
-	VINE_RESULT_UNKNOWN = 4 << 3,	    /**< The result could not be classified. **/
-	VINE_RESULT_FORSAKEN = 5 << 3,	    /**< The task failed, but it was not a task error **/
-	VINE_RESULT_MAX_RETRIES = 6 << 3,   /**< Currently unused. **/
-	VINE_RESULT_MAX_WALL_TIME = 7 << 3, /**< The task ran for more than the specified time (relative since running
-					       in a worker). **/
-	VINE_RESULT_RMONITOR_ERROR =
-			8 << 3, /**< The task failed because the monitor did not produce a summary report. **/
-	VINE_RESULT_OUTPUT_TRANSFER_ERROR = 9 << 3,   /**< The task failed because an output could be transfered to the
-							 manager (not enough disk space, incorrect write permissions). */
-	VINE_RESULT_FIXED_LOCATION_MISSING = 10 << 3, /**< The task failed because no worker could satisfy the fixed
-							 location input file requirements. */
-	VINE_RESULT_CANCELLED = 11 << 3,	      /**< The task was cancelled by the caller. */
-	VINE_RESULT_LIBRARY_EXIT = 12 << 3	      /**< Task is a library that has terminated. **/
+	VINE_RESULT_MAX_END_TIME        = 3 << 3, /**< The task ran after the specified (absolute since epoch) end time. **/
+	VINE_RESULT_UNKNOWN             = 4 << 3, /**< The result could not be classified. **/
+	VINE_RESULT_FORSAKEN            = 5 << 3, /**< The task failed, but it was not a task error **/
+	VINE_RESULT_MAX_RETRIES         = 6 << 3, /**< Currently unused. **/
+	VINE_RESULT_MAX_WALL_TIME       = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
+	VINE_RESULT_RMONITOR_ERROR      = 8 << 3, /**< The task failed because the monitor did not produce a summary report. **/
+	VINE_RESULT_OUTPUT_TRANSFER_ERROR = 9 << 3,  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
+	VINE_RESULT_FIXED_LOCATION_MISSING = 10 << 3, /**< The task failed because no worker could satisfy the fixed location input file requirements. */
+	VINE_RESULT_CANCELLED = 11 << 3, /**< The task was cancelled by the caller. */
+	VINE_RESULT_LIBRARY_EXIT      = 12 << 3, /**< Task is a library that has exited unexpected. **/
 } vine_result_t;
 
 /** Select how to allocate resources for similar tasks with @ref vine_set_category_mode */

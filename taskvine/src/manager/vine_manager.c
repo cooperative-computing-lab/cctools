@@ -1664,6 +1664,26 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	/* Consume the stdout data immediately following this message. */
 	get_stdout(q, w, t, output_length);
 
+	/* If a library task fails, remove this instance  */
+	/* handle failed library instances */
+	if (task_status == VINE_RESULT_LIBRARY_EXIT) {
+		debug(D_VINE, "Task %d library %s failed", t->task_id, t->provides_library);
+		reset_task_to_state(q, t, VINE_TASK_RETRIEVED);
+		t->refcount--;
+		printf("Library %s failed on worker %s (%s)", t->provides_library, w->hostname, w->addrport);
+		if (q->watch_library_logfiles)
+			printf(", check the library log file %s\n", t->library_log_path);
+		else
+			printf(", enable watch-library-logfiles for debug\n");
+
+		struct vine_task *original = hash_table_lookup(q->library_templates, t->provides_library);
+		if (original) {
+			original->library_failed_count++;
+			original->time_when_last_failure = timestamp_get();
+		}
+		return VINE_SUCCESS;
+	}
+
 	/* Update task stats for this completion. */
 	observed_execution_time = timestamp_get() - t->time_when_commit_end;
 
