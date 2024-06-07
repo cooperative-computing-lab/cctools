@@ -505,54 +505,6 @@ static int handle_transfer_hostport(struct vine_manager *q, struct vine_worker_i
 	return VINE_MSG_PROCESSED;
 }
 
-void exit_alert(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
-{
-	if (t->result == VINE_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
-		switch (t->exit_code) {
-		case (126):
-			warn(D_VINE,
-					"Task %d ran for a very short time and exited with code %d.\n",
-					t->task_id,
-					t->exit_code);
-			warn(D_VINE, "This usually means that the task's command is not an executable,\n");
-			warn(D_VINE, "or that the worker's scratch directory is on a no-exec partition.\n");
-			break;
-		case (127):
-			warn(D_VINE,
-					"Task %d ran for a very short time and exited with code %d.\n",
-					t->task_id,
-					t->exit_code);
-			warn(D_VINE, "This usually means that the task's command could not be found, or that\n");
-			warn(D_VINE, "it uses a shared library not available at the worker, or that\n");
-			warn(D_VINE, "it uses a version of the glibc different than the one at the worker.\n");
-			break;
-		case (139):
-			warn(D_VINE,
-					"Task %d ran for a very short time and exited with code %d.\n",
-					t->task_id,
-					t->exit_code);
-			warn(D_VINE, "This usually means that the task's command had a segmentation fault,\n");
-			warn(D_VINE, "either because it has a memory access error (segfault), or because\n");
-			warn(D_VINE, "it uses a version of a shared library different from the one at the worker.\n");
-			break;
-		default:
-			break;
-		}
-	}
-
-	vine_task_info_add(q, t);
-
-	debug(D_VINE,
-			"%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
-			w->hostname,
-			w->addrport,
-			(t->time_when_done - t->time_when_commit_start) / 1000000.0,
-			(long long)w->total_tasks_complete,
-			w->total_task_time / w->total_tasks_complete / 1000000.0);
-
-	return;
-}
-
 static vine_result_code_t get_completion_result(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
 	if (!q || !w || !line)
@@ -1333,13 +1285,31 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 	reap_task_from_worker(q, w, t, VINE_TASK_RETRIEVED);
 	vine_manager_send(q, w, "kill %d\n", t->task_id);
 
-	w->finished_tasks--;
-	w->total_tasks_complete++;
+	switch (t->result) {
+	case VINE_RESULT_INPUT_MISSING:
+	case VINE_RESULT_FORSAKEN:
+		/* do not count tasks that didn't execute as complete, or finished tasks */
+		break;
+	default:
+		w->finished_tasks--;
+		w->total_tasks_complete++;
 
-	// At least one task has finished without triggering a slow worker disconnect, thus we
-	// now have evidence that worker is not slow (e.g., it was probably the
-	// previous task that was slow).
-	w->alarm_slow_worker = 0;
+		// At least one task has finished without triggering a slow worker disconnect, thus we
+		// now have evidence that worker is not slow (e.g., it was probably the
+		// previous task that was slow).
+		w->alarm_slow_worker = 0;
+
+		vine_task_info_add(q, t);
+		debug(D_VINE,
+				"%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
+				w->hostname,
+				w->addrport,
+				(t->time_when_done - t->time_when_commit_start) / 1000000.0,
+				(long long)w->total_tasks_complete,
+				w->total_task_time / w->total_tasks_complete / 1000000.0);
+
+		break;
+	}
 
 	/* print warnings if the task ran for a very short time (1s) and exited with common non-zero status */
 	if (t->result == VINE_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
@@ -1374,16 +1344,6 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 			break;
 		}
 	}
-
-	vine_task_info_add(q, t);
-
-	debug(D_VINE,
-			"%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
-			w->hostname,
-			w->addrport,
-			(t->time_when_done - t->time_when_commit_start) / 1000000.0,
-			(long long)w->total_tasks_complete,
-			w->total_task_time / w->total_tasks_complete / 1000000.0);
 
 	return 1;
 }
