@@ -126,8 +126,6 @@ def library_network_code():
             stdout_timed_message(f"error: not enough values to unpack from {line} (expected 4 items), exception: {e}")
             exit(1)
 
-        print(f"func_id = {function_id} name = {function_name} sdbx = {function_sandbox} stdout = {function_stdout_filename}")
-
         try:
             function_id = int(function_id)
         except Exception as e:
@@ -245,7 +243,7 @@ def library_network_code():
                     finally:
                         os._exit(exit_status)
                 elif p < 0:
-                    print(f"TASK {function_id} error: unable to fork to execute {function_name}")
+                    stdout_timed_message(f"TASK {function_id} error: unable to fork to execute {function_name}")
                     return -1
 
                 # return pid and function id of child process to parent.
@@ -398,7 +396,7 @@ def library_network_code():
             try:
                 rlist, wlist, xlist = select.select([in_pipe_fd, r], [], [], timeout)
             except Exception as e:
-                print(f"error unable to read from pipe {in_pipe_fd}\n{e}")
+                stdout_timed_message(f"error unable to read from pipe {in_pipe_fd}\n{e}")
 
             for re in rlist:
                 # worker has a function, run it
