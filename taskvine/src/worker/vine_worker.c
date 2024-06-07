@@ -1546,6 +1546,8 @@ static void check_libraries_ready(struct link *manager)
 		if (library_process->type != VINE_PROCESS_TYPE_LIBRARY || library_process->library_ready)
 			continue;
 
+		library_link_info.link = library_process->library_read_link;
+
 		/* Check if library has sent its startup message. */
 		if (link_poll(&library_link_info, 1, 0) && (library_link_info.revents & LINK_READ)) {
 			if (check_library_startup(library_process)) {
