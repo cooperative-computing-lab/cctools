@@ -21,7 +21,6 @@ def library_network_code():
     import select
     import signal
     import time
-    import ast
     from datetime import datetime
     import socket
     from threadpoolctl import threadpool_limits
@@ -76,22 +75,6 @@ def library_network_code():
             return LibraryResponse(result, success, reason).generate()
 
         return remote_wrapper
-
-    # Parse the current library code and return the source code of installed functions
-    def get_installed_function_code():
-        with open(os.path.abspath(__file__), 'r') as f:
-            content = f.read()
-            tree = ast.parse(content)
-            all_function_code = []
-
-            for node in ast.walk(tree):
-                if isinstance(node, ast.FunctionDef):
-                    for decorator in node.decorator_list:
-                        if isinstance(decorator, ast.Name) and decorator.id == 'remote_execute':
-                            function_code = ast.get_source_segment(content, node)
-                            all_function_code.append(function_code)
-
-        return "\n".join(all_function_code)
 
     # Handler to sigchld when child exits.
     def sigchld_handler(signum, frame):
@@ -354,7 +337,6 @@ def library_network_code():
         stdout_timed_message(f"library cores        {args.library_cores}")
         stdout_timed_message(f"function slots       {args.function_slots}")
         stdout_timed_message(f"thread limit         {thread_limit}")
-        stdout_timed_message(f"functions installed\n{get_installed_function_code()}")
 
         # Open communication pipes to vine_worker.
         # The file descriptors are inherited from the vine_worker parent process

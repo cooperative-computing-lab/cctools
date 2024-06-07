@@ -1438,7 +1438,6 @@ static vine_result_code_t get_update(struct vine_manager *q, struct vine_worker_
 
 	int n = sscanf(line, "update %" PRId64 " %s %" PRId64 " %" PRId64, &task_id, path, &offset, &length);
 	if (n != 4) {
-		debug(D_VINE, "WHAT?");
 		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		return VINE_WORKER_FAILURE;
 	}
@@ -1691,8 +1690,12 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		}
 	}
 
+	/* Finally update data structures to reflect the completion. */
+	itable_remove(q->running_table, t->task_id);
+	change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
+
 	/* If a library task fails, remove it and print some useful information. */
-	/* Notice that vine_cancel_by_task_id directly sets its state to VINE_TASK_RETRIVED */
+	/* Notice that vine_cancel_by_task_id directly sets its state to VINE_TASK_RETRIVED. */
 	if (task_status == VINE_RESULT_LIBRARY_EXIT) {
 		vine_cancel_by_task_id(q, t->task_id);
 
@@ -1709,12 +1712,6 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 			original->time_when_last_failure = timestamp_get();
 		}
 	}
-
-	/* Finally update data structures to reflect the completion. */
-	itable_remove(q->running_table, t->task_id);
-
-	if (task_status != VINE_RESULT_LIBRARY_EXIT)
-		change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
 
 	return VINE_SUCCESS;
 }
@@ -5275,9 +5272,6 @@ int vine_cancel_by_task_id(struct vine_manager *q, int task_id)
 		debug(D_VINE, "Task with id %d is not found in manager.", task_id);
 		return 0;
 	}
-
-	if (task->type == VINE_TASK_TYPE_LIBRARY_INSTANCE)
-		task->refcount--;
 
 	reset_task_to_state(q, task, VINE_TASK_RETRIEVED);
 
