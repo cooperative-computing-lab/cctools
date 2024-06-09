@@ -1,4 +1,5 @@
 import os
+import signal
 import subprocess
 import threading
 import time
@@ -8,6 +9,13 @@ from log_monitor import monitor_log_file
 
 def execute_program(config, working_dir, state_dict, service_name, cond, state_times, start_time, pgid_dict,
                     stop_event):
+    def signal_handler(signum, frame):
+        print(f"Received signal {signum} in {service_name}")
+        stop_event.set()  # Set the stop event when the signal is received
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
     command = config['command']
     stdout_path = config['stdout_path']
     stderr_path = config['stderr_path']
@@ -60,10 +68,22 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
             process = subprocess.Popen(command, shell=True, cwd=working_dir, stdout=out, stderr=err,
                                        preexec_fn=os.setsid)
             pgid_dict[service_name] = os.getpgid(process.pid)
-            process.wait()
 
-        # #todo: disucss this. this was done to makeup for log monitor delay
-        time.sleep(0.01)
+        # while process.poll() is None and not stop_event.is_set():
+        #     time.sleep(0.1)
+
+        while process.poll() is None:
+            time.sleep(0.1)
+
+        return_code = process.returncode
+
+        print(f"Returned with code {return_code}")
+
+        with cond:
+            if stop_event.is_set() and return_code == -signal.SIGTERM:
+                state_dict[service_name] = "stopped"
+                update_state_time(service_name, "stopped", start_time, state_times)
+                cond.notify_all()
 
         if service_type == 'service' and not stop_event.is_set():
             print(f"DEBUG: Stopping execution of '{service_type}' {service_name}")
@@ -71,26 +91,38 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
             # If a service stops before receiving a stop event, mark it as failed
             with cond:
                 state_dict[service_name] = "failure"
-                local_state_times = state_times[service_name]
-                local_state_times['failure'] = time.time() - start_time
-                state_times[service_name] = local_state_times
+                update_state_time(service_name, "failure", start_time, state_times)
                 cond.notify_all()
             print(f"ERROR: Service {service_name} stopped unexpectedly, marked as failure.")
 
+        elif service_type == 'action':
+            if return_code == 0:
+                state_dict[service_name] = "success"
+                update_state_time(service_name, "success", start_time, state_times)
+                cond.notify_all()
+            else:
+                state_dict[service_name] = "failure"
+                update_state_time(service_name, "failure", start_time, state_times)
+                cond.notify_all()
+
         with cond:
             state_dict[service_name] = "final"
-            local_state_times = state_times[service_name]
-            local_state_times['final'] = time.time() - start_time
-            state_times[service_name] = local_state_times
+            update_state_time(service_name, "final", start_time, state_times)
             cond.notify_all()
 
-        if log_thread.is_alive():
-            log_thread.join()
-
-        if file_monitor_thread and file_monitor_thread.is_alive():
-            file_monitor_thread.join()
+        # if log_thread.is_alive():
+        #     log_thread.join()
+        #
+        # if file_monitor_thread and file_monitor_thread.is_alive():
+        #     file_monitor_thread.join()
 
     except Exception as e:
         print(f"Exception in executing {service_name}: {e}")
 
     print(f"DEBUG: Finished execution of {service_name}")
+
+
+def update_state_time(service_name, state, start_time, state_times):
+    local_state_times = state_times[service_name]
+    local_state_times[state] = time.time() - start_time
+    state_times[service_name] = local_state_times

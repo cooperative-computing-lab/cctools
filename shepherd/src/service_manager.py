@@ -102,7 +102,7 @@ class ServiceManager:
                     os.killpg(pgid, signal.SIGTERM)
                 except ProcessLookupError:
                     print(f"Process group {pgid} for service {service_name} not found.")
-            process.terminate()
+            # process.terminate()
 
         for process in self.processes.values():
             process.join()

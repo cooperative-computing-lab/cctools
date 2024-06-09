@@ -15,19 +15,18 @@ def monitor_log_file(log_path, state_dict, service_name, state_keywords, cond, s
             return
         time.sleep(0.1)
 
-    # todo: get from user?
-    final_state = list(state_keywords.keys())[-1]
+    last_state = list(state_keywords.keys())[-1]
 
     with open(log_path, 'r') as file:
         while not stop_event.is_set():
             line = file.readline()
             if not line:
-                time.sleep(0.001)
+                time.sleep(0.01)
                 continue
 
             current_time = time.time() - start_time
 
-            reached_final_state = False
+            reached_last_state = False
 
             for state in state_keywords:
                 if state_keywords[state] in line:
@@ -40,11 +39,11 @@ def monitor_log_file(log_path, state_dict, service_name, state_keywords, cond, s
 
                         print(f"DEBUG: {service_name} reached state '{state}' at {current_time}")
 
-                        if state == final_state:
-                            reached_final_state = True
+                        if state == last_state:
+                            reached_last_state = True
                             break
 
-            if reached_final_state:
+            if reached_last_state:
                 break
 
     print(f"DEBUG: Finished monitoring file '{log_path}' for {service_name}")
