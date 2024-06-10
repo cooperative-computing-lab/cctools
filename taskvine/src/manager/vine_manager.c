@@ -1346,42 +1346,15 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 		w->alarm_slow_worker = 0;
 
 		vine_task_info_add(q, t);
-		exit_debug_message(q, w, t);
 		break;
 	}
 
-	/* print warnings if the task ran for a very short time (1s) and exited with common non-zero status */
-	if (t->result == VINE_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
-		switch (t->exit_code) {
-		case (126):
-			warn(D_VINE,
-					"Task %d ran for a very short time and exited with code %d.\n",
-					t->task_id,
-					t->exit_code);
-			warn(D_VINE, "This usually means that the task's command is not an executable,\n");
-			warn(D_VINE, "or that the worker's scratch directory is on a no-exec partition.\n");
-			break;
-		case (127):
-			warn(D_VINE,
-					"Task %d ran for a very short time and exited with code %d.\n",
-					t->task_id,
-					t->exit_code);
-			warn(D_VINE, "This usually means that the task's command could not be found, or that\n");
-			warn(D_VINE, "it uses a shared library not available at the worker, or that\n");
-			warn(D_VINE, "it uses a version of the glibc different than the one at the worker.\n");
-			break;
-		case (139):
-			warn(D_VINE,
-					"Task %d ran for a very short time and exited with code %d.\n",
-					t->task_id,
-					t->exit_code);
-			warn(D_VINE, "This usually means that the task's command had a segmentation fault,\n");
-			warn(D_VINE, "either because it has a memory access error (segfault), or because\n");
-			warn(D_VINE, "it uses a version of a shared library different from the one at the worker.\n");
-			break;
-		default:
-			break;
-		}
+	exit_debug_message(q, w, t);
+
+	if (w->forsaken_tasks > VINE_DEFAULT_MAX_FORSAKEN_PER_WORKER && w->total_tasks_complete == 0) {
+		debug(D_VINE, "Disconnecting worker that keeps forsaking tasks %s (%s).", w->hostname, w->addrport);
+		handle_failure(q, w, t, VINE_WORKER_FAILURE);
+		return 0;
 	}
 
 	return 1;
