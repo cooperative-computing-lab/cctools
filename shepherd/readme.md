@@ -227,3 +227,64 @@ max_run_time: 120
   }
 }
 ```
+## Other Configuration Options in Shepherd
+
+Shepherd offers a variety of configuration options to tailor the execution and monitoring of 
+your programs. These options include setting up dependencies, specifying output files, handling 
+stop signals, and defining maximum run times. Here are some additional configuration options 
+you can use in your Shepherd configuration file.
+
+### Setting Up Dependencies
+Dependencies allow you to specify the conditions under which a program should start. 
+Shepherd supports two dependency modes: all and any.
+
+#### Dependency Modes
+1. **All Mode:** The program will start only when all specified dependencies have been met.
+2. **Any Mode:** The program will start when any one of the specified dependencies has been met.
+
+Here is a configuration file demonstrating both all and any dependency modes:
+```yaml
+services:
+  program1:
+    ..
+  program2:
+    ...
+  program3:
+   ...
+  program4:
+    command: "./program4.sh"
+    dependency:
+      mode: "all"  # All specified dependencies must be met
+      items:
+        program1: "ready"
+        program2: "complete"
+  program5:
+    command: "./program5.sh"
+    dependency:
+      mode: "any"  # Any one of the specified dependencies must be met
+      items:
+        program2: "ready"
+        program3: "complete"
+```
+### Specifying User-defined States in File
+Shepherd can monitor specific files to determine user-defined states. This allows you to control the flow based on 
+custom conditions recorded in external files.
+
+```yaml
+services:
+  program1:
+    command: "./program1.sh"
+    state:
+      file:
+        path: "/tmp/program1_state.log"
+        states:
+          ready: "program is ready"
+          complete: "program is completed"
+```
+In this example, program1 will transition to the "ready" state when "program is ready" is found in 
+`/tmp/program1_state.log`, and to the "complete" state when "program is completed" is found.
+
+### Specifying Custom Stdout Files
+### Specifying Output Files
+### Specifying Stop File
+### Defining Maximum Run Times
