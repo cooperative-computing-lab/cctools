@@ -19,20 +19,4 @@ This module is private to the manager and should not be invoked by the end user.
  */
 char *vine_runtime_directory_create();
 
-<<<<<<< HEAD
-/* Returns path relative to the logs runtime directory */
-char *vine_get_runtime_path_log(struct vine_manager *m, const char *path);
-
-/* Returns path relative to the staging runtime directory */
-char *vine_get_path_staging(struct vine_manager *m, const char *path);
-
-/* Returns path relative to the library output runtime directory */
-char *vine_get_path_library_log(struct vine_manager *m, const char *path);
-
-/* Returns path relative to the cache runtime directory */
-char *vine_get_runtime_path_caching(struct vine_manager *m, const char *path);
-
 #endif
-=======
-#endif
->>>>>>> 8a2538eb9 (Clean up swig bindings (#3847))
