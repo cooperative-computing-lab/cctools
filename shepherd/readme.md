@@ -49,7 +49,7 @@ all programs ultimately transition to a `Final` state, reflecting their executio
 Shepherd simplifies complex application workflows. Here’s a simple example to demonstrate how to use Shepherd for 
 scheduling dependent programs.
 
-##### 1. Create Sample Scripts
+#### 1. Create Sample Scripts
 
 Create two shell scripts named `program1.sh` and `program2.sh` with the following content:
 
@@ -61,7 +61,7 @@ sleep 5
 echo "Program completed"
 ```
 
-##### 2. Create a Shepherd Configuration File
+#### 2. Create a Shepherd Configuration File
 
 Create a Shepherd configuration file to schedule `program2` to start only after` program1` has successfully completed its 
 execution. Save the following content as` program-config.yml`:
@@ -79,7 +79,7 @@ output:
 max_run_time: 60  # Optional: Limit total runtime to 60 seconds
 ```
 
-##### 3. Run Shepherd
+#### 3. Run Shepherd
 
 To run the configuration with Shepherd, use the following command:
 ```shell
@@ -91,7 +91,7 @@ If you are running the python source, then run
 python3 shepherd.py program-config.yml
 ```
 
-##### Understanding the workflow
+#### Understanding the workflow
 With this simple configuration, Shepherd will:
 1. Execute `program1.sh`.
 2. Monitor the internal states of the program.
@@ -115,3 +115,115 @@ With this simple configuration, Shepherd will:
 }
 ```
 
+## Monitoring User-Defined States in Shepherd
+Shepherd has the ability to monitor standard output (stdout) or any other file to detect 
+user-defined states. These states can then be used as dependencies for other programs. 
+This feature allows you to define complex workflows based on custom application states.
+
+#### Example Scenario: Dynamic Dependencies
+Here’s an example shell script that simulates a program with different states. Save this script as `program1.sh`, 
+`program2.sh`, and `program3.sh`:
+```bash
+#!/bin/bash
+START_TIME=$(date +%s)
+startup_delay=5
+
+while true; do
+  echo "$(date +%s) - program is booting up"
+  sleep 0.5
+
+  if [[ $(date +%s) -gt $((START_TIME + startup_delay)) ]]; then
+    echo "$(date +%s) - program is ready"
+    break
+  fi
+done
+
+READY_TIME=$(date +%s)
+run_duration=30
+
+while true; do
+  echo "$(date +%s) - program is running"
+  sleep 0.5
+
+  if [[ $(date +%s) -gt $((READY_TIME + run_duration)) ]]; then
+    echo "$(date +%s) - program is completed"
+    break
+  fi
+done
+
+```
+This script simulates a program that boots up, becomes ready, runs for a while, and then completes. Shepherd can use 
+the log output to determine when the program is ready for the next step in your workflow.
+
+#### Shepherd Configuration with user-defined states
+Below is a sample Shepherd configuration that uses custom states defined in the application's stdout. The configuration 
+specifies that program2 will start only after program1 is "ready" and program3 is "complete".
+
+Save the following content as `program-config.yml`:
+
+```yaml
+services:
+  program1:
+    command: "./program1.sh"
+    state:
+      log:
+        ready: "program is ready"
+        complete: "program is completed"
+  program2:
+    command: "./program2.sh"
+    state:
+      log:
+        ready: "program is ready"
+        complete: "program is completed"
+    dependency:
+      mode: "all"
+      items:
+        program1: "ready"
+        program3: "complete"
+  program3:
+    command: "./program3.sh"
+    state:
+      log:
+        ready: "program is ready"
+        complete: "program is completed"
+output:
+  state_times: "state_transition_times.json"
+max_run_time: 120
+```
+
+#### How This Configuration Works
+- program1: Starts immediately. Shepherd monitors its output for "program is ready" and "program is completed".
+- program3: Also starts immediately. Shepherd monitors it similarly to program1.
+- program2: Starts only after BOTH of these conditions are met:
+  - program1 reaches the "ready" state.
+  - program3 reaches the "complete" state
+
+- And this will also create the following state transition data:
+```json
+{
+  "program1": {
+    "initialized": 0.2520601749420166,
+    "started": 0.2529749870300293,
+    "ready": 5.447847843170166,
+    "complete": 36.73489499092102,
+    "success": 36.781131982803345,
+    "final": 36.781386852264404
+  },
+  "program3": {
+    "initialized": 0.252730131149292,
+    "started": 0.25317811965942383,
+    "ready": 5.451045989990234,
+    "complete": 36.72722291946411,
+    "success": 36.80730319023132,
+    "final": 36.80773401260376
+  },
+  "program2": {
+    "initialized": 0.25133585929870605,
+    "started": 36.72884702682495,
+    "ready": 42.47040295600891,
+    "complete": 73.59736275672913,
+    "success": 73.61198306083679,
+    "final": 73.612459897995
+  }
+}
+```

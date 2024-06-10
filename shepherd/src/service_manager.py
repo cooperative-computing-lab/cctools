@@ -124,7 +124,7 @@ class ServiceManager:
             print(f"Service {service_name} not found.")
 
     def check_stop_signal_file(self):
-        if os.path.exists(self.stop_signal_path):
+        if os.path.exists(self.stop_signal_path) and os.path.isfile(self.stop_signal_path):
             print("Received stop signal")
             return True
 
