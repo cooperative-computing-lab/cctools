@@ -1220,6 +1220,52 @@ static void resource_monitor_compress_logs(struct vine_manager *q, struct vine_t
 	free(command);
 }
 
+void exit_debug_message(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	if (t->result == VINE_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
+		switch (t->exit_code) {
+		case (126):
+			warn(D_VINE,
+					"Task %d ran for a very short time and exited with code %d.\n",
+					t->task_id,
+					t->exit_code);
+			warn(D_VINE, "This usually means that the task's command is not an executable,\n");
+			warn(D_VINE, "or that the worker's scratch directory is on a no-exec partition.\n");
+			break;
+		case (127):
+			warn(D_VINE,
+					"Task %d ran for a very short time and exited with code %d.\n",
+					t->task_id,
+					t->exit_code);
+			warn(D_VINE, "This usually means that the task's command could not be found, or that\n");
+			warn(D_VINE, "it uses a shared library not available at the worker, or that\n");
+			warn(D_VINE, "it uses a version of the glibc different than the one at the worker.\n");
+			break;
+		case (139):
+			warn(D_VINE,
+					"Task %d ran for a very short time and exited with code %d.\n",
+					t->task_id,
+					t->exit_code);
+			warn(D_VINE, "This usually means that the task's command had a segmentation fault,\n");
+			warn(D_VINE, "either because it has a memory access error (segfault), or because\n");
+			warn(D_VINE, "it uses a version of a shared library different from the one at the worker.\n");
+			break;
+		default:
+			break;
+		}
+	}
+
+	debug(D_VINE,
+			"%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
+			w->hostname,
+			w->addrport,
+			(t->time_when_done - t->time_when_commit_start) / 1000000.0,
+			(long long)w->total_tasks_complete,
+			w->total_task_time / w->total_tasks_complete / 1000000.0);
+
+	return;
+}
+
 static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_info *w, int task_id)
 {
 	struct vine_task *t;
@@ -1300,14 +1346,7 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 		w->alarm_slow_worker = 0;
 
 		vine_task_info_add(q, t);
-		debug(D_VINE,
-				"%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
-				w->hostname,
-				w->addrport,
-				(t->time_when_done - t->time_when_commit_start) / 1000000.0,
-				(long long)w->total_tasks_complete,
-				w->total_task_time / w->total_tasks_complete / 1000000.0);
-
+		exit_debug_message(q, w, t);
 		break;
 	}
 
