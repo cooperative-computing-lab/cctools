@@ -11,7 +11,7 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
                     stop_event):
     def signal_handler(signum, frame):
         print(f"Received signal {signum} in {service_name}")
-        stop_event.set()  # Set the stop event when the signal is received
+        stop_event.set()
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -26,7 +26,12 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
     file_path_to_monitor = config.get('state', {}).get('file', {}).get('path', '')
     file_states = config.get('state', {}).get('file', {}).get('states', {})
 
-    service_type = config.get('type', 'action')  # Default to 'action' if type is not specified
+    service_type = config.get('type', 'action')
+
+    with cond:
+        state_dict[service_name] = "initialized"
+        update_state_time(service_name, "initialized", start_time, state_times)
+        cond.notify_all()
 
     try:
         with cond:
@@ -46,6 +51,11 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
                         cond.wait()
 
         print(f"DEBUG: Starting execution of '{service_type}' {service_name}")
+
+        with cond:
+            state_dict[service_name] = "started"
+            update_state_time(service_name, "started", start_time, state_times)
+            cond.notify_all()
 
         # Start the main log monitoring thread
         log_thread = threading.Thread(target=monitor_log_file,
@@ -97,13 +107,15 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
 
         elif service_type == 'action':
             if return_code == 0:
-                state_dict[service_name] = "success"
-                update_state_time(service_name, "success", start_time, state_times)
-                cond.notify_all()
+                with cond:
+                    state_dict[service_name] = "action_success"
+                    update_state_time(service_name, "success", start_time, state_times)
+                    cond.notify_all()
             else:
-                state_dict[service_name] = "failure"
-                update_state_time(service_name, "failure", start_time, state_times)
-                cond.notify_all()
+                with cond:
+                    state_dict[service_name] = "action_failure"
+                    update_state_time(service_name, "failure", start_time, state_times)
+                    cond.notify_all()
 
         with cond:
             state_dict[service_name] = "final"

@@ -20,7 +20,7 @@ digraph StateFlowchart {
     Final [label="Final"];
 
     Start -> Initialized [label="Initialization"];
-    Initialized -> Started [label="Start Execution"];
+    Initialized -> Started [label="Dependencies Satisfied"];
     Started -> UserDefinedState [label="Transition to User Defined State"];
 
     UserDefinedState -> ActionSuccess [label="Action Complete\n(Return Code 0)"];

@@ -56,7 +56,7 @@ class ServiceManager:
         for service in self.sorted_services:
             service_config = self.services[service]
 
-            self.state_dict[service] = "initial"
+            self.state_dict[service] = ""
             self.state_times[service] = {}
 
             p_exec = Process(target=execute_program, args=(
@@ -76,7 +76,7 @@ class ServiceManager:
 
         stop_thread.join()
 
-        if os.path.exists(self.stop_signal_path):
+        if os.path.isfile(self.stop_signal_path) and os.path.exists(self.stop_signal_path):
             os.remove(self.stop_signal_path)
 
         save_state_times(self.state_times, os.path.join(self.working_dir, self.output['state_times']))

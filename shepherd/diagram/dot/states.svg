@@ -39,7 +39,7 @@
 <title>Initialized&#45;&gt;Started</title>
 <path fill="none" stroke="black" d="M243.62,-370.41C243.62,-358.76 243.62,-343.05 243.62,-329.52"/>
 <polygon fill="black" stroke="black" points="247.13,-329.86 243.63,-319.86 240.13,-329.86 247.13,-329.86"/>
-<text text-anchor="middle" x="285.62" y="-339.2" font-family="Times,serif" font-size="14.00">Start Execution</text>
+<text text-anchor="middle" x="307" y="-339.2" font-family="Times,serif" font-size="14.00">Dependencies Satisfied</text>
 </g>
 <!-- UserDefinedState -->
 <g id="node4" class="node">
