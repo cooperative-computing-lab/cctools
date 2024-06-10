@@ -1,0 +1,36 @@
+digraph StateFlowchart {
+    rankdir=TD;
+
+
+    node [shape=ellipse, style=filled, fillcolor=white];
+    Start [label="Start"];
+     node [shape=rect, style=filled, fillcolor=lightgrey];
+    Initialized [label="Initialized"];
+    Started [label="Started"];
+
+    node [shape=rect, style=dashed, fillcolor=lightgrey];
+    UserDefinedState [label="User Defined State"];
+
+
+    node [shape=rect, style=filled, fillcolor=lightgrey];
+    ActionSuccess [label="Action Success"];
+    ActionFailure [label="Action Failure"];
+    ServiceFailure [label="Service Failure"];
+    Stopped [label="Stopped"];
+    Final [label="Final"];
+
+    Start -> Initialized [label="Initialization"];
+    Initialized -> Started [label="Start Execution"];
+    Started -> UserDefinedState [label="Transition to User Defined State"];
+
+    UserDefinedState -> ActionSuccess [label="Action Complete\n(Return Code 0)"];
+    UserDefinedState -> ActionFailure [label="Action Failed\n(Non-zero Return Code)"];
+    UserDefinedState -> ServiceFailure [label="Service Unexpectedly Stopped"];
+    UserDefinedState -> Stopped [label="Stop Signal Received"];
+
+    ActionSuccess -> Final [label="Mark as Final State"];
+    ActionFailure -> Final [label="Mark as Final State"];
+    ServiceFailure -> Final [label="Mark as Final State"];
+    Stopped -> Final [label="Mark as Final State"];
+}
+

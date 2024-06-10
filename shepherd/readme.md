@@ -33,7 +33,7 @@ file, and response to external interrupts, ensuring a controlled and safe cessat
 each application and the overall workflow. It also provides configurable actions to be taken in specific failure 
 scenarios.
 
-## Configuration
+## Sample Configuration
 Shepherd requires a YAML configuration file to specify details about the services it needs to manage.
 Below is an explanation of the configuration parameters and an example:
 
@@ -81,6 +81,16 @@ stop_signal: "/tmp/bashapp/stop"
 max_run_time: 120
 
 ```
+## Program State Transition Overview
+
+The Shepherd tool manages program execution through a series of defined states, ensuring dependencies are met and final 
+states are recorded. Every program has default states (`Initialized`, `Started`, and `Final`) and can have optional 
+user-defined states. Programs transition from `Initialized` to `Started` once dependencies are satisfied, then move through 
+user-defined states. Actions return `Action Success` on a zero return code and `Action Failure` otherwise, while services 
+transition to `Service Failure` if they stop unexpectedly. Any program receiving a stop signal is marked as `Stopped`, and 
+all programs ultimately transition to a `Final` state, reflecting their execution outcome.
+
+![Test](diagram/dot/states.svg)
 
 ## Visualization
 
