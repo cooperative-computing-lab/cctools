@@ -19,6 +19,7 @@ See the file COPYING for details.
 #include <netinet/tcp.h>
 #include <poll.h>
 #include <sys/file.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -1447,6 +1448,13 @@ int link_poll(struct link_info *links, int nlinks, int msec)
 	free(fds);
 
 	return result;
+}
+
+int link_get_buffer_bytes(struct link *link)
+{
+	int bytes;
+	ioctl(link->fd, TIOCOUTQ, &bytes);
+	return bytes;
 }
 
 /* vim: set noexpandtab tabstop=8: */

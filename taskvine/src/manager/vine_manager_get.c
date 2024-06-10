@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "host_disk_info.h"
 #include "link.h"
+#include "macros.h"
 #include "path.h"
 #include "rmsummary.h"
 #include "stringtools.h"
