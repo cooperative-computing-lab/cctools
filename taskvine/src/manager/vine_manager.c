@@ -1697,8 +1697,6 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	/* If a library task fails, remove it and print some useful information. */
 	/* Notice that vine_cancel_by_task_id directly sets its state to VINE_TASK_RETRIVED. */
 	if (task_status == VINE_RESULT_LIBRARY_EXIT) {
-		vine_cancel_by_task_id(q, t->task_id);
-
 		debug(D_VINE, "Task %d library %s failed", t->task_id, t->provides_library);
 		printf("Library %s failed on worker %s (%s)", t->provides_library, w->hostname, w->addrport);
 		if (q->watch_library_logfiles)
@@ -3204,7 +3202,7 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 Determine whether there is a suitable library task for a function call task.
 */
 
-static int vine_manager_check_libray_for_function_call(struct vine_manager *q, struct vine_task *t)
+static int vine_manager_check_library_for_function_call(struct vine_manager *q, struct vine_task *t)
 {
 	if (!t->needs_library || hash_table_lookup(q->library_templates, t->needs_library))
 		return 1;
@@ -3256,7 +3254,7 @@ static int send_one_task(struct vine_manager *q)
 		}
 
 		// Skip function call task if no suitable library template was installed
-		if (!vine_manager_check_libray_for_function_call(q, t)) {
+		if (!vine_manager_check_library_for_function_call(q, t)) {
 			continue;
 		}
 

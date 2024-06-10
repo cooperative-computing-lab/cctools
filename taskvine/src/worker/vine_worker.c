@@ -545,12 +545,6 @@ static void reap_process(struct vine_process *p, struct link *manager)
 
 	vine_gpus_free(p->task->task_id);
 
-	/* For a library process, do not stageout its sandbox until the watched logfile
-	 * is updated to the manger */
-	if (p->type != VINE_PROCESS_TYPE_LIBRARY) {
-		vine_sandbox_stageout(p, cache_manager, manager);
-	}
-
 	if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
 		p->library_process->functions_running--;
 	}
