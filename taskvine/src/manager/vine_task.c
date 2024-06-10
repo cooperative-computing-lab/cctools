@@ -73,6 +73,7 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->current_resource_box = 0;
 
 	t->refcount = 1;
+	t->output_received = 0;
 
 	vine_counters.task.created++;
 
@@ -99,6 +100,8 @@ void vine_task_clean(struct vine_task *t)
 
 	free(t->output);
 	t->output = NULL;
+	t->output_length = 0;
+	t->output_received = 0;
 
 	free(t->hostname);
 	t->hostname = NULL;
