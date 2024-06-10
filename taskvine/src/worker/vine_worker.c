@@ -695,6 +695,58 @@ static void expire_procs_running()
 	}
 }
 
+/* Force a single running task to finish with the given result flag. */
+
+static void finish_running_task(struct vine_process *p, vine_result_t result)
+{
+	p->result |= result;
+	vine_process_kill(p);
+}
+
+/* Force all running tasks to finish with the given result flag. */
+
+static void finish_running_tasks(vine_result_t result)
+{
+	struct vine_process *p;
+	uint64_t task_id;
+
+	ITABLE_ITERATE(procs_running, task_id, p)
+	{
+		finish_running_task(p, result);
+	}
+}
+
+/*
+Kill a failed library process.
+This library process may either not existent or no longer responses.
+*/
+
+static void handle_failed_library_process(struct vine_process *p, struct link *manager)
+{
+	if (p->type != VINE_PROCESS_TYPE_LIBRARY) {
+		return;
+	}
+
+	p->library_ready = 0;
+	p->exit_code = 1;
+
+	/* Mark this library as failed */
+	finish_running_task(p, VINE_RESULT_LIBRARY_EXIT);
+
+	/* Forsake the tasks that are running on this library */
+	/* It no available libraries on this worker, tasks waiting for this library will be forsaken */
+
+	struct vine_process *p_running;
+	uint64_t task_id;
+
+	ITABLE_ITERATE(procs_running, task_id, p_running)
+	{
+		if (p_running->library_process == p) {
+			finish_running_task(p_running, VINE_RESULT_FORSAKEN);
+		}
+	}
+}
+
 /*
 Scan over all of the processes known by the worker,
 and if they have exited, move them into the procs_complete table
@@ -716,6 +768,15 @@ static int handle_completed_tasks(struct link *manager)
 		/* Check to see if this process itself is completed. */
 
 		if (vine_process_is_complete(p)) {
+			if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
+				/* Kill the library process if it completes. */
+				debug(D_VINE,
+						"Library %s task id %d is detected to be failed. Killing it.",
+						p->task->provides_library,
+						p->task->task_id);
+				handle_failed_library_process(p, manager);
+			}
+			/* simply reap this process */
 			reap_process(p, manager);
 			result_retrieved++;
 		}
@@ -1051,27 +1112,6 @@ static void kill_all_tasks()
 	assert(gpus_allocated == 0);
 
 	debug(D_VINE, "all data structures are clean");
-}
-
-/* Force a single running task to finish with the given result flag. */
-
-static void finish_running_task(struct vine_process *p, vine_result_t result)
-{
-	p->result |= result;
-	vine_process_kill(p);
-}
-
-/* Force all running tasks to finish with the given result flag. */
-
-static void finish_running_tasks(vine_result_t result)
-{
-	struct vine_process *p;
-	uint64_t task_id;
-
-	ITABLE_ITERATE(procs_running, task_id, p)
-	{
-		finish_running_task(p, result);
-	}
 }
 
 /* Check whether a given process is still within the various limits imposed on it. */
@@ -1433,9 +1473,9 @@ static int process_can_run_eventually(struct vine_process *p, struct vine_cache 
 
 	if (p->task->needs_library) {
 		/* Note that we check for *some* library but do not bind to it. */
-		if (!find_future_library_for_function(p->task->needs_library)) {
+		struct vine_process *p_future = find_future_library_for_function(p->task->needs_library);
+		if (!p || p_future->result == VINE_RESULT_LIBRARY_EXIT)
 			return 0;
-		}
 	}
 
 	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager);
@@ -1578,7 +1618,7 @@ static int check_library_startup(struct vine_process *p)
  * A library starts up and tells the vine_worker it's ready by reporting
  * back its library name. */
 
-static void check_libraries_ready()
+static void check_libraries_ready(struct link *manager)
 {
 	uint64_t library_task_id;
 	struct vine_process *library_process;
@@ -1587,28 +1627,38 @@ static void check_libraries_ready()
 	library_link_info.events = LINK_READ;
 	library_link_info.revents = 0;
 
-	/* Loop through all processes to find libraries and check if they are ready. */
+	/* Loop through all processes to find libraries and check if they are alive. */
 	ITABLE_ITERATE(procs_running, library_task_id, library_process)
 	{
-		if ((library_process->type == VINE_PROCESS_TYPE_LIBRARY) && !library_process->library_ready) {
-			library_link_info.link = library_process->library_read_link;
+		/* Skip non-library processes or libraries that are already ready */
+		if (library_process->type != VINE_PROCESS_TYPE_LIBRARY || library_process->library_ready)
+			continue;
 
-			/* Check if library has sent its startup message. */
-			if (link_poll(&library_link_info, 1, 0) && (library_link_info.revents & LINK_READ)) {
-				if (check_library_startup(library_process)) {
-					debug(D_VINE,
-							"Library %s reports ready to execute functions.",
-							library_process->task->provides_library);
-					library_process->library_ready = 1;
-				} else {
-					/* Kill library if the name reported back doesn't match its name or
-					 * if there's any problem. */
-					debug(D_VINE, "Library verification failed. Killing it.");
-					vine_process_kill(library_process);
-				}
+		library_link_info.link = library_process->library_read_link;
+
+		/* Check if library has sent its startup message. */
+		if (link_poll(&library_link_info, 1, 0) && (library_link_info.revents & LINK_READ)) {
+			if (check_library_startup(library_process)) {
+				debug(D_VINE,
+						"Library %s reports ready to execute functions.",
+						library_process->task->provides_library);
+				library_process->library_ready = 1;
+			} else {
+				/* Kill library if the name reported back doesn't match its name or
+				 * if there's any problem. */
+				debug(D_VINE,
+						"Library %s task id %" PRIu64
+						" verification failed (unexpected response). Killing it.",
+						library_process->task->provides_library,
+						library_task_id);
+				handle_failed_library_process(library_process, manager);
 			}
-			library_link_info.revents = 0;
+		} else {
+			/* The library is running and the link has no readable data, do nothing until the
+			 * handle_completed_tasks detects its failure or it sends back the startup message */
 		}
+
+		library_link_info.revents = 0;
 	}
 }
 
@@ -1705,7 +1755,7 @@ static void vine_worker_serve_manager(struct link *manager)
 		}
 
 		/* Check all known libraries if they are ready to execute functions. */
-		check_libraries_ready();
+		check_libraries_ready(manager);
 
 		/* deliver queued asynchronous messages if available */
 		deliver_async_messages(manager);
@@ -1726,6 +1776,7 @@ static void vine_worker_serve_manager(struct link *manager)
 				} else if (process_can_run_eventually(p, cache_manager, manager)) {
 					list_push_tail(procs_waiting, p);
 				} else {
+					debug(D_VINE, "No suitable library found for task %d", p->task->task_id);
 					forsake_waiting_process(manager, p);
 					task_event++;
 				}
