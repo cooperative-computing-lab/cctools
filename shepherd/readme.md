@@ -284,7 +284,65 @@ services:
 In this example, program1 will transition to the "ready" state when "program is ready" is found in 
 `/tmp/program1_state.log`, and to the "complete" state when "program is completed" is found.
 
-### Specifying Custom Stdout Files
-### Specifying Output Files
-### Specifying Stop File
-### Defining Maximum Run Times
+### Specifying Custom Stdout and Stderr Files
+By default, Shepherd saves the stdout and stderr of each program to files named `<program_name>_stdout.log` and 
+`<program_name>_stderr.log `respectively. These file names can be customized as needed.
+```yaml
+services:
+  program1:
+    command: "./program1.sh"
+    stdout_path: "/tmp/log/custom_program1_out.log"
+    stderr_path: "/tmp/log/custom_program1_error.log"
+...
+```
+### Specifying Stop Conditions
+Shepherd allows you to define various stop conditions to control the termination of the workflow. These conditions 
+include specifying a stop file, defining a maximum run time, and setting success criteria.
+
+#### 1. Specifying Stop File
+Shepherd can monitor a specific file for stop signals. If this file is created, Shepherd will gracefully stop all 
+running services.
+
+```yaml
+services:
+  program1:
+    ...
+stop_signal: "/tmp/shepherd_stop"
+```
+In this configuration, if the file /tmp/shepherd_stop is created, Shepherd will initiate a controlled shutdown of all
+services.
+
+#### 2. Defining Maximum Run Times
+You can set a maximum runtime for the entire set of services. If the total runtime exceeds this limit, Shepherd will 
+stop all services.
+
+```yaml
+services:
+  program1:
+    ...
+max_run_time: 120  # Maximum runtime in seconds
+```
+
+#### 3. Specifying Success Criteria
+Shepherd allows you to define success criteria for multiple services. When these criteria are met, Shepherd will shut 
+down all services. You can specify the success mode as either all or any.
+
+- **All Mode:** All specified criteria must be met.
+- **Any Mode:** Any one of the specified criteria must be met.
+
+```yaml
+services:
+  program1:
+    ...
+  program2:
+    ...
+success_criteria:
+  mode: "all"
+  items:
+    program1: "action_success"
+    program2: "action_success"
+
+```
+In this example, the workflow will be considered successful and Shepherd will shut down all services when both program1
+and program2 reach the "action_success" state.
+
