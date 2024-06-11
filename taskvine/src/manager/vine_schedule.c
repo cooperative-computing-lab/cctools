@@ -84,7 +84,7 @@ int check_worker_have_enough_resources(
 	/* Subtract resources from libraries that have slots unused and don't match the current task. */
 	/* These will be killed anyway as needed in commit_task_to_worker. */
 	/* Matches assumption in vine_manager.c:commit_task_to_worker() */
-	
+
 	uint64_t task_id;
 	struct vine_task *ti;
 	ITABLE_ITERATE(w->current_tasks, task_id, ti)
@@ -211,15 +211,15 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	}
 
 	/* Finally check to see if a function task has the needed library task */
-	
+
 	if (t->needs_library) {
 		struct vine_task *library = vine_schedule_find_library(q, w, t->needs_library);
-		if(library) {
+		if (library) {
 			/* The worker already has the library with a free slot. */
 		} else {
-			library = vine_manager_find_library_template(q,t->needs_library);
-			if(library) {
-				if(check_worker_against_task(q,w,library)) {
+			library = vine_manager_find_library_template(q, t->needs_library);
+			if (library) {
+				if (check_worker_against_task(q, w, library)) {
 					/* The library would fit this worker if it was sent. */
 				} else {
 					/* The library would not fit the worker. */
@@ -236,7 +236,8 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 
 /* Find a library task running on a specific worker that has an available slot.
  * @return pointer to the library task if there's one, 0 otherwise. */
-struct vine_task *vine_schedule_find_library(struct vine_manager *q, struct vine_worker_info *w, const char *library_name)
+struct vine_task *vine_schedule_find_library(
+		struct vine_manager *q, struct vine_worker_info *w, const char *library_name)
 {
 	uint64_t task_id;
 	struct vine_task *task;
