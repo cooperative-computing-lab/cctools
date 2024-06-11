@@ -22,6 +22,6 @@ struct vine_worker_info *vine_schedule_task_to_worker( struct vine_manager *q, s
 void vine_schedule_check_for_large_tasks( struct vine_manager *q );
 int vine_schedule_check_fixed_location(struct vine_manager *q, struct vine_task *t);
 int vine_schedule_in_ramp_down(struct vine_manager *q);
-struct vine_task *vine_schedule_find_library(struct vine_worker_info *w, const char *library_name);
+struct vine_task *vine_schedule_find_library(struct vine_manager *q, struct vine_worker_info *w, const char *library_name);
 int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 #endif
