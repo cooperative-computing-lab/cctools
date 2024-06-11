@@ -234,6 +234,29 @@ your programs. These options include setting up dependencies, specifying output 
 stop signals, and defining maximum run times. Here are some additional configuration options 
 you can use in your Shepherd configuration file.
 
+### Service vs Action
+In Shepherd, there are two types of programs: **actions** and **services**. Actions are programs expected to end with a 
+return code of 0 upon successful completion, transitioning to the `action_success` state. If they fail, they 
+transition to the `action_failure` state with a non-zero return code. 
+
+Services, on the other hand, are long-running programs that do not terminate unless a stop event is set.
+When a stop event occurs, they transition to the `stopped` state. If they stop unexpectedly without a stop event, 
+they transition to the `service_failure` state.
+
+By default, programs are treated as actions unless specified otherwise in the configuration. Here is an example config 
+demonstrating both actions and services:
+
+```yaml
+services:
+  action1:
+    type: "action"
+    command: "./action1.sh"
+  service1:
+    type: "service"
+    command: "./service1.sh"
+...
+```
+
 ### Setting Up Dependencies
 Dependencies allow you to specify the conditions under which a program should start. 
 Shepherd supports two dependency modes: all and any.
