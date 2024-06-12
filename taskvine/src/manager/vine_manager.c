@@ -169,6 +169,9 @@ static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_
 static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename,
 		vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
 
+struct vine_task *send_library_to_worker(
+		struct vine_manager *q, struct vine_worker_info *w, const char *name, vine_result_code_t *result);
+
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
 static int count_workers(struct vine_manager *q, vine_worker_type_t type)
@@ -2874,26 +2877,39 @@ assignment and the new task state.
 
 static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	/* Kill empty libraries to reclaim resources. Match the assumption of
-	 * @vine.schedule.c:check_worker_have_enough_resources() */
+	vine_result_code_t result = VINE_SUCCESS;
+
+	/* Kill unused libraries on this worker to reclaim resources. */
+	/* Matches assumption in vine_schedule.c:check_available_resources() */
 	kill_empty_libraries_on_worker(q, w, t);
+
+	/* If this is a function needing a library, dispatch the library. */
+	if (t->needs_library) {
+		/* Consider whether the library task is already on that machine. */
+		t->library_task = vine_schedule_find_library(q, w, t->needs_library);
+		if (!t->library_task) {
+			/* Otherwise send the library to the worker. */
+			/* Note that this call will re-enter commit_task_to_worker. */
+			t->library_task = send_library_to_worker(q, w, t->needs_library, &result);
+
+			/* Careful: if the above failed, then w may no longer be valid */
+			/* In that case return immediately without making further changes. */
+			if (!t->library_task)
+				return result;
+		}
+		/* If start_one_task_fails, this will be decremented in handle_failure below. */
+		t->library_task->function_slots_inuse++;
+	}
+
 	t->hostname = xxstrdup(w->hostname);
 	t->addrport = xxstrdup(w->addrport);
 
 	t->time_when_commit_start = timestamp_get();
-	vine_result_code_t result = start_one_task(q, w, t);
+	result = start_one_task(q, w, t);
 	t->time_when_commit_end = timestamp_get();
 
 	itable_insert(w->current_tasks, t->task_id, t);
 	t->worker = w;
-
-	/* Increment the function count if this is a function task.
-	 * If the manager fails to send this function task to the worker however,
-	 * then the count will be decremented properly in @handle_failure() below. */
-	if (t->needs_library) {
-		t->library_task = vine_schedule_find_library(w, t->needs_library);
-		t->library_task->function_slots_inuse++;
-	}
 
 	change_task_state(q, t, VINE_TASK_RUNNING);
 
@@ -4605,9 +4621,11 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
  * @param q The manager structure.
  * @param w The worker info structure.
  * @param name The name of the library to be sent.
+ * @param result A pointer to a result reflecting the reason for any failure.
  * @return pointer to the library task if the operation succeeds, 0 otherwise.
  */
-struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name)
+struct vine_task *send_library_to_worker(
+		struct vine_manager *q, struct vine_worker_info *w, const char *name, vine_result_code_t *result)
 {
 	/* Find the original prototype library task by name, if it exists. */
 	struct vine_task *original = hash_table_lookup(q->library_templates, name);
@@ -4677,10 +4695,10 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 
 	/* Send the task to the worker in the usual way. */
 	/* Careful: If this failed, then the worker object or task object may no longer be valid! */
-	vine_result_code_t result = commit_task_to_worker(q, w, t);
+	*result = commit_task_to_worker(q, w, t);
 
 	/* Careful again: If commit_task_to_worker failed the worker object or task object may no longer be valid! */
-	if (result == VINE_SUCCESS) {
+	if (*result == VINE_SUCCESS) {
 		vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
 		return t;
 	} else {
@@ -4707,10 +4725,10 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 	HASH_TABLE_ITERATE(q->worker_table, worker_key, w)
 	{
 		/* A worker might contain multiple library instances */
-		struct vine_task *library = vine_schedule_find_library(w, name);
+		struct vine_task *library = vine_schedule_find_library(q, w, name);
 		while (library) {
 			vine_cancel_by_task_id(q, library->task_id);
-			library = vine_schedule_find_library(w, name);
+			library = vine_schedule_find_library(q, w, name);
 		}
 		hash_table_remove(q->library_templates, name);
 
