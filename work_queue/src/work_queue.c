@@ -2657,7 +2657,8 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"port",work_queue_port(q));
 	jx_insert_integer(j,"priority",info.priority);
 	jx_insert_string(j,"manager_preferred_connection",q->manager_preferred_connection);
-
+	jx_insert_integer(j,"protocol",WORK_QUEUE_PROTOCOL_VERSION);
+	
 	int use_ssl = 0;
 #ifdef HAS_OPENSSL
 	if(q->ssl_enabled) {

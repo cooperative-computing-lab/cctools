@@ -2087,7 +2087,8 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "priority", q->priority);
 	jx_insert_string(j, "manager_preferred_connection", q->manager_preferred_connection);
 	jx_insert_string(j, "taskvine_uuid", q->uuid);
-
+	jx_insert_integer(j, "protocol", VINE_PROTOCOL_VERSION );
+	
 	char *name, *key;
 	HASH_TABLE_ITERATE(q->properties, name, key)
 	{
