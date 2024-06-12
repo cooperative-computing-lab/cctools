@@ -19,7 +19,7 @@ on:
 name: Test and deploy
 
 jobs:
-  build-linux:
+  build-native-linux:
     runs-on: ubuntu-latest
     container: ${{ format('cclnd/cctools-env:x86_64-{0}', matrix.os-name) }}
     timeout-minutes: 30
@@ -60,7 +60,7 @@ jobs:
           commit: ${{ steps.vars.output.tag_sha }}
           tag: ${{ github.event.inputs.tag }}
 
-  build-conda:
+  build-conda-linux:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -104,14 +104,56 @@ jobs:
           commit: ${{ steps.vars.output.tag_sha }}
           tag: ${{ github.event.inputs.tag }}
 
-  build-macos:
+  build-conda-macos-x86_64:
     runs-on: ${{ matrix.os-name }}
     strategy:
       matrix:
-        os-name: ['macos-12','macos-13', 'macos-14']
+        os-name: ['macos-12','macos-13']
     timeout-minutes: 30
     env:
       CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, matrix.os-name) }}
+      CCTOOLS_SOURCE_PROFILE: yes
+    steps:
+      - name: checkout CCTools from branch head
+        uses: actions/checkout@v4
+      - name: Get sha of tag
+        id: vars
+        shell: bash
+        run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Conda-Setup
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/setup.sh
+      - name: Configure
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/configure.sh
+      - name: Build
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/build.sh
+      - name: Install
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/install.sh
+      - name: Test
+        run: ${GITHUB_WORKSPACE}/packaging/build-conda/test.sh
+      - name: deploy
+        uses: ncipollo/release-action@v1
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          artifacts: /tmp/${{ env.CCTOOLS_OUTPUT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: true
+          artifactContentType: application/gzip
+          draft: true
+          omitBody: true
+          omitBodyDuringUpdate: true
+          prerelease: true
+          replacesArtifacts: true
+          commit: ${{ steps.vars.output.tag_sha }}
+          tag: ${{ github.event.inputs.tag }}
+
+  build-conda-macos-arm64:
+    runs-on: ${{ matrix.os-name }}
+    strategy:
+      matrix:
+        os-name: ['macos-14']
+    timeout-minutes: 30
+    env:
+      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-arm64-{1}.tar.gz', github.event.inputs.version, matrix.os-name) }}
       CCTOOLS_SOURCE_PROFILE: yes
     steps:
       - name: checkout CCTools from branch head
