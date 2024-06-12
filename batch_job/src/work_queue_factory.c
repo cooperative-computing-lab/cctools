@@ -5,6 +5,8 @@ See the file COPYING for details.
 */
 
 #include "work_queue_catalog.h"
+#include "work_queue_protocol.h"
+
 #include "cctools.h"
 #include "batch_job.h"
 #include "hash_table.h"
@@ -331,6 +333,13 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 		const int tr =       jx_lookup_integer(j,"tasks_on_workers");
 		const int tw =       jx_lookup_integer(j,"tasks_waiting");
 		const int tl =       jx_lookup_integer(j,"tasks_left");
+		const int protocol = jx_lookup_integer(j,"protocol");
+
+		if(protocol!=WORK_QUEUE_PROTOCOL_VERSION) {
+			printf("WARNING: skipping manager %s (%s:%d) with protocol version %d\n",project, host, port, protocol);
+			printf("that is not compatible with this factory protocol version %d\n",WORK_QUEUE_PROTOCOL_VERSION);
+			continue;
+		}
 
 		int capacity = manager_workers_capacity(j);
 
