@@ -514,10 +514,11 @@ $ export PERL5LIB=${HOME}/cctools/lib/perl5/site_perl:${PERL5LIB}
 
 #### C Language Setup
 
-If you are writing a Work Queue application in C, you should compile it into an executable like this:
+If you are writing a Work Queue application in C, you should compile it into an executable with a command like this.  Note that this example assumes that CCTools has
+been installed using the `conda` method.
 
 ```sh
-$ gcc work_queue_example.c -o work_queue_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -lwork_queue -ldttools -lcrypto -lssl -lm -lz
+$ gcc work_queue_example.c -o work_queue_example -I${CONDA_PREFIX}/include/cctools -L${CONDA_PREFIX}/cctools/lib -lwork_queue -ldttools -lcrypto -lssl -lm -lz
 ```
    
 ### Running a Manager Program
