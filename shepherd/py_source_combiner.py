@@ -31,7 +31,7 @@ def combine_files(source_dir, output_file, file_list=None, compact=False):
         file_list = os.listdir(source_dir)
         file_list.sort()
 
-    for file in sorted(file_list):
+    for file in file_list:
         if file.endswith('.py'):
             filepath = os.path.join(source_dir, file)
             with open(filepath) as infile:

@@ -1,3 +1,4 @@
+import json
 import sys
 
 from graphviz import Digraph, Source
@@ -28,7 +29,7 @@ def generate_dot(config):
 def render_dot(dot_source, output_filename='workflow_visualization'):
     # Todo: try optional unflatten method
     src = Source(dot_source)
-    src.format = 'png'
+    src.format = 'svg'
     src.render(output_filename, view=True)
 
 
@@ -63,6 +64,11 @@ if __name__ == '__main__':
 
     if len(sys.argv) > 1:
         config = load_and_preprocess_config(sys.argv[1])
+    else:
+        config = load_and_preprocess_config('sade-config.yml')
+
+    json.dump(config, sys.stdout, indent=2)
+
 
     dot = generate_dot(config)
     print(dot)

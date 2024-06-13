@@ -1,0 +1,74 @@
+services:
+  reserve_port:
+    type: "action"
+    command: "python3 /tmp/scripts/reserve_ports.py /home/user/Firmware/build/px4_sitl_default/etc/init.d-posix/ports.config {{ num_px4_instances }} {{ start_port | default(4600) }} simulator,gcs_local,gcs_remote,offboard_local,onboard_payload_local,onboard_gimbal_local,typhoon_offboard_local,gazebo_master"
+    stdout_path: "/tmp/log/reserve_ports.log"
+    stderr_path: "/tmp/log/reserve_ports_error.log"
+    state:
+      log:
+        complete: "ports and their PIDs written to"
+  chmod_port_config:
+    type: "action"
+    command: "chmod +x /home/user/Firmware/build/px4_sitl_default/etc/init.d-posix/ports.config"
+    stdout_path: "/tmp/log/chmod_port_config.log"
+    stderr_path: "/tmp/log/chmod_port_config_error.log"
+    dependency:
+      items:
+        reserve_port: "final"
+
+  copy_ports_config:
+    command: "cp /home/user/Firmware/build/px4_sitl_default/etc/init.d-posix/ports.config /tmp/log/ports.config"
+    stdout_path: "/tmp/log/copy_ports_config.log"
+    stderr_path: "/tmp/log/copy_ports_config_error.log"
+    monitor_log: false
+    dependency:
+      items:
+        chmod_port_config: "final"
+
+  gazebo_server:
+    type: "service"
+    command: "/tmp/scripts/start_gazebo_server.sh"
+    stdout_path: "/tmp/log/gazebo_server.log"
+    stderr_path: "/tmp/log/gazebo_server_error.log"
+    state:
+      log:
+        ready: "Connected to gazebo master"
+    dependency:
+      items:
+        chmod_port_config: "final"
+{% for i in range(num_px4_instances) %}
+  px4_instance_{{ i }}:
+    type: "service"
+    command: "/tmp/scripts/start_px4_instance.sh {{ i }}"
+    stdout_path: "/tmp/log/px4_{{ i }}.log"
+    stderr_path: "/tmp/log/px4_{{ i }}_error.log"
+    state:
+      log:
+        waiting_for_simulator: "Waiting for simulator to accept connection"
+        ready: "Startup script returned successfully"
+    dependency:
+      items:
+        gazebo_server: "ready"
+
+  spawn_model_{{ i }}:
+    type: "action"
+    command: "/tmp/scripts/spawn_model.sh {{ i }}"
+    stdout_path: "/tmp/log/spawn_model_{{ i }}.log"
+    stderr_path: "/tmp/log/spawn_model_{{ i }}_error.log"
+    dependency:
+      items:
+        px4_instance_{{ i }}: "waiting_for_simulator"
+{% endfor %}
+  pose_sender:
+    type: "service"
+    command: "/tmp/scripts/start_pose_sender.sh"
+    stdout_path: "/tmp/log/pose_sender.log"
+    stderr_path: "/tmp/log/pose_sender_error.log"
+    dependency:
+      items:
+        {% for i in range(num_px4_instances) %}
+        px4_instance_{{ i }}: "ready"{% if not loop.last %}, {% endif %}
+        {% endfor %}
+output:
+  state_times: "/tmp/log/state_times.json"
+stop_signal: "/tmp/log/stop.txt"
