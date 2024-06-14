@@ -28,7 +28,7 @@ jobs:
       CCTOOLS_DOCKER_GITHUB: ${{ matrix.os-name }}
     strategy: 
       matrix:
-        os-name: ['centos7', 'almalinux8', 'almalinux9', 'ubuntu20.04']
+        os-name: ['almalinux8', 'almalinux9', 'ubuntu20.04']
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
