@@ -77,17 +77,16 @@ int64_t copy_fd_to_fd(int in, int out)
 
 int64_t copy_file_to_file(const char *input, const char *output)
 {
-	int in = open(input, O_RDONLY);
+	int64_t in = open(input, O_RDONLY);
 	if (in == -1)
 		return -1;
-
 	struct stat info;
 	if (fstat(in, &info) == -1) {
 		close(in);
 		return -1;
 	}
 
-	int out = open(output, O_WRONLY | O_CREAT | O_TRUNC, info.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO));
+	int64_t out = open(output, O_WRONLY | O_CREAT | O_TRUNC, info.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO));
 	if (out == -1 && errno == ENOTDIR) {
 		char dir[PATH_MAX];
 		path_dirname(output, dir);

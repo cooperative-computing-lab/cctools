@@ -740,7 +740,7 @@ int makeflow_archive_copy_preserved_files(struct archive_instance *a, struct bat
 		free(directory_name);
 		// Copy output file or directory over to specified location
 		if(path_is_dir(output_file_path) != 1){
-			int success = copy_file_to_file(output_file_path, file_name);
+			int64_t success = copy_file_to_file(output_file_path, file_name);
 			free(output_file_path);
 			free(file_name);
 			if (!success) {
