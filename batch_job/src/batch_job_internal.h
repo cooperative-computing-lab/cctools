@@ -40,7 +40,7 @@ struct batch_queue_module {
 		int (*chdir) (struct batch_queue *q, const char *path);
 		int (*getcwd) (struct batch_queue *q, char *buf, size_t size);
 		int (*mkdir) (struct batch_queue *q, const char *path, mode_t mode, int recursive);
-		int (*putfile) (struct batch_queue *q, const char *lpath, const char *rpath);
+		int64_t (*putfile) (struct batch_queue *q, const char *lpath, const char *rpath);
 		int (*rename) (struct batch_queue *q, const char *lpath, const char *rpath);
 		int (*stat) (struct batch_queue *q, const char *path, struct stat *buf);
 		int (*unlink) (struct batch_queue *q, const char *path);
