@@ -181,7 +181,7 @@ static int batch_fs_dryrun_unlink (struct batch_queue *q, const char *path) {
 	}
 }
 
-static int batch_fs_dryrun_putfile (struct batch_queue *q, const char *lpath, const char *rpath) {
+static int64_t batch_fs_dryrun_putfile (struct batch_queue *q, const char *lpath, const char *rpath) {
 	FILE *log;
 
 	if ((log = fopen(q->logfile, "a"))) {

@@ -319,14 +319,14 @@ int batch_fs_chirp_mkdir (struct batch_queue *q, const char *path, mode_t mode, 
 		return chirp_reli_mkdir(gethost(q), resolved, mode, STOPTIME);
 }
 
-int batch_fs_chirp_putfile (struct batch_queue *q, const char *lpath, const char *rpath)
+int64_t batch_fs_chirp_putfile (struct batch_queue *q, const char *lpath, const char *rpath)
 {
 	char resolved[CHIRP_PATH_MAX];
 	struct stat buf;
 	FILE *file = fopen(lpath, "r");
 	snprintf(resolved, sizeof(resolved), "%s/%s", getroot(q), rpath);
 	if (file && fstat(fileno(file), &buf) == 0) {
-		int n = chirp_reli_putfile(gethost(q), resolved, file, buf.st_mode, buf.st_size, STOPTIME);
+		int64_t n = chirp_reli_putfile(gethost(q), resolved, file, buf.st_mode, buf.st_size, STOPTIME);
 		fclose(file);
 		return n;
 	}
