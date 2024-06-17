@@ -1630,7 +1630,7 @@ int main(int argc, char *argv[])
 	list_first_item(wrapper_inputs);
 	while((item = list_next_item(wrapper_inputs))) {
 		char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(item));
-		int result = copy_file_to_file(item, file_at_scratch_dir);
+		int64_t result = copy_file_to_file(item, file_at_scratch_dir);
 		if(result < 0) {
 			fprintf(stderr,"work_queue_factory: Cannot copy wrapper input file %s to factory scratch directory %s:\n", item, file_at_scratch_dir);
 			fprintf(stderr,"%s\n", strerror(errno));

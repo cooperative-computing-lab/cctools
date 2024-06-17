@@ -287,7 +287,7 @@ int batch_fs_mkdir (struct batch_queue *q, const char *path, mode_t mode, int re
 	return q->module->fs.mkdir(q, path, mode, recursive);
 }
 
-int batch_fs_putfile (struct batch_queue *q, const char *lpath, const char *rpath)
+int64_t batch_fs_putfile (struct batch_queue *q, const char *lpath, const char *rpath)
 {
 	return q->module->fs.putfile(q, lpath, rpath);
 }
