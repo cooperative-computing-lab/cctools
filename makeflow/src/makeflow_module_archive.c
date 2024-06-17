@@ -743,7 +743,7 @@ int makeflow_archive_copy_preserved_files(struct archive_instance *a, struct bat
 			int64_t success = copy_file_to_file(output_file_path, file_name);
 			free(output_file_path);
 			free(file_name);
-			if (!success) {
+			if (success < 0) {
 				list_cursor_destroy(cur);
 				debug(D_ERROR|D_MAKEFLOW_HOOK,"Failed to copy output file %s to %s\n", output_file_path, file_name);
 				return 1;
