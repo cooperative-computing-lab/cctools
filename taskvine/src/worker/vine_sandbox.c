@@ -191,7 +191,6 @@ static int stage_output_file(struct vine_process *p, struct vine_mount *m, struc
 				    size,
 				    mtime,
 				    transfer_time)) {
-
 			vine_worker_send_cache_update(manager,
 					f->cached_name,
 					f->type,
