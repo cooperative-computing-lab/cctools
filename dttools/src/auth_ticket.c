@@ -344,11 +344,11 @@ void auth_ticket_load(const char *tickets)
 {
 	if (tickets) {
 		char *tickets_copy = strdup(tickets);
-		char *t = strtok(tickets_copy,",");
-		while(t) {
+		char *t = strtok(tickets_copy, ",");
+		while (t) {
 			debug(D_CHIRP, "adding %s", t);
 			list_push_tail(client_ticket_list, strdup(t));
-			t = strtok(0,",");
+			t = strtok(0, ",");
 		}
 		free(tickets_copy);
 	} else {
