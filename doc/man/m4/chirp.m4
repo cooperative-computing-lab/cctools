@@ -42,7 +42,7 @@ LIST_END
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_ARG(a, auth, flag)Require this authentication mode.
+OPTION_ARG(a,auth,flag) Enable authentication mode: unix, hostname, address, ticket, kerberos, or globus.
 OPTION_ARG(d, debug, flag)Enable debugging for this subsystem.
 OPTION_ARG(i, tickets, files)Comma-delimited list of tickets to use for authentication.
 OPTION_FLAG(l,verbose)Long transfer information.

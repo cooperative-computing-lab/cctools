@@ -36,6 +36,7 @@ attempted in the order chosen.
 - "unix"
 - "hostname"
 - "address"
+- "ticket"
 @see auth_register_all
 */
 
