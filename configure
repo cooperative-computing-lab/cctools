@@ -1123,6 +1123,20 @@ then
 	report_detection openssl_static "${openssl_static_avail}" auto "${openssl_path}"
 fi
 
+if check_path openssl
+then
+    echon "checking for pkeyutl/rsautl..."
+    # In openssl3, "openssl rsautl" is deprecated in favor of "openssl pkeyutl"
+    if openssl pkeyutl --help >/dev/null 2>&1
+    then
+	echo "using newer openssl pkeyutl"
+	ccflags_append_define HAS_OPENSSL_PKEYUTL
+    else
+	echo "using older openssl rsautl"
+	ccflags_append_define HAS_OPENSSL_RSAUTL
+    fi	
+fi
+
 
 # from glibc:
 library_search_standard resolv ${base_root}
