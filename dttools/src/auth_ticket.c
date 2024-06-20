@@ -269,9 +269,9 @@ static int server_accepts_ticket(struct link *link, const char *ticket_digest, t
 	int result = system(cmd);
 	free(cmd);
 
-	// unlink(signature_file);
-	// unlink(challenge_file);
-	// unlink(ticket_file);
+	unlink(signature_file);
+	unlink(challenge_file);
+	unlink(ticket_file);
 
 	if (result != 0) {
 		debug(D_AUTH, "ticket: failed challenge for %s", ticket_digest);
