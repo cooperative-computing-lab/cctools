@@ -118,7 +118,7 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 			static const char cmd[] = OPENSSL_RANDFILE "openssl pkeyutl -inkey \"$TICKET\" -sign\n";
 #else
 			static const char cmd[] = OPENSSL_RANDFILE "openssl rsautl -inkey \"$TICKET\" -sign\n";
-#endif			
+#endif
 			const char *env[] = {NULL, NULL};
 			BUFFER_STACK_ABORT(Benv, 8192);
 			BUFFER_STACK_ABORT(Bout, 65536);
@@ -268,9 +268,8 @@ static int server_accepts_ticket(struct link *link, const char *ticket_digest, t
 			challenge_file,
 			signature_file);
 #else
-	char *cmd = string_format("openssl rsautl -pubin -inkey \"%s\" -in \"%s\" -verify",
-			ticket_file,
-			signature_file);
+	char *cmd = string_format(
+			"openssl rsautl -pubin -inkey \"%s\" -in \"%s\" -verify", ticket_file, signature_file);
 #endif
 
 	debug(D_DEBUG, "ticket: %s\n", cmd);
