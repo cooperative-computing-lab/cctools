@@ -14,13 +14,13 @@ See the file COPYING for details.
 #include "full_io.h"
 #include "hash_table.h"
 #include "link.h"
+#include "list.h"
 #include "md5.h"
 #include "random.h"
 #include "shell.h"
 #include "sort_dir.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
-#include "list.h"
 
 #include <sys/stat.h>
 
@@ -44,120 +44,119 @@ See the file COPYING for details.
 #define CHALLENGE_LENGTH (64)
 
 static auth_ticket_server_callback_t server_callback = NULL;
-static struct list * client_ticket_list = NULL;
+static struct list *client_ticket_list = NULL;
 
 static int auth_ticket_assert(struct link *link, time_t stoptime)
 {
 	int rc;
 	char line[AUTH_LINE_MAX];
+	char *ticket;
 
-	if (list_size(client_ticket_list)) {
-		char *ticket;
-		LIST_ITERATE(client_ticket_list,ticket) {
-			char digest[MD5_DIGEST_LENGTH_HEX + 1] = "";
-			char challenge[1024];
+	LIST_ITERATE(client_ticket_list, ticket)
+	{
+		char digest[MD5_DIGEST_LENGTH_HEX + 1] = "";
+		char challenge[1024];
 
-			if (access(ticket, R_OK) == -1) {
-				debug(D_AUTH, "could not access ticket %s: %s", ticket, strerror(errno));
-				continue;
-			}
+		if (access(ticket, R_OK) == -1) {
+			debug(D_AUTH, "could not access ticket %s: %s", ticket, strerror(errno));
+			continue;
+		}
 
-			/* load the digest */
-			{
-				static const char cmd[] = OPENSSL_RANDFILE "openssl rsa -in \"$TICKET\" -pubout\n";
+		/* load the digest */
+		{
+			static const char cmd[] = OPENSSL_RANDFILE "openssl rsa -in \"$TICKET\" -pubout\n";
 
-				const char *env[] = {NULL, NULL};
-				BUFFER_STACK_ABORT(Benv, 8192);
-				BUFFER_STACK(Bout, 4096);
-				BUFFER_STACK(Berr, 4096);
-				int status;
+			const char *env[] = {NULL, NULL};
+			BUFFER_STACK_ABORT(Benv, 8192);
+			BUFFER_STACK(Bout, 4096);
+			BUFFER_STACK(Berr, 4096);
+			int status;
 
-				buffer_putfstring(Benv, "TICKET=%s", ticket);
-				env[0] = buffer_tostring(Benv);
-				CATCHUNIX(shellcode(cmd, env, NULL, 0, Bout, Berr, &status));
-				if (buffer_pos(Berr))
-					debug(D_DEBUG, "shellcode:\n%s", buffer_tostring(Berr));
+			buffer_putfstring(Benv, "TICKET=%s", ticket);
+			env[0] = buffer_tostring(Benv);
+			CATCHUNIX(shellcode(cmd, env, NULL, 0, Bout, Berr, &status));
+			if (buffer_pos(Berr))
+				debug(D_DEBUG, "shellcode:\n%s", buffer_tostring(Berr));
 
-				if (status == 0 && buffer_pos(Bout) > 0) {
-					size_t i;
-					unsigned char md5digest[MD5_DIGEST_LENGTH];
-					BUFFER_STACK_ABORT(Bhex, sizeof(digest));
-					md5_buffer(buffer_tostring(Bout), buffer_pos(Bout), md5digest);
-					for (i = 0; i < sizeof(md5digest); i++)
-						buffer_putfstring(Bhex, "%02x", (unsigned int)md5digest[i]);
-					assert(buffer_pos(Bhex) < sizeof(digest));
-					strcpy(digest, buffer_tostring(Bhex));
-				} else {
-					debug(D_AUTH, "openssl did not return pubkey, trying next ticket");
-					continue;
-				}
-			}
-
-			debug(D_AUTH, "trying ticket %s", digest);
-			CATCHUNIX(link_printf(link, stoptime, "%s\n", digest));
-
-			CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
-			if (strcmp(line, "declined") == 0) {
-				debug(D_AUTH, "ticket %s declined, trying next one...", digest);
-				continue;
-			}
-
-			errno = 0;
-			unsigned long length = strtoul(line, NULL, 10);
-			if (errno == ERANGE || errno == EINVAL)
-				CATCH(EIO);
-			else if (length > sizeof(challenge))
-				CATCH(EINVAL);
-
-			CATCHUNIX(link_read(link, challenge, length, stoptime));
-			debug(D_AUTH, "received challenge of %lu bytes", length);
-
-			{
-				static const char cmd[] = OPENSSL_RANDFILE
-						"openssl pkeyutl -inkey \"$TICKET\" -sign\n" /* reads challenge from
-											       stdin */
-						;
-
-				const char *env[] = {NULL, NULL};
-				BUFFER_STACK_ABORT(Benv, 8192);
-				BUFFER_STACK_ABORT(Bout, 65536);
-				BUFFER_STACK(Berr, 4096);
-				int status;
-
-				buffer_putfstring(Benv, "TICKET=%s", ticket);
-				env[0] = buffer_tostring(Benv);
-				rc = shellcode(cmd, env, challenge, length, Bout, Berr, &status);
-				if (buffer_pos(Berr))
-					debug(D_DEBUG, "shellcode:\n%s", buffer_tostring(Berr));
-				if (rc == -1) {
-					debug(D_AUTH, "openssl failed, your keysize may be too small");
-					debug(D_AUTH, "please debug using \"dd if=/dev/urandom count=64 bs=1 | openssl pkeyutl -inkey <ticket file> -sign\"");
-					CATCHUNIX(rc);
-				}
-
-				if (status) {
-					debug(D_AUTH, "openssl did not return digest, trying next ticket");
-					continue;
-				}
-
-				CATCHUNIX(link_printf(link, stoptime, "%zu\n", buffer_pos(Bout)));
-				CATCHUNIX(link_putlstring(link, buffer_tostring(Bout), buffer_pos(Bout), stoptime));
-				debug(D_AUTH, "sent signed challenge of %zu bytes", buffer_pos(Bout));
-			}
-
-			CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
-
-			if (strcmp(line, "success") == 0) {
-				debug(D_AUTH, "succeeded challenge for %s", digest);
-				rc = 0;
-				goto out;
-			} else if (strcmp(line, "failure") == 0) {
-				debug(D_AUTH, "failed challenge for %s", digest);
-				THROW_QUIET(EINVAL);
+			if (status == 0 && buffer_pos(Bout) > 0) {
+				size_t i;
+				unsigned char md5digest[MD5_DIGEST_LENGTH];
+				BUFFER_STACK_ABORT(Bhex, sizeof(digest));
+				md5_buffer(buffer_tostring(Bout), buffer_pos(Bout), md5digest);
+				for (i = 0; i < sizeof(md5digest); i++)
+					buffer_putfstring(Bhex, "%02x", (unsigned int)md5digest[i]);
+				assert(buffer_pos(Bhex) < sizeof(digest));
+				strcpy(digest, buffer_tostring(Bhex));
 			} else {
-				debug(D_AUTH, "received bad response: '%s'", line);
-				THROW_QUIET(EINVAL);
+				debug(D_AUTH, "openssl did not return pubkey, trying next ticket");
+				continue;
 			}
+		}
+
+		debug(D_AUTH, "trying ticket %s", digest);
+		CATCHUNIX(link_printf(link, stoptime, "%s\n", digest));
+
+		CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
+		if (strcmp(line, "declined") == 0) {
+			debug(D_AUTH, "ticket %s declined, trying next one...", digest);
+			continue;
+		}
+
+		errno = 0;
+		unsigned long length = strtoul(line, NULL, 10);
+		if (errno == ERANGE || errno == EINVAL)
+			CATCH(EIO);
+		else if (length > sizeof(challenge))
+			CATCH(EINVAL);
+
+		CATCHUNIX(link_read(link, challenge, length, stoptime));
+		debug(D_AUTH, "received challenge of %lu bytes", length);
+
+		{
+			static const char cmd[] =
+					OPENSSL_RANDFILE "openssl pkeyutl -inkey \"$TICKET\" -sign\n" /* reads challenge
+													from stdin */
+					;
+
+			const char *env[] = {NULL, NULL};
+			BUFFER_STACK_ABORT(Benv, 8192);
+			BUFFER_STACK_ABORT(Bout, 65536);
+			BUFFER_STACK(Berr, 4096);
+			int status;
+
+			buffer_putfstring(Benv, "TICKET=%s", ticket);
+			env[0] = buffer_tostring(Benv);
+			rc = shellcode(cmd, env, challenge, length, Bout, Berr, &status);
+			if (buffer_pos(Berr))
+				debug(D_DEBUG, "shellcode:\n%s", buffer_tostring(Berr));
+			if (rc == -1) {
+				debug(D_AUTH, "openssl failed, your keysize may be too small");
+				debug(D_AUTH, "please debug using \"dd if=/dev/urandom count=64 bs=1 | openssl pkeyutl -inkey <ticket file> -sign\"");
+				CATCHUNIX(rc);
+			}
+
+			if (status) {
+				debug(D_AUTH, "openssl did not return digest, trying next ticket");
+				continue;
+			}
+
+			CATCHUNIX(link_printf(link, stoptime, "%zu\n", buffer_pos(Bout)));
+			CATCHUNIX(link_putlstring(link, buffer_tostring(Bout), buffer_pos(Bout), stoptime));
+			debug(D_AUTH, "sent signed challenge of %zu bytes", buffer_pos(Bout));
+		}
+
+		CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
+
+		if (strcmp(line, "success") == 0) {
+			debug(D_AUTH, "succeeded challenge for %s", digest);
+			rc = 0;
+			goto out;
+		} else if (strcmp(line, "failure") == 0) {
+			debug(D_AUTH, "failed challenge for %s", digest);
+			THROW_QUIET(EINVAL);
+		} else {
+			debug(D_AUTH, "received bad response: '%s'", line);
+			THROW_QUIET(EINVAL);
 		}
 	}
 	CATCHUNIX(link_putliteral(link, "==\n", stoptime));
@@ -354,7 +353,7 @@ void auth_ticket_load(const char *tickets)
 			memset(value, 0, end - start + 1);
 			strncpy(value, start, end - start);
 			debug(D_CHIRP, "adding %s", value);
-			list_push_tail(client_ticket_list,value);
+			list_push_tail(client_ticket_list, value);
 		}
 	} else {
 		/* populate a list with tickets in the current directory */
@@ -365,7 +364,7 @@ void auth_ticket_load(const char *tickets)
 			if (strncmp(list[i], "ticket.", strlen("ticket.")) == 0 &&
 					(strlen(list[i]) == (strlen("ticket.") + (MD5_DIGEST_LENGTH << 1)))) {
 				debug(D_CHIRP, "adding ticket %s", list[i]);
-				list_push_tail(client_ticket_list,strdup(list[i]));
+				list_push_tail(client_ticket_list, strdup(list[i]));
 			}
 		}
 		sort_dir_free(list);
