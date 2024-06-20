@@ -24,7 +24,7 @@ SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_ARG(A, default-acl,file)Use this file as the default ACL.
 OPTION_FLAG_LONG(inherit-default-acl) Directories without an ACL inherit from parent directories.
-OPTION_ARG(a, auth,method)Enable this authentication method.
+OPTION_ARG(a,auth,flag) Enable authentication mode: unix, hostname, address, ticket, kerberos, or globus.
 OPTION_FLAG(b,background)Run as daemon.
 OPTION_ARG(B, pid-file,file)Write PID to file.
 OPTION_FLAG(C,no-core-dump)Do not create a core dump, even due to a crash.

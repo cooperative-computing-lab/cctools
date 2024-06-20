@@ -16,7 +16,7 @@ BOLD(chirp_distribute) also can clean up replicated data using -X option.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ARG(a,auth,flag)Require this authentication mode.
+OPTION_ARG(a,auth,flag) Enable authentication mode: unix, hostname, address, ticket, kerberos, or globus.
 OPTION_ARG(d,debug,flag)Enable debugging for this subsystem.
 OPTION_FLAG(D,info-transfer)Show detailed location, time, and performance of each transfer.
 OPTION_ARG(F,failures-file,file)Write matrix of failures to this file.
