@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "sort_dir.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "list.h"
 
 #include <sys/stat.h>
 
@@ -43,18 +44,16 @@ See the file COPYING for details.
 #define CHALLENGE_LENGTH (64)
 
 static auth_ticket_server_callback_t server_callback = NULL;
-static char **client_tickets = NULL;
+static struct list * client_ticket_list = NULL;
 
 static int auth_ticket_assert(struct link *link, time_t stoptime)
 {
 	int rc;
 	char line[AUTH_LINE_MAX];
-	char **tickets = client_tickets;
 
-	if (tickets) {
+	if (list_size(client_ticket_list)) {
 		char *ticket;
-
-		for (ticket = *tickets; ticket; ticket = *(++tickets)) {
+		LIST_ITERATE(client_ticket_list,ticket) {
 			char digest[MD5_DIGEST_LENGTH_HEX + 1] = "";
 			char challenge[1024];
 
@@ -330,9 +329,8 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 
 int auth_ticket_register(void)
 {
-	if (!client_tickets) {
-		client_tickets = xxrealloc(NULL, sizeof(char *));
-		client_tickets[0] = NULL;
+	if (!client_ticket_list) {
+		client_ticket_list = list_create();
 	}
 	debug(D_AUTH, "ticket: registered");
 	return auth_register("ticket", auth_ticket_assert, auth_ticket_accept);
@@ -345,10 +343,6 @@ void auth_ticket_server_callback(auth_ticket_server_callback_t sc)
 
 void auth_ticket_load(const char *tickets)
 {
-	size_t n = 0;
-	client_tickets = xxrealloc(client_tickets, sizeof(char *));
-	client_tickets[n] = NULL;
-
 	if (tickets) {
 		const char *start, *end;
 		for (start = end = tickets; start < tickets + strlen(tickets); start = ++end) {
@@ -360,9 +354,7 @@ void auth_ticket_load(const char *tickets)
 			memset(value, 0, end - start + 1);
 			strncpy(value, start, end - start);
 			debug(D_CHIRP, "adding %s", value);
-			client_tickets = xxrealloc(client_tickets, sizeof(char *) * ((++n) + 1));
-			client_tickets[n - 1] = value;
-			client_tickets[n] = NULL;
+			list_push_tail(client_ticket_list,value);
 		}
 	} else {
 		/* populate a list with tickets in the current directory */
@@ -373,9 +365,7 @@ void auth_ticket_load(const char *tickets)
 			if (strncmp(list[i], "ticket.", strlen("ticket.")) == 0 &&
 					(strlen(list[i]) == (strlen("ticket.") + (MD5_DIGEST_LENGTH << 1)))) {
 				debug(D_CHIRP, "adding ticket %s", list[i]);
-				client_tickets = xxrealloc(client_tickets, sizeof(char *) * ((++n) + 1));
-				client_tickets[n - 1] = strdup(list[i]);
-				client_tickets[n] = NULL;
+				list_push_tail(client_ticket_list,strdup(list[i]));
 			}
 		}
 		sort_dir_free(list);
