@@ -343,18 +343,14 @@ void auth_ticket_server_callback(auth_ticket_server_callback_t sc)
 void auth_ticket_load(const char *tickets)
 {
 	if (tickets) {
-		const char *start, *end;
-		for (start = end = tickets; start < tickets + strlen(tickets); start = ++end) {
-			while (*end != '\0' && *end != ',')
-				end++;
-			if (start == end)
-				continue;
-			char *value = xxmalloc(end - start + 1);
-			memset(value, 0, end - start + 1);
-			strncpy(value, start, end - start);
-			debug(D_CHIRP, "adding %s", value);
-			list_push_tail(client_ticket_list, value);
+		char *tickets_copy = strdup(tickets);
+		char *t = strtok(tickets_copy,",");
+		while(t) {
+			debug(D_CHIRP, "adding %s", t);
+			list_push_tail(client_ticket_list, strdup(t));
+			t = strtok(0,",");
 		}
+		free(tickets_copy);
 	} else {
 		/* populate a list with tickets in the current directory */
 		int i;
