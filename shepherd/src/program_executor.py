@@ -37,7 +37,7 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
         with cond:
             if dependency_mode == 'all':
                 for dep_service, required_state in dependencies.items():
-                    while required_state not in state_times.get(dep_service, {}):
+                    while required_state not in state_times.get(dep_service, {}) and not stop_event.is_set():
                         cond.wait()
 
             elif dependency_mode == 'any':
@@ -49,6 +49,13 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
                             break
                     if not satisfied:
                         cond.wait()
+
+        if stop_event.is_set():
+            with cond:
+                state_dict[service_name] = "stopped_before_execution"
+                update_state_time(service_name, "stopped_before_execution", start_time, state_times)
+                cond.notify_all()
+            return
 
         print(f"DEBUG: Starting execution of '{service_type}' {service_name}")
 
@@ -125,6 +132,7 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
         print(f"Exception in executing {service_name}: {e}")
 
     print(f"DEBUG: Finished execution of {service_name}")
+
 
 def update_state_time(service_name, state, start_time, state_times):
     current_time = time.time() - start_time
