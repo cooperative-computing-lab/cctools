@@ -114,11 +114,13 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 
 		{
 			/* reads challenge from stdin */
+			/* clang-format off */
 #if defined(HAS_OPENSSL_PKEYUTL)
 			static const char cmd[] = OPENSSL_RANDFILE "openssl pkeyutl -inkey \"$TICKET\" -sign\n";
 #else
 			static const char cmd[] = OPENSSL_RANDFILE "openssl rsautl -inkey \"$TICKET\" -sign\n";
 #endif
+			/* clang-format on */
 			const char *env[] = {NULL, NULL};
 			BUFFER_STACK_ABORT(Benv, 8192);
 			BUFFER_STACK_ABORT(Bout, 65536);
@@ -270,15 +272,13 @@ static int server_accepts_ticket(struct link *link, const char *ticket_digest, t
 	the correspponding signature as a separate file, and then just returns success or failure.
 	*/
 
+	/* clang-format off */
 #if defined(HAS_OPENSSL_PKEYUTL)
-	char *cmd = string_format("openssl pkeyutl -pubin -inkey \"%s\" -in \"%s\" -sigfile \"%s\" -verify",
-			ticket_file,
-			challenge_file,
-			signature_file);
+	char *cmd = string_format("openssl pkeyutl -pubin -inkey \"%s\" -in \"%s\" -sigfile \"%s\" -verify", ticket_file, challenge_file, signature_file);
 #else
-	char *cmd = string_format(
-			"openssl rsautl -pubin -inkey \"%s\" -in \"%s\" -verify", ticket_file, signature_file);
+	char *cmd = string_format("openssl rsautl -pubin -inkey \"%s\" -in \"%s\" -verify", ticket_file, signature_file);
 #endif
+	/* clang-format on */
 
 	debug(D_DEBUG, "ticket: %s\n", cmd);
 	int result = system(cmd);
