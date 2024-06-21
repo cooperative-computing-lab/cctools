@@ -729,8 +729,7 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 		// On BSD-derived systems, failure to connect is indicated by errno = EINVAL.
 		// Set it to something more explanatory.
 		if(result<0 && errno==EINVAL) {
-		  printf("result = %i", result);
-		  errno=ECONNREFUSED;
+			errno = ECONNREFUSED;
 		}
 
 		// Otherwise, a non-temporary errno should cause us to bail out.

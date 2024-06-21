@@ -1,10 +1,8 @@
-/* /usr/local/bin/ld: /home/rmason/Software/CCTools/cctools-source-git/chirp/src/chirp_swig_wrap.o: relocation R_X86_64_32S against symbol `__stderrp@@FBSD_1.0' can not be used when making a shared object; recompile with -fPIC */
-// Had to compile by hand: gcc -c chirp_swig_wrap.c -fPIC
 
-#include "buffer.h"		/* Copied from dttools/src */
-#include "chirp_reli.h"		/* Had to copy int_sizes.h from dttools/src */
+#include "buffer.h"
+#include "chirp_reli.h"
 #include "chirp_types.h"
-#include "xxmalloc.h"		/* Copied from dttools/src */
+#include "xxmalloc.h"
 
 #include <assert.h>
 

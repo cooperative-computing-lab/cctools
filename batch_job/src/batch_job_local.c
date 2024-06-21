@@ -16,7 +16,10 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
-#if defined (__FreeBSD__)
+
+#if defined(CCTOOLS_OPSYS_DARWIN)
+/* no such header */
+#elif defined(CCTOOLS_OPSYS_FREEBSD)
 #include <sys/procctl.h>
 #else
 #include <sys/prctl.h>
@@ -40,47 +43,25 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 		debug(D_BATCH, "couldn't create new process: %s\n", strerror(errno));
 		return -1;
 	} else {
-		/** The following code works but would duplicates the current process because of the system() function.
-		int result = system(cmd);
-		if(WIFEXITED(result)) {
-			_exit(WEXITSTATUS(result));
-		} else {
-			_exit(1);
-		}*/
-
 		if(envlist) {
 			jx_export(envlist);
 		}
 
-		/** A note from "man system 3" as of Jan 2012:
-		 * Do not use system() from a program with set-user-ID or set-group-ID
-		 * privileges, because strange values for some environment variables
-		 * might be used to subvert system integrity. Use the exec(3) family of
-		 * functions instead, but not execlp(3) or execvp(3). system() will
-		 * not, in fact, work properly from programs with set-user-ID or
-		 * set-group-ID privileges on systems on which /bin/sh is bash version
-		 * 2, since bash 2 drops privileges on startup. (Debian uses a modified
-		 * bash which does not do this when invoked as sh.)
-		 */
-		/* #ifndef CCTOOLS_OPSYS_DARWIN */
-		/* 	prctl(PR_SET_PDEATHSIG, SIGKILL); */
-		/* #endif */
+		/* Force the child process to exit if the parent dies. */
+#if defined(CCTOOLS_OPSYS_DARWIN)
+		/* no such syscall */
+#elif defined (CCTOOLS_OPSYS_FREEBSD)
+		const int sig = SIGTERM;
+		procctl (P_PID, 0, PROC_PDEATHSIG_CTL, (void *)&sig);
+#else
+		prctl (PR_SET_PDEATHSIG, SIGTERM);
+#endif
+
 		execlp("/bin/sh", "sh", "-c", cmd, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 	}
 	return -1;
 }
-
-#if defined (__FreeBSD__)
-static int set_exit_with_parent (void) {
-    const int sig = SIGTERM;
-    return procctl (P_PID, 0, PROC_PDEATHSIG_CTL, (void *)&sig);
-}
-#else
-static int set_exit_with_parent (void) {
-    return prctl (PR_SET_PDEATHSIG, SIGTERM);
-}
-#endif
 
 static batch_job_id_t batch_job_local_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {

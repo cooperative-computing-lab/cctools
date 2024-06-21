@@ -1092,7 +1092,7 @@ then
 
 	if [ "${openssl_avail}" = yes ]
 	then
-		openssl_ccflags="-I${openssl_path}/include -fPIC"
+		openssl_ccflags="-I${openssl_path}/include"
 		openssl_ldflags="-L${openssl_path}/lib -lssl -lcrypto"
 	fi
 fi
@@ -1255,7 +1255,7 @@ echo "checking for package compatibility..."
 
 if [ "${include_package_chirp}" = chirp ]
 then
-		internal_ccflags="${internal_ccflags} -DCCTOOLS_WITH_CHIRP -fPIC"
+		internal_ccflags="${internal_ccflags} -DCCTOOLS_WITH_CHIRP"
 fi
 
 if [ "$include_package_parrot" = parrot ]
