@@ -262,6 +262,14 @@ static int server_accepts_ticket(struct link *link, const char *ticket_digest, t
 		return 0;
 	}
 
+	/*
+	Note that "openssl rsautl" is the older command, now deprecated in favor of "openssl pkeyutl".
+	rsautl -verify expects a signature (challenge + signed hash) on the input,
+	and produces the challenge plaintext on the output, returning true on success.
+	However, pkeyutl -verify expects the challenge plaintext on the input,
+	the correspponding signature as a separate file, and then just returns success or failure.
+	*/
+
 #if defined(HAS_OPENSSL_PKEYUTL)
 	char *cmd = string_format("openssl pkeyutl -pubin -inkey \"%s\" -in \"%s\" -sigfile \"%s\" -verify",
 			ticket_file,
