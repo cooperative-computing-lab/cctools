@@ -19,10 +19,10 @@ int host_memory_info_get(UINT64_T *avail, UINT64_T *total)
 
 #elif defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 
-#include <sys/types.h>
 #include <sys/sysctl.h>
+#include <sys/types.h>
 
-int host_memory_info_get(UINT64_T * avail, UINT64_T * total)
+int host_memory_info_get(UINT64_T *avail, UINT64_T *total)
 {
 	unsigned x = 0;
 	size_t s = sizeof(x);

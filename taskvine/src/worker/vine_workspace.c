@@ -19,7 +19,7 @@
 #include <string.h>
 
 #if defined(CCTOOLS_OPSYS_FREEBSD)
-#include<sys/wait.h>
+#include <sys/wait.h>
 #endif
 
 /* Create a new workspace object and sub-paths */
