@@ -7,7 +7,7 @@ See the file COPYING for details.
 #include "uptime.h"
 #include "debug.h"
 
-#if defined(CCTOOLS_OPSYS_DARWIN)
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 #include <sys/sysctl.h>
 #include <time.h>
 #elif defined(CCTOOLS_OPSYS_LINUX)
@@ -18,7 +18,7 @@ int uptime_get()
 {
 	int uptime;
 
-#if defined(CCTOOLS_OPSYS_DARWIN)
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 	struct timeval boottime;
 	size_t len = sizeof(boottime);
 	int mib[2] = {CTL_KERN, KERN_BOOTTIME};

@@ -10,3 +10,4 @@ AllowShortFunctionsOnASingleLine: false
 IndentCaseLabels: false
 BreakStringLiterals: false
 BinPackArguments: false
+SortIncludes: false

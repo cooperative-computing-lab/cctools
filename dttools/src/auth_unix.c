@@ -98,10 +98,10 @@ static void make_challenge_path(char *path)
 	debug(D_AUTH, "unix: challenge path is %s", path);
 }
 
-#ifdef CCTOOLS_OPSYS_DARWIN
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 
 /*
-Darwin does not have fgetpwent in libc,
+Darwin/FreeBSD does not have fgetpwent in libc,
 but all other platforms do.
 */
 
@@ -140,6 +140,7 @@ static struct passwd *auth_get_passwd_from_uid(uid_t uid)
 		if (file) {
 			while (1) {
 				p = fgetpwent(file);
+
 				if (!p)
 					break;
 

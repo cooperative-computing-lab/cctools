@@ -491,7 +491,7 @@ int do_direct_query( const char *manager_host, int manager_port, time_t stoptime
 
 	l = link_connect(manager_addr,manager_port,stoptime);
 	if(!l) {
-		fprintf(stderr,"couldn't connect to %s port %d: %s\n",manager_host,manager_port,strerror(errno));
+		fprintf(stderr,"vine_status: couldn't connect to %s port %d: %s\n",manager_host,manager_port,strerror(errno));
 		return 1;
 	}
 

@@ -11,7 +11,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 
 #include "rmonitor_types.h"
-#if defined(CCTOOLS_OPSYS_DARWIN)
+#if defined (CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
   #include <sys/param.h>
   #include <sys/mount.h>
   #include <sys/resource.h>

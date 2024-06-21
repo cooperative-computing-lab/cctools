@@ -4,12 +4,15 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+
 #include <string.h>
 #include <errno.h>
+#include <sys/types.h>
 
 #include "grow.h"
 #include "debug.h"
 #include "xxmalloc.h"
+#include "int_sizes.h"
 
 static sha1_context_t grow_filesystem_checksum;
 

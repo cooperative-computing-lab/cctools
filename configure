@@ -762,7 +762,7 @@ then
 
 	if [ "${mpi_avail}" = yes ]
 	then
-		ccflags="-DCCTOOLS_WITH_MPI"
+		ccflags="${ccflags} -DCCTOOLS_WITH_MPI"
 		ccompiler=${mpi_exe}
 		linker=${mpi_exe}
 	else

@@ -63,6 +63,16 @@
 #	define O_NOFOLLOW 0
 #endif
 
+#if defined (CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
+/* Darwin/FreeBSD have 64-bit I/O by default */
+#	define stat64 stat
+#	define fstat64 fstat
+#	define ftruncate64 ftruncate
+#	define statfs64 statfs
+#	define fstatfs64 fstatfs
+#	define fstatat64 fstatat
+#endif
+
 struct url_binding {
 	char path[PATH_MAX]; /* task_path */
 	char *url;

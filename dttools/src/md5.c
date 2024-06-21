@@ -369,7 +369,7 @@ void md5_buffer(const void *buffer, size_t length, unsigned char digest[16])
 	md5_final(digest, &context);
 }
 
-#if defined(CCTOOLS_OPSYS_DARWIN)
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 #define stat64 stat
 #endif
 

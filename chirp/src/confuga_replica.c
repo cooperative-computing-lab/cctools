@@ -27,6 +27,12 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
+#if defined (CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
+#	include <sys/mount.h>
+#	include <sys/param.h>
+#include <sys/stat.h>
+#endif
+
 #define STOPTIME (time(NULL)+30)
 
 struct confuga_replica {

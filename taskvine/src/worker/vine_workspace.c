@@ -18,6 +18,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#if defined(CCTOOLS_OPSYS_FREEBSD)
+#include <sys/wait.h>
+#endif
+
 /* Create a new workspace object and sub-paths */
 
 struct vine_workspace *vine_workspace_create(const char *manual_workspace_dir)

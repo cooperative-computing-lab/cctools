@@ -170,7 +170,7 @@ FILE *open_proc_file(pid_t pid, char *filename)
 	FILE *fproc;
 	char fproc_path[PATH_MAX];
 
-#if defined(CCTOOLS_OPSYS_DARWIN)
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 	return NULL;
 #endif
 

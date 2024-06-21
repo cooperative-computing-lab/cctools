@@ -61,7 +61,7 @@ ssize_t full_write(int fd, const void *buf, size_t count)
 
 ssize_t full_pread64(int fd, void *buf, size_t count, int64_t offset)
 {
-#ifdef CCTOOLS_OPSYS_DARWIN
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 	FULL_PIO(pread(fd, buf, count, offset));
 #else
 	FULL_PIO(pread64(fd, buf, count, offset));
@@ -70,7 +70,7 @@ ssize_t full_pread64(int fd, void *buf, size_t count, int64_t offset)
 
 ssize_t full_pwrite64(int fd, const void *buf, size_t count, int64_t offset)
 {
-#ifdef CCTOOLS_OPSYS_DARWIN
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 	FULL_PIO(pwrite(fd, buf, count, offset));
 #else
 	FULL_PIO(pwrite64(fd, buf, count, offset));
