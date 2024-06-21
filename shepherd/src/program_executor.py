@@ -37,14 +37,14 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
         with cond:
             if dependency_mode == 'all':
                 for dep_service, required_state in dependencies.items():
-                    while state_dict.get(dep_service) != required_state:
+                    while required_state not in state_times.get(dep_service, {}):
                         cond.wait()
 
             elif dependency_mode == 'any':
                 satisfied = False
                 while not satisfied and not stop_event.is_set():
                     for dep_service, required_state in dependencies.items():
-                        if state_dict.get(dep_service) == required_state:
+                        if required_state in state_times.get(dep_service, {}):
                             satisfied = True
                             break
                     if not satisfied:
@@ -79,9 +79,6 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
                                        preexec_fn=os.setsid)
             pgid_dict[service_name] = os.getpgid(process.pid)
 
-        # while process.poll() is None and not stop_event.is_set():
-        #     time.sleep(0.1)
-
         while process.poll() is None:
             time.sleep(0.1)
 
@@ -106,35 +103,34 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
             print(f"ERROR: Service {service_name} stopped unexpectedly, marked as failure.")
 
         elif service_type == 'action':
-            if return_code == 0:
-                with cond:
-                    state_dict[service_name] = "action_success"
-                    update_state_time(service_name, "success", start_time, state_times)
-                    cond.notify_all()
-            else:
-                with cond:
-                    state_dict[service_name] = "action_failure"
-                    update_state_time(service_name, "failure", start_time, state_times)
-                    cond.notify_all()
+            action_state = "action_success" if return_code == 0 else "action_failure"
+
+            with cond:
+                state_dict[service_name] = action_state
+                update_state_time(service_name, action_state, start_time, state_times)
+                cond.notify_all()
 
         with cond:
             state_dict[service_name] = "final"
             update_state_time(service_name, "final", start_time, state_times)
             cond.notify_all()
 
-        # if log_thread.is_alive():
-        #     log_thread.join()
-        #
-        # if file_monitor_thread and file_monitor_thread.is_alive():
-        #     file_monitor_thread.join()
+        if log_thread.is_alive():
+            log_thread.join()
+
+        if file_monitor_thread and file_monitor_thread.is_alive():
+            file_monitor_thread.join()
 
     except Exception as e:
         print(f"Exception in executing {service_name}: {e}")
 
     print(f"DEBUG: Finished execution of {service_name}")
 
-
 def update_state_time(service_name, state, start_time, state_times):
+    current_time = time.time() - start_time
+
     local_state_times = state_times[service_name]
-    local_state_times[state] = time.time() - start_time
+    local_state_times[state] = current_time
     state_times[service_name] = local_state_times
+
+    print(f"DEBUG: Service '{service_name}' reached the state '{state}' at time {current_time:.3f}")
