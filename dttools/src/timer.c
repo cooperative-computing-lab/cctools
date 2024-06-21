@@ -38,10 +38,10 @@ void timer_init(int timers, const char *timer_strings[])
 	TimerStrings = timer_strings;
 }
 
-#define FREE_AND_NULL(s)                                                                                               \
-	if (s) {                                                                                                       \
-		free(s);                                                                                               \
-		(s) = NULL;                                                                                            \
+#define FREE_AND_NULL(s) \
+	if (s) { \
+		free(s); \
+		(s) = NULL; \
 	}
 
 void timer_destroy()

@@ -31,14 +31,14 @@ See the file COPYING for details.
 #include <string.h>
 
 /* Prevent openssl from opening $HOME/.rnd */
-#define OPENSSL_RANDFILE                                                                                               \
-	"if [ -r /dev/urandom ]; then\n"                                                                               \
-	"	export RANDFILE=/dev/urandom\n"                                                                              \
-	"elif [ -r /dev/random ]; then\n"                                                                              \
-	"	export RANDFILE=/dev/random\n"                                                                               \
-	"else\n"                                                                                                       \
-	"	unset RANDFILE\n"                                                                                            \
-	"	export HOME=/\n"                                                                                             \
+#define OPENSSL_RANDFILE \
+	"if [ -r /dev/urandom ]; then\n" \
+	"	export RANDFILE=/dev/urandom\n" \
+	"elif [ -r /dev/random ]; then\n" \
+	"	export RANDFILE=/dev/random\n" \
+	"else\n" \
+	"	unset RANDFILE\n" \
+	"	export HOME=/\n" \
 	"fi\n"
 
 #define CHALLENGE_LENGTH (64)

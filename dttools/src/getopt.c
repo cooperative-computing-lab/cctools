@@ -115,11 +115,11 @@ extern char *__getopt_nonoption_flags;
 #endif
 
 #ifdef USE_NONOPTION_FLAGS
-#define SWAP_FLAGS(ch1, ch2)                                                                                           \
-	if (d->__nonoption_flags_len > 0) {                                                                            \
-		char __tmp = __getopt_nonoption_flags[ch1];                                                            \
-		__getopt_nonoption_flags[ch1] = __getopt_nonoption_flags[ch2];                                         \
-		__getopt_nonoption_flags[ch2] = __tmp;                                                                 \
+#define SWAP_FLAGS(ch1, ch2) \
+	if (d->__nonoption_flags_len > 0) { \
+		char __tmp = __getopt_nonoption_flags[ch1]; \
+		__getopt_nonoption_flags[ch1] = __getopt_nonoption_flags[ch2]; \
+		__getopt_nonoption_flags[ch2] = __tmp; \
 	}
 #else
 #define SWAP_FLAGS(ch1, ch2)
@@ -341,8 +341,8 @@ int _getopt_internal_r(int argc, char *const *argv, const char *optstring, const
 	   from the shell indicating it is not an option.  The later information
 	   is only used when the used in the GNU libc.  */
 #if defined _LIBC && defined USE_NONOPTION_FLAGS
-#define NONOPTION_P                                                                                                    \
-	(argv[d->optind][0] != '-' || argv[d->optind][1] == '\0' ||                                                    \
+#define NONOPTION_P \
+	(argv[d->optind][0] != '-' || argv[d->optind][1] == '\0' || \
 			(d->optind < d->__nonoption_flags_len && __getopt_nonoption_flags[d->optind] == '1'))
 #else
 #define NONOPTION_P (argv[d->optind][0] != '-' || argv[d->optind][1] == '\0')

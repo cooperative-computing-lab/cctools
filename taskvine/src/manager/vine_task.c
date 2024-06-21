@@ -813,8 +813,8 @@ const char *vine_task_get_hostname(struct vine_task *t)
 	return t->hostname;
 }
 
-#define METRIC(x)                                                                                                      \
-	if (!strcmp(name, #x))                                                                                         \
+#define METRIC(x) \
+	if (!strcmp(name, #x)) \
 		return t->x;
 int64_t vine_task_get_metric(struct vine_task *t, const char *name)
 {
@@ -833,8 +833,8 @@ int64_t vine_task_get_metric(struct vine_task *t, const char *name)
 	return 0;
 }
 
-#define RESOURCES(x)                                                                                                   \
-	if (!strcmp(name, #x))                                                                                         \
+#define RESOURCES(x) \
+	if (!strcmp(name, #x)) \
 		return t->resources_##x;
 const struct rmsummary *vine_task_get_resources(struct vine_task *t, const char *name)
 {

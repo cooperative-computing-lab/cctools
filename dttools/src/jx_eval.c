@@ -16,24 +16,24 @@ See the file COPYING for details.
 
 // FAILOP(jx_operator *op, struct jx *left, struct jx *right, const char *message)
 // left, right, and message are evaluated exactly once
-#define FAILOP(op, left, right, message)                                                                               \
-	do {                                                                                                           \
-		assert(op);                                                                                            \
-		assert(message);                                                                                       \
-		struct jx *t = jx_operator(op->type, left, right);                                                     \
-		char *s = jx_print_string(t);                                                                          \
-		struct jx *e = jx_error(jx_format("on line %d, %s: %s", op->line, s, message));                        \
-		jx_delete(t);                                                                                          \
-		free(s);                                                                                               \
-		return e;                                                                                              \
+#define FAILOP(op, left, right, message) \
+	do { \
+		assert(op); \
+		assert(message); \
+		struct jx *t = jx_operator(op->type, left, right); \
+		char *s = jx_print_string(t); \
+		struct jx *e = jx_error(jx_format("on line %d, %s: %s", op->line, s, message)); \
+		jx_delete(t); \
+		free(s); \
+		return e; \
 	} while (false)
 
 // FAILARR(struct jx *array, const char *message)
-#define FAILARR(array, message)                                                                                        \
-	do {                                                                                                           \
-		assert(array);                                                                                         \
-		assert(message);                                                                                       \
-		return jx_error(jx_format("array reference on line %d: %s", array->line, message));                    \
+#define FAILARR(array, message) \
+	do { \
+		assert(array); \
+		assert(message); \
+		return jx_error(jx_format("array reference on line %d: %s", array->line, message)); \
 	} while (false)
 
 static struct jx *jx_check_errors(struct jx *j);

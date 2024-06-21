@@ -11,3 +11,4 @@ IndentCaseLabels: false
 BreakStringLiterals: false
 BinPackArguments: false
 SortIncludes: false
+AlignEscapedNewlines: DontAlign

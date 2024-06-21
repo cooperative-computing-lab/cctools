@@ -16,15 +16,15 @@
 #define inuse(b) ((size_t)(b->end - b->buf))
 #define avail(b) (b->len - inuse(b))
 
-#define checkerror(b, err, expr)                                                                                       \
-	do {                                                                                                           \
-		if ((err) == (expr)) {                                                                                 \
-			if (b->abort_on_failure) {                                                                     \
-				fatal("[%s:%d]: %s", __FILE__, __LINE__, strerror(errno));                             \
-			} else {                                                                                       \
-				return -1;                                                                             \
-			}                                                                                              \
-		}                                                                                                      \
+#define checkerror(b, err, expr) \
+	do { \
+		if ((err) == (expr)) { \
+			if (b->abort_on_failure) { \
+				fatal("[%s:%d]: %s", __FILE__, __LINE__, strerror(errno)); \
+			} else { \
+				return -1; \
+			} \
+		} \
 	} while (0)
 
 void buffer_init(buffer_t *b)

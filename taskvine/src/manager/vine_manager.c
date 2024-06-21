@@ -4796,19 +4796,19 @@ static void print_password_warning(struct vine_manager *q)
 	did_password_warning = 1;
 }
 
-#define BEGIN_ACCUM_TIME(q, stat)                                                                                      \
-	{                                                                                                              \
-		if (q->stats_measure->stat != 0) {                                                                     \
-			fatal("Double-counting stat %s. This should not happen, and it is a taskvine bug.");           \
-		} else {                                                                                               \
-			q->stats_measure->stat = timestamp_get();                                                      \
-		}                                                                                                      \
+#define BEGIN_ACCUM_TIME(q, stat) \
+	{ \
+		if (q->stats_measure->stat != 0) { \
+			fatal("Double-counting stat %s. This should not happen, and it is a taskvine bug."); \
+		} else { \
+			q->stats_measure->stat = timestamp_get(); \
+		} \
 	}
 
-#define END_ACCUM_TIME(q, stat)                                                                                        \
-	{                                                                                                              \
-		q->stats->stat += timestamp_get() - q->stats_measure->stat;                                            \
-		q->stats_measure->stat = 0;                                                                            \
+#define END_ACCUM_TIME(q, stat) \
+	{ \
+		q->stats->stat += timestamp_get() - q->stats_measure->stat; \
+		q->stats_measure->stat = 0; \
 	}
 
 struct vine_task *vine_wait(struct vine_manager *q, int timeout)

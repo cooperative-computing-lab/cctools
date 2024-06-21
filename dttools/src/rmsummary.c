@@ -692,30 +692,30 @@ void rmsummary_read_env_vars(struct rmsummary *s)
 	}
 }
 
-#define RM_BIN_OP(dest, src, fn)                                                                                       \
-	{                                                                                                              \
-		if (!src || !dest)                                                                                     \
-			return;                                                                                        \
-		size_t i;                                                                                              \
-		for (i = 0; i < rmsummary_num_resources(); i++) {                                                      \
-			const struct resource_info *info = &resources_info[i];                                         \
-			double dest_value = *((double *)((char *)dest + info->offset));                                \
-			double src_value = *((double *)((char *)src + info->offset));                                  \
-			double result = fn(dest_value, src_value);                                                     \
-			*(double *)((char *)dest + info->offset) = result;                                             \
-		}                                                                                                      \
+#define RM_BIN_OP(dest, src, fn) \
+	{ \
+		if (!src || !dest) \
+			return; \
+		size_t i; \
+		for (i = 0; i < rmsummary_num_resources(); i++) { \
+			const struct resource_info *info = &resources_info[i]; \
+			double dest_value = *((double *)((char *)dest + info->offset)); \
+			double src_value = *((double *)((char *)src + info->offset)); \
+			double result = fn(dest_value, src_value); \
+			*(double *)((char *)dest + info->offset) = result; \
+		} \
 	}
 
 /* Only operate on the fields that TaskVine actually uses;
  * cores, gpu, memory, disk. */
-#define RM_BIN_OP_BASIC(dest, src, fn)                                                                                 \
-	{                                                                                                              \
-		if (!src || !dest)                                                                                     \
-			return;                                                                                        \
-		dest->cores = fn(dest->cores, src->cores);                                                             \
-		dest->gpus = fn(dest->gpus, src->gpus);                                                                \
-		dest->memory = fn(dest->memory, src->memory);                                                          \
-		dest->disk = fn(dest->disk, src->disk);                                                                \
+#define RM_BIN_OP_BASIC(dest, src, fn) \
+	{ \
+		if (!src || !dest) \
+			return; \
+		dest->cores = fn(dest->cores, src->cores); \
+		dest->gpus = fn(dest->gpus, src->gpus); \
+		dest->memory = fn(dest->memory, src->memory); \
+		dest->disk = fn(dest->disk, src->disk); \
 	}
 
 /* Copy the value for all the fields in src > -1 to dest */

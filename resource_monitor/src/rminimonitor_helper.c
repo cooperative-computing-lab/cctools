@@ -27,8 +27,8 @@
 #define CCTOOLS_HELPER_DEBUG_MESSAGES 0
 
 #define D_RMON stderr
-#define debug                                                                                                          \
-	if (CCTOOLS_HELPER_DEBUG_MESSAGES)                                                                             \
+#define debug \
+	if (CCTOOLS_HELPER_DEBUG_MESSAGES) \
 	fprintf
 
 #define BUFFER_MAX 1024
