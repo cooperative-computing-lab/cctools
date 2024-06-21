@@ -48,12 +48,8 @@ struct jx_function_info {
 	jx_function_pointer function_pointer;
 };
 
-const struct jx_function_info jx_functions[] = {
-		{"range", "range( start, stop, step )", 0, {.single_arg = jx_function_range}},
-		{"format",
-				"format( str: %s int: %d float: %f\", \"hello\", 42, 3.14159 )",
-				0,
-				{.single_arg = jx_function_format}},
+const struct jx_function_info jx_functions[] = {{"range", "range( start, stop, step )", 0, {.single_arg = jx_function_range}},
+		{"format", "format( str: %s int: %d float: %f\", \"hello\", 42, 3.14159 )", 0, {.single_arg = jx_function_format}},
 		{"join", "join( array, delim )", 0, {.single_arg = jx_function_join}},
 		{"ceil", "ceil( value )", 0, {.single_arg = jx_function_ceil}},
 		{"floor", "floor( value )", 0, {.single_arg = jx_function_floor}},
@@ -69,15 +65,9 @@ const struct jx_function_info jx_functions[] = {
 		{"values", "values( object )", 0, {.single_arg = jx_function_values}},
 		{"items", "items( object )", 0, {.single_arg = jx_function_items}},
 		{"template", "template( string [,object] )", JX_DOUBLE_ARG, {.double_arg = jx_function_template}},
-		{"select",
-				"select( array, boolean )",
-				JX_DOUBLE_ARG | JX_DEFER_EVAL,
-				{.double_arg = jx_function_select}},
+		{"select", "select( array, boolean )", JX_DOUBLE_ARG | JX_DEFER_EVAL, {.double_arg = jx_function_select}},
 		{"where", "where( array, boolean )", JX_DOUBLE_ARG | JX_DEFER_EVAL, {.double_arg = jx_function_select}},
-		{"project",
-				"project( array, expression )",
-				JX_DOUBLE_ARG | JX_DEFER_EVAL,
-				{.double_arg = jx_function_project}},
+		{"project", "project( array, expression )", JX_DOUBLE_ARG | JX_DEFER_EVAL, {.double_arg = jx_function_project}},
 		{0, 0, 0, {0}}};
 
 static struct jx *make_error(const char *funcname, struct jx *args, const char *fmt, ...)
@@ -662,9 +652,7 @@ static struct jx *expand_template(struct jx *template, struct jx *ctx, struct jx
 			goto FAILURE;
 		}
 		if (!isalpha(*s) && *s != '_') {
-			out = make_error(func,
-					template,
-					"invalid template; each expression must be a single identifier");
+			out = make_error(func, template, "invalid template; each expression must be a single identifier");
 			goto FAILURE;
 		}
 		buffer_putlstring(&var, s, 1); // copy identifier to buffer
@@ -681,9 +669,7 @@ static struct jx *expand_template(struct jx *template, struct jx *ctx, struct jx
 			goto FAILURE;
 		}
 		if (*s != '}') {
-			out = make_error(func,
-					template,
-					"invalid template; each expression must be a single identifier");
+			out = make_error(func, template, "invalid template; each expression must be a single identifier");
 			goto FAILURE;
 		}
 		s++;

@@ -22,8 +22,7 @@ struct vine_task_info *vine_task_info_create(struct vine_task *t)
 {
 	struct vine_task_info *ti = calloc(1, sizeof(*ti));
 
-	ti->transfer_time = (t->time_when_commit_end - t->time_when_commit_start) +
-			    (t->time_when_done - t->time_when_retrieval);
+	ti->transfer_time = (t->time_when_commit_end - t->time_when_commit_start) + (t->time_when_done - t->time_when_retrieval);
 	ti->exec_time = t->time_workers_execute_last;
 	ti->manager_time = (((t->time_when_done - t->time_when_commit_start) - ti->transfer_time) - ti->exec_time);
 	ti->resources = rmsummary_copy(t->resources_allocated, 0);
@@ -108,10 +107,8 @@ void vine_task_info_compute_capacity(const struct vine_manager *q, struct vine_s
 
 		ti = list_peek_tail(q->task_info_list);
 		if (ti->transfer_time > 0) {
-			capacity_instantaneous =
-					DIV_INT_ROUND_UP(ti->exec_time, (ti->transfer_time + ti->manager_time));
-			q->stats->capacity_weighted = (int)ceil((alpha * (float)capacity_instantaneous) +
-								((1.0 - alpha) * q->stats->capacity_weighted));
+			capacity_instantaneous = DIV_INT_ROUND_UP(ti->exec_time, (ti->transfer_time + ti->manager_time));
+			q->stats->capacity_weighted = (int)ceil((alpha * (float)capacity_instantaneous) + ((1.0 - alpha) * q->stats->capacity_weighted));
 			time_t ts;
 			time(&ts);
 		}
@@ -122,8 +119,7 @@ void vine_task_info_compute_capacity(const struct vine_manager *q, struct vine_s
 	capacity->manager_time = MAX(1, capacity->manager_time);
 
 	// Never go below the default capacity
-	int64_t ratio = MAX(VINE_DEFAULT_CAPACITY_TASKS,
-			DIV_INT_ROUND_UP(capacity->exec_time, (capacity->transfer_time + capacity->manager_time)));
+	int64_t ratio = MAX(VINE_DEFAULT_CAPACITY_TASKS, DIV_INT_ROUND_UP(capacity->exec_time, (capacity->transfer_time + capacity->manager_time)));
 
 	q->stats->capacity_tasks = ratio;
 	q->stats->capacity_cores = DIV_INT_ROUND_UP(capacity->resources->cores * ratio, count);

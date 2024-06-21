@@ -74,8 +74,7 @@ struct list *vine_catalog_query_cached(const char *catalog_host, int catalog_por
 	static time_t managers_list_timestamp = 0;
 	static char *prev_regex = 0;
 
-	if (prev_regex && !strcmp(project_regex, prev_regex) && managers_list &&
-			(time(0) - managers_list_timestamp) < 60) {
+	if (prev_regex && !strcmp(project_regex, prev_regex) && managers_list && (time(0) - managers_list_timestamp) < 60) {
 		return managers_list;
 	}
 

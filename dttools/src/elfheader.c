@@ -32,8 +32,8 @@ typedef uint64_t Elf64_Xword;
 typedef int64_t Elf64_Sxword;
 
 #define EI_NIDENT 16
-#define ELFMAG                                                                                                         \
-	"\x7f"                                                                                                         \
+#define ELFMAG \
+	"\x7f" \
 	"ELF"
 
 /* indexes */

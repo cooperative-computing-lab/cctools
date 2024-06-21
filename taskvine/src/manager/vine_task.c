@@ -267,9 +267,7 @@ void vine_task_set_library_required(struct vine_task *t, const char *library_nam
 
 	if (library_name) {
 		if (t->provides_library) {
-			fatal("A task cannot simultaneously provide (%s) and require a library (%s)",
-					t->provides_library,
-					library_name);
+			fatal("A task cannot simultaneously provide (%s) and require a library (%s)", t->provides_library, library_name);
 		}
 		t->needs_library = xxstrdup(library_name);
 	}
@@ -297,9 +295,7 @@ void vine_task_set_library_provided(struct vine_task *t, const char *library_nam
 
 	if (library_name) {
 		if (t->needs_library) {
-			fatal("A task cannot simultaneously provide (%s) and require a library (%s)",
-					library_name,
-					t->needs_library);
+			fatal("A task cannot simultaneously provide (%s) and require a library (%s)", library_name, t->needs_library);
 		}
 		t->provides_library = xxstrdup(library_name);
 	}
@@ -468,10 +464,7 @@ void vine_task_check_consistency(struct vine_task *t)
 	LIST_ITERATE(t->input_mounts, m)
 	{
 		if (hash_table_lookup(table, m->remote_name)) {
-			fprintf(stderr,
-					"warning: task %d has more than one input file named %s\n",
-					t->task_id,
-					m->remote_name);
+			fprintf(stderr, "warning: task %d has more than one input file named %s\n", t->task_id, m->remote_name);
 		} else {
 			hash_table_insert(table, m->remote_name, m->remote_name);
 		}
@@ -484,10 +477,7 @@ void vine_task_check_consistency(struct vine_task *t)
 	LIST_ITERATE(t->output_mounts, m)
 	{
 		if (m->file->type == VINE_FILE && hash_table_lookup(table, m->file->source)) {
-			fprintf(stderr,
-					"warning: task %d has more than one output file named %s\n",
-					t->task_id,
-					m->file->source);
+			fprintf(stderr, "warning: task %d has more than one output file named %s\n", t->task_id, m->file->source);
 		} else {
 			hash_table_insert(table, m->remote_name, m->file->source);
 		}
@@ -521,10 +511,7 @@ int vine_task_add_input(struct vine_task *t, struct vine_file *f, const char *re
 	}
 
 	if (remote_name[0] == '/') {
-		debug(D_NOTICE | D_VINE,
-				"%s: invalid remote name %s: cannot start with a slash.",
-				__func__,
-				remote_name);
+		debug(D_NOTICE | D_VINE, "%s: invalid remote name %s: cannot start with a slash.", __func__, remote_name);
 		return 0;
 	}
 
@@ -545,10 +532,7 @@ int vine_task_add_output(struct vine_task *t, struct vine_file *f, const char *r
 	}
 
 	if (remote_name[0] == '/') {
-		debug(D_NOTICE | D_VINE,
-				"%s: invalid remote name %s: cannot start with a slash.",
-				__func__,
-				remote_name);
+		debug(D_NOTICE | D_VINE, "%s: invalid remote name %s: cannot start with a slash.", __func__, remote_name);
 		return 0;
 	}
 
@@ -571,8 +555,7 @@ int vine_task_add_output(struct vine_task *t, struct vine_file *f, const char *r
 	return 1;
 }
 
-int vine_task_add_input_file(
-		struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
+int vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
 {
 	struct vine_file *f = vine_file_local(local_name, VINE_CACHE_LEVEL_TASK, 0);
 	int r = vine_task_add_input(t, f, remote_name, flags);
@@ -580,8 +563,7 @@ int vine_task_add_input_file(
 	return r;
 }
 
-int vine_task_add_output_file(
-		struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
+int vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
 {
 	struct vine_file *f = vine_file_local(local_name, VINE_CACHE_LEVEL_TASK, 0);
 	int r = vine_task_add_output(t, f, remote_name, flags);
@@ -589,8 +571,7 @@ int vine_task_add_output_file(
 	return r;
 }
 
-int vine_task_add_input_url(
-		struct vine_task *t, const char *file_url, const char *remote_name, vine_mount_flags_t flags)
+int vine_task_add_input_url(struct vine_task *t, const char *file_url, const char *remote_name, vine_mount_flags_t flags)
 {
 	struct vine_file *f = vine_file_url(file_url, VINE_CACHE_LEVEL_TASK, 0);
 	int r = vine_task_add_input(t, f, remote_name, flags);
@@ -598,8 +579,7 @@ int vine_task_add_input_url(
 	return r;
 }
 
-int vine_task_add_input_buffer(
-		struct vine_task *t, const char *data, int length, const char *remote_name, vine_mount_flags_t flags)
+int vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_mount_flags_t flags)
 {
 	struct vine_file *f = vine_file_buffer(data, length, VINE_CACHE_LEVEL_TASK, 0);
 	int r = vine_task_add_input(t, f, remote_name, flags);
@@ -607,8 +587,7 @@ int vine_task_add_input_buffer(
 	return r;
 }
 
-int vine_task_add_input_mini_task(
-		struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_mount_flags_t flags)
+int vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_mount_flags_t flags)
 {
 	/* XXX mini task must have a single output file */
 	struct vine_file *f = vine_file_mini_task(mini_task, "minitask", VINE_CACHE_LEVEL_TASK, 0);
@@ -813,8 +792,8 @@ const char *vine_task_get_hostname(struct vine_task *t)
 	return t->hostname;
 }
 
-#define METRIC(x)                                                                                                      \
-	if (!strcmp(name, #x))                                                                                         \
+#define METRIC(x) \
+	if (!strcmp(name, #x)) \
 		return t->x;
 int64_t vine_task_get_metric(struct vine_task *t, const char *name)
 {
@@ -833,8 +812,8 @@ int64_t vine_task_get_metric(struct vine_task *t, const char *name)
 	return 0;
 }
 
-#define RESOURCES(x)                                                                                                   \
-	if (!strcmp(name, #x))                                                                                         \
+#define RESOURCES(x) \
+	if (!strcmp(name, #x)) \
 		return t->resources_##x;
 const struct rmsummary *vine_task_get_resources(struct vine_task *t, const char *name)
 {
@@ -969,8 +948,7 @@ char *vine_task_to_json(struct vine_task *t)
 		buffer_putfstring(&b, "inputs = ");
 		LIST_ITERATE(t->input_mounts, m)
 		{
-			buffer_putfstring(
-					&b, "{ name: \"%s\", content: \"%s\"}, ", m->remote_name, m->file->cached_name);
+			buffer_putfstring(&b, "{ name: \"%s\", content: \"%s\"}, ", m->remote_name, m->file->cached_name);
 		}
 		buffer_putfstring(&b, "\n");
 	}

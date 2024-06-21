@@ -308,9 +308,7 @@ static int flush_send(struct mq *mq)
 		 */
 		if (snd->buffering) {
 			if (snd->buf_pos < snd->len) {
-				ssize_t rc = read(snd->pipefd,
-						(char *)buffer_tostring(snd->buffer) + snd->buf_pos,
-						snd->len - snd->buf_pos);
+				ssize_t rc = read(snd->pipefd, (char *)buffer_tostring(snd->buffer) + snd->buf_pos, snd->len - snd->buf_pos);
 				if (rc == -1 && errno_is_temporary(errno) && !snd->hung_up) {
 					return 0;
 				} else if (rc == 0) {
@@ -367,10 +365,7 @@ static int flush_send(struct mq *mq)
 			snd->hdr_pos = checked_add(snd->hdr_pos, rc);
 			continue;
 		} else if (snd->buf_pos < snd->len) {
-			ssize_t rc = send(socket,
-					buffer_tostring(snd->buffer) + snd->buf_pos,
-					MIN(snd->len, NEXT_FRAME(snd->buf_pos)) - snd->buf_pos,
-					0);
+			ssize_t rc = send(socket, buffer_tostring(snd->buffer) + snd->buf_pos, MIN(snd->len, NEXT_FRAME(snd->buf_pos)) - snd->buf_pos, 0);
 			if (rc == -1 && errno_is_temporary(errno)) {
 				return 0;
 			} else if (rc <= 0) {
@@ -462,10 +457,7 @@ static int flush_recv(struct mq *mq)
 				rcv->parsed_header = true;
 				continue;
 			} else if (rcv->buf_pos < rcv->len) {
-				ssize_t rc = recv(socket,
-						(char *)buffer_tostring(rcv->buffer) + rcv->buf_pos,
-						rcv->len - rcv->buf_pos,
-						0);
+				ssize_t rc = recv(socket, (char *)buffer_tostring(rcv->buffer) + rcv->buf_pos, rcv->len - rcv->buf_pos, 0);
 
 				if (rc == -1 && errno_is_temporary(errno) && errno != 0) {
 					/* for write, rc == 0 is only an error if errno != 0. */
@@ -495,9 +487,7 @@ static int flush_recv(struct mq *mq)
 		 */
 		if (rcv->storage == MQ_MSG_FD) {
 			if (rcv->buf_pos < rcv->len) {
-				ssize_t rc = write(rcv->pipefd,
-						(char *)buffer_tostring(rcv->buffer) + rcv->buf_pos,
-						rcv->len - rcv->buf_pos);
+				ssize_t rc = write(rcv->pipefd, (char *)buffer_tostring(rcv->buffer) + rcv->buf_pos, rcv->len - rcv->buf_pos);
 				if (rc == -1 && errno_is_temporary(errno)) {
 					return 0;
 				} else if (rc <= 0) {

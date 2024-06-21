@@ -92,42 +92,29 @@ void vine_worker_options_show_help(const char *cmd, struct vine_worker_options *
 	printf("where options are:\n");
 	printf(" %-30s Show version string\n", "-v,--version");
 	printf(" %-30s Show this help screen\n", "-h,--help");
-	printf(" %-30s Name of manager (project) to contact.  May be a regular expression.\n",
-			"-M,--manager-name=<name>");
-	printf(" %-30s Catalog server to query for managers.  (default: %s:%d) \n",
-			"-C,--catalog=<host:port>",
-			CATALOG_HOST,
-			CATALOG_PORT);
+	printf(" %-30s Name of manager (project) to contact.  May be a regular expression.\n", "-M,--manager-name=<name>");
+	printf(" %-30s Catalog server to query for managers.  (default: %s:%d) \n", "-C,--catalog=<host:port>", CATALOG_HOST, CATALOG_PORT);
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, or :stdout)\n", "-o,--debug-file=<file>");
-	printf(" %-30s Set the maximum size of the debug log (default 10M, 0 disables).\n",
-			"--debug-rotate-max=<bytes>");
+	printf(" %-30s Set the maximum size of the debug log (default 10M, 0 disables).\n", "--debug-rotate-max=<bytes>");
 	printf(" %-30s Use SSL to connect to the manager. (Not needed if using -M)", "--ssl");
 	printf(" %-30s Password file for authenticating to the manager.\n", "-P,--password=<pwfile>");
 	printf(" %-30s Set both --idle-timeout and --connect-timeout.\n", "-t,--timeout=<time>");
-	printf(" %-30s Disconnect after this time if manager sends no work. (default=%ds)\n",
-			"   --idle-timeout=<time>",
-			options->idle_timeout);
-	printf(" %-30s Abort after this time if no managers are available. (default=%ds)\n",
-			"   --connect-timeout=<time>",
-			options->idle_timeout);
+	printf(" %-30s Disconnect after this time if manager sends no work. (default=%ds)\n", "   --idle-timeout=<time>", options->idle_timeout);
+	printf(" %-30s Abort after this time if no managers are available. (default=%ds)\n", "   --connect-timeout=<time>", options->idle_timeout);
 	printf(" %-30s Exit if parent process dies.\n", "--parent-death");
 	printf(" %-30s Set TCP window size.\n", "-w,--tcp-window-size=<size>");
-	printf(" %-30s Set initial value for backoff interval when worker fails to connect\n",
-			"-i,--min-backoff=<time>");
+	printf(" %-30s Set initial value for backoff interval when worker fails to connect\n", "-i,--min-backoff=<time>");
 	printf(" %-30s to a manager. (default=%ds)\n", "", options->init_backoff_interval);
-	printf(" %-30s Set maximum value for backoff interval when worker fails to connect\n",
-			"-b,--max-backoff=<time>");
+	printf(" %-30s Set maximum value for backoff interval when worker fails to connect\n", "-b,--max-backoff=<time>");
 	printf(" %-30s to a manager. (default=%ds)\n", "", options->max_backoff_interval);
 	printf(" %-30s Set architecture string for the worker to report to manager instead\n", "-A,--arch=<arch>");
 	printf(" %-30s of the value in uname (%s).\n", "", options->arch_name);
 	printf(" %-30s Set operating system string for the worker to report to manager instead\n", "-O,--os=<os>");
 	printf(" %-30s of the value in uname (%s).\n", "", options->os_name);
-	printf(" %-30s Set the workspace dir for this worker. (default is /tmp/worker-UID-PID)\n",
-			"-s,--workspace=<path>");
+	printf(" %-30s Set the workspace dir for this worker. (default is /tmp/worker-UID-PID)\n", "-s,--workspace=<path>");
 	printf(" %-30s Keep (do not delete) the workspace dir when worker exits.\n", "   --keep-workspace");
-	printf(" %-30s Set the number of cores reported by this worker. If not given, or less than 1,\n",
-			"--cores=<n>");
+	printf(" %-30s Set the number of cores reported by this worker. If not given, or less than 1,\n", "--cores=<n>");
 	printf(" %-30s then try to detect cores available.\n", "");
 
 	printf(" %-30s Set the number of GPUs reported by this worker. If not given, or less than 0,\n", "--gpus=<n>");
@@ -139,14 +126,11 @@ void vine_worker_options_show_help(const char *cmd, struct vine_worker_options *
 	printf(" %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
 	printf(" %-30s If not given, or less than 1, then try to detect disk space available.\n", "");
 
-	printf(" %-30s Set the conservative disk reporting percent when --disk is unspecified.\n",
-			"--disk-percent=<percent>");
+	printf(" %-30s Set the conservative disk reporting percent when --disk is unspecified.\n", "--disk-percent=<percent>");
 	printf(" %-30s Defaults to %d.\n", "", options->disk_percent);
 
-	printf(" %-30s Use loop devices for task sandboxes (default=disabled, requires root access).\n",
-			"--disk-allocation");
-	printf(" %-30s Specifies a user-defined feature the worker provides. May be specified several times.\n",
-			"--feature");
+	printf(" %-30s Use loop devices for task sandboxes (default=disabled, requires root access).\n", "--disk-allocation");
+	printf(" %-30s Specifies a user-defined feature the worker provides. May be specified several times.\n", "--feature");
 	printf(" %-30s Set the maximum number of seconds the worker may be active. (in s).\n", "--wall-time=<s>");
 
 	printf(" %-30s When using -M, override manager preference to resolve its address.\n", "--connection-mode");
@@ -154,14 +138,11 @@ void vine_worker_options_show_help(const char *cmd, struct vine_worker_options *
 
 	printf(" %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
-	printf(" %-30s Listening port for worker-worker transfers. Either port or port_min:port_max (default: any)\n",
-			"--transfer-port");
-	printf(" %-30s Explicit contact host:port for worker-worker transfers, e.g., when routing is used. (default: :<transfer_port>)\n",
-			"--contact-hostport");
+	printf(" %-30s Listening port for worker-worker transfers. Either port or port_min:port_max (default: any)\n", "--transfer-port");
+	printf(" %-30s Explicit contact host:port for worker-worker transfers, e.g., when routing is used. (default: :<transfer_port>)\n", "--contact-hostport");
 
 	printf(" %-30s Enable tls connection to manager (manager should support it).\n", "--ssl");
-	printf(" %-30s SNI domain name if different from manager hostname. Implies --ssl.\n",
-			"--tls-sni=<domain name>");
+	printf(" %-30s SNI domain name if different from manager hostname. Implies --ssl.\n", "--tls-sni=<domain name>");
 }
 
 enum {
@@ -355,9 +336,7 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 		case 'b':
 			options->max_backoff_interval = string_metric_parse(optarg);
 			if (options->max_backoff_interval < options->init_backoff_interval) {
-				fprintf(stderr,
-						"Maximum backoff interval provided must be greater than the initial backoff interval of %ds.\n",
-						options->init_backoff_interval);
+				fprintf(stderr, "Maximum backoff interval provided must be greater than the initial backoff interval of %ds.\n", options->init_backoff_interval);
 				exit(1);
 			}
 			break;
@@ -377,9 +356,7 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 		}
 		case LONG_OPT_KEEP_WORKSPACE:
 			if (!options->workspace_dir) {
-				fprintf(stderr,
-						"%s: error: --keep-workspace also requires explicit --workspace argument.\n",
-						argv[0]);
+				fprintf(stderr, "%s: error: --keep-workspace also requires explicit --workspace argument.\n", argv[0]);
 				exit(EXIT_FAILURE);
 			}
 			options->keep_workspace_at_exit = 1;
@@ -390,10 +367,7 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 			break;
 		case 'P':
 			if (copy_file_to_buffer(optarg, &options->password, NULL) < 0) {
-				fprintf(stderr,
-						"vine_worker: couldn't load password from %s: %s\n",
-						optarg,
-						strerror(errno));
+				fprintf(stderr, "vine_worker: couldn't load password from %s: %s\n", optarg, strerror(errno));
 				exit(EXIT_FAILURE);
 			}
 			break;
@@ -462,8 +436,7 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 		case LONG_OPT_CONN_MODE:
 			free(options->preferred_connection);
 			options->preferred_connection = xxstrdup(optarg);
-			if (strcmp(options->preferred_connection, "by_ip") &&
-					strcmp(options->preferred_connection, "by_hostname") &&
+			if (strcmp(options->preferred_connection, "by_ip") && strcmp(options->preferred_connection, "by_hostname") &&
 					strcmp(options->preferred_connection, "by_apparent_ip")) {
 				fatal("connection-mode should be one of: by_ip, by_hostname, by_apparent_ip");
 			}

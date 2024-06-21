@@ -13,8 +13,8 @@ See the file COPYING for details.
 #define MD5_BLOCK_SIZE 64
 #define SHA1_BLOCK_SIZE 64
 
-int hmac(const void *text, size_t text_len, const void *in_key, size_t in_key_len, unsigned char *digest,
-		size_t digest_len, size_t block_size, void (*hash_func)(const void *, size_t, unsigned char *))
+int hmac(const void *text, size_t text_len, const void *in_key, size_t in_key_len, unsigned char *digest, size_t digest_len, size_t block_size,
+		void (*hash_func)(const void *, size_t, unsigned char *))
 {
 	unsigned char *key;
 	char *inner, *outer;
@@ -62,14 +62,12 @@ int hmac(const void *text, size_t text_len, const void *in_key, size_t in_key_le
 	return 0;
 }
 
-int hmac_md5(const void *text, size_t text_len, const void *in_key, size_t in_key_len,
-		unsigned char digest[MD5_DIGEST_LENGTH])
+int hmac_md5(const void *text, size_t text_len, const void *in_key, size_t in_key_len, unsigned char digest[MD5_DIGEST_LENGTH])
 {
 	return hmac(text, text_len, in_key, in_key_len, digest, MD5_DIGEST_LENGTH, MD5_BLOCK_SIZE, &md5_buffer);
 }
 
-int hmac_sha1(const void *text, size_t text_len, const void *in_key, size_t in_key_len,
-		unsigned char digest[SHA1_DIGEST_LENGTH])
+int hmac_sha1(const void *text, size_t text_len, const void *in_key, size_t in_key_len, unsigned char digest[SHA1_DIGEST_LENGTH])
 {
 	return hmac(text, text_len, in_key, in_key_len, digest, SHA1_DIGEST_LENGTH, SHA1_BLOCK_SIZE, &sha1_buffer);
 }

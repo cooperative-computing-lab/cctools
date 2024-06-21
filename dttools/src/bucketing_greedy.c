@@ -188,24 +188,23 @@ static int bucketing_compare_break_points(const void *p1, const void *p2)
  * @param break_point empty pointer to be filled
  * @return cost of current break point
  * @return -1 if failure */
-static double bucketing_greedy_policy(
-		bucketing_bucket_range_t *range, int break_index, bucketing_cursor_w_pos_t **break_point)
+static double bucketing_greedy_policy(bucketing_bucket_range_t *range, int break_index, bucketing_cursor_w_pos_t **break_point)
 {
 	if (!range) {
 		fatal("No range to apply policy\n");
 		return -1;
 	}
 
-	int total_sig = 0;		      // track total significance of points in range
-	int total_lo_sig = 0;		      // track total significance in low range
-	int total_hi_sig = 0;		      // track total significance in high range
-	double p1 = 0;			      // probability of candidate lower bucket
-	double p2 = 0;			      // probability of candidate higher bucket
-	bucketing_point_t *tmp_point_ptr = 0; // pointer to get item from sorted points
-	double exp_cons_lq_break = 0;	      // expected value if next point is lower than or equal to break point
-	double exp_cons_g_break = 0;	      // expected value if next point is higher than break point
-	int break_val = -1;		      // value at break point
-	int max_val = -1;		      // value at max point
+	int total_sig = 0;					     // track total significance of points in range
+	int total_lo_sig = 0;					     // track total significance in low range
+	int total_hi_sig = 0;					     // track total significance in high range
+	double p1 = 0;						     // probability of candidate lower bucket
+	double p2 = 0;						     // probability of candidate higher bucket
+	bucketing_point_t *tmp_point_ptr = 0;			     // pointer to get item from sorted points
+	double exp_cons_lq_break = 0;				     // expected value if next point is lower than or equal to break point
+	double exp_cons_g_break = 0;				     // expected value if next point is higher than break point
+	int break_val = -1;					     // value at break point
+	int max_val = -1;					     // value at max point
 	struct list_cursor *iter = list_cursor_clone(range->lo->lc); // cursor to iterate through list
 
 	/* Loop through the range to collect statistics */
@@ -379,8 +378,7 @@ static struct list *bucketing_greedy_find_break_points(bucketing_state_t *s)
 				if (break_point->pos + 1 == bbr_ptr->hi->pos)
 					continue;
 				else {
-					hi_bucket_range = bucketing_bucket_range_create(
-							break_point->pos + 1, bbr_ptr->hi->pos, s->sorted_points);
+					hi_bucket_range = bucketing_bucket_range_create(break_point->pos + 1, bbr_ptr->hi->pos, s->sorted_points);
 					if (!hi_bucket_range) {
 						fatal("Cannot create high bucket range\n");
 						return 0;
@@ -397,8 +395,7 @@ static struct list *bucketing_greedy_find_break_points(bucketing_state_t *s)
 			else {
 				/* can spawn high bucket */
 				if (break_point->pos + 1 != bbr_ptr->hi->pos) {
-					hi_bucket_range = bucketing_bucket_range_create(
-							break_point->pos + 1, bbr_ptr->hi->pos, s->sorted_points);
+					hi_bucket_range = bucketing_bucket_range_create(break_point->pos + 1, bbr_ptr->hi->pos, s->sorted_points);
 					if (!hi_bucket_range) {
 						fatal("Cannot create high bucket range\n");
 						return 0;
@@ -409,8 +406,7 @@ static struct list *bucketing_greedy_find_break_points(bucketing_state_t *s)
 						return 0;
 					}
 				}
-				lo_bucket_range = bucketing_bucket_range_create(
-						bbr_ptr->lo->pos, break_point->pos, s->sorted_points);
+				lo_bucket_range = bucketing_bucket_range_create(bbr_ptr->lo->pos, break_point->pos, s->sorted_points);
 				if (!lo_bucket_range) {
 					fatal("Cannot create low bucket range\n");
 					return 0;
@@ -429,8 +425,7 @@ static struct list *bucketing_greedy_find_break_points(bucketing_state_t *s)
 	} while (list_next(lc));
 
 	/* Push the highest point into the break point list */
-	bucketing_cursor_w_pos_t *last_break_point =
-			bucketing_cursor_w_pos_create(list_cursor_clone(init_range->hi->lc), init_range->hi->pos);
+	bucketing_cursor_w_pos_t *last_break_point = bucketing_cursor_w_pos_create(list_cursor_clone(init_range->hi->lc), init_range->hi->pos);
 	if (!last_break_point) {
 		fatal("Cannot create last break point\n");
 		return 0;

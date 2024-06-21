@@ -81,17 +81,7 @@ static int auth_globus_assert(struct link *link, time_t stoptime)
 		debug(D_AUTH, "globus: waiting for server to get ready");
 		if (auth_barrier(link, "yes\n", stoptime) == 0) {
 			debug(D_AUTH, "globus: authenticating with server");
-			major = globus_gss_assist_init_sec_context(&minor,
-					credential,
-					&context,
-					"GSI-NO-TARGET",
-					0,
-					&flags,
-					&token,
-					read_token,
-					link,
-					write_token,
-					link);
+			major = globus_gss_assist_init_sec_context(&minor, credential, &context, "GSI-NO-TARGET", 0, &flags, &token, read_token, link, write_token, link);
 			if (major == GSS_S_COMPLETE) {
 				debug(D_AUTH, "globus: credentials accepted!");
 				gss_delete_sec_context(&minor, &context, GSS_C_NO_BUFFER);
@@ -142,18 +132,8 @@ static int auth_globus_accept(struct link *link, char **subject, time_t stoptime
 
 			delegated_credential = GSS_C_NO_CREDENTIAL;
 			debug(D_AUTH, "globus: authenticating client");
-			major = globus_gss_assist_accept_sec_context(&minor,
-					&context,
-					credential,
-					subject,
-					&flags,
-					0,
-					&token,
-					&delegated_credential,
-					read_token,
-					link,
-					write_token,
-					link);
+			major = globus_gss_assist_accept_sec_context(
+					&minor, &context, credential, subject, &flags, 0, &token, &delegated_credential, read_token, link, write_token, link);
 			if (major == GSS_S_COMPLETE) {
 				debug(D_AUTH, "globus: accepted client %s", *subject);
 				if (delegated_credential != GSS_C_NO_CREDENTIAL) {

@@ -1,7 +1,7 @@
 BasedOnStyle: LLVM
 IndentWidth: 8
 UseTab: Always
-ColumnLimit: 120
+ColumnLimit: 0
 ContinuationIndentWidth: 16
 AlignAfterOpenBracket: DontAlign
 BreakBeforeBraces: Linux
@@ -11,3 +11,4 @@ IndentCaseLabels: false
 BreakStringLiterals: false
 BinPackArguments: false
 SortIncludes: false
+AlignEscapedNewlines: DontAlign

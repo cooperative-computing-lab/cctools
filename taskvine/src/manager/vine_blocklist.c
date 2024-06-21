@@ -94,11 +94,7 @@ void vine_blocklist_block(struct vine_manager *q, const char *hostname, time_t t
 	info->blocked = 1;
 
 	if (timeout > 0) {
-		debug(D_VINE,
-				"Blocking host %s by %" PRIu64 " seconds (blocked %d times).\n",
-				hostname,
-				(uint64_t)timeout,
-				info->times_blocked);
+		debug(D_VINE, "Blocking host %s by %" PRIu64 " seconds (blocked %d times).\n", hostname, (uint64_t)timeout, info->times_blocked);
 		info->release_at = time(0) + timeout;
 	} else {
 		debug(D_VINE, "Blocking host %s indefinitely.\n", hostname);

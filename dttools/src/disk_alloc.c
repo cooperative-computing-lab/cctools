@@ -48,20 +48,15 @@ int disk_alloc_create(char *loc, char *fs, int64_t size)
 	}
 
 	// Create Image
-	dd_args = string_format(
-			"dd if=/dev/zero of=%s bs=1024 count=%" PRId64 " > /dev/null 2> /dev/null", device_loc, size);
+	dd_args = string_format("dd if=/dev/zero of=%s bs=1024 count=%" PRId64 " > /dev/null 2> /dev/null", device_loc, size);
 	if (system(dd_args) != 0) {
 		debug(D_NOTICE, "Failed to allocate junk space for loop device image: %s.\n", strerror(errno));
 		if (unlink(device_loc) == -1) {
-			debug(D_NOTICE,
-					"Failed to unlink loop device image while attempting to clean up after failure: %s.\n",
-					strerror(errno));
+			debug(D_NOTICE, "Failed to unlink loop device image while attempting to clean up after failure: %s.\n", strerror(errno));
 			goto error;
 		}
 		if (rmdir(loc) == -1) {
-			debug(D_NOTICE,
-					"Failed to remove directory of loop device image while attempting to clean up after failure: %s.\n",
-					strerror(errno));
+			debug(D_NOTICE, "Failed to remove directory of loop device image while attempting to clean up after failure: %s.\n", strerror(errno));
 		}
 		goto error;
 	}
@@ -91,15 +86,11 @@ int disk_alloc_create(char *loc, char *fs, int64_t size)
 	if (losetup_flag == 1) {
 		debug(D_NOTICE, "Failed to attach image to loop device: %s.\n", strerror(errno));
 		if (unlink(device_loc) == -1) {
-			debug(D_NOTICE,
-					"Failed to unlink loop device image while attempting to clean up after failure: %s.\n",
-					strerror(errno));
+			debug(D_NOTICE, "Failed to unlink loop device image while attempting to clean up after failure: %s.\n", strerror(errno));
 			goto error;
 		}
 		if (rmdir(loc) == -1) {
-			debug(D_NOTICE,
-					"Failed to remove directory of loop device image while attempting to clean up after failure: %s.\n",
-					strerror(errno));
+			debug(D_NOTICE, "Failed to remove directory of loop device image while attempting to clean up after failure: %s.\n", strerror(errno));
 		}
 		goto error;
 	}
@@ -110,9 +101,7 @@ int disk_alloc_create(char *loc, char *fs, int64_t size)
 		debug(D_NOTICE, "Failed to initialize filesystem on loop device: %s.\n", strerror(errno));
 		rm_dir_args = string_format("losetup -d /dev/loop%d; rm -r %s", j, loc);
 		if (system(rm_dir_args) == -1) {
-			debug(D_NOTICE,
-					"Failed to detach loop device and remove its contents while attempting to clean up after failure: %s.\n",
-					strerror(errno));
+			debug(D_NOTICE, "Failed to detach loop device and remove its contents while attempting to clean up after failure: %s.\n", strerror(errno));
 		}
 		free(rm_dir_args);
 		goto error;
@@ -125,9 +114,7 @@ int disk_alloc_create(char *loc, char *fs, int64_t size)
 		debug(D_NOTICE, "Failed to mount loop device: %s.\n", strerror(errno));
 		rm_dir_args = string_format("losetup -d /dev/loop%d; rm -r %s", j, loc);
 		if (system(rm_dir_args) == -1) {
-			debug(D_NOTICE,
-					"Failed to detach loop device and remove its contents while attempting to clean up after failure: %s.\n",
-					strerror(errno));
+			debug(D_NOTICE, "Failed to detach loop device and remove its contents while attempting to clean up after failure: %s.\n", strerror(errno));
 		}
 		free(rm_dir_args);
 		goto error;
@@ -221,9 +208,7 @@ int disk_alloc_delete(char *loc)
 
 	// Device Not Found
 	if (strcmp(dev_num, "-1") == 0) {
-		debug(D_NOTICE,
-				"Failed to locate loop device associated with given mountpoint: %s.\n",
-				strerror(errno));
+		debug(D_NOTICE, "Failed to locate loop device associated with given mountpoint: %s.\n", strerror(errno));
 		goto error;
 	}
 
@@ -235,9 +220,7 @@ int disk_alloc_delete(char *loc)
 	if (result != 0) {
 
 		if (errno != ENOENT) {
-			debug(D_NOTICE,
-					"Failed to remove loop device associated with given mountpoint: %s.\n",
-					strerror(errno));
+			debug(D_NOTICE, "Failed to remove loop device associated with given mountpoint: %s.\n", strerror(errno));
 			goto error;
 		}
 	}

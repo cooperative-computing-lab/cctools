@@ -16,24 +16,24 @@ See the file COPYING for details.
 
 // FAILOP(jx_operator *op, struct jx *left, struct jx *right, const char *message)
 // left, right, and message are evaluated exactly once
-#define FAILOP(op, left, right, message)                                                                               \
-	do {                                                                                                           \
-		assert(op);                                                                                            \
-		assert(message);                                                                                       \
-		struct jx *t = jx_operator(op->type, left, right);                                                     \
-		char *s = jx_print_string(t);                                                                          \
-		struct jx *e = jx_error(jx_format("on line %d, %s: %s", op->line, s, message));                        \
-		jx_delete(t);                                                                                          \
-		free(s);                                                                                               \
-		return e;                                                                                              \
+#define FAILOP(op, left, right, message) \
+	do { \
+		assert(op); \
+		assert(message); \
+		struct jx *t = jx_operator(op->type, left, right); \
+		char *s = jx_print_string(t); \
+		struct jx *e = jx_error(jx_format("on line %d, %s: %s", op->line, s, message)); \
+		jx_delete(t); \
+		free(s); \
+		return e; \
 	} while (false)
 
 // FAILARR(struct jx *array, const char *message)
-#define FAILARR(array, message)                                                                                        \
-	do {                                                                                                           \
-		assert(array);                                                                                         \
-		assert(message);                                                                                       \
-		return jx_error(jx_format("array reference on line %d: %s", array->line, message));                    \
+#define FAILARR(array, message) \
+	do { \
+		assert(array); \
+		assert(message); \
+		return jx_error(jx_format("array reference on line %d: %s", array->line, message)); \
 	} while (false)
 
 static struct jx *jx_check_errors(struct jx *j);
@@ -474,10 +474,7 @@ static struct jx_item *jx_eval_list_comprehension(struct jx *body, struct jx_com
 				jx_delete(list);
 				jx_item_delete(result);
 				char *s = jx_print_string(cond);
-				struct jx *err = jx_error(jx_format(
-						"on line %d, %s: list comprehension condition takes a boolean",
-						cond->line,
-						s));
+				struct jx *err = jx_error(jx_format("on line %d, %s: list comprehension condition takes a boolean", cond->line, s));
 				free(s);
 				return jx_item(err, NULL);
 			}
@@ -523,8 +520,7 @@ static struct jx_item *jx_eval_list_comprehension(struct jx *body, struct jx_com
 	return result;
 }
 
-static struct jx_pair *jx_eval_dict_comprehension(
-		struct jx *key, struct jx *value, struct jx_comprehension *comp, struct jx *context)
+static struct jx_pair *jx_eval_dict_comprehension(struct jx *key, struct jx *value, struct jx_comprehension *comp, struct jx *context)
 {
 	assert(key);
 	assert(value);
@@ -535,9 +531,7 @@ static struct jx_pair *jx_eval_dict_comprehension(
 		return jx_pair(list, NULL, NULL);
 	if (!jx_istype(list, JX_ARRAY)) {
 		jx_delete(list);
-		return jx_pair(jx_error(jx_format("on line %d: dict comprehension takes an array", comp->line)),
-				NULL,
-				NULL);
+		return jx_pair(jx_error(jx_format("on line %d: dict comprehension takes an array", comp->line)), NULL, NULL);
 	}
 
 	struct jx_pair *result = NULL;
@@ -561,10 +555,7 @@ static struct jx_pair *jx_eval_dict_comprehension(
 				jx_delete(list);
 				jx_pair_delete(result);
 				char *s = jx_print_string(cond);
-				struct jx *err = jx_error(jx_format(
-						"on line %d, %s: dict comprehension condition takes a boolean",
-						cond->line,
-						s));
+				struct jx *err = jx_error(jx_format("on line %d, %s: dict comprehension condition takes a boolean", cond->line, s));
 				free(s);
 				return jx_pair(err, NULL, NULL);
 			}
@@ -630,9 +621,7 @@ static struct jx_pair *jx_eval_pair(struct jx_pair *pair, struct jx *context)
 			return jx_eval_pair(pair->next, context);
 		}
 	} else {
-		return jx_pair(jx_eval(pair->key, context),
-				jx_eval(pair->value, context),
-				jx_eval_pair(pair->next, context));
+		return jx_pair(jx_eval(pair->key, context), jx_eval(pair->value, context), jx_eval_pair(pair->next, context));
 	}
 }
 

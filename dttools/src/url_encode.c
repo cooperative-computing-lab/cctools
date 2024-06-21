@@ -13,8 +13,7 @@ void url_encode(const char *s, char *t, int length)
 {
 	if (s) {
 		while (*s && length > 1) {
-			if (*s <= 32 || *s == '%' || *s == '\\' || *s == '<' || *s == '>' || *s == '\'' || *s == '\"' ||
-					*s > 122) {
+			if (*s <= 32 || *s == '%' || *s == '\\' || *s == '<' || *s == '>' || *s == '\'' || *s == '\"' || *s > 122) {
 				if (length > 3) {
 					snprintf(t, length, "%%%2X", *s);
 					t += 3;

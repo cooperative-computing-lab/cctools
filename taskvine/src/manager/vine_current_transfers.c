@@ -18,8 +18,7 @@ struct vine_transfer_pair {
 	char *source_url;
 };
 
-static struct vine_transfer_pair *vine_transfer_pair_create(
-		struct vine_worker_info *to, struct vine_worker_info *source_worker, const char *source_url)
+static struct vine_transfer_pair *vine_transfer_pair_create(struct vine_worker_info *to, struct vine_worker_info *source_worker, const char *source_url)
 {
 	struct vine_transfer_pair *t = malloc(sizeof(struct vine_transfer_pair));
 	t->to = to;
@@ -37,8 +36,7 @@ static void vine_transfer_pair_delete(struct vine_transfer_pair *p)
 }
 
 // add a current transaction to the transfer table
-char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info *to,
-		struct vine_worker_info *source_worker, const char *source_url)
+char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info *to, struct vine_worker_info *source_worker, const char *source_url)
 {
 	cctools_uuid_t uuid;
 	cctools_uuid_create(&uuid);
@@ -91,14 +89,7 @@ void set_throttle(struct vine_manager *m, struct vine_worker_info *w, int is_des
 		dir = "source";
 	}
 
-	debug(D_VINE,
-			"Setting transfer failure (%d,%d/%d) timestamp on %s worker: %s:%d",
-			streak,
-			bad,
-			good + bad,
-			dir,
-			w->hostname,
-			w->transfer_port);
+	debug(D_VINE, "Setting transfer failure (%d,%d/%d) timestamp on %s worker: %s:%d", streak, bad, good + bad, dir, w->hostname, w->transfer_port);
 
 	w->last_transfer_failure = timestamp_get();
 
@@ -109,12 +100,7 @@ void set_throttle(struct vine_manager *m, struct vine_worker_info *w, int is_des
 
 	if (good <= bad) {
 		/* this worker has failed more often than not, release it. */
-		notice(D_VINE,
-				"Releasing worker %s because of repeated %s transfer failures: %d/%d",
-				dir,
-				w->addrport,
-				bad,
-				bad + good);
+		notice(D_VINE, "Releasing worker %s because of repeated %s transfer failures: %d/%d", dir, w->addrport, bad, bad + good);
 		vine_manager_remove_worker(m, w, VINE_WORKER_DISCONNECT_XFER_ERRORS);
 	}
 }
@@ -251,12 +237,7 @@ void vine_current_transfers_print_table(struct vine_manager *q)
 	{
 		w = t->source_worker;
 		if (w) {
-			debug(D_VINE,
-					"%s : source: %s:%d url: %s",
-					id,
-					w->transfer_host,
-					w->transfer_port,
-					t->source_url);
+			debug(D_VINE, "%s : source: %s:%d url: %s", id, w->transfer_host, w->transfer_port, t->source_url);
 		} else {
 			debug(D_VINE, "%s : source: remote url: %s", id, t->source_url);
 		}

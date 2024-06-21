@@ -31,14 +31,14 @@ See the file COPYING for details.
 #include <string.h>
 
 /* Prevent openssl from opening $HOME/.rnd */
-#define OPENSSL_RANDFILE                                                                                               \
-	"if [ -r /dev/urandom ]; then\n"                                                                               \
-	"	export RANDFILE=/dev/urandom\n"                                                                              \
-	"elif [ -r /dev/random ]; then\n"                                                                              \
-	"	export RANDFILE=/dev/random\n"                                                                               \
-	"else\n"                                                                                                       \
-	"	unset RANDFILE\n"                                                                                            \
-	"	export HOME=/\n"                                                                                             \
+#define OPENSSL_RANDFILE \
+	"if [ -r /dev/urandom ]; then\n" \
+	"	export RANDFILE=/dev/urandom\n" \
+	"elif [ -r /dev/random ]; then\n" \
+	"	export RANDFILE=/dev/random\n" \
+	"else\n" \
+	"	unset RANDFILE\n" \
+	"	export HOME=/\n" \
 	"fi\n"
 
 #define CHALLENGE_LENGTH (64)
@@ -372,8 +372,7 @@ void auth_ticket_load(const char *tickets)
 		char **list;
 		sort_dir(".", &list, strcmp);
 		for (i = 0; list[i]; i++) {
-			if (strncmp(list[i], "ticket.", strlen("ticket.")) == 0 &&
-					(strlen(list[i]) == (strlen("ticket.") + (MD5_DIGEST_LENGTH << 1)))) {
+			if (strncmp(list[i], "ticket.", strlen("ticket.")) == 0 && (strlen(list[i]) == (strlen("ticket.") + (MD5_DIGEST_LENGTH << 1)))) {
 				debug(D_CHIRP, "adding ticket %s", list[i]);
 				list_push_tail(client_ticket_list, strdup(list[i]));
 			}

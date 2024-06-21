@@ -474,18 +474,14 @@ static struct jx_comprehension *jx_parse_comprehension(struct jx_parser *s)
 
 	t = jx_scan(s);
 	if (t != JX_TOKEN_SYMBOL) {
-		jx_parse_error_a(s,
-				string_format("expected 'for' to be followed by a variable name, not '%s'", s->token));
+		jx_parse_error_a(s, string_format("expected 'for' to be followed by a variable name, not '%s'", s->token));
 		goto FAILURE;
 	}
 	variable = strdup(s->token);
 
 	t = jx_scan(s);
 	if (t != JX_TOKEN_IN) {
-		jx_parse_error_a(s,
-				string_format("expected 'for %s' to be followed by 'in', not '%s'",
-						variable,
-						s->token));
+		jx_parse_error_a(s, string_format("expected 'for %s' to be followed by 'in', not '%s'", variable, s->token));
 		goto FAILURE;
 	}
 
@@ -723,9 +719,7 @@ static struct jx *jx_parse_atomic(struct jx_parser *s, bool arglist)
 		return jx_add_lineno(s, jx_null());
 	case JX_TOKEN_SYMBOL: {
 		if (s->strict_mode) {
-			jx_parse_error_a(s,
-					string_format("unquoted strings (%s) are not allowed in strict parsing mode",
-							s->token));
+			jx_parse_error_a(s, string_format("unquoted strings (%s) are not allowed in strict parsing mode", s->token));
 			return NULL;
 		}
 		return jx_add_lineno(s, jx_symbol(s->token));

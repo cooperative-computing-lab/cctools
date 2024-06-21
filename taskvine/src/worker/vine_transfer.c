@@ -70,8 +70,7 @@ end
 
 */
 
-static int vine_transfer_put_internal(struct link *lnk, const char *full_name, const char *relative_name,
-		vine_transfer_mode_t xfer_mode, time_t stoptime)
+static int vine_transfer_put_internal(struct link *lnk, const char *full_name, const char *relative_name, vine_transfer_mode_t xfer_mode, time_t stoptime)
 {
 	struct stat info;
 	int64_t actual, length;
@@ -92,12 +91,7 @@ static int vine_transfer_put_internal(struct link *lnk, const char *full_name, c
 		int fd = open(full_name, O_RDONLY, 0);
 		if (fd >= 0) {
 			length = info.st_size;
-			send_message(lnk,
-					"file %s %" PRId64 " 0%o %lld\n",
-					relative_name_encoded,
-					length,
-					mode,
-					(long long)info.st_mtime);
+			send_message(lnk, "file %s %" PRId64 " 0%o %lld\n", relative_name_encoded, length, mode, (long long)info.st_mtime);
 			actual = link_stream_from_fd(lnk, fd, length, stoptime);
 			close(fd);
 			if (actual != length)
@@ -128,8 +122,7 @@ static int vine_transfer_put_internal(struct link *lnk, const char *full_name, c
 			if (!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
 				continue;
 			char *sub_full_name = string_format("%s/%s", full_name, dent->d_name);
-			int sub_result = vine_transfer_put_internal(
-					lnk, sub_full_name, dent->d_name, xfer_mode, stoptime);
+			int sub_result = vine_transfer_put_internal(lnk, sub_full_name, dent->d_name, xfer_mode, stoptime);
 			free(sub_full_name);
 
 			// Bail out of transfer if we cannot send any more
@@ -160,12 +153,7 @@ access_failure:
 	return 1;
 
 send_failure:
-	debug(D_VINE,
-			"Sending back output file - %s failed: bytes to send = %" PRId64
-			" and bytes actually sent = %" PRId64 ".",
-			full_name,
-			length,
-			actual);
+	debug(D_VINE, "Sending back output file - %s failed: bytes to send = %" PRId64 " and bytes actually sent = %" PRId64 ".", full_name, length, actual);
 	return 0;
 }
 
@@ -173,8 +161,7 @@ send_failure:
 Send a cached object of any type down the wire.
 */
 
-int vine_transfer_put_any(struct link *lnk, struct vine_cache *cache, const char *filename,
-		vine_transfer_mode_t xfer_mode, time_t stoptime)
+int vine_transfer_put_any(struct link *lnk, struct vine_cache *cache, const char *filename, vine_transfer_mode_t xfer_mode, time_t stoptime)
 {
 	char *cached_path = vine_cache_data_path(cache, filename);
 	int r = vine_transfer_put_internal(lnk, cached_path, path_basename(filename), xfer_mode, stoptime);
@@ -219,14 +206,10 @@ the necessary parent directories and checked the
 name for validity.
 */
 
-static int vine_transfer_get_file_internal(
-		struct link *lnk, const char *filename, int64_t length, int mode, int mtime, time_t stoptime)
+static int vine_transfer_get_file_internal(struct link *lnk, const char *filename, int64_t length, int mode, int mtime, time_t stoptime)
 {
 	if (!check_disk_space_for_filesize(".", length, 0)) {
-		debug(D_VINE,
-				"Could not put file %s, not enough disk space (%" PRId64 " bytes needed)\n",
-				filename,
-				length);
+		debug(D_VINE, "Could not put file %s, not enough disk space (%" PRId64 " bytes needed)\n", filename, length);
 		return 0;
 	}
 
@@ -254,8 +237,7 @@ static int vine_transfer_get_file_internal(
 	return 1;
 }
 
-static int vine_transfer_get_dir_internal(
-		struct link *lnk, const char *dirname, int64_t *totalsize, int mode, int mtime, time_t stoptime);
+static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname, int64_t *totalsize, int mode, int mtime, time_t stoptime);
 
 /*
 Receive a single item of unknown type into the directory "dirname".
@@ -264,8 +246,7 @@ Returns 1 on successful transfer of one item.
 Returns 2 on successful receipt of "end" of list.
 */
 
-int vine_transfer_get_any(
-		struct link *lnk, const char *dirname, int64_t *totalsize, int *mode, int *mtime, time_t stoptime)
+int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totalsize, int *mode, int *mtime, time_t stoptime)
 {
 	char line[VINE_LINE_MAX];
 	char name_encoded[VINE_LINE_MAX];
@@ -334,8 +315,7 @@ and now we process "file" and "dir" commands within the list
 until "end" is reached.
 */
 
-static int vine_transfer_get_dir_internal(
-		struct link *lnk, const char *dirname, int64_t *totalsize, int mode, int mtime, time_t stoptime)
+static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname, int64_t *totalsize, int mode, int mtime, time_t stoptime)
 {
 	/* Only use the normal mode bits. */
 	mode &= 0777;
@@ -366,8 +346,7 @@ static int vine_transfer_get_dir_internal(
 	return 0;
 }
 
-int vine_transfer_request_any(struct link *lnk, const char *request_path, const char *dirname, int64_t *totalsize,
-		int *mode, int *mtime, time_t stoptime)
+int vine_transfer_request_any(struct link *lnk, const char *request_path, const char *dirname, int64_t *totalsize, int *mode, int *mtime, time_t stoptime)
 {
 	send_message(lnk, "get %s\n", request_path);
 	return vine_transfer_get_any(lnk, dirname, totalsize, mode, mtime, stoptime);

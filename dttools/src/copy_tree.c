@@ -202,9 +202,7 @@ file_type check_file_type(const char *source)
 	} else if (S_ISDIR(st.st_mode)) {
 		return FILE_TYPE_DIR;
 	} else {
-		debug(D_DEBUG,
-				"the file type of %s is not supported: only dir, regular files, and symlink are supported!\n",
-				source);
+		debug(D_DEBUG, "the file type of %s is not supported: only dir, regular files, and symlink are supported!\n", source);
 		return FILE_TYPE_UNSUPPORTED;
 	}
 }

@@ -112,8 +112,7 @@ struct rmsummary **vine_manager_summarize_workers(struct vine_manager *q)
 	}
 
 	int count = 0;
-	struct rmsummary **worker_data =
-			(struct rmsummary **)malloc((hash_table_size(workers_count) + 1) * sizeof(struct rmsummary *));
+	struct rmsummary **worker_data = (struct rmsummary **)malloc((hash_table_size(workers_count) + 1) * sizeof(struct rmsummary *));
 
 	HASH_TABLE_ITERATE(workers_count, resources_key, s)
 	{

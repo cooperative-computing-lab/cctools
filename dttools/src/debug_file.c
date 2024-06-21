@@ -39,9 +39,7 @@ int debug_file_reopen(void)
 		if (file_fd > 2) {
 			close(file_fd);
 		}
-		CATCHUNIX(file_fd = open(file_path,
-					  O_CREAT | O_APPEND | O_WRONLY | O_NOCTTY,
-					  S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP));
+		CATCHUNIX(file_fd = open(file_path, O_CREAT | O_APPEND | O_WRONLY | O_NOCTTY, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP));
 		CATCHUNIX(flags = fcntl(file_fd, F_GETFD));
 		flags |= FD_CLOEXEC;
 		CATCHUNIX(fcntl(file_fd, F_SETFD, flags));

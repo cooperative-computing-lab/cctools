@@ -34,9 +34,7 @@ int semaphore_create(int value)
 {
 	int s = semget(IPC_PRIVATE, 1, 0600 | IPC_CREAT);
 	if (s < 0) {
-		debug(D_BATCH,
-				"warning: couldn't create transfer semaphore (%s) but will proceed anyway",
-				strerror(errno));
+		debug(D_BATCH, "warning: couldn't create transfer semaphore (%s) but will proceed anyway", strerror(errno));
 		return -1;
 	}
 

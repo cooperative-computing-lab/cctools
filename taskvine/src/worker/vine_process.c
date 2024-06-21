@@ -208,18 +208,10 @@ static void vine_process_complete(struct vine_process *p, int status)
 {
 	if (!WIFEXITED(status)) {
 		p->exit_code = WTERMSIG(status);
-		debug(D_VINE,
-				"task %d (pid %d) exited abnormally with signal %d",
-				p->task->task_id,
-				p->pid,
-				p->exit_code);
+		debug(D_VINE, "task %d (pid %d) exited abnormally with signal %d", p->task->task_id, p->pid, p->exit_code);
 	} else {
 		p->exit_code = WEXITSTATUS(status);
-		debug(D_VINE,
-				"task %d (pid %d) exited normally with exit code %d",
-				p->task->task_id,
-				p->pid,
-				p->exit_code);
+		debug(D_VINE, "task %d (pid %d) exited normally with exit code %d", p->task->task_id, p->pid, p->exit_code);
 	}
 }
 
@@ -244,13 +236,8 @@ int vine_process_execute_and_wait(struct vine_process *p)
 
 int vine_process_invoke_function(struct vine_process *p)
 {
-	char *buffer = string_format(
-			"%d %s %s %s", p->task->task_id, p->task->command_line, p->sandbox, p->output_file_name);
-	ssize_t result = link_printf(p->library_process->library_write_link,
-			time(0) + options->active_timeout,
-			"%ld\n%s",
-			strlen(buffer),
-			buffer);
+	char *buffer = string_format("%d %s %s %s", p->task->task_id, p->task->command_line, p->sandbox, p->output_file_name);
+	ssize_t result = link_printf(p->library_process->library_write_link, time(0) + options->active_timeout, "%ld\n%s", strlen(buffer), buffer);
 
 	// conservatively assume that the function starts executing as soon as we send it to the library.
 	// XXX Alternatively, the library could report when the function started.
@@ -259,10 +246,7 @@ int vine_process_invoke_function(struct vine_process *p)
 	free(buffer);
 
 	if (result < 0) {
-		debug(D_VINE,
-				"failed to communicate with library '%s' task %d",
-				p->task->needs_library,
-				p->library_process->pid);
+		debug(D_VINE, "failed to communicate with library '%s' task %d", p->task->needs_library, p->library_process->pid);
 		return 0;
 	} else {
 		debug(D_VINE,
@@ -407,8 +391,7 @@ int vine_process_execute(struct vine_process *p)
 		if (p->type != VINE_PROCESS_TYPE_LIBRARY) {
 			execl("/bin/sh", "sh", "-c", p->task->command_line, (char *)0);
 		} else {
-			char *final_command = string_format(
-					"%s --in-pipe-fd %d --out-pipe-fd %d --task-id %d --library-cores %d --function-slots %d --worker-pid %d",
+			char *final_command = string_format("%s --in-pipe-fd %d --out-pipe-fd %d --task-id %d --library-cores %d --function-slots %d --worker-pid %d",
 					p->task->command_line,
 					in_pipe_fd,
 					out_pipe_fd,
