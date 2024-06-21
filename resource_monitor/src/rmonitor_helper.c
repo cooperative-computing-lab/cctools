@@ -68,7 +68,8 @@
 		PUSH_ERRNO
 #define END(msg) \
 	POP_ERRNO(msg) \
-	if (msg.type == RX || msg.type == TX) msg.end = timestamp_get(); \
+	if (msg.type == RX || msg.type == TX) \
+		msg.end = timestamp_get(); \
 	}
 
 static struct itable *family_of_fd = NULL;
