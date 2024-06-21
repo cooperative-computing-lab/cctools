@@ -24,9 +24,9 @@ See the file COPYING for details.
 #include <time.h>
 #include <unistd.h>
 
-/* Cygwin does not have 64-bit I/O, while Darwin has it by default. */
+/* Cygwin does not have 64-bit I/O, while Darwin & FreeBSD have it by default. */
 
-#ifdef CCTOOLS_OPSYS_DARWIN
+#if defined (CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 #define fstat64 fstat
 #define stat64 stat
 #define open64 open

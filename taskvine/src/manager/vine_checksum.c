@@ -11,8 +11,8 @@ See the file COPYING for details.
 #include "string_array.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "debug.h" 		/* <> Wrong? */
 
-#include <debug.h>
 #include <dirent.h>
 #include <string.h>
 #include <sys/stat.h>

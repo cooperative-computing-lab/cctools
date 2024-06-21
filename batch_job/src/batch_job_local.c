@@ -16,8 +16,10 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
-#ifndef CCTOOLS_OPSYS_DARWIN
-	#include <sys/prctl.h>
+#if defined (__FreeBSD__)
+#include <sys/procctl.h>
+#else
+#include <sys/prctl.h>
 #endif
 
 static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
@@ -60,14 +62,25 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 		 * 2, since bash 2 drops privileges on startup. (Debian uses a modified
 		 * bash which does not do this when invoked as sh.)
 		 */
-		#ifndef CCTOOLS_OPSYS_DARWIN
-			prctl(PR_SET_PDEATHSIG, SIGKILL);
-		#endif
+		/* #ifndef CCTOOLS_OPSYS_DARWIN */
+		/* 	prctl(PR_SET_PDEATHSIG, SIGKILL); */
+		/* #endif */
 		execlp("/bin/sh", "sh", "-c", cmd, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 	}
 	return -1;
 }
+
+#if defined (__FreeBSD__)
+static int set_exit_with_parent (void) {
+    const int sig = SIGTERM;
+    return procctl (P_PID, 0, PROC_PDEATHSIG_CTL, (void *)&sig);
+}
+#else
+static int set_exit_with_parent (void) {
+    return prctl (PR_SET_PDEATHSIG, SIGTERM);
+}
+#endif
 
 static batch_job_id_t batch_job_local_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {

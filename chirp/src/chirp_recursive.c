@@ -18,7 +18,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <dirent.h>
 
-#ifdef CCTOOLS_OPSYS_DARWIN
+#if defined (CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 #define fopen64 fopen
 #define open64 open
 #define lseek64 lseek

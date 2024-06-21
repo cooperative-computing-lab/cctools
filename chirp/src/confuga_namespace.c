@@ -32,8 +32,8 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef CCTOOLS_OPSYS_DARWIN
-	/* Cygwin does not have 64-bit I/O, while FreeBSD/Darwin has it by default. */
+#if defined (CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
+	/* Cygwin does not have 64-bit I/O, while FreeBSD/Darwin have it by default. */
 #	define stat64 stat
 #	define fstat64 fstat
 #	define ftruncate64 ftruncate

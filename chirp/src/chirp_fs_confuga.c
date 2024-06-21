@@ -21,6 +21,11 @@ See the file COPYING for details.
 #include <errno.h>
 #include <string.h>
 
+#if defined(CCTOOLS_OPSYS_FREEBSD)
+#include <sys/stat.h>
+#endif
+
+
 #define STOPTIME (time(0)+15)
 
 #define COPY_STAT_CONFUGA_TO_CHIRP(cbuf,buf) \

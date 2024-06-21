@@ -36,7 +36,7 @@ the space used (in MB.)
 #include "catalog_query.h"
 
 #include "macros.h"
-#include "debug.h"
+#include "debug.h"		/* Why is this not found when catalog_query.h is? Had to copy it. */
 #include "full_io.h"
 #include "sleeptools.h"
 #include "hash_table.h"

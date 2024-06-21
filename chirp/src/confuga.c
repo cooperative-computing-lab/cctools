@@ -40,11 +40,21 @@ See the file COPYING for details.
 #ifdef HAS_SYS_STATVFS_H
 #	include <sys/statvfs.h>
 #endif
-#ifdef CCTOOLS_OPSYS_DARWIN
+#if defined (CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 #	include <sys/mount.h>
 #	include <sys/param.h>
-#	define statfs64 statfs
 #endif
+
+#if defined (CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
+/* Darwin/FreeBSD have 64-bit I/O by default */
+#	define stat64 stat
+#	define fstat64 fstat
+#	define ftruncate64 ftruncate
+#	define statfs64 statfs
+#	define fstatfs64 fstatfs
+#	define fstatat64 fstatat
+#endif
+
 
 #include <assert.h>
 #include <limits.h>

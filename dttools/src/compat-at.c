@@ -28,7 +28,7 @@ static int getfullpath(int dirfd, const char *path, char fullpath[PATH_MAX])
 	if (path[0] == '/') {
 		dirpath[0] = 0;
 	} else if (dirfd != AT_FDCWD) {
-#if defined(CCTOOLS_OPSYS_DARWIN)
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 		if (fcntl(dirfd, F_GETPATH, dirpath) == -1)
 			return -1;
 #elif defined(CCTOOLS_OPSYS_LINUX)

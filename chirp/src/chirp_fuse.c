@@ -7,7 +7,7 @@ See the file COPYING for details.
 This module written by James Fitzgerald, B.S. 2006.
 */
 
-#ifdef HAS_FUSE
+//#ifdef HAS_FUSE
 
 #define _FILE_OFFSET_BITS 64
 #define FUSE_USE_VERSION 27
@@ -721,16 +721,16 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-#else
+/* #else */
 
-#include <stdio.h>
+/* #include <stdio.h> */
 
-int main(int argc, char *argv[])
-{
-	printf("%s: sorry, fuse support was not built in\n", argv[0]);
-	return 1;
-}
+/* int main(int argc, char *argv[]) */
+/* { */
+/* 	printf("%s: sorry, fuse support was not built in\n", argv[0]); */
+/* 	return 1; */
+/* } */
 
-#endif
+/* #endif */
 
 /* vim: set noexpandtab tabstop=8: */

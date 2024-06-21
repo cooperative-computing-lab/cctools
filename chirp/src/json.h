@@ -82,8 +82,7 @@ typedef enum
    json_string,
    json_boolean,
    json_null
-
-} json_type;
+   } json_type;
 
 extern const struct _json_value json_value_none;
 

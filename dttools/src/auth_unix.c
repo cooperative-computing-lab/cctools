@@ -139,7 +139,12 @@ static struct passwd *auth_get_passwd_from_uid(uid_t uid)
 		file = fopen(alternate_passwd_file, "r");
 		if (file) {
 			while (1) {
-				p = fgetpwent(file);
+#if defined(CCTOOLS_OPSYS_FREEBSD)
+			  p = getpwent();
+#else
+			  p = fgetpwent(file);
+#endif
+
 				if (!p)
 					break;
 
