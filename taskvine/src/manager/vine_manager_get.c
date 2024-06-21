@@ -28,10 +28,8 @@ See the file COPYING for details.
 #include <fcntl.h>
 #include <unistd.h>
 
-static vine_result_code_t vine_manager_get_symlink_contents(struct vine_manager *q, struct vine_worker_info *w,
-		struct vine_task *t, const char *filename, int length);
-static vine_result_code_t vine_manager_get_dir_contents(struct vine_manager *q, struct vine_worker_info *w,
-		struct vine_task *t, const char *dirname, int64_t *totalsize);
+static vine_result_code_t vine_manager_get_symlink_contents(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *filename, int length);
+static vine_result_code_t vine_manager_get_dir_contents(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *dirname, int64_t *totalsize);
 
 /*
 Get an output file from the task and return it as a buffer in memory.
@@ -39,8 +37,7 @@ The buffer is attached to the f->data element and can then be retrieved
 by the application using vine_task_get_output_buffer.
 */
 
-static vine_result_code_t vine_manager_get_buffer(struct vine_manager *q, struct vine_worker_info *w,
-		struct vine_task *t, struct vine_file *f, int64_t *total_size)
+static vine_result_code_t vine_manager_get_buffer(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f, int64_t *total_size)
 {
 	char line[VINE_LINE_MAX];
 	char name_encoded[VINE_LINE_MAX];
@@ -57,12 +54,7 @@ static vine_result_code_t vine_manager_get_buffer(struct vine_manager *q, struct
 
 	if (sscanf(line, "file %s %" SCNd64 " %o %d", name_encoded, &size, &mode, &mtime) == 4) {
 		f->size = size;
-		debug(D_VINE,
-				"Receiving buffer %s (size: %" PRId64 " bytes) from %s (%s) ...",
-				f->cached_name,
-				(int64_t)f->size,
-				w->addrport,
-				w->hostname);
+		debug(D_VINE, "Receiving buffer %s (size: %" PRId64 " bytes) from %s (%s) ...", f->cached_name, (int64_t)f->size, w->addrport, w->hostname);
 
 		f->data = malloc(size + 1);
 		if (f->data) {
@@ -85,12 +77,7 @@ static vine_result_code_t vine_manager_get_buffer(struct vine_manager *q, struct
 			r = VINE_APP_FAILURE;
 		}
 	} else if (sscanf(line, "error %s %d", name_encoded, &errornum) == 2) {
-		debug(D_VINE,
-				"%s (%s): could not access buffer %s (%s)",
-				w->hostname,
-				w->addrport,
-				f->cached_name,
-				strerror(errornum));
+		debug(D_VINE, "%s (%s): could not access buffer %s (%s)", w->hostname, w->addrport, f->cached_name, strerror(errornum));
 		/* Mark the task as missing an output, but return success to keep going. */
 		vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
 		r = VINE_SUCCESS;
@@ -107,8 +94,7 @@ The "file" header has already been received, just
 bring back the streaming data within various constraints.
 */
 
-static vine_result_code_t vine_manager_get_file_contents(struct vine_manager *q, struct vine_worker_info *w,
-		struct vine_task *t, const char *local_name, int64_t length, int mode)
+static vine_result_code_t vine_manager_get_file_contents(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *local_name, int64_t length, int mode)
 {
 	// If a bandwidth limit is in effect, choose the effective stoptime.
 	timestamp_t effective_stoptime = 0;
@@ -131,19 +117,11 @@ static vine_result_code_t vine_manager_get_file_contents(struct vine_manager *q,
 	}
 
 	// Create the local file.
-	debug(D_VINE,
-			"Receiving file %s (size: %" PRId64 " bytes) from %s (%s) ...",
-			local_name,
-			length,
-			w->addrport,
-			w->hostname);
+	debug(D_VINE, "Receiving file %s (size: %" PRId64 " bytes) from %s (%s) ...", local_name, length, w->addrport, w->hostname);
 
 	// Check if there is space for incoming file at manager
 	if (!check_disk_space_for_filesize(dirname, length, q->disk_avail_threshold)) {
-		debug(D_VINE,
-				"Could not receive file %s, not enough disk space (%" PRId64 " bytes needed)\n",
-				local_name,
-				length);
+		debug(D_VINE, "Could not receive file %s, not enough disk space (%" PRId64 " bytes needed)\n", local_name, length);
 		return VINE_MGR_FAILURE;
 	}
 
@@ -166,11 +144,7 @@ static vine_result_code_t vine_manager_get_file_contents(struct vine_manager *q,
 	}
 
 	if (actual != length) {
-		debug(D_VINE,
-				"Received item size (%" PRId64 ") does not match the expected size - %" PRId64
-				" bytes.",
-				actual,
-				length);
+		debug(D_VINE, "Received item size (%" PRId64 ") does not match the expected size - %" PRId64 " bytes.", actual, length);
 		unlink(local_name);
 		return VINE_WORKER_FAILURE;
 	}
@@ -189,8 +163,7 @@ Get the contents of a symlink back from the worker,
 after the "symlink" header has already been received.
 */
 
-static vine_result_code_t vine_manager_get_symlink_contents(struct vine_manager *q, struct vine_worker_info *w,
-		struct vine_task *t, const char *filename, int length)
+static vine_result_code_t vine_manager_get_symlink_contents(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *filename, int length)
 {
 	char *target = malloc(length);
 
@@ -224,8 +197,8 @@ top-level case of renamed files as well as interior files
 within a directory.
 */
 
-static vine_result_code_t vine_manager_get_any(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t,
-		const char *dirname, const char *forced_name, int64_t *totalsize)
+static vine_result_code_t vine_manager_get_any(
+		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *dirname, const char *forced_name, int64_t *totalsize)
 {
 	char line[VINE_LINE_MAX];
 	char name_encoded[VINE_LINE_MAX];
@@ -292,12 +265,7 @@ static vine_result_code_t vine_manager_get_any(struct vine_manager *q, struct vi
 		// but we continue and consider the transfer a 'success' so that other
 		// outputs are transferred and the task is given back to the caller.
 		url_decode(name_encoded, name, sizeof(name));
-		debug(D_VINE,
-				"%s (%s): could not access requested file %s (%s)",
-				w->hostname,
-				w->addrport,
-				name,
-				strerror(errornum));
+		debug(D_VINE, "%s (%s): could not access requested file %s (%s)", w->hostname, w->addrport, name, strerror(errornum));
 		vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
 
 		r = VINE_SUCCESS;
@@ -319,8 +287,7 @@ dir, then receiving each item in the directory until an "end"
 header is received.
 */
 
-static vine_result_code_t vine_manager_get_dir_contents(struct vine_manager *q, struct vine_worker_info *w,
-		struct vine_task *t, const char *dirname, int64_t *totalsize)
+static vine_result_code_t vine_manager_get_dir_contents(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *dirname, int64_t *totalsize)
 {
 	int result = mkdir(dirname, 0777);
 
@@ -360,8 +327,7 @@ vine_result_code_t vine_manager_get_single_file(struct vine_manager *q, struct v
 Get a single output file, located at the worker under 'cached_name'.
 */
 
-vine_result_code_t vine_manager_get_output_file(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t,
-		struct vine_mount *m, struct vine_file *f)
+vine_result_code_t vine_manager_get_output_file(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_mount *m, struct vine_file *f)
 {
 	int64_t total_bytes = 0;
 	vine_result_code_t result = VINE_SUCCESS; // return success unless something fails below.
@@ -410,12 +376,7 @@ vine_result_code_t vine_manager_get_output_file(struct vine_manager *q, struct v
 	// But if we failed to *store* the file, that is a manager failure.
 
 	if (result != VINE_SUCCESS) {
-		debug(D_VINE,
-				"%s (%s) failed to return output %s to %s",
-				w->addrport,
-				w->hostname,
-				f->cached_name,
-				f->source);
+		debug(D_VINE, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, f->cached_name, f->source);
 	}
 
 	// If the transfer was successful, make a record of it in the cache.
@@ -423,20 +384,14 @@ vine_result_code_t vine_manager_get_output_file(struct vine_manager *q, struct v
 		struct vine_file_replica *replica = NULL;
 
 		if (f->type == VINE_BUFFER) {
-			replica = vine_file_replica_create(
-					f->type, f->cache_level, total_bytes, /* no mtime available */ 0);
+			replica = vine_file_replica_create(f->type, f->cache_level, total_bytes, /* no mtime available */ 0);
 		} else {
 			struct stat local_info;
 
 			if (stat(f->source, &local_info) == 0) {
-				replica = vine_file_replica_create(
-						f->type, f->cache_level, total_bytes, local_info.st_mtime);
+				replica = vine_file_replica_create(f->type, f->cache_level, total_bytes, local_info.st_mtime);
 			} else {
-				debug(D_NOTICE,
-						"Cannot stat file %s(%s): %s",
-						f->cached_name,
-						f->source,
-						strerror(errno));
+				debug(D_NOTICE, "Cannot stat file %s(%s): %s", f->cached_name, f->source, strerror(errno));
 			}
 		}
 
@@ -450,8 +405,7 @@ vine_result_code_t vine_manager_get_output_file(struct vine_manager *q, struct v
 
 /* Get all output files produced by a given task on this worker. */
 
-vine_result_code_t vine_manager_get_output_files(
-		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+vine_result_code_t vine_manager_get_output_files(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 
 	int task_succeeded = (t->result == VINE_RESULT_SUCCESS && t->exit_code == 0);
@@ -505,8 +459,7 @@ Get only the resource monitor output file for a given task,
 usually because the task has failed, and we want to know why.
 */
 
-vine_result_code_t vine_manager_get_monitor_output_file(
-		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+vine_result_code_t vine_manager_get_monitor_output_file(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	vine_result_code_t result = VINE_SUCCESS;
 

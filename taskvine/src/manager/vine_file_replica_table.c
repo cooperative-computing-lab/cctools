@@ -20,8 +20,7 @@ See the file COPYING for details.
 #include "macros.h"
 
 // add a file to the remote file table.
-int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_info *w, const char *cachename,
-		struct vine_file_replica *replica)
+int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_info *w, const char *cachename, struct vine_file_replica *replica)
 {
 	w->inuse_cache += replica->size;
 	hash_table_insert(w->current_files, cachename, replica);
@@ -38,8 +37,7 @@ int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_in
 }
 
 // remove a file from the remote file table.
-struct vine_file_replica *vine_file_replica_table_remove(
-		struct vine_manager *m, struct vine_worker_info *w, const char *cachename)
+struct vine_file_replica *vine_file_replica_table_remove(struct vine_manager *m, struct vine_worker_info *w, const char *cachename)
 {
 	struct vine_file_replica *replica = hash_table_remove(w->current_files, cachename);
 	if (replica) {
@@ -97,8 +95,7 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 			continue;
 		}
 
-		if ((replica = hash_table_lookup(peer->current_files, cachename)) &&
-				replica->state == VINE_FILE_REPLICA_STATE_READY) {
+		if ((replica = hash_table_lookup(peer->current_files, cachename)) && replica->state == VINE_FILE_REPLICA_STATE_READY) {
 			int current_transfers = vine_current_transfers_source_in_use(q, peer);
 			if (current_transfers < q->worker_source_max_transfers) {
 				peer_selected = peer;
@@ -117,8 +114,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 {
 	int found = 0;
 
-	if (vine_current_transfers_get_table_size(m) >=
-			hash_table_size(m->worker_table) * m->worker_source_max_transfers) {
+	if (vine_current_transfers_get_table_size(m) >= hash_table_size(m->worker_table) * m->worker_source_max_transfers) {
 		return found;
 	}
 
@@ -205,8 +201,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 /*
 Count number of replicas of a file in the system.
 */
-int vine_file_replica_table_count_replicas(
-		struct vine_manager *q, const char *cachename, vine_file_replica_state_t state)
+int vine_file_replica_table_count_replicas(struct vine_manager *q, const char *cachename, vine_file_replica_state_t state)
 {
 	struct vine_worker_info *w;
 	struct vine_file_replica *r;

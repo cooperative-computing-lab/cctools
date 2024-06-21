@@ -30,38 +30,10 @@ static char *int_to_string(int n)
  * @param m the bucketing manager */
 static void bucketing_manager_add_default_resource_types(bucketing_manager_t *m)
 {
-	bucketing_manager_add_resource_type(m,
-			"cores",
-			0,
-			default_cores,
-			default_num_sampling_points,
-			default_increase_rate,
-			default_max_num_buckets,
-			default_update_epoch);
-	bucketing_manager_add_resource_type(m,
-			"memory",
-			0,
-			default_mem,
-			default_num_sampling_points,
-			default_increase_rate,
-			default_max_num_buckets,
-			default_update_epoch);
-	bucketing_manager_add_resource_type(m,
-			"disk",
-			0,
-			default_disk,
-			default_num_sampling_points,
-			default_increase_rate,
-			default_max_num_buckets,
-			default_update_epoch);
-	bucketing_manager_add_resource_type(m,
-			"gpus",
-			0,
-			default_gpus,
-			default_num_sampling_points,
-			default_increase_rate,
-			default_max_num_buckets,
-			default_update_epoch);
+	bucketing_manager_add_resource_type(m, "cores", 0, default_cores, default_num_sampling_points, default_increase_rate, default_max_num_buckets, default_update_epoch);
+	bucketing_manager_add_resource_type(m, "memory", 0, default_mem, default_num_sampling_points, default_increase_rate, default_max_num_buckets, default_update_epoch);
+	bucketing_manager_add_resource_type(m, "disk", 0, default_disk, default_num_sampling_points, default_increase_rate, default_max_num_buckets, default_update_epoch);
+	bucketing_manager_add_resource_type(m, "gpus", 0, default_gpus, default_num_sampling_points, default_increase_rate, default_max_num_buckets, default_update_epoch);
 }
 /* End: internals */
 
@@ -106,8 +78,8 @@ void bucketing_manager_delete(bucketing_manager_t *m)
 	free(m);
 }
 
-void bucketing_manager_add_resource_type(bucketing_manager_t *m, const char *r, int set_default, double default_value,
-		int num_sampling_points, double increase_rate, int max_num_buckets, int update_epoch)
+void bucketing_manager_add_resource_type(
+		bucketing_manager_t *m, const char *r, int set_default, double default_value, int num_sampling_points, double increase_rate, int max_num_buckets, int update_epoch)
 {
 	if (!m) {
 		fatal("No bucketing manager to add resource\n");
@@ -119,52 +91,28 @@ void bucketing_manager_add_resource_type(bucketing_manager_t *m, const char *r, 
 	if (!hash_table_lookup(m->res_type_to_bucketing_state, r)) {
 		if (set_default) {
 			if (!strcmp(r, "cores")) {
-				b = bucketing_state_create(default_cores,
-						default_num_sampling_points,
-						default_increase_rate,
-						default_max_num_buckets,
-						m->mode,
-						default_update_epoch);
+				b = bucketing_state_create(
+						default_cores, default_num_sampling_points, default_increase_rate, default_max_num_buckets, m->mode, default_update_epoch);
 			} else if (!strcmp(r, "memory")) {
-				b = bucketing_state_create(default_mem,
-						default_num_sampling_points,
-						default_increase_rate,
-						default_max_num_buckets,
-						m->mode,
-						default_update_epoch);
+				b = bucketing_state_create(default_mem, default_num_sampling_points, default_increase_rate, default_max_num_buckets, m->mode, default_update_epoch);
 			} else if (!strcmp(r, "disk")) {
-				b = bucketing_state_create(default_disk,
-						default_num_sampling_points,
-						default_increase_rate,
-						default_max_num_buckets,
-						m->mode,
-						default_update_epoch);
+				b = bucketing_state_create(
+						default_disk, default_num_sampling_points, default_increase_rate, default_max_num_buckets, m->mode, default_update_epoch);
 			} else if (!strcmp(r, "gpus")) {
-				b = bucketing_state_create(default_gpus,
-						default_num_sampling_points,
-						default_increase_rate,
-						default_max_num_buckets,
-						m->mode,
-						default_update_epoch);
+				b = bucketing_state_create(
+						default_gpus, default_num_sampling_points, default_increase_rate, default_max_num_buckets, m->mode, default_update_epoch);
 			} else {
 				warn(D_BUCKETING, "resource type %s is not supported to set default\n", r);
 				return;
 			}
 		} else {
-			b = bucketing_state_create(default_value,
-					num_sampling_points,
-					increase_rate,
-					max_num_buckets,
-					m->mode,
-					update_epoch);
+			b = bucketing_state_create(default_value, num_sampling_points, increase_rate, max_num_buckets, m->mode, update_epoch);
 		}
 
 		if (!hash_table_insert(m->res_type_to_bucketing_state, r, b))
 			fatal("Cannot insert bucketing state into bucket manager\n");
 	} else {
-		warn(D_BUCKETING,
-				"Ignoring request to add %s as a resource type as it already exists in the given bucketing manager\n",
-				r);
+		warn(D_BUCKETING, "Ignoring request to add %s as a resource type as it already exists in the given bucketing manager\n", r);
 	}
 }
 
@@ -265,9 +213,7 @@ struct rmsummary *bucketing_manager_predict(bucketing_manager_t *m, int task_id)
 			old_val = rmsummary_get(old_res, res_name);
 
 			/* if task doesn't exceed limits or it does but not this resource */
-			if (!old_res->limits_exceeded ||
-					(old_res->limits_exceeded &&
-							rmsummary_get(old_res->limits_exceeded, res_name) == -1)) {
+			if (!old_res->limits_exceeded || (old_res->limits_exceeded && rmsummary_get(old_res->limits_exceeded, res_name) == -1)) {
 				/* if this resource is a newly added resource, predict a new value */
 				if (old_val == -1)
 					pred_val = bucketing_predict(state, old_val);

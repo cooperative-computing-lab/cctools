@@ -372,8 +372,7 @@ void auth_ticket_load(const char *tickets)
 		char **list;
 		sort_dir(".", &list, strcmp);
 		for (i = 0; list[i]; i++) {
-			if (strncmp(list[i], "ticket.", strlen("ticket.")) == 0 &&
-					(strlen(list[i]) == (strlen("ticket.") + (MD5_DIGEST_LENGTH << 1)))) {
+			if (strncmp(list[i], "ticket.", strlen("ticket.")) == 0 && (strlen(list[i]) == (strlen("ticket.") + (MD5_DIGEST_LENGTH << 1)))) {
 				debug(D_CHIRP, "adding ticket %s", list[i]);
 				list_push_tail(client_ticket_list, strdup(list[i]));
 			}

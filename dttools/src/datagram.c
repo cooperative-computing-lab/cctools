@@ -126,13 +126,7 @@ int datagram_recv(struct datagram *d, char *data, int length, char *addr, int *p
 	if (result < 0)
 		return result;
 
-	getnameinfo((struct sockaddr *)&iaddr,
-			iaddr_length,
-			addr,
-			addr_length,
-			port_string,
-			port_string_length,
-			NI_NUMERICHOST | NI_NUMERICSERV);
+	getnameinfo((struct sockaddr *)&iaddr, iaddr_length, addr, addr_length, port_string, port_string_length, NI_NUMERICHOST | NI_NUMERICSERV);
 
 	*port = atoi(port_string);
 

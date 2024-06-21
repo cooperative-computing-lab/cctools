@@ -86,8 +86,7 @@ void twister_init_by_array64(uint64_t init_key[], uint64_t key_length)
 	j = 0;
 	k = (NN > key_length ? NN : key_length);
 	for (; k; k--) {
-		mt[i] = (mt[i] ^ ((mt[i - 1] ^ (mt[i - 1] >> 62)) * 3935559000370003845ULL)) + init_key[j] +
-			j; /* non linear */
+		mt[i] = (mt[i] ^ ((mt[i - 1] ^ (mt[i - 1] >> 62)) * 3935559000370003845ULL)) + init_key[j] + j; /* non linear */
 		i++;
 		j++;
 		if (i >= NN) {

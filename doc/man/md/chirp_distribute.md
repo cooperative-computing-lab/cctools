@@ -38,7 +38,7 @@
 ## OPTIONS
 
 
-- **-a**,**--auth=_&lt;flag&gt;_**<br />Require this authentication mode.
+- **-a**,**--auth=_&lt;flag&gt;_**<br /> Enable authentication mode: unix, hostname, address, ticket, kerberos, or globus.
 - **-d**,**--debug=_&lt;flag&gt;_**<br />Enable debugging for this subsystem.
 - **-D**,**--info-transfer**<br />Show detailed location, time, and performance of each transfer.
 - **-F**,**--failures-file=_&lt;file&gt;_**<br />Write matrix of failures to this file.

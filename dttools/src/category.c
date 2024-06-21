@@ -31,11 +31,8 @@ struct peak_count_time {
 
 static int64_t first_allocation_every_n_tasks = 25; /* tasks */
 
-static const size_t labeled_resources[] = {offsetof(struct rmsummary, cores),
-		offsetof(struct rmsummary, gpus),
-		offsetof(struct rmsummary, memory),
-		offsetof(struct rmsummary, disk),
-		0};
+static const size_t labeled_resources[] = {
+		offsetof(struct rmsummary, cores), offsetof(struct rmsummary, gpus), offsetof(struct rmsummary, memory), offsetof(struct rmsummary, disk), 0};
 
 /* map from resoure name to int bucket size. Initialized in category_create first time it is called. */
 static struct rmsummary *bucket_sizes = NULL;
@@ -143,8 +140,7 @@ void category_specify_first_allocation_guess(struct category *c, const struct rm
 
 int category_in_bucketing_mode(struct category *c)
 {
-	if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING ||
-			c->allocation_mode == CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING)
+	if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING || c->allocation_mode == CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING)
 		return 1;
 	return 0;
 }
@@ -161,9 +157,7 @@ void category_specify_allocation_mode(struct category *c, int mode)
 
 	if (category_in_bucketing_mode(c)) {
 		if (!c->bucketing_manager) {
-			bucketing_mode_t bmode = c->allocation_mode == CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING
-								 ? BUCKETING_MODE_GREEDY
-								 : BUCKETING_MODE_EXHAUSTIVE;
+			bucketing_mode_t bmode = c->allocation_mode == CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING ? BUCKETING_MODE_GREEDY : BUCKETING_MODE_EXHAUSTIVE;
 			c->bucketing_manager = bucketing_manager_initialize(bmode);
 		}
 	}
@@ -287,8 +281,7 @@ void category_inc_histogram_count(struct histogram *h, double value, double wall
 	}
 }
 
-void category_first_allocation_accum_times(
-		struct histogram *h, double *keys, double *tau_mean, double *counts_accum, double *times_accum)
+void category_first_allocation_accum_times(struct histogram *h, double *keys, double *tau_mean, double *counts_accum, double *times_accum)
 {
 
 	int n = histogram_size(h);
@@ -463,8 +456,7 @@ int64_t category_first_allocation_max_throughput(struct histogram *h, int64_t to
 	return a_1;
 }
 
-int64_t category_first_allocation_max_seen(
-		struct histogram *h, int64_t top_resource, int64_t max_worker, int64_t max_explicit)
+int64_t category_first_allocation_max_seen(struct histogram *h, int64_t top_resource, int64_t max_worker, int64_t max_explicit)
 {
 	/* Automatically labeling for resource is not activated. */
 	if (top_resource < 0) {
@@ -498,8 +490,7 @@ int64_t category_first_allocation_max_seen(
 	}
 }
 
-int64_t category_first_allocation(struct histogram *h, category_mode_t mode, int64_t top_resource, int64_t max_worker,
-		int64_t max_explicit)
+int64_t category_first_allocation(struct histogram *h, category_mode_t mode, int64_t top_resource, int64_t max_worker, int64_t max_explicit)
 {
 
 	int64_t alloc;
@@ -564,8 +555,7 @@ int category_update_first_allocation(struct category *c, const struct rmsummary 
 				worker = rmsummary_get_by_offset(max_worker, o);
 			}
 
-			int64_t new_value = category_first_allocation(
-					h, c->allocation_mode, top_value, worker, max_explicit);
+			int64_t new_value = category_first_allocation(h, c->allocation_mode, top_value, worker, max_explicit);
 
 			rmsummary_set_by_offset(c->first_allocation, o, new_value);
 		}
@@ -680,8 +670,7 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
 	return update;
 }
 
-int category_bucketing_accumulate_summary(struct category *c, const struct rmsummary *rs,
-		const struct rmsummary *max_worker, int taskid, int success)
+int category_bucketing_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker, int taskid, int success)
 {
 	int update = 0;
 
@@ -694,8 +683,7 @@ int category_bucketing_accumulate_summary(struct category *c, const struct rmsum
 	if (category_in_bucketing_mode(c)) {
 		// only add resource report when resources are exhausted (success = 0) or task succeeds (success = 1)
 		if (success != -1)
-			bucketing_manager_add_resource_report(
-					c->bucketing_manager, taskid, (struct rmsummary *)rs, success);
+			bucketing_manager_add_resource_report(c->bucketing_manager, taskid, (struct rmsummary *)rs, success);
 	}
 
 	/* get user explicitly given maximum value per resource */
@@ -809,8 +797,7 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 }
 
 /* returns the next allocation state. */
-category_allocation_t category_next_label(struct category *c, category_allocation_t current_label,
-		int resource_overflow, struct rmsummary *user, struct rmsummary *measured)
+category_allocation_t category_next_label(struct category *c, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured)
 {
 	if (resource_overflow) {
 		/* not autolabeling, so we return error. */
@@ -863,8 +850,7 @@ category_allocation_t category_next_label(struct category *c, category_allocatio
 }
 
 // taskid >=0 means real task needs prediction, -1 means function called for other purposes
-const struct rmsummary *category_task_max_resources(
-		struct category *c, struct rmsummary *user, category_allocation_t request, int taskid)
+const struct rmsummary *category_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request, int taskid)
 {
 	/* we keep an internal label so that the caller does not have to worry
 	 * about memory leaks. */
@@ -876,11 +862,8 @@ const struct rmsummary *category_task_max_resources(
 
 	internal = rmsummary_create(-1);
 
-	if (c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED &&
-			c->allocation_mode != CATEGORY_ALLOCATION_MODE_MAX) {
-		if (category_in_steady_state(c) &&
-				(c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE ||
-						c->allocation_mode == CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT)) {
+	if (c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED && c->allocation_mode != CATEGORY_ALLOCATION_MODE_MAX) {
+		if (category_in_steady_state(c) && (c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE || c->allocation_mode == CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT)) {
 			/* load max seen values, but only if not in fixed or max mode.
 			 * In max mode, max seen is the first allocation, and next allocation
 			 * is to use whole workers. */
@@ -889,8 +872,7 @@ const struct rmsummary *category_task_max_resources(
 			/* Never go below what first_allocation computed */
 			rmsummary_merge_max(internal, c->first_allocation);
 		} else if (taskid >= 0 && category_in_bucketing_mode(c)) {
-			struct rmsummary *bucketing_prediction =
-					bucketing_manager_predict(c->bucketing_manager, taskid);
+			struct rmsummary *bucketing_prediction = bucketing_manager_predict(c->bucketing_manager, taskid);
 			rmsummary_merge_override(internal, bucketing_prediction);
 			rmsummary_delete(bucketing_prediction);
 		}
@@ -900,8 +882,7 @@ const struct rmsummary *category_task_max_resources(
 	rmsummary_merge_override(internal, c->max_allocation);
 
 	if (category_in_steady_state(c) && request == CATEGORY_ALLOCATION_FIRST &&
-			(c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE ||
-					c->allocation_mode == CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT ||
+			(c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE || c->allocation_mode == CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT ||
 					c->allocation_mode == CATEGORY_ALLOCATION_MODE_MAX)) {
 		rmsummary_merge_override(internal, c->first_allocation);
 	}
@@ -912,8 +893,7 @@ const struct rmsummary *category_task_max_resources(
 	return internal;
 }
 
-const struct rmsummary *category_task_min_resources(
-		struct category *c, struct rmsummary *user, category_allocation_t request, int taskid)
+const struct rmsummary *category_task_min_resources(struct category *c, struct rmsummary *user, category_allocation_t request, int taskid)
 {
 	static struct rmsummary *internal = NULL;
 	const struct rmsummary *allocation = category_task_max_resources(c, user, request, taskid);

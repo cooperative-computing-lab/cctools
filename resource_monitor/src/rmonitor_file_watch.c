@@ -124,9 +124,7 @@ struct rmonitor_file_watch_event *parse_event(const char *fname, struct jx *spec
 
 		if (defined != 1) {
 			error = 1;
-			warn(D_RMON | D_NOTICE,
-					"Exactly one of on-create, on-delete, on-truncate, or on-pattern should be specified for '%s'",
-					fname);
+			warn(D_RMON | D_NOTICE, "Exactly one of on-create, on-delete, on-truncate, or on-pattern should be specified for '%s'", fname);
 		}
 	}
 
@@ -370,11 +368,7 @@ void initialize_watch_events(struct rmonitor_file_watch_info *f, struct jx *watc
 				f->event_with_pattern = 1;
 			}
 			list_push_tail(f->events, e);
-			debug(D_RMON,
-					"Added event for file '%s', label '%s', max_count %" PRId64,
-					f->filename,
-					e->label,
-					e->max_count);
+			debug(D_RMON, "Added event for file '%s', label '%s', max_count %" PRId64, f->filename, e->label, e->max_count);
 		} else {
 			error = 1;
 		}

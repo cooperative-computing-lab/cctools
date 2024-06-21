@@ -56,10 +56,7 @@ struct jx *interfaces_of_host()
 
 		int result = address_from_sockaddr(address, ifa->ifa_addr);
 		if (!result) {
-			warn(D_NOTICE,
-					"Could not determine address of interface '%s': %s",
-					ifa->ifa_name,
-					gai_strerror(result));
+			warn(D_NOTICE, "Could not determine address of interface '%s': %s", ifa->ifa_name, gai_strerror(result));
 			continue;
 		}
 

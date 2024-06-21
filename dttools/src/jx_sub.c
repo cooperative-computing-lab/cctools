@@ -118,8 +118,7 @@ static struct jx_item *jx_sub_list_comprehension(struct jx *body, struct jx_comp
 	return result;
 }
 
-static struct jx_pair *jx_sub_dict_comprehension(
-		struct jx *key, struct jx *value, struct jx_comprehension *comp, struct jx *context)
+static struct jx_pair *jx_sub_dict_comprehension(struct jx *key, struct jx *value, struct jx_comprehension *comp, struct jx *context)
 {
 	assert(key);
 	assert(value);
@@ -182,9 +181,7 @@ static struct jx_pair *jx_sub_dict_comprehension(
 			jx_delete(condition);
 			jx_delete(new_key);
 			jx_delete(new_value);
-			return jx_pair(jx_error(jx_format("on line %d, invalid pair in dict comprehension", key->line)),
-					NULL,
-					NULL);
+			return jx_pair(jx_error(jx_format("on line %d, invalid pair in dict comprehension", key->line)), NULL, NULL);
 		}
 	}
 
@@ -213,9 +210,7 @@ static struct jx_pair *jx_sub_pair(struct jx_pair *pair, struct jx *context)
 			return jx_sub_pair(pair->next, context);
 		}
 	} else {
-		return jx_pair(jx_sub(pair->key, context),
-				jx_sub(pair->value, context),
-				jx_sub_pair(pair->next, context));
+		return jx_pair(jx_sub(pair->key, context), jx_sub(pair->value, context), jx_sub_pair(pair->next, context));
 	}
 }
 

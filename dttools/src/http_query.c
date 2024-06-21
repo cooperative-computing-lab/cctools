@@ -84,8 +84,7 @@ struct link *http_query_size(const char *url, const char *action, INT64_T *size,
 	}
 }
 
-struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, const char *action, INT64_T *size,
-		time_t stoptime, int cache_reload)
+struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, const char *action, INT64_T *size, time_t stoptime, int cache_reload)
 {
 	char url[HTTP_LINE_MAX];
 	char newurl[HTTP_LINE_MAX];
@@ -157,14 +156,9 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 		buffer_putliteral(&B, "Connection: close\r\n");
 		buffer_printf(&B, "Host: %s\r\n", actual_host);
 		if (getenv("HTTP_USER_AGENT"))
-			buffer_printf(&B,
-					"User-Agent: Mozilla/5.0 (compatible; CCTools %s Parrot; http://ccl.cse.nd.edu/ %s)\r\n",
-					CCTOOLS_VERSION,
-					getenv("HTTP_USER_AGENT"));
+			buffer_printf(&B, "User-Agent: Mozilla/5.0 (compatible; CCTools %s Parrot; http://ccl.cse.nd.edu/ %s)\r\n", CCTOOLS_VERSION, getenv("HTTP_USER_AGENT"));
 		else
-			buffer_printf(&B,
-					"User-Agent: Mozilla/5.0 (compatible; CCTools %s Parrot; http://ccl.cse.nd.edu/)\r\n",
-					CCTOOLS_VERSION);
+			buffer_printf(&B, "User-Agent: Mozilla/5.0 (compatible; CCTools %s Parrot; http://ccl.cse.nd.edu/)\r\n", CCTOOLS_VERSION);
 		buffer_putliteral(&B, "\r\n"); /* header terminator */
 
 		debug(D_HTTP, "%s", buffer_tostring(&B));
@@ -199,15 +193,11 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 				link_close(link);
 				if (newurl[0]) {
 					if (!strcmp(url, newurl)) {
-						debug(D_HTTP,
-								"error: server gave %d redirect from %s back to the same url!",
-								response,
-								url);
+						debug(D_HTTP, "error: server gave %d redirect from %s back to the same url!", response, url);
 						errno = EIO;
 						return 0;
 					} else {
-						return http_query_size_via_proxy(
-								proxy, newurl, action, size, stoptime, cache_reload);
+						return http_query_size_via_proxy(proxy, newurl, action, size, stoptime, cache_reload);
 					}
 				} else {
 					errno = ENOENT;

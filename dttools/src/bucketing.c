@@ -132,8 +132,7 @@ void bucketing_bucket_delete(bucketing_bucket_t *b)
 	free(b);
 }
 
-bucketing_state_t *bucketing_state_create(double default_value, int num_sampling_points, double increase_rate,
-		int max_num_buckets, bucketing_mode_t mode, int update_epoch)
+bucketing_state_t *bucketing_state_create(double default_value, int num_sampling_points, double increase_rate, int max_num_buckets, bucketing_mode_t mode, int update_epoch)
 {
 	if (default_value < 0) {
 		warn(D_BUCKETING, "default value cannot be less than 0\n");

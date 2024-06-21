@@ -61,8 +61,7 @@ void timer_stop(int i)
 {
 	gettimeofday(&EndTime[i], NULL);
 
-	ElapsedTime[i] += (double)(EndTime[i].tv_sec - StartTime[i].tv_sec) +
-			  (double)(EndTime[i].tv_usec - StartTime[i].tv_usec) / 1000000.0;
+	ElapsedTime[i] += (double)(EndTime[i].tv_sec - StartTime[i].tv_sec) + (double)(EndTime[i].tv_usec - StartTime[i].tv_usec) / 1000000.0;
 	TimedRuns[i]++;
 }
 
@@ -87,11 +86,7 @@ void timer_print_summary(int print_all)
 	int i;
 	for (i = 0; i < NumberOfTimers; i++)
 		if (TimedRuns[i] > 0 || print_all)
-			printf("%s = average(%2.6lf), total(%2.6lf), runs(%d)\n",
-					TimerStrings[i],
-					timer_average_time(i),
-					ElapsedTime[i],
-					TimedRuns[i]);
+			printf("%s = average(%2.6lf), total(%2.6lf), runs(%d)\n", TimerStrings[i], timer_average_time(i), ElapsedTime[i], TimedRuns[i]);
 }
 
 /* vim: set noexpandtab tabstop=8: */

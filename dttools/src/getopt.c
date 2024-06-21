@@ -160,9 +160,7 @@ static void exchange(char **argv, struct _getopt_data *d)
 		if (new_str == NULL)
 			d->__nonoption_flags_len = d->__nonoption_flags_max_len = 0;
 		else {
-			memset(__mempcpy(new_str, __getopt_nonoption_flags, d->__nonoption_flags_max_len),
-					'\0',
-					top + 1 - d->__nonoption_flags_max_len);
+			memset(__mempcpy(new_str, __getopt_nonoption_flags, d->__nonoption_flags_max_len), '\0', top + 1 - d->__nonoption_flags_max_len);
 			d->__nonoption_flags_max_len = top + 1;
 			__getopt_nonoption_flags = new_str;
 		}
@@ -248,9 +246,7 @@ static const char *_getopt_initialize(int argc, char *const *argv, const char *o
 				if (__getopt_nonoption_flags == NULL)
 					d->__nonoption_flags_max_len = -1;
 				else
-					memset(__mempcpy(__getopt_nonoption_flags, orig_str, len),
-							'\0',
-							d->__nonoption_flags_max_len - len);
+					memset(__mempcpy(__getopt_nonoption_flags, orig_str, len), '\0', d->__nonoption_flags_max_len - len);
 			}
 		}
 		d->__nonoption_flags_len = d->__nonoption_flags_max_len;
@@ -317,8 +313,7 @@ static const char *_getopt_initialize(int argc, char *const *argv, const char *o
    If LONG_ONLY is nonzero, '-' as well as '--' can introduce
    long-named options.  */
 
-int _getopt_internal_r(int argc, char *const *argv, const char *optstring, const struct option *longopts, int *longind,
-		int long_only, struct _getopt_data *d)
+int _getopt_internal_r(int argc, char *const *argv, const char *optstring, const struct option *longopts, int *longind, int long_only, struct _getopt_data *d)
 {
 	int print_errors = d->opterr;
 	if (optstring[0] == ':')
@@ -341,9 +336,7 @@ int _getopt_internal_r(int argc, char *const *argv, const char *optstring, const
 	   from the shell indicating it is not an option.  The later information
 	   is only used when the used in the GNU libc.  */
 #if defined _LIBC && defined USE_NONOPTION_FLAGS
-#define NONOPTION_P \
-	(argv[d->optind][0] != '-' || argv[d->optind][1] == '\0' || \
-			(d->optind < d->__nonoption_flags_len && __getopt_nonoption_flags[d->optind] == '1'))
+#define NONOPTION_P (argv[d->optind][0] != '-' || argv[d->optind][1] == '\0' || (d->optind < d->__nonoption_flags_len && __getopt_nonoption_flags[d->optind] == '1'))
 #else
 #define NONOPTION_P (argv[d->optind][0] != '-' || argv[d->optind][1] == '\0')
 #endif
@@ -434,10 +427,7 @@ int _getopt_internal_r(int argc, char *const *argv, const char *optstring, const
 
 	   This distinction seems to be the most useful approach.  */
 
-	if (longopts != NULL &&
-			(argv[d->optind][1] == '-' ||
-					(long_only && (argv[d->optind][2] ||
-								      !strchr(optstring, argv[d->optind][1]))))) {
+	if (longopts != NULL && (argv[d->optind][1] == '-' || (long_only && (argv[d->optind][2] || !strchr(optstring, argv[d->optind][1]))))) {
 		char *nameend;
 		const struct option *p;
 		const struct option *pfound = NULL;
@@ -463,8 +453,7 @@ int _getopt_internal_r(int argc, char *const *argv, const char *optstring, const
 					/* First nonexact match found.  */
 					pfound = p;
 					indfound = option_index;
-				} else if (long_only || pfound->has_arg != p->has_arg || pfound->flag != p->flag ||
-						pfound->val != p->val)
+				} else if (long_only || pfound->has_arg != p->has_arg || pfound->flag != p->flag || pfound->val != p->val)
 					/* Second or later nonexact match found.  */
 					ambig = 1;
 			}
@@ -474,8 +463,7 @@ int _getopt_internal_r(int argc, char *const *argv, const char *optstring, const
 #if defined _LIBC && defined USE_IN_LIBIO
 				char *buf;
 
-				if (__asprintf(&buf, _("%s: option '%s' is ambiguous\n"), argv[0], argv[d->optind]) >=
-						0) {
+				if (__asprintf(&buf, _("%s: option '%s' is ambiguous\n"), argv[0], argv[d->optind]) >= 0) {
 					_IO_flockfile(stderr);
 
 					int old_flags2 = ((_IO_FILE *)stderr)->_flags2;
@@ -595,10 +583,7 @@ int _getopt_internal_r(int argc, char *const *argv, const char *optstring, const
 							free(buf);
 						}
 #else
-						fprintf(stderr,
-								_("%s: option '%s' requires an argument\n"),
-								argv[0],
-								argv[d->optind - 1]);
+						fprintf(stderr, _("%s: option '%s' requires an argument\n"), argv[0], argv[d->optind - 1]);
 #endif
 					}
 					d->__nextchar += strlen(d->__nextchar);
@@ -630,27 +615,16 @@ int _getopt_internal_r(int argc, char *const *argv, const char *optstring, const
 				if (argv[d->optind][1] == '-') {
 					/* --option */
 #if defined _LIBC && defined USE_IN_LIBIO
-					n = __asprintf(&buf,
-							_("%s: unrecognized option '--%s'\n"),
-							argv[0],
-							d->__nextchar);
+					n = __asprintf(&buf, _("%s: unrecognized option '--%s'\n"), argv[0], d->__nextchar);
 #else
 					fprintf(stderr, _("%s: unrecognized option '--%s'\n"), argv[0], d->__nextchar);
 #endif
 				} else {
 					/* +option or -option */
 #if defined _LIBC && defined USE_IN_LIBIO
-					n = __asprintf(&buf,
-							_("%s: unrecognized option '%c%s'\n"),
-							argv[0],
-							argv[d->optind][0],
-							d->__nextchar);
+					n = __asprintf(&buf, _("%s: unrecognized option '%c%s'\n"), argv[0], argv[d->optind][0], d->__nextchar);
 #else
-					fprintf(stderr,
-							_("%s: unrecognized option '%c%s'\n"),
-							argv[0],
-							argv[d->optind][0],
-							d->__nextchar);
+					fprintf(stderr, _("%s: unrecognized option '%c%s'\n"), argv[0], argv[d->optind][0], d->__nextchar);
 #endif
 				}
 
@@ -740,10 +714,7 @@ int _getopt_internal_r(int argc, char *const *argv, const char *optstring, const
 #if defined _LIBC && defined USE_IN_LIBIO
 					char *buf;
 
-					if (__asprintf(&buf,
-							    _("%s: option requires an argument -- '%c'\n"),
-							    argv[0],
-							    c) >= 0) {
+					if (__asprintf(&buf, _("%s: option requires an argument -- '%c'\n"), argv[0], c) >= 0) {
 						_IO_flockfile(stderr);
 
 						int old_flags2 = ((_IO_FILE *)stderr)->_flags2;
@@ -800,10 +771,7 @@ int _getopt_internal_r(int argc, char *const *argv, const char *optstring, const
 #if defined _LIBC && defined USE_IN_LIBIO
 					char *buf;
 
-					if (__asprintf(&buf,
-							    _("%s: option '-W %s' is ambiguous\n"),
-							    argv[0],
-							    argv[d->optind]) >= 0) {
+					if (__asprintf(&buf, _("%s: option '-W %s' is ambiguous\n"), argv[0], argv[d->optind]) >= 0) {
 						_IO_flockfile(stderr);
 
 						int old_flags2 = ((_IO_FILE *)stderr)->_flags2;
@@ -817,10 +785,7 @@ int _getopt_internal_r(int argc, char *const *argv, const char *optstring, const
 						free(buf);
 					}
 #else
-					fprintf(stderr,
-							_("%s: option '-W %s' is ambiguous\n"),
-							argv[0],
-							argv[d->optind]);
+					fprintf(stderr, _("%s: option '-W %s' is ambiguous\n"), argv[0], argv[d->optind]);
 #endif
 				}
 				d->__nextchar += strlen(d->__nextchar);
@@ -894,10 +859,7 @@ int _getopt_internal_r(int argc, char *const *argv, const char *optstring, const
 								free(buf);
 							}
 #else
-							fprintf(stderr,
-									_("%s: option '%s' requires an argument\n"),
-									argv[0],
-									argv[d->optind - 1]);
+							fprintf(stderr, _("%s: option '%s' requires an argument\n"), argv[0], argv[d->optind - 1]);
 #endif
 						}
 						d->__nextchar += strlen(d->__nextchar);
@@ -955,10 +917,7 @@ int _getopt_internal_r(int argc, char *const *argv, const char *optstring, const
 							free(buf);
 						}
 #else
-						fprintf(stderr,
-								_("%s: option requires an argument -- '%c'\n"),
-								argv[0],
-								c);
+						fprintf(stderr, _("%s: option requires an argument -- '%c'\n"), argv[0], c);
 #endif
 					}
 					d->optopt = c;
@@ -977,8 +936,7 @@ int _getopt_internal_r(int argc, char *const *argv, const char *optstring, const
 	}
 }
 
-int _getopt_internal(int argc, char *const *argv, const char *optstring, const struct option *longopts, int *longind,
-		int long_only)
+int _getopt_internal(int argc, char *const *argv, const char *optstring, const struct option *longopts, int *longind, int long_only)
 {
 	int result;
 

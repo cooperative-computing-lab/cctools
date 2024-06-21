@@ -474,10 +474,7 @@ static struct jx_item *jx_eval_list_comprehension(struct jx *body, struct jx_com
 				jx_delete(list);
 				jx_item_delete(result);
 				char *s = jx_print_string(cond);
-				struct jx *err = jx_error(jx_format(
-						"on line %d, %s: list comprehension condition takes a boolean",
-						cond->line,
-						s));
+				struct jx *err = jx_error(jx_format("on line %d, %s: list comprehension condition takes a boolean", cond->line, s));
 				free(s);
 				return jx_item(err, NULL);
 			}
@@ -523,8 +520,7 @@ static struct jx_item *jx_eval_list_comprehension(struct jx *body, struct jx_com
 	return result;
 }
 
-static struct jx_pair *jx_eval_dict_comprehension(
-		struct jx *key, struct jx *value, struct jx_comprehension *comp, struct jx *context)
+static struct jx_pair *jx_eval_dict_comprehension(struct jx *key, struct jx *value, struct jx_comprehension *comp, struct jx *context)
 {
 	assert(key);
 	assert(value);
@@ -535,9 +531,7 @@ static struct jx_pair *jx_eval_dict_comprehension(
 		return jx_pair(list, NULL, NULL);
 	if (!jx_istype(list, JX_ARRAY)) {
 		jx_delete(list);
-		return jx_pair(jx_error(jx_format("on line %d: dict comprehension takes an array", comp->line)),
-				NULL,
-				NULL);
+		return jx_pair(jx_error(jx_format("on line %d: dict comprehension takes an array", comp->line)), NULL, NULL);
 	}
 
 	struct jx_pair *result = NULL;
@@ -561,10 +555,7 @@ static struct jx_pair *jx_eval_dict_comprehension(
 				jx_delete(list);
 				jx_pair_delete(result);
 				char *s = jx_print_string(cond);
-				struct jx *err = jx_error(jx_format(
-						"on line %d, %s: dict comprehension condition takes a boolean",
-						cond->line,
-						s));
+				struct jx *err = jx_error(jx_format("on line %d, %s: dict comprehension condition takes a boolean", cond->line, s));
 				free(s);
 				return jx_pair(err, NULL, NULL);
 			}
@@ -630,9 +621,7 @@ static struct jx_pair *jx_eval_pair(struct jx_pair *pair, struct jx *context)
 			return jx_eval_pair(pair->next, context);
 		}
 	} else {
-		return jx_pair(jx_eval(pair->key, context),
-				jx_eval(pair->value, context),
-				jx_eval_pair(pair->next, context));
+		return jx_pair(jx_eval(pair->key, context), jx_eval(pair->value, context), jx_eval_pair(pair->next, context));
 	}
 }
 

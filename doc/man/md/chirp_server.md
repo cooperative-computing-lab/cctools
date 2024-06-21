@@ -46,7 +46,7 @@ For complete details with examples, see the [Chirp User's Manual](http://ccl.cse
 
 - **-A**,**--default-acl=_&lt;file&gt;_**<br />Use this file as the default ACL.
 - **--inherit-default-acl**<br /> Directories without an ACL inherit from parent directories.
-- **-a**,**--auth=_&lt;method&gt;_**<br />Enable this authentication method.
+- **-a**,**--auth=_&lt;flag&gt;_**<br /> Enable authentication mode: unix, hostname, address, ticket, kerberos, or globus.
 - **-b**,**--background**<br />Run as daemon.
 - **-B**,**--pid-file=_&lt;file&gt;_**<br />Write PID to file.
 - **-C**,**--no-core-dump**<br />Do not create a core dump, even due to a crash.

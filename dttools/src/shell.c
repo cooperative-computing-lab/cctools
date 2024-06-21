@@ -48,8 +48,7 @@ out:
 	abort();
 }
 
-int shellcode(const char *cmd, const char *const env[], const char *input, size_t len, buffer_t *Bout, buffer_t *Berr,
-		int *status)
+int shellcode(const char *cmd, const char *const env[], const char *input, size_t len, buffer_t *Bout, buffer_t *Berr, int *status)
 {
 	int rc;
 	int in[2] = {-1, -1};
@@ -149,9 +148,7 @@ out:
 	if (err[1] >= 0)
 		close(err[1]);
 	gettimeofday(&stop, NULL);
-	debug(D_DEBUG,
-			"shellcode finished in %.2fs",
-			(double)(stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) * 1e-6);
+	debug(D_DEBUG, "shellcode finished in %.2fs", (double)(stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) * 1e-6);
 	return RCUNIX(rc);
 }
 

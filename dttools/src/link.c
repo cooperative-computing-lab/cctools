@@ -575,9 +575,7 @@ int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert)
 		}
 
 		if (!link_nonblocking(link, 1)) {
-			debug(D_SSL,
-					"Could not switch link back to non-blocking after SSL handshake: %s",
-					strerror(errno));
+			debug(D_SSL, "Could not switch link back to non-blocking after SSL handshake: %s", strerror(errno));
 			return 0;
 		}
 
@@ -1175,13 +1173,7 @@ int link_address_local(struct link *link, char *addr, int *port)
 	if (result != 0)
 		return 0;
 
-	result = getnameinfo((struct sockaddr *)&iaddr,
-			length,
-			addr,
-			addr_length,
-			port_string,
-			port_string_length,
-			NI_NUMERICHOST | NI_NUMERICSERV);
+	result = getnameinfo((struct sockaddr *)&iaddr, length, addr, addr_length, port_string, port_string_length, NI_NUMERICHOST | NI_NUMERICSERV);
 	if (result == 0) {
 		*port = atoi(port_string);
 		return 1;
@@ -1210,13 +1202,7 @@ int link_address_remote(struct link *link, char *addr, int *port)
 	if (result != 0)
 		return 0;
 
-	result = getnameinfo((struct sockaddr *)&iaddr,
-			length,
-			addr,
-			addr_length,
-			port_string,
-			port_string_length,
-			NI_NUMERICHOST | NI_NUMERICSERV);
+	result = getnameinfo((struct sockaddr *)&iaddr, length, addr, addr_length, port_string, port_string_length, NI_NUMERICHOST | NI_NUMERICSERV);
 	if (result == 0) {
 		*port = atoi(port_string);
 		return 1;

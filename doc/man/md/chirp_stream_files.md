@@ -43,7 +43,7 @@ In all cases, files are accessed in a streaming manner, making this particularly
 ## OPTIONS
 
 
-- **-a**,**--auth=_&lt;flag&gt;_**<br />Require this authentication mode.
+- **-a**,**--auth=_&lt;flag&gt;_**<br /> Enable authentication mode: unix, hostname, address, ticket, kerberos, or globus.
 - **-b**,**--block-size=_&lt;size&gt;_**<br />Set transfer buffer size. (default is 1048576 bytes)
 - **-d**,**--debug=_&lt;flag&gt;_**<br />Enable debugging for this subsystem.
 - **-i**,**--tickes=_&lt;files&gt;_**<br />Comma-delimited list of tickets to use for authentication.

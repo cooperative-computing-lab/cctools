@@ -95,9 +95,7 @@ void vine_watcher_add_process(struct vine_watcher *w, struct vine_process *p)
 		if (m->flags & VINE_WATCH) {
 
 			struct entry *e;
-			e = entry_create(p->task->task_id,
-					string_format("%s/%s", p->sandbox, m->remote_name),
-					strdup(m->remote_name));
+			e = entry_create(p->task->task_id, string_format("%s/%s", p->sandbox, m->remote_name), strdup(m->remote_name));
 
 			list_push_tail(w->watchlist, e);
 		}
@@ -178,11 +176,7 @@ int vine_watcher_send_changes(struct vine_watcher *w, struct link *manager, time
 			if (info.st_size > e->size) {
 				int64_t offset = e->size;
 				int64_t length = info.st_size - e->size;
-				debug(D_VINE,
-						"%s increased from %" PRId64 " to %" PRId64 " bytes",
-						e->physical_path,
-						offset,
-						offset + length);
+				debug(D_VINE, "%s increased from %" PRId64 " to %" PRId64 " bytes", e->physical_path, offset, offset + length);
 				int fd = open(e->physical_path, O_RDONLY);
 				if (fd < 0) {
 					debug(D_VINE, "unable to open %s: %s", e->physical_path, strerror(errno));
@@ -190,24 +184,14 @@ int vine_watcher_send_changes(struct vine_watcher *w, struct link *manager, time
 				}
 
 				lseek(fd, offset, SEEK_SET);
-				link_printf(manager,
-						stoptime,
-						"update %" PRId64 " %s %" PRId64 " %" PRId64 "\n",
-						e->task_id,
-						e->logical_path,
-						offset,
-						length);
+				link_printf(manager, stoptime, "update %" PRId64 " %s %" PRId64 " %" PRId64 "\n", e->task_id, e->logical_path, offset, length);
 				int actual = link_stream_from_fd(manager, fd, length, stoptime);
 				close(fd);
 				if (actual != length)
 					return 0;
 				e->size = info.st_size;
 			} else if (info.st_size < e->size) {
-				debug(D_VINE,
-						"%s unexpectedly shrank from %" PRId64 " to %" PRId64 " bytes",
-						e->physical_path,
-						(int64_t)e->size,
-						(int64_t)info.st_size);
+				debug(D_VINE, "%s unexpectedly shrank from %" PRId64 " to %" PRId64 " bytes", e->physical_path, (int64_t)e->size, (int64_t)info.st_size);
 				debug(D_VINE, "%s will no longer be watched for changes", e->physical_path);
 				e->do_not_watch = 1;
 			}

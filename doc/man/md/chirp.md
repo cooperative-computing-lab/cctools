@@ -64,7 +64,7 @@ Here are some important  **chirp** commands:
 
 ## OPTIONS
 
-- **-a**,**--auth=_&lt;flag&gt;_**<br />Require this authentication mode.
+- **-a**,**--auth=_&lt;flag&gt;_**<br /> Enable authentication mode: unix, hostname, address, ticket, kerberos, or globus.
 - **-d**,**--debug=_&lt;flag&gt;_**<br />Enable debugging for this subsystem.
 - **-i**,**--tickets=_&lt;files&gt;_**<br />Comma-delimited list of tickets to use for authentication.
 - **-l**,**--verbose**<br />Long transfer information.

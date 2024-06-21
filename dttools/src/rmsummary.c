@@ -820,8 +820,7 @@ static void merge_limits(struct rmsummary *dest, const struct rmsummary *src)
 			}
 
 			double src_lim = src->limits_exceeded ? rmsummary_get_by_offset(src->limits_exceeded, o) : -1;
-			double dest_lim =
-					dest->limits_exceeded ? rmsummary_get_by_offset(dest->limits_exceeded, o) : -1;
+			double dest_lim = dest->limits_exceeded ? rmsummary_get_by_offset(dest->limits_exceeded, o) : -1;
 
 			rmsummary_set_by_offset(dest->limits_exceeded, o, src_lim < 0 ? -1 : MAX(src_lim, dest_lim));
 		}
@@ -984,14 +983,7 @@ int rmsummary_check_limits(struct rmsummary *measured, struct rmsummary *limits)
 		// if there is a limit, and the resource was measured, and the
 		// measurement is larger than the limit, report the broken limit.
 		if (l > -1 && m > 0 && l < (m - f)) {
-			debug(D_DEBUG,
-					"Resource limit for %s has been exceeded: %.*f > %.*f %s\n",
-					info->name,
-					info->decimals,
-					m,
-					info->decimals,
-					l,
-					info->units);
+			debug(D_DEBUG, "Resource limit for %s has been exceeded: %.*f > %.*f %s\n", info->name, info->decimals, m, info->decimals, l, info->units);
 
 			if (!measured->limits_exceeded) {
 				measured->limits_exceeded = rmsummary_create(-1);
@@ -1036,13 +1028,7 @@ const char *rmsummary_resource_to_str(const char *resource, double value, int in
 		return NULL;
 	}
 
-	string_nformat(output,
-			sizeof(output),
-			"%.*f%s%s",
-			decimals,
-			value,
-			include_units ? " " : "",
-			include_units ? units : "");
+	string_nformat(output, sizeof(output), "%.*f%s%s", decimals, value, include_units ? " " : "", include_units ? units : "");
 
 	return output;
 }
