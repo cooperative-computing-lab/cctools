@@ -28,8 +28,11 @@ struct jx_parser;
 /* Sets module-wide flag for static parse mode */
 void jx_parse_set_static_mode( bool mode );
 
-/** Parse a JSON string to a JX expression.  @param str A C string containing JSON data.  @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
+/** Parse a JSON string to a JX expression.  @param str A null-terminated C string containing JSON data.  @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
 struct jx * jx_parse_string( const char *str );
+
+/** Parse a JSON string to a JX expression.  @param str An unterminated string containing JSON data.  @param Length of the string in bytes.  @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
+struct jx * jx_parse_string_and_length( const char *str, int length );
 
 /** Parse a standard IO stream to a JX expression.  @param file A stream containing JSON data.  @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
 struct jx * jx_parse_stream( FILE *file );
@@ -63,8 +66,11 @@ struct jx_parser *jx_parser_create(bool strict_mode);
 /** Attach parser to a file.  @param p A parser object.  @param file A standard IO stream. */
 void jx_parser_read_stream( struct jx_parser *p, FILE *file );
 
-/** Attach parser to a string.  @param p A parser object.  @param str A JSON string to parse. */
+/** Attach parser to a null-terminate string.  @param p A parser object.  @param str A JSON string to parse. */
 void jx_parser_read_string( struct jx_parser *p, const char *str );
+
+/** Attach parser to a raw string with known length.  @param p A parser object.  @param str A JSON string to parse. @param length The length of the string in bytes. */
+void jx_parser_read_string_and_length( struct jx_parser *p, const char *str, int length );
 
 /** Attach parser to a link.  @param p A parser object.  @param l A link object.  @param stoptime The absolute time at which to stop. */
 void jx_parser_read_link( struct jx_parser *p, struct link *l, time_t stoptime );
