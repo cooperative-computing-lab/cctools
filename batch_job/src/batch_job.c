@@ -88,7 +88,7 @@ void batch_job_info_delete(struct batch_job_info *info)
 	free(info);
 }
 
-struct batch_queue *batch_queue_create(batch_queue_type_t type)
+struct batch_queue *batch_queue_create(batch_queue_type_t type, const char *ssl_key_file, const char *ssl_cert_file )
 {
 	int i;
 	struct batch_queue *q;
@@ -108,7 +108,9 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 	batch_queue_set_feature(q, "output_directories", "yes");
 	batch_queue_set_feature(q, "batch_log_name", "%s.batchlog");
 	batch_queue_set_feature(q, "gc_size", "yes");
-
+	if(ssl_key_file) batch_queue_set_feature(q, "ssl_key_file", strdup(ssl_key_file) );
+	if(ssl_cert_file) batch_queue_set_feature(q, "ssl_cert_file", strdup(ssl_cert_file) );
+	
 	q->module = NULL;
 	for (i = 0; batch_queue_modules[i]->type != BATCH_QUEUE_TYPE_UNKNOWN; i++)
 		if (batch_queue_modules[i]->type == type)
