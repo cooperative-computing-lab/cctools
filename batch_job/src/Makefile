@@ -6,11 +6,6 @@ LIBRARIES = libbatch_job.a
 PROGRAMS = work_queue_factory work_queue_pool vine_factory
 SCRIPTS = condor_chaos_monkey
 
-ifeq ($(CCTOOLS_CHIRP),chirp)
-CHIRP_LIB=${CCTOOLS_HOME}/chirp/src/libchirp.a
-CHIRP_BATCH=batch_job_chirp.c
-endif
-
 DT_LIB=${CCTOOLS_HOME}/dttools/src/libdttools.a
 WQ_LIB=${CCTOOLS_HOME}/work_queue/src/libwork_queue.a
 VINE_LIB=${CCTOOLS_HOME}/taskvine/src/manager/libtaskvine.a
