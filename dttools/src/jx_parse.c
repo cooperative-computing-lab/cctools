@@ -66,6 +66,7 @@ struct jx_parser {
 	char token[MAX_TOKEN_SIZE];
 	FILE *source_file;
 	const char *source_string;
+	int source_string_length;
 	struct link *source_link;
 	unsigned line;
 	time_t stoptime;
@@ -104,6 +105,13 @@ void jx_parser_read_stream(struct jx_parser *p, FILE *file)
 void jx_parser_read_string(struct jx_parser *p, const char *str)
 {
 	p->source_string = str;
+	p->source_string_length = -1;
+}
+
+void jx_parser_read_string_and_length(struct jx_parser *p, const char *str, int length)
+{
+	p->source_string = str;
+	p->source_string_length = length;
 }
 
 void jx_parser_read_link(struct jx_parser *p, struct link *l, time_t stoptime)
@@ -175,11 +183,22 @@ static int jx_getchar(struct jx_parser *p)
 	if (p->source_file) {
 		c = fgetc(p->source_file);
 	} else if (p->source_string) {
-		c = *p->source_string;
-		if (c) {
-			p->source_string++;
+		if (p->source_string_length == -1) {
+			/* processing a null terminated string */
+			c = *p->source_string;
+			if (c) {
+				p->source_string++;
+			} else {
+				c = EOF;
+			}
 		} else {
-			c = EOF;
+			/* processing a known length string */
+			if (p->source_string_length > 0) {
+				c = *p->source_string++;
+				p->source_string_length--;
+			} else {
+				c = EOF;
+			}
 		}
 	} else if (p->source_link) {
 		char ch;
@@ -1175,6 +1194,13 @@ struct jx *jx_parse_string(const char *str)
 {
 	struct jx_parser *p = jx_parser_create(false);
 	jx_parser_read_string(p, str);
+	return jx_parse_finish(p);
+}
+
+struct jx *jx_parse_string_and_length(const char *str, int length)
+{
+	struct jx_parser *p = jx_parser_create(false);
+	jx_parser_read_string_and_length(p, str, length);
 	return jx_parse_finish(p);
 }
 

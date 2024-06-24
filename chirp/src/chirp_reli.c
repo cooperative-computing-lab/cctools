@@ -781,19 +781,19 @@ INT64_T chirp_reli_job_create (const char *host, const char *json, chirp_jobid_t
 	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_create(client,json,id,stoptime); )
 }
 
-INT64_T chirp_reli_job_commit (const char *host, const char *json, time_t stoptime)
+INT64_T chirp_reli_job_commit (const char *host, chirp_jobid_t id, time_t stoptime)
 {
-	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_commit(client,json,stoptime); )
+	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_commit(client,id,stoptime); )
 }
 
-INT64_T chirp_reli_job_kill (const char *host, const char *json, time_t stoptime)
+INT64_T chirp_reli_job_kill (const char *host, chirp_jobid_t id, time_t stoptime)
 {
-	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_kill(client,json,stoptime); )
+	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_kill(client,id,stoptime); )
 }
 
-INT64_T chirp_reli_job_status (const char *host, const char *json, char **status, time_t stoptime)
+INT64_T chirp_reli_job_status (const char *host, chirp_jobid_t id, char **status, time_t stoptime)
 {
-	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_status(client,json,status,stoptime); )
+	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_status(client,id,status,stoptime); )
 }
 
 INT64_T chirp_reli_job_wait (const char *host, chirp_jobid_t id, INT64_T timeout, char **status, time_t stoptime)
@@ -801,9 +801,9 @@ INT64_T chirp_reli_job_wait (const char *host, chirp_jobid_t id, INT64_T timeout
 	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_wait(client,id,timeout,status,stoptime); )
 }
 
-INT64_T chirp_reli_job_reap (const char *host, const char *json, time_t stoptime)
+INT64_T chirp_reli_job_reap (const char *host, chirp_jobid_t id, time_t stoptime)
 {
-	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_reap(client,json,stoptime); )
+	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_reap(client,id,stoptime); )
 }
 
 INT64_T chirp_reli_remote_debug( const char *host, const char *flag, time_t stoptime )

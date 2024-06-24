@@ -20,8 +20,6 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "list.h"
 #include "catalog_query.h"
-#include "json.h"
-#include "json_aux.h"
 #include "getopt_aux.h"
 #include "cctools.h"
 #include "xxmalloc.h"
