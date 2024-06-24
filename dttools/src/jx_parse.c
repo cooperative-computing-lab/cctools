@@ -108,7 +108,7 @@ void jx_parser_read_string(struct jx_parser *p, const char *str)
 	p->source_string_length = -1;
 }
 
-void jx_parser_read_string_and_length(struct jx_parser *p, const char *str, int length )
+void jx_parser_read_string_and_length(struct jx_parser *p, const char *str, int length)
 {
 	p->source_string = str;
 	p->source_string_length = length;
@@ -182,8 +182,8 @@ static int jx_getchar(struct jx_parser *p)
 
 	if (p->source_file) {
 		c = fgetc(p->source_file);
-	} else if (p->source_string ) {
-		if(p->source_string_length==-1) {
+	} else if (p->source_string) {
+		if (p->source_string_length == -1) {
 			/* processing a null terminated string */
 			c = *p->source_string;
 			if (c) {
@@ -193,7 +193,7 @@ static int jx_getchar(struct jx_parser *p)
 			}
 		} else {
 			/* processing a known length string */
-			if(p->source_string_length>0) {
+			if (p->source_string_length > 0) {
 				c = *p->source_string++;
 				p->source_string_length--;
 			} else {
