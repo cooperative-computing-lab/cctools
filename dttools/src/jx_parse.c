@@ -1197,6 +1197,13 @@ struct jx *jx_parse_string(const char *str)
 	return jx_parse_finish(p);
 }
 
+struct jx *jx_parse_string_and_length(const char *str, int length)
+{
+	struct jx_parser *p = jx_parser_create(false);
+	jx_parser_read_string_and_length(p, str, length);
+	return jx_parse_finish(p);
+}
+
 struct jx *jx_parse_link(struct link *l, time_t stoptime)
 {
 	struct jx_parser *p = jx_parser_create(false);
