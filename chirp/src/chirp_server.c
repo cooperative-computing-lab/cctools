@@ -1575,58 +1575,20 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				errno = EINVAL;
 				goto failure;
 			}
-		} else if(sscanf(line, "job_commit %" PRId64, &length) == 1) {
-			if ((length = getvarstring(l, stalltime, buffer, length, 0)) == -1)
+		} else if(sscanf(line, "job_commit %" PRICHIRP_JOBID_T, &id) == 1) {
+			debug(D_CHIRP, "--> job_commit %" PRICHIRP_JOBID_T,id);
+			result = chirp_job_commit(id, esubject);
+		} else if(sscanf(line, "job_kill %" PRICHIRP_JOBID_T, &id) == 1) {
+			debug(D_CHIRP, "--> job_kill %" PRICHIRP_JOBID_T,id);
+			result = chirp_job_kill(id, esubject);
+		} else if(sscanf(line, "job_status %" PRICHIRP_JOBID_T, &id) == 1) {
+			debug(D_CHIRP, "--> job_status %" PRICHIRP_JOBID_T, id);
+			result = chirp_job_status(id, esubject, B);
+			if (result) {
+				errno = result;
 				goto failure;
-			debug(D_CHIRP, "--> job_commit `%.*s'", (int)length, (char *)buffer);
-			struct jx *j = jx_parse_string_and_length(buffer, length);
-			if (j) {
-				result = chirp_job_commit(j, esubject);
-				jx_delete(j);
-				if (result) {
-					errno = result;
-					goto failure;
-				}
 			} else {
-				debug(D_DEBUG, "does not parse as json!");
-				errno = EINVAL;
-				goto failure;
-			}
-		} else if(sscanf(line, "job_kill %" PRId64, &length) == 1) {
-			if ((length = getvarstring(l, stalltime, buffer, length, 0)) == -1)
-				goto failure;
-			debug(D_DEBUG, "--> job_kill `%.*s'", (int)length, (char *)buffer);
-			struct jx *j = jx_parse_string_and_length(buffer, length);
-			if (j) {
-				result = chirp_job_kill(j, esubject);
-				jx_delete(j);
-				if (result) {
-					errno = result;
-					goto failure;
-				}
-			} else {
-				debug(D_DEBUG, "does not parse as json!");
-				errno = EINVAL;
-				goto failure;
-			}
-		} else if(sscanf(line, "job_status %" PRId64, &length) == 1) {
-			if ((length = getvarstring(l, stalltime, buffer, length, 0)) == -1)
-				goto failure;
-			debug(D_CHIRP, "--> job_status `%.*s'", (int)length, (char *)buffer);
-			struct jx *j = jx_parse_string_and_length(buffer, length);
-			if (j) {
-				result = chirp_job_status(j, esubject, B);
-				if (result) {
-					errno = result;
-					goto failure;
-				} else {
-					result = buffer_pos(B);
-				}
-				jx_delete(j);
-			} else {
-				debug(D_DEBUG, "does not parse as json!");
-				errno = EINVAL;
-				goto failure;
+				result = buffer_pos(B);
 			}
 		} else if(sscanf(line, "job_wait %" SCNCHIRP_JOBID_T " %" SCNd64, &id, &length) == 2) {
 			result = chirp_job_wait(id, esubject, length, B);
@@ -1636,23 +1598,9 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			} else {
 				result = buffer_pos(B);
 			}
-		} else if(sscanf(line, "job_reap %" PRId64, &length) == 1) {
-			if ((length = getvarstring(l, stalltime, buffer, length, 0)) == -1)
-				goto failure;
-			debug(D_DEBUG, "--> job_reap `%.*s'", (int)length, (char *)buffer);
-			struct jx *j = jx_parse_string_and_length(buffer, length);
-			if (j) {
-				result = chirp_job_reap(j, esubject);
-				jx_delete(j);
-				if (result) {
-					errno = result;
-					goto failure;
-				}
-			} else {
-				debug(D_DEBUG, "does not parse as json!");
-				errno = EINVAL;
-				goto failure;
-			}
+		} else if(sscanf(line, "job_reap %" PRICHIRP_JOBID_T, &id) == 1) {
+			debug(D_DEBUG, "--> job_reap %" PRICHIRP_JOBID_T, id);
+			result = chirp_job_reap(id, esubject);
 		} else {
 			errno = ENOSYS;
 			goto failure;

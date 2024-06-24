@@ -1060,18 +1060,18 @@ static INT64_T do_job_create(int argc, char **argv)
 
 static INT64_T do_job_commit(int argc, char **argv)
 {
-	return chirp_reli_job_commit(current_host, argv[1], stoptime);
+	return chirp_reli_job_commit(current_host, atoi(argv[1]), stoptime);
 }
 
 static INT64_T do_job_kill(int argc, char **argv)
 {
-	return chirp_reli_job_kill(current_host, argv[1], stoptime);
+	return chirp_reli_job_kill(current_host, atoi(argv[1]), stoptime);
 }
 
 static INT64_T do_job_status(int argc, char **argv)
 {
 	char *status;
-	INT64_T result = chirp_reli_job_status(current_host, argv[1], &status, stoptime);
+	INT64_T result = chirp_reli_job_status(current_host, atoi(argv[1]), &status, stoptime);
 	if (result > 0) {
 		fprintf(stdout, "%s\n", status);
 		free(status);
@@ -1097,7 +1097,7 @@ static INT64_T do_job_wait(int argc, char **argv)
 
 static INT64_T do_job_reap(int argc, char **argv)
 {
-	return chirp_reli_job_reap(current_host, argv[1], stoptime);
+	return chirp_reli_job_reap(current_host, atoi(argv[1]), stoptime);
 }
 
 
@@ -1160,7 +1160,7 @@ static struct command list[] = {
 	{"job_kill", 1, 1, 1, "<id>", do_job_kill},
 	{"job_status", 1, 1, 1, "<id>", do_job_status},
 	{"job_wait", 1, 1, 2, "<id> [timeout]", do_job_wait},
-	{"job_reap", 1, 1, 1, "<json>", do_job_reap},
+	{"job_reap", 1, 1, 1, "<id>", do_job_reap},
 	{0, 0, 0, 0, 0, 0},
 };
 

@@ -88,39 +88,27 @@ int64_t chirp_wrap_job_create (const char *host, const char *json, time_t stopti
 }
 
 
-int64_t chirp_wrap_job_commit (const char *host, const char *json, time_t stoptime)
+int64_t chirp_wrap_job_commit (const char *host, chirp_jobid_t id, time_t stoptime)
 {
-	int64_t result;
-	result = chirp_reli_job_commit(host, json, stoptime);
-
-	return result;
+	return chirp_reli_job_commit(host, id, stoptime);
 }
 
-
-int64_t chirp_wrap_job_kill (const char *host, const char *json, time_t stoptime)
+int64_t chirp_wrap_job_kill (const char *host, chirp_jobid_t id, time_t stoptime)
 {
-	int64_t result;
-	result = chirp_reli_job_kill(host, json, stoptime);
-
-	return result;
+	return chirp_reli_job_kill(host, id, stoptime);
 }
 
-
-int64_t chirp_wrap_job_reap (const char *host, const char *json, time_t stoptime)
+int64_t chirp_wrap_job_reap (const char *host, chirp_jobid_t id, time_t stoptime)
 {
-	int64_t result;
-	result = chirp_reli_job_reap(host, json, stoptime);
-
-	return result;
+	return chirp_reli_job_reap(host, id, stoptime);
 }
 
-
-char *chirp_wrap_job_status (const char *host, const char *json, time_t stoptime)
+char *chirp_wrap_job_status (const char *host, chirp_jobid_t id, time_t stoptime)
 {
 	char *status;
 
 	int64_t result;
-	result = chirp_reli_job_status(host, json, &status, stoptime);
+	result = chirp_reli_job_status(host, id, &status, stoptime);
 
 	if(result < 0)
 		return NULL;
