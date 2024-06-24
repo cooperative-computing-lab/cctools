@@ -6,7 +6,6 @@ See the file COPYING for details.
 
 #include "chirp_filesystem.h"
 #include "chirp_fs_local.h"
-#include "chirp_fs_local_scheduler.h"
 
 #include "catch.h"
 #include "compat-at.h"
@@ -1112,9 +1111,6 @@ struct chirp_filesystem chirp_fs_local = {
 #endif
 
 	chirp_fs_do_acl_check,
-
-	chirp_fs_local_job_dbinit,
-	chirp_fs_local_job_schedule,
 };
 
 /* vim: set noexpandtab tabstop=8: */

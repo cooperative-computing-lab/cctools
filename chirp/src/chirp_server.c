@@ -8,7 +8,6 @@
 #include "chirp_alloc.h"
 #include "chirp_audit.h"
 #include "chirp_filesystem.h"
-#include "chirp_fs_confuga.h"
 #include "chirp_group.h"
 #include "chirp_job.h"
 #include "chirp_protocol.h"
@@ -30,9 +29,9 @@
 #include "getopt_aux.h"
 #include "host_disk_info.h"
 #include "host_memory_info.h"
-#include "json.h"
 #include "jx.h"
 #include "jx_print.h"
+#include "jx_parse.h"
 #include "link.h"
 #include "list.h"
 #include "load_average.h"
@@ -957,13 +956,6 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		} else if(sscanf(line, "thirdput %s %s %s", path, chararg1, newpath) == 3) {
 			const char *hostname = chararg1;
 			path_fix(path);
-			if (cfs == &chirp_fs_confuga) {
-				/* Confuga cannot support thirdput because of auth problems,
-				 * see Authentication comment in chirp_receive.
-				 */
-				errno = EACCES;
-				goto failure;
-			}
 			/* ACL check will occur inside of chirp_thirdput */
 			result = chirp_thirdput(subject, path, hostname, newpath, stalltime);
 		} else if(sscanf(line, "open %s %s %" SCNd64, path, newpath, &mode) == 3) {
@@ -1569,10 +1561,10 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if ((length = getvarstring(l, stalltime, buffer, length, 0)) == -1)
 				goto failure;
 			debug(D_CHIRP, "--> job_create `%.*s'", (int)length, (char *)buffer);
-			json_value *J = json_parse(buffer, length);
-			if (J) {
-				result = chirp_job_create(&id, J, esubject);
-				json_value_free(J);
+			struct jx *j = jx_parse_string_and_length(buffer, length);
+			if (j) {
+				result = chirp_job_create(&id, j, esubject);
+				jx_delete(j);
 				if (result) {
 					errno = result;
 					goto failure;
@@ -1587,10 +1579,10 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if ((length = getvarstring(l, stalltime, buffer, length, 0)) == -1)
 				goto failure;
 			debug(D_CHIRP, "--> job_commit `%.*s'", (int)length, (char *)buffer);
-			json_value *J = json_parse(buffer, length);
-			if (J) {
-				result = chirp_job_commit(J, esubject);
-				json_value_free(J);
+			struct jx *j = jx_parse_string_and_length(buffer, length);
+			if (j) {
+				result = chirp_job_commit(j, esubject);
+				jx_delete(j);
 				if (result) {
 					errno = result;
 					goto failure;
@@ -1604,10 +1596,10 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if ((length = getvarstring(l, stalltime, buffer, length, 0)) == -1)
 				goto failure;
 			debug(D_DEBUG, "--> job_kill `%.*s'", (int)length, (char *)buffer);
-			json_value *J = json_parse(buffer, length);
-			if (J) {
-				result = chirp_job_kill(J, esubject);
-				json_value_free(J);
+			struct jx *j = jx_parse_string_and_length(buffer, length);
+			if (j) {
+				result = chirp_job_kill(j, esubject);
+				jx_delete(j);
 				if (result) {
 					errno = result;
 					goto failure;
@@ -1621,16 +1613,16 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if ((length = getvarstring(l, stalltime, buffer, length, 0)) == -1)
 				goto failure;
 			debug(D_CHIRP, "--> job_status `%.*s'", (int)length, (char *)buffer);
-			json_value *J = json_parse(buffer, length);
-			if (J) {
-				result = chirp_job_status(J, esubject, B);
+			struct jx *j = jx_parse_string_and_length(buffer, length);
+			if (j) {
+				result = chirp_job_status(j, esubject, B);
 				if (result) {
 					errno = result;
 					goto failure;
 				} else {
 					result = buffer_pos(B);
 				}
-				json_value_free(J);
+				jx_delete(j);
 			} else {
 				debug(D_DEBUG, "does not parse as json!");
 				errno = EINVAL;
@@ -1648,10 +1640,10 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if ((length = getvarstring(l, stalltime, buffer, length, 0)) == -1)
 				goto failure;
 			debug(D_DEBUG, "--> job_reap `%.*s'", (int)length, (char *)buffer);
-			json_value *J = json_parse(buffer, length);
-			if (J) {
-				result = chirp_job_reap(J, esubject);
-				json_value_free(J);
+			struct jx *j = jx_parse_string_and_length(buffer, length);
+			if (j) {
+				result = chirp_job_reap(j, esubject);
+				jx_delete(j);
 				if (result) {
 					errno = result;
 					goto failure;
@@ -1755,17 +1747,14 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 
 		downgrade(); /* downgrade privileges after authentication */
 
-		/* See above comment concerning authentication. */
-		if (cfs != &chirp_fs_confuga) {
-			/* Enable only globus, hostname, and address authentication for third-party transfers. */
-			auth_clear();
-			if(auth_globus_has_delegated_credential()) {
-				auth_globus_use_delegated_credential(1);
-				auth_globus_register();
-			}
-			auth_hostname_register();
-			auth_address_register();
+		/* Enable only globus, hostname, and address authentication for third-party transfers. */
+		auth_clear();
+		if(auth_globus_has_delegated_credential()) {
+			auth_globus_use_delegated_credential(1);
+			auth_globus_register();
 		}
+		auth_hostname_register();
+		auth_address_register();
 
 		change_process_title("chirp_server [%s:%d] [%s]", addr, port, typesubject);
 

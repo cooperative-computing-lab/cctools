@@ -11,7 +11,6 @@ See the file COPYING for details.
 #include "chirp_fs_chirp.h"
 #include "chirp_fs_hdfs.h"
 #include "chirp_fs_local.h"
-#include "chirp_fs_confuga.h"
 
 #include "debug.h"
 #include "macros.h"
@@ -64,8 +63,6 @@ struct chirp_filesystem *cfs_lookup(const char *url)
 		return &chirp_fs_chirp;
 	} else if(strprfx(url, "hdfs://")) {
 		return &chirp_fs_hdfs;
-	} else if(strprfx(url, "confuga://")) {
-		return &chirp_fs_confuga;
 	} else {
 		/* always interpret as a local url */
 		return &chirp_fs_local;
@@ -81,11 +78,6 @@ void cfs_normalize(char url[CHIRP_PATH_MAX])
 		return;
 	} else if(strprfx(url, "hdfs:")) {
 		return;
-	} else if(pattern_match(url, "^confuga://([^?]*)(.*)", &root, &rest) >= 0) {
-		char absolute[PATH_MAX];
-		path_absolute(root, absolute, 0);
-		debug(D_CHIRP, "normalizing url `%s' as `confuga://%s%s'", url, absolute, rest);
-		string_nformat(url, CHIRP_PATH_MAX, "confuga://%s%s", absolute, rest);
 	} else {
 		char absolute[PATH_MAX];
 		if(strprfx(url, "file:") || strprfx(url, "local:"))
@@ -905,16 +897,6 @@ INT64_T cfs_stub_lremovexattr(const char *path, const char *name)
 {
 	errno = ENOSYS;
 	return -1;
-}
-
-int cfs_stub_job_dbinit(sqlite3 * db)
-{
-	return ENOSYS;
-}
-
-int cfs_stub_job_schedule(sqlite3 * db)
-{
-	return ENOSYS;
 }
 
 /* vim: set noexpandtab tabstop=8: */
