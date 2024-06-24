@@ -172,11 +172,21 @@ static int batch_job_wq_remove (struct batch_queue *q, batch_job_id_t jobid)
 	return 0;
 }
 
-static int batch_queue_wq_create (struct batch_queue *q)
+static int batch_queue_wq_create (struct batch_queue *q )
 {
 	strncpy(q->logfile, "wq.log", sizeof(q->logfile));
-	if ((q->wq_manager = work_queue_create(0)) == NULL)
-		return -1;
+
+	const char *ssl_key_file = batch_queue_get_option(q,"ssl_key_file");
+	const char *ssl_cert_file = batch_queue_get_option(q,"ssl_cert_file");
+	
+	if(ssl_key_file && ssl_cert_file) {
+		q->wq_manager = work_queue_ssl_create(0,ssl_key_file,ssl_cert_file);
+	} else {
+		q->wq_manager = work_queue_create(0);
+	}
+
+	if(!q->wq_manager) return -1;
+
 	work_queue_enable_process_module(q->wq_manager);
 	batch_queue_set_feature(q, "absolute_path", NULL);
 	batch_queue_set_feature(q, "remote_rename", "%s=%s");

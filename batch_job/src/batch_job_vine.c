@@ -181,11 +181,21 @@ static int batch_job_vine_remove (struct batch_queue *q, batch_job_id_t jobid)
 	return 0;
 }
 
-static int batch_queue_vine_create (struct batch_queue *q)
+static int batch_queue_vine_create (struct batch_queue *q )
 {
 	strncpy(q->logfile, "vine.log", sizeof(q->logfile));
-	if ((q->tv_manager = vine_create(0)) == NULL)
-		return -1;
+
+	const char *ssl_key_file = batch_queue_get_option(q,"ssl_key_file");
+	const char *ssl_cert_file = batch_queue_get_option(q,"ssl_cert_file");
+	
+	if(ssl_key_file && ssl_cert_file) {
+		q->tv_manager = vine_ssl_create(0,ssl_key_file,ssl_cert_file);
+	} else {
+		q->tv_manager = vine_create(0);
+	}
+
+	if(!q->tv_manager) return -1;
+
 	vine_manager_enable_process_shortcut(q->tv_manager);
 	batch_queue_set_feature(q, "absolute_path", NULL);
 	batch_queue_set_feature(q, "remote_rename", "%s=%s");

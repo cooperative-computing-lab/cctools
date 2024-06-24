@@ -80,9 +80,11 @@ void batch_job_info_delete(struct batch_job_info *info);
 
 /** Create a new batch queue.
 @param type The type of the queue.
+@param ssl_key_file The location of the queue manager's ssl key file, if it has one.
+@param ssl_key_file The location of the queue manager's ssl certiciate file, if it has one.
 @return A new batch queue object on success, null on failure.
 */
-struct batch_queue *batch_queue_create(batch_queue_type_t type);
+struct batch_queue *batch_queue_create(batch_queue_type_t type, const char *ssl_key_file, const char *ssl_cert_file );
 
 /** Submit a batch job.
 @param q The queue to submit to.

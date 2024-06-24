@@ -1648,7 +1648,7 @@ int main(int argc, char *argv[])
 	signal(SIGTERM, handle_abort);
 	signal(SIGHUP, ignore_signal);
 
-	queue = batch_queue_create(batch_queue_type);
+	queue = batch_queue_create(batch_queue_type,0,0);
 	if(!queue) {
 		fprintf(stderr,"vine_factory: couldn't establish queue type %s",batch_queue_type_to_string(batch_queue_type));
 		return 1;

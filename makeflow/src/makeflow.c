@@ -262,6 +262,13 @@ Options related to TLQ debugging
 static int tlq_port = 0;
 
 /*
+Location of SSL key and cert for use by TaskVine or Work Queue
+*/
+
+static char *ssl_key_file = 0;
+static char *ssl_cert_file = 0;
+
+/*
 If enabled, then all environment variables are sent
 from the submission site to the job execution site.
 */
@@ -1504,6 +1511,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_SINGULARITY,
 		LONG_OPT_SINGULARITY_OPT,
 		LONG_OPT_SHARED_FS,
+		LONG_OPT_SSL_KEY,
+		LONG_OPT_SSL_CERT,
 		LONG_OPT_ARCHIVE,
 		LONG_OPT_ARCHIVE_S3,
 		LONG_OPT_ARCHIVE_S3_NO_CHECK,
@@ -1583,6 +1592,8 @@ int main(int argc, char *argv[])
 		{"send-environment", no_argument, 0, LONG_OPT_SEND_ENVIRONMENT},
 		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
 		{"show-output", no_argument, 0, 'O'}, // Deprecated
+		{"ssl-key", required_argument, 0, LONG_OPT_SSL_KEY},
+		{"ssl-cert", required_argument, 0, LONG_OPT_SSL_CERT},
 		{"storage-type", required_argument, 0, LONG_OPT_STORAGE_TYPE},
 		{"storage-limit", required_argument, 0, LONG_OPT_STORAGE_LIMIT},
 		{"storage-print", required_argument, 0, LONG_OPT_STORAGE_PRINT},
@@ -1932,6 +1943,12 @@ int main(int argc, char *argv[])
 				if(!jx_lookup(hook_args, "shared_fs_list"))
 					jx_insert(hook_args, jx_string("shared_fs_list"),jx_array(NULL));
 				jx_array_append(jx_lookup(hook_args, "shared_fs_list"), jx_string(optarg));
+				break;
+			case LONG_OPT_SSL_KEY:
+				ssl_key_file = optarg;
+				break;
+			case LONG_OPT_SSL_CERT:
+				ssl_cert_file = optarg;
 				break;
 			case LONG_OPT_STORAGE_TYPE:
 				if (makeflow_hook_register(&makeflow_hook_storage_allocation, &hook_args) == MAKEFLOW_HOOK_FAILURE)
@@ -2341,7 +2358,7 @@ int main(int argc, char *argv[])
 
 	printf("max running local jobs: %d\n",local_jobs_max);
 
-	remote_queue = batch_queue_create(batch_queue_type);
+	remote_queue = batch_queue_create(batch_queue_type,ssl_key_file,ssl_cert_file);
 	if(!remote_queue) {
 		fprintf(stderr, "makeflow: couldn't create batch queue.\n");
 		if(port != 0)
@@ -2417,7 +2434,7 @@ int main(int argc, char *argv[])
 	if(!batch_queue_supports_feature(remote_queue, "local_job_queue")) {
 		local_queue = 0;
 	} else {
-		local_queue = batch_queue_create(BATCH_QUEUE_TYPE_LOCAL);
+		local_queue = batch_queue_create(BATCH_QUEUE_TYPE_LOCAL,0,0);
 		if(!local_queue) {
 			fatal("couldn't create local job queue.");
 		}
