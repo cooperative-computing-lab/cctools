@@ -783,6 +783,26 @@ $ makeflow --password mypwfile ...
 $ vine_worker --password mypwfile ...
 ```
 
+### SSL Encryption
+
+We also recommend the use of SSL for encrypting the manager-worker connection
+when operating on a wide area network.
+
+If you do not have a key and certificate at hand, but you want the
+communications to be encrypted, you can create your own key and certificate like this:
+
+```sh
+openssl req -x509 -newkey rsa:4096 -keyout MY_KEY.pem -out MY_CERT.pem -sha256 -days 365 -nodes
+```
+
+To activate SSL encryption, indicate the paths to the key and certificate when
+running `makeflow` as well as the workers:
+
+```sh
+$ makeflow --ssl-key MY_KEY.pem --ssl-cert MY_CERT.pem ...
+$ vine_worker --ssl ...
+```
+
 ## Container Environments
 
 Makeflow can interoperate with a variety of container technologies, including
