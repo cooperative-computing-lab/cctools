@@ -5,6 +5,9 @@ import yaml
 
 def load_and_preprocess_config(filepath):
     """Loads and preprocesses configuration from a YAML file."""
+    if filepath is None or not os.path.exists(filepath):
+        return None
+
     with open(filepath, 'r') as file:
         config = yaml.safe_load(file)
 
@@ -88,4 +91,3 @@ def topological_sort(programs):
         dfs(program)
     print(f"DEBUG: Topological sort result: {stack}")
     return stack
-

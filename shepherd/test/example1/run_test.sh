@@ -2,6 +2,6 @@
 
 echo "Starting test ..."
 
-python ../../src/main.py program-config.yml
+python ../../src/shepherd.py program-config.yml
 
 echo "Completed test"
