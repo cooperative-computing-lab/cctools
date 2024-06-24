@@ -10,8 +10,6 @@ See the file COPYING for details.
 #include "list.h"
 #include "makeflow_summary.h"
 #include "catalog_query.h"
-#include "json.h"
-#include "json_aux.h"
 #include "username.h"
 #include "batch_job.h"
 #include "jx_print.h"
