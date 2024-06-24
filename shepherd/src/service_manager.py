@@ -84,7 +84,8 @@ class ServiceManager:
     def check_stop_conditions(self, start_time):
         print("DEBUG: Checking stop conditions")
         while not self.stop_event.is_set():
-            if self.check_stop_signal_file() or self.check_max_run_time(start_time):
+            if (self.check_stop_signal_file()
+                    or self.check_max_run_time(start_time) or self.check_all_services_final()):
                 self.stop_event.set()
             else:
                 self.stop_event.wait(timeout=1)
@@ -135,3 +136,9 @@ class ServiceManager:
                 print("Maximum runtime exceeded. Stopping all services.")
                 return True
         return False
+
+    def check_all_services_final(self):
+        for state in self.state_dict.values():
+            if state != 'final':
+                return False
+        return True
