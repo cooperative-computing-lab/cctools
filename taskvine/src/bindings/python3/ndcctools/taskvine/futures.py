@@ -3,6 +3,11 @@ from . import cvine
 import hashlib
 from concurrent.futures import Executor
 from concurrent.futures import Future
+from concurrent.futures import FIRST_COMPLETED
+from concurrent.futures import FIRST_EXCEPTION
+from concurrent.futures import ALL_COMPLETED
+from concurrent.futures import TimeoutError
+from collections import namedtuple
 from .task import (
     PythonTask,
     FunctionCall,
@@ -15,6 +20,7 @@ from .manager import (
 )
 
 import os
+import time
 import textwrap
 
 try:
@@ -29,6 +35,109 @@ except Exception:
 # To be installed in the library for FutureFunctionCalls
 def retrieve_output(arg):
     return arg
+
+
+def wait(fs, timeout=None, return_when=ALL_COMPLETED):
+
+    results = namedtuple('result', ['done', 'not_done'])
+    results.done = set()
+    results.not_done = set()
+
+    # submit tasks if they have not been subitted
+    for f in fs:
+        if not f._task._is_submitted:
+            f.module_manager.submit(f._task)
+
+    time_init = time.time()
+    if timeout is None:
+        time_check = float('inf')
+    else:
+        time_check = timeout
+    done = False
+    while time.time() - time_init < time_check and not done:
+        done = True
+        for f in fs:
+
+            # skip if future is complete
+            if f in results.done:
+                continue
+
+            # check for completion
+            result = f.result(timeout=5)
+
+            # add to set of finished tasks and break when needed.
+            if result is not None:
+                results.done.add(f)
+
+                # if this is the first completed task, break.
+                if return_when == FIRST_COMPLETED:
+                    done = True
+                    break
+
+            if isinstance(result, Exception) and return_when == FIRST_EXCEPTION:
+                done = True
+                break
+
+            # set done to false to finish loop.
+            else:
+                done = False
+
+            # check form timeout
+            if timeout is not None:
+                if time.time() - time_init > timeout:
+                    break
+
+    # add incomplete futures to set
+    for f in fs:
+        if f not in results.done:
+            results.not_done.add(f)
+
+    return results
+
+
+def as_completed(fs, timeout=None):
+
+    results = set()
+
+    # submit tasks if they have not been subitted
+    for f in fs:
+        if not f._task._is_submitted:
+            f.module_manager.submit(f._task)
+
+    time_init = time.time()
+    if timeout is None:
+        time_check = float('inf')
+    else:
+        time_check = timeout
+
+    done = False
+    while time.time() - time_init < time_check and not done:
+        for f in fs:
+            done = True
+            # skip if future is complete
+            if f in results:
+                continue
+
+            # check for completion
+            result = f.result(timeout=5)
+
+            # add to set of finished tasks
+            if result is not None:
+                results.add(f)
+
+            # set done to false to finish loop.
+            else:
+                done = False
+
+            # check form timeout
+            if timeout is not None:
+                if time.time() - time_init > timeout:
+                    break
+    for f in fs:
+        if f not in results:
+            results.add(TimeoutError)
+
+    return iter(results)
 
 
 ##
@@ -156,6 +265,7 @@ class VineFuture(Future):
 class FutureFunctionCall(FunctionCall):
     def __init__(self, manager, is_retriever, library_name, fn, *args, **kwargs):
         super().__init__(library_name, fn, *args, **kwargs)
+        self._is_submitted = False
         self.enable_temp_output()
         self.manager = manager
         self.library_name = library_name
@@ -187,7 +297,10 @@ class FutureFunctionCall(FunctionCall):
         if not self._is_retriever:
             if self._saved_output:
                 return self._saved_output
-            self._saved_output = self._retriever.output(timeout=timeout)
+            result = self._retriever.output(timeout=timeout)
+            if result is None:
+                return result
+            self._saved_output = result
             if not self._ran_functions:
                 for fn in self._future._callback_fns:
                     fn(self._future)
@@ -200,6 +313,8 @@ class FutureFunctionCall(FunctionCall):
                 result = self._manager.wait_for_task_id(self.id, timeout=timeout)
                 if result:
                     self._has_retrieved = True
+                else:
+                    return None
             if not self._saved_output and self._has_retrieved:
                 if self.successful():
                     try:
@@ -233,6 +348,7 @@ class FutureFunctionCall(FunctionCall):
                 new_fn_args.append(arg)
         self._event['fn_args'] = tuple(new_fn_args)
 
+        self._is_submitted = True
         super().submit_finalize()
 
     def __del__(self):
@@ -258,6 +374,7 @@ class FuturePythonTask(PythonTask):
     def __init__(self, manager, rf, func, *args, **kwargs):
         super(FuturePythonTask, self).__init__(func, *args, **kwargs)
         self.enable_temp_output()
+        self._is_submitted = False
         self._module_manager = manager
         self._future = VineFuture(self)
         self._envs = []
@@ -279,7 +396,10 @@ class FuturePythonTask(PythonTask):
 
         if not self._is_retriever:
             if not self._output_loaded:
-                self._output = self._retriever._future.result(timeout=timeout)
+                result = self._retriever._future.result(timeout=timeout)
+                if result is None:
+                    return None
+                self._output = result
                 self._output_loaded = True
             if not self._ran_functions:
                 for fn in self._future._callback_fns:
@@ -292,6 +412,8 @@ class FuturePythonTask(PythonTask):
                 result = self._module_manager.wait_for_task_id(self.id, timeout=timeout)
                 if result:
                     self._has_retrieved = True
+                else:
+                    return None
             if not self._output_loaded and self._has_retrieved:
                 if self.successful():
                     try:
@@ -324,6 +446,7 @@ class FuturePythonTask(PythonTask):
 
         args = new_fn_args
         self._fn_def = (func, args, kwargs)
+        self._is_submitted = True
 
         super().submit_finalize()
 
