@@ -196,7 +196,10 @@ static int batch_queue_vine_create (struct batch_queue *q )
 
 	if(!q->tv_manager) return -1;
 
+	vine_set_property(q->tv_manager,"framework","makeflow");
+	
 	vine_manager_enable_process_shortcut(q->tv_manager);
+
 	batch_queue_set_feature(q, "absolute_path", NULL);
 	batch_queue_set_feature(q, "remote_rename", "%s=%s");
 	batch_queue_set_feature(q, "batch_log_name", "%s.vine.log");
