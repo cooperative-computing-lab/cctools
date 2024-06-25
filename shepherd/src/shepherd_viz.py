@@ -29,7 +29,43 @@ def generate_state_times_graph(state_transition, output_prefix, output_format='p
 
 
 def generate_state_transition_graph(config, state_transition, output_prefix, output_format='png'):
-    pass
+    output_filename = output_prefix + '_workflow_transition'
+
+    dot = Digraph(comment='Workflow Visualization')
+
+    colors = {
+        'service': 'lightblue',
+        'action': 'lightblue',
+    }
+
+    # Add subgraphs for each service with their state transitions
+    for service, details in config['services'].items():
+        service_type = details.get('type', 'action')  # Default to 'action' if type is not specified
+        node_color = colors.get(service_type, 'lightgrey')  # Default color if no specific type is found
+
+        with dot.subgraph(name=f'cluster_{service}') as sub:
+            sub.attr(style='filled', color='lightgrey')
+            sub.node_attr.update(style='filled', color=node_color)
+            states = state_transition.get(service, {})
+
+            # Add nodes for each state
+            for state, time in states.items():
+                sub.node(f'{service}_{state}', f'{state}\n{time:.2f}s')
+
+            # Add edges between states
+            state_list = list(states.keys())
+            for i in range(len(state_list) - 1):
+                sub.edge(f'{service}_{state_list[i]}', f'{service}_{state_list[i + 1]}')
+
+            sub.attr(label=service)
+
+    # Add edges based on dependencies
+    for service, details in config['services'].items():
+        dependencies = details.get('dependency', {}).get('items', {})
+        for dep, state in dependencies.items():
+            dot.edge(f'{dep}_{state}', f'{service}_started', label=f'{dep} {state}')
+
+    return render_dot(dot.source, output_filename, output_format)
 
 
 def generate_workflow_graph(config, output_prefix, output_format='png'):
