@@ -1,0 +1,27 @@
+services:
+  program1:
+    command: "./program1.sh"
+    state:
+      log:
+        ready: "program is ready"
+        complete: "program is completed"
+  program2:
+    command: "./program2.sh"
+    state:
+      log:
+        ready: "program is ready"
+        complete: "program is completed"
+    dependency:
+      mode: "all"
+      items:
+        program1: "ready"
+        program3: "complete"
+  program3:
+    command: "./program3.sh"
+    state:
+      log:
+        ready: "program is ready"
+        complete: "program is completed"
+output:
+  state_times: "state_transition_times.json"
+max_run_time: 120

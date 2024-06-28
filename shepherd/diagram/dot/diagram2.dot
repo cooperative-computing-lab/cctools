@@ -1,0 +1,30 @@
+digraph {
+	reserve_port [label="Reserve Port" shape=box style=filled]
+	reserve_port -> chmod_port_config [label="Ports Reserved"]
+	chmod_port_config [label="Chmod Port Config" shape=box style=filled]
+	chmod_port_config -> copy_ports_config [label="Permissions Set"]
+	copy_ports_config [label="Copy Ports Config" shape=box style=filled]
+	chmod_port_config -> gazebo_server [label="Config Copied"]
+	gazebo_server [label="Start Gazebo Server" shape=box style=filled]
+	gazebo_server -> px4_instance_0 [label="Gazebo Ready"]
+	px4_instance_0 [label="PX4 Instance 0" shape=box style=filled]
+	px4_instance_0 -> spawn_model_0 [label="Waiting For Simulator"]
+	spawn_model_0 [label="Spawn Model 0" shape=box style=filled]
+	gazebo_server -> px4_instance_1 [label="Gazebo Ready"]
+	px4_instance_1 [label="PX4 Instance 1" shape=box style=filled]
+	px4_instance_1 -> spawn_model_1 [label="Waiting For Simulator"]
+	
+	spawn_model_1 [label="Spawn Model 1" shape=box style=filled]
+	gazebo_server -> px4_instance_2 [label="Gazebo Ready"]
+	
+	px4_instance_2 [label="PX4 Instance 2" shape=box style=filled]
+	px4_instance_2 -> spawn_model_2 [label="Waiting For Simulator"]
+	
+	spawn_model_2 [label="Spawn Model 2" shape=box style=filled]
+	
+	pose_sender [label="Start Pose Sender" shape=box style=filled]
+	
+	px4_instance_0 -> pose_sender [label="Ready"]
+	px4_instance_1 -> pose_sender [label="Ready"]
+	px4_instance_2 -> pose_sender [label="Ready"]
+}

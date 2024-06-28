@@ -1,0 +1,49 @@
+// Workflow Visualization
+digraph {
+	subgraph cluster_service1 {
+		node [color=lightblue style=filled]
+		color=lightgrey style=filled
+// 		service1_initialized [label="initialized"]
+		service1_started [label="started"]
+		service1_ready [label="ready"]
+		service1_custom_state [label="running"]
+		service1_stopped [label="stopped"]
+// 		service1_initialized -> service1_started
+		service1_started -> service1_ready
+		service1_ready -> service1_custom_state
+		service1_custom_state -> service1_stopped
+		label=service1
+	}
+	subgraph cluster_service2 {
+		node [color=lightblue style=filled]
+		color=lightgrey style=filled
+// 		service2_initialized [label="initialized"]
+		service2_started [label="started"]
+		service2_ready [label="ready"]
+		service2_custom_state [label="running"]
+		service2_stopped [label="stopped"]
+
+// 		service2_initialized -> service2_started
+		service2_started -> service2_ready
+		service2_ready -> service2_custom_state
+		service2_custom_state -> service2_stopped
+
+		label=service2
+	}
+	subgraph cluster_service3 {
+		node [color=lightblue style=filled]
+		color=lightgrey style=filled
+// 		service3_initialized [label="initialized"]
+		service3_started [label="started"]
+		service3_ready [label="ready"]
+		service3_custom_state [label="running"]
+		service3_stopped [label="stopped"]
+// 		service3_initialized -> service3_started
+		service3_started -> service3_ready
+		service3_ready -> service3_custom_state
+		service3_custom_state -> service3_stopped
+		label=service3
+	}
+	service1_ready -> service3_started [label="service1 ready"]
+	service2_ready -> service3_started [label="service2 ready"]
+}
