@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-from config_loader import load_and_preprocess_config
-
 import os
 import argparse
 import json
 import matplotlib.pyplot as plt
 import numpy as np
 from graphviz import Digraph, Source
+
+from shepherd.config_loader import load_and_preprocess_config
 
 
 def load_json_from_file(filename):

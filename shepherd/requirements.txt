@@ -3,4 +3,4 @@ jinja2
 graphviz
 matplotlib
 pandas
-seaborn
+numpy

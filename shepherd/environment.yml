@@ -5,9 +5,5 @@ channels:
 dependencies:
   - python=3.11
   - pip
-  - pyyaml
-  - graphviz
-  - matplotlib
-  - seaborn
-#  - pip:
-#    - -r requirements.txt
+  - pip:
+      - -r requirements.txt

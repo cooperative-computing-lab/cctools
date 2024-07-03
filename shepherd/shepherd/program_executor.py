@@ -3,14 +3,18 @@ import signal
 import subprocess
 import threading
 import time
+import logging
 
-from log_monitor import monitor_log_file
+from shepherd.log_monitor import monitor_log_file
+from shepherd.logging_setup import setup_logging
 
 
 def execute_program(config, working_dir, state_dict, service_name, cond, state_times, start_time, pgid_dict,
-                    stop_event):
+                    stop_event, logging_queue):
+    setup_logging(logging_queue)
+
     def signal_handler(signum, frame):
-        print(f"Received signal {signum} in {service_name}")
+        logging.debug(f"Received signal {signum} in {service_name}")
         stop_event.set()
 
     signal.signal(signal.SIGINT, signal_handler)
@@ -57,7 +61,7 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
                 cond.notify_all()
             return
 
-        print(f"DEBUG: Starting execution of '{service_type}' {service_name}")
+        logging.debug(f"Starting execution of '{service_type}' {service_name}")
 
         with cond:
             state_dict[service_name] = "started"
@@ -91,7 +95,7 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
 
         return_code = process.returncode
 
-        print(f"Returned with code {return_code}")
+        logging.debug(f"Returned with code {return_code}")
 
         with cond:
             if stop_event.is_set() and return_code == -signal.SIGTERM:
@@ -100,14 +104,14 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
                 cond.notify_all()
 
         if service_type == 'service' and not stop_event.is_set():
-            print(f"DEBUG: Stopping execution of '{service_type}' {service_name}")
+            logging.debug(f"Stopping execution of '{service_type}' {service_name}")
 
             # If a service stops before receiving a stop event, mark it as failed
             with cond:
                 state_dict[service_name] = "failure"
                 update_state_time(service_name, "failure", start_time, state_times)
                 cond.notify_all()
-            print(f"ERROR: Service {service_name} stopped unexpectedly, marked as failure.")
+            logging.debug(f"ERROR: Service {service_name} stopped unexpectedly, marked as failure.")
 
         elif service_type == 'action':
             action_state = "action_success" if return_code == 0 else "action_failure"
@@ -129,9 +133,9 @@ def execute_program(config, working_dir, state_dict, service_name, cond, state_t
             file_monitor_thread.join()
 
     except Exception as e:
-        print(f"Exception in executing {service_name}: {e}")
+        logging.debug(f"Exception in executing {service_name}: {e}")
 
-    print(f"DEBUG: Finished execution of {service_name}")
+    logging.debug(f"Finished execution of {service_name}")
 
 
 def update_state_time(service_name, state, start_time, state_times):
@@ -141,4 +145,4 @@ def update_state_time(service_name, state, start_time, state_times):
     local_state_times[state] = current_time
     state_times[service_name] = local_state_times
 
-    print(f"DEBUG: Service '{service_name}' reached the state '{state}' at time {current_time:.3f}")
+    logging.debug(f"Service '{service_name}' reached the state '{state}' at time {current_time:.3f}")

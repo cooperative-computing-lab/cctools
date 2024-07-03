@@ -1,5 +1,5 @@
 import os
-
+import logging
 import yaml
 
 
@@ -13,7 +13,7 @@ def load_and_preprocess_config(filepath):
 
     preprocess_config(config, filepath)
 
-    print(f"DEBUG: Loaded and preprocessed config from {filepath}")
+    logging.debug(f"Loaded and preprocessed config from {filepath}")
     return config
 
 
@@ -44,7 +44,7 @@ def preprocess_config(config, config_path):
 
 
 def validate_and_sort_programs(config):
-    print("DEBUG: Validating and sorting programs")
+    logging.debug("Validating and sorting programs")
     required_keys = ['services']
 
     for key in required_keys:
@@ -60,12 +60,12 @@ def validate_and_sort_programs(config):
             raise ValueError(f"Program {service} is missing the 'stdout_path' key")
 
     sorted_services = topological_sort(services)
-    print(f"DEBUG: Sorted services: {sorted_services}")
+    logging.debug(f"Sorted services: {sorted_services}")
     return sorted_services
 
 
 def topological_sort(programs):
-    print("DEBUG: Performing topological sort")
+    logging.debug("Performing topological sort")
 
     graph = {program: details.get('dependency', {}).get('items', {}) for program, details in programs.items()}
 
@@ -89,5 +89,5 @@ def topological_sort(programs):
 
     for program in graph:
         dfs(program)
-    print(f"DEBUG: Topological sort result: {stack}")
+    logging.debug(f"Topological sort result: {stack}")
     return stack

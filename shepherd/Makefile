@@ -1,10 +1,11 @@
-# Variables
+#Todo: This file is incomplete
+
 CONFIG_PATH = test/bashapp/program-config.yml
 PYTHON = python3
 MAIN_SCRIPT = src/main.py
 PROGRAM_NAME = shepherd
-SRC_DIR=src
-SRC=config_loader.py log_monitor.py program_executor.py service_manager.py main.py
+SRC_DIR=shepherd
+SRC=config_loader.py log_monitor.py program_executor.py service_manager.py shepherd.py
 FLAGS =
 
 all: test

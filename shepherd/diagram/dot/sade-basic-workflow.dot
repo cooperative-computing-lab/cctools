@@ -1,7 +1,7 @@
 digraph {
 	reserve_port [label="Reserve Port" shape=box style=filled]
 	reserve_port -> chmod_port_config [label="Ports Reserved"]
-	chmod_port_config [label="Chmod Port Config" shape=box style=filled]
+	chmod_port_config [label="Change Permission of Port Config" shape=box style=filled]
 	chmod_port_config -> copy_ports_config [label="Permissions Set"]
 	copy_ports_config [label="Copy Ports Config" shape=box style=filled]
 	chmod_port_config -> gazebo_server [label="Config Copied"]

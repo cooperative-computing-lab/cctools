@@ -2,6 +2,7 @@ import os
 import re
 import sys
 
+# This is temporary file and should be removed
 
 def extract_imports(file_content, source_dir):
     """Extract import statements from the file content."""

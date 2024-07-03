@@ -22,7 +22,7 @@ def render_dot_file(dot_file_path, output_file_path, output_format='png'):
 
 if __name__ == "__main__":
     # Example usage
-    input_dot_file = "state.dot"  # Replace with your DOT file path
-    output_image_file = "states"  # Output file path without extension
+    input_dot_file = "shepherd-state-machine.dot"  # Replace with your DOT file path
+    output_image_file = "shepherd-state-machine"  # Output file path without extension
 
     render_dot_file(input_dot_file, output_image_file, output_format='svg')
