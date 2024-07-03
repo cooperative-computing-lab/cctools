@@ -97,9 +97,16 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 	}
 
 	int ok = 1;
-	if (worker_net_resources->disk.inuse + tr->disk > worker_net_resources->disk.total) { /* No overcommit disk */
+	if (((double)worker_net_resources->disk.inuse) + tr->disk >
+			(double)worker_net_resources->disk.total) { /* No overcommit disk */
 		ok = 0;
 	}
+
+	debug(D_VINE,
+			"comparing worker disk inuse vs task disk request %f : %f",
+			((double)w->resources->disk.inuse),
+			tr->disk);
+	debug(D_VINE, "Worker total disk %ld", w->resources->disk.total);
 
 	if ((tr->cores > worker_net_resources->cores.total) ||
 			(worker_net_resources->cores.inuse + tr->cores > overcommitted_resource_total(q, worker_net_resources->cores.total))) {

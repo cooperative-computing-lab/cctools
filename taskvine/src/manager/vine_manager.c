@@ -366,6 +366,10 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 
 		vine_txn_log_write_cache_update(q, w, size, transfer_time, start_time, cachename);
 
+		w->resources->disk.inuse += size / 1e6;
+
+		debug(D_VINE, "Worker disk in use currently %ld", w->resources->disk.inuse);
+
 		/* If the replica corresponds to a declared file. */
 
 		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
@@ -2582,6 +2586,8 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 			 * thus the proportion is modified by the current overcommit
 			 * multiplier */
 			limits->disk = MAX(1, MAX(limits->disk, floor(w->resources->disk.total * max_proportion / q->resource_submit_multiplier)));
+
+			debug(D_VINE, "disk limit set to %f", limits->disk);
 		}
 	}
 
@@ -2695,6 +2701,15 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 		w->resources->disk.inuse += box->disk;
 		w->resources->gpus.inuse += box->gpus;
 	}
+
+	char *cachename;
+	struct vine_file_replica *replica;
+	HASH_TABLE_ITERATE(w->current_files, cachename, replica)
+	{
+		w->resources->disk.inuse += ((double)replica->size) / 1e6;
+	}
+
+	debug(D_VINE, "worker disk usage %ld", w->resources->disk.inuse);
 }
 
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w)
