@@ -2583,7 +2583,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 			/* worker's disk is shared even among tasks that are not running,
 			 * thus the proportion is modified by the current overcommit
 			 * multiplier */
-			limits->disk = MAX(1, MAX(limits->disk, floor(w->resources->disk.total * max_proportion / q->resource_submit_multiplier)));
+			limits->disk = MAX(1, MAX(limits->disk, floor((w->resources->disk.total - w->resources->disk.inuse) * max_proportion / q->resource_submit_multiplier)));
 		}
 	}
 
