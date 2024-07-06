@@ -5,19 +5,24 @@ import time
 import logging
 import logging.config
 import logging.handlers
+import argparse
+
+import yaml
 
 from shepherd.service_manager import ServiceManager
 from shepherd.logging_setup import setup_logging, listener_process
 
-__version__ = "0.1.0"
 
 def main():
-    config_path = sys.argv[1]
+    parser = argparse.ArgumentParser(description='Run Shepherd Workflow Manager')
 
-    if len(sys.argv) > 2:
-        log_file = sys.argv[2]
-    else:
-        log_file = f"shepherd.{time.time()}.log"
+    parser.add_argument('--config', '-c', type=str, help='Path to the program config YAML file')
+    parser.add_argument('--log', '-l', type=str, default='shepherd.log', help='Path to the log file')
+
+    args = parser.parse_args()
+
+    config_path = args.config
+    log_file = args.log
 
     start_time = time.time()
 
