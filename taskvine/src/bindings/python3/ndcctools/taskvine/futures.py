@@ -6,6 +6,9 @@ from concurrent.futures import Future
 from concurrent.futures import FIRST_COMPLETED
 from concurrent.futures import FIRST_EXCEPTION
 from concurrent.futures import ALL_COMPLETED
+from concurrent.futures._base import PENDING
+from concurrent.futures._base import CANCELLED
+from concurrent.futures._base import FINISHED
 from concurrent.futures import TimeoutError
 from collections import namedtuple
 from .task import (
@@ -22,6 +25,8 @@ from .manager import (
 import os
 import time
 import textwrap
+
+RESULT_PENDING = 'result_pending'
 
 try:
     import cloudpickle
@@ -66,7 +71,7 @@ def wait(fs, timeout=None, return_when=ALL_COMPLETED):
             result = f.result(timeout=5)
 
             # add to set of finished tasks and break when needed.
-            if result is not None:
+            if result != RESULT_PENDING:
                 results.done.add(f)
 
                 # if this is the first completed task, break.
@@ -122,7 +127,7 @@ def as_completed(fs, timeout=None):
             result = f.result(timeout=5)
 
             # add to set of finished tasks
-            if result is not None:
+            if result != RESULT_PENDING:
                 results.add(f)
 
             # set done to false to finish loop.
@@ -219,11 +224,15 @@ class FuturesExecutor(Executor):
 # An instance of this class can re resolved to a value that will be computed asynchronously
 class VineFuture(Future):
     def __init__(self, task):
+        super().__init__()
+        self._state = PENDING
         self._task = task
         self._callback_fns = []
+        self._result = None
 
     def cancel(self):
         self._task._module_manager.cancel_by_task_id(self._task.id)
+        self._state = CANCELLED
 
     def cancelled(self):
         state = self._task._module_manager.task_state(self._task.id)
@@ -249,7 +258,13 @@ class VineFuture(Future):
     def result(self, timeout="wait_forever"):
         if timeout is None:
             timeout = "wait_forever"
-        return self._task.output(timeout=timeout)
+        result = self._task.output(timeout=timeout)
+        if result == RESULT_PENDING:
+            return RESULT_PENDING
+        else:
+            self._result = result
+            self._state = FINISHED
+            return result
 
     def add_done_callback(self, fn):
         self._callback_fns.append(fn)
@@ -298,8 +313,8 @@ class FutureFunctionCall(FunctionCall):
             if self._saved_output:
                 return self._saved_output
             result = self._retriever.output(timeout=timeout)
-            if result is None:
-                return result
+            if result is RESULT_PENDING:
+                return RESULT_PENDING
             self._saved_output = result
             if not self._ran_functions:
                 for fn in self._future._callback_fns:
@@ -314,7 +329,7 @@ class FutureFunctionCall(FunctionCall):
                 if result:
                     self._has_retrieved = True
                 else:
-                    return None
+                    return RESULT_PENDING
             if not self._saved_output and self._has_retrieved:
                 if self.successful():
                     try:
@@ -397,8 +412,8 @@ class FuturePythonTask(PythonTask):
         if not self._is_retriever:
             if not self._output_loaded:
                 result = self._retriever._future.result(timeout=timeout)
-                if result is None:
-                    return None
+                if result == RESULT_PENDING:
+                    return RESULT_PENDING
                 self._output = result
                 self._output_loaded = True
             if not self._ran_functions:
@@ -413,7 +428,7 @@ class FuturePythonTask(PythonTask):
                 if result:
                     self._has_retrieved = True
                 else:
-                    return None
+                    return RESULT_PENDING
             if not self._output_loaded and self._has_retrieved:
                 if self.successful():
                     try:
