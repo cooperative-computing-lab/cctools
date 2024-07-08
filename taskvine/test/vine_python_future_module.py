@@ -46,7 +46,7 @@ def main():
     c = executor.submit(t3)
     
     print("waiting for result...")
-    results = vine.futures.wait([t1, t2, t3])
+    results = vine.futures.wait([a, b, c])
     done = results.done
     not_done = result.not_done
     print(f"results = DONE: {done}\n NOT DONE: not_done")
@@ -67,7 +67,7 @@ def main():
     c = executor.submit(t3)
     
     print("waiting for result...")
-    results = vine.futures.as_completed([t1, t2, t3])
+    results = vine.futures.as_completed([a, b, c])
     print(f"results = {results}")
 
 if __name__ == "__main__":
