@@ -48,7 +48,7 @@ def main():
     print("waiting for result...")
     results = vine.futures.wait([a, b, c])
     done = results.done
-    not_done = result.not_done
+    not_done = results.not_done
     print(f"results = DONE: {done}\n NOT DONE: not_done")
 
     # Submit several tasks for as_completed function:
