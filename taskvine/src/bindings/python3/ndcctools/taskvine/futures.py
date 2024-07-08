@@ -50,7 +50,7 @@ def wait(fs, timeout=None, return_when=ALL_COMPLETED):
 
     # submit tasks if they have not been subitted
     for f in fs:
-        if not f._task._is_submitted:
+        if not f._is_submitted:
             f.module_manager.submit(f._task)
 
     time_init = time.time()
@@ -106,7 +106,7 @@ def as_completed(fs, timeout=None):
 
     # submit tasks if they have not been subitted
     for f in fs:
-        if not f._task._is_submitted:
+        if not f._is_submitted:
             f.module_manager.submit(f._task)
 
     time_init = time.time()
@@ -179,12 +179,16 @@ class FuturesExecutor(Executor):
     def submit(self, fn, *args, **kwargs):
         if isinstance(fn, FuturePythonTask):
             self.manager.submit(fn)
+            fn._future._is_submitted = True
             return fn._future
         if isinstance(fn, FutureFunctionCall):
             self.manager.submit(fn)
             self.task_table.append(fn)
+            fn._future._is_submitted = True
             return fn._future
         future_task = self.future_task(fn, *args, **kwargs)
+        self.task_table.append(future_task)
+        future_task._future._is_submitted = True
         self.submit(future_task)
         return future_task._future
 
@@ -229,6 +233,7 @@ class VineFuture(Future):
         self._task = task
         self._callback_fns = []
         self._result = None
+        self._is_submitted = False
 
     def cancel(self):
         self._task._module_manager.cancel_by_task_id(self._task.id)
@@ -280,7 +285,6 @@ class VineFuture(Future):
 class FutureFunctionCall(FunctionCall):
     def __init__(self, manager, is_retriever, library_name, fn, *args, **kwargs):
         super().__init__(library_name, fn, *args, **kwargs)
-        self._is_submitted = False
         self.enable_temp_output()
         self.manager = manager
         self.library_name = library_name
@@ -363,7 +367,6 @@ class FutureFunctionCall(FunctionCall):
                 new_fn_args.append(arg)
         self._event['fn_args'] = tuple(new_fn_args)
 
-        self._is_submitted = True
         super().submit_finalize()
 
     def __del__(self):
@@ -389,7 +392,6 @@ class FuturePythonTask(PythonTask):
     def __init__(self, manager, rf, func, *args, **kwargs):
         super(FuturePythonTask, self).__init__(func, *args, **kwargs)
         self.enable_temp_output()
-        self._is_submitted = False
         self._module_manager = manager
         self._future = VineFuture(self)
         self._envs = []
@@ -461,7 +463,6 @@ class FuturePythonTask(PythonTask):
 
         args = new_fn_args
         self._fn_def = (func, args, kwargs)
-        self._is_submitted = True
 
         super().submit_finalize()
 
