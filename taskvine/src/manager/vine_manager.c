@@ -2499,6 +2499,20 @@ static int build_poll_table(struct vine_manager *q)
 }
 
 /*
+ * Use declared dependencies to estimate the minimum disk requriement of a task
+ */
+static void vine_manager_estimate_task_disk_min(struct vine_manager *q, struct vine_task *t)
+{
+	int mb = 0;
+	struct vine_mount *m;
+	LIST_ITERATE(t->input_mounts, m)
+	{
+		mb += (m->file->size) / 1e6;
+	}
+	t->resources_requested->disk = mb;
+}
+
+/*
  * Determine the resources to allocate for a given task when assigned to a specific worker.
  * @param q The manager structure.
  * @param w The worker info structure.
@@ -2519,6 +2533,10 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		limits->disk = 0;
 		limits->gpus = 0;
 		return limits;
+	}
+
+	if (t->resources_requested->disk == -1) {
+		vine_manager_estimate_task_disk_min(q, t);
 	}
 
 	/* Compute the minimum and maximum resources for this task. */
