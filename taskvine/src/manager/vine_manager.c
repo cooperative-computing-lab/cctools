@@ -366,6 +366,8 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 
 		vine_txn_log_write_cache_update(q, w, size, transfer_time, start_time, cachename);
 
+		w->resources->disk.inuse += size / 1e6;
+
 		/* If the replica corresponds to a declared file. */
 
 		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
@@ -2497,6 +2499,22 @@ static int build_poll_table(struct vine_manager *q)
 }
 
 /*
+ * Use declared dependencies to estimate the minimum disk requriement of a task
+ */
+static void vine_manager_estimate_task_disk_min(struct vine_manager *q, struct vine_task *t)
+{
+	int mb = 0;
+	struct vine_mount *m;
+	LIST_ITERATE(t->input_mounts, m)
+	{
+		mb += (m->file->size) / 1e6;
+	}
+	if (mb > 0) {
+		t->resources_requested->disk = mb;
+	}
+}
+
+/*
  * Determine the resources to allocate for a given task when assigned to a specific worker.
  * @param q The manager structure.
  * @param w The worker info structure.
@@ -2517,6 +2535,10 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		limits->disk = 0;
 		limits->gpus = 0;
 		return limits;
+	}
+
+	if (t->resources_requested->disk < 0) {
+		vine_manager_estimate_task_disk_min(q, t);
 	}
 
 	/* Compute the minimum and maximum resources for this task. */
@@ -2581,7 +2603,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 			/* worker's disk is shared even among tasks that are not running,
 			 * thus the proportion is modified by the current overcommit
 			 * multiplier */
-			limits->disk = MAX(1, MAX(limits->disk, floor(w->resources->disk.total * max_proportion / q->resource_submit_multiplier)));
+			limits->disk = MAX(1, MAX(limits->disk, floor((w->resources->disk.total - w->resources->disk.inuse) * max_proportion / q->resource_submit_multiplier)));
 		}
 	}
 
@@ -2694,6 +2716,13 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 		w->resources->memory.inuse += box->memory;
 		w->resources->disk.inuse += box->disk;
 		w->resources->gpus.inuse += box->gpus;
+	}
+
+	char *cachename;
+	struct vine_file_replica *replica;
+	HASH_TABLE_ITERATE(w->current_files, cachename, replica)
+	{
+		w->resources->disk.inuse += ((double)replica->size) / 1e6;
 	}
 }
 
