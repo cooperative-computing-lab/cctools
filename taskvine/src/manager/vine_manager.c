@@ -2509,8 +2509,9 @@ static void vine_manager_estimate_task_disk_min(struct vine_manager *q, struct v
 	{
 		mb += (m->file->size) / 1e6;
 	}
-	if (mb > 0)
+	if (mb > 0) {
 		t->resources_requested->disk = mb;
+	}
 }
 
 /*
@@ -2536,7 +2537,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		return limits;
 	}
 
-	if (t->resources_requested->disk == -1) {
+	if (t->resources_requested->disk < 0) {
 		vine_manager_estimate_task_disk_min(q, t);
 	}
 

@@ -97,8 +97,7 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 	}
 
 	int ok = 1;
-	if (((double)worker_net_resources->disk.inuse) + tr->disk >
-			(double)worker_net_resources->disk.total) { /* No overcommit disk */
+	if (worker_net_resources->disk.inuse + tr->disk > worker_net_resources->disk.total) { /* No overcommit disk */
 		ok = 0;
 	}
 
