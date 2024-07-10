@@ -27,7 +27,7 @@ int gpu_count_get()
 	if (access(GPU_EXECUTABLE, X_OK) != 0)
 		return 0;
 
-	debug(D_DEBUG,"gpu_count_get: running \"%s\"\n",GPU_COUNT_COMMAND);
+	debug(D_DEBUG, "gpu_count_get: running \"%s\"\n", GPU_COUNT_COMMAND);
 
 	FILE *pipe = popen(GPU_COUNT_COMMAND, "r");
 	if (!pipe)
@@ -43,14 +43,14 @@ int gpu_count_get()
 	so we must check the exit status before declaring success.
 	*/
 
-	if(WIFEXITED(status) && WEXITSTATUS(status)==0) {
+	if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
 		if (fields == 1) {
 			return gpus;
 		} else {
 			return 0;
 		}
 	} else {
-		debug(D_DEBUG,"gpu_count_get: failed with status %d",WEXITSTATUS(status));
+		debug(D_DEBUG, "gpu_count_get: failed with status %d", WEXITSTATUS(status));
 		return 0;
 	}
 }
@@ -60,7 +60,7 @@ char *gpu_name_get()
 	if (access(GPU_EXECUTABLE, X_OK) != 0)
 		return 0;
 
-	debug(D_DEBUG,"gpu_name_get: running \"%s\"\n",GPU_NAME_COMMAND);
+	debug(D_DEBUG, "gpu_name_get: running \"%s\"\n", GPU_NAME_COMMAND);
 
 	FILE *pipe = popen(GPU_NAME_COMMAND, "r");
 	if (!pipe)
@@ -78,10 +78,10 @@ char *gpu_name_get()
 	so we must check the exit status before declaring success.
 	*/
 
-	if(WIFEXITED(status) && WEXITSTATUS(status)==0) {
+	if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
 		return gpu_name;
 	} else {
-		debug(D_DEBUG,"gpu_name_get: failed with status %d",WEXITSTATUS(status));
+		debug(D_DEBUG, "gpu_name_get: failed with status %d", WEXITSTATUS(status));
 		return 0;
 	}
 }
