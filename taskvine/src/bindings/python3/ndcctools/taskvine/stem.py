@@ -10,10 +10,12 @@ from multiprocessing import Pipe
 from multiprocessing.connection import wait
 
 class StemObject():
-    def __init__(self):
+    def __init__(self):        
         self._item_id = str(uuid.uuid1())
         self._chain_id = None
-        self.i = True
+
+        self._domain == "independant"
+        self._range == "independant"
         self.full_map = False
 
     
@@ -23,16 +25,12 @@ class StemObject():
         else:
             self._domain = from_domain
             self._range = to_range
-
-    @property
-    def i(self):
-        self.i = True
-        return i
+        return self
 
 class Chain(StemObject):
     """
     A chain is group of tasks or groups that are executed to be executed sequentially.
-    by default, running a singular group or seed eventually executes chain(group(seed))
+    by default, running a singular  seed eventually executes chain(group(seed))
     
     _chain - list of Seed and Group stem objects to execute sequentially
     _current_link - current StemObject (Seed or Group) currently being executed
@@ -42,7 +40,14 @@ class Chain(StemObject):
     _pending_chain_items - mapping from chain_ids to the chains pending items in the queue
     _manager_links - list of read connection fds in which the Stem checks for messages
     _managers - mapping of manager names to manager connection objects
-    _default_mgr - generated id of a default manager for a given chain, used if nno manager is specified during submission
+    _default_mgr - generated id of a default manager for a given chain, used if no manager is specified during submission
+
+    ------Mapping information------
+    _mapping - If True, map the last link's results to the next link's argumnets
+    _full_map - If True, map ALL results from the preivous link to the next link's arguments. Otherwise Domain -> Range mpping
+    _item_mapping - mapping of items within a group to their original indicie
+    _previous_results - list of results generated from previous group executed
+    _current_results - list of current results generated from activelty running group.
     
     """
     def __init__ (self, *args):
@@ -50,14 +55,21 @@ class Chain(StemObject):
         self._current_link = None
         self._current_items = {}
         self._waiting_items = {}
-        self._pending_chains = {}
-        self._pending_chain_items = {}
-        self._item_mapping = {}
         self._manager_links = []
         self._managers = {}
         self._default_mgr = str(uuid.uuid1())
+
+        self._mapping = False
+        self._full_map = False
+        self._item_mapping = {}
+        self._previous_results = []
+        self._current_results = []
     
-    
+        super()__init__()
+        self._popping = False
+        self._chain_mapping = {self._item_id:self}
+        
+
         # Add Stem Objects to the Chain. 
         # NOTE: the order of the objects determine execution order.
         # NOTE: Chains can not bee added to Chains. i.e. (Chain(Chain())) is invalid. However, Chain(Group(Chain)) is valid.
@@ -89,44 +101,52 @@ class Chain(StemObject):
         # When a Chain is called wirh run() it becomes the master chain.
         # The master chain maintains mappings of results from the previous link that has been executed
         # Additionally, the current links results are kept. This is used when mapping outputs to inputs between links 
-        self._master_item_mapping = {}
-        self._master_previous_results = []
-        self._master_current_results = []
-        while self.pop_link:
+        self._popping = True
+        while self.pop_link():
             link = self._current_link
             # Execution of a Group of Stem objects
             if isinstance(link, Group):
                 self.exec_group(link)
-                       
-            # Execution of a Single Seed object
+            # Execution of a Seed object
             elif isinstance(link, Seed):
-                self.exec_single_seed(link)
+                self.exec_seed(link)
 
     # Set _currrent_link to the next available link. Returns False if there are no more links            
     def pop_link(self):
         if self._chain:
             self._current_link = self._chain.pop(0)
-            return True
+            return self._current_link
         else:
-            return False
-        
+            return None
+    
+    def set_group(self, group):
+        count = 0
+        for item in group._group:
+            self._current_items[item._item_id] = item
+            self._item_mapping[item._item_id] = count
+            self._current_results.appeend(None)
+            item.chain_id = self._item_id
+            count += 1 
+        if group._domain != "idependent" and group._range != "independent":
+            self._mapping = True
+            if group._domain == "all" or group._range == "all":
+                self._full_map = True
+        else:
+            self._mapping = False
+
+    def exec_seed(self, seed):
+        grouped_seed = Group(seed)
+        grouped_seed.map(seed._domain, seed._range)
+        self._chain.insert(0, grouped_seed)
+
     # Execute a Group of Stem Objects.
     # NOTE: Each object can execute in Parallel
     # NOTE: When executing a SubChain, significant considerations need to be made.
     def exec_group(self, group):
         # Queue inital items and create mapping for value
-        count = 0
-        for item in group._group:
-            self._current_tasks[item._item_id] = item
-            self._item_mapping[item._item_id] = count
-            count += 1 
-        # Assign previous results to tasks
-        if group._from_range and group._to_range:
-            pass
-        elif group._full_map:
-            pass
+        set_group(group)
         # Exceute current link as a group.
-        while self._current_tasks or self._waiting_tasks: 
+        while self._current_items or self._waiting_items: 
             # Queue current tasks
             for item in list(self._current_tasks.values()):
                 if isinstance(item, Seed):
@@ -135,57 +155,44 @@ class Chain(StemObject):
                     exec_sub_chain(item)
                 else:
                     del self._current_tasks[item._item_id]
-
             # check for results from managers.
             self.check_results() 
+        # expand results to a continous list
+        self.expand_results()
+        # set previous results
         self._previous_results = self._current_results
+        # clear current results
         self._current_results = []
 
-    def exec_single_seed(self, seed):
-        grouped_seed = Group(seed)
-        grouped_seed.map(seed._domain, seed._range)
-        self._chain.insert(0, grouped_seed)
-
     def exec_sub_chain(self, chain):
-        if item._chain:
-            chain_link = item._chain.pop(0)
-        else:
-            chain_link = None
-            # set result to master chain
-            if item._chain_id:
-                # This is a subchain pass on the result 
-                self.unlink_from_chain(chain)
+        chain_link = chain.pop_link
         if isinstance(chain_link, Seed):
-            # either load result from master results OR previous results if within a sub chain
-            self._current_tasks[chain_link._item_id] = chain_link
-            self._pending_chain_tasks[item._item_id] = {chain_link._item_id}
-            self._pending_chains[item._item_id] = item
-            chain_link._chain_id = item._item_id
-            del self._current_tasks[item._item_id]
-
+            seed = chain_link
+            grouped_seed = Group(seed)
+            grouped_seed.map(seed._domain, seed._range)
+            chain._chain.insert(0, grouped_seed)
         elif isinstance(chain_link, Group):
-            # load results from master results OR previous results
-            for group_item in chain_link._group:
-                self._current_tasks[group_item._item_id] = group_item
-                if item._item_id not in self._pending_chain_tasks:
-                    self._pending_chain_tasks[item._item_id] = set()
-                self._pending_chain_tasks[item._item_id].add(group_item._item_id)
-                group_item._chain_id = item._item_id
-            self._pending_chains[item._item_id] = item
-            del self._current_tasks[item._item_id]
+            group = chain_link
+            chain.set_group(group)
+            for item in group._group:
+                del chain._current_items.[item._item_id]
+                chain._waiting_items[item._item_id] = item
+
+            del self._current_items[chain._item_id]
+            self._waiting_items[chain._item_id] = chain
+        elif chain_link is None:
+            del self._current_tasks[chain._item_id]
+        # Shouldn't happen but just in case
         else:
-            del self._current_tasks[item._item_id]
+            del self._current_tasks[chain._item_id]
 
     def exec_sub_seed(self, seed):
-        if seed._item_id in self._item_mapping and mapping:
-            if full_map:
-                item.update_args(self._previous_results)
-            else:
-                domain_index = self._item_mapping[item._item_id]//group._range
-                start_index = domain_index*group._domain
-                stop_index = domain_index*group._domain+group._domain
-                item.update_args(self._previous_results[start_index:stop_index])
-
+        # Map group Frontier Seeds to Results 
+        if seed._item_id in self._item_mapping and self._mapping:
+            self.map_frontier_seed(seed)
+        elif seed._item_id not in self.item_mapping and self._mapping:
+            self._map_chain_seed(seed)
+            # TODO: Have to do this for a chain
         if not item._manager:
             manager = self._default_mgr
         else:
@@ -198,7 +205,20 @@ class Chain(StemObject):
         self._managers[manager]["write"].send(item)
         self._waiting_tasks[item._item_id] = item
         del self._current_tasks[item._item_id]
-    
+
+    def map_chain_seed(self, seed):
+
+
+    def map_frontier_seed(self, seed):
+        if self._full_map:
+            # all of the previous results are added as the seeds arguments
+            seed.update_args(self._previous_results)
+        else:
+            # Map specific arguments to the to the seed arguments
+            domain_index = self._item_mapping[seed._item_id]//group._range
+            start_index = domain_index*group._domain
+            stop_index = domain_index*group._domain+group._domain
+            seed.update_args(self._previous_results[start_index:stop_index])
 
     def check_results(self):
         links = wait(self._manager_links, timeout=-1)
@@ -211,24 +231,21 @@ class Chain(StemObject):
             """
             item = link.recv()
             if isinstance(item, Seed):
-                # Remove from waiting tasks
-                del self._waiting_tasks[item._item_id]
                 if isinstance(item._result, Bloom):
                     self.handle_bloom(item, item._result._item)
-                if item._chain_id:
-                    self.unlink_from_chain(item)
+                self.unlink_from_chain(item)
             else:
                 print("Invalid object sent through Pipe!")
                 raise TypeError
 
     def unlink_from_chain(self, item):
-        # Remove from chains pending tasks
-        self._pending_chain_tasks[item._chain_id].remove(item._item_id)
-        # Check if no pending tasks for chain
-        if not self._pending_chain_tasks[item._chain_id]:
-            chain = self._pending_chains[item._chain_id]
-            del self._pending_chains[item._chain_id]
-            self._current_tasks[chain._item_id] = chain
+        # Get Chain item is linked to
+        chain = self._chain_mapping[item._chain_id]
+        # remove item from waiting items
+        del chain._waiting_items.[item._item_id]
+        # add chain to master's current item if no pending items and chain is not the master chain
+        if not chain._current_items and chain._waiting_items and chain._item_id != self._item_id:
+            self._current_items[chai_id] = chain
         
     def handle_bloom(self, item, bloomed_item):
         # bloomed_item = cloudpickle.loads(bloomed_item)
