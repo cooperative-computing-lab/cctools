@@ -5872,6 +5872,10 @@ from workers when the file is no longer needed by the manager.
 */
 void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 {
+	if (!f) {
+		return;
+	}
+
 	/*
 	Special case: If the manager has already been gc'ed
 	(e.g. by python exiting), do nothing. Any memory or unlink_when_done files were gc'ed by vine_delete.
