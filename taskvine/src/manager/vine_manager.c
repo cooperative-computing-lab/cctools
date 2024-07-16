@@ -5926,6 +5926,34 @@ void vine_undeclare_file(struct vine_manager *m, struct vine_file *f)
 	*/
 }
 
+/*
+This function shares a similar purpose with vine_undeclare_file in 
+managing file replicas across remote workers, but it differs in execution. 
+While vine_undeclare_file removes the file from the manager’s table and 
+all the remote workers, vine_prune_file solely focuses on removing replicas
+from worker nodes.
+
+It is primarily used to remove replicas from workers when the file is no longer
+needed by the manager.
+*/
+void vine_prune_file(struct vine_manager *m, struct vine_file *f)
+{
+       if (!f || !m) {
+               return;
+       }
+       const char *filename = f->cached_name;
+       if (f->cache_level < VINE_CACHE_LEVEL_FOREVER) {
+               char *key;
+               struct vine_worker_info *w;
+               HASH_TABLE_ITERATE(m->worker_table, key, w)
+               {
+                       if (vine_file_replica_table_lookup(w, filename)) {
+                               delete_worker_file(m, w, filename, 0, 0);
+                       }
+               }
+       }
+}
+
 struct vine_file *vine_manager_lookup_file(struct vine_manager *m, const char *cached_name)
 {
 	return hash_table_lookup(m->file_table, cached_name);

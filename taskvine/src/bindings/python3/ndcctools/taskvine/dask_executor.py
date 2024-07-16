@@ -272,10 +272,14 @@ class DaskVine(Manager):
                         if self.wrapper:
                             self.wrapper_proc(t.load_wrapper_output(self))
 
-                        result_file.garbage_collect_children(self)
-
                         if t.key in dsk:
                             bar_update(advance=1)
+
+                        children = dag.get_children(t.key)
+                        for c in children:
+                            if len(dag.get_pending_parents(c)) == 0:
+                                c_result = dag.get_result(c)
+                                self.prune_file(c_result._file)
                     else:
                         retries_left = t.decrement_retry()
                         print(f"task id {t.id} key {t.key} failed: {t.result}. {retries_left} attempts left.\n{t.std_output}")
@@ -436,27 +440,6 @@ class DaskVineFile:
             self._ready_for_gc = all(f.ready_for_gc() for f in self._dag.get_parents().values())
         return self._ready_for_gc
 
-    def garbage_collect_children(self, manager):
-        if self._checkpointed:
-            return
-
-        if self.is_temp():
-            # do nothing until all the nodes that need this result have been completed and have been checkpointed
-            for p in self._dag.get_parents(self._key):
-                if not (self._dag.has_result(p) and self._dag.get_result(p)._checkpointed):
-                    return
-            self._checkpointed = True
-        else:
-            # files that are not temporary are immediately considered checkpointed
-            self._checkpointed = True
-
-        for c in self._dag.get_children(self._key):
-            r = self._dag.get_result(c)
-            if isinstance(r, DaskVineFile):
-                r.garbage_collect_children(manager)
-                if r._checkpointed and not r._is_target:
-                    manager.undeclare_file(r._file)
-
 
 ##
 # @class ndcctools.taskvine.dask_executor.DaskVineExecutionError
@@ -511,6 +494,8 @@ class PythonTaskDask(PythonTask):
         self._wrapper_output_file = None
         self._wrapper_output = None
 
+        self.inputs = []
+
         args_raw = {k: dag.get_result(k) for k in dag.get_children(key)}
         args = {
             k: f"{uuid4()}.p"
@@ -531,6 +516,7 @@ class PythonTaskDask(PythonTask):
 
         for k, f in args_raw.items():
             if isinstance(f, DaskVineFile):
+                self.inputs.append(f.file)
                 self.add_input(f.file, args[k])
 
         if category:
@@ -541,6 +527,7 @@ class PythonTaskDask(PythonTask):
             self.add_environment(environment)
         if extra_files:
             for f, name in extra_files.items():
+                self.inputs.append(f.file)
                 self.add_input(f, name)
         if env_vars:
             for k, v in env_vars.items():
