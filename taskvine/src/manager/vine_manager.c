@@ -5876,10 +5876,6 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 		return;
 	}
 
-	/*
-	Special case: If the manager has already been gc'ed
-	(e.g. by python exiting), do nothing. Any memory or unlink_when_done files were gc'ed by vine_delete.
-	*/
 	if (!m) {
 		return;
 	}
