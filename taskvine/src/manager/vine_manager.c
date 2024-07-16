@@ -5865,28 +5865,13 @@ int vine_set_task_id_min(struct vine_manager *q, int minid)
 /* File functions */
 
 /*
-Careful: The semantics of undeclare_file are a little subtle.
-The user calls this function to indicate that they are done
-using a particular file, and there will be no more tasks
-that can consume it.
+Remove all replicas of a special file across the compute cluster.
 
-This causes the file to be removed from the manager's table,
-the replicas in the cluster to be deleted.
-There should be no running tasks that require the file after this.
-
-However, there may be *returned* tasks that still hold
-references to the vine_file object, and so it will not be
-fully garbage collected until those also call vine_file_delete
-to bring the reference count to zero.  At that point, if
-the UNLINK_WHEN_DONE flag is on, the local state will also be deleted.
+While invoking outside, it is primarily used to remove replicas
+from workers when the file is no longer needed by the manager.
 */
-
-void vine_undeclare_file(struct vine_manager *m, struct vine_file *f)
+void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 {
-	if (!f) {
-		return;
-	}
-
 	/*
 	Special case: If the manager has already been gc'ed
 	(e.g. by python exiting), do nothing. Any memory or unlink_when_done files were gc'ed by vine_delete.
@@ -5910,9 +5895,31 @@ void vine_undeclare_file(struct vine_manager *m, struct vine_file *f)
 			}
 		}
 	}
+}
 
-	/* Remove the object from our table and delete a reference. */
+/*
+Careful: The semantics of undeclare_file are a little subtle.
+The user calls this function to indicate that they are done
+using a particular file, and there will be no more tasks
+that can consume it.
 
+This causes the file to be removed from the manager's table,
+the replicas in the cluster to be deleted.
+There should be no running tasks that require the file after this.
+
+However, there may be *returned* tasks that still hold
+references to the vine_file object, and so it will not be
+fully garbage collected until those also call vine_file_delete
+to bring the reference count to zero.  At that point, if
+the UNLINK_WHEN_DONE flag is on, the local state will also be deleted.
+*/
+
+void vine_undeclare_file(struct vine_manager *m, struct vine_file *f)
+{
+	/* First prune the file on all workers */
+	vine_prune_file(m, f);
+
+	/* Then, remove the object from our table and delete a reference. */
 	if (hash_table_lookup(m->file_table, f->cached_name)) {
 		hash_table_remove(m->file_table, f->cached_name);
 		vine_file_delete(f);
@@ -5924,34 +5931,6 @@ void vine_undeclare_file(struct vine_manager *m, struct vine_file *f)
 	this file. But the object is no longer the manager's
 	responsibility.
 	*/
-}
-
-/*
-This function shares a similar purpose with vine_undeclare_file in 
-managing file replicas across remote workers, but it differs in execution. 
-While vine_undeclare_file removes the file from the manager’s table and 
-all the remote workers, vine_prune_file solely focuses on removing replicas
-from worker nodes.
-
-It is primarily used to remove replicas from workers when the file is no longer
-needed by the manager.
-*/
-void vine_prune_file(struct vine_manager *m, struct vine_file *f)
-{
-       if (!f || !m) {
-               return;
-       }
-       const char *filename = f->cached_name;
-       if (f->cache_level < VINE_CACHE_LEVEL_FOREVER) {
-               char *key;
-               struct vine_worker_info *w;
-               HASH_TABLE_ITERATE(m->worker_table, key, w)
-               {
-                       if (vine_file_replica_table_lookup(w, filename)) {
-                               delete_worker_file(m, w, filename, 0, 0);
-                       }
-               }
-       }
 }
 
 struct vine_file *vine_manager_lookup_file(struct vine_manager *m, const char *cached_name)
