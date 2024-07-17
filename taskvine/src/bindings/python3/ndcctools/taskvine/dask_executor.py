@@ -104,6 +104,7 @@ class DaskVine(Manager):
     #                      fn(*args) at some point during its execution to produce the dask task result.
     #                      Should return a tuple of (wrapper result, dask call result). Use for debugging.
     # @param wrapper_proc  Function to process results from wrapper on completion. (default is print)
+    # @param prune_cluster If True, remove files from the cluster after they are no longer needed.
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
@@ -127,6 +128,7 @@ class DaskVine(Manager):
             progress_label="[green]tasks",
             wrapper=None,
             wrapper_proc=print,
+            prune_cluster=False,
             import_modules=None,  # Deprecated, use lib_modules
             lazy_transfers=True,  # Deprecated, use worker_tranfers
             ):
@@ -162,6 +164,7 @@ class DaskVine(Manager):
             self.progress_label = progress_label
             self.wrapper = wrapper
             self.wrapper_proc = wrapper_proc
+            self.prune_cluster = prune_cluster
 
             if submit_per_cycle is not None and submit_per_cycle < 1:
                 submit_per_cycle = None
@@ -275,7 +278,8 @@ class DaskVine(Manager):
                         if t.key in dsk:
                             bar_update(advance=1)
 
-                        self._prune_cluster(dag, t.key)
+                        if self.prune_cluster:
+                            self._prune_cluster(dag, t.key)
                     else:
                         retries_left = t.decrement_retry()
                         print(f"task id {t.id} key {t.key} failed: {t.result}. {retries_left} attempts left.\n{t.std_output}")
