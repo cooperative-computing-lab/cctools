@@ -33,7 +33,7 @@ static batch_job_id_t batch_job_dryrun_submit (struct batch_queue *q, const char
 	debug(D_BATCH, "started dry run of job %" PRIbjid ": %s", jobid, cmd);
 
 	if ((log = fopen(q->logfile, "a"))) {
-		if (!(info = calloc(sizeof(*info), 1))) {
+		if (!(info = calloc(1, sizeof(*info)))) {
 			fclose(log);
 			return -1;
 		}
