@@ -275,11 +275,7 @@ class DaskVine(Manager):
                         if t.key in dsk:
                             bar_update(advance=1)
 
-                        children = dag.get_children(t.key)
-                        for c in children:
-                            if len(dag.get_pending_parents(c)) == 0:
-                                c_result = dag.get_result(c)
-                                self.prune_file(c_result._file)
+                        self._prune_cluster(dag, t.key)
                     else:
                         retries_left = t.decrement_retry()
                         print(f"task id {t.id} key {t.key} failed: {t.result}. {retries_left} attempts left.\n{t.std_output}")
@@ -394,6 +390,13 @@ class DaskVine(Manager):
         else:
             return raw
 
+    def _prune_cluster(self, dag, key):
+        children = dag.get_children(key)
+        for c in children:
+            if len(dag.get_pending_parents(c)) == 0:
+                c_result = dag.get_result(c)
+                self.prune_file(c_result._file)
+
 ##
 # @class ndcctools.taskvine.dask_executor.DaskVineFile
 #
@@ -494,8 +497,6 @@ class PythonTaskDask(PythonTask):
         self._wrapper_output_file = None
         self._wrapper_output = None
 
-        self.inputs = []
-
         args_raw = {k: dag.get_result(k) for k in dag.get_children(key)}
         args = {
             k: f"{uuid4()}.p"
@@ -516,7 +517,6 @@ class PythonTaskDask(PythonTask):
 
         for k, f in args_raw.items():
             if isinstance(f, DaskVineFile):
-                self.inputs.append(f.file)
                 self.add_input(f.file, args[k])
 
         if category:
@@ -527,7 +527,6 @@ class PythonTaskDask(PythonTask):
             self.add_environment(environment)
         if extra_files:
             for f, name in extra_files.items():
-                self.inputs.append(f.file)
                 self.add_input(f, name)
         if env_vars:
             for k, v in env_vars.items():

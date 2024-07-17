@@ -73,7 +73,7 @@ class DaskVineDag:
         # key->value of its computation
         self._result_of = {}
 
-        # child -> pending parents. I.e., parents that have not done
+        # child -> nodes that use the child as an input, and that have not been completed
         self._pending_parents_of = defaultdict(lambda: set())
 
         # key->depth. The shallowest level the key is found
