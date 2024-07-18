@@ -3145,7 +3145,7 @@ and should consider re-creating it via a recovery task.
 static int vine_manager_check_inputs_available(struct vine_manager *q, struct vine_task *t)
 {
 	struct vine_mount *m;
-	// check if all input files are available, if not, consider recovery tasks for them at once
+	/* all input files are available, if not, consider recovery tasks for them at once */
 	int all_available = 1;
 	LIST_ITERATE(t->input_mounts, m)
 	{
