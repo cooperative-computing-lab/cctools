@@ -992,8 +992,8 @@ class PythonTask(Task):
         name = os.path.join(manager.staging_directory, "arguments", self._id)
         with open(name, "wb") as wf:
             cloudpickle.dump([args, kwargs], wf)
-        f = manager.declare_file(name, unlink_when_done=True)
-        self.add_input(f, f"a_{self._id}")
+        self._input_file = manager.declare_file(name, unlink_when_done=True)
+        self.add_input(self._input_file, f"a_{self._id}")
 
         if self._tmp_output_enabled:
             self._output_file = self.manager.declare_temp()
