@@ -887,6 +887,14 @@ however this function can be used for earlier cleanup of unneeded file objects.
 */
 void vine_undeclare_file(struct vine_manager *m, struct vine_file *f);
 
+/** Prune a file among the cluster.
+The given file or directory object is deleted from all worker's caches,
+but is still available on the manager's site, and can be recovered by submitting a recovery task.
+@param m A manager object
+@param f Any file object.
+*/
+void vine_prune_file(struct vine_manager *m, struct vine_file *f);
+
 //@}
 
 /** @name Functions - Managers */

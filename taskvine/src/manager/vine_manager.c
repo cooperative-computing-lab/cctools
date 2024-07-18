@@ -5865,6 +5865,39 @@ int vine_set_task_id_min(struct vine_manager *q, int minid)
 /* File functions */
 
 /*
+Remove all replicas of a special file across the compute cluster.
+
+While invoking outside, it is primarily used to remove replicas
+from workers when the file is no longer needed by the manager.
+*/
+void vine_prune_file(struct vine_manager *m, struct vine_file *f)
+{
+	if (!f) {
+		return;
+	}
+
+	if (!m) {
+		return;
+	}
+
+	const char *filename = f->cached_name;
+	/*
+	If this is not a file that should be cached forever,
+	delete all of the replicas present at remote workers.
+	*/
+	if (f->cache_level < VINE_CACHE_LEVEL_FOREVER) {
+		char *key;
+		struct vine_worker_info *w;
+		HASH_TABLE_ITERATE(m->worker_table, key, w)
+		{
+			if (vine_file_replica_table_lookup(w, filename)) {
+				delete_worker_file(m, w, filename, 0, 0);
+			}
+		}
+	}
+}
+
+/*
 Careful: The semantics of undeclare_file are a little subtle.
 The user calls this function to indicate that they are done
 using a particular file, and there will be no more tasks
@@ -5895,24 +5928,10 @@ void vine_undeclare_file(struct vine_manager *m, struct vine_file *f)
 		return;
 	}
 
-	const char *filename = f->cached_name;
-	/*
-	If this is not a file that should be cached forever,
-	delete all of the replicas present at remote workers.
-	*/
-	if (f->cache_level < VINE_CACHE_LEVEL_FOREVER) {
-		char *key;
-		struct vine_worker_info *w;
-		HASH_TABLE_ITERATE(m->worker_table, key, w)
-		{
-			if (vine_file_replica_table_lookup(w, filename)) {
-				delete_worker_file(m, w, filename, 0, 0);
-			}
-		}
-	}
+	/* First prune the file on all workers */
+	vine_prune_file(m, f);
 
-	/* Remove the object from our table and delete a reference. */
-
+	/* Then, remove the object from our table and delete a reference. */
 	if (hash_table_lookup(m->file_table, f->cached_name)) {
 		hash_table_remove(m->file_table, f->cached_name);
 		vine_file_delete(f);

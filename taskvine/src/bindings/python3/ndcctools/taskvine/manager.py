@@ -1480,6 +1480,9 @@ class Manager(object):
     def undeclare_file(self, file):
         cvine.vine_undeclare_file(self._taskvine, file._file)
 
+    def prune_file(self, file):
+        cvine.vine_prune_file(self._taskvine, file._file)
+
     # Deprecated, for backwards compatibility.
     def remove_file(self, file):
         self.undeclare_file(file)

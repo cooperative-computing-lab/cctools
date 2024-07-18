@@ -104,6 +104,7 @@ class DaskVine(Manager):
     #                      fn(*args) at some point during its execution to produce the dask task result.
     #                      Should return a tuple of (wrapper result, dask call result). Use for debugging.
     # @param wrapper_proc  Function to process results from wrapper on completion. (default is print)
+    # @param prune_files If True, remove files from the cluster after they are no longer needed.
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
@@ -127,6 +128,7 @@ class DaskVine(Manager):
             progress_label="[green]tasks",
             wrapper=None,
             wrapper_proc=print,
+            prune_files=False,
             import_modules=None,  # Deprecated, use lib_modules
             lazy_transfers=True,  # Deprecated, use worker_tranfers
             ):
@@ -162,6 +164,7 @@ class DaskVine(Manager):
             self.progress_label = progress_label
             self.wrapper = wrapper
             self.wrapper_proc = wrapper_proc
+            self.prune_files = prune_files
 
             if submit_per_cycle is not None and submit_per_cycle < 1:
                 submit_per_cycle = None
@@ -272,10 +275,11 @@ class DaskVine(Manager):
                         if self.wrapper:
                             self.wrapper_proc(t.load_wrapper_output(self))
 
-                        result_file.garbage_collect_children(self)
-
                         if t.key in dsk:
                             bar_update(advance=1)
+
+                        if self.prune_files:
+                            self._prune_file(dag, t.key)
                     else:
                         retries_left = t.decrement_retry()
                         print(f"task id {t.id} key {t.key} failed: {t.result}. {retries_left} attempts left.\n{t.std_output}")
@@ -390,6 +394,13 @@ class DaskVine(Manager):
         else:
             return raw
 
+    def _prune_file(self, dag, key):
+        children = dag.get_children(key)
+        for c in children:
+            if len(dag.get_pending_parents(c)) == 0:
+                c_result = dag.get_result(c)
+                self.prune_file(c_result._file)
+
 ##
 # @class ndcctools.taskvine.dask_executor.DaskVineFile
 #
@@ -435,27 +446,6 @@ class DaskVineFile:
         if not self._ready_for_gc:
             self._ready_for_gc = all(f.ready_for_gc() for f in self._dag.get_parents().values())
         return self._ready_for_gc
-
-    def garbage_collect_children(self, manager):
-        if self._checkpointed:
-            return
-
-        if self.is_temp():
-            # do nothing until all the nodes that need this result have been completed and have been checkpointed
-            for p in self._dag.get_parents(self._key):
-                if not (self._dag.has_result(p) and self._dag.get_result(p)._checkpointed):
-                    return
-            self._checkpointed = True
-        else:
-            # files that are not temporary are immediately considered checkpointed
-            self._checkpointed = True
-
-        for c in self._dag.get_children(self._key):
-            r = self._dag.get_result(c)
-            if isinstance(r, DaskVineFile):
-                r.garbage_collect_children(manager)
-                if r._checkpointed and not r._is_target:
-                    manager.undeclare_file(r._file)
 
 
 ##
