@@ -377,8 +377,8 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 			f->state = VINE_FILE_STATE_CREATED;
 			f->size = size;
 
-			/* And if the file is a newly created temporary. replicate it as needed. */
-			if (f->type == VINE_TEMP && *id == 'X' && q->temp_replica_count > 0) {
+			/* And if the file is a newly created temporary, replicate as needed. */
+			if (f->type == VINE_TEMP && *id == 'X' && q->temp_replica_count > 1) {
 				hash_table_insert(q->temp_files_to_replicate, f->cached_name, NULL);
 			}
 		}
@@ -932,7 +932,8 @@ static int recover_temp_files(struct vine_manager *q)
 			int curr_file_replication_cnt = vine_file_replica_table_replicate(q, f);
 
 			if (curr_file_replication_cnt < 1) {
-				/* There are two cases that a file can be added into the recovery queue:
+				/*
+				There are two cases that a file can be added into the recovery queue:
 					1. A file is newly created, and the temp_replica_count is tuned to replicate it.
 					2. A worker is lost, and the transfer-temps-recovery is tuned to recover it.
 				Likewise, there might be two cases that the curr_file_replication_cnt can be less than 1:
@@ -943,6 +944,8 @@ static int recover_temp_files(struct vine_manager *q)
 				*/
 				if (q->transfer_temps_recovery) {
 					vine_manager_consider_recovery_task(q, f, f->recovery_task);
+				} else {
+					/* should not get here */
 				}
 				hash_table_remove(q->temp_files_to_replicate, cached_name);
 			} else {
@@ -3815,7 +3818,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->worker_source_max_transfers = VINE_WORKER_SOURCE_MAX_TRANSFERS;
 	q->perf_log_interval = VINE_PERF_LOG_INTERVAL;
 
-	q->temp_replica_count = 0;
+	q->temp_replica_count = 1;
 	q->transfer_temps_recovery = 0;
 	q->transfer_replica_per_cycle = 10;
 
@@ -5377,7 +5380,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		q->short_timeout = MAX(1, (int)value);
 
 	} else if (!strcmp(name, "temp-replica-count")) {
-		q->temp_replica_count = MAX(0, (int)value);
+		q->temp_replica_count = MAX(1, (int)value);
 
 	} else if (!strcmp(name, "transfer-outlier-factor")) {
 		q->transfer_outlier_factor = value;
@@ -5912,8 +5915,7 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 	}
 
 	/*
-	Also, a file can be added into the temp_files_to_replicate
-	list, but not yet replicated. In this case, just remove it.
+	Pruned files do not need to be scheduled for replication anymore.
 	*/
 	hash_table_remove(m->temp_files_to_replicate, f->cached_name);
 }
