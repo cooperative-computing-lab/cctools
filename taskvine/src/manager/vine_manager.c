@@ -499,7 +499,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	struct vine_task *t;
 	int task_status, exit_status;
 	uint64_t task_id;
-	int64_t output_length, bytes_sent;
+	int64_t output_length, bytes_sent, sandbox_used;
 
 	timestamp_t execution_time, start_time, end_time;
 	timestamp_t observed_execution_time;
@@ -507,13 +507,14 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	// Format: task completion status, exit status (exit code or signal), output length, bytes_sent, execution time,
 	// task_id
 	int n = sscanf(line,
-			"complete %d %d %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 "",
+			"complete %d %d %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 "",
 			&task_status,
 			&exit_status,
 			&output_length,
 			&bytes_sent,
 			&start_time,
 			&end_time,
+			&sandbox_used,
 			&task_id);
 
 	if (n < 7) {

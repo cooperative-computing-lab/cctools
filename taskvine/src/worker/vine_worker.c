@@ -277,6 +277,7 @@ void send_complete_tasks(struct link *l)
 	struct vine_process *p;
 	for (visited = 0; visited < size; visited++) {
 		p = itable_pop(procs_complete);
+		vine_process_measure_disk(p, options->max_time_on_measurement);
 		if (p->output_length <= 1024 && p->output_length > 0) {
 
 			char *output;
@@ -286,25 +287,27 @@ void send_complete_tasks(struct link *l)
 			output[p->output_length] = '\0';
 			close(output_file);
 			send_async_message(l,
-					"complete %d %d %lld %lld %llu %llu %d\n%s",
+					"complete %d %d %lld %lld %llu %llu %d %d\n%s",
 					p->result,
 					p->exit_code,
 					(long long)p->output_length,
 					(long long)p->output_length,
 					(unsigned long long)p->execution_start,
 					(unsigned long long)p->execution_end,
+					p->sandbox_size,
 					p->task->task_id,
 					output);
 			free(output);
 		} else {
 			send_async_message(l,
-					"complete %d %d %lld %lld %llu %llu %d\n",
+					"complete %d %d %lld %lld %llu %llu %d %d\n",
 					p->result,
 					p->exit_code,
 					(long long)p->output_length,
 					0,
 					(unsigned long long)p->execution_start,
 					(unsigned long long)p->execution_end,
+					p->sandbox_size,
 					p->task->task_id);
 		}
 	}
