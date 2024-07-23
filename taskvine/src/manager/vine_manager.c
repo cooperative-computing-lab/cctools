@@ -157,8 +157,9 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 static void release_all_workers(struct vine_manager *q);
 
 static int vine_manager_check_inputs_available(struct vine_manager *q, struct vine_task *t);
-static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
+static void vine_manager_consider_recovery_task(struct vine_manager *q, struct vine_file *lost_file, struct vine_task *rt);
 
+static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name, vine_result_code_t *result);
@@ -376,8 +377,8 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 			f->state = VINE_FILE_STATE_CREATED;
 			f->size = size;
 
-			/* And if the file is a newly created temporary. replicate it. */
-			if (f->type == VINE_TEMP && *id == 'X') {
+			/* And if the file is a newly created temporary, replicate as needed. */
+			if (f->type == VINE_TEMP && *id == 'X' && q->temp_replica_count > 1) {
 				hash_table_insert(q->temp_files_to_replicate, f->cached_name, NULL);
 			}
 		}
@@ -931,6 +932,21 @@ static int recover_temp_files(struct vine_manager *q)
 			int curr_file_replication_cnt = vine_file_replica_table_replicate(q, f);
 
 			if (curr_file_replication_cnt < 1) {
+				/*
+				There are two cases that a file can be added into the recovery queue:
+					1. A file is newly created, and the temp_replica_count is tuned to replicate it.
+					2. A worker is lost, and the transfer-temps-recovery is tuned to recover it.
+				Likewise, there might be two cases that the curr_file_replication_cnt can be less than 1:
+					1. A newly created file is pruned before it is about to be replicated.
+					2. A lost file doesn't have any replicas in the cluster.
+				As a file is deleted from the recovery queue when it is pruned (vine_prune_file),
+				so we only need to check the second case here.
+				*/
+				if (q->transfer_temps_recovery) {
+					vine_manager_consider_recovery_task(q, f, f->recovery_task);
+				} else {
+					/* should not get here */
+				}
 				hash_table_remove(q->temp_files_to_replicate, cached_name);
 			} else {
 				if (iter_count_var > q->attempt_schedule_depth) {
@@ -3802,7 +3818,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->worker_source_max_transfers = VINE_WORKER_SOURCE_MAX_TRANSFERS;
 	q->perf_log_interval = VINE_PERF_LOG_INTERVAL;
 
-	q->temp_replica_count = 0;
+	q->temp_replica_count = 1;
 	q->transfer_temps_recovery = 0;
 	q->transfer_replica_per_cycle = 10;
 
@@ -5364,7 +5380,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		q->short_timeout = MAX(1, (int)value);
 
 	} else if (!strcmp(name, "temp-replica-count")) {
-		q->temp_replica_count = MAX(0, (int)value);
+		q->temp_replica_count = MAX(1, (int)value);
 
 	} else if (!strcmp(name, "transfer-outlier-factor")) {
 		q->transfer_outlier_factor = value;
@@ -5897,6 +5913,11 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 			}
 		}
 	}
+
+	/*
+	Pruned files do not need to be scheduled for replication anymore.
+	*/
+	hash_table_remove(m->temp_files_to_replicate, f->cached_name);
 }
 
 /*
