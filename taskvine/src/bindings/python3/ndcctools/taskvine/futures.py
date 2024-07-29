@@ -321,9 +321,9 @@ class FutureFunctionCall(FunctionCall):
                 return RESULT_PENDING
             self._saved_output = result
             if not self._ran_functions:
+                self._ran_functions = True
                 for fn in self._future._callback_fns:
                     fn(self._future)
-                self._ran_functions = True
             return self._saved_output
 
         # for retriever task: fetch the result of its retrievee on completion
@@ -345,6 +345,7 @@ class FutureFunctionCall(FunctionCall):
 
                     except Exception as e:
                         self._saved_output = e
+                        raise e
                 else:
                     self._saved_output = FunctionCallNoResult()
             return self._saved_output
@@ -419,9 +420,9 @@ class FuturePythonTask(PythonTask):
                 self._output = result
                 self._output_loaded = True
             if not self._ran_functions:
+                self._ran_functions = True
                 for fn in self._future._callback_fns:
                     fn(self._future)
-                self._ran_functions = True
             return self._output
 
         else:
@@ -441,6 +442,7 @@ class FuturePythonTask(PythonTask):
                                 self._output = f.read()
                     except Exception as e:
                         self._output = e
+                        raise e
                 else:
                     self._output = PythonTaskNoResult()
                 self._output_loaded = True
