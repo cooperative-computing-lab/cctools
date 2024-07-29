@@ -1,4 +1,5 @@
 import sys
+import copy
 import os
 import select
 import time
@@ -12,15 +13,20 @@ from multiprocessing.connection import wait
 class StemObject():
     def __init__(self):        
         self._item_id = str(uuid.uuid1())
+        self._link_id = None
         self._chain_id = None
+        self._parent_chain = None
+        self._sub_item = False
 
-        self._domain == "independant"
-        self._range == "independant"
+        self._domain = "independent"
+        self._range = "independent"
         self.full_map = False
 
     
-    def map(self, from_domain="all", to_range="all")
+    def map(self, from_domain="all", to_range="all"):
         if from_domain == "all" or to_range == "all":
+            self._domain = "all"
+            self._range = "all"
             self._full_map = True
         else:
             self._domain = from_domain
@@ -65,51 +71,45 @@ class Chain(StemObject):
         self._previous_results = []
         self._current_results = []
     
-        super()__init__()
-        self._popping = False
+        # remove item from parent chain's waiting items
+        super().__init__()
         self._chain_mapping = {self._item_id:self}
         
 
         # Add Stem Objects to the Chain. 
         # NOTE: the order of the objects determine execution order.
         # NOTE: Chains can not bee added to Chains. i.e. (Chain(Chain())) is invalid. However, Chain(Group(Chain)) is valid.
+        count = 0
         for arg in iter(args):
             try:
                 iargs = iter(arg)
                 for iarg in iargs:
                     if isinstance(iarg, Group):
                         self._chain.append(iarg)
+                        iarg._link_id = count
+                        count += 1
                     elif isinstance(iarg, Seed):
                         self._chain.append(iarg)
+                        iarg._link_id = count
+                        count += 1
                     else:
                         raise TypeError
             except:
                 if isinstance(arg, Group):
                     self._chain.append(arg)
+                    arg._link_id = count
+                    count += 1
                 elif isinstance(arg, Seed):
                     self._chain.append(arg)
+                    arg._link_id = count
+                    count += 1
                 else:
                     raise TypeError
     
     # When deleting a master chain we send messages to kill all managers.
-    def __del__(self):
-        for manager in self._managers:
-            self._managers[manager]["write"].send("kill")
-    
-    # Execute Stem objects within a chain in order
-    def run(self):        
-        # When a Chain is called wirh run() it becomes the master chain.
-        # The master chain maintains mappings of results from the previous link that has been executed
-        # Additionally, the current links results are kept. This is used when mapping outputs to inputs between links 
-        self._popping = True
-        while self.pop_link():
-            link = self._current_link
-            # Execution of a Group of Stem objects
-            if isinstance(link, Group):
-                self.exec_group(link)
-            # Execution of a Seed object
-            elif isinstance(link, Seed):
-                self.exec_seed(link)
+    #def __del__(self):
+    #    for manager in self._managers:
+    #        self._managers[manager]["write"].send("kill")
 
     # Set _currrent_link to the next available link. Returns False if there are no more links            
     def pop_link(self):
@@ -119,24 +119,25 @@ class Chain(StemObject):
         else:
             return None
     
-    def set_group(self, group):
-        count = 0
-        for item in group._group:
-            self._current_items[item._item_id] = item
-            self._item_mapping[item._item_id] = count
-            self._current_results.appeend(None)
-            item.chain_id = self._item_id
-            count += 1 
-        if group._domain != "idependent" and group._range != "independent":
-            self._mapping = True
-            if group._domain == "all" or group._range == "all":
-                self._full_map = True
-        else:
-            self._mapping = False
+    # Execute Stem objects within a chain in order
+    def run(self):        
+        # When a Chain is called wirh run() it becomes the master chain.
+        # The master chain maintains mappings of results from the previous link that has been executed
+        # Additionally, the current links results are kept. This is used when mapping outputs to inputs between links 
+        while self.pop_link():
+            link = self._current_link
+            # Execution of a Seed object: Convert seed to group and queue at top.
+            if isinstance(link, Seed):
+                self.exec_seed(link)
+            # Execution of a Group object: execute items concurrently.
+            elif isinstance(link, Group):
+                self.exec_group(link)
+        print(self._previous_results)
 
     def exec_seed(self, seed):
         grouped_seed = Group(seed)
         grouped_seed.map(seed._domain, seed._range)
+        grouped_seed._link_id = seed._link_id
         self._chain.insert(0, grouped_seed)
 
     # Execute a Group of Stem Objects.
@@ -144,70 +145,130 @@ class Chain(StemObject):
     # NOTE: When executing a SubChain, significant considerations need to be made.
     def exec_group(self, group):
         # Queue inital items and create mapping for value
-        set_group(group)
+        self.set_group(group)
         # Exceute current link as a group.
         while self._current_items or self._waiting_items: 
             # Queue current tasks
-            for item in list(self._current_tasks.values()):
+            for item in list(self._current_items.values()):
                 if isinstance(item, Seed):
-                    exec_sub_seed(item)
+                    self.exec_sub_seed(item)
                 elif isinstance(item, Chain):
-                    exec_sub_chain(item)
+                    self.exec_sub_chain(item)
                 else:
-                    del self._current_tasks[item._item_id]
-            # check for results from managers.
+                    del self._current_items[item._item_id]
+            # check for results from managers
             self.check_results() 
-        # expand results to a continous list
-        self.expand_results()
-        # set previous results
-        self._previous_results = self._current_results
+
+        self._previous_results = []
+        # expand results to a continous list and move to previous results
+        self.expand_results(self._current_results)
         # clear current results
         self._current_results = []
 
-    def exec_sub_chain(self, chain):
-        chain_link = chain.pop_link
-        if isinstance(chain_link, Seed):
-            seed = chain_link
-            grouped_seed = Group(seed)
-            grouped_seed.map(seed._domain, seed._range)
-            chain._chain.insert(0, grouped_seed)
-        elif isinstance(chain_link, Group):
-            group = chain_link
-            chain.set_group(group)
-            for item in group._group:
-                del chain._current_items.[item._item_id]
-                chain._waiting_items[item._item_id] = item
-
-            del self._current_items[chain._item_id]
-            self._waiting_items[chain._item_id] = chain
-        elif chain_link is None:
-            del self._current_tasks[chain._item_id]
-        # Shouldn't happen but just in case
-        else:
-            del self._current_tasks[chain._item_id]
-
     def exec_sub_seed(self, seed):
-        # Map group Frontier Seeds to Results 
-        if seed._item_id in self._item_mapping and self._mapping:
+        # map results from master chain to seed item
+        if seed._chain_id == self._item_id and self._mapping:
             self.map_frontier_seed(seed)
-        elif seed._item_id not in self.item_mapping and self._mapping:
-            self._map_chain_seed(seed)
-            # TODO: Have to do this for a chain
-        if not item._manager:
+        # map results from sub chain to seed item
+        elif seed._parent_chain._mapping:
+            self.map_chain_seed(seed)
+
+        # create item and send item
+        if not seed._manager:
             manager = self._default_mgr
         else:
-            manager = item._manager
+            manager = seed._manager
         if manager not in self._managers:
             read, write = run_manager(manager)
             self._managers[manager] = {"read":read, "write":write}
             self._manager_links.append(read)
+        self._managers[manager]["write"].send(seed)
+        self._waiting_items[seed._item_id] = seed
+        del self._current_items[seed._item_id]
+            
+    def exec_sub_chain(self, chain):
+        # get next avialable link from chain
+        chain_link = chain.pop_link()
+        if chain._item_id not in self._chain_mapping:
+            self._chain_mapping[chain._item_id] = chain
+        if isinstance(chain_link, Seed): 
+            seed = chain_link
+            grouped_seed = Group(seed)
+            grouped_seed.map(seed._domain, seed._range)
+            grouped_seed._link_id  = seed._link_id
+            chain._chain.insert(0, grouped_seed)
+        elif isinstance(chain_link, Group):
+            # set chains results for mapping 
+            self.set_chain_results(chain)
+            group = chain_link
+            chain.set_group(group)
+            for item in group._group:
+                # remove item from sub chain current items
+                del chain._current_items[item._item_id]
+                # add item to master chain current items
+                self._current_items[item._item_id] = item
+                # add item to sub chain waiting items
+                chain._waiting_items[item._item_id] = item
+            # remove chain from mater chain current items
+            del self._current_items[chain._item_id]
+            # add chain to  mater chain current items
+            chain._parent_chain._waiting_items[chain._item_id] = chain
+        elif chain_link is None:
+            # TODO: deep copy probably
+            chain._previous_results = []
+            chain.expand_results(chain._current_results) 
+            chain._parent_chain._item_mapping[chain._item_id].append(chain._previous_results)
+            del self._current_items[chain._item_id]
+            del chain._parent_chain._waiting_items[chain._item_id]
+        else:
+            del self._current_items[chain._item_id]
+
+    def set_group(self, group):
+        count = 0
+        for item in group._group:
+            item.map(group._domain, group._range)
+            self._current_items[item._item_id] = item
+            self._current_results.append([])
+            self._item_mapping[item._item_id] = self._current_results[count]
+            self._item_index = count
+            item._chain_id = self._item_id
+            item._parent_chain = self
+            count += 1 
+        if group._link_id == 0:
+            pass
+        elif group._domain != "idependent" and group._range != "independent":
+            self._mapping = True
+            if group._domain == "all" and group._range == "all":
+                self._full_map = True
+        else:
+            self._mapping = False
+
+    def set_chain_results(self, chain):
+        if chain._current_link._link_id == 0 and chain._current_link is not None:
+            # if the first link of sub chain is to be executed and its parent chain is mapping,
+            # map the the  necessary results to this chains results.
+            if chain._parent_chain._mapping:
+                chain._mapping = True
+                if chain._parent_chain._full_map:
+                    chain._previous_results = copy.deepcopy(chain._parent_chain._previous_results)
+                else:
+                    domain_index = chain._parent_chain._item_index//chain._range
+                    start_index = domain_index*chain._domain
+                    stop_index - domain_index*chain._domain+chain._domain
+                    chain._previous_results = copy.deepcopy(chain._parent_chain._previous_results[start_index:stop_index]) 
+
+        elif chain._current_link is not None:
+            chain._current_results = []
         
-        self._managers[manager]["write"].send(item)
-        self._waiting_tasks[item._item_id] = item
-        del self._current_tasks[item._item_id]
-
     def map_chain_seed(self, seed):
-
+        chain = seed._parent_chain
+        if chain._full_map:
+            seed.update_args(chain._previous_results)
+        else:
+            domain_index = chain._item_index//seed._range
+            start_index = domain_index*seed._domain
+            stop_index = domain_index*seed._domain+seed._domain
+            seed.update_args(chain._previous_results[start_index:stop_index])
 
     def map_frontier_seed(self, seed):
         if self._full_map:
@@ -215,9 +276,9 @@ class Chain(StemObject):
             seed.update_args(self._previous_results)
         else:
             # Map specific arguments to the to the seed arguments
-            domain_index = self._item_mapping[seed._item_id]//group._range
-            start_index = domain_index*group._domain
-            stop_index = domain_index*group._domain+group._domain
+            domain_index = self._item_index//seed._range
+            start_index = domain_index*seed._domain
+            stop_index = domain_index*seed._domain+seed._domain
             seed.update_args(self._previous_results[start_index:stop_index])
 
     def check_results(self):
@@ -233,41 +294,66 @@ class Chain(StemObject):
             if isinstance(item, Seed):
                 if isinstance(item._result, Bloom):
                     self.handle_bloom(item, item._result._item)
-                self.unlink_from_chain(item)
+                else:
+                    self.unlink_from_chain(item)
             else:
                 print("Invalid object sent through Pipe!")
                 raise TypeError
 
+    # remove item from its parent chain and master chain if they are not the same
     def unlink_from_chain(self, item):
         # Get Chain item is linked to
         chain = self._chain_mapping[item._chain_id]
-        # remove item from waiting items
-        del chain._waiting_items.[item._item_id]
-        # add chain to master's current item if no pending items and chain is not the master chain
-        if not chain._current_items and chain._waiting_items and chain._item_id != self._item_id:
-            self._current_items[chai_id] = chain
+        # remove item from parent chain's waiting items
+        del chain._waiting_items[item._item_id]
+        # remove item from master chain if parent chain is not master
+        if item._item_id in self._waiting_items:
+            del self._waiting_items[item._item_id]
+        # set chain result
+        chain._item_mapping[item._item_id].append(item._result)
+        # add chain to master's current items if no pending items and chain is not the master chain
+        if not chain._current_items and not chain._waiting_items and chain._item_id != self._item_id:
+            chain._previous_results = []
+            chain.expand_results(chain._current_results) 
+            self._current_items[chain._item_id] = chain
+        
+    def expand_results(self, results):
+        for result in results:
+            if isinstance(result, list):
+                self.expand_results(result)
+            else:
+                self._previous_results.append(result)
         
     def handle_bloom(self, item, bloomed_item):
-        # bloomed_item = cloudpickle.loads(bloomed_item)
+        chain = self._chain_mapping[item._chain_id]
+        del chain._waiting_item[item._item_id]
+        if item._item_id in self._waiting_items:
+            del self._waiting_items[item._item_id]
         if isinstance(bloomed_item, Seed):
-            if item._chain_id:
-                bloomed_item._chain_id = item._chain_id
-                self._pending_chain_tasks[bloomed_item._chain_id].add(bloomed_item._item_id)
-            self._current_tasks[bloomed_item._item_id] = bloomed_item
+            bloomed_item._sub_item = True
+            bloomed_item._chain_id = chain._item_id
+            bloomed_item._parent_chain = chain
+            chain._item_mapping[bloomed_item._item_id] = chain._item_mapping[item._item_id]
+            self._current_items[bloomed_item._item_id] = bloomed_item
+
+            if chain._item_id != self._item_id:
+                chain._waiting_items[item._item_id] = bloomed_item
 
         elif isinstance(bloomed_item, Group):
+            count = 0
             for group_item in bloomed_item._group:
-                if item._chain_id:
-                    group_item._chain_id = item._chain_id
-                    self._pending_chain_tasks[group_item._chain_id].add(group_item._item_id)
-                self._current_tasks[group_item._item_id] = group_item
+                group_item._sub_item = True
+                group_item._chain_id = chain._item_id
+                group_item._parent_chain = chain
 
-        elif isinstance(bloomed_item, Chain):
-            if item._chain_id:
-                bloomed_item._chain_id = item._chain_id
-                self._pending_chain_tasks[bloomed_item._chain_id].add(bloomed_item._item_id)
-            self._current_tasks[bloomed_item._item_id] = bloomed_item
+                chain._item_mapping[item._item_id].append([])    
+                chain._item_mapping[group_item._item_id] = chain._item_mapping[item._item_id][count]                
+                self._current_items[group_item._item_id] = group_item
+    
+                if chain._item_id != self._item_id:
+                    chain._waiting_items[item._item_id] = group_item
 
+                count += 1
         else:
             raise TypeError
             
@@ -277,7 +363,7 @@ class Group(StemObject):
     """
     def __init__ (self, *args):
         self._group = []
-        super().__init__
+        super().__init__()
         for arg in iter(args):
             try:
                 iargs = iter(arg)
@@ -306,10 +392,7 @@ class Seed(StemObject):
     A Seed onject reflects the base object to be executed. 
     """
     def __init__(self, func, *args, **kwargs):
-        #self._func = func
-        #self._args = args
-        #self._kwargs = kwargs
-        # TODO: This keeps The connection object from complaining when sending certain object via the Commuincation Pipe
+        # TODO: This keeps The connection object from complaining when sending certain objectis via the Commuincation Pipe
         # However, this may cause some overhead so a better solution may need to be explored
         self._srl = cloudpickle.dumps((func, args, kwargs))
         self._item_id = str(uuid.uuid1())
@@ -326,15 +409,20 @@ class Seed(StemObject):
         group = Group(self)
         group.run()
         
-    def print(self):
-        print(self._function, self._args, self._kwargs)
-    
+    def update_args(self, new_args):
+        func, args, kwargs = cloudpickle.loads(self._srl)
+        args = tuple(new_args)
+        self._srl = cloudpickle.dumps((func, args, kwargs))
+          
     def set_result(self, result):
         self._result = result
 
     def set(self, attr, *args, **kwargs):
         self._attr_list[attr] = {"args":args, "kwargs":kwargs}
         return self
+
+    def print(self):
+        print(self._function, self._args, self._kwargs)
 
 
 class Bloom():
@@ -343,10 +431,10 @@ class Bloom():
     that replaces a seed  
     """
     def __init__(self, item):
-        if isinstance(item, Seed) or isinstance(item, Group) or isinstance(item, Chain):
+        if isinstance(item, Seed) or isinstance(item, Group):
             self._item = item
         else:
-            print("Error: A Bloom object must contain a Seed Group or Chain!", file=sys.stderr)
+            print("Error: A Bloom object must contain a Seed or Group!", file=sys.stderr)
             raise TypeError
 
 def run_manager(name):
