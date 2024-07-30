@@ -112,7 +112,7 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 // trigger replications of file to satisfy temp_replica_count
 int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *f)
 {
-	/* the number of replicas in this round */
+	/* the number of replicated copies in this round */
 	int round_replication_count = 0;
 
 	if (vine_current_transfers_get_table_size(m) >= hash_table_size(m->worker_table) * m->worker_source_max_transfers) {
