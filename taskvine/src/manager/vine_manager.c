@@ -931,21 +931,14 @@ static int recover_temp_files(struct vine_manager *q)
 		if (f) {
 			int curr_file_replication_cnt = vine_file_replica_table_replicate(q, f);
 
+			/* Worker busy or no replicas found */
 			if (curr_file_replication_cnt < 1) {
 				/*
-				There are two cases that a file can be added into the recovery queue:
-					1. A file is newly created, and the temp_replica_count is tuned to replicate it.
-					2. A worker is lost, and the transfer-temps-recovery is tuned to recover it.
-				Likewise, there might be two cases that the curr_file_replication_cnt can be less than 1:
-					1. A newly created file is pruned before it is about to be replicated.
-					2. A lost file doesn't have any replicas in the cluster.
-				As a file is deleted from the recovery queue when it is pruned (vine_prune_file),
-				so we only need to check the second case here.
+				If no replicas are found, it indicates that the file is pruned or lost.
+				Because a pruned file is removed from the recovery queue, so it definitely indicates that the file is lost.
 				*/
-				if (q->transfer_temps_recovery) {
+				if (!vine_file_replica_table_exists_somewhere(q, f->cached_name) && q->transfer_temps_recovery) {
 					vine_manager_consider_recovery_task(q, f, f->recovery_task);
-				} else {
-					/* should not get here */
 				}
 				hash_table_remove(q->temp_files_to_replicate, cached_name);
 			} else {
