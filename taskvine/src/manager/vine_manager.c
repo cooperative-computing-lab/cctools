@@ -929,12 +929,12 @@ static int recover_temp_files(struct vine_manager *q)
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
 
 		if (f) {
-			int curr_file_replication_cnt = vine_file_replica_table_replicate(q, f);
+			int round_replication_count = vine_file_replica_table_replicate(q, f);
 
 			/* Worker busy or no replicas found */
-			if (curr_file_replication_cnt < 1) {
+			if (round_replication_count < 1) {
 				/*
-				If no replicas are found, it indicates that the file is pruned or lost.
+				If no replicas are found, it indicates that the file doesn't exist, either pruned or lost.
 				Because a pruned file is removed from the recovery queue, so it definitely indicates that the file is lost.
 				*/
 				if (!vine_file_replica_table_exists_somewhere(q, f->cached_name) && q->transfer_temps_recovery) {
@@ -949,7 +949,7 @@ static int recover_temp_files(struct vine_manager *q)
 				}
 			}
 
-			total_replication_count += curr_file_replication_cnt;
+			total_replication_count += round_replication_count;
 		}
 	}
 
