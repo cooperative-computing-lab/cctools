@@ -128,6 +128,8 @@ OPTION_END
 - **-u**,**--keepalive-interval=_&lt;#&gt;_**<br />Work Queue keepalive interval (default: 120s)
 - **-W**,**--schedule=_&lt;mode&gt;_**<br />WorkQueue scheduling algorithm. (time|files|fcfs)
 - **--password=_&lt;pwfile&gt;_**<br />Password file for authenticating workers.
+- **--ssl_cert=_&lt;&gt;_**<br /> Set the SSL certificate file for encrypting connection.
+- **--ssl_key=_&lt;&gt;_**<br /> Set the SSL certificate file for encrypting connection.
 - **--cache-mode**<br /> Control worker caching mode. (never|workflow|forever)
 - **--preferred-connection=_&lt;connection&gt;_**<br />Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
 
