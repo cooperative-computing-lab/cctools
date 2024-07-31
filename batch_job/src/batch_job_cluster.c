@@ -518,14 +518,6 @@ batch_queue_stub_free(cluster);
 batch_queue_stub_port(cluster);
 batch_queue_stub_option_update(cluster);
 
-batch_fs_stub_chdir(cluster);
-batch_fs_stub_getcwd(cluster);
-batch_fs_stub_mkdir(cluster);
-batch_fs_stub_putfile(cluster);
-batch_fs_stub_rename(cluster);
-batch_fs_stub_stat(cluster);
-batch_fs_stub_unlink(cluster);
-
 const struct batch_queue_module batch_queue_cluster = {
 	BATCH_QUEUE_TYPE_CLUSTER,
 	"cluster",
@@ -535,21 +527,9 @@ const struct batch_queue_module batch_queue_cluster = {
 	batch_queue_cluster_port,
 	batch_queue_cluster_option_update,
 
-	{
-		batch_job_cluster_submit,
-		batch_job_cluster_wait,
-		batch_job_cluster_remove,
-	},
-
-	{
-		batch_fs_cluster_chdir,
-		batch_fs_cluster_getcwd,
-		batch_fs_cluster_mkdir,
-		batch_fs_cluster_putfile,
-		batch_fs_cluster_rename,
-		batch_fs_cluster_stat,
-		batch_fs_cluster_unlink,
-	},
+	batch_job_cluster_submit,
+	batch_job_cluster_wait,
+	batch_job_cluster_remove,
 };
 
 const struct batch_queue_module batch_queue_moab = {
@@ -561,21 +541,9 @@ const struct batch_queue_module batch_queue_moab = {
 	batch_queue_cluster_port,
 	batch_queue_cluster_option_update,
 
-	{
-		batch_job_cluster_submit,
-		batch_job_cluster_wait,
-		batch_job_cluster_remove,
-	},
-
-	{
-		batch_fs_cluster_chdir,
-		batch_fs_cluster_getcwd,
-		batch_fs_cluster_mkdir,
-		batch_fs_cluster_putfile,
-		batch_fs_cluster_rename,
-		batch_fs_cluster_stat,
-		batch_fs_cluster_unlink,
-	},
+	batch_job_cluster_submit,
+	batch_job_cluster_wait,
+	batch_job_cluster_remove,
 };
 
 const struct batch_queue_module batch_queue_sge = {
@@ -587,21 +555,9 @@ const struct batch_queue_module batch_queue_sge = {
 	batch_queue_cluster_port,
 	batch_queue_cluster_option_update,
 
-	{
-		batch_job_cluster_submit,
-		batch_job_cluster_wait,
-		batch_job_cluster_remove,
-	},
-
-	{
-		batch_fs_cluster_chdir,
-		batch_fs_cluster_getcwd,
-		batch_fs_cluster_mkdir,
-		batch_fs_cluster_putfile,
-		batch_fs_cluster_rename,
-		batch_fs_cluster_stat,
-		batch_fs_cluster_unlink,
-	},
+	batch_job_cluster_submit,
+	batch_job_cluster_wait,
+	batch_job_cluster_remove,
 };
 
 const struct batch_queue_module batch_queue_pbs = {
@@ -613,21 +569,9 @@ const struct batch_queue_module batch_queue_pbs = {
 	batch_queue_cluster_port,
 	batch_queue_cluster_option_update,
 
-	{
-		batch_job_cluster_submit,
-		batch_job_cluster_wait,
-		batch_job_cluster_remove,
-	},
-
-	{
-		batch_fs_cluster_chdir,
-		batch_fs_cluster_getcwd,
-		batch_fs_cluster_mkdir,
-		batch_fs_cluster_putfile,
-		batch_fs_cluster_rename,
-		batch_fs_cluster_stat,
-		batch_fs_cluster_unlink,
-	},
+	batch_job_cluster_submit,
+	batch_job_cluster_wait,
+	batch_job_cluster_remove,
 };
 
 const struct batch_queue_module batch_queue_lsf = {
@@ -639,21 +583,9 @@ const struct batch_queue_module batch_queue_lsf = {
 	batch_queue_cluster_port,
 	batch_queue_cluster_option_update,
 
-	{
-		batch_job_cluster_submit,
-		batch_job_cluster_wait,
-		batch_job_cluster_remove,
-	},
-
-	{
-		batch_fs_cluster_chdir,
-		batch_fs_cluster_getcwd,
-		batch_fs_cluster_mkdir,
-		batch_fs_cluster_putfile,
-		batch_fs_cluster_rename,
-		batch_fs_cluster_stat,
-		batch_fs_cluster_unlink,
-	},
+	batch_job_cluster_submit,
+	batch_job_cluster_wait,
+	batch_job_cluster_remove,
 };
 
 const struct batch_queue_module batch_queue_torque = {
@@ -665,22 +597,11 @@ const struct batch_queue_module batch_queue_torque = {
 	batch_queue_cluster_port,
 	batch_queue_cluster_option_update,
 
-	{
-		batch_job_cluster_submit,
-		batch_job_cluster_wait,
-		batch_job_cluster_remove,
-	},
-
-	{
-		batch_fs_cluster_chdir,
-		batch_fs_cluster_getcwd,
-		batch_fs_cluster_mkdir,
-		batch_fs_cluster_putfile,
-		batch_fs_cluster_rename,
-		batch_fs_cluster_stat,
-		batch_fs_cluster_unlink,
-	},
+	batch_job_cluster_submit,
+	batch_job_cluster_wait,
+	batch_job_cluster_remove,
 };
+
 
 const struct batch_queue_module batch_queue_slurm = {
 	BATCH_QUEUE_TYPE_SLURM,
@@ -691,21 +612,9 @@ const struct batch_queue_module batch_queue_slurm = {
 	batch_queue_cluster_port,
 	batch_queue_cluster_option_update,
 
-	{
-		batch_job_cluster_submit,
-		batch_job_cluster_wait,
-		batch_job_cluster_remove,
-	},
-
-	{
-		batch_fs_cluster_chdir,
-		batch_fs_cluster_getcwd,
-		batch_fs_cluster_mkdir,
-		batch_fs_cluster_putfile,
-		batch_fs_cluster_rename,
-		batch_fs_cluster_stat,
-		batch_fs_cluster_unlink,
-	},
+	batch_job_cluster_submit,
+	batch_job_cluster_wait,
+	batch_job_cluster_remove,
 };
 
 /* vim: set noexpandtab tabstop=8: */

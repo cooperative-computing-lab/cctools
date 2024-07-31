@@ -274,11 +274,9 @@ const struct batch_queue_module batch_queue_vine = {
 	batch_queue_vine_port,
 	batch_queue_vine_option_update,
 
-	{
-		batch_job_vine_submit,
-		batch_job_vine_wait,
-		batch_job_vine_remove,
-	}
+	batch_job_vine_submit,
+	batch_job_vine_wait,
+	batch_job_vine_remove,
 };
 
 /* vim: set noexpandtab tabstop=8: */

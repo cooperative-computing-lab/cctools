@@ -134,11 +134,9 @@ const struct batch_queue_module batch_queue_local = {
 	batch_queue_local_port,
 	batch_queue_local_option_update,
 
-	{
-		batch_job_local_submit,
-		batch_job_local_wait,
-		batch_job_local_remove,
-	}
+	batch_job_local_submit,
+	batch_job_local_wait,
+	batch_job_local_remove,
 };
 
 /* vim: set noexpandtab tabstop=8: */

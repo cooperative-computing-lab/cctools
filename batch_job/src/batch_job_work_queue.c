@@ -264,11 +264,9 @@ const struct batch_queue_module batch_queue_wq = {
 	batch_queue_wq_port,
 	batch_queue_wq_option_update,
 
-	{
-		batch_job_wq_submit,
-		batch_job_wq_wait,
-		batch_job_wq_remove,
-	}
+	batch_job_wq_submit,
+	batch_job_wq_wait,
+	batch_job_wq_remove,
 };
 
 /* vim: set noexpandtab tabstop=8: */

@@ -842,9 +842,7 @@ const struct batch_queue_module batch_queue_amazon = {
 	batch_queue_amazon_port,
 	batch_queue_amazon_option_update,
 
-	{
-	 batch_job_amazon_submit,
-	 batch_job_amazon_wait,
-	 batch_job_amazon_remove,
-	 },
+	batch_job_amazon_submit,
+	batch_job_amazon_wait,
+	batch_job_amazon_remove,
 };

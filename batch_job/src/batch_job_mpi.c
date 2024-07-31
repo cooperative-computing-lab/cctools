@@ -689,14 +689,6 @@ void batch_job_mpi_setup( const char *debug_filename, int manual_cores, int manu
 batch_queue_stub_port(mpi);
 batch_queue_stub_option_update(mpi);
 
-batch_fs_stub_chdir(mpi);
-batch_fs_stub_getcwd(mpi);
-batch_fs_stub_mkdir(mpi);
-batch_fs_stub_putfile(mpi);
-batch_fs_stub_rename(mpi);
-batch_fs_stub_stat(mpi);
-batch_fs_stub_unlink(mpi);
-
 const struct batch_queue_module batch_queue_mpi = {
 	BATCH_QUEUE_TYPE_MPI,
 	"mpi",
@@ -706,20 +698,9 @@ const struct batch_queue_module batch_queue_mpi = {
 	batch_queue_mpi_port,
 	batch_queue_mpi_option_update,
 
-	{
-	 batch_job_mpi_submit,
-	 batch_job_mpi_wait,
-	 batch_job_mpi_remove,},
-
-	{
-	 batch_fs_mpi_chdir,
-	 batch_fs_mpi_getcwd,
-	 batch_fs_mpi_mkdir,
-	 batch_fs_mpi_putfile,
-	 batch_fs_mpi_rename,
-	 batch_fs_mpi_stat,
-	 batch_fs_mpi_unlink,
-	 },
+	batch_job_mpi_submit,
+	batch_job_mpi_wait,
+	batch_job_mpi_remove,},
 };
 #else
 

@@ -112,12 +112,9 @@ const struct batch_queue_module batch_queue_dryrun = {
 	batch_queue_dryrun_port,
 	batch_queue_dryrun_option_update,
 
-	{
-		batch_job_dryrun_submit,
-		batch_job_dryrun_wait,
-		batch_job_dryrun_remove,
-	}
-
+	batch_job_dryrun_submit,
+	batch_job_dryrun_wait,
+	batch_job_dryrun_remove,
 };
 
 

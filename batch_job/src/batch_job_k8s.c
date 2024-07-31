@@ -696,11 +696,9 @@ const struct batch_queue_module batch_queue_k8s = {
 	batch_queue_k8s_port,
 	batch_queue_k8s_option_update,
 
-	{
-		batch_job_k8s_submit,
-		batch_job_k8s_wait,
-		batch_job_k8s_remove,
-	}
+	batch_job_k8s_submit,
+	batch_job_k8s_wait,
+	batch_job_k8s_remove,
 };
 
 /* vim: set noexpandtab tabstop=8: */

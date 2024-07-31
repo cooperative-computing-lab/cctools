@@ -398,11 +398,9 @@ const struct batch_queue_module batch_queue_condor = {
 	batch_queue_condor_port,
 	batch_queue_condor_option_update,
 
-	{
-		batch_job_condor_submit,
-		batch_job_condor_wait,
-		batch_job_condor_remove,
-	}
+	batch_job_condor_submit,
+	batch_job_condor_wait,
+	batch_job_condor_remove,
 };
 
 /* vim: set noexpandtab tabstop=8: */

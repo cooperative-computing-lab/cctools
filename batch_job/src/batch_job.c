@@ -41,10 +41,7 @@ extern const struct batch_queue_module batch_queue_mpi;
 
 static struct batch_queue_module batch_queue_unknown = {
 	BATCH_QUEUE_TYPE_UNKNOWN, "unknown",
-
-	NULL, NULL, NULL, NULL,
-
-	{NULL, NULL, NULL},
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 };
 
 #define BATCH_JOB_SYSTEMS "local, vine, wq, condor, sge, pbs, lsf, torque, moab, mpi, slurm, amazon, amazon-batch, lambda, mesos, k8s, dryrun"
@@ -247,22 +244,22 @@ const char *batch_queue_type_string()
 
 batch_job_id_t batch_job_submit(struct batch_queue * q, struct batch_task *bt )
 {
-	return q->module->job.submit(q,bt);
+	return q->module->submit(q,bt);
 }
 
 batch_job_id_t batch_job_wait(struct batch_queue * q, struct batch_job_info * info)
 {
-	return q->module->job.wait(q, info, 0);
+	return q->module->wait(q, info, 0);
 }
 
 batch_job_id_t batch_job_wait_timeout(struct batch_queue * q, struct batch_job_info * info, time_t stoptime)
 {
-	return q->module->job.wait(q, info, stoptime);
+	return q->module->wait(q, info, stoptime);
 }
 
 int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid)
 {
-	return q->module->job.remove(q, jobid);
+	return q->module->remove(q, jobid);
 }
 
 /* vim: set noexpandtab tabstop=8: */

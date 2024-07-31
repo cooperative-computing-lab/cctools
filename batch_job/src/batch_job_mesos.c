@@ -394,11 +394,9 @@ const struct batch_queue_module batch_queue_mesos = {
 	batch_queue_mesos_port,
 	batch_queue_mesos_option_update,
 
-	{
-		batch_job_mesos_submit,
-		batch_job_mesos_wait,
-		batch_job_mesos_remove,
-	},
+	batch_job_mesos_submit,
+	batch_job_mesos_wait,
+	batch_job_mesos_remove,
 };
 
 /* vim: set noexpandtab tabstop=8: */
