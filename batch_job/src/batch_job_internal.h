@@ -31,7 +31,7 @@ struct batch_queue_module {
 	void (*option_update) (struct batch_queue *Q, const char *what, const char *value); /* called when an option is changed */
 
 	struct {
-		batch_job_id_t (*submit) (struct batch_queue *Q, const char *command, const char *inputs, const char *outputs, struct jx *env_list, const struct rmsummary *resources);
+		batch_job_id_t (*submit) (struct batch_queue *Q, struct batch_task *bt );
 		batch_job_id_t (*wait) (struct batch_queue *Q, struct batch_job_info *info, time_t stoptime);
 		int (*remove) (struct batch_queue *Q, batch_job_id_t id);
 	} job;

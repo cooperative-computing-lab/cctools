@@ -86,7 +86,7 @@ static char *blacklisted_expression(struct batch_queue *q) {
 }
 
 
-static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
+static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, struct batch_task *bt )
 {
 	FILE *file;
 	int njobs;
@@ -106,11 +106,21 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 
 	fprintf(file, "universe = vanilla\n");
 	fprintf(file, "executable = condor.sh\n");
-	char *escaped = string_escape_condor(cmd);
+	char *escaped = string_escape_condor(bt->command);
 	fprintf(file, "arguments = %s\n", escaped);
 	free(escaped);
-	if(extra_input_files)
-		fprintf(file, "transfer_input_files = %s\n", extra_input_files);
+
+	/* Add the input files to the transfer list. */
+	if(bt->input_files) {
+		fprintf(file, "transfer_input_files = ");
+		struct batch_file *bf;
+		LIST_ITERATE(bt->input_files,bf) {
+			fprintf(file, "%s, ", bf->inner_name);
+		}
+		/* XXX do we have to worry about a trailing comma? */
+		fprintf(file, "\n");
+	}
+
 	// Note that we do not use transfer_output_files, because that causes the job
 	// to get stuck in a system hold if the files are not created.
 	fprintf(file, "should_transfer_files = yes\n");
@@ -145,8 +155,8 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 
 	fprintf(file, "getenv = true\n");
 
-	if(envlist) {
-		jx_export(envlist);
+	if(bt->envlist) {
+		jx_export(bt->envlist);
 	}
 
 	/* set same deafults as condor_submit_workers */
@@ -155,6 +165,7 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	int64_t disk   = 1024;
 	int64_t gpus   = 0;
 
+	struct rmsummary *resources = bt->resources;
 	if(resources) {
 		cores  = resources->cores  > -1 ? resources->cores  : cores;
 		memory = resources->memory > -1 ? resources->memory : memory;

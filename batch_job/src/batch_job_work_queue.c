@@ -19,42 +19,22 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 
-static void specify_files(struct work_queue_task *t, const char *input_files, const char *output_files, int caching_flag )
-{
-	char *f, *p, *files;
+/* For each input and output file, add the file specification to the task. */
 
+static void specify_files( struct batch_queue *q, struct work_queue_task *t, struct list *input_files, struct list *output_files, int caching_flag )
+{
+	struct batch_file *bf;
+	
 	if(input_files) {
-		files = strdup(input_files);
-		f = strtok(files, " \t,");
-		while(f) {
-			p = strchr(f, '=');
-			if(p) {
-				*p = 0;
-				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_INPUT, caching_flag);
-				*p = '=';
-			} else {
-				work_queue_task_specify_file(t, f, f, WORK_QUEUE_INPUT, caching_flag);
-			}
-			f = strtok(0, " \t,");
+		LIST_ITERATE(input_files,bf) {
+			work_queue_task_specify_file(t, bf->inner_name, bf->outer_name, WORK_QUEUE_INPUT, caching_flag);
 		}
-		free(files);
 	}
 
 	if(output_files) {
-		files = strdup(output_files);
-		f = strtok(files, " \t,");
-		while(f) {
-			p = strchr(f, '=');
-			if(p) {
-				*p = 0;
-				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_OUTPUT, caching_flag);
-				*p = '=';
-			} else {
-				work_queue_task_specify_file(t, f, f, WORK_QUEUE_OUTPUT, caching_flag);
-			}
-			f = strtok(0, " \t,");
+		LIST_ITERATE(output_files,bf) {
+			work_queue_task_specify_file(t, bf->inner_name, bf->outer_name, WORK_QUEUE_OUTPUT, caching_flag);
 		}
-		free(files);
 	}
 }
 
@@ -68,7 +48,7 @@ static void specify_envlist( struct work_queue_task *t, struct jx *envlist )
 	}
 }
 
-static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
+static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, struct batch_task *bt )
 {
 	struct work_queue_task *t;
 
@@ -81,21 +61,20 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *c
 		caching_flag = WORK_QUEUE_CACHE;
 	}
 
-	t = work_queue_task_create(cmd);
+	t = work_queue_task_create(bt->command);
 
-	specify_files(t, extra_input_files, extra_output_files, caching_flag);
-	specify_envlist(t,envlist);
+	specify_files(q, t, bt->input_files, bt->output_files, caching_flag);
 
-	if(envlist) {
-		const char *category = jx_lookup_string(envlist, "CATEGORY");
+	if(bt->envlist) {
+		specify_envlist(t,bt->envlist);
+		const char *category = jx_lookup_string(bt->envlist, "CATEGORY");
 		if(category) {
 			work_queue_task_specify_category(t, category);
 		}
 	}
 
-	if(resources)
-	{
-		work_queue_task_specify_resources(t, resources);
+	if(bt->resources) {
+		work_queue_task_specify_resources(t, bt->resources);
 	}
 
 	work_queue_submit(q->wq_manager, t);

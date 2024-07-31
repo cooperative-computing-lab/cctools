@@ -482,42 +482,40 @@ static int submit_worker( struct batch_queue *queue )
 		cmd = newcmd;
 	}
 
-	char *files = NULL;
-	if(!runos_os && !k8s_worker_image) {
-		files = xxstrdup(worker_command);
-	} else {
-		// if runos, then worker comes from vc3_cmd. if k8s, then from the
-		// container image.
-		files = xxstrdup("");
-	}
-
-	if(password_file) {
-		char *newfiles = string_format("%s,pwfile",files);
-		free(files);
-		files = newfiles;
-	}
-
-	const char *item = NULL;
-	list_first_item(wrapper_inputs);
-	while((item = list_next_item(wrapper_inputs))) {
-		char *newfiles = string_format("%s,%s",files,path_basename(item));
-		free(files);
-		files = newfiles;
-	}
-
 	if(runos_os){
 		char* temp = string_format("%s %s %s",CCTOOLS_RUNOS_PATH,runos_os,cmd);
 		free(cmd);
 		cmd = temp;
 	}
 
+	struct batch_task *task = batch_task_create(queue);
+
+	batch_task_set_command(task,cmd);
+	
+	if(!runos_os && !k8s_worker_image) {
+		batch_task_add_input_file(task,worker_command,0);
+	} else {
+		// if runos, then worker comes from vc3_cmd. if k8s, then from the container image.
+	}
+
+	if(password_file) {
+		batch_task_add_input_file(task,"pwfile",0);
+	}
+
+	const char *item = NULL;
+	LIST_ITERATE(wrapper_inputs,item) {
+		batch_task_add_input_file(task,path_basename(item),0);
+	}
+
+	batch_task_add_output_file(task,"output.log",0);
+	
 	debug(D_WQ,"submitting worker: %s",cmd);
 
+	int status = batch_job_submit(queue,task);
 
-	int status = batch_job_submit(queue,cmd,files,"output.log",batch_env,resources);
-
+	batch_task_delete(task);
+	
 	free(cmd);
-	free(files);
 	free(worker);
 
 	return status;

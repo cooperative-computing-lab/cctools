@@ -17,22 +17,22 @@ SOURCES = \
 	batch_task.c \
 	batch_wrapper.c \
 	batch_job.c \
-	batch_job_amazon.c \
-	batch_job_amazon_batch.c \
 	batch_job_dryrun.c \
-	$(CHIRP_BATCH) \
-	batch_job_cluster.c \
-	batch_job_blue_waters.c \
 	batch_job_condor.c \
 	batch_job_local.c \
-	batch_job_work_queue.c\
-	batch_job_lambda.c \
 	batch_job_work_queue.c \
-	batch_job_vine.c \
-	batch_job_mesos.c \
-	batch_job_k8s.c \
-	batch_job_mpi.c \
-	mesos_task.c
+	batch_job_vine.c
+
+#	batch_job_amazon.c \
+#	batch_job_amazon_batch.c \
+#	$(CHIRP_BATCH) \
+#	batch_job_cluster.c \
+#	batch_job_blue_waters.c \
+#	batch_job_lambda.c \
+#	batch_job_mesos.c \
+#	batch_job_k8s.c \
+#	batch_job_mpi.c \
+#	mesos_task.c
 
 PUBLIC_HEADERS = batch_job.h
 

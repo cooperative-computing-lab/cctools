@@ -18,23 +18,23 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-extern const struct batch_queue_module batch_queue_amazon;
-extern const struct batch_queue_module batch_queue_lambda;
-extern const struct batch_queue_module batch_queue_amazon_batch;
-extern const struct batch_queue_module batch_queue_cluster;
+//extern const struct batch_queue_module batch_queue_amazon;
+//extern const struct batch_queue_module batch_queue_lambda;
+//extern const struct batch_queue_module batch_queue_amazon_batch;
+//extern const struct batch_queue_module batch_queue_cluster;
 extern const struct batch_queue_module batch_queue_condor;
 extern const struct batch_queue_module batch_queue_local;
-extern const struct batch_queue_module batch_queue_moab;
-extern const struct batch_queue_module batch_queue_sge;
-extern const struct batch_queue_module batch_queue_pbs;
-extern const struct batch_queue_module batch_queue_lsf;
-extern const struct batch_queue_module batch_queue_torque;
-extern const struct batch_queue_module batch_queue_blue_waters;
-extern const struct batch_queue_module batch_queue_slurm;
+//extern const struct batch_queue_module batch_queue_moab;
+//extern const struct batch_queue_module batch_queue_sge;
+//extern const struct batch_queue_module batch_queue_pbs;
+//extern const struct batch_queue_module batch_queue_lsf;
+//extern const struct batch_queue_module batch_queue_torque;
+//extern const struct batch_queue_module batch_queue_blue_waters;
+//extern const struct batch_queue_module batch_queue_slurm;
 extern const struct batch_queue_module batch_queue_wq;
 extern const struct batch_queue_module batch_queue_vine;
-extern const struct batch_queue_module batch_queue_mesos;
-extern const struct batch_queue_module batch_queue_k8s;
+//extern const struct batch_queue_module batch_queue_mesos;
+//extern const struct batch_queue_module batch_queue_k8s;
 extern const struct batch_queue_module batch_queue_dryrun;
 #ifdef CCTOOLS_WITH_MPI
 extern const struct batch_queue_module batch_queue_mpi;
@@ -53,26 +53,26 @@ static struct batch_queue_module batch_queue_unknown = {
 #define BATCH_JOB_SYSTEMS "local, vine, wq, condor, sge, pbs, lsf, torque, moab, mpi, slurm, amazon, amazon-batch, lambda, mesos, k8s, dryrun"
 
 const struct batch_queue_module * const batch_queue_modules[] = {
-	&batch_queue_amazon,
-	&batch_queue_amazon_batch,
-	&batch_queue_lambda,
+	//	&batch_queue_amazon,
+	//	&batch_queue_amazon_batch,
+	//	&batch_queue_lambda,
 #ifdef CCTOOLS_WITH_MPI
         &batch_queue_mpi,
 #endif
-	&batch_queue_cluster,
+	//	&batch_queue_cluster,
 	&batch_queue_condor,
 	&batch_queue_local,
-	&batch_queue_moab,
-	&batch_queue_sge,
-	&batch_queue_pbs,
-	&batch_queue_lsf,
-	&batch_queue_torque,
-	&batch_queue_blue_waters,
-	&batch_queue_slurm,
+	//	&batch_queue_moab,
+	//	&batch_queue_sge,
+	//	&batch_queue_pbs,
+	//	&batch_queue_lsf,
+	//	&batch_queue_torque,
+	//	&batch_queue_blue_waters,
+	//	&batch_queue_slurm,
 	&batch_queue_wq,
 	&batch_queue_vine,
-	&batch_queue_mesos,
-	&batch_queue_k8s,
+	//	&batch_queue_mesos,
+	//	&batch_queue_k8s,
 	&batch_queue_dryrun,
 	&batch_queue_unknown
 };
@@ -249,9 +249,9 @@ const char *batch_queue_type_string()
 }
 
 
-batch_job_id_t batch_job_submit(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
+batch_job_id_t batch_job_submit(struct batch_queue * q, struct batch_task *bt )
 {
-	return q->module->job.submit(q, cmd, extra_input_files, extra_output_files, envlist, resources);
+	return q->module->job.submit(q,bt);
 }
 
 batch_job_id_t batch_job_wait(struct batch_queue * q, struct batch_job_info * info)

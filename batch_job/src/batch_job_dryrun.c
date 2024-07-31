@@ -19,7 +19,7 @@ See the file COPYING for details.
 #include "path.h"
 #include "xxmalloc.h"
 
-static batch_job_id_t batch_job_dryrun_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
+static batch_job_id_t batch_job_dryrun_submit (struct batch_queue *q, struct batch_task *bt )
 {
 	FILE *log;
 	char *escaped_cmd;
@@ -30,7 +30,7 @@ static batch_job_id_t batch_job_dryrun_submit (struct batch_queue *q, const char
 
 	fflush(NULL);
 
-	debug(D_BATCH, "started dry run of job %" PRIbjid ": %s", jobid, cmd);
+	debug(D_BATCH, "started dry run of job %" PRIbjid ": %s", jobid, bt->command );
 
 	if ((log = fopen(q->logfile, "a"))) {
 		if (!(info = calloc(1, sizeof(*info)))) {
@@ -41,10 +41,10 @@ static batch_job_id_t batch_job_dryrun_submit (struct batch_queue *q, const char
 		info->started = time(0);
 		itable_insert(q->job_table, jobid, info);
 
-		if(envlist && jx_istype(envlist, JX_OBJECT) && envlist->u.pairs) {
+		if(bt->envlist && jx_istype(bt->envlist, JX_OBJECT) && bt->envlist->u.pairs) {
 			struct jx_pair *p;
 			fprintf(log, "env ");
-			for(p=envlist->u.pairs;p;p=p->next) {
+			for(p=bt->envlist->u.pairs;p;p=p->next) {
 				if(p->key->type==JX_STRING && p->value->type==JX_STRING) {
 					env_assignment = string_format("%s=%s", p->key->u.string_value,p->value->u.string_value);
 					escaped_env_assignment = string_escape_shell(env_assignment);
@@ -55,7 +55,7 @@ static batch_job_id_t batch_job_dryrun_submit (struct batch_queue *q, const char
 				}
 			}
 		}
-		escaped_cmd = string_escape_shell(cmd);
+		escaped_cmd = string_escape_shell(bt->command);
 		fprintf(log, "sh -c %s\n", escaped_cmd);
 		free(escaped_cmd);
 		fclose(log);

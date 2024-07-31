@@ -25,14 +25,14 @@ See the file COPYING for details.
 #include <sys/prctl.h>
 #endif
 
-static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
+static batch_job_id_t batch_job_local_submit (struct batch_queue *q, struct batch_task *bt )
 {
 	batch_job_id_t jobid;
 
 	fflush(NULL);
 	jobid = fork();
 	if(jobid > 0) {
-		debug(D_BATCH, "started process %" PRIbjid ": %s", jobid, cmd);
+		debug(D_BATCH, "started process %" PRIbjid ": %s", jobid, bt->command);
 		struct batch_job_info *info = malloc(sizeof(*info));
 		memset(info, 0, sizeof(*info));
 		info->submitted = time(0);
@@ -43,8 +43,8 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 		debug(D_BATCH, "couldn't create new process: %s\n", strerror(errno));
 		return -1;
 	} else {
-		if(envlist) {
-			jx_export(envlist);
+		if(bt->envlist) {
+			jx_export(bt->envlist);
 		}
 
 		/* Force the child process to exit if the parent dies. */
@@ -57,7 +57,7 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 		prctl (PR_SET_PDEATHSIG, SIGTERM);
 #endif
 
-		execlp("/bin/sh", "sh", "-c", cmd, (char *) 0);
+		execlp("/bin/sh", "sh", "-c", bt->command, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 	}
 	return -1;

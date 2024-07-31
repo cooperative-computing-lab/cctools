@@ -448,11 +448,10 @@ static int submit_worker( struct batch_queue *queue )
 
 	char *features_string = make_features_string(features_table);
 	
-	char *worker = string_format("./%s", worker_command);
 	if(using_catalog) {
 		cmd = string_format(
-		"%s --parent-death -M %s -t %d -C '%s' %s %s %s %s %s %s %s",
-		worker,
+		"./%s --parent-death -M %s -t %d -C '%s' %s %s %s %s %s %s %s",
+		worker_command,
 		submission_regex,
 		worker_timeout,
 		catalog_host,
@@ -466,8 +465,8 @@ static int submit_worker( struct batch_queue *queue )
 		);
 	} else {
 		cmd = string_format(
-		"%s --parent-death %s %d -t %d -C '%s' %s %s %s %s %s %s",
-		worker,
+		"./%s --parent-death %s %d -t %d -C '%s' %s %s %s %s %s %s",
+		worker_command,
 		manager_host,
 		manager_port,
 		worker_timeout,
@@ -491,32 +490,31 @@ static int submit_worker( struct batch_queue *queue )
 		cmd = newcmd;
 	}
 
-	char *files = NULL;
-	files = xxstrdup(worker_command);
+	struct batch_task *task = batch_task_create(queue);
+	
+	batch_task_set_command(task,cmd);
+	batch_task_add_input_file(task,worker_command,0);
 
 	if(password_file) {
-		char *newfiles = string_format("%s,pwfile",files);
-		free(files);
-		files = newfiles;
+		batch_task_add_input_file(task,"pwfile",0);
 	}
 
 	const char *item = NULL;
-	list_first_item(wrapper_inputs);
-	while((item = list_next_item(wrapper_inputs))) {
-		char *newfiles = string_format("%s,%s",files,path_basename(item));
-		free(files);
-		files = newfiles;
+	LIST_ITERATE(wrapper_inputs,item) {
+		batch_task_add_input_file(task,path_basename(item),0);
 	}
 
+	batch_task_add_output_file(task,worker_log_file,0);
+	
 	debug(D_VINE,"submitting worker: %s",cmd);
 
-	int status = batch_job_submit(queue,cmd,files,worker_log_file,batch_env,resources);
+	int status = batch_job_submit(queue,task);
 
+	batch_task_delete(task);
+	
 	free(worker_log_file);
 	free(debug_worker_options);
 	free(cmd);
-	free(files);
-	free(worker);
 
 	return status;
 }

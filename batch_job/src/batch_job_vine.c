@@ -19,64 +19,49 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 
-static struct vine_file *declare_once( struct batch_queue *q, const char *name, vine_cache_level_t cache, vine_file_flags_t flags )
+/*
+The batch_job interface provides a new batch_file every time.
+But vine_file objects should get reused.
+So look up this name in our table to see if we already have it.
+*/
+
+static struct vine_file *declare_once( struct batch_queue *q, struct batch_file *bf, vine_cache_level_t cache )
 {
 	struct vine_file *f;
 
 	if(!q->tv_file_table) q->tv_file_table = hash_table_create(0,0);
 
-	f = hash_table_lookup(q->tv_file_table,name);
+	f = hash_table_lookup(q->tv_file_table,bf->outer_name);
 	if(!f) {
-		f = vine_declare_file(q->tv_manager,name,cache,flags);
-		hash_table_insert(q->tv_file_table,name,f);
+		//if(bf->flags & BATCH_FILE_TEMP) {
+		//	f = vine_declare_temp(q->tv_manager);
+		//} else {
+			f = vine_declare_file(q->tv_manager,bf->outer_name,cache,0);
+			//}
+		hash_table_insert(q->tv_file_table,bf->outer_name,f);
 	}
 	return f;
 }
 
-static void specify_files( struct batch_queue *q, struct vine_task *t, const char *input_files, const char *output_files, vine_cache_level_t cache, vine_file_flags_t flags )
-{
-	char *files;       // Copy of string list of files.
-	char *local_name;  // Name of file at manager.
-	char *remote_name; // Name of file in task sandbox.
+/* For each input and output file, convert to a vine_file and add to the task. */
 
-	struct vine_file *f;
+static void specify_files( struct batch_queue *q, struct vine_task *t, struct list *input_files, struct list *output_files, vine_cache_level_t cache )
+{
+	struct batch_file *bf;
+	struct vine_file *vf;
 	
 	if(input_files) {
-		files = strdup(input_files);
-		local_name = strtok(files, " \t,");
-		while(local_name) {
-			remote_name = strchr(local_name, '=');
-			if(remote_name) {
-				*remote_name = 0;
-				f = declare_once(q,local_name,cache,flags);
-				vine_task_add_input(t,f,remote_name+1,0);
-				*remote_name = '=';
-			} else {
-				f = declare_once(q,local_name,cache,flags);
-				vine_task_add_input(t,f,local_name,0);
-			}
-			local_name = strtok(0, " \t,");
+		LIST_ITERATE(input_files,bf) {
+			vf = declare_once(q,bf,cache);
+			vine_task_add_input(t,vf,bf->inner_name,0);
 		}
-		free(files);
 	}
 
 	if(output_files) {
-		files = strdup(output_files);
-		local_name = strtok(files, " \t,");
-		while(local_name) {
-			remote_name = strchr(local_name, '=');
-			if(remote_name) {
-				*remote_name = 0;
-				f = declare_once(q,local_name,cache,flags);
-				vine_task_add_output(t,f,remote_name+1,0);
-				*remote_name = '=';
-			} else {
-				f = declare_once(q,local_name,cache,flags);
-				vine_task_add_output(t,f,local_name,0);
-			}
-			local_name = strtok(0, " \t,");
+		LIST_ITERATE(output_files,bf) {
+			vf = declare_once(q,bf,cache);
+			vine_task_add_output(t,vf,bf->inner_name,0);
 		}
-		free(files);
 	}
 }
 
@@ -90,7 +75,7 @@ static void specify_envlist( struct vine_task *t, struct jx *envlist )
 	}
 }
 
-static batch_job_id_t batch_job_vine_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
+static batch_job_id_t batch_job_vine_submit (struct batch_queue *q, struct batch_task *bt )
 {
 	struct vine_task *t;
 
@@ -109,21 +94,20 @@ static batch_job_id_t batch_job_vine_submit (struct batch_queue * q, const char 
 		caching_flag = VINE_CACHE_LEVEL_WORKFLOW;
 	}
 
-	t = vine_task_create(cmd);
+	t = vine_task_create(bt->command);
 
-	specify_files(q, t, extra_input_files, extra_output_files, caching_flag, 0);
-	specify_envlist(t,envlist);
+	specify_files(q, t, bt->input_files, bt->output_files, caching_flag);
+	specify_envlist(t,bt->envlist);
 
-	if(envlist) {
-		const char *category = jx_lookup_string(envlist, "CATEGORY");
+	if(bt->envlist) {
+		const char *category = jx_lookup_string(bt->envlist, "CATEGORY");
 		if(category) {
 			vine_task_set_category(t, category);
 		}
 	}
 
-	if(resources)
-	{
-		vine_task_set_resources(t, resources);
+	if(bt->resources) {
+		vine_task_set_resources(t, bt->resources);
 	}
 
 	return vine_submit(q->tv_manager, t);

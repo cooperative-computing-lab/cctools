@@ -14,6 +14,12 @@ See the file COPYING for details.
 #include <stdint.h>
 #include <time.h>
 
+struct batch_queue;
+struct batch_task;
+struct batch_file;
+
+#include "batch_task.h"
+#include "batch_file.h"
 #include "jx.h"
 #include "rmsummary.h"
 
@@ -88,15 +94,12 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type, const char *ssl_
 
 /** Submit a batch job.
 @param q The queue to submit to.
-@param cmdline The command line to execute.  This line will be interpreted by the shell, so it may include output redirection, multiple commands, pipes, and so forth.
-@param input_files A comma separated list of all input files that will be required by the job.  Null pointer is equivalent to empty string.  This must also include the executable and any dependent programs.
-@param output_files A comma separated list of all output files to retrieve from the job.  Null pointer is equivalent to empty string.
-@param envlist The set of environment variables for the job, in a jx object.
+@param task The job description to submit.
 @param resources The computational resources needed by the job.
 @return On success, returns a positive unique identifier for the batch job.  On failure, returns a negative number.
 Zero is not a valid batch job id and indicates an internal failure.
 */
-batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmdline, const char *input_files, const char *output_files, struct jx *envlist, const struct rmsummary *resources);
+batch_job_id_t batch_job_submit(struct batch_queue *q, struct batch_task *task );
 
 /** Wait for any batch job to complete.
 Blocks until a batch job completes.
