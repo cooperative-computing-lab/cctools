@@ -412,6 +412,7 @@ class FuturePythonTask(PythonTask):
         if not self._output_loaded and self._has_retrieved:
             if self.successful():
                 try:
+                    self._module_manager.fetch_file(self._output_file)
                     self._output = cloudpickle.loads(self._output_file.contents())
                 except Exception as e:
                     self._output = e

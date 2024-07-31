@@ -67,6 +67,8 @@ class File(object):
             with open(self.source(), "rb") as f:
                 return unserializer(f)
         else:
+            with io.BytesIO(cvine.vine_file_contents_as_bytes(self._file)) as f:
+                return unserializer(f)
             raise ValueError("File does not have local contents", self.type())
 
     ##
