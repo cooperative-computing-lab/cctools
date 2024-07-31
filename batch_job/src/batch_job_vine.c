@@ -265,14 +265,6 @@ static void batch_queue_vine_option_update (struct batch_queue *q, const char *w
 	}
 }
 
-batch_fs_stub_chdir(vine);
-batch_fs_stub_getcwd(vine);
-batch_fs_stub_mkdir(vine);
-batch_fs_stub_putfile(vine);
-batch_fs_stub_rename(vine);
-batch_fs_stub_stat(vine);
-batch_fs_stub_unlink(vine);
-
 const struct batch_queue_module batch_queue_vine = {
 	BATCH_QUEUE_TYPE_VINE,
 	"vine",
@@ -286,17 +278,7 @@ const struct batch_queue_module batch_queue_vine = {
 		batch_job_vine_submit,
 		batch_job_vine_wait,
 		batch_job_vine_remove,
-	},
-
-	{
-		batch_fs_vine_chdir,
-		batch_fs_vine_getcwd,
-		batch_fs_vine_mkdir,
-		batch_fs_vine_putfile,
-		batch_fs_vine_rename,
-		batch_fs_vine_stat,
-		batch_fs_vine_unlink,
-	},
+	}
 };
 
 /* vim: set noexpandtab tabstop=8: */

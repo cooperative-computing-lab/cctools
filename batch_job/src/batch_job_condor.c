@@ -389,14 +389,6 @@ batch_queue_stub_free(condor);
 batch_queue_stub_port(condor);
 batch_queue_stub_option_update(condor);
 
-batch_fs_stub_chdir(condor);
-batch_fs_stub_getcwd(condor);
-batch_fs_stub_mkdir(condor);
-batch_fs_stub_putfile(condor);
-batch_fs_stub_rename(condor);
-batch_fs_stub_stat(condor);
-batch_fs_stub_unlink(condor);
-
 const struct batch_queue_module batch_queue_condor = {
 	BATCH_QUEUE_TYPE_CONDOR,
 	"condor",
@@ -410,17 +402,7 @@ const struct batch_queue_module batch_queue_condor = {
 		batch_job_condor_submit,
 		batch_job_condor_wait,
 		batch_job_condor_remove,
-	},
-
-	{
-		batch_fs_condor_chdir,
-		batch_fs_condor_getcwd,
-		batch_fs_condor_mkdir,
-		batch_fs_condor_putfile,
-		batch_fs_condor_rename,
-		batch_fs_condor_stat,
-		batch_fs_condor_unlink,
-	},
+	}
 };
 
 /* vim: set noexpandtab tabstop=8: */

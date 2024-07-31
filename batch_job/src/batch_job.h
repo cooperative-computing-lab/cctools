@@ -135,14 +135,6 @@ You must still call @ref batch_job_wait to wait for the removal to complete.
 */
 int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid);
 
-int batch_fs_chdir (struct batch_queue *q, const char *path);
-int batch_fs_getcwd (struct batch_queue *q, char *buf, size_t size);
-int batch_fs_mkdir (struct batch_queue *q, const char *path, mode_t mode, int recursive);
-int64_t batch_fs_putfile (struct batch_queue *q, const char *lpath, const char *rpath);
-int batch_fs_rename (struct batch_queue *q, const char *lpath, const char *rpath);
-int batch_fs_stat (struct batch_queue *q, const char *path, struct stat *buf);
-int batch_fs_unlink (struct batch_queue *q, const char *path);
-
 /** Converts a string into a batch queue type.
 @param str A string listing all of the known batch queue types (which changes over time.)
 @return The batch queue type corresponding to the string, or BATCH_QUEUE_TYPE_UNKNOWN if the string is invalid.

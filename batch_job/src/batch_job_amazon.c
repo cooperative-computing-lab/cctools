@@ -833,14 +833,6 @@ batch_queue_stub_free(amazon);
 batch_queue_stub_port(amazon);
 batch_queue_stub_option_update(amazon);
 
-batch_fs_stub_chdir(amazon);
-batch_fs_stub_getcwd(amazon);
-batch_fs_stub_mkdir(amazon);
-batch_fs_stub_putfile(amazon);
-batch_fs_stub_rename(amazon);
-batch_fs_stub_stat(amazon);
-batch_fs_stub_unlink(amazon);
-
 const struct batch_queue_module batch_queue_amazon = {
 	BATCH_QUEUE_TYPE_AMAZON,
 	"amazon",
@@ -854,15 +846,5 @@ const struct batch_queue_module batch_queue_amazon = {
 	 batch_job_amazon_submit,
 	 batch_job_amazon_wait,
 	 batch_job_amazon_remove,
-	 },
-
-	{
-	 batch_fs_amazon_chdir,
-	 batch_fs_amazon_getcwd,
-	 batch_fs_amazon_mkdir,
-	 batch_fs_amazon_putfile,
-	 batch_fs_amazon_rename,
-	 batch_fs_amazon_stat,
-	 batch_fs_amazon_unlink,
 	 },
 };

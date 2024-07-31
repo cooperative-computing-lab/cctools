@@ -436,14 +436,6 @@ batch_queue_stub_free(lambda);
 batch_queue_stub_port(lambda);
 batch_queue_stub_option_update(lambda);
 
-batch_fs_stub_chdir(lambda);
-batch_fs_stub_getcwd(lambda);
-batch_fs_stub_mkdir(lambda);
-batch_fs_stub_putfile(lambda);
-batch_fs_stub_rename(lambda);
-batch_fs_stub_stat(lambda);
-batch_fs_stub_unlink(lambda);
-
 const struct batch_queue_module batch_queue_lambda = {
 	BATCH_QUEUE_TYPE_LAMBDA,
 	"lambda",
@@ -457,15 +449,5 @@ const struct batch_queue_module batch_queue_lambda = {
 	 batch_job_lambda_submit,
 	 batch_job_lambda_wait,
 	 batch_job_lambda_remove,
-	 },
-
-	{
-	 batch_fs_lambda_chdir,
-	 batch_fs_lambda_getcwd,
-	 batch_fs_lambda_mkdir,
-	 batch_fs_lambda_putfile,
-	 batch_fs_lambda_rename,
-	 batch_fs_lambda_stat,
-	 batch_fs_lambda_unlink,
-	 },
+	 }
 };

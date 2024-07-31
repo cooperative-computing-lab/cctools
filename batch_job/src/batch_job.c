@@ -45,8 +45,6 @@ static struct batch_queue_module batch_queue_unknown = {
 	NULL, NULL, NULL, NULL,
 
 	{NULL, NULL, NULL},
-
-	{NULL, NULL, NULL, NULL, NULL, NULL, NULL},
 };
 
 #define BATCH_JOB_SYSTEMS "local, vine, wq, condor, sge, pbs, lsf, torque, moab, mpi, slurm, amazon, amazon-batch, lambda, mesos, k8s, dryrun"
@@ -265,42 +263,6 @@ batch_job_id_t batch_job_wait_timeout(struct batch_queue * q, struct batch_job_i
 int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid)
 {
 	return q->module->job.remove(q, jobid);
-}
-
-
-int batch_fs_chdir (struct batch_queue *q, const char *path)
-{
-	return q->module->fs.chdir(q, path);
-}
-
-int batch_fs_getcwd (struct batch_queue *q, char *buf, size_t size)
-{
-	return q->module->fs.getcwd(q, buf, size);
-}
-
-int batch_fs_mkdir (struct batch_queue *q, const char *path, mode_t mode, int recursive)
-{
-	return q->module->fs.mkdir(q, path, mode, recursive);
-}
-
-int64_t batch_fs_putfile (struct batch_queue *q, const char *lpath, const char *rpath)
-{
-	return q->module->fs.putfile(q, lpath, rpath);
-}
-
-int batch_fs_rename (struct batch_queue *q, const char *lpath, const char *rpath)
-{
-	return q->module->fs.rename(q, lpath, rpath);
-}
-
-int batch_fs_stat (struct batch_queue *q, const char *path, struct stat *buf)
-{
-	return q->module->fs.stat(q, path, buf);
-}
-
-int batch_fs_unlink (struct batch_queue *q, const char *path)
-{
-	return q->module->fs.unlink(q, path);
 }
 
 /* vim: set noexpandtab tabstop=8: */

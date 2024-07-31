@@ -687,14 +687,6 @@ static int batch_queue_k8s_free(struct batch_queue *q)
 batch_queue_stub_port(k8s);
 batch_queue_stub_option_update(k8s);
 
-batch_fs_stub_chdir(k8s);
-batch_fs_stub_getcwd(k8s);
-batch_fs_stub_mkdir(k8s);
-batch_fs_stub_putfile(k8s);
-batch_fs_stub_rename(k8s);
-batch_fs_stub_stat(k8s);
-batch_fs_stub_unlink(k8s);
-
 const struct batch_queue_module batch_queue_k8s = {
 	BATCH_QUEUE_TYPE_K8S,
 	"k8s",
@@ -708,17 +700,7 @@ const struct batch_queue_module batch_queue_k8s = {
 		batch_job_k8s_submit,
 		batch_job_k8s_wait,
 		batch_job_k8s_remove,
-	},
-
-	{
-		batch_fs_k8s_chdir,
-		batch_fs_k8s_getcwd,
-		batch_fs_k8s_mkdir,
-		batch_fs_k8s_putfile,
-		batch_fs_k8s_rename,
-		batch_fs_k8s_stat,
-		batch_fs_k8s_unlink,
-	},
+	}
 };
 
 /* vim: set noexpandtab tabstop=8: */

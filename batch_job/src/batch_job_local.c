@@ -125,14 +125,6 @@ batch_queue_stub_free(local);
 batch_queue_stub_port(local);
 batch_queue_stub_option_update(local);
 
-batch_fs_stub_chdir(local);
-batch_fs_stub_getcwd(local);
-batch_fs_stub_mkdir(local);
-batch_fs_stub_putfile(local);
-batch_fs_stub_rename(local);
-batch_fs_stub_stat(local);
-batch_fs_stub_unlink(local);
-
 const struct batch_queue_module batch_queue_local = {
 	BATCH_QUEUE_TYPE_LOCAL,
 	"local",
@@ -146,17 +138,7 @@ const struct batch_queue_module batch_queue_local = {
 		batch_job_local_submit,
 		batch_job_local_wait,
 		batch_job_local_remove,
-	},
-
-	{
-		batch_fs_local_chdir,
-		batch_fs_local_getcwd,
-		batch_fs_local_mkdir,
-		batch_fs_local_putfile,
-		batch_fs_local_rename,
-		batch_fs_local_stat,
-		batch_fs_local_unlink,
-	},
+	}
 };
 
 /* vim: set noexpandtab tabstop=8: */

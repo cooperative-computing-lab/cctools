@@ -99,120 +99,6 @@ static int batch_queue_dryrun_create (struct batch_queue *q)
 	return 0;
 }
 
-static int batch_fs_dryrun_stat (struct batch_queue *q, const char *path, struct stat *buf) {
-	struct stat dummy;
-	FILE *log;
-
-	if ((log = fopen(q->logfile, "a"))) {
-		char *escaped_path = string_escape_shell(path);
-		// Since Makeflow only calls stat *after* a file has been created,
-		// add a test here as a sanity check. If Makeflow e.g. tries to stat
-		// files before running rules to create them, these tests will
-		// cripple the shell script representation.
-		fprintf(log, "test -e %s\n", escaped_path);
-		free(escaped_path);
-		fclose(log);
-		dummy.st_size = 1;
-		memcpy(buf, &dummy, sizeof(dummy));
-		return 0;
-	} else {
-		return -1;
-	}
-}
-
-static int batch_fs_dryrun_mkdir (struct batch_queue *q, const char *path, mode_t mode, int recursive) {
-	FILE *log;
-
-	if ((log = fopen(q->logfile, "a"))) {
-		char *escaped_path = string_escape_shell(path);
-		if (recursive) {
-			fprintf(log, "mkdir -p -m %d %s\n", mode, escaped_path);
-		} else {
-			fprintf(log, "mkdir -m %d %s\n", mode, escaped_path);
-		}
-		fclose(log);
-		free(escaped_path);
-		return 0;
-	} else {
-		return -1;
-	}
-}
-
-static int batch_fs_dryrun_chdir (struct batch_queue *q, const char *path) {
-	FILE *log;
-
-	if ((log = fopen(q->logfile, "a"))) {
-		char *escaped_path = string_escape_shell(path);
-		batch_queue_set_option(q, "cwd", xxstrdup(path));
-
-		fprintf(log, "cd %s\n", escaped_path);
-
-		fclose(log);
-		free(escaped_path);
-		return 0;
-	} else {
-		return -1;
-	}
-}
-
-static int batch_fs_dryrun_getcwd (struct batch_queue *q, char *buf, size_t size) {
-	const char *cwd = batch_queue_get_option(q, "cwd");
-	size_t pathlength = strlen(cwd);
-	if (pathlength + 1 > size) {
-		errno = ERANGE;
-		return -1;
-	} else {
-		strcpy(buf, cwd);
-		return 0;
-	}
-}
-
-static int batch_fs_dryrun_unlink (struct batch_queue *q, const char *path) {
-	FILE *log;
-
-	if ((log = fopen(q->logfile, "a"))) {
-		char *escaped_path = string_escape_shell(path);
-		fprintf(log, "rm -r %s\n", escaped_path);
-		free(escaped_path);
-		fclose(log);
-		return 0;
-	} else {
-		return -1;
-	}
-}
-
-static int64_t batch_fs_dryrun_putfile (struct batch_queue *q, const char *lpath, const char *rpath) {
-	FILE *log;
-
-	if ((log = fopen(q->logfile, "a"))) {
-		char *escaped_lpath = string_escape_shell(lpath);
-		char *escaped_rpath = string_escape_shell(rpath);
-		fprintf(log, "cp %s %s\n", escaped_lpath, escaped_rpath);
-		free(escaped_lpath);
-		free(escaped_rpath);
-		fclose(log);
-		return 0;
-	} else {
-		return -1;
-	}
-}
-
-static int batch_fs_dryrun_rename (struct batch_queue *q, const char *lpath, const char *rpath) {
-	FILE *log;
-
-	if ((log = fopen(q->logfile, "a"))) {
-		char *escaped_lpath = string_escape_shell(lpath);
-		char *escaped_rpath = string_escape_shell(rpath);
-		fprintf(log, "mv %s %s\n", escaped_lpath, escaped_rpath);
-		free(escaped_lpath);
-		free(escaped_rpath);
-		fclose(log);
-		return 0;
-	} else {
-		return -1;
-	}
-}
-
 batch_queue_stub_free(dryrun);
 batch_queue_stub_port(dryrun);
 batch_queue_stub_option_update(dryrun);
@@ -230,17 +116,9 @@ const struct batch_queue_module batch_queue_dryrun = {
 		batch_job_dryrun_submit,
 		batch_job_dryrun_wait,
 		batch_job_dryrun_remove,
-	},
+	}
 
-	{
-		batch_fs_dryrun_chdir,
-		batch_fs_dryrun_getcwd,
-		batch_fs_dryrun_mkdir,
-		batch_fs_dryrun_putfile,
-		batch_fs_dryrun_rename,
-		batch_fs_dryrun_stat,
-		batch_fs_dryrun_unlink,
-	},
 };
+
 
 /* vim: set noexpandtab tabstop=8: */

@@ -35,16 +35,6 @@ struct batch_queue_module {
 		batch_job_id_t (*wait) (struct batch_queue *Q, struct batch_job_info *info, time_t stoptime);
 		int (*remove) (struct batch_queue *Q, batch_job_id_t id);
 	} job;
-
-	struct {
-		int (*chdir) (struct batch_queue *q, const char *path);
-		int (*getcwd) (struct batch_queue *q, char *buf, size_t size);
-		int (*mkdir) (struct batch_queue *q, const char *path, mode_t mode, int recursive);
-		int64_t (*putfile) (struct batch_queue *q, const char *lpath, const char *rpath);
-		int (*rename) (struct batch_queue *q, const char *lpath, const char *rpath);
-		int (*stat) (struct batch_queue *q, const char *path, struct stat *buf);
-		int (*unlink) (struct batch_queue *q, const char *path);
-	} fs;
 };
 
 struct batch_queue {
@@ -64,14 +54,6 @@ struct batch_queue {
 #define batch_queue_stub_free(name)  static int batch_queue_##name##_free (struct batch_queue *Q) { return 0; }
 #define batch_queue_stub_port(name)  static int batch_queue_##name##_port (struct batch_queue *Q) { return 0; }
 #define batch_queue_stub_option_update(name)  static void batch_queue_##name##_option_update (struct batch_queue *Q, const char *what, const char *value) { return; }
-
-#define batch_fs_stub_chdir(name)  static int batch_fs_##name##_chdir (struct batch_queue *Q, const char *path) { return chdir(path); }
-#define batch_fs_stub_getcwd(name)  static int batch_fs_##name##_getcwd (struct batch_queue *Q, char *buf, size_t size) { getcwd(buf, size); return 0; }
-#define batch_fs_stub_mkdir(name)  static int batch_fs_##name##_mkdir (struct batch_queue *Q, const char *path, mode_t mode, int recursive) { if (recursive) return create_dir(path, mode); else return mkdir(path, mode); }
-#define batch_fs_stub_putfile(name)  static int64_t batch_fs_##name##_putfile (struct batch_queue *Q, const char *lpath, const char *rpath) { return copy_file_to_file(lpath, rpath); }
-#define batch_fs_stub_rename(name)  static int batch_fs_##name##_rename (struct batch_queue *Q, const char *lpath, const char *rpath) { return create_dir_parents(rpath, 0755) && !rename(lpath, rpath) ? 0 : -1; }
-#define batch_fs_stub_stat(name)  static int batch_fs_##name##_stat (struct batch_queue *Q, const char *path, struct stat *buf) { return stat(path, buf); }
-#define batch_fs_stub_unlink(name)  static int batch_fs_##name##_unlink (struct batch_queue *Q, const char *path) { return unlink_recursive(path); }
 
 #endif
 
