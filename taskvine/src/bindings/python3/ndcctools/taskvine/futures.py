@@ -402,51 +402,24 @@ class FuturePythonTask(PythonTask):
         self._retriever = None
 
     def output(self, timeout="wait_forever"):
-        def retrieve_output(arg):
-            return arg
-        if not self._is_retriever and not self._retriever:
-            self._retriever = FuturePythonTask(self._module_manager, True, retrieve_output, self._future)
-            self._retriever.set_cores(1)
-            for env in self._envs:
-                self._retriever.add_environment(env)
-            self._retriever.disable_temp_output()
-            self._module_manager.submit(self._retriever)
+        if not self._has_retrieved:
+            result = self._module_manager.wait_for_task_id(self.id, timeout=timeout)
+            if result:
+                self._has_retrieved = True
+            else:
+                return RESULT_PENDING
 
-        if not self._is_retriever:
-            if not self._output_loaded:
-                result = self._retriever._future.result(timeout=timeout)
-                if result == RESULT_PENDING:
-                    return RESULT_PENDING
-                self._output = result
-                self._output_loaded = True
-            if not self._ran_functions:
-                self._ran_functions = True
-                for fn in self._future._callback_fns:
-                    fn(self._future)
-            return self._output
-
-        else:
-            if not self._has_retrieved:
-                result = self._module_manager.wait_for_task_id(self.id, timeout=timeout)
-                if result:
-                    self._has_retrieved = True
-                else:
-                    return RESULT_PENDING
-            if not self._output_loaded and self._has_retrieved:
-                if self.successful():
-                    try:
-                        with open(self._output_file.source(), "rb") as f:
-                            if self._serialize_output:
-                                self._output = cloudpickle.load(f)
-                            else:
-                                self._output = f.read()
-                    except Exception as e:
-                        self._output = e
-                        raise e
-                else:
-                    self._output = PythonTaskNoResult()
-                self._output_loaded = True
-            return self._output
+        if not self._output_loaded and self._has_retrieved:
+            if self.successful():
+                try:
+                    self._output = cloudpickle.loads(self._output_file.contents())
+                except Exception as e:
+                    self._output = e
+                    raise e
+            else:
+                self._output = PythonTaskNoResult()
+            self._output_loaded = True
+        return self._output
 
     def submit_finalize(self):
         func, args, kwargs = self._fn_def
