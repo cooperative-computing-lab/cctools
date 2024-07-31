@@ -1099,7 +1099,7 @@ static void kill_all_tasks()
 static int enforce_process_limits(struct vine_process *p)
 {
 	/* If the task did not set disk usage, return right away. */
-	if (p->disk < 1)
+	if (p->task->resources_requested->disk < 1)
 		return 1;
 
 	vine_process_measure_disk(p, options->max_time_on_measurement);
