@@ -29,7 +29,6 @@ extern const struct batch_queue_module batch_queue_local;
 //extern const struct batch_queue_module batch_queue_pbs;
 //extern const struct batch_queue_module batch_queue_lsf;
 //extern const struct batch_queue_module batch_queue_torque;
-//extern const struct batch_queue_module batch_queue_blue_waters;
 //extern const struct batch_queue_module batch_queue_slurm;
 extern const struct batch_queue_module batch_queue_wq;
 extern const struct batch_queue_module batch_queue_vine;
@@ -67,7 +66,6 @@ const struct batch_queue_module * const batch_queue_modules[] = {
 	//	&batch_queue_pbs,
 	//	&batch_queue_lsf,
 	//	&batch_queue_torque,
-	//	&batch_queue_blue_waters,
 	//	&batch_queue_slurm,
 	&batch_queue_wq,
 	&batch_queue_vine,

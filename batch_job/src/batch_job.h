@@ -48,7 +48,6 @@ typedef enum {
 	BATCH_QUEUE_TYPE_PBS,                 /**< Batch jobs will be send to the PBS Scheduler. */
 	BATCH_QUEUE_TYPE_LSF,		      /**< Batch jobs will be sent to LSF. */
 	BATCH_QUEUE_TYPE_TORQUE,              /**< Batch jobs will be send to the Torque Scheduler. */
-	BATCH_QUEUE_TYPE_BLUE_WATERS,         /**< Batch jobs will be send to the Torque Scheduler at Blue Waters. */
 	BATCH_QUEUE_TYPE_SLURM,               /**< Batch jobs will be send to the SLURM Scheduler. */
 	BATCH_QUEUE_TYPE_CLUSTER,             /**< Batch jobs will be sent to a user-defined cluster manager. */
 	BATCH_QUEUE_TYPE_WORK_QUEUE,          /**< Batch jobs will be sent to the Work Queue. */
