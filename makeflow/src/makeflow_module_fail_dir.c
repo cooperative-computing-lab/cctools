@@ -37,7 +37,7 @@ struct dag_file *makeflow_module_lookup_fail_dir(struct dag *d, struct batch_que
 		}
 		return f;
 	} else {
-		if (!batch_fs_stat(q, path, &buf)) {
+		if (!stat(path, &buf)) {
 			debug(D_MAKEFLOW_HOOK,
 					"skipping %s since it already exists",
 					path);
@@ -61,7 +61,7 @@ int makeflow_module_move_fail_file(struct dag *d, struct dag_node *n, struct bat
 			return MAKEFLOW_HOOK_SUCCESS;
 		}
 
-		if (batch_fs_rename(q, f->filename, o->filename) < 0) {
+		if (rename(f->filename, o->filename) < 0) {
 			debug(D_MAKEFLOW_HOOK, "Failed to rename %s -> %s: %s",
 					f->filename, o->filename, strerror(errno));
 		} else {

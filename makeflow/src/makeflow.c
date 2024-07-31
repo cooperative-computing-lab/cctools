@@ -86,11 +86,6 @@ These are all functions named makeflow_*() to distinguish them from dag_*().
 because some of the execution state (note states, node counts, etc)
 is stored in struct dag and struct dag_node.  Perhaps this can be improved.
 
-- All operations on files should use the batch_fs_*() functions, rather
-than invoking Unix I/O directly.  This is because some batch systems
-(Hadoop, Confuga, etc) also include the storage where the files to be
-accessed are located.
-
 - APIs like work_queue_* and vine_* should be indirectly accessed by setting options
 in Batch Job using batch_queue_set_option. See batch_job_work_queue.c for
 an example.
@@ -787,7 +782,7 @@ int makeflow_node_check_file_was_created(struct dag *d, struct dag_node *n, stru
 	int64_t start_check = time(0);
 
 	while(!file_created) {
-		if(batch_fs_stat(remote_queue, f->filename, &buf) < 0) {
+		if(stat(f->filename, &buf) < 0) {
 			fprintf(stderr, "%s did not create file %s\n", n->command, f->filename);
 		}
 		else if(output_len_check && buf.st_size <= 0) {
@@ -968,7 +963,7 @@ static int makeflow_check_files(struct dag *d)
 		if(!dag_file_should_exist(f)) continue;
 
 		/* Check for the presence of the file. */
-		int result = batch_fs_stat(remote_queue, f->filename, &buf );
+		int result = stat(f->filename, &buf );
 
 		if(dag_file_is_source(f)) {
 			/* Source files must exist before running */

@@ -121,7 +121,7 @@ static int dag_check( void * instance_struct, struct dag *d ){
 	struct umbrella_instance *u = (struct umbrella_instance*)instance_struct;
 	struct stat st;
 	if(u->spec){
-		if(batch_fs_stat(makeflow_get_remote_queue(), u->spec, &st) == -1) {
+		if(stat(u->spec, &st) == -1) {
 			debug(D_NOTICE, "stat on %s failed: %s\n", u->spec, strerror(errno));
 			return MAKEFLOW_HOOK_FAILURE;
 		}
@@ -135,7 +135,7 @@ static int dag_check( void * instance_struct, struct dag *d ){
 	}
 
 	if(u->binary){
-		if(batch_fs_stat(makeflow_get_remote_queue(), u->binary, &st) == -1) {
+		if(stat(u->binary, &st) == -1) {
 			debug(D_NOTICE, "stat on %s failed: %s\n", u->binary, strerror(errno));
 			return MAKEFLOW_HOOK_FAILURE;
 		}
