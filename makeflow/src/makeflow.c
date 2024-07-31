@@ -549,17 +549,7 @@ static enum job_submit_status makeflow_node_submit_retry( struct batch_queue *qu
 			break;
 		}
 
-		/* This will eventually be replaced by submit (queue, task )... */
-		char *input_files  = batch_files_to_string(queue, task->input_files);
-		char *output_files = batch_files_to_string(queue, task->output_files);
-		jobid = batch_job_submit(queue,
-								task->command,
-								input_files,
-								output_files,
-								task->envlist,
-								task->resources);
-		free(input_files);
-		free(output_files);
+		jobid = batch_job_submit(queue,task);
 
 		if(jobid > 0) {
 			printf("submitted job %"PRIbjid"\n", jobid);
