@@ -27,13 +27,7 @@ SOURCES = \
 	batch_queue_k8s.c \
 	batch_queue_amazon.c
 
-# These are older modules that were prototyped but not actively maintained.
-#	batch_queue_amazon_batch.c
-#	batch_queue_lambda.c
-#	batch_queue_mesos.c
-#	batch_queue_mpi.c
-
-PUBLIC_HEADERS = batch_queue.h
+PUBLIC_HEADERS = batch_queue.h batch_job.h batch_job_info.h batch_file.h batch_wrapper.h
 
 OBJECTS = $(SOURCES:%.c=%.o)
 
@@ -60,5 +54,5 @@ install:
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools
 
 clean:
-	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) batch_queue_amazon_script.c *.o
+	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) *.o
 
