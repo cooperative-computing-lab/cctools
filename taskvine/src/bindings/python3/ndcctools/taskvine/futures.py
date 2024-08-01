@@ -288,7 +288,7 @@ class VineFuture(Future):
 # This class is a sublcass of FunctionCall that is specialized for future execution
 
 class FutureFunctionCall(FunctionCall):
-    def __init__(self, manager, is_retriever, library_name, fn, *args, **kwargs):
+    def __init__(self, manager, library_name, fn, *args, **kwargs):
         super().__init__(library_name, fn, *args, **kwargs)
         self.enable_temp_output()
         self.manager = manager
