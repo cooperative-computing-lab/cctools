@@ -43,10 +43,6 @@ See the file COPYING for details.
 #include "parser.h"
 #include "parser_jx.h"
 
-#ifdef CCTOOLS_WITH_MPI
-#include <mpi.h>
-#endif
-
 #include "makeflow_summary.h"
 #include "makeflow_gc.h"
 #include "makeflow_log.h"
@@ -1267,8 +1263,6 @@ static void show_help_run(const char *cmd)
 	printf("    --ignore-memory-spec        Excludes memory at submission (SLURM).\n");
 	printf("    --batch-mem-type=<type>     Specify memory resource type (SGE).\n");
 	printf("    --working-dir=<dir|url>     Working directory for the batch system.\n");
-	printf("    --mpi-cores=#               Manually set number of cores on each MPI worker. (-T mpi)\n");
-	printf("    --mpi-memory=#              Manually set memory (MB) on each MPI worker. (-T mpi)\n");
 	        /********************************************************************************/
 	printf("\nContainers and Wrappers:\n");
 	printf(" --docker=<image>               Run each task using the named Docker image.\n");
@@ -1364,9 +1358,6 @@ int main(int argc, char *argv[])
 	char *mesos_preload = NULL;
 	int keep_wrapper_stdout = 0;
 
-	int mpi_cores = 0;
-	int mpi_memory = 0;
-
 	dag_syntax_type dag_syntax = DAG_SYNTAX_MAKE;
 	struct jx *jx_args = jx_object(NULL);
 	struct jx *base_hook_args = jx_object(NULL);
@@ -1393,10 +1384,6 @@ int main(int argc, char *argv[])
 
 #ifdef HAS_CURL
 	extern struct makeflow_hook makeflow_hook_archive;
-#endif
-
-#ifdef CCTOOLS_WITH_MPI
-	MPI_Init(&argc,&argv);
 #endif
 
 	// Enable external functions like fetch and listdir.
@@ -1514,8 +1501,6 @@ int main(int argc, char *argv[])
 		LONG_OPT_K8S_IMG,
 		LONG_OPT_VERBOSE_JOBNAMES,
 		LONG_OPT_KEEP_WRAPPER_STDOUT,
-		LONG_OPT_MPI_CORES,
-		LONG_OPT_MPI_MEMORY,
 		LONG_OPT_TLQ,
 		LONG_OPT_FILE_STATUS,
 		LONG_OPT_FILE_STATUS_INTERVAL,
@@ -1641,8 +1626,6 @@ int main(int argc, char *argv[])
 		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
 		{"verbose-jobnames", no_argument, 0, LONG_OPT_VERBOSE_JOBNAMES},
 		{"keep-wrapper-stdout", no_argument, 0, LONG_OPT_KEEP_WRAPPER_STDOUT},
-		{"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
-		{"mpi-memory", required_argument,0, LONG_OPT_MPI_MEMORY},
 		{"tlq", required_argument, 0, LONG_OPT_TLQ},
 		{"file-status", required_argument, 0, LONG_OPT_FILE_STATUS},
 		{"file-status-interval", required_argument, 0, LONG_OPT_FILE_STATUS_INTERVAL},
@@ -2171,12 +2154,6 @@ int main(int argc, char *argv[])
 			case LONG_OPT_KEEP_WRAPPER_STDOUT:
 				keep_wrapper_stdout = 1;
 				break;
-			case LONG_OPT_MPI_CORES:
-				mpi_cores = atoi(optarg);
-				break;
-			case LONG_OPT_MPI_MEMORY:
-				mpi_memory = atoi(optarg);
-				break;
 			case LONG_OPT_TLQ:
 				tlq_port = atoi(optarg);
 				break;
@@ -2199,11 +2176,6 @@ int main(int argc, char *argv[])
 	/* If cleaning anything, assume local execution. This only really matters for nested workflows. */
 	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
 		batch_queue_type = batch_queue_type_from_string("local");
-	}
-
-	/* Perform initial MPI setup prior to creating the batch queue object. */
-	if(batch_queue_type==BATCH_QUEUE_TYPE_MPI) {
-		batch_queue_mpi_setup(debug_file_name ? debug_file_name : "debug", mpi_cores,mpi_memory);
 	}
 
 	if(!did_explicit_auth)
