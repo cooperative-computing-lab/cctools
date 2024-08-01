@@ -7,11 +7,12 @@ See the file COPYING for details.
 #ifndef BATCH_TASK_H
 #define BATCH_TASK_H
 
-#include "batch_file.h"
 #include "list.h"
-#include "sha1.h"
 #include "jx.h"
 #include "rmsummary.h"
+
+struct batch_queue;
+struct batch_file;
 
 struct batch_task {
 	int taskid;                  /* Indicates the id provided by the creating system. I.E. Makeflow */

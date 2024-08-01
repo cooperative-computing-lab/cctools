@@ -10,6 +10,8 @@ See the file COPYING for details.
 #include "batch_task.h"
 #include "batch_file.h"
 #include "batch_wrapper.h"
+#include "batch_job.h"
+
 #include "sha1.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
@@ -63,7 +65,7 @@ void batch_task_delete(struct batch_task *t)
 /** Creates new batch_file and adds to inputs. */
 struct batch_file * batch_task_add_input_file(struct batch_task *task, const char * outer_name, const char * inner_name)
 {
-	struct batch_file *f = batch_file_create(task->queue, outer_name, inner_name);
+	struct batch_file *f = batch_file_create(outer_name, inner_name);
 	list_push_tail(task->input_files, f);
 
 	return f;
@@ -72,7 +74,7 @@ struct batch_file * batch_task_add_input_file(struct batch_task *task, const cha
 /** Creates new batch_file and adds to outputs. */
 struct batch_file * batch_task_add_output_file(struct batch_task *task, const char * outer_name, const char * inner_name)
 {
-	struct batch_file *f = batch_file_create(task->queue, outer_name, inner_name);
+	struct batch_file *f = batch_file_create(outer_name, inner_name);
 	list_push_tail(task->output_files, f);
 
 	return f;
@@ -176,7 +178,7 @@ char * batch_task_generate_id(struct batch_task *t) {
 	sha1_update(&context, "\0", 1);
 
 	/* Sort inputs for consistent hashing */
-	list_sort(t->input_files, batch_file_outer_compare);
+	list_sort(t->input_files, (void*)batch_file_outer_compare);
 
 	/* add checksum of the node's input files together */
 	struct list_cursor *cur = list_cursor_create(t->input_files);
@@ -199,7 +201,7 @@ char * batch_task_generate_id(struct batch_task *t) {
 	list_cursor_destroy(cur);
 
 	/* Sort outputs for consistent hashing */
-	list_sort(t->output_files, batch_file_outer_compare);
+	list_sort(t->output_files, (void*)batch_file_outer_compare);
 
 	/* add checksum of the node's output file names together */
 	cur = list_cursor_create(t->output_files);
@@ -217,3 +219,4 @@ char * batch_task_generate_id(struct batch_task *t) {
 }
 
 /* vim: set noexpandtab tabstop=8: */
+

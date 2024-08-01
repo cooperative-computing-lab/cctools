@@ -4,12 +4,16 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "batch_job.h"
+#include "batch_task.h"
 #include "batch_file.h"
+
 #include "sha1.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 #include "path.h"
 #include "hash_table.h"
+
 #include <time.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -26,18 +30,16 @@ double total_checksum_time = 0.0;
  *  IF no inner_name is given, or the specified batch_queue does not support
  *  remote renaming the outer_name will be used.
  **/
-struct batch_file *batch_file_create(struct batch_queue *queue, const char * outer_name, const char * inner_name)
+struct batch_file *batch_file_create(const char * outer_name, const char * inner_name)
 {
 	struct batch_file *f = calloc(1,sizeof(*f));
-    f->outer_name = xxstrdup(outer_name);
-
-	if(batch_queue_supports_feature(queue, "remote_rename") && inner_name){
+	f->outer_name = xxstrdup(outer_name);
+	if(inner_name) {
 		f->inner_name = xxstrdup(inner_name);
 	} else {
 		f->inner_name = xxstrdup(outer_name);
 	}
-
-    return f;
+	return f;
 }
 
 /**
@@ -54,57 +56,9 @@ void batch_file_delete(struct batch_file *f)
 	free(f);
 }
 
-/**
- * Given a file, return the string that identifies it appropriately
- * for the given batch system, combining the local and remote name
- * and making substitutions according to the node.
- **/
-char * batch_file_to_string(struct batch_queue *queue, struct batch_file *f )
+int batch_file_outer_compare( struct batch_file *file1, struct batch_file *file2 )
 {
-    if(batch_queue_supports_feature(queue,"remote_rename")) {
-            return string_format("%s=%s", f->outer_name, f->inner_name);
-    } else {
-            return string_format("%s", f->outer_name);
-    }
-}
-
-/**
- * Given a list of files, add the files to the given string.
- * Returns the original string, realloced if necessary
- **/
-char * batch_files_to_string(struct batch_queue *queue, struct list *files )
-{
-    struct batch_file *file;
-
-    char * file_str = strdup("");
-
-	char * separator = "";
-
-    if(!files) return file_str;
-
-    list_first_item(files);
-    while((file=list_next_item(files))) {
-		/* Only add separator if past first item. */
-		file_str = string_combine(file_str,separator);
-
-        char *f = batch_file_to_string(queue, file);
-        file_str = string_combine(file_str,f);
-	
-		/* This could be set using batch_queue feature or option 
-		 * to allow for batch system specific separators. */
-		separator = ",";
-
-        free(f);
-    }
-
-    return file_str;
-}
-
-int batch_file_outer_compare(const void *file1, const void *file2) {
-	struct batch_file **f1 = (void *)file1;
-	struct batch_file **f2 = (void *)file2;
-
-	return strcmp((*f1)->outer_name, (*f2)->outer_name);
+	return strcmp(file1->outer_name,file2->outer_name);
 }
 
 /* Return the content based ID for a file.

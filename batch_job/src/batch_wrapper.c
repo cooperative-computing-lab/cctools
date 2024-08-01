@@ -4,18 +4,21 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include <assert.h>
-#include <string.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <stdio.h>
-
 #include "batch_wrapper.h"
+
 #include "list.h"
 #include "debug.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 #include "random.h"
+
+#include <assert.h>
+#include <string.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 struct batch_wrapper {
 	struct list *pre;
