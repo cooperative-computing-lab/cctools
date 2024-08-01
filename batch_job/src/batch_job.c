@@ -70,17 +70,6 @@ const struct batch_queue_module * const batch_queue_modules[] = {
 	&batch_queue_unknown
 };
 
-struct batch_job_info *batch_job_info_create()
-{
-	struct batch_job_info *info = calloc(1,sizeof(*info));
-	return info;
-}
-
-void batch_job_info_delete(struct batch_job_info *info)
-{
-	free(info);
-}
-
 struct batch_queue *batch_queue_create(batch_queue_type_t type, const char *ssl_key_file, const char *ssl_cert_file )
 {
 	int i;

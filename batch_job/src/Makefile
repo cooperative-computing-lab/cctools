@@ -17,6 +17,7 @@ SOURCES = \
 	batch_task.c \
 	batch_wrapper.c \
 	batch_job.c \
+	batch_job_info.c \
 	batch_job_dryrun.c \
 	batch_job_condor.c \
 	batch_job_local.c \
