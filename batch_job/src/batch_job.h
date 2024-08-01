@@ -11,27 +11,30 @@ See the file COPYING for details.
 #include "jx.h"
 #include "rmsummary.h"
 
+/** @file batch_job.h Represents a single batch job.
+A @ref batch_job describes a single batch job to be submitted to a batch queue
+using @ref batch_queue_submit.  This structure should not be manipulated manually,
+but created with @ref batch_job_create and then elaborated with @ref batch_job_set_command
+@ref batch_job_add_input_file , @ref batch_job_add_output_file and similar methods.
+This level of details permits the underlying system to appropriately manage the data
+used by each job.  Once submitted to a queue, the batch_job object may be deleted.
+*/
+
 struct batch_queue;
 struct batch_file;
 
+/** Internal description of a single batch job submitted to a queue. */
 struct batch_job {
-	int taskid;                  /* Indicates the id provided by the creating system. I.E. Makeflow */
-	int jobid;                   /* Indicates the id assigned to the job by the submission system. */
-
-	struct batch_queue *queue;   /* The queue this task is assigned to. */
-
-	char *command;               /* The command line to execute. */
-
-	struct list   *input_files;  /* Task's required inputs, type batch_file */
-	struct list   *output_files; /* Task's expected outputs, type batch_file */
-
-	struct rmsummary *resources; /* Resources assigned to task */
-
-	struct jx *envlist;          /* JSON formatted environment list */ 
-
-	struct batch_job_info *info; /* Stores the info struct created by batch_queue. */
-
-	char *hash;                  /* Checksum based on CMD, input contents, and output names. */
+	int taskid;                  /**< Indicates the id provided by the creating system. I.E. Makeflow */
+	int jobid;                   /**< Indicates the id assigned to the job by the submission system. */
+	struct batch_queue *queue;   /**< The queue this task is assigned to. */
+	char *command;               /**< The command line to execute. */
+	struct list   *input_files;  /**< Task's required inputs, type batch_file */
+	struct list   *output_files; /**< Task's expected outputs, type batch_file */
+	struct rmsummary *resources; /**< Resources assigned to task */
+	struct jx *envlist;          /**< JSON formatted environment list */ 
+	struct batch_job_info *info; /**< Stores the info struct created by batch_queue. */
+	char *hash;                  /**< Checksum based on CMD, input contents, and output names. */
 };
 
 /** Create a batch_job struct.

@@ -16,10 +16,19 @@ See the file COPYING for details.
 #include "debug.h"
 #include "path.h"
 
+/** @file batch_file.h  Describes a single input or output file of a batch job.
+For each input/output file consumed/produced by a single @ref batch_job, a @ref batch_file
+object describes the name of the file as the submitter sees it (outer_name) and
+the intended name of the file as seen by the running job (inner_name).  Many (but not all)
+batch systems execute jobs in a sandbox that permits these two names to be different.
+Some batch systems do not permit these names to differ.
+*/
+
+/** Internal description of a single file used by a batch job. */
 struct batch_file {
-	char *outer_name;
-	char *inner_name;
-	char *hash;/* Checksum based on contents. */
+	char *outer_name;   /**< The name of the file in the submitters filesystem namespace. */
+	char *inner_name;   /**< The name of the file as it should appear to the running job. */
+	char *hash;         /**< The hierarchical checksum of this file/directory, when content based names are used. */
 };
 
 /** Create batch_file struct.

@@ -14,37 +14,60 @@ See the file COPYING for details.
 #include <stdint.h>
 #include <time.h>
 
-struct batch_queue;
-struct batch_job;
-struct batch_file;
-
 #include "batch_job.h"
 #include "batch_file.h"
 #include "batch_job_info.h"
+#include "batch_wrapper.h"
 
 #include "jx.h"
 #include "rmsummary.h"
 
-/** @file batch_queue.h Batch job submission.
-This module implements batch job submission to multiple systems,
-including local processes, HTCondor, TaskVine, Work Queue, SGE, PBS, Amazon EC2, and others.
-This simplifies the construction
-of parallel abstractions that need a simple form of parallel process execution.
+/** @file batch_queue.h Batch queue submission library.
+This module implements an abstract interface to submit batch jobs
+to a variety of underlying queuing systems, including
+including local processes, HTCondor, TaskVine, Work Queue, SGE, PBS, SLURM Amazon EC2, and others.
+This simplifies the construction of workflow systems and other parallel
+computing systems that need a simple form of distributed process execution.
+
+Basic use is as follows:
+
+<pre>
+// Create a queue for submitting to HTCondor.
+struct batch_queue *queue = batch_queue_create(BATCH_QUEUE_TYPE_CONDOR);
+
+// Define a batch job consiting of a command with input and output files.
+struct batch_job *job = batch_job_create(queue);
+batch_job_set_command(job,"grep needle words.txt > output.txt");
+batch_job_add_input_file(job,"/usr/share/dict/words","words.txt");
+batch_job_add_output_file(job,"output.txt","output.txt");
+
+// Submit the job to the queue, which returns a jobid 
+batch_job_id_t jobid = batch_queue_submit(queue,job);
+printf("jobid %" PRIbjid" submitted\n",jobid);
+
+// Wait for a job to complete, which returns the jobid and info.
+struct batch_job_info info;
+jobid = batch_queue_wait(queue,&info);
+
+printf("jobid %" PRIbjid" completed\n",jobid);
+
+// Delete objects when done.
+batch_job_delete(job);
+batch_queue_delete(queue);
+</pre>
 */
 
 /** An integer type indicating a unique batch job number.*/
 typedef int64_t batch_queue_id_t;
+
 #define PRIbjid  PRId64
 #define SCNbjid  SCNd64
 
 /** Indicates which type of batch submission to use. */
-/* Must be kept in sync with batch_queue_subsystems. */
 typedef enum {
 	BATCH_QUEUE_TYPE_LOCAL,	              /**< Batch jobs will run as local processes. */
 	BATCH_QUEUE_TYPE_CONDOR,              /**< Batch jobs will be sent to Condor pool. */
 	BATCH_QUEUE_TYPE_AMAZON,              /**< Batch jobs will be sent spun up Amazon ec2 instances */
-	BATCH_QUEUE_TYPE_LAMBDA,              /**< Batch jobs will be executed by an Amazon Lambda function with S3 objects */
-        BATCH_QUEUE_TYPE_AMAZON_BATCH,        /**< Batch jobs will be sent to Amazon Batch System */
 	BATCH_QUEUE_TYPE_SGE,	              /**< Batch jobs will be sent to Sun Grid Engine. */
 	BATCH_QUEUE_TYPE_MOAB,                /**< Batch jobs will be sent to the Moab Workload Manager. */
 	BATCH_QUEUE_TYPE_PBS,                 /**< Batch jobs will be send to the PBS Scheduler. */
@@ -54,10 +77,8 @@ typedef enum {
 	BATCH_QUEUE_TYPE_CLUSTER,             /**< Batch jobs will be sent to a user-defined cluster manager. */
 	BATCH_QUEUE_TYPE_WORK_QUEUE,          /**< Batch jobs will be sent to the Work Queue. */
 	BATCH_QUEUE_TYPE_CHIRP,               /**< Batch jobs will be sent to Chirp. */
-	BATCH_QUEUE_TYPE_MESOS,               /**< Batch jobs will be sent to Mesos. */
 	BATCH_QUEUE_TYPE_K8S,                 /**< Batch jobs will be sent to kubernetes. */
 	BATCH_QUEUE_TYPE_DRYRUN,              /**< Batch jobs will not actually run. */
-        BATCH_QUEUE_TYPE_MPI,                 /**< Batch jobs distributed within an MPI program. */
 	BATCH_QUEUE_TYPE_VINE,                /**< Batch jobs executed via TaskVine. */
 	BATCH_QUEUE_TYPE_UNKNOWN = -1         /**< An invalid batch queue type. */
 } batch_queue_type_t;
