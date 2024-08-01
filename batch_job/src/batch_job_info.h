@@ -1,3 +1,9 @@
+/*
+Copyright (C) 2024 The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #ifndef BATCH_JOB_INFO_H
 #define BATCH_JOB_INFO_H
 
