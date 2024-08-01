@@ -18,17 +18,16 @@ SOURCES = \
 	batch_job_info.c \
 	batch_file.c \
 	batch_wrapper.c \
+	batch_queue_local.c \
 	batch_queue_dryrun.c \
 	batch_queue_condor.c \
-	batch_queue_local.c \
+	batch_queue_vine.c \
 	batch_queue_work_queue.c \
-	batch_queue_vine.c
+	batch_queue_cluster.c \
+	batch_queue_amazon.c
 
-#	batch_queue_amazon.c \
+# These are older modules that were prototyped but not actively maintained
 #	batch_queue_amazon_batch.c \
-#	$(CHIRP_BATCH) \
-#	batch_queue_cluster.c \
-#	batch_queue_blue_waters.c \
 #	batch_queue_lambda.c \
 #	batch_queue_mesos.c \
 #	batch_queue_k8s.c \
