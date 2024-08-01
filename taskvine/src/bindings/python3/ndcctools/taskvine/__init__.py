@@ -56,6 +56,7 @@ from .task import (
     PythonTaskNoResult,
     LibraryTask,
     FunctionCall,
+    Function
 )
 from .dask_dag import DaskVineDag
 
@@ -83,6 +84,7 @@ __all__ = [
     "Factory",
     "LibraryTask",
     "FunctionCall",
+    "Function",
     "FuturesExecutor",
     "FuturePythonTask",
     "FutureFunctionCall",
