@@ -11,7 +11,7 @@ See the file COPYING for details.
 #include "makeflow_summary.h"
 #include "catalog_query.h"
 #include "username.h"
-#include "batch_job.h"
+#include "batch_queue.h"
 #include "jx_print.h"
 
 #include <stdlib.h>

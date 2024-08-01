@@ -7,7 +7,7 @@
 #include "stringtools.h"
 #include "xxmalloc.h"
 
-#include "batch_task.h"
+#include "batch_job.h"
 #include "batch_wrapper.h"
 
 #include "dag.h"
@@ -170,7 +170,7 @@ static char *set_log_prefix(struct makeflow_monitor *monitor, struct dag_node *n
 	return log_prefix;
 }
 
-static int node_submit(void * instance_struct, struct dag_node *n, struct batch_task *task)
+static int node_submit(void * instance_struct, struct dag_node *n, struct batch_job *task)
 {
 	struct makeflow_monitor *monitor = (struct makeflow_monitor*)instance_struct;
 	char *log_name;
@@ -236,14 +236,14 @@ static int node_submit(void * instance_struct, struct dag_node *n, struct batch_
 	free(output_prefix);
 	free(log_prefix);
 
-	batch_task_wrap_command(task, cmd);
+	batch_job_wrap_command(task, cmd);
 	free(cmd);
 
 	batch_wrapper_cmd(wrapper, task->command);
 
 	cmd = batch_wrapper_write(wrapper, task);
 	if (cmd) {
-		batch_task_set_command(task, cmd);
+		batch_job_set_command(task, cmd);
 		struct dag_file *df = makeflow_hook_add_input_file(n->d, task, cmd, cmd, DAG_FILE_TYPE_TEMP);
 		debug(D_MAKEFLOW_HOOK, "Wrapper written to %s", df->filename);
 		makeflow_log_file_state_change(n->d, df, DAG_FILE_STATE_EXISTS);
@@ -318,7 +318,7 @@ int makeflow_monitor_move_output_if_needed(struct makeflow_monitor *monitor, str
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int node_end(void * instance_struct, struct dag_node *n, struct batch_task *task)
+static int node_end(void * instance_struct, struct dag_node *n, struct batch_job *task)
 {
 	struct makeflow_monitor *monitor = (struct makeflow_monitor*)instance_struct;
 	char *log_prefix = set_log_prefix(monitor, n);
@@ -351,7 +351,7 @@ static int node_end(void * instance_struct, struct dag_node *n, struct batch_tas
 	return makeflow_monitor_move_output_if_needed(monitor, n, makeflow_get_queue(n));
 }
 
-static int node_fail(void * instance_struct, struct dag_node *n, struct batch_task *task)
+static int node_fail(void * instance_struct, struct dag_node *n, struct batch_job *task)
 {
 	struct makeflow_monitor *monitor = (struct makeflow_monitor*)instance_struct;
 	int rc = MAKEFLOW_HOOK_FAILURE;

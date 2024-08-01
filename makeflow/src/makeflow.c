@@ -6,7 +6,7 @@ See the file COPYING for details.
 
 #include "auth_all.h"
 #include "auth_ticket.h"
-#include "batch_job.h"
+#include "batch_queue.h"
 #include "cctools.h"
 #include "copy_stream.h"
 #include "create_dir.h"
@@ -87,7 +87,7 @@ because some of the execution state (note states, node counts, etc)
 is stored in struct dag and struct dag_node.  Perhaps this can be improved.
 
 - APIs like work_queue_* and vine_* should be indirectly accessed by setting options
-in Batch Job using batch_queue_set_option. See batch_job_work_queue.c for
+in Batch Job using batch_queue_set_option. See batch_queue_work_queue.c for
 an example.
 */
 
@@ -195,13 +195,13 @@ Hack: Enable batch job feature to pass detailed name to batch system.
 Would be better implemented as a batch system feature.
 */
 
-extern int batch_job_verbose_jobnames;
+extern int batch_queue_verbose_jobnames;
 
 /**
 Hack: Disable batch job feature which generates and checks heartbeats.
 */
 
-extern int batch_job_disable_heartbeat;
+extern int batch_queue_disable_heartbeat;
 
 /*
 Wait upto this many seconds for an output file of a succesfull task
@@ -306,15 +306,15 @@ Consider a node in the dag and convert it into a batch task ready to execute,
 with resources environments, and everything prior to calling hooks.
 */
 
-struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue *queue )
+struct batch_job *makeflow_node_to_task(struct dag_node *n, struct batch_queue *queue )
 {
-	struct batch_task *task = batch_task_create(queue);
+	struct batch_job *task = batch_job_create(queue);
 	task->taskid = n->nodeid;
 
 	if(n->type==DAG_NODE_TYPE_COMMAND) {
 
 		/* A plain command just gets a command string. */
-		batch_task_set_command(task, n->command);
+		batch_job_set_command(task, n->command);
 
 	} else if(n->type==DAG_NODE_TYPE_WORKFLOW) {
 		/* A sub-workflow must be expanded into a makeflow invocation */
@@ -358,8 +358,8 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 			buffer_printf(&b, " --local-disk %s", rmsummary_resource_to_str("disk", n->resources_requested->disk, 0));
 		}
 
-		batch_task_add_input_file(task,n->workflow_file,n->workflow_file);
-		batch_task_set_command(task, buffer_tostring(&b));
+		batch_job_add_input_file(task,n->workflow_file,n->workflow_file);
+		batch_job_set_command(task, buffer_tostring(&b));
 		buffer_free(&b);
 	} else {
 		fatal("invalid job type %d in dag node (%s)",n->type,n->command);
@@ -370,18 +370,18 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 	struct dag_file *f;
 	list_first_item(n->source_files);
 	while((f = list_next_item(n->source_files))){
-		batch_task_add_input_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
+		batch_job_add_input_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
 	}
 
 	list_first_item(n->target_files);
 	while((f = list_next_item(n->target_files))){
-		batch_task_add_output_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
+		batch_job_add_output_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
 	}
 
-	batch_task_set_resources(task, dag_node_dynamic_label(n));
+	batch_job_set_resources(task, dag_node_dynamic_label(n));
 
 	struct jx *env = dag_node_env_create(n->d, n, should_send_all_local_environment);
-	batch_task_set_envlist(task, env);
+	batch_job_set_envlist(task, env);
 	jx_delete(env);
 
 	return task;
@@ -395,7 +395,7 @@ static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_
 {
 	printf("aborting %s job %" PRIu64 "\n", name, jobid);
 
-	batch_job_remove(q, jobid);
+	batch_queue_remove(q, jobid);
 	makeflow_hook_node_abort(n);
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
 	makeflow_clean_node(d,q,n);
@@ -425,7 +425,7 @@ static void makeflow_abort_all(struct dag *d)
 
 /* A few forward prototypes to handle mutually-recursive definitions. */
 
-static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_task *task);
+static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_job *task);
 static void makeflow_node_reset_by_file( struct dag *d, struct dag_file *f );
 
 /*
@@ -442,10 +442,10 @@ void makeflow_node_reset( struct dag *d, struct dag_node *n )
 
 	if(n->state == DAG_NODE_STATE_RUNNING) {
 		if(n->local_job && local_queue) {
-			batch_job_remove(local_queue, n->jobid);
+			batch_queue_remove(local_queue, n->jobid);
 			itable_remove(d->local_job_table, n->jobid);
 		} else {
-			batch_job_remove(remote_queue, n->jobid);
+			batch_queue_remove(remote_queue, n->jobid);
 			itable_remove(d->remote_job_table, n->jobid);
 		}
 	}
@@ -518,11 +518,11 @@ Submit one fully formed job, retrying failures up to the makeflow_submit_timeout
 This is necessary because busy batch systems occasionally do not accept a job submission.
 */
 
-static enum job_submit_status makeflow_node_submit_retry( struct batch_queue *queue, struct batch_task *task)
+static enum job_submit_status makeflow_node_submit_retry( struct batch_queue *queue, struct batch_job *task)
 {
 	time_t stoptime = time(0) + makeflow_submit_timeout;
 	int waittime = 1;
-	batch_job_id_t jobid = 0;
+	batch_queue_id_t jobid = 0;
 
 
 	/* Display the fully elaborated command, just like Make does. */
@@ -544,7 +544,7 @@ static enum job_submit_status makeflow_node_submit_retry( struct batch_queue *qu
 			break;
 		}
 
-		jobid = batch_job_submit(queue,task);
+		jobid = batch_queue_submit(queue,task);
 
 		if(jobid > 0) {
 			printf("submitted job %"PRIbjid"\n", jobid);
@@ -600,7 +600,7 @@ static enum job_submit_status makeflow_node_submit(struct dag *d, struct dag_nod
 	}
 
 	/* Create task from node information */
-	struct batch_task *task = makeflow_node_to_task(n, queue );
+	struct batch_job *task = makeflow_node_to_task(n, queue );
 	batch_queue_set_int_option(queue, "task-id", task->taskid);
 	n->task = task;
 
@@ -621,7 +621,7 @@ static enum job_submit_status makeflow_node_submit(struct dag *d, struct dag_nod
 			debug(D_MAKEFLOW_RUN, "node %d could not be submitted because of a hook failure.", n->nodeid);
 			makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
 			n->task = NULL;
-			batch_task_delete(task);
+			batch_job_delete(task);
 			makeflow_failed_flag = 1;
 			break;
 		case JOB_SUBMISSION_SKIPPED:
@@ -742,7 +742,7 @@ static void makeflow_dispatch_ready_jobs(struct dag *d)
 	 * available, such as vms in amazon, then the submission fails with a
 	 * timeout. When this occurs, submission_timeout is set to 1, and only
 	 * local jobs are tried for submission. Batch jobs are tried again the next
-	 * time makeflow_dispatch_ready_jobs is called. This allows batch_job_wait
+	 * time makeflow_dispatch_ready_jobs is called. This allows batch_queue_wait
 	 * to be called in-between, which may free some batch resources and allow
 	 * job submissions that do not timeout.
 	 */
@@ -814,16 +814,16 @@ int makeflow_node_check_file_was_created(struct dag *d, struct dag_node *n, stru
 }
 
 /*
-Mark the given task as completing, using the batch_job_info completion structure provided by batch_job.
+Mark the given task as completing, using the batch_job_info completion structure provided by batch_queue.
 */
 
-static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_task *task)
+static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_job *task)
 {
 	struct batch_file *bf;
 	struct dag_file *f;
 	int job_failed = 0;
 
-	/* This is intended for changes to the batch_task that need no
+	/* This is intended for changes to the batch_job that need no
 		no context from dag_node/dag, such as shared_fs. */
 	int rc = makeflow_hook_batch_retrieve(task);
 	/* Batch Retrieve returns MAKEFLOW_HOOK_RUN if the node was
@@ -864,7 +864,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	}
 
 	if(job_failed) {
-		/* As integration moves forward batch_task will also be passed. */
+		/* As integration moves forward batch_job will also be passed. */
 		/* If a hook indicates failure here, it is not fatal, but will result
 			in a failed task. */
 		int hook_success = makeflow_hook_node_fail(n, task);
@@ -1041,7 +1041,7 @@ Main loop for running a makeflow: submit jobs, wait for completion, keep going u
 static void makeflow_run( struct dag *d )
 {
 	struct dag_node *n;
-	batch_job_id_t jobid;
+	batch_queue_id_t jobid;
 	struct batch_job_info info;
 	// Start Catalog at current time
 	timestamp_t start = timestamp_get();
@@ -1075,14 +1075,14 @@ static void makeflow_run( struct dag *d )
 
 		if(dag_remote_jobs_running(d)) {
 			int tmp_timeout = 5;
-			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
+			jobid = batch_queue_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
 				printf("job %"PRIbjid" completed\n",jobid);
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
 				if(n){
-					// Stop gap until batch_job_wait returns task struct
-					batch_task_set_info(n->task, &info);
+					// Stop gap until batch_queue_wait returns task struct
+					batch_job_set_info(n->task, &info);
 					makeflow_node_complete(d, n, remote_queue, n->task);
 				}
 			}
@@ -1098,13 +1098,13 @@ static void makeflow_run( struct dag *d )
 				stoptime = time(0) + tmp_timeout;
 			}
 
-			jobid = batch_job_wait_timeout(local_queue, &info, stoptime);
+			jobid = batch_queue_wait_timeout(local_queue, &info, stoptime);
 			if(jobid > 0) {
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->local_job_table, jobid);
 				if(n){
-					// Stop gap until batch_job_wait returns task struct
-					batch_task_set_info(n->task, &info);
+					// Stop gap until batch_queue_wait returns task struct
+					batch_job_set_info(n->task, &info);
 					makeflow_node_complete(d, n, local_queue, n->task);
 				}
 			}
@@ -1877,7 +1877,7 @@ int main(int argc, char *argv[])
 				cache_mode = "task";
 				break;
 			case LONG_OPT_DISABLE_HEARTBEAT:
-				batch_job_disable_heartbeat = 1;
+				batch_queue_disable_heartbeat = 1;
 				break;
 			case LONG_OPT_HOOK_EXAMPLE:
 				if (makeflow_hook_register(&makeflow_hook_example, &hook_args) == MAKEFLOW_HOOK_FAILURE)
@@ -2166,7 +2166,7 @@ int main(int argc, char *argv[])
 				break;
 			}
 			case LONG_OPT_VERBOSE_JOBNAMES:
-				batch_job_verbose_jobnames = 1;
+				batch_queue_verbose_jobnames = 1;
 				break;
 			case LONG_OPT_KEEP_WRAPPER_STDOUT:
 				keep_wrapper_stdout = 1;
@@ -2203,7 +2203,7 @@ int main(int argc, char *argv[])
 
 	/* Perform initial MPI setup prior to creating the batch queue object. */
 	if(batch_queue_type==BATCH_QUEUE_TYPE_MPI) {
-		batch_job_mpi_setup(debug_file_name ? debug_file_name : "debug", mpi_cores,mpi_memory);
+		batch_queue_mpi_setup(debug_file_name ? debug_file_name : "debug", mpi_cores,mpi_memory);
 	}
 
 	if(!did_explicit_auth)
@@ -2592,10 +2592,10 @@ EXIT_WITH_FAILURE:
 	runtime = time_completed - runtime;
 
 	/*
-	 * Set the abort and failed flag for batch_job_mesos mode.
+	 * Set the abort and failed flag for batch_queue_mesos mode.
 	 * Since batch_queue_delete(struct batch_queue *q) will call
 	 * batch_queue_mesos_free(struct batch_queue *q), which is defined 
-	 * in batch_job/src/batch_job_mesos.c. Then this function will check 
+	 * in batch_queue/src/batch_queue_mesos.c. Then this function will check 
 	 * the abort and failed status of the batch_queue and inform 
 	 * the makeflow mesos scheduler. 
 	 */
