@@ -200,7 +200,7 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 	return resources_str;
 }
 
-static batch_queue_id_t batch_queue_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
+static batch_queue_id_t batch_queue_cluster_submit (struct batch_queue * q, struct batch_job *j )
 {
 	batch_queue_id_t jobid;
 	struct batch_job_info *info;
@@ -211,7 +211,7 @@ static batch_queue_id_t batch_queue_cluster_submit (struct batch_queue * q, cons
 		return -1;
 	}
 
-	char *cluster_resources = cluster_set_resource_string(q, resources);
+	char *cluster_resources = cluster_set_resource_string(q, j->resources);
 
 	/*
 	Experiment shows that passing environment variables
@@ -221,14 +221,14 @@ static batch_queue_id_t batch_queue_cluster_submit (struct batch_queue * q, cons
 	option to load the environment into the job.
 	*/
 
-	if(envlist) {
-		jx_export(envlist);
+	if(j->envlist) {
+		jx_export(j->envlist);
 	}
 
 	/*
 	Pass the command to run through the environment as well.
 	*/
-	setenv("BATCH_JOB_COMMAND", cmd, 1);
+	setenv("BATCH_JOB_COMMAND", j->command, 1);
 
 	/*
 	Re the PBS qsub manpage, the -N name must start with a letter and be <= 15 characters long.
@@ -254,7 +254,7 @@ static batch_queue_id_t batch_queue_cluster_submit (struct batch_queue * q, cons
 	char *jobname;
 
 	if (batch_queue_verbose_jobnames) {
-		char *firstword = strdup(cmd);
+		char *firstword = strdup(j->command);
 
 		char *end = strchr(firstword, ' ');
 		if (end) *end = 0;
