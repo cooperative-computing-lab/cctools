@@ -1184,7 +1184,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Set the amount of memory (in MB) per worker.\n", "--memory=<mb>           ");
 	printf(" %-30s Set the amount of disk (in MB) per worker.\n", "--disk=<mb>");
 	printf(" %-30s Add a custom feature to each worker.\n", "--feature=<name>");
-	printf(" %-30s Autosize worker to slot (Condor, Mesos, K8S).\n", "--autosize");
+	printf(" %-30s Autosize worker to slot (Condor, K8S).\n", "--autosize");
 	
 	printf("\nWorker environment options:\n");
 	printf(" %-30s Environment variable to add to worker.\n", "--env=<variable=value>");
@@ -1217,9 +1217,6 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_WRAPPER, 
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WORKER_BINARY,
-		LONG_OPT_MESOS_MANAGER, 
-		LONG_OPT_MESOS_PATH,
-		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_K8S_IMAGE,
 		LONG_OPT_K8S_WORKER_IMAGE,
 		LONG_OPT_CATALOG,
@@ -1667,13 +1664,6 @@ int main(int argc, char *argv[])
 	}
 
 	mainloop( queue );
-
-	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-
-		batch_queue_set_int_option(queue, "batch-queue-abort-flag", (int)abort_flag);
-		batch_queue_set_int_option(queue, "batch-queue-failed-flag", 0);
-
-	}
 
 	batch_queue_delete(queue);
 
