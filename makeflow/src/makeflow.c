@@ -1248,9 +1248,6 @@ static void show_help_run(const char *cmd)
 	        /********************************************************************************/
 	printf("\nBatch System Options:\n");
 	printf("    --amazon-config=<file>      Amazon EC2 config from makeflow_ec2_setup.\n");
-	printf("    --lambda-config=<file>      Lambda config from makeflow_lambda_setup.\n");
-	printf("    --amazon-batch-config=<file>Batch config from makeflow_amazon_batch_setup.\n");
-	printf("    --amazon-batch-img=<img>    Specify Amazon ECS Image(Used for amazon-batch)\n");
 	printf(" -B,--batch-options=<options>   Add these options to all batch submit files.\n");
 	printf("    --disable-heartbeat         Disable job heartbeat check.\n");
 	printf("    --local-cores=#             Max number of local cores to use.\n");
@@ -1280,9 +1277,6 @@ static void show_help_run(const char *cmd)
 	printf(" --enforcement                  Enforce access to only named inputs/outputs.\n");
 	printf(" --parrot-path=<path>           Path to parrot_run for --enforcement.\n");
 	printf(" --env-replace-path=<path>      Path to env_replace for --enforcement.\n");
-	printf(" --mesos-master=<hostname:port> Mesos manager address and port\n");
-	printf(" --mesos-path=<path>            Path to mesos python2 site-packages.\n");
-	printf(" --mesos-preload=<path>         Path to libraries needed by Mesos.\n");
 	printf(" --k8s-image=<path>             Container image used by kubernetes.\n");
 	printf(" --sandbox                      Surround node command with sandbox wrapper.\n");
 	printf(" --vc3-builder                  VC3 Builder enabled.\n");
@@ -1336,9 +1330,6 @@ int main(int argc, char *argv[])
 	const char *option_port_file = NULL;
 	double option_fast_abort_multiplier = -1.0;
 	const char *amazon_config = NULL;
-	const char *lambda_config = NULL;
-	const char *amazon_batch_img = NULL;
-	const char *amazon_batch_cfg = NULL;
 	const char *priority = NULL;
 	char *option_password = NULL;
 	char *option_wait_queue_size = 0;
@@ -1353,9 +1344,6 @@ int main(int argc, char *argv[])
 	char *debug_file_name = 0;
 	char *batch_mem_type = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
-	char *mesos_manager = "127.0.0.1:5050/";
-	char *mesos_path = NULL;
-	char *mesos_preload = NULL;
 	int keep_wrapper_stdout = 0;
 
 	dag_syntax_type dag_syntax = DAG_SYNTAX_MAKE;
@@ -1464,9 +1452,6 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER_OPT,
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CONFIG,
-		LONG_OPT_LAMBDA_CONFIG,
-		LONG_OPT_AMAZON_BATCH_IMG,
-		LONG_OPT_AMAZON_BATCH_CFG,
 		LONG_OPT_JSON,
 		LONG_OPT_JX,
 		LONG_OPT_JX_ARGS,
@@ -1494,9 +1479,6 @@ int main(int argc, char *argv[])
 		LONG_OPT_ARCHIVE_DIR,
 		LONG_OPT_ARCHIVE_READ,
 		LONG_OPT_ARCHIVE_WRITE,
-		LONG_OPT_MESOS_MANAGER,
-		LONG_OPT_MESOS_PATH,
-		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_SEND_ENVIRONMENT,
 		LONG_OPT_K8S_IMG,
 		LONG_OPT_VERBOSE_JOBNAMES,
@@ -1597,9 +1579,6 @@ int main(int argc, char *argv[])
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
 		{"docker-opt", required_argument, 0, LONG_OPT_DOCKER_OPT},
 		{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
-		{"lambda-config", required_argument, 0, LONG_OPT_LAMBDA_CONFIG},
-		{"amazon-batch-img",required_argument,0,LONG_OPT_AMAZON_BATCH_IMG},
-		{"amazon-batch-config",required_argument,0,LONG_OPT_AMAZON_BATCH_CFG},
 		{"json", no_argument, 0, LONG_OPT_JSON},
 		{"jx", no_argument, 0, LONG_OPT_JX},
 		{"jx-context", required_argument, 0, LONG_OPT_JX_ARGS}, // Deprecated
@@ -1619,10 +1598,6 @@ int main(int argc, char *argv[])
 		{"archive-dir", required_argument, 0, LONG_OPT_ARCHIVE_DIR},
 		{"archive-read", no_argument, 0, LONG_OPT_ARCHIVE_READ},
 		{"archive-write", no_argument, 0, LONG_OPT_ARCHIVE_WRITE},
-		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MANAGER},
-		{"mesos-master",  required_argument, 0, LONG_OPT_MESOS_MANAGER}, //same as mesos-master
-		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
-		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
 		{"verbose-jobnames", no_argument, 0, LONG_OPT_VERBOSE_JOBNAMES},
 		{"keep-wrapper-stdout", no_argument, 0, LONG_OPT_KEEP_WRAPPER_STDOUT},
@@ -1779,15 +1754,6 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_AMAZON_CONFIG:
 				amazon_config = xxstrdup(optarg);
-				break;
-			case LONG_OPT_LAMBDA_CONFIG:
-				lambda_config = xxstrdup(optarg);
-				break;
-			case LONG_OPT_AMAZON_BATCH_IMG:
-				amazon_batch_img = xxstrdup(optarg);
-				break;
-			case LONG_OPT_AMAZON_BATCH_CFG:
-				amazon_batch_cfg = xxstrdup(optarg);
 				break;
 			case 'M':
 			case 'N':
@@ -2008,15 +1974,6 @@ int main(int argc, char *argv[])
 				if (makeflow_hook_register(&makeflow_hook_umbrella, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 					goto EXIT_WITH_FAILURE;
 				jx_insert(hook_args, jx_string("umbrella_spec"), jx_string(optarg));
-				break;
-			case LONG_OPT_MESOS_MANAGER:
-				mesos_manager = xxstrdup(optarg);
-				break;
-			case LONG_OPT_MESOS_PATH:
-				mesos_path = xxstrdup(optarg);
-				break;
-			case LONG_OPT_MESOS_PRELOAD:
-				mesos_preload = xxstrdup(optarg);
 				break;
 			case LONG_OPT_K8S_IMG:
 				k8s_image = xxstrdup(optarg);
@@ -2331,12 +2288,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-		batch_queue_set_option(remote_queue, "mesos-path", mesos_path);
-		batch_queue_set_option(remote_queue, "mesos-master", mesos_manager);
-		batch_queue_set_option(remote_queue, "mesos-preload", mesos_preload);
-	}
-
 	if(batch_queue_type == BATCH_QUEUE_TYPE_K8S) {
 		batch_queue_set_option(remote_queue, "k8s-image", k8s_image);
 	}
@@ -2370,11 +2321,8 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "caching", cache_mode);
 	batch_queue_set_option(remote_queue, "wait-queue-size", option_wait_queue_size);
 	batch_queue_set_option(remote_queue, "amazon-config", amazon_config);
-	batch_queue_set_option(remote_queue, "lambda-config", lambda_config);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 	batch_queue_set_option(remote_queue, "manager-preferred-connection", option_preferred_connection);
-	batch_queue_set_option(remote_queue, "amazon-batch-config",amazon_batch_cfg);
-	batch_queue_set_option(remote_queue, "amazon-batch-img", amazon_batch_img);
 	batch_queue_set_option(remote_queue, "safe-submit-mode", safe_submit ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "ignore-mem-spec", ignore_mem_spec ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "mem-type", batch_mem_type);
@@ -2562,20 +2510,6 @@ EXIT_WITH_SUCCESS:
 EXIT_WITH_FAILURE:
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
-
-	/*
-	 * Set the abort and failed flag for batch_queue_mesos mode.
-	 * Since batch_queue_delete(struct batch_queue *q) will call
-	 * batch_queue_mesos_free(struct batch_queue *q), which is defined 
-	 * in batch_queue/src/batch_queue_mesos.c. Then this function will check 
-	 * the abort and failed status of the batch_queue and inform 
-	 * the makeflow mesos scheduler. 
-	 */
-
-	if (batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-		batch_queue_set_int_option(remote_queue, "batch-queue-abort-flag", (int)makeflow_abort_flag);
-		batch_queue_set_int_option(remote_queue, "batch-queue-failed-flag", (int)makeflow_failed_flag);
-	}
 
 	if(write_summary_to || email_summary_to)
 		makeflow_summary_create(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile, remote_queue, makeflow_abort_flag, makeflow_failed_flag );
