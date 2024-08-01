@@ -304,7 +304,7 @@ class FutureFunctionCall(FunctionCall):
     def output(self, timeout="wait_forever"):
 
         if not self._has_retrieved:
-            result = self._module_manager.wait_for_task_id(self.id, timeout=timeout)
+            result = self.manager.wait_for_task_id(self.id, timeout=timeout)
             if result:
                 self._has_retrieved = True
             else:
@@ -313,7 +313,7 @@ class FutureFunctionCall(FunctionCall):
         if not self._saved_output and self._has_retrieved:
             if self.successful():
                 try:
-                    self._module_manager.fetch_file(self._output_file)
+                    self.manager.fetch_file(self._output_file)
                     output = cloudpickle.loads(self._output_file.contents())
                     if output['Success']:
                         self._saved_output = output['Result']
