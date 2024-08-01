@@ -25,7 +25,7 @@ struct batch_file;
 #include "jx.h"
 #include "rmsummary.h"
 
-/** @file batch_job.h Batch job submission.
+/** @file batch_queue.h Batch job submission.
 This module implements batch job submission to multiple systems,
 including local processes, HTCondor, TaskVine, Work Queue, SGE, PBS, Amazon EC2, and others.
 This simplifies the construction
@@ -33,12 +33,12 @@ of parallel abstractions that need a simple form of parallel process execution.
 */
 
 /** An integer type indicating a unique batch job number.*/
-typedef int64_t batch_job_id_t;
+typedef int64_t batch_queue_id_t;
 #define PRIbjid  PRId64
 #define SCNbjid  SCNd64
 
 /** Indicates which type of batch submission to use. */
-/* Must be kept in sync with batch_job_subsystems. */
+/* Must be kept in sync with batch_queue_subsystems. */
 typedef enum {
 	BATCH_QUEUE_TYPE_LOCAL,	              /**< Batch jobs will run as local processes. */
 	BATCH_QUEUE_TYPE_CONDOR,              /**< Batch jobs will be sent to Condor pool. */
@@ -77,7 +77,7 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type, const char *ssl_
 @return On success, returns a positive unique identifier for the batch job.  On failure, returns a negative number.
 Zero is not a valid batch job id and indicates an internal failure.
 */
-batch_job_id_t batch_job_submit(struct batch_queue *q, struct batch_task *task );
+batch_queue_id_t batch_queue_submit(struct batch_queue *q, struct batch_task *task );
 
 /** Wait for any batch job to complete.
 Blocks until a batch job completes.
@@ -89,7 +89,7 @@ Blocks until a batch job completes.
 If equal to zero, there were no more jobs to wait for.
 If less than zero, the operation was interrupted by a system event, but may be tried again.
 */
-batch_job_id_t batch_job_wait(struct batch_queue *q, struct batch_job_info *info);
+batch_queue_id_t batch_queue_wait(struct batch_queue *q, struct batch_job_info *info);
 
 /** Wait for any batch job to complete, with a timeout.
 Blocks until a batch job completes or the current time exceeds stoptime.
@@ -103,16 +103,16 @@ then this function will check for a complete job but will not block.
 If equal to zero, there were no more jobs to wait for.
 If less than zero, the operation timed out or was interrupted by a system event, but may be tried again.
 */
-batch_job_id_t batch_job_wait_timeout(struct batch_queue *q, struct batch_job_info *info, time_t stoptime);
+batch_queue_id_t batch_queue_wait_timeout(struct batch_queue *q, struct batch_job_info *info, time_t stoptime);
 
 /** Remove a batch job.
 This call will start the removal process.
-You must still call @ref batch_job_wait to wait for the removal to complete.
+You must still call @ref batch_queue_wait to wait for the removal to complete.
 @param q The queue to remove from.
 @param jobid The job to be removed.
 @return Greater than zero if the job exists and was removed, zero otherwise.
 */
-int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid);
+int batch_queue_remove(struct batch_queue *q, batch_queue_id_t jobid);
 
 /** Converts a string into a batch queue type.
 @param str A string listing all of the known batch queue types (which changes over time.)
@@ -201,8 +201,8 @@ batch_queue_type_t batch_queue_get_type(struct batch_queue *q);
 /** Delete a batch queue.
 Note that this function just destroys the internal data structures,
 it does not abort running jobs.  To properly clean up running jobs,
-you must call @ref batch_job_wait until it returns zero, or
-call @ref batch_job_remove on all runnings jobs.
+you must call @ref batch_queue_wait until it returns zero, or
+call @ref batch_queue_remove on all runnings jobs.
 @param q The queue to delete.
 */
 void batch_queue_delete(struct batch_queue *q);
@@ -222,6 +222,6 @@ int batch_queue_port(struct batch_queue *q);
 /* Hack: provide a backdoor to allow the MPI module to perform
    some initial setup before the MPI batch queue is created.
 */
-void batch_job_mpi_setup( const char *debug_filename, int mpi_cores, int mpi_memory );
+void batch_queue_mpi_setup( const char *debug_filename, int mpi_cores, int mpi_memory );
 
 #endif

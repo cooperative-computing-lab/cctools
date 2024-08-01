@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "batch_job.h"
-#include "batch_job_internal.h"
+#include "batch_queue.h"
+#include "batch_queue_internal.h"
 #include "debug.h"
 #include "process.h"
 #include "macros.h"
@@ -25,9 +25,9 @@ See the file COPYING for details.
 #include <sys/prctl.h>
 #endif
 
-static batch_job_id_t batch_job_local_submit (struct batch_queue *q, struct batch_task *bt )
+static batch_queue_id_t batch_queue_local_submit (struct batch_queue *q, struct batch_task *bt )
 {
-	batch_job_id_t jobid;
+	batch_queue_id_t jobid;
 
 	fflush(NULL);
 	jobid = fork();
@@ -63,7 +63,7 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, struct batc
 	return -1;
 }
 
-static batch_job_id_t batch_job_local_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
+static batch_queue_id_t batch_queue_local_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	while(1) {
 		int timeout;
@@ -107,7 +107,7 @@ static batch_job_id_t batch_job_local_wait (struct batch_queue * q, struct batch
 	}
 }
 
-static int batch_job_local_remove (struct batch_queue *q, batch_job_id_t jobid)
+static int batch_queue_local_remove (struct batch_queue *q, batch_queue_id_t jobid)
 {
 	int max_wait = 5; // maximum seconds we wish to wait for a given process
 	process_kill_waitpid(jobid, max_wait);
@@ -134,9 +134,9 @@ const struct batch_queue_module batch_queue_local = {
 	batch_queue_local_port,
 	batch_queue_local_option_update,
 
-	batch_job_local_submit,
-	batch_job_local_wait,
-	batch_job_local_remove,
+	batch_queue_local_submit,
+	batch_queue_local_wait,
+	batch_queue_local_remove,
 };
 
 /* vim: set noexpandtab tabstop=8: */

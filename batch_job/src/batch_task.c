@@ -10,7 +10,7 @@ See the file COPYING for details.
 #include "batch_task.h"
 #include "batch_file.h"
 #include "batch_wrapper.h"
-#include "batch_job.h"
+#include "batch_queue.h"
 
 #include "sha1.h"
 #include "stringtools.h"
@@ -128,7 +128,7 @@ void batch_task_set_envlist(struct batch_task *t, struct jx *envlist)
 /** Sets the batch_job_info of batch_task.
  Manually copies data into struct.
  Does not free in current code, but as this become standard
- in batch_job interface we should.
+ in batch_queue interface we should.
 */
 void batch_task_set_info(struct batch_task *t, struct batch_job_info *info)
 {

@@ -4,9 +4,9 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "batch_job_internal.h"
+#include "batch_queue_internal.h"
 #include "process.h"
-#include "batch_job.h"
+#include "batch_queue.h"
 #include "stringtools.h"
 #include "debug.h"
 #include "macros.h"
@@ -24,7 +24,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <errno.h>
 
-struct batch_job_amazon_info {
+struct batch_queue_amazon_info {
 	struct batch_job_info info;
 	struct aws_config *aws_config;
 	char *instance_id;
@@ -550,7 +550,7 @@ and extracts the output file.  We rely on the parent makeflow
 process to create and delete the instance as needed.
 */
 
-static int batch_job_amazon_subprocess( struct aws_config *aws_config, const char *instance_id, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
+static int batch_queue_amazon_subprocess( struct aws_config *aws_config, const char *instance_id, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
 {
 	char *ip_address = 0;
 
@@ -645,11 +645,11 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 /*
 To ensure that we track all instances correctly and avoid overloading the network,
 the setting up of an instance and the sending of input files are done sequentially
-within batch_job_amazon_submit.  Once the inputs are successfully sent, we fork
+within batch_queue_amazon_submit.  Once the inputs are successfully sent, we fork
 a process in order to execute the desired task, and await its completion.
 */
 
-static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
+static batch_queue_id_t batch_queue_amazon_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
 {
 	/* Flush output streams before forking, to avoid stale buffered data. */
 	fflush(NULL);
@@ -703,7 +703,7 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 
 	/* Create a new object describing the job */
 
-	struct batch_job_amazon_info *info = malloc(sizeof(*info));
+	struct batch_queue_amazon_info *info = malloc(sizeof(*info));
 	memset(info,0,sizeof(*info));
 	info->aws_config = aws_config;
  	info->instance_id = strdup(instance_id);
@@ -713,7 +713,7 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 
 	/* Now fork a new process to actually execute the task and wait for completion.*/
 
-	batch_job_id_t jobid = fork();
+	batch_queue_id_t jobid = fork();
 	if(jobid > 0) {
 		debug(D_BATCH, "started process %" PRIbjid ": %s", jobid, cmd);
 		itable_insert(q->job_table, jobid, info);
@@ -732,12 +732,12 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 		signal(SIGQUIT,SIG_DFL);
 		signal(SIGABRT,SIG_DFL);
 
-		_exit(batch_job_amazon_subprocess(aws_config,instance_id,cmd,extra_input_files,extra_output_files,envlist));
+		_exit(batch_queue_amazon_subprocess(aws_config,instance_id,cmd,extra_input_files,extra_output_files,envlist));
 	}
 	return -1;
 }
 
-static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
+static batch_queue_id_t batch_queue_amazon_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	while(1) {
 		int timeout;
@@ -750,7 +750,7 @@ static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batc
 
 		struct process_info *p = process_wait(timeout);
 		if(p) {
-			struct batch_job_amazon_info *i = itable_remove(q->job_table, p->pid);
+			struct batch_queue_amazon_info *i = itable_remove(q->job_table, p->pid);
 			if(!i) {
 				process_putback(p);
 				return -1;
@@ -797,9 +797,9 @@ kill the local ssh process forcibly, and then we save
 the Amazon instance and delete other expired instances.
 */
 
-static int batch_job_amazon_remove (struct batch_queue *q, batch_job_id_t jobid)
+static int batch_queue_amazon_remove (struct batch_queue *q, batch_queue_id_t jobid)
 {
-	struct batch_job_amazon_info *info;
+	struct batch_queue_amazon_info *info;
 
 	info = itable_lookup(q->job_table,jobid);
 	if(!info) {
@@ -842,7 +842,7 @@ const struct batch_queue_module batch_queue_amazon = {
 	batch_queue_amazon_port,
 	batch_queue_amazon_option_update,
 
-	batch_job_amazon_submit,
-	batch_job_amazon_wait,
-	batch_job_amazon_remove,
+	batch_queue_amazon_submit,
+	batch_queue_amazon_wait,
+	batch_queue_amazon_remove,
 };

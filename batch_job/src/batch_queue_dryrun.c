@@ -10,8 +10,8 @@ See the file COPYING for details.
 #include <errno.h>
 #include <signal.h>
 
-#include "batch_job.h"
-#include "batch_job_internal.h"
+#include "batch_queue.h"
+#include "batch_queue_internal.h"
 #include "debug.h"
 #include "process.h"
 #include "macros.h"
@@ -19,14 +19,14 @@ See the file COPYING for details.
 #include "path.h"
 #include "xxmalloc.h"
 
-static batch_job_id_t batch_job_dryrun_submit (struct batch_queue *q, struct batch_task *bt )
+static batch_queue_id_t batch_queue_dryrun_submit (struct batch_queue *q, struct batch_task *bt )
 {
 	FILE *log;
 	char *escaped_cmd;
 	char *env_assignment;
 	char *escaped_env_assignment;
 	struct batch_job_info *info;
-	batch_job_id_t jobid = random();
+	batch_queue_id_t jobid = random();
 
 	fflush(NULL);
 
@@ -65,7 +65,7 @@ static batch_job_id_t batch_job_dryrun_submit (struct batch_queue *q, struct bat
 	}
 }
 
-static batch_job_id_t batch_job_dryrun_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
+static batch_queue_id_t batch_queue_dryrun_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	struct batch_job_info *info;
 	UINT64_T jobid;
@@ -84,7 +84,7 @@ static batch_job_id_t batch_job_dryrun_wait (struct batch_queue * q, struct batc
 	}
 }
 
-static int batch_job_dryrun_remove (struct batch_queue *q, batch_job_id_t jobid)
+static int batch_queue_dryrun_remove (struct batch_queue *q, batch_queue_id_t jobid)
 {
 	return 0;
 }
@@ -112,9 +112,9 @@ const struct batch_queue_module batch_queue_dryrun = {
 	batch_queue_dryrun_port,
 	batch_queue_dryrun_option_update,
 
-	batch_job_dryrun_submit,
-	batch_job_dryrun_wait,
-	batch_job_dryrun_remove,
+	batch_queue_dryrun_submit,
+	batch_queue_dryrun_wait,
+	batch_queue_dryrun_remove,
 };
 
 

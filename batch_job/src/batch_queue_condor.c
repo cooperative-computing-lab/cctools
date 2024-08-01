@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "batch_job.h"
-#include "batch_job_internal.h"
+#include "batch_queue.h"
+#include "batch_queue_internal.h"
 #include "debug.h"
 #include "itable.h"
 #include "path.h"
@@ -86,7 +86,7 @@ static char *blacklisted_expression(struct batch_queue *q) {
 }
 
 
-static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, struct batch_task *bt )
+static batch_queue_id_t batch_queue_condor_submit (struct batch_queue *q, struct batch_task *bt )
 {
 	FILE *file;
 	int njobs;
@@ -226,7 +226,7 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, struct bat
 	return -1;
 }
 
-static batch_job_id_t batch_job_condor_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
+static batch_queue_id_t batch_queue_condor_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	static FILE *logfile = 0;
 
@@ -262,7 +262,7 @@ static batch_job_id_t batch_job_condor_wait (struct batch_queue * q, struct batc
 		char line[BATCH_JOB_LINE_MAX];
 		while(fgets(line, sizeof(line), logfile)) {
 			int type, proc, subproc;
-			batch_job_id_t jobid;
+			batch_queue_id_t jobid;
 
 			struct batch_job_info *info;
 			int logcode, exitcode;
@@ -356,7 +356,7 @@ static batch_job_id_t batch_job_condor_wait (struct batch_queue * q, struct batc
 	return -1;
 }
 
-static int batch_job_condor_remove (struct batch_queue *q, batch_job_id_t jobid)
+static int batch_queue_condor_remove (struct batch_queue *q, batch_queue_id_t jobid)
 {
 	char *command = string_format("condor_rm %" PRIbjid, jobid);
 
@@ -398,9 +398,9 @@ const struct batch_queue_module batch_queue_condor = {
 	batch_queue_condor_port,
 	batch_queue_condor_option_update,
 
-	batch_job_condor_submit,
-	batch_job_condor_wait,
-	batch_job_condor_remove,
+	batch_queue_condor_submit,
+	batch_queue_condor_wait,
+	batch_queue_condor_remove,
 };
 
 /* vim: set noexpandtab tabstop=8: */

@@ -17,8 +17,8 @@
  *
  */
 
-#include "batch_job.h"
-#include "batch_job_internal.h"
+#include "batch_queue.h"
+#include "batch_queue_internal.h"
 #include "debug.h"
 #include "process.h"
 #include "macros.h"
@@ -136,7 +136,7 @@ static void start_mesos_scheduler(struct batch_queue *q)
 }
 
 
-static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char *cmd, 
+static batch_queue_id_t batch_queue_mesos_submit (struct batch_queue *q, const char *cmd, 
 	const char *extra_input_files, const char *extra_output_files, 
 	struct jx *envlist, const struct rmsummary *resources )
 {
@@ -241,7 +241,7 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 	return task_id;
 }
 
-static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
+static batch_queue_id_t batch_queue_mesos_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 		
 	char line[MAX_BUF_SIZE];
@@ -331,7 +331,7 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
  * method does not guarantee the termination of executors, but all executors would be
  * terminated before the mesos scheduler stop.
  */
-static int batch_job_mesos_remove (struct batch_queue *q, batch_job_id_t jobid)
+static int batch_queue_mesos_remove (struct batch_queue *q, batch_queue_id_t jobid)
 {
 	struct batch_job_info *info = itable_lookup(q->job_table, jobid);
 	info->finished = time(0);
@@ -394,9 +394,9 @@ const struct batch_queue_module batch_queue_mesos = {
 	batch_queue_mesos_port,
 	batch_queue_mesos_option_update,
 
-	batch_job_mesos_submit,
-	batch_job_mesos_wait,
-	batch_job_mesos_remove,
+	batch_queue_mesos_submit,
+	batch_queue_mesos_wait,
+	batch_queue_mesos_remove,
 };
 
 /* vim: set noexpandtab tabstop=8: */

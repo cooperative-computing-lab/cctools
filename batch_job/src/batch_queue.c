@@ -5,8 +5,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "batch_job.h"
-#include "batch_job_internal.h"
+#include "batch_queue.h"
+#include "batch_queue_internal.h"
 
 #include "debug.h"
 #include "itable.h"
@@ -231,22 +231,22 @@ const char *batch_queue_type_string()
 }
 
 
-batch_job_id_t batch_job_submit(struct batch_queue * q, struct batch_task *bt )
+batch_queue_id_t batch_queue_submit(struct batch_queue * q, struct batch_task *bt )
 {
 	return q->module->submit(q,bt);
 }
 
-batch_job_id_t batch_job_wait(struct batch_queue * q, struct batch_job_info * info)
+batch_queue_id_t batch_queue_wait(struct batch_queue * q, struct batch_job_info * info)
 {
 	return q->module->wait(q, info, 0);
 }
 
-batch_job_id_t batch_job_wait_timeout(struct batch_queue * q, struct batch_job_info * info, time_t stoptime)
+batch_queue_id_t batch_queue_wait_timeout(struct batch_queue * q, struct batch_job_info * info, time_t stoptime)
 {
 	return q->module->wait(q, info, stoptime);
 }
 
-int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid)
+int batch_queue_remove(struct batch_queue *q, batch_queue_id_t jobid)
 {
 	return q->module->remove(q, jobid);
 }

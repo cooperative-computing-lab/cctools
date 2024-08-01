@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "batch_job.h"
-#include "batch_job_internal.h"
+#include "batch_queue.h"
+#include "batch_queue_internal.h"
 #include "buffer.h"
 #include "debug.h"
 #include "path.h"
@@ -31,8 +31,8 @@ static char * cluster_remove_cmd = NULL;
 static char * cluster_options = NULL;
 static char * cluster_jobname_var = NULL;
 
-int batch_job_verbose_jobnames = 0;
-int batch_job_disable_heartbeat = 0;
+int batch_queue_verbose_jobnames = 0;
+int batch_queue_disable_heartbeat = 0;
 
 static int heartbeat_rate =  30;	//in seconds. rate at which hearbeats are written to the log.
 static int heartbeat_max  = 120;	//in seconds. maximum wait for a heartbeat before giving up on the job.
@@ -50,7 +50,7 @@ support precise passing of command line arguments.
 
 The wrapper then writes a status file, which indicates the
 starting and ending time of the task to a known log file,
-which batch_job_cluster_wait then periodically polls to observe completion.
+which batch_queue_cluster_wait then periodically polls to observe completion.
 While this is not particularly elegant, there is no widely
 portable API for querying the state of a batch job in PBS-like systems.
 This method is simple, cheap, and reasonably effective.
@@ -95,7 +95,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	fprintf(file, "starttime=`date +%%s`\n");
 	fprintf(file, "echo start $starttime > $logfile\n");
 
-	if(!batch_job_disable_heartbeat) {
+	if(!batch_queue_disable_heartbeat) {
 		// Write a heartbeat to the log file, in case the batch system removes the job from under us.
 		fprintf(file, "(while true; do sleep %d; echo alive $(date +%%s) >> $logfile; done) &\n", heartbeat_rate);
 		fprintf(file, "pid_heartbeat=$!\n");
@@ -106,7 +106,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 
 	// When done, write the status and time to the logfile.
 	fprintf(file, "status=$?\n");
-	if(!batch_job_disable_heartbeat) {
+	if(!batch_queue_disable_heartbeat) {
 		fprintf(file, "kill $pid_heartbeat\n");
 	}
 	fprintf(file, "stoptime=`date +%%s`\n");
@@ -200,9 +200,9 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 	return resources_str;
 }
 
-static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
+static batch_queue_id_t batch_queue_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
 {
-	batch_job_id_t jobid;
+	batch_queue_id_t jobid;
 	struct batch_job_info *info;
 	const char *options = hash_table_lookup(q->options, "batch-options");
 
@@ -253,7 +253,7 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	static uint16_t submit_id = 0;
 	char *jobname;
 
-	if (batch_job_verbose_jobnames) {
+	if (batch_queue_verbose_jobnames) {
 		char *firstword = strdup(cmd);
 
 		char *end = strchr(firstword, ' ');
@@ -321,10 +321,10 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	return -1;
 }
 
-static batch_job_id_t batch_job_cluster_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
+static batch_queue_id_t batch_queue_cluster_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	struct batch_job_info *info;
-	batch_job_id_t jobid;
+	batch_queue_id_t jobid;
 	int t, c;
 
 	while(1) {
@@ -356,13 +356,13 @@ static batch_job_id_t batch_job_cluster_wait (struct batch_queue * q, struct bat
 				info->log_pos = ftell(file);
 				fclose(file);
 
-				if(!batch_job_disable_heartbeat && (time(0) - info->heartbeat > heartbeat_max)) {
+				if(!batch_queue_disable_heartbeat && (time(0) - info->heartbeat > heartbeat_max)) {
 						warn(D_BATCH, "job %" PRIbjid " does not appear to be running anymore.", jobid);
 						if(!info->started)
 							info->started = info->heartbeat;
 						info->finished = info->heartbeat;
 						info->exited_normally = 0;
-						info->exit_signal = 1;  //same used as batch_job_cluster_remove
+						info->exit_signal = 1;  //same used as batch_queue_cluster_remove
 				}
 
 				if(info->finished != 0) {
@@ -395,7 +395,7 @@ static batch_job_id_t batch_job_cluster_wait (struct batch_queue * q, struct bat
 	return -1;
 }
 
-static int batch_job_cluster_remove (struct batch_queue *q, batch_job_id_t jobid)
+static int batch_queue_cluster_remove (struct batch_queue *q, batch_queue_id_t jobid)
 {
 	struct batch_job_info *info;
 
@@ -527,9 +527,9 @@ const struct batch_queue_module batch_queue_cluster = {
 	batch_queue_cluster_port,
 	batch_queue_cluster_option_update,
 
-	batch_job_cluster_submit,
-	batch_job_cluster_wait,
-	batch_job_cluster_remove,
+	batch_queue_cluster_submit,
+	batch_queue_cluster_wait,
+	batch_queue_cluster_remove,
 };
 
 const struct batch_queue_module batch_queue_moab = {
@@ -541,9 +541,9 @@ const struct batch_queue_module batch_queue_moab = {
 	batch_queue_cluster_port,
 	batch_queue_cluster_option_update,
 
-	batch_job_cluster_submit,
-	batch_job_cluster_wait,
-	batch_job_cluster_remove,
+	batch_queue_cluster_submit,
+	batch_queue_cluster_wait,
+	batch_queue_cluster_remove,
 };
 
 const struct batch_queue_module batch_queue_sge = {
@@ -555,9 +555,9 @@ const struct batch_queue_module batch_queue_sge = {
 	batch_queue_cluster_port,
 	batch_queue_cluster_option_update,
 
-	batch_job_cluster_submit,
-	batch_job_cluster_wait,
-	batch_job_cluster_remove,
+	batch_queue_cluster_submit,
+	batch_queue_cluster_wait,
+	batch_queue_cluster_remove,
 };
 
 const struct batch_queue_module batch_queue_pbs = {
@@ -569,9 +569,9 @@ const struct batch_queue_module batch_queue_pbs = {
 	batch_queue_cluster_port,
 	batch_queue_cluster_option_update,
 
-	batch_job_cluster_submit,
-	batch_job_cluster_wait,
-	batch_job_cluster_remove,
+	batch_queue_cluster_submit,
+	batch_queue_cluster_wait,
+	batch_queue_cluster_remove,
 };
 
 const struct batch_queue_module batch_queue_lsf = {
@@ -583,9 +583,9 @@ const struct batch_queue_module batch_queue_lsf = {
 	batch_queue_cluster_port,
 	batch_queue_cluster_option_update,
 
-	batch_job_cluster_submit,
-	batch_job_cluster_wait,
-	batch_job_cluster_remove,
+	batch_queue_cluster_submit,
+	batch_queue_cluster_wait,
+	batch_queue_cluster_remove,
 };
 
 const struct batch_queue_module batch_queue_torque = {
@@ -597,9 +597,9 @@ const struct batch_queue_module batch_queue_torque = {
 	batch_queue_cluster_port,
 	batch_queue_cluster_option_update,
 
-	batch_job_cluster_submit,
-	batch_job_cluster_wait,
-	batch_job_cluster_remove,
+	batch_queue_cluster_submit,
+	batch_queue_cluster_wait,
+	batch_queue_cluster_remove,
 };
 
 
@@ -612,9 +612,9 @@ const struct batch_queue_module batch_queue_slurm = {
 	batch_queue_cluster_port,
 	batch_queue_cluster_option_update,
 
-	batch_job_cluster_submit,
-	batch_job_cluster_wait,
-	batch_job_cluster_remove,
+	batch_queue_cluster_submit,
+	batch_queue_cluster_wait,
+	batch_queue_cluster_remove,
 };
 
 /* vim: set noexpandtab tabstop=8: */

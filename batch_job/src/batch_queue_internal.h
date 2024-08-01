@@ -12,7 +12,7 @@ See the file COPYING for details.
 #include <limits.h>
 #include <stdlib.h>
 
-#include "batch_job.h"
+#include "batch_queue.h"
 #include "copy_stream.h"
 #include "create_dir.h"
 #include "unlink_recursive.h"
@@ -30,9 +30,9 @@ struct batch_queue_module {
 	int (*port) (struct batch_queue *Q);
 	void (*option_update) (struct batch_queue *Q, const char *what, const char *value); /* called when an option is changed */
 
-	batch_job_id_t (*submit) (struct batch_queue *Q, struct batch_task *bt );
-	batch_job_id_t (*wait) (struct batch_queue *Q, struct batch_job_info *info, time_t stoptime);
-	int (*remove) (struct batch_queue *Q, batch_job_id_t id);
+	batch_queue_id_t (*submit) (struct batch_queue *Q, struct batch_task *bt );
+	batch_queue_id_t (*wait) (struct batch_queue *Q, struct batch_job_info *info, time_t stoptime);
+	int (*remove) (struct batch_queue *Q, batch_queue_id_t id);
 };
 
 struct batch_queue {

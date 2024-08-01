@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "batch_job.h"
-#include "batch_job_internal.h"
+#include "batch_queue.h"
+#include "batch_queue_internal.h"
 #include "taskvine.h"
 #include "vine_manager.h" // Internal header for vine_enable_process_module
 #include "debug.h"
@@ -20,7 +20,7 @@ See the file COPYING for details.
 #include <errno.h>
 
 /*
-The batch_job interface provides a new batch_file every time.
+The batch_queue interface provides a new batch_file every time.
 But vine_file objects should get reused.
 So look up this name in our table to see if we already have it.
 */
@@ -75,7 +75,7 @@ static void specify_envlist( struct vine_task *t, struct jx *envlist )
 	}
 }
 
-static batch_job_id_t batch_job_vine_submit (struct batch_queue *q, struct batch_task *bt )
+static batch_queue_id_t batch_queue_vine_submit (struct batch_queue *q, struct batch_task *bt )
 {
 	struct vine_task *t;
 
@@ -113,7 +113,7 @@ static batch_job_id_t batch_job_vine_submit (struct batch_queue *q, struct batch
 	return vine_submit(q->tv_manager, t);
 }
 
-static batch_job_id_t batch_job_vine_wait (struct batch_queue * q, struct batch_job_info * info, time_t stoptime)
+static batch_queue_id_t batch_queue_vine_wait (struct batch_queue * q, struct batch_job_info * info, time_t stoptime)
 {
 	int timeout, taskid = -1;
 
@@ -160,7 +160,7 @@ static batch_job_id_t batch_job_vine_wait (struct batch_queue * q, struct batch_
 	}
 }
 
-static int batch_job_vine_remove (struct batch_queue *q, batch_job_id_t jobid)
+static int batch_queue_vine_remove (struct batch_queue *q, batch_queue_id_t jobid)
 {
 	return 0;
 }
@@ -274,9 +274,9 @@ const struct batch_queue_module batch_queue_vine = {
 	batch_queue_vine_port,
 	batch_queue_vine_option_update,
 
-	batch_job_vine_submit,
-	batch_job_vine_wait,
-	batch_job_vine_remove,
+	batch_queue_vine_submit,
+	batch_queue_vine_wait,
+	batch_queue_vine_remove,
 };
 
 /* vim: set noexpandtab tabstop=8: */

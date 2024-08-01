@@ -6,8 +6,8 @@ See the file COPYING for details.
 
 #ifdef CCTOOLS_WITH_MPI
 
-#include "batch_job.h"
-#include "batch_job_internal.h"
+#include "batch_queue.h"
+#include "batch_queue_internal.h"
 #include "debug.h"
 #include "macros.h"
 #include "stringtools.h"
@@ -44,7 +44,7 @@ struct mpi_job {
 	int memory;
 	struct mpi_worker *worker;
 	char *cmd;
-	batch_job_id_t jobid;
+	batch_queue_id_t jobid;
 	struct jx *env;
 	char *infiles;
 	char *outfiles;
@@ -65,9 +65,9 @@ job_table is a table of all jobs in any state, indexed by jobid
 static struct list *job_queue = 0;
 static struct itable *job_table = 0;
 
-/* Each job is assigned a unique jobid returned by batch_job_submit. */
+/* Each job is assigned a unique jobid returned by batch_queue_submit. */
 
-static batch_job_id_t jobid = 1;
+static batch_queue_id_t jobid = 1;
 
 /* Workers use an exponentially increasing sleep time from 1ms to 100ms. */
 
@@ -170,11 +170,11 @@ representation into a batch_job_info structure.  Returns the
 jobid of the completed job.
 */
 
-static batch_job_id_t receive_result_from_worker( struct mpi_worker *worker, struct batch_job_info *info )
+static batch_queue_id_t receive_result_from_worker( struct mpi_worker *worker, struct batch_job_info *info )
 {
 	struct jx *j = mpi_recv_jx(worker->rank);
 
-	batch_job_id_t jobid = jx_lookup_integer(j, "JOBID");
+	batch_queue_id_t jobid = jx_lookup_integer(j, "JOBID");
 
 	struct mpi_job *job = itable_lookup(job_table,jobid);
 	if(!job) {
@@ -248,7 +248,7 @@ and adding it to the job_queue and job table.
 Returns a generated jobid for the job.
 */
 
-static batch_job_id_t batch_job_mpi_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
+static batch_queue_id_t batch_queue_mpi_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
 {
 	struct mpi_job * job = mpi_job_create(cmd,extra_input_files,extra_output_files,envlist,resources);
 
@@ -266,7 +266,7 @@ wait for an MPI message with a timeout, use an exponentially
 increasing sleep time.
 */
 
-static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job_info *info, time_t stoptime)
+static batch_queue_id_t batch_queue_mpi_wait(struct batch_queue *q, struct batch_job_info *info, time_t stoptime)
 {
 	struct mpi_job *job;
 	struct mpi_worker *worker;
@@ -315,7 +315,7 @@ Remove a running job by taking it out of the job_table and job_queue,
 and if necessary, send a remove message to the corresponding worker.
 */
 
-static int batch_job_mpi_remove( struct batch_queue *q, batch_job_id_t jobid )
+static int batch_queue_mpi_remove( struct batch_queue *q, batch_queue_id_t jobid )
 {
 	struct mpi_job *job = itable_remove(job_table,jobid);
 	if(job) {
@@ -347,7 +347,7 @@ Send a message to all workers telling them to exit.
 XXX This would be better implemented as a broadcast.
 */
 
-static void batch_job_mpi_kill_workers()
+static void batch_queue_mpi_kill_workers()
 {
 	int i;
 	debug(D_BATCH,"killing all mpi workers");
@@ -374,7 +374,7 @@ static int batch_queue_mpi_free(struct batch_queue *q)
 	list_delete(job_queue);
 	itable_delete(job_table);
 
-	batch_job_mpi_kill_workers();
+	batch_queue_mpi_kill_workers();
 	MPI_Finalize();
 	return 0;
 }
@@ -432,7 +432,7 @@ and if necessary, killing the process and waiting for it.
 
 static void mpi_worker_handle_remove( struct jx *msg )
 {
-	batch_job_id_t jobid = jx_lookup_integer(msg, "JOBID");
+	batch_queue_id_t jobid = jx_lookup_integer(msg, "JOBID");
 
 	uint64_t pid;
 	struct jx *job;
@@ -466,7 +466,7 @@ table with the pid as the key.
 
 void mpi_worker_handle_execute( struct jx *job )
 {
-	batch_job_id_t jobid = jx_lookup_integer(job,"JOBID");
+	batch_queue_id_t jobid = jx_lookup_integer(job,"JOBID");
 	const char *cmd = jx_lookup_string(job,"CMD");
 
 	pid_t pid = fork();
@@ -621,7 +621,7 @@ and send it a terminate message, leaving one active
 worker per machine.
 */
 
-static void batch_job_mpi_manager_setup(int mpi_world_size, int manual_cores, int manual_memory )
+static void batch_queue_mpi_manager_setup(int mpi_world_size, int manual_cores, int manual_memory )
 {
 	int i;
 
@@ -661,7 +661,7 @@ Determine the rank and then (if manager) initalize and return,
 or (if worker) continue on to the worker code.
 */
 
-void batch_job_mpi_setup( const char *debug_filename, int manual_cores, int manual_memory )
+void batch_queue_mpi_setup( const char *debug_filename, int manual_cores, int manual_memory )
 {
 	int mpi_world_size;
 	int mpi_rank;
@@ -674,7 +674,7 @@ void batch_job_mpi_setup( const char *debug_filename, int manual_cores, int manu
 
 	if(mpi_rank == 0) {
 		printf("MPI manager process ready.\n");
-		batch_job_mpi_manager_setup(mpi_world_size, manual_cores, manual_memory );
+		batch_queue_mpi_manager_setup(mpi_world_size, manual_cores, manual_memory );
 	} else {
 		printf("MPI worker process ready.\n");
 		procname[procnamelen] = 0;
@@ -698,15 +698,15 @@ const struct batch_queue_module batch_queue_mpi = {
 	batch_queue_mpi_port,
 	batch_queue_mpi_option_update,
 
-	batch_job_mpi_submit,
-	batch_job_mpi_wait,
-	batch_job_mpi_remove,},
+	batch_queue_mpi_submit,
+	batch_queue_mpi_wait,
+	batch_queue_mpi_remove,},
 };
 #else
 
 #include "debug.h"
 
-void batch_job_mpi_setup( const char *debug_file_name, int manual_cores, int manual_memory)
+void batch_queue_mpi_setup( const char *debug_file_name, int manual_cores, int manual_memory)
 {
 	fatal("makeflow: mpi support is not enabled: please reconfigure using --with-mpi-path");
 }

@@ -29,7 +29,7 @@ struct batch_task {
 
 	struct jx *envlist;          /* JSON formatted environment list */ 
 
-	struct batch_job_info *info; /* Stores the info struct created by batch_job. */
+	struct batch_job_info *info; /* Stores the info struct created by batch_queue. */
 
 	char *hash;                  /* Checksum based on CMD, input contents, and output names. */
 };

@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "batch_job.h"
+#include "batch_queue.h"
 #include "batch_task.h"
 #include "batch_file.h"
 

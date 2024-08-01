@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "batch_job.h"
-#include "batch_job_internal.h"
+#include "batch_queue.h"
+#include "batch_queue_internal.h"
 #include "work_queue.h"
 #include "work_queue_internal.h" /* EVIL */
 #include "debug.h"
@@ -48,7 +48,7 @@ static void specify_envlist( struct work_queue_task *t, struct jx *envlist )
 	}
 }
 
-static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, struct batch_task *bt )
+static batch_queue_id_t batch_queue_wq_submit (struct batch_queue * q, struct batch_task *bt )
 {
 	struct work_queue_task *t;
 
@@ -82,7 +82,7 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, struct batch_
 	return t->taskid;
 }
 
-static batch_job_id_t batch_job_wq_wait (struct batch_queue * q, struct batch_job_info * info, time_t stoptime)
+static batch_queue_id_t batch_queue_wq_wait (struct batch_queue * q, struct batch_job_info * info, time_t stoptime)
 {
 	static int try_open_log = 0;
 	int timeout, taskid = -1;
@@ -146,7 +146,7 @@ static batch_job_id_t batch_job_wq_wait (struct batch_queue * q, struct batch_jo
 	}
 }
 
-static int batch_job_wq_remove (struct batch_queue *q, batch_job_id_t jobid)
+static int batch_queue_wq_remove (struct batch_queue *q, batch_queue_id_t jobid)
 {
 	return 0;
 }
@@ -264,9 +264,9 @@ const struct batch_queue_module batch_queue_wq = {
 	batch_queue_wq_port,
 	batch_queue_wq_option_update,
 
-	batch_job_wq_submit,
-	batch_job_wq_wait,
-	batch_job_wq_remove,
+	batch_queue_wq_submit,
+	batch_queue_wq_wait,
+	batch_queue_wq_remove,
 };
 
 /* vim: set noexpandtab tabstop=8: */

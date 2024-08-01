@@ -1,5 +1,5 @@
-#include "batch_job.h"
-#include "batch_job_internal.h"
+#include "batch_queue.h"
+#include "batch_queue_internal.h"
 #include "debug.h"
 #include "process.h"
 #include "macros.h"
@@ -31,7 +31,7 @@ static int count = 1;
 static struct itable *k8s_job_info_table = NULL;
 
 static const char *k8s_script = 
-#include "batch_job_k8s_script.c"
+#include "batch_queue_k8s_script.c"
 
 static const char *k8s_script_file_name = "_temp_k8s_script.sh";
 static const char *kubectl_failed_log = "kubectl_failed.log";
@@ -101,7 +101,7 @@ struct allocatable_resources{
 	double mem;
 };
 
-static struct allocatable_resources *batch_job_k8s_get_allocatable_resources()
+static struct allocatable_resources *batch_queue_k8s_get_allocatable_resources()
 {	
 	double min_cpu = DBL_MAX;
    	double min_mem = DBL_MAX;
@@ -199,7 +199,7 @@ static struct allocatable_resources *batch_job_k8s_get_allocatable_resources()
 	return min_resource;
 }
 
-static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *cmd, 
+static batch_queue_id_t batch_queue_k8s_submit (struct batch_queue *q, const char *cmd, 
 		const char *extra_input_files, const char *extra_output_files, struct jx *envlist, 
 		const struct rmsummary *resources )
 {
@@ -273,7 +273,7 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 		}
 		
 		if(batch_queue_get_option(q, "autosize")) {
-			struct allocatable_resources *min_resource = batch_job_k8s_get_allocatable_resources();
+			struct allocatable_resources *min_resource = batch_queue_k8s_get_allocatable_resources();
 			debug(D_BATCH, "Allocatable cpu: %f, Allocatable memory: %f", min_resource->cpu, min_resource->mem);
 			// there are always 0.4 cpu used by daemon containers
 			cores = min_resource->cpu - 0.4;
@@ -325,7 +325,7 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 	return -1;
 }
 
-static int batch_job_k8s_remove (struct batch_queue *q, batch_job_id_t jobid)
+static int batch_queue_k8s_remove (struct batch_queue *q, batch_queue_id_t jobid)
 {
 	
 	pid_t pid = fork();
@@ -368,7 +368,7 @@ static int batch_job_k8s_remove (struct batch_queue *q, batch_job_id_t jobid)
 
 }
 
-static void batch_job_k8s_handle_complete_task (char *pod_id, int job_id,
+static void batch_queue_k8s_handle_complete_task (char *pod_id, int job_id,
 		k8s_job_info *curr_k8s_job_info, int exited_normally, int exit_code,
 		struct batch_job_info *info_out, struct list *running_pod_lst,
 		struct batch_queue *q)
@@ -387,7 +387,7 @@ static void batch_job_k8s_handle_complete_task (char *pod_id, int job_id,
 	free(info);
 
 	list_remove(running_pod_lst, pod_id);
-	batch_job_k8s_remove(q, job_id);
+	batch_queue_k8s_remove(q, job_id);
 
 	if(curr_k8s_job_info->is_running == 0) {
 		process_wait(timeout);
@@ -398,7 +398,7 @@ static void batch_job_k8s_handle_complete_task (char *pod_id, int job_id,
 
 }
 
-static k8s_job_info *batch_job_k8s_get_kubectl_failed_task()
+static k8s_job_info *batch_queue_k8s_get_kubectl_failed_task()
 {
 	FILE *kubectl_failed_fp = fopen(kubectl_failed_log, "r");
 	if(!kubectl_failed_fp) {
@@ -430,7 +430,7 @@ static k8s_job_info *batch_job_k8s_get_kubectl_failed_task()
 }	
 // ContainerCreating
 // Terminating
-static int batch_job_k8s_gen_running_pod_lst(struct list **running_pod_lst, 
+static int batch_queue_k8s_gen_running_pod_lst(struct list **running_pod_lst, 
 		struct list **terminating_pod_lst, struct list **creating_pod_lst)
 {
 	if(*running_pod_lst != NULL) {
@@ -510,7 +510,7 @@ static int batch_job_k8s_gen_running_pod_lst(struct list **running_pod_lst,
 
 
 
-static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q, 
+static batch_queue_id_t batch_queue_k8s_wait (struct batch_queue * q, 
 		struct batch_job_info * info_out, time_t stoptime)
 {
 	/*
@@ -529,18 +529,18 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q,
 	while(1) {
 
 		// 1. Check if there is a task failed because of local kubectl failure
-		k8s_job_info *failed_job_info = batch_job_k8s_get_kubectl_failed_task();
+		k8s_job_info *failed_job_info = batch_queue_k8s_get_kubectl_failed_task();
 		if(failed_job_info != NULL) {
 			char *pod_id = string_format("%s-%d", mf_uuid->str, failed_job_info->job_id);
-			batch_job_k8s_handle_complete_task(pod_id, failed_job_info->job_id, 
+			batch_queue_k8s_handle_complete_task(pod_id, failed_job_info->job_id, 
 					failed_job_info, 0, failed_job_info->exit_code, info_out, running_pod_lst, q);
 			free(pod_id);
 			return failed_job_info->job_id;
 		}
 
 		// 2. Generate the list of running pod	
-		int failed_job_id = batch_job_k8s_gen_running_pod_lst(&running_pod_lst, &terminating_pod_lst, &creating_pod_lst);
-		// if failed_job_id == -1, batch_job_k8s_gen_running_pod_lst function call
+		int failed_job_id = batch_queue_k8s_gen_running_pod_lst(&running_pod_lst, &terminating_pod_lst, &creating_pod_lst);
+		// if failed_job_id == -1, batch_queue_k8s_gen_running_pod_lst function call
 		// failed, return -1
 		if(failed_job_id == -1) {
 			return failed_job_id;
@@ -549,7 +549,7 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q,
 		if (failed_job_id > 0) {
 			k8s_job_info *curr_k8s_job_info = itable_lookup(k8s_job_info_table, failed_job_id);
 			char *pod_id = string_format("%s-%d", mf_uuid->str, failed_job_id);
-			batch_job_k8s_handle_complete_task(pod_id, failed_job_id, 
+			batch_queue_k8s_handle_complete_task(pod_id, failed_job_id, 
 					curr_k8s_job_info, 0, 1, info_out, running_pod_lst, q);
 			free(pod_id);
 			return failed_job_id;
@@ -641,13 +641,13 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q,
 				// if job finished, remove the pod from running_pod_lst
 				// and delete the pod on k8s cluster
 				
-				batch_job_k8s_handle_complete_task(curr_pod_id, curr_job_id_int,
+				batch_queue_k8s_handle_complete_task(curr_pod_id, curr_job_id_int,
 						curr_k8s_job_info, 1, 0, info_out, running_pod_lst, q);
 				return curr_job_id_int;
 
 			} else if (strcmp(task_state, "exec_failed") == 0) {
 				int exit_code_int = atoi(strtok(NULL, ","));
-				batch_job_k8s_handle_complete_task(curr_pod_id, curr_job_id_int, 
+				batch_queue_k8s_handle_complete_task(curr_pod_id, curr_job_id_int, 
 						curr_k8s_job_info, 0, exit_code_int, info_out, running_pod_lst, q);
 				return curr_job_id_int;
 
@@ -696,9 +696,9 @@ const struct batch_queue_module batch_queue_k8s = {
 	batch_queue_k8s_port,
 	batch_queue_k8s_option_update,
 
-	batch_job_k8s_submit,
-	batch_job_k8s_wait,
-	batch_job_k8s_remove,
+	batch_queue_k8s_submit,
+	batch_queue_k8s_wait,
+	batch_queue_k8s_remove,
 };
 
 /* vim: set noexpandtab tabstop=8: */

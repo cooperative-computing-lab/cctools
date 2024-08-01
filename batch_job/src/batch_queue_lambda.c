@@ -7,7 +7,7 @@ See the file COPYING for details.
 /*
 Theory of operation:
 
-batch_job_lambda assumes that the a generic lambda function
+batch_queue_lambda assumes that the a generic lambda function
 and an S3 bucket have been created by makeflow_lambda_setup,
 and the necessary info recorded to a config file, which is
 loaded here.
@@ -34,9 +34,9 @@ Files are stored in S3 underneath their "outer" name, and are then
 downloaded to the function where they are stored with the "inner" name.
 */
 
-#include "batch_job_internal.h"
+#include "batch_queue_internal.h"
 #include "process.h"
-#include "batch_job.h"
+#include "batch_queue.h"
 #include "stringtools.h"
 #include "debug.h"
 #include "path.h"
@@ -292,10 +292,10 @@ static int transfer_semaphore = -1;
 Within a child process, invoke the lambda function itself,
 and then download the output files.  It would be better to
 download the outputs as part of wait(), but that information
-is not (currently) available within batch_job_lambda_wait().
+is not (currently) available within batch_queue_lambda_wait().
 */
 
-static int batch_job_lambda_subprocess( struct lambda_config *config, const char *cmdline, const char *input_file_string, const char *output_file_string )
+static int batch_queue_lambda_subprocess( struct lambda_config *config, const char *cmdline, const char *input_file_string, const char *output_file_string )
 {
 	struct jx *input_files = filestring_to_jx(input_file_string);
 	struct jx *output_files = filestring_to_jx(output_file_string);
@@ -319,7 +319,7 @@ Submit a lambda job by uploading the input files, forking
 a child process, and invoking the subprocess function.
 */
 
-static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char *cmdline, const char *input_file_string, const char *output_file_string, struct jx *envlist, const struct rmsummary *resources)
+static batch_queue_id_t batch_queue_lambda_submit(struct batch_queue *q, const char *cmdline, const char *input_file_string, const char *output_file_string, struct jx *envlist, const struct rmsummary *resources)
 {
 	if(transfer_semaphore==-1) {
 		transfer_semaphore = semaphore_create(1);
@@ -340,7 +340,7 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 		return -1;
 	}
 
-	batch_job_id_t jobid = fork();
+	batch_queue_id_t jobid = fork();
 
 	if(jobid > 0) {
 		/* parent process */
@@ -353,7 +353,7 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 		return jobid;
 	} else if(jobid == 0) {
 		/* child process */
-		int result = batch_job_lambda_subprocess(config,cmdline,input_file_string,output_file_string);
+		int result = batch_queue_lambda_subprocess(config,cmdline,input_file_string,output_file_string);
 		_exit(result);
 	} else {
 		debug(D_BATCH,"failed to fork: %s\n",strerror(errno));
@@ -367,7 +367,7 @@ containing subprocess.  Note that the process module is needed
 here to avoid accidentally reaping unrelated processes.
 */
 
-static batch_job_id_t batch_job_lambda_wait(struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime)
+static batch_queue_id_t batch_queue_lambda_wait(struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime)
 {
 	while(1) {
 		int timeout = 10;
@@ -405,7 +405,7 @@ process to be returned by waitpid().  If it's not
 in the job table, then it's not a valid job.
 */
 
-static int batch_job_lambda_remove(struct batch_queue *q, batch_job_id_t jobid)
+static int batch_queue_lambda_remove(struct batch_queue *q, batch_queue_id_t jobid)
 {
 	struct batch_job_info *info;
 	info = itable_remove(q->job_table, jobid);
@@ -446,8 +446,8 @@ const struct batch_queue_module batch_queue_lambda = {
 	batch_queue_lambda_option_update,
 
 	{
-	 batch_job_lambda_submit,
-	 batch_job_lambda_wait,
-	 batch_job_lambda_remove,
+	 batch_queue_lambda_submit,
+	 batch_queue_lambda_wait,
+	 batch_queue_lambda_remove,
 	 }
 };

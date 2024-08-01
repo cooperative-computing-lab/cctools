@@ -8,7 +8,7 @@ See the file COPYING for details.
 #include "vine_protocol.h"
 
 #include "cctools.h"
-#include "batch_job.h"
+#include "batch_queue.h"
 #include "hash_table.h"
 #include "copy_stream.h"
 #include "debug.h"
@@ -127,7 +127,7 @@ int manual_ssl_option = 0;
 // Change the name presented in tls routing
 static char *manual_tls_sni = NULL;
 
-//Environment variables to pass along in batch_job_submit
+//Environment variables to pass along in batch_queue_submit
 struct jx *batch_env = NULL;
 
 //Features to pass along as worker arguments
@@ -508,7 +508,7 @@ static int submit_worker( struct batch_queue *queue )
 	
 	debug(D_VINE,"submitting worker: %s",cmd);
 
-	int status = batch_job_submit(queue,task);
+	int status = batch_queue_submit(queue,task);
 
 	batch_task_delete(task);
 	
@@ -588,7 +588,7 @@ void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
 	itable_firstkey(job_table);
 	while(itable_nextkey(job_table,&jobid,&value)) {
 		debug(D_VINE,"removing job %"PRId64,jobid);
-		batch_job_remove(queue,jobid);
+		batch_queue_remove(queue,jobid);
 	}
 	debug(D_VINE,"%d workers removed.",count);
 
@@ -1087,8 +1087,8 @@ static void mainloop( struct batch_queue *queue )
 
 		while(1) {
 			struct batch_job_info info;
-			batch_job_id_t jobid;
-			jobid = batch_job_wait_timeout(queue,&info,stoptime);
+			batch_queue_id_t jobid;
+			jobid = batch_queue_wait_timeout(queue,&info,stoptime);
 			if(jobid>0) {
 				if(itable_lookup(job_table,jobid)) {
 					itable_remove(job_table,jobid);

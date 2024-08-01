@@ -16,26 +16,26 @@ SOURCES = \
 	batch_file.c \
 	batch_task.c \
 	batch_wrapper.c \
-	batch_job.c \
 	batch_job_info.c \
-	batch_job_dryrun.c \
-	batch_job_condor.c \
-	batch_job_local.c \
-	batch_job_work_queue.c \
-	batch_job_vine.c
+	batch_queue.c \
+	batch_queue_dryrun.c \
+	batch_queue_condor.c \
+	batch_queue_local.c \
+	batch_queue_work_queue.c \
+	batch_queue_vine.c
 
-#	batch_job_amazon.c \
-#	batch_job_amazon_batch.c \
+#	batch_queue_amazon.c \
+#	batch_queue_amazon_batch.c \
 #	$(CHIRP_BATCH) \
-#	batch_job_cluster.c \
-#	batch_job_blue_waters.c \
-#	batch_job_lambda.c \
-#	batch_job_mesos.c \
-#	batch_job_k8s.c \
-#	batch_job_mpi.c \
+#	batch_queue_cluster.c \
+#	batch_queue_blue_waters.c \
+#	batch_queue_lambda.c \
+#	batch_queue_mesos.c \
+#	batch_queue_k8s.c \
+#	batch_queue_mpi.c \
 #	mesos_task.c
 
-PUBLIC_HEADERS = batch_job.h
+PUBLIC_HEADERS = batch_queue.h
 
 OBJECTS = $(SOURCES:%.c=%.o)
 
@@ -62,5 +62,5 @@ install:
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools
 
 clean:
-	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) batch_job_amazon_script.c *.o
+	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) batch_queue_amazon_script.c *.o
 
