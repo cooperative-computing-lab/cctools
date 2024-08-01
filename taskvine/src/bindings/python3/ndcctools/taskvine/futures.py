@@ -193,7 +193,7 @@ class FuturesExecutor(Executor):
         return future_task._future
 
     def future_task(self, fn, *args, **kwargs):
-        return FuturePythonTask(self.manager, False, fn, *args, **kwargs)
+        return FuturePythonTask(self.manager, fn, *args, **kwargs)
 
     def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True, import_modules=None):
         return self.manager.create_library_from_functions(name, *function_list, retrieve_output, poncho_env=poncho_env, init_command=init_command, add_env=add_env, import_modules=import_modules)
@@ -202,7 +202,7 @@ class FuturesExecutor(Executor):
         self.manager.install_library(libtask)
 
     def future_funcall(self, library_name, fn, *args, **kwargs):
-        return FutureFunctionCall(self.manager, False, library_name, fn, *args, **kwargs)
+        return FutureFunctionCall(self.manager, library_name, fn, *args, **kwargs)
 
     def set(self, name, value):
         if self.factory:
