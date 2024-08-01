@@ -26,9 +26,8 @@ geography, and high energy physics all use Makeflow to compose workflows from
 existing applications.
 
 Makeflow can send your jobs to a wide variety of services, such as batch
-systems (HTCondor, SGE, PBS, LSF, Torque), task executors (TaskVine, Work Queue),
-cluster managers (Mesos and Kubernetes),
-cloud services (Amazon EC2 or Lambda) and container environments like Docker
+systems (HTCondor, SGE, SLURM, PBS, LSF, Torque), task executors (TaskVine, Work Queue),
+cluster managers (Kubernetes), cloud services (Amazon EC2) and container environments like Docker
 and Singularity. Details for each of those systems are given in the Batch
 System Support section.
 
@@ -452,71 +451,6 @@ output: input
 Use the `-T moab` option to submit jobs to the Moab scheduler or compatible
 systems.
 
-### MPI Makeflow
-
-An alternate method of using Makeflow on an HPC system is to submit Makeflow
-itself as one large parallel job. Makeflow will then use the MPI (Message
-Passing Interface) to communicate between nodes and dispatch each task in the
-workflow to nodes as needed. The entire "job" will return when the workflow is
-complete. This mode assumes that there exists a shared parallel filesystem
-mounted across all nodes in the system.
-
-To use this option, Makeflow must be built from source to take advantage of
-the specialized MPI compilers and libraries available on your machine. First,
-consult your local documentation on how to set up access to your MPI compiler,
-typically named `mpicc`. Then, configure and build Makeflow using the `--with-
-mpi-path` option, like this:
-
-```sh
-$ git clone http://github.com/cooperative-computing-lab/cctools cctools-src
-$ cd cctools-src
-$ ./configure --with-mpi-path `which mpicc` --prefix $HOME/cctools
-$ make clean
-$ make install
-$ export PATH=$HOME/cctools/bin:$PATH
-```
-
-You can test this configuration locally at small scale using `mpirun`. For
-example, to run makeflow on four MPI nodes:
-
-```sh
-$ mpirun -np 4 makeflow -T mpi example.makeflow
-```
-
-Then, consult your local documentation on how to submit an MPI job to your
-cluster. This varies considerably between sites, but here is a typical example
-of a script for a system that uses a `qsub` style interface and `modules` for
-loading software:
-
-    
-```sh
-#!/bin/bash
-#$ -pe mpi 48
-module load ompi
-mpirun -np $NSLOTS makeflow -T mpi example.makeflow
-```
-
-
-### Mesos
-
-Makeflow can be used with Apache Mesos. To run Makeflow with Mesos, give the
-batch mode via `-T mesos` and pass the hostname and port number of Mesos
-manager to Makeflow with the `--mesos-master` option. Since the Makeflow-Mesos
-Scheduler is based on Mesos Python2 API, the path to Mesos Python2 library
-should be included in the `$PATH`, or one can specify a preferred Mesos
-Python2 API via ` --mesos-path ` option. To successfully import the Python
-library, you may need to indicate dependencies through `--mesos-preload `
-option.
-
-For example, here is the command to run Makeflow on a Mesos cluster that has
-the manager listening on port 5050 of localhost, with a user specified python
-library:
-
-```sh
-$ makeflow -T mesos --mesos-master localhost:5050 --mesos-path /path/to/mesos-0.26.0/lib/python2.6/site-packages example.makeflow ...
-```
-
-
 ### Kubernetes
 
 Makeflow can be run on [Kubernetes](https://kubernetes.io/) cluster. To run
@@ -592,39 +526,6 @@ variables within the Makeflow file. For example:
 ```sh
 $ export AMAZON_INSTANCE_TYPE=m4.4xlarge export AMAZON_AMI=ami-343a694f
 ```
-
-
-### Amazon Lambda
-
-To use Amazon Lambda, first set up an AWS account and install the `aws`
-command line tools as noted above.
-
-Then, use the `makeflow_lambda_setup` command, which will establish the
-appropriate roles, buckets, and functions needed to use Amazon Lambda. The
-names of these items will be stored in a config file named on the command
-line:
-
-```sh
-$ makeflow_lambda_setup my.config
-```
-
-Then, you may use `makeflow` normally, indicating `lambda` as the batch type,
-and passing in the configuration file with the `--lambda-config` option:
-
-    
-```sh
-$ makeflow -T lambda --lambda-config my.config example.makeflow ...
-```
-
-You may run multiple workflows in this fashion. When you are ready to clean up
-the associated state in Amazon, run `makeflow_lambda_cleanup` and pass in the
-configuration file:
-
-    
-```sh    
-$ makeflow_lambda_cleanup my.config
-```
-    
 
 ### Generic Cluster Submission
 
@@ -1339,7 +1240,7 @@ export USER
 When the underlying batch system supports it, Makeflow supports "Remote
 Renaming" where the name of a file in the execution sandbox is different than
 the name of the same file in the DAG. This is currently supported by the
-TaskVine, Work Queue, HTCondor, and Amazon batch system.
+TaskVine, Work Queue, HTCondor, and Amazon batch systems.
 
 For example, `local_name->remote_name` indicates that the file `local_name` is
 called `remote_name` in the remote system. Consider the following example:
