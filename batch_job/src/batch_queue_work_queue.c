@@ -27,13 +27,13 @@ static void specify_files( struct batch_queue *q, struct work_queue_task *t, str
 	
 	if(input_files) {
 		LIST_ITERATE(input_files,bf) {
-			work_queue_task_specify_file(t, bf->inner_name, bf->outer_name, WORK_QUEUE_INPUT, caching_flag);
+			work_queue_task_specify_file(t, bf->outer_name, bf->inner_name, WORK_QUEUE_INPUT, caching_flag);
 		}
 	}
 
 	if(output_files) {
 		LIST_ITERATE(output_files,bf) {
-			work_queue_task_specify_file(t, bf->inner_name, bf->outer_name, WORK_QUEUE_OUTPUT, caching_flag);
+			work_queue_task_specify_file(t, bf->outer_name, bf->inner_name, WORK_QUEUE_OUTPUT, caching_flag);
 		}
 	}
 }
