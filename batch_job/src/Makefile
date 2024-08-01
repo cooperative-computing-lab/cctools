@@ -24,15 +24,14 @@ SOURCES = \
 	batch_queue_vine.c \
 	batch_queue_work_queue.c \
 	batch_queue_cluster.c \
+	batch_queue_k8s.c \
 	batch_queue_amazon.c
 
-# These are older modules that were prototyped but not actively maintained
-#	batch_queue_amazon_batch.c \
-#	batch_queue_lambda.c \
-#	batch_queue_mesos.c \
-#	batch_queue_k8s.c \
-#	batch_queue_mpi.c \
-#	mesos_task.c
+# These are older modules that were prototyped but not actively maintained.
+#	batch_queue_amazon_batch.c
+#	batch_queue_lambda.c
+#	batch_queue_mesos.c
+#	batch_queue_mpi.c
 
 PUBLIC_HEADERS = batch_queue.h
 

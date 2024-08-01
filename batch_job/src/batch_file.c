@@ -56,6 +56,41 @@ void batch_file_delete(struct batch_file *f)
 	free(f);
 }
 
+char * batch_file_to_string( struct batch_file *f )
+{
+	if(!strcmp(f->inner_name,f->outer_name)) {
+		return strdup(f->outer_name);
+	} else {
+		return string_format("%s=%s",f->outer_name,f->inner_name);
+	}
+}
+
+char * batch_file_list_to_string( struct list *file_list )
+{
+	struct batch_file *file;
+
+	char * file_str = strdup("");
+	char * separator = "";
+
+	if(!file_list) return file_str;
+
+	LIST_ITERATE(file_list,file) {
+		/* Only add separator if past first item. */
+		file_str = string_combine(file_str,separator);
+
+		char *f = batch_file_to_string(file);
+		file_str = string_combine(file_str,f);
+
+		/* This could be set using batch_queue feature or option 
+		 * to allow for batch system specific separators. */
+		separator = ",";
+
+		free(f);
+	}
+
+	return file_str;
+}
+
 int batch_file_outer_compare( struct batch_file *file1, struct batch_file *file2 )
 {
 	return strcmp(file1->outer_name,file2->outer_name);

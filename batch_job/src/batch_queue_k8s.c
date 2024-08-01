@@ -199,7 +199,7 @@ static struct allocatable_resources *batch_queue_k8s_get_allocatable_resources()
 	return min_resource;
 }
 
-static batch_queue_id_t batch_queue_k8s_submit (struct batch_queue *q, const char *cmd, 
+static batch_queue_id_t batch_queue_k8s_submit_old (struct batch_queue *q, const char *cmd, 
 		const char *extra_input_files, const char *extra_output_files, struct jx *envlist, 
 		const struct rmsummary *resources )
 {
@@ -323,6 +323,32 @@ static batch_queue_id_t batch_queue_k8s_submit (struct batch_queue *q, const cha
 	}
 
 	return -1;
+}
+
+/*
+batch_queue_submit( queue, job ) is the improved interface to the batch queue.
+batch_queue_submit_old( queue, ... ) is the older interface.
+
+To minimize untested modifications to old code, this function simply transforms
+the batch job structure to the older interface.  There is some inherent duplication
+here because the old code then turns around and creates a k8s_job_info structure,
+which pretty much duplicates a batch_job object.  In the future, this module could
+be simplified to use the batch_job structure throughout.
+*/
+
+static batch_queue_id_t batch_queue_k8s_submit ( struct batch_queue *q, struct batch_job *j )
+{
+	batch_queue_id_t jobid;
+	
+	char *input_file_string = batch_file_list_to_string(j->input_files);
+	char *output_file_string = batch_file_list_to_string(j->output_files);
+	
+	jobid = batch_queue_k8s_submit_old( q, j->command, input_file_string, output_file_string, j->envlist, j->resources );
+
+	free(input_file_string);
+	free(output_file_string);
+
+	return jobid;
 }
 
 static int batch_queue_k8s_remove (struct batch_queue *q, batch_queue_id_t jobid)
