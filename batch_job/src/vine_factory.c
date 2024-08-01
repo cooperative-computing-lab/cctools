@@ -504,7 +504,9 @@ static int submit_worker( struct batch_queue *queue )
 		batch_job_add_input_file(task,path_basename(item),0);
 	}
 
-	batch_job_add_output_file(task,worker_log_file,0);
+	if(worker_log_file) {
+		batch_job_add_output_file(task,worker_log_file,0);
+	}
 	
 	debug(D_VINE,"submitting worker: %s",cmd);
 
