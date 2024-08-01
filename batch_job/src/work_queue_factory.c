@@ -1200,9 +1200,6 @@ static void show_help(const char *cmd)
 	printf(" %-30s Disable check for use of AFS with HTCondor.\n", "--disable-afs-check");
 	printf(" %-30s Specify Amazon config file.\n", "--amazon-config");
 	printf(" %-30s Set requirements for the workers as Condor jobs.\n", "--condor-requirements");
-	printf(" %-30s Host name of mesos manager node..\n", "--mesos-master");
-	printf(" %-30s Path to mesos python library..\n", "--mesos-path");
-	printf(" %-30s Libraries for running mesos.\n", "--mesos-preload");
 	printf(" %-30s Container image for Kubernetes.\n", "--k8s-image");
 	printf(" %-30s Container image with worker for Kubernetes.\n", "--k8s-worker-image");
 
@@ -1223,9 +1220,6 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_WRAPPER, 
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WORKER_BINARY,
-		LONG_OPT_MESOS_MANAGER, 
-		LONG_OPT_MESOS_PATH,
-		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_K8S_IMAGE,
 		LONG_OPT_K8S_WORKER_IMAGE,
 		LONG_OPT_CATALOG,
@@ -1267,9 +1261,6 @@ static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"max-workers", required_argument, 0, 'W'},
 	{"memory", required_argument,  0,  LONG_OPT_MEMORY},
-	{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MANAGER},
-	{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
-	{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 	{"min-workers", required_argument, 0, 'w'},
 	{"parent-death", no_argument, 0, LONG_OPT_PARENT_DEATH},
 	{"password", required_argument, 0, 'P'},
@@ -1294,9 +1285,6 @@ static const struct option long_options[] = {
 
 int main(int argc, char *argv[])
 {
-	char *mesos_manager = NULL;
-	char *mesos_path = NULL;
-	char *mesos_preload = NULL;
 	char *k8s_image = NULL;
 
 	wrapper_inputs = list_create();
@@ -1466,15 +1454,6 @@ int main(int argc, char *argv[])
 			case 'h':
 				show_help(argv[0]);
 				exit(EXIT_SUCCESS);
-			case LONG_OPT_MESOS_MANAGER:
-				mesos_manager = xxstrdup(optarg);
-				break;
-			case LONG_OPT_MESOS_PATH:
-				mesos_path = xxstrdup(optarg);
-				break;
-			case LONG_OPT_MESOS_PRELOAD:
-				mesos_preload = xxstrdup(optarg);
-				break;
 			case LONG_OPT_K8S_IMAGE:
 				k8s_image = xxstrdup(optarg);
 				break;
@@ -1696,25 +1675,11 @@ int main(int argc, char *argv[])
 		batch_queue_set_option(queue, "condor-requirements", condor_requirements);
 	}
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-		batch_queue_set_option(queue, "mesos-path", mesos_path);
-		batch_queue_set_option(queue, "mesos-master", mesos_manager);
-		batch_queue_set_option(queue, "mesos-preload", mesos_preload);
-		batch_queue_set_logfile(queue, "work_queue_factory.mesoslog");
-	}
-	
 	if(batch_queue_type == BATCH_QUEUE_TYPE_K8S) {
 		batch_queue_set_option(queue, "k8s-image", k8s_image);
 	}
 
 	mainloop( queue );
-
-	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-
-		batch_queue_set_int_option(queue, "batch-queue-abort-flag", (int)abort_flag);
-		batch_queue_set_int_option(queue, "batch-queue-failed-flag", 0);
-
-	}
 
 	batch_queue_delete(queue);
 
