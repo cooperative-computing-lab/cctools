@@ -15,10 +15,10 @@ See the file COPYING for details.
 #include <time.h>
 
 struct batch_queue;
-struct batch_task;
+struct batch_job;
 struct batch_file;
 
-#include "batch_task.h"
+#include "batch_job.h"
 #include "batch_file.h"
 #include "batch_job_info.h"
 
@@ -77,7 +77,7 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type, const char *ssl_
 @return On success, returns a positive unique identifier for the batch job.  On failure, returns a negative number.
 Zero is not a valid batch job id and indicates an internal failure.
 */
-batch_queue_id_t batch_queue_submit(struct batch_queue *q, struct batch_task *task );
+batch_queue_id_t batch_queue_submit(struct batch_queue *q, struct batch_job *task );
 
 /** Wait for any batch job to complete.
 Blocks until a batch job completes.

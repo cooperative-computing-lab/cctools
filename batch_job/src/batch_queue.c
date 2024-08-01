@@ -231,7 +231,7 @@ const char *batch_queue_type_string()
 }
 
 
-batch_queue_id_t batch_queue_submit(struct batch_queue * q, struct batch_task *bt )
+batch_queue_id_t batch_queue_submit(struct batch_queue * q, struct batch_job *bt )
 {
 	return q->module->submit(q,bt);
 }

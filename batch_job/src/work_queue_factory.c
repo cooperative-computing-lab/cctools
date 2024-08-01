@@ -488,32 +488,32 @@ static int submit_worker( struct batch_queue *queue )
 		cmd = temp;
 	}
 
-	struct batch_task *task = batch_task_create(queue);
+	struct batch_job *task = batch_job_create(queue);
 
-	batch_task_set_command(task,cmd);
+	batch_job_set_command(task,cmd);
 	
 	if(!runos_os && !k8s_worker_image) {
-		batch_task_add_input_file(task,worker_command,0);
+		batch_job_add_input_file(task,worker_command,0);
 	} else {
 		// if runos, then worker comes from vc3_cmd. if k8s, then from the container image.
 	}
 
 	if(password_file) {
-		batch_task_add_input_file(task,"pwfile",0);
+		batch_job_add_input_file(task,"pwfile",0);
 	}
 
 	const char *item = NULL;
 	LIST_ITERATE(wrapper_inputs,item) {
-		batch_task_add_input_file(task,path_basename(item),0);
+		batch_job_add_input_file(task,path_basename(item),0);
 	}
 
-	batch_task_add_output_file(task,"output.log",0);
+	batch_job_add_output_file(task,"output.log",0);
 	
 	debug(D_WQ,"submitting worker: %s",cmd);
 
 	int status = batch_queue_submit(queue,task);
 
-	batch_task_delete(task);
+	batch_job_delete(task);
 	
 	free(cmd);
 	free(worker);

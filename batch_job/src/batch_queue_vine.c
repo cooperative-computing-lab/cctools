@@ -75,7 +75,7 @@ static void specify_envlist( struct vine_task *t, struct jx *envlist )
 	}
 }
 
-static batch_queue_id_t batch_queue_vine_submit (struct batch_queue *q, struct batch_task *bt )
+static batch_queue_id_t batch_queue_vine_submit (struct batch_queue *q, struct batch_job *bt )
 {
 	struct vine_task *t;
 

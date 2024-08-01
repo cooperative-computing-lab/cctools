@@ -7,7 +7,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 
-#include "batch_task.h"
+#include "batch_job.h"
 #include "batch_file.h"
 #include "batch_wrapper.h"
 #include "batch_queue.h"
@@ -17,10 +17,10 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "debug.h"
 
-/** Creates new batch_task and initializes file lists. */
-struct batch_task *batch_task_create(struct batch_queue *queue)
+/** Creates new batch_job and initializes file lists. */
+struct batch_job *batch_job_create(struct batch_queue *queue)
 {
-	struct batch_task *t = calloc(1,sizeof(*t));
+	struct batch_job *t = calloc(1,sizeof(*t));
 
 	t->queue = queue;
 
@@ -33,7 +33,7 @@ struct batch_task *batch_task_create(struct batch_queue *queue)
 }
 
 /** Deletes task struct and frees contained data. */
-void batch_task_delete(struct batch_task *t)
+void batch_job_delete(struct batch_job *t)
 {
 	if (!t)
 		return;
@@ -63,7 +63,7 @@ void batch_task_delete(struct batch_task *t)
 }
 
 /** Creates new batch_file and adds to inputs. */
-struct batch_file * batch_task_add_input_file(struct batch_task *task, const char * outer_name, const char * inner_name)
+struct batch_file * batch_job_add_input_file(struct batch_job *task, const char * outer_name, const char * inner_name)
 {
 	struct batch_file *f = batch_file_create(outer_name, inner_name);
 	list_push_tail(task->input_files, f);
@@ -72,7 +72,7 @@ struct batch_file * batch_task_add_input_file(struct batch_task *task, const cha
 }
 
 /** Creates new batch_file and adds to outputs. */
-struct batch_file * batch_task_add_output_file(struct batch_task *task, const char * outer_name, const char * inner_name)
+struct batch_file * batch_job_add_output_file(struct batch_job *task, const char * outer_name, const char * inner_name)
 {
 	struct batch_file *f = batch_file_create(outer_name, inner_name);
 	list_push_tail(task->output_files, f);
@@ -81,7 +81,7 @@ struct batch_file * batch_task_add_output_file(struct batch_task *task, const ch
 }
 
 /** Free previous command and strdup passed command. */
-void batch_task_set_command(struct batch_task *t, const char *command)
+void batch_job_set_command(struct batch_job *t, const char *command)
 {
 	free(t->command);
 	t->command = xxstrdup(command);
@@ -91,7 +91,7 @@ void batch_task_set_command(struct batch_task *t, const char *command)
  See stringtools for a more detailed example of its use.
  Frees the previously set command after wrapping.
 */
-void batch_task_wrap_command(struct batch_task *t, const char *command)
+void batch_job_wrap_command(struct batch_job *t, const char *command)
 {
 	if(!command) return; 
 
@@ -107,30 +107,30 @@ void batch_task_wrap_command(struct batch_task *t, const char *command)
 	t->command = result;
 }
 
-/** Sets the resources of batch_task.
+/** Sets the resources of batch_job.
  Uses rmsummary_copy to create a deep copy of resources.
 */
-void batch_task_set_resources(struct batch_task *t, const struct rmsummary *resources)
+void batch_job_set_resources(struct batch_job *t, const struct rmsummary *resources)
 {
 	rmsummary_delete(t->resources);
 	t->resources = rmsummary_copy(resources, 0);
 }
 
-/** Sets the envlist of batch_task.
+/** Sets the envlist of batch_job.
  Uses jx_copy to create a deep copy.
 */
-void batch_task_set_envlist(struct batch_task *t, struct jx *envlist)
+void batch_job_set_envlist(struct batch_job *t, struct jx *envlist)
 {
 	jx_delete(t->envlist);
 	t->envlist = jx_copy(envlist);
 }
 
-/** Sets the batch_job_info of batch_task.
+/** Sets the batch_job_info of batch_job.
  Manually copies data into struct.
  Does not free in current code, but as this become standard
  in batch_queue interface we should.
 */
-void batch_task_set_info(struct batch_task *t, struct batch_job_info *info)
+void batch_job_set_info(struct batch_job *t, struct batch_job_info *info)
 {
 	t->info->submitted = info->submitted;
 	t->info->started   = info->started  ;
@@ -141,7 +141,7 @@ void batch_task_set_info(struct batch_task *t, struct batch_job_info *info)
 	t->info->disk_allocation_exhausted = info->disk_allocation_exhausted;
 }
 
-void batch_task_set_command_spec(struct batch_task *t, struct jx *command) {
+void batch_job_set_command_spec(struct batch_job *t, struct jx *command) {
 	char *new_command = batch_wrapper_expand(t, command);
 	if (!new_command) {
 		int saved_errno = errno;
@@ -149,7 +149,7 @@ void batch_task_set_command_spec(struct batch_task *t, struct jx *command) {
 		errno = saved_errno;
 		return;
 	}
-	batch_task_set_command(t, new_command);
+	batch_job_set_command(t, new_command);
 	free(new_command);
 }
 
@@ -163,7 +163,7 @@ void batch_task_set_command_spec(struct batch_task *t, struct jx *command) {
  *  LATER : environment variables (name:value)
  *  returns a string the caller needs to free
  **/
-char * batch_task_generate_id(struct batch_task *t) {
+char * batch_job_generate_id(struct batch_job *t) {
 	if(t->hash)
 		free(t->hash);
 	unsigned char *hash = xxcalloc(1, sizeof(char *)*SHA1_DIGEST_LENGTH);

@@ -86,7 +86,7 @@ static char *blacklisted_expression(struct batch_queue *q) {
 }
 
 
-static batch_queue_id_t batch_queue_condor_submit (struct batch_queue *q, struct batch_task *bt )
+static batch_queue_id_t batch_queue_condor_submit (struct batch_queue *q, struct batch_job *bt )
 {
 	FILE *file;
 	int njobs;

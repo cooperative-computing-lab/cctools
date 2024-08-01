@@ -248,7 +248,7 @@ static batch_queue_id_t batch_queue_cluster_submit (struct batch_queue * q, cons
 	thei counter could roll over.
 	This shouldn't be an issue.
 
-	TODO change this to the nodeid during a refactor to batch_task
+	TODO change this to the nodeid during a refactor to batch_job
 	*/
 	static uint16_t submit_id = 0;
 	char *jobname;

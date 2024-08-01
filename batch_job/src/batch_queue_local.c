@@ -25,7 +25,7 @@ See the file COPYING for details.
 #include <sys/prctl.h>
 #endif
 
-static batch_queue_id_t batch_queue_local_submit (struct batch_queue *q, struct batch_task *bt )
+static batch_queue_id_t batch_queue_local_submit (struct batch_queue *q, struct batch_job *bt )
 {
 	batch_queue_id_t jobid;
 

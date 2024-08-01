@@ -113,7 +113,7 @@ void batch_wrapper_prefix(struct batch_wrapper *w, const char *prefix) {
 	w->prefix = xxstrdup(prefix);
 }
 
-char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *task) {
+char *batch_wrapper_write(struct batch_wrapper *w, struct batch_job *task) {
 	assert(w);
 	assert(task);
 
@@ -127,7 +127,7 @@ char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *task) {
 		return NULL;
 	}
 
-	batch_task_add_input_file(task, name, NULL);
+	batch_job_add_input_file(task, name, NULL);
 
 	if (fchmod(wrapper_fd, 0700) == -1) {
 		int saved_errno = errno;
@@ -193,7 +193,7 @@ static void free_argv(char *argv[]) {
 	free(argv);
 }
 
-static char **jx_array_to_argv(struct batch_task *t, struct jx *argv) {
+static char **jx_array_to_argv(struct batch_job *t, struct jx *argv) {
 	if (!jx_istype(argv, JX_ARRAY)) {
 		debug(D_NOTICE|D_BATCH, "arguments must be in an array");
 		return NULL;
@@ -225,7 +225,7 @@ static char **jx_array_to_argv(struct batch_task *t, struct jx *argv) {
 	return ptrs;
 }
 
-char *batch_wrapper_expand(struct batch_task *t, struct jx *spec) {
+char *batch_wrapper_expand(struct batch_job *t, struct jx *spec) {
 	assert(t);
 	assert(spec);
 

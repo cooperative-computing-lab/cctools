@@ -5,7 +5,7 @@ See the file COPYING for details.
 */
 
 #include "batch_queue.h"
-#include "batch_task.h"
+#include "batch_job.h"
 #include "batch_file.h"
 
 #include "sha1.h"

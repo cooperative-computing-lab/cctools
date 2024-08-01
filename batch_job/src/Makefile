@@ -13,11 +13,11 @@ VINE_LIB=${CCTOOLS_HOME}/taskvine/src/manager/libtaskvine.a
 EXTERNAL_LIBRARIES=$(CHIRP_LIB) $(DT_LIB)
 
 SOURCES = \
-	batch_file.c \
-	batch_task.c \
-	batch_wrapper.c \
-	batch_job_info.c \
 	batch_queue.c \
+	batch_job.c \
+	batch_job_info.c \
+	batch_file.c \
+	batch_wrapper.c \
 	batch_queue_dryrun.c \
 	batch_queue_condor.c \
 	batch_queue_local.c \
