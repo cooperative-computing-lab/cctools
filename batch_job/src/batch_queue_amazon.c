@@ -422,26 +422,12 @@ static int put_file( struct aws_config *c, const char *ip_address, const char *l
 	return result;
 }
 
-static int put_files( struct aws_config *aws_config, const char *ip_address, const char *files )
+static int put_files( struct aws_config *aws_config, const char *ip_address, struct list *files )
 {
-	char *filelist = strdup(files);
-	char *f = strtok(filelist,",");
-	while(f) {
-		/*
-		Each item in the list could have the format
-		"filename" or "filename=remotename"
-		*/
-		const char *remotename = f;
-		char *e = strchr(f,'=');
-		if(e) {
-			*e = 0;
-			remotename = e+1;
-		}
-
-		if(put_file(aws_config,ip_address,f,remotename)!=0) return -1;
-		f = strtok(0,",");
+	struct batch_file *f;
+	LIST_ITERATE(files,f) {
+		if(put_file(aws_config,ip_address,f->outer_name,f->inner_name)!=0) return -1;
 	}
-	free(filelist);
 	return 0;
 }
 
@@ -457,29 +443,12 @@ static int get_file( struct aws_config *c, const char *ip_address, const char *l
 	return result;
 }
 
-static void get_files( struct aws_config *aws_config, const char *ip_address, const char *files )
+static void get_files( struct aws_config *aws_config, const char *ip_address, struct list *files )
 {
-	char *filelist = strdup(files);
-	char *f = strtok(filelist,",");
-	while(f) {
-		/*
-		Each item in the list could have the format
-		"filename" or "filename=remotename"
-		*/
-		const char *remotename = f;
-		char *e = strchr(f,'=');
-		if(e) {
-			*e = 0;
-			remotename = e+1;
-		}
-		/*
-		In the case of failure, keep going b/c the other output files
-		may be necessary to debug the problem. 
-		*/
-		get_file(aws_config,ip_address,f,remotename);
-		f = strtok(0,",");
+	struct batch_file *f;
+	LIST_ITERATE(files,f) {
+		get_file(aws_config,ip_address,f->outer_name,f->inner_name);
 	}
-	free(filelist);
 }
 
 static int run_task( struct aws_config *c, const char *ip_address, const char *command )
@@ -550,7 +519,7 @@ and extracts the output file.  We rely on the parent makeflow
 process to create and delete the instance as needed.
 */
 
-static int batch_queue_amazon_subprocess( struct aws_config *aws_config, const char *instance_id, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
+static int batch_queue_amazon_subprocess( struct aws_config *aws_config, const char *instance_id, struct batch_job *j )
 {
 	char *ip_address = 0;
 
@@ -608,7 +577,7 @@ static int batch_queue_amazon_subprocess( struct aws_config *aws_config, const c
 
 	/* Send each of the input files to the instance. */
 	semaphore_down(transfer_semaphore);
-	int result = put_files(aws_config,ip_address,extra_input_files);
+	int result = put_files(aws_config,ip_address,j->input_files);
 	semaphore_up(transfer_semaphore);
 
 	/*
@@ -620,7 +589,7 @@ static int batch_queue_amazon_subprocess( struct aws_config *aws_config, const c
 
 	/* Generate a unique script with the contents of the task. */
 	char *runscript = string_format(".makeflow_task_script_%d",getpid());
-	create_script(runscript,cmd,envlist);
+	create_script(runscript,j->command,j->envlist);
 
 	/* Send the script and delete the local copy right away. */
 	put_file(aws_config,ip_address,runscript,"makeflow_task_script");
@@ -631,7 +600,7 @@ static int batch_queue_amazon_subprocess( struct aws_config *aws_config, const c
 
 	/* Retreive each of the output files from the instance. */
 	semaphore_down(transfer_semaphore);
-	get_files(aws_config,ip_address,extra_output_files);
+	get_files(aws_config,ip_address,j->output_files);
 	semaphore_up(transfer_semaphore);
 
 	/* 
@@ -649,7 +618,7 @@ within batch_queue_amazon_submit.  Once the inputs are successfully sent, we for
 a process in order to execute the desired task, and await its completion.
 */
 
-static batch_queue_id_t batch_queue_amazon_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
+static batch_queue_id_t batch_queue_amazon_submit(struct batch_queue *q, struct batch_job *j )
 {
 	/* Flush output streams before forking, to avoid stale buffered data. */
 	fflush(NULL);
@@ -668,7 +637,8 @@ static batch_queue_id_t batch_queue_amazon_submit(struct batch_queue *q, const c
 	static struct aws_config * aws_config = 0;
 	if(!aws_config) aws_config = aws_config_load(config_file);
 
-	const char *instance_type = jx_lookup_string(envlist,"AMAZON_INSTANCE_TYPE");
+	struct rmsummary *resources = j->resources;
+	const char *instance_type = jx_lookup_string(j->envlist,"AMAZON_INSTANCE_TYPE");
 	if(!instance_type) {
 		instance_type = aws_instance_select(resources->cores,resources->memory,resources->disk);
 		if(!instance_type) {
@@ -678,7 +648,7 @@ static batch_queue_id_t batch_queue_amazon_submit(struct batch_queue *q, const c
 		}
 	}
 
-	const char *ami = jx_lookup_string(envlist,"AMAZON_AMI");
+	const char *ami = jx_lookup_string(j->envlist,"AMAZON_AMI");
 	if(!ami) ami = aws_config->ami;
 
 	/* Before create a new instance, fetch to see if an idle instance exists */
@@ -715,7 +685,7 @@ static batch_queue_id_t batch_queue_amazon_submit(struct batch_queue *q, const c
 
 	batch_queue_id_t jobid = fork();
 	if(jobid > 0) {
-		debug(D_BATCH, "started process %" PRIbjid ": %s", jobid, cmd);
+		debug(D_BATCH, "started process %" PRIbjid ": %s", jobid, j->command);
 		itable_insert(q->job_table, jobid, info);
 		return jobid;
 	} else if(jobid < 0) {
@@ -732,7 +702,7 @@ static batch_queue_id_t batch_queue_amazon_submit(struct batch_queue *q, const c
 		signal(SIGQUIT,SIG_DFL);
 		signal(SIGABRT,SIG_DFL);
 
-		_exit(batch_queue_amazon_subprocess(aws_config,instance_id,cmd,extra_input_files,extra_output_files,envlist));
+		_exit(batch_queue_amazon_subprocess(aws_config,instance_id,j));
 	}
 	return -1;
 }
