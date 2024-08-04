@@ -594,8 +594,6 @@ int vine_process_measure_disk(struct vine_process *p, int max_time_on_measuremen
 	/* not a memory leak... Either disk_measurement_state was NULL or the same as state. */
 	p->disk_measurement_state = state;
 
-	debug(D_VINE, "Recorded Sandbox Use of %ld", state->last_byte_size_complete);
-
 	if (state->last_byte_size_complete >= 0) {
 		p->sandbox_size = (int64_t)ceil(state->last_byte_size_complete / (1.0 * MEGA));
 	} else {
