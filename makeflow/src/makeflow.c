@@ -2280,6 +2280,11 @@ int main(int argc, char *argv[])
 		goto EXIT_WITH_FAILURE;
 	}
 
+	if(batch_queue_option_is_yes(queue,"experimental")) {
+		fprintf(stderr, "makeflow: WARNING: support for batch target '%s' is experimental.\n",batch_queue_type_to_string(batch_queue_type));
+		fprintf(stderr, "makeflow: please visit https://ccl.cse.nd.edu/software/help to report any bugs.\n");
+	}
+
 	if(!batchlogfilename) {
 		if(batch_queue_supports_feature(remote_queue, "batch_log_name")){
 			batchlogfilename = string_format(batch_queue_supports_feature(remote_queue, "batch_log_name"), dagfile);

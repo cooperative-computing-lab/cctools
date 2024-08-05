@@ -820,6 +820,7 @@ static int batch_queue_amazon_create(struct batch_queue *q)
 	batch_queue_set_feature(q, "batch_log_name", "%s.amazonlog");
 	batch_queue_set_feature(q, "autosize", "yes");
 	batch_queue_set_feature(q, "remote_rename", "%s=%s");
+	batch_queue_set_feature(q, "experimental", "yes");
 	return 0;
 }
 

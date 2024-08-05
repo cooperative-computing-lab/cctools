@@ -678,6 +678,7 @@ static int batch_queue_k8s_create(struct batch_queue *q)
 	strncpy(q->logfile, "k8s.log", sizeof(q->logfile));
 	batch_queue_set_feature(q, "batch_log_name", "%s.k8slog");
 	batch_queue_set_feature(q, "batch_log_transactions", "%s.tr");
+	batch_queue_set_feature(q, "experimental", "yes");
 	return 0;
 }
 
