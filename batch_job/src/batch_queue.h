@@ -38,6 +38,7 @@ struct batch_queue *queue = batch_queue_create(BATCH_QUEUE_TYPE_CONDOR);
 // Define a batch job consiting of a command with input and output files.
 struct batch_job *job = batch_job_create(queue);
 batch_job_set_command(job,"grep needle words.txt > output.txt");
+batch_job_add_input_file(job,"needle","needle");
 batch_job_add_input_file(job,"/usr/share/dict/words","words.txt");
 batch_job_add_output_file(job,"output.txt","output.txt");
 
