@@ -55,7 +55,7 @@ new_state - a integer represents the new state this node (whose id is in the nod
    2. complete
    3. failed
    4. aborted
-job_id - the job id of this node in the underline execution system (local or batch system). If the makeflow is executed locally, the job id would be the process id of the process that executes this node. If the underline execution system is a batch system, such as Condor or SGE, the job id would be the job id assigned by the batch system when the task was sent to the batch system for execution.
+job_id - the job id of this node in the underlying execution system (local or batch system). If the makeflow is executed locally, the job id would be the process id of the process that executes this node. If the underlying execution system is a batch system, such as Condor or UGE, the job id would be the job id assigned by the batch system when the task was sent to the batch system for execution.
 nodes_waiting - the number of nodes are waiting to be executed.
 nodes_running - the number of nodes are being executed.
 nodes_complete - the number of nodes has been completed.

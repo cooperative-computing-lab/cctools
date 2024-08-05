@@ -162,7 +162,7 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 		}
 
 		buffer_printf(&cluster_resources, " -N 1 -n %d -c %d", procs, cores);
-	} else if(q->type == BATCH_QUEUE_TYPE_SGE){
+	} else if(q->type == BATCH_QUEUE_TYPE_UGE){
 		if(!ignore_mem && resources->memory > 0) {
 			const char *mem_type = batch_queue_get_option(q, "mem-type");
 			buffer_printf(&cluster_resources, " -l %s=%.0fM", mem_type ? mem_type : "h_vmem", resources->memory);
@@ -443,8 +443,8 @@ static int batch_queue_cluster_create (struct batch_queue *q)
 	*/
 
 	switch(q->type) {
-		case BATCH_QUEUE_TYPE_SGE:
-			cluster_name = strdup("sge");
+		case BATCH_QUEUE_TYPE_UGE:
+			cluster_name = strdup("uge");
 			cluster_submit_cmd = strdup("qsub");
 			cluster_remove_cmd = strdup("qdel");
 			cluster_options = string_format("-cwd -j y -V");
@@ -546,8 +546,23 @@ const struct batch_queue_module batch_queue_moab = {
 	batch_queue_cluster_remove,
 };
 
+const struct batch_queue_module batch_queue_uge = {
+	BATCH_QUEUE_TYPE_UGE,
+	"uge",
+
+	batch_queue_cluster_create,
+	batch_queue_cluster_free,
+	batch_queue_cluster_port,
+	batch_queue_cluster_option_update,
+
+	batch_queue_cluster_submit,
+	batch_queue_cluster_wait,
+	batch_queue_cluster_remove,
+};
+
+/* retained sge keyword for backwards compatibility after sge->uge name change. */
 const struct batch_queue_module batch_queue_sge = {
-	BATCH_QUEUE_TYPE_SGE,
+	BATCH_QUEUE_TYPE_UGE,
 	"sge",
 
 	batch_queue_cluster_create,

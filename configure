@@ -167,12 +167,12 @@ do
 		--build-date)
 			build_date=${arg}
 			;;
-		--sge-parameter)
-			if [ -z "$sge_parameters" ]
+		--uge-parameter)
+			if [ -z "$uge_parameters" ]
 			then
-				sge_parameters="\#$ ${arg}"
+				uge_parameters="\#$ ${arg}"
 			else
-				sge_parameters="${sge_parameters}\n\#$ ${arg}"
+				uge_parameters="${uge_parameters}\n\#$ ${arg}"
 			fi
 			;;
 		--with-base-dir)
@@ -306,7 +306,7 @@ Where options are:
   --build-label        <label>
   --strict
   --sanitize
-  --sge-parameter      <parameter>
+  --uge-parameter      <parameter>
   --globus-flavor      <flavor>
   --irods-flavor       3 | 4
   --tcp-low-port       <port>
@@ -1513,7 +1513,7 @@ CCTOOLS_PYDOC=$(which pydoc 2> /dev/null || which pydoc2 2> /dev/null || which p
 
 CCTOOLS_FLAKE8_IGNORE_ERRORS=C901,E501,W503
 
-CCTOOLS_SGE_PARAMETERS=$(echo ${sge_parameters} | sed -e 's/\$/\\\$\$/g')
+CCTOOLS_UGE_PARAMETERS=$(echo ${uge_parameters} | sed -e 's/\$/\\\$\$/g')
 
 CCTOOLS_DOCTARGETS=${cctools_doctargets}
 

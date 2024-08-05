@@ -26,7 +26,7 @@ geography, and high energy physics all use Makeflow to compose workflows from
 existing applications.
 
 Makeflow can send your jobs to a wide variety of services, such as batch
-systems (HTCondor, SGE, SLURM, PBS, LSF, Torque), task executors (TaskVine, Work Queue),
+systems (HTCondor, UGE, SLURM, PBS, LSF, Torque), task executors (TaskVine, Work Queue),
 cluster managers (Kubernetes), cloud services (Amazon EC2) and container environments like Docker
 and Singularity. Details for each of those systems are given in the Batch
 System Support section.
@@ -106,14 +106,14 @@ Use the `--clean` option to clean everything up before trying it again:
 $ makeflow --clean example.makeflow
 ```
 
-If you have access to a batch system like Condor, SGE, or Torque, or a cloud
+If you have access to a batch system like Condor, UGE, or Torque, or a cloud
 service provider like Amazon, you can direct Makeflow to run your jobs there
 by using the `-T` option:
 
 ```sh
 $ makeflow -T condor example.makeflow
 
-$ makeflow -T sge example.makeflow
+$ makeflow -T uge example.makeflow
 
 $ makeflow -T torque example.makeflow
 
@@ -319,9 +319,8 @@ BATCH_OPTIONS="Requirements = (Memory>1024)"
 
 ### UGE - Univa Grid Engine / OGE - Open Grid Engine / SGE - Sun Grid Engine
 
-Use the `-T sge` option to submit jobs to Sun Grid Engine or systems derived
-from it like [Open Grid Scheduler](http://gridscheduler.sourceforge.net) or
-[Univa Grid Engine](http://www.univa.com/products/).
+Use the `-T uge` option to submit jobs to [Univa Grid Engine](http://www.univa.com/products/)
+or its predecessors like Open Grid Scheduler or Sun Grid Engine. (`-T sge` is a synonym for backwards compatibility.)
 
 As above, Makeflow will automatically generate `qsub` commands. Use the `-B`
 option or `BATCH_OPTIONS` variable to specify text to add to the command line.
@@ -533,7 +532,7 @@ For clusters that are not directly supported by Makeflow we strongly suggest
 using the [TaskVine](../taskvine/index.md) system and
 submitting workers via the cluster's normal submission mechanism.
 
-However, if you have a system similar to Torque, SGE, or PBS which submits
+However, if you have a system similar to Torque, UGE, or PBS which submits
 jobs with commands like "qsub", you can inform Makeflow of those commands and
 use the `cluster` driver. For this to work, it is assumed there is a
 distributed filesystem shared (like NFS) shared across all nodes of the
@@ -593,10 +592,10 @@ Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
 ```
 
-Or, submit 10 worker processes to SGE like this:
+Or, submit 10 worker processes to UGE like this:
 
 ```sh
-$ vine_submit_workers -T sge head.cluster.edu 9123 10
+$ vine_submit_workers -T uge head.cluster.edu 9123 10
 ```
 
 Or, you can start workers manually on any other machine you can log into:
@@ -1365,7 +1364,7 @@ Makeflow, starting with zero. Each line contains the following items:
     2. complete 
     3. failed 
     4. aborted 
-  * **job id** \- the underline execution system is a batch system, such as Condor or SGE, the job id would be the job id assigned by the batch system when the task was sent to the batch system for execution.
+  * **job id** \- the underline execution system is a batch system, such as Condor or UGE, the job id would be the job id assigned by the batch system when the task was sent to the batch system for execution.
   * **tasks waiting** \- the number of tasks are waiting to be executed.
   * **tasks running** \- the number of tasks are being executed.
   * **tasks complete** \- the number of tasks has been completed.

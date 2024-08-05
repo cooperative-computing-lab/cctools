@@ -572,7 +572,7 @@ Similar scripts are available for other common batch systems:
 
 ```sh
 $ vine_submit_workers -T slurm MACHINENAME 9123 10
-$ vine_submit_workers _T sge MACHINENAME 9123 10
+$ vine_submit_workers _T uge MACHINENAME 9123 10
 ```
 
 When the manager completes, if the workers were not otherwise shut down,
@@ -627,10 +627,10 @@ Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
 ```
 
-Or similarly on SGE using `vine_submit_workers` as:
+Or similarly on UGE using `vine_submit_workers` as:
 
 ```sh
-$ vine_submit_workers -T sge -M myproject 10
+$ vine_submit_workers -T uge -M myproject 10
 Your job 153097 ("worker.sh") has been submitted
 Your job 153098 ("worker.sh") has been submitted
 Your job 153099 ("worker.sh") has been submitted
@@ -1960,33 +1960,33 @@ You may also use the same `--cores`, `--memory`, `--disk`, and `--gpus` options 
 batch submission script `vine_submit_workers`, and the script will correctly ask the right 
 batch system for a node of the desired size.
 
-The only caveat is when using `vine_submit_workers -T sge`, as there are many
+The only caveat is when using `vine_submit_workers -T uge`, as there are many
 differences across systems that the script cannot manage. For `
-vine_submit_workers -T sge` you have to set **both** the resources used by the
+vine_submit_workers -T uge` you have to set **both** the resources used by the
 worker (i.e., with `--cores`, etc.) and the appropiate computing node with the `
 -p ` option.
 
-For example, say that your local SGE installation requires you to set the
+For example, say that your local UGE installation requires you to set the
 number of cores with the switch ` -pe smp ` , and you want workers with 4
 cores:
 
 ```sh
-$ vine_submit_workers -T sge --cores 4 -p "-pe smp 4" MACHINENAME 9123
+$ vine_submit_workers -T uge --cores 4 -p "-pe smp 4" MACHINENAME 9123
 ```
 
 If you find that there are options that are needed everytime, you can compile
-CCTools using the ` --sge-parameter `. For example, at Notre Dame we
+CCTools using the ` --uge-parameter `. For example, at Notre Dame we
 automatically set the number of cores as follows:
 
 ```sh
-$ ./configure  --sge-parameter '-pe smp $cores'
+$ ./configure  --uge-parameter '-pe smp $cores'
 ```
 
 
 So that we can simply call:
 
 ```sh
-$ vine_submit_workers -T sge --cores 4 MACHINENAME 9123
+$ vine_submit_workers -T uge --cores 4 MACHINENAME 9123
 ```
 
 The variables `$cores `, `$memory `, and `$disk `, have the values of the

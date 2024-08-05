@@ -25,7 +25,7 @@ See the file COPYING for details.
 /** @file batch_queue.h Batch queue submission library.
 This module implements an abstract interface to submit batch jobs
 to a variety of underlying queuing systems, including
-including local processes, HTCondor, TaskVine, Work Queue, SGE, PBS, SLURM Amazon EC2, and others.
+including local processes, HTCondor, TaskVine, Work Queue, UGE, PBS, SLURM Amazon EC2, and others.
 This simplifies the construction of workflow systems and other parallel
 computing systems that need a simple form of distributed process execution.
 
@@ -70,7 +70,7 @@ typedef enum {
 	BATCH_QUEUE_TYPE_CONDOR,              /**< Batch jobs will be sent to Condor pool. */
 	BATCH_QUEUE_TYPE_VINE,                /**< Batch jobs will be sent to TaskVine manager. */
 	BATCH_QUEUE_TYPE_WORK_QUEUE,          /**< Batch jobs will be sent to Work Queue manager. */
-	BATCH_QUEUE_TYPE_SGE,	              /**< Batch jobs will be sent to Sun Grid Engine */
+	BATCH_QUEUE_TYPE_UGE,	              /**< Batch jobs will be sent to Univa Grid Engine */
 	BATCH_QUEUE_TYPE_SLURM,               /**< Batch jobs will be send to the SLURM scheduler */
 	BATCH_QUEUE_TYPE_CLUSTER,             /**< Batch jobs will be sent to a user-defined cluster manager. */
 	BATCH_QUEUE_TYPE_MOAB,                /**< Batch jobs will be sent to the Moab Workload Manager. */
@@ -161,7 +161,7 @@ time a job is submitted.  It may be called once to apply to all subsequent
 jobs, or it may be called before each submission.  If the queue type
 is @ref BATCH_QUEUE_TYPE_CONDOR, the options must be valid submit file
 properties like <tt>requirements = (Memory>100)</tt>.
-If the batch queue type is @ref BATCH_QUEUE_TYPE_SGE, the extra text will be added as options to
+If the batch queue type is @ref BATCH_QUEUE_TYPE_UGE, the extra text will be added as options to
 the <tt>qsub</tt> command.  This call has no effect on other queue types.
 @param q The batch queue to adjust.
 @param what The key for option.

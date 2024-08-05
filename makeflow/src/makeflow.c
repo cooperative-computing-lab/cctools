@@ -1258,7 +1258,7 @@ static void show_help_run(const char *cmd)
 	printf("    --verbose-jobnames          Set the job name based on the command.\n");
 	printf("    --keep-wrapper-stdout       Do not redirect to /dev/null the stdout file from the batch system.");
 	printf("    --ignore-memory-spec        Excludes memory at submission (SLURM).\n");
-	printf("    --batch-mem-type=<type>     Specify memory resource type (SGE).\n");
+	printf("    --batch-mem-type=<type>     Specify memory resource type (UGE).\n");
 	printf("    --working-dir=<dir|url>     Working directory for the batch system.\n");
 	        /********************************************************************************/
 	printf("\nContainers and Wrappers:\n");
