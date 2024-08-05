@@ -1,4 +1,4 @@
-/*
+ /*
 Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
@@ -2280,7 +2280,7 @@ int main(int argc, char *argv[])
 		goto EXIT_WITH_FAILURE;
 	}
 
-	if(batch_queue_option_is_yes(queue,"experimental")) {
+	if(batch_queue_option_is_yes(remote_queue,"experimental")) {
 		fprintf(stderr, "makeflow: WARNING: support for batch target '%s' is experimental.\n",batch_queue_type_to_string(batch_queue_type));
 		fprintf(stderr, "makeflow: please visit https://ccl.cse.nd.edu/software/help to report any bugs.\n");
 	}
