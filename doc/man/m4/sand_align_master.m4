@@ -52,7 +52,7 @@ LONGCODE_BEGIN
 LONGCODE_END
 
 To speed up the process, run more MANPAGE(work_queue_worker) processes
-on other machines, or use MANPAGE(condor_submit_workers,1) or MANPAGE(sge_submit_workers,1) to start hundreds of workers in your local batch system.
+on other machines, or use MANPAGE(condor_submit_workers,1) or MANPAGE(uge_submit_workers,1) to start hundreds of workers in your local batch system.
 
 SECTION(COPYRIGHT)
 

@@ -2,7 +2,7 @@ include(manual.h)dnl
 HEADER(vine_submit_workers)
 
 SECTION(NAME)
-BOLD(vine_submit_workers) - submit vine_worker to the Condor, Slurm, or SGE batch systems.
+BOLD(vine_submit_workers) - submit vine_worker to the Condor, Slurm, or UGE batch systems.
 
 SECTION(SYNOPSIS)
 CODE(vine_submit_workers [batch options] [worker options] [batch specific options] PARAM(servername) PARAM(port) PARAM(num-workers))
@@ -14,7 +14,7 @@ CODE(vine_submit_workers [batch options] [worker options] --manager-name PARAM(n
 
 SECTION(DESCRIPTION)
 CODE(vine_submit_workers) schedules the execution of MANPAGE(vine_worker,1)
-on Condor, Slurm, or SGE through their respective job submission interfaces.
+on Condor, Slurm, or UGE through their respective job submission interfaces.
 The number of BOLD(vine_worker) scheduled and run is given by the BOLD(num-workers)
 argument.
 
@@ -24,7 +24,7 @@ the catalog server by specifying the name of the TaskVine manager using the --ma
 
 SECTION(BATCH OPTIONS)
 OPTIONS_BEGIN
-OPTION_ARG(T, batch-type, batch)Name of the batch system to submit workers. Out of (condor, slurm, sge).
+OPTION_ARG(T, batch-type, batch)Name of the batch system to submit workers. Out of (condor, slurm, uge).
 OPTIONS_END
 
 SECTION(WORKER OPTIONS)
@@ -62,9 +62,9 @@ SECTION(SLURM)
 OPTION_ARG(j)Use job array to submit workers.
 OPTION_ARG(p, parameters)SLURM sbatch parameters.
 
-SECTION(SGE)
+SECTION(UGE)
 OPTION_ARG(j)Use job array to submit workers.
-OPTION_ARG(p, parameters)SGE qsub parameters.
+OPTION_ARG(p, parameters)UGE qsub parameters.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

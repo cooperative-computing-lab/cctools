@@ -67,7 +67,7 @@ OPTION_ARG(B, batch-options, options)Add these options to all batch submit files
 OPTION_FLAG_LONG(send-environment)Send all local environment variables in remote execution.
 OPTION_ARG_LONG(wait-for-files-upto, #)Wait for output files to be created upto this many seconds (e.g., to deal with NFS semantics).
 OPTION_ARG(S, submission-timeout, timeout)Time to retry failed batch job submission. (default is 3600s)
-OPTION_ARG(T, batch-type, type)Batch system type: local, dryrun, condor, sge, pbs, torque, blue_waters, slurm, moab, cluster, wq, amazon, mesos. (default is local)
+OPTION_ARG(T, batch-type, type)Batch system type: local, dryrun, condor, wq, vine, uge, pbs, torque, slurm, moab, cluster, amazon. (default is local)
 OPTION_FLAG_LONG(safe-submit-mode)Excludes resources at submission. (SLURM, TORQUE, and PBS)
 OPTION_FLAG_LONG(ignore-memory-spec)Excludes memory at submission. (SLURM)
 OPTION_ARG_LONG(batch-mem-type, type)Specify memory resource type. (SGE)
