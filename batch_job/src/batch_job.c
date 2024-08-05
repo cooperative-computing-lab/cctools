@@ -20,7 +20,7 @@ See the file COPYING for details.
 /** Creates new batch_job and initializes file lists. */
 struct batch_job *batch_job_create(struct batch_queue *queue)
 {
-	struct batch_job *t = calloc(1,sizeof(*t));
+	struct batch_job *t = calloc(1, sizeof(*t));
 
 	t->queue = queue;
 
@@ -42,13 +42,13 @@ void batch_job_delete(struct batch_job *t)
 
 	struct batch_file *f;
 	list_first_item(t->input_files);
-	while((f = list_next_item(t->input_files))){
+	while ((f = list_next_item(t->input_files))) {
 		batch_file_delete(f);
 	}
 	list_delete(t->input_files);
 
 	list_first_item(t->output_files);
-	while((f = list_next_item(t->output_files))){
+	while ((f = list_next_item(t->output_files))) {
 		batch_file_delete(f);
 	}
 	list_delete(t->output_files);
@@ -63,7 +63,7 @@ void batch_job_delete(struct batch_job *t)
 }
 
 /** Creates new batch_file and adds to inputs. */
-struct batch_file * batch_job_add_input_file(struct batch_job *task, const char * outer_name, const char * inner_name)
+struct batch_file *batch_job_add_input_file(struct batch_job *task, const char *outer_name, const char *inner_name)
 {
 	struct batch_file *f = batch_file_create(outer_name, inner_name);
 	list_push_tail(task->input_files, f);
@@ -72,7 +72,7 @@ struct batch_file * batch_job_add_input_file(struct batch_job *task, const char 
 }
 
 /** Creates new batch_file and adds to outputs. */
-struct batch_file * batch_job_add_output_file(struct batch_job *task, const char * outer_name, const char * inner_name)
+struct batch_file *batch_job_add_output_file(struct batch_job *task, const char *outer_name, const char *inner_name)
 {
 	struct batch_file *f = batch_file_create(outer_name, inner_name);
 	list_push_tail(task->output_files, f);
@@ -93,9 +93,10 @@ void batch_job_set_command(struct batch_job *t, const char *command)
 */
 void batch_job_wrap_command(struct batch_job *t, const char *command)
 {
-	if(!command) return; 
+	if (!command)
+		return;
 
-	char *id = string_format("%d",t->taskid);
+	char *id = string_format("%d", t->taskid);
 	char *wrap_tmp = string_replace_percents(command, id);
 
 	free(id);
@@ -133,19 +134,20 @@ void batch_job_set_envlist(struct batch_job *t, struct jx *envlist)
 void batch_job_set_info(struct batch_job *t, struct batch_job_info *info)
 {
 	t->info->submitted = info->submitted;
-	t->info->started   = info->started  ;
-	t->info->finished  = info->finished ;
+	t->info->started = info->started;
+	t->info->finished = info->finished;
 	t->info->exited_normally = info->exited_normally;
 	t->info->exit_code = info->exit_code;
 	t->info->exit_signal = info->exit_signal;
 	t->info->disk_allocation_exhausted = info->disk_allocation_exhausted;
 }
 
-void batch_job_set_command_spec(struct batch_job *t, struct jx *command) {
+void batch_job_set_command_spec(struct batch_job *t, struct jx *command)
+{
 	char *new_command = batch_wrapper_expand(t, command);
 	if (!new_command) {
 		int saved_errno = errno;
-		debug(D_NOTICE|D_BATCH, "failed to expand wrapper command: %s", strerror(errno));
+		debug(D_NOTICE | D_BATCH, "failed to expand wrapper command: %s", strerror(errno));
 		errno = saved_errno;
 		return;
 	}
@@ -157,16 +159,17 @@ void batch_job_set_command_spec(struct batch_job *t, struct jx *command) {
  * This includes :
  *  command
  *  input files (content)
- *  output files (name) : 
- *	    important addition as changed expected outputs may not 
+ *  output files (name) :
+ *	    important addition as changed expected outputs may not
  *	    be reflected in the command and not present in archive
  *  LATER : environment variables (name:value)
  *  returns a string the caller needs to free
  **/
-char * batch_job_generate_id(struct batch_job *t) {
-	if(t->hash)
+char *batch_job_generate_id(struct batch_job *t)
+{
+	if (t->hash)
 		free(t->hash);
-	unsigned char *hash = xxcalloc(1, sizeof(char *)*SHA1_DIGEST_LENGTH);
+	unsigned char *hash = xxcalloc(1, sizeof(char *) * SHA1_DIGEST_LENGTH);
 	struct batch_file *f;
 
 	sha1_context_t context;
@@ -178,17 +181,16 @@ char * batch_job_generate_id(struct batch_job *t) {
 	sha1_update(&context, "\0", 1);
 
 	/* Sort inputs for consistent hashing */
-	list_sort(t->input_files, (void*)batch_file_outer_compare);
+	list_sort(t->input_files, (void *)batch_file_outer_compare);
 
 	/* add checksum of the node's input files together */
 	struct list_cursor *cur = list_cursor_create(t->input_files);
-	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
-		char * file_id;
-		if(path_is_dir(f->inner_name) == 1){
+	for (list_seek(cur, 0); list_get(cur, (void **)&f); list_next(cur)) {
+		char *file_id;
+		if (path_is_dir(f->inner_name) == 1) {
 			f->hash = batch_file_generate_id_dir(f->outer_name);
 			file_id = xxstrdup(f->hash);
-		}
-		else{
+		} else {
 			file_id = batch_file_generate_id(f);
 		}
 		sha1_update(&context, "I", 1);
@@ -201,11 +203,11 @@ char * batch_job_generate_id(struct batch_job *t) {
 	list_cursor_destroy(cur);
 
 	/* Sort outputs for consistent hashing */
-	list_sort(t->output_files, (void*)batch_file_outer_compare);
+	list_sort(t->output_files, (void *)batch_file_outer_compare);
 
 	/* add checksum of the node's output file names together */
 	cur = list_cursor_create(t->output_files);
-	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+	for (list_seek(cur, 0); list_get(cur, (void **)&f); list_next(cur)) {
 		sha1_update(&context, "O", 1);
 		sha1_update(&context, f->outer_name, strlen(f->outer_name));
 		sha1_update(&context, "\0", 1);
@@ -219,4 +221,3 @@ char * batch_job_generate_id(struct batch_job *t) {
 }
 
 /* vim: set noexpandtab tabstop=8: */
-

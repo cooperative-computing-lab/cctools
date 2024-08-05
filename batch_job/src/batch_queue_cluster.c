@@ -25,18 +25,17 @@ See the file COPYING for details.
 
 #include <sys/stat.h>
 
-static char * cluster_name = NULL;
-static char * cluster_submit_cmd = NULL;
-static char * cluster_remove_cmd = NULL;
-static char * cluster_options = NULL;
-static char * cluster_jobname_var = NULL;
+static char *cluster_name = NULL;
+static char *cluster_submit_cmd = NULL;
+static char *cluster_remove_cmd = NULL;
+static char *cluster_options = NULL;
+static char *cluster_jobname_var = NULL;
 
 int batch_queue_verbose_jobnames = 0;
 int batch_queue_disable_heartbeat = 0;
 
-static int heartbeat_rate =  30;	//in seconds. rate at which hearbeats are written to the log.
-static int heartbeat_max  = 120;	//in seconds. maximum wait for a heartbeat before giving up on the job.
-
+static int heartbeat_rate = 30; // in seconds. rate at which hearbeats are written to the log.
+static int heartbeat_max = 120; // in seconds. maximum wait for a heartbeat before giving up on the job.
 
 /*
 Principle of operation:
@@ -61,13 +60,13 @@ setup_batch_wrapper creates the wrapper file if necessary,
 returning true on success and false on failure.
 */
 
-static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
+static int setup_batch_wrapper(struct batch_queue *q, const char *sysname)
 {
 	char wrapperfile[PATH_MAX];
 	snprintf(wrapperfile, PATH_MAX, "%s.wrapper", sysname);
 
 	FILE *file = fopen(wrapperfile, "w");
-	if(!file) {
+	if (!file) {
 		return 0;
 	}
 	fchmod(fileno(file), 0755);
@@ -78,15 +77,15 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	fprintf(file, "#!/bin/sh\n");
 	fprintf(file, "#$ -S /bin/sh\n");
 
-	if(q->type == BATCH_QUEUE_TYPE_SLURM){
+	if (q->type == BATCH_QUEUE_TYPE_SLURM) {
 		fprintf(file, "[ -n \"${SLURM_JOB_ID}\" ] && JOB_ID=`echo ${SLURM_JOB_ID} | cut -d . -f 1`\n");
-	} else if(q->type == BATCH_QUEUE_TYPE_LSF) {
+	} else if (q->type == BATCH_QUEUE_TYPE_LSF) {
 		fprintf(file, "[ -n \"${LSB_JOBID}\" ] && JOB_ID=`echo ${LSB_JOBID} | cut -d . -f 1`\n");
 	} else {
 		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
 	}
 
-	if(q->type == BATCH_QUEUE_TYPE_TORQUE || q->type == BATCH_QUEUE_TYPE_PBS || q->type==BATCH_QUEUE_TYPE_LSF) {
+	if (q->type == BATCH_QUEUE_TYPE_TORQUE || q->type == BATCH_QUEUE_TYPE_PBS || q->type == BATCH_QUEUE_TYPE_LSF) {
 		fprintf(file, "cd %s\n", path);
 	}
 
@@ -95,7 +94,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	fprintf(file, "starttime=`date +%%s`\n");
 	fprintf(file, "echo start $starttime > $logfile\n");
 
-	if(!batch_queue_disable_heartbeat) {
+	if (!batch_queue_disable_heartbeat) {
 		// Write a heartbeat to the log file, in case the batch system removes the job from under us.
 		fprintf(file, "(while true; do sleep %d; echo alive $(date +%%s) >> $logfile; done) &\n", heartbeat_rate);
 		fprintf(file, "pid_heartbeat=$!\n");
@@ -106,7 +105,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 
 	// When done, write the status and time to the logfile.
 	fprintf(file, "status=$?\n");
-	if(!batch_queue_disable_heartbeat) {
+	if (!batch_queue_disable_heartbeat) {
 		fprintf(file, "kill $pid_heartbeat\n");
 	}
 	fprintf(file, "stoptime=`date +%%s`\n");
@@ -119,11 +118,11 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 
 static char *cluster_set_resource_string(struct batch_queue *q, const struct rmsummary *resources)
 {
-	if(batch_queue_option_is_yes(q, "safe-submit-mode")) {
+	if (batch_queue_option_is_yes(q, "safe-submit-mode")) {
 		return xxstrdup("");
 	}
 
-	int ignore_mem  = batch_queue_option_is_yes(q, "ignore-mem-spec");
+	int ignore_mem = batch_queue_option_is_yes(q, "ignore-mem-spec");
 	int ignore_disk = batch_queue_option_is_yes(q, "ignore-disk-spec");
 	int ignore_time = batch_queue_option_is_yes(q, "ignore-time-spec");
 	int ignore_core = batch_queue_option_is_yes(q, "ignore-core-spec");
@@ -131,65 +130,65 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 	buffer_t cluster_resources;
 	buffer_init(&cluster_resources);
 
-	if(q->type == BATCH_QUEUE_TYPE_TORQUE || q->type == BATCH_QUEUE_TYPE_PBS){
+	if (q->type == BATCH_QUEUE_TYPE_TORQUE || q->type == BATCH_QUEUE_TYPE_PBS) {
 		buffer_printf(&cluster_resources, " -l nodes=1:ppn=%.0f", MAX(1, DIV_INT_ROUND_UP(resources->cores, 1)));
-		if(!ignore_mem && resources->memory > 0) {
+		if (!ignore_mem && resources->memory > 0) {
 			buffer_printf(&cluster_resources, ",mem=%.0fmb", DIV_INT_ROUND_UP(resources->memory, 1));
 		}
-		if(!ignore_disk && resources->disk > 0) {
+		if (!ignore_disk && resources->disk > 0) {
 			buffer_printf(&cluster_resources, ",file=%.0fmb", DIV_INT_ROUND_UP(resources->disk, 1));
 		}
-	} else if(q->type == BATCH_QUEUE_TYPE_SLURM){
-		if(!ignore_mem && resources->memory > 0) {
+	} else if (q->type == BATCH_QUEUE_TYPE_SLURM) {
+		if (!ignore_mem && resources->memory > 0) {
 			buffer_printf(&cluster_resources, " --mem=%.0fM", DIV_INT_ROUND_UP(resources->memory, 1));
 		}
-		if(!ignore_time && resources->wall_time > 0) {
+		if (!ignore_time && resources->wall_time > 0) {
 			// expected in minutes, not seconds
 			buffer_printf(&cluster_resources, " --time=%.0f", DIV_INT_ROUND_UP(resources->wall_time, 60));
 		}
 
 		/* The value of max_concurrent_processes is set by the .MAKEFLOW MPI_PROCESSES.
 		 * If set, the number of cores should be divisible by max_concurrent_processes. */
-		int procs = resources->max_concurrent_processes > 0 ? (int) DIV_INT_ROUND_UP(resources->max_concurrent_processes, 1) : 1;
-		int cores = resources->cores > 0 ? (int) DIV_INT_ROUND_UP(resources->cores, 1) : 1;
+		int procs = resources->max_concurrent_processes > 0 ? (int)DIV_INT_ROUND_UP(resources->max_concurrent_processes, 1) : 1;
+		int cores = resources->cores > 0 ? (int)DIV_INT_ROUND_UP(resources->cores, 1) : 1;
 
-		if(procs > 1) {
+		if (procs > 1) {
 			cores = cores / procs;
-			//It is an error if cores cannot be equally distributes to all (mpi) processes
-			if(cores * procs != resources->cores) {
+			// It is an error if cores cannot be equally distributes to all (mpi) processes
+			if (cores * procs != resources->cores) {
 				fatal("The number of MPI processes (%d) does not eqully divide the number of cores (%d).", procs, resources->cores);
 			}
 		}
 
 		buffer_printf(&cluster_resources, " -N 1 -n %d -c %d", procs, cores);
-	} else if(q->type == BATCH_QUEUE_TYPE_UGE){
-		if(!ignore_mem && resources->memory > 0) {
+	} else if (q->type == BATCH_QUEUE_TYPE_UGE) {
+		if (!ignore_mem && resources->memory > 0) {
 			const char *mem_type = batch_queue_get_option(q, "mem-type");
 			buffer_printf(&cluster_resources, " -l %s=%.0fM", mem_type ? mem_type : "h_vmem", resources->memory);
 		}
-		if(!ignore_time && resources->wall_time > 0) {
+		if (!ignore_time && resources->wall_time > 0) {
 			buffer_printf(&cluster_resources, " -l h_rt=00:%.0f:00", DIV_INT_ROUND_UP(resources->wall_time, 60));
 		}
 
 		buffer_printf(&cluster_resources, " -pe smp %.0f", resources->cores > 0 ? DIV_INT_ROUND_UP(resources->cores, 1) : 1);
-	} else if(q->type==BATCH_QUEUE_TYPE_LSF) {
-		if(!ignore_mem && resources->memory>0) {
+	} else if (q->type == BATCH_QUEUE_TYPE_LSF) {
+		if (!ignore_mem && resources->memory > 0) {
 			// resources->memory is in units of MB
-			buffer_printf(&cluster_resources,"-M %.0fMB",resources->memory);
+			buffer_printf(&cluster_resources, "-M %.0fMB", resources->memory);
 		}
 
-		if(!ignore_core && resources->cores>0) {
+		if (!ignore_core && resources->cores > 0) {
 			// -n Gives the number of "tasks" in a job.
 			// Can be specified as a range: -n 4,8 indicates flexibility of 4 to 8 tasks.
 			// Not yet clear yet if this meaning differs for multi-thread versus MPI applications.
-			buffer_printf(&cluster_resources,"-n %.0f", DIV_INT_ROUND_UP(resources->cores, 1));
+			buffer_printf(&cluster_resources, "-n %.0f", DIV_INT_ROUND_UP(resources->cores, 1));
 		}
 
-		if(!ignore_time && resources->wall_time > 0 ) {
+		if (!ignore_time && resources->wall_time > 0) {
 			// -W puts a hard limit on run time.
 			// -We gives an estimated time for scheduling puporses.
 			// Both use minutes as the units.
-			buffer_printf(&cluster_resources,"-We %.0f", DIV_INT_ROUND_UP(resources->wall_time, 60));
+			buffer_printf(&cluster_resources, "-We %.0f", DIV_INT_ROUND_UP(resources->wall_time, 60));
 		}
 	}
 
@@ -200,14 +199,14 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 	return resources_str;
 }
 
-static batch_queue_id_t batch_queue_cluster_submit (struct batch_queue * q, struct batch_job *j )
+static batch_queue_id_t batch_queue_cluster_submit(struct batch_queue *q, struct batch_job *j)
 {
 	batch_queue_id_t jobid;
 	struct batch_job_info *info;
 	const char *options = hash_table_lookup(q->options, "batch-options");
 
-	if(!setup_batch_wrapper(q, cluster_name)) {
-		debug(D_NOTICE|D_BATCH,"couldn't setup wrapper file: %s",strerror(errno));
+	if (!setup_batch_wrapper(q, cluster_name)) {
+		debug(D_NOTICE | D_BATCH, "couldn't setup wrapper file: %s", strerror(errno));
 		return -1;
 	}
 
@@ -221,7 +220,7 @@ static batch_queue_id_t batch_queue_cluster_submit (struct batch_queue * q, stru
 	option to load the environment into the job.
 	*/
 
-	if(j->envlist) {
+	if (j->envlist) {
 		jx_export(j->envlist);
 	}
 
@@ -257,10 +256,12 @@ static batch_queue_id_t batch_queue_cluster_submit (struct batch_queue * q, stru
 		char *firstword = strdup(j->command);
 
 		char *end = strchr(firstword, ' ');
-		if (end) *end = 0;
+		if (end)
+			*end = 0;
 
 		jobname = strdup(string_front(path_basename(firstword), 15));
-		if (jobname[0] != 0 && !isalpha(jobname[0])) jobname[0] = 'X';
+		if (jobname[0] != 0 && !isalpha(jobname[0]))
+			jobname[0] = 'X';
 
 		free(firstword);
 	} else {
@@ -268,7 +269,7 @@ static batch_queue_id_t batch_queue_cluster_submit (struct batch_queue * q, stru
 	}
 	submit_id++;
 
-	const char *cluster_stdout_redirect = batch_queue_option_is_yes(q,"keep-wrapper-stdout")  ? "" : "-o /dev/null";
+	const char *cluster_stdout_redirect = batch_queue_option_is_yes(q, "keep-wrapper-stdout") ? "" : "-o /dev/null";
 
 	/*
 	Note that dot-slash is needed in front of the wrapper command
@@ -276,14 +277,14 @@ static batch_queue_id_t batch_queue_cluster_submit (struct batch_queue * q, stru
 	*/
 
 	char *command = string_format("%s %s %s %s %s %s %s ./%s.wrapper",
-		cluster_submit_cmd,
-		cluster_resources,
-		cluster_options,
-		cluster_stdout_redirect,
-		cluster_jobname_var,
-		jobname,
-		options ? options : "",
-		cluster_name);
+			cluster_submit_cmd,
+			cluster_resources,
+			cluster_options,
+			cluster_stdout_redirect,
+			cluster_jobname_var,
+			jobname,
+			options ? options : "",
+			cluster_name);
 
 	free(jobname);
 	free(cluster_resources);
@@ -291,17 +292,14 @@ static batch_queue_id_t batch_queue_cluster_submit (struct batch_queue * q, stru
 
 	FILE *file = popen(command, "r");
 	free(command);
-	if(!file) {
+	if (!file) {
 		debug(D_BATCH, "couldn't submit job: %s", strerror(errno));
 		return -1;
 	}
 
 	char line[BATCH_JOB_LINE_MAX] = "";
-	while(fgets(line, sizeof(line), file)) {
-		if(sscanf(line, "Your job %" SCNbjid, &jobid) == 1
-		|| sscanf(line, "Submitted batch job %" SCNbjid, &jobid) == 1
-		|| sscanf(line, "Job <%" SCNbjid "> is submitted", &jobid) == 1
-		|| sscanf(line, "%" SCNbjid, &jobid) == 1 ) {
+	while (fgets(line, sizeof(line), file)) {
+		if (sscanf(line, "Your job %" SCNbjid, &jobid) == 1 || sscanf(line, "Submitted batch job %" SCNbjid, &jobid) == 1 || sscanf(line, "Job <%" SCNbjid "> is submitted", &jobid) == 1 || sscanf(line, "%" SCNbjid, &jobid) == 1) {
 			debug(D_BATCH, "job %" PRIbjid " submitted", jobid);
 			pclose(file);
 			info = malloc(sizeof(*info));
@@ -312,7 +310,7 @@ static batch_queue_id_t batch_queue_cluster_submit (struct batch_queue * q, stru
 		}
 	}
 
-	if(strlen(line)) {
+	if (strlen(line)) {
 		debug(D_NOTICE, "job submission failed: %s", line);
 	} else {
 		debug(D_NOTICE, "job submission failed: no output from %s", cluster_name);
@@ -321,32 +319,32 @@ static batch_queue_id_t batch_queue_cluster_submit (struct batch_queue * q, stru
 	return -1;
 }
 
-static batch_queue_id_t batch_queue_cluster_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
+static batch_queue_id_t batch_queue_cluster_wait(struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime)
 {
 	struct batch_job_info *info;
 	batch_queue_id_t jobid;
 	int t, c;
 
-	while(1) {
+	while (1) {
 		UINT64_T ujobid;
 		itable_firstkey(q->job_table);
-		while(itable_nextkey(q->job_table, &ujobid, (void **) &info)) {
+		while (itable_nextkey(q->job_table, &ujobid, (void **)&info)) {
 			jobid = ujobid;
 			char *statusfile = string_format("%s.status.%" PRIbjid, cluster_name, jobid);
 			FILE *file = fopen(statusfile, "r");
-			if(file) {
+			if (file) {
 				fseek(file, info->log_pos, SEEK_SET);
 				char line[BATCH_JOB_LINE_MAX];
-				while(fgets(line, sizeof(line), file)) {
-					if(sscanf(line, "start %d", &t)) {
+				while (fgets(line, sizeof(line), file)) {
+					if (sscanf(line, "start %d", &t)) {
 						info->started = t;
-						if(!info->heartbeat)
+						if (!info->heartbeat)
 							info->heartbeat = t;
-					} else if(sscanf(line, "alive %d", &t)) {
+					} else if (sscanf(line, "alive %d", &t)) {
 						info->heartbeat = t;
-					} else if(sscanf(line, "stop %d %d", &c, &t) == 2) {
+					} else if (sscanf(line, "stop %d %d", &c, &t) == 2) {
 						debug(D_BATCH, "job %" PRIbjid " complete", jobid);
-						if(!info->started)
+						if (!info->started)
 							info->started = t;
 						info->finished = t;
 						info->exited_normally = 1;
@@ -356,16 +354,16 @@ static batch_queue_id_t batch_queue_cluster_wait (struct batch_queue * q, struct
 				info->log_pos = ftell(file);
 				fclose(file);
 
-				if(!batch_queue_disable_heartbeat && (time(0) - info->heartbeat > heartbeat_max)) {
-						warn(D_BATCH, "job %" PRIbjid " does not appear to be running anymore.", jobid);
-						if(!info->started)
-							info->started = info->heartbeat;
-						info->finished = info->heartbeat;
-						info->exited_normally = 0;
-						info->exit_signal = 1;  //same used as batch_queue_cluster_remove
+				if (!batch_queue_disable_heartbeat && (time(0) - info->heartbeat > heartbeat_max)) {
+					warn(D_BATCH, "job %" PRIbjid " does not appear to be running anymore.", jobid);
+					if (!info->started)
+						info->started = info->heartbeat;
+					info->finished = info->heartbeat;
+					info->exited_normally = 0;
+					info->exit_signal = 1; // same used as batch_queue_cluster_remove
 				}
 
-				if(info->finished != 0) {
+				if (info->finished != 0) {
 					unlink(statusfile);
 					info = itable_remove(q->job_table, jobid);
 					*info_out = *info;
@@ -380,13 +378,13 @@ static batch_queue_id_t batch_queue_cluster_wait (struct batch_queue * q, struct
 			free(statusfile);
 		}
 
-		if(itable_size(q->job_table) <= 0)
+		if (itable_size(q->job_table) <= 0)
 			return 0;
 
-		if(stoptime != 0 && time(0) >= stoptime)
+		if (stoptime != 0 && time(0) >= stoptime)
 			return -1;
 
-		if(process_pending())
+		if (process_pending())
 			return -1;
 
 		sleep(1);
@@ -395,15 +393,15 @@ static batch_queue_id_t batch_queue_cluster_wait (struct batch_queue * q, struct
 	return -1;
 }
 
-static int batch_queue_cluster_remove (struct batch_queue *q, batch_queue_id_t jobid)
+static int batch_queue_cluster_remove(struct batch_queue *q, batch_queue_id_t jobid)
 {
 	struct batch_job_info *info;
 
 	info = itable_lookup(q->job_table, jobid);
-	if(!info)
+	if (!info)
 		return 0;
 
-	if(!info->started)
+	if (!info->started)
 		info->started = time(0);
 
 	info->finished = time(0);
@@ -417,17 +415,17 @@ static int batch_queue_cluster_remove (struct batch_queue *q, batch_queue_id_t j
 	return 1;
 }
 
-static int batch_queue_cluster_create (struct batch_queue *q)
+static int batch_queue_cluster_create(struct batch_queue *q)
 {
-	if(cluster_name)
+	if (cluster_name)
 		free(cluster_name);
-	if(cluster_submit_cmd)
+	if (cluster_submit_cmd)
 		free(cluster_submit_cmd);
-	if(cluster_remove_cmd)
+	if (cluster_remove_cmd)
 		free(cluster_remove_cmd);
-	if(cluster_options)
+	if (cluster_options)
 		free(cluster_options);
-	if(cluster_jobname_var)
+	if (cluster_jobname_var)
 		free(cluster_jobname_var);
 
 	cluster_name = cluster_submit_cmd = cluster_remove_cmd = cluster_options = cluster_jobname_var = NULL;
@@ -442,73 +440,73 @@ static int batch_queue_cluster_create (struct batch_queue *q)
 	https://github.com/cooperative-computing-lab/cctools/issues/2701
 	*/
 
-	switch(q->type) {
-		case BATCH_QUEUE_TYPE_UGE:
-			cluster_name = strdup("uge");
-			cluster_submit_cmd = strdup("qsub");
-			cluster_remove_cmd = strdup("qdel");
-			cluster_options = string_format("-cwd -j y -V");
-			cluster_jobname_var = strdup("-N");
-			break;
-		case BATCH_QUEUE_TYPE_MOAB:
-			cluster_name = strdup("moab");
-			cluster_submit_cmd = strdup("msub");
-			cluster_remove_cmd = strdup("mdel");
-			cluster_options = string_format("-d . -j oe -V");
-			cluster_jobname_var = strdup("-N");
-			break;
-		case BATCH_QUEUE_TYPE_PBS:
-			cluster_name = strdup("pbs");
-			cluster_submit_cmd = strdup("qsub");
-			cluster_remove_cmd = strdup("qdel");
-			cluster_options = string_format("-j oe -V");
-			cluster_jobname_var = strdup("-N");
-			break;
-		case BATCH_QUEUE_TYPE_LSF:
-			cluster_name = strdup("lsf");
-			cluster_submit_cmd = strdup("bsub");
-			cluster_remove_cmd = strdup("bkill");
-			cluster_options = string_format("-e /dev/null -env all");
-			cluster_jobname_var = strdup("-J");
-			break;
-		case BATCH_QUEUE_TYPE_TORQUE:
-			cluster_name = strdup("torque");
-			cluster_submit_cmd = strdup("qsub");
-			cluster_remove_cmd = strdup("qdel");
-			cluster_options = string_format("-j oe -V");
-			cluster_jobname_var = strdup("-N");
-			break;
-		case BATCH_QUEUE_TYPE_SLURM:
-			cluster_name = strdup("slurm");
-			cluster_submit_cmd = strdup("sbatch");
-			cluster_remove_cmd = strdup("scancel");
-			cluster_options = string_format("-D . -e /dev/null --export=ALL");
-			cluster_jobname_var = strdup("-J");
-			break;
-		case BATCH_QUEUE_TYPE_CLUSTER:
-			cluster_name = getenv("BATCH_QUEUE_CLUSTER_NAME");
-			cluster_submit_cmd = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND");
-			cluster_remove_cmd = getenv("BATCH_QUEUE_CLUSTER_REMOVE_COMMAND");
-			cluster_options = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS");
-			cluster_jobname_var = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_JOBNAME_VAR");
-			break;
-		default:
-			debug(D_BATCH, "Invalid cluster type: %s\n", batch_queue_type_to_string(q->type));
-			return -1;
+	switch (q->type) {
+	case BATCH_QUEUE_TYPE_UGE:
+		cluster_name = strdup("uge");
+		cluster_submit_cmd = strdup("qsub");
+		cluster_remove_cmd = strdup("qdel");
+		cluster_options = string_format("-cwd -j y -V");
+		cluster_jobname_var = strdup("-N");
+		break;
+	case BATCH_QUEUE_TYPE_MOAB:
+		cluster_name = strdup("moab");
+		cluster_submit_cmd = strdup("msub");
+		cluster_remove_cmd = strdup("mdel");
+		cluster_options = string_format("-d . -j oe -V");
+		cluster_jobname_var = strdup("-N");
+		break;
+	case BATCH_QUEUE_TYPE_PBS:
+		cluster_name = strdup("pbs");
+		cluster_submit_cmd = strdup("qsub");
+		cluster_remove_cmd = strdup("qdel");
+		cluster_options = string_format("-j oe -V");
+		cluster_jobname_var = strdup("-N");
+		break;
+	case BATCH_QUEUE_TYPE_LSF:
+		cluster_name = strdup("lsf");
+		cluster_submit_cmd = strdup("bsub");
+		cluster_remove_cmd = strdup("bkill");
+		cluster_options = string_format("-e /dev/null -env all");
+		cluster_jobname_var = strdup("-J");
+		break;
+	case BATCH_QUEUE_TYPE_TORQUE:
+		cluster_name = strdup("torque");
+		cluster_submit_cmd = strdup("qsub");
+		cluster_remove_cmd = strdup("qdel");
+		cluster_options = string_format("-j oe -V");
+		cluster_jobname_var = strdup("-N");
+		break;
+	case BATCH_QUEUE_TYPE_SLURM:
+		cluster_name = strdup("slurm");
+		cluster_submit_cmd = strdup("sbatch");
+		cluster_remove_cmd = strdup("scancel");
+		cluster_options = string_format("-D . -e /dev/null --export=ALL");
+		cluster_jobname_var = strdup("-J");
+		break;
+	case BATCH_QUEUE_TYPE_CLUSTER:
+		cluster_name = getenv("BATCH_QUEUE_CLUSTER_NAME");
+		cluster_submit_cmd = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND");
+		cluster_remove_cmd = getenv("BATCH_QUEUE_CLUSTER_REMOVE_COMMAND");
+		cluster_options = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS");
+		cluster_jobname_var = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_JOBNAME_VAR");
+		break;
+	default:
+		debug(D_BATCH, "Invalid cluster type: %s\n", batch_queue_type_to_string(q->type));
+		return -1;
 	}
 
-	if(cluster_name && cluster_submit_cmd && cluster_remove_cmd && cluster_options && cluster_jobname_var)
+	if (cluster_name && cluster_submit_cmd && cluster_remove_cmd && cluster_options && cluster_jobname_var)
 		return 0;
 
-	if(!cluster_name)
+	if (!cluster_name)
 		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_NAME unset\n");
-	if(!cluster_submit_cmd)
+	if (!cluster_submit_cmd)
 		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND unset\n");
-	if(!cluster_remove_cmd)
+	if (!cluster_remove_cmd)
 		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_REMOVE_COMMAND unset\n");
-	if(!cluster_options)
+	if (!cluster_options)
 		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS unset\n");
-	if(!cluster_jobname_var)
+	if (!cluster_jobname_var)
 		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_SUBMIT_JOBNAME_VAR unset\n");
 
 	return -1;
@@ -519,117 +517,116 @@ batch_queue_stub_port(cluster);
 batch_queue_stub_option_update(cluster);
 
 const struct batch_queue_module batch_queue_cluster = {
-	BATCH_QUEUE_TYPE_CLUSTER,
-	"cluster",
+		BATCH_QUEUE_TYPE_CLUSTER,
+		"cluster",
 
-	batch_queue_cluster_create,
-	batch_queue_cluster_free,
-	batch_queue_cluster_port,
-	batch_queue_cluster_option_update,
+		batch_queue_cluster_create,
+		batch_queue_cluster_free,
+		batch_queue_cluster_port,
+		batch_queue_cluster_option_update,
 
-	batch_queue_cluster_submit,
-	batch_queue_cluster_wait,
-	batch_queue_cluster_remove,
+		batch_queue_cluster_submit,
+		batch_queue_cluster_wait,
+		batch_queue_cluster_remove,
 };
 
 const struct batch_queue_module batch_queue_moab = {
-	BATCH_QUEUE_TYPE_MOAB,
-	"moab",
+		BATCH_QUEUE_TYPE_MOAB,
+		"moab",
 
-	batch_queue_cluster_create,
-	batch_queue_cluster_free,
-	batch_queue_cluster_port,
-	batch_queue_cluster_option_update,
+		batch_queue_cluster_create,
+		batch_queue_cluster_free,
+		batch_queue_cluster_port,
+		batch_queue_cluster_option_update,
 
-	batch_queue_cluster_submit,
-	batch_queue_cluster_wait,
-	batch_queue_cluster_remove,
+		batch_queue_cluster_submit,
+		batch_queue_cluster_wait,
+		batch_queue_cluster_remove,
 };
 
 const struct batch_queue_module batch_queue_uge = {
-	BATCH_QUEUE_TYPE_UGE,
-	"uge",
+		BATCH_QUEUE_TYPE_UGE,
+		"uge",
 
-	batch_queue_cluster_create,
-	batch_queue_cluster_free,
-	batch_queue_cluster_port,
-	batch_queue_cluster_option_update,
+		batch_queue_cluster_create,
+		batch_queue_cluster_free,
+		batch_queue_cluster_port,
+		batch_queue_cluster_option_update,
 
-	batch_queue_cluster_submit,
-	batch_queue_cluster_wait,
-	batch_queue_cluster_remove,
+		batch_queue_cluster_submit,
+		batch_queue_cluster_wait,
+		batch_queue_cluster_remove,
 };
 
 /* retained sge keyword for backwards compatibility after sge->uge name change. */
 const struct batch_queue_module batch_queue_sge = {
-	BATCH_QUEUE_TYPE_UGE,
-	"sge",
+		BATCH_QUEUE_TYPE_UGE,
+		"sge",
 
-	batch_queue_cluster_create,
-	batch_queue_cluster_free,
-	batch_queue_cluster_port,
-	batch_queue_cluster_option_update,
+		batch_queue_cluster_create,
+		batch_queue_cluster_free,
+		batch_queue_cluster_port,
+		batch_queue_cluster_option_update,
 
-	batch_queue_cluster_submit,
-	batch_queue_cluster_wait,
-	batch_queue_cluster_remove,
+		batch_queue_cluster_submit,
+		batch_queue_cluster_wait,
+		batch_queue_cluster_remove,
 };
 
 const struct batch_queue_module batch_queue_pbs = {
-	BATCH_QUEUE_TYPE_PBS,
-	"pbs",
+		BATCH_QUEUE_TYPE_PBS,
+		"pbs",
 
-	batch_queue_cluster_create,
-	batch_queue_cluster_free,
-	batch_queue_cluster_port,
-	batch_queue_cluster_option_update,
+		batch_queue_cluster_create,
+		batch_queue_cluster_free,
+		batch_queue_cluster_port,
+		batch_queue_cluster_option_update,
 
-	batch_queue_cluster_submit,
-	batch_queue_cluster_wait,
-	batch_queue_cluster_remove,
+		batch_queue_cluster_submit,
+		batch_queue_cluster_wait,
+		batch_queue_cluster_remove,
 };
 
 const struct batch_queue_module batch_queue_lsf = {
-	BATCH_QUEUE_TYPE_LSF,
-	"lsf",
+		BATCH_QUEUE_TYPE_LSF,
+		"lsf",
 
-	batch_queue_cluster_create,
-	batch_queue_cluster_free,
-	batch_queue_cluster_port,
-	batch_queue_cluster_option_update,
+		batch_queue_cluster_create,
+		batch_queue_cluster_free,
+		batch_queue_cluster_port,
+		batch_queue_cluster_option_update,
 
-	batch_queue_cluster_submit,
-	batch_queue_cluster_wait,
-	batch_queue_cluster_remove,
+		batch_queue_cluster_submit,
+		batch_queue_cluster_wait,
+		batch_queue_cluster_remove,
 };
 
 const struct batch_queue_module batch_queue_torque = {
-	BATCH_QUEUE_TYPE_TORQUE,
-	"torque",
+		BATCH_QUEUE_TYPE_TORQUE,
+		"torque",
 
-	batch_queue_cluster_create,
-	batch_queue_cluster_free,
-	batch_queue_cluster_port,
-	batch_queue_cluster_option_update,
+		batch_queue_cluster_create,
+		batch_queue_cluster_free,
+		batch_queue_cluster_port,
+		batch_queue_cluster_option_update,
 
-	batch_queue_cluster_submit,
-	batch_queue_cluster_wait,
-	batch_queue_cluster_remove,
+		batch_queue_cluster_submit,
+		batch_queue_cluster_wait,
+		batch_queue_cluster_remove,
 };
 
-
 const struct batch_queue_module batch_queue_slurm = {
-	BATCH_QUEUE_TYPE_SLURM,
-	"slurm",
+		BATCH_QUEUE_TYPE_SLURM,
+		"slurm",
 
-	batch_queue_cluster_create,
-	batch_queue_cluster_free,
-	batch_queue_cluster_port,
-	batch_queue_cluster_option_update,
+		batch_queue_cluster_create,
+		batch_queue_cluster_free,
+		batch_queue_cluster_port,
+		batch_queue_cluster_option_update,
 
-	batch_queue_cluster_submit,
-	batch_queue_cluster_wait,
-	batch_queue_cluster_remove,
+		batch_queue_cluster_submit,
+		batch_queue_cluster_wait,
+		batch_queue_cluster_remove,
 };
 
 /* vim: set noexpandtab tabstop=8: */
