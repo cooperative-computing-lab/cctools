@@ -68,18 +68,18 @@ typedef int64_t batch_queue_id_t;
 typedef enum {
 	BATCH_QUEUE_TYPE_LOCAL,	              /**< Batch jobs will run as local processes. */
 	BATCH_QUEUE_TYPE_CONDOR,              /**< Batch jobs will be sent to Condor pool. */
-	BATCH_QUEUE_TYPE_AMAZON,              /**< Batch jobs will be sent spun up Amazon ec2 instances */
-	BATCH_QUEUE_TYPE_SGE,	              /**< Batch jobs will be sent to Sun Grid Engine. */
-	BATCH_QUEUE_TYPE_MOAB,                /**< Batch jobs will be sent to the Moab Workload Manager. */
-	BATCH_QUEUE_TYPE_PBS,                 /**< Batch jobs will be send to the PBS Scheduler. */
-	BATCH_QUEUE_TYPE_LSF,		      /**< Batch jobs will be sent to LSF. */
-	BATCH_QUEUE_TYPE_TORQUE,              /**< Batch jobs will be send to the Torque Scheduler. */
-	BATCH_QUEUE_TYPE_SLURM,               /**< Batch jobs will be send to the SLURM Scheduler. */
+	BATCH_QUEUE_TYPE_VINE,                /**< Batch jobs will be sent to TaskVine manager. */
+	BATCH_QUEUE_TYPE_WORK_QUEUE,          /**< Batch jobs will be sent to Work Queue manager. */
+	BATCH_QUEUE_TYPE_SGE,	              /**< Batch jobs will be sent to Sun Grid Engine */
+	BATCH_QUEUE_TYPE_SLURM,               /**< Batch jobs will be send to the SLURM scheduler */
 	BATCH_QUEUE_TYPE_CLUSTER,             /**< Batch jobs will be sent to a user-defined cluster manager. */
-	BATCH_QUEUE_TYPE_WORK_QUEUE,          /**< Batch jobs will be sent to the Work Queue. */
-	BATCH_QUEUE_TYPE_K8S,                 /**< Batch jobs will be sent to kubernetes. */
+	BATCH_QUEUE_TYPE_MOAB,                /**< Batch jobs will be sent to the Moab Workload Manager. */
+	BATCH_QUEUE_TYPE_PBS,                 /**< Batch jobs will be send to the PBS scheduler. */
+	BATCH_QUEUE_TYPE_LSF,		      /**< Batch jobs will be sent to the LSF scheduler */
+	BATCH_QUEUE_TYPE_TORQUE,              /**< Batch jobs will be send to the Torque scheduler. */
+	BATCH_QUEUE_TYPE_AMAZON,              /**< Batch jobs will be run inside Amazon EC2 Instances */
+	BATCH_QUEUE_TYPE_K8S,                 /**< Batch jobs will be run inside Kubernetes pods. */
 	BATCH_QUEUE_TYPE_DRYRUN,              /**< Batch jobs will not actually run. */
-	BATCH_QUEUE_TYPE_VINE,                /**< Batch jobs executed via TaskVine. */
 	BATCH_QUEUE_TYPE_UNKNOWN = -1         /**< An invalid batch queue type. */
 } batch_queue_type_t;
 
@@ -239,10 +239,5 @@ const char *batch_queue_type_string();
 @return The port number in use, or zero if not applicable.
 */
 int batch_queue_port(struct batch_queue *q);
-
-/* Hack: provide a backdoor to allow the MPI module to perform
-   some initial setup before the MPI batch queue is created.
-*/
-void batch_queue_mpi_setup( const char *debug_filename, int mpi_cores, int mpi_memory );
 
 #endif
