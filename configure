@@ -409,7 +409,7 @@ done
 # Currently, we rely on the linker --as-needed flag to sort out
 # which dynamic libraries each executable actually needs.
 # This is apparently a recent addition to gnu ld.
-# A better solution would be to explicitely specify which libraries
+# A better solution would be to explicitly specify which libraries
 # are needed by which executable, but this will come in a later version.
 #
 
