@@ -106,8 +106,8 @@ OPTION_ARG(t, keepalive-timeout, #)Work Queue keepalive timeout (default: 30s)
 OPTION_ARG(u, keepalive-interval, #)Work Queue keepalive interval (default: 120s)
 OPTION_ARG(W, schedule, mode)WorkQueue scheduling algorithm. (time|files|fcfs)
 OPTION_ARG_LONG(password, pwfile)Password file for authenticating workers.
-OPTION_ARG_LONG(ssl_cert) Set the SSL certificate file for encrypting connection.
-OPTION_ARG_LONG(ssl_key) Set the SSL certificate file for encrypting connection.
+OPTION_ARG_LONG(ssl-cert) Set the SSL certificate file for encrypting connection.
+OPTION_ARG_LONG(ssl-key) Set the SSL certificate file for encrypting connection.
 OPTION_FLAG_LONG(cache-mode) Control worker caching mode. (never|workflow|forever)
 OPTION_ARG_LONG(preferred-connection,connection)Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
 OPTIONS_END
