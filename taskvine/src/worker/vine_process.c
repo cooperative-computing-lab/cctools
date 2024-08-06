@@ -607,156 +607,26 @@ int vine_process_measure_disk(struct vine_process *p, int max_time_on_measuremen
 
 static int vine_process_sandbox_disk_measure(struct vine_process *p, int max_secs, struct path_disk_size_info **state)
 {
-	int64_t start_time = time(0);
-	int result = 0;
+	int num_inputs = list_size(p->task->input_mounts);
 
-	const char *path = p->sandbox;
 
-	struct DIR_with_name {
-		DIR *dir;
-		char *name;
-	};
+	char **skip_paths = malloc(num_inputs);
 
-	if (!*state) {
-		/* if state is null, there is no state, and path is the root of the measurement. */
-		*state = calloc(1, sizeof(struct path_disk_size_info));
-	}
 
-	struct path_disk_size_info *s = *state; /* shortcut for *state, so we do not need to type (*state)->... */
+	if (p->task->input_mounts) {
+		struct vine_mount *m;
 
-	/* if no current_dirs, we begin a new measurement. */
-	if (!s->current_dirs) {
-		s->complete_measurement = 0;
-
-		struct DIR_with_name *here = calloc(1, sizeof(struct DIR_with_name));
-
-		if ((here->dir = opendir(path))) {
-			here->name = xxstrdup(path);
-			s->current_dirs = list_create();
-			s->size_so_far = 0;
-			s->count_so_far = 1; /* count the root directory */
-			list_push_tail(s->current_dirs, here);
-		} else {
-			debug(D_DEBUG, "error reading disk usage on directory: %s.\n", path);
-			s->size_so_far = -1;
-			s->count_so_far = -1;
-			s->complete_measurement = 1;
-			result = -1;
-
-			free(here);
-			goto timeout;
+		int i=0;
+		LIST_ITERATE(p->task->input_mounts, m)
+		{
+			skip_paths[i] = m->remote_name;
+			i++;
 		}
 	}
 
-	struct DIR_with_name *tail;
-	while ((tail = list_peek_tail(s->current_dirs))) {
-		struct dirent *entry;
-		struct stat file_info;
+	int result = path_disk_size_info_get_r_skip(p->sandbox, max_secs, state, skip_paths, num_inputs);
 
-		if (!tail->dir) { // only open dir when it's being processed
-			tail->dir = opendir(tail->name);
-			if (!tail->dir) {
-				if (errno == ENOENT) {
-					/* Do nothing as a directory might go away. */
-					tail = list_pop_tail(s->current_dirs);
-					free(tail->name);
-					free(tail);
-					continue;
-				} else {
-					debug(D_DEBUG, "error opening directory '%s', errno: %s.\n", tail->name, strerror(errno));
-					result = -1;
-					goto timeout;
-				}
-			}
-		}
-		/* Read out entries from the dir stream. */
-		while ((entry = readdir(tail->dir))) {
-			if (strcmp(".", entry->d_name) == 0 || strcmp("..", entry->d_name) == 0)
-				continue;
-
-			char composed_path[PATH_MAX];
-			if (entry->d_name[0] == '/') {
-				strncpy(composed_path, entry->d_name, PATH_MAX);
-			} else {
-				snprintf(composed_path, PATH_MAX, "%s/%s", tail->name, entry->d_name);
-			}
-
-			if (lstat(composed_path, &file_info) < 0) {
-				if (errno == ENOENT) {
-					/* our DIR structure is stale, and a file went away. We simply do nothing. */
-				} else {
-					debug(D_DEBUG, "error reading disk usage on '%s'.\n", path);
-					result = -1;
-				}
-				continue;
-			}
-
-			int skip = 0;
-			if (p->task->input_mounts) {
-				struct vine_mount *m;
-				LIST_ITERATE(p->task->input_mounts, m)
-				{
-
-					int offset = 0;
-					char *idx = strchr(composed_path, '/');
-					while (idx != NULL) {
-						offset = idx - composed_path + 1;
-						idx = strchr(idx + 1, '/');
-					}
-
-					if (strncmp(composed_path + offset, m->remote_name, PATH_MAX) == 0) {
-						skip = 1;
-						break;
-					}
-				}
-			}
-
-			s->count_so_far++;
-
-			if (!skip) {
-				if (S_ISREG(file_info.st_mode)) {
-					s->size_so_far += file_info.st_size;
-				} else if (S_ISDIR(file_info.st_mode)) {
-					/* Only add name of directory, will only open it to read when it's its turn. */
-					struct DIR_with_name *branch = calloc(1, sizeof(struct DIR_with_name));
-					branch->name = xxstrdup(composed_path);
-					list_push_head(s->current_dirs, branch);
-				} else if (S_ISLNK(file_info.st_mode)) {
-					/* do nothing, avoiding infinite loops. */
-				}
-			}
-			if (max_secs > -1) {
-				if (time(0) - start_time >= max_secs) {
-					goto timeout;
-				}
-			}
-		}
-		/* we are done reading a complete directory, and we go to the next in the queue */
-		tail = list_pop_tail(s->current_dirs);
-		if (tail->dir) {
-			closedir(tail->dir);
-		}
-		free(tail->name);
-		free(tail);
-	}
-
-	list_delete(s->current_dirs);
-	s->current_dirs = NULL; /* signal that a new measurement is needed, if state structure is reused. */
-	s->complete_measurement = 1;
-
-timeout:
-	if (s->complete_measurement) {
-		/* if a complete measurement has been done, then update
-		 * for the found value */
-		s->last_byte_size_complete = s->size_so_far;
-		s->last_file_count_complete = s->count_so_far;
-	} else {
-		/* else, we hit a timeout. measurement reported is conservative, from
-		 * what we knew, and know so far. */
-
-		s->last_byte_size_complete = MAX(s->last_byte_size_complete, s->size_so_far);
-		s->last_file_count_complete = MAX(s->last_file_count_complete, s->count_so_far);
-	}
+	free(skip_paths);
 
 	return result;
 }

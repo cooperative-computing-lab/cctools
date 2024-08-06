@@ -44,6 +44,8 @@ When the function returns, if *state->complete_measurement is 1, then the measur
 */
 int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_disk_size_info **state);
 
+int path_disk_size_info_get_r_skip(const char *path, int64_t max_secs, struct path_disk_size_info **state, char **paths_to_skip, int num_skip);
+
 void path_disk_size_info_delete_state(struct path_disk_size_info *state);
 
 #endif
