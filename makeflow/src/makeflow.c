@@ -2366,8 +2366,8 @@ int main(int argc, char *argv[])
 		if(!strncmp(cwd, "/afs", 4)) {
 			fprintf(stderr,"error: The working directory is '%s'\n", cwd);
 			fprintf(stderr,"This won't work because Condor is not able to write to files in AFS.\n");
-			fprintf(stderr,"Instead, run your workflow from a local disk like /tmp.");
-			fprintf(stderr,"Or, use the Work Queue batch system with -T wq.\n");
+			fprintf(stderr,"Instead, run your workflow from a local disk like /tmp.\n");
+			fprintf(stderr,"Or, use WorkQueue or TaskVine workers submitted to Condor.\n");
 			free(cwd);
 			goto EXIT_WITH_FAILURE;
 		}
