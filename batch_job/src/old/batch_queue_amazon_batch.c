@@ -1,12 +1,12 @@
 /*
- * Copyright (C) 2022 The University of Notre Dame
+ * Copyright (C) 2024 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "batch_job_internal.h"
+#include "batch_queue_internal.h"
 #include "process.h"
-#include "batch_job.h"
+#include "batch_queue.h"
 #include "stringtools.h"
 #include "debug.h"
 #include "jx_parse.h"
@@ -397,7 +397,7 @@ static int del_job_def(char* jobdef){
     return ret;
 }
 
-static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const char* cmd, const char* extra_input_files, const char* extra_output_files, struct jx* envlist, const struct rmsummary* resources){
+static batch_queue_id_t batch_queue_amazon_batch_submit(struct batch_queue* q, const char* cmd, const char* extra_input_files, const char* extra_output_files, struct jx* envlist, const struct rmsummary* resources){
 	struct internal_amazon_batch_amazon_ids amazon_ids = initialize(q);
 	char* env_var = amazon_ids.env_prefix;
 
@@ -452,7 +452,7 @@ static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const
 	
 }
 
-static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime){
+static batch_queue_id_t batch_queue_amazon_batch_wait(struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime){
 	struct internal_amazon_batch_amazon_ids amazon_ids = initialize(q);
 	//succeeded check
 	int done  = 0;
@@ -497,7 +497,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 				
 				//Let Makeflow know we're all done!
 				debug(D_BATCH,"Removing the job from the job_table");
-				struct batch_job_info* info = itable_remove(q->job_table, id);//got from batch_job_amazon.c
+				struct batch_job_info* info = itable_remove(q->job_table, id);//got from batch_queue_amazon.c
 				info->finished = time(0);//get now
 				info->exited_normally=1;
 				info->exit_code=finished_aws_job_exit_code(jaid,env_var);
@@ -519,7 +519,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 				
 				debug(D_BATCH,"Failed job: %i",id);
 				
-				struct batch_job_info* info = itable_remove(q->job_table, id);//got from batch_job_amazon.c
+				struct batch_job_info* info = itable_remove(q->job_table, id);//got from batch_queue_amazon.c
 				info->finished = time(0); //get now
 				info->exited_normally=0;
 				int exc = finished_aws_job_exit_code(jaid,env_var);
@@ -540,7 +540,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 	return -1;
 }
 
-static int batch_job_amazon_batch_remove(struct batch_queue *q, batch_job_id_t jobid){
+static int batch_queue_amazon_batch_remove(struct batch_queue *q, batch_queue_id_t jobid){
 	struct internal_amazon_batch_amazon_ids amazon_ids = initialize(q);
 	char* env_var = amazon_ids.env_prefix;
 	if(itable_lookup(done_jobs,jobid)==NULL){
@@ -565,14 +565,6 @@ batch_queue_stub_free(amazon_batch);
 batch_queue_stub_port(amazon_batch);
 batch_queue_stub_option_update(amazon_batch);
 
-batch_fs_stub_chdir(amazon_batch);
-batch_fs_stub_getcwd(amazon_batch);
-batch_fs_stub_mkdir(amazon_batch);
-batch_fs_stub_putfile(amazon_batch);
-batch_fs_stub_rename(amazon_batch);
-batch_fs_stub_stat(amazon_batch);
-batch_fs_stub_unlink(amazon_batch);
-
 const struct batch_queue_module batch_queue_amazon_batch = {
 	BATCH_QUEUE_TYPE_AMAZON_BATCH,
 	"amazon-batch",
@@ -582,20 +574,8 @@ const struct batch_queue_module batch_queue_amazon_batch = {
 	batch_queue_amazon_batch_port,
 	batch_queue_amazon_batch_option_update,
 
-	{
-		batch_job_amazon_batch_submit,
-		batch_job_amazon_batch_wait,
-		batch_job_amazon_batch_remove,
-	},
-
-	{
-		batch_fs_amazon_batch_chdir,
-		batch_fs_amazon_batch_getcwd,
-		batch_fs_amazon_batch_mkdir,
-		batch_fs_amazon_batch_putfile,
-		batch_fs_amazon_batch_rename,
-		batch_fs_amazon_batch_stat,
-		batch_fs_amazon_batch_unlink,
-	},
+	batch_queue_amazon_batch_submit,
+	batch_queue_amazon_batch_wait,
+	batch_queue_amazon_batch_remove,
 };
 

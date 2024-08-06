@@ -1,21 +1,24 @@
 /*
-Copyright (C) 2022 The University of Notre Dame
+Copyright (C) 2024 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
+
+#include "batch_wrapper.h"
+
+#include "list.h"
+#include "debug.h"
+#include "stringtools.h"
+#include "xxmalloc.h"
+#include "random.h"
 
 #include <assert.h>
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
-
-#include "batch_wrapper.h"
-#include "list.h"
-#include "debug.h"
-#include "stringtools.h"
-#include "xxmalloc.h"
-#include "random.h"
+#include <sys/types.h>
+#include <sys/stat.h>
 
 struct batch_wrapper {
 	struct list *pre;
@@ -25,12 +28,15 @@ struct batch_wrapper {
 	char *prefix;
 };
 
-struct batch_wrapper *batch_wrapper_create(void) {
+struct batch_wrapper *batch_wrapper_create(void)
+{
 	return xxcalloc(1, sizeof(struct batch_wrapper));
 }
 
-void batch_wrapper_delete(struct batch_wrapper *w) {
-	if (!w) return;
+void batch_wrapper_delete(struct batch_wrapper *w)
+{
+	if (!w)
+		return;
 	list_free(w->pre);
 	list_delete(w->pre);
 	list_free(w->post);
@@ -42,7 +48,8 @@ void batch_wrapper_delete(struct batch_wrapper *w) {
 	free(w);
 }
 
-void batch_wrapper_pre(struct batch_wrapper *w, const char *cmd) {
+void batch_wrapper_pre(struct batch_wrapper *w, const char *cmd)
+{
 	assert(w);
 	assert(cmd);
 
@@ -54,7 +61,8 @@ void batch_wrapper_pre(struct batch_wrapper *w, const char *cmd) {
 	assert(rc == 1);
 }
 
-void batch_wrapper_argv(struct batch_wrapper *w, char *const argv[]) {
+void batch_wrapper_argv(struct batch_wrapper *w, char *const argv[])
+{
 	assert(w);
 	assert(argv);
 	assert(!w->argv);
@@ -68,7 +76,8 @@ void batch_wrapper_argv(struct batch_wrapper *w, char *const argv[]) {
 	}
 }
 
-void batch_wrapper_args(struct batch_wrapper *w, char *const args[]) {
+void batch_wrapper_args(struct batch_wrapper *w, char *const args[])
+{
 	assert(w);
 	assert(args);
 	assert(!w->argv);
@@ -82,7 +91,8 @@ void batch_wrapper_args(struct batch_wrapper *w, char *const args[]) {
 	}
 }
 
-void batch_wrapper_cmd(struct batch_wrapper *w, const char *cmd) {
+void batch_wrapper_cmd(struct batch_wrapper *w, const char *cmd)
+{
 	assert(w);
 	assert(cmd);
 	assert(!w->argv);
@@ -91,7 +101,8 @@ void batch_wrapper_cmd(struct batch_wrapper *w, const char *cmd) {
 	w->cmd = string_escape_shell(cmd);
 }
 
-void batch_wrapper_post(struct batch_wrapper *w, const char *cmd) {
+void batch_wrapper_post(struct batch_wrapper *w, const char *cmd)
+{
 	assert(w);
 	assert(cmd);
 
@@ -103,14 +114,16 @@ void batch_wrapper_post(struct batch_wrapper *w, const char *cmd) {
 	assert(rc == 1);
 }
 
-void batch_wrapper_prefix(struct batch_wrapper *w, const char *prefix) {
+void batch_wrapper_prefix(struct batch_wrapper *w, const char *prefix)
+{
 	assert(w);
 	assert(prefix);
 	assert(!w->prefix);
 	w->prefix = xxstrdup(prefix);
 }
 
-char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *task) {
+char *batch_wrapper_write(struct batch_wrapper *w, struct batch_job *task)
+{
 	assert(w);
 	assert(task);
 
@@ -118,17 +131,17 @@ char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *task) {
 	int wrapper_fd = mkstemp(name);
 	if (wrapper_fd == -1) {
 		int saved_errno = errno;
-		debug(D_NOTICE|D_BATCH, "failed to create wrapper: %s", strerror(errno));
+		debug(D_NOTICE | D_BATCH, "failed to create wrapper: %s", strerror(errno));
 		free(name);
 		errno = saved_errno;
 		return NULL;
 	}
 
-	batch_task_add_input_file(task, name, NULL);
+	batch_job_add_input_file(task, name, NULL);
 
 	if (fchmod(wrapper_fd, 0700) == -1) {
 		int saved_errno = errno;
-		debug(D_NOTICE|D_BATCH, "failed to make wrapper executable: %s", strerror(errno));
+		debug(D_NOTICE | D_BATCH, "failed to make wrapper executable: %s", strerror(errno));
 		free(name);
 		close(wrapper_fd);
 		errno = saved_errno;
@@ -138,7 +151,7 @@ char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *task) {
 	FILE *wrapper = fdopen(wrapper_fd, "w");
 	if (!wrapper) {
 		int saved_errno = errno;
-		debug(D_NOTICE|D_BATCH, "failed to open wrapper: %s", strerror(errno));
+		debug(D_NOTICE | D_BATCH, "failed to open wrapper: %s", strerror(errno));
 		free(name);
 		close(wrapper_fd);
 		errno = saved_errno;
@@ -183,16 +196,19 @@ char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *task) {
 	return name;
 }
 
-static void free_argv(char *argv[]) {
-	if (!argv) return;
+static void free_argv(char *argv[])
+{
+	if (!argv)
+		return;
 	for (size_t i = 0; argv[i]; i++)
 		free(argv[i]);
 	free(argv);
 }
 
-static char **jx_array_to_argv(struct batch_task *t, struct jx *argv) {
+static char **jx_array_to_argv(struct batch_job *t, struct jx *argv)
+{
 	if (!jx_istype(argv, JX_ARRAY)) {
-		debug(D_NOTICE|D_BATCH, "arguments must be in an array");
+		debug(D_NOTICE | D_BATCH, "arguments must be in an array");
 		return NULL;
 	}
 
@@ -213,7 +229,7 @@ static char **jx_array_to_argv(struct batch_task *t, struct jx *argv) {
 			}
 		} else {
 			free_argv(ptrs);
-			debug(D_NOTICE|D_BATCH, "arguments must be strings");
+			debug(D_NOTICE | D_BATCH, "arguments must be strings");
 			return NULL;
 		}
 		++i;
@@ -222,7 +238,8 @@ static char **jx_array_to_argv(struct batch_task *t, struct jx *argv) {
 	return ptrs;
 }
 
-char *batch_wrapper_expand(struct batch_task *t, struct jx *spec) {
+char *batch_wrapper_expand(struct batch_job *t, struct jx *spec)
+{
 	assert(t);
 	assert(spec);
 
@@ -232,14 +249,14 @@ char *batch_wrapper_expand(struct batch_task *t, struct jx *spec) {
 	struct batch_wrapper *w = batch_wrapper_create();
 
 	if (!jx_istype(spec, JX_OBJECT)) {
-		debug(D_NOTICE|D_BATCH, "wrapper command spec must be a JX object");
+		debug(D_NOTICE | D_BATCH, "wrapper command spec must be a JX object");
 		goto FAIL;
 	}
 
 	struct jx *prefix = jx_lookup(spec, "prefix");
 	if (prefix) {
 		if (!jx_istype(prefix, JX_STRING)) {
-			debug(D_NOTICE|D_BATCH, "prefix must be a string");
+			debug(D_NOTICE | D_BATCH, "prefix must be a string");
 			goto FAIL;
 		}
 		batch_wrapper_prefix(w, prefix->u.string_value);
@@ -248,12 +265,12 @@ char *batch_wrapper_expand(struct batch_task *t, struct jx *spec) {
 	struct jx *pre = jx_lookup(spec, "pre");
 	if (pre) {
 		if (!jx_istype(pre, JX_ARRAY)) {
-			debug(D_NOTICE|D_BATCH, "pre commands must be specified in an array");
+			debug(D_NOTICE | D_BATCH, "pre commands must be specified in an array");
 			goto FAIL;
 		}
 		for (void *i = NULL; (j = jx_iterate_array(pre, &i));) {
 			if (!jx_istype(j, JX_STRING)) {
-				debug(D_NOTICE|D_BATCH, "pre commands must be strings");
+				debug(D_NOTICE | D_BATCH, "pre commands must be strings");
 				goto FAIL;
 			}
 			batch_wrapper_pre(w, j->u.string_value);
@@ -263,12 +280,12 @@ char *batch_wrapper_expand(struct batch_task *t, struct jx *spec) {
 	struct jx *post = jx_lookup(spec, "post");
 	if (post) {
 		if (!jx_istype(post, JX_ARRAY)) {
-			debug(D_NOTICE|D_BATCH, "post commands must be specified in an array");
+			debug(D_NOTICE | D_BATCH, "post commands must be specified in an array");
 			goto FAIL;
 		}
 		for (void *i = NULL; (j = jx_iterate_array(post, &i));) {
 			if (!jx_istype(j, JX_STRING)) {
-				debug(D_NOTICE|D_BATCH, "post commands must be strings");
+				debug(D_NOTICE | D_BATCH, "post commands must be strings");
 				goto FAIL;
 			}
 			batch_wrapper_post(w, j->u.string_value);
@@ -278,7 +295,7 @@ char *batch_wrapper_expand(struct batch_task *t, struct jx *spec) {
 	struct jx *argv = jx_lookup(spec, "argv");
 	if (argv) {
 		if (commands++) {
-			debug(D_NOTICE|D_BATCH, "only one command is allowed");
+			debug(D_NOTICE | D_BATCH, "only one command is allowed");
 			goto FAIL;
 		}
 
@@ -295,7 +312,7 @@ char *batch_wrapper_expand(struct batch_task *t, struct jx *spec) {
 	struct jx *args = jx_lookup(spec, "args");
 	if (args) {
 		if (commands++) {
-			debug(D_NOTICE|D_BATCH, "only one command is allowed");
+			debug(D_NOTICE | D_BATCH, "only one command is allowed");
 			goto FAIL;
 		}
 
@@ -312,25 +329,26 @@ char *batch_wrapper_expand(struct batch_task *t, struct jx *spec) {
 	struct jx *cmd = jx_lookup(spec, "cmd");
 	if (cmd) {
 		if (commands++) {
-			debug(D_NOTICE|D_BATCH, "only one command is allowed");
+			debug(D_NOTICE | D_BATCH, "only one command is allowed");
 			goto FAIL;
 		}
 
 		if (jx_istype(cmd, JX_OBJECT)) {
 			char *nested = batch_wrapper_expand(t, cmd);
-			if (!nested) goto FAIL;
+			if (!nested)
+				goto FAIL;
 			batch_wrapper_cmd(w, nested);
 			free(nested);
 		} else if (jx_istype(cmd, JX_STRING)) {
 			batch_wrapper_cmd(w, cmd->u.string_value);
 		} else {
-			debug(D_NOTICE|D_BATCH, "cmd must be a string");
+			debug(D_NOTICE | D_BATCH, "cmd must be a string");
 			goto FAIL;
 		}
 	}
 
 	if (commands != 1) {
-		debug(D_NOTICE|D_BATCH, "a command is required to generate a wrapper");
+		debug(D_NOTICE | D_BATCH, "a command is required to generate a wrapper");
 		goto FAIL;
 	}
 

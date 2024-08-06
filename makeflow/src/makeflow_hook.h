@@ -13,8 +13,8 @@
  *
  */
 
+#include "batch_queue.h"
 #include "batch_job.h"
-#include "batch_task.h"
 #include "dag.h"
 #include "dag_node.h"
 #include "dag_file.h"
@@ -266,7 +266,7 @@ struct makeflow_hook {
 	 * @param task The task being submitted.
 	 * @return MAKEFLOW_HOOK_SUCCESS if successful, MAKEFLOW_HOOK_FAILURE if not.
 	 */
-	int (*node_submit)   (void * instance_struct, struct dag_node *node, struct batch_task *task);
+	int (*node_submit)   (void * instance_struct, struct dag_node *node, struct batch_job *task);
 
 	/* Hook after node is collected, but prior to qualifying node success.
 	 * 
@@ -277,7 +277,7 @@ struct makeflow_hook {
 	 * @param task The task being submitted.
 	 * @return MAKEFLOW_HOOK_SUCCESS if successful, MAKEFLOW_HOOK_FAILURE if not.
 	 */
-	int (*node_end)      (void * instance_struct, struct dag_node *node, struct batch_task *task);
+	int (*node_end)      (void * instance_struct, struct dag_node *node, struct batch_job *task);
 
 	/* Hook if node was successful.
 	 * 
@@ -285,7 +285,7 @@ struct makeflow_hook {
 	 * @param task The task that succeeded.
 	 * @return MAKEFLOW_HOOK_SUCCESS if successful, MAKEFLOW_HOOK_FAILURE if not.
 	 */
-	int (*node_success)  (void * instance_struct, struct dag_node *node, struct batch_task *task);
+	int (*node_success)  (void * instance_struct, struct dag_node *node, struct batch_job *task);
 
 	/* Hook if node failed.
 	 * 
@@ -293,7 +293,7 @@ struct makeflow_hook {
 	 * @param task The task that failed.
 	 * @return MAKEFLOW_HOOK_SUCCESS if successful, MAKEFLOW_HOOK_FAILURE if not.
 	 */
-	int (*node_fail)     (void * instance_struct, struct dag_node *node, struct batch_task *task);
+	int (*node_fail)     (void * instance_struct, struct dag_node *node, struct batch_job *task);
 
 	/* Hook if node aborted.
 	 * 
@@ -310,13 +310,13 @@ struct makeflow_hook {
 	 * oppurtunity to change what is passed to the batch system. Files
 	 * `forgotten` by sharedfs are not forgotten in Makeflow.
 	 *
-	 * The batch_task contains the job to be passed
+	 * The batch_job contains the job to be passed
 	 * to allow for modifications of the structure.
 	 *
 	 * @param task The task being submitted.
 	 * @return MAKEFLOW_HOOK_SUCCESS if successfully modified, MAKEFLOW_HOOK_FAILURE if not.
 	 */
-	int (*batch_submit) ( void * instance_struct, struct batch_task *task);
+	int (*batch_submit) ( void * instance_struct, struct batch_job *task);
 
 	/* Fix/Augment/Modify the job structure retrieved from batch system.
 	 *
@@ -330,7 +330,7 @@ struct makeflow_hook {
 	 * @param task The task retrieved from queue.
 	 * @return MAKEFLOW_HOOK_SUCCESS if successfully modified, MAKEFLOW_HOOK_FAILURE if not.
 	 */
-	int (*batch_retrieve) ( void * instance_struct, struct batch_task *task);
+	int (*batch_retrieve) ( void * instance_struct, struct batch_job *task);
 
 	/* Hook when file is registered as complete.
 	 *
@@ -374,31 +374,31 @@ struct batch_queue * makeflow_get_remote_queue();
 struct batch_queue * makeflow_get_local_queue();
 struct batch_queue * makeflow_get_queue(struct dag_node *node);
 
-/** Add file to batch_task and DAG.
+/** Add file to batch_job and DAG.
  *  This function takes a pattern for name_on_submission and name_on_exectution,
  *   replaces %% with the taskid, creates a dag_file to associate with the DAG, 
- *    and adds the specific names to the batch_task input files.
+ *    and adds the specific names to the batch_job input files.
  *    @param d The DAG these files are created in.
- *    @param task The batch_task this file is added to.
+ *    @param task The batch_job this file is added to.
  *    @param name_on_submission The pattern of the name from the submission/host site.
  *    @param name_on_execution The pattern of the name at execution site.
  *    @param file_type The type of file used in wrapper, GLOBAL or TEMP. TEMP is cleaned after each node.
  *    @return The DAG file that was either found or created in the dag.
  *    */
-struct dag_file * makeflow_hook_add_input_file(struct dag *d, struct batch_task *task, const char * name_on_submission, const char * name_on_execution, dag_file_type_t file_type);
+struct dag_file * makeflow_hook_add_input_file(struct dag *d, struct batch_job *task, const char * name_on_submission, const char * name_on_execution, dag_file_type_t file_type);
 
-/** Add file to batch_task and DAG.
+/** Add file to batch_job and DAG.
  *  This function takes a pattern for name_on_submission and name_on_exectution,
  *   replaces %% with the taskid, creates a dag_file to associate with the DAG, 
- *    and adds the specific names to the batch_task output files.
+ *    and adds the specific names to the batch_job output files.
  *    @param d The DAG these files are created in.
- *    @param task The batch_task this file is added to.
+ *    @param task The batch_job this file is added to.
  *    @param name_on_submission The pattern of the name from the submission/host site.
  *    @param name_on_execution The pattern of the name at execution site.
  *    @param file_type The type of file used in wrapper, GLOBAL or TEMP. TEMP is cleaned after each node.
  *    @return The DAG file that was either found or created in the dag.
  *    */
-struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task *task, const char * name_on_submission, const char * name_on_execution, dag_file_type_t file_type);
+struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_job *task, const char * name_on_submission, const char * name_on_execution, dag_file_type_t file_type);
 
 /** Add/Register makeflow_hook struct in list of hooks.
  Example of use see above.
@@ -433,17 +433,17 @@ int makeflow_hook_dag_success(struct dag *d);
 
 int makeflow_hook_node_check(struct dag_node *node, struct batch_queue *queue);
 
-int makeflow_hook_node_submit(struct dag_node *node, struct batch_task *task);
+int makeflow_hook_node_submit(struct dag_node *node, struct batch_job *task);
 
-int makeflow_hook_batch_submit(struct batch_task *task);
+int makeflow_hook_batch_submit(struct batch_job *task);
 
-int makeflow_hook_batch_retrieve(struct batch_task *task);
+int makeflow_hook_batch_retrieve(struct batch_job *task);
 
-int makeflow_hook_node_end(struct dag_node *node, struct batch_task *task);
+int makeflow_hook_node_end(struct dag_node *node, struct batch_job *task);
 
-int makeflow_hook_node_success(struct dag_node *node, struct batch_task *task);
+int makeflow_hook_node_success(struct dag_node *node, struct batch_job *task);
 
-int makeflow_hook_node_fail(struct dag_node *node, struct batch_task *task);
+int makeflow_hook_node_fail(struct dag_node *node, struct batch_job *task);
 
 int makeflow_hook_node_abort(struct dag_node *node);
 

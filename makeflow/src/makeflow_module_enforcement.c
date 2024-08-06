@@ -15,9 +15,9 @@
 #include "makeflow_hook.h"
 #include "makeflow_log.h"
 
-#include "batch_job.h"
+#include "batch_queue.h"
 #include "batch_file.h"
-#include "batch_task.h"
+#include "batch_job.h"
 #include "batch_wrapper.h"
 
 #include <string.h>
@@ -178,7 +178,7 @@ static int dag_check( void * instance_struct, struct dag *d ){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int node_submit( void * instance_struct, struct dag_node *n, struct batch_task *t)
+static int node_submit( void * instance_struct, struct dag_node *n, struct batch_job *t)
 {
 	struct parrot_enforce_instance *p = (struct parrot_enforce_instance*)instance_struct;
 	struct batch_wrapper *enforce = batch_wrapper_create();
@@ -257,7 +257,7 @@ static int node_submit( void * instance_struct, struct dag_node *n, struct batch
 
 	cmd = batch_wrapper_write(enforce, t);
 	if(cmd){
-		batch_task_set_command(t, cmd);
+		batch_job_set_command(t, cmd);
 		df = makeflow_hook_add_input_file(n->d, t, cmd, cmd, DAG_FILE_TYPE_TEMP);
 		debug(D_MAKEFLOW_HOOK, "Wrapper written to %s", df->filename);
 		makeflow_log_file_state_change(n->d, df, DAG_FILE_STATE_EXISTS);

@@ -8,7 +8,7 @@
 #include "makeflow_log.h"
 #include "makeflow_hook.h"
 
-#include "batch_task.h"
+#include "batch_job.h"
 #include "batch_wrapper.h"
 
 #include "debug.h"
@@ -26,7 +26,7 @@ static int makeflow_module_sandbox_register(struct makeflow_hook *h, struct list
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int makeflow_module_sandbox_node_submit( void * instance_struct, struct dag_node *node, struct batch_task *task){
+static int makeflow_module_sandbox_node_submit( void * instance_struct, struct dag_node *node, struct batch_job *task){
 	struct batch_wrapper *wrapper = batch_wrapper_create();
 	char *wrap_name = string_format("./task_%d_sandbox", task->taskid);
 	batch_wrapper_prefix(wrapper, wrap_name);
@@ -77,7 +77,7 @@ static int makeflow_module_sandbox_node_submit( void * instance_struct, struct d
 
 	cmd = batch_wrapper_write(wrapper, task);
 	if(cmd){
-		batch_task_set_command(task, cmd);
+		batch_job_set_command(task, cmd);
 		struct dag_file *df = makeflow_hook_add_input_file(node->d, task, cmd, cmd, DAG_FILE_TYPE_TEMP);
 		debug(D_MAKEFLOW_HOOK, "Wrapper written to %s", df->filename);
 		makeflow_log_file_state_change(node->d, df, DAG_FILE_STATE_EXISTS);

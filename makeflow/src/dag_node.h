@@ -7,8 +7,8 @@ See the file COPYING for details.
 #ifndef DAG_NODE_H
 #define DAG_NODE_H
 
+#include "batch_queue.h"
 #include "batch_job.h"
-#include "batch_task.h"
 #include "category.h"
 #include "set.h"
 #include "hash_table.h"
@@ -83,7 +83,7 @@ struct dag_node {
 	int only_my_children;               /* Number of nodes this node is the only parent. */
 
 	/* dynamic properties of execution */
-	batch_job_id_t jobid;               /* The id this node get, either from the local or remote batch system. */
+	batch_queue_id_t jobid;               /* The id this node get, either from the local or remote batch system. */
 	dag_node_state_t state;             /* Enum: DAG_NODE_STATE_{WAITING,RUNNING,...} */
 	int failure_count;                  /* How many times has this rule failed? (see -R and -r) */
 	time_t previous_completion;
@@ -92,7 +92,7 @@ struct dag_node {
 	
 	char *archive_id;
 
-	struct batch_task *task;            /* Batch task associated with job at batch_submit. */
+	struct batch_job *task;            /* Batch task associated with job at batch_submit. */
 
 	struct dag_node *next;              /* The next node in the list of nodes */
 };
