@@ -609,14 +609,12 @@ static int vine_process_sandbox_disk_measure(struct vine_process *p, int max_sec
 {
 	int num_inputs = list_size(p->task->input_mounts);
 
-
 	char **skip_paths = malloc(num_inputs);
-
 
 	if (p->task->input_mounts) {
 		struct vine_mount *m;
 
-		int i=0;
+		int i = 0;
 		LIST_ITERATE(p->task->input_mounts, m)
 		{
 			skip_paths[i] = m->remote_name;

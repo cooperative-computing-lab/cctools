@@ -251,26 +251,24 @@ int path_disk_size_info_get_r_skip(const char *path, int64_t max_secs, struct pa
 				}
 				continue;
 			}
-			
+
 			int skip = 0;
-                        for(int i=0; i<num_skip; i++)
-                        {
+			for (int i = 0; i < num_skip; i++) {
 
-                                int offset = 0;
-                                char *idx = strchr(composed_path, '/');
-                                while (idx != NULL) {
-                                        offset = idx - composed_path + 1;
-                                        idx = strchr(idx + 1, '/');
-                                }
+				int offset = 0;
+				char *idx = strchr(composed_path, '/');
+				while (idx != NULL) {
+					offset = idx - composed_path + 1;
+					idx = strchr(idx + 1, '/');
+				}
 
-                                if(strcmp(composed_path + offset, paths_to_skip[i]) == 0)
-				{
+				if (strcmp(composed_path + offset, paths_to_skip[i]) == 0) {
 					skip = 1;
 					break;
 				}
-                        }
-			
-			if(!skip){
+			}
+
+			if (!skip) {
 				s->count_so_far++;
 				if (S_ISREG(file_info.st_mode)) {
 					s->size_so_far += file_info.st_size;
@@ -288,7 +286,7 @@ int path_disk_size_info_get_r_skip(const char *path, int64_t max_secs, struct pa
 						goto timeout;
 					}
 				}
-		        }
+			}
 		}
 		/* we are done reading a complete directory, and we go to the next in the queue */
 		tail = list_pop_tail(s->current_dirs);
