@@ -1,0 +1,11 @@
+services:
+  program1:
+    command: "./program1.sh"
+  program2:
+    command: "./program2.sh"
+    dependency:
+      items:
+        program1: "action_success"  # Start program2 only after program1 succeeds
+output:
+  state_times: "state_transition_times.json"
+max_run_time: 60  # Optional: Limit total runtime to 60 seconds
