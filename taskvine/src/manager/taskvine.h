@@ -306,6 +306,7 @@ void vine_task_set_library_provided(struct vine_task *t, const char *name);
 const char *vine_task_get_library_provided(struct vine_task *t);
 
 /** Set the number of concurrent functions a library can run.
+If unset, the library will runs as many functions as it has cores available.
 @param t A task object.
 @param nslots The maximum number of concurrent functions this library can run.
 */
