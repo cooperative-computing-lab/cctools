@@ -38,6 +38,7 @@ def main():
     args = parser.parse_args()
 
     q = vine.Manager(port=0)
+    q.tune("watch-library-logfiles", 1)
 
     print(f"TaskVine manager listening on port {q.port}")
 
@@ -48,9 +49,9 @@ def main():
     print("Creating library from packages and functions...")
 
     # This format shows how to create package import statements for the library
-    import_modules = [math]
-    libtask = q.create_library_from_functions('test-library', divide, double, cube, import_modules=import_modules, add_env=False)
-   
+    hoisting_modules = [math]
+    libtask = q.create_library_from_functions('test-library', divide, double, cube, hoisting_modules=hoisting_modules, add_env=False)
+
     # Just take default resources for the library, this will cause it to fill the whole worker. 
     # And the number of functions slots will match the number of cores available.
 
