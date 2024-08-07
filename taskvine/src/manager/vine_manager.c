@@ -2677,6 +2677,19 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 {
 	struct rmsummary *limits = vine_manager_choose_resources_for_task(q, w, t);
 
+	/*
+	If this is a library task, then choose the number of slots to either
+	match the explicit request, or set it to the number of cores.
+	*/
+
+	if (t->provides_library) {
+		if (t->function_slots_requested <= 0) {
+			t->function_slots_total = limits->cores;
+		} else {
+			t->function_slots_total = t->function_slots_requested;
+		}
+	}
+
 	char *command_line;
 
 	if (q->monitor_mode && !t->needs_library) {

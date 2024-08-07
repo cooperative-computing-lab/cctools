@@ -508,7 +508,7 @@ vine_result_code_t vine_manager_put_task(
 
 	if (t->provides_library) {
 		vine_manager_send(q, w, "provides_library %s\n", t->provides_library);
-		vine_manager_send(q, w, "function_slots %d\n", t->function_slots);
+		vine_manager_send(q, w, "function_slots %d\n", t->function_slots_total);
 	}
 
 	vine_manager_send(q, w, "category %s\n", t->category);
