@@ -934,10 +934,7 @@ class Manager(object):
     def create_library_from_functions(self, library_name, *function_list, poncho_env=None, init_command=None, add_env=True, import_modules=None):
         # Delay loading of poncho until here, to avoid bringing in poncho dependencies unless needed.
         # Ensure poncho python library is available.
-        try:
-            from ndcctools.poncho import package_serverize
-        except ImportError:
-            raise ModuleNotFoundError(f"The poncho module is not available. Cannot create library {library_name}.")
+        from ndcctools.poncho import package_serverize
 
         # Positional arguments are the list of functions to include in the library.
         # Create a unique hash of a combination of function names and bodies.
