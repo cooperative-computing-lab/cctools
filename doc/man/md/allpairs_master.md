@@ -113,7 +113,7 @@ the resulting matrix):
 
 To speed up the process, run more [work_queue_worker(1)](work_queue_worker.md) processes on
 other machines, or use [condor_submit_workers(1)](condor_submit_workers.md) or
-[sge_submit_workers(1)](sge_submit_workers.md) to start hundreds of workers in your local batch
+[uge_submit_workers(1)](uge_submit_workers.md) to start hundreds of workers in your local batch
 system.
 
 The following is an example of adding more workers to execute a All-Pairs
@@ -147,7 +147,7 @@ The Cooperative Computing Tools are Copyright (C) 2022 The University of Notre D
 - [Work Queue User Manual]("http://ccl.cse.nd.edu/software/manuals/workqueue.html")
 - [work_queue_worker(1)](work_queue_worker.md)
 - [condor_submit_workers(1)](condor_submit_workers.md)
-- [sge_submit_workers(1)](sge_submit_workers.md)
+- [uge_submit_workers(1)](uge_submit_workers.md)
 - [allpairs_multicore(1)](allpairs_multicore.md)
 
 

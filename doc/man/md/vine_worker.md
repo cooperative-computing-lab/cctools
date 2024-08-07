@@ -58,8 +58,7 @@ Alternatevely, the manager may be specified by name, using the **-M** option.
 
 
 **vine_worker** can be run locally or deployed remotely on any of the
-grid or cloud computing environments such as SGE, PBS, SLURM, and HTCondor using
-[sge_submit_workers(1)](sge_submit_workers.md), [pbs_submit_workers(1)](pbs_submit_workers.md), [slurm_submit_workers()](slurm_submit_workers.md), and [condor_submit_workers(1)](condor_submit_workers.md) respectively.
+grid or cloud computing environments such as UGE, PBS, SLURM, and HTCondor using [vine_submit_workers(1)](vine_submit_workers.md) or [vine_factory(1)](vine_factory.md).
 
 ## OPTIONS
 
