@@ -1328,7 +1328,7 @@ static int task_resources_fit_now(struct vine_task *t)
 	return (cores_allocated + t->resources_requested->cores <= total_resources->cores.total) &&
 	       (memory_allocated + t->resources_requested->memory <= total_resources->memory.total) &&
 	       ((t->needs_library || disk_allocated + t->resources_requested->disk <= total_resources->disk.total)) && (gpus_allocated + t->resources_requested->gpus <= total_resources->gpus.total);
-		// XXX Disk is constantly shrinking, and library disk requests are currently static. Once we generate some files things will hang. 
+	// XXX Disk is constantly shrinking, and library disk requests are currently static. Once we generate some files things will hang.
 }
 
 /*
