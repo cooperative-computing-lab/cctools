@@ -51,10 +51,9 @@ def main():
     # This format shows how to create package import statements for the library
     hoisting_modules = [math]
     libtask = q.create_library_from_functions('test-library', divide, double, cube, hoisting_modules=hoisting_modules, add_env=False)
-    
-    libtask.set_cores(1)
-    libtask.set_memory(1000)
-    libtask.set_disk(1000)
+
+    # Just take default resources for the library, this will cause it to fill the whole worker. 
+    # And the number of functions slots will match the number of cores available.
 
     q.install_library(libtask)
 

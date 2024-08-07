@@ -858,7 +858,10 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 		} else if (sscanf(line, "provides_library %s", library_name) == 1) {
 			vine_task_set_library_provided(task, library_name);
 		} else if (sscanf(line, "function_slots %" PRId64, &n) == 1) {
-			vine_task_set_function_slots(task, n);
+			/* Set the number of slots requested by the user. */
+			task->function_slots_requested = n;
+			/* Also set the total number determined by the manager. */
+			task->function_slots_total = n;
 		} else if (sscanf(line, "infile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			vine_hack_do_not_compute_cached_name = 1;
@@ -1356,7 +1359,7 @@ static struct vine_process *find_running_library_for_function(const char *librar
 	ITABLE_ITERATE(procs_running, task_id, p)
 	{
 		if (p->task->provides_library && !strcmp(p->task->provides_library, library_name)) {
-			if (p->library_ready && p->functions_running < p->task->function_slots) {
+			if (p->library_ready && p->functions_running < p->task->function_slots_total) {
 				return p;
 			}
 		}

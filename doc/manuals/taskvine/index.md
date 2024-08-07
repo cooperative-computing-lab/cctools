@@ -1583,7 +1583,7 @@ If the overhead of importing modules per function is noticeable, modules can be 
     ```
 
 
-After installing the packages and functions, you can optionally specify the number of functions the library can run concurrently by setting the number of function slots (default to 1):
+After installing the packages and functions, you can optionally specify the number of functions the library can run concurrently by setting the number of function slots.  (If unset, TaskVine will assume the library can run one function per core available.)
 
 === "Python"
     ```python

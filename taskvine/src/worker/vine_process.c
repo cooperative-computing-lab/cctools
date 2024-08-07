@@ -397,7 +397,7 @@ int vine_process_execute(struct vine_process *p)
 					out_pipe_fd,
 					p->task->task_id,
 					(int)p->task->resources_requested->cores,
-					p->task->function_slots,
+					p->task->function_slots_total,
 					getppid());
 			execl("/bin/sh", "sh", "-c", final_command, (char *)0);
 		}
