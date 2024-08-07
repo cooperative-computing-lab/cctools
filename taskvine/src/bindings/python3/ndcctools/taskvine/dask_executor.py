@@ -129,8 +129,9 @@ class DaskVine(Manager):
             wrapper=None,
             wrapper_proc=print,
             prune_files=False,
-            import_modules=None,  # Deprecated, use lib_modules
-            lazy_transfers=True,  # Deprecated, use worker_tranfers
+            hoisting_modules=None,  # Deprecated, use lib_modules
+            import_modules=None,    # Deprecated, use lib_modules
+            lazy_transfers=True,    # Deprecated, use worker_tranfers
             ):
         try:
             self.set_property("framework", "dask")
@@ -157,7 +158,7 @@ class DaskVine(Manager):
             if lib_modules:
                 self.lib_modules = lib_modules
             else:
-                self.lib_modules = import_modules  # Deprecated
+                self.lib_modules = hoisting_modules if hoisting_modules else import_modules  # Deprecated
             self.task_mode = task_mode
             self.env_per_task = env_per_task
             self.progress_disable = progress_disable
@@ -212,7 +213,7 @@ class DaskVine(Manager):
                                                          poncho_env="dummy-value",
                                                          add_env=False,
                                                          init_command=self.lib_command,
-                                                         import_modules=self.lib_modules)
+                                                         hoisting_modules=self.lib_modules)
 
             if self.environment:
                 libtask.add_environment(self.environment)

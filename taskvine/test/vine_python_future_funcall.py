@@ -33,7 +33,7 @@ def main():
     # Create library task
     print("creating library from functions...")
     libtask = executor.create_library_from_functions(
-        "test-library", my_sum, import_modules=None, add_env=False
+        "test-library", my_sum, hoisting_modules=None, add_env=False
     )
 
     # Install library on executor.manager
