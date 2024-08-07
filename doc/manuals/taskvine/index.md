@@ -1556,7 +1556,7 @@ You can certainly embed `import` statements within the function and install any 
     libtask = m.create_library_from_functions("my_library", divide)
     ```
 
-If the overhead of importing modules per function is noticeable, modules can be optionally imported as a common preamble to the function executions. Common modules can be specified with the `import_modules` argument to `create_library_from_functions`. This reduces the overhead by eliminating redundant imports:
+If the overhead of importing modules per function is noticeable, modules can be optionally imported as a common preamble to the function executions. Common modules can be specified with the `hoisting_modules` argument to `create_library_from_functions`. This reduces the overhead by eliminating redundant imports:
 
 
 === Python
@@ -1564,10 +1564,10 @@ If the overhead of importing modules per function is noticeable, modules can be 
     import numpy
     import math
 
-    import_modules = [numpy, math]
+    hoisting_modules = [numpy, math]
     ```
 
-`import_modules` only accepts modules as arguments (e.g. it can't be used to import functions, or select particular names with `from ... import ...` statements. Such statements should be made inside functions after specifying the modules with `import_modules`.
+`hoisting_modules` only accepts modules as arguments (e.g. it can't be used to import functions, or select particular names with `from ... import ...` statements. Such statements should be made inside functions after specifying the modules with `hoisting_modules`.
 
 === Python
     ```python
