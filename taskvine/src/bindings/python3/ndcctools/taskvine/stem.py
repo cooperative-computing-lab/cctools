@@ -292,6 +292,8 @@ class Chain(StemObject):
             """
             item = link.recv()
             if isinstance(item, Seed):
+                print(type(item._result))
+                print(item._result)
                 if isinstance(item._result, Bloom):
                     self.handle_bloom(item, item._result._item)
                 else:
@@ -326,7 +328,7 @@ class Chain(StemObject):
         
     def handle_bloom(self, item, bloomed_item):
         chain = self._chain_mapping[item._chain_id]
-        del chain._waiting_item[item._item_id]
+        del chain._waiting_items[item._item_id]
         if item._item_id in self._waiting_items:
             del self._waiting_items[item._item_id]
         if isinstance(bloomed_item, Seed):
