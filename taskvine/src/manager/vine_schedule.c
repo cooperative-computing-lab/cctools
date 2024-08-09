@@ -85,7 +85,7 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 	The problem here is that the manager always allocates the whole disk the the library task,
 	so that libtask->current_resource_box->disk is always equal to worker_net_resources->disk.total.
 	For the first task, the ti->current_resource_box->disk == 0, it is able to run because the expr in line 114 doesn't satisfy.
-	However, if the first task causes any increase in the worker's disk, worker_net_resources->disk.total will go above the total,
+	However, if the first task causes any increase in the worker's disk, worker_net_resources->disk.inuse will go above the total,
 	which causes the consistent true of the expr in line 114.
 	*/
 	if (t->needs_library) {
