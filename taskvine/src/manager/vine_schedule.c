@@ -78,6 +78,10 @@ int vine_schedule_in_ramp_down(struct vine_manager *q)
  * @return 1 if yes, 0 otherwise. */
 int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *tr)
 {
+	if (t->needs_library) {
+		return 1;
+	}
+
 	struct vine_resources *worker_net_resources = vine_resources_copy(w->resources);
 
 	/* Subtract resources from libraries that have slots unused and don't match the current task. */
