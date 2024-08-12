@@ -21,6 +21,8 @@ Operation complexity:
 - Pop: O(log n)
 - Get head: O(1)
 - Get element: O(1)
+- Get max priority: O(1)
+- Get min priority: O(n)
 - Remove element: O(log n)
 
 If all elements have the same priority, the priority queue behaves differently from a standard queue or stack.
@@ -125,6 +127,18 @@ The first accessible element is at index 1.
 @return The pointer to the element if any, failure otherwise
 */
 void *priority_queue_get_element(struct priority_queue *pq, int index);
+
+/** Get the highest priority of all elements from a priority queue.
+@param pq A pointer to a priority queue.
+@return The highest priority of the queue.
+*/
+double priority_queue_get_max_priority(struct priority_queue *pq);
+
+/** Get the lowest priority of all elements from a priority queue.
+@param pq A pointer to a priority queue.
+@return The lowest priority of the queue.
+*/
+double priority_queue_get_min_priority(struct priority_queue *pq);
 
 /** Remove the element with the specified index from a priority queue.
 @param pq A pointer to a priority queue.

@@ -44,8 +44,7 @@ struct priority_queue *priority_queue_create(double init_capacity) {
     pq->size = 0;
 
     /* The 0th element is used as a sentinel with the highest priority,
-        which is in order to simplify boundary checks in heap operations like swim and sink.
-    */
+        which is in order to simplify boundary checks in heap operations like swim and sink. */
     pq->elements[0] = (struct element *)calloc(1, sizeof(struct element));
     if (!pq->elements[0]) {
         free(pq->elements);
@@ -158,6 +157,25 @@ void *priority_queue_get_element(struct priority_queue *pq, int index) {
 
     return pq->elements[index]->data;
 }
+
+double priority_queue_get_max_priority(struct priority_queue *pq) {
+    if (!pq || pq->size == 0) return NULL;
+
+    return pq->elements[1]->priority;
+}
+
+double priority_queue_get_min_priority(struct priority_queue *pq) {
+    if (!pq || pq->size == 0) return NULL;
+
+    double min_priority = pq->elements[1]->priority;
+
+    for (int i = 2; i <= pq->size; i++) {
+        min_priority = pq->elements[i]->priority < min_priority ? pq->elements[i]->priority : min_priority;
+    }
+
+    return min_priority;
+}
+
 
 int priority_queue_remove(struct priority_queue *pq, void *data) {
     if (!pq) return 0;
