@@ -15,6 +15,14 @@ This priority queue module is implemented as a complete binary heap that manages
 Each element in the priority queue has a priority, and the queue ensures that the element with the highest priority
 can be accessed in constant time.
 
+Operation complexity:
+- Create: O(n)
+- Push: O(log n)
+- Pop: O(log n)
+- Get head: O(1)
+- Get element: O(1)
+- Remove element: O(log n)
+
 If all elements have the same priority, the priority queue behaves differently from a standard queue or stack.
 For example, a priority has elements with (priority, data) tuples
 [(1, "a"), (1, "b"), (1, "c"), (1, "d"), (1, "e")]
