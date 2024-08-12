@@ -140,6 +140,14 @@ double priority_queue_get_max_priority(struct priority_queue *pq);
 */
 double priority_queue_get_min_priority(struct priority_queue *pq);
 
+/** Update the priority of an element in a priority queue.
+@param pq A pointer to a priority queue.
+@param data The pointer to the element to update.
+@param new_priority The new priority of the element.
+@return One if the update succeeded, failure otherwise
+*/
+int priority_queue_update_priority(struct priority_queue *pq, void *data, double new_priority);
+
 /** Remove the element with the specified index from a priority queue.
 @param pq A pointer to a priority queue.
 @param index The index of the element to remove.

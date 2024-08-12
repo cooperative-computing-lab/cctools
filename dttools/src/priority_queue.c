@@ -176,6 +176,33 @@ double priority_queue_get_min_priority(struct priority_queue *pq) {
     return min_priority;
 }
 
+int priority_queue_update_priority(struct priority_queue *pq, void *data, double new_priority) {
+    if (!pq) return 0;
+
+    int index = -1;
+    for (int i = 1; i <= pq->size; i++) {
+        if (pq->elements[i]->data == data) {
+            index = i;
+            break;
+        }
+    }
+
+    if (index == -1) {
+        return 0;
+    }
+
+    double old_priority = pq->elements[index]->priority;
+    pq->elements[index]->priority = new_priority;
+
+    if (new_priority > old_priority) {
+        swim(pq, index);
+    } else if (new_priority < old_priority) {
+        sink(pq, index);
+    }
+
+    return 1;
+}
+
 int priority_queue_remove(struct priority_queue *pq, void *data) {
     if (!pq) return 0;
 
