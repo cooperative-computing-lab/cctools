@@ -176,7 +176,6 @@ double priority_queue_get_min_priority(struct priority_queue *pq) {
     return min_priority;
 }
 
-
 int priority_queue_remove(struct priority_queue *pq, void *data) {
     if (!pq) return 0;
 
