@@ -43,6 +43,9 @@ struct priority_queue *priority_queue_create(double init_capacity) {
     pq->capacity = init_capacity;
     pq->size = 0;
 
+    /* The 0th element is used as a sentinel with the highest priority,
+        which is in order to simplify boundary checks in heap operations like swim and sink.
+    */
     pq->elements[0] = (struct element *)calloc(1, sizeof(struct element));
     if (!pq->elements[0]) {
         free(pq->elements);
