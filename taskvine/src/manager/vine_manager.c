@@ -591,6 +591,13 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 			}
 		}
 
+		/* Update category disk info */
+		struct category *c = vine_category_lookup_or_create(q, t->category);
+		if(sandbox_used > c->max_disk_use)
+		{
+			c->max_disk_use = sandbox_used + 1;
+		}
+
 		hash_table_insert(q->workers_with_complete_tasks, w->hashkey, w);
 	}
 
@@ -2504,14 +2511,20 @@ static int build_poll_table(struct vine_manager *q)
  */
 static void vine_manager_estimate_task_disk_min(struct vine_manager *q, struct vine_task *t)
 {
-	int mb = 0;
-	struct vine_mount *m;
-	LIST_ITERATE(t->input_mounts, m)
-	{
-		mb += (m->file->size) / 1e6;
-	}
-	if (mb > 0) {
-		t->resources_requested->disk = mb;
+	struct category *c = vine_category_lookup_or_create(q, t->category);
+
+	if (c->max_disk_use) {
+		t->resources_requested->disk = c->max_disk_use;
+	} else {
+		int mb = 0;
+		struct vine_mount *m;
+		LIST_ITERATE(t->input_mounts, m)
+		{
+			mb += (m->file->size) / 1e6;
+		}
+		if (mb > 0) {
+			t->resources_requested->disk = mb;
+		}
 	}
 }
 

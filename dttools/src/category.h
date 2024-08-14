@@ -103,6 +103,7 @@ struct category {
 
 	/* stats for taskvine */
 	struct vine_stats *vine_stats;
+	int64_t max_disk_use;
 
 	/* variables for makeflow */
 	/* Mappings between variable names defined in the makeflow file and their values. */
