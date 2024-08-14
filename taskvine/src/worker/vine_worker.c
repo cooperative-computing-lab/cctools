@@ -406,6 +406,11 @@ static void measure_worker_resources()
 	if (options->disk_total > 0) {
 		r->disk.total = MIN(r->disk.total, options->disk_total);
 	} else if (!disk_set) {
+		/* XXX If no disk is specified we will allocate half of the worker disk available
+		   at startup. We will not update the allocation since it should remain static.
+		   If something else is consuming disk on the machine it would cause issues with tasks which
+		   request the whole available worker disk. Leaving half of the disk to other processes
+		   should leave the worker free to use the other half without the need to re measure. */
 		r->disk.total = ceil(r->disk.total * options->disk_percent / 100) + r->disk.inuse;
 		disk_set = 1;
 	}
