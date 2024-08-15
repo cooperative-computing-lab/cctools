@@ -92,6 +92,7 @@ SOURCES = \
 	ppoll_compat.c \
 	preadwrite.c \
 	process.c \
+	priority_queue.c \
 	random.c \
 	rmonitor.c \
 	rmonitor_poll.c \
@@ -161,6 +162,7 @@ HEADERS_PUBLIC = \
 	md5.h \
 	macros.h \
 	path.h \
+	priority_queue.h \
 	rmonitor_poll.h \
 	rmsummary.h \
 	stringtools.h \
