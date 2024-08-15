@@ -91,7 +91,7 @@ Element with a higher priority is at the top of the heap.
 @param init_capacity The initial number of elements in the queue. If zero, a default value will be used.
 @return A pointer to a new priority queue.
 */
-struct priority_queue *priority_queue_create(int init_capacity);
+struct priority_queue *priority_queue_create(double init_capacity);
 
 /** Count the elements in a priority queue.
 @param pq A pointer to a priority queue.

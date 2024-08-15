@@ -9,10 +9,11 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
+#include <float.h>
 
 #define DEFAULT_CAPACITY 127
 #define MAX_PRIORITY DBL_MAX
+#define MIN_PRIORITY DBL_MIN
 
 struct element {
     void *data;
@@ -159,13 +160,13 @@ void *priority_queue_get_element(struct priority_queue *pq, int index) {
 }
 
 double priority_queue_get_max_priority(struct priority_queue *pq) {
-    if (!pq || pq->size == 0) return NULL;
+    if (!pq || pq->size == 0) return MIN_PRIORITY;
 
     return pq->elements[1]->priority;
 }
 
 double priority_queue_get_min_priority(struct priority_queue *pq) {
-    if (!pq || pq->size == 0) return NULL;
+    if (!pq || pq->size == 0) return MAX_PRIORITY;
 
     double min_priority = pq->elements[1]->priority;
 
