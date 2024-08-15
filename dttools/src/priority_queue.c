@@ -113,7 +113,7 @@ int priority_queue_double_capacity(struct priority_queue *pq) {
     return 1;
 }
 
-int priority_queue_push(struct priority_queue *pq, void *data, int priority) {
+int priority_queue_push(struct priority_queue *pq, void *data, double priority) {
     if (!pq) return 0;
 
     if (pq->size >= pq->capacity) {
