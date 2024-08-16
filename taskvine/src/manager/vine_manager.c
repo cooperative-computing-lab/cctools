@@ -593,8 +593,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 
 		/* Update category disk info */
 		struct category *c = vine_category_lookup_or_create(q, t->category);
-		if(sandbox_used > c->max_disk_use)
-		{
+		if (sandbox_used > c->max_disk_use) {
 			c->max_disk_use = sandbox_used + 1;
 		}
 
