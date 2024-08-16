@@ -173,9 +173,14 @@ class DaskVineDag:
             self.flatten_rec(key, self._working_graph[key], toplevel=True)
 
     def _add_second_targets(self, key):
-        if not DaskVineDag.listp(self._working_graph[key]):
+        v = self._working_graph[key]
+        if self.graph_keyp(v):
+            lst = [v]
+        elif DaskVineDag.listp(v):
+            lst = v
+        else:
             return
-        for c in self._working_graph[key]:
+        for c in lst:
             if self.graph_keyp(c):
                 self._targets.add(c)
                 self._add_second_targets(c)
