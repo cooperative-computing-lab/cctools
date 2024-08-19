@@ -91,8 +91,8 @@ SOURCES = \
 	pattern.c \
 	ppoll_compat.c \
 	preadwrite.c \
-	process.c \
 	priority_queue.c \
+	process.c \
 	random.c \
 	rmonitor.c \
 	rmonitor_poll.c \
