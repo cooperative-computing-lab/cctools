@@ -3606,7 +3606,7 @@ static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vin
 		break;
 
 	case VINE_TASK_READY:
-		priority_queue_find_idx(q->ready_tasks, t);
+		t_idx = priority_queue_find_idx(q->ready_tasks, t);
 		priority_queue_remove(q->ready_tasks, t_idx);
 		change_task_state(q, t, new_state);
 		break;
