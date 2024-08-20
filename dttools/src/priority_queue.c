@@ -24,6 +24,9 @@ struct priority_queue {
 	int size;
 	int capacity;
 	struct element **elements;
+	int step_cursor;	         // iterate from the left to the right, keep the last position
+	int scheduling_cursor;       // used in scheduling
+	int sweep_cursor;            // iterate from the left to the right, restart every time
 };
 
 struct priority_queue *priority_queue_create(double init_capacity)
@@ -55,6 +58,10 @@ struct priority_queue *priority_queue_create(double init_capacity)
 	}
 
 	pq->elements[0]->priority = MAX_PRIORITY;
+
+	pq->step_cursor = 0;
+	pq->sweep_cursor = 0;
+	pq->scheduling_cursor = 0;
 
 	return pq;
 }
@@ -228,6 +235,69 @@ int priority_queue_update_priority(struct priority_queue *pq, void *data, double
 	return 1;
 }
 
+void *priority_queue_step_next(struct priority_queue *pq)
+{
+	if (!pq || pq->size == 0)
+		return NULL;
+
+	pq->step_cursor++;
+	if (pq->step_cursor > pq->size) {
+		pq->step_cursor = 1;
+	}
+
+	return pq->elements[pq->step_cursor]->data;
+}
+
+void priority_queue_sweep_reset(struct priority_queue *pq)
+{
+	if (!pq)
+		return;
+
+	pq->step_cursor = 0;
+}
+
+void *priority_queue_sweep_next(struct priority_queue *pq)
+{
+	if (!pq || pq->size == 0)
+		return NULL;
+
+	pq->sweep_cursor++;
+	if (pq->sweep_cursor > pq->size) {
+		pq->sweep_cursor = 1;
+	}
+
+	return pq->elements[pq->sweep_cursor]->data;
+}
+
+int priority_queue_get_scheduling_cursor(struct priority_queue *pq)
+{
+	if (!pq)
+		return -1;
+
+	return pq->scheduling_cursor;
+}
+
+void priority_queue_scheduling_reset(struct priority_queue *pq)
+{
+	if (!pq)
+		return;
+
+	pq->scheduling_cursor = 0;
+}
+
+void *priority_queue_scheduling_next(struct priority_queue *pq)
+{
+	if (!pq || pq->size == 0)
+		return NULL;
+
+	pq->scheduling_cursor++;
+	if (pq->scheduling_cursor > pq->size) {
+		pq->scheduling_cursor = 1;
+	}
+
+	return pq->elements[pq->scheduling_cursor]->data;
+}
+
 int priority_queue_remove(struct priority_queue *pq, void *data)
 {
 	if (!pq)
@@ -239,6 +309,16 @@ int priority_queue_remove(struct priority_queue *pq, void *data)
 			pq->elements[i] = pq->elements[pq->size];
 			pq->elements[pq->size--] = NULL;
 			sink(pq, i);
+
+			if (pq->step_cursor == i) {
+				pq->step_cursor--;
+			}
+			if (pq->sweep_cursor == i) {
+				pq->sweep_cursor--;
+			}
+			if (pq->scheduling_cursor == i) {
+				pq->scheduling_cursor--;
+			}
 			free(e);
 			return 1;
 		}
@@ -246,7 +326,7 @@ int priority_queue_remove(struct priority_queue *pq, void *data)
 	return 0;
 }
 
-void priority_queue_destroy(struct priority_queue *pq)
+void priority_queue_delete(struct priority_queue *pq)
 {
 	if (!pq)
 		return;

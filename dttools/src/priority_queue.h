@@ -148,6 +148,24 @@ double priority_queue_get_min_priority(struct priority_queue *pq);
 */
 int priority_queue_update_priority(struct priority_queue *pq, void *data, double new_priority);
 
+
+
+
+void *priority_queue_step_next(struct priority_queue *pq);
+
+void priority_queue_sweep_reset(struct priority_queue *pq);
+
+void *priority_queue_sweep_next(struct priority_queue *pq);
+
+int priority_queue_get_scheduling_cursor(struct priority_queue *pq);
+
+void priority_queue_scheduling_reset(struct priority_queue *pq);
+
+void *priority_queue_scheduling_next(struct priority_queue *pq);
+
+
+
+
 /** Remove the element with the specified index from a priority queue.
 @param pq A pointer to a priority queue.
 @param index The index of the element to remove.
@@ -155,10 +173,10 @@ int priority_queue_update_priority(struct priority_queue *pq, void *data, double
 */
 int priority_queue_remove(struct priority_queue *pq, void *data);
 
-/** Destroy a priority queue.
+/** Delete a priority queue.
 @param pq A pointer to a priority queue.
 */
-void priority_queue_destroy(struct priority_queue *pq);
+void priority_queue_delete(struct priority_queue *pq);
 
 /** Utility macro to simplify common case of iterating over a priority queue.
 Use as follows:
@@ -172,7 +190,7 @@ PRIORITY_QUEUE_ITERATE(pq, data) {
 
 </pre>
 */
-#define PRIORITY_QUEUE_ITERATE( pq, data ) int i = 1; while ((data = priority_queue_get_element(pq, i++)))
+#define PRIORITY_QUEUE_ITERATE( pq, data ) priority_queue_sweep_reset(pq); while ((data = priority_queue_sweep_next(pq)))
 
 
 #endif

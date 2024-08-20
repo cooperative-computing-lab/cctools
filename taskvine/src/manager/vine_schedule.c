@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "hash_table.h"
 #include "list.h"
+#include "priority_queue.h"
 #include "rmonitor_types.h"
 #include "rmsummary.h"
 
@@ -60,7 +61,7 @@ int vine_schedule_in_ramp_down(struct vine_manager *q)
 		return 0;
 	}
 
-	if (hash_table_size(q->worker_table) > list_size(q->ready_list)) {
+	if (hash_table_size(q->worker_table) > priority_queue_size(q->ready_tasks)) {
 		return 1;
 	}
 
@@ -582,9 +583,8 @@ void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 
 	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
 
-	LIST_ITERATE(q->ready_list, t)
+	PRIORITY_QUEUE_ITERATE(q->ready_tasks, t)
 	{
-
 		// check each task against the queue of connected workers
 		vine_resource_bitmask_t bit_set = is_task_larger_than_any_worker(q, t);
 		if (bit_set) {

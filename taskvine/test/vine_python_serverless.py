@@ -74,13 +74,14 @@ def main():
     print("Waiting for results...")
 
     total_sum = 0
-
+    completed = 0
     while not q.empty():
         t = q.wait(5)
         if t:
             x = t.output
             total_sum += x
-            print(f"task {t.id} completed with result {x}")
+            completed += 1
+            print(f"task {t.id} completed with result {x}, {completed} tasks completed")
 
     # Check that we got the right result.
     expected = tasks * (divide(2, 2**2) + double(3) + cube(4))
