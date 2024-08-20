@@ -4875,13 +4875,13 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 	// time left?
 	while ((stoptime == 0) || (time(0) < stoptime)) {
-printf("1\n");
+		printf("1\n");
 		BEGIN_ACCUM_TIME(q, time_internal);
 		// update catalog if appropriate
 		if (q->name) {
 			update_catalog(q, 0);
 		}
-printf("2\n");
+		printf("2\n");
 		if (q->monitor_mode) {
 			update_resource_report(q);
 		}
@@ -4900,7 +4900,7 @@ printf("2\n");
 				break;
 			}
 		}
-printf("3\n");
+		printf("3\n");
 		// retrieve worker status messages
 		if (poll_active_workers(q, stoptime) > 0) {
 			// at least one worker was removed.
@@ -4909,7 +4909,7 @@ printf("3\n");
 			// further events. This is because we give top priority to
 			// returning and retrieving tasks.
 		}
-printf("4\n");
+		printf("4\n");
 		// get updates for watched files.
 		if (hash_table_size(q->workers_with_watched_file_updates)) {
 
@@ -4921,7 +4921,7 @@ printf("4\n");
 				hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
 			}
 		}
-printf("5\n");
+		printf("5\n");
 		q->busy_waiting_flag = 0;
 
 		// retrieve results from workers
@@ -4952,7 +4952,7 @@ printf("5\n");
 			}
 		} while (q->max_retrievals < 0 || retrieved_this_cycle < q->max_retrievals || !priority_queue_size(q->ready_tasks));
 		END_ACCUM_TIME(q, time_receive);
-printf("6\n");
+		printf("6\n");
 		// expired tasks
 		BEGIN_ACCUM_TIME(q, time_internal);
 		result = expire_waiting_tasks(q);
