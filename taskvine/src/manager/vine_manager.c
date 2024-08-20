@@ -1349,7 +1349,7 @@ static int expire_waiting_tasks(struct vine_manager *q)
 	int tasks_considered = 0;
 	double current_time = timestamp_get() / ONE_SECOND;
 
-	while ((t_idx = priority_queue_step_next(q->ready_tasks) && (t = priority_queue_get_element(q->ready_tasks, t_idx)))) {
+	while ((t_idx = priority_queue_step_next(q->ready_tasks)) && (t = priority_queue_get_element(q->ready_tasks, t_idx))) {
 		if (tasks_considered > q->attempt_schedule_depth) {
 			return expired;
 		}
