@@ -70,6 +70,7 @@ See the file COPYING for details.
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <float.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -133,7 +134,6 @@ static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w
 
 static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state);
 
-static int task_state_count(struct vine_manager *q, const char *category, vine_task_state_t state);
 static int task_request_count(struct vine_manager *q, const char *category, category_allocation_t request);
 
 static vine_msg_code_t handle_http_request(struct vine_manager *q, struct vine_worker_info *w, const char *path, time_t stoptime);
@@ -816,6 +816,7 @@ static void update_write_catalog(struct vine_manager *q)
 
 static void update_catalog(struct vine_manager *q, int force_update)
 {
+	printf("update_catalog\n");
 	// Only update every last_update_time seconds.
 	if (!force_update && (time(0) - q->catalog_last_update_time) < q->update_interval)
 		return;
@@ -3289,7 +3290,7 @@ static int send_one_task(struct vine_manager *q)
 
 		commit_task_to_worker(q, w, t);
 		return 1;
-	} while ((priority_queue_update_priority(q->ready_tasks, t, --t->priority)) && (t = priority_queue_scheduling_next(q->ready_tasks)));
+	} while ((t = priority_queue_scheduling_next(q->ready_tasks)));
 
 	// if we made it here we reached the end of the queue
 	return 0;
@@ -4267,19 +4268,19 @@ char *vine_monitor_wrap(struct vine_manager *q, struct vine_worker_info *w, stru
 	return wrap_cmd;
 }
 
-static double vine_task_priority(void *item)
-{
-	assert(item);
-	struct vine_task *t = item;
-	return t->priority;
-}
-
 /* Put a given task on the ready list, taking into account the task priority and the manager schedule. */
 
 static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t)
 {
-	/* Push the task with its priority into the ready queue. */
-	priority_queue_push(q->ready_tasks, t, t->priority);
+	if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
+		/* when a task is resubmitted given resource exhaustion, we
+		 * push it at the head of the list, so it gets to run as soon
+		 * as possible. This avoids the issue in which all 'big' tasks
+		 * fail because the first allocation is too small. */
+		priority_queue_push(q->ready_tasks, t, DBL_MAX);
+	} else {
+		priority_queue_push(q->ready_tasks, t, t->priority);
+	}
 
 	/* If the task has been used before, clear out accumulated state. */
 	vine_task_clean(t);
@@ -4424,23 +4425,6 @@ const char *vine_result_string(vine_result_t result)
 	}
 
 	return str;
-}
-
-static int task_state_count(struct vine_manager *q, const char *category, vine_task_state_t state)
-{
-	struct vine_task *t;
-	uint64_t task_id;
-	int count = 0;
-	ITABLE_ITERATE(q->tasks, task_id, t)
-	{
-		if (t->state == state) {
-			if (!category || strcmp(category, t->category) == 0) {
-				count++;
-			}
-		}
-	}
-
-	return count;
 }
 
 static int task_request_count(struct vine_manager *q, const char *category, category_allocation_t request)
@@ -4891,12 +4875,13 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 	// time left?
 	while ((stoptime == 0) || (time(0) < stoptime)) {
+printf("1\n");
 		BEGIN_ACCUM_TIME(q, time_internal);
 		// update catalog if appropriate
 		if (q->name) {
 			update_catalog(q, 0);
 		}
-
+printf("2\n");
 		if (q->monitor_mode) {
 			update_resource_report(q);
 		}
@@ -4915,7 +4900,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				break;
 			}
 		}
-
+printf("3\n");
 		// retrieve worker status messages
 		if (poll_active_workers(q, stoptime) > 0) {
 			// at least one worker was removed.
@@ -4924,7 +4909,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			// further events. This is because we give top priority to
 			// returning and retrieving tasks.
 		}
-
+printf("4\n");
 		// get updates for watched files.
 		if (hash_table_size(q->workers_with_watched_file_updates)) {
 
@@ -4936,7 +4921,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
 			}
 		}
-
+printf("5\n");
 		q->busy_waiting_flag = 0;
 
 		// retrieve results from workers
@@ -4967,7 +4952,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 		} while (q->max_retrievals < 0 || retrieved_this_cycle < q->max_retrievals || !priority_queue_size(q->ready_tasks));
 		END_ACCUM_TIME(q, time_receive);
-
+printf("6\n");
 		// expired tasks
 		BEGIN_ACCUM_TIME(q, time_internal);
 		result = expire_waiting_tasks(q);
