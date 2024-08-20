@@ -3191,7 +3191,6 @@ static int vine_manager_check_library_for_function_call(struct vine_manager *q, 
 	return 0;
 }
 
-
 /*
 Count all the available cores among all workers.
 */

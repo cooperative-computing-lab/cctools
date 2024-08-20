@@ -24,9 +24,9 @@ struct priority_queue {
 	int size;
 	int capacity;
 	struct element **elements;
-	int step_cursor;	         // iterate from the left to the right, keep the last position
-	int scheduling_cursor;       // used in scheduling
-	int sweep_cursor;            // iterate from the left to the right, restart every time
+	int step_cursor;       // iterate from the left to the right, keep the last position
+	int scheduling_cursor; // used in scheduling
+	int sweep_cursor;      // iterate from the left to the right, restart every time
 };
 
 struct priority_queue *priority_queue_create(double init_capacity)

@@ -345,7 +345,7 @@ static void count_worker_resources(struct work_queue *q, struct work_queue_worke
 static void find_max_worker(struct work_queue *q);
 static void update_max_worker(struct work_queue *q, struct work_queue_worker *w);
 
-static void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t );
+static void push_task_to_ready_tasks( struct work_queue *q, struct work_queue_task *t );
 
 /* returns old state */
 static work_queue_task_state_t change_task_state( struct work_queue *q, struct work_queue_task *t, work_queue_task_state_t new_state);
@@ -6400,7 +6400,7 @@ static double work_queue_task_priority(void *item) {
 
 /* Put a given task on the ready list, taking into account the task priority and the queue schedule. */
 
-void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
+void push_task_to_ready_tasks( struct work_queue *q, struct work_queue_task *t )
 {
 	int by_priority = 1;
 
@@ -6494,7 +6494,7 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 		case WORK_QUEUE_TASK_READY:
 			c->wq_stats->tasks_waiting++;
 			update_task_result(t, WORK_QUEUE_RESULT_UNKNOWN);
-			push_task_to_ready_list(q, t);
+			push_task_to_ready_tasks(q, t);
 			break;
 		case WORK_QUEUE_TASK_RUNNING:
 			c->wq_stats->tasks_running++;
