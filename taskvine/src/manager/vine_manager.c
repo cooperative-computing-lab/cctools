@@ -792,6 +792,7 @@ static void update_write_catalog(struct vine_manager *q)
 		return;
 
 	// Generate the manager status in an jx, and print it to a buffer.
+
 	struct jx *j = manager_to_jx(q);
 	char *str = jx_print_string(j);
 
@@ -816,7 +817,6 @@ static void update_write_catalog(struct vine_manager *q)
 
 static void update_catalog(struct vine_manager *q, int force_update)
 {
-	printf("update_catalog\n");
 	// Only update every last_update_time seconds.
 	if (!force_update && (time(0) - q->catalog_last_update_time) < q->update_interval)
 		return;
@@ -827,6 +827,7 @@ static void update_catalog(struct vine_manager *q, int force_update)
 
 	// Update the catalog.
 	update_write_catalog(q);
+
 	update_read_catalog(q);
 
 	q->catalog_last_update_time = time(0);
@@ -2103,11 +2104,11 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 
 	// add total resources used/needed by the manager
 	struct rmsummary *total = total_resources_needed(q);
+
 	jx_insert_integer(j, "tasks_total_cores", total->cores);
 	jx_insert_integer(j, "tasks_total_memory", total->memory);
 	jx_insert_integer(j, "tasks_total_disk", total->disk);
 	jx_insert_integer(j, "tasks_total_gpus", total->gpus);
-
 	rmsummary_delete(total);
 
 	return j;
@@ -3193,23 +3194,6 @@ static int vine_manager_check_library_for_function_call(struct vine_manager *q, 
 }
 
 /*
-Count all the available cores among all workers.
-*/
-static int count_available_cores(struct vine_manager *q)
-{
-	int available_cores = 0;
-
-	char *key;
-	struct vine_worker_info *w;
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
-	{
-		available_cores += w->resources->cores.total - w->resources->cores.inuse;
-	}
-
-	return available_cores;
-}
-
-/*
 Advance the state of the system by selecting one task available
 to run, finding the best worker for that task, and then committing
 the task to the worker.
@@ -3217,10 +3201,6 @@ the task to the worker.
 
 static int send_one_task(struct vine_manager *q)
 {
-	if (!count_available_cores(q)) {
-		return 0;
-	}
-
 	struct vine_task *t;
 	struct vine_worker_info *w = NULL;
 
@@ -4875,13 +4855,13 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 	// time left?
 	while ((stoptime == 0) || (time(0) < stoptime)) {
-		printf("1\n");
+
 		BEGIN_ACCUM_TIME(q, time_internal);
 		// update catalog if appropriate
 		if (q->name) {
 			update_catalog(q, 0);
 		}
-		printf("2\n");
+
 		if (q->monitor_mode) {
 			update_resource_report(q);
 		}
@@ -4900,7 +4880,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				break;
 			}
 		}
-		printf("3\n");
+
 		// retrieve worker status messages
 		if (poll_active_workers(q, stoptime) > 0) {
 			// at least one worker was removed.
@@ -4909,7 +4889,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			// further events. This is because we give top priority to
 			// returning and retrieving tasks.
 		}
-		printf("4\n");
+
 		// get updates for watched files.
 		if (hash_table_size(q->workers_with_watched_file_updates)) {
 
@@ -4921,7 +4901,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
 			}
 		}
-		printf("5\n");
+
 		q->busy_waiting_flag = 0;
 
 		// retrieve results from workers
@@ -4952,7 +4932,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 		} while (q->max_retrievals < 0 || retrieved_this_cycle < q->max_retrievals || !priority_queue_size(q->ready_tasks));
 		END_ACCUM_TIME(q, time_receive);
-		printf("6\n");
+
 		// expired tasks
 		BEGIN_ACCUM_TIME(q, time_internal);
 		result = expire_waiting_tasks(q);

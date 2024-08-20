@@ -256,6 +256,11 @@ void priority_queue_sweep_reset(struct priority_queue *pq)
 	pq->step_cursor = 0;
 }
 
+/* 
+Advance the sweep cursor and reture the pointed data, 
+should be used only in PRIORITY_QUEUE_ITERATE 
+*/
+
 void *priority_queue_sweep_next(struct priority_queue *pq)
 {
 	if (!pq || pq->size == 0)
@@ -263,7 +268,8 @@ void *priority_queue_sweep_next(struct priority_queue *pq)
 
 	pq->sweep_cursor++;
 	if (pq->sweep_cursor > pq->size) {
-		pq->sweep_cursor = 1;
+		priority_queue_sweep_reset(pq);
+		return NULL;
 	}
 
 	return pq->elements[pq->sweep_cursor]->data;
