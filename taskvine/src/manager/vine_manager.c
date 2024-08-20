@@ -1343,19 +1343,20 @@ exceeded the maximum number of retries, or other policy issues.
 static int expire_waiting_tasks(struct vine_manager *q)
 {
 	struct vine_task *t;
+	int t_idx;
 	int expired = 0;
 
 	int tasks_considered = 0;
 	double current_time = timestamp_get() / ONE_SECOND;
 
-	while ((t = priority_queue_step_next(q->ready_tasks))) {
+	while ((t_idx = priority_queue_step_next(q->ready_tasks) && (t = priority_queue_get_element(q->ready_tasks, t_idx)))) {
 		if (tasks_considered > q->attempt_schedule_depth) {
 			return expired;
 		}
 
 		if (t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
 			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
-			priority_queue_remove(q->ready_tasks, t);
+			priority_queue_remove(q->ready_tasks, t_idx);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			expired++;
 		}
@@ -1372,15 +1373,16 @@ Terminate those to which no such worker exists.
 */
 static int enforce_waiting_fixed_locations(struct vine_manager *q)
 {
+	int t_idx;
 	struct vine_task *t;
 	int terminated = 0;
 
-	PRIORITY_QUEUE_ITERATE(q->ready_tasks, t)
+	PRIORITY_QUEUE_ITERATE(q->ready_tasks, t_idx, t)
 	{
 		if (t->has_fixed_locations && !vine_schedule_check_fixed_location(q, t)) {
 			vine_task_set_result(t, VINE_RESULT_FIXED_LOCATION_MISSING);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
-			priority_queue_remove(q->ready_tasks, t);
+			priority_queue_remove(q->ready_tasks, t_idx);
 			terminated++;
 		}
 	}
@@ -1733,13 +1735,13 @@ of the manager's resource consumption for status reporting.
 
 static struct rmsummary *total_resources_needed(struct vine_manager *q)
 {
-
+	int t_idx;
 	struct vine_task *t;
 
 	struct rmsummary *total = rmsummary_create(0);
 
 	/* for waiting tasks, we use what they would request if dispatched right now. */
-	PRIORITY_QUEUE_ITERATE(q->ready_tasks, t)
+	PRIORITY_QUEUE_ITERATE(q->ready_tasks, t_idx, t)
 	{
 		const struct rmsummary *s = vine_manager_task_resources_min(q, t);
 		rmsummary_add(total, s);
@@ -3201,6 +3203,7 @@ the task to the worker.
 
 static int send_one_task(struct vine_manager *q)
 {
+	int t_idx;
 	struct vine_task *t;
 	struct vine_worker_info *w = NULL;
 
@@ -3212,7 +3215,8 @@ static int send_one_task(struct vine_manager *q)
 	int tasks_to_consider = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
 
 	// First consider the task with the highest priority
-	t = priority_queue_get_head(q->ready_tasks);
+	t_idx = 1;
+	t = priority_queue_get_element(q->ready_tasks, t_idx);
 	if (!t) {
 		return 0;
 	}
@@ -3266,11 +3270,11 @@ static int send_one_task(struct vine_manager *q)
 		}
 
 		// Otherwise, remove it from the ready queue and start it:
-		priority_queue_remove(q->ready_tasks, t);
+		priority_queue_remove(q->ready_tasks, t_idx);
 
 		commit_task_to_worker(q, w, t);
 		return 1;
-	} while ((t = priority_queue_scheduling_next(q->ready_tasks)));
+	} while ((t_idx = priority_queue_scheduling_next(q->ready_tasks)) && (t = priority_queue_get_element(q->ready_tasks, t_idx)));
 
 	// if we made it here we reached the end of the queue
 	return 0;
@@ -3601,12 +3605,12 @@ static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vin
 		break;
 
 	case VINE_TASK_READY:
-		priority_queue_remove(q->ready_tasks, t);
+		int t_idx = priority_queue_find_idx(q->ready_tasks, t);
+		priority_queue_remove(q->ready_tasks, t_idx);
 		change_task_state(q, t, new_state);
 		break;
 
 	case VINE_TASK_RUNNING:
-
 		// t->worker must be set if in RUNNING state.
 		assert(w);
 
@@ -5111,9 +5115,10 @@ int vine_hungry(struct vine_manager *q)
 	int64_t ready_task_disk = 0;
 	int64_t ready_task_gpus = 0;
 
+	int t_idx;
 	struct vine_task *t;
 
-	PRIORITY_QUEUE_ITERATE(q->ready_tasks, t)
+	PRIORITY_QUEUE_ITERATE(q->ready_tasks, t_idx, t)
 	{
 		ready_task_cores += MAX(1, t->resources_requested->cores);
 		ready_task_memory += t->resources_requested->memory;

@@ -575,6 +575,7 @@ This is quite an expensive function and so is invoked only periodically.
 
 void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 {
+	int t_idx;
 	struct vine_task *t;
 	int unfit_core = 0;
 	int unfit_mem = 0;
@@ -583,7 +584,7 @@ void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 
 	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
 
-	PRIORITY_QUEUE_ITERATE(q->ready_tasks, t)
+	PRIORITY_QUEUE_ITERATE(q->ready_tasks, t_idx, t)
 	{
 		// check each task against the queue of connected workers
 		vine_resource_bitmask_t bit_set = is_task_larger_than_any_worker(q, t);

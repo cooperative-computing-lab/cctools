@@ -78,9 +78,10 @@ for (int i = 1; i <= priority_queue_size(pq); i++) {
 Or use the PRIORITY_QUEUE_ITERATE macro:
 
 <pre>
+int idx;
 void *data;
-PRIORITY_QUEUE_ITERATE (pq, data) {
-    printf("Priority queue contains: %p\n", data);
+PRIORITY_QUEUE_ITERATE (pq, idx, data) {
+    printf("Data idx: %d\n", idx);
 }
 </pre>
 */
@@ -128,18 +129,6 @@ The first accessible element is at index 1.
 */
 void *priority_queue_get_element(struct priority_queue *pq, int index);
 
-/** Get the highest priority of all elements from a priority queue.
-@param pq A pointer to a priority queue.
-@return The highest priority of the queue.
-*/
-double priority_queue_get_max_priority(struct priority_queue *pq);
-
-/** Get the lowest priority of all elements from a priority queue.
-@param pq A pointer to a priority queue.
-@return The lowest priority of the queue.
-*/
-double priority_queue_get_min_priority(struct priority_queue *pq);
-
 /** Update the priority of an element in a priority queue.
 @param pq A pointer to a priority queue.
 @param data The pointer to the element to update.
@@ -149,29 +138,27 @@ double priority_queue_get_min_priority(struct priority_queue *pq);
 int priority_queue_update_priority(struct priority_queue *pq, void *data, double new_priority);
 
 
+int priority_queue_find_idx(struct priority_queue *pq, void *data);
 
-
-void *priority_queue_step_next(struct priority_queue *pq);
+int priority_queue_step_next(struct priority_queue *pq);
 
 void priority_queue_sweep_reset(struct priority_queue *pq);
 
-void *priority_queue_sweep_next(struct priority_queue *pq);
-
-int priority_queue_get_scheduling_cursor(struct priority_queue *pq);
+int priority_queue_sweep_next(struct priority_queue *pq);
 
 void priority_queue_scheduling_reset(struct priority_queue *pq);
 
-void *priority_queue_scheduling_next(struct priority_queue *pq);
+int priority_queue_scheduling_next(struct priority_queue *pq);
 
 
 
 
 /** Remove the element with the specified index from a priority queue.
 @param pq A pointer to a priority queue.
-@param index The index of the element to remove.
+@param idx The index of the element to remove.
 @return One if the remove succeeded, failure otherwise
 */
-int priority_queue_remove(struct priority_queue *pq, void *data);
+int priority_queue_remove(struct priority_queue *pq, int idx);
 
 /** Delete a priority queue.
 @param pq A pointer to a priority queue.
@@ -182,15 +169,16 @@ void priority_queue_delete(struct priority_queue *pq);
 Use as follows:
 
 <pre>
+int idx;
 char *data;
 
-PRIORITY_QUEUE_ITERATE(pq, data) {
-	printf("data: %s\n", data);
+PRIORITY_QUEUE_ITERATE(pq, idx, data) {
+	printf("Data idx: %d\n", idx);
 }
 
 </pre>
 */
-#define PRIORITY_QUEUE_ITERATE( pq, data ) priority_queue_sweep_reset(pq); while ((data = priority_queue_sweep_next(pq)))
+#define PRIORITY_QUEUE_ITERATE( pq, idx, data ) priority_queue_sweep_reset(pq); while ((idx = priority_queue_sweep_next(pq)) && (data = priority_queue_get_element(pq, idx)))
 
 
 #endif
