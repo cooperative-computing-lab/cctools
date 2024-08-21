@@ -24,9 +24,9 @@ struct priority_queue {
 	int size;
 	int capacity;
 	struct element **elements;
-	int sweep_cursor;    // iterate from the left to the right, reset at each iteration
-	int static_cursor;   // iterate from the left to the right, never reset
-	int rotate_cursor;   // iterate from the left to the right, reset when needed
+	int base_cursor;   // iterate from the left to the right, reset at each iteration
+	int static_cursor; // iterate from the left to the right, never reset
+	int rotate_cursor; // iterate from the left to the right, reset when needed
 };
 
 struct priority_queue *priority_queue_create(double init_capacity)
@@ -60,7 +60,7 @@ struct priority_queue *priority_queue_create(double init_capacity)
 	pq->elements[0]->priority = MAX_PRIORITY;
 
 	pq->static_cursor = 0;
-	pq->sweep_cursor = 0;
+	pq->base_cursor = 0;
 	pq->rotate_cursor = 0;
 
 	return pq;
@@ -240,30 +240,30 @@ int priority_queue_static_next(struct priority_queue *pq)
 	return pq->static_cursor;
 }
 
-void priority_queue_sweep_reset(struct priority_queue *pq)
+void priority_queue_base_reset(struct priority_queue *pq)
 {
 	if (!pq)
 		return;
 
-	pq->sweep_cursor = 0;
+	pq->base_cursor = 0;
 }
 
 /*
-Advance the sweep cursor and return it, should be used only in PRIORITY_QUEUE_ITERATE
+Advance the base cursor and return it, should be used only in PRIORITY_QUEUE_BASE_ITERATE
 */
 
-int priority_queue_sweep_next(struct priority_queue *pq)
+int priority_queue_base_next(struct priority_queue *pq)
 {
 	if (!pq || pq->size == 0)
 		return 0;
 
-	pq->sweep_cursor++;
-	if (pq->sweep_cursor > pq->size) {
-		priority_queue_sweep_reset(pq);
+	pq->base_cursor++;
+	if (pq->base_cursor > pq->size) {
+		priority_queue_base_reset(pq);
 		return 0;
 	}
 
-	return pq->sweep_cursor;
+	return pq->base_cursor;
 }
 
 void priority_queue_rotate_reset(struct priority_queue *pq)
@@ -300,8 +300,8 @@ int priority_queue_remove(struct priority_queue *pq, int idx)
 	if (pq->static_cursor == idx) {
 		pq->static_cursor--;
 	}
-	if (pq->sweep_cursor == idx) {
-		pq->sweep_cursor--;
+	if (pq->base_cursor == idx) {
+		pq->base_cursor--;
 	}
 	if (pq->rotate_cursor == idx) {
 		pq->rotate_cursor--;

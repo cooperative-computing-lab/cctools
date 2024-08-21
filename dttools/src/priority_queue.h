@@ -75,12 +75,12 @@ for (int i = 1; i <= priority_queue_size(pq); i++) {
 }
 </pre>
 
-Or use the PRIORITY_QUEUE_ITERATE macro:
+Or use the PRIORITY_QUEUE_BASE_ITERATE macro:
 
 <pre>
 int idx;
 void *data;
-PRIORITY_QUEUE_ITERATE (pq, idx, data) {
+PRIORITY_QUEUE_BASE_ITERATE (pq, idx, data) {
     printf("Data idx: %d\n", idx);
 }
 </pre>
@@ -152,17 +152,17 @@ The position of the static_cursor is automatically remembered and never reset.
 */
 int priority_queue_static_next(struct priority_queue *pq);
 
-/** Reset the sweep_cursor to 0.
-The sweep_cursor is used in PRIORITY_QUEUE_ITERATE to iterate over the elements from the beginning.
+/** Reset the base_cursor to 0.
+The base_cursor is used in PRIORITY_QUEUE_BASE_ITERATE to iterate over the elements from the beginning.
 @param pq A pointer to a priority queue.
 */
-void priority_queue_sweep_reset(struct priority_queue *pq);
+void priority_queue_base_reset(struct priority_queue *pq);
 
-/** Advance the sweep_cursor to the next element and return the index.
+/** Advance the base_cursor to the next element and return the index.
 @param pq A pointer to a priority queue.
 @return The index of the next element if any, 0 on failure.
 */
-int priority_queue_sweep_next(struct priority_queue *pq);
+int priority_queue_base_next(struct priority_queue *pq);
 
 /** Reset the rotate_cursor to 0.
 The rotate_cursor is used to iterate over the elements from the beginning, and reset if needed.
@@ -198,7 +198,7 @@ Use as follows:
 int idx;
 char *data;
 
-PRIORITY_QUEUE_ITERATE(pq, idx, data) {
+PRIORITY_QUEUE_BASE_ITERATE(pq, idx, data) {
 	printf("Data idx: %d\n", idx);
 }
 
@@ -206,7 +206,7 @@ PRIORITY_QUEUE_ITERATE(pq, idx, data) {
 */
 
 /* Iterate from begining */
-#define PRIORITY_QUEUE_ITERATE( pq, idx, data ) priority_queue_sweep_reset(pq); while ((idx = priority_queue_sweep_next(pq)) && (data = priority_queue_get_element(pq, idx)))
+#define PRIORITY_QUEUE_BASE_ITERATE( pq, idx, data ) priority_queue_base_reset(pq); while ((idx = priority_queue_base_next(pq)) && (data = priority_queue_get_element(pq, idx)))
 
 /* Iterate from last position (never reset) */
 #define PRIORITY_QUEUE_STATIC_ITERATE( pq, idx, data ) while ((idx = priority_queue_static_next(pq)) && (data = priority_queue_get_element(pq, idx)))
