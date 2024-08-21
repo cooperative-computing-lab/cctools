@@ -333,11 +333,10 @@ class FutureFunctionCall(FunctionCall):
                     if output['Success']:
                         self._saved_output = output['Result']
                     else:
-                        self._saved_output = output['Reason']
+                        self._saved_output = FunctionCallNoResult(output['Reason'])
 
                 except Exception as e:
                     self._saved_output = e
-                    raise e
             else:
                 self._saved_output = FunctionCallNoResult()
             self._output_loaded = True
