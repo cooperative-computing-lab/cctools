@@ -24,7 +24,7 @@ struct priority_queue {
 	int size;
 	int capacity;
 	struct element **elements;
-	int step_cursor;       // iterate from the left to the right, remember the last position
+	int static_cursor;       // iterate from the left to the right, remember the last position
 	int sweep_cursor;      // iterate from the left to the right, restart at each iteration
 	int scheduling_cursor; // used for task scheduling
 };
@@ -59,7 +59,7 @@ struct priority_queue *priority_queue_create(double init_capacity)
 
 	pq->elements[0]->priority = MAX_PRIORITY;
 
-	pq->step_cursor = 0;
+	pq->static_cursor = 0;
 	pq->sweep_cursor = 0;
 	pq->scheduling_cursor = 0;
 
@@ -227,17 +227,17 @@ int priority_queue_find_idx(struct priority_queue *pq, void *data)
 	return 0;
 }
 
-int priority_queue_step_next(struct priority_queue *pq)
+int priority_queue_static_next(struct priority_queue *pq)
 {
 	if (!pq || pq->size == 0)
 		return 0;
 
-	pq->step_cursor++;
-	if (pq->step_cursor > pq->size) {
-		pq->step_cursor = 1;
+	pq->static_cursor++;
+	if (pq->static_cursor > pq->size) {
+		pq->static_cursor = 1;
 	}
 
-	return pq->step_cursor;
+	return pq->static_cursor;
 }
 
 void priority_queue_sweep_reset(struct priority_queue *pq)
@@ -297,8 +297,8 @@ int priority_queue_remove(struct priority_queue *pq, int idx)
 	pq->elements[pq->size--] = NULL;
 	sink(pq, idx);
 
-	if (pq->step_cursor == idx) {
-		pq->step_cursor--;
+	if (pq->static_cursor == idx) {
+		pq->static_cursor--;
 	}
 	if (pq->sweep_cursor == idx) {
 		pq->sweep_cursor--;

@@ -144,13 +144,13 @@ int priority_queue_update_priority(struct priority_queue *pq, void *data, double
 */
 int priority_queue_find_idx(struct priority_queue *pq, void *data);
 
-/** Advance the step_cursor to the next element and return the index.
-The step_cursor is used to globally iterate over the elements by sequential index.
-The position of the step_cursor is automatically remembered.
+/** Advance the static_cursor to the next element and return the index.
+The static_cursor is used to globally iterate over the elements by sequential index.
+The position of the static_cursor is automatically remembered and never reset.
 @param pq A pointer to a priority queue.
 @return The index of the next element if any, 0 on failure.
 */
-int priority_queue_step_next(struct priority_queue *pq);
+int priority_queue_static_next(struct priority_queue *pq);
 
 /** Reset the sweep_cursor to 0.
 The sweep_cursor is used in PRIORITY_QUEUE_ITERATE to iterate over the elements from the beginning.
@@ -204,7 +204,14 @@ PRIORITY_QUEUE_ITERATE(pq, idx, data) {
 
 </pre>
 */
+
+/* Iterate from begining */
 #define PRIORITY_QUEUE_ITERATE( pq, idx, data ) priority_queue_sweep_reset(pq); while ((idx = priority_queue_sweep_next(pq)) && (data = priority_queue_get_element(pq, idx)))
 
+/* Iterate from last position (never reset) */
+#define PRIORITY_QUEUE_STATIC_ITERATE( pq, idx, data ) while ((idx = priority_queue_static_next(pq)) && (data = priority_queue_get_element(pq, idx)))
+
+/* Iterate from last position, reset to the begining if needed */
+#define PRIORITY_QUEUE_SCHEDULING_ITERATE( pq, idx, data ) while ((idx = priority_queue_scheduling_next(pq)) && (data = priority_queue_get_element(pq, idx)))
 
 #endif

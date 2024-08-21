@@ -1349,7 +1349,8 @@ static int expire_waiting_tasks(struct vine_manager *q)
 	int tasks_considered = 0;
 	double current_time = timestamp_get() / ONE_SECOND;
 
-	while ((t_idx = priority_queue_step_next(q->ready_tasks)) && (t = priority_queue_get_element(q->ready_tasks, t_idx))) {
+	PRIORITY_QUEUE_STATIC_ITERATE(q->ready_tasks, t_idx, t)
+	{
 		if (tasks_considered > q->attempt_schedule_depth) {
 			return expired;
 		}
@@ -3274,7 +3275,8 @@ static int send_one_task(struct vine_manager *q)
 
 		commit_task_to_worker(q, w, t);
 		return 1;
-	} while ((t_idx = priority_queue_scheduling_next(q->ready_tasks)) && (t = priority_queue_get_element(q->ready_tasks, t_idx)));
+	}
+	PRIORITY_QUEUE_SCHEDULING_ITERATE(q->ready_tasks, t_idx, t);
 
 	// if we made it here we reached the end of the queue
 	return 0;
