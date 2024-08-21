@@ -53,44 +53,44 @@ def wait(fs, timeout=None, return_when=ALL_COMPLETED):
         if not f._is_submitted:
             f.module_manager.submit(f._task)
 
-    time_init = time.time()
-    if timeout is None:
-        time_check = float('inf')
-    else:
-        time_check = timeout
-    done = False
-    while time.time() - time_init < time_check and not done:
-        done = True
-        for f in fs:
+    start = time.perf_counter()
+    time_check = float('inf') if timeout is None else timeout
+    result_timeout = min(timeout, 5) if timeout is not None else 5
 
+    done = False
+    while time.perf_counter() - start < time_check and not done:
+        for f in fs:
             # skip if future is complete
             if f in results.done:
                 continue
 
-            # check for completion
-            result = f.result(timeout=5)
-
-            # add to set of finished tasks and break when needed.
-            if result != RESULT_PENDING:
+            try:
+                # check for completion
+                f.result(timeout=result_timeout)
+            except TimeoutError:
+                # TimeoutError's are expected since we are polling the
+                # future's status. If a timeout happens, we do nothing.
+                pass
+            except Exception:
+                # Future.result() raises the task's exception but that is
+                # not relevant here---just if the task has finished.
                 results.done.add(f)
-
-                # if this is the first completed task, break.
+                if return_when in (FIRST_EXCEPTION, FIRST_COMPLETED):
+                    done = True
+                    break
+            else:
+                results.done.add(f)
                 if return_when == FIRST_COMPLETED:
                     done = True
                     break
 
-            if isinstance(result, Exception) and return_when == FIRST_EXCEPTION:
+            if len(results.done) == len(fs):
                 done = True
                 break
 
-            # set done to false to finish loop.
-            else:
-                done = False
-
             # check form timeout
-            if timeout is not None:
-                if time.time() - time_init > timeout:
-                    break
+            if time.perf_counter() - start > time_check:
+                break
 
     # add incomplete futures to set
     for f in fs:
