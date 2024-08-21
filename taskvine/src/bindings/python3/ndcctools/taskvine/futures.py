@@ -266,7 +266,7 @@ class VineFuture(Future):
             timeout = "wait_forever"
         result = self._task.output(timeout=timeout)
         if result == RESULT_PENDING:
-            return RESULT_PENDING
+            raise TimeoutError()
 
         if isinstance(result, Exception):
             self._exception = result

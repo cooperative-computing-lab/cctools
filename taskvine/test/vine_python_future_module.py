@@ -22,6 +22,11 @@ def my_sum(x, y, negate=False):
     return s
 
 
+def my_timeout():
+    import time
+    time.sleep(60)
+
+
 def main():
     executor = vine.FuturesExecutor(
         port=[9123, 9129], manager_name="vine_matrtix_build_test", factory=False
@@ -69,6 +74,19 @@ def main():
     print("waiting for result...")
     results = vine.futures.as_completed([a, b, c])
     print(f"results = {results}")
+
+    # Test timeouts
+    t1 = executor.future_task(my_timeout)
+    t1.set_cores(1)
+    future = executor.submit(t1)
+
+    try:
+        future.result(timeout=1)
+    except TimeoutError:
+        print("timeout raised correctly")
+    else:
+        raise RuntimeError("TimeoutError was not raised correctly.")
+
 
 if __name__ == "__main__":
     main()
