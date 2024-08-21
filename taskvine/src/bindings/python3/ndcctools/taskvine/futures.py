@@ -1,6 +1,7 @@
 
 from . import cvine
 import hashlib
+from collections import deque
 from concurrent.futures import Executor
 from concurrent.futures import Future
 from concurrent.futures import FIRST_COMPLETED
@@ -100,48 +101,45 @@ def wait(fs, timeout=None, return_when=ALL_COMPLETED):
 
 
 def as_completed(fs, timeout=None):
+    fs = deque(fs)
 
-    results = set()
-
-    # submit tasks if they have not been subitted
+    # submit tasks if they have not been submitted
     for f in fs:
         if not f._is_submitted:
             f.module_manager.submit(f._task)
 
-    time_init = time.time()
-    if timeout is None:
-        time_check = float('inf')
-    else:
-        time_check = timeout
+    start = time.perf_counter()
+    result_timeout = min(timeout, 5) if timeout is not None else 5
 
-    done = False
-    while time.time() - time_init < time_check and not done:
-        for f in fs:
-            done = True
-            # skip if future is complete
-            if f in results:
-                continue
+    def _iterator():
+        # iterate of queue of futures, yeilding completed futures and
+        # requeuing non-completed futures until all futures are yielded or
+        # the timeout is reached.
+        while fs:
+            f = fs.popleft()
 
-            # check for completion
-            result = f.result(timeout=5)
-
-            # add to set of finished tasks
-            if result != RESULT_PENDING:
-                results.add(f)
-
-            # set done to false to finish loop.
+            try:
+                result = f.result(timeout=result_timeout)
+            except TimeoutError:
+                # TimeoutError's are expected since we are polling the
+                # future's status. If a timeout happens, add the future to
+                # the back of the queue.
+                fs.append(f)
+            except Exception:
+                # Future.result() raises the task's exception but that is
+                # not relevant here---just if the task has finished.
+                yield f
             else:
-                done = False
+                assert result != RESULT_PENDING
+                yield f
 
-            # check form timeout
-            if timeout is not None:
-                if time.time() - time_init > timeout:
-                    break
-    for f in fs:
-        if f not in results:
-            results.add(TimeoutError)
+            if (
+                fs and timeout is not None
+                and time.perf_counter() - start > timeout
+            ):
+                raise TimeoutError()
 
-    return iter(results)
+    return _iterator()
 
 
 ##
