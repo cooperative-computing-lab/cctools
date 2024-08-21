@@ -104,24 +104,24 @@ int priority_queue_size(struct priority_queue *pq);
 @param pq A pointer to a priority queue.
 @param data A pointer to store in the queue.
 @param priority The specified priority with the given object.
-@return One if the push succeeded, failure otherwise
+@return One if the push succeeded, failure otherwise.
 */
 int priority_queue_push(struct priority_queue *pq, void *data, double priority);
 
 /** Pop the element with the highest priority from a priority queue.
 @param pq A pointer to a priority queue.
-@return The pointer to the top of the heap if any, failure otherwise
+@return The pointer to the top of the queue if any, failure otherwise.
 */
 void *priority_queue_pop(struct priority_queue *pq);
 
 /** Get the element with the highest priority from a priority queue.
 Similar to @ref priority_queue_pop, but the element is not removed.
 @param pq A pointer to a priority queue.
-@return The pointer to the top of the heap if any, failure otherwise
+@return The pointer to the top of the queue if any, failure otherwise
 */
 void *priority_queue_get_head(struct priority_queue *pq);
 
-/** Get the element with the specified index from a priority queue.
+/** Get an element from a priority queue by a specified index.
 The first accessible element is at index 1.
 @param pq A pointer to a priority queue.
 @param index The index of the element to get.
@@ -133,25 +133,51 @@ void *priority_queue_get_element(struct priority_queue *pq, int index);
 @param pq A pointer to a priority queue.
 @param data The pointer to the element to update.
 @param new_priority The new priority of the element.
-@return One if the update succeeded, failure otherwise
+@return One if the update succeeded, 0 on failure.
 */
 int priority_queue_update_priority(struct priority_queue *pq, void *data, double new_priority);
 
-
+/** Find the index of an element in a priority queue.
+@param pq A pointer to a priority queue.
+@param data The pointer to the element to find.
+@return The index of the element if found, 0 on failure.
+*/
 int priority_queue_find_idx(struct priority_queue *pq, void *data);
 
+/** Advance the step_cursor to the next element and return the index.
+The step_cursor is used to globally iterate over the elements by sequential index.
+The position of the step_cursor is automatically remembered.
+@param pq A pointer to a priority queue.
+@return The index of the next element if any, 0 on failure.
+*/
 int priority_queue_step_next(struct priority_queue *pq);
 
+/** Reset the sweep_cursor to 0.
+The sweep_cursor is used in PRIORITY_QUEUE_ITERATE to iterate over the elements from the beginning.
+@param pq A pointer to a priority queue.
+*/
 void priority_queue_sweep_reset(struct priority_queue *pq);
 
+/** Advance the sweep_cursor to the next element and return the index.
+@param pq A pointer to a priority queue.
+@return The index of the next element if any, 0 on failure.
+*/
 int priority_queue_sweep_next(struct priority_queue *pq);
 
+/** Reset the scheduling_cursor to 0.
+The scheduling_cursor is used in scheduling algorithms to iterate over the elements from the beginning.
+We tipically iterate over a amall number of elements at a time, if there is no task to execute,
+we remember the position of the cursor and we can start from there the next time.
+If there are interesting events happening, we reset the cursor to 0 and start from the beginning.
+@param pq A pointer to a priority queue.
+*/
 void priority_queue_scheduling_reset(struct priority_queue *pq);
 
+/** Advance the scheduling_cursor to the next element and return the index.
+@param pq A pointer to a priority queue.
+@return The index of the next element if any, 0 on failure.
+*/
 int priority_queue_scheduling_next(struct priority_queue *pq);
-
-
-
 
 /** Remove the element with the specified index from a priority queue.
 @param pq A pointer to a priority queue.

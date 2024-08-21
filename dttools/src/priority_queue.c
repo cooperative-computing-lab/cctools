@@ -245,7 +245,7 @@ void priority_queue_sweep_reset(struct priority_queue *pq)
 	if (!pq)
 		return;
 
-	pq->step_cursor = 0;
+	pq->sweep_cursor = 0;
 }
 
 /*
