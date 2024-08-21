@@ -5,6 +5,7 @@ import ndcctools.taskvine as vine
 from concurrent.futures import FIRST_COMPLETED
 from concurrent.futures import FIRST_EXCEPTION
 from concurrent.futures import ALL_COMPLETED
+from concurrent.futures import TimeoutError
 
 port_file = None
 try:
