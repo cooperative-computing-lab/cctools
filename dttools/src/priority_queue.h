@@ -164,20 +164,20 @@ void priority_queue_sweep_reset(struct priority_queue *pq);
 */
 int priority_queue_sweep_next(struct priority_queue *pq);
 
-/** Reset the scheduling_cursor to 0.
-The scheduling_cursor is used in scheduling algorithms to iterate over the elements from the beginning.
-We tipically iterate over a amall number of elements at a time, if there is no task to execute,
+/** Reset the rotate_cursor to 0.
+The rotate_cursor is used to iterate over the elements from the beginning, and reset if needed.
+In scheduling, we tipically iterate over a amall number of tasks at a time. If there is no task to execute,
 we remember the position of the cursor and we can start from there the next time.
-If there are interesting events happening, we reset the cursor to 0 and start from the beginning.
+If there are interesting events happening, we reset the cursor and start from the beginning.
 @param pq A pointer to a priority queue.
 */
-void priority_queue_scheduling_reset(struct priority_queue *pq);
+void priority_queue_rotate_reset(struct priority_queue *pq);
 
-/** Advance the scheduling_cursor to the next element and return the index.
+/** Advance the rotate_cursor to the next element and return the index.
 @param pq A pointer to a priority queue.
 @return The index of the next element if any, 0 on failure.
 */
-int priority_queue_scheduling_next(struct priority_queue *pq);
+int priority_queue_rotate_next(struct priority_queue *pq);
 
 /** Remove the element with the specified index from a priority queue.
 @param pq A pointer to a priority queue.
@@ -212,6 +212,6 @@ PRIORITY_QUEUE_ITERATE(pq, idx, data) {
 #define PRIORITY_QUEUE_STATIC_ITERATE( pq, idx, data ) while ((idx = priority_queue_static_next(pq)) && (data = priority_queue_get_element(pq, idx)))
 
 /* Iterate from last position, reset to the begining if needed */
-#define PRIORITY_QUEUE_SCHEDULING_ITERATE( pq, idx, data ) while ((idx = priority_queue_scheduling_next(pq)) && (data = priority_queue_get_element(pq, idx)))
+#define PRIORITY_QUEUE_ROTATE_ITERATE( pq, idx, data ) while ((idx = priority_queue_rotate_next(pq)) && (data = priority_queue_get_element(pq, idx)))
 
 #endif

@@ -3276,7 +3276,7 @@ static int send_one_task(struct vine_manager *q)
 		commit_task_to_worker(q, w, t);
 		return 1;
 	}
-	PRIORITY_QUEUE_SCHEDULING_ITERATE(q->ready_tasks, t_idx, t);
+	PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t);
 
 	// if we made it here we reached the end of the queue
 	return 0;
@@ -5029,7 +5029,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// return if manager is empty and something interesting already happened
 		// in this wait.
 		if (events > 0) {
-			priority_queue_scheduling_reset(q->ready_tasks);
+			priority_queue_rotate_reset(q->ready_tasks);
 
 			BEGIN_ACCUM_TIME(q, time_internal);
 			int done = !priority_queue_size(q->ready_tasks) && !list_size(q->waiting_retrieval_list) && !itable_size(q->running_table);
