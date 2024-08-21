@@ -14,7 +14,6 @@ from collections import namedtuple
 from .task import (
     PythonTask,
     FunctionCall,
-    PythonTaskNoResult,
     FunctionCallNoResult,
 )
 from .manager import (
@@ -233,6 +232,7 @@ class VineFuture(Future):
         self._task = task
         self._callback_fns = []
         self._result = None
+        self._exception = None
         self._is_submitted = False
         self._ran_functions = False
 
@@ -267,14 +267,29 @@ class VineFuture(Future):
         result = self._task.output(timeout=timeout)
         if result == RESULT_PENDING:
             return RESULT_PENDING
+
+        if isinstance(result, Exception):
+            self._exception = result
         else:
             self._result = result
-            self._state = FINISHED
-            if self._callback_fns and not self._ran_functions:
-                self._ran_functions = True
-                for fn in self._callback_fns:
-                    fn(self)
-            return result
+
+        self._state = FINISHED
+        if self._callback_fns and not self._ran_functions:
+            self._ran_functions = True
+            for fn in self._callback_fns:
+                fn(self)
+
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    def exception(self, timeout="wait_forever"):
+        try:
+            self.result()
+        except Exception as e:
+            return e
+        else:
+            return None
 
     def add_done_callback(self, fn):
         self._callback_fns.append(fn)
@@ -388,15 +403,14 @@ class FuturePythonTask(PythonTask):
 
         # fetch output file and load output
         if not self._output_loaded and self._has_retrieved:
-            if self.successful():
-                try:
-                    self._module_manager.fetch_file(self._output_file)
-                    self._output = cloudpickle.loads(self._output_file.contents())
-                except Exception as e:
-                    self._output = e
-                    raise e
-            else:
-                self._output = PythonTaskNoResult()
+            try:
+                self._module_manager.fetch_file(self._output_file)
+                # _output can be either the return value of a successful
+                # task or the exception object of a failed task.
+                self._output = cloudpickle.loads(self._output_file.contents())
+            except Exception as e:
+                # handle output file fetch/deserialization failures
+                self._output = e
             self._output_loaded = True
 
         return self._output
