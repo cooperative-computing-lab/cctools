@@ -172,6 +172,8 @@ class DaskVine(Manager):
             self.wrapper_proc = wrapper_proc
             self.prune_files = prune_files
             self.category_execution_time = defaultdict(list)
+            self.max_priority = 1e100
+            self.min_priority = -1e100
 
             if submit_per_cycle is not None and submit_per_cycle < 1:
                 submit_per_cycle = None
@@ -339,23 +341,20 @@ class DaskVine(Manager):
 
             # each task has a category name
             category = self.category_name(sexpr)
-            if len(self.category_execution_time[category]):
-                category_avg_execution_time = sum(self.category_execution_time[category]) / len(self.category_execution_time[category])
-            else:
-                # if no tasks have been executed in this category, set a high priority so that we know more information about each category
-                category_avg_execution_time = 1e10
 
             task_depth = dag.depth_of(k)
             if self.scheduling_mode == 'random':
-                priority = round(random.uniform(-1, 1), 10)
+                priority = random.randint(self.min_priority, self.max_priority)
             elif self.scheduling_mode == 'depth-first':
                 priority = task_depth
             elif self.scheduling_mode == 'breadth-first':
                 priority = -task_depth
             elif self.scheduling_mode == 'longest-first':
-                priority = category_avg_execution_time
+                # if no tasks have been executed in this category, set a high priority so that we know more information about each category
+                priority = sum(self.category_execution_time[category]) / len(self.category_execution_time[category]) if len(self.category_execution_time[category]) else self.max_priority
             elif self.scheduling_mode == 'shortest-first':
-                priority = -category_avg_execution_time
+                # if no tasks have been executed in this category, set a high priority so that we know more information about each category
+                priority = -sum(self.category_execution_time[category]) / len(self.category_execution_time[category]) if len(self.category_execution_time[category]) else self.max_priority
             elif self.scheduling_mode == 'FIFO':
                 priority = -round(time.time(), 6)
             elif self.scheduling_mode == 'LIFO':
