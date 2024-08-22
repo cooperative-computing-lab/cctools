@@ -339,9 +339,11 @@ class DaskVine(Manager):
 
             # each task has a category name
             category = self.category_name(sexpr)
-            category_avg_execution_time = 0
             if len(self.category_execution_time[category]):
                 category_avg_execution_time = sum(self.category_execution_time[category]) / len(self.category_execution_time[category])
+            else:
+                # if no tasks have been executed in this category, set a high priority so that we know more information about each category
+                category_avg_execution_time = 1e10
 
             task_depth = dag.depth_of(k)
             if self.scheduling_mode == 'random':
