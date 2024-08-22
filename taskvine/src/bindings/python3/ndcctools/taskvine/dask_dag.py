@@ -113,12 +113,12 @@ class DaskVineDag:
             for sub in sexpr:
                 dependencies.update(self.find_dependencies(sub))
         return dependencies
-    
+
     def set_depth(self, key):
         if key not in self._children_of or not self._children_of[key]:
             self._depth_of[key] = 1
             return 1
-        
+
         max_children_depth = 0
         for child in self._children_of[key]:
             if child not in self._depth_of:

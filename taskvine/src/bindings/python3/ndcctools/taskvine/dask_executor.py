@@ -333,7 +333,7 @@ class DaskVine(Manager):
             lazy = self.worker_transfers and k not in targets
             if lazy and self.checkpoint_fn:
                 lazy = self.checkpoint_fn(dag, k)
-            
+
             task_depth = dag.depth_of(k)
             if self.scheduling_mode == 'random':
                 priority = round(random.uniform(-1, 1), 10)
