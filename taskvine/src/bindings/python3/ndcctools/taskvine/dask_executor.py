@@ -12,12 +12,14 @@ from .manager import Manager
 from .task import PythonTask
 from .task import FunctionCall
 from .dask_dag import DaskVineDag
-from .cvine import VINE_TEMP
+from .cvine import VINE_TEMP, vine_task_set_priority
 
 import contextlib
 import cloudpickle
 import os
+import time
 from uuid import uuid4
+import random
 
 try:
     import rich
@@ -123,6 +125,7 @@ class DaskVine(Manager):
             lib_command=None,
             lib_modules=None,
             task_mode='tasks',
+            task_priority=None,
             env_per_task=False,
             progress_disable=False,
             progress_label="[green]tasks",
@@ -160,6 +163,7 @@ class DaskVine(Manager):
             else:
                 self.lib_modules = hoisting_modules if hoisting_modules else import_modules  # Deprecated
             self.task_mode = task_mode
+            self.task_priority = task_priority
             self.env_per_task = env_per_task
             self.progress_disable = progress_disable
             self.progress_label = progress_label
@@ -329,7 +333,20 @@ class DaskVine(Manager):
             lazy = self.worker_transfers and k not in targets
             if lazy and self.checkpoint_fn:
                 lazy = self.checkpoint_fn(dag, k)
-
+            
+            task_depth = dag.depth_of(k)
+            if self.task_priority == 'random':
+                priority = round(random.uniform(-1, 1), 10)
+            elif self.task_priority == 'depth-first':
+                priority = task_depth
+            elif self.task_priority == 'breadth-first':
+                priority = -task_depth
+            elif self.task_priority == 'FIFO':
+                priority = -round(time.time(), 6)
+            elif self.task_priority == 'LIFO':
+                priority = round(time.time(), 6)
+            else:
+                priority = 0
             cat = self.category_name(sexpr)
             if self.task_mode == 'tasks':
                 if cat not in self._categories_known:
@@ -352,6 +369,7 @@ class DaskVine(Manager):
                                    worker_transfers=lazy,
                                    wrapper=self.wrapper)
 
+                vine_task_set_priority(t._task, priority)
                 if self.env_per_task:
                     t.set_command(
                         f"mkdir envdir && tar -xf {self._environment_name} -C envdir && envdir/bin/run_in_env {t._command}")
@@ -369,6 +387,7 @@ class DaskVine(Manager):
                                      worker_transfers=lazy,
                                      wrapper=self.wrapper)
 
+                vine_task_set_priority(t._task, priority)
                 t.set_tag(tag)  # tag that identifies this dag
 
                 enqueued_calls.append(t)

@@ -77,7 +77,7 @@ class DaskVineDag:
         self._pending_parents_of = defaultdict(lambda: set())
 
         # key->depth. The shallowest level the key is found
-        self._depth_of = defaultdict(lambda: float('inf'))
+        self._depth_of = defaultdict(lambda: 0)
 
         # target keys that the dag should compute
         self._targets = set()
@@ -102,16 +102,32 @@ class DaskVineDag:
     def initialize_graph(self):
         for key, sexpr in self._working_graph.items():
             self.set_relations(key, sexpr)
+        for key, sexpr in self._working_graph.items():
+            self.set_depth(key)
 
-    def find_dependencies(self, sexpr, depth=0):
+    def find_dependencies(self, sexpr):
         dependencies = set()
         if self.graph_keyp(sexpr):
             dependencies.add(sexpr)
-            self._depth_of[sexpr] = min(depth, self._depth_of[sexpr])
         elif not DaskVineDag.symbolp(sexpr):
             for sub in sexpr:
-                dependencies.update(self.find_dependencies(sub, depth + 1))
+                dependencies.update(self.find_dependencies(sub))
         return dependencies
+    
+    def set_depth(self, key):
+        if key not in self._children_of or not self._children_of[key]:
+            self._depth_of[key] = 1
+            return 1
+        
+        max_children_depth = 0
+        for child in self._children_of[key]:
+            if child not in self._depth_of:
+                child_depth = self.set_depth(child)
+            else:
+                child_depth = self._depth_of[child]
+            max_children_depth = max(max_children_depth, child_depth)
+        self._depth_of[key] = max_children_depth + 1
+        return self._depth_of[key]
 
     def set_relations(self, key, sexpr):
         sexpr = self._working_graph[key]
