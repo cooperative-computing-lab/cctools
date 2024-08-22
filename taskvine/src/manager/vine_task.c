@@ -655,6 +655,11 @@ void vine_task_set_priority(struct vine_task *t, double priority)
 	t->priority = priority;
 }
 
+double vine_task_get_execution_time(struct vine_task *t)
+{
+	return t->time_workers_execute_last_end - t->time_workers_execute_last_start;
+}
+
 int vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output_directory)
 {
 
