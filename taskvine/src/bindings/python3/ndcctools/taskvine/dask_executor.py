@@ -125,7 +125,7 @@ class DaskVine(Manager):
             lib_command=None,
             lib_modules=None,
             task_mode='tasks',
-            task_priority=None,
+            scheduling_mode=None,
             env_per_task=False,
             progress_disable=False,
             progress_label="[green]tasks",
@@ -163,7 +163,7 @@ class DaskVine(Manager):
             else:
                 self.lib_modules = hoisting_modules if hoisting_modules else import_modules  # Deprecated
             self.task_mode = task_mode
-            self.task_priority = task_priority
+            self.scheduling_mode = scheduling_mode
             self.env_per_task = env_per_task
             self.progress_disable = progress_disable
             self.progress_label = progress_label
@@ -335,15 +335,15 @@ class DaskVine(Manager):
                 lazy = self.checkpoint_fn(dag, k)
             
             task_depth = dag.depth_of(k)
-            if self.task_priority == 'random':
+            if self.scheduling_mode == 'random':
                 priority = round(random.uniform(-1, 1), 10)
-            elif self.task_priority == 'depth-first':
+            elif self.scheduling_mode == 'depth-first':
                 priority = task_depth
-            elif self.task_priority == 'breadth-first':
+            elif self.scheduling_mode == 'breadth-first':
                 priority = -task_depth
-            elif self.task_priority == 'FIFO':
+            elif self.scheduling_mode == 'FIFO':
                 priority = -round(time.time(), 6)
-            elif self.task_priority == 'LIFO':
+            elif self.scheduling_mode == 'LIFO':
                 priority = round(time.time(), 6)
             else:
                 priority = 0
