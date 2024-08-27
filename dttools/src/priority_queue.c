@@ -214,11 +214,15 @@ int priority_queue_update_priority(struct priority_queue *pq, void *data, double
 	double old_priority = pq->elements[idx]->priority;
 	pq->elements[idx]->priority = new_priority;
 
+	int new_idx = -1;
+
 	if (new_priority > old_priority) {
-		return swim(pq, idx);
+		new_idx = swim(pq, idx);
 	} else if (new_priority < old_priority) {
-		return sink(pq, idx);
+		new_idx = sink(pq, idx);
 	}
+
+	return new_idx;
 }
 
 int priority_queue_find_idx(struct priority_queue *pq, void *data)
@@ -303,7 +307,7 @@ int priority_queue_remove(struct priority_queue *pq, int idx)
 	struct element *e = pq->elements[idx];
 	pq->elements[idx] = pq->elements[pq->size];
 	pq->elements[pq->size--] = NULL;
-	
+
 	sink(pq, idx);
 
 	if (pq->static_cursor == idx) {
