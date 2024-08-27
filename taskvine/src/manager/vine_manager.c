@@ -4951,6 +4951,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 		// only check for fixed location if any are present (high overhead)
 		if (q->fixed_location_in_queue) {
+
 			BEGIN_ACCUM_TIME(q, time_internal);
 			result = enforce_waiting_fixed_locations(q);
 			END_ACCUM_TIME(q, time_internal);
@@ -4960,8 +4961,12 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 		}
 
-		if (retrieved_this_cycle && !q->prefer_dispatch) {
-			continue;
+		if (retrieved_this_cycle) {
+			// reset the rotate cursor on task retrieval
+			priority_queue_rotate_reset(q->ready_tasks);
+			if (!q->prefer_dispatch) {
+				continue;
+			}
 		}
 
 		sent_in_previous_cycle = 0;
@@ -5000,6 +5005,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		END_ACCUM_TIME(q, time_status_msgs);
 		if (result) {
 			// accepted at least one worker
+			// reset the rotate cursor on worker connection
+			priority_queue_rotate_reset(q->ready_tasks);
 			events++;
 			continue;
 		}
@@ -5015,7 +5022,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		}
 
 		if (q->process_pending_check) {
-
 			BEGIN_ACCUM_TIME(q, time_internal);
 			int pending = process_pending();
 			END_ACCUM_TIME(q, time_internal);
@@ -5029,8 +5035,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// return if manager is empty and something interesting already happened
 		// in this wait.
 		if (events > 0) {
-			priority_queue_rotate_reset(q->ready_tasks);
-
 			BEGIN_ACCUM_TIME(q, time_internal);
 			int done = !priority_queue_size(q->ready_tasks) && !list_size(q->waiting_retrieval_list) && !itable_size(q->running_table);
 			END_ACCUM_TIME(q, time_internal);

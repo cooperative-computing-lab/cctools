@@ -104,7 +104,7 @@ int priority_queue_size(struct priority_queue *pq);
 @param pq A pointer to a priority queue.
 @param data A pointer to store in the queue.
 @param priority The specified priority with the given object.
-@return One if the push succeeded, failure otherwise.
+@return The idex of data if the push succeeded, -1 on failure.
 */
 int priority_queue_push(struct priority_queue *pq, void *data, double priority);
 
@@ -133,7 +133,7 @@ void *priority_queue_get_element(struct priority_queue *pq, int index);
 @param pq A pointer to a priority queue.
 @param data The pointer to the element to update.
 @param new_priority The new priority of the element.
-@return One if the update succeeded, 0 on failure.
+@return The new index if the update succeeded, -1 on failure.
 */
 int priority_queue_update_priority(struct priority_queue *pq, void *data, double new_priority);
 

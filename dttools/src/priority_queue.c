@@ -81,21 +81,23 @@ void swap_elements(struct priority_queue *pq, int i, int j)
 	pq->elements[j] = temp;
 }
 
-void swim(struct priority_queue *pq, int k)
+int swim(struct priority_queue *pq, int k)
 {
 	if (!pq)
-		return;
+		return 1;
 
 	while (k > 1 && pq->elements[k / 2]->priority < pq->elements[k]->priority) {
 		swap_elements(pq, k, k / 2);
 		k /= 2;
 	}
+
+	return k;
 }
 
-void sink(struct priority_queue *pq, int k)
+int sink(struct priority_queue *pq, int k)
 {
 	if (!pq)
-		return;
+		return -1;
 
 	while (2 * k <= pq->size) {
 		int j = 2 * k;
@@ -108,6 +110,8 @@ void sink(struct priority_queue *pq, int k)
 		swap_elements(pq, k, j);
 		k = j;
 	}
+
+	return k;
 }
 
 int priority_queue_double_capacity(struct priority_queue *pq)
@@ -148,9 +152,15 @@ int priority_queue_push(struct priority_queue *pq, void *data, double priority)
 	e->priority = priority;
 
 	pq->elements[++pq->size] = e;
-	swim(pq, pq->size);
 
-	return 1;
+	int new_idx = swim(pq, pq->size);
+
+	if (new_idx <= pq->rotate_cursor) {
+		// reset the rotate cursor if the new element is inserted before/equal to it
+		priority_queue_rotate_reset(pq);
+	}
+
+	return new_idx;
 }
 
 void *priority_queue_pop(struct priority_queue *pq)
@@ -205,12 +215,10 @@ int priority_queue_update_priority(struct priority_queue *pq, void *data, double
 	pq->elements[idx]->priority = new_priority;
 
 	if (new_priority > old_priority) {
-		swim(pq, idx);
+		return swim(pq, idx);
 	} else if (new_priority < old_priority) {
-		sink(pq, idx);
+		return sink(pq, idx);
 	}
-
-	return 1;
 }
 
 int priority_queue_find_idx(struct priority_queue *pq, void *data)
@@ -295,6 +303,7 @@ int priority_queue_remove(struct priority_queue *pq, int idx)
 	struct element *e = pq->elements[idx];
 	pq->elements[idx] = pq->elements[pq->size];
 	pq->elements[pq->size--] = NULL;
+	
 	sink(pq, idx);
 
 	if (pq->static_cursor == idx) {
@@ -307,6 +316,12 @@ int priority_queue_remove(struct priority_queue *pq, int idx)
 		pq->rotate_cursor--;
 	}
 	free(e);
+
+	if (idx <= pq->rotate_cursor) {
+		// reset the rotate cursor if the removed element is before/equal to it
+		priority_queue_rotate_reset(pq);
+	}
+
 	return 1;
 }
 
