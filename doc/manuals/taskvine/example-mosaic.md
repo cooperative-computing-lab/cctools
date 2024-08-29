@@ -5,5 +5,5 @@ tool to produce a mosaic.  Demonstrates use of remote data, unpacking,
 caching, starch, and temporary files.
 
 ```
---8<-- "taskvine/code-examples/vine_example_mosaic.py"
+--8<-- "../../taskvine/src/examples/vine_example_mosaic.py"
 ```
