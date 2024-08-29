@@ -5,6 +5,6 @@ and performs multiple queries against it.  It demonstrates use of remote
 data, unpacking, temporary files, and immediate buffer data.
 
 ```
---8<-- "taskvine/code-examples/vine_example_blast.py"
+--8<-- "../../taskvine/src/examples/vine_example_blast.py"
 ```
 

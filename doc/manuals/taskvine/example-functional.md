@@ -5,13 +5,13 @@ These three examples show the use of higher order functions
 Python functions to data via remote tasks:
 
 ```
---8<-- "taskvine/code-examples/vine_example_map.py"
+--8<-- "../../taskvine/src/examples/vine_example_map.py"
 ```
 
 ```
---8<-- "taskvine/code-examples/vine_example_pair.py"
+--8<-- "../../taskvine/src/examples/vine_example_pair.py"
 ```
 
 ```
---8<-- "taskvine/code-examples/vine_example_tree_reduce.py"
+--8<-- "../../taskvine/src/examples/vine_example_tree_reduce.py"
 ```

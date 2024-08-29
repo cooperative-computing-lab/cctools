@@ -5,5 +5,5 @@ performs an all-to-all comparison of each pair using a Unix script.
 Demonstrates use of external data, caching, and shared data.
 
 ```
---8<-- "taskvine/code-examples/vine_example_gutenberg.py"
+--8<-- "../../taskvine/src/examples/vine_example_gutenberg.py"
 ```
