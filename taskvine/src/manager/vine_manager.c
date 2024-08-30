@@ -2933,7 +2933,6 @@ task/worker back into the proper state.
 
 static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-<<<<<<< HEAD
 	vine_result_code_t result = VINE_SUCCESS;
 
 	/* Kill unused libraries on this worker to reclaim resources. */
@@ -2971,14 +2970,11 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 	t->addrport = xxstrdup(w->addrport);
 
 	t->time_when_commit_start = timestamp_get();
-	vine_result_code_t result;
-=======
 	vine_result_code_t result = 0;
->>>>>>> 5ab8af678 (add worker code)
 	struct list *l = 0;
 	l = hash_table_lookup(q->task_group_table, t->group_id);
 	int counter = 0;
-	do {	
+	do {
 		/* Kill empty libraries to reclaim resources. Match the assumption of
 		 * @vine.schedule.c:check_worker_have_enough_resources() */
 		kill_empty_libraries_on_worker(q, w, t);
@@ -3014,8 +3010,8 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 		}
 
 		counter++;
-	
-	} while((t = list_next_item(l)));
+
+	} while ((t = list_next_item(l)));
 
 	debug(D_VINE, "Sent batch of %d tasks to worker %s", counter, w->hostname);
 

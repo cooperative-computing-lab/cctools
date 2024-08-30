@@ -893,7 +893,7 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 		} else if (sscanf(line, "gpus %" PRId64, &n)) {
 			vine_task_set_gpus(task, n);
 		} else if (sscanf(line, "groupid %s", groupid)) {
-			task->group_id = xxstrdup(groupid);	
+			task->group_id = xxstrdup(groupid);
 		} else if (sscanf(line, "wall_time %" PRIu64, &nt)) {
 			vine_task_set_time_max(task, nt);
 		} else if (sscanf(line, "end_time %" PRIu64, &nt)) {
