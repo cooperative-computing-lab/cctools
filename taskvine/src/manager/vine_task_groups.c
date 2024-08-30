@@ -40,7 +40,7 @@ static int vine_task_groups_add_to_group(struct vine_manager *q, struct vine_tas
 			LIST_ITERATE(lt->output_mounts, lm)
 			{
 				if (m->file == lm->file) {
-					t->group_id = lt->group_id; 
+					t->group_id = lt->group_id;
 					struct vine_task *tc = vine_task_clone(t);
 					list_push_tail(l, tc);
 					return 1;
