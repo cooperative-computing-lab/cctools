@@ -352,7 +352,7 @@ static int64_t measure_worker_disk()
 		return 0;
 
 	char *cache_dir = vine_cache_data_path(cache_manager, ".");
-	path_disk_size_info_get_r(cache_dir, options->max_time_on_measurement, &state);
+	path_disk_size_info_get_r(cache_dir, options->max_time_on_measurement, &state, NULL);
 	free(cache_dir);
 
 	int64_t disk_measured = 0;

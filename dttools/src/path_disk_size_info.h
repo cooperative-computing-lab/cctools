@@ -9,6 +9,7 @@ See the file COPYING for details.
 
 #include "int_sizes.h"
 #include "list.h"
+#include "hash_table.h"
 
 struct path_disk_size_info {
 	int     complete_measurement;
@@ -29,9 +30,10 @@ Query disk space on the given directory.
 @param path Directory to be measured.
 @param *measured_size A pointer to an integer that will be filled with the total space in bytes.
 @param *number_of_files A pointer to an integer that will be filled with the total number of files, directories, and symbolic links.
+@param exclude_paths  Hash table with strings of paths that should not be measured. Values of the hash table are ignored.
 @return zero on success, -1 if an error is encounterd (see errno).
 */
-int path_disk_size_info_get(const char *path, int64_t *measured_size, int64_t *number_of_files);
+int path_disk_size_info_get(const char *path, int64_t *measured_size, int64_t *number_of_files, struct hash_table *exclude_paths);
 
 /** Get a (perhaps partial) disk usage on path, but measure by max_secs at a time.
 If *state is NULL, start a new measurement, otherwise continue from
@@ -40,11 +42,11 @@ When the function returns, if *state->complete_measurement is 1, then the measur
 @param path Directory to be measured.
 @param max_secs Maximum number of seconds to spend in the measurement.
 @param *state State of the measurement.
+@param exclude_paths  Hash table with strings of paths that should not be measured. Values of the hash table are ignored.
 @return zero on success, -1 if an error is encounterd (see errno).
 */
-int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_disk_size_info **state);
+int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_disk_size_info **state, struct hash_table *exclude_paths);
 
-int path_disk_size_info_get_r_skip(const char *path, int64_t max_secs, struct path_disk_size_info **state, char **paths_to_skip, int num_skip);
 
 void path_disk_size_info_delete_state(struct path_disk_size_info *state);
 

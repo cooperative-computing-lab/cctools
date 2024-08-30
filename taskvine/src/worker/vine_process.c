@@ -607,24 +607,27 @@ int vine_process_measure_disk(struct vine_process *p, int max_time_on_measuremen
 
 static int vine_process_sandbox_disk_measure(struct vine_process *p, int max_secs, struct path_disk_size_info **state)
 {
-	int num_inputs = list_size(p->task->input_mounts);
-
-	char **skip_paths = malloc(num_inputs);
-
+	int num_inputs = 0;
 	if (p->task->input_mounts) {
-		struct vine_mount *m;
+		num_inputs = list_size(p->task->input_mounts);
+	}
 
-		int i = 0;
+	struct hash_table *exclude_paths = NULL;
+	if (num_inputs > 0) {
+		exclude_paths = hash_table_create(2 * num_inputs, 0);
+
+		struct vine_mount *m;
 		LIST_ITERATE(p->task->input_mounts, m)
 		{
-			skip_paths[i] = m->remote_name;
-			i++;
+			hash_table_insert(exclude_paths, m->remote_name, (void *)1);
 		}
 	}
 
-	int result = path_disk_size_info_get_r_skip(p->sandbox, max_secs, state, skip_paths, num_inputs);
+	int result = path_disk_size_info_get_r(p->sandbox, max_secs, state, exclude_paths);
 
-	free(skip_paths);
+	if (exclude_paths) {
+		hash_table_delete(exclude_paths);
+	}
 
 	return result;
 }
