@@ -2972,7 +2972,9 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 	t->time_when_commit_start = timestamp_get();
 	result = VINE_SUCCESS;
 	struct list *l = 0;
-	l = hash_table_lookup(q->task_group_table, t->group_id);
+	if (t->group_id) {
+		l = hash_table_lookup(q->task_group_table, t->group_id);
+	}
 	int counter = 0;
 	do {
 		/* Kill empty libraries to reclaim resources. Match the assumption of
@@ -2992,7 +2994,7 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 		 * If the manager fails to send this function task to the worker however,
 		 * then the count will be decremented properly in @handle_failure() below. */
 		if (t->needs_library) {
-			t->library_task = vine_schedule_find_lbrary(w, t->needs_library);
+			t->library_task = vine_schedule_find_library(q, w, t->needs_library);
 			t->library_task->function_slots_inuse++;
 			vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
 		}
@@ -3011,7 +3013,7 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 
 		counter++;
 
-	} while ((t = list_next_item(l)));
+	} while ((l && (t = list_next_item(l))));
 
 	debug(D_VINE, "Sent batch of %d tasks to worker %s", counter, w->hostname);
 
