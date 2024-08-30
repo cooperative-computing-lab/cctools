@@ -2970,7 +2970,7 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 	t->addrport = xxstrdup(w->addrport);
 
 	t->time_when_commit_start = timestamp_get();
-	vine_result_code_t result = 0;
+	result = VINE_SUCCESS;
 	struct list *l = 0;
 	l = hash_table_lookup(q->task_group_table, t->group_id);
 	int counter = 0;
@@ -2992,7 +2992,7 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 		 * If the manager fails to send this function task to the worker however,
 		 * then the count will be decremented properly in @handle_failure() below. */
 		if (t->needs_library) {
-			t->library_task = find_library_on_worker_for_task(w, t->needs_library);
+			t->library_task = vine_schedule_find_lbrary(w, t->needs_library);
 			t->library_task->function_slots_inuse++;
 			vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
 		}
