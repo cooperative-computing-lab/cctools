@@ -4,7 +4,7 @@
 #include "xxmalloc.h"
 #include "makeflow_log.h"
 #include "makeflow_alloc.h"
-#include "batch_task.h"
+#include "batch_job.h"
 #include "dag.h"
 #include "dag_node.h"
 #include "dag_node_footprint.h"
@@ -121,7 +121,7 @@ static int node_check( void * instance_struct, struct dag_node *n, struct batch_
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int node_submit( void * instance_struct, struct dag_node *n, struct batch_task *task){
+static int node_submit( void * instance_struct, struct dag_node *n, struct batch_job *task){
 	if(makeflow_alloc_commit_space(storage_allocation, n)){
 		makeflow_log_alloc_event(n->d, storage_allocation);
 	} else if (storage_allocation->locked)  {
@@ -131,7 +131,7 @@ static int node_submit( void * instance_struct, struct dag_node *n, struct batch
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int node_success( void * instance_struct, struct dag_node *n, struct batch_task *task){
+static int node_success( void * instance_struct, struct dag_node *n, struct batch_job *task){
 	struct dag_file *f = NULL;
 	cleaned_completed_node = 1;
 	

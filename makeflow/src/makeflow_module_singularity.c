@@ -64,7 +64,7 @@ static int destroy( void * instance_struct, struct dag *d)
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int node_submit( void * instance_struct, struct dag_node *n, struct batch_task *t){
+static int node_submit( void * instance_struct, struct dag_node *n, struct batch_job *t){
 	struct singularity_instance *s = (struct singularity_instance*)instance_struct;
 	struct batch_wrapper *wrapper = batch_wrapper_create();
 	batch_wrapper_prefix(wrapper, CONTAINER_SINGULARITY_SH);
@@ -78,7 +78,7 @@ static int node_submit( void * instance_struct, struct dag_node *n, struct batch
 
 	cmd = batch_wrapper_write(wrapper, t);
 	if(cmd){
-		batch_task_set_command(t, cmd);
+		batch_job_set_command(t, cmd);
 		struct dag_file *df = makeflow_hook_add_input_file(n->d, t, cmd, cmd, DAG_FILE_TYPE_TEMP);
 		debug(D_MAKEFLOW_HOOK, "Wrapper written to %s", df->filename);
 		makeflow_log_file_state_change(n->d, df, DAG_FILE_STATE_EXISTS);

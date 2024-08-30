@@ -1,254 +1,128 @@
 /*
-Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
-Copyright (C) 2022 The University of Notre Dame
+Copyright (C) 2024 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef BATCH_JOB_H
-#define BATCH_JOB_H
+#ifndef BATCH_TASK_H
+#define BATCH_TASK_H
 
-#include <sys/stat.h>
-
-#include <inttypes.h>
-#include <stdint.h>
-#include <time.h>
-
+#include "list.h"
 #include "jx.h"
 #include "rmsummary.h"
 
-/** @file batch_job.h Batch job submission.
-This module implements batch job submission to multiple systems,
-including local processes, HTCondor, TaskVine, Work Queue, SGE, PBS, Amazon EC2, and others.
-This simplifies the construction
-of parallel abstractions that need a simple form of parallel process execution.
+/** @file batch_job.h Represents a single batch job.
+A @ref batch_job describes a single batch job to be submitted to a batch queue
+using @ref batch_queue_submit.  This structure should not be manipulated manually,
+but created with @ref batch_job_create and then elaborated with @ref batch_job_set_command
+@ref batch_job_add_input_file , @ref batch_job_add_output_file and similar methods.
+This level of details permits the underlying system to appropriately manage the data
+used by each job.  Once submitted to a queue, the batch_job object may be deleted.
 */
 
-/** An integer type indicating a unique batch job number.*/
-typedef int64_t batch_job_id_t;
-#define PRIbjid  PRId64
-#define SCNbjid  SCNd64
+struct batch_queue;
+struct batch_file;
 
-/** Indicates which type of batch submission to use. */
-/* Must be kept in sync with batch_job_subsystems. */
-typedef enum {
-	BATCH_QUEUE_TYPE_LOCAL,	              /**< Batch jobs will run as local processes. */
-	BATCH_QUEUE_TYPE_CONDOR,              /**< Batch jobs will be sent to Condor pool. */
-	BATCH_QUEUE_TYPE_AMAZON,              /**< Batch jobs will be sent spun up Amazon ec2 instances */
-	BATCH_QUEUE_TYPE_LAMBDA,              /**< Batch jobs will be executed by an Amazon Lambda function with S3 objects */
-        BATCH_QUEUE_TYPE_AMAZON_BATCH,        /**< Batch jobs will be sent to Amazon Batch System */
-	BATCH_QUEUE_TYPE_SGE,	              /**< Batch jobs will be sent to Sun Grid Engine. */
-	BATCH_QUEUE_TYPE_MOAB,                /**< Batch jobs will be sent to the Moab Workload Manager. */
-	BATCH_QUEUE_TYPE_PBS,                 /**< Batch jobs will be send to the PBS Scheduler. */
-	BATCH_QUEUE_TYPE_LSF,		      /**< Batch jobs will be sent to LSF. */
-	BATCH_QUEUE_TYPE_TORQUE,              /**< Batch jobs will be send to the Torque Scheduler. */
-	BATCH_QUEUE_TYPE_BLUE_WATERS,         /**< Batch jobs will be send to the Torque Scheduler at Blue Waters. */
-	BATCH_QUEUE_TYPE_SLURM,               /**< Batch jobs will be send to the SLURM Scheduler. */
-	BATCH_QUEUE_TYPE_CLUSTER,             /**< Batch jobs will be sent to a user-defined cluster manager. */
-	BATCH_QUEUE_TYPE_WORK_QUEUE,          /**< Batch jobs will be sent to the Work Queue. */
-	BATCH_QUEUE_TYPE_CHIRP,               /**< Batch jobs will be sent to Chirp. */
-	BATCH_QUEUE_TYPE_MESOS,               /**< Batch jobs will be sent to Mesos. */
-	BATCH_QUEUE_TYPE_K8S,                 /**< Batch jobs will be sent to kubernetes. */
-	BATCH_QUEUE_TYPE_DRYRUN,              /**< Batch jobs will not actually run. */
-        BATCH_QUEUE_TYPE_MPI,                 /**< Batch jobs distributed within an MPI program. */
-	BATCH_QUEUE_TYPE_VINE,                /**< Batch jobs executed via TaskVine. */
-	BATCH_QUEUE_TYPE_UNKNOWN = -1         /**< An invalid batch queue type. */
-} batch_queue_type_t;
-
-/** Describes a batch job when it has completed. */
-struct batch_job_info {
-	time_t submitted;    /**< Time the job was submitted to the system. */
-	time_t started;      /**< Time the job actually began executing. */
-	time_t finished;     /**< Time at which the job actually completed. */
-	time_t heartbeat;    /**< Time the job last wrote heartbeat. (only for batch_job_cluster) */
-	int exited_normally; /**< Non-zero if the job ran to completion, zero otherwise. */
-	int exit_code;       /**< The result code of the job, if it exited normally. */
-	int exit_signal;     /**< The signal by which the job was killed, if it exited abnormally. */
-	int disk_allocation_exhausted; /**< Non-zero if the job filled its loop device allocation to capacity, zero otherwise */
-	long log_pos;        /**< Last read position in the log file, for ftell and fseek. (only for batch_job_cluster) */
+/** Internal description of a single batch job submitted to a queue. */
+struct batch_job {
+	int taskid;                  /**< Indicates the id provided by the creating system. I.E. Makeflow */
+	int jobid;                   /**< Indicates the id assigned to the job by the submission system. */
+	struct batch_queue *queue;   /**< The queue this task is assigned to. */
+	char *command;               /**< The command line to execute. */
+	struct list   *input_files;  /**< Task's required inputs, type batch_file */
+	struct list   *output_files; /**< Task's expected outputs, type batch_file */
+	struct rmsummary *resources; /**< Resources assigned to task */
+	struct jx *envlist;          /**< JSON formatted environment list */ 
+	struct batch_job_info *info; /**< Stores the info struct created by batch_queue. */
+	char *hash;                  /**< Checksum based on CMD, input contents, and output names. */
 };
 
-/** Create a new batch_job_info struct.
-@return A new empty batch_job_info struct.
+/** Create a batch_job struct.
+@param queue The queue this task is associated with/assigned to.
+@return A batch_job struct in newly alloced space.
 */
-struct batch_job_info *batch_job_info_create();
+struct batch_job *batch_job_create(struct batch_queue *queue );
 
-/** Delete a batch_job_info struct.
-@param info The batch_job_info struct to be deleted.
+/** Delete a batch_job struct.
+ This frees the command, deletes the files and lists, deletes the resources, and deletes envlist.
+@param t The batch_job struct to be freed.
 */
-void batch_job_info_delete(struct batch_job_info *info);
+void batch_job_delete(struct batch_job *t);
 
-/** Create a new batch queue.
-@param type The type of the queue.
-@param ssl_key_file The location of the queue manager's ssl key file, if it has one.
-@param ssl_key_file The location of the queue manager's ssl certiciate file, if it has one.
-@return A new batch queue object on success, null on failure.
+/** Add file to input list of batch_job
+ Creates a new batch_file from outer_name and inner_name.
+ This newly created file is add to input_files.
+ For clarifications on outer_name, inner_name, and their uses see batch_file.
+@param task The batch_job this file is being added to.
+@param outer_name The name of the file at submission/host site.
+@param inner_name The name of the file at execution site.
+@return A pointer to the newly allocated batch_file struct.
 */
-struct batch_queue *batch_queue_create(batch_queue_type_t type, const char *ssl_key_file, const char *ssl_cert_file );
+struct batch_file * batch_job_add_input_file(struct batch_job *task, const char * outer_name, const char * inner_name);
 
-/** Submit a batch job.
-@param q The queue to submit to.
-@param cmdline The command line to execute.  This line will be interpreted by the shell, so it may include output redirection, multiple commands, pipes, and so forth.
-@param input_files A comma separated list of all input files that will be required by the job.  Null pointer is equivalent to empty string.  This must also include the executable and any dependent programs.
-@param output_files A comma separated list of all output files to retrieve from the job.  Null pointer is equivalent to empty string.
-@param envlist The set of environment variables for the job, in a jx object.
-@param resources The computational resources needed by the job.
-@return On success, returns a positive unique identifier for the batch job.  On failure, returns a negative number.
-Zero is not a valid batch job id and indicates an internal failure.
+/** Add file to output list of batch_job
+ Creates a new batch_file from outer_name and inner_name.
+ This newly created file is add to output_files.
+ For clarifications on outer_name, inner_name, and their uses see batch_file.
+@param task The batch_job this file is being added to.
+@param outer_name The name of the file at submission/host site.
+@param inner_name The name of the file at execution site.
+@return A pointer to the newly allocated batch_file struct.
 */
-batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmdline, const char *input_files, const char *output_files, struct jx *envlist, const struct rmsummary *resources);
+struct batch_file * batch_job_add_output_file(struct batch_job *task, const char * outer_name, const char * inner_name);
 
-/** Wait for any batch job to complete.
-Blocks until a batch job completes.
- * Note Submit may return 0 as a valid jobid. As of 04/18 wait will not return 0 as a valid jobid. 
- *  Wait returning 0 indicates there are no waiting jobs in this queue.
-@param q The queue to wait on.
-@param info Pointer to a @ref batch_job_info structure that will be filled in with the details of the completed job.
-@return If greater than zero, indicates the jobid of the completed job.
-If equal to zero, there were no more jobs to wait for.
-If less than zero, the operation was interrupted by a system event, but may be tried again.
+/** Set the command of the batch_job.
+ Frees previous command and xxstrdups new command.
+@param t The batch_job to be updated.
+@param command The new command to use.
 */
-batch_job_id_t batch_job_wait(struct batch_queue *q, struct batch_job_info *info);
+void batch_job_set_command(struct batch_job *t, const char *command);
 
-/** Wait for any batch job to complete, with a timeout.
-Blocks until a batch job completes or the current time exceeds stoptime.
- * Note Submit may return 0 as a valid jobid. As of 04/18 wait will not return 0 as a valid jobid. 
- *  Wait returning 0 indicates there are no waiting jobs in this queue.
-@param q The queue to wait on.
-@param info Pointer to a @ref batch_job_info structure that will be filled in with the details of the completed job.
-@param stoptime An absolute time at which to stop waiting.  If less than or equal to the current time,
-then this function will check for a complete job but will not block.
-@return If greater than zero, indicates the jobid of the completed job.
-If equal to zero, there were no more jobs to wait for.
-If less than zero, the operation timed out or was interrupted by a system event, but may be tried again.
+/** Set the batch task's command to the given JX command spec.
+ * The JX command spec is first expanded, and replaces the
+ * batch task's previous command.
+ * @param t The batch_job to be updated.
+ * @param command The spec to use.
+ */
+void batch_job_set_command_spec(struct batch_job *t, struct jx *command);
+
+/** Wrap the existing command with a template string.
+ This uses string_wrap_command to wrap command, see stringtools.h for details.
+ This function allocates a new string with the result and free the previous command.
+ Does not free passed command. Will use wrapper interface in future.
+@param t The batch_job whose command is being wrapped.
+@param command The command template that will wrap existing command.
 */
-batch_job_id_t batch_job_wait_timeout(struct batch_queue *q, struct batch_job_info *info, time_t stoptime);
+void batch_job_wrap_command(struct batch_job *t, const char *command);
 
-/** Remove a batch job.
-This call will start the removal process.
-You must still call @ref batch_job_wait to wait for the removal to complete.
-@param q The queue to remove from.
-@param jobid The job to be removed.
-@return Greater than zero if the job exists and was removed, zero otherwise.
+/** Set the resources needed for task.
+ This function will make a copy of full copy of resources using rmsummary_copy().
+@param t The batch_job requiring specified resources.
+@param resources A rmsummary specifying required resources.
 */
-int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid);
+void batch_job_set_resources(struct batch_job *t, const struct rmsummary *resources);
 
-int batch_fs_chdir (struct batch_queue *q, const char *path);
-int batch_fs_getcwd (struct batch_queue *q, char *buf, size_t size);
-int batch_fs_mkdir (struct batch_queue *q, const char *path, mode_t mode, int recursive);
-int64_t batch_fs_putfile (struct batch_queue *q, const char *lpath, const char *rpath);
-int batch_fs_rename (struct batch_queue *q, const char *lpath, const char *rpath);
-int batch_fs_stat (struct batch_queue *q, const char *path, struct stat *buf);
-int batch_fs_unlink (struct batch_queue *q, const char *path);
-
-/** Converts a string into a batch queue type.
-@param str A string listing all of the known batch queue types (which changes over time.)
-@return The batch queue type corresponding to the string, or BATCH_QUEUE_TYPE_UNKNOWN if the string is invalid.
+/** Set the envlist for this task.
+ This function will make a copy using jx_copy of envlist.
+@param t The batch_job using this environment.
+@param envlist The jx_object specifying the environment.
 */
-batch_queue_type_t batch_queue_type_from_string(const char *str);
+void batch_job_set_envlist(struct batch_job *t, struct jx *envlist);
 
-/** Converts a batch queue type to a string.
-@param t A @ref batch_queue_type_t.
-@return A string corresponding to the batch queue type.
+/** Set the batch_job_info of this task.
+ Performs simple copy into already allocated memory.
+@param t The batch_job that was completed.
+@param info The batch_job_info of the completed task.
 */
-const char *batch_queue_type_to_string(batch_queue_type_t t);
+void batch_job_set_info(struct batch_job *t, struct batch_job_info *info);
 
-/** Set the log file used by the batch queue.
-This is an optional call that will only affect batch queue types
-that use an internal logfile; currently only Condor.
-@param q The batch queue to adjust.
-@param logfile Name of the logfile to use.
+/** Generate a sha1 hash based on the specified task.
+ Includes Command, Input files contents, Output files names
+ Future improvement should include the Environment
+@param t The batch_job whose checksum will be generated.
+@return Allocated string of the hash, user should free.
 */
-void batch_queue_set_logfile(struct batch_queue *q, const char *logfile);
-
-/** Add extra options to pass to the underlying batch system.
-This call specifies additional options to be passed to the batch system each
-time a job is submitted.  It may be called once to apply to all subsequent
-jobs, or it may be called before each submission.  If the queue type
-is @ref BATCH_QUEUE_TYPE_CONDOR, the options must be valid submit file
-properties like <tt>requirements = (Memory>100)</tt>.
-If the batch queue type is @ref BATCH_QUEUE_TYPE_SGE, the extra text will be added as options to
-the <tt>qsub</tt> command.  This call has no effect on other queue types.
-@param q The batch queue to adjust.
-@param what The key for option.
-@param value The value of the option.
-*/
-void batch_queue_set_option(struct batch_queue *q, const char *what, const char *value);
-
-/** Expresses support for feature in the underlying batch system.
-This call specifies features that are supported by this batch system for
-use in exterior systems. Used within batch_queue_* for the specific batch
-system.
-@param q The batch queue to adjust.
-@param what The key for feature.
-@param value The value of the feature.
-*/
-void batch_queue_set_feature(struct batch_queue *q, const char *what, const char *value);
-
-/** As @ref batch_queue_set_option, but allowing an integer argument.
-@param q The batch queue to adjust.
-@param what The key for option.
-@param value The value of the option.
-*/
-void batch_queue_set_int_option(struct batch_queue *q, const char *what, int value);
-
-/** Get batch queue options.
-This call returns the additional options to be passed to the batch system each
-time a job is submitted.
-@param q The batch queue.
-@param what The option key.
-@return The option value.
-*/
-const char *batch_queue_get_option(struct batch_queue *q, const char *what);
-
-/** Check if option is set to yes
-@param q The batch queue.
-@param what The option key.
-@return 1 if option is yes, 0 if unset or not set to yes.
-*/
-int batch_queue_option_is_yes (struct batch_queue *q, const char *what);
-
-/** Get batch queue feature.
-This call returns a valid const char if the feaute specified is
-supported by the given queue type.
-@param q The batch queue.
-@param what The option key.
-@return The option value.
-*/
-const char *batch_queue_supports_feature (struct batch_queue *q, const char *what);
-
-
-/** Get batch queue type.
-This call returns the type of the batch queue.
-@param q The batch queue.
-@return The type of the batch queue, defined when it was created.
-*/
-batch_queue_type_t batch_queue_get_type(struct batch_queue *q);
-
-/** Delete a batch queue.
-Note that this function just destroys the internal data structures,
-it does not abort running jobs.  To properly clean up running jobs,
-you must call @ref batch_job_wait until it returns zero, or
-call @ref batch_job_remove on all runnings jobs.
-@param q The queue to delete.
-*/
-void batch_queue_delete(struct batch_queue *q);
-
-/** Returns the list of queue types supported by this module.
-Useful for including in help-option outputs.
-@return A static string listing the types of queues supported.
-*/
-const char *batch_queue_type_string();
-
-/** Returns the port number of the batch queue.
-@param q The batch queue of interest.
-@return The port number in use, or zero if not applicable.
-*/
-int batch_queue_port(struct batch_queue *q);
-
-/* Hack: provide a backdoor to allow the MPI module to perform
-   some initial setup before the MPI batch queue is created.
-*/
-void batch_job_mpi_setup( const char *debug_filename, int mpi_cores, int mpi_memory );
+char * batch_job_generate_id(struct batch_job *t);
 
 #endif
+/* vim: set noexpandtab tabstop=8: */

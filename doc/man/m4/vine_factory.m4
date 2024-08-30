@@ -10,7 +10,7 @@ CODE(vine_factory -M PARAM(project-name) -T PARAM(batch-type) [options])
 SECTION(DESCRIPTION)
 BOLD(vine_factory) submits and maintains a number
 of MANPAGE(vine_worker,1) processes on various batch systems, such as
-Condor and SGE.  All the workers managed by a BOLD(vine_factory) process
+Condor and UGE.  All the workers managed by a BOLD(vine_factory) process
 will be directed to work for a specific manager, or any set of managers matching
 a given project name.  BOLD(vine_factory) will automatically determine
 the correct number of workers to have running, based on criteria set on
@@ -47,7 +47,7 @@ SECTION(OPTIONS)
 General options:
 
 OPTIONS_BEGIN
-OPTION_ARG(T,batch-type,type) Batch system type (required). One of: local, wq, condor, sge, pbs, lsf, torque, moab, mpi, slurm, chirp, amazon, amazon-batch, lambda, mesos, k8s, dryrun
+OPTION_ARG(T,batch-type,type) Batch system type (required). One of: local, condor, vine, wq, uge, pbs, lsf, torque, moab, slurm, amazon, k8s, dryrun
 OPTION_ARG(C,config-file,file) Use configuration file PARAM(file).
 OPTION_ARG(M,manager-name,project) Project name of managers to server, can be regex
 OPTION_ARG(F,foremen-name,project) Foremen to serve, can be a regular expression.
@@ -125,10 +125,10 @@ LONGCODE_BEGIN
 vine_factory -T condor -M barney
 LONGCODE_END
 
-To maintain a maximum of 100 workers on an SGE batch system, do this:
+To maintain a maximum of 100 workers on an UGE batch system, do this:
 
 LONGCODE_BEGIN
-vine_factory -T sge -M barney -W 100
+vine_factory -T uge -M barney -W 100
 LONGCODE_END
 
 To start workers such that the workers exit after 5 minutes (300s) of idleness:

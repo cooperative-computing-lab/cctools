@@ -116,7 +116,7 @@ void makeflow_summary_create(struct dag *d, const char *filename, const char *em
 		for(list_first_item(output_files); (fn = list_next_item(output_files)) != NULL;) {
 			const char *size;
 			struct stat buf;
-			batch_fs_stat(remote_queue, fn, &buf);
+			stat(fn, &buf);
 			size = string_metric(buf.st_size, -1, NULL);
 			summarize(summary_file, summary_email, "\t%s\t%s\n", fn, size);
 		}

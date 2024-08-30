@@ -7,7 +7,7 @@
 #include "xxmalloc.h"
 #include "makeflow_log.h"
 #include "makeflow_alloc.h"
-#include "batch_task.h"
+#include "batch_job.h"
 #include "dag.h"
 #include "dag_node.h"
 #include "dag_node_footprint.h"
@@ -145,7 +145,7 @@ static int dag_check(void * instance_struct, struct dag *d){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int batch_submit( void * instance_struct, struct batch_task *t){
+static int batch_submit( void * instance_struct, struct batch_job *t){
 	struct shared_fs_instance *sf = (struct shared_fs_instance*)instance_struct;
 	struct batch_file *f = NULL;
 	struct list *saved_inputs = list_create();
@@ -174,7 +174,7 @@ static int batch_submit( void * instance_struct, struct batch_task *t){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int batch_retrieve( void * instance_struct, struct batch_task *t){
+static int batch_retrieve( void * instance_struct, struct batch_job *t){
 	struct shared_fs_instance *sf = (struct shared_fs_instance*)instance_struct;
 
 	struct batch_file *f = NULL;

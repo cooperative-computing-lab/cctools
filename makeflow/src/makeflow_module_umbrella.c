@@ -19,8 +19,8 @@
 #include "path.h"
 #include "stringtools.h"
 
+#include "batch_queue.h"
 #include "batch_job.h"
-#include "batch_task.h"
 #include "batch_wrapper.h"
 
 #include "dag.h"
@@ -121,7 +121,7 @@ static int dag_check( void * instance_struct, struct dag *d ){
 	struct umbrella_instance *u = (struct umbrella_instance*)instance_struct;
 	struct stat st;
 	if(u->spec){
-		if(batch_fs_stat(makeflow_get_remote_queue(), u->spec, &st) == -1) {
+		if(stat(u->spec, &st) == -1) {
 			debug(D_NOTICE, "stat on %s failed: %s\n", u->spec, strerror(errno));
 			return MAKEFLOW_HOOK_FAILURE;
 		}
@@ -135,7 +135,7 @@ static int dag_check( void * instance_struct, struct dag *d ){
 	}
 
 	if(u->binary){
-		if(batch_fs_stat(makeflow_get_remote_queue(), u->binary, &st) == -1) {
+		if(stat(u->binary, &st) == -1) {
 			debug(D_NOTICE, "stat on %s failed: %s\n", u->binary, strerror(errno));
 			return MAKEFLOW_HOOK_FAILURE;
 		}
@@ -194,7 +194,7 @@ char *makeflow_umbrella_print_files(struct list *files, bool is_output) {
 	return result;
 }
 
-static int node_submit( void * instance_struct, struct dag_node *n, struct batch_task *t)
+static int node_submit( void * instance_struct, struct dag_node *n, struct batch_job *t)
 {
 	struct umbrella_instance *u = (struct umbrella_instance*)instance_struct;
     struct batch_wrapper *wrapper = batch_wrapper_create();
@@ -206,11 +206,9 @@ static int node_submit( void * instance_struct, struct dag_node *n, struct batch
 		makeflow_hook_add_input_file(n->d, t, u->spec, path_basename(u->spec), DAG_FILE_TYPE_GLOBAL);
 	}
 
-	debug(D_MAKEFLOW_HOOK, "input_files: %s\n", batch_files_to_string(makeflow_get_queue(n), t->input_files));
 	char *umbrella_input_opt = makeflow_umbrella_print_files(t->input_files, false);
 	debug(D_MAKEFLOW_HOOK, "umbrella input opt: %s\n", umbrella_input_opt);
 
-	debug(D_MAKEFLOW_HOOK, "output_files: %s\n", batch_files_to_string(makeflow_get_queue(n), t->output_files));
 	char *umbrella_output_opt = makeflow_umbrella_print_files(t->output_files, true);
 	debug(D_MAKEFLOW_HOOK, "umbrella output opt: %s\n", umbrella_output_opt);
 
@@ -260,7 +258,7 @@ static int node_submit( void * instance_struct, struct dag_node *n, struct batch
 
     cmd = batch_wrapper_write(wrapper, t);
     if(cmd){
-        batch_task_set_command(t, cmd);
+        batch_job_set_command(t, cmd);
         struct dag_file *df = makeflow_hook_add_input_file(n->d, t, cmd, cmd, DAG_FILE_TYPE_TEMP);
         debug(D_MAKEFLOW_HOOK, "Wrapper written to %s", df->filename);
         makeflow_log_file_state_change(n->d, df, DAG_FILE_STATE_EXISTS);

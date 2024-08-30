@@ -158,19 +158,23 @@ def library_network_code():
                 finally:
                     os.chdir(library_sandbox)
             else:
+                try:
+                    arg_infile = os.path.join(function_sandbox, "infile")
+                    with open(arg_infile, "rb") as f:
+                        event = cloudpickle.load(f)
+                except Exception:
+                    stdout_timed_message(f"TASK {function_id} error: can't load the arguments from {arg_infile}")
+                    return
                 p = os.fork()
                 if p == 0:
                     try:
-                        stdout_timed_message(f"TASK {function_id} {function_name} arrives, starting to run in process {os.getpid()}")
-
                         # change the working directory to the function's sandbox
                         os.chdir(function_sandbox)
 
+                        stdout_timed_message(f"TASK {function_id} {function_name} arrives, starting to run in process {os.getpid()}")
+
                         try:
                             exit_status = 1
-                            # parameters are represented as infile.
-                            with open("infile", "rb") as f:
-                                event = cloudpickle.load(f)
                         except Exception:
                             stdout_timed_message(f"TASK {function_id} error: can't load the arguments from infile")
                             exit_status = 2

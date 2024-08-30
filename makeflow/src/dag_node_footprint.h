@@ -7,7 +7,7 @@ See the file COPYING for details.
 #ifndef DAG_NODE_FOOTPRINT_H
 #define DAG_NODE_FOOTPRINT_H
 
-#include "batch_job.h"
+#include "batch_queue.h"
 #include "dag_node.h"
 #include "category.h"
 #include "set.h"

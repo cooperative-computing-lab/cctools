@@ -50,7 +50,7 @@ with open(port_file, "w") as f:
     print("Writing port {port} to file {file}".format(port=q.port, file=port_file))
     f.write(str(q.port))
 
-worker = vine.Factory("local", manager_host_port="localhost:{}".format(q.port))
+worker = vine.Factory("local", manager_host_port="localhost:{}".format(q.port),log_file="factory.log")
 worker.max_workers = 1
 worker.min_workers = 1
 

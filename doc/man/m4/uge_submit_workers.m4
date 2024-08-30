@@ -1,21 +1,21 @@
 include(manual.h)dnl
-HEADER(sge_submit_workers)
+HEADER(uge_submit_workers)
 
 SECTION(NAME)
-BOLD(sge_submit_workers) - submit work_queue_worker to a SUN Grid Engine (SGE).
+BOLD(uge_submit_workers) - submit work_queue_worker to a Univa Grid Engine (UGE) cluster.
 
 SECTION(SYNOPSIS)
-CODE(sge_submit_workers [options] PARAM(servername) PARAM(port) PARAM(num-workers))
+CODE(uge_submit_workers [options] PARAM(servername) PARAM(port) PARAM(num-workers))
 
 when auto mode is not enabled for the worker, or
 
-CODE(sge_submit_workers [options] PARAM(num-workers))
+CODE(uge_submit_workers [options] PARAM(num-workers))
 
 when auto mode is enabled for the worker.
 
 SECTION(DESCRIPTION)
-CODE(sge_submit_workers) schedules the execution of MANPAGE(work_queue_worker,1)
-on the SUN Grid Engine (SGE) through its job submission interface, qsub.
+CODE(uge_submit_workers) schedules the execution of MANPAGE(work_queue_worker,1)
+on the Univa Grid Engine (UGE) through its job submission interface, qsub.
 The number of BOLD(work_queue_worker) scheduled and run is given by the BOLD(num-workers)
 argument.
 
@@ -43,7 +43,7 @@ OPTION_ARG_LONG(memory, size)Manually set the amonut of memory (in MB) reported 
 OPTION_ARG_LONG(disk, size)Manually set the amount of disk (in MB) reported by this worker.
 OPTION_ARG_LONG(scratch-dir, path)Set the scratch directory location created on the local machine. (default=${USER}-workers) 
 OPTION_FLAG_SHORT(j)Use job array to submit workers.
-OPTION_ARG_SHORT(-p, parameters)SGE qsub parameters.
+OPTION_ARG_SHORT(-p, parameters)UGE qsub parameters.
 OPTION_FLAG(h,help)Show help message.
 OPTIONS_END
 
@@ -52,17 +52,17 @@ On success, returns zero. On failure, returns non-zero.
 
 SECTION(EXAMPLES)
 
-Submit 10 worker instances to run on SGE and connect to a specific manager:
+Submit 10 worker instances to run on UGE and connect to a specific manager:
 
 LONGCODE_BEGIN
-sge_submit_workers manager.somewhere.edu 9123 10
+uge_submit_workers manager.somewhere.edu 9123 10
 LONGCODE_END
 
-Submit 10 work_queue_worker instances to run on SGE in auto mode with their
+Submit 10 work_queue_worker instances to run on UGE in auto mode with their
 preferred project name set to Project_A and abort timeout set to 3600 seconds:
 
 LONGCODE_BEGIN
-sge_submit_workers -a -t 3600 -M Project_A 10
+uge_submit_workers -a -t 3600 -M Project_A 10
 LONGCODE_END
 
 SECTION(COPYRIGHT)

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022 The University of Notre Dame
+Copyright (C) 2024 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -8,7 +8,7 @@ See the file COPYING for details.
 #include "work_queue_protocol.h"
 
 #include "cctools.h"
-#include "batch_job.h"
+#include "batch_queue.h"
 #include "hash_table.h"
 #include "copy_stream.h"
 #include "debug.h"
@@ -124,7 +124,7 @@ struct batch_queue *queue = 0;
 // announces it is using SSL, then SSL is used regardless of manual_ssl_option.
 int manual_ssl_option = 0;
 
-//Environment variables to pass along in batch_job_submit
+//Environment variables to pass along in batch_queue_submit
 struct jx *batch_env = NULL;
 
 //Features to pass along as worker arguments
@@ -482,42 +482,44 @@ static int submit_worker( struct batch_queue *queue )
 		cmd = newcmd;
 	}
 
-	char *files = NULL;
-	if(!runos_os && !k8s_worker_image) {
-		files = xxstrdup(worker_command);
-	} else {
-		// if runos, then worker comes from vc3_cmd. if k8s, then from the
-		// container image.
-		files = xxstrdup("");
-	}
-
-	if(password_file) {
-		char *newfiles = string_format("%s,pwfile",files);
-		free(files);
-		files = newfiles;
-	}
-
-	const char *item = NULL;
-	list_first_item(wrapper_inputs);
-	while((item = list_next_item(wrapper_inputs))) {
-		char *newfiles = string_format("%s,%s",files,path_basename(item));
-		free(files);
-		files = newfiles;
-	}
-
 	if(runos_os){
 		char* temp = string_format("%s %s %s",CCTOOLS_RUNOS_PATH,runos_os,cmd);
 		free(cmd);
 		cmd = temp;
 	}
 
+	struct batch_job *task = batch_job_create(queue);
+
+	batch_job_set_command(task,cmd);
+	
+	if(resources) {
+		batch_job_set_resources(task, resources);
+	}
+	
+	if(!runos_os && !k8s_worker_image) {
+		batch_job_add_input_file(task,worker_command,0);
+	} else {
+		// if runos, then worker comes from vc3_cmd. if k8s, then from the container image.
+	}
+
+	if(password_file) {
+		batch_job_add_input_file(task,"pwfile",0);
+	}
+
+	const char *item = NULL;
+	LIST_ITERATE(wrapper_inputs,item) {
+		batch_job_add_input_file(task,path_basename(item),0);
+	}
+
+	batch_job_add_output_file(task,"output.log",0);
+	
 	debug(D_WQ,"submitting worker: %s",cmd);
 
+	int status = batch_queue_submit(queue,task);
 
-	int status = batch_job_submit(queue,cmd,files,"output.log",batch_env,resources);
-
+	batch_job_delete(task);
+	
 	free(cmd);
-	free(files);
 	free(worker);
 
 	return status;
@@ -592,7 +594,7 @@ void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
 	itable_firstkey(job_table);
 	while(itable_nextkey(job_table,&jobid,&value)) {
 		debug(D_WQ,"removing job %"PRId64,jobid);
-		batch_job_remove(queue,jobid);
+		batch_queue_remove(queue,jobid);
 	}
 	debug(D_WQ,"%d workers removed.",count);
 
@@ -1091,8 +1093,8 @@ static void mainloop( struct batch_queue *queue )
 
 		while(1) {
 			struct batch_job_info info;
-			batch_job_id_t jobid;
-			jobid = batch_job_wait_timeout(queue,&info,stoptime);
+			batch_queue_id_t jobid;
+			jobid = batch_queue_wait_timeout(queue,&info,stoptime);
 			if(jobid>0) {
 				if(itable_lookup(job_table,jobid)) {
 					itable_remove(job_table,jobid);
@@ -1202,9 +1204,6 @@ static void show_help(const char *cmd)
 	printf(" %-30s Disable check for use of AFS with HTCondor.\n", "--disable-afs-check");
 	printf(" %-30s Specify Amazon config file.\n", "--amazon-config");
 	printf(" %-30s Set requirements for the workers as Condor jobs.\n", "--condor-requirements");
-	printf(" %-30s Host name of mesos manager node..\n", "--mesos-master");
-	printf(" %-30s Path to mesos python library..\n", "--mesos-path");
-	printf(" %-30s Libraries for running mesos.\n", "--mesos-preload");
 	printf(" %-30s Container image for Kubernetes.\n", "--k8s-image");
 	printf(" %-30s Container image with worker for Kubernetes.\n", "--k8s-worker-image");
 
@@ -1225,9 +1224,6 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_WRAPPER, 
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WORKER_BINARY,
-		LONG_OPT_MESOS_MANAGER, 
-		LONG_OPT_MESOS_PATH,
-		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_K8S_IMAGE,
 		LONG_OPT_K8S_WORKER_IMAGE,
 		LONG_OPT_CATALOG,
@@ -1269,9 +1265,6 @@ static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"max-workers", required_argument, 0, 'W'},
 	{"memory", required_argument,  0,  LONG_OPT_MEMORY},
-	{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MANAGER},
-	{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
-	{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 	{"min-workers", required_argument, 0, 'w'},
 	{"parent-death", no_argument, 0, LONG_OPT_PARENT_DEATH},
 	{"password", required_argument, 0, 'P'},
@@ -1296,9 +1289,6 @@ static const struct option long_options[] = {
 
 int main(int argc, char *argv[])
 {
-	char *mesos_manager = NULL;
-	char *mesos_path = NULL;
-	char *mesos_preload = NULL;
 	char *k8s_image = NULL;
 
 	wrapper_inputs = list_create();
@@ -1468,15 +1458,6 @@ int main(int argc, char *argv[])
 			case 'h':
 				show_help(argv[0]);
 				exit(EXIT_SUCCESS);
-			case LONG_OPT_MESOS_MANAGER:
-				mesos_manager = xxstrdup(optarg);
-				break;
-			case LONG_OPT_MESOS_PATH:
-				mesos_path = xxstrdup(optarg);
-				break;
-			case LONG_OPT_MESOS_PRELOAD:
-				mesos_preload = xxstrdup(optarg);
-				break;
 			case LONG_OPT_K8S_IMAGE:
 				k8s_image = xxstrdup(optarg);
 				break;
@@ -1698,25 +1679,11 @@ int main(int argc, char *argv[])
 		batch_queue_set_option(queue, "condor-requirements", condor_requirements);
 	}
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-		batch_queue_set_option(queue, "mesos-path", mesos_path);
-		batch_queue_set_option(queue, "mesos-master", mesos_manager);
-		batch_queue_set_option(queue, "mesos-preload", mesos_preload);
-		batch_queue_set_logfile(queue, "work_queue_factory.mesoslog");
-	}
-	
 	if(batch_queue_type == BATCH_QUEUE_TYPE_K8S) {
 		batch_queue_set_option(queue, "k8s-image", k8s_image);
 	}
 
 	mainloop( queue );
-
-	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-
-		batch_queue_set_int_option(queue, "batch-queue-abort-flag", (int)abort_flag);
-		batch_queue_set_int_option(queue, "batch-queue-failed-flag", 0);
-
-	}
 
 	batch_queue_delete(queue);
 

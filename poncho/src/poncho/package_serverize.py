@@ -32,22 +32,26 @@ init_function = """if __name__ == "__main__":
 
 
 # Generates a list of import statements based on the given argument.
-# @param import_modules  A list of modules imported at the preamble of library
-def generate_import_statements(import_modules):
-    if not import_modules:
+# @param hoisting_modules  A list of modules imported at the preamble of library, including packages, functions and classes.
+def generate_hoisting_code(hoisting_modules):
+    if not hoisting_modules:
         return
 
-    if not isinstance(import_modules, list):
-        raise ValueError("Expected 'import_modules' to be a list.")
+    if not isinstance(hoisting_modules, list):
+        raise ValueError("Expected 'hoisting_modules' to be a list.")
 
-    import_statements = []
-    for module in import_modules:
-        if not isinstance(module, types.ModuleType):
-            raise ValueError("Expected ModuleType in 'import_modules'.")
+    hoisting_code_list = []
+    for module in hoisting_modules:
+        if isinstance(module, types.ModuleType):
+            hoisting_code_list.append(f"import {module.__name__}")
+        elif inspect.isfunction(module):
+            source_code = inspect.getsource(module)
+            hoisting_code_list.append(source_code)
+        elif inspect.isclass(module):
+            source_code = inspect.getsource(module)
+            hoisting_code_list.append(source_code)
 
-        import_statements.append(f"import {module.__name__}")
-
-    return import_statements
+    return hoisting_code_list
 
 
 # Create the library driver code that will be run as a normal task
@@ -56,17 +60,17 @@ def generate_import_statements(import_modules):
 # @param funcs           A list of relevant function names.
 # @param dest            Path to the final library script.
 # @param version         Whether this is for workqueue or taskvine serverless code.
-# @param import_modules  A list of modules to be imported at the preamble of library
-def create_library_code(path, funcs, dest, version, import_modules=None):
+# @param hoisting_modules  A list of modules imported at the preamble of library, including packages, functions and classes.
+def create_library_code(path, funcs, dest, version, hoisting_modules=None):
     # create output file
     with open(dest, "w") as output_file:
         # write shebang to file
         output_file.write(shebang)
         # write imports to file
-        import_statements = generate_import_statements(import_modules)
-        if import_statements:
-            for import_statement in import_statements:
-                output_file.write(f"{import_statement}\n")
+        hoisting_code_list = generate_hoisting_code(hoisting_modules)
+        if hoisting_code_list:
+            for hoisting_code in hoisting_code_list:
+                output_file.write(f"{hoisting_code}\n")
 
         function_source_code = []
         name_source_code = ""
@@ -167,12 +171,12 @@ def pack_library_code(path, envpath):
 # Python's exec or Jupyter Notebooks won't work here.
 # @param functions  A list of functions to generate the hash value from.
 # @return           a string of hex characters resulted from hashing the contents and names of functions.
-def generate_functions_hash(functions: list, import_modules=None) -> str:
+def generate_functions_hash(functions: list, hoisting_modules=None) -> str:
     import sys
 
     source_code = []
-    if import_modules:
-        source_code.extend(["import " + module.__name__ + "\n" for module in import_modules])
+    if hoisting_modules:
+        source_code.extend(["import " + module.__name__ + "\n" for module in hoisting_modules])
 
     for fnc in functions:
         try:
@@ -191,9 +195,9 @@ def generate_functions_hash(functions: list, import_modules=None) -> str:
 # The functions in the list must have source code for this code to work.
 # @param path             path to directory to create the library python file and the environment tarball.
 # @param functions        list of functions to include in the
-# @param import_modules   a list of modules to be imported at the preamble of library
+# @param hoisting_modules   a list of modules to be imported at the preamble of library
 def serverize_library_from_code(
-    path, functions, name, need_pack=True, import_modules=None
+    path, functions, name, need_pack=True, hoisting_modules=None
 ):
     tmp_library_path = f"{path}/tmp_library.py"
 
@@ -209,7 +213,7 @@ def serverize_library_from_code(
         [fnc.__name__ for fnc in functions],
         path + "/library_code.py",
         "taskvine",
-        import_modules=import_modules,
+        hoisting_modules=hoisting_modules,
     )
     # remove the temp library file
     os.remove(tmp_library_path)

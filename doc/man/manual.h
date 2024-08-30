@@ -15,7 +15,7 @@ define(SEE_ALSO_WORK_QUEUE,
 `LIST_BEGIN
 LIST_ITEM(MANUAL(Cooperative Computing Tools Documentation,"../index.html"))
 LIST_ITEM(MANUAL(Work Queue User Manual,"../workqueue.html"))
-LIST_ITEM(MANPAGE(work_queue_worker,1) MANPAGE(work_queue_status,1) MANPAGE(work_queue_factory,1) MANPAGE(condor_submit_workers,1) MANPAGE(sge_submit_workers,1) MANPAGE(torque_submit_workers,1) )
+LIST_ITEM(MANPAGE(work_queue_worker,1) MANPAGE(work_queue_status,1) MANPAGE(work_queue_factory,1) MANPAGE(condor_submit_workers,1) MANPAGE(uge_submit_workers,1) MANPAGE(torque_submit_workers,1) )
 LIST_END')dnl
 dnl
 define(SEE_ALSO_TASK_VINE,

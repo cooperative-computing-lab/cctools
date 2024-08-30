@@ -12,7 +12,7 @@ explain the principles of operations, give examples for new users to follow, and
 as a general reference.
 
 **Local Build**. The manual is written using [mkdocs flavored markdown](https://www.mkdocs.org/user-guide/writing-your-docs/).
-To build and test the documentation locally, run `mkdocs serve` in the `doc` directory,
+To build and test the documentation locally, run `mkdocs serve --config-file doc/mkdocs.yml` from the repository root directory,
 which will compile the sources into HTML and start a local web server on `http://localhost:8000`.
 You can then view the compiled manuals using your browser.
 
@@ -33,7 +33,7 @@ all options and environment variables.
 
 The source for each man page is found in `man/m4` and written using the M4 macro language.
 The `Makefile` runs `m4` on each source in order to generate the same text in several different formats:
-- `m4` for markdown documentation, which is copied to `manuals/man_pages` to become part of the online documentation
+- `md` for markdown documentation, which is copied to `manuals/man_pages` to become part of the online documentation
 - `html` for traditional web pages, which is installed to `$PREFIX/doc` by `make install`
 - `man` for traditional Unix nroff format, which is installed to $PREFIX/man by `make install`
 
@@ -46,7 +46,7 @@ is generated from `api/cctools.doxygen`.
 
 ## Combined Documentation
 
-Note that both the traditional man pages are and the API documentation (while useful separately)
+Note that both the traditional man pages and the API documentation (while useful separately)
 are built and then copied into the user manual, so that they can easily be viewed online:
 - API docs are built and copied into `manual/api` by `.readthedocs.yaml`
 - Man pages are built and copied from `man/md` to `manual/man_pages` by `make`.

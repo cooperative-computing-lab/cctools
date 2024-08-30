@@ -2663,6 +2663,16 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	/* never go below specified min resources. */
 	rmsummary_merge_max(limits, min);
 
+	/* If the user specified resources, override proportional calculation */
+	if (t->resources_requested->cores > 0)
+		limits->cores = t->resources_requested->cores;
+	if (t->resources_requested->memory > 0)
+		limits->memory = t->resources_requested->memory;
+	if (t->resources_requested->disk > 0)
+		limits->disk = t->resources_requested->disk;
+	if (t->resources_requested->gpus > 0)
+		limits->gpus = t->resources_requested->gpus;
+
 	return limits;
 }
 
@@ -2676,6 +2686,19 @@ files that have already been uploaded into the worker's cache by the manager.
 static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	struct rmsummary *limits = vine_manager_choose_resources_for_task(q, w, t);
+
+	/*
+	If this is a library task, then choose the number of slots to either
+	match the explicit request, or set it to the number of cores.
+	*/
+
+	if (t->provides_library) {
+		if (t->function_slots_requested <= 0) {
+			t->function_slots_total = limits->cores;
+		} else {
+			t->function_slots_total = t->function_slots_requested;
+		}
+	}
 
 	char *command_line;
 
