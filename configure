@@ -4,7 +4,7 @@
 # *** Set for releases. ***
 
 MAJOR=7
-MINOR=12
+MINOR=13
 MICRO=0
 
 # Optionally set the source/tag for this code (e.g. RC1 or FINAL).  Setting
