@@ -19,7 +19,7 @@ static int vine_task_groups_create_group(struct vine_manager *q, struct vine_tas
 
 	t->group_id = id;
 
-	struct vine_task *tc = vine_task_clone(t);
+	struct vine_task *tc = vine_task_addref(t);
 
 	list_push_head(l, tc);
 	hash_table_insert(q->task_group_table, id, l);
@@ -41,7 +41,7 @@ static int vine_task_groups_add_to_group(struct vine_manager *q, struct vine_tas
 			{
 				if (m->file == lm->file) {
 					t->group_id = lt->group_id;
-					struct vine_task *tc = vine_task_clone(t);
+					struct vine_task *tc = vine_task_addref(t);
 					list_push_tail(l, tc);
 					return 1;
 				}
