@@ -2862,34 +2862,7 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 {
 	vine_result_code_t result = VINE_SUCCESS;
 
-	/* Kill unused libraries on this worker to reclaim resources. */
-	/* Matches assumption in vine_schedule.c:check_available_resources() */
-	kill_empty_libraries_on_worker(q, w, t);
-
-	/* If this is a function needing a library, dispatch the library. */
-	if (t->needs_library) {
-		/* Consider whether the library task is already on that machine. */
-		t->library_task = vine_schedule_find_library(q, w, t->needs_library);
-		if (!t->library_task) {
-			/* Otherwise send the library to the worker. */
-			/* Note that this call will re-enter commit_task_to_worker. */
-			t->library_task = send_library_to_worker(q, w, t->needs_library, &result);
-
-			/* Careful: if the above failed, then w may no longer be valid */
-			/* In that case return immediately without making further changes. */
-			if (!t->library_task)
-				return result;
-		}
-		/* If start_one_task_fails, this will be decremented in handle_failure below. */
-		t->library_task->function_slots_inuse++;
-	}
-
-	t->hostname = xxstrdup(w->hostname);
-	t->addrport = xxstrdup(w->addrport);
-
-	t->time_when_commit_start = timestamp_get();
-	result = VINE_SUCCESS;
-	struct list *l = 0;
+	struct list *l = NULL;
 	if (t->group_id) {
 		debug(D_VINE, "Task Has GroupID of %s. Should Send:", t->group_id);
 		l = hash_table_lookup(q->task_group_table, t->group_id);
