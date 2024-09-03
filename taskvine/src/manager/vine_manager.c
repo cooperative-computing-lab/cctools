@@ -2973,7 +2973,7 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 	result = VINE_SUCCESS;
 	struct list *l = 0;
 	if (t->group_id) {
-		debug(D_VINE, "Task Has GroupID of %s. Should Send:", t->group_id);
+		debug(D_VINE, "Task %d has GroupID of %s. Should Send:", t->task_id, t->group_id);
 		l = hash_table_lookup(q->task_group_table, t->group_id);
 
 		struct vine_task *logt;
@@ -2986,17 +2986,34 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 		// decrement refcount
 		vine_task_delete(t);
 	}
+
 	int counter = 0;
 	do {
-		if (counter) {
-			list_remove(q->ready_list, t);
-			// decrement refcount
-			vine_task_delete(t);
-		}
 
 		/* Kill empty libraries to reclaim resources. Match the assumption of
 		 * @vine.schedule.c:check_worker_have_enough_resources() */
 		kill_empty_libraries_on_worker(q, w, t);
+
+		/* If this is a function needing a library, dispatch the library. */
+		if (t->needs_library) {
+			/* Consider whether the library task is already on that machine. */
+			t->library_task = vine_schedule_find_library(q, w, t->needs_library);
+			if (!t->library_task) {
+				/* Otherwise send the library to the worker. */
+				/* Note that this call will re-enter commit_task_to_worker. */
+				t->library_task = send_library_to_worker(q, w, t->needs_library, &result);
+
+				/* Careful: if the above failed, then w may no longer be valid */
+				/* In that case return immediately without making further changes. */
+				if (!t->library_task) {
+					list_push_head(l, t);
+					return result;
+				}
+			}
+			/* If start_one_task_fails, this will be decremented in handle_failure below. */
+			t->library_task->function_slots_inuse++;
+		}
+
 		t->hostname = xxstrdup(w->hostname);
 		t->addrport = xxstrdup(w->addrport);
 
@@ -3006,15 +3023,6 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 
 		itable_insert(w->current_tasks, t->task_id, t);
 		t->worker = w;
-
-		/* Increment the function count if this is a function task.
-		 * If the manager fails to send this function task to the worker however,
-		 * then the count will be decremented properly in @handle_failure() below. */
-		if (t->needs_library) {
-			t->library_task = vine_schedule_find_library(q, w, t->needs_library);
-			t->library_task->function_slots_inuse++;
-			vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
-		}
 
 		change_task_state(q, t, VINE_TASK_RUNNING);
 
@@ -3026,6 +3034,12 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 		if (result != VINE_SUCCESS) {
 			debug(D_VINE, "Failed to send task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
 			handle_failure(q, w, t, result);
+		}
+
+		if (counter) {
+			list_remove(q->ready_list, t);
+			// decrement refcount
+			vine_task_delete(t);
 		}
 
 		counter++;
