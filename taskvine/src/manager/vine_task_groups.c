@@ -91,3 +91,15 @@ int vine_task_groups_assign_task(struct vine_manager *q, struct vine_task *t)
 
 	return inputs_present || outputs_present;
 }
+
+static void vine_task_group_delete(struct list *l)
+{
+	if (l) {
+		list_delete(l);
+	}
+}
+
+void vine_task_groups_clear(struct vine_manager *q)
+{
+	hash_table_clear(q->task_group_table, (void *)vine_task_group_delete);
+}
