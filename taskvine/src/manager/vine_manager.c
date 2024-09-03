@@ -2973,10 +2973,27 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 	result = VINE_SUCCESS;
 	struct list *l = 0;
 	if (t->group_id) {
+		debug(D_VINE, "Task Has GroupID of %s. Should Send:", t->group_id);
 		l = hash_table_lookup(q->task_group_table, t->group_id);
+
+		struct vine_task *logt;
+		LIST_ITERATE(l, logt)
+		{
+			debug(D_VINE, "Task ID: %d", logt->task_id);
+		}
+
+		list_remove(l, t);
+		// decrement refcount
+		vine_task_delete(t);
 	}
 	int counter = 0;
 	do {
+		if (counter) {
+			list_remove(q->ready_list, t);
+			// decrement refcount
+			vine_task_delete(t);
+		}
+
 		/* Kill empty libraries to reclaim resources. Match the assumption of
 		 * @vine.schedule.c:check_worker_have_enough_resources() */
 		kill_empty_libraries_on_worker(q, w, t);
@@ -3013,7 +3030,7 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 
 		counter++;
 
-	} while ((l && (t = list_next_item(l))));
+	} while ((l && (t = list_pop_head(l))));
 
 	debug(D_VINE, "Sent batch of %d tasks to worker %s", counter, w->hostname);
 
@@ -4315,6 +4332,9 @@ void vine_delete(struct vine_manager *q)
 
 	vine_current_transfers_clear(q);
 	hash_table_delete(q->current_transfer_table);
+
+	vine_task_groups_clear(q);
+	hash_table_delete(q->task_group_table);
 
 	itable_clear(q->tasks, (void *)delete_task_at_exit);
 	itable_delete(q->tasks);
