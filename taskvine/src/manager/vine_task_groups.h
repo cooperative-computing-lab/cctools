@@ -10,3 +10,5 @@ See the file COPYING for details.
 
 
 int vine_task_groups_assign_task(struct vine_manager *q, struct vine_task *t);
+
+void vine_task_groups_clear(struct vine_manager *q);
