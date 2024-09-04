@@ -2510,25 +2510,27 @@ static int build_poll_table(struct vine_manager *q)
 }
 
 /*
- * Use declared dependencies to estimate the minimum disk requriement of a task
+ * Use declared dependencies to estimate the minimum disk requirement of a task
  */
 static void vine_manager_estimate_task_disk_min(struct vine_manager *q, struct vine_task *t)
 {
-	struct category *c = vine_category_lookup_or_create(q, t->category);
-
-	if (c->vine_stats->max_sandbox) {
-		t->resources_requested->disk = c->vine_stats->max_sandbox;
-	} else {
-		int mb = 0;
-		struct vine_mount *m;
-		LIST_ITERATE(t->input_mounts, m)
-		{
-			mb += (m->file->size) / 1e6;
-		}
-		if (mb > 0) {
-			t->resources_requested->disk = mb;
-		}
+	int input_size = 0;
+	struct vine_mount *m;
+	LIST_ITERATE(t->input_mounts, m)
+	{
+		input_size += (int)(ceil(m->file->size / 1e6));
 	}
+
+	struct category *c = vine_category_lookup_or_create(q, t->category);
+	if (c->vine_stats->max_sandbox < input_size) {
+		c->vine_stats->max_sandbox = input_size;
+	}
+
+	if (t->resources_requested->disk > 0 && t->resources_requested->disk < c->vine_stats->max_sandbox) {
+		notice(D_VINE, "disk requested for task %d is smaller than observed previous sandbox (%d < %d), updating request...", t->task_id, t->resources_requested->disk, c->vine_stats->max_sandbox);
+	}
+
+	t->resources_requested->disk = MAX(t->resources_requested->disk, c->vine_stats->max_sandbox);
 }
 
 /*
@@ -2554,9 +2556,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		return limits;
 	}
 
-	if (t->resources_requested->disk < 0) {
-		vine_manager_estimate_task_disk_min(q, t);
-	}
+	vine_manager_estimate_task_disk_min(q, t);
 
 	/* Compute the minimum and maximum resources for this task. */
 	const struct rmsummary *min = vine_manager_task_resources_min(q, t);
