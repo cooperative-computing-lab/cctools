@@ -593,6 +593,11 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 
 		/* Update category disk info */
 		struct category *c = vine_category_lookup_or_create(q, t->category);
+		int64_t bucket_size = MAX(1, category_get_bucket_size("disk"));
+
+		// in multiples of bucket_size, padded with at least bucket_size/2.
+		sandbox_used = (int64_t) (bucket_size * ceil((sandbox_used + bucket_size/2.0) / bucket_size));
+
 		if (sandbox_used > c->vine_stats->max_sandbox) {
 			c->vine_stats->max_sandbox = sandbox_used;
 		}
