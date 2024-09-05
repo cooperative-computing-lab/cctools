@@ -2673,6 +2673,14 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	/* never go below specified min resources. */
 	rmsummary_merge_max(limits, min);
 
+	/* never go below observed sandboxes. sandbox padded as other allocations. */
+	struct category *c = vine_category_lookup_or_create(q, t->category);
+	double sandbox = MAX((double)c->vine_stats->max_sandbox, ceil(t->input_files_size / 1e6));
+	int64_t bucket_size = MAX(1, category_get_bucket_size("disk"));
+	sandbox = bucket_size * ceil((sandbox + bucket_size / 2.0) / bucket_size);
+
+	limits->disk = MAX(limits->disk, sandbox);
+
 	return limits;
 }
 
@@ -5828,26 +5836,9 @@ int vine_enable_category_resource(struct vine_manager *q, const char *category, 
 
 const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, struct vine_task *t)
 {
-
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 
-	/* ues estimate of sandbox usage when requesting resource allocations. We save the original user disk request to reset it later. */
-	double original_request = t->resources_requested->disk;
-	double sandbox = MAX((double)c->vine_stats->max_sandbox, ceil(t->input_files_size / 1e6));
-
-	if (sandbox > 0 && c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED) {
-		// if in fixed mode, give sandbox some slack according to allocation bucket sizes, as we would do for other allocations.
-		int64_t bucket_size = MAX(1, category_get_bucket_size("disk"));
-		sandbox = bucket_size * ceil((sandbox + bucket_size / 2.0) / bucket_size);
-	}
-
-	t->resources_requested->disk = MAX(c->vine_stats->max_sandbox, sandbox);
-
-	const struct rmsummary *alloc = category_task_max_resources(c, t->resources_requested, t->resource_request, t->task_id);
-
-	t->resources_requested->disk = original_request;
-
-	return alloc;
+	return  category_task_max_resources(c, t->resources_requested, t->resource_request, t->task_id);
 }
 
 const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, struct vine_task *t)
