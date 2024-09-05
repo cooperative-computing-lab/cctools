@@ -288,7 +288,7 @@ static int64_t measure_worker_disk()
 {
 	static struct path_disk_size_info *state = NULL;
 
-	path_disk_size_info_get_r("./cache", max_time_on_measurement, &state);
+	path_disk_size_info_get_r("./cache", max_time_on_measurement, &state, NULL);
 
 	int64_t disk_measured = 0;
 	if(state->last_byte_size_complete >= 0) {
