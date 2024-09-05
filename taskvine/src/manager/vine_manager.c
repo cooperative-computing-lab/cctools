@@ -4408,6 +4408,9 @@ const char *vine_result_string(vine_result_t result)
 	case VINE_RESULT_LIBRARY_EXIT:
 		str = "LIBRARY_EXIT";
 		break;
+	case VINE_RESULT_SANDBOX_EXHAUSTION:
+		str = "SANDBOX_EXHAUSTION";
+		break;
 	}
 
 	return str;

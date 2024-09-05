@@ -1098,7 +1098,7 @@ static void kill_all_tasks()
 
 /* Check whether a given process is still within the various limits imposed on it. */
 
-static int enforce_process_limits(struct vine_process *p)
+static int enforce_process_sanbox_limits(struct vine_process *p)
 {
 	/* If the task did not set disk usage, return right away. */
 	if (p->task->resources_requested->disk < 1)
@@ -1119,7 +1119,7 @@ static int enforce_process_limits(struct vine_process *p)
 
 /* Check all processes to see whether they have exceeded various limits, and kill if necessary. */
 
-static int enforce_processes_limits()
+static int enforce_processes_sandbox_limits()
 {
 	static time_t last_check_time = 0;
 
@@ -1134,8 +1134,8 @@ static int enforce_processes_limits()
 
 	ITABLE_ITERATE(procs_running, task_id, p)
 	{
-		if (!enforce_process_limits(p)) {
-			finish_running_task(p, VINE_RESULT_RESOURCE_EXHAUSTION);
+		if (!enforce_process_sanbox_limits(p)) {
+			finish_running_task(p, VINE_RESULT_SANDBOX_EXHAUSTION);
 			trash_file(p->sandbox);
 
 			ok = 0;
@@ -1679,7 +1679,7 @@ static void vine_worker_serve_manager(struct link *manager)
 
 		/* end a running processes if goes above its declared limits.
 		 * Mark offending process as RESOURCE_EXHASTION. */
-		enforce_processes_limits();
+		enforce_processes_sandbox_limits();
 
 		/* end running processes if worker resources are exhasusted, and marked
 		 * them as FORSAKEN, so they can be resubmitted somewhere else. */
