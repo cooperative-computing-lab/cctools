@@ -2673,13 +2673,9 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	/* never go below specified min resources. */
 	rmsummary_merge_max(limits, min);
 
-	/* never go below observed sandboxes. sandbox padded as other allocations. */
+	/* never go below observed sandboxes. */
 	struct category *c = vine_category_lookup_or_create(q, t->category);
-	double sandbox = MAX((double)c->vine_stats->max_sandbox, ceil(t->input_files_size / 1e6));
-	int64_t bucket_size = MAX(1, category_get_bucket_size("disk"));
-	sandbox = bucket_size * ceil((sandbox + bucket_size / 2.0) / bucket_size);
-
-	limits->disk = MAX(limits->disk, sandbox);
+	limits->disk = MAX(limits->disk, c->vine_stats->max_sandbox);
 
 	return limits;
 }
@@ -2911,6 +2907,37 @@ static int resubmit_task_on_exhaustion(struct vine_manager *q, struct vine_worke
 	return 0;
 }
 
+/* 1 if task resubmitted, 0 otherwise */
+static int resubmit_task_on_sandbox_exhaustion(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	if (t->result != VINE_RESULT_SANDBOX_EXHAUSTION) {
+		return 0;
+	}
+
+	struct category *c = vine_category_lookup_or_create(q, t->category);
+
+	/* on sandbox exhausted, the resources allocated correspond to the overflown sandbox */
+	double sandbox = t->resources_allocated->disk;
+
+	/* grow sandbox by given factor (default is two) */
+	sandbox *= q->sandbox_grow_factor * sandbox;
+	c->vine_stats->max_sandbox = MAX(c->vine_stats->max_sandbox, sandbox);
+
+	debug(D_VINE, "Task %d exhausted disk sandbox on %s (%s).\n", t->task_id, w->hostname, w->addrport);
+
+	double max_allowed_disk = MAX(t->resources_requested->disk, c->max_allocation->disk);
+
+	if (max_allowed_disk && c->vine_stats->max_sandbox < max_allowed_disk) {
+		debug(D_VINE, "Task %d failed given max disk limit for sandbox.\n", t->task_id);
+		return 0;
+	}
+
+	change_task_state(q, t, VINE_TASK_READY);
+
+	return 1;
+}
+
+
 static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	/* in this function, any change_task_state should only be to VINE_TASK_READY */
@@ -2935,6 +2962,9 @@ static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w
 	switch (t->result) {
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
 		return resubmit_task_on_exhaustion(q, w, t);
+		break;
+	case VINE_RESULT_SANDBOX_EXHAUSTION:
+		return resubmit_task_on_sandbox_exhaustion(q, w, t);
 		break;
 	default:
 		/* by default tasks are not resumitted */
@@ -3762,6 +3792,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->measured_local_resources = rmsummary_create(-1);
 	q->current_max_worker = rmsummary_create(-1);
 	q->max_task_resources_requested = rmsummary_create(-1);
+
+	q->sandbox_grow_factor = 2.0;
 
 	q->stats = calloc(1, sizeof(struct vine_stats));
 	q->stats_disconnected_workers = calloc(1, sizeof(struct vine_stats));
@@ -5445,8 +5477,13 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "option-blocklist-slow-workers-timeout")) {
 		q->option_blocklist_slow_workers_timeout = MAX(0, value); /*todo: confirm 0 or 1*/
+
 	} else if (!strcmp(name, "watch-library-logfiles")) {
 		q->watch_library_logfiles = !!((int)value);
+
+	} else if (!strcmp(name, "sandbox-grow-factor")) {
+		q->sandbox_grow_factor = MAX(1.1, value);
+
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
