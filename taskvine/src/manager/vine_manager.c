@@ -2937,7 +2937,6 @@ static int resubmit_task_on_sandbox_exhaustion(struct vine_manager *q, struct vi
 	return 1;
 }
 
-
 static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	/* in this function, any change_task_state should only be to VINE_TASK_READY */
@@ -5875,7 +5874,7 @@ const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, 
 {
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 
-	return  category_task_max_resources(c, t->resources_requested, t->resource_request, t->task_id);
+	return category_task_max_resources(c, t->resources_requested, t->resource_request, t->task_id);
 }
 
 const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, struct vine_task *t)
