@@ -593,11 +593,6 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 
 		/* Update category disk info */
 		struct category *c = vine_category_lookup_or_create(q, t->category);
-		int64_t bucket_size = MAX(1, category_get_bucket_size("disk"));
-
-		// in multiples of bucket_size, padded with at least bucket_size/2.
-		sandbox_used = (int64_t) (bucket_size * ceil((sandbox_used + bucket_size/2.0) / bucket_size));
-
 		if (sandbox_used > c->vine_stats->max_sandbox) {
 			c->vine_stats->max_sandbox = sandbox_used;
 		}
@@ -2514,28 +2509,28 @@ static int build_poll_table(struct vine_manager *q)
 	return n;
 }
 
-/*
- * Use declared dependencies to estimate the minimum disk requirement of a task
- */
-static void vine_manager_estimate_task_disk_min(struct vine_manager *q, struct vine_task *t)
+static void vine_manager_compute_input_size(struct vine_manager *q, struct vine_task *t)
 {
-	int input_size = 0;
+	int64_t input_size = 0;
 	struct vine_mount *m;
 	LIST_ITERATE(t->input_mounts, m)
 	{
-		input_size += (int)(ceil(m->file->size / 1e6));
+		input_size += m->file->size;
 	}
 
+	t->input_files_size = input_size;
+
+	int64_t input_size_in_mbs = (int64_t)ceil(input_size / 1e6);
+
+	/* update max sandbox size with current knowledge of input files */
 	struct category *c = vine_category_lookup_or_create(q, t->category);
-	if (c->vine_stats->max_sandbox < input_size) {
-		c->vine_stats->max_sandbox = input_size;
+	if (c->vine_stats->max_sandbox < input_size_in_mbs) {
+		c->vine_stats->max_sandbox = input_size_in_mbs;
 	}
 
-	if (t->resources_requested->disk > 0 && t->resources_requested->disk < c->vine_stats->max_sandbox) {
-		notice(D_VINE, "disk requested for task %d is smaller than observed previous sandbox (%d < %d) updating request...", t->task_id, t->resources_requested->disk, c->vine_stats->max_sandbox);
+	if (q->stats->max_sandbox < input_size_in_mbs) {
+		q->stats->max_sandbox = input_size_in_mbs;
 	}
-
-	t->resources_requested->disk = MAX(t->resources_requested->disk, c->vine_stats->max_sandbox);
 }
 
 /*
@@ -2561,7 +2556,9 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		return limits;
 	}
 
-	vine_manager_estimate_task_disk_min(q, t);
+	if (t->input_files_size < 0) {
+		vine_manager_compute_input_size(q, t);
+	}
 
 	/* Compute the minimum and maximum resources for this task. */
 	const struct rmsummary *min = vine_manager_task_resources_min(q, t);
@@ -5831,7 +5828,23 @@ const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, 
 
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 
-	return category_task_max_resources(c, t->resources_requested, t->resource_request, t->task_id);
+	/* ues estimate of sandbox usage when requesting resource allocations. We save the original user disk request to reset it later. */
+	double original_request = t->resources_requested->disk;
+	double sandbox = MAX((double)c->vine_stats->max_sandbox, ceil(t->input_files_size / 1e6));
+
+	if (sandbox > 0 && c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED) {
+		// if in fixed mode, give sandbox some slack according to allocation bucket sizes, as we would do for other allocations.
+		int64_t bucket_size = MAX(1, category_get_bucket_size("disk"));
+		sandbox = bucket_size * ceil((sandbox + bucket_size / 2.0) / bucket_size);
+	}
+
+	t->resources_requested->disk = MAX(c->vine_stats->max_sandbox, sandbox);
+
+	const struct rmsummary *alloc = category_task_max_resources(c, t->resources_requested, t->resource_request, t->task_id);
+
+	t->resources_requested->disk = original_request;
+
+	return alloc;
 }
 
 const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, struct vine_task *t)
