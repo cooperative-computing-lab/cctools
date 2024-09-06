@@ -2568,6 +2568,12 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 
 	int use_whole_worker = 1;
 
+	int proportional_whole_tasks = q->proportional_whole_tasks;
+	if (t->resources_requested->cores > -1 || t->resources_requested->gpus > -1 || t->resources_requested->memory > -1 || t->resources_requested->disk > -1) {
+		/* if at least one resource was specified explicitely, do not expand resources to fill an integer number of tasks. */
+		proportional_whole_tasks = 0;
+	}
+
 	/* Proportionally assign the worker's resources to the task if configured. */
 	if (q->proportional_resources) {
 
@@ -2611,7 +2617,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 			use_whole_worker = 0;
 
 			// adjust max_proportion so that an integer number of tasks fit the worker.
-			if (q->proportional_whole_tasks) {
+			if (proportional_whole_tasks) {
 				max_proportion = 1.0 / (floor(1.0 / max_proportion));
 			}
 
