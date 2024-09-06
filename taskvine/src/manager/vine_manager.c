@@ -3971,12 +3971,6 @@ int vine_disable_proportional_resources(struct vine_manager *q)
 	return 1;
 }
 
-/** Disable proportional resources. See @ref vine_enable_proportional_resources.
- * Proportional resources are enabled by default.
-@param m A manager object
- **/
-void vine_disable_proportional_resources(struct vine_manager *m);
-
 int vine_enable_disconnect_slow_workers_category(struct vine_manager *q, const char *category, double multiplier)
 {
 	struct category *c = vine_category_lookup_or_create(q, category);
