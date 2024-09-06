@@ -2689,6 +2689,10 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 	limits->disk = MAX(limits->disk, c->vine_stats->max_sandbox);
 
+	/* assume the user knows what they are doing... */
+	rmsummary_merge_override_basic(limits, t->resources_requested);
+
+
 	return limits;
 }
 
