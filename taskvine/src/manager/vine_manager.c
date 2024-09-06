@@ -2573,27 +2573,39 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 
 		/* Compute the proportion of the worker the task shall have across resource types. */
 		double max_proportion = -1;
+		double min_proportion = -1;
+
 		if (w->resources->cores.total > 0) {
 			max_proportion = MAX(max_proportion, limits->cores / w->resources->cores.total);
+			min_proportion = MAX(min_proportion, min->cores / w->resources->cores.total);
 		}
 
 		if (w->resources->memory.total > 0) {
 			max_proportion = MAX(max_proportion, limits->memory / w->resources->memory.total);
+			min_proportion = MAX(min_proportion, min->memory / w->resources->memory.total);
 		}
 
 		if (w->resources->disk.total > 0) {
 			max_proportion = MAX(max_proportion, limits->disk / w->resources->disk.total);
+			min_proportion = MAX(min_proportion, min->disk / w->resources->disk.total);
 		}
 
 		if (w->resources->gpus.total > 0) {
 			max_proportion = MAX(max_proportion, limits->gpus / w->resources->gpus.total);
+			min_proportion = MAX(min_proportion, min->disk / w->resources->gpus.total);
 		}
 
-		/* If max_proportion > 1, then the task does not fit the worker for the
+		/* If a max_proportion was defined, it cannot be less than a proportion using the minimum
+		 * resources for the category. */
+		if (max_proportion != -1) {
+			max_proportion = MAX(max_proportion, min_proportion);
+		}
+
+		/* If max_proportion or min_proportion > 1, then the task does not fit the worker for the
 		 * specified resources. For the unspecified resources we use the whole
 		 * worker as not to trigger a warning when checking for tasks that can't
 		 * run on any available worker. */
-		if (max_proportion > 1) {
+		if (max_proportion > 1 || min_proportion > 1) {
 			use_whole_worker = 1;
 		} else if (max_proportion > 0) {
 			use_whole_worker = 0;
