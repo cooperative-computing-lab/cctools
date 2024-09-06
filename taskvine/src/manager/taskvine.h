@@ -1082,6 +1082,21 @@ int vine_enable_peer_transfers(struct vine_manager *m);
 /** Disable taskvine peer transfers to be scheduled by the manager **/
 int vine_disable_peer_transfers(struct vine_manager *m);
 
+/** When enabled, resources to tasks in are assigned in proportion to the size
+of the worker. If a resource is specified (e.g. with @ref vine_task_set_cores),
+proportional resources never go below explicit specifications. This mode is most
+useful when only some of the resources are explicitely specified, or
+with automatic resource allocation. By default it is enabled.
+@param m A manager object
+ **/
+int vine_enable_proportional_resources(struct vine_manager *m);
+
+/** Disable proportional resources. See @ref vine_enable_proportional_resources.
+ * Proportional resources are enabled by default.
+@param m A manager object
+ **/
+int vine_disable_proportional_resources(struct vine_manager *m);
+
 /** Set the minimum task_id of future submitted tasks.
 Further submitted tasks are guaranteed to have a task_id larger or equal to
 minid.  This function is useful to make task_ids consistent in a workflow that

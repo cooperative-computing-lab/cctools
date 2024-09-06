@@ -1908,8 +1908,7 @@ Consider now that the task requires 1 cores, 6GB of memory, and 27 GB of disk:
 
 !!! note
     If you want TaskVine to exactly allocate the resources you have
-    specified, use the `proportional-resources` and `proportional-whole-tasks`
-    parameters as shown [here](#specialized-and-experimental-settings).  In
+    specified, use `m.disable_proportional_resources()`, In
     general, however, we have found that using proportions nicely adapts to the
     underlying available resources, and leads to very few resource exhaustion
     failures while still using worker resources efficiently.
@@ -2515,7 +2514,6 @@ change.
 | min-transfer-timeout | Set the minimum number of seconds to wait for files to be transferred to or from a worker. | 10 |
 | monitor-interval        | Maximum number of seconds between resource monitor measurements. If less than 1, use default. | 5 |
 | prefer-dispatch | If 1, try to dispatch tasks even if there are retrieved tasks ready to be reportedas done. | 0 |
-| proportional-resources | If set to 0, do not assign resources proportionally to tasks. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
 | proportional-whole-tasks | Round up resource proportions such that only an integer number of tasks could be fit in the worker. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
 | ramp-down-heuristic     | If set to 1 and there are more workers than tasks waiting, then tasks are allocated all the free resources of a worker large enough to run them. If monitoring watchdog is not enabled, then this heuristic has no effect. | 0 |
 | resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |

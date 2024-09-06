@@ -3955,6 +3955,28 @@ int vine_disable_peer_transfers(struct vine_manager *q)
 	return 1;
 }
 
+int vine_enable_proportional_resources(struct vine_manager *q)
+{
+	debug(D_VINE, "Proportional resources enabled");
+	q->proportional_resources = 1;
+	q->proportional_whole_tasks = 1;
+	return 1;
+}
+
+int vine_disable_proportional_resources(struct vine_manager *q)
+{
+	debug(D_VINE, "Proportional resources disabled");
+	q->proportional_resources = 0;
+	q->proportional_whole_tasks = 0;
+	return 1;
+}
+
+/** Disable proportional resources. See @ref vine_enable_proportional_resources.
+ * Proportional resources are enabled by default.
+@param m A manager object
+ **/
+void vine_disable_proportional_resources(struct vine_manager *m);
+
 int vine_enable_disconnect_slow_workers_category(struct vine_manager *q, const char *category, double multiplier)
 {
 	struct category *c = vine_category_lookup_or_create(q, category);
@@ -5408,7 +5430,11 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		q->prefer_dispatch = !!((int)value);
 
 	} else if (!strcmp(name, "force-proportional-resources") || !strcmp(name, "proportional-resources")) {
-		q->proportional_resources = MAX(0, (int)value);
+		if (value > 0) {
+			vine_enable_proportional_resources(q);
+		} else {
+			vine_disable_proportional_resources(q);
+		}
 
 	} else if (!strcmp(name, "force-proportional-resources-whole-tasks") || !strcmp(name, "proportional-whole-tasks")) {
 		q->proportional_whole_tasks = MAX(0, (int)value);
