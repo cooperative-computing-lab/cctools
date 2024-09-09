@@ -4070,6 +4070,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	// peer transfers enabled by default
 	q->peer_transfers_enabled = 1;
 
+	q->task_groups_enabled = 0;
+
 	q->load_from_shared_fs_enabled = 0;
 
 	q->file_source_max_transfers = VINE_FILE_SOURCE_MAX_TRANSFERS;
@@ -4731,8 +4733,10 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	/* Ensure category structure is created. */
 	vine_category_lookup_or_create(q, t->category);
 
-	/* Attemp to group this task based on temp dependencies. */
-	vine_task_groups_assign_task(q, t);
+	/* Attempt to group this task based on temp dependencies. */
+	if(q->task_groups_enabled) { 
+		vine_task_groups_assign_task(q, t);
+	}
 
 	change_task_state(q, t, VINE_TASK_READY);
 
@@ -5748,6 +5752,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "update-interval")) {
 		q->update_interval = MAX(1, (int)value);
+
+	} else if (!strcmp(name, "task-groups")) {
+		q->task_groups_enabled = MIN(1, (int)value);
 
 	} else if (!strcmp(name, "resource-management-interval")) {
 		q->resource_management_interval = MAX(1, (int)value);
