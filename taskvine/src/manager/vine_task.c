@@ -799,7 +799,6 @@ const char *vine_task_get_state(struct vine_task *t)
 	return vine_task_state_to_string(t->state);
 }
 
-
 #define METRIC(x) \
 	if (!strcmp(name, #x)) \
 		return t->x;
