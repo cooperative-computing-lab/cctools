@@ -177,6 +177,9 @@ struct vine_manager {
 	int file_source_max_transfers;
 	int worker_source_max_transfers;
 
+	/* Task Groups Configuration */
+	int task_groups_enabled; 
+
 	/* Various performance knobs that can be tuned. */
 	int short_timeout;            /* Timeout in seconds to send/recv a brief message from worker */
 	int long_timeout;             /* Timeout if in the middle of an incomplete message. */
