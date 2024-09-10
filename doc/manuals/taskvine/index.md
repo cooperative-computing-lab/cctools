@@ -71,7 +71,7 @@ and machine learning.
 ## Quick Start
 
 Installing via `conda` is the easiest method for most users.
-First, [Install Miniconda](https://docs.conda.io/en/latest/miniconda.html) if you haven't done so before.
+First, [Install Miniforge](https://github.com/conda-forge/miniforge#install) if you don't already have `conda` installed.
 Then, open a terminal and install `ndcctools` like this:
 
 ```
