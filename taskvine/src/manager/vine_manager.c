@@ -591,14 +591,12 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 			}
 		}
 
+		t->sandbox_measured = sandbox_used;
+
 		/* Update category disk info */
 		struct category *c = vine_category_lookup_or_create(q, t->category);
-		if (sandbox_used > c->vine_stats->min_sandbox) {
-			c->vine_stats->min_sandbox = sandbox_used;
-		}
-
-		if (sandbox_used > q->stats->min_sandbox) {
-			q->stats->min_sandbox = sandbox_used;
+		if (sandbox_used > c->min_vine_sandbox) {
+			c->min_vine_sandbox = sandbox_used;
 		}
 
 		hash_table_insert(q->workers_with_complete_tasks, w->hashkey, w);
@@ -1294,6 +1292,9 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 		if (q->monitor_mode & VINE_MON_FULL)
 			resource_monitor_compress_logs(q, t);
 	}
+
+	// fill in measured disk as it comes from a different info source.
+	t->resources_measured->disk = MAX(t->resources_measured->disk, t->sandbox_measured);
 
 	// Finish receiving output.
 	t->time_when_done = timestamp_get();
@@ -2524,12 +2525,8 @@ static void vine_manager_compute_input_size(struct vine_manager *q, struct vine_
 
 	/* update max sandbox size with current knowledge of input files */
 	struct category *c = vine_category_lookup_or_create(q, t->category);
-	if (c->vine_stats->min_sandbox < input_size_in_mbs) {
-		c->vine_stats->min_sandbox = input_size_in_mbs;
-	}
-
-	if (q->stats->min_sandbox < input_size_in_mbs) {
-		q->stats->min_sandbox = input_size_in_mbs;
+	if (c->min_vine_sandbox < input_size_in_mbs) {
+		c->min_vine_sandbox = input_size_in_mbs;
 	}
 }
 
@@ -2939,13 +2936,12 @@ static int resubmit_task_on_sandbox_exhaustion(struct vine_manager *q, struct vi
 
 	/* grow sandbox by given factor (default is two) */
 	sandbox *= q->sandbox_grow_factor * sandbox;
-	c->vine_stats->min_sandbox = MAX(c->vine_stats->min_sandbox, sandbox);
+	c->min_vine_sandbox = MAX(c->min_vine_sandbox, sandbox);
 
 	debug(D_VINE, "Task %d exhausted disk sandbox on %s (%s).\n", t->task_id, w->hostname, w->addrport);
-
 	double max_allowed_disk = MAX(t->resources_requested->disk, c->max_allocation->disk);
 
-	if (max_allowed_disk && c->vine_stats->min_sandbox < max_allowed_disk) {
+	if (max_allowed_disk > -1 && c->min_vine_sandbox < max_allowed_disk) {
 		debug(D_VINE, "Task %d failed given max disk limit for sandbox.\n", t->task_id);
 		return 0;
 	}
@@ -4290,6 +4286,9 @@ char *vine_monitor_wrap(struct vine_manager *q, struct vine_worker_info *w, stru
 	if (q->monitor_interval > 0) {
 		buffer_printf(&b, " --interval %d", q->monitor_interval);
 	}
+
+	/* disable disk as it is measured throught the sandbox, otherwise we end up measuring twice. */
+	buffer_printf(&b, " --without-disk-footprint");
 
 	int extra_files = (q->monitor_mode & VINE_MON_FULL);
 
@@ -5804,6 +5803,7 @@ void vine_accumulate_task(struct vine_manager *q, struct vine_task *t)
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
 	case VINE_RESULT_MAX_WALL_TIME:
 	case VINE_RESULT_OUTPUT_TRANSFER_ERROR:
+	case VINE_RESULT_SANDBOX_EXHAUSTION:
 		if (category_accumulate_summary(c, t->resources_measured, q->current_max_worker)) {
 			vine_txn_log_write_category(q, c);
 		}
@@ -5823,11 +5823,15 @@ void vine_accumulate_task(struct vine_manager *q, struct vine_task *t)
 		break;
 	case VINE_RESULT_INPUT_MISSING:
 	case VINE_RESULT_OUTPUT_MISSING:
+	case VINE_RESULT_FIXED_LOCATION_MISSING:
+	case VINE_RESULT_CANCELLED:
+	case VINE_RESULT_RMONITOR_ERROR:
+	case VINE_RESULT_STDOUT_MISSING:
 	case VINE_RESULT_MAX_END_TIME:
 	case VINE_RESULT_UNKNOWN:
 	case VINE_RESULT_FORSAKEN:
 	case VINE_RESULT_MAX_RETRIES:
-	default:
+	case VINE_RESULT_LIBRARY_EXIT:
 		break;
 	}
 }

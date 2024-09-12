@@ -253,7 +253,6 @@ struct vine_stats {
 	int64_t min_gpus;   /**< The smallest number of gpus observed among the connected workers. */
 
 	int64_t inuse_cache; /**< Used disk space of declared files in MB aggregated across the connected workers. */
-	int64_t min_sandbox; /**< Max sandbox disk space observed, in MB. This is the minimum sandbox size needed if nothing else is known about the task. */
 };
 
 /** @name Functions - Tasks */
