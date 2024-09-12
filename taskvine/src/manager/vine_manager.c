@@ -593,12 +593,12 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 
 		/* Update category disk info */
 		struct category *c = vine_category_lookup_or_create(q, t->category);
-		if (sandbox_used > c->vine_stats->max_sandbox) {
-			c->vine_stats->max_sandbox = sandbox_used;
+		if (sandbox_used > c->vine_stats->min_sandbox) {
+			c->vine_stats->min_sandbox = sandbox_used;
 		}
 
-		if (sandbox_used > q->stats->max_sandbox) {
-			q->stats->max_sandbox = sandbox_used;
+		if (sandbox_used > q->stats->min_sandbox) {
+			q->stats->min_sandbox = sandbox_used;
 		}
 
 		hash_table_insert(q->workers_with_complete_tasks, w->hashkey, w);
@@ -2524,12 +2524,12 @@ static void vine_manager_compute_input_size(struct vine_manager *q, struct vine_
 
 	/* update max sandbox size with current knowledge of input files */
 	struct category *c = vine_category_lookup_or_create(q, t->category);
-	if (c->vine_stats->max_sandbox < input_size_in_mbs) {
-		c->vine_stats->max_sandbox = input_size_in_mbs;
+	if (c->vine_stats->min_sandbox < input_size_in_mbs) {
+		c->vine_stats->min_sandbox = input_size_in_mbs;
 	}
 
-	if (q->stats->max_sandbox < input_size_in_mbs) {
-		q->stats->max_sandbox = input_size_in_mbs;
+	if (q->stats->min_sandbox < input_size_in_mbs) {
+		q->stats->min_sandbox = input_size_in_mbs;
 	}
 }
 
@@ -2690,10 +2690,6 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 
 	/* never go below specified min resources. */
 	rmsummary_merge_max(limits, min);
-
-	/* never go below observed sandboxes. */
-	struct category *c = vine_category_lookup_or_create(q, t->category);
-	limits->disk = MAX(limits->disk, c->vine_stats->max_sandbox);
 
 	/* assume the user knows what they are doing... */
 	rmsummary_merge_override_basic(limits, t->resources_requested);
@@ -2943,13 +2939,13 @@ static int resubmit_task_on_sandbox_exhaustion(struct vine_manager *q, struct vi
 
 	/* grow sandbox by given factor (default is two) */
 	sandbox *= q->sandbox_grow_factor * sandbox;
-	c->vine_stats->max_sandbox = MAX(c->vine_stats->max_sandbox, sandbox);
+	c->vine_stats->min_sandbox = MAX(c->vine_stats->min_sandbox, sandbox);
 
 	debug(D_VINE, "Task %d exhausted disk sandbox on %s (%s).\n", t->task_id, w->hostname, w->addrport);
 
 	double max_allowed_disk = MAX(t->resources_requested->disk, c->max_allocation->disk);
 
-	if (max_allowed_disk && c->vine_stats->max_sandbox < max_allowed_disk) {
+	if (max_allowed_disk && c->vine_stats->min_sandbox < max_allowed_disk) {
 		debug(D_VINE, "Task %d failed given max disk limit for sandbox.\n", t->task_id);
 		return 0;
 	}
