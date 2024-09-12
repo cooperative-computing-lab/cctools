@@ -317,7 +317,7 @@ void vine_task_set_function_slots(struct vine_task *t, int nslots);
 @param f A file object, created by @ref vine_declare_file, @ref vine_declare_url, @ref vine_declare_buffer, @ref
 vine_declare_mini_task.
 @param remote_name The name of the file as it should appear in the task's sandbox.
-@param flags May be zero or more @ref vine_mount_flags_t or'd together. See @ref vine_task_add_input.
+@param flags May be zero or more @ref vine_mount_flags_t or'd together. See @ref vine_task_add_output.
 @return True on success, false on failure.
 */
 
