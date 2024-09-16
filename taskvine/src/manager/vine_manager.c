@@ -3233,7 +3233,8 @@ static int send_one_task(struct vine_manager *q)
 	tasks_considered++;
 	if (!w) {
 		// If not, perform the rotation search to find the next eligible task
-		PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t) {
+		PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t)
+		{
 			w = consider_task(q, t);
 			if (w) {
 				break;
@@ -3260,31 +3261,31 @@ static struct vine_worker_info *consider_task(struct vine_manager *q, struct vin
 	timestamp_t now_usecs = timestamp_get();
 	double now_secs = ((double)now_usecs) / ONE_SECOND;
 
-    // Skip task if min requested start time not met.
-    if (t->resources_requested->start > now_secs) {
-        return NULL;
-    }
+	// Skip task if min requested start time not met.
+	if (t->resources_requested->start > now_secs) {
+		return NULL;
+	}
 
-    // Skip if this task failed recently
-    if (t->time_when_last_failure + q->transient_error_interval > now_usecs) {
-        return NULL;
-    }
+	// Skip if this task failed recently
+	if (t->time_when_last_failure + q->transient_error_interval > now_usecs) {
+		return NULL;
+	}
 
-    // Skip if category already running maximum allowed tasks
-    struct category *c = vine_category_lookup_or_create(q, t->category);
-    if (c->max_concurrent > -1 && c->max_concurrent <= c->vine_stats->tasks_running) {
-        return NULL;
-    }
+	// Skip if category already running maximum allowed tasks
+	struct category *c = vine_category_lookup_or_create(q, t->category);
+	if (c->max_concurrent > -1 && c->max_concurrent <= c->vine_stats->tasks_running) {
+		return NULL;
+	}
 
-    // Skip task if temp input files have not been materialized.
-    if (!vine_manager_check_inputs_available(q, t)) {
-        return NULL;
-    }
+	// Skip task if temp input files have not been materialized.
+	if (!vine_manager_check_inputs_available(q, t)) {
+		return NULL;
+	}
 
-    // Skip function call task if no suitable library template was installed
-    if (!vine_manager_check_library_for_function_call(q, t)) {
-        return NULL;
-    }
+	// Skip function call task if no suitable library template was installed
+	if (!vine_manager_check_library_for_function_call(q, t)) {
+		return NULL;
+	}
 
 	// Find the best worker for the task
 	q->stats_measure->time_scheduling = timestamp_get();
@@ -3300,8 +3301,8 @@ static struct vine_worker_info *consider_task(struct vine_manager *q, struct vin
 			return NULL;
 	}
 
-    // All checks passed
-    return w;
+	// All checks passed
+	return w;
 }
 
 /*
