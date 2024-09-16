@@ -16,7 +16,7 @@ on:
         required: true
 
 
-name: Test and deploy
+name: Regression Testing
 
 jobs:
   build-native-linux:

@@ -42,7 +42,9 @@ markdown_extensions:
     - pymdownx.tabbed:
     - pymdownx.superfences:
     - pymdownx.snippets:
-        base_path: manuals
+        base_path: ['doc/manuals']   # make snippets relative to manual root
+        restrict_base_path: false    # allow snippets to include examples outside of that tree
+        check_paths: true            # fail if snippet include doesn't work
 
 validation:
     nav:

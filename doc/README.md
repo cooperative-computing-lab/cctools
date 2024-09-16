@@ -12,7 +12,7 @@ explain the principles of operations, give examples for new users to follow, and
 as a general reference.
 
 **Local Build**. The manual is written using [mkdocs flavored markdown](https://www.mkdocs.org/user-guide/writing-your-docs/).
-To build and test the documentation locally, run `mkdocs serve` in the `doc` directory,
+To build and test the documentation locally, run `mkdocs serve --config-file doc/mkdocs.yml` from the repository root directory,
 which will compile the sources into HTML and start a local web server on `http://localhost:8000`.
 You can then view the compiled manuals using your browser.
 
