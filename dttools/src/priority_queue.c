@@ -29,6 +29,83 @@ struct priority_queue {
 	int rotate_cursor; // iterate from the left to the right, reset when needed
 };
 
+/****** Static Methods ******/
+
+static void swap_elements(struct priority_queue *pq, int i, int j)
+{
+	struct element *temp = pq->elements[i];
+	pq->elements[i] = pq->elements[j];
+	pq->elements[j] = temp;
+}
+
+static int swim(struct priority_queue *pq, int k)
+{
+	if (!pq)
+		return 1;
+
+	while (k > 1 && pq->elements[k / 2]->priority < pq->elements[k]->priority) {
+		swap_elements(pq, k, k / 2);
+		k /= 2;
+	}
+
+	return k;
+}
+
+static int swim_upward(struct priority_queue *pq, int k)
+{
+	if (!pq)
+		return 1;
+
+	while (k > 1 && pq->elements[k / 2]->priority <= pq->elements[k]->priority) {
+		swap_elements(pq, k, k / 2);
+		k /= 2;
+	}
+
+	return k;
+}
+
+static int sink(struct priority_queue *pq, int k)
+{
+	if (!pq)
+		return -1;
+
+	while (2 * k <= pq->size) {
+		int j = 2 * k;
+		if (j < pq->size && pq->elements[j]->priority < pq->elements[j + 1]->priority) {
+			j++;
+		}
+		if (pq->elements[k]->priority >= pq->elements[j]->priority) {
+			break;
+		}
+		swap_elements(pq, k, j);
+		k = j;
+	}
+
+	return k;
+}
+
+static int priority_queue_double_capacity(struct priority_queue *pq)
+{
+	if (!pq)
+		return 0;
+
+	int new_capacity = pq->capacity * 2;
+	struct element **new_elements = (struct element **)malloc(sizeof(struct element *) * (new_capacity + 1));
+	if (!new_elements) {
+		return 0;
+	}
+
+	memcpy(new_elements, pq->elements, sizeof(struct element *) * (pq->size + 1));
+
+	free(pq->elements);
+	pq->elements = new_elements;
+	pq->capacity = new_capacity;
+
+	return 1;
+}
+
+/****** External Methods ******/
+
 struct priority_queue *priority_queue_create(double init_capacity)
 {
 	struct priority_queue *pq = (struct priority_queue *)malloc(sizeof(struct priority_queue));
@@ -74,66 +151,6 @@ int priority_queue_size(struct priority_queue *pq)
 	return pq->size;
 }
 
-void swap_elements(struct priority_queue *pq, int i, int j)
-{
-	struct element *temp = pq->elements[i];
-	pq->elements[i] = pq->elements[j];
-	pq->elements[j] = temp;
-}
-
-int swim(struct priority_queue *pq, int k)
-{
-	if (!pq)
-		return 1;
-
-	while (k > 1 && pq->elements[k / 2]->priority < pq->elements[k]->priority) {
-		swap_elements(pq, k, k / 2);
-		k /= 2;
-	}
-
-	return k;
-}
-
-int sink(struct priority_queue *pq, int k)
-{
-	if (!pq)
-		return -1;
-
-	while (2 * k <= pq->size) {
-		int j = 2 * k;
-		if (j < pq->size && pq->elements[j]->priority < pq->elements[j + 1]->priority) {
-			j++;
-		}
-		if (pq->elements[k]->priority >= pq->elements[j]->priority) {
-			break;
-		}
-		swap_elements(pq, k, j);
-		k = j;
-	}
-
-	return k;
-}
-
-int priority_queue_double_capacity(struct priority_queue *pq)
-{
-	if (!pq)
-		return 0;
-
-	int new_capacity = pq->capacity * 2;
-	struct element **new_elements = (struct element **)malloc(sizeof(struct element *) * (new_capacity + 1));
-	if (!new_elements) {
-		return 0;
-	}
-
-	memcpy(new_elements, pq->elements, sizeof(struct element *) * (pq->size + 1));
-
-	free(pq->elements);
-	pq->elements = new_elements;
-	pq->capacity = new_capacity;
-
-	return 1;
-}
-
 int priority_queue_push(struct priority_queue *pq, void *data, double priority)
 {
 	if (!pq)
@@ -154,6 +171,35 @@ int priority_queue_push(struct priority_queue *pq, void *data, double priority)
 	pq->elements[++pq->size] = e;
 
 	int new_idx = swim(pq, pq->size);
+
+	if (new_idx <= pq->rotate_cursor) {
+		// reset the rotate cursor if the new element is inserted before/equal to it
+		priority_queue_rotate_reset(pq);
+	}
+
+	return new_idx;
+}
+
+int priority_queue_push_upward(struct priority_queue *pq, void *data, double priority)
+{
+	if (!pq)
+		return 0;
+
+	if (pq->size >= pq->capacity) {
+		if (!priority_queue_double_capacity(pq)) {
+			return 0;
+		}
+	}
+	struct element *e = (struct element *)malloc(sizeof(struct element));
+	if (!e) {
+		return 0;
+	}
+	e->data = data;
+	e->priority = priority;
+
+	pq->elements[++pq->size] = e;
+
+	int new_idx = swim_upward(pq, pq->size);
 
 	if (new_idx <= pq->rotate_cursor) {
 		// reset the rotate cursor if the new element is inserted before/equal to it
