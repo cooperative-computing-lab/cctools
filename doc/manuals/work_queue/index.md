@@ -714,7 +714,7 @@ For further options, please refer to the work queue factory [manual](../man_page
 
 By default, the factory submits as many tasks that are waiting and running up
 to a specified maximum. To run more than one task in a worker, please refer
-to the following section on describing [task resources](#task-resources) and [worker resources](#work-queue-factory-and-resources).
+to the following section on describing [task resources](#task-resources) and [worker resources](#worker-resources).
 
 
 #### Using the factory with python
@@ -860,7 +860,7 @@ its number of cores. (This will likely change in the future.)
 When you would like to run several tasks in a worker, but you are not sure
 about the resources each task needs, Work Queue can automatically find values
 of resources that maximize throughput, or minimize waste. This is discussed in
-the section [below](#grouping-tasks-with-similar-resources-needs).
+the section [below](#grouping-tasks-with-similar-resource-needs).
 
 ### Worker Resources
 

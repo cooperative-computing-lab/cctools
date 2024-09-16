@@ -494,6 +494,10 @@ static int submit_worker( struct batch_queue *queue )
 	
 	batch_job_set_command(task,cmd);
 	batch_job_add_input_file(task,worker_command,0);
+	
+	if(resources) {
+		batch_job_set_resources(task, resources);
+	}
 
 	if(password_file) {
 		batch_job_add_input_file(task,"pwfile",0);

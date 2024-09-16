@@ -277,7 +277,7 @@ tasks at once:
     struct vine_file *x = vine_declare_untar(m, u);
     ```
 
-`declare_untar` is an example of a [MiniTask](#MiniTasks), which is explained further below.
+`declare_untar` is an example of a [MiniTask](#minitasks), which is explained further below.
 
 
 ### Declaring Tasks
@@ -692,7 +692,7 @@ For further options, please refer to the TaskVine factory [manual](../man_pages/
 
 By default, the factory submits as many tasks that are waiting and running up
 to a specified maximum. To run more than one task in a worker, please refer
-to the following section on describing [task resources](#task-resources) and [worker resources](#taskvine-factory-and-resources).
+to the following section on describing [task resources](#task-resources) and [worker resources](#worker-resources).
 
 We can also create a factory directly in python. Creating a factory object does not
 immediately launch it, so this is a good time to configure the resources,
@@ -1675,7 +1675,7 @@ can be tailored as any other task:
     print(f.result())
     ```
 
-Instead of tasks, the futures may also executed using [function calls](serverless-computing) with the `future_funcall` method:
+Instead of tasks, the futures may also executed using [function calls](#serverless-computing) with the `future_funcall` method:
 
 === "Python"
     ```python
@@ -1909,7 +1909,7 @@ Consider now that the task requires 1 cores, 6GB of memory, and 27 GB of disk:
 !!! note
     If you want TaskVine to exactly allocate the resources you have
     specified, use the `proportional-resources` and `proportional-whole-tasks`
-    parameters as shown [here](#specialized-and-experimental-settings).  In
+    parameters as shown [here](#tuning-specialized-execution-parameters).  In
     general, however, we have found that using proportions nicely adapts to the
     underlying available resources, and leads to very few resource exhaustion
     failures while still using worker resources efficiently.
@@ -1921,7 +1921,7 @@ its number of cores. (This will likely change in the future.)
 When you would like to run several tasks in a worker, but you are not sure
 about the resources each task needs, TaskVine can automatically find values
 of resources that maximize throughput, or minimize waste. This is discussed in
-the section [below](#grouping-tasks-with-similar-resources-needs).
+the section [below](#grouping-tasks-with-similar-resource-needs).
 
 ### Worker Resources
 
@@ -2408,7 +2408,7 @@ produces the following graphs:
 
 ![](images/plot-perf-montage.png)
 
-- [Performance Log File Format Details](log-file-formats#performance-log-format)
+- [Performance Log File Format Details](log-file-formats.md#performance-log-format)
 
 ### Transactions Log
 
@@ -2432,7 +2432,7 @@ to produce a visualization of how tasks are packed into workers like this:
 
 ![](images/plot-txn-workers.png)
 
-- [Transactions Log File Format Details](log-file-formats#transactions-log-format)
+- [Transactions Log File Format Details](log-file-formats.md#transactions-log-format)
 
 
 Custom APPLICATION messages can be added to the log with the calls:
@@ -2695,7 +2695,7 @@ The `compute` call above may receive the following keyword arguments:
 
 | Keyword | Description |
 |------------ |---------|
-| environment | A TaskVine file that provides an [environment](#environments) to execute each task. |
+| environment | A TaskVine file that provides an [environment](#execution-contexts) to execute each task. |
 | env\_vars   | A dictionary of VAR=VALUE environment variables to set per task. A value should be either a string, or a function that accepts as arguments the manager and task, and that returns a string. |
 | extra\_files | A dictionary of {taskvine.File: "remote_name"} of input files to attach to each task.|
 | lazy\_transfer | Whether to bring each result back from the workers (False, default), or keep transient results at workers (True) |

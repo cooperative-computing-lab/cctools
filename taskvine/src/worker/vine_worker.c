@@ -386,6 +386,7 @@ and apply any local options that override it.
 
 static void measure_worker_resources()
 {
+	static int disk_set = 0;
 	static time_t last_resources_measurement = 0;
 	if (time(0) < last_resources_measurement + options->check_resources_interval) {
 		return;
@@ -404,14 +405,14 @@ static void measure_worker_resources()
 
 	if (options->disk_total > 0) {
 		r->disk.total = MIN(r->disk.total, options->disk_total);
-	} else {
-		/* Set the reporting disk to a fraction of the measured disk to avoid
-		 * unnecessarily forsaking tasks with unspecified resources.
-		 * Note that @vine_resources_measure_locally reports that
-		 * disk.total = available_disk + disk.inuse, so we leave out disk.inuse in
-		 * the discounting calculation, then add it back in. */
-		r->disk.total -= r->disk.inuse;
+	} else if (!disk_set) {
+		/* XXX If no disk is specified we will allocate half of the worker disk available
+		   at startup. We will not update the allocation since it should remain static.
+		   If something else is consuming disk on the machine it would cause issues with tasks which
+		   request the whole available worker disk. Leaving half of the disk to other processes
+		   should leave the worker free to use the other half without the need to re measure. */
 		r->disk.total = ceil(r->disk.total * options->disk_percent / 100) + r->disk.inuse;
+		disk_set = 1;
 	}
 
 	r->disk.inuse = measure_worker_disk();

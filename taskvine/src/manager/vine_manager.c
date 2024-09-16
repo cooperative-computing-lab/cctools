@@ -2663,6 +2663,16 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	/* never go below specified min resources. */
 	rmsummary_merge_max(limits, min);
 
+	/* If the user specified resources, override proportional calculation */
+	if (t->resources_requested->cores > 0)
+		limits->cores = t->resources_requested->cores;
+	if (t->resources_requested->memory > 0)
+		limits->memory = t->resources_requested->memory;
+	if (t->resources_requested->disk > 0)
+		limits->disk = t->resources_requested->disk;
+	if (t->resources_requested->gpus > 0)
+		limits->gpus = t->resources_requested->gpus;
+
 	return limits;
 }
 

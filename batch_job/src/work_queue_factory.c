@@ -492,6 +492,10 @@ static int submit_worker( struct batch_queue *queue )
 
 	batch_job_set_command(task,cmd);
 	
+	if(resources) {
+		batch_job_set_resources(task, resources);
+	}
+	
 	if(!runos_os && !k8s_worker_image) {
 		batch_job_add_input_file(task,worker_command,0);
 	} else {
