@@ -22,6 +22,10 @@ def my_sum(x, y, negate=False):
     return s
 
 
+def failure():
+    raise Exception('Expected failure.')
+
+
 def main():
     executor = vine.FuturesExecutor(
         port=[9123, 9129], manager_name="vine_matrtix_build_test", factory=False
@@ -49,11 +53,24 @@ def main():
 
     res = t3.output()
     print(f"t3 output = {c.result()}")
+    assert c.exception() is None
 
     a = 7 + 4
     b = a + a
     c = a + b
     assert res == c
+
+    f1 = executor.future_task(failure)
+    f1.set_cores(1)
+    future = executor.submit(f1)
+
+    try:
+        future.result()
+    except Exception as e:
+        assert str(e) == "Expected failure."
+        assert future.exception() == e
+    else:
+        raise RuntimeError("Future did not raise exception.")
 
 
 if __name__ == "__main__":
