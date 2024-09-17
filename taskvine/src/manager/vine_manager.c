@@ -2510,25 +2510,6 @@ static int build_poll_table(struct vine_manager *q)
 	return n;
 }
 
-static void vine_manager_compute_input_size(struct vine_manager *q, struct vine_task *t)
-{
-	int64_t input_size = 0;
-	struct vine_mount *m;
-	LIST_ITERATE(t->input_mounts, m)
-	{
-		input_size += m->file->size;
-	}
-
-	t->input_files_size = input_size;
-
-	int64_t input_size_in_mbs = (int64_t)ceil(input_size / 1e6);
-
-	/* update max sandbox size with current knowledge of input files */
-	struct category *c = vine_category_lookup_or_create(q, t->category);
-	if (c->min_vine_sandbox < input_size_in_mbs) {
-		c->min_vine_sandbox = input_size_in_mbs;
-	}
-}
 
 /*
  * Determine the resources to allocate for a given task when assigned to a specific worker.
@@ -2553,13 +2534,12 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		return limits;
 	}
 
-	if (t->input_files_size < 0) {
-		vine_manager_compute_input_size(q, t);
-	}
-
 	/* Compute the minimum and maximum resources for this task. */
 	const struct rmsummary *min = vine_manager_task_resources_min(q, t);
 	const struct rmsummary *max = vine_manager_task_resources_max(q, t);
+
+	/* space for tasks should not assume that space given to the cache is available */
+	int64_t available_disk = w->resources->disk.total - w->inuse_cache;
 
 	rmsummary_merge_override_basic(limits, max);
 
@@ -2588,9 +2568,9 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 			min_proportion = MAX(min_proportion, min->memory / w->resources->memory.total);
 		}
 
-		if (w->resources->disk.total > 0) {
-			max_proportion = MAX(max_proportion, limits->disk / w->resources->disk.total);
-			min_proportion = MAX(min_proportion, min->disk / w->resources->disk.total);
+		if (available_disk > 0) {
+			max_proportion = MAX(max_proportion, limits->disk / available_disk);
+			min_proportion = MAX(min_proportion, min->disk / available_disk);
 		}
 
 		if (w->resources->gpus.total > 0) {
@@ -2638,7 +2618,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 			/* worker's disk is shared even among tasks that are not running,
 			 * thus the proportion is modified by the current overcommit
 			 * multiplier */
-			limits->disk = MAX(1, MAX(limits->disk, floor((w->resources->disk.total - w->resources->disk.inuse) * max_proportion / q->resource_submit_multiplier)));
+			limits->disk = MAX(1, MAX(limits->disk, floor(available_disk * max_proportion / q->resource_submit_multiplier)));
 		}
 	}
 
@@ -2649,7 +2629,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	/* At least one specified resource would use the whole worker, thus
 	 * using whole worker for all unspecified resources. */
 	if ((limits->cores > 0 && limits->cores >= w->resources->cores.total) || (limits->gpus > 0 && limits->gpus >= w->resources->gpus.total) ||
-			(limits->memory > 0 && limits->memory >= w->resources->memory.total) || (limits->disk > 0 && limits->disk >= w->resources->disk.total)) {
+			(limits->memory > 0 && limits->memory >= w->resources->memory.total) || (limits->disk > 0 && limits->disk >= available_disk)) {
 
 		use_whole_worker = 1;
 	}
@@ -2670,7 +2650,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		}
 
 		if (limits->disk <= 0) {
-			limits->disk = w->resources->disk.total;
+			limits->disk = available_disk;
 		}
 	} else if (vine_schedule_in_ramp_down(q)) {
 		/* if in ramp down, use all the free space of that worker. note that we don't use
@@ -2683,7 +2663,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		}
 
 		limits->memory = w->resources->memory.total - w->resources->memory.inuse;
-		limits->disk = w->resources->disk.total - w->resources->disk.inuse;
+		limits->disk = available_disk;
 	}
 
 	/* never go below specified min resources. */

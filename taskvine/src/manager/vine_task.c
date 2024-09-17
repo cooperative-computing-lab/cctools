@@ -71,7 +71,6 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->resources_measured = rmsummary_create(-1);
 	t->resources_allocated = rmsummary_create(-1);
 	t->current_resource_box = 0;
-	t->input_files_size = -1;
 
 	t->refcount = 1;
 	t->output_received = 0;
