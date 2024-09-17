@@ -2522,7 +2522,8 @@ static void vine_manager_estimate_task_disk_min(struct vine_manager *q, struct v
 		mb += (m->file->size) / 1e6;
 	}
 	if (mb > 0) {
-		t->resources_requested->disk = mb;
+		struct category *c = category_lookup_or_create(q->categories, vine_task_get_category(t));
+		c->min_allocation->disk = MAX(mb, c->min_allocation->disk);
 	}
 }
 
