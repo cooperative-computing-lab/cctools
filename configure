@@ -5,7 +5,7 @@
 
 MAJOR=7
 MINOR=13
-MICRO=0
+MICRO=1
 
 # Optionally set the source/tag for this code (e.g. RC1 or FINAL).  Setting
 # this variable is instead useful for statically naming the source when it will
