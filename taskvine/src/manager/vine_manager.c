@@ -2599,7 +2599,8 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		}
 
 		/* If a max_proportion was defined, it cannot be less than a proportion using the minimum
-		 * resources for the category. */
+		 * resources for the category. If it was defined, then the min_proportion is not relevant as the
+		 * task will try to use the whole worker. */
 		if (max_proportion != -1) {
 			max_proportion = MAX(max_proportion, min_proportion);
 		}
@@ -2641,7 +2642,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		}
 	}
 
-	/* If no resource was specified, using whole worker. */
+	/* If no resource was specified, use whole worker. */
 	if (limits->cores < 1 && limits->gpus < 1 && limits->memory < 1 && limits->disk < 1) {
 		use_whole_worker = 1;
 	}
@@ -2690,7 +2691,6 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 
 	/* assume the user knows what they are doing... */
 	rmsummary_merge_override_basic(limits, t->resources_requested);
-
 
 	return limits;
 }
@@ -2936,6 +2936,8 @@ static int resubmit_task_on_sandbox_exhaustion(struct vine_manager *q, struct vi
 
 	/* grow sandbox by given factor (default is two) */
 	sandbox *= q->sandbox_grow_factor * sandbox;
+
+	/* take the MAX in case min_vine_sandbox was updated before th result of this task was processed */
 	c->min_vine_sandbox = MAX(c->min_vine_sandbox, sandbox);
 
 	debug(D_VINE, "Task %d exhausted disk sandbox on %s (%s).\n", t->task_id, w->hostname, w->addrport);
