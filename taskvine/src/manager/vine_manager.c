@@ -3207,55 +3207,8 @@ static int vine_manager_check_library_for_function_call(struct vine_manager *q, 
 }
 
 /*
-Advance the state of the system by selecting one task available
-to run, finding the best worker for that task, and then committing
-the task to the worker.
+Consider if a task is eligible to run, and if so, find the best worker for it.
 */
-
-static int send_one_task(struct vine_manager *q)
-{
-	int t_idx;
-	struct vine_task *t;
-	struct vine_worker_info *w = NULL;
-
-	int tasks_considered = 0;
-	int tasks_to_consider = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
-
-	// First consider the task of the highest priority
-	t_idx = 1;
-	t = priority_queue_get_element(q->ready_tasks, t_idx);
-	if (!t) {
-		return 0;
-	}
-
-	// First check if the task of the highest priority is eligible to run
-	w = consider_task(q, t);
-	tasks_considered++;
-	if (!w) {
-		// If not, perform the rotation search to find the next eligible task
-		PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t)
-		{
-			w = consider_task(q, t);
-			if (w) {
-				break;
-			}
-			if (++tasks_considered >= tasks_to_consider) {
-				return 0;
-			}
-		}
-	}
-
-	if (w) {
-		// Find a task and its suitable worker
-		priority_queue_remove(q->ready_tasks, t_idx);
-		commit_task_to_worker(q, w, t);
-		return 1;
-	} else {
-		// No task is eligible to run
-		return 0;
-	}
-}
-
 static struct vine_worker_info *consider_task(struct vine_manager *q, struct vine_task *t)
 {
 	timestamp_t now_usecs = timestamp_get();
@@ -3303,6 +3256,56 @@ static struct vine_worker_info *consider_task(struct vine_manager *q, struct vin
 
 	// All checks passed
 	return w;
+}
+
+/*
+Advance the state of the system by selecting one task available
+to run, finding the best worker for that task, and then committing
+the task to the worker.
+*/
+
+static int send_one_task(struct vine_manager *q)
+{
+	int t_idx;
+	struct vine_task *t;
+	struct vine_worker_info *w = NULL;
+
+	int tasks_considered = 0;
+	int tasks_to_consider = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
+
+	// First consider the task of the highest priority
+	t_idx = 1;
+	t = priority_queue_get_element(q->ready_tasks, t_idx);
+	if (!t) {
+		return 0;
+	}
+
+	// First check if the task of the highest priority is eligible to run
+	w = consider_task(q, t);
+	tasks_considered++;
+	if (!w) {
+		// If not, perform the rotation search to find the next eligible task
+		PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t)
+		{
+			w = consider_task(q, t);
+			if (w) {
+				break;
+			}
+			if (++tasks_considered >= tasks_to_consider) {
+				return 0;
+			}
+		}
+	}
+
+	if (w) {
+		// Find a task and its suitable worker
+		priority_queue_remove(q->ready_tasks, t_idx);
+		commit_task_to_worker(q, w, t);
+		return 1;
+	} else {
+		// No task is eligible to run
+		return 0;
+	}
 }
 
 /*
