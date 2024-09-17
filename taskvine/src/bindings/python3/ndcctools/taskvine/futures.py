@@ -1,6 +1,7 @@
 
 from . import cvine
 import hashlib
+from collections import deque
 from concurrent.futures import Executor
 from concurrent.futures import Future
 from concurrent.futures import FIRST_COMPLETED
@@ -14,7 +15,6 @@ from collections import namedtuple
 from .task import (
     PythonTask,
     FunctionCall,
-    PythonTaskNoResult,
     FunctionCallNoResult,
 )
 from .manager import (
@@ -53,44 +53,44 @@ def wait(fs, timeout=None, return_when=ALL_COMPLETED):
         if not f._is_submitted:
             f.module_manager.submit(f._task)
 
-    time_init = time.time()
-    if timeout is None:
-        time_check = float('inf')
-    else:
-        time_check = timeout
-    done = False
-    while time.time() - time_init < time_check and not done:
-        done = True
-        for f in fs:
+    start = time.perf_counter()
+    time_check = float('inf') if timeout is None else timeout
+    result_timeout = min(timeout, 5) if timeout is not None else 5
 
+    done = False
+    while time.perf_counter() - start < time_check and not done:
+        for f in fs:
             # skip if future is complete
             if f in results.done:
                 continue
 
-            # check for completion
-            result = f.result(timeout=5)
-
-            # add to set of finished tasks and break when needed.
-            if result != RESULT_PENDING:
+            try:
+                # check for completion
+                f.result(timeout=result_timeout)
+            except TimeoutError:
+                # TimeoutError's are expected since we are polling the
+                # future's status. If a timeout happens, we do nothing.
+                pass
+            except Exception:
+                # Future.result() raises the task's exception but that is
+                # not relevant here---just if the task has finished.
                 results.done.add(f)
-
-                # if this is the first completed task, break.
+                if return_when in (FIRST_EXCEPTION, FIRST_COMPLETED):
+                    done = True
+                    break
+            else:
+                results.done.add(f)
                 if return_when == FIRST_COMPLETED:
                     done = True
                     break
 
-            if isinstance(result, Exception) and return_when == FIRST_EXCEPTION:
+            if len(results.done) == len(fs):
                 done = True
                 break
 
-            # set done to false to finish loop.
-            else:
-                done = False
-
             # check form timeout
-            if timeout is not None:
-                if time.time() - time_init > timeout:
-                    break
+            if time.perf_counter() - start > time_check:
+                break
 
     # add incomplete futures to set
     for f in fs:
@@ -101,48 +101,45 @@ def wait(fs, timeout=None, return_when=ALL_COMPLETED):
 
 
 def as_completed(fs, timeout=None):
+    fs = deque(fs)
 
-    results = set()
-
-    # submit tasks if they have not been subitted
+    # submit tasks if they have not been submitted
     for f in fs:
         if not f._is_submitted:
             f.module_manager.submit(f._task)
 
-    time_init = time.time()
-    if timeout is None:
-        time_check = float('inf')
-    else:
-        time_check = timeout
+    start = time.perf_counter()
+    result_timeout = min(timeout, 5) if timeout is not None else 5
 
-    done = False
-    while time.time() - time_init < time_check and not done:
-        for f in fs:
-            done = True
-            # skip if future is complete
-            if f in results:
-                continue
+    def _iterator():
+        # iterate of queue of futures, yeilding completed futures and
+        # requeuing non-completed futures until all futures are yielded or
+        # the timeout is reached.
+        while fs:
+            f = fs.popleft()
 
-            # check for completion
-            result = f.result(timeout=5)
-
-            # add to set of finished tasks
-            if result != RESULT_PENDING:
-                results.add(f)
-
-            # set done to false to finish loop.
+            try:
+                result = f.result(timeout=result_timeout)
+            except TimeoutError:
+                # TimeoutError's are expected since we are polling the
+                # future's status. If a timeout happens, add the future to
+                # the back of the queue.
+                fs.append(f)
+            except Exception:
+                # Future.result() raises the task's exception but that is
+                # not relevant here---just if the task has finished.
+                yield f
             else:
-                done = False
+                assert result != RESULT_PENDING
+                yield f
 
-            # check form timeout
-            if timeout is not None:
-                if time.time() - time_init > timeout:
-                    break
-    for f in fs:
-        if f not in results:
-            results.add(TimeoutError)
+            if (
+                fs and timeout is not None
+                and time.perf_counter() - start > timeout
+            ):
+                raise TimeoutError()
 
-    return iter(results)
+    return _iterator()
 
 
 ##
@@ -233,6 +230,7 @@ class VineFuture(Future):
         self._task = task
         self._callback_fns = []
         self._result = None
+        self._exception = None
         self._is_submitted = False
         self._ran_functions = False
 
@@ -266,15 +264,30 @@ class VineFuture(Future):
             timeout = "wait_forever"
         result = self._task.output(timeout=timeout)
         if result == RESULT_PENDING:
-            return RESULT_PENDING
+            raise TimeoutError()
+
+        if isinstance(result, Exception):
+            self._exception = result
         else:
             self._result = result
-            self._state = FINISHED
-            if self._callback_fns and not self._ran_functions:
-                self._ran_functions = True
-                for fn in self._callback_fns:
-                    fn(self)
-            return result
+
+        self._state = FINISHED
+        if self._callback_fns and not self._ran_functions:
+            self._ran_functions = True
+            for fn in self._callback_fns:
+                fn(self)
+
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    def exception(self, timeout="wait_forever"):
+        try:
+            self.result()
+        except Exception as e:
+            return e
+        else:
+            return None
 
     def add_done_callback(self, fn):
         self._callback_fns.append(fn)
@@ -318,11 +331,10 @@ class FutureFunctionCall(FunctionCall):
                     if output['Success']:
                         self._saved_output = output['Result']
                     else:
-                        self._saved_output = output['Reason']
+                        self._saved_output = FunctionCallNoResult(output['Reason'])
 
                 except Exception as e:
                     self._saved_output = e
-                    raise e
             else:
                 self._saved_output = FunctionCallNoResult()
             self._output_loaded = True
@@ -388,15 +400,14 @@ class FuturePythonTask(PythonTask):
 
         # fetch output file and load output
         if not self._output_loaded and self._has_retrieved:
-            if self.successful():
-                try:
-                    self._module_manager.fetch_file(self._output_file)
-                    self._output = cloudpickle.loads(self._output_file.contents())
-                except Exception as e:
-                    self._output = e
-                    raise e
-            else:
-                self._output = PythonTaskNoResult()
+            try:
+                self._module_manager.fetch_file(self._output_file)
+                # _output can be either the return value of a successful
+                # task or the exception object of a failed task.
+                self._output = cloudpickle.loads(self._output_file.contents())
+            except Exception as e:
+                # handle output file fetch/deserialization failures
+                self._output = e
             self._output_loaded = True
 
         return self._output

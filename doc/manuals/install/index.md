@@ -19,9 +19,8 @@ You may already have Conda installed.  To check:
 $ conda -V
 ```
 
-This displays the version of conda currently installed. If it fails, then you should install [Miniconda](https://docs.conda.io/projects/conda/en/latest/user-guide/install).
-Miniconda is a __light__ version of Anaconda, and we recommend it as it is much faster to install.
-We also recommend installing the version for `Python 3.9`
+This displays the version of conda currently installed. If it fails, then you should install [Miniforge](https://github.com/conda-forge/miniforge#install).
+Miniforge is a __light__ version of Anaconda that uses the conda-forge channel by default, and we recommend it as it is much faster to install.
 
 Once Conda is installed, then install **CCTools** with:
 
@@ -69,7 +68,6 @@ This can run slowly, so, for a potential speedup, try running:
 ```sh
 unset PYTHONPATH
 conda env create -y -f environment.yml --experimental-solver=libmamba
-
 ```
 
 Now that you are inside the `cctools-dev` environment, you can check out
