@@ -172,7 +172,6 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		return 0;
 	}
 
-
 	/* Don't send tasks if a task recently failed at this worker. */
 	if (w->last_failure_time + q->transient_error_interval > timestamp_get()) {
 		return 0;

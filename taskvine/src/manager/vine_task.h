@@ -64,6 +64,7 @@ struct vine_task {
 	int max_retries;             /**< Number of times the task is tried to be executed on some workers until success. If less than one, the task is retried indefinitely. See try_count below.*/
 	int max_forsaken;            /**< Number of times the task is submitted to workers without being executed. If less than one, the task is retried indefinitely. See forsaken_count below.*/
 	int64_t min_running_time;    /**< Minimum time (in seconds) the task needs to run. (see vine_worker --wall-time)*/
+	int64_t input_files_size;    /**< Size (in bytes) of input files. < 0 if the size of at least one of the input files is unknown. */
 
 	/***** Internal state of task as it works towards completion. *****/
 

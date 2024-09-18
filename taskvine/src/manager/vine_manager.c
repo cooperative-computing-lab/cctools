@@ -2510,6 +2510,25 @@ static int build_poll_table(struct vine_manager *q)
 	return n;
 }
 
+static void vine_manager_compute_input_size(struct vine_manager *q, struct vine_task *t)
+{
+	int64_t input_size = 0;
+	struct vine_mount *m;
+	LIST_ITERATE(t->input_mounts, m)
+	{
+		input_size += m->file->size;
+	}
+
+	t->input_files_size = input_size;
+
+	int64_t input_size_in_mbs = (int64_t)ceil(input_size / 1e6);
+
+	/* update max sandbox size with current knowledge of input files */
+	struct category *c = vine_category_lookup_or_create(q, t->category);
+	if (c->min_vine_sandbox < input_size_in_mbs) {
+		c->min_vine_sandbox = input_size_in_mbs;
+	}
+}
 
 /*
  * Determine the resources to allocate for a given task when assigned to a specific worker.
@@ -2534,12 +2553,20 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		return limits;
 	}
 
+	if (t->input_files_size < 0) {
+		vine_manager_compute_input_size(q, t);
+	}
+
 	/* Compute the minimum and maximum resources for this task. */
 	const struct rmsummary *min = vine_manager_task_resources_min(q, t);
 	const struct rmsummary *max = vine_manager_task_resources_max(q, t);
 
-	/* space for tasks should not assume that space given to the cache is available */
+	/* available disk for all sandboxes */
 	int64_t available_disk = w->resources->disk.total - w->inuse_cache;
+
+	/* do not count the size of input files as available.
+	 * TODO: efficiently discount the size of files already at worker. */
+	available_disk -= t->input_files_size;
 
 	rmsummary_merge_override_basic(limits, max);
 
@@ -2615,7 +2642,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 
 			limits->memory = MAX(1, MAX(limits->memory, floor(w->resources->memory.total * max_proportion)));
 
-			/* worker's disk is shared even among tasks that are not running,
+			/* worker's disk is shared evenly among tasks that are not running,
 			 * thus the proportion is modified by the current overcommit
 			 * multiplier */
 			limits->disk = MAX(1, MAX(limits->disk, floor(available_disk * max_proportion / q->resource_submit_multiplier)));
