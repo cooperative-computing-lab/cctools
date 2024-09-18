@@ -2736,12 +2736,7 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 		w->resources->gpus.inuse += box->gpus;
 	}
 
-	char *cachename;
-	struct vine_file_replica *replica;
-	HASH_TABLE_ITERATE(w->current_files, cachename, replica)
-	{
-		w->resources->disk.inuse += ((double)replica->size) / 1e6;
-	}
+	w->resources->disk.inuse += w->inuse_cache;
 }
 
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w)
