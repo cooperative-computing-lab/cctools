@@ -2528,9 +2528,8 @@ static void vine_manager_compute_input_size(struct vine_manager *q, struct vine_
 		input_size += m->file->size;
 	}
 
-	if (mb > 0) {
-		struct category *c = category_lookup_or_create(q->categories, vine_task_get_category(t));
-		c->min_allocation->disk = MAX(mb, c->min_allocation->disk);
+	if (input_size > 0) {
+	    t->input_files_size = input_size;
 	}
 }
 
