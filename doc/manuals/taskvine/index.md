@@ -734,7 +734,7 @@ that are specific to one task, and one task only.
 should be retained as long as the workflow runs, and then deleted at the end.
 - A cache value of **worker** indicates that the file should be retained
 by the worker until the worker's end-of-life.
-- A cache value of **always** indicates that the file should be retained
+- A cache value of **forever** indicates that the file should be retained
 by the worker, even across workflows.  This is appropriate for widely used
 software packages and reference datasets. This level of cache leaves files on
 the execution sites even when workers terminate, thus use with care.
