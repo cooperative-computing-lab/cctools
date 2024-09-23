@@ -575,6 +575,15 @@ class Task(object):
         return cvine.vine_task_get_command(self._task)
 
     ##
+    # Get the state of the task.
+    # @code
+    # >>> print(t.command)
+    # @endcode
+    @property
+    def state(self):
+        return cvine.vine_task_get_state(self._task)
+
+    ##
     # Get the standard output of the task. Must be called only after the task
     # completes execution.
     # @code

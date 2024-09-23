@@ -468,6 +468,13 @@ also written to that directory.
 
 int vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output);
 
+/** Get the state line of the task.
+@param t A task object.
+@return a string of the task's state.
+*/
+
+const char *vine_task_get_state(struct vine_task *t);
+
 /** Get the command line of the task.
 @param t A task object.
 @return The command line set by @ref vine_task_create.
