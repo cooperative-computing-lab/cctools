@@ -2573,8 +2573,10 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	int use_whole_worker = 1;
 
 	int proportional_whole_tasks = q->proportional_whole_tasks;
-	if (t->resources_requested->cores > -1 || t->resources_requested->gpus > -1 || t->resources_requested->memory > -1 || t->resources_requested->disk > -1) {
-		/* if at least one resource was specified explicitely, do not expand resources to fill an integer number of tasks. */
+	if (t->resources_requested->memory > -1 || t->resources_requested->disk > -1) {
+		/* if mem or disk are specified explicitely, do not expand resources to fill an integer number of tasks. With this,
+		 * the task is assigned exactly the memory and disk specified. We do not do this for cores and gpus, as the use case
+		 * here is to specify the number of cores and allocated the rest of the resources evenly. */
 		proportional_whole_tasks = 0;
 	}
 
