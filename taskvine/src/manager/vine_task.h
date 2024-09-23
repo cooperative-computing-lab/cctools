@@ -51,7 +51,7 @@ struct vine_task {
 
 	char *needs_library;         /**< If this is a FunctionTask, the name of the library used */
 	char *provides_library;      /**< If this is a LibraryTask, the name of the library provided. */
-	int   function_slots;        /**< If this is a LibraryTask, the max concurrent functions. */
+	int   function_slots_requested; /**< If this is a LibraryTask, the number of function slots requested by the user. -1 causes the number of slots to match the number of cores. */
 	
 	struct list *input_mounts;    /**< The mounted files expected as inputs. */
 	struct list *output_mounts;   /**< The mounted files expected as outputs. */
@@ -78,6 +78,7 @@ struct vine_task {
 	int exhausted_attempts;     /**< Number of times the task failed given exhausted resources. */
 	int forsaken_attempts;      /**< Number of times the task was submitted to a worker but failed to start execution. */
 	int workers_slow;           /**< Number of times this task has been terminated for running too long. */
+	int function_slots_total;   /**< If a library, the total number of function slots usable. */
 	int function_slots_inuse;   /**< If a library, the number of functions currently running. */
 		
 	/***** Results of task once it has reached completion. *****/

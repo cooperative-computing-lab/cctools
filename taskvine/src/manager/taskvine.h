@@ -307,6 +307,7 @@ void vine_task_set_library_provided(struct vine_task *t, const char *name);
 const char *vine_task_get_library_provided(struct vine_task *t);
 
 /** Set the number of concurrent functions a library can run.
+If unset, the library will runs as many functions as it has cores available.
 @param t A task object.
 @param nslots The maximum number of concurrent functions this library can run.
 */
@@ -317,7 +318,7 @@ void vine_task_set_function_slots(struct vine_task *t, int nslots);
 @param f A file object, created by @ref vine_declare_file, @ref vine_declare_url, @ref vine_declare_buffer, @ref
 vine_declare_mini_task.
 @param remote_name The name of the file as it should appear in the task's sandbox.
-@param flags May be zero or more @ref vine_mount_flags_t or'd together. See @ref vine_task_add_input.
+@param flags May be zero or more @ref vine_mount_flags_t or'd together. See @ref vine_task_add_output.
 @return True on success, false on failure.
 */
 
@@ -467,6 +468,13 @@ also written to that directory.
 */
 
 int vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output);
+
+/** Get the state line of the task.
+@param t A task object.
+@return a string of the task's state.
+*/
+
+const char *vine_task_get_state(struct vine_task *t);
 
 /** Get the command line of the task.
 @param t A task object.

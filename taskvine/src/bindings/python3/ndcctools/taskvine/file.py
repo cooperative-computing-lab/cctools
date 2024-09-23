@@ -66,6 +66,12 @@ class File(object):
         elif ftype == cvine.VINE_FILE:
             with open(self.source(), "rb") as f:
                 return unserializer(f)
+        elif ftype == cvine.VINE_TEMP:
+            try:
+                with io.BytesIO(cvine.vine_file_contents_as_bytes(self._file)) as f:
+                    return unserializer(f)
+            except Exception as e:
+                raise e("Temp file does not have local contents, The file much be fetched beforehand", self.type())
         else:
             raise ValueError("File does not have local contents", self.type())
 

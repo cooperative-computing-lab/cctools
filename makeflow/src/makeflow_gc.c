@@ -30,7 +30,7 @@ See the file COPYING for details.
 XXX This module is implemented using Unix operations, and so
 only make sense for batch modes that rely on the local disk.
 An improved implementation should pass all filesystem operations
-through the batch_job interface, which must be expanded to
+through the batch_queue interface, which must be expanded to
 include measuring available space and inodes consumed.
 */
 
@@ -139,7 +139,7 @@ int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_fi
 
 	makeflow_hook_file_clean(f);
 
-	if(batch_fs_unlink(queue, f->filename) == 0) {
+	if(unlink_recursive(f->filename) == 0) {
 		printf("deleted %s\n",f->filename);
 		d->total_file_size -= f->actual_size;
 		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
@@ -162,7 +162,7 @@ a variety of wrappers and options, and so may have
 more output files than the abstract dag node.
 */
 
-void makeflow_clean_task( struct dag *dag, struct batch_queue *queue, struct batch_task *task )
+void makeflow_clean_task( struct dag *dag, struct batch_queue *queue, struct batch_job *task )
 {
 	struct batch_file *bf;
 	struct dag_file *df;
@@ -175,7 +175,7 @@ void makeflow_clean_task( struct dag *dag, struct batch_queue *queue, struct bat
 }
 
 
-extern struct batch_task * makeflow_node_to_task( struct dag_node *node, struct batch_queue *queue );
+extern struct batch_job * makeflow_node_to_task( struct dag_node *node, struct batch_queue *queue );
 
 /*
 Clean an individual node in the dag.
@@ -207,7 +207,7 @@ void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_no
 		free(command);
 	}
 
-	batch_task_delete(n->task);
+	batch_job_delete(n->task);
 	n->task = 0;
 }
 

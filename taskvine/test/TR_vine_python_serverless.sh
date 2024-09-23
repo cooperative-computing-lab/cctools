@@ -43,7 +43,8 @@ run()
 	# wait at most 15 seconds for vine to find a port.
 	wait_for_file_creation $PORT_FILE 15
 
-	run_taskvine_worker $PORT_FILE worker.log --cores 2 --memory 2000 --disk 2000
+	# run an artificially large worker in order to test high concurreny for serverless
+	run_taskvine_worker $PORT_FILE worker.log --cores 8 --memory 1000 --disk 1000
 
 	# wait for vine to exit.
 	wait_for_file_creation $STATUS_FILE 15

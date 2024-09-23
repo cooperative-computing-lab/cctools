@@ -9,7 +9,7 @@ See the file COPYING for details.
 #include "dag_node.h"
 
 #include "debug.h"
-#include "batch_task.h"
+#include "batch_job.h"
 #include "rmsummary.h"
 #include "list.h"
 #include "stringtools.h"

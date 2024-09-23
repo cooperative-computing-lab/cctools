@@ -9,7 +9,7 @@
 #include "list.h"
 #include "xxmalloc.h"
 
-#include "batch_task.h"
+#include "batch_job.h"
 
 #include "dag.h"
 #include "makeflow_hook.h"
@@ -152,7 +152,7 @@ static int destroy( void * instance_struct, struct dag *d ){
     return MAKEFLOW_HOOK_SUCCESS;
 }
 
-void wrapper_generate_files( struct batch_task *task, struct dag_node *n, struct wrapper_instance *w)
+void wrapper_generate_files( struct batch_job *task, struct dag_node *n, struct wrapper_instance *w)
 {
 	char *f;
 	char *nodeid = string_format("%d",n->nodeid);
@@ -216,7 +216,7 @@ void wrapper_generate_files( struct batch_task *task, struct dag_node *n, struct
 
 }
 
-static int node_submit( void * instance_struct, struct dag_node *n, struct batch_task *t)
+static int node_submit( void * instance_struct, struct dag_node *n, struct batch_job *t)
 {
 	struct wrapper_instance *w = (struct wrapper_instance*)instance_struct;
 
@@ -225,7 +225,7 @@ static int node_submit( void * instance_struct, struct dag_node *n, struct batch
     char *nodeid = string_format("%d",n->nodeid);
     char *wrap_tmp = string_replace_percents(w->command, nodeid);
 
-    batch_task_wrap_command(t, wrap_tmp); 
+    batch_job_wrap_command(t, wrap_tmp); 
 
     free(nodeid);
     free(wrap_tmp);
