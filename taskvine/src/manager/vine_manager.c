@@ -2529,7 +2529,7 @@ static void vine_manager_compute_input_size(struct vine_manager *q, struct vine_
 	}
 
 	if (input_size > 0) {
-	    t->input_files_size = input_size;
+		t->input_files_size = input_size;
 	}
 }
 
