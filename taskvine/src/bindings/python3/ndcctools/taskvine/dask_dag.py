@@ -73,6 +73,9 @@ class DaskVineDag:
         # key->value of its computation
         self._result_of = {}
 
+        # child -> nodes that use the child as an input, and that have not been completed
+        self._pending_parents_of = defaultdict(lambda: set())
+
         # key->depth. The shallowest level the key is found
         self._depth_of = defaultdict(lambda: float('inf'))
 
@@ -117,6 +120,7 @@ class DaskVineDag:
 
         for c in self._children_of[key]:
             self._parents_of[c].add(key)
+            self._pending_parents_of[c].add(key)
 
     def get_ready(self):
         """ List of [(key, sexpr),...] ready for computation.
@@ -156,6 +160,10 @@ class DaskVineDag:
                 rs.update(self.set_result(p, sexpr))
             else:
                 rs[p] = (p, sexpr)
+
+        for c in self._children_of[key]:
+            self._pending_parents_of[c].discard(key)
+
         return rs.values()
 
     def _flatten_graph(self):
@@ -165,9 +173,14 @@ class DaskVineDag:
             self.flatten_rec(key, self._working_graph[key], toplevel=True)
 
     def _add_second_targets(self, key):
-        if not DaskVineDag.listp(self._working_graph[key]):
+        v = self._working_graph[key]
+        if self.graph_keyp(v):
+            lst = [v]
+        elif DaskVineDag.listp(v):
+            lst = v
+        else:
             return
-        for c in self._working_graph[key]:
+        for c in lst:
             if self.graph_keyp(c):
                 self._targets.add(c)
                 self._add_second_targets(c)
@@ -211,6 +224,9 @@ class DaskVineDag:
 
     def get_parents(self, key):
         return self._parents_of[key]
+
+    def get_pending_parents(self, key):
+        return self._pending_parents_of[key]
 
     def set_targets(self, keys):
         """ Values of keys that need to be computed. """

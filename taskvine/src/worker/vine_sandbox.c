@@ -94,11 +94,7 @@ static int stage_input_file(struct vine_process *p, struct vine_mount *m, struct
 		}
 
 		if (!result)
-			debug(D_VINE,
-					"couldn't link %s into sandbox as %s: %s",
-					cache_path,
-					sandbox_path,
-					strerror(errno));
+			debug(D_VINE, "couldn't link %s into sandbox as %s: %s", cache_path, sandbox_path, strerror(errno));
 	} else {
 		debug(D_VINE, "input: %s is not ready in the cache!", f->cached_name);
 		result = 0;
@@ -167,8 +163,7 @@ Move a given output file back to the target cache location
 and inform the manager of the added file.
 */
 
-static int stage_output_file(struct vine_process *p, struct vine_mount *m, struct vine_file *f,
-		struct vine_cache *cache, struct link *manager)
+static int stage_output_file(struct vine_process *p, struct vine_mount *m, struct vine_file *f, struct vine_cache *cache, struct link *manager)
 {
 	char *cache_path = vine_cache_data_path(cache, f->cached_name);
 	char *sandbox_path = vine_sandbox_full_path(p, m->remote_name);
@@ -183,29 +178,12 @@ static int stage_output_file(struct vine_process *p, struct vine_mount *m, struc
 	debug(D_VINE, "output: measuring %s", sandbox_path);
 	if (vine_cache_file_measure_metadata(sandbox_path, &mode, &size, &mtime)) {
 		debug(D_VINE, "output: moving %s to %s", sandbox_path, cache_path);
-		if (vine_cache_add_file(cache,
-				    f->cached_name,
-				    sandbox_path,
-				    f->cache_level,
-				    mode,
-				    size,
-				    mtime,
-				    transfer_time)) {
-			vine_worker_send_cache_update(manager,
-					f->cached_name,
-					f->type,
-					f->cache_level,
-					f->size,
-					mode,
-					transfer_time,
-					p->execution_start);
+		if (vine_cache_add_file(cache, f->cached_name, sandbox_path, f->cache_level, mode, size, mtime, transfer_time)) {
+			f->size = size;
+			vine_worker_send_cache_update(manager, f->cached_name, f->type, f->cache_level, f->size, mode, transfer_time, p->execution_start);
 			result = 1;
 		} else {
-			debug(D_VINE,
-					"output: unable to move %s to %s: %s\n",
-					sandbox_path,
-					cache_path,
-					strerror(errno));
+			debug(D_VINE, "output: unable to move %s to %s: %s\n", sandbox_path, cache_path, strerror(errno));
 			result = 0;
 		}
 	} else {

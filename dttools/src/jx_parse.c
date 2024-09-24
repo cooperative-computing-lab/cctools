@@ -66,6 +66,7 @@ struct jx_parser {
 	char token[MAX_TOKEN_SIZE];
 	FILE *source_file;
 	const char *source_string;
+	int source_string_length;
 	struct link *source_link;
 	unsigned line;
 	time_t stoptime;
@@ -104,6 +105,13 @@ void jx_parser_read_stream(struct jx_parser *p, FILE *file)
 void jx_parser_read_string(struct jx_parser *p, const char *str)
 {
 	p->source_string = str;
+	p->source_string_length = -1;
+}
+
+void jx_parser_read_string_and_length(struct jx_parser *p, const char *str, int length)
+{
+	p->source_string = str;
+	p->source_string_length = length;
 }
 
 void jx_parser_read_link(struct jx_parser *p, struct link *l, time_t stoptime)
@@ -175,11 +183,22 @@ static int jx_getchar(struct jx_parser *p)
 	if (p->source_file) {
 		c = fgetc(p->source_file);
 	} else if (p->source_string) {
-		c = *p->source_string;
-		if (c) {
-			p->source_string++;
+		if (p->source_string_length == -1) {
+			/* processing a null terminated string */
+			c = *p->source_string;
+			if (c) {
+				p->source_string++;
+			} else {
+				c = EOF;
+			}
 		} else {
-			c = EOF;
+			/* processing a known length string */
+			if (p->source_string_length > 0) {
+				c = *p->source_string++;
+				p->source_string_length--;
+			} else {
+				c = EOF;
+			}
 		}
 	} else if (p->source_link) {
 		char ch;
@@ -474,18 +493,14 @@ static struct jx_comprehension *jx_parse_comprehension(struct jx_parser *s)
 
 	t = jx_scan(s);
 	if (t != JX_TOKEN_SYMBOL) {
-		jx_parse_error_a(s,
-				string_format("expected 'for' to be followed by a variable name, not '%s'", s->token));
+		jx_parse_error_a(s, string_format("expected 'for' to be followed by a variable name, not '%s'", s->token));
 		goto FAILURE;
 	}
 	variable = strdup(s->token);
 
 	t = jx_scan(s);
 	if (t != JX_TOKEN_IN) {
-		jx_parse_error_a(s,
-				string_format("expected 'for %s' to be followed by 'in', not '%s'",
-						variable,
-						s->token));
+		jx_parse_error_a(s, string_format("expected 'for %s' to be followed by 'in', not '%s'", variable, s->token));
 		goto FAILURE;
 	}
 
@@ -723,9 +738,7 @@ static struct jx *jx_parse_atomic(struct jx_parser *s, bool arglist)
 		return jx_add_lineno(s, jx_null());
 	case JX_TOKEN_SYMBOL: {
 		if (s->strict_mode) {
-			jx_parse_error_a(s,
-					string_format("unquoted strings (%s) are not allowed in strict parsing mode",
-							s->token));
+			jx_parse_error_a(s, string_format("unquoted strings (%s) are not allowed in strict parsing mode", s->token));
 			return NULL;
 		}
 		return jx_add_lineno(s, jx_symbol(s->token));
@@ -1181,6 +1194,13 @@ struct jx *jx_parse_string(const char *str)
 {
 	struct jx_parser *p = jx_parser_create(false);
 	jx_parser_read_string(p, str);
+	return jx_parse_finish(p);
+}
+
+struct jx *jx_parse_string_and_length(const char *str, int length)
+{
+	struct jx_parser *p = jx_parser_create(false);
+	jx_parser_read_string_and_length(p, str, length);
 	return jx_parse_finish(p);
 }
 

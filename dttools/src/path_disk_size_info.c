@@ -97,10 +97,7 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 					free(tail);
 					continue;
 				} else {
-					debug(D_DEBUG,
-							"error opening directory '%s', errno: %s.\n",
-							tail->name,
-							strerror(errno));
+					debug(D_DEBUG, "error opening directory '%s', errno: %s.\n", tail->name, strerror(errno));
 					result = -1;
 					goto timeout;
 				}

@@ -10,7 +10,7 @@
         "checksum": "93284f9e50040fe5704c0c795d72df61",
 		"note": "this os image = `docker pull centos:6` + `yum install ImageMagick`. Using yum is becuase ImageMagick is not relocatable.",
         "source": [
-            "http://ccl.cse.nd.edu/research/data/hep-case-study/93284f9e50040fe5704c0c795d72df61/centos-6.8-x86_64.tar.gz"
+            "https://ccl.cse.nd.edu/research/data/hep-case-study/93284f9e50040fe5704c0c795d72df61/centos-6.8-x86_64.tar.gz"
         ],
         "version": "6.8",
         "uncompressed_size": "309442560",

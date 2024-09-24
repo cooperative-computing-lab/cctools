@@ -15,8 +15,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <sys/stat.h>
 
-struct vine_cache_file *vine_cache_file_create(
-		vine_cache_type_t cache_type, const char *source, struct vine_task *mini_task)
+struct vine_cache_file *vine_cache_file_create(vine_cache_type_t cache_type, const char *source, struct vine_task *mini_task)
 {
 	struct vine_cache_file *f = malloc(sizeof(*f));
 	memset(f, 0, sizeof(*f));

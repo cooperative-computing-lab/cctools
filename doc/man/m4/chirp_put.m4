@@ -16,7 +16,7 @@ BOLD(chirp_put) is a quick and simple way to copy a single local file PARAM(loca
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ARG(a,auth, flag)Require this authentication mode.
+OPTION_ARG(a,auth,flag) Enable authentication mode: unix, hostname, address, ticket, kerberos, or globus.
 OPTION_ARG(d,debug,flag)Enable debugging for this subsystem.
 OPTION_ARG(b,block-size,size)Set transfer buffer size. (default is 65536 bytes).
 OPTION_FLAG(f,follow)Follow input file like tail -f.

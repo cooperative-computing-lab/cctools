@@ -445,9 +445,7 @@ struct bitmap *bitmap_load_pcx(const char *path)
 			palettesize = 256;
 			fseek(file, -768, SEEK_END);
 		} else {
-			printf("bitmap: %s has %d bits per pixel, I don't support that...\n",
-					path,
-					header.bitsperpixel);
+			printf("bitmap: %s has %d bits per pixel, I don't support that...\n", path, header.bitsperpixel);
 			fclose(file);
 			free(m);
 			return 0;

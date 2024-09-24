@@ -15,7 +15,7 @@ See the file COPYING for details.
 #include "string_set.h"
 #include "set.h"
 #include "timestamp.h"
-#include "batch_job.h"
+#include "batch_queue.h"
 #include "category.h"
 
 #include <stdio.h>

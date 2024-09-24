@@ -76,18 +76,33 @@ int vine_schedule_in_ramp_down(struct vine_manager *q)
  * @param t     Task info structure.
  * @param tr    Chosen task resources.
  * @return 1 if yes, 0 otherwise. */
-int check_worker_have_enough_resources(
-		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *tr)
+int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *tr)
 {
+	/*
+	This is a temporary hack in order to get Greg's application running.
+	The problem is in line with the problem pointed out in PR #3909 but a special case in the manager's end.
+
+	The problem here is that the manager always allocates the whole disk the the library task,
+	so that libtask->current_resource_box->disk is always equal to worker_net_resources->disk.total.
+	For the first task, the ti->current_resource_box->disk == 0, it is able to run because the expr in line 114 doesn't satisfy.
+	However, if the first task causes any increase in the worker's disk, worker_net_resources->disk.inuse will go above the total,
+	which causes the consistent true of the expr in line 114.
+	*/
+	if (t->needs_library) {
+		return 1;
+	}
+
 	struct vine_resources *worker_net_resources = vine_resources_copy(w->resources);
 
-	/* Pretend to reclaim resources from empty libraries. */
+	/* Subtract resources from libraries that have slots unused and don't match the current task. */
+	/* These will be killed anyway as needed in commit_task_to_worker. */
+	/* Matches assumption in vine_manager.c:commit_task_to_worker() */
+
 	uint64_t task_id;
 	struct vine_task *ti;
 	ITABLE_ITERATE(w->current_tasks, task_id, ti)
 	{
-		if (ti->provides_library && ti->function_slots_inuse == 0 &&
-				(!t->needs_library || strcmp(t->needs_library, ti->provides_library))) {
+		if (ti->provides_library && ti->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, ti->provides_library))) {
 			worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
 			worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
 			worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
@@ -101,20 +116,16 @@ int check_worker_have_enough_resources(
 	}
 
 	if ((tr->cores > worker_net_resources->cores.total) ||
-			(worker_net_resources->cores.inuse + tr->cores >
-					overcommitted_resource_total(q, worker_net_resources->cores.total))) {
+			(worker_net_resources->cores.inuse + tr->cores > overcommitted_resource_total(q, worker_net_resources->cores.total))) {
 		ok = 0;
 	}
 
 	if ((tr->memory > worker_net_resources->memory.total) ||
-			(worker_net_resources->memory.inuse + tr->memory >
-					overcommitted_resource_total(q, worker_net_resources->memory.total))) {
+			(worker_net_resources->memory.inuse + tr->memory > overcommitted_resource_total(q, worker_net_resources->memory.total))) {
 		ok = 0;
 	}
 
-	if ((tr->gpus > worker_net_resources->gpus.total) ||
-			(worker_net_resources->gpus.inuse + tr->gpus >
-					overcommitted_resource_total(q, worker_net_resources->gpus.total))) {
+	if ((tr->gpus > worker_net_resources->gpus.total) || (worker_net_resources->gpus.inuse + tr->gpus > overcommitted_resource_total(q, worker_net_resources->gpus.total))) {
 		ok = 0;
 	}
 	vine_resources_delete(worker_net_resources);
@@ -207,33 +218,40 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		}
 	}
 
-	/* do this check last! otherwise the library is sent to workers that can't fit it. */
+	/* Finally check to see if a function task has the needed library task */
+
 	if (t->needs_library) {
-		struct vine_task *library = vine_schedule_find_library(w, t->needs_library);
-		if (!library) {
-			/* XXX: checking for matches should not modify the state of workers. */
-			library = send_library_to_worker(q, w, t->needs_library);
-			/* Careful: If this failed, then the worker object may longer be valid! */
-			if (!library) {
+		struct vine_task *library = vine_schedule_find_library(q, w, t->needs_library);
+		if (library) {
+			/* The worker already has the library with a free slot. */
+		} else {
+			library = vine_manager_find_library_template(q, t->needs_library);
+			if (library) {
+				if (check_worker_against_task(q, w, library)) {
+					/* The library would fit this worker if it was sent. */
+				} else {
+					/* The library would not fit the worker. */
+					return 0;
+				}
+			} else {
+				/* There is no library by that name, yikes! */
 				return 0;
 			}
 		}
 	}
-
 	return 1;
 }
 
 /* Find a library task running on a specific worker that has an available slot.
  * @return pointer to the library task if there's one, 0 otherwise. */
-struct vine_task *vine_schedule_find_library(struct vine_worker_info *w, const char *library_name)
+struct vine_task *vine_schedule_find_library(struct vine_manager *q, struct vine_worker_info *w, const char *library_name)
 {
 	uint64_t task_id;
 	struct vine_task *task;
 	ITABLE_ITERATE(w->current_tasks, task_id, task)
 	{
-		if (task->type == VINE_TASK_TYPE_LIBRARY_INSTANCE && task->provides_library &&
-				!strcmp(task->provides_library, library_name) &&
-				(task->function_slots_inuse < task->function_slots)) {
+		if (task->type == VINE_TASK_TYPE_LIBRARY_INSTANCE && task->provides_library && !strcmp(task->provides_library, library_name) &&
+				(task->function_slots_inuse < task->function_slots_total)) {
 			return task;
 		}
 	}
@@ -319,8 +337,7 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 			}
 
 			if (!best_worker || task_cached_bytes > most_task_cached_bytes ||
-					(ramp_down && task_cached_bytes == most_task_cached_bytes &&
-							candidate_has_worse_fit(best_worker, w))) {
+					(ramp_down && task_cached_bytes == most_task_cached_bytes && candidate_has_worse_fit(best_worker, w))) {
 				best_worker = w;
 				most_task_cached_bytes = task_cached_bytes;
 			}
@@ -431,9 +448,7 @@ static struct vine_worker_info *find_worker_by_time(struct vine_manager *q, stru
 		if (check_worker_against_task(q, w, t)) {
 			if (w->total_tasks_complete > 0) {
 				double t = (w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
-				if (!best_worker || t < best_time ||
-						(t == best_time && vine_schedule_in_ramp_down(q) &&
-								candidate_has_worse_fit(best_worker, w))) {
+				if (!best_worker || t < best_time || (t == best_time && vine_schedule_in_ramp_down(q) && candidate_has_worse_fit(best_worker, w))) {
 					best_worker = w;
 					best_time = t;
 				}
@@ -490,8 +505,7 @@ Returns a bitmask that indicates which resource of the task, if any, cannot
 be met by the worker. If the task fits in the worker, it returns 0.
 */
 
-static vine_resource_bitmask_t is_task_larger_than_worker(
-		struct vine_manager *q, struct vine_task *t, struct vine_worker_info *w)
+static vine_resource_bitmask_t is_task_larger_than_worker(struct vine_manager *q, struct vine_task *t, struct vine_worker_info *w)
 {
 	if (w->resources->tag < 0) {
 		/* quickly return if worker has not sent its resources yet */
@@ -596,31 +610,19 @@ void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 	}
 
 	if (unfit_core) {
-		notice(D_VINE,
-				"    %d waiting task(s) need more than %s",
-				unfit_core,
-				rmsummary_resource_to_str("cores", largest_unfit_task->cores, 1));
+		notice(D_VINE, "    %d waiting task(s) need more than %s", unfit_core, rmsummary_resource_to_str("cores", largest_unfit_task->cores, 1));
 	}
 
 	if (unfit_mem) {
-		notice(D_VINE,
-				"    %d waiting task(s) need more than %s of memory",
-				unfit_mem,
-				rmsummary_resource_to_str("memory", largest_unfit_task->memory, 1));
+		notice(D_VINE, "    %d waiting task(s) need more than %s of memory", unfit_mem, rmsummary_resource_to_str("memory", largest_unfit_task->memory, 1));
 	}
 
 	if (unfit_disk) {
-		notice(D_VINE,
-				"    %d waiting task(s) need more than %s of disk",
-				unfit_disk,
-				rmsummary_resource_to_str("disk", largest_unfit_task->disk, 1));
+		notice(D_VINE, "    %d waiting task(s) need more than %s of disk", unfit_disk, rmsummary_resource_to_str("disk", largest_unfit_task->disk, 1));
 	}
 
 	if (unfit_gpu) {
-		notice(D_VINE,
-				"    %d waiting task(s) need more than %s",
-				unfit_gpu,
-				rmsummary_resource_to_str("gpus", largest_unfit_task->gpus, 1));
+		notice(D_VINE, "    %d waiting task(s) need more than %s", unfit_gpu, rmsummary_resource_to_str("gpus", largest_unfit_task->gpus, 1));
 	}
 
 	rmsummary_delete(largest_unfit_task);

@@ -28,6 +28,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "domain_name_cache.h"
 #include "envtools.h"
+#include "full_io.h"
 #include "gpu_info.h"
 #include "hash_cache.h"
 #include "hash_table.h"
@@ -93,6 +94,9 @@ static struct itable *procs_running = NULL;
 /* List of all procs that are waiting to be run. */
 /* These are additional pointers into procs_table and should not be deleted */
 static struct list *procs_waiting = NULL;
+
+/* List of asynchronous messages pending to be sent to the manager */
+static struct list *pending_async_messages = NULL;
 
 /* Table of all processes with results to be sent back, indexed by task_id. */
 /* These are additional pointers into procs_table and should not be deleted */
@@ -208,6 +212,112 @@ __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const ch
 	va_end(va);
 }
 
+/*
+Send messages from list of asychronous messages available.
+Asynchronus messages are measured and sent as to not overflow the
+TCP window (typically 64KB). This is done to avoid deadlock. Should
+the worker overflow the window, deadlock may occur in the scenario in
+which the manager requests data from the worker (files, etc.) during the
+the time in which the worker is sending data, causing the worker to block.
+This function attempts to deliver messages that have been buffered via
+the function send_async_message. We measure the size of the window and
+bytes present within the window. As we iterate though buffered messages,
+should a buffered message not overflow the the window, it is sent. Otherwise,
+we break once a message would overflow the window.
+*/
+
+void deliver_async_messages(struct link *l)
+{
+	int recv_window;
+	int send_window;
+	link_window_get(l, &send_window, &recv_window);
+
+	int bytes_in_buffer = link_get_buffer_bytes(l);
+	int bytes_available = send_window - bytes_in_buffer;
+
+	int messages = list_size(pending_async_messages);
+	int visited;
+	char *message;
+
+	for (visited = 0; visited < messages; visited++) {
+		message = list_peek_head(pending_async_messages);
+		int message_size = strlen(message);
+		if (message_size < bytes_available) {
+			message = list_pop_head(pending_async_messages);
+			bytes_available -= message_size;
+			debug(D_VINE, "tx: %s", message);
+			link_printf(l, time(0) + options->active_timeout, "%s", message);
+			free(message);
+		} else {
+			break;
+		}
+	}
+}
+
+/* Buffer an asynchronous message to be sent to the manager */
+
+void send_async_message(struct link *l, const char *fmt, ...)
+{
+	va_list va;
+	char *message = malloc(VINE_LINE_MAX);
+	va_start(va, fmt);
+	vsprintf(message, fmt, va);
+	va_end(va);
+
+	list_push_tail(pending_async_messages, message);
+	deliver_async_messages(l); // attempt to deliver message, will be delivered later if buffer is full.
+}
+
+/* Send asynchronous task completion messages for current complete processes */
+
+void send_complete_tasks(struct link *l)
+{
+	int size = itable_size(procs_complete);
+	int visited;
+	struct vine_process *p;
+	for (visited = 0; visited < size; visited++) {
+		p = itable_pop(procs_complete);
+		if (p->output_length <= 1024 && p->output_length > 0) {
+
+			char *output;
+			int output_file = open(p->output_file_name, O_RDONLY);
+			output = malloc(p->output_length + 1);
+			full_read(output_file, output, p->output_length);
+			output[p->output_length] = '\0';
+			close(output_file);
+			send_async_message(l,
+					"complete %d %d %lld %lld %llu %llu %d\n%s",
+					p->result,
+					p->exit_code,
+					(long long)p->output_length,
+					(long long)p->output_length,
+					(unsigned long long)p->execution_start,
+					(unsigned long long)p->execution_end,
+					p->task->task_id,
+					output);
+			free(output);
+		} else {
+			send_async_message(l,
+					"complete %d %d %lld %lld %llu %llu %d\n",
+					p->result,
+					p->exit_code,
+					(long long)p->output_length,
+					0,
+					(unsigned long long)p->execution_start,
+					(unsigned long long)p->execution_end,
+					p->task->task_id);
+		}
+	}
+}
+
+static void report_changes(struct link *manager)
+{
+	vine_watcher_send_changes(watcher, manager, time(0) + options->active_timeout);
+	send_message(manager, "end\n");
+
+	results_to_be_sent_msg = 0;
+}
+
 /* Receive a single-line message from the current manager. */
 
 int recv_message(struct link *l, char *line, int length, time_t stoptime)
@@ -276,6 +386,7 @@ and apply any local options that override it.
 
 static void measure_worker_resources()
 {
+	static int disk_set = 0;
 	static time_t last_resources_measurement = 0;
 	if (time(0) < last_resources_measurement + options->check_resources_interval) {
 		return;
@@ -294,14 +405,14 @@ static void measure_worker_resources()
 
 	if (options->disk_total > 0) {
 		r->disk.total = MIN(r->disk.total, options->disk_total);
-	} else {
-		/* Set the reporting disk to a fraction of the measured disk to avoid
-		 * unnecessarily forsaking tasks with unspecified resources.
-		 * Note that @vine_resources_measure_locally reports that
-		 * disk.total = available_disk + disk.inuse, so we leave out disk.inuse in
-		 * the discounting calculation, then add it back in. */
-		r->disk.total -= r->disk.inuse;
+	} else if (!disk_set) {
+		/* XXX If no disk is specified we will allocate half of the worker disk available
+		   at startup. We will not update the allocation since it should remain static.
+		   If something else is consuming disk on the machine it would cause issues with tasks which
+		   request the whole available worker disk. Leaving half of the disk to other processes
+		   should leave the worker free to use the other half without the need to re measure. */
 		r->disk.total = ceil(r->disk.total * options->disk_percent / 100) + r->disk.inuse;
+		disk_set = 1;
 	}
 
 	r->disk.inuse = measure_worker_disk();
@@ -325,7 +436,7 @@ static void send_features(struct link *manager)
 	{
 		char feature_encoded[VINE_LINE_MAX];
 		url_encode(f, feature_encoded, VINE_LINE_MAX);
-		send_message(manager, "feature %s\n", feature_encoded);
+		send_async_message(manager, "feature %s\n", feature_encoded);
 	}
 }
 
@@ -361,7 +472,7 @@ think that the worker has crashed and gone away.
 
 static int send_keepalive(struct link *manager, int force_resources)
 {
-	send_message(manager, "alive\n");
+	send_async_message(manager, "alive\n");
 	send_resource_update(manager);
 	return 1;
 }
@@ -371,16 +482,15 @@ Send an asynchronmous message to the manager indicating that an item was success
 its size in bytes and transfer time in usec.
 */
 
-void vine_worker_send_cache_update(struct link *manager, const char *cachename, vine_file_type_t type,
-		vine_cache_level_t cache_level, int64_t size, time_t mtime, timestamp_t transfer_time,
-		timestamp_t transfer_start)
+void vine_worker_send_cache_update(struct link *manager, const char *cachename, vine_file_type_t type, vine_cache_level_t cache_level, int64_t size, time_t mtime,
+		timestamp_t transfer_time, timestamp_t transfer_start)
 {
 	char *transfer_id = hash_table_remove(current_transfers, cachename);
 	if (!transfer_id) {
 		transfer_id = xxstrdup("X");
 	}
 
-	send_message(manager,
+	send_async_message(manager,
 			"cache-update %s %d %d %lld %lld %lld %lld %s\n",
 			cachename,
 			type,
@@ -405,10 +515,10 @@ void vine_worker_send_cache_invalid(struct link *manager, const char *cachename,
 	char *transfer_id = hash_table_remove(current_transfers, cachename);
 	if (transfer_id) {
 		debug(D_VINE, "Sending Cache invalid transfer id: %s", transfer_id);
-		send_message(manager, "cache-invalid %s %d %s\n", cachename, length, transfer_id);
+		send_async_message(manager, "cache-invalid %s %d %s\n", cachename, length, transfer_id);
 		free(transfer_id);
 	} else {
-		send_message(manager, "cache-invalid %s %d\n", cachename, length);
+		send_async_message(manager, "cache-invalid %s %d\n", cachename, length);
 	}
 	link_write(manager, message, length, time(0) + options->active_timeout);
 }
@@ -428,9 +538,9 @@ static void send_transfer_address(struct link *manager)
 	}
 
 	if (options->reported_transfer_host) {
-		send_message(manager, "transfer-hostport %s %d\n", options->reported_transfer_host, port);
+		send_async_message(manager, "transfer-hostport %s %d\n", options->reported_transfer_host, port);
 	} else {
-		send_message(manager, "transfer-port %d\n", port);
+		send_async_message(manager, "transfer-port %d\n", port);
 	}
 }
 
@@ -451,7 +561,7 @@ static void report_worker_ready(struct link *manager)
 		strcpy(hostname, "unknown");
 	}
 
-	send_message(manager,
+	send_async_message(manager,
 			"taskvine %d %s %s %s %d.%d.%d\n",
 			VINE_PROTOCOL_VERSION,
 			hostname,
@@ -460,17 +570,15 @@ static void report_worker_ready(struct link *manager)
 			CCTOOLS_VERSION_MAJOR,
 			CCTOOLS_VERSION_MINOR,
 			CCTOOLS_VERSION_MICRO);
-	send_message(manager, "info worker-id %s\n", worker_id);
+	send_async_message(manager, "info worker-id %s\n", worker_id);
 	vine_cache_scan(cache_manager, manager);
 
 	send_features(manager);
 	send_transfer_address(manager);
-	send_message(manager,
-			"info worker-end-time %" PRId64 "\n",
-			(int64_t)DIV_INT_ROUND_UP(options->end_time, USECOND));
+	send_async_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t)DIV_INT_ROUND_UP(options->end_time, USECOND));
 
 	if (options->factory_name) {
-		send_message(manager, "info from-factory %s\n", options->factory_name);
+		send_async_message(manager, "info from-factory %s\n", options->factory_name);
 	}
 
 	send_keepalive(manager, 1);
@@ -552,60 +660,16 @@ static void reap_process(struct vine_process *p, struct link *manager)
 
 	itable_remove(procs_running, p->task->task_id);
 	itable_insert(procs_complete, p->task->task_id, p);
-}
 
-/*
-Transmit the results of the given process to the manager.
-*/
-
-static void report_task_complete(struct link *manager, struct vine_process *p)
-{
-	int64_t output_length;
-
-	int output_file = open(p->output_file_name, O_RDONLY);
-	if (output_file >= 0) {
-		struct stat info;
-		fstat(output_file, &info);
-		output_length = info.st_size;
+	struct stat info;
+	if (!stat(p->output_file_name, &info)) {
+		p->output_length = info.st_size;
 	} else {
-		output_length = 0;
-	}
-
-	send_message(manager,
-			"result %d %d %lld %llu %llu %d\n",
-			p->result,
-			p->exit_code,
-			(long long)output_length,
-			(unsigned long long)p->execution_start,
-			(unsigned long long)p->execution_end,
-			p->task->task_id);
-
-	if (output_file >= 0) {
-		link_stream_from_fd(manager, output_file, output_length, time(0) + options->active_timeout);
-		close(output_file);
+		p->output_length = 0;
 	}
 
 	total_task_execution_time += (p->execution_end - p->execution_start);
 	total_tasks_executed++;
-}
-
-/*
-For every unreported complete task and watched file,
-send the results to the manager.
-*/
-
-static void report_tasks_complete(struct link *manager)
-{
-	struct vine_process *p;
-
-	while ((p = itable_pop(procs_complete))) {
-		report_task_complete(manager, p);
-	}
-
-	vine_watcher_send_changes(watcher, manager, time(0) + options->active_timeout);
-	send_message(manager, "end\n");
-
-	results_to_be_sent_msg = 0;
 }
 
 /*
@@ -625,6 +689,58 @@ static void expire_procs_running()
 		if (p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end) {
 			p->result = VINE_RESULT_MAX_END_TIME;
 			vine_process_kill(p);
+		}
+	}
+}
+
+/* Force a single running task to finish with the given result flag. */
+
+static void finish_running_task(struct vine_process *p, vine_result_t result)
+{
+	p->result |= result;
+	vine_process_kill(p);
+}
+
+/* Force all running tasks to finish with the given result flag. */
+
+static void finish_running_tasks(vine_result_t result)
+{
+	struct vine_process *p;
+	uint64_t task_id;
+
+	ITABLE_ITERATE(procs_running, task_id, p)
+	{
+		finish_running_task(p, result);
+	}
+}
+
+/*
+Kill a failed library process.
+This library process may either not existent or no longer responses.
+*/
+
+static void handle_failed_library_process(struct vine_process *p, struct link *manager)
+{
+	if (p->type != VINE_PROCESS_TYPE_LIBRARY) {
+		return;
+	}
+
+	p->library_ready = 0;
+	p->exit_code = 1;
+
+	/* Mark this library as failed */
+	finish_running_task(p, VINE_RESULT_LIBRARY_EXIT);
+
+	/* Forsake the tasks that are running on this library */
+	/* It no available libraries on this worker, tasks waiting for this library will be forsaken */
+
+	struct vine_process *p_running;
+	uint64_t task_id;
+
+	ITABLE_ITERATE(procs_running, task_id, p_running)
+	{
+		if (p_running->library_process == p) {
+			finish_running_task(p_running, VINE_RESULT_FORSAKEN);
 		}
 	}
 }
@@ -650,6 +766,12 @@ static int handle_completed_tasks(struct link *manager)
 		/* Check to see if this process itself is completed. */
 
 		if (vine_process_is_complete(p)) {
+			if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
+				/* Kill the library process if it completes. */
+				debug(D_VINE, "Library %s task id %d is detected to be failed. Killing it.", p->task->provides_library, p->task->task_id);
+				handle_failed_library_process(p, manager);
+			}
+			/* simply reap this process */
 			reap_process(p, manager);
 			result_retrieved++;
 		}
@@ -685,8 +807,7 @@ static void normalize_resources(struct vine_process *p)
 {
 	struct vine_task *t = p->task;
 
-	if (t->resources_requested->cores < 0 && t->resources_requested->memory < 0 &&
-			t->resources_requested->disk < 0 && t->resources_requested->gpus < 0) {
+	if (t->resources_requested->cores < 0 && t->resources_requested->memory < 0 && t->resources_requested->disk < 0 && t->resources_requested->gpus < 0) {
 		t->resources_requested->cores = total_resources->cores.total;
 		t->resources_requested->memory = total_resources->memory.total;
 		t->resources_requested->disk = total_resources->disk.total;
@@ -738,7 +859,10 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 		} else if (sscanf(line, "provides_library %s", library_name) == 1) {
 			vine_task_set_library_provided(task, library_name);
 		} else if (sscanf(line, "function_slots %" PRId64, &n) == 1) {
-			vine_task_set_function_slots(task, n);
+			/* Set the number of slots requested by the user. */
+			task->function_slots_requested = n;
+			/* Also set the total number determined by the manager. */
+			task->function_slots_total = n;
 		} else if (sscanf(line, "infile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			vine_hack_do_not_compute_cached_name = 1;
@@ -830,21 +954,13 @@ static int do_put(struct link *manager, const char *cachename, vine_cache_level_
 	char *transfer_path = vine_cache_transfer_path(cache_manager, cachename);
 
 	timestamp_t start = timestamp_get();
-	int r = vine_transfer_get_any(
-			manager, transfer_dir, &actual_size, &mode, &mtime, time(0) + options->active_timeout);
+	int r = vine_transfer_get_any(manager, transfer_dir, &actual_size, &mode, &mtime, time(0) + options->active_timeout);
 	timestamp_t stop = timestamp_get();
 
 	/* XXX actual_size should equal expected size, but only for a simple file, not a dir. */
 
 	if (r) {
-		vine_cache_add_file(cache_manager,
-				cachename,
-				transfer_path,
-				cache_level,
-				mode,
-				actual_size,
-				mtime,
-				stop - start);
+		vine_cache_add_file(cache_manager, cachename, transfer_path, cache_level, mode, actual_size, mtime, stop - start);
 	} else {
 		trash_file(transfer_path);
 	}
@@ -859,22 +975,18 @@ static int do_put(struct link *manager, const char *cachename, vine_cache_level_
 Accept a url specification and queue it for later transfer.
 */
 
-static int do_put_url(
-		const char *cache_name, vine_cache_level_t cache_level, int64_t size, int mode, const char *source)
+static int do_put_url(const char *cache_name, vine_cache_level_t cache_level, int64_t size, int mode, const char *source)
 {
-	return vine_cache_add_transfer(
-			cache_manager, cache_name, source, cache_level, mode, size, VINE_CACHE_FLAGS_ON_TASK);
+	return vine_cache_add_transfer(cache_manager, cache_name, source, cache_level, mode, size, VINE_CACHE_FLAGS_ON_TASK);
 }
 
 /*
 Accept a url specification and transfer immediately.
 */
 
-static int do_put_url_now(
-		const char *cache_name, vine_cache_level_t cache_level, int64_t size, int mode, const char *source)
+static int do_put_url_now(const char *cache_name, vine_cache_level_t cache_level, int64_t size, int mode, const char *source)
 {
-	return vine_cache_add_transfer(
-			cache_manager, cache_name, source, cache_level, mode, size, VINE_CACHE_FLAGS_NOW);
+	return vine_cache_add_transfer(cache_manager, cache_name, source, cache_level, mode, size, VINE_CACHE_FLAGS_NOW);
 }
 
 /*
@@ -882,8 +994,7 @@ Accept a mini_task that is executed on demand.
 We will then extract the file "source" from the sandbox in order to produce "cache_name".
 */
 
-static int do_put_mini_task(struct link *manager, time_t stoptime, const char *cache_name,
-		vine_cache_level_t cache_level, int64_t size, int mode, const char *source)
+static int do_put_mini_task(struct link *manager, time_t stoptime, const char *cache_name, vine_cache_level_t cache_level, int64_t size, int mode, const char *source)
 {
 	mini_task_id++;
 
@@ -987,33 +1098,12 @@ static void kill_all_tasks()
 	debug(D_VINE, "all data structures are clean");
 }
 
-/* Force a single running task to finish with the given result flag. */
-
-static void finish_running_task(struct vine_process *p, vine_result_t result)
-{
-	p->result |= result;
-	vine_process_kill(p);
-}
-
-/* Force all running tasks to finish with the given result flag. */
-
-static void finish_running_tasks(vine_result_t result)
-{
-	struct vine_process *p;
-	uint64_t task_id;
-
-	ITABLE_ITERATE(procs_running, task_id, p)
-	{
-		finish_running_task(p, result);
-	}
-}
-
 /* Check whether a given process is still within the various limits imposed on it. */
 
 static int enforce_process_limits(struct vine_process *p)
 {
 	/* If the task did not set disk usage, return right away. */
-	if (p->disk < 1)
+	if (p->task->resources_requested->disk < 1)
 		return 1;
 
 	vine_process_measure_disk(p, options->max_time_on_measurement);
@@ -1083,8 +1173,7 @@ static void enforce_processes_max_running_time()
 					"Task %d went over its running time limit: %s > %s\n",
 					p->task->task_id,
 					rmsummary_resource_to_str("wall_time", (now - p->execution_start) / 1e6, 1),
-					rmsummary_resource_to_str(
-							"wall_time", p->task->resources_requested->wall_time, 1));
+					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
 			p->result = VINE_RESULT_MAX_WALL_TIME;
 			vine_process_kill(p);
 		}
@@ -1121,6 +1210,32 @@ static void disconnect_manager(struct link *manager)
 	}
 }
 
+void send_stdout(struct link *l, int64_t task_id)
+{
+	char line[VINE_LINE_MAX];
+	struct vine_process *p = itable_lookup(procs_table, task_id);
+	if (!p) {
+		strcpy(line, "process unknown: no stdout");
+		errno = ESRCH;
+		send_message(l, "error %s %d\n", line, errno);
+		return;
+	}
+
+	int output_file = open(p->output_file_name, O_RDONLY);
+	if (output_file < 0) {
+		send_message(l, "error %s %d\n", p->output_file_name, errno);
+		return;
+	}
+
+	send_message(l, "stdout %" SCNd64 " %lld\n", task_id, (long long)p->output_length);
+
+	if (output_file >= 0) {
+		link_stream_from_fd(l, output_file, p->output_length, time(0) + options->active_timeout);
+		close(output_file);
+	}
+	return;
+}
+
 /* Handle the next incoming message from the currently connected manager. */
 
 static int handle_manager(struct link *manager)
@@ -1144,66 +1259,32 @@ static int handle_manager(struct link *manager)
 			url_decode(filename_encoded, filename, sizeof(filename));
 			r = do_put(manager, filename, cache_level, length);
 			reset_idle_timer();
-		} else if (sscanf(line,
-					   "puturl %s %s %d %" SCNd64 " %o %s",
-					   source_encoded,
-					   filename_encoded,
-					   &cache_level,
-					   &length,
-					   &mode,
-					   transfer_id) == 6) {
+		} else if (sscanf(line, "puturl %s %s %d %" SCNd64 " %o %s", source_encoded, filename_encoded, &cache_level, &length, &mode, transfer_id) == 6) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			url_decode(source_encoded, source, sizeof(source));
 			r = do_put_url(filename, cache_level, length, mode, source);
 			reset_idle_timer();
 			hash_table_insert(current_transfers, filename, strdup(transfer_id));
-		} else if (sscanf(line,
-					   "puturl_now %s %s %d %" SCNd64 " %o %s",
-					   source_encoded,
-					   filename_encoded,
-					   &cache_level,
-					   &length,
-					   &mode,
-					   transfer_id) == 6) {
+		} else if (sscanf(line, "puturl_now %s %s %d %" SCNd64 " %o %s", source_encoded, filename_encoded, &cache_level, &length, &mode, transfer_id) == 6) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			url_decode(source_encoded, source, sizeof(source));
 			r = do_put_url_now(filename, cache_level, length, mode, source);
 			reset_idle_timer();
 			hash_table_insert(current_transfers, filename, strdup(transfer_id));
-		} else if (sscanf(line,
-					   "mini_task %s %s %d %" SCNd64 " %o",
-					   source_encoded,
-					   filename_encoded,
-					   &cache_level,
-					   &length,
-					   &mode) == 5) {
+		} else if (sscanf(line, "mini_task %s %s %d %" SCNd64 " %o", source_encoded, filename_encoded, &cache_level, &length, &mode) == 5) {
 			url_decode(source_encoded, source, sizeof(source));
 			url_decode(filename_encoded, filename, sizeof(filename));
-			r = do_put_mini_task(manager,
-					time(0) + options->active_timeout,
-					filename,
-					cache_level,
-					length,
-					mode,
-					source);
+			r = do_put_mini_task(manager, time(0) + options->active_timeout, filename, cache_level, length, mode, source);
 			reset_idle_timer();
 		} else if (sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			r = do_unlink(manager, filename);
 		} else if (sscanf(line, "getfile %s", filename_encoded) == 1) {
 			url_decode(filename_encoded, filename, sizeof(filename));
-			r = vine_transfer_put_any(manager,
-					cache_manager,
-					filename,
-					VINE_TRANSFER_MODE_FILE_ONLY,
-					time(0) + options->active_timeout);
+			r = vine_transfer_put_any(manager, cache_manager, filename, VINE_TRANSFER_MODE_FILE_ONLY, time(0) + options->active_timeout);
 		} else if (sscanf(line, "get %s", filename_encoded) == 1) {
 			url_decode(filename_encoded, filename, sizeof(filename));
-			r = vine_transfer_put_any(manager,
-					cache_manager,
-					filename,
-					VINE_TRANSFER_MODE_ANY,
-					time(0) + options->active_timeout);
+			r = vine_transfer_put_any(manager, cache_manager, filename, VINE_TRANSFER_MODE_ANY, time(0) + options->active_timeout);
 		} else if (sscanf(line, "kill %" SCNd64, &task_id) == 1) {
 			if (task_id >= 0) {
 				r = do_kill(task_id);
@@ -1222,7 +1303,10 @@ static int handle_manager(struct link *manager)
 			fprintf(stderr, "vine_worker: this manager requires a password. (use the -P option)\n");
 			r = 0;
 		} else if (sscanf(line, "send_results %d", &n) == 1) {
-			report_tasks_complete(manager);
+			report_changes(manager);
+			r = 1;
+		} else if (sscanf(line, "send_stdout %" SCNd64 "", &task_id) == 1) {
+			send_stdout(manager, task_id);
 			r = 1;
 		} else {
 			debug(D_VINE, "Unrecognized manager message: %s.\n", line);
@@ -1244,8 +1328,8 @@ static int task_resources_fit_now(struct vine_task *t)
 {
 	return (cores_allocated + t->resources_requested->cores <= total_resources->cores.total) &&
 	       (memory_allocated + t->resources_requested->memory <= total_resources->memory.total) &&
-	       (disk_allocated + t->resources_requested->disk <= total_resources->disk.total) &&
-	       (gpus_allocated + t->resources_requested->gpus <= total_resources->gpus.total);
+	       ((t->needs_library || disk_allocated + t->resources_requested->disk <= total_resources->disk.total)) && (gpus_allocated + t->resources_requested->gpus <= total_resources->gpus.total);
+	// XXX Disk is constantly shrinking, and library disk requests are currently static. Once we generate some files things will hang.
 }
 
 /*
@@ -1261,8 +1345,7 @@ static int task_resources_fit_eventually(struct vine_task *t)
 
 	r = total_resources;
 
-	return (t->resources_requested->cores <= r->cores.total) &&
-	       (t->resources_requested->memory <= r->memory.total) && (t->resources_requested->disk <= r->disk.total) &&
+	return (t->resources_requested->cores <= r->cores.total) && (t->resources_requested->memory <= r->memory.total) && (t->resources_requested->disk <= r->disk.total) &&
 	       (t->resources_requested->gpus <= r->gpus.total);
 }
 
@@ -1278,7 +1361,7 @@ static struct vine_process *find_running_library_for_function(const char *librar
 	ITABLE_ITERATE(procs_running, task_id, p)
 	{
 		if (p->task->provides_library && !strcmp(p->task->provides_library, library_name)) {
-			if (p->library_ready && p->functions_running < p->task->function_slots) {
+			if (p->library_ready && p->functions_running < p->task->function_slots_total) {
 				return p;
 			}
 		}
@@ -1338,9 +1421,9 @@ static int process_can_run_eventually(struct vine_process *p, struct vine_cache 
 
 	if (p->task->needs_library) {
 		/* Note that we check for *some* library but do not bind to it. */
-		if (!find_future_library_for_function(p->task->needs_library)) {
+		struct vine_process *p_future = find_future_library_for_function(p->task->needs_library);
+		if (!p || p_future->result == VINE_RESULT_LIBRARY_EXIT)
 			return 0;
-		}
 	}
 
 	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager);
@@ -1375,8 +1458,7 @@ static int enforce_worker_limits(struct link *manager)
 {
 	if (options->disk_total > 0 && total_resources->disk.inuse > options->disk_total) {
 		fprintf(stderr,
-				"vine_worker: %s used more than declared disk space (--disk - < disk used) %" PRIu64
-				" < %" PRIu64 " MB\n",
+				"vine_worker: %s used more than declared disk space (--disk - < disk used) %" PRIu64 " < %" PRIu64 " MB\n",
 				workspace->workspace_dir,
 				options->disk_total,
 				total_resources->disk.inuse);
@@ -1390,8 +1472,7 @@ static int enforce_worker_limits(struct link *manager)
 
 	if (options->memory_total > 0 && total_resources->memory.inuse > options->memory_total) {
 		fprintf(stderr,
-				"vine_worker: used more than declared memory (--memory < memory used) %" PRIu64
-				" < %" PRIu64 " MB\n",
+				"vine_worker: used more than declared memory (--memory < memory used) %" PRIu64 " < %" PRIu64 " MB\n",
 				options->memory_total,
 				total_resources->memory.inuse);
 
@@ -1412,21 +1493,16 @@ If 0, the worker has less resources than promised. 1 otherwise.
 static int enforce_worker_promises(struct link *manager)
 {
 	if (options->end_time > 0 && timestamp_get() > ((uint64_t)options->end_time)) {
-		warn(D_NOTICE,
-				"vine_worker: reached the wall time limit %" PRIu64 " s\n",
-				(uint64_t)options->manual_wall_time_option);
+		warn(D_NOTICE, "vine_worker: reached the wall time limit %" PRIu64 " s\n", (uint64_t)options->manual_wall_time_option);
 		if (manager) {
-			send_message(manager,
-					"info wall_time_exhausted %" PRIu64 "\n",
-					(uint64_t)options->manual_wall_time_option);
+			send_message(manager, "info wall_time_exhausted %" PRIu64 "\n", (uint64_t)options->manual_wall_time_option);
 		}
 		return 0;
 	}
 
 	if (options->disk_total > 0 && total_resources->disk.total < options->disk_total) {
 		fprintf(stderr,
-				"vine_worker: has less than the promised disk space (--disk > disk total) %" PRIu64
-				" < %" PRIu64 " MB\n",
+				"vine_worker: has less than the promised disk space (--disk > disk total) %" PRIu64 " < %" PRIu64 " MB\n",
 				options->disk_total,
 				total_resources->disk.total);
 
@@ -1483,7 +1559,7 @@ static int check_library_startup(struct vine_process *p)
  * A library starts up and tells the vine_worker it's ready by reporting
  * back its library name. */
 
-static void check_libraries_ready()
+static void check_libraries_ready(struct link *manager)
 {
 	uint64_t library_task_id;
 	struct vine_process *library_process;
@@ -1492,28 +1568,35 @@ static void check_libraries_ready()
 	library_link_info.events = LINK_READ;
 	library_link_info.revents = 0;
 
-	/* Loop through all processes to find libraries and check if they are ready. */
+	/* Loop through all processes to find libraries and check if they are alive. */
 	ITABLE_ITERATE(procs_running, library_task_id, library_process)
 	{
-		if ((library_process->type == VINE_PROCESS_TYPE_LIBRARY) && !library_process->library_ready) {
-			library_link_info.link = library_process->library_read_link;
+		/* Skip non-library processes or libraries that are already ready */
+		if (library_process->type != VINE_PROCESS_TYPE_LIBRARY || library_process->library_ready)
+			continue;
 
-			/* Check if library has sent its startup message. */
-			if (link_poll(&library_link_info, 1, 0) && (library_link_info.revents & LINK_READ)) {
-				if (check_library_startup(library_process)) {
-					debug(D_VINE,
-							"Library %s reports ready to execute functions.",
-							library_process->task->provides_library);
-					library_process->library_ready = 1;
-				} else {
-					/* Kill library if the name reported back doesn't match its name or
-					 * if there's any problem. */
-					debug(D_VINE, "Library verification failed. Killing it.");
-					vine_process_kill(library_process);
-				}
+		library_link_info.link = library_process->library_read_link;
+
+		/* Check if library has sent its startup message. */
+		if (link_poll(&library_link_info, 1, 0) && (library_link_info.revents & LINK_READ)) {
+			if (check_library_startup(library_process)) {
+				debug(D_VINE, "Library %s reports ready to execute functions.", library_process->task->provides_library);
+				library_process->library_ready = 1;
+			} else {
+				/* Kill library if the name reported back doesn't match its name or
+				 * if there's any problem. */
+				debug(D_VINE,
+						"Library %s task id %" PRIu64 " verification failed (unexpected response). Killing it.",
+						library_process->task->provides_library,
+						library_task_id);
+				handle_failed_library_process(library_process, manager);
 			}
-			library_link_info.revents = 0;
+		} else {
+			/* The library is running and the link has no readable data, do nothing until the
+			 * handle_completed_tasks detects its failure or it sends back the startup message */
 		}
+
+		library_link_info.revents = 0;
 	}
 }
 
@@ -1610,7 +1693,10 @@ static void vine_worker_serve_manager(struct link *manager)
 		}
 
 		/* Check all known libraries if they are ready to execute functions. */
-		check_libraries_ready();
+		check_libraries_ready(manager);
+
+		/* deliver queued asynchronous messages if available */
+		deliver_async_messages(manager);
 
 		int task_event = 0;
 		if (ok) {
@@ -1628,18 +1714,20 @@ static void vine_worker_serve_manager(struct link *manager)
 				} else if (process_can_run_eventually(p, cache_manager, manager)) {
 					list_push_tail(procs_waiting, p);
 				} else {
+					debug(D_VINE, "No suitable library found for task %d", p->task->task_id);
 					forsake_waiting_process(manager, p);
 					task_event++;
 				}
 			}
 		}
 
-		if (ok && !results_to_be_sent_msg) {
-			if (vine_watcher_check(watcher) || itable_size(procs_complete) > 0) {
-				send_message(manager, "available_results\n");
-				results_to_be_sent_msg = 1;
+		if (ok) {
+			if (vine_watcher_check(watcher)) {
+				send_async_message(manager, "available_results\n");
 			}
-
+			if (itable_size(procs_complete) > 0) {
+				send_complete_tasks(manager);
+			}
 			if (task_event > 0) {
 				send_stats_update(manager);
 			}
@@ -1680,11 +1768,7 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 	struct link *manager = link_connect(current_manager_address->addr, port, options->idle_stoptime);
 
 	if (!manager) {
-		fprintf(stderr,
-				"couldn't connect to %s:%d: %s\n",
-				current_manager_address->addr,
-				port,
-				strerror(errno));
+		fprintf(stderr, "couldn't connect to %s:%d: %s\n", current_manager_address->addr, port, strerror(errno));
 		return 0;
 	}
 
@@ -1757,7 +1841,7 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 	vine_worker_serve_manager(manager);
 
 	if (abort_signal_received) {
-		send_message(manager, "info vacating %d\n", abort_signal_received);
+		send_async_message(manager, "info vacating %d\n", abort_signal_received);
 	}
 
 	last_task_received = 0;
@@ -1832,9 +1916,7 @@ static struct list *interfaces_to_list(const char *canonical_host_or_addr, int p
 	}
 
 	if (host_aliases && !found_canonical) {
-		warn(D_NOTICE,
-				"Did not find the manager address '%s' in the list of interfaces.",
-				canonical_host_or_addr);
+		warn(D_NOTICE, "Did not find the manager address '%s' in the list of interfaces.", canonical_host_or_addr);
 	}
 
 	if (!found_canonical) {
@@ -1888,8 +1970,7 @@ static int vine_worker_serve_manager_by_name(const char *catalog_hosts, const ch
 		}
 
 		if (last_addr) {
-			if (time(0) > options->idle_stoptime && strcmp(addr, last_addr->host) == 0 &&
-					port == last_addr->port) {
+			if (time(0) > options->idle_stoptime && strcmp(addr, last_addr->host) == 0 && port == last_addr->port) {
 				if (list_size(managers_list) < 2) {
 					free(last_addr);
 					last_addr = NULL;
@@ -1897,12 +1978,7 @@ static int vine_worker_serve_manager_by_name(const char *catalog_hosts, const ch
 					/* convert options->idle_stoptime into connect_stoptime (e.g., time already
 					 * served). */
 					options->connect_stoptime = options->idle_stoptime;
-					debug(D_VINE,
-							"Previous idle disconnection from only manager available project=%s name=%s addr=%s port=%d",
-							project,
-							name,
-							addr,
-							port);
+					debug(D_VINE, "Previous idle disconnection from only manager available project=%s name=%s addr=%s port=%d", project, name, addr, port);
 
 					return 0;
 				} else {
@@ -1915,12 +1991,7 @@ static int vine_worker_serve_manager_by_name(const char *catalog_hosts, const ch
 		int result;
 
 		if (pref && strcmp(pref, "by_hostname") == 0) {
-			debug(D_VINE,
-					"selected manager with project=%s hostname=%s addr=%s port=%d",
-					project,
-					name,
-					addr,
-					port);
+			debug(D_VINE, "selected manager with project=%s hostname=%s addr=%s port=%d", project, name, addr, port);
 			manager_addresses = interfaces_to_list(name, port, NULL);
 		} else if (pref && strcmp(pref, "by_apparent_ip") == 0) {
 			debug(D_VINE, "selected manager with project=%s apparent_addr=%s port=%d", project, addr, port);
@@ -1971,8 +2042,7 @@ static void vine_worker_serve_managers()
 		if (options->project_regex) {
 			result = vine_worker_serve_manager_by_name(options->catalog_hosts, options->project_regex);
 		} else {
-			result = vine_worker_serve_manager_by_hostport_list(
-					manager_addresses, /* use ssl only if --ssl */ options->ssl_requested);
+			result = vine_worker_serve_manager_by_hostport_list(manager_addresses, /* use ssl only if --ssl */ options->ssl_requested);
 		}
 
 		/*
@@ -2084,6 +2154,7 @@ void vine_worker_create_structures()
 	procs_table = itable_create(0);
 	procs_running = itable_create(0);
 	procs_waiting = list_create();
+	pending_async_messages = list_create();
 	procs_complete = itable_create(0);
 
 	current_transfers = hash_table_create(0, 0);

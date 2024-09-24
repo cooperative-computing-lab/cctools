@@ -271,7 +271,7 @@ def check_gnuplot_version(gnuplot_cmd):
     try:
         version = check_output([gnuplot_cmd, '--version'])
         version = version.decode("utf-8")
-        result = re.match('gnuplot\s+(\d+\.\d+)\D', version)
+        result = re.match(r'gnuplot\s+(\d+\.\d+)\D', version)
 
         if not result:
             sys.stderr.write("Could not determine gnuplot version.")

@@ -18,7 +18,7 @@ BOLD(chirp_get) also can stream data which can be useful in a shell pipeline.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ARG(a,auth,flag)Require this authentication mode.
+OPTION_ARG(a,auth,flag) Enable authentication mode: unix, hostname, address, ticket, kerberos, or globus.
 OPTION_ARG(d,debug,flag)Enable debugging for this subsystem.
 OPTION_ARG(t,timeout,time)Timeout for failure. (default is 3600s)
 OPTION_ARG(i,tickets,files)Comma-delimited list of tickets to use for authentication.

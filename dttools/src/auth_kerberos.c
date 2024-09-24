@@ -61,8 +61,7 @@ int auth_kerberos_assert(struct link *link, time_t stoptime)
 					free(name);
 
 					debug(D_AUTH, "kerberos: building server principal");
-					if (!krb5_sname_to_principal(
-							    context, dname, SERVICE, KRB5_NT_SRV_HST, &server)) {
+					if (!krb5_sname_to_principal(context, dname, SERVICE, KRB5_NT_SRV_HST, &server)) {
 
 						krb5_unparse_name(context, server, &name);
 						debug(D_AUTH, "kerberos: expecting server %s", name);
@@ -164,14 +163,7 @@ int auth_kerberos_accept(struct link *link, char **subject, time_t stoptime)
 						debug(D_AUTH, "kerberos: receiving client credentials");
 						int fd = link_fd(link);
 						link_nonblocking(link, 0);
-						int result = krb5_recvauth(context,
-								&auth_context,
-								&fd,
-								VERSION,
-								principal,
-								0,
-								0,
-								&ticket);
+						int result = krb5_recvauth(context, &auth_context, &fd, VERSION, principal, 0, 0, &ticket);
 						link_nonblocking(link, 1);
 						if (result == 0) {
 
@@ -181,19 +173,13 @@ int auth_kerberos_accept(struct link *link, char **subject, time_t stoptime)
 
 							debug(D_AUTH, "kerberos: parsing client name");
 
-							strncpy(myrealm,
-									principal->realm.data,
-									principal->realm.length);
+							strncpy(myrealm, principal->realm.data, principal->realm.length);
 							myrealm[principal->realm.length] = 0;
 
-							strncpy(userrealm,
-									ticket->enc_part2->client->realm.data,
-									ticket->enc_part2->client->realm.length);
+							strncpy(userrealm, ticket->enc_part2->client->realm.data, ticket->enc_part2->client->realm.length);
 							userrealm[ticket->enc_part2->client->realm.length] = 0;
 
-							strncpy(username,
-									ticket->enc_part2->client->data->data,
-									ticket->enc_part2->client->data->length);
+							strncpy(username, ticket->enc_part2->client->data->data, ticket->enc_part2->client->data->length);
 							username[ticket->enc_part2->client->data->length] = 0;
 
 							debug(D_AUTH, "kerberos: user is %s@%s\n", username, userrealm);

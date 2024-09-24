@@ -38,7 +38,7 @@
 ## OPTIONS
 
 
-- **-a**,**--auth=_&lt;flag&gt;_**<br />Require this authentication mode.
+- **-a**,**--auth=_&lt;flag&gt;_**<br /> Enable authentication mode: unix, hostname, address, ticket, kerberos, or globus.
 - **-d**,**--debug=_&lt;flag&gt;_**<br />Enable debugging for this subsystem.
 - **-b**,**--block-size=_&lt;size&gt;_**<br />Set transfer buffer size. (default is 65536 bytes).
 - **-f**,**--follow**<br />Follow input file like tail -f.

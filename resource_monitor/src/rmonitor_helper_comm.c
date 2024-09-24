@@ -235,10 +235,7 @@ int rmonitor_helper_init(char *lib_default_path, int *fd, int stop_short_running
 		rmonitor_port = string_format("%d", port);
 
 		char *prev_ldpreload = getenv("LD_PRELOAD");
-		char *ld_preload = string_format("%s%s%s",
-				helper_absolute,
-				prev_ldpreload ? ":" : "",
-				prev_ldpreload ? prev_ldpreload : "");
+		char *ld_preload = string_format("%s%s%s", helper_absolute, prev_ldpreload ? ":" : "", prev_ldpreload ? prev_ldpreload : "");
 
 		debug(D_RMON, "setting LD_PRELOAD to %s\n", ld_preload);
 

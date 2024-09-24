@@ -32,7 +32,7 @@
 ## DESCRIPTION
 **work_queue_factory** submits and maintains a number
 of [work_queue_worker(1)](work_queue_worker.md) processes on various batch systems, such as
-Condor and SGE.  All the workers managed by a **work_queue_factory** process
+Condor and UGE.  All the workers managed by a **work_queue_factory** process
 will be directed to work for a specific manager, or any set of managers matching
 a given project name.  **work_queue_factory** will automatically determine
 the correct number of workers to have running, based on criteria set on
@@ -69,7 +69,7 @@ remove all running workers before exiting.
 General options:
 
 
-- **-T**,**--batch-type=_&lt;type&gt;_**<br /> Batch system type (required). One of: local, wq, condor, sge, pbs, lsf, torque, moab, mpi, slurm, chirp, amazon, amazon-batch, lambda, mesos, k8s, dryrun
+- **-T**,**--batch-type=_&lt;type&gt;_**<br /> Batch system type (required). One of: local, wq, vine, condor, uge, pbs, lsf, torque, moab, slurm, amazon, k8s, dryrun
 - **-C**,**--config-file=_&lt;file&gt;_**<br /> Use configuration file _&lt;file&gt;_.
 - **-M**,**--manager-name=_&lt;project&gt;_**<br /> Project name of managers to server, can be regex
 - **-F**,**--foremen-name=_&lt;project&gt;_**<br /> Foremen to serve, can be a regular expression.
@@ -145,10 +145,10 @@ To maintain workers for barney, do this:
 work_queue_factory -T condor -M barney
 ```
 
-To maintain a maximum of 100 workers on an SGE batch system, do this:
+To maintain a maximum of 100 workers on an UGE batch system, do this:
 
 ```
-work_queue_factory -T sge -M barney -W 100
+work_queue_factory -T uge -M barney -W 100
 ```
 
 To start workers such that the workers exit after 5 minutes (300s) of idleness:
@@ -219,7 +219,7 @@ The Cooperative Computing Tools are Copyright (C) 2022 The University of Notre D
 
 - [Cooperative Computing Tools Documentation]("../index.html")
 - [Work Queue User Manual]("../workqueue.html")
-- [work_queue_worker(1)](work_queue_worker.md) [work_queue_status(1)](work_queue_status.md) [work_queue_factory(1)](work_queue_factory.md) [condor_submit_workers(1)](condor_submit_workers.md) [sge_submit_workers(1)](sge_submit_workers.md) [torque_submit_workers(1)](torque_submit_workers.md) 
+- [work_queue_worker(1)](work_queue_worker.md) [work_queue_status(1)](work_queue_status.md) [work_queue_factory(1)](work_queue_factory.md) [condor_submit_workers(1)](condor_submit_workers.md) [uge_submit_workers(1)](uge_submit_workers.md) [torque_submit_workers(1)](torque_submit_workers.md) 
 
 
 CCTools

@@ -11,7 +11,7 @@ See the file COPYING for details.
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/udp.h>
-#include <sys/file.h>
+#include <sys/file.h> /* Add _before_ udp.h solves an error on FreeBSD */
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -126,13 +126,7 @@ int datagram_recv(struct datagram *d, char *data, int length, char *addr, int *p
 	if (result < 0)
 		return result;
 
-	getnameinfo((struct sockaddr *)&iaddr,
-			iaddr_length,
-			addr,
-			addr_length,
-			port_string,
-			port_string_length,
-			NI_NUMERICHOST | NI_NUMERICSERV);
+	getnameinfo((struct sockaddr *)&iaddr, iaddr_length, addr, addr_length, port_string, port_string_length, NI_NUMERICHOST | NI_NUMERICSERV);
 
 	*port = atoi(port_string);
 

@@ -25,16 +25,13 @@ void vine_fair_write_workflow_info(struct vine_manager *m)
 	}
 
 	if (m->monitor_mode != VINE_MON_DISABLED) {
-		rmonitor_measure_process_update_to_peak(
-				m->measured_local_resources, getpid(), /* do not include disk */ 0);
+		rmonitor_measure_process_update_to_peak(m->measured_local_resources, getpid(), /* do not include disk */ 0);
 
 		if (!m->measured_local_resources->exit_type) {
 			m->measured_local_resources->exit_type = xxstrdup("normal");
 		}
 
-		jx_insert(mi,
-				jx_string("managerUsedLocalResources"),
-				rmsummary_to_json(m->measured_local_resources, 1));
+		jx_insert(mi, jx_string("managerUsedLocalResources"), rmsummary_to_json(m->measured_local_resources, 1));
 	}
 
 	struct jx *jv = jx_objectv("@id",
@@ -52,7 +49,7 @@ void vine_fair_write_workflow_info(struct vine_manager *m)
 	struct jx *g = jx_arrayv(jv, mi, NULL);
 	struct jx *w = jx_objectv("@context", jx_string("https://w3id.org/ro/crate/1.1/context"), "@graph", g, NULL);
 
-	char *workflow = vine_get_runtime_path_log(m, "workflow.json");
+	char *workflow = vine_get_path_log(m, "workflow.json");
 	FILE *info_file = fopen(workflow, "w");
 	if (info_file) {
 		jx_pretty_print_stream(w, info_file);

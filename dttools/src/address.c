@@ -54,7 +54,7 @@ int address_to_sockaddr(const char *str, int port, struct sockaddr_storage *addr
 			ipv6->sin6_family = AF_INET6;
 			ipv6->sin6_addr = in6addr_any;
 			ipv6->sin6_port = htons(port);
-#if defined(CCTOOLS_OPSYS_DARWIN)
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 			ipv6->sin6_len = sizeof(*ipv6);
 #endif
 			return AF_INET6;
@@ -63,26 +63,24 @@ int address_to_sockaddr(const char *str, int port, struct sockaddr_storage *addr
 			*length = sizeof(*ipv4);
 			ipv4->sin_family = AF_INET;
 			ipv4->sin_port = htons(port);
-#if defined(CCTOOLS_OPSYS_DARWIN)
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 			ipv4->sin_len = sizeof(*ipv4);
 #endif
 			return AF_INET;
 		}
-	} else if ((info.ai_family == AF_UNSPEC || info.ai_family == AF_INET) &&
-			inet_pton(AF_INET, str, &ipv4->sin_addr) == 1) {
+	} else if ((info.ai_family == AF_UNSPEC || info.ai_family == AF_INET) && inet_pton(AF_INET, str, &ipv4->sin_addr) == 1) {
 		*length = sizeof(*ipv4);
 		ipv4->sin_family = AF_INET;
 		ipv4->sin_port = htons(port);
-#if defined(CCTOOLS_OPSYS_DARWIN)
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 		ipv4->sin_len = sizeof(*ipv4);
 #endif
 		return AF_INET;
-	} else if ((info.ai_family == AF_UNSPEC || info.ai_family == AF_INET6) &&
-			inet_pton(AF_INET6, str, &ipv6->sin6_addr) == 1) {
+	} else if ((info.ai_family == AF_UNSPEC || info.ai_family == AF_INET6) && inet_pton(AF_INET6, str, &ipv6->sin6_addr) == 1) {
 		*length = sizeof(*ipv6);
 		ipv6->sin6_family = AF_INET6;
 		ipv6->sin6_port = htons(port);
-#if defined(CCTOOLS_OPSYS_DARWIN)
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 		ipv6->sin6_len = sizeof(*ipv6);
 #endif
 		return AF_INET6;

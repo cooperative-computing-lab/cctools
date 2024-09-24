@@ -314,8 +314,7 @@ static int find(buffer_t *B, const size_t base, buffer_t *path, const char *patt
 					goto failure; /* NUL padded */
 				rc += 1;
 			}
-			if (recursive && strcmp(entry->d_name, ".") && strcmp(entry->d_name, "..") &&
-					stat(buffer_tostring(path), &buf) == 0 && S_ISDIR(buf.st_mode)) {
+			if (recursive && strcmp(entry->d_name, ".") && strcmp(entry->d_name, "..") && stat(buffer_tostring(path), &buf) == 0 && S_ISDIR(buf.st_mode)) {
 				if (buffer_putliteral(path, "/") == -1)
 					goto failure;
 				int found = find(B, base, path, pattern, recursive);
@@ -421,8 +420,7 @@ static int path_is_exec(const char *path)
 	struct stat s;
 	int found = 0;
 
-	if (access(path, X_OK) == 0 && stat(path, &s) == 0 && S_ISREG(s.st_mode) &&
-			(getuid() != 0 || (s.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0)) {
+	if (access(path, X_OK) == 0 && stat(path, &s) == 0 && S_ISREG(s.st_mode) && (getuid() != 0 || (s.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0)) {
 		found = 1;
 	}
 

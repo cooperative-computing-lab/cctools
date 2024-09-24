@@ -115,7 +115,8 @@ struct vine_manager {
 	struct hash_table *worker_table;     /* Maps link -> vine_worker_info */
 	struct hash_table *worker_blocklist; /* Maps hostname -> vine_blocklist_info */
 	struct hash_table *factory_table;    /* Maps factory_name -> vine_factory_info */
-	struct hash_table *workers_with_available_results;  /* Maps link -> vine_worker_info */
+	struct hash_table *workers_with_watched_file_updates;  /* Maps link -> vine_worker_info */
+	struct hash_table *workers_with_complete_tasks;  /* Maps link -> vine_worker_info */
 	struct hash_table *current_transfer_table; 	/* Maps uuid -> struct transfer_pair */
 
 	/* Primary data structures for tracking files. */
@@ -133,6 +134,7 @@ struct vine_manager {
 	/* Internal state modified by the manager */
 
 	int next_task_id;       /* Next integer task_id to be assigned to a created task. */
+	int duplicated_libraries;  /* The number of duplicated libraries */
 	int fixed_location_in_queue; /* Number of fixed location tasks currently being managed */
 	int num_tasks_left;    /* Optional: Number of tasks remaining, if given by user.  @ref vine_set_num_tasks */
 	int busy_waiting_flag; /* Set internally in main loop if no messages were processed -> wait longer. */
@@ -141,7 +143,6 @@ struct vine_manager {
 
 	struct vine_stats *stats;
 	struct vine_stats *stats_measure;
-	struct vine_stats *stats_disconnected_workers;
 
 	/* Time of most recent events for computing various timeouts */
 
@@ -214,6 +215,9 @@ struct vine_manager {
 	int resource_management_interval;	/* Seconds between measurement of manager local resources. */
 	timestamp_t transient_error_interval; /* microseconds between new attempts on task rescheduling and using a file replica as source after a failure. */
 
+	int max_library_retries;        /* The maximum time that a library can be failed and retry another one, if over this count the library template will be removed */
+	int watch_library_logfiles;     /* If true, watch the output files produced by each of the library processes running on the remote workers, take them back the current logging directory */
+
 	/*todo: confirm datatype. int or int64*/
 	int max_task_stdout_storage;	/* Maximum size of standard output from task.  (If larger, send to a separate file.) */
 	int max_new_workers;			/* Maximum number of workers to add in a single cycle before dealing with other matters. */
@@ -248,8 +252,8 @@ int vine_manager_transfer_time( struct vine_manager *q, struct vine_worker_info 
 const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, struct vine_task *t);
 const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, struct vine_task *t);
 
-/* Internal: Find a library task running on a specific worker by name. */
-struct vine_task *vine_manager_find_library_on_worker( struct vine_manager *q, struct vine_worker_info *w, const char *library_name);
+/* Find a library template on the manager */
+struct vine_task *vine_manager_find_library_template(struct vine_manager *q, const char *library_name);
 
 /* Internal: Enable shortcut of main loop upon child process completion. Needed for Makeflow to interleave local and remote execution. */
 void vine_manager_enable_process_shortcut(struct vine_manager *q);
@@ -258,19 +262,13 @@ struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q
 
 int64_t overcommitted_resource_total(struct vine_manager *q, int64_t total);
 
-/* Internal: Enable checking and sending library tasks as necessary. Needed for @vine_schedule.c to check if a worker is compatible to a function task. */
-int vine_manager_check_worker_can_run_function_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
-
 /* Internal: Shut down a specific worker. */
 int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_info *w);
-
-struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
 /** Return any completed task without doing any manager work. */
 struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, int task_id);
 
 void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason);
-
 
 /* The expected format of files created by the resource monitor.*/
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-task-%d"

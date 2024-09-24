@@ -118,6 +118,12 @@ char *vine_runtime_directory_create()
 	}
 	free(tmp);
 
+	tmp = string_format("%s/library-logs", runtime_dir);
+	if (!create_dir(tmp, 0755)) {
+		return NULL;
+	}
+	free(tmp);
+
 	if (symlink_most_recent) {
 		char *tmp = path_concat(vine_runtime_info_path, "most-recent");
 		unlink(tmp);
@@ -128,17 +134,22 @@ char *vine_runtime_directory_create()
 	return runtime_dir;
 }
 
-char *vine_get_runtime_path_log(struct vine_manager *m, const char *path)
+char *vine_get_path_log(struct vine_manager *m, const char *path)
 {
 	return string_format("%s/vine-logs%s%s", m->runtime_directory, path ? "/" : "", path ? path : "");
 }
 
-char *vine_get_runtime_path_staging(struct vine_manager *m, const char *path)
+char *vine_get_path_staging(struct vine_manager *m, const char *path)
 {
 	return string_format("%s/staging%s%s", m->runtime_directory, path ? "/" : "", path ? path : "");
 }
 
-char *vine_get_runtime_path_caching(struct vine_manager *m, const char *path)
+char *vine_get_path_library_log(struct vine_manager *m, const char *path)
+{
+	return string_format("%s/library-logs%s%s", m->runtime_directory, path ? "/" : "", path ? path : "");
+}
+
+char *vine_get_path_cache(struct vine_manager *m, const char *path)
 {
 	char abs[PATH_MAX];
 	char *tmp = string_format("%s/../vine-cache%s%s", m->runtime_directory, path ? "/" : "", path ? path : "");

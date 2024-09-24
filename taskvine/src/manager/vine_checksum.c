@@ -6,13 +6,13 @@ See the file COPYING for details.
 
 #include "vine_checksum.h"
 
+#include "debug.h"
 #include "md5.h"
 #include "sort_dir.h"
 #include "string_array.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 
-#include <debug.h>
 #include <dirent.h>
 #include <string.h>
 #include <sys/stat.h>

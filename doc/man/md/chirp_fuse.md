@@ -50,7 +50,7 @@ For complete details with examples, see the
 ## OPTIONS
 
 
-- **-a**,**--auth=_&lt;flag&gt;_**<br />Require this authentication mode.
+- **-a**,**--auth=_&lt;flag&gt;_**<br /> Enable authentication mode: unix, hostname, address, ticket, kerberos, or globus.
 - **-b**,**--block-size=_&lt;bytes&gt;_**<br />Block size for network I/O. (default is 65536s)
 - **-d**,**--debug=_&lt;flag&gt;_**<br />Enable debugging for this subsystem.
 - **-D**,**--no-optimize**<br />Disable small file optimizations such as recursive delete.

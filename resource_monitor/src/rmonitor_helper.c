@@ -42,32 +42,34 @@
 #define CCTOOLS_HELPER_DEBUG_MESSAGES 0
 
 #define D_RMON stderr
-#define debug                                                                                                          \
-	if (CCTOOLS_HELPER_DEBUG_MESSAGES)                                                                             \
+#define debug \
+	if (CCTOOLS_HELPER_DEBUG_MESSAGES) \
 	fprintf
 
 #include "rmonitor_helper_comm.h"
 
 #define BUFFER_MAX 1024
 
-#define PUSH_ERRNO                                                                                                     \
-	{                                                                                                              \
-		int last_errno = errno;                                                                                \
+#define PUSH_ERRNO \
+	{ \
+		int last_errno = errno; \
 		errno = 0;
-#define POP_ERRNO(msg)                                                                                                 \
-	msg.error = errno;                                                                                             \
-	if (!errno) {                                                                                                  \
-		errno = last_errno;                                                                                    \
-	}                                                                                                              \
+#define POP_ERRNO(msg) \
+	msg.error = errno; \
+	if (!errno) { \
+		errno = last_errno; \
+	} \
 	}
 
-#define START(msg)                                                                                                     \
-	{                                                                                                              \
-		if (msg.type == RX || msg.type == TX)                                                                  \
-			msg.start = timestamp_get();                                                                   \
+#define START(msg) \
+	{ \
+		if (msg.type == RX || msg.type == TX) \
+			msg.start = timestamp_get(); \
 		PUSH_ERRNO
-#define END(msg)                                                                                                       \
-	POP_ERRNO(msg) if (msg.type == RX || msg.type == TX) msg.end = timestamp_get();                                \
+#define END(msg) \
+	POP_ERRNO(msg) \
+	if (msg.type == RX || msg.type == TX) \
+		msg.end = timestamp_get(); \
 	}
 
 static struct itable *family_of_fd = NULL;

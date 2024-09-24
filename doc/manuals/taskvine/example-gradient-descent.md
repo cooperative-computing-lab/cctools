@@ -5,5 +5,5 @@ a function.  Demonstrates the use of serverless computing,
 and distributed python environments.
 
 ```
---8<-- "taskvine/code-examples/vine_example_gradient_descent.py"
+--8<-- "../../taskvine/src/examples/vine_example_gradient_descent.py"
 ```

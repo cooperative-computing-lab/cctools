@@ -1,4 +1,4 @@
-/*
+ /*
 Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
@@ -6,7 +6,7 @@ See the file COPYING for details.
 
 #include "auth_all.h"
 #include "auth_ticket.h"
-#include "batch_job.h"
+#include "batch_queue.h"
 #include "cctools.h"
 #include "copy_stream.h"
 #include "create_dir.h"
@@ -42,10 +42,6 @@ See the file COPYING for details.
 #include "dag_visitors.h"
 #include "parser.h"
 #include "parser_jx.h"
-
-#ifdef CCTOOLS_WITH_MPI
-#include <mpi.h>
-#endif
 
 #include "makeflow_summary.h"
 #include "makeflow_gc.h"
@@ -86,13 +82,8 @@ These are all functions named makeflow_*() to distinguish them from dag_*().
 because some of the execution state (note states, node counts, etc)
 is stored in struct dag and struct dag_node.  Perhaps this can be improved.
 
-- All operations on files should use the batch_fs_*() functions, rather
-than invoking Unix I/O directly.  This is because some batch systems
-(Hadoop, Confuga, etc) also include the storage where the files to be
-accessed are located.
-
 - APIs like work_queue_* and vine_* should be indirectly accessed by setting options
-in Batch Job using batch_queue_set_option. See batch_job_work_queue.c for
+in Batch Job using batch_queue_set_option. See batch_queue_work_queue.c for
 an example.
 */
 
@@ -200,13 +191,13 @@ Hack: Enable batch job feature to pass detailed name to batch system.
 Would be better implemented as a batch system feature.
 */
 
-extern int batch_job_verbose_jobnames;
+extern int batch_queue_verbose_jobnames;
 
 /**
 Hack: Disable batch job feature which generates and checks heartbeats.
 */
 
-extern int batch_job_disable_heartbeat;
+extern int batch_queue_disable_heartbeat;
 
 /*
 Wait upto this many seconds for an output file of a succesfull task
@@ -262,6 +253,13 @@ Options related to TLQ debugging
 static int tlq_port = 0;
 
 /*
+Location of SSL key and cert for use by TaskVine or Work Queue
+*/
+
+static char *ssl_key_file = 0;
+static char *ssl_cert_file = 0;
+
+/*
 If enabled, then all environment variables are sent
 from the submission site to the job execution site.
 */
@@ -304,15 +302,15 @@ Consider a node in the dag and convert it into a batch task ready to execute,
 with resources environments, and everything prior to calling hooks.
 */
 
-struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue *queue )
+struct batch_job *makeflow_node_to_task(struct dag_node *n, struct batch_queue *queue )
 {
-	struct batch_task *task = batch_task_create(queue);
+	struct batch_job *task = batch_job_create(queue);
 	task->taskid = n->nodeid;
 
 	if(n->type==DAG_NODE_TYPE_COMMAND) {
 
 		/* A plain command just gets a command string. */
-		batch_task_set_command(task, n->command);
+		batch_job_set_command(task, n->command);
 
 	} else if(n->type==DAG_NODE_TYPE_WORKFLOW) {
 		/* A sub-workflow must be expanded into a makeflow invocation */
@@ -356,8 +354,8 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 			buffer_printf(&b, " --local-disk %s", rmsummary_resource_to_str("disk", n->resources_requested->disk, 0));
 		}
 
-		batch_task_add_input_file(task,n->workflow_file,n->workflow_file);
-		batch_task_set_command(task, buffer_tostring(&b));
+		batch_job_add_input_file(task,n->workflow_file,n->workflow_file);
+		batch_job_set_command(task, buffer_tostring(&b));
 		buffer_free(&b);
 	} else {
 		fatal("invalid job type %d in dag node (%s)",n->type,n->command);
@@ -368,18 +366,18 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 	struct dag_file *f;
 	list_first_item(n->source_files);
 	while((f = list_next_item(n->source_files))){
-		batch_task_add_input_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
+		batch_job_add_input_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
 	}
 
 	list_first_item(n->target_files);
 	while((f = list_next_item(n->target_files))){
-		batch_task_add_output_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
+		batch_job_add_output_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
 	}
 
-	batch_task_set_resources(task, dag_node_dynamic_label(n));
+	batch_job_set_resources(task, dag_node_dynamic_label(n));
 
 	struct jx *env = dag_node_env_create(n->d, n, should_send_all_local_environment);
-	batch_task_set_envlist(task, env);
+	batch_job_set_envlist(task, env);
 	jx_delete(env);
 
 	return task;
@@ -393,7 +391,7 @@ static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_
 {
 	printf("aborting %s job %" PRIu64 "\n", name, jobid);
 
-	batch_job_remove(q, jobid);
+	batch_queue_remove(q, jobid);
 	makeflow_hook_node_abort(n);
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
 	makeflow_clean_node(d,q,n);
@@ -423,7 +421,7 @@ static void makeflow_abort_all(struct dag *d)
 
 /* A few forward prototypes to handle mutually-recursive definitions. */
 
-static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_task *task);
+static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_job *task);
 static void makeflow_node_reset_by_file( struct dag *d, struct dag_file *f );
 
 /*
@@ -440,10 +438,10 @@ void makeflow_node_reset( struct dag *d, struct dag_node *n )
 
 	if(n->state == DAG_NODE_STATE_RUNNING) {
 		if(n->local_job && local_queue) {
-			batch_job_remove(local_queue, n->jobid);
+			batch_queue_remove(local_queue, n->jobid);
 			itable_remove(d->local_job_table, n->jobid);
 		} else {
-			batch_job_remove(remote_queue, n->jobid);
+			batch_queue_remove(remote_queue, n->jobid);
 			itable_remove(d->remote_job_table, n->jobid);
 		}
 	}
@@ -516,11 +514,11 @@ Submit one fully formed job, retrying failures up to the makeflow_submit_timeout
 This is necessary because busy batch systems occasionally do not accept a job submission.
 */
 
-static enum job_submit_status makeflow_node_submit_retry( struct batch_queue *queue, struct batch_task *task)
+static enum job_submit_status makeflow_node_submit_retry( struct batch_queue *queue, struct batch_job *task)
 {
 	time_t stoptime = time(0) + makeflow_submit_timeout;
 	int waittime = 1;
-	batch_job_id_t jobid = 0;
+	batch_queue_id_t jobid = 0;
 
 
 	/* Display the fully elaborated command, just like Make does. */
@@ -542,17 +540,7 @@ static enum job_submit_status makeflow_node_submit_retry( struct batch_queue *qu
 			break;
 		}
 
-		/* This will eventually be replaced by submit (queue, task )... */
-		char *input_files  = batch_files_to_string(queue, task->input_files);
-		char *output_files = batch_files_to_string(queue, task->output_files);
-		jobid = batch_job_submit(queue,
-								task->command,
-								input_files,
-								output_files,
-								task->envlist,
-								task->resources);
-		free(input_files);
-		free(output_files);
+		jobid = batch_queue_submit(queue,task);
 
 		if(jobid > 0) {
 			printf("submitted job %"PRIbjid"\n", jobid);
@@ -608,7 +596,7 @@ static enum job_submit_status makeflow_node_submit(struct dag *d, struct dag_nod
 	}
 
 	/* Create task from node information */
-	struct batch_task *task = makeflow_node_to_task(n, queue );
+	struct batch_job *task = makeflow_node_to_task(n, queue );
 	batch_queue_set_int_option(queue, "task-id", task->taskid);
 	n->task = task;
 
@@ -629,7 +617,7 @@ static enum job_submit_status makeflow_node_submit(struct dag *d, struct dag_nod
 			debug(D_MAKEFLOW_RUN, "node %d could not be submitted because of a hook failure.", n->nodeid);
 			makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
 			n->task = NULL;
-			batch_task_delete(task);
+			batch_job_delete(task);
 			makeflow_failed_flag = 1;
 			break;
 		case JOB_SUBMISSION_SKIPPED:
@@ -750,7 +738,7 @@ static void makeflow_dispatch_ready_jobs(struct dag *d)
 	 * available, such as vms in amazon, then the submission fails with a
 	 * timeout. When this occurs, submission_timeout is set to 1, and only
 	 * local jobs are tried for submission. Batch jobs are tried again the next
-	 * time makeflow_dispatch_ready_jobs is called. This allows batch_job_wait
+	 * time makeflow_dispatch_ready_jobs is called. This allows batch_queue_wait
 	 * to be called in-between, which may free some batch resources and allow
 	 * job submissions that do not timeout.
 	 */
@@ -790,7 +778,7 @@ int makeflow_node_check_file_was_created(struct dag *d, struct dag_node *n, stru
 	int64_t start_check = time(0);
 
 	while(!file_created) {
-		if(batch_fs_stat(remote_queue, f->filename, &buf) < 0) {
+		if(stat(f->filename, &buf) < 0) {
 			fprintf(stderr, "%s did not create file %s\n", n->command, f->filename);
 		}
 		else if(output_len_check && buf.st_size <= 0) {
@@ -822,16 +810,16 @@ int makeflow_node_check_file_was_created(struct dag *d, struct dag_node *n, stru
 }
 
 /*
-Mark the given task as completing, using the batch_job_info completion structure provided by batch_job.
+Mark the given task as completing, using the batch_job_info completion structure provided by batch_queue.
 */
 
-static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_task *task)
+static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_job *task)
 {
 	struct batch_file *bf;
 	struct dag_file *f;
 	int job_failed = 0;
 
-	/* This is intended for changes to the batch_task that need no
+	/* This is intended for changes to the batch_job that need no
 		no context from dag_node/dag, such as shared_fs. */
 	int rc = makeflow_hook_batch_retrieve(task);
 	/* Batch Retrieve returns MAKEFLOW_HOOK_RUN if the node was
@@ -872,7 +860,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	}
 
 	if(job_failed) {
-		/* As integration moves forward batch_task will also be passed. */
+		/* As integration moves forward batch_job will also be passed. */
 		/* If a hook indicates failure here, it is not fatal, but will result
 			in a failed task. */
 		int hook_success = makeflow_hook_node_fail(n, task);
@@ -971,7 +959,7 @@ static int makeflow_check_files(struct dag *d)
 		if(!dag_file_should_exist(f)) continue;
 
 		/* Check for the presence of the file. */
-		int result = batch_fs_stat(remote_queue, f->filename, &buf );
+		int result = stat(f->filename, &buf );
 
 		if(dag_file_is_source(f)) {
 			/* Source files must exist before running */
@@ -1049,7 +1037,7 @@ Main loop for running a makeflow: submit jobs, wait for completion, keep going u
 static void makeflow_run( struct dag *d )
 {
 	struct dag_node *n;
-	batch_job_id_t jobid;
+	batch_queue_id_t jobid;
 	struct batch_job_info info;
 	// Start Catalog at current time
 	timestamp_t start = timestamp_get();
@@ -1083,14 +1071,14 @@ static void makeflow_run( struct dag *d )
 
 		if(dag_remote_jobs_running(d)) {
 			int tmp_timeout = 5;
-			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
+			jobid = batch_queue_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
 				printf("job %"PRIbjid" completed\n",jobid);
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
 				if(n){
-					// Stop gap until batch_job_wait returns task struct
-					batch_task_set_info(n->task, &info);
+					// Stop gap until batch_queue_wait returns task struct
+					batch_job_set_info(n->task, &info);
 					makeflow_node_complete(d, n, remote_queue, n->task);
 				}
 			}
@@ -1106,13 +1094,13 @@ static void makeflow_run( struct dag *d )
 				stoptime = time(0) + tmp_timeout;
 			}
 
-			jobid = batch_job_wait_timeout(local_queue, &info, stoptime);
+			jobid = batch_queue_wait_timeout(local_queue, &info, stoptime);
 			if(jobid > 0) {
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->local_job_table, jobid);
 				if(n){
-					// Stop gap until batch_job_wait returns task struct
-					batch_task_set_info(n->task, &info);
+					// Stop gap until batch_queue_wait returns task struct
+					batch_job_set_info(n->task, &info);
 					makeflow_node_complete(d, n, local_queue, n->task);
 				}
 			}
@@ -1260,9 +1248,6 @@ static void show_help_run(const char *cmd)
 	        /********************************************************************************/
 	printf("\nBatch System Options:\n");
 	printf("    --amazon-config=<file>      Amazon EC2 config from makeflow_ec2_setup.\n");
-	printf("    --lambda-config=<file>      Lambda config from makeflow_lambda_setup.\n");
-	printf("    --amazon-batch-config=<file>Batch config from makeflow_amazon_batch_setup.\n");
-	printf("    --amazon-batch-img=<img>    Specify Amazon ECS Image(Used for amazon-batch)\n");
 	printf(" -B,--batch-options=<options>   Add these options to all batch submit files.\n");
 	printf("    --disable-heartbeat         Disable job heartbeat check.\n");
 	printf("    --local-cores=#             Max number of local cores to use.\n");
@@ -1273,10 +1258,8 @@ static void show_help_run(const char *cmd)
 	printf("    --verbose-jobnames          Set the job name based on the command.\n");
 	printf("    --keep-wrapper-stdout       Do not redirect to /dev/null the stdout file from the batch system.");
 	printf("    --ignore-memory-spec        Excludes memory at submission (SLURM).\n");
-	printf("    --batch-mem-type=<type>     Specify memory resource type (SGE).\n");
+	printf("    --batch-mem-type=<type>     Specify memory resource type (UGE).\n");
 	printf("    --working-dir=<dir|url>     Working directory for the batch system.\n");
-	printf("    --mpi-cores=#               Manually set number of cores on each MPI worker. (-T mpi)\n");
-	printf("    --mpi-memory=#              Manually set memory (MB) on each MPI worker. (-T mpi)\n");
 	        /********************************************************************************/
 	printf("\nContainers and Wrappers:\n");
 	printf(" --docker=<image>               Run each task using the named Docker image.\n");
@@ -1294,9 +1277,6 @@ static void show_help_run(const char *cmd)
 	printf(" --enforcement                  Enforce access to only named inputs/outputs.\n");
 	printf(" --parrot-path=<path>           Path to parrot_run for --enforcement.\n");
 	printf(" --env-replace-path=<path>      Path to env_replace for --enforcement.\n");
-	printf(" --mesos-master=<hostname:port> Mesos manager address and port\n");
-	printf(" --mesos-path=<path>            Path to mesos python2 site-packages.\n");
-	printf(" --mesos-preload=<path>         Path to libraries needed by Mesos.\n");
 	printf(" --k8s-image=<path>             Container image used by kubernetes.\n");
 	printf(" --sandbox                      Surround node command with sandbox wrapper.\n");
 	printf(" --vc3-builder                  VC3 Builder enabled.\n");
@@ -1350,9 +1330,6 @@ int main(int argc, char *argv[])
 	const char *option_port_file = NULL;
 	double option_fast_abort_multiplier = -1.0;
 	const char *amazon_config = NULL;
-	const char *lambda_config = NULL;
-	const char *amazon_batch_img = NULL;
-	const char *amazon_batch_cfg = NULL;
 	const char *priority = NULL;
 	char *option_password = NULL;
 	char *option_wait_queue_size = 0;
@@ -1367,13 +1344,7 @@ int main(int argc, char *argv[])
 	char *debug_file_name = 0;
 	char *batch_mem_type = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
-	char *mesos_manager = "127.0.0.1:5050/";
-	char *mesos_path = NULL;
-	char *mesos_preload = NULL;
 	int keep_wrapper_stdout = 0;
-
-	int mpi_cores = 0;
-	int mpi_memory = 0;
 
 	dag_syntax_type dag_syntax = DAG_SYNTAX_MAKE;
 	struct jx *jx_args = jx_object(NULL);
@@ -1401,10 +1372,6 @@ int main(int argc, char *argv[])
 
 #ifdef HAS_CURL
 	extern struct makeflow_hook makeflow_hook_archive;
-#endif
-
-#ifdef CCTOOLS_WITH_MPI
-	MPI_Init(&argc,&argv);
 #endif
 
 	// Enable external functions like fetch and listdir.
@@ -1485,9 +1452,6 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER_OPT,
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CONFIG,
-		LONG_OPT_LAMBDA_CONFIG,
-		LONG_OPT_AMAZON_BATCH_IMG,
-		LONG_OPT_AMAZON_BATCH_CFG,
 		LONG_OPT_JSON,
 		LONG_OPT_JX,
 		LONG_OPT_JX_ARGS,
@@ -1504,6 +1468,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_SINGULARITY,
 		LONG_OPT_SINGULARITY_OPT,
 		LONG_OPT_SHARED_FS,
+		LONG_OPT_SSL_KEY,
+		LONG_OPT_SSL_CERT,
 		LONG_OPT_ARCHIVE,
 		LONG_OPT_ARCHIVE_S3,
 		LONG_OPT_ARCHIVE_S3_NO_CHECK,
@@ -1513,15 +1479,10 @@ int main(int argc, char *argv[])
 		LONG_OPT_ARCHIVE_DIR,
 		LONG_OPT_ARCHIVE_READ,
 		LONG_OPT_ARCHIVE_WRITE,
-		LONG_OPT_MESOS_MANAGER,
-		LONG_OPT_MESOS_PATH,
-		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_SEND_ENVIRONMENT,
 		LONG_OPT_K8S_IMG,
 		LONG_OPT_VERBOSE_JOBNAMES,
 		LONG_OPT_KEEP_WRAPPER_STDOUT,
-		LONG_OPT_MPI_CORES,
-		LONG_OPT_MPI_MEMORY,
 		LONG_OPT_TLQ,
 		LONG_OPT_FILE_STATUS,
 		LONG_OPT_FILE_STATUS_INTERVAL,
@@ -1583,6 +1544,8 @@ int main(int argc, char *argv[])
 		{"send-environment", no_argument, 0, LONG_OPT_SEND_ENVIRONMENT},
 		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
 		{"show-output", no_argument, 0, 'O'}, // Deprecated
+		{"ssl-key", required_argument, 0, LONG_OPT_SSL_KEY},
+		{"ssl-cert", required_argument, 0, LONG_OPT_SSL_CERT},
 		{"storage-type", required_argument, 0, LONG_OPT_STORAGE_TYPE},
 		{"storage-limit", required_argument, 0, LONG_OPT_STORAGE_LIMIT},
 		{"storage-print", required_argument, 0, LONG_OPT_STORAGE_PRINT},
@@ -1616,9 +1579,6 @@ int main(int argc, char *argv[])
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
 		{"docker-opt", required_argument, 0, LONG_OPT_DOCKER_OPT},
 		{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
-		{"lambda-config", required_argument, 0, LONG_OPT_LAMBDA_CONFIG},
-		{"amazon-batch-img",required_argument,0,LONG_OPT_AMAZON_BATCH_IMG},
-		{"amazon-batch-config",required_argument,0,LONG_OPT_AMAZON_BATCH_CFG},
 		{"json", no_argument, 0, LONG_OPT_JSON},
 		{"jx", no_argument, 0, LONG_OPT_JX},
 		{"jx-context", required_argument, 0, LONG_OPT_JX_ARGS}, // Deprecated
@@ -1638,15 +1598,9 @@ int main(int argc, char *argv[])
 		{"archive-dir", required_argument, 0, LONG_OPT_ARCHIVE_DIR},
 		{"archive-read", no_argument, 0, LONG_OPT_ARCHIVE_READ},
 		{"archive-write", no_argument, 0, LONG_OPT_ARCHIVE_WRITE},
-		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MANAGER},
-		{"mesos-master",  required_argument, 0, LONG_OPT_MESOS_MANAGER}, //same as mesos-master
-		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
-		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
 		{"verbose-jobnames", no_argument, 0, LONG_OPT_VERBOSE_JOBNAMES},
 		{"keep-wrapper-stdout", no_argument, 0, LONG_OPT_KEEP_WRAPPER_STDOUT},
-		{"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
-		{"mpi-memory", required_argument,0, LONG_OPT_MPI_MEMORY},
 		{"tlq", required_argument, 0, LONG_OPT_TLQ},
 		{"file-status", required_argument, 0, LONG_OPT_FILE_STATUS},
 		{"file-status-interval", required_argument, 0, LONG_OPT_FILE_STATUS_INTERVAL},
@@ -1801,15 +1755,6 @@ int main(int argc, char *argv[])
 			case LONG_OPT_AMAZON_CONFIG:
 				amazon_config = xxstrdup(optarg);
 				break;
-			case LONG_OPT_LAMBDA_CONFIG:
-				lambda_config = xxstrdup(optarg);
-				break;
-			case LONG_OPT_AMAZON_BATCH_IMG:
-				amazon_batch_img = xxstrdup(optarg);
-				break;
-			case LONG_OPT_AMAZON_BATCH_CFG:
-				amazon_batch_cfg = xxstrdup(optarg);
-				break;
 			case 'M':
 			case 'N':
 				free(project);
@@ -1881,7 +1826,7 @@ int main(int argc, char *argv[])
 				cache_mode = "task";
 				break;
 			case LONG_OPT_DISABLE_HEARTBEAT:
-				batch_job_disable_heartbeat = 1;
+				batch_queue_disable_heartbeat = 1;
 				break;
 			case LONG_OPT_HOOK_EXAMPLE:
 				if (makeflow_hook_register(&makeflow_hook_example, &hook_args) == MAKEFLOW_HOOK_FAILURE)
@@ -1932,6 +1877,12 @@ int main(int argc, char *argv[])
 				if(!jx_lookup(hook_args, "shared_fs_list"))
 					jx_insert(hook_args, jx_string("shared_fs_list"),jx_array(NULL));
 				jx_array_append(jx_lookup(hook_args, "shared_fs_list"), jx_string(optarg));
+				break;
+			case LONG_OPT_SSL_KEY:
+				ssl_key_file = optarg;
+				break;
+			case LONG_OPT_SSL_CERT:
+				ssl_cert_file = optarg;
 				break;
 			case LONG_OPT_STORAGE_TYPE:
 				if (makeflow_hook_register(&makeflow_hook_storage_allocation, &hook_args) == MAKEFLOW_HOOK_FAILURE)
@@ -2023,15 +1974,6 @@ int main(int argc, char *argv[])
 				if (makeflow_hook_register(&makeflow_hook_umbrella, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 					goto EXIT_WITH_FAILURE;
 				jx_insert(hook_args, jx_string("umbrella_spec"), jx_string(optarg));
-				break;
-			case LONG_OPT_MESOS_MANAGER:
-				mesos_manager = xxstrdup(optarg);
-				break;
-			case LONG_OPT_MESOS_PATH:
-				mesos_path = xxstrdup(optarg);
-				break;
-			case LONG_OPT_MESOS_PRELOAD:
-				mesos_preload = xxstrdup(optarg);
 				break;
 			case LONG_OPT_K8S_IMG:
 				k8s_image = xxstrdup(optarg);
@@ -2164,16 +2106,10 @@ int main(int argc, char *argv[])
 				break;
 			}
 			case LONG_OPT_VERBOSE_JOBNAMES:
-				batch_job_verbose_jobnames = 1;
+				batch_queue_verbose_jobnames = 1;
 				break;
 			case LONG_OPT_KEEP_WRAPPER_STDOUT:
 				keep_wrapper_stdout = 1;
-				break;
-			case LONG_OPT_MPI_CORES:
-				mpi_cores = atoi(optarg);
-				break;
-			case LONG_OPT_MPI_MEMORY:
-				mpi_memory = atoi(optarg);
 				break;
 			case LONG_OPT_TLQ:
 				tlq_port = atoi(optarg);
@@ -2197,11 +2133,6 @@ int main(int argc, char *argv[])
 	/* If cleaning anything, assume local execution. This only really matters for nested workflows. */
 	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
 		batch_queue_type = batch_queue_type_from_string("local");
-	}
-
-	/* Perform initial MPI setup prior to creating the batch queue object. */
-	if(batch_queue_type==BATCH_QUEUE_TYPE_MPI) {
-		batch_job_mpi_setup(debug_file_name ? debug_file_name : "debug", mpi_cores,mpi_memory);
 	}
 
 	if(!did_explicit_auth)
@@ -2341,12 +2272,17 @@ int main(int argc, char *argv[])
 
 	printf("max running local jobs: %d\n",local_jobs_max);
 
-	remote_queue = batch_queue_create(batch_queue_type);
+	remote_queue = batch_queue_create(batch_queue_type,ssl_key_file,ssl_cert_file);
 	if(!remote_queue) {
 		fprintf(stderr, "makeflow: couldn't create batch queue.\n");
 		if(port != 0)
 			fprintf(stderr, "makeflow: perhaps port %d is already in use?\n", port);
 		goto EXIT_WITH_FAILURE;
+	}
+
+	if(batch_queue_option_is_yes(remote_queue,"experimental")) {
+		fprintf(stderr, "makeflow: WARNING: support for batch target '%s' is experimental.\n",batch_queue_type_to_string(batch_queue_type));
+		fprintf(stderr, "makeflow: please visit https://ccl.cse.nd.edu/software/help to report any bugs.\n");
 	}
 
 	if(!batchlogfilename) {
@@ -2355,12 +2291,6 @@ int main(int argc, char *argv[])
 		} else {
 			batchlogfilename = string_format("%s.batchlog", dagfile);
 		}
-	}
-
-	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-		batch_queue_set_option(remote_queue, "mesos-path", mesos_path);
-		batch_queue_set_option(remote_queue, "mesos-master", mesos_manager);
-		batch_queue_set_option(remote_queue, "mesos-preload", mesos_preload);
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_K8S) {
@@ -2396,11 +2326,8 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "caching", cache_mode);
 	batch_queue_set_option(remote_queue, "wait-queue-size", option_wait_queue_size);
 	batch_queue_set_option(remote_queue, "amazon-config", amazon_config);
-	batch_queue_set_option(remote_queue, "lambda-config", lambda_config);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 	batch_queue_set_option(remote_queue, "manager-preferred-connection", option_preferred_connection);
-	batch_queue_set_option(remote_queue, "amazon-batch-config",amazon_batch_cfg);
-	batch_queue_set_option(remote_queue, "amazon-batch-img", amazon_batch_img);
 	batch_queue_set_option(remote_queue, "safe-submit-mode", safe_submit ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "ignore-mem-spec", ignore_mem_spec ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "mem-type", batch_mem_type);
@@ -2417,7 +2344,7 @@ int main(int argc, char *argv[])
 	if(!batch_queue_supports_feature(remote_queue, "local_job_queue")) {
 		local_queue = 0;
 	} else {
-		local_queue = batch_queue_create(BATCH_QUEUE_TYPE_LOCAL);
+		local_queue = batch_queue_create(BATCH_QUEUE_TYPE_LOCAL,0,0);
 		if(!local_queue) {
 			fatal("couldn't create local job queue.");
 		}
@@ -2439,8 +2366,8 @@ int main(int argc, char *argv[])
 		if(!strncmp(cwd, "/afs", 4)) {
 			fprintf(stderr,"error: The working directory is '%s'\n", cwd);
 			fprintf(stderr,"This won't work because Condor is not able to write to files in AFS.\n");
-			fprintf(stderr,"Instead, run your workflow from a local disk like /tmp.");
-			fprintf(stderr,"Or, use the Work Queue batch system with -T wq.\n");
+			fprintf(stderr,"Instead, run your workflow from a local disk like /tmp.\n");
+			fprintf(stderr,"Or, use WorkQueue or TaskVine workers submitted to Condor.\n");
 			free(cwd);
 			goto EXIT_WITH_FAILURE;
 		}
@@ -2588,20 +2515,6 @@ EXIT_WITH_SUCCESS:
 EXIT_WITH_FAILURE:
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
-
-	/*
-	 * Set the abort and failed flag for batch_job_mesos mode.
-	 * Since batch_queue_delete(struct batch_queue *q) will call
-	 * batch_queue_mesos_free(struct batch_queue *q), which is defined 
-	 * in batch_job/src/batch_job_mesos.c. Then this function will check 
-	 * the abort and failed status of the batch_queue and inform 
-	 * the makeflow mesos scheduler. 
-	 */
-
-	if (batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-		batch_queue_set_int_option(remote_queue, "batch-queue-abort-flag", (int)makeflow_abort_flag);
-		batch_queue_set_int_option(remote_queue, "batch-queue-failed-flag", (int)makeflow_failed_flag);
-	}
 
 	if(write_summary_to || email_summary_to)
 		makeflow_summary_create(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile, remote_queue, makeflow_abort_flag, makeflow_failed_flag );

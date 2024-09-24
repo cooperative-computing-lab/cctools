@@ -149,7 +149,7 @@ static void show_help(const char *progname)
 	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr,\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s or :stdout)\n", "");
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
-	fprintf(stdout, " %-30s Use SSL when directly connecting to a manager.", "--ssl");
+	fprintf(stdout, " %-30s Use SSL when directly connecting to a manager.\n", "--ssl");
 	fprintf(stdout, " %-30s Show vine_status version.\n", "-v,--version");
 	fprintf(stdout, " %-30s SNI domain name if different from manager hostname. Implies --ssl.\n", "--tls-sni=<domain name>");
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");
@@ -491,7 +491,7 @@ int do_direct_query( const char *manager_host, int manager_port, time_t stoptime
 
 	l = link_connect(manager_addr,manager_port,stoptime);
 	if(!l) {
-		fprintf(stderr,"couldn't connect to %s port %d: %s\n",manager_host,manager_port,strerror(errno));
+		fprintf(stderr,"vine_status: couldn't connect to %s port %d: %s\n",manager_host,manager_port,strerror(errno));
 		return 1;
 	}
 

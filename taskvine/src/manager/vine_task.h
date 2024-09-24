@@ -38,9 +38,9 @@ typedef enum {
 } vine_task_state_t;
 
 struct vine_task {
-        /***** Fixed properties of task at submit time. ******/
+    /***** Fixed properties of task at submit time. ******/
 
-        int task_id;                 /**< A unique task id number. */
+    int task_id;                 /**< A unique task id number. */
 	vine_task_type_t type;       /**< The type of the task. */
 	char *command_line;          /**< The program(s) to execute, as a shell command line. */
 	char *tag;                   /**< An optional user-defined logical name for the task. */
@@ -51,7 +51,7 @@ struct vine_task {
 
 	char *needs_library;         /**< If this is a FunctionTask, the name of the library used */
 	char *provides_library;      /**< If this is a LibraryTask, the name of the library provided. */
-	int   function_slots;        /**< If this is a LibraryTask, the max concurrent functions. */
+	int   function_slots_requested; /**< If this is a LibraryTask, the number of function slots requested by the user. -1 causes the number of slots to match the number of cores. */
 	
 	struct list *input_mounts;    /**< The mounted files expected as inputs. */
 	struct list *output_mounts;   /**< The mounted files expected as outputs. */
@@ -69,18 +69,23 @@ struct vine_task {
 
 	vine_task_state_t state;       /**< Current state of task: READY, RUNNING, etc */
 	struct vine_worker_info *worker;    /**< Worker to which this task has been dispatched. */
-        struct vine_task* library_task; /**< Library task to which a function task has been matched. */
+    struct vine_task* library_task; /**< Library task to which a function task has been matched. */
+	char *library_log_path; /**< The path of the library log file, used only for library task if set q->watch_library_logfiles */
 	int try_count;               /**< The number of times the task has been dispatched to a worker without being forsaken. If larger than max_retries, return with result of last attempt. */
 	int forsaken_count;         /**< The number of times the task has been dispatched to a worker. If larger than max_forsaken, return with VINE_RESULT_FORSAKEN. */
+	int library_failed_count;   /**< The number of times the duplicated library instances failed on the workers. Only count for the template. */
 	int exhausted_attempts;     /**< Number of times the task failed given exhausted resources. */
 	int forsaken_attempts;      /**< Number of times the task was submitted to a worker but failed to start execution. */
 	int workers_slow;           /**< Number of times this task has been terminated for running too long. */
+	int function_slots_total;   /**< If a library, the total number of function slots usable. */
 	int function_slots_inuse;   /**< If a library, the number of functions currently running. */
 		
 	/***** Results of task once it has reached completion. *****/
 
 	vine_result_t result;          /**< The result of the task (see @ref vine_result_t */
 	int exit_code;               /**< The exit code of the command line. */
+	int output_received;          /**< If the stdout of the task has been received. */
+	int64_t output_length;       /**< length of the standard output of a task */
 	char *output;                /**< The standard output of the task. */
 	char *addrport;              /**< The address and port of the host on which it ran. */
 	char *hostname;              /**< The name of the host on which it ran. */

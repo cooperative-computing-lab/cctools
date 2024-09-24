@@ -6,11 +6,6 @@ LIBRARIES = libbatch_job.a
 PROGRAMS = work_queue_factory work_queue_pool vine_factory
 SCRIPTS = condor_chaos_monkey
 
-ifeq ($(CCTOOLS_CHIRP),chirp)
-CHIRP_LIB=${CCTOOLS_HOME}/chirp/src/libchirp.a
-CHIRP_BATCH=batch_job_chirp.c
-endif
-
 DT_LIB=${CCTOOLS_HOME}/dttools/src/libdttools.a
 WQ_LIB=${CCTOOLS_HOME}/work_queue/src/libwork_queue.a
 VINE_LIB=${CCTOOLS_HOME}/taskvine/src/manager/libtaskvine.a
@@ -18,28 +13,21 @@ VINE_LIB=${CCTOOLS_HOME}/taskvine/src/manager/libtaskvine.a
 EXTERNAL_LIBRARIES=$(CHIRP_LIB) $(DT_LIB)
 
 SOURCES = \
-	batch_file.c \
-	batch_task.c \
-	batch_wrapper.c \
+	batch_queue.c \
 	batch_job.c \
-	batch_job_amazon.c \
-	batch_job_amazon_batch.c \
-	batch_job_dryrun.c \
-	$(CHIRP_BATCH) \
-	batch_job_cluster.c \
-	batch_job_blue_waters.c \
-	batch_job_condor.c \
-	batch_job_local.c \
-	batch_job_work_queue.c\
-	batch_job_lambda.c \
-	batch_job_work_queue.c \
-	batch_job_vine.c \
-	batch_job_mesos.c \
-	batch_job_k8s.c \
-	batch_job_mpi.c \
-	mesos_task.c
+	batch_job_info.c \
+	batch_file.c \
+	batch_wrapper.c \
+	batch_queue_local.c \
+	batch_queue_dryrun.c \
+	batch_queue_condor.c \
+	batch_queue_vine.c \
+	batch_queue_work_queue.c \
+	batch_queue_cluster.c \
+	batch_queue_k8s.c \
+	batch_queue_amazon.c
 
-PUBLIC_HEADERS = batch_job.h
+PUBLIC_HEADERS = batch_queue.h batch_job.h batch_job_info.h batch_file.h batch_wrapper.h
 
 OBJECTS = $(SOURCES:%.c=%.o)
 
@@ -66,5 +54,17 @@ install:
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools
 
 clean:
-	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) batch_job_amazon_script.c *.o
+	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) *.o
+
+lint:
+	if ( ! clang-format -Werror --dry-run --style='file:../../.clang-format' $(SOURCES));\
+	then\
+		echo  "========================================================";\
+		echo  "NOTICE: Run `make format` to format your latest changes.";\
+		echo  "========================================================";\
+		exit 1;\
+	fi
+
+format:
+	clang-format -i $(SOURCES)
 

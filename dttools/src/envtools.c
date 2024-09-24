@@ -76,9 +76,7 @@ int env_replace(const char *infile, const char *outfile)
 			if (var) {
 				fprintf(OUTPUT, "%s", var);
 			} else {
-				debug(D_NOTICE,
-						"failed to resolve %s environment variable, restoring string",
-						variable);
+				debug(D_NOTICE, "failed to resolve %s environment variable, restoring string", variable);
 			}
 			valid_var = 0;
 			var_index = 0;

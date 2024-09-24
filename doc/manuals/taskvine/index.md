@@ -71,7 +71,7 @@ and machine learning.
 ## Quick Start
 
 Installing via `conda` is the easiest method for most users.
-First, [Install Miniconda](https://docs.conda.io/en/latest/miniconda.html) if you haven't done so before.
+First, [Install Miniforge](https://github.com/conda-forge/miniforge#install) if you don't already have `conda` installed.
 Then, open a terminal and install `ndcctools` like this:
 
 ```
@@ -256,7 +256,7 @@ data to the manager.
 If a temporary file is unexpectedly lost due to the crash or failure
 of a worker, then the task that created it will be re-executed. Temp files
 may also be replicated across workers to a degree set by the `vine_tune` parameter
-`temp-replica-count'. Temp file replicas are useful if significant work
+`temp-replica-count`. Temp file replicas are useful if significant work
 is required to re-execute the task that created it. 
 The contents of a temporary file can be obtained with `fetch_file`
 
@@ -277,7 +277,7 @@ tasks at once:
     struct vine_file *x = vine_declare_untar(m, u);
     ```
 
-`declare_untar` is an example of a [MiniTask](#MiniTasks), which is explained further below.
+`declare_untar` is an example of a [MiniTask](#minitasks), which is explained further below.
 
 
 ### Declaring Tasks
@@ -502,10 +502,11 @@ $ export PYTHONPATH=${HOME}/cctools/lib/python${PYVER}/site-packages:${PYTHONPAT
 
 #### C Language Setup
 
-If you are writing a TaskVine application in C, you should compile it into an executable like this:
+If you are writing a TaskVine application in C, you should compile it into an executable with a command like this. Note that this example assumes that CCTools has
+been installed using the `conda` method.
 
 ```sh
-${CC:-gcc} taskvine_example.c -o taskvine_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -ltaskvine -ldttools -lm -lz
+gcc taskvine_example.c -o taskvine_example -I${CONDA_PREFIX}/include/cctools -L${CONDA_PREFIX}/lib -ltaskvine -ldttools -lm -lz
 ```
 
 ### Running a Manager Program
@@ -571,7 +572,7 @@ Similar scripts are available for other common batch systems:
 
 ```sh
 $ vine_submit_workers -T slurm MACHINENAME 9123 10
-$ vine_submit_workers _T sge MACHINENAME 9123 10
+$ vine_submit_workers _T uge MACHINENAME 9123 10
 ```
 
 When the manager completes, if the workers were not otherwise shut down,
@@ -626,10 +627,10 @@ Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
 ```
 
-Or similarly on SGE using `vine_submit_workers` as:
+Or similarly on UGE using `vine_submit_workers` as:
 
 ```sh
-$ vine_submit_workers -T sge -M myproject 10
+$ vine_submit_workers -T uge -M myproject 10
 Your job 153097 ("worker.sh") has been submitted
 Your job 153098 ("worker.sh") has been submitted
 Your job 153099 ("worker.sh") has been submitted
@@ -691,7 +692,7 @@ For further options, please refer to the TaskVine factory [manual](../man_pages/
 
 By default, the factory submits as many tasks that are waiting and running up
 to a specified maximum. To run more than one task in a worker, please refer
-to the following section on describing [task resources](#task-resources) and [worker resources](#taskvine-factory-and-resources).
+to the following section on describing [task resources](#task-resources) and [worker resources](#worker-resources).
 
 We can also create a factory directly in python. Creating a factory object does not
 immediately launch it, so this is a good time to configure the resources,
@@ -733,7 +734,7 @@ that are specific to one task, and one task only.
 should be retained as long as the workflow runs, and then deleted at the end.
 - A cache value of **worker** indicates that the file should be retained
 by the worker until the worker's end-of-life.
-- A cache value of **always** indicates that the file should be retained
+- A cache value of **forever** indicates that the file should be retained
 by the worker, even across workflows.  This is appropriate for widely used
 software packages and reference datasets. This level of cache leaves files on
 the execution sites even when workers terminate, thus use with care.
@@ -1555,7 +1556,7 @@ You can certainly embed `import` statements within the function and install any 
     libtask = m.create_library_from_functions("my_library", divide)
     ```
 
-If the overhead of importing modules per function is noticeable, modules can be optionally imported as a common preamble to the function executions. Common modules can be specified with the `import_modules` argument to `create_library_from_functions`. This reduces the overhead by eliminating redundant imports:
+If the overhead of importing modules per function is noticeable, modules can be optionally imported as a common preamble to the function executions. Common modules can be specified with the `hoisting_modules` argument to `create_library_from_functions`. This reduces the overhead by eliminating redundant imports:
 
 
 === Python
@@ -1563,10 +1564,10 @@ If the overhead of importing modules per function is noticeable, modules can be 
     import numpy
     import math
 
-    import_modules = [numpy, math]
+    hoisting_modules = [numpy, math]
     ```
 
-`import_modules` only accepts modules as arguments (e.g. it can't be used to import functions, or select particular names with `from ... import ...` statements. Such statements should be made inside functions after specifying the modules with `import_modules`.
+`hoisting_modules` only accepts modules as arguments (e.g. it can't be used to import functions, or select particular names with `from ... import ...` statements. Such statements should be made inside functions after specifying the modules with `hoisting_modules`.
 
 === Python
     ```python
@@ -1582,7 +1583,7 @@ If the overhead of importing modules per function is noticeable, modules can be 
     ```
 
 
-After installing the packages and functions, you can optionally specify the number of functions the library can run concurrently by setting the number of function slots (default to 1):
+After installing the packages and functions, you can optionally specify the number of functions the library can run concurrently by setting the number of function slots.  (If unset, TaskVine will assume the library can run one function per core available.)
 
 === "Python"
     ```python
@@ -1647,7 +1648,7 @@ a Future object. The result of the task can retrieved by calling `future.result(
     a = m.submit(my_sum, 3, 4)
     b = m.submit(my_sum, 5, 2)
     c = m.submit(my_sum, a, b)  # note that the futures a and b are
-                                # a passed as any other argument.
+                                # passed as any other argument.
 
     print(c.result())
     ```
@@ -1674,7 +1675,27 @@ can be tailored as any other task:
     print(f.result())
     ```
 
-Instead of tasks, the futures may also executed using [function calls](serverless-computing) with the `future_funcall` method:
+Additionally, the executor the Vine Factory to submit TaskVine workers.
+Specifications for the workers can be provided via the `opts` keyword argument when creating to executor.
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+
+    def my_sum(x, y):
+        return x + y
+
+    opts = {"memory": 8000, "disk":8000, "cores":8, "min-workers": 5}
+    m = vine.FuturesExecutor(manager_name='my_manager', batch_type="condor", opts=opts)
+
+    t = m.future_task(my_sum, 3, 4)
+    t.set_cores(1)
+
+    f = m.submit(t)
+
+    print(f.result())
+
+Instead of tasks, the futures may also executed using [function calls](#serverless-computing) with the `future_funcall` method:
 
 === "Python"
     ```python
@@ -1908,7 +1929,7 @@ Consider now that the task requires 1 cores, 6GB of memory, and 27 GB of disk:
 !!! note
     If you want TaskVine to exactly allocate the resources you have
     specified, use the `proportional-resources` and `proportional-whole-tasks`
-    parameters as shown [here](#specialized-and-experimental-settings).  In
+    parameters as shown [here](#tuning-specialized-execution-parameters).  In
     general, however, we have found that using proportions nicely adapts to the
     underlying available resources, and leads to very few resource exhaustion
     failures while still using worker resources efficiently.
@@ -1920,7 +1941,7 @@ its number of cores. (This will likely change in the future.)
 When you would like to run several tasks in a worker, but you are not sure
 about the resources each task needs, TaskVine can automatically find values
 of resources that maximize throughput, or minimize waste. This is discussed in
-the section [below](#grouping-tasks-with-similar-resources-needs).
+the section [below](#grouping-tasks-with-similar-resource-needs).
 
 ### Worker Resources
 
@@ -1959,33 +1980,33 @@ You may also use the same `--cores`, `--memory`, `--disk`, and `--gpus` options 
 batch submission script `vine_submit_workers`, and the script will correctly ask the right 
 batch system for a node of the desired size.
 
-The only caveat is when using `vine_submit_workers -T sge`, as there are many
+The only caveat is when using `vine_submit_workers -T uge`, as there are many
 differences across systems that the script cannot manage. For `
-vine_submit_workers -T sge` you have to set **both** the resources used by the
+vine_submit_workers -T uge` you have to set **both** the resources used by the
 worker (i.e., with `--cores`, etc.) and the appropiate computing node with the `
 -p ` option.
 
-For example, say that your local SGE installation requires you to set the
+For example, say that your local UGE installation requires you to set the
 number of cores with the switch ` -pe smp ` , and you want workers with 4
 cores:
 
 ```sh
-$ vine_submit_workers -T sge --cores 4 -p "-pe smp 4" MACHINENAME 9123
+$ vine_submit_workers -T uge --cores 4 -p "-pe smp 4" MACHINENAME 9123
 ```
 
 If you find that there are options that are needed everytime, you can compile
-CCTools using the ` --sge-parameter `. For example, at Notre Dame we
+CCTools using the ` --uge-parameter `. For example, at Notre Dame we
 automatically set the number of cores as follows:
 
 ```sh
-$ ./configure  --sge-parameter '-pe smp $cores'
+$ ./configure  --uge-parameter '-pe smp $cores'
 ```
 
 
 So that we can simply call:
 
 ```sh
-$ vine_submit_workers -T sge --cores 4 MACHINENAME 9123
+$ vine_submit_workers -T uge --cores 4 MACHINENAME 9123
 ```
 
 The variables `$cores `, `$memory `, and `$disk `, have the values of the
@@ -2407,7 +2428,7 @@ produces the following graphs:
 
 ![](images/plot-perf-montage.png)
 
-- [Performance Log File Format Details](log-file-formats#performance-log-format)
+- [Performance Log File Format Details](log-file-formats.md#performance-log-format)
 
 ### Transactions Log
 
@@ -2431,7 +2452,7 @@ to produce a visualization of how tasks are packed into workers like this:
 
 ![](images/plot-txn-workers.png)
 
-- [Transactions Log File Format Details](log-file-formats#transactions-log-format)
+- [Transactions Log File Format Details](log-file-formats.md#transactions-log-format)
 
 
 Custom APPLICATION messages can be added to the log with the calls:
@@ -2468,6 +2489,29 @@ Note that very large task graphs may be impractical to graph at this level of de
     conda install -c conda-forge graphviz
     ```
 
+### Other Tools
+
+`vine_plot_compose` visualizes workflow executions in a variety of ways, creating a composition of multiple plots in a single visualiztion. This tool may be useful in 
+comparing performance across multiple executions. 
+
+```sh
+vine_plot_compose transactions_log_1 ... transactions_log_N --worker-view --task-view --worker-cache --scale --sublabels --out composition.png
+```
+Produces an image containing the specified visualizations for each transactions log included like so:
+
+![Example Plot Composition](images/composition.png)
+
+`vine_transfer_plot_animate` creates an animation visualizing the amount of data exchanged between worker nodes and the manager during the duration of workflow execution.
+
+```sh
+vine_plot_animate debug_log
+```
+produces an animation like this:
+
+![Example Animation](images/anim.gif)
+
+
+
 ### Tuning Specialized Execution Parameters
 
 The behaviour of TaskVine can be tuned by the following parameters. We advise
@@ -2503,6 +2547,8 @@ change.
 | transient-error-interval | Time to wait in seconds after a resource failure before attempting to use it again | 15 |
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
 | worker-retrievals | If 1, retrieve all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |
+| watch-library-logfiles | If 1, watch the output files produced by each of the library processes running on the remote workers, take 
+them back the current logging directory. | 0 |
 
 === "Python"
     ```python
@@ -2669,7 +2715,7 @@ The `compute` call above may receive the following keyword arguments:
 
 | Keyword | Description |
 |------------ |---------|
-| environment | A TaskVine file that provides an [environment](#environments) to execute each task. |
+| environment | A TaskVine file that provides an [environment](#execution-contexts) to execute each task. |
 | env\_vars   | A dictionary of VAR=VALUE environment variables to set per task. A value should be either a string, or a function that accepts as arguments the manager and task, and that returns a string. |
 | extra\_files | A dictionary of {taskvine.File: "remote_name"} of input files to attach to each task.|
 | lazy\_transfer | Whether to bring each result back from the workers (False, default), or keep transient results at workers (True) |

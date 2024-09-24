@@ -170,7 +170,7 @@ FILE *open_proc_file(pid_t pid, char *filename)
 	FILE *fproc;
 	char fproc_path[PATH_MAX];
 
-#if defined(CCTOOLS_OPSYS_DARWIN)
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 	return NULL;
 #endif
 
@@ -285,13 +285,13 @@ int rmonitor_get_start_time(pid_t pid, uint64_t *start_time)
 			"%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s"	      /* pid of parent */
 			"%*s" /* group ID */ "%*s" /* session id */ "%*s" /* tty pid */ "%*s" /* tty group ID */
 			"%*s" /* linux/sched.h flags */ "%*s %*s %*s %*s"		      /* faults */
-			"%*s"			      /* user mode time (in clock ticks)   (field 14)  */
-			"%*s"			      /* kernel mode time (in clock ticks) (field 15) */
-			"%*s"			      /* time (clock ticks) waiting for children in user mode */
-			"%*s"			      /* time (clock ticks) waiting for children in kernel mode */
-			"%*s" /* priority */ "%*s"    /* nice */
-			"%*s" /* num threads */ "%*s" /* always 0 */
-			"%" SCNu64		      /* clock ticks since start     (field 22) */
+			"%*s"								      /* user mode time (in clock ticks)   (field 14)  */
+			"%*s"								      /* kernel mode time (in clock ticks) (field 15) */
+			"%*s"								      /* time (clock ticks) waiting for children in user mode */
+			"%*s"								      /* time (clock ticks) waiting for children in kernel mode */
+			"%*s" /* priority */ "%*s"					      /* nice */
+			"%*s" /* num threads */ "%*s"					      /* always 0 */
+			"%" SCNu64							      /* clock ticks since start     (field 22) */
 			/* .... */,
 			&start_clicks);
 	fclose(fstat);
@@ -330,8 +330,8 @@ int rmonitor_get_cpu_time_usage(pid_t pid, struct rmonitor_cpu_time_info *cpu)
 			"%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s"	      /* pid of parent */
 			"%*s" /* group ID */ "%*s" /* session id */ "%*s" /* tty pid */ "%*s" /* tty group ID */
 			"%*s" /* linux/sched.h flags */ "%*s %*s %*s %*s"		      /* faults */
-			"%" SCNu64 /* user mode time (in clock ticks) */
-			"%" SCNu64 /* kernel mode time (in clock ticks) */
+			"%" SCNu64							      /* user mode time (in clock ticks) */
+			"%" SCNu64							      /* kernel mode time (in clock ticks) */
 			/* .... */,
 			&kernel,
 			&user);
@@ -820,8 +820,7 @@ char *rmonitor_get_command_line(pid_t pid)
 	return xxstrdup(cmdline);
 }
 
-void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_wdir_info *d,
-		struct rmonitor_filesys_info *f, uint64_t start_time)
+void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f, uint64_t start_time)
 {
 	tr->start = ((double)start_time) / ONE_SECOND;
 	tr->end = ((double)usecs_since_epoch()) / ONE_SECOND;
@@ -959,8 +958,8 @@ struct rmsummary *rmonitor_measure_host(char *path)
 	return tr;
 }
 
-struct rmsummary *rmonitor_collate_minimonitor(uint64_t start_time, int current_ps, int total_processes,
-		struct rmonitor_process_info *p, struct rmonitor_mem_info *m, struct rmonitor_wdir_info *d)
+struct rmsummary *rmonitor_collate_minimonitor(
+		uint64_t start_time, int current_ps, int total_processes, struct rmonitor_process_info *p, struct rmonitor_mem_info *m, struct rmonitor_wdir_info *d)
 {
 	struct rmsummary *tr = rmsummary_create(-1);
 
@@ -1090,8 +1089,7 @@ struct rmsummary *rmonitor_minimonitor(minimonitor_op op, uint64_t pid)
 			rmonitor_poll_maps_once(processes, m_acc);
 			rmonitor_poll_wd_once(d_acc, 1);
 
-			result = rmonitor_collate_minimonitor(
-					start_time, itable_size(processes), total_processes, p_acc, m_acc, d_acc);
+			result = rmonitor_collate_minimonitor(start_time, itable_size(processes), total_processes, p_acc, m_acc, d_acc);
 		}
 		break;
 	}

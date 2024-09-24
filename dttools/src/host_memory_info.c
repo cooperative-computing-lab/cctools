@@ -17,7 +17,7 @@ int host_memory_info_get(UINT64_T *avail, UINT64_T *total)
 	return 1;
 }
 
-#elif defined(CCTOOLS_OPSYS_DARWIN)
+#elif defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
 
 #include <sys/sysctl.h>
 #include <sys/types.h>

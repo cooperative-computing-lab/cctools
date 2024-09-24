@@ -32,8 +32,7 @@ struct jx_item *jx_item(struct jx *value, struct jx_item *next)
 	return item;
 }
 
-struct jx_comprehension *jx_comprehension(
-		const char *variable, struct jx *elements, struct jx *condition, struct jx_comprehension *next)
+struct jx_comprehension *jx_comprehension(const char *variable, struct jx *elements, struct jx *condition, struct jx_comprehension *next)
 {
 	assert(variable);
 	assert(elements);
@@ -510,8 +509,7 @@ int jx_comprehension_equals(struct jx_comprehension *j, struct jx_comprehension 
 		return 1;
 	if (!j || !k)
 		return 0;
-	return !strcmp(j->variable, k->variable) && jx_equals(j->elements, k->elements) &&
-	       jx_equals(j->condition, k->condition) && jx_comprehension_equals(j->next, k->next);
+	return !strcmp(j->variable, k->variable) && jx_equals(j->elements, k->elements) && jx_equals(j->condition, k->condition) && jx_comprehension_equals(j->next, k->next);
 }
 
 int jx_pair_equals(struct jx_pair *j, struct jx_pair *k)
@@ -520,8 +518,7 @@ int jx_pair_equals(struct jx_pair *j, struct jx_pair *k)
 		return 1;
 	if (!j || !k)
 		return 0;
-	return jx_equals(j->key, k->key) && jx_equals(j->value, k->value) &&
-	       jx_comprehension_equals(j->comp, k->comp) && jx_pair_equals(j->next, k->next);
+	return jx_equals(j->key, k->key) && jx_equals(j->value, k->value) && jx_comprehension_equals(j->comp, k->comp) && jx_pair_equals(j->next, k->next);
 }
 
 int jx_item_equals(struct jx_item *j, struct jx_item *k)
@@ -530,8 +527,7 @@ int jx_item_equals(struct jx_item *j, struct jx_item *k)
 		return 1;
 	if (!j || !k)
 		return 0;
-	return jx_equals(j->value, k->value) && jx_comprehension_equals(j->comp, k->comp) &&
-	       jx_item_equals(j->next, k->next);
+	return jx_equals(j->value, k->value) && jx_comprehension_equals(j->comp, k->comp) && jx_item_equals(j->next, k->next);
 }
 
 int jx_equals(struct jx *j, struct jx *k)
@@ -561,8 +557,7 @@ int jx_equals(struct jx *j, struct jx *k)
 	case JX_OBJECT:
 		return jx_pair_equals(j->u.pairs, k->u.pairs);
 	case JX_OPERATOR:
-		return j->u.oper.type == k->u.oper.type && jx_equals(j->u.oper.left, k->u.oper.right) &&
-		       jx_equals(j->u.oper.right, j->u.oper.right);
+		return j->u.oper.type == k->u.oper.type && jx_equals(j->u.oper.left, k->u.oper.right) && jx_equals(j->u.oper.right, j->u.oper.right);
 	case JX_ERROR:
 		return jx_equals(j->u.err, k->u.err);
 	}

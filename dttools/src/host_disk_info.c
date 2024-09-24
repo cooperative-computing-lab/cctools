@@ -40,8 +40,7 @@ int check_disk_space_for_filesize(char *path, int64_t file_size, uint64_t disk_a
 		if (file_size > 0) {
 			if ((uint64_t)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
 				debug(D_DEBUG,
-						"File of size %" PRId64 " MB will lower available disk space (%" PRIu64
-						" MB) below threshold (%" PRIu64 " MB).\n",
+						"File of size %" PRId64 " MB will lower available disk space (%" PRIu64 " MB) below threshold (%" PRIu64 " MB).\n",
 						file_size / MEGA,
 						disk_avail / MEGA,
 						disk_avail_threshold / MEGA);
@@ -49,11 +48,7 @@ int check_disk_space_for_filesize(char *path, int64_t file_size, uint64_t disk_a
 			}
 		} else {
 			if (disk_avail < disk_avail_threshold) {
-				debug(D_DEBUG,
-						"Available disk space (%" PRIu64 " MB) lower than threshold (%" PRIu64
-						" MB).\n",
-						disk_avail / MEGA,
-						disk_avail_threshold / MEGA);
+				debug(D_DEBUG, "Available disk space (%" PRIu64 " MB) lower than threshold (%" PRIu64 " MB).\n", disk_avail / MEGA, disk_avail_threshold / MEGA);
 				return 0;
 			}
 		}

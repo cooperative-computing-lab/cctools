@@ -231,11 +231,10 @@ int64_t total_bytes_tx;	  /* total bytes sent */
 
 const char *sh_cmd_line = NULL; /* command line passed with the --sh option. */
 
-char *snapshot_watch_events_file =
-		NULL; /* name of the file with a jx document that looks like:
-								     { "FILENAME" : [ { "pattern":"REGEXP", "label":"my
-			 snapshot", "max_count":1}, "FILENAME2" : ... ] } A snapshot is generated when pattern matches a
-			 line in the file FILENAME. */
+char *snapshot_watch_events_file = NULL; /* name of the file with a jx document that looks like:
+											{ "FILENAME" : [ { "pattern":"REGEXP", "label":"my
+					    snapshot", "max_count":1}, "FILENAME2" : ... ] } A snapshot is generated when pattern matches a
+					    line in the file FILENAME. */
 
 size_t snapshots_allocated = 0; /* dynamic number of snapshot slots allocated */
 
@@ -422,12 +421,7 @@ void find_hostname()
 
 void find_version()
 {
-	char *monitor_self_info = string_format("monitor_version:%9s %d.%d.%d.%.8s",
-			"",
-			CCTOOLS_VERSION_MAJOR,
-			CCTOOLS_VERSION_MINOR,
-			CCTOOLS_VERSION_MICRO,
-			CCTOOLS_COMMIT);
+	char *monitor_self_info = string_format("monitor_version:%9s %d.%d.%d.%.8s", "", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, CCTOOLS_COMMIT);
 	add_verbatim_field(monitor_self_info);
 	free(monitor_self_info);
 }
@@ -524,8 +518,7 @@ int send_catalog_update(struct rmsummary *s, int force)
 	char *str = jx_print_string(j);
 
 	debug(D_RMON, "Sending resources snapshot to catalog server(s) at %s ...", catalog_hosts);
-	int status = catalog_query_send_update(
-			catalog_hosts, str, CATALOG_UPDATE_BACKGROUND | CATALOG_UPDATE_CONDITIONAL);
+	int status = catalog_query_send_update(catalog_hosts, str, CATALOG_UPDATE_BACKGROUND | CATALOG_UPDATE_CONDITIONAL);
 
 	free(str);
 	jx_delete(j);
@@ -784,10 +777,7 @@ int rmonitor_handle_inotify(void)
 					(finfo->n_references)--;
 					if (finfo->n_references == 0) {
 						inotify_rm_watch(rmonitor_inotify_fd, evdata[i].wd);
-						debug(D_RMON,
-								"removed watch (id: %d) for file %s",
-								evdata[i].wd,
-								fname);
+						debug(D_RMON, "removed watch (id: %d) for file %s", evdata[i].wd, fname);
 						free(fname);
 						inotify_watches[evdata[i].wd] = NULL;
 					}
@@ -873,10 +863,8 @@ void rmonitor_summary_header()
 		fprintf(log_series, "# virtual, resident and swap memory in megabytes.\n");
 		fprintf(log_series, "# disk in megabytes.\n");
 		fprintf(log_series, "# bandwidth in Mbps.\n");
-		fprintf(log_series,
-				"# cpu_time, bytes_read, bytes_written, bytes_sent, and bytes_received show cummulative values.\n");
-		fprintf(log_series,
-				"# wall_clock, max_concurrent_processes, virtual, resident, swap, files, and disk show values at the sample point.\n");
+		fprintf(log_series, "# cpu_time, bytes_read, bytes_written, bytes_sent, and bytes_received show cummulative values.\n");
+		fprintf(log_series, "# wall_clock, max_concurrent_processes, virtual, resident, swap, files, and disk show values at the sample point.\n");
 
 		fprintf(log_series, "#");
 		fprintf(log_series, "%s", "wall_clock");
@@ -955,8 +943,7 @@ double peak_cores(double wall_time, double cpu_time)
 	return ((double)diff_cpu) / diff_wall;
 }
 
-void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_mem_info *m,
-		struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f)
+void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_mem_info *m, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f)
 {
 	tr->start = summary->start;
 	tr->end = ((double)usecs_since_epoch()) / ONE_SECOND;
@@ -1042,9 +1029,7 @@ void rmonitor_log_row(struct rmsummary *tr)
 			fprintf(log_series, " %s", rmsummary_resource_to_str("cores", tr->cores_avg, 0));
 		}
 
-		fprintf(log_series,
-				" %s",
-				rmsummary_resource_to_str("max_concurrent_processes", tr->max_concurrent_processes, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("max_concurrent_processes", tr->max_concurrent_processes, 0));
 		fprintf(log_series, " %s", rmsummary_resource_to_str("virtual_memory", tr->virtual_memory, 0));
 		fprintf(log_series, " %s", rmsummary_resource_to_str("memory", tr->memory, 0));
 		fprintf(log_series, " %s", rmsummary_resource_to_str("swap_memory", tr->swap_memory, 0));
@@ -1122,10 +1107,7 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 	summary->exit_status = first_process_exit_status;
 
 	if (WIFSIGNALED(wait_status) || WIFSTOPPED(wait_status)) {
-		debug(D_RMON,
-				"process %d terminated: %s.\n",
-				first_process_pid,
-				strsignal(WIFSIGNALED(wait_status) ? WTERMSIG(wait_status) : WSTOPSIG(wait_status)));
+		debug(D_RMON, "process %d terminated: %s.\n", first_process_pid, strsignal(WIFSIGNALED(wait_status) ? WTERMSIG(wait_status) : WSTOPSIG(wait_status)));
 
 		summary->exit_type = xxstrdup("signal");
 
@@ -1193,12 +1175,7 @@ void rmonitor_add_files_to_summary(char *field, int outputs)
 			continue;
 		}
 
-		buffer_putfstring(&b,
-				"%s%20s\"%s\", %" PRId64 " ]",
-				delimeter,
-				"[ ",
-				fname,
-				(int64_t)ceil(1.0 * file_size / ONE_MEGABYTE));
+		buffer_putfstring(&b, "%s%20s\"%s\", %" PRId64 " ]", delimeter, "[ ", fname, (int64_t)ceil(1.0 * file_size / ONE_MEGABYTE));
 		delimeter = ",\n";
 	}
 
@@ -1231,11 +1208,7 @@ int rmonitor_file_io_summaries()
 		hash_table_firstkey(files);
 		while (hash_table_nextkey(files, &fname, (void **)&finfo)) {
 			fprintf(log_inotify, "%-15s\n%-15s ", fname, "");
-			fprintf(log_inotify,
-					"%6" PRId64 " %20lld %20lld",
-					finfo->device,
-					(long long int)finfo->size_on_open,
-					(long long int)finfo->size_on_close);
+			fprintf(log_inotify, "%6" PRId64 " %20lld %20lld", finfo->device, (long long int)finfo->size_on_open, (long long int)finfo->size_on_close);
 			fprintf(log_inotify, " %6" PRId64 " %6" PRId64, finfo->n_opens, finfo->n_closes);
 			fprintf(log_inotify, " %6" PRId64 " %6" PRId64 "\n", finfo->n_reads, finfo->n_writes);
 		}
@@ -1480,9 +1453,7 @@ void set_snapshot_watch_events()
 		struct jx *array = jx_lookup(j, fname);
 
 		if (!jx_istype(array, JX_OBJECT)) {
-			debug(D_FATAL,
-					"Error processing snapshot configurations for %s. Not of the form {\"FILENAME\" : { \"events\" : [ { \"label\": ..., }, ... ]",
-					fname);
+			debug(D_FATAL, "Error processing snapshot configurations for %s. Not of the form {\"FILENAME\" : { \"events\" : [ { \"label\": ..., }, ... ]", fname);
 			exit(RM_MONITOR_ERROR);
 		}
 
@@ -1519,8 +1490,7 @@ struct rmsummary *rmonitor_final_usage_tree(void)
 
 	if (usg.ru_majflt > 0) {
 		/* Here we add the maximum recorded + the io from memory maps */
-		tr_usg->bytes_read =
-				summary->bytes_read + (((double)usg.ru_majflt * sysconf(_SC_PAGESIZE)) / ONE_MEGABYTE);
+		tr_usg->bytes_read = summary->bytes_read + (((double)usg.ru_majflt * sysconf(_SC_PAGESIZE)) / ONE_MEGABYTE);
 		debug(D_RMON, "page faults: %ld.\n", usg.ru_majflt);
 	}
 
@@ -1973,16 +1943,12 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
 				/* Try bringing the child process to the session foreground */
 				retc = tcsetpgrp(fdtty, getpgid(pid));
 				if (retc < 0) {
-					debug(D_FATAL,
-							"error bringing process to the session foreground (tcsetpgrp): %s\n",
-							strerror(errno));
+					debug(D_FATAL, "error bringing process to the session foreground (tcsetpgrp): %s\n", strerror(errno));
 					exit(RM_MONITOR_ERROR);
 				}
 				close(fdtty);
 			} else {
-				debug(D_FATAL,
-						"error accessing controlling terminal (/dev/tty): %s\n",
-						strerror(errno));
+				debug(D_FATAL, "error accessing controlling terminal (/dev/tty): %s\n", strerror(errno));
 				exit(RM_MONITOR_ERROR);
 			}
 		}
@@ -2021,79 +1987,43 @@ static void show_help(const char *cmd)
 {
 	fprintf(stdout, "\nUse: %s [options] -- command-line-and-options\n\n", cmd);
 	fprintf(stdout, "%-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
-	fprintf(stdout,
-			"%-30s Send debugging to this file. (can also be :stderr, or :stdout)\n",
-			"-o,--debug-file=<file>");
+	fprintf(stdout, "%-30s Send debugging to this file. (can also be :stderr, or :stdout)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, "%-30s Show this message.\n", "-h,--help");
 	fprintf(stdout, "%-30s Show version string.\n", "-v,--version");
 	fprintf(stdout, "\n");
-	fprintf(stdout,
-			"%-30s Maximum interval between observations, in seconds. (default=%d)\n",
-			"-i,--interval=<n>",
-			DEFAULT_INTERVAL);
-	fprintf(stdout,
-			"%-30s Track <pid> instead of executing a command line (warning: less precise measurements).\n",
-			"--pid=<pid>");
-	fprintf(stdout,
-			"%-30s Accurately measure short running processes (adds overhead).\n",
-			"--accurate-short-processes");
+	fprintf(stdout, "%-30s Maximum interval between observations, in seconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
+	fprintf(stdout, "%-30s Track <pid> instead of executing a command line (warning: less precise measurements).\n", "--pid=<pid>");
+	fprintf(stdout, "%-30s Accurately measure short running processes (adds overhead).\n", "--accurate-short-processes");
 	fprintf(stdout, "%-30s Read command line from <str>, and execute as '/bin/sh -c <str>'\n", "-c,--sh=<str>");
 	fprintf(stdout, "\n");
-	fprintf(stdout,
-			"%-30s Use maxfile with list of var: value pairs for resource limits.\n",
-			"-l,--limits-file=<maxfile>");
-	fprintf(stdout,
-			"%-30s Use string of the form \"var: value, var: value\" to specify.\n",
-			"-L,--limits=<string>");
+	fprintf(stdout, "%-30s Use maxfile with list of var: value pairs for resource limits.\n", "-l,--limits-file=<maxfile>");
+	fprintf(stdout, "%-30s Use string of the form \"var: value, var: value\" to specify.\n", "-L,--limits=<string>");
 	fprintf(stdout, "%-30s resource limits. Can be specified multiple times.\n", "");
 	fprintf(stdout, "%-30s Do not enforce resource limits, only measure resources.\n", "--measure-only");
 	fprintf(stdout, "\n");
-	fprintf(stdout,
-			"%-30s Keep the monitored process in foreground (for interactive use).\n",
-			"-f,--child-in-foreground");
+	fprintf(stdout, "%-30s Keep the monitored process in foreground (for interactive use).\n", "-f,--child-in-foreground");
 	fprintf(stdout, "\n");
-	fprintf(stdout,
-			"%-30s Specify filename template for log files (default=resource-pid-<pid>)\n",
-			"-O,--with-output-files=<file>");
+	fprintf(stdout, "%-30s Specify filename template for log files (default=resource-pid-<pid>)\n", "-O,--with-output-files=<file>");
 	fprintf(stdout, "%-30s Write resource time series to <template>.series\n", "--with-time-series");
-	fprintf(stdout,
-			"%-30s Write inotify statistics of opened files to default=<template>.files\n",
-			"--with-inotify");
-	fprintf(stdout,
-			"%-30s Include this string verbatim in a line in the summary. \n",
-			"-V,--verbatim-to-summary=<str>");
+	fprintf(stdout, "%-30s Write inotify statistics of opened files to default=<template>.files\n", "--with-inotify");
+	fprintf(stdout, "%-30s Include this string verbatim in a line in the summary. \n", "-V,--verbatim-to-summary=<str>");
 	fprintf(stdout, "%-30s (Could be specified multiple times.)\n", "");
 	fprintf(stdout, "\n");
-	fprintf(stdout,
-			"%-30s Follow the size of <dir>. By default the directory at the start of\n",
-			"--measure-dir=<dir>");
+	fprintf(stdout, "%-30s Follow the size of <dir>. By default the directory at the start of\n", "--measure-dir=<dir>");
 	fprintf(stdout, "%-30s execution is followed. Can be specified multiple times.\n", "");
 	fprintf(stdout, "%-30s See --without-disk-footprint below.\n", "");
-	fprintf(stdout,
-			"%-30s Do not measure working directory footprint. Overrides --measure-dir and --follow-chdir.\n",
-			"--without-disk-footprint");
+	fprintf(stdout, "%-30s Do not measure working directory footprint. Overrides --measure-dir and --follow-chdir.\n", "--without-disk-footprint");
 	fprintf(stdout, "\n");
-	fprintf(stdout,
-			"%-30s Report measurements to catalog server with \"task\"=<task-name>.\n",
-			"--catalog-task-name=<name>");
-	fprintf(stdout,
-			"%-30s Set project name of catalog update to <project> (default=<task-name>).\n",
-			"--catalog-project=<project>");
-	fprintf(stdout,
-			"%-30s Use catalog server <catalog>. (default=catalog.cse.nd.edu:9094).\n",
-			"--catalog=<catalog>");
-	fprintf(stdout,
-			"%-30s Send update to catalog every <interval> seconds. (default=%" PRId64 ").\n",
-			"--catalog-interval=<interval>",
-			catalog_interval_default);
+	fprintf(stdout, "%-30s Report measurements to catalog server with \"task\"=<task-name>.\n", "--catalog-task-name=<name>");
+	fprintf(stdout, "%-30s Set project name of catalog update to <project> (default=<task-name>).\n", "--catalog-project=<project>");
+	fprintf(stdout, "%-30s Use catalog server <catalog>. (default=catalog.cse.nd.edu:9094).\n", "--catalog=<catalog>");
+	fprintf(stdout, "%-30s Send update to catalog every <interval> seconds. (default=%" PRId64 ").\n", "--catalog-interval=<interval>", catalog_interval_default);
 	fprintf(stdout, "\n");
 	fprintf(stdout, "%-30s Update resource summary file every measurement interval.\n", "--update-summary");
 	fprintf(stdout, "\n");
 	fprintf(stdout, "%-30s Do not pretty-print summaries.\n", "--no-pprint");
 	fprintf(stdout, "\n");
-	fprintf(stdout,
-			"%-30s Configuration file for snapshots on file patterns. (See man page.)\n",
-			"--snapshot-events=<file>");
+	fprintf(stdout, "%-30s Configuration file for snapshots on file patterns. (See man page.)\n", "--snapshot-events=<file>");
 }
 
 int rmonitor_resources(long int interval /*in seconds */)
@@ -2463,9 +2393,7 @@ int main(int argc, char **argv)
 		}
 
 		if (catalog_interval < interval) {
-			warn(D_RMON,
-					"catalog update interval (%" PRId64
-					") is less than measurements interval (%" PRId64 "). Using the latter.");
+			warn(D_RMON, "catalog update interval (%" PRId64 ") is less than measurements interval (%" PRId64 "). Using the latter.");
 			catalog_interval = interval;
 		}
 

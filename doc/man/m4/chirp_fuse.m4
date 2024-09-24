@@ -28,7 +28,7 @@ LINK(Chirp User's Manual,http://ccl.cse.nd.edu/software/manuals/chirp.html).
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ARG(a, auth,flag)Require this authentication mode.
+OPTION_ARG(a,auth,flag) Enable authentication mode: unix, hostname, address, ticket, kerberos, or globus.
 OPTION_ARG(b,block-size,bytes)Block size for network I/O. (default is 65536s)
 OPTION_ARG(d,debug,flag)Enable debugging for this subsystem.
 OPTION_FLAG(D,no-optimize)Disable small file optimizations such as recursive delete.

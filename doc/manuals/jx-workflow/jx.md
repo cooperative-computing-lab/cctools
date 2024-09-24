@@ -32,7 +32,7 @@ A workflow is encoded as a JSON object with the following keys:
 | Key | Required | Description |
 |-----|:--------:|-------------|
 |[**rules**](#rules)|  yes     | Unordered array of rules comprising the workflow.<br>  Each `<rule>` corresponds to a single job represented as a JSON object to be executed in the workflow.
-|[**define**](#defining-values) | no | Defines [expression substitutions](#jx-expressions) that can be used when defining rules, environments, and categories.|
+|[**define**](#computed-values) | no | Defines [expression substitutions](#computed-values) that can be used when defining rules, environments, and categories.|
 |[**environment**](#environments) | no | Defines environment variables to be set when executing all rules.|
 |[**categories**](#categories)| no  | Rules are grouped into categories. Rules inside a category are run with the same [environment variables values](#environments), and the same resource requirements.|
 |default_category | no | Name of the category used if none is specified for a rule. <br>If there is no corresponding category defined, default values will be filled in. If not provided, the default category is `"default"`.|
@@ -84,8 +84,8 @@ single command, but it replaces the key `command` with keys `workflow` and
 |-----|:--------:|-------------|
 | command <br> _or_ <br> workflow | yes | Either `command`, which is a single Unix program to run, or a `workflow` which names another workflow to be run as a sub-job.
 | args      | no | **Only used with workflow key.**  Gives arguments as a JSON array to be passed to a sub-workflow.
-| inputs    | no | An array of [file specifications](#Files) required by the command or sub-workflow.
-| outputs   | no | An array of [file specifications](#Files) produced by the command or sub-workflow.
+| inputs    | no | An array of [file specifications](#files) required by the command or sub-workflow.
+| outputs   | no | An array of [file specifications](#files) produced by the command or sub-workflow.
 | local_job | no | If `true` indicates that the job is best run locally by the workflow manager, rather than dispatched to a distributed system. This is a performance hint provided by the end user and not a functional requirement. Default is `false`.
 | category  | no | Specifies the name of a job category. The name given should correspond to the key of a category object in the global workflow object.
 | resources | no | Specifies the specific [resource requirements](#resources) of this job.

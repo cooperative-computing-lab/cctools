@@ -201,12 +201,10 @@ class Task(object):
         return cvine.vine_task_set_command(self._task, command)
 
     ##
-    # Set the name of the library at the worker that should execute the task's command.
-    # This is not needed for regular tasks.
-    #
-    # @param self Reference to the current task object.
-    # @param library The library or name of the library
-    def set_library_required(self, library):
+    # Compute the name of a given library
+    # @param self          Reference to the current task object.
+    # @param library       The library or the name of the library
+    def _compute_library_name(self, library):
         library_name = None
         if isinstance(library, Task):
             try:
@@ -219,9 +217,19 @@ class Task(object):
         if not isinstance(library, str):
             raise ValueError(f"{library} is not a valid library")
 
+        return library_name
+
+    ##
+    # Set the name of the library at the worker that should execute the task's command.
+    # This is not needed for regular tasks.
+    #
+    # @param self          Reference to the current task object.
+    # @param library       The library or the name of the library
+    def set_library_required(self, library):
+        library_name = self._compute_library_name(library)
         if self.get_libray_provided():
             raise ValueError(
-                f"A task cannot both provide ({self.get_libray_provided()}) and require ({library_name}) a library."
+                f"A task cannot both provide ({library_name}) and require ({library_name}) a library."
             )
         return cvine.vine_task_set_library_required(self._task, library_name)
 
@@ -229,7 +237,7 @@ class Task(object):
     # Get the name of the library at the worker that should execute the task's command.
     #
     # @param self Reference to the current task object.
-    def get_libray_required(self):
+    def get_library_required(self):
         return cvine.vine_task_get_library_required(self._task)
 
     ##
@@ -244,9 +252,9 @@ class Task(object):
     # @param self Reference to the current task object.
     # @param library_name The name of the library.
     def set_library_provided(self, library_name):
-        if self.get_libray_required():
+        if self.get_library_required():
             raise ValueError(
-                f"A task cannot both provide ({library_name}) and require ({self.get_libray_required()}) a library."
+                f"A task cannot both provide ({library_name}) and require ({self.get_library_required()}) a library."
             )
         return cvine.vine_task_set_library_provided(self._task, library_name)
 
@@ -567,6 +575,15 @@ class Task(object):
         return cvine.vine_task_get_command(self._task)
 
     ##
+    # Get the state of the task.
+    # @code
+    # >>> print(t.command)
+    # @endcode
+    @property
+    def state(self):
+        return cvine.vine_task_get_state(self._task)
+
+    ##
     # Get the standard output of the task. Must be called only after the task
     # completes execution.
     # @code
@@ -765,23 +782,23 @@ class Task(object):
     # @endcode
     @property
     def resources_measured(self):
-        if not self._task.resources_measured:
+        if not self._task:
             return None
-
-        return self._task.resources_measured
+        return cvine.vine_task_get_resources(self._task, "measured")
 
     ##
     # Get the resources the task exceeded. For valid field see @ref ndcctools.taskvine.task.Task.resources_measured.
     #
     @property
     def limits_exceeded(self):
-        if not self._task.resources_measured:
+        if not self._task:
             return None
 
-        if not self._task.resources_measured.limits_exceeded:
+        measured = cvine.vine_task_get_resources(self._task, "measured")
+        if not measured:
             return None
 
-        return self._task.resources_measured.limits_exceeded
+        return measured.limits_exceeded
 
     ##
     # Get the resources the task requested to run. For valid fields see
@@ -789,9 +806,9 @@ class Task(object):
     #
     @property
     def resources_requested(self):
-        if not self._task.resources_requested:
+        if not self._task:
             return None
-        return self._task.resources_requested
+        return cvine.vine_task_get_resources(self._task, "requested")
 
     ##
     # Get the resources allocated to the task in its latest attempt. For valid
@@ -799,9 +816,9 @@ class Task(object):
     #
     @property
     def resources_allocated(self):
-        if not self._task.resources_allocated:
+        if not self._task:
             return None
-        return self._task.resources_allocated
+        return cvine.vine_task_get_resources(self._task, "allocated")
 
     ##
     # Adds inputs for nopen library and rules file and sets LD_PRELOAD
@@ -984,8 +1001,8 @@ class PythonTask(Task):
         name = os.path.join(manager.staging_directory, "arguments", self._id)
         with open(name, "wb") as wf:
             cloudpickle.dump([args, kwargs], wf)
-        f = manager.declare_file(name, unlink_when_done=True)
-        self.add_input(f, f"a_{self._id}")
+        self._input_file = manager.declare_file(name, unlink_when_done=True)
+        self.add_input(self._input_file, f"a_{self._id}")
 
         if self._tmp_output_enabled:
             self._output_file = self.manager.declare_temp()
@@ -1073,6 +1090,10 @@ class FunctionCall(PythonTask):
     #
     # @param self 	Reference to the current python task object
     def submit_finalize(self):
+        library_name = self.get_library_required()
+        if not self.manager.check_library_exists(library_name):
+            raise ValueError(f"invalid library name \'{library_name}\'")
+
         name = os.path.join(self.manager.staging_directory, "arguments", self._id)
         with open(name, "wb") as wf:
             cloudpickle.dump(self._event, wf)
@@ -1162,13 +1183,13 @@ class LibraryTask(Task):
     ##
     # Create a new LibraryTask task specification.
     #
-    # @param self       Reference to the current remote task object.
-    # @param fn         The command for this LibraryTask to run
-    # @param name       The name of this Library.
-    def __init__(self, fn, name):
+    # @param self               Reference to the current remote task object.
+    # @param fn                 The command for this LibraryTask to run
+    # @param library_name       The name of this Library.
+    def __init__(self, fn, library_name):
         Task.__init__(self, fn)
         self._manager_will_free = True
-        self.provides_library(name)
+        self.provides_library(library_name)
 
 
 class Function:

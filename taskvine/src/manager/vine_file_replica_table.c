@@ -20,8 +20,7 @@ See the file COPYING for details.
 #include "macros.h"
 
 // add a file to the remote file table.
-int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_info *w, const char *cachename,
-		struct vine_file_replica *replica)
+int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_info *w, const char *cachename, struct vine_file_replica *replica)
 {
 	w->inuse_cache += replica->size;
 	hash_table_insert(w->current_files, cachename, replica);
@@ -38,8 +37,7 @@ int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_in
 }
 
 // remove a file from the remote file table.
-struct vine_file_replica *vine_file_replica_table_remove(
-		struct vine_manager *m, struct vine_worker_info *w, const char *cachename)
+struct vine_file_replica *vine_file_replica_table_remove(struct vine_manager *m, struct vine_worker_info *w, const char *cachename)
 {
 	struct vine_file_replica *replica = hash_table_remove(w->current_files, cachename);
 	if (replica) {
@@ -97,8 +95,7 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 			continue;
 		}
 
-		if ((replica = hash_table_lookup(peer->current_files, cachename)) &&
-				replica->state == VINE_FILE_REPLICA_STATE_READY) {
+		if ((replica = hash_table_lookup(peer->current_files, cachename)) && replica->state == VINE_FILE_REPLICA_STATE_READY) {
 			int current_transfers = vine_current_transfers_source_in_use(q, peer);
 			if (current_transfers < q->worker_source_max_transfers) {
 				peer_selected = peer;
@@ -115,22 +112,22 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 // trigger replications of file to satisfy temp_replica_count
 int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *f)
 {
-	int found = 0;
+	/* the number of replicated copies in this round */
+	int round_replication_count = 0;
 
-	if (vine_current_transfers_get_table_size(m) >=
-			hash_table_size(m->worker_table) * m->worker_source_max_transfers) {
-		return found;
+	if (vine_current_transfers_get_table_size(m) >= hash_table_size(m->worker_table) * m->worker_source_max_transfers) {
+		return round_replication_count;
 	}
 
 	struct set *sources = hash_table_lookup(m->file_worker_table, f->cached_name);
 	if (!sources) {
-		return found;
+		return round_replication_count;
 	}
 
 	int nsources = set_size(sources);
 	int to_find = MIN(m->temp_replica_count - nsources, m->transfer_replica_per_cycle);
 	if (to_find < 1) {
-		return found;
+		return round_replication_count;
 	}
 
 	debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsources, f->cached_name, to_find);
@@ -141,7 +138,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 	int i = 0;
 	for (source = sources_frozen[i]; i < nsources; i++) {
-		if (found >= to_find) {
+		if (round_replication_count >= to_find) {
 			break;
 		}
 
@@ -191,7 +188,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 			source_in_use++;
 			found_per_source++;
-			found++;
+			round_replication_count++;
 		}
 
 		free(source_addr);
@@ -199,14 +196,13 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 	free(sources_frozen);
 
-	return found;
+	return round_replication_count;
 }
 
 /*
 Count number of replicas of a file in the system.
 */
-int vine_file_replica_table_count_replicas(
-		struct vine_manager *q, const char *cachename, vine_file_replica_state_t state)
+int vine_file_replica_table_count_replicas(struct vine_manager *q, const char *cachename, vine_file_replica_state_t state)
 {
 	struct vine_worker_info *w;
 	struct vine_file_replica *r;

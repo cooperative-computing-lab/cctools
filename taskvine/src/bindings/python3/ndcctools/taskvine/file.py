@@ -33,18 +33,17 @@ class File(object):
     #
     # @param self       A file object.
     def source(self):
-        if self.file_type() == cvine.VINE_FILE:
-            return getattr(self._file, "source")
-        else:
-            return None
+        if self._file:
+            return cvine.vine_file_source(self._file)
 
     ##
     # Return the enum type of this file. (e.g., VINE_FILE, VINE_TEMP, etc.)
     # Typically used to return the contents of an output buffer.
     #
     # @param self       A file object.
-    def file_type(self):
-        return getattr(self._file, "type")
+    def type(self):
+        if self._file:
+            return cvine.vine_file_type(self._file)
 
     ##
     # Return the contents of a file object as a string.
@@ -59,7 +58,7 @@ class File(object):
         if not unserializer:
             unserializer = identity_read
 
-        ftype = self.file_type()
+        ftype = self.type()
 
         if ftype == cvine.VINE_BUFFER:
             with io.BytesIO(cvine.vine_file_contents_as_bytes(self._file)) as f:
@@ -67,8 +66,14 @@ class File(object):
         elif ftype == cvine.VINE_FILE:
             with open(self.source(), "rb") as f:
                 return unserializer(f)
+        elif ftype == cvine.VINE_TEMP:
+            try:
+                with io.BytesIO(cvine.vine_file_contents_as_bytes(self._file)) as f:
+                    return unserializer(f)
+            except Exception as e:
+                raise e("Temp file does not have local contents, The file much be fetched beforehand", self.type())
         else:
-            raise ValueError("File does not have local contents", self.file_type())
+            raise ValueError("File does not have local contents", self.type())
 
     ##
     # Return the size of a file object, in bytes.

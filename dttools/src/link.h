@@ -391,6 +391,13 @@ Wait for a activity on a an array of links.
 
 int link_poll(struct link_info *array, int nlinks, int msec);
 
+/** Get the number of bytes in the output buffer of a link.
+@param link The link to examine.
+@return The number of bytes in the output buffer of a link.
+*/
+int link_get_buffer_bytes(struct link *link);
+
+
 int errno_is_temporary(int e);
 
 #endif

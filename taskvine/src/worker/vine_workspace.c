@@ -18,6 +18,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#if defined(CCTOOLS_OPSYS_FREEBSD)
+#include <sys/wait.h>
+#endif
+
 /* Create a new workspace object and sub-paths */
 
 struct vine_workspace *vine_workspace_create(const char *manual_workspace_dir)
@@ -73,9 +77,7 @@ int vine_workspace_check(struct vine_workspace *w)
 
 		if (WIFEXITED(exit_status) && WEXITSTATUS(exit_status) == 126) {
 			/* Note that we do not set status=1 on 126, as the executables may live ouside workspace. */
-			warn(D_NOTICE,
-					"Could not execute a test script in the workspace directory '%s'.",
-					w->workspace_dir);
+			warn(D_NOTICE, "Could not execute a test script in the workspace directory '%s'.", w->workspace_dir);
 			warn(D_NOTICE, "Is the filesystem mounted as 'noexec'?\n");
 			warn(D_NOTICE, "Unless the task command is an absolute path, the task will fail with exit status 126.\n");
 		} else if (!WIFEXITED(exit_status) || WEXITSTATUS(exit_status) != 0) {

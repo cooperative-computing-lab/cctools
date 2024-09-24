@@ -1,12 +1,14 @@
 /*
-Copyright (C) 2022 The University of Notre Dame
+Copyright (C) 2024 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
 #include "vine_catalog.h"
+#include "vine_protocol.h"
+
 #include "cctools.h"
-#include "batch_job.h"
+#include "batch_queue.h"
 #include "hash_table.h"
 #include "copy_stream.h"
 #include "debug.h"
@@ -125,7 +127,7 @@ int manual_ssl_option = 0;
 // Change the name presented in tls routing
 static char *manual_tls_sni = NULL;
 
-//Environment variables to pass along in batch_job_submit
+//Environment variables to pass along in batch_queue_submit
 struct jx *batch_env = NULL;
 
 //Features to pass along as worker arguments
@@ -336,6 +338,13 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 		const int tr =       jx_lookup_integer(j,"tasks_on_workers");
 		const int tw =       jx_lookup_integer(j,"tasks_waiting");
 		const int tl =       jx_lookup_integer(j,"tasks_left");
+		const int protocol = jx_lookup_integer(j,"protocol");
+
+		if(protocol!=VINE_PROTOCOL_VERSION) {
+			printf("WARNING: skipping manager %s (%s:%d) with protocol version %d\n",project, host, port, protocol);
+			printf("that is not compatible with this factory protocol version %d\n",VINE_PROTOCOL_VERSION);
+			continue;
+		}
 
 		int capacity = manager_workers_capacity(j);
 
@@ -439,11 +448,10 @@ static int submit_worker( struct batch_queue *queue )
 
 	char *features_string = make_features_string(features_table);
 	
-	char *worker = string_format("./%s", worker_command);
 	if(using_catalog) {
 		cmd = string_format(
-		"%s --parent-death -M %s -t %d -C '%s' %s %s %s %s %s %s %s",
-		worker,
+		"./%s --parent-death -M %s -t %d -C '%s' %s %s %s %s %s %s %s",
+		worker_command,
 		submission_regex,
 		worker_timeout,
 		catalog_host,
@@ -457,8 +465,8 @@ static int submit_worker( struct batch_queue *queue )
 		);
 	} else {
 		cmd = string_format(
-		"%s --parent-death %s %d -t %d -C '%s' %s %s %s %s %s %s",
-		worker,
+		"./%s --parent-death %s %d -t %d -C '%s' %s %s %s %s %s %s",
+		worker_command,
 		manager_host,
 		manager_port,
 		worker_timeout,
@@ -482,32 +490,37 @@ static int submit_worker( struct batch_queue *queue )
 		cmd = newcmd;
 	}
 
-	char *files = NULL;
-	files = xxstrdup(worker_command);
+	struct batch_job *task = batch_job_create(queue);
+	
+	batch_job_set_command(task,cmd);
+	batch_job_add_input_file(task,worker_command,0);
+	
+	if(resources) {
+		batch_job_set_resources(task, resources);
+	}
 
 	if(password_file) {
-		char *newfiles = string_format("%s,pwfile",files);
-		free(files);
-		files = newfiles;
+		batch_job_add_input_file(task,"pwfile",0);
 	}
 
 	const char *item = NULL;
-	list_first_item(wrapper_inputs);
-	while((item = list_next_item(wrapper_inputs))) {
-		char *newfiles = string_format("%s,%s",files,path_basename(item));
-		free(files);
-		files = newfiles;
+	LIST_ITERATE(wrapper_inputs,item) {
+		batch_job_add_input_file(task,path_basename(item),0);
 	}
 
+	if(worker_log_file) {
+		batch_job_add_output_file(task,worker_log_file,0);
+	}
+	
 	debug(D_VINE,"submitting worker: %s",cmd);
 
-	int status = batch_job_submit(queue,cmd,files,worker_log_file,batch_env,resources);
+	int status = batch_queue_submit(queue,task);
 
+	batch_job_delete(task);
+	
 	free(worker_log_file);
 	free(debug_worker_options);
 	free(cmd);
-	free(files);
-	free(worker);
 
 	return status;
 }
@@ -581,7 +594,7 @@ void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
 	itable_firstkey(job_table);
 	while(itable_nextkey(job_table,&jobid,&value)) {
 		debug(D_VINE,"removing job %"PRId64,jobid);
-		batch_job_remove(queue,jobid);
+		batch_queue_remove(queue,jobid);
 	}
 	debug(D_VINE,"%d workers removed.",count);
 
@@ -1080,8 +1093,8 @@ static void mainloop( struct batch_queue *queue )
 
 		while(1) {
 			struct batch_job_info info;
-			batch_job_id_t jobid;
-			jobid = batch_job_wait_timeout(queue,&info,stoptime);
+			batch_queue_id_t jobid;
+			jobid = batch_queue_wait_timeout(queue,&info,stoptime);
 			if(jobid>0) {
 				if(itable_lookup(job_table,jobid)) {
 					itable_remove(job_table,jobid);
@@ -1177,7 +1190,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Set the amount of memory (in MB) per worker.\n", "--memory=<mb>           ");
 	printf(" %-30s Set the amount of disk (in MB) per worker.\n", "--disk=<mb>");
 	printf(" %-30s Add a custom feature to each worker.\n", "--feature=<name>");
-	printf(" %-30s Autosize worker to slot (Condor, Mesos, K8S).\n", "--autosize");
+	printf(" %-30s Autosize worker to slot (Condor, K8S).\n", "--autosize");
 	
 	printf("\nWorker environment options:\n");
 	printf(" %-30s Environment variable to add to worker.\n", "--env=<variable=value>");
@@ -1210,9 +1223,6 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_WRAPPER, 
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WORKER_BINARY,
-		LONG_OPT_MESOS_MANAGER, 
-		LONG_OPT_MESOS_PATH,
-		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_K8S_IMAGE,
 		LONG_OPT_K8S_WORKER_IMAGE,
 		LONG_OPT_CATALOG,
@@ -1587,7 +1597,7 @@ int main(int argc, char *argv[])
 	list_first_item(wrapper_inputs);
 	while((item = list_next_item(wrapper_inputs))) {
 		char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(item));
-		int result = copy_file_to_file(item, file_at_scratch_dir);
+		int64_t result = copy_file_to_file(item, file_at_scratch_dir);
 		if(result < 0) {
 			fprintf(stderr,"vine_factory: Cannot copy wrapper input file %s to factory scratch directory %s:\n", item, file_at_scratch_dir);
 			fprintf(stderr,"%s\n", strerror(errno));
@@ -1639,7 +1649,7 @@ int main(int argc, char *argv[])
 	signal(SIGTERM, handle_abort);
 	signal(SIGHUP, ignore_signal);
 
-	queue = batch_queue_create(batch_queue_type);
+	queue = batch_queue_create(batch_queue_type,0,0);
 	if(!queue) {
 		fprintf(stderr,"vine_factory: couldn't establish queue type %s",batch_queue_type_to_string(batch_queue_type));
 		return 1;
@@ -1660,13 +1670,6 @@ int main(int argc, char *argv[])
 	}
 
 	mainloop( queue );
-
-	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-
-		batch_queue_set_int_option(queue, "batch-queue-abort-flag", (int)abort_flag);
-		batch_queue_set_int_option(queue, "batch-queue-failed-flag", 0);
-
-	}
 
 	batch_queue_delete(queue);
 

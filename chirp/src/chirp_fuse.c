@@ -727,8 +727,8 @@ int main(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-	printf("%s: sorry, fuse support was not built in\n", argv[0]);
-	return 1;
+ 	printf("%s: sorry, fuse support was not built in\n", argv[0]);
+ 	return 1;
 }
 
 #endif

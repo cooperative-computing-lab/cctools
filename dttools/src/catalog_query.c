@@ -378,12 +378,7 @@ static int catalog_update_tcp_background(const char *host, const char *address, 
 			_exit(0);
 		}
 	} else if (pid > 0) {
-		debug(D_DEBUG,
-				"sending update via tcp to %s(%s):%d (background pid %d)",
-				host,
-				address,
-				port,
-				(int)pid);
+		debug(D_DEBUG, "sending update via tcp to %s(%s):%d (background pid %d)", host, address, port, (int)pid);
 		pid_t result = waitpid(pid, 0, 0);
 		if (result != pid) {
 			debug(D_DEBUG, "unable to wait for child process %d! (%s)", pid, strerror(errno));
@@ -421,9 +416,7 @@ int catalog_query_send_update(const char *hosts, const char *text, catalog_updat
 		debug(D_DEBUG, "compressed update message from %d to %d bytes", (int)strlen(text), (int)data_length);
 
 		if (data_length > compress_limit && (flags & CATALOG_UPDATE_CONDITIONAL) && !use_udp) {
-			debug(D_DEBUG,
-					"compressed update message exceeds limit of %d bytes (CATALOG_UPDATE_LIMIT)",
-					(int)compress_limit);
+			debug(D_DEBUG, "compressed update message exceeds limit of %d bytes (CATALOG_UPDATE_LIMIT)", (int)compress_limit);
 			return 0;
 		}
 	}

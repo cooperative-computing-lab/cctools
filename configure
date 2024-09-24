@@ -114,7 +114,6 @@ config_curl_path=no
 config_cvmfs_path=no
 config_globus_path=no
 config_irods_path=no
-config_mpi_path=no
 config_uuid_path=no
 config_xrootd_path=no
 
@@ -168,12 +167,12 @@ do
 		--build-date)
 			build_date=${arg}
 			;;
-		--sge-parameter)
-			if [ -z "$sge_parameters" ]
+		--uge-parameter)
+			if [ -z "$uge_parameters" ]
 			then
-				sge_parameters="\#$ ${arg}"
+				uge_parameters="\#$ ${arg}"
 			else
-				sge_parameters="${sge_parameters}\n\#$ ${arg}"
+				uge_parameters="${uge_parameters}\n\#$ ${arg}"
 			fi
 			;;
 		--with-base-dir)
@@ -205,10 +204,6 @@ do
 		--with-irods-path)
 			irods_path=${arg}
 			config_irods_path=$(config_X_path ${arg})
-			;;
-		--with-mpi-path)
-			mpi_path=${arg}
-			config_mpi_path=$(config_X_path ${arg})
 			;;
 		--with-mysql-path)
 			mysql_path=${arg}
@@ -311,7 +306,7 @@ Where options are:
   --build-label        <label>
   --strict
   --sanitize
-  --sge-parameter      <parameter>
+  --uge-parameter      <parameter>
   --globus-flavor      <flavor>
   --irods-flavor       3 | 4
   --tcp-low-port       <port>
@@ -327,7 +322,6 @@ Where PACKAGE may be:
 	fuse
 	globus
 	irods
-	mpi
 	mysql
 	perl
 	python
@@ -415,7 +409,7 @@ done
 # Currently, we rely on the linker --as-needed flag to sort out
 # which dynamic libraries each executable actually needs.
 # This is apparently a recent addition to gnu ld.
-# A better solution would be to explicitely specify which libraries
+# A better solution would be to explicitly specify which libraries
 # are needed by which executable, but this will come in a later version.
 #
 
@@ -741,37 +735,6 @@ then
 fi
 
 report_detection ext2fs "${ext2fs_avail}" "${config_ext2fs_path}" "${ext2fs_path}"
-
-
-mpi_avail=no
-mpi_exe=""
-if [ "$config_mpi_path" != no ]
-then
-	mpi_avail=yes
-	mpi_path=${mpi_path:-${base_root}}
-
-	if [ "${config_mpi_path}" = auto ] && search_file_executable mpicc
-	then
-		mpi_exe=${executable_search_result}
-	elif search_file_executable ${mpi_path} ${mpi_path}/bin/mpicc ${mpi_path}/mpicc
-	then
-		mpi_exe=${executable_search_result}
-	else
-		mpi_avail=no
-	fi
-
-	if [ "${mpi_avail}" = yes ]
-	then
-		ccflags="-DCCTOOLS_WITH_MPI"
-		ccompiler=${mpi_exe}
-		linker=${mpi_exe}
-	else
-		mpi_avail=no
-	fi
-fi
-
-report_detection mpi "${mpi_avail}" "${config_mpi_path}" "${mpi_path}"
-
 
 ##########################################################################
 # SWITCH BACK TO DYNAMIC LINKING FOR COMMON SYSTEM LIBRARIES
@@ -1121,6 +1084,20 @@ then
 	fi
 
 	report_detection openssl_static "${openssl_static_avail}" auto "${openssl_path}"
+fi
+
+if check_path openssl
+then
+    echon "checking for pkeyutl/rsautl..."
+    # In openssl3, "openssl rsautl" is deprecated in favor of "openssl pkeyutl"
+    if openssl pkeyutl --help >/dev/null 2>&1
+    then
+	echo "using newer openssl pkeyutl"
+	ccflags_append_define HAS_OPENSSL_PKEYUTL
+    else
+	echo "using older openssl rsautl"
+	ccflags_append_define HAS_OPENSSL_RSAUTL
+    fi	
 fi
 
 
@@ -1536,7 +1513,7 @@ CCTOOLS_PYDOC=$(which pydoc 2> /dev/null || which pydoc2 2> /dev/null || which p
 
 CCTOOLS_FLAKE8_IGNORE_ERRORS=C901,E501,W503
 
-CCTOOLS_SGE_PARAMETERS=$(echo ${sge_parameters} | sed -e 's/\$/\\\$\$/g')
+CCTOOLS_UGE_PARAMETERS=$(echo ${uge_parameters} | sed -e 's/\$/\\\$\$/g')
 
 CCTOOLS_DOCTARGETS=${cctools_doctargets}
 
@@ -1580,10 +1557,6 @@ CCTOOLS_FUSE_AVAILABLE=${fuse_avail}
 CCTOOLS_FUSE_LDFLAGS=${fuse_ldflags}
 CCTOOLS_FUSE_CCFLAGS=${fuse_ccflags}
 
-CCTOOLS_MPI_AVAILABLE=${mpi_avail}
-CCTOOLS_MPI_LDFLAGS=${mpi_ldflags}
-CCTOOLS_MPI_CCFLAGS=${mpi_ccflags}
-
 CCTOOLS_CURL_AVAILABLE=${curl_avail}
 CCTOOLS_CURL_LDFLAGS=${curl_ldflags}
 CCTOOLS_CURL_CCFLAGS=${curl_ccflags}
@@ -1603,7 +1576,6 @@ echo "General libraries"
 printf "%-15s %3s\n" curl ${curl_avail}
 printf "%-15s %3s\n" ext2fs ${ext2fs_avail}
 printf "%-15s %3s\n" fuse ${fuse_avail}
-printf "%-15s %3s\n" "makeflow mpi" ${mpi_avail}
 printf "%-15s %3s\n" openssl ${openssl_avail}
 printf "%-15s %3s\n" openssl_static ${openssl_static_avail}
 printf "%-15s %3s\n" readline ${readline_avail}

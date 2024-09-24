@@ -33,7 +33,7 @@
       "inputs": [CURL],
       # Environment variables here apply only to the current rule.
       "environment": {
-        "URL": "http://ccl.cse.nd.edu/images/capitol.jpg"
+        "URL": "https://ccl.cse.nd.edu/images/capitol.jpg"
       },
       # If a rule is specified with local_job, it executes at the local site
       "local_job": true

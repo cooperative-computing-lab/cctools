@@ -22,4 +22,4 @@ capitol.360.jpg: capitol.jpg
 .MAKEFLOW CATEGORY 2
 .UMBRELLA SPEC umbrella_specs/convert_S_category2.umbrella
 capitol.jpg:
-	curl -o capitol.jpg http://ccl.cse.nd.edu/images/capitol.jpg
+	curl -o capitol.jpg https://ccl.cse.nd.edu/images/capitol.jpg

@@ -11,13 +11,18 @@ prepare()
 run()
 {
 	echo "starting the catalog server"
-	../src/catalog_server -d all -o catalog.log &
+	../src/catalog_server -d all -o catalog.log --port-file catalog.port --port 9097 &
 	pid=$!
 
-	echo "sending udp updates to the server"
+	echo "waiting for catalog server to start"
+	wait_for_file_creation catalog.port 5
+
+	port=`cat catalog.port`
+	
+	echo "sending updates to the server"
 	for i in 1 2 3 4 5
 	do
-		../../dttools/src/catalog_update --catalog localhost:9097 --file update.json -d all
+		../../dttools/src/catalog_update --catalog localhost:$port --file update.json
 		sleep 1
 	done
 
@@ -25,7 +30,7 @@ run()
 	# echo 'type=="cctools-test"' | base64
 
 	echo "fetching the results via http"
-	curl http://localhost:9097/query/dHlwZT09ImNjdG9vbHMtdGVzdCIK > query.out
+	curl http://localhost:$port/query/dHlwZT09ImNjdG9vbHMtdGVzdCIK > query.out
 
 	if ../../dttools/src/jx2json < query.out
 	then
@@ -39,7 +44,7 @@ run()
 	fi
 
 	echo "killing the catalog server"
-	kill -9 $pid
+	kill $pid
 	wait $pid
 	
 	if [ $result != 0 ]
@@ -53,7 +58,7 @@ run()
 
 clean()
 {
-	rm -f cert.pem key.pem catalog.log update.json query.out
+	rm -f cert.pem key.pem catalog.log catalog.port update.json query.out
 	rm -rf catalog.history
 	return 0
 }

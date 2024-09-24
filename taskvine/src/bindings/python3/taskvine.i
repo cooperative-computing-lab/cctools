@@ -9,13 +9,8 @@
 %}
 
 %{
-	#include "cctools.h"
 	#include "int_sizes.h"
-	#include "timestamp.h"
 	#include "taskvine.h"
-    #include "vine_task.h"
-    #include "vine_file.h"
-    #include "vine_runtime_dir.h"
 %}
 
 /* We compile with -D__LARGE64_FILES, thus off_t is at least 64bit.
@@ -23,15 +18,13 @@ long long int is guaranteed to be at least 64bit. */
 %typemap(in) off_t = long long int;
 %typemap(in) size_t = unsigned long long;
 
-/* vdebug() takes va_list as arg but SWIG can't wrap such functions. */
-%ignore vdebug;
-%ignore debug;
-
 /* return a char*, enable automatic free */
 %newobject vine_get_status;
-%newobject vine_get_runtime_path_staging;
-%newobject vine_get_runtime_path_caching;
-%newobject cctools_version_string;
+%newobject vine_get_path_staging;
+%newobject vine_get_path_cache;
+%newobject vine_get_path_log;
+%newobject vine_get_path_library_log;
+%newobject vine_version_string;
 
 /* These return pointers to lists defined in list.h. We aren't
  * wrapping methods in list.h and so ignore these. */
@@ -75,10 +68,4 @@ into a swig function f(data) */
 
 %include "stdint.i"
 %include "int_sizes.h"
-%include "timestamp.h"
 %include "taskvine.h"
-%include "vine_task.h"
-%include "vine_file.h"
-%include "vine_runtime_dir.h"
-%include "cctools.h"
-

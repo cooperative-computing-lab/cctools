@@ -692,30 +692,30 @@ void rmsummary_read_env_vars(struct rmsummary *s)
 	}
 }
 
-#define RM_BIN_OP(dest, src, fn)                                                                                       \
-	{                                                                                                              \
-		if (!src || !dest)                                                                                     \
-			return;                                                                                        \
-		size_t i;                                                                                              \
-		for (i = 0; i < rmsummary_num_resources(); i++) {                                                      \
-			const struct resource_info *info = &resources_info[i];                                         \
-			double dest_value = *((double *)((char *)dest + info->offset));                                \
-			double src_value = *((double *)((char *)src + info->offset));                                  \
-			double result = fn(dest_value, src_value);                                                     \
-			*(double *)((char *)dest + info->offset) = result;                                             \
-		}                                                                                                      \
+#define RM_BIN_OP(dest, src, fn) \
+	{ \
+		if (!src || !dest) \
+			return; \
+		size_t i; \
+		for (i = 0; i < rmsummary_num_resources(); i++) { \
+			const struct resource_info *info = &resources_info[i]; \
+			double dest_value = *((double *)((char *)dest + info->offset)); \
+			double src_value = *((double *)((char *)src + info->offset)); \
+			double result = fn(dest_value, src_value); \
+			*(double *)((char *)dest + info->offset) = result; \
+		} \
 	}
 
 /* Only operate on the fields that TaskVine actually uses;
  * cores, gpu, memory, disk. */
-#define RM_BIN_OP_BASIC(dest, src, fn)                                                                                 \
-	{                                                                                                              \
-		if (!src || !dest)                                                                                     \
-			return;                                                                                        \
-		dest->cores = fn(dest->cores, src->cores);                                                             \
-		dest->gpus = fn(dest->gpus, src->gpus);                                                                \
-		dest->memory = fn(dest->memory, src->memory);                                                          \
-		dest->disk = fn(dest->disk, src->disk);                                                                \
+#define RM_BIN_OP_BASIC(dest, src, fn) \
+	{ \
+		if (!src || !dest) \
+			return; \
+		dest->cores = fn(dest->cores, src->cores); \
+		dest->gpus = fn(dest->gpus, src->gpus); \
+		dest->memory = fn(dest->memory, src->memory); \
+		dest->disk = fn(dest->disk, src->disk); \
 	}
 
 /* Copy the value for all the fields in src > -1 to dest */
@@ -820,8 +820,7 @@ static void merge_limits(struct rmsummary *dest, const struct rmsummary *src)
 			}
 
 			double src_lim = src->limits_exceeded ? rmsummary_get_by_offset(src->limits_exceeded, o) : -1;
-			double dest_lim =
-					dest->limits_exceeded ? rmsummary_get_by_offset(dest->limits_exceeded, o) : -1;
+			double dest_lim = dest->limits_exceeded ? rmsummary_get_by_offset(dest->limits_exceeded, o) : -1;
 
 			rmsummary_set_by_offset(dest->limits_exceeded, o, src_lim < 0 ? -1 : MAX(src_lim, dest_lim));
 		}
@@ -984,14 +983,7 @@ int rmsummary_check_limits(struct rmsummary *measured, struct rmsummary *limits)
 		// if there is a limit, and the resource was measured, and the
 		// measurement is larger than the limit, report the broken limit.
 		if (l > -1 && m > 0 && l < (m - f)) {
-			debug(D_DEBUG,
-					"Resource limit for %s has been exceeded: %.*f > %.*f %s\n",
-					info->name,
-					info->decimals,
-					m,
-					info->decimals,
-					l,
-					info->units);
+			debug(D_DEBUG, "Resource limit for %s has been exceeded: %.*f > %.*f %s\n", info->name, info->decimals, m, info->decimals, l, info->units);
 
 			if (!measured->limits_exceeded) {
 				measured->limits_exceeded = rmsummary_create(-1);
@@ -1036,13 +1028,7 @@ const char *rmsummary_resource_to_str(const char *resource, double value, int in
 		return NULL;
 	}
 
-	string_nformat(output,
-			sizeof(output),
-			"%.*f%s%s",
-			decimals,
-			value,
-			include_units ? " " : "",
-			include_units ? units : "");
+	string_nformat(output, sizeof(output), "%.*f%s%s", decimals, value, include_units ? " " : "", include_units ? units : "");
 
 	return output;
 }

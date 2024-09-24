@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022 The University of Notre Dame
+Copyright (C) 2024 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -7,7 +7,22 @@ See the file COPYING for details.
 #ifndef BATCH_WRAPPER_H
 #define BATCH_WRAPPER_H
 
-#include "batch_task.h"
+#include "batch_job.h"
+
+/** @file batch_wrapper.h Wrapper operators for transforming batch jobs.
+A wrapper object is a tool for performing a consistent transformation
+on a sequence of batch jobs.  This is typically used for things like
+wrapping all commands in a container execution environment.  A wrapper
+can modify a job at several points in its lifetime: @ref batch_wrapper_pre
+gives commands to run before the job, @ref batch_wrapper_post gives commands
+to run after the job, and @ref batch_wrapper_argv defines that command to
+be run in the wrapper.  Finally, @ref batch_wrapper_write applies the wrapper
+to a specific batch job, producing a script with the desired results.
+This module is used primarily by Makeflow to perform consistent transformations.
+
+See: Nick Hazekamp, "An Algebra for Robust Workflow Transformations", eScience 2018.
+https://ccl.cse.nd.edu/research/papers/workflow-transformation-escience-2018.pdf
+*/
 
 /** Create a builder for a batch wrapper.
  * Use batch_wrapper_pre, batch_wrapper_cmd, etc. to add
@@ -77,7 +92,7 @@ void batch_wrapper_prefix(struct batch_wrapper *w, const char *prefix);
  * @returns The name of the generated wrapper, which the caller must free().
  * @returns NULL on failure, and sets errno.
  */
-char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *t);
+char *batch_wrapper_write(struct batch_wrapper *w, struct batch_job *t);
 
 /** Generate one or more wrapper scripts from a JX command spec.
  * All generated scripts will be added as inputs to the given
@@ -85,7 +100,7 @@ char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *t);
  * @returns The name of the outermost wrapper script.
  * @returns NULL on failure, and sets errno.
  */
-char *batch_wrapper_expand(struct batch_task *t, struct jx *spec);
+char *batch_wrapper_expand(struct batch_job *t, struct jx *spec);
 
 #endif
 /* vim: set noexpandtab tabstop=8: */

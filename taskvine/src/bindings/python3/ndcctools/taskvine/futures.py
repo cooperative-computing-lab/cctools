@@ -1,12 +1,20 @@
 
 from . import cvine
 import hashlib
+from collections import deque
 from concurrent.futures import Executor
 from concurrent.futures import Future
+from concurrent.futures import FIRST_COMPLETED
+from concurrent.futures import FIRST_EXCEPTION
+from concurrent.futures import ALL_COMPLETED
+from concurrent.futures._base import PENDING
+from concurrent.futures._base import CANCELLED
+from concurrent.futures._base import FINISHED
+from concurrent.futures import TimeoutError
+from collections import namedtuple
 from .task import (
     PythonTask,
     FunctionCall,
-    PythonTaskNoResult,
     FunctionCallNoResult,
 )
 from .manager import (
@@ -15,7 +23,10 @@ from .manager import (
 )
 
 import os
+import time
 import textwrap
+
+RESULT_PENDING = 'result_pending'
 
 try:
     import cloudpickle
@@ -24,6 +35,111 @@ except Exception:
     # Note that the intended exception here is ModuleNotFoundError.
     # However, that type does not exist in Python 2
     pythontask_available = False
+
+
+# To be installed in the library for FutureFunctionCalls
+def retrieve_output(arg):
+    return arg
+
+
+def wait(fs, timeout=None, return_when=ALL_COMPLETED):
+
+    results = namedtuple('result', ['done', 'not_done'])
+    results.done = set()
+    results.not_done = set()
+
+    # submit tasks if they have not been subitted
+    for f in fs:
+        if not f._is_submitted:
+            f.module_manager.submit(f._task)
+
+    start = time.perf_counter()
+    time_check = float('inf') if timeout is None else timeout
+    result_timeout = min(timeout, 5) if timeout is not None else 5
+
+    done = False
+    while time.perf_counter() - start < time_check and not done:
+        for f in fs:
+            # skip if future is complete
+            if f in results.done:
+                continue
+
+            try:
+                # check for completion
+                f.result(timeout=result_timeout)
+            except TimeoutError:
+                # TimeoutError's are expected since we are polling the
+                # future's status. If a timeout happens, we do nothing.
+                pass
+            except Exception:
+                # Future.result() raises the task's exception but that is
+                # not relevant here---just if the task has finished.
+                results.done.add(f)
+                if return_when in (FIRST_EXCEPTION, FIRST_COMPLETED):
+                    done = True
+                    break
+            else:
+                results.done.add(f)
+                if return_when == FIRST_COMPLETED:
+                    done = True
+                    break
+
+            if len(results.done) == len(fs):
+                done = True
+                break
+
+            # check form timeout
+            if time.perf_counter() - start > time_check:
+                break
+
+    # add incomplete futures to set
+    for f in fs:
+        if f not in results.done:
+            results.not_done.add(f)
+
+    return results
+
+
+def as_completed(fs, timeout=None):
+    fs = deque(fs)
+
+    # submit tasks if they have not been submitted
+    for f in fs:
+        if not f._is_submitted:
+            f.module_manager.submit(f._task)
+
+    start = time.perf_counter()
+    result_timeout = min(timeout, 5) if timeout is not None else 5
+
+    def _iterator():
+        # iterate of queue of futures, yeilding completed futures and
+        # requeuing non-completed futures until all futures are yielded or
+        # the timeout is reached.
+        while fs:
+            f = fs.popleft()
+
+            try:
+                result = f.result(timeout=result_timeout)
+            except TimeoutError:
+                # TimeoutError's are expected since we are polling the
+                # future's status. If a timeout happens, add the future to
+                # the back of the queue.
+                fs.append(f)
+            except Exception:
+                # Future.result() raises the task's exception but that is
+                # not relevant here---just if the task has finished.
+                yield f
+            else:
+                assert result != RESULT_PENDING
+                yield f
+
+            if (
+                fs and timeout is not None
+                and time.perf_counter() - start > timeout
+            ):
+                raise TimeoutError()
+
+    return _iterator()
 
 
 ##
@@ -60,26 +176,30 @@ class FuturesExecutor(Executor):
     def submit(self, fn, *args, **kwargs):
         if isinstance(fn, FuturePythonTask):
             self.manager.submit(fn)
+            fn._future._is_submitted = True
             return fn._future
         if isinstance(fn, FutureFunctionCall):
             self.manager.submit(fn)
             self.task_table.append(fn)
+            fn._future._is_submitted = True
             return fn._future
         future_task = self.future_task(fn, *args, **kwargs)
+        self.task_table.append(future_task)
+        future_task._future._is_submitted = True
         self.submit(future_task)
         return future_task._future
 
     def future_task(self, fn, *args, **kwargs):
-        return FuturePythonTask(self.manager, False, fn, *args, **kwargs)
+        return FuturePythonTask(self.manager, fn, *args, **kwargs)
 
-    def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True, import_modules=None):
-        return self.manager.create_library_from_functions(name, *function_list, poncho_env=poncho_env, init_command=init_command, add_env=add_env, import_modules=import_modules)
+    def create_library_from_functions(self, name, *function_list, poncho_env=None, init_command=None, add_env=True, hoisting_modules=None):
+        return self.manager.create_library_from_functions(name, *function_list, retrieve_output, poncho_env=poncho_env, init_command=init_command, add_env=add_env, hoisting_modules=hoisting_modules)
 
     def install_library(self, libtask):
         self.manager.install_library(libtask)
 
     def future_funcall(self, library_name, fn, *args, **kwargs):
-        return FutureFunctionCall(self.manager, False, library_name, fn, *args, **kwargs)
+        return FutureFunctionCall(self.manager, library_name, fn, *args, **kwargs)
 
     def set(self, name, value):
         if self.factory:
@@ -105,11 +225,18 @@ class FuturesExecutor(Executor):
 # An instance of this class can re resolved to a value that will be computed asynchronously
 class VineFuture(Future):
     def __init__(self, task):
+        super().__init__()
+        self._state = PENDING
         self._task = task
         self._callback_fns = []
+        self._result = None
+        self._exception = None
+        self._is_submitted = False
+        self._ran_functions = False
 
     def cancel(self):
         self._task._module_manager.cancel_by_task_id(self._task.id)
+        self._state = CANCELLED
 
     def cancelled(self):
         state = self._task._module_manager.task_state(self._task.id)
@@ -119,15 +246,15 @@ class VineFuture(Future):
             return False
 
     def running(self):
-        state = self._task._module_manager.task_state(self._task.id)
-        if state == cvine.VINE_TASK_RUNNING:
+        state = self._task.state
+        if state == "RUNNING":
             return True
         else:
             return False
 
     def done(self):
-        state = self._task._module_manager.task_state(self._task.id)
-        if state == cvine.VINE_TASK_DONE:
+        state = self._task.state
+        if state == "DONE" or state == "RETRIEVED":
             return True
         else:
             return False
@@ -135,7 +262,32 @@ class VineFuture(Future):
     def result(self, timeout="wait_forever"):
         if timeout is None:
             timeout = "wait_forever"
-        return self._task.output(timeout=timeout)
+        result = self._task.output(timeout=timeout)
+        if result == RESULT_PENDING:
+            raise TimeoutError()
+
+        if isinstance(result, Exception):
+            self._exception = result
+        else:
+            self._result = result
+
+        self._state = FINISHED
+        if self._callback_fns and not self._ran_functions:
+            self._ran_functions = True
+            for fn in self._callback_fns:
+                fn(self)
+
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    def exception(self, timeout="wait_forever"):
+        try:
+            self.result()
+        except Exception as e:
+            return e
+        else:
+            return None
 
     def add_done_callback(self, fn):
         self._callback_fns.append(fn)
@@ -149,7 +301,7 @@ class VineFuture(Future):
 # This class is a sublcass of FunctionCall that is specialized for future execution
 
 class FutureFunctionCall(FunctionCall):
-    def __init__(self, manager, is_retriever, library_name, fn, *args, **kwargs):
+    def __init__(self, manager, library_name, fn, *args, **kwargs):
         super().__init__(library_name, fn, *args, **kwargs)
         self.enable_temp_output()
         self.manager = manager
@@ -157,58 +309,36 @@ class FutureFunctionCall(FunctionCall):
         self._envs = []
 
         self._future = VineFuture(self)
-        self._is_retriever = is_retriever
         self._has_retrieved = False
-        self._retriever = None
-        self._ran_functions = False
-
-    # Set a retriever for this task, it has to disable temp_output b/c
-    # it aims to bring the remote output back to the manager
-    def set_retriever(self):
-        self._retriever = FutureFunctionCall(self.manager, True, self.library_name, 'retrieve_output', self._future)
-        self._retriever.disable_temp_output()
-        self.manager.submit(self._retriever)
 
     # Given that every designated task stores its outcome in a temp file,
-    # this function is invoked through `VineFuture.result()` to trigger its retriever
+    # we must first fetch the file before retruning the result.
     # to bring that output back to the manager.
     def output(self, timeout="wait_forever"):
 
-        # when output() is called, set a retriever task to bring back the on-worker output
-        if not self._is_retriever and not self._retriever:
-            self.set_retriever()
+        if not self._has_retrieved:
+            result = self.manager.wait_for_task_id(self.id, timeout=timeout)
+            if result:
+                self._has_retrieved = True
+            else:
+                return RESULT_PENDING
 
-        # for retrievee task: wait for retriever to get result
-        if not self._is_retriever:
-            if self._saved_output:
-                return self._saved_output
-            self._saved_output = self._retriever.output(timeout=timeout)
-            if not self._ran_functions:
-                for fn in self._future._callback_fns:
-                    fn(self._future)
-                self._ran_functions = True
-            return self._saved_output
+        if not self._saved_output and self._has_retrieved:
+            if self.successful():
+                try:
+                    self.manager.fetch_file(self._output_file)
+                    output = cloudpickle.loads(self._output_file.contents())
+                    if output['Success']:
+                        self._saved_output = output['Result']
+                    else:
+                        self._saved_output = FunctionCallNoResult(output['Reason'])
 
-        # for retriever task: fetch the result of its retrievee on completion
-        if self._is_retriever:
-            if not self._has_retrieved:
-                result = self._manager.wait_for_task_id(self.id, timeout=timeout)
-                if result:
-                    self._has_retrieved = True
-            if not self._saved_output and self._has_retrieved:
-                if self.successful():
-                    try:
-                        output = cloudpickle.loads(self._output_file.contents())
-                        if output['Success']:
-                            self._saved_output = output['Result']
-                        else:
-                            self._saved_output = output['Reason']
-
-                    except Exception as e:
-                        self._saved_output = e
-                else:
-                    self._saved_output = FunctionCallNoResult()
-            return self._saved_output
+                except Exception as e:
+                    self._saved_output = e
+            else:
+                self._saved_output = FunctionCallNoResult()
+            self._output_loaded = True
+        return self._saved_output
 
     # gather results from preceding tasks to use as inputs for this specific task
     def submit_finalize(self):
@@ -250,57 +380,37 @@ class FuturePythonTask(PythonTask):
     # @param func
     # @param args
     # @param kwargs
-    def __init__(self, manager, rf, func, *args, **kwargs):
+    def __init__(self, manager, func, *args, **kwargs):
         super(FuturePythonTask, self).__init__(func, *args, **kwargs)
         self.enable_temp_output()
         self._module_manager = manager
         self._future = VineFuture(self)
         self._envs = []
         self._has_retrieved = False
-        self._ran_functions = False
-        self._is_retriever = rf
-        self._retriever = None
 
     def output(self, timeout="wait_forever"):
-        def retrieve_output(arg):
-            return arg
-        if not self._is_retriever and not self._retriever:
-            self._retriever = FuturePythonTask(self._module_manager, True, retrieve_output, self._future)
-            self._retriever.set_cores(1)
-            for env in self._envs:
-                self._retriever.add_environment(env)
-            self._retriever.disable_temp_output()
-            self._module_manager.submit(self._retriever)
 
-        if not self._is_retriever:
-            if not self._output_loaded:
-                self._output = self._retriever._future.result(timeout=timeout)
-                self._output_loaded = True
-            if not self._ran_functions:
-                for fn in self._future._callback_fns:
-                    fn(self._future)
-                self._ran_functions = True
-            return self._output
+        # wait for task to complete if it has not been completed
+        if not self._has_retrieved:
+            result = self._module_manager.wait_for_task_id(self.id, timeout=timeout)
+            if result:
+                self._has_retrieved = True
+            else:
+                return RESULT_PENDING
 
-        else:
-            if not self._has_retrieved:
-                result = self._module_manager.wait_for_task_id(self.id, timeout=timeout)
-                if result:
-                    self._has_retrieved = True
-            if not self._output_loaded and self._has_retrieved:
-                if self.successful():
-                    try:
-                        with open(self._output_file.source(), "rb") as f:
-                            if self._serialize_output:
-                                self._output = cloudpickle.load(f)
-                            else:
-                                self._output = f.read()
-                    except Exception as e:
-                        self._output = e
-                else:
-                    self._output = PythonTaskNoResult()
-                self._output_loaded = True
-            return self._output
+        # fetch output file and load output
+        if not self._output_loaded and self._has_retrieved:
+            try:
+                self._module_manager.fetch_file(self._output_file)
+                # _output can be either the return value of a successful
+                # task or the exception object of a failed task.
+                self._output = cloudpickle.loads(self._output_file.contents())
+            except Exception as e:
+                # handle output file fetch/deserialization failures
+                self._output = e
+            self._output_loaded = True
+
+        return self._output
 
     def submit_finalize(self):
         func, args, kwargs = self._fn_def

@@ -2804,7 +2804,7 @@ int main(int argc, char *argv[])
 	signal(SIGQUIT, handle_abort);
 	signal(SIGINT, handle_abort);
 	//Also do cleanup on SIGUSR1 & SIGUSR2 to allow using -notify and -l s_rt= options if submitting 
-	//this worker process with SGE qsub. Otherwise task processes are left running when SGE
+	//this worker process with UGE qsub. Otherwise task processes are left running when UGE
 	//terminates this process with SIGKILL.
 	signal(SIGUSR1, handle_abort);
 	signal(SIGUSR2, handle_abort);

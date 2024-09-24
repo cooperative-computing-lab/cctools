@@ -37,7 +37,7 @@ Updated for S3 bucket handling and directory handling for input and output files
 #include "copy_tree.h"
 #include "s3_file_io.h"
 
-#include "batch_job.h"
+#include "batch_queue.h"
 #include "batch_wrapper.h"
 
 #include "dag.h"
@@ -244,7 +244,7 @@ static int dag_loop( void * instance_struct, struct dag *d){
 	return MAKEFLOW_HOOK_END;
 }
 
-static int makeflow_archive_task_adheres_to_sandbox( struct batch_task *t ){
+static int makeflow_archive_task_adheres_to_sandbox( struct batch_job *t ){
 	int rc = 0;
 	struct batch_file *f;
 	struct list_cursor *cur = list_cursor_create(t->input_files);
@@ -291,7 +291,7 @@ static int makeflow_archive_task_adheres_to_sandbox( struct batch_task *t ){
 
 /* Write the task and run info to the task directory
  *	These files are hardcoded to task_info and run_info */
-static int makeflow_archive_write_task_info(struct archive_instance *a, struct dag_node *n, struct batch_task *t, char *archive_path) {
+static int makeflow_archive_write_task_info(struct archive_instance *a, struct dag_node *n, struct batch_job *t, char *archive_path) {
 	struct batch_file *f;
 
 /* task_info :
@@ -570,7 +570,7 @@ FAIL:
 }
 
 /* Loop over inputs and archive each file */
-static int makeflow_archive_write_input_files(struct archive_instance *a, struct batch_task *t, char *archive_directory_path) {
+static int makeflow_archive_write_input_files(struct archive_instance *a, struct batch_job *t, char *archive_directory_path) {
 	struct batch_file *f;
 
 	struct list_cursor *cur = list_cursor_create(t->input_files);
@@ -591,7 +591,7 @@ static int makeflow_archive_write_input_files(struct archive_instance *a, struct
 }
 
 /* Loop over outputs and archive each file */
-static int makeflow_archive_write_output_files(struct archive_instance *a, struct batch_task *t, char *archive_directory_path) {
+static int makeflow_archive_write_output_files(struct archive_instance *a, struct batch_job *t, char *archive_directory_path) {
 	struct batch_file *f;
 
 	struct list_cursor *cur = list_cursor_create(t->output_files);
@@ -625,7 +625,7 @@ static int makeflow_archive_create_dir(char * prefix, char * name){
 	return 0;
 }
 
-/* Archive a batch_task.
+/* Archive a batch_job.
  * Archiving requires several steps:
  *  1. Create task directory structure
  *  2. Write out task information
@@ -634,9 +634,9 @@ static int makeflow_archive_create_dir(char * prefix, char * name){
  *
 @return 1 if archive was successful, 0 if archive failed.
  */
-static int makeflow_archive_task(struct archive_instance *a, struct dag_node *n, struct batch_task *t) {
+static int makeflow_archive_task(struct archive_instance *a, struct dag_node *n, struct batch_job *t) {
 	// Generates a hash id for the task
-	char *id = batch_task_generate_id(t);
+	char *id = batch_job_generate_id(t);
 	int result = 1;
 
 	/* The archive name is binned by the first 2 characters of the id for compactness */
@@ -684,9 +684,9 @@ FAIL:
 /* Remove partial or corrupted archive.
 @return 1 if archive was successful, 0 if archive failed.
  */
-static int makeflow_archive_remove_task(struct archive_instance *a, struct dag_node *n, struct batch_task *t) {
+static int makeflow_archive_remove_task(struct archive_instance *a, struct dag_node *n, struct batch_job *t) {
 	/* Generate the task id */
-	char *id = batch_task_generate_id(t);
+	char *id = batch_job_generate_id(t);
 
 	/* The archive name is binned by the first 2 characters of the id for compactness */
 	char *archive_directory_path = string_format("%s/tasks/%.2s/%s", a->dir, id, id);
@@ -705,7 +705,7 @@ static int makeflow_archive_remove_task(struct archive_instance *a, struct dag_n
 	return 1;
 }
 
-int makeflow_archive_copy_preserved_files(struct archive_instance *a, struct batch_task *t, char *task_path ) {
+int makeflow_archive_copy_preserved_files(struct archive_instance *a, struct batch_job *t, char *task_path ) {
 	struct batch_file *f;
 	struct stat buf;
 	struct list_cursor *cur = list_cursor_create(t->output_files);
@@ -740,10 +740,10 @@ int makeflow_archive_copy_preserved_files(struct archive_instance *a, struct bat
 		free(directory_name);
 		// Copy output file or directory over to specified location
 		if(path_is_dir(output_file_path) != 1){
-			int success = copy_file_to_file(output_file_path, file_name);
+			int64_t success = copy_file_to_file(output_file_path, file_name);
 			free(output_file_path);
 			free(file_name);
-			if (!success) {
+			if (success < 0) {
 				list_cursor_destroy(cur);
 				debug(D_ERROR|D_MAKEFLOW_HOOK,"Failed to copy output file %s to %s\n", output_file_path, file_name);
 				return 1;
@@ -768,7 +768,7 @@ int makeflow_archive_copy_preserved_files(struct archive_instance *a, struct bat
 	return 0;
 }
 
-int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_task *t, char *task_path) {
+int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_job *t, char *task_path) {
 	struct batch_file *f;
 	struct stat buf;
 	// If the task does NOT adhere to the sandbox or there is a failure with getting the stat
@@ -802,7 +802,7 @@ int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_task 
 	return 1;
 }
 
-static int makeflow_s3_archive_copy_task_files(struct archive_instance *a, char *id, char *task_path, struct batch_task *t){
+static int makeflow_s3_archive_copy_task_files(struct archive_instance *a, char *id, char *task_path, struct batch_job *t){
 	char *taskTarFile = string_format("%s/%s",task_path,id);
 	// Check to see if the task is already in the local archive so it is not downloaded twice
 	if(access(taskTarFile,R_OK) != 0){
@@ -907,11 +907,11 @@ static int makeflow_s3_archive_copy_task_files(struct archive_instance *a, char 
 	return 1;
 }
 
-static int batch_submit( void * instance_struct, struct batch_task *t){
+static int batch_submit( void * instance_struct, struct batch_job *t){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 	int rc = MAKEFLOW_HOOK_SUCCESS;
 	// Generates a hash id for the task
-	char *id = batch_task_generate_id(t);
+	char *id = batch_job_generate_id(t);
 	char *task_path = string_format("%s/tasks/%.2s/%s",a->dir, id, id);
 	create_dir(task_path,0777);
 	debug(D_MAKEFLOW_HOOK, "Checking archive for task %d at %.5s\n", t->taskid, id);
@@ -941,11 +941,11 @@ static int batch_submit( void * instance_struct, struct batch_task *t){
 	return rc;
 }
 
-static int batch_retrieve( void * instance_struct, struct batch_task *t){
+static int batch_retrieve( void * instance_struct, struct batch_job *t){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 	int rc = MAKEFLOW_HOOK_SUCCESS;
 	// Generates a hash id for the task
-	char *id = batch_task_generate_id(t);
+	char *id = batch_job_generate_id(t);
 	char *task_path = string_format("%s/tasks/%.2s/%s",a->dir, id, id);
 
 	// If a is in read mode and the archive is preserved (all the output files exist)
@@ -1004,7 +1004,7 @@ static int makeflow_archive_s3_task(struct archive_instance *a, char *taskID, ch
 
 	return 1;
 }
-static int node_success( void * instance_struct, struct dag_node *n, struct batch_task *t){
+static int node_success( void * instance_struct, struct dag_node *n, struct batch_job *t){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 	/* store node into archiving directory  */
 	// If a is in write mode
@@ -1017,7 +1017,7 @@ static int node_success( void * instance_struct, struct dag_node *n, struct batc
 		}
 
 		// Generates a hash id for the task
-		char *id = batch_task_generate_id(t);
+		char *id = batch_job_generate_id(t);
 		char *task_path = string_format("%s/tasks/%.2s/%s",a->dir, id, id);
 		// If the archive is preserved (all the output files exist)
 		if(makeflow_archive_is_preserved(a, t, task_path)){

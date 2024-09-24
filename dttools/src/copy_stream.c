@@ -80,7 +80,6 @@ int64_t copy_file_to_file(const char *input, const char *output)
 	int in = open(input, O_RDONLY);
 	if (in == -1)
 		return -1;
-
 	struct stat info;
 	if (fstat(in, &info) == -1) {
 		close(in);

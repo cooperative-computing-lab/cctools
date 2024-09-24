@@ -718,7 +718,7 @@ report_detection()
 		echo "compiling with ${package} support"
 	elif [ "${required}" = no ]
 	then
-		echo "${package} support explicitely disabled"
+		echo "${package} support explicitly disabled"
 	elif [ "${required}" = yes ]
 	then
 		echo "*** Sorry, I couldn't find ${package} in ${path_tried}"

@@ -19,6 +19,7 @@ See the file COPYING for details.
 #include <netinet/tcp.h>
 #include <poll.h>
 #include <sys/file.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -574,9 +575,7 @@ int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert)
 		}
 
 		if (!link_nonblocking(link, 1)) {
-			debug(D_SSL,
-					"Could not switch link back to non-blocking after SSL handshake: %s",
-					strerror(errno));
+			debug(D_SSL, "Could not switch link back to non-blocking after SSL handshake: %s", strerror(errno));
 			return 0;
 		}
 
@@ -727,8 +726,9 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 		// On BSD-derived systems, failure to connect is indicated by errno = EINVAL.
 		// Set it to something more explanatory.
-		if (result < 0 && errno == EINVAL)
+		if (result < 0 && errno == EINVAL) {
 			errno = ECONNREFUSED;
+		}
 
 		// Otherwise, a non-temporary errno should cause us to bail out.
 		if (result < 0 && !errno_is_temporary(errno))
@@ -1173,13 +1173,7 @@ int link_address_local(struct link *link, char *addr, int *port)
 	if (result != 0)
 		return 0;
 
-	result = getnameinfo((struct sockaddr *)&iaddr,
-			length,
-			addr,
-			addr_length,
-			port_string,
-			port_string_length,
-			NI_NUMERICHOST | NI_NUMERICSERV);
+	result = getnameinfo((struct sockaddr *)&iaddr, length, addr, addr_length, port_string, port_string_length, NI_NUMERICHOST | NI_NUMERICSERV);
 	if (result == 0) {
 		*port = atoi(port_string);
 		return 1;
@@ -1208,13 +1202,7 @@ int link_address_remote(struct link *link, char *addr, int *port)
 	if (result != 0)
 		return 0;
 
-	result = getnameinfo((struct sockaddr *)&iaddr,
-			length,
-			addr,
-			addr_length,
-			port_string,
-			port_string_length,
-			NI_NUMERICHOST | NI_NUMERICSERV);
+	result = getnameinfo((struct sockaddr *)&iaddr, length, addr, addr_length, port_string, port_string_length, NI_NUMERICHOST | NI_NUMERICSERV);
 	if (result == 0) {
 		*port = atoi(port_string);
 		return 1;
@@ -1447,6 +1435,13 @@ int link_poll(struct link_info *links, int nlinks, int msec)
 	free(fds);
 
 	return result;
+}
+
+int link_get_buffer_bytes(struct link *link)
+{
+	int bytes;
+	ioctl(link->fd, TIOCOUTQ, &bytes);
+	return bytes;
 }
 
 /* vim: set noexpandtab tabstop=8: */

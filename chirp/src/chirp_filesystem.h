@@ -8,7 +8,6 @@ See the file COPYING for details.
 #define CHIRP_FILESYSTEM_H
 
 #include "chirp_job.h"
-#include "chirp_sqlite.h"
 #include "chirp_types.h"
 
 #include "buffer.h"
@@ -83,9 +82,6 @@ struct chirp_filesystem {
 	INT64_T (*lremovexattr)  ( const char *path, const char *name );
 
 	int (*do_acl_check) ();
-
-	int (*job_dbinit) (sqlite3 *db);
-	int (*job_schedule) (sqlite3 *db);
 };
 
 /* Lookup of a backend FS associated with a URL */
@@ -136,10 +132,6 @@ INT64_T cfs_stub_lsetxattr (const char *path, const char *name, const void *data
 INT64_T cfs_stub_removexattr (const char *path, const char *name);
 INT64_T cfs_stub_fremovexattr (int fd, const char *name);
 INT64_T cfs_stub_lremovexattr (const char *path, const char *name);
-
-int     cfs_stub_job_dbinit (sqlite3 *db);
-int     cfs_stub_job_schedule (sqlite3 *db);
-
 
 extern struct chirp_filesystem *cfs;
 extern char   chirp_url[CHIRP_PATH_MAX];
