@@ -62,7 +62,7 @@ them to run on the controlling machine.
 ```make
 CURL=/usr/bin/curl
 CONVERT=/usr/bin/convert
-URL="http://ccl.cse.nd.edu/images/capitol.jpg"
+URL="https://ccl.cse.nd.edu/images/capitol.jpg"
 
 capitol.anim.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
     LOCAL $(CONVERT) -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.anim.gif
