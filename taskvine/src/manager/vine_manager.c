@@ -40,6 +40,7 @@ See the file COPYING for details.
 #include "domain_name_cache.h"
 #include "envtools.h"
 #include "hash_table.h"
+#include "priority_queue.h"
 #include "int_sizes.h"
 #include "interfaces_address.h"
 #include "itable.h"
@@ -69,6 +70,7 @@ See the file COPYING for details.
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <float.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -132,7 +134,6 @@ static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w
 
 static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state);
 
-static int task_state_count(struct vine_manager *q, const char *category, vine_task_state_t state);
 static int task_request_count(struct vine_manager *q, const char *category, category_allocation_t request);
 
 static vine_msg_code_t handle_http_request(struct vine_manager *q, struct vine_worker_info *w, const char *path, time_t stoptime);
@@ -791,6 +792,7 @@ static void update_write_catalog(struct vine_manager *q)
 		return;
 
 	// Generate the manager status in an jx, and print it to a buffer.
+
 	struct jx *j = manager_to_jx(q);
 	char *str = jx_print_string(j);
 
@@ -825,6 +827,7 @@ static void update_catalog(struct vine_manager *q, int force_update)
 
 	// Update the catalog.
 	update_write_catalog(q);
+
 	update_read_catalog(q);
 
 	q->catalog_last_update_time = time(0);
@@ -1340,17 +1343,21 @@ exceeded the maximum number of retries, or other policy issues.
 static int expire_waiting_tasks(struct vine_manager *q)
 {
 	struct vine_task *t;
+	int t_idx;
 	int expired = 0;
 
 	int tasks_considered = 0;
 	double current_time = timestamp_get() / ONE_SECOND;
-	while ((t = list_rotate(q->ready_list))) {
+
+	PRIORITY_QUEUE_STATIC_ITERATE(q->ready_tasks, t_idx, t)
+	{
 		if (tasks_considered > q->attempt_schedule_depth) {
 			return expired;
 		}
+
 		if (t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
 			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
-			list_remove(q->ready_list, t);
+			priority_queue_remove(q->ready_tasks, t_idx);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			expired++;
 		}
@@ -1367,21 +1374,17 @@ Terminate those to which no such worker exists.
 */
 static int enforce_waiting_fixed_locations(struct vine_manager *q)
 {
+	int t_idx;
 	struct vine_task *t;
 	int terminated = 0;
-	int count;
 
-	count = task_state_count(q, NULL, VINE_TASK_READY);
-	while (count > 0) {
-		count--;
-
-		t = list_pop_head(q->ready_list);
+	PRIORITY_QUEUE_BASE_ITERATE(q->ready_tasks, t_idx, t)
+	{
 		if (t->has_fixed_locations && !vine_schedule_check_fixed_location(q, t)) {
 			vine_task_set_result(t, VINE_RESULT_FIXED_LOCATION_MISSING);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
+			priority_queue_remove(q->ready_tasks, t_idx);
 			terminated++;
-		} else {
-			list_push_tail(q->ready_list, t);
 		}
 	}
 
@@ -1733,13 +1736,13 @@ of the manager's resource consumption for status reporting.
 
 static struct rmsummary *total_resources_needed(struct vine_manager *q)
 {
-
+	int t_idx;
 	struct vine_task *t;
 
 	struct rmsummary *total = rmsummary_create(0);
 
 	/* for waiting tasks, we use what they would request if dispatched right now. */
-	LIST_ITERATE(q->ready_list, t)
+	PRIORITY_QUEUE_BASE_ITERATE(q->ready_tasks, t_idx, t)
 	{
 		const struct rmsummary *s = vine_manager_task_resources_min(q, t);
 		rmsummary_add(total, s);
@@ -2104,11 +2107,11 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 
 	// add total resources used/needed by the manager
 	struct rmsummary *total = total_resources_needed(q);
+
 	jx_insert_integer(j, "tasks_total_cores", total->cores);
 	jx_insert_integer(j, "tasks_total_memory", total->memory);
 	jx_insert_integer(j, "tasks_total_disk", total->disk);
 	jx_insert_integer(j, "tasks_total_gpus", total->gpus);
-
 	rmsummary_delete(total);
 
 	return j;
@@ -3205,6 +3208,58 @@ static int vine_manager_check_library_for_function_call(struct vine_manager *q, 
 }
 
 /*
+Consider if a task is eligible to run, and if so, find the best worker for it.
+*/
+static struct vine_worker_info *consider_task(struct vine_manager *q, struct vine_task *t)
+{
+	timestamp_t now_usecs = timestamp_get();
+	double now_secs = ((double)now_usecs) / ONE_SECOND;
+
+	// Skip task if min requested start time not met.
+	if (t->resources_requested->start > now_secs) {
+		return NULL;
+	}
+
+	// Skip if this task failed recently
+	if (t->time_when_last_failure + q->transient_error_interval > now_usecs) {
+		return NULL;
+	}
+
+	// Skip if category already running maximum allowed tasks
+	struct category *c = vine_category_lookup_or_create(q, t->category);
+	if (c->max_concurrent > -1 && c->max_concurrent <= c->vine_stats->tasks_running) {
+		return NULL;
+	}
+
+	// Skip task if temp input files have not been materialized.
+	if (!vine_manager_check_inputs_available(q, t)) {
+		return NULL;
+	}
+
+	// Skip function call task if no suitable library template was installed
+	if (!vine_manager_check_library_for_function_call(q, t)) {
+		return NULL;
+	}
+
+	// Find the best worker for the task
+	q->stats_measure->time_scheduling = timestamp_get();
+	struct vine_worker_info *w = vine_schedule_task_to_worker(q, t);
+	if (!w) {
+		return NULL;
+	}
+	q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
+
+	// Check if there is transfer capacity available.
+	if (q->peer_transfers_enabled) {
+		if (!vine_manager_transfer_capacity_available(q, w, t))
+			return NULL;
+	}
+
+	// All checks passed
+	return w;
+}
+
+/*
 Advance the state of the system by selecting one task available
 to run, finding the best worker for that task, and then committing
 the task to the worker.
@@ -3212,72 +3267,46 @@ the task to the worker.
 
 static int send_one_task(struct vine_manager *q)
 {
+	int t_idx;
 	struct vine_task *t;
 	struct vine_worker_info *w = NULL;
 
 	int tasks_considered = 0;
+	int tasks_to_consider = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
 
-	timestamp_t now_usecs = timestamp_get();
-	double now_secs = ((double)now_usecs) / ONE_SECOND;
-
-	int tasks_to_consider = MIN(list_size(q->ready_list), q->attempt_schedule_depth);
-
-	while ((t = list_rotate(q->ready_list))) {
-		if (tasks_considered++ > tasks_to_consider) {
-			return 0;
-		}
-
-		// Skip task if min requested start time not met.
-		if (t->resources_requested->start > now_secs) {
-			continue;
-		}
-
-		// Skip if this task failed recently
-		if (t->time_when_last_failure + q->transient_error_interval > now_usecs) {
-			continue;
-		}
-
-		// Skip if category already running maximum allowed tasks
-		struct category *c = vine_category_lookup_or_create(q, t->category);
-		if (c->max_concurrent > -1 && c->max_concurrent < c->vine_stats->tasks_running) {
-			continue;
-		}
-
-		// Skip task if temp input files have not been materialized.
-		if (!vine_manager_check_inputs_available(q, t)) {
-			continue;
-		}
-
-		// Skip function call task if no suitable library template was installed
-		if (!vine_manager_check_library_for_function_call(q, t)) {
-			continue;
-		}
-
-		q->stats_measure->time_scheduling = timestamp_get();
-
-		// Find the best worker for the task at the head of the list
-		w = vine_schedule_task_to_worker(q, t);
-
-		if (!w) {
-			continue;
-		}
-
-		q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
-
-		// Check if there is transfer capacity available.
-		if (q->peer_transfers_enabled) {
-			if (!vine_manager_transfer_capacity_available(q, w, t))
-				continue;
-		}
-
-		// Otherwise, remove it from the ready list and start it:
-		list_pop_tail(q->ready_list);
-		commit_task_to_worker(q, w, t);
-		return 1;
+	// First consider the task of the highest priority
+	t_idx = 1;
+	t = priority_queue_get_element(q->ready_tasks, t_idx);
+	if (!t) {
+		return 0;
 	}
 
-	// if we made it here we reached the end of the list
-	return 0;
+	// First check if the task of the highest priority is eligible to run
+	w = consider_task(q, t);
+	tasks_considered++;
+	if (!w) {
+		// If not, perform the rotation search to find the next eligible task
+		PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t)
+		{
+			w = consider_task(q, t);
+			if (w) {
+				break;
+			}
+			if (++tasks_considered >= tasks_to_consider) {
+				return 0;
+			}
+		}
+	}
+
+	if (w) {
+		// Find a task and its suitable worker
+		priority_queue_remove(q->ready_tasks, t_idx);
+		commit_task_to_worker(q, w, t);
+		return 1;
+	} else {
+		// No task is eligible to run
+		return 0;
+	}
 }
 
 /*
@@ -3597,6 +3626,7 @@ data structure.
 
 static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state)
 {
+	int t_idx;
 	struct vine_worker_info *w = t->worker;
 
 	switch (t->state) {
@@ -3605,12 +3635,12 @@ static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vin
 		break;
 
 	case VINE_TASK_READY:
-		list_remove(q->ready_list, t);
+		t_idx = priority_queue_find_idx(q->ready_tasks, t);
+		priority_queue_remove(q->ready_tasks, t_idx);
 		change_task_state(q, t, new_state);
 		break;
 
 	case VINE_TASK_RUNNING:
-
 		// t->worker must be set if in RUNNING state.
 		assert(w);
 
@@ -3748,7 +3778,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->next_task_id = 1;
 	q->fixed_location_in_queue = 0;
 
-	q->ready_list = list_create();
+	q->ready_tasks = priority_queue_create(0);
 	q->running_table = itable_create(0);
 	q->waiting_retrieval_list = list_create();
 	q->retrieved_list = list_create();
@@ -4105,7 +4135,7 @@ void vine_delete(struct vine_manager *q)
 	}
 	hash_table_delete(q->categories);
 
-	list_delete(q->ready_list);
+	priority_queue_delete(q->ready_tasks);
 	itable_delete(q->running_table);
 	list_delete(q->waiting_retrieval_list);
 	list_delete(q->retrieved_list);
@@ -4250,36 +4280,18 @@ char *vine_monitor_wrap(struct vine_manager *q, struct vine_worker_info *w, stru
 	return wrap_cmd;
 }
 
-static double vine_task_priority(void *item)
-{
-	assert(item);
-	struct vine_task *t = item;
-	return t->priority;
-}
-
 /* Put a given task on the ready list, taking into account the task priority and the manager schedule. */
 
-static void push_task_to_ready_list(struct vine_manager *q, struct vine_task *t)
+static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t)
 {
-	int by_priority = 1;
-
 	if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
 		/* when a task is resubmitted given resource exhaustion, we
 		 * push it at the head of the list, so it gets to run as soon
 		 * as possible. This avoids the issue in which all 'big' tasks
 		 * fail because the first allocation is too small. */
-		by_priority = 0;
-	}
-
-	if (by_priority) {
-		/*If a task has a priority of 0 it gets added to the end of the ready list.*/
-		if (vine_task_priority(t) != 0) {
-			list_push_priority(q->ready_list, vine_task_priority, t);
-		} else {
-			list_push_tail(q->ready_list, t);
-		}
+		priority_queue_push_upward(q->ready_tasks, t, t->priority);
 	} else {
-		list_push_head(q->ready_list, t);
+		priority_queue_push(q->ready_tasks, t, t->priority);
 	}
 
 	/* If the task has been used before, clear out accumulated state. */
@@ -4334,7 +4346,7 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 		break;
 	case VINE_TASK_READY:
 		vine_task_set_result(t, VINE_RESULT_UNKNOWN);
-		push_task_to_ready_list(q, t);
+		push_task_to_ready_tasks(q, t);
 		c->vine_stats->tasks_waiting++;
 		break;
 	case VINE_TASK_RUNNING:
@@ -4425,23 +4437,6 @@ const char *vine_result_string(vine_result_t result)
 	}
 
 	return str;
-}
-
-static int task_state_count(struct vine_manager *q, const char *category, vine_task_state_t state)
-{
-	struct vine_task *t;
-	uint64_t task_id;
-	int count = 0;
-	ITABLE_ITERATE(q->tasks, task_id, t)
-	{
-		if (t->state == state) {
-			if (!category || strcmp(category, t->category) == 0) {
-				count++;
-			}
-		}
-	}
-
-	return count;
 }
 
 static int task_request_count(struct vine_manager *q, const char *category, category_allocation_t request)
@@ -4892,6 +4887,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 	// time left?
 	while ((stoptime == 0) || (time(0) < stoptime)) {
+
 		BEGIN_ACCUM_TIME(q, time_internal);
 		// update catalog if appropriate
 		if (q->name) {
@@ -4912,7 +4908,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				END_ACCUM_TIME(q, time_internal);
 			}
 
-			if (t && (!q->prefer_dispatch || list_size(q->ready_list) == 0 || !sent_in_previous_cycle)) {
+			if (t && (!q->prefer_dispatch || priority_queue_size(q->ready_tasks) == 0 || !sent_in_previous_cycle)) {
 				break;
 			}
 		}
@@ -4966,7 +4962,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				// task to be received
 				break;
 			}
-		} while (q->max_retrievals < 0 || retrieved_this_cycle < q->max_retrievals || !list_size(q->ready_list));
+		} while (q->max_retrievals < 0 || retrieved_this_cycle < q->max_retrievals || !priority_queue_size(q->ready_tasks));
 		END_ACCUM_TIME(q, time_receive);
 
 		// expired tasks
@@ -4980,6 +4976,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 		// only check for fixed location if any are present (high overhead)
 		if (q->fixed_location_in_queue) {
+
 			BEGIN_ACCUM_TIME(q, time_internal);
 			result = enforce_waiting_fixed_locations(q);
 			END_ACCUM_TIME(q, time_internal);
@@ -4989,8 +4986,12 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 		}
 
-		if (retrieved_this_cycle && !q->prefer_dispatch) {
-			continue;
+		if (retrieved_this_cycle) {
+			// reset the rotate cursor on task retrieval
+			priority_queue_rotate_reset(q->ready_tasks);
+			if (!q->prefer_dispatch) {
+				continue;
+			}
 		}
 
 		sent_in_previous_cycle = 0;
@@ -5029,6 +5030,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		END_ACCUM_TIME(q, time_status_msgs);
 		if (result) {
 			// accepted at least one worker
+			// reset the rotate cursor on worker connection
+			priority_queue_rotate_reset(q->ready_tasks);
 			events++;
 			continue;
 		}
@@ -5044,7 +5047,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		}
 
 		if (q->process_pending_check) {
-
 			BEGIN_ACCUM_TIME(q, time_internal);
 			int pending = process_pending();
 			END_ACCUM_TIME(q, time_internal);
@@ -5059,7 +5061,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// in this wait.
 		if (events > 0) {
 			BEGIN_ACCUM_TIME(q, time_internal);
-			int done = !list_size(q->ready_list) && !list_size(q->waiting_retrieval_list) && !itable_size(q->running_table);
+			int done = !priority_queue_size(q->ready_tasks) && !list_size(q->waiting_retrieval_list) && !itable_size(q->running_table);
 			END_ACCUM_TIME(q, time_internal);
 
 			if (done) {
@@ -5145,20 +5147,15 @@ int vine_hungry(struct vine_manager *q)
 	int64_t ready_task_disk = 0;
 	int64_t ready_task_gpus = 0;
 
+	int t_idx;
 	struct vine_task *t;
 
-	int count = task_state_count(q, NULL, VINE_TASK_READY);
-
-	while (count > 0) {
-		count--;
-		t = list_pop_head(q->ready_list);
-
+	PRIORITY_QUEUE_BASE_ITERATE(q->ready_tasks, t_idx, t)
+	{
 		ready_task_cores += MAX(1, t->resources_requested->cores);
 		ready_task_memory += t->resources_requested->memory;
 		ready_task_disk += t->resources_requested->disk;
 		ready_task_gpus += t->resources_requested->gpus;
-
-		list_push_tail(q->ready_list, t);
 	}
 
 	// check possible limiting factors
@@ -5494,7 +5491,7 @@ void vine_get_stats(struct vine_manager *q, struct vine_stats *s)
 	// s->workers_able computed below.
 
 	// info about tasks
-	s->tasks_waiting = list_size(q->ready_list);
+	s->tasks_waiting = priority_queue_size(q->ready_tasks);
 	s->tasks_with_results = list_size(q->waiting_retrieval_list);
 	s->tasks_running = itable_size(q->running_table);
 	s->tasks_on_workers = s->tasks_with_results + s->tasks_running;
