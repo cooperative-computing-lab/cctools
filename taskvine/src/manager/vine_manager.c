@@ -5197,7 +5197,7 @@ int vine_workers_shutdown(struct vine_manager *q, int n)
 	{
 		if (i >= n)
 			break;
-		if (itable_size(w->current_tasks) == 0) {
+		if (itable_size(w->current_tasks) != 0) {
 			vine_manager_shut_down_worker(q, w);
 
 			/* vine_manager_shut_down_worker alters the table, so we reset it here. */
