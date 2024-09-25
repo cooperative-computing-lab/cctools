@@ -143,7 +143,6 @@ struct vine_manager {
 
 	struct vine_stats *stats;
 	struct vine_stats *stats_measure;
-	struct vine_stats *stats_disconnected_workers;
 
 	/* Time of most recent events for computing various timeouts */
 

@@ -3802,7 +3802,6 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->max_task_resources_requested = rmsummary_create(-1);
 
 	q->stats = calloc(1, sizeof(struct vine_stats));
-	q->stats_disconnected_workers = calloc(1, sizeof(struct vine_stats));
 	q->stats_measure = calloc(1, sizeof(struct vine_stats));
 
 	q->workers_with_watched_file_updates = hash_table_create(0, 0);
@@ -4188,7 +4187,6 @@ void vine_delete(struct vine_manager *q)
 
 	free(q->runtime_directory);
 	free(q->stats);
-	free(q->stats_disconnected_workers);
 	free(q->stats_measure);
 
 	vine_counters_debug();

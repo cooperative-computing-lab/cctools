@@ -246,15 +246,15 @@ class VineFuture(Future):
             return False
 
     def running(self):
-        state = self._task._module_manager.task_state(self._task.id)
-        if state == cvine.VINE_TASK_RUNNING:
+        state = self._task.state
+        if state == "RUNNING":
             return True
         else:
             return False
 
     def done(self):
-        state = self._task._module_manager.task_state(self._task.id)
-        if state == cvine.VINE_TASK_DONE:
+        state = self._task.state
+        if state == "DONE" or state == "RETRIEVED":
             return True
         else:
             return False

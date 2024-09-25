@@ -734,7 +734,7 @@ that are specific to one task, and one task only.
 should be retained as long as the workflow runs, and then deleted at the end.
 - A cache value of **worker** indicates that the file should be retained
 by the worker until the worker's end-of-life.
-- A cache value of **always** indicates that the file should be retained
+- A cache value of **forever** indicates that the file should be retained
 by the worker, even across workflows.  This is appropriate for widely used
 software packages and reference datasets. This level of cache leaves files on
 the execution sites even when workers terminate, thus use with care.
@@ -1648,7 +1648,7 @@ a Future object. The result of the task can retrieved by calling `future.result(
     a = m.submit(my_sum, 3, 4)
     b = m.submit(my_sum, 5, 2)
     c = m.submit(my_sum, a, b)  # note that the futures a and b are
-                                # a passed as any other argument.
+                                # passed as any other argument.
 
     print(c.result())
     ```
@@ -1674,6 +1674,26 @@ can be tailored as any other task:
 
     print(f.result())
     ```
+
+Additionally, the executor the Vine Factory to submit TaskVine workers.
+Specifications for the workers can be provided via the `opts` keyword argument when creating to executor.
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+
+    def my_sum(x, y):
+        return x + y
+
+    opts = {"memory": 8000, "disk":8000, "cores":8, "min-workers": 5}
+    m = vine.FuturesExecutor(manager_name='my_manager', batch_type="condor", opts=opts)
+
+    t = m.future_task(my_sum, 3, 4)
+    t.set_cores(1)
+
+    f = m.submit(t)
+
+    print(f.result())
 
 Instead of tasks, the futures may also executed using [function calls](#serverless-computing) with the `future_funcall` method:
 
