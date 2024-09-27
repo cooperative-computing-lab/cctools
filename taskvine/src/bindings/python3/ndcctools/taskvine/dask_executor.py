@@ -145,7 +145,7 @@ class DaskVine(Manager):
 
             self.extra_files = extra_files
             # if one of both is False, then worker_transfers is False, otherwise True
-            if not self.worker_transfers or not worker_transfers:
+            if not self.worker_transfers or not lazy_transfers:
                 self.worker_transfers = False
             else:
                 self.worker_transfers = True
