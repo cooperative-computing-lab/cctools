@@ -2575,7 +2575,6 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		available_disk -= t->input_files_size;
 	}
 
-
 	rmsummary_merge_override_basic(limits, max);
 
 	int use_whole_worker = 1;
