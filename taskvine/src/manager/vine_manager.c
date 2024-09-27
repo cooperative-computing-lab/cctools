@@ -3893,7 +3893,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	// peer transfers enabled by default
 	q->peer_transfers_enabled = 1;
 
-	q->load_from_shared_fs_enabled = 0;
+	q->shared_filesystem_cache_mode = 0;
+	q->shared_filesystem_link_mode = 0;
 
 	q->file_source_max_transfers = VINE_FILE_SOURCE_MAX_TRANSFERS;
 	q->worker_source_max_transfers = VINE_WORKER_SOURCE_MAX_TRANSFERS;
@@ -5558,8 +5559,11 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "worker-source-max-transfers")) {
 		q->worker_source_max_transfers = MAX(1, (int)value);
 
-	} else if (!strcmp(name, "load-from-shared-filesystem")) {
-		q->load_from_shared_fs_enabled = !!((int)value);
+	} else if (!strcmp(name, "shared-filesystem-cache-mode")) {
+		q->shared_filesystem_cache_mode = !!((int)value);
+
+	} else if (!strcmp(name, "shared-filesystem-link-mode")) {
+		q->shared_filesystem_link_mode = !!((int)value);
 
 	} else if (!strcmp(name, "perf-log-interval")) {
 		q->perf_log_interval = MAX(1, (int)value);
@@ -6156,11 +6160,13 @@ struct vine_file *vine_declare_file(struct vine_manager *m, const char *source, 
 {
 	struct vine_file *f;
 
-	if (m->load_from_shared_fs_enabled) {
+	if(m->shared_filesystem_link_mode) {
+		/* XXX need to get absolute path here. */
+		f = vine_file_sharedfs(source,flags);
+	} else if (m->shared_filesystem_cache_mode) {
 		char *file_url = vine_file_make_file_url(source);
 		f = vine_file_url(file_url, cache, flags);
 		free(file_url);
-
 	} else {
 		f = vine_file_local(source, cache, flags);
 	}
@@ -6231,6 +6237,7 @@ const char *vine_fetch_file(struct vine_manager *m, struct vine_file *f)
 
 	switch (f->type) {
 	case VINE_FILE:
+	case VINE_SHAREDFS:
 		/* If it is on the local filesystem, load it. */
 		{
 			size_t length;

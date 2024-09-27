@@ -176,6 +176,10 @@ struct vine_manager {
 	int file_source_max_transfers;
 	int worker_source_max_transfers;
 
+	/* Shared Filesystem Configuration */
+	int shared_filesystem_cache_mode; /* Worker loads input files from shared filesystem into cache. */
+	int shared_filesystem_link_mode;  /* Worker links directly to files in shared filesystem. */
+
 	/* Various performance knobs that can be tuned. */
 	int short_timeout;            /* Timeout in seconds to send/recv a brief message from worker */
 	int long_timeout;             /* Timeout if in the middle of an incomplete message. */
@@ -193,7 +197,6 @@ struct vine_manager {
                                      than 1, prefer to receive all completed tasks before submitting new tasks. */
 	int worker_retrievals;        /* retrieve all completed tasks from a worker as opposed to recieving one of any completed task*/
 	int prefer_dispatch;          /* try to dispatch tasks even if there are retrieved tasks ready to return  */
-	int load_from_shared_fs_enabled;/* Allow worker to load file from shared filesytem instead of through manager */
 
 	int fetch_factory;            /* If true, manager queries catalog for factory configuration. */
 	int proportional_resources;   /* If true, tasks divide worker resources proportionally. */

@@ -334,6 +334,11 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 		debug(D_VINE, "%s (%s) will use temp file %s", w->hostname, w->addrport, f->source);
 		// Do nothing.  Temporary files are created and used in place.
 		break;
+
+	case VINE_SHAREDFS:
+		debug(D_VINE, "%s (%s) will use shared file %s", w->hostname, w->addrport, f->source);
+		// Do nothing.  Shared FS files are used in place.
+		break;
 	}
 
 	if (result == VINE_SUCCESS) {
@@ -438,6 +443,7 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 		case VINE_FILE:
 		case VINE_MINI_TASK:
 		case VINE_BUFFER:
+		case VINE_SHAREDFS: // XXX I'm not sure this makes sense
 			/* For these types, we sent the data, so we know it exists. */
 			replica->state = VINE_FILE_REPLICA_STATE_READY;
 			f->state = VINE_FILE_STATE_CREATED;

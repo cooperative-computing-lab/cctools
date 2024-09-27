@@ -42,6 +42,9 @@ vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cach
 	struct vine_mount *m;
 	LIST_ITERATE(p->task->input_mounts, m)
 	{
+		// no need to check files stored in the shared filesystem
+		if(m->file->type==VINE_SHAREDFS) continue;
+		
 		vine_cache_status_t cache_status = vine_cache_ensure(cache, m->file->cached_name);
 
 		switch (cache_status) {
@@ -108,19 +111,35 @@ static int stage_input_file(struct vine_process *p, struct vine_mount *m, struct
 
 /* Create an empty output directory when requested by VINE_MOUNT_MKDIR */
 
-static int create_empty_output_dir(struct vine_process *p, struct vine_mount *m)
+static int vine_sandbox_create_empty_output_dir(struct vine_process *p, struct vine_mount *m)
 {
 	char *sandbox_path = vine_sandbox_full_path(p, m->remote_name);
 
 	int result = mkdir(sandbox_path, 0755);
 	if (result != 0) {
 		debug(D_VINE, "sandbox: couldn't mkdir %s: %s", sandbox_path, strerror(errno));
-		free(sandbox_path);
-		return 0;
-	} else {
-		free(sandbox_path);
-		return 1;
 	}
+
+	free(sandbox_path);
+	return !result; // invert unix result to boolean
+}
+
+/*
+Link a name in the sandbox directory directly to a shared filesystem.
+This is used for both input and output files of type VINE_SHAREDFS
+*/
+
+static int vine_sandbox_symlink_to_sharedfs(struct vine_process *p, struct vine_mount *m)
+{
+	char *sandbox_path = vine_sandbox_full_path(p, m->remote_name);
+
+	int result = symlink(m->file->source,sandbox_path);
+	if (result != 0) {
+		debug(D_VINE, "sandbox: couldn't symlink %s -> %s : %s", sandbox_path, m->file->source, strerror(errno));
+	}
+
+	free(sandbox_path);
+	return !result; // invert unix result to boolean
 }
 
 /*
@@ -135,24 +154,30 @@ int vine_sandbox_stagein(struct vine_process *p, struct vine_cache *cache)
 
 	struct vine_mount *m;
 
-	/* For each input mount, stage it into the sandbox. */
+	/* For each input mount, stage it into the sandbox */
 
 	LIST_ITERATE(t->input_mounts, m)
 	{
-		result = stage_input_file(p, m, m->file, cache);
-		if (!result)
-			break;
+		if(m->file->type==VINE_SHAREDFS) {
+			result = vine_sandbox_symlink_to_sharedfs(p, m);
+		} else {
+			result = stage_input_file(p, m, m->file, cache);
+		}
+		if (!result) break;
 	}
 
-	/* If any of the output mounts have the MKDIR flag, then create those empty dirs. */
+	/* Certain output file types must also be created in the sandbox */
 
 	LIST_ITERATE(t->output_mounts, m)
 	{
-		if (m->flags & VINE_MOUNT_MKDIR) {
-			result = create_empty_output_dir(p, m);
-			if (!result)
-				break;
+		if(m->file->type==VINE_SHAREDFS) {
+			result = vine_sandbox_symlink_to_sharedfs(p, m);
+		} else if (m->flags & VINE_MOUNT_MKDIR) {
+			result = vine_sandbox_create_empty_output_dir(p, m);
+		} else {
+			result = 1;
 		}
+		if (!result) break;
 	}
 
 	return result;
