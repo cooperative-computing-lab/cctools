@@ -543,6 +543,7 @@ int vine_task_add_output(struct vine_task *t, struct vine_file *f, const char *r
 	case VINE_FILE:
 	case VINE_BUFFER:
 	case VINE_TEMP:
+	case VINE_SHAREDFS:
 		/* keep going */
 		break;
 	case VINE_URL:
