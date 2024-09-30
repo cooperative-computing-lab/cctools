@@ -500,7 +500,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	struct vine_task *t;
 	int task_status, exit_status;
 	uint64_t task_id;
-	int64_t output_length, bytes_sent;
+	int64_t output_length, bytes_sent, sandbox_used;
 
 	timestamp_t execution_time, start_time, end_time;
 	timestamp_t observed_execution_time;
@@ -508,13 +508,14 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	// Format: task completion status, exit status (exit code or signal), output length, bytes_sent, execution time,
 	// task_id
 	int n = sscanf(line,
-			"complete %d %d %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 "",
+			"complete %d %d %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 " %" SCNd64 "",
 			&task_status,
 			&exit_status,
 			&output_length,
 			&bytes_sent,
 			&start_time,
 			&end_time,
+			&sandbox_used,
 			&task_id);
 
 	if (n < 7) {
@@ -589,6 +590,14 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 			} else if (t->exit_code == RM_TIME_EXPIRE) {
 				task_status = VINE_RESULT_MAX_END_TIME;
 			}
+		}
+
+		t->sandbox_measured = sandbox_used;
+
+		/* Update category disk info */
+		struct category *c = vine_category_lookup_or_create(q, t->category);
+		if (sandbox_used > c->min_vine_sandbox) {
+			c->min_vine_sandbox = sandbox_used;
 		}
 
 		hash_table_insert(q->workers_with_complete_tasks, w->hashkey, w);
@@ -1292,6 +1301,9 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 		if (q->monitor_mode & VINE_MON_FULL)
 			resource_monitor_compress_logs(q, t);
 	}
+
+	// fill in measured disk as it comes from a different info source.
+	t->resources_measured->disk = MAX(t->resources_measured->disk, t->sandbox_measured);
 
 	// Finish receiving output.
 	t->time_when_done = timestamp_get();
@@ -2507,21 +2519,20 @@ static int build_poll_table(struct vine_manager *q)
 	return n;
 }
 
-/*
- * Use declared dependencies to estimate the minimum disk requriement of a task
- */
-static void vine_manager_estimate_task_disk_min(struct vine_manager *q, struct vine_task *t)
+static void vine_manager_compute_input_size(struct vine_manager *q, struct vine_task *t)
 {
-	int mb = 0;
+	t->input_files_size = -1;
+
+	int64_t input_size = 0;
 	struct vine_mount *m;
 	LIST_ITERATE(t->input_mounts, m)
 	{
-		mb += (m->file->size) / 1e6;
+		if (m->file->state == VINE_FILE_STATE_CREATED) {
+			input_size += m->file->size;
+		}
 	}
-	if (mb > 0) {
-		struct category *c = category_lookup_or_create(q->categories, vine_task_get_category(t));
-		c->min_allocation->disk = MAX(mb, c->min_allocation->disk);
-	}
+
+	t->input_files_size = (int64_t)ceil(((double)input_size) / ONE_MEGABYTE);
 }
 
 /*
@@ -2547,50 +2558,80 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		return limits;
 	}
 
-	if (t->resources_requested->disk < 0) {
-		vine_manager_estimate_task_disk_min(q, t);
+	if (t->input_files_size < 0) {
+		vine_manager_compute_input_size(q, t);
 	}
 
 	/* Compute the minimum and maximum resources for this task. */
 	const struct rmsummary *min = vine_manager_task_resources_min(q, t);
 	const struct rmsummary *max = vine_manager_task_resources_max(q, t);
 
+	/* available disk for all sandboxes */
+	int64_t available_disk = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
+
+	/* do not count the size of input files as available.
+	 * TODO: efficiently discount the size of files already at worker. */
+	if (t->input_files_size > 0) {
+		available_disk -= t->input_files_size;
+	}
+
 	rmsummary_merge_override_basic(limits, max);
 
 	int use_whole_worker = 1;
+
+	int proportional_whole_tasks = q->proportional_whole_tasks;
+	if (t->resources_requested->memory > -1 || t->resources_requested->disk > -1) {
+		/* if mem or disk are specified explicitely, do not expand resources to fill an integer number of tasks. With this,
+		 * the task is assigned exactly the memory and disk specified. We do not do this for cores and gpus, as the use case
+		 * here is to specify the number of cores and allocated the rest of the resources evenly. */
+		proportional_whole_tasks = 0;
+	}
 
 	/* Proportionally assign the worker's resources to the task if configured. */
 	if (q->proportional_resources) {
 
 		/* Compute the proportion of the worker the task shall have across resource types. */
 		double max_proportion = -1;
+		double min_proportion = -1;
+
 		if (w->resources->cores.total > 0) {
 			max_proportion = MAX(max_proportion, limits->cores / w->resources->cores.total);
+			min_proportion = MAX(min_proportion, min->cores / w->resources->cores.total);
 		}
 
 		if (w->resources->memory.total > 0) {
 			max_proportion = MAX(max_proportion, limits->memory / w->resources->memory.total);
+			min_proportion = MAX(min_proportion, min->memory / w->resources->memory.total);
 		}
 
-		if (w->resources->disk.total > 0) {
-			max_proportion = MAX(max_proportion, limits->disk / w->resources->disk.total);
+		if (available_disk > 0) {
+			max_proportion = MAX(max_proportion, limits->disk / available_disk);
+			min_proportion = MAX(min_proportion, min->disk / available_disk);
 		}
 
 		if (w->resources->gpus.total > 0) {
 			max_proportion = MAX(max_proportion, limits->gpus / w->resources->gpus.total);
+			min_proportion = MAX(min_proportion, min->gpus / w->resources->gpus.total);
 		}
 
-		/* If max_proportion > 1, then the task does not fit the worker for the
+		/* If a max_proportion was defined, it cannot be less than a proportion using the minimum
+		 * resources for the category. If it was defined, then the min_proportion is not relevant as the
+		 * task will try to use the whole worker. */
+		if (max_proportion != -1) {
+			max_proportion = MAX(max_proportion, min_proportion);
+		}
+
+		/* If max_proportion or min_proportion > 1, then the task does not fit the worker for the
 		 * specified resources. For the unspecified resources we use the whole
 		 * worker as not to trigger a warning when checking for tasks that can't
 		 * run on any available worker. */
-		if (max_proportion > 1) {
+		if (max_proportion > 1 || min_proportion > 1) {
 			use_whole_worker = 1;
 		} else if (max_proportion > 0) {
 			use_whole_worker = 0;
 
 			// adjust max_proportion so that an integer number of tasks fit the worker.
-			if (q->proportional_whole_tasks) {
+			if (proportional_whole_tasks) {
 				max_proportion = 1.0 / (floor(1.0 / max_proportion));
 			}
 
@@ -2610,21 +2651,21 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 
 			limits->memory = MAX(1, MAX(limits->memory, floor(w->resources->memory.total * max_proportion)));
 
-			/* worker's disk is shared even among tasks that are not running,
+			/* worker's disk is shared evenly among tasks that are not running,
 			 * thus the proportion is modified by the current overcommit
 			 * multiplier */
-			limits->disk = MAX(1, MAX(limits->disk, floor((w->resources->disk.total - w->resources->disk.inuse) * max_proportion / q->resource_submit_multiplier)));
+			limits->disk = MAX(1, MAX(limits->disk, floor(available_disk * max_proportion / q->resource_submit_multiplier)));
 		}
 	}
 
-	/* If no resource was specified, using whole worker. */
+	/* If no resource was specified, use whole worker. */
 	if (limits->cores < 1 && limits->gpus < 1 && limits->memory < 1 && limits->disk < 1) {
 		use_whole_worker = 1;
 	}
 	/* At least one specified resource would use the whole worker, thus
 	 * using whole worker for all unspecified resources. */
 	if ((limits->cores > 0 && limits->cores >= w->resources->cores.total) || (limits->gpus > 0 && limits->gpus >= w->resources->gpus.total) ||
-			(limits->memory > 0 && limits->memory >= w->resources->memory.total) || (limits->disk > 0 && limits->disk >= w->resources->disk.total)) {
+			(limits->memory > 0 && limits->memory >= w->resources->memory.total) || (limits->disk > 0 && limits->disk >= available_disk)) {
 
 		use_whole_worker = 1;
 	}
@@ -2645,7 +2686,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		}
 
 		if (limits->disk <= 0) {
-			limits->disk = w->resources->disk.total;
+			limits->disk = available_disk;
 		}
 	} else if (vine_schedule_in_ramp_down(q)) {
 		/* if in ramp down, use all the free space of that worker. note that we don't use
@@ -2658,21 +2699,14 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		}
 
 		limits->memory = w->resources->memory.total - w->resources->memory.inuse;
-		limits->disk = w->resources->disk.total - w->resources->disk.inuse;
+		limits->disk = available_disk;
 	}
 
 	/* never go below specified min resources. */
 	rmsummary_merge_max(limits, min);
 
-	/* If the user specified resources, override proportional calculation */
-	if (t->resources_requested->cores > 0)
-		limits->cores = t->resources_requested->cores;
-	if (t->resources_requested->memory > 0)
-		limits->memory = t->resources_requested->memory;
-	if (t->resources_requested->disk > 0)
-		limits->disk = t->resources_requested->disk;
-	if (t->resources_requested->gpus > 0)
-		limits->gpus = t->resources_requested->gpus;
+	/* assume the user knows what they are doing... */
+	rmsummary_merge_override_basic(limits, t->resources_requested);
 
 	return limits;
 }
@@ -2751,12 +2785,7 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 		w->resources->gpus.inuse += box->gpus;
 	}
 
-	char *cachename;
-	struct vine_file_replica *replica;
-	HASH_TABLE_ITERATE(w->current_files, cachename, replica)
-	{
-		w->resources->disk.inuse += ((double)replica->size) / 1e6;
-	}
+	w->resources->disk.inuse += ceil(BYTES_TO_MEGABYTES(w->inuse_cache));
 }
 
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w)
@@ -2776,8 +2805,8 @@ static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w
 		q->current_max_worker->memory = w->resources->memory.total;
 	}
 
-	if (q->current_max_worker->disk < w->resources->disk.total) {
-		q->current_max_worker->disk = w->resources->disk.total;
+	if (q->current_max_worker->disk < (w->resources->disk.total - w->inuse_cache)) {
+		q->current_max_worker->disk = w->resources->disk.total - w->inuse_cache;
 	}
 
 	if (q->current_max_worker->gpus < w->resources->gpus.total) {
@@ -2917,6 +2946,37 @@ static int resubmit_task_on_exhaustion(struct vine_manager *q, struct vine_worke
 	return 0;
 }
 
+/* 1 if task resubmitted, 0 otherwise */
+static int resubmit_task_on_sandbox_exhaustion(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	if (t->result != VINE_RESULT_SANDBOX_EXHAUSTION) {
+		return 0;
+	}
+
+	struct category *c = vine_category_lookup_or_create(q, t->category);
+
+	/* on sandbox exhausted, the resources allocated correspond to the overflown sandbox */
+	double sandbox = t->resources_allocated->disk;
+
+	/* grow sandbox by given factor (default is two) */
+	sandbox *= q->sandbox_grow_factor * sandbox;
+
+	/* take the MAX in case min_vine_sandbox was updated before th result of this task was processed */
+	c->min_vine_sandbox = MAX(c->min_vine_sandbox, sandbox);
+
+	debug(D_VINE, "Task %d exhausted disk sandbox on %s (%s).\n", t->task_id, w->hostname, w->addrport);
+	double max_allowed_disk = MAX(t->resources_requested->disk, c->max_allocation->disk);
+
+	if (max_allowed_disk > -1 && c->min_vine_sandbox < max_allowed_disk) {
+		debug(D_VINE, "Task %d failed given max disk limit for sandbox.\n", t->task_id);
+		return 0;
+	}
+
+	change_task_state(q, t, VINE_TASK_READY);
+
+	return 1;
+}
+
 static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	/* in this function, any change_task_state should only be to VINE_TASK_READY */
@@ -2941,6 +3001,9 @@ static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w
 	switch (t->result) {
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
 		return resubmit_task_on_exhaustion(q, w, t);
+		break;
+	case VINE_RESULT_SANDBOX_EXHAUSTION:
+		return resubmit_task_on_sandbox_exhaustion(q, w, t);
 		break;
 	default:
 		/* by default tasks are not resumitted */
@@ -3771,6 +3834,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->current_max_worker = rmsummary_create(-1);
 	q->max_task_resources_requested = rmsummary_create(-1);
 
+	q->sandbox_grow_factor = 2.0;
+
 	q->stats = calloc(1, sizeof(struct vine_stats));
 	q->stats_measure = calloc(1, sizeof(struct vine_stats));
 
@@ -3928,6 +3993,22 @@ int vine_disable_peer_transfers(struct vine_manager *q)
 {
 	debug(D_VINE, "Peer Transfers disabled");
 	q->peer_transfers_enabled = 0;
+	return 1;
+}
+
+int vine_enable_proportional_resources(struct vine_manager *q)
+{
+	debug(D_VINE, "Proportional resources enabled");
+	q->proportional_resources = 1;
+	q->proportional_whole_tasks = 1;
+	return 1;
+}
+
+int vine_disable_proportional_resources(struct vine_manager *q)
+{
+	debug(D_VINE, "Proportional resources disabled");
+	q->proportional_resources = 0;
+	q->proportional_whole_tasks = 0;
 	return 1;
 }
 
@@ -4232,6 +4313,9 @@ char *vine_monitor_wrap(struct vine_manager *q, struct vine_worker_info *w, stru
 		buffer_printf(&b, " --interval %d", q->monitor_interval);
 	}
 
+	/* disable disk as it is measured throught the sandbox, otherwise we end up measuring twice. */
+	buffer_printf(&b, " --without-disk-footprint");
+
 	int extra_files = (q->monitor_mode & VINE_MON_FULL);
 
 	char *monitor_cmd = resource_monitor_write_command("./" RESOURCE_MONITOR_REMOTE_NAME,
@@ -4421,6 +4505,9 @@ const char *vine_result_string(vine_result_t result)
 		break;
 	case VINE_RESULT_LIBRARY_EXIT:
 		str = "LIBRARY_EXIT";
+		break;
+	case VINE_RESULT_SANDBOX_EXHAUSTION:
+		str = "SANDBOX_EXHAUSTION";
 		break;
 	}
 
@@ -5075,6 +5162,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		timestamp_t current_time = timestamp_get();
 		if (current_time - q->time_last_large_tasks_check >= q->large_task_check_interval) {
 			q->time_last_large_tasks_check = current_time;
+			find_max_worker(q);
 			vine_schedule_check_for_large_tasks(q);
 		}
 
@@ -5380,7 +5468,11 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		q->prefer_dispatch = !!((int)value);
 
 	} else if (!strcmp(name, "force-proportional-resources") || !strcmp(name, "proportional-resources")) {
-		q->proportional_resources = MAX(0, (int)value);
+		if (value > 0) {
+			vine_enable_proportional_resources(q);
+		} else {
+			vine_disable_proportional_resources(q);
+		}
 
 	} else if (!strcmp(name, "force-proportional-resources-whole-tasks") || !strcmp(name, "proportional-whole-tasks")) {
 		q->proportional_whole_tasks = MAX(0, (int)value);
@@ -5448,8 +5540,13 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "option-blocklist-slow-workers-timeout")) {
 		q->option_blocklist_slow_workers_timeout = MAX(0, value); /*todo: confirm 0 or 1*/
+
 	} else if (!strcmp(name, "watch-library-logfiles")) {
 		q->watch_library_logfiles = !!((int)value);
+
+	} else if (!strcmp(name, "sandbox-grow-factor")) {
+		q->sandbox_grow_factor = MAX(1.1, value);
+
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
@@ -5733,6 +5830,7 @@ void vine_accumulate_task(struct vine_manager *q, struct vine_task *t)
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
 	case VINE_RESULT_MAX_WALL_TIME:
 	case VINE_RESULT_OUTPUT_TRANSFER_ERROR:
+	case VINE_RESULT_SANDBOX_EXHAUSTION:
 		if (category_accumulate_summary(c, t->resources_measured, q->current_max_worker)) {
 			vine_txn_log_write_category(q, c);
 		}
@@ -5752,11 +5850,15 @@ void vine_accumulate_task(struct vine_manager *q, struct vine_task *t)
 		break;
 	case VINE_RESULT_INPUT_MISSING:
 	case VINE_RESULT_OUTPUT_MISSING:
+	case VINE_RESULT_FIXED_LOCATION_MISSING:
+	case VINE_RESULT_CANCELLED:
+	case VINE_RESULT_RMONITOR_ERROR:
+	case VINE_RESULT_STDOUT_MISSING:
 	case VINE_RESULT_MAX_END_TIME:
 	case VINE_RESULT_UNKNOWN:
 	case VINE_RESULT_FORSAKEN:
 	case VINE_RESULT_MAX_RETRIES:
-	default:
+	case VINE_RESULT_LIBRARY_EXIT:
 		break;
 	}
 }
@@ -5839,7 +5941,6 @@ int vine_enable_category_resource(struct vine_manager *q, const char *category, 
 
 const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, struct vine_task *t)
 {
-
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 
 	return category_task_max_resources(c, t->resources_requested, t->resource_request, t->task_id);

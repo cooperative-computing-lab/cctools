@@ -286,25 +286,27 @@ void send_complete_tasks(struct link *l)
 			output[p->output_length] = '\0';
 			close(output_file);
 			send_async_message(l,
-					"complete %d %d %lld %lld %llu %llu %d\n%s",
+					"complete %d %d %lld %lld %llu %llu %d %d\n%s",
 					p->result,
 					p->exit_code,
 					(long long)p->output_length,
 					(long long)p->output_length,
 					(unsigned long long)p->execution_start,
 					(unsigned long long)p->execution_end,
+					p->sandbox_size,
 					p->task->task_id,
 					output);
 			free(output);
 		} else {
 			send_async_message(l,
-					"complete %d %d %lld %lld %llu %llu %d\n",
+					"complete %d %d %lld %lld %llu %llu %d %d\n",
 					p->result,
 					p->exit_code,
 					(long long)p->output_length,
 					0,
 					(unsigned long long)p->execution_start,
 					(unsigned long long)p->execution_end,
+					p->sandbox_size,
 					p->task->task_id);
 		}
 	}
@@ -350,7 +352,7 @@ static int64_t measure_worker_disk()
 		return 0;
 
 	char *cache_dir = vine_cache_data_path(cache_manager, ".");
-	path_disk_size_info_get_r(cache_dir, options->max_time_on_measurement, &state);
+	path_disk_size_info_get_r(cache_dir, options->max_time_on_measurement, &state, NULL);
 	free(cache_dir);
 
 	int64_t disk_measured = 0;
@@ -1100,7 +1102,7 @@ static void kill_all_tasks()
 
 /* Check whether a given process is still within the various limits imposed on it. */
 
-static int enforce_process_limits(struct vine_process *p)
+static int enforce_process_sanbox_limits(struct vine_process *p)
 {
 	/* If the task did not set disk usage, return right away. */
 	if (p->task->resources_requested->disk < 1)
@@ -1121,7 +1123,7 @@ static int enforce_process_limits(struct vine_process *p)
 
 /* Check all processes to see whether they have exceeded various limits, and kill if necessary. */
 
-static int enforce_processes_limits()
+static int enforce_processes_sandbox_limits()
 {
 	static time_t last_check_time = 0;
 
@@ -1136,8 +1138,8 @@ static int enforce_processes_limits()
 
 	ITABLE_ITERATE(procs_running, task_id, p)
 	{
-		if (!enforce_process_limits(p)) {
-			finish_running_task(p, VINE_RESULT_RESOURCE_EXHAUSTION);
+		if (!enforce_process_sanbox_limits(p)) {
+			finish_running_task(p, VINE_RESULT_SANDBOX_EXHAUSTION);
 			trash_file(p->sandbox);
 
 			ok = 0;
@@ -1682,7 +1684,7 @@ static void vine_worker_serve_manager(struct link *manager)
 
 		/* end a running processes if goes above its declared limits.
 		 * Mark offending process as RESOURCE_EXHASTION. */
-		enforce_processes_limits();
+		enforce_processes_sandbox_limits();
 
 		/* end running processes if worker resources are exhasusted, and marked
 		 * them as FORSAKEN, so they can be resubmitted somewhere else. */
