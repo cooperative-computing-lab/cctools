@@ -225,7 +225,7 @@ struct vine_file *vine_file_local(const char *source, vine_cache_level_t cache, 
 	return vine_file_create(source, 0, 0, 0, VINE_FILE, 0, cache, flags);
 }
 
-struct vine_file *vine_file_sharedfs(const char *source, vine_file_flags_t flags )
+struct vine_file *vine_file_sharedfs(const char *source, vine_file_flags_t flags)
 {
 	return vine_file_create(source, 0, 0, 0, VINE_SHAREDFS, 0, VINE_CACHE_LEVEL_TASK, flags);
 }

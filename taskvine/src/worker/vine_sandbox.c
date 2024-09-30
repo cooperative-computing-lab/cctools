@@ -43,8 +43,9 @@ vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cach
 	LIST_ITERATE(p->task->input_mounts, m)
 	{
 		// no need to check files stored in the shared filesystem
-		if(m->file->type==VINE_SHAREDFS) continue;
-		
+		if (m->file->type == VINE_SHAREDFS)
+			continue;
+
 		vine_cache_status_t cache_status = vine_cache_ensure(cache, m->file->cached_name);
 
 		switch (cache_status) {
@@ -133,7 +134,7 @@ static int vine_sandbox_symlink_to_sharedfs(struct vine_process *p, struct vine_
 {
 	char *sandbox_path = vine_sandbox_full_path(p, m->remote_name);
 
-	int result = symlink(m->file->source,sandbox_path);
+	int result = symlink(m->file->source, sandbox_path);
 	if (result != 0) {
 		debug(D_VINE, "sandbox: couldn't symlink %s -> %s : %s", sandbox_path, m->file->source, strerror(errno));
 	}
@@ -158,26 +159,28 @@ int vine_sandbox_stagein(struct vine_process *p, struct vine_cache *cache)
 
 	LIST_ITERATE(t->input_mounts, m)
 	{
-		if(m->file->type==VINE_SHAREDFS) {
+		if (m->file->type == VINE_SHAREDFS) {
 			result = vine_sandbox_symlink_to_sharedfs(p, m);
 		} else {
 			result = stage_input_file(p, m, m->file, cache);
 		}
-		if (!result) break;
+		if (!result)
+			break;
 	}
 
 	/* Certain output file types must also be created in the sandbox */
 
 	LIST_ITERATE(t->output_mounts, m)
 	{
-		if(m->file->type==VINE_SHAREDFS) {
+		if (m->file->type == VINE_SHAREDFS) {
 			result = vine_sandbox_symlink_to_sharedfs(p, m);
 		} else if (m->flags & VINE_MOUNT_MKDIR) {
 			result = vine_sandbox_create_empty_output_dir(p, m);
 		} else {
 			result = 1;
 		}
-		if (!result) break;
+		if (!result)
+			break;
 	}
 
 	return result;

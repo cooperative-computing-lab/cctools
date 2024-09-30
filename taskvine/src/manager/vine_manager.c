@@ -6160,9 +6160,9 @@ struct vine_file *vine_declare_file(struct vine_manager *m, const char *source, 
 {
 	struct vine_file *f;
 
-	if(m->shared_filesystem_link_mode) {
+	if (m->shared_filesystem_link_mode) {
 		/* XXX need to get absolute path here. */
-		f = vine_file_sharedfs(source,flags);
+		f = vine_file_sharedfs(source, flags);
 	} else if (m->shared_filesystem_cache_mode) {
 		char *file_url = vine_file_make_file_url(source);
 		f = vine_file_url(file_url, cache, flags);
