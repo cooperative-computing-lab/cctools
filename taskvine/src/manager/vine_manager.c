@@ -5113,7 +5113,7 @@ struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, 
 // check if workers' resources are available to execute more tasks queue should
 // have at least MAX(hungry_minimum, hungry_minimum_factor * number of workers) ready tasks
 //@param: 	struct vine_manager* - pointer to manager
-//@return: 	1 if hungry, 0 otherwise
+//@return: 	approximate number of additional tasks if hungry, 0 otherwise
 int vine_hungry(struct vine_manager *q)
 {
 	// check if manager is initialized
@@ -5136,7 +5136,7 @@ int vine_hungry(struct vine_manager *q)
 	int64_t workers_total_avail_memory = 0;
 	int64_t workers_total_avail_disk = 0;
 	int64_t workers_total_avail_gpus = 0;
-	// overcommited_resource_total(q, quantity)
+	// Find available resources (2 * total - committed)
 	workers_total_avail_cores = 2*qstats.total_cores - qstats.committed_cores;
 	workers_total_avail_memory = 2*qstats.total_memory - qstats.committed_memory;
 	workers_total_avail_gpus = 2*qstats.total_gpus - qstats.committed_gpus;
@@ -5153,6 +5153,8 @@ int vine_hungry(struct vine_manager *q)
 
 	int count = task_state_count(q, NULL, VINE_TASK_READY);
 
+
+	// represents number of tasks in queue
 	int i = count;
 
 	while (i > 0) {
@@ -5170,19 +5172,15 @@ int vine_hungry(struct vine_manager *q)
 	// return false if required resources exceed available resources
 	int64_t avg_additional_tasks_cores, avg_additional_tasks_memory, avg_additional_tasks_disk, avg_additional_tasks_gpus;
 	if (ready_task_cores > workers_total_avail_cores) {
-		printf("task_cores, worker_cores %ld %ld\n", ready_task_cores, workers_total_avail_cores);
 		return 0;
 	}
 	if (ready_task_memory > workers_total_avail_memory) {
-		printf("task_memory, worker_memory %ld %ld\n", ready_task_memory, workers_total_avail_memory);
 		return 0;
 	}
 	if (ready_task_disk > workers_total_avail_disk) {	
-		printf("task_disk, worker_disk %ld %ld\n", ready_task_disk, workers_total_avail_disk);
 		return 0;
 	}
 	if (ready_task_gpus > workers_total_avail_gpus) {
-		printf("task_gpu, worker_gpu %ld %ld\n", ready_task_gpus, workers_total_avail_gpus);
 		return 0;
 	}
 
@@ -5190,10 +5188,8 @@ int vine_hungry(struct vine_manager *q)
 	if (ready_task_memory < 0) ready_task_memory = 0;
 	if (ready_task_disk < 0) ready_task_disk = 0;
 	if (ready_task_gpus < 0) ready_task_gpus = 0;
-	printf("pre: %ld %ld %ld %ld\n", ready_task_cores, ready_task_memory, ready_task_disk, ready_task_gpus); // in the queue
-	printf("prenext: %ld %ld %ld %ld\n", workers_total_avail_cores, workers_total_avail_memory, workers_total_avail_disk, workers_total_avail_gpus); // 2*total - committed
-	printf("prenextnext: %ld %ld, %ld %ld, %ld %ld, %ld %ld", qstats.total_cores, qstats.committed_cores, qstats.total_memory, qstats.committed_memory, qstats.total_gpus, qstats.committed_gpus, qstats.total_disk, qstats.committed_disk);
-	if (count != 0) {
+
+	if (count != 0) { // each statement counts the available (2*total - committed) and further subtracts the ready/in-queue tasks and then finds how mabny more
 		if (ready_task_cores != 0) {
 			avg_additional_tasks_cores = (workers_total_avail_cores - ready_task_cores) / (ready_task_cores / count);
 		} else {
@@ -5215,15 +5211,14 @@ int vine_hungry(struct vine_manager *q)
 			avg_additional_tasks_gpus = workers_total_avail_cores;
 		}
 	} else {
-		printf(":(");
 		return workers_total_avail_cores; // this returns number of cores if no tasks in queue and we have resources. 
 	}
-	printf("%ld, %ld, %ld, %ld\n", avg_additional_tasks_cores, avg_additional_tasks_memory, avg_additional_tasks_disk, avg_additional_tasks_gpus);
+	// find the limiting factor
 	int64_t min = avg_additional_tasks_cores;
 	if (avg_additional_tasks_memory < min) min = avg_additional_tasks_memory;
 	if (avg_additional_tasks_disk < min) min = avg_additional_tasks_disk;
 	if (avg_additional_tasks_gpus < min) min = avg_additional_tasks_gpus;
-	if (min < 0) min = 0;
+	if (min < 0) min = 0; // if for some reason we have a negative, just make it 0
 
 	return min;
 
