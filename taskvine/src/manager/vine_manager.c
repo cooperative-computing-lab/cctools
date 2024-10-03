@@ -80,7 +80,6 @@ See the file COPYING for details.
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-#include <limits.h>
 
 /* Default value for seconds between updates to the catalog. */
 #define VINE_UPDATE_INTERVAL 60
