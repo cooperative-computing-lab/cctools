@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "hash_table.h"
 #include "list.h"
+#include "macros.h"
 #include "rmonitor_types.h"
 #include "rmsummary.h"
 
@@ -78,6 +79,20 @@ int vine_schedule_in_ramp_down(struct vine_manager *q)
  * @return 1 if yes, 0 otherwise. */
 int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *tr)
 {
+	/*
+	This is a temporary hack in order to get Greg's application running.
+	The problem is in line with the problem pointed out in PR #3909 but a special case in the manager's end.
+
+	The problem here is that the manager always allocates the whole disk the the library task,
+	so that libtask->current_resource_box->disk is always equal to worker_net_resources->disk.total.
+	For the first task, the ti->current_resource_box->disk == 0, it is able to run because the expr in line 114 doesn't satisfy.
+	However, if the first task causes any increase in the worker's disk, worker_net_resources->disk.inuse will go above the total,
+	which causes the consistent true of the expr in line 114.
+	*/
+	if (t->needs_library) {
+		return 1;
+	}
+
 	struct vine_resources *worker_net_resources = vine_resources_copy(w->resources);
 
 	/* Subtract resources from libraries that have slots unused and don't match the current task. */
@@ -118,6 +133,31 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 	return ok;
 }
 
+/* t->disk only specifies the size of output and ephemeral files. Here we check if the task would fit together with all its input files
+ * taking into account that some files may be already at the worker. */
+int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	int ok = 1;
+	double available = w->resources->disk.total - MAX(0, t->resources_requested->disk) - w->resources->disk.inuse;
+
+	struct vine_mount *m;
+	LIST_ITERATE(t->input_mounts, m)
+	{
+		if (hash_table_lookup(w->current_files, m->file->cached_name)) {
+			continue;
+		}
+
+		available -= m->file->size;
+
+		if (available < 0) {
+			ok = 1;
+			break;
+		}
+	}
+
+	return ok;
+}
+
 /* Check if this task is compatible with this given worker by considering
  * resources availability, features, blocklist, and all other relevant factors.
  * Used by all scheduling methods for basic compatibility.
@@ -133,12 +173,16 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	/* Otherwise library templates are modified during the run. */
 
 	/* worker has not reported any resources yet */
-	if (w->resources->tag < 0 || w->resources->workers.total < 1) {
+	if (w->resources->tag < 0 || w->resources->workers.total < 1 || w->end_time < 0) {
 		return 0;
 	}
 
 	/* Don't send tasks to this worker if it is in draining mode (no more tasks). */
 	if (w->draining) {
+		return 0;
+	}
+	// if worker's end time has not been received
+	if (w->end_time < 0) {
 		return 0;
 	}
 
@@ -168,11 +212,6 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	}
 	rmsummary_delete(l);
 
-	// if worker's end time has not been received
-	if (w->end_time < 0) {
-		return 0;
-	}
-
 	// if wall time for worker is specified and there's not enough time for task, then not ok
 	if (w->end_time > 0) {
 		double current_time = ((double)timestamp_get()) / ONE_SECOND;
@@ -182,6 +221,10 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		if (t->min_running_time > 0 && w->end_time - current_time < t->min_running_time) {
 			return 0;
 		}
+	}
+
+	if (!check_worker_have_enough_disk_with_inputs(q, w, t)) {
+		return 0;
 	}
 
 	/* If the worker is not the one the task wants. */
@@ -237,7 +280,7 @@ struct vine_task *vine_schedule_find_library(struct vine_manager *q, struct vine
 	ITABLE_ITERATE(w->current_tasks, task_id, task)
 	{
 		if (task->type == VINE_TASK_TYPE_LIBRARY_INSTANCE && task->provides_library && !strcmp(task->provides_library, library_name) &&
-				(task->function_slots_inuse < task->function_slots)) {
+				(task->function_slots_inuse < task->function_slots_total)) {
 			return task;
 		}
 	}

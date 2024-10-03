@@ -49,13 +49,13 @@ install: $(INSTALL_PACKAGES)
 test: $(CCTOOLS_PACKAGES)
 	./run_all_tests.sh
 
-PACKAGES_TO_LINT = taskvine dttools poncho resource_monitor
+PACKAGES_TO_LINT = taskvine resource_monitor batch_job dttools poncho
 LINT_PACKAGES = $(PACKAGES_TO_LINT:%=lint-%)
 $(LINT_PACKAGES): config.mk
 	@$(MAKE) -C $(@:lint-%=%) lint
 lint: $(LINT_PACKAGES)
 
-PACKAGES_TO_FORMAT = taskvine resource_monitor dttools
+PACKAGES_TO_FORMAT = taskvine resource_monitor batch_job dttools
 FORMAT_PACKAGES = $(PACKAGES_TO_FORMAT:%=format-%)
 $(FORMAT_PACKAGES): config.mk
 	@$(MAKE) -C $(@:format-%=%) format

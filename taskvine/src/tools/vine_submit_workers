@@ -25,8 +25,8 @@ condor_requirements=
 condor_parameters=
 condor_transfer_input_files="vine_worker, cctools_gpu_autodetect"
 
-sge_use_jobarray=0
-sge_parameters=""
+uge_use_jobarray=0
+uge_parameters=""
 
 slurm_parameters=""
 
@@ -54,11 +54,11 @@ slurm_show_help()
     echo ""
 }
 
-sge_show_help()
+uge_show_help()
 {
-    echo "SGE:"
+    echo "UGE:"
     echo "  -j                       Use job array to submit workers."
-    echo "  -p <parameters>          SGE qsub parameters."
+    echo "  -p <parameters>          UGE qsub parameters."
     echo ""
 }
 
@@ -72,7 +72,7 @@ show_help()
 
     echo " "
     echo "batch selection:"
-    echo "  -T, --batch-type <batch>  Name of the batch system to submit workers. Out of (condor, slurm, sge)."
+    echo "  -T, --batch-type <batch>  Name of the batch system to submit workers. Out of (condor, slurm, uge)."
     echo ""
 
 	echo "worker options:"
@@ -101,14 +101,14 @@ show_help()
 
     condor_show_help
     slurm_show_help
-    sge_show_help
+    uge_show_help
 
 	exit "$exit_status"
 }
 
 unset_parse_arguments() {
     echo "Batch system should be selected before any batch configuration option." 1>&2
-    echo "Choose one of: -Tcondor -Tsge -Tslurm" 1>&2
+    echo "Choose one of: -Tcondor -Tuge -Tslurm" 1>&2
     exit 1
 }
 
@@ -311,8 +311,8 @@ EOF
 
 }
 
-# SGE specific
-sge_setup()
+# UGE specific
+uge_setup()
 {
     if [ -z "$cores" ] || [ "$cores" = 0 ]
     then
@@ -323,22 +323,22 @@ sge_setup()
 	then
 		echo "Worker resources were manually specified. Remember to also describe your" 1>&2
         echo "resources according to your local qsub system e.g., -p '-pe smp 4'." 1>&2
-        echo "See also the --sge-parameter option in the configure script when manually compiling CCTools." 1>&2
+        echo "See also the --uge-parameter option in the configure script when manually compiling CCTools." 1>&2
 	fi
 
 }
 
-sge_parse_arguments()
+uge_parse_arguments()
 {
     consumed=2
     case $1 in
         -j)
-            sge_use_jobarray=1
+            uge_use_jobarray=1
             consumed=1
         ;;
         -p)
             shift
-            sge_parameters="$sge_parameters $1"
+            uge_parameters="$uge_parameters $1"
         ;;
         *)
             consumed=0
@@ -348,9 +348,9 @@ sge_parse_arguments()
     return "$consumed"
 }
 
-sge_submit_workers_command()
+uge_submit_workers_command()
 {
-    sge_setup
+    uge_setup
 
     cat >worker.sh <<EOF
 #!/bin/sh
@@ -376,15 +376,15 @@ EOF
     fi
 
 
-    if [ "$sge_use_jobarray" = 1 ]
+    if [ "$uge_use_jobarray" = 1 ]
     then
-        ${qsub} -t 1-"$count":1 -cwd $sge_parameters worker.sh
+        ${qsub} -t 1-"$count":1 -cwd $uge_parameters worker.sh
     else
         n=0
         while [ "$n" -lt "$count" ]
         do
             n=$((n+1))
-            ${qsub} -cwd $sge_parameters worker.sh
+            ${qsub} -cwd $uge_parameters worker.sh
         done
     fi
 }
@@ -406,14 +406,14 @@ parse_arguments_general()
                 condor)
                     parse_arguments_batch=condor_parse_arguments
                 ;;
-                sge)
-                    parse_arguments_batch=sge_parse_arguments
+                uge)
+                    parse_arguments_batch=uge_parse_arguments
                 ;;
                 slurm)
                     parse_arguments_batch=slurm_parse_arguments
                 ;;
                 *)
-                    echo "$batch_option is not a valid batch. Choose from condor, sge and slurm"
+                    echo "$batch_option is not a valid batch. Choose from condor, uge and slurm"
                     exit 1
                 ;;
             esac
@@ -713,8 +713,8 @@ submit_workers_command()
         "slurm")
             slurm_submit_workers_command
         ;;
-        "sge")
-            sge_submit_workers_command
+        "uge")
+            uge_submit_workers_command
         ;;
         *)
             echo "Batch option \"$batch_option\" is not supported." 1>&2

@@ -4,6 +4,8 @@ Copyright (C) 2022- The University of Notre Dame
 See the file COPYING for details.
 */
 
+#include <math.h>
+
 #include "vine_file_replica_table.h"
 #include "set.h"
 #include "vine_blocklist.h"
@@ -25,6 +27,12 @@ int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_in
 	w->inuse_cache += replica->size;
 	hash_table_insert(w->current_files, cachename, replica);
 
+	double prev_available = w->resources->disk.total - ceil(BYTES_TO_MEGABYTES(w->inuse_cache + replica->size));
+	if (prev_available >= m->current_max_worker->disk) {
+		/* the current worker may have been the one with the maximum available space, so we update it. */
+		m->current_max_worker->disk = w->resources->disk.total - ceil(BYTES_TO_MEGABYTES(w->inuse_cache));
+	}
+
 	struct set *workers = hash_table_lookup(m->file_worker_table, cachename);
 	if (!workers) {
 		workers = set_create(4);
@@ -42,6 +50,12 @@ struct vine_file_replica *vine_file_replica_table_remove(struct vine_manager *m,
 	struct vine_file_replica *replica = hash_table_remove(w->current_files, cachename);
 	if (replica) {
 		w->inuse_cache -= replica->size;
+	}
+
+	double available = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
+	if (available > m->current_max_worker->disk) {
+		/* the current worker has more space than we knew before for all workers, so we update it. */
+		m->current_max_worker->disk = available;
 	}
 
 	struct set *workers = hash_table_lookup(m->file_worker_table, cachename);
@@ -112,21 +126,22 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 // trigger replications of file to satisfy temp_replica_count
 int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *f)
 {
-	int found = 0;
+	/* the number of replicated copies in this round */
+	int round_replication_count = 0;
 
 	if (vine_current_transfers_get_table_size(m) >= hash_table_size(m->worker_table) * m->worker_source_max_transfers) {
-		return found;
+		return round_replication_count;
 	}
 
 	struct set *sources = hash_table_lookup(m->file_worker_table, f->cached_name);
 	if (!sources) {
-		return found;
+		return round_replication_count;
 	}
 
 	int nsources = set_size(sources);
 	int to_find = MIN(m->temp_replica_count - nsources, m->transfer_replica_per_cycle);
 	if (to_find < 1) {
-		return found;
+		return round_replication_count;
 	}
 
 	debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsources, f->cached_name, to_find);
@@ -137,7 +152,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 	int i = 0;
 	for (source = sources_frozen[i]; i < nsources; i++) {
-		if (found >= to_find) {
+		if (round_replication_count >= to_find) {
 			break;
 		}
 
@@ -187,7 +202,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 			source_in_use++;
 			found_per_source++;
-			found++;
+			round_replication_count++;
 		}
 
 		free(source_addr);
@@ -195,7 +210,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 	free(sources_frozen);
 
-	return found;
+	return round_replication_count;
 }
 
 /*

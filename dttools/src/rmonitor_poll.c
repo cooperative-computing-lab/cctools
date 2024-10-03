@@ -780,7 +780,7 @@ int rmonitor_get_wd_usage(struct rmonitor_wdir_info *d, int max_time_for_measure
 {
 	/* We need a pointer to a pointer, which it is not possible from a struct. Use a dummy variable. */
 	struct path_disk_size_info *state = d->state;
-	int status = path_disk_size_info_get_r(d->path, max_time_for_measurement, &state);
+	int status = path_disk_size_info_get_r(d->path, max_time_for_measurement, &state, NULL);
 
 	d->state = state;
 
@@ -945,7 +945,7 @@ struct rmsummary *rmonitor_measure_host(char *path)
 	struct rmsummary *tr = rmsummary_create(-1);
 
 	if (path) {
-		path_disk_size_info_get(path, &total_disk, &file_count);
+		path_disk_size_info_get(path, &total_disk, &file_count, NULL);
 		tr->disk = ((double)total_disk) / ONE_MEGABYTE;
 		tr->total_files = file_count;
 	}

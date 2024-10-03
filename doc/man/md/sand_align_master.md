@@ -74,7 +74,7 @@ Then, invoke [sand_align_master()](sand_align_master.md) as follows:
 ```
 
 To speed up the process, run more [work_queue_worker()](work_queue_worker.md) processes
-on other machines, or use [condor_submit_workers(1)](condor_submit_workers.md) or [sge_submit_workers(1)](sge_submit_workers.md) to start hundreds of workers in your local batch system.
+on other machines, or use [condor_submit_workers(1)](condor_submit_workers.md) or [uge_submit_workers(1)](uge_submit_workers.md) to start hundreds of workers in your local batch system.
 
 ## COPYRIGHT
 

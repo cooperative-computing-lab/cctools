@@ -36,8 +36,7 @@ Alternatevely, the manager may be specified by name, using the BOLD(-M) option.
 PARA
 
 BOLD(vine_worker) can be run locally or deployed remotely on any of the
-grid or cloud computing environments such as SGE, PBS, SLURM, and HTCondor using
-MANPAGE(sge_submit_workers,1), MANPAGE(pbs_submit_workers,1), MANPAGE(slurm_submit_workers), and MANPAGE(condor_submit_workers,1) respectively.
+grid or cloud computing environments such as UGE, PBS, SLURM, and HTCondor using MANPAGE(vine_submit_workers,1) or MANPAGE(vine_factory,1).
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN

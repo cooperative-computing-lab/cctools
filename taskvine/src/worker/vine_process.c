@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include "vine_file.h"
 #include "vine_mount.h"
 #include "vine_worker.h"
+#include "vine_cache.h"
 
 #include "change_process_title.h"
 #include "create_dir.h"
@@ -47,6 +48,8 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+
+extern struct vine_cache *cache_manager;
 
 /*
 Give the letter code used for the process sandbox dir.
@@ -397,7 +400,7 @@ int vine_process_execute(struct vine_process *p)
 					out_pipe_fd,
 					p->task->task_id,
 					(int)p->task->resources_requested->cores,
-					p->task->function_slots,
+					p->task->function_slots_total,
 					getppid());
 			execl("/bin/sh", "sh", "-c", final_command, (char *)0);
 		}
@@ -578,13 +581,15 @@ void vine_process_compute_disk_needed(struct vine_process *p)
 	}
 }
 
+static int vine_process_sandbox_disk_measure(struct vine_process *p, int max_time_on_measurement, struct path_disk_size_info **state);
+
 int vine_process_measure_disk(struct vine_process *p, int max_time_on_measurement)
 {
 	/* we can't have pointers to struct members, thus we create temp variables here */
 
 	struct path_disk_size_info *state = p->disk_measurement_state;
 
-	int result = path_disk_size_info_get_r(p->sandbox, max_time_on_measurement, &state);
+	int result = vine_process_sandbox_disk_measure(p, max_time_on_measurement, &state);
 
 	/* not a memory leak... Either disk_measurement_state was NULL or the same as state. */
 	p->disk_measurement_state = state;
@@ -596,6 +601,33 @@ int vine_process_measure_disk(struct vine_process *p, int max_time_on_measuremen
 	}
 
 	p->sandbox_file_count = state->last_file_count_complete;
+
+	return result;
+}
+
+static int vine_process_sandbox_disk_measure(struct vine_process *p, int max_secs, struct path_disk_size_info **state)
+{
+	int num_inputs = 0;
+	if (p->task->input_mounts) {
+		num_inputs = list_size(p->task->input_mounts);
+	}
+
+	struct hash_table *exclude_paths = NULL;
+	if (num_inputs > 0) {
+		exclude_paths = hash_table_create(2 * num_inputs, 0);
+
+		struct vine_mount *m;
+		LIST_ITERATE(p->task->input_mounts, m)
+		{
+			hash_table_insert(exclude_paths, m->remote_name, (void *)1);
+		}
+	}
+
+	int result = path_disk_size_info_get_r(p->sandbox, max_secs, state, exclude_paths);
+
+	if (exclude_paths) {
+		hash_table_delete(exclude_paths);
+	}
 
 	return result;
 }

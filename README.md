@@ -13,9 +13,9 @@ at the [University of Notre Dame](https://www.nd.edu),
 led by [Prof. Douglas Thain](https://dthain.github.io).
 The file [CREDITS](CREDITS) lists the many people that have contributed to the software over the years.
 
-## Quick Install Via Miniconda
+## Quick Install Via Miniforge
 
-The easiest way to install the binaries is via [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
+The easiest way to install the binaries is via [Miniforge](https://github.com/conda-forge/miniforge#install), a light version of Anaconda
 ```
 conda install -y -c conda-forge ndcctools
 ```

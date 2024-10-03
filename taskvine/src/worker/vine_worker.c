@@ -286,25 +286,27 @@ void send_complete_tasks(struct link *l)
 			output[p->output_length] = '\0';
 			close(output_file);
 			send_async_message(l,
-					"complete %d %d %lld %lld %llu %llu %d\n%s",
+					"complete %d %d %lld %lld %llu %llu %d %d\n%s",
 					p->result,
 					p->exit_code,
 					(long long)p->output_length,
 					(long long)p->output_length,
 					(unsigned long long)p->execution_start,
 					(unsigned long long)p->execution_end,
+					p->sandbox_size,
 					p->task->task_id,
 					output);
 			free(output);
 		} else {
 			send_async_message(l,
-					"complete %d %d %lld %lld %llu %llu %d\n",
+					"complete %d %d %lld %lld %llu %llu %d %d\n",
 					p->result,
 					p->exit_code,
 					(long long)p->output_length,
 					0,
 					(unsigned long long)p->execution_start,
 					(unsigned long long)p->execution_end,
+					p->sandbox_size,
 					p->task->task_id);
 		}
 	}
@@ -350,7 +352,7 @@ static int64_t measure_worker_disk()
 		return 0;
 
 	char *cache_dir = vine_cache_data_path(cache_manager, ".");
-	path_disk_size_info_get_r(cache_dir, options->max_time_on_measurement, &state);
+	path_disk_size_info_get_r(cache_dir, options->max_time_on_measurement, &state, NULL);
 	free(cache_dir);
 
 	int64_t disk_measured = 0;
@@ -386,6 +388,7 @@ and apply any local options that override it.
 
 static void measure_worker_resources()
 {
+	static int disk_set = 0;
 	static time_t last_resources_measurement = 0;
 	if (time(0) < last_resources_measurement + options->check_resources_interval) {
 		return;
@@ -404,14 +407,14 @@ static void measure_worker_resources()
 
 	if (options->disk_total > 0) {
 		r->disk.total = MIN(r->disk.total, options->disk_total);
-	} else {
-		/* Set the reporting disk to a fraction of the measured disk to avoid
-		 * unnecessarily forsaking tasks with unspecified resources.
-		 * Note that @vine_resources_measure_locally reports that
-		 * disk.total = available_disk + disk.inuse, so we leave out disk.inuse in
-		 * the discounting calculation, then add it back in. */
-		r->disk.total -= r->disk.inuse;
+	} else if (!disk_set) {
+		/* XXX If no disk is specified we will allocate half of the worker disk available
+		   at startup. We will not update the allocation since it should remain static.
+		   If something else is consuming disk on the machine it would cause issues with tasks which
+		   request the whole available worker disk. Leaving half of the disk to other processes
+		   should leave the worker free to use the other half without the need to re measure. */
 		r->disk.total = ceil(r->disk.total * options->disk_percent / 100) + r->disk.inuse;
+		disk_set = 1;
 	}
 
 	r->disk.inuse = measure_worker_disk();
@@ -858,7 +861,10 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 		} else if (sscanf(line, "provides_library %s", library_name) == 1) {
 			vine_task_set_library_provided(task, library_name);
 		} else if (sscanf(line, "function_slots %" PRId64, &n) == 1) {
-			vine_task_set_function_slots(task, n);
+			/* Set the number of slots requested by the user. */
+			task->function_slots_requested = n;
+			/* Also set the total number determined by the manager. */
+			task->function_slots_total = n;
 		} else if (sscanf(line, "infile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			vine_hack_do_not_compute_cached_name = 1;
@@ -1096,10 +1102,10 @@ static void kill_all_tasks()
 
 /* Check whether a given process is still within the various limits imposed on it. */
 
-static int enforce_process_limits(struct vine_process *p)
+static int enforce_process_sanbox_limits(struct vine_process *p)
 {
 	/* If the task did not set disk usage, return right away. */
-	if (p->disk < 1)
+	if (p->task->resources_requested->disk < 1)
 		return 1;
 
 	vine_process_measure_disk(p, options->max_time_on_measurement);
@@ -1117,7 +1123,7 @@ static int enforce_process_limits(struct vine_process *p)
 
 /* Check all processes to see whether they have exceeded various limits, and kill if necessary. */
 
-static int enforce_processes_limits()
+static int enforce_processes_sandbox_limits()
 {
 	static time_t last_check_time = 0;
 
@@ -1132,8 +1138,8 @@ static int enforce_processes_limits()
 
 	ITABLE_ITERATE(procs_running, task_id, p)
 	{
-		if (!enforce_process_limits(p)) {
-			finish_running_task(p, VINE_RESULT_RESOURCE_EXHAUSTION);
+		if (!enforce_process_sanbox_limits(p)) {
+			finish_running_task(p, VINE_RESULT_SANDBOX_EXHAUSTION);
 			trash_file(p->sandbox);
 
 			ok = 0;
@@ -1324,7 +1330,8 @@ static int task_resources_fit_now(struct vine_task *t)
 {
 	return (cores_allocated + t->resources_requested->cores <= total_resources->cores.total) &&
 	       (memory_allocated + t->resources_requested->memory <= total_resources->memory.total) &&
-	       (disk_allocated + t->resources_requested->disk <= total_resources->disk.total) && (gpus_allocated + t->resources_requested->gpus <= total_resources->gpus.total);
+	       ((t->needs_library || disk_allocated + t->resources_requested->disk <= total_resources->disk.total)) && (gpus_allocated + t->resources_requested->gpus <= total_resources->gpus.total);
+	// XXX Disk is constantly shrinking, and library disk requests are currently static. Once we generate some files things will hang.
 }
 
 /*
@@ -1356,7 +1363,7 @@ static struct vine_process *find_running_library_for_function(const char *librar
 	ITABLE_ITERATE(procs_running, task_id, p)
 	{
 		if (p->task->provides_library && !strcmp(p->task->provides_library, library_name)) {
-			if (p->library_ready && p->functions_running < p->task->function_slots) {
+			if (p->library_ready && p->functions_running < p->task->function_slots_total) {
 				return p;
 			}
 		}
@@ -1677,7 +1684,7 @@ static void vine_worker_serve_manager(struct link *manager)
 
 		/* end a running processes if goes above its declared limits.
 		 * Mark offending process as RESOURCE_EXHASTION. */
-		enforce_processes_limits();
+		enforce_processes_sandbox_limits();
 
 		/* end running processes if worker resources are exhasusted, and marked
 		 * them as FORSAKEN, so they can be resubmitted somewhere else. */

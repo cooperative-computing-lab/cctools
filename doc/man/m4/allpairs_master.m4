@@ -91,7 +91,7 @@ LONGCODE_END
 
 To speed up the process, run more MANPAGE(work_queue_worker,1) processes on
 other machines, or use MANPAGE(condor_submit_workers,1) or
-MANPAGE(sge_submit_workers,1) to start hundreds of workers in your local batch
+MANPAGE(uge_submit_workers,1) to start hundreds of workers in your local batch
 system.
 PARA
 The following is an example of adding more workers to execute a All-Pairs
@@ -125,7 +125,7 @@ LIST_ITEM(LINK(All-Pairs User Manual,"http://ccl.cse.nd.edu/software/manuals/all
 LIST_ITEM(LINK(Work Queue User Manual,"http://ccl.cse.nd.edu/software/manuals/workqueue.html"))
 LIST_ITEM(MANPAGE(work_queue_worker,1))
 LIST_ITEM(MANPAGE(condor_submit_workers,1))
-LIST_ITEM(MANPAGE(sge_submit_workers,1))
+LIST_ITEM(MANPAGE(uge_submit_workers,1))
 LIST_ITEM(MANPAGE(allpairs_multicore,1))
 LIST_END
 
