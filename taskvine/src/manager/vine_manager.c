@@ -80,6 +80,7 @@ See the file COPYING for details.
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <limits.h>
 
 /* Default value for seconds between updates to the catalog. */
 #define VINE_UPDATE_INTERVAL 60
@@ -5124,9 +5125,9 @@ int vine_hungry(struct vine_manager *q)
 	struct vine_stats qstats;
 	vine_get_stats(q, &qstats);
 
-	// if number of ready tasks is less than minimum, then queue is hungry
-	if (qstats.tasks_waiting < MAX(q->hungry_minimum, q->hungry_minimum_factor * hash_table_size(q->worker_table))) {
-		return 1;
+	// if number of ready tasks is the queue is less than the miniumum, then it is hungry
+	if (qstats.tasks_waiting < q->hungry_minimum) {
+		return q->hungry_minimum - qstats.tasks_waiting;
 	}
 
 	// get total available resources consumption (cores, memory, disk, gpus) of all workers of this manager
@@ -5135,13 +5136,14 @@ int vine_hungry(struct vine_manager *q)
 	int64_t workers_total_avail_memory = 0;
 	int64_t workers_total_avail_disk = 0;
 	int64_t workers_total_avail_gpus = 0;
+	// overcommited_resource_total(q, quantity)
+	workers_total_avail_cores = 2*qstats.total_cores - qstats.committed_cores;
+	workers_total_avail_memory = 2*qstats.total_memory - qstats.committed_memory;
+	workers_total_avail_gpus = 2*qstats.total_gpus - qstats.committed_gpus;
+	workers_total_avail_disk = 2*qstats.total_disk - qstats.committed_disk; // never overcommit disk
 
-	workers_total_avail_cores = overcommitted_resource_total(q, q->stats->total_cores) - q->stats->committed_cores;
-	workers_total_avail_memory = overcommitted_resource_total(q, q->stats->total_memory) - q->stats->committed_memory;
-	workers_total_avail_gpus = overcommitted_resource_total(q, q->stats->total_gpus) - q->stats->committed_gpus;
-	workers_total_avail_disk = q->stats->total_disk - q->stats->committed_disk; // never overcommit disk
-
-	// get required resources (cores, memory, disk, gpus) of one waiting task
+	// get required resources (cores, memory, disk, gpus) of one (all?) waiting tasks
+	// seems to iterate through all tasks counted in the queue
 	int64_t ready_task_cores = 0;
 	int64_t ready_task_memory = 0;
 	int64_t ready_task_disk = 0;
@@ -5151,34 +5153,80 @@ int vine_hungry(struct vine_manager *q)
 
 	int count = task_state_count(q, NULL, VINE_TASK_READY);
 
-	while (count > 0) {
-		count--;
+	int i = count;
+
+	while (i > 0) {
+		i--;
 		t = list_pop_head(q->ready_list);
 
 		ready_task_cores += MAX(1, t->resources_requested->cores);
-		ready_task_memory += t->resources_requested->memory;
-		ready_task_disk += t->resources_requested->disk;
-		ready_task_gpus += t->resources_requested->gpus;
-
+		ready_task_memory += t->resources_requested->memory >= 0 ? t->resources_requested->memory : 0;
+		ready_task_disk +=  t->resources_requested->disk >= 0 ? t->resources_requested->disk : 0;
+		ready_task_gpus += t->resources_requested->gpus >= 0 ? t->resources_requested->gpus : 0;
 		list_push_tail(q->ready_list, t);
 	}
 
 	// check possible limiting factors
 	// return false if required resources exceed available resources
+	int64_t avg_additional_tasks_cores, avg_additional_tasks_memory, avg_additional_tasks_disk, avg_additional_tasks_gpus;
 	if (ready_task_cores > workers_total_avail_cores) {
+		printf("task_cores, worker_cores %ld %ld\n", ready_task_cores, workers_total_avail_cores);
 		return 0;
 	}
 	if (ready_task_memory > workers_total_avail_memory) {
+		printf("task_memory, worker_memory %ld %ld\n", ready_task_memory, workers_total_avail_memory);
 		return 0;
 	}
-	if (ready_task_disk > workers_total_avail_disk) {
+	if (ready_task_disk > workers_total_avail_disk) {	
+		printf("task_disk, worker_disk %ld %ld\n", ready_task_disk, workers_total_avail_disk);
 		return 0;
 	}
 	if (ready_task_gpus > workers_total_avail_gpus) {
+		printf("task_gpu, worker_gpu %ld %ld\n", ready_task_gpus, workers_total_avail_gpus);
 		return 0;
 	}
 
-	return 1; // all good
+	if (ready_task_cores < 0) ready_task_cores = 0;
+	if (ready_task_memory < 0) ready_task_memory = 0;
+	if (ready_task_disk < 0) ready_task_disk = 0;
+	if (ready_task_gpus < 0) ready_task_gpus = 0;
+	printf("pre: %ld %ld %ld %ld\n", ready_task_cores, ready_task_memory, ready_task_disk, ready_task_gpus); // in the queue
+	printf("prenext: %ld %ld %ld %ld\n", workers_total_avail_cores, workers_total_avail_memory, workers_total_avail_disk, workers_total_avail_gpus); // 2*total - committed
+	printf("prenextnext: %ld %ld, %ld %ld, %ld %ld, %ld %ld", qstats.total_cores, qstats.committed_cores, qstats.total_memory, qstats.committed_memory, qstats.total_gpus, qstats.committed_gpus, qstats.total_disk, qstats.committed_disk);
+	if (count != 0) {
+		if (ready_task_cores != 0) {
+			avg_additional_tasks_cores = (workers_total_avail_cores - ready_task_cores) / (ready_task_cores / count);
+		} else {
+			avg_additional_tasks_cores = workers_total_avail_cores;
+		}
+		if (ready_task_memory != 0) {
+			avg_additional_tasks_memory = (workers_total_avail_memory - ready_task_memory) / (ready_task_memory / count);
+		} else {
+			avg_additional_tasks_memory = workers_total_avail_cores;
+		}
+		if (ready_task_disk != 0 ) {
+			avg_additional_tasks_disk = (workers_total_avail_disk - ready_task_disk) / (ready_task_disk / count);
+		} else {
+			avg_additional_tasks_disk = workers_total_avail_cores;
+		}
+		if (ready_task_gpus != 0) {
+			avg_additional_tasks_gpus = (workers_total_avail_gpus - ready_task_gpus) / (ready_task_gpus / count);
+		} else {
+			avg_additional_tasks_gpus = workers_total_avail_cores;
+		}
+	} else {
+		printf(":(");
+		return workers_total_avail_cores; // this returns number of cores if no tasks in queue and we have resources. 
+	}
+	printf("%ld, %ld, %ld, %ld\n", avg_additional_tasks_cores, avg_additional_tasks_memory, avg_additional_tasks_disk, avg_additional_tasks_gpus);
+	int64_t min = avg_additional_tasks_cores;
+	if (avg_additional_tasks_memory < min) min = avg_additional_tasks_memory;
+	if (avg_additional_tasks_disk < min) min = avg_additional_tasks_disk;
+	if (avg_additional_tasks_gpus < min) min = avg_additional_tasks_gpus;
+	if (min < 0) min = 0;
+
+	return min;
+
 }
 
 int vine_workers_shutdown(struct vine_manager *q, int n)
