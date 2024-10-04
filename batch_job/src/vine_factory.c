@@ -1168,8 +1168,9 @@ static void show_help(const char *cmd)
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
 	printf(" %-30s Specify the size of the debug file.\n", "-O,--debug-file-size=<mb>");
-	printf(" %-30s Workers should use SSL to connect to managers. (Not needed if project names.)", "--ssl");
+	printf(" %-30s Workers should use SSL to connect to managers. (Not needed if project names.)\n", "--ssl");
 	printf(" %-30s SNI domain name if different from manager hostname. Implies --ssl.\n", "--tls-sni=<domain name>");
+	printf(" %-30s Set a custom factory name.\n", "--factory-name");
 
 	printf(" %-30s Show the version string.\n", "-v,--version");
 	printf(" %-30s Show this screen.\n", "-h,--help");
@@ -1198,7 +1199,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Alternate binary instead of vine_worker.\n", "--worker-binary=<file>");
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
-	printf(" %-30s Run each worker inside this python environment.\n","--python-env=<file.tar.gz>");
+	printf(" %-30s Run each worker inside this poncho environment.\n","--poncho-env=<file.tar.gz>");
 
 	printf("\nOptions specific to batch systems:\n");
 	printf(" %-30s Generic batch system options.\n", "-B,--batch-options=<options>");
