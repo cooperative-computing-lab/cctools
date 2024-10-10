@@ -5157,26 +5157,10 @@ int vine_hungry(struct vine_manager *q)
 		ready_task_gpus += t->resources_requested->gpus;
 	}
 
-	int count = task_state_count(q, NULL, VINE_TASK_READY);
-	/*
-	// represents number of tasks in queue
-	int i = count;
+	int count = task_state_count(q, NULL, VINE_TASK_READY);	
 
-	while (i > 0) {
-		i--;
-		t = list_pop_head(q->ready_list);
-
-		ready_task_cores += MAX(1, t->resources_requested->cores);
-		ready_task_memory += t->resources_requested->memory >= 0 ? t->resources_requested->memory : 0;
-		ready_task_disk += t->resources_requested->disk >= 0 ? t->resources_requested->disk : 0;
-		ready_task_gpus += t->resources_requested->gpus >= 0 ? t->resources_requested->gpus : 0;
-		list_push_tail(q->ready_list, t);
-	}
-	*/
-
-	// check possible limiting factors
-	// return false if required resources exceed available resources
 	int64_t avg_additional_tasks_cores, avg_additional_tasks_memory, avg_additional_tasks_disk, avg_additional_tasks_gpus;
+
 	if (ready_task_cores > workers_total_avail_cores) {
 		return 0;
 	}
