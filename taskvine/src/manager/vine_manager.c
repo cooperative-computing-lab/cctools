@@ -5142,7 +5142,7 @@ int vine_hungry(struct vine_manager *q)
 	workers_total_avail_disk = 2 * qstats.total_disk - qstats.committed_disk; // never overcommit disk
 
 	// get required resources (cores, memory, disk, gpus) of one (all?) waiting tasks
-	// seems to iterate through all tasks counted in the queue
+	// seems to iterate through all tasks counted in the queue.
 	int64_t ready_task_cores = 0;
 	int64_t ready_task_memory = 0;
 	int64_t ready_task_disk = 0;
