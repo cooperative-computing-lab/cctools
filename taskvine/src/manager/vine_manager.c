@@ -5150,8 +5150,15 @@ int vine_hungry(struct vine_manager *q)
 
 	struct vine_task *t;
 
-	int count = task_state_count(q, NULL, VINE_TASK_READY);
+	LIST_ITERATE(q->ready_list, t) {
+		ready_task_cores += MAX(1, t->resources_requested->cores);
+		ready_task_memory += t->resources_requested->memory;
+		ready_task_disk += t->resources_requested->disk;
+		ready_task_gpus += t->resources_requested->gpus;
+	}
 
+	int count = task_state_count(q, NULL, VINE_TASK_READY);
+	/*
 	// represents number of tasks in queue
 	int i = count;
 
@@ -5165,6 +5172,7 @@ int vine_hungry(struct vine_manager *q)
 		ready_task_gpus += t->resources_requested->gpus >= 0 ? t->resources_requested->gpus : 0;
 		list_push_tail(q->ready_list, t);
 	}
+	*/
 
 	// check possible limiting factors
 	// return false if required resources exceed available resources
