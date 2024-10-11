@@ -179,6 +179,15 @@ def dict_to_env(
     return output
 
 
+def _write_pinned_files(poncho_spec, env_dir):
+    if "pinned" in poncho_spec:
+        if "conda" in poncho_spec:
+            with open(os.path.join(env_dir, "env", "conda-meta", "pinned"), "w") as f:
+                for p, v in poncho_spec["pinned"]["conda"].items():
+                    assert isinstance(v, str)
+                    f.write(f"{p}={v}\n")
+
+
 def pack_env_from_dict(
     spec,
     output,
@@ -210,11 +219,21 @@ def pack_env_from_dict(
         http_data(spec, env_dir)
 
         # create conda environment in temp directory
+        logger.info("creating environment directory...")
+        _run_conda_command(
+            env_dir,
+            needs_confirmation,
+            "create",
+        )
+
+        _write_pinned_files(spec, env_dir)
+
+        # update conda environment in temp directory from spec
         logger.info("populating environment...")
         _run_conda_command(
             env_dir,
             needs_confirmation,
-            "env create",
+            "env update",
             "--file",
             env_dir + "/conda_spec.yml",
         )
