@@ -265,15 +265,15 @@ def pack_env(
 
     # else if spec is a file or from stdin
     elif os.path.isfile(spec) or spec == "-":
-        f = open(spec, "r")
-        poncho_spec = json.load(f)
-        pack_env_from_dict(
-            poncho_spec,
-            output,
-            conda_executable,
-            download_micromamba,
-            ignore_editable_packages,
-        )
+        with open(spec, "r") as f:
+            poncho_spec = json.load(f)
+            pack_env_from_dict(
+                poncho_spec,
+                output,
+                conda_executable,
+                download_micromamba,
+                ignore_editable_packages,
+            )
 
     # else pack from a conda environment name
     # this thus assumes conda executable is in the current shell executable path
