@@ -5235,7 +5235,7 @@ int vine_hungry(struct vine_manager *q)
 		ready_task_gpus += t->resources_requested->gpus;
 	}
 
-	int count = task_state_count(q, NULL, VINE_TASK_READY);
+	int count = priority_queue_size(q->ready_tasks);
 
 	int64_t avg_additional_tasks_cores, avg_additional_tasks_memory, avg_additional_tasks_disk, avg_additional_tasks_gpus;
 
