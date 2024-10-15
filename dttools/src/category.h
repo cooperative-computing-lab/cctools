@@ -104,6 +104,9 @@ struct category {
 	/* stats for taskvine */
 	struct vine_stats *vine_stats;
 
+	/* Max sandbox disk space observed, in MB. This is the minimum sandbox size needed if nothing else is known about the task.*/
+	int64_t min_vine_sandbox;
+
 	/* variables for makeflow */
 	/* Mappings between variable names defined in the makeflow file and their values. */
 	struct hash_table *mf_variables;

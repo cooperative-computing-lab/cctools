@@ -15,6 +15,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "list.h"
 #include "priority_queue.h"
+#include "macros.h"
 #include "rmonitor_types.h"
 #include "rmsummary.h"
 
@@ -133,6 +134,31 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 	return ok;
 }
 
+/* t->disk only specifies the size of output and ephemeral files. Here we check if the task would fit together with all its input files
+ * taking into account that some files may be already at the worker. */
+int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	int ok = 1;
+	double available = w->resources->disk.total - MAX(0, t->resources_requested->disk) - w->resources->disk.inuse;
+
+	struct vine_mount *m;
+	LIST_ITERATE(t->input_mounts, m)
+	{
+		if (hash_table_lookup(w->current_files, m->file->cached_name)) {
+			continue;
+		}
+
+		available -= m->file->size;
+
+		if (available < 0) {
+			ok = 1;
+			break;
+		}
+	}
+
+	return ok;
+}
+
 /* Check if this task is compatible with this given worker by considering
  * resources availability, features, blocklist, and all other relevant factors.
  * Used by all scheduling methods for basic compatibility.
@@ -148,12 +174,16 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	/* Otherwise library templates are modified during the run. */
 
 	/* worker has not reported any resources yet */
-	if (w->resources->tag < 0 || w->resources->workers.total < 1) {
+	if (w->resources->tag < 0 || w->resources->workers.total < 1 || w->end_time < 0) {
 		return 0;
 	}
 
 	/* Don't send tasks to this worker if it is in draining mode (no more tasks). */
 	if (w->draining) {
+		return 0;
+	}
+	// if worker's end time has not been received
+	if (w->end_time < 0) {
 		return 0;
 	}
 
@@ -183,11 +213,6 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	}
 	rmsummary_delete(l);
 
-	// if worker's end time has not been received
-	if (w->end_time < 0) {
-		return 0;
-	}
-
 	// if wall time for worker is specified and there's not enough time for task, then not ok
 	if (w->end_time > 0) {
 		double current_time = ((double)timestamp_get()) / ONE_SECOND;
@@ -197,6 +222,10 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		if (t->min_running_time > 0 && w->end_time - current_time < t->min_running_time) {
 			return 0;
 		}
+	}
+
+	if (!check_worker_have_enough_disk_with_inputs(q, w, t)) {
+		return 0;
 	}
 
 	/* If the worker is not the one the task wants. */

@@ -218,6 +218,8 @@ struct vine_manager {
 	int max_library_retries;        /* The maximum time that a library can be failed and retry another one, if over this count the library template will be removed */
 	int watch_library_logfiles;     /* If true, watch the output files produced by each of the library processes running on the remote workers, take them back the current logging directory */
 
+	double sandbox_grow_factor;         /* When task disk sandboxes are exhausted, increase the allocation using their measured valued times this factor */
+
 	/*todo: confirm datatype. int or int64*/
 	int max_task_stdout_storage;	/* Maximum size of standard output from task.  (If larger, send to a separate file.) */
 	int max_new_workers;			/* Maximum number of workers to add in a single cycle before dealing with other matters. */

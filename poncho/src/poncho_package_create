@@ -5,7 +5,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Create a packed environment from a spec, a conda environment name, or a conda directory.')
     parser.add_argument('spec', help='Read in a spec file, a conda environment name, a conda directory, or - for stdin.')
     parser.add_argument('output', help='Write output from conda-pack to the given file.')
-    parser.add_argument('--conda-executable', action='store_true', help='Path to conda executable to use. Default are, in this order: mamba, $CONDA_EXE, conda')
+    parser.add_argument('--conda-executable', action='store', help='Path to conda executable to use. Default are, in this order: mamba, $CONDA_EXE, conda')
 
     parser.add_argument('--no-micromamba', action='store_true', help='Do not try no download micromamba if a conda executable is not found.')
     parser.add_argument('--ignore-editable-packages', action='store_true', help='Skip checks for editable packages.')

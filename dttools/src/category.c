@@ -921,6 +921,11 @@ const struct rmsummary *category_task_min_resources(struct category *c, struct r
 	/* but don't go below the minimum defined for the category. */
 	rmsummary_merge_max(internal, c->min_allocation);
 
+	/* nor below the observed sandboxes if not in an auto mode */
+	if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED && user && user->disk < 0) {
+		internal->disk = MAX(internal->disk, c->min_vine_sandbox);
+	}
+
 	return internal;
 }
 
