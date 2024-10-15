@@ -4734,7 +4734,7 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	vine_category_lookup_or_create(q, t->category);
 
 	/* Attempt to group this task based on temp dependencies. */
-	if(q->task_groups_enabled) { 
+	if (q->task_groups_enabled) {
 		vine_task_groups_assign_task(q, t);
 	}
 
