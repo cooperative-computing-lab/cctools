@@ -5112,7 +5112,7 @@ struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, 
 // check if workers' resources are available to execute more tasks queue should
 // have at least MAX(hungry_minimum, hungry_minimum_factor * number of workers) ready tasks
 //@param: 	struct vine_manager* - pointer to manager
-//@return: 	1 if hungry, 0 otherwise
+//@return: 	approximate number of additional tasks if hungry, 0 otherwise
 int vine_hungry(struct vine_manager *q)
 {
 	// check if manager is initialized
@@ -5124,9 +5124,9 @@ int vine_hungry(struct vine_manager *q)
 	struct vine_stats qstats;
 	vine_get_stats(q, &qstats);
 
-	// if number of ready tasks is less than minimum, then queue is hungry
-	if (qstats.tasks_waiting < MAX(q->hungry_minimum, q->hungry_minimum_factor * hash_table_size(q->worker_table))) {
-		return 1;
+	// if number of ready tasks is the queue is less than the miniumum, then it is hungry
+	if (qstats.tasks_waiting < q->hungry_minimum) {
+		return q->hungry_minimum - qstats.tasks_waiting;
 	}
 
 	// get total available resources consumption (cores, memory, disk, gpus) of all workers of this manager
@@ -5135,13 +5135,14 @@ int vine_hungry(struct vine_manager *q)
 	int64_t workers_total_avail_memory = 0;
 	int64_t workers_total_avail_disk = 0;
 	int64_t workers_total_avail_gpus = 0;
+	// Find available resources (2 * total - committed)
+	workers_total_avail_cores = 2 * qstats.total_cores - qstats.committed_cores;
+	workers_total_avail_memory = 2 * qstats.total_memory - qstats.committed_memory;
+	workers_total_avail_gpus = 2 * qstats.total_gpus - qstats.committed_gpus;
+	workers_total_avail_disk = 2 * qstats.total_disk - qstats.committed_disk; // never overcommit disk
 
-	workers_total_avail_cores = overcommitted_resource_total(q, q->stats->total_cores) - q->stats->committed_cores;
-	workers_total_avail_memory = overcommitted_resource_total(q, q->stats->total_memory) - q->stats->committed_memory;
-	workers_total_avail_gpus = overcommitted_resource_total(q, q->stats->total_gpus) - q->stats->committed_gpus;
-	workers_total_avail_disk = q->stats->total_disk - q->stats->committed_disk; // never overcommit disk
-
-	// get required resources (cores, memory, disk, gpus) of one waiting task
+	// get required resources (cores, memory, disk, gpus) of one (all?) waiting tasks
+	// seems to iterate through all tasks counted in the queue.
 	int64_t ready_task_cores = 0;
 	int64_t ready_task_memory = 0;
 	int64_t ready_task_disk = 0;
@@ -5149,22 +5150,18 @@ int vine_hungry(struct vine_manager *q)
 
 	struct vine_task *t;
 
-	int count = task_state_count(q, NULL, VINE_TASK_READY);
-
-	while (count > 0) {
-		count--;
-		t = list_pop_head(q->ready_list);
-
+	LIST_ITERATE(q->ready_list, t)
+	{
 		ready_task_cores += MAX(1, t->resources_requested->cores);
 		ready_task_memory += t->resources_requested->memory;
 		ready_task_disk += t->resources_requested->disk;
 		ready_task_gpus += t->resources_requested->gpus;
-
-		list_push_tail(q->ready_list, t);
 	}
 
-	// check possible limiting factors
-	// return false if required resources exceed available resources
+	int count = task_state_count(q, NULL, VINE_TASK_READY);
+
+	int64_t avg_additional_tasks_cores, avg_additional_tasks_memory, avg_additional_tasks_disk, avg_additional_tasks_gpus;
+
 	if (ready_task_cores > workers_total_avail_cores) {
 		return 0;
 	}
@@ -5178,7 +5175,51 @@ int vine_hungry(struct vine_manager *q)
 		return 0;
 	}
 
-	return 1; // all good
+	if (ready_task_cores < 0)
+		ready_task_cores = 0;
+	if (ready_task_memory < 0)
+		ready_task_memory = 0;
+	if (ready_task_disk < 0)
+		ready_task_disk = 0;
+	if (ready_task_gpus < 0)
+		ready_task_gpus = 0;
+
+	if (count != 0) { // each statement counts the available (2*total - committed) and further subtracts the ready/in-queue tasks and then finds how mabny more
+		if (ready_task_cores != 0) {
+			avg_additional_tasks_cores = (workers_total_avail_cores - ready_task_cores) / (ready_task_cores / count);
+		} else {
+			avg_additional_tasks_cores = workers_total_avail_cores;
+		}
+		if (ready_task_memory != 0) {
+			avg_additional_tasks_memory = (workers_total_avail_memory - ready_task_memory) / (ready_task_memory / count);
+		} else {
+			avg_additional_tasks_memory = workers_total_avail_cores;
+		}
+		if (ready_task_disk != 0) {
+			avg_additional_tasks_disk = (workers_total_avail_disk - ready_task_disk) / (ready_task_disk / count);
+		} else {
+			avg_additional_tasks_disk = workers_total_avail_cores;
+		}
+		if (ready_task_gpus != 0) {
+			avg_additional_tasks_gpus = (workers_total_avail_gpus - ready_task_gpus) / (ready_task_gpus / count);
+		} else {
+			avg_additional_tasks_gpus = workers_total_avail_cores;
+		}
+	} else {
+		return workers_total_avail_cores; // this returns number of cores if no tasks in queue and we have resources.
+	}
+	// find the limiting factor
+	int64_t min = avg_additional_tasks_cores;
+	if (avg_additional_tasks_memory < min)
+		min = avg_additional_tasks_memory;
+	if (avg_additional_tasks_disk < min)
+		min = avg_additional_tasks_disk;
+	if (avg_additional_tasks_gpus < min)
+		min = avg_additional_tasks_gpus;
+	if (min < 0)
+		min = 0; // if for some reason we have a negative, just make it 0
+
+	return min;
 }
 
 int vine_workers_shutdown(struct vine_manager *q, int n)
