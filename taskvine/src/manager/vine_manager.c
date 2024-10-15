@@ -3338,11 +3338,17 @@ static int send_one_task(struct vine_manager *q)
 	int tasks_to_consider = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
 
 	// Iterate over the ready tasks by priority.
-	// If the one with the highest priority is not eligible to run, iterate by index 
-	// until the torate cursor is reset to the top under two circusmtances:
-	// 	1. Task retrieval from worker
-	// 	2. New worker connection
-	//  3. Delete/Insert an element prior/equal to the rotate cursor
+	// The first time we arrive here, the task with the highest priority is considered. However, there may be various reasons
+	// 	that this particular task is not eligible to run, such as: 1) the task requires more resources than the workers have;
+	// 	2) the task requires input files that are not available; 3) the task failed recently; etc. (check consider_task function)
+	// Therefore, we may permit occasional skips of the highest priority task, and consider the next one in the queue. Similarly,
+	// 	other tasks may be skipped, too, until we find a task that is able to run.
+	// For a priority queue, iterating over tasks by priority is expensive, as it requires a full sort of the queue. Therefore,
+	// 	we simply iterate by numerical index if the task at the top is unable to run, and reset the cursor to the top if events
+	// 	that may enable tasks prior to the current cursor to run occur. Specifically, the following events should trigger a reset:
+	// 	1. Task retrieval from worker (resources released or inputs available)
+	// 	2. New worker connection (more resources available)
+	//  3. Delete/Insert an element prior/equal to the rotate cursor (tasks prior to the current cursor changed)
 	// 1 and 2 are explicitly handled by the manager, while 3 is implicitly handled by the priority queue data structure
 	PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t)
 	{
