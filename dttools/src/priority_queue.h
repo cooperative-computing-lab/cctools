@@ -140,6 +140,13 @@ The first accessible element is at index 1.
 */
 void *priority_queue_get_element(struct priority_queue *pq, int index);
 
+/** Get the priority of an element at a specified index.
+@param pq A pointer to a priority queue.
+@param index The index of the element.
+@return The priority of the element if any, NAN on failure.
+*/
+double priority_queue_get_priority(struct priority_queue *pq, int index);
+
 /** Update the priority of an element in a priority queue.
 @param pq A pointer to a priority queue.
 @param data The pointer to the element to update.
@@ -216,13 +223,13 @@ PRIORITY_QUEUE_BASE_ITERATE(pq, idx, data) {
 </pre>
 */
 
-/* Iterate from begining */
+/* Iterate from begining every time starts, ends when manually set a depth or reach the end. */
 #define PRIORITY_QUEUE_BASE_ITERATE( pq, idx, data ) priority_queue_base_reset(pq); while ((idx = priority_queue_base_next(pq)) && (data = priority_queue_get_element(pq, idx)))
 
-/* Iterate from last position, never reset */
+/* Iterate from last position, never reset. MUST munually break the iteration, otherwise it never ends. */
 #define PRIORITY_QUEUE_STATIC_ITERATE( pq, idx, data ) while ((idx = priority_queue_static_next(pq)) && (data = priority_queue_get_element(pq, idx)))
 
-/* Iterate from last position, reset to the begining when needed */
+/* Iterate from last position, reset to the begining when needed. MUST munually break the iteration, otherwise it never ends. */
 #define PRIORITY_QUEUE_ROTATE_ITERATE( pq, idx, data ) while ((idx = priority_queue_rotate_next(pq)) && (data = priority_queue_get_element(pq, idx)))
 
 #endif

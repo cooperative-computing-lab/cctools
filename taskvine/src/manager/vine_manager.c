@@ -3352,6 +3352,8 @@ static int send_one_task(struct vine_manager *q)
 			commit_task_to_worker(q, w, t);
 			return 1;
 		}
+		// The break check must go after the task is considered, as the rotate cursor is
+		// advanced in the macro and must be considered
 		if (++tasks_considered >= tasks_to_consider) {
 			return 0;
 		}

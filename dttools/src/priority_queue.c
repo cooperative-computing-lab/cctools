@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <float.h>
 
 #define DEFAULT_CAPACITY 127
@@ -230,6 +231,14 @@ void *priority_queue_get_head(struct priority_queue *pq)
 		return NULL;
 
 	return pq->elements[1]->data;
+}
+
+double priority_queue_get_priority(struct priority_queue *pq, int index)
+{
+	if (!pq || pq->size < 1 || index < 1 || index > pq->size)
+		return NAN;
+
+	return pq->elements[index]->priority;
 }
 
 void *priority_queue_get_element(struct priority_queue *pq, int idx)
