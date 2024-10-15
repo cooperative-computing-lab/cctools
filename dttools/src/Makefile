@@ -92,6 +92,7 @@ SOURCES = \
 	ppoll_compat.c \
 	preadwrite.c \
 	priority_queue.c \
+	priority_queue_test.c \
 	process.c \
 	random.c \
 	rmonitor.c \
