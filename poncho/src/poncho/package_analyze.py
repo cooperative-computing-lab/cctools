@@ -11,6 +11,7 @@ import json
 import subprocess
 import importlib
 import email.parser
+import dis
 
 PKG_MAP = {}
 
@@ -150,6 +151,31 @@ def export_env(overrides, imports, extra):
             env["conda"]["dependencies"].append(pip_set)
 
     return env
+
+
+def analyze_function_from_bytecode(func):
+    func_bytecode = dis.Bytecode(func)
+    imports = set()
+
+    for instruction in func_bytecode:
+        if instruction.opname == 'IMPORT_NAME':
+            import_val = instruction.argval
+            import_pkg = import_val.split('.')[0]   # only get the global package
+            imports.add(import_pkg)
+
+    return imports
+   
+
+def analyze_functions_from_bytecode(func_list):
+    imports = set()
+    for func in func_list:
+        imports = imports.union(analyze_function_from_bytecode(func))
+    return imports
+
+
+def create_spec_from_functions(func_list):
+    imports = analyze_functions_from_bytecode(func_list)
+    return export_env({}, imports, [])
 
 
 def create_spec(
