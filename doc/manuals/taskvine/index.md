@@ -151,6 +151,7 @@ The following examples show more complex applications and various features of Ta
 - [Gradient Descent Example](example-gradient-descent.md)
 - [Watch Files Example](example-watch.md)
 - [Functional Example](example-functional.md)
+- [CFD Example](example-cfd.md)
 
 Read on to learn how to build applications from scratch and run large numbers of workers at scale.
 
