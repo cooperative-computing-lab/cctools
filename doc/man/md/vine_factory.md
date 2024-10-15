@@ -86,6 +86,8 @@ Also configurable through environment variables **CCTOOLS_TEMP** or **TMPDIR**
 - **--tls-sni=_&lt;&gt;_**<br />SNI domain name if different from manager hostname. Implies --ssl.
 - **-v**,**--version**<br /> Show the version string.
 - **-h**,**--help**<br /> Show this screen.
+- **--debug-workers**<br /> Bring the woker logs back to the scratch directory, usually work with **--single-shot**
+- **--single-shot**<br /> Shut down workers gracefully once their connected manager is done
 
 
 Concurrent control options:
@@ -171,6 +173,8 @@ If running on condor, you may manually specify condor requirements:
 ```
 vine_factory -T condor -M barney --condor-requirements 'MachineGroup == "disc"' --condor-requirements 'has_matlab == true'
 ```
+
+If 
 
 Repeated uses of **condor-requirements** are and-ed together. The previous example will produce a statement equivalent to:
 
