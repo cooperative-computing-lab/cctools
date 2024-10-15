@@ -3337,39 +3337,27 @@ static int send_one_task(struct vine_manager *q)
 	int tasks_considered = 0;
 	int tasks_to_consider = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
 
-	// First consider the task of the highest priority
-	t_idx = 1;
-	t = priority_queue_get_element(q->ready_tasks, t_idx);
-	if (!t) {
-		return 0;
-	}
-
-	// First check if the task of the highest priority is eligible to run
-	w = consider_task(q, t);
-	tasks_considered++;
-	if (!w) {
-		// If not, perform the rotation search to find the next eligible task
-		PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t)
-		{
-			w = consider_task(q, t);
-			if (w) {
-				break;
-			}
-			if (++tasks_considered >= tasks_to_consider) {
-				return 0;
-			}
+	// Iterate over the ready tasks by priority.
+	// If the one with the highest priority is not eligible to run, iterate by index 
+	// until the torate cursor is reset to the top under two circusmtances:
+	// 	1. Task retrieval from worker
+	// 	2. New worker connection
+	//  3. Delete/Insert an element prior/equal to the rotate cursor
+	// 1 and 2 are explicitly handled by the manager, while 3 is implicitly handled by the priority queue data structure
+	PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t)
+	{
+		w = consider_task(q, t);
+		if (w) {
+			priority_queue_remove(q->ready_tasks, t_idx);
+			commit_task_to_worker(q, w, t);
+			return 1;
+		}
+		if (++tasks_considered >= tasks_to_consider) {
+			return 0;
 		}
 	}
 
-	if (w) {
-		// Find a task and its suitable worker
-		priority_queue_remove(q->ready_tasks, t_idx);
-		commit_task_to_worker(q, w, t);
-		return 1;
-	} else {
-		// No task is eligible to run
-		return 0;
-	}
+	return 0;
 }
 
 /*
