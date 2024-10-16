@@ -24,6 +24,7 @@ See the file COPYING for details.
 #include "vine_runtime_dir.h"
 #include "vine_schedule.h"
 #include "vine_task.h"
+#include "vine_task_groups.h"
 #include "vine_task_info.h"
 #include "vine_taskgraph_log.h"
 #include "vine_txn_log.h"
@@ -2861,49 +2862,82 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 {
 	vine_result_code_t result = VINE_SUCCESS;
 
-	/* Kill unused libraries on this worker to reclaim resources. */
-	/* Matches assumption in vine_schedule.c:check_available_resources() */
-	kill_empty_libraries_on_worker(q, w, t);
+	struct list *l = NULL;
+	if (t->group_id) {
+		debug(D_VINE, "Task %d has GroupID of %s. Should Send:", t->task_id, t->group_id);
+		l = hash_table_lookup(q->task_group_table, t->group_id);
 
-	/* If this is a function needing a library, dispatch the library. */
-	if (t->needs_library) {
-		/* Consider whether the library task is already on that machine. */
-		t->library_task = vine_schedule_find_library(q, w, t->needs_library);
-		if (!t->library_task) {
-			/* Otherwise send the library to the worker. */
-			/* Note that this call will re-enter commit_task_to_worker. */
-			t->library_task = send_library_to_worker(q, w, t->needs_library, &result);
-
-			/* Careful: if the above failed, then w may no longer be valid */
-			/* In that case return immediately without making further changes. */
-			if (!t->library_task)
-				return result;
+		struct vine_task *logt;
+		LIST_ITERATE(l, logt)
+		{
+			debug(D_VINE, "Task ID: %d", logt->task_id);
 		}
-		/* If start_one_task_fails, this will be decremented in handle_failure below. */
-		t->library_task->function_slots_inuse++;
+
+		list_remove(l, t);
+		// decrement refcount
+		vine_task_delete(t);
 	}
 
-	t->hostname = xxstrdup(w->hostname);
-	t->addrport = xxstrdup(w->addrport);
+	int counter = 0;
+	do {
 
-	t->time_when_commit_start = timestamp_get();
-	result = start_one_task(q, w, t);
-	t->time_when_commit_end = timestamp_get();
+		/* Kill empty libraries to reclaim resources. Match the assumption of
+		 * @vine.schedule.c:check_worker_have_enough_resources() */
+		kill_empty_libraries_on_worker(q, w, t);
 
-	itable_insert(w->current_tasks, t->task_id, t);
-	t->worker = w;
+		/* If this is a function needing a library, dispatch the library. */
+		if (t->needs_library) {
+			/* Consider whether the library task is already on that machine. */
+			t->library_task = vine_schedule_find_library(q, w, t->needs_library);
+			if (!t->library_task) {
+				/* Otherwise send the library to the worker. */
+				/* Note that this call will re-enter commit_task_to_worker. */
+				t->library_task = send_library_to_worker(q, w, t->needs_library, &result);
 
-	change_task_state(q, t, VINE_TASK_RUNNING);
+				/* Careful: if the above failed, then w may no longer be valid */
+				/* In that case return immediately without making further changes. */
+				if (!t->library_task) {
+					list_push_head(l, t);
+					return result;
+				}
+			}
+			/* If start_one_task_fails, this will be decremented in handle_failure below. */
+			t->library_task->function_slots_inuse++;
+		}
 
-	t->try_count += 1;
-	q->stats->tasks_dispatched += 1;
+		t->hostname = xxstrdup(w->hostname);
+		t->addrport = xxstrdup(w->addrport);
 
-	count_worker_resources(q, w);
+		t->time_when_commit_start = timestamp_get();
+		result = start_one_task(q, w, t);
+		t->time_when_commit_end = timestamp_get();
 
-	if (result != VINE_SUCCESS) {
-		debug(D_VINE, "Failed to send task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
-		handle_failure(q, w, t, result);
-	}
+		itable_insert(w->current_tasks, t->task_id, t);
+		t->worker = w;
+
+		change_task_state(q, t, VINE_TASK_RUNNING);
+
+		t->try_count += 1;
+		q->stats->tasks_dispatched += 1;
+
+		count_worker_resources(q, w);
+
+		if (result != VINE_SUCCESS) {
+			debug(D_VINE, "Failed to send task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
+			handle_failure(q, w, t, result);
+		}
+
+		if (counter) {
+			list_remove(q->ready_list, t);
+			// decrement refcount
+			vine_task_delete(t);
+		}
+
+		counter++;
+
+	} while ((l && (t = list_pop_head(l))));
+
+	debug(D_VINE, "Sent batch of %d tasks to worker %s", counter, w->hostname);
 
 	return result;
 }
@@ -3828,6 +3862,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->factory_table = hash_table_create(0, 0);
 	q->current_transfer_table = hash_table_create(0, 0);
+	q->task_group_table = hash_table_create(0, 0);
 	q->fetch_factory = 0;
 
 	q->measured_local_resources = rmsummary_create(-1);
@@ -3892,6 +3927,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	// peer transfers enabled by default
 	q->peer_transfers_enabled = 1;
+
+	q->task_groups_enabled = 0;
 
 	q->load_from_shared_fs_enabled = 0;
 
@@ -4167,6 +4204,9 @@ void vine_delete(struct vine_manager *q)
 
 	vine_current_transfers_clear(q);
 	hash_table_delete(q->current_transfer_table);
+
+	vine_task_groups_clear(q);
+	hash_table_delete(q->task_group_table);
 
 	itable_clear(q->tasks, (void *)delete_task_at_exit);
 	itable_delete(q->tasks);
@@ -4579,6 +4619,11 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 	/* Ensure category structure is created. */
 	vine_category_lookup_or_create(q, t->category);
+
+	/* Attempt to group this task based on temp dependencies. */
+	if (q->task_groups_enabled) {
+		vine_task_groups_assign_task(q, t);
+	}
 
 	change_task_state(q, t, VINE_TASK_READY);
 
@@ -5366,6 +5411,14 @@ int vine_cancel_by_task_id(struct vine_manager *q, int task_id)
 		return 0;
 	}
 
+	if (task->group_id && (task->refcount > 1)) {
+		struct list *l = hash_table_lookup(q->task_group_table, task->group_id);
+		if (l) {
+			list_remove(l, task);
+		}
+		vine_task_delete(task);
+	}
+
 	reset_task_to_state(q, task, VINE_TASK_RETRIEVED);
 
 	task->result = VINE_RESULT_CANCELLED;
@@ -5566,6 +5619,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "update-interval")) {
 		q->update_interval = MAX(1, (int)value);
+
+	} else if (!strcmp(name, "task-groups")) {
+		q->task_groups_enabled = MIN(1, (int)value);
 
 	} else if (!strcmp(name, "resource-management-interval")) {
 		q->resource_management_interval = MAX(1, (int)value);

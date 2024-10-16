@@ -118,6 +118,7 @@ struct vine_manager {
 	struct hash_table *workers_with_watched_file_updates;  /* Maps link -> vine_worker_info */
 	struct hash_table *workers_with_complete_tasks;  /* Maps link -> vine_worker_info */
 	struct hash_table *current_transfer_table; 	/* Maps uuid -> struct transfer_pair */
+	struct hash_table *task_group_table; 	/* Maps uuid -> list vine_task */
 
 	/* Primary data structures for tracking files. */
 
@@ -175,6 +176,9 @@ struct vine_manager {
 	int peer_transfers_enabled;
 	int file_source_max_transfers;
 	int worker_source_max_transfers;
+
+	/* Task Groups Configuration */
+	int task_groups_enabled; 
 
 	/* Various performance knobs that can be tuned. */
 	int short_timeout;            /* Timeout in seconds to send/recv a brief message from worker */

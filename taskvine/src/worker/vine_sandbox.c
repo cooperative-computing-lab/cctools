@@ -54,6 +54,10 @@ vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cach
 			break;
 		case VINE_CACHE_STATUS_UNKNOWN:
 		case VINE_CACHE_STATUS_FAILED:
+			if (p->task->group_id) {
+				processing++;
+				break;
+			}
 			return VINE_CACHE_STATUS_FAILED;
 		}
 	}
