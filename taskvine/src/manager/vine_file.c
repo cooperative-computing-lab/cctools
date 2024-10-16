@@ -67,6 +67,7 @@ int vine_file_delete(struct vine_file *f)
 		free(f->source);
 		free(f->cached_name);
 		free(f->data);
+		free(f->transfer_id);
 		free(f);
 	}
 

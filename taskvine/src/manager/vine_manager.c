@@ -3093,6 +3093,9 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 {
 	struct vine_mount *m;
 
+	/* Keep a list of txid created for peer transfers, in case we decide not to schedule we can remove them */
+	struct list *list_txid_scheduled = list_create();
+
 	LIST_ITERATE(t->input_mounts, m)
 	{
 		/* Is the file already present on that worker? */
@@ -3117,6 +3120,11 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 			if ((peer = vine_file_replica_table_find_worker(q, m->file->cached_name))) {
 				char *peer_source = string_format("%s/%s", peer->transfer_url, m->file->cached_name);
 				m->substitute = vine_file_substitute_url(m->file, peer_source, peer);
+
+				char *transfer_id = vine_current_transfers_add(q, w, peer, 0);
+				m->substitute->transfer_id = xxstrdup(transfer_id);
+				list_push_head(list_txid_scheduled, transfer_id);
+
 				free(peer_source);
 				found_match = 1;
 			}
@@ -3135,6 +3143,11 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		if (m->file->type == VINE_URL) {
 			/* For a URL transfer, we can fall back to the original if capacity is available. */
 			if (vine_current_transfers_url_in_use(q, m->file->source) >= q->file_source_max_transfers) {
+				char *txid;
+				LIST_ITERATE(list_txid_scheduled, txid)
+				{
+					vine_current_transfers_remove(q, txid);
+				}
 				return 0;
 			} else {
 				/* keep going */
@@ -3142,15 +3155,27 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		} else if (m->file->type == VINE_TEMP) {
 			//  debug(D_VINE,"task %lld has no ready transfer source for temp %s",(long
 			//  long)t->task_id,m->file->cached_name);
+			char *txid;
+			LIST_ITERATE(list_txid_scheduled, txid)
+			{
+				vine_current_transfers_remove(q, txid);
+			}
 			return 0;
 		} else if (m->file->type == VINE_MINI_TASK) {
 			if (!vine_manager_transfer_capacity_available(q, w, m->file->mini_task)) {
+				char *txid;
+				LIST_ITERATE(list_txid_scheduled, txid)
+				{
+					vine_current_transfers_remove(q, txid);
+				}
 				return 0;
 			}
 		} else {
 			/* keep going */
 		}
 	}
+
+	list_delete(list_txid_scheduled);
 
 	debug(D_VINE, "task %lld has a ready transfer source for all files", (long long)t->task_id);
 	return 1;

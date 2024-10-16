@@ -232,14 +232,11 @@ vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_
 	url_encode(source, source_encoded, sizeof(source_encoded));
 	url_encode(f->cached_name, cached_name_encoded, sizeof(cached_name_encoded));
 
-	char *transfer_id = vine_current_transfers_add(q, w, f->source_worker, source);
-
-	vine_manager_send(q, w, "puturl_now %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, mode, transfer_id);
+	vine_manager_send(q, w, "puturl_now %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, mode, f->transfer_id);
 
 	struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
 	vine_file_replica_table_insert(q, w, f->cached_name, replica);
 
-	free(transfer_id);
 	return VINE_SUCCESS;
 }
 
@@ -268,14 +265,11 @@ vine_result_code_t vine_manager_put_url(struct vine_manager *q, struct vine_work
 	url_encode(f->source, source_encoded, sizeof(source_encoded));
 	url_encode(f->cached_name, cached_name_encoded, sizeof(cached_name_encoded));
 
-	char *transfer_id = vine_current_transfers_add(q, w, f->source_worker, f->source);
-
-	vine_manager_send(q, w, "puturl %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, mode, transfer_id);
+	vine_manager_send(q, w, "puturl %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, mode, f->transfer_id);
 
 	struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
 	vine_file_replica_table_insert(q, w, f->cached_name, replica);
 
-	free(transfer_id);
 	return VINE_SUCCESS;
 }
 

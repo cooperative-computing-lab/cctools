@@ -43,6 +43,7 @@ struct vine_file {
 	struct vine_task *recovery_task; // For temp files, a copy of the task that created it.
 	struct vine_worker_info *source_worker; // if this is a substitute file, attach the worker serving it. 
 	int change_message_shown; // True if error message already shown.
+	char *transfer_id;	// Contains the transfer id when file is a remote url/peer transfer.
 	int refcount;       // Number of references from a task object, delete when zero.
 };
 
