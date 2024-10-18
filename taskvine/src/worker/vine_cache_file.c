@@ -119,7 +119,7 @@ int vine_cache_file_measure_metadata(const char *path, int *mode, int64_t *size,
 		return 0;
 
 	/* Measure the size of the item recursively, if a directory. */
-	result = path_disk_size_info_get(path, size, &nfiles);
+	result = path_disk_size_info_get(path, size, &nfiles, NULL);
 	if (result < 0)
 		return 0;
 
