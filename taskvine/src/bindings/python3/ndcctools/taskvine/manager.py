@@ -930,8 +930,10 @@ class Manager(object):
     # @param init_command    A string describing a shell command to execute before the library task is run
     # @param add_env         Whether to automatically create and/or add environment to the library
     # @param hoisting_modules  A list of modules imported at the preamble of library, including packages, functions and classes.
+    # @param exec_mode       Execution mode that the library should use to run function calls. Either 'direct' or 'fork'
+    # @param library_context_info   A list containing [library_context_func, library_context_args, library_context_kwargs]. Used to create the library context on remote nodes.
     # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
-    def create_library_from_functions(self, library_name, *function_list, poncho_env=None, init_command=None, add_env=True, hoisting_modules=None):
+    def create_library_from_functions(self, library_name, *function_list, poncho_env=None, init_command=None, add_env=True, hoisting_modules=None, exec_mode='direct', library_context_info=None):
         # Delay loading of poncho until here, to avoid bringing in poncho dependencies unless needed.
         # Ensure poncho python library is available.
         from ndcctools.poncho import package_serverize
