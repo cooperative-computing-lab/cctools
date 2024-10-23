@@ -34,7 +34,6 @@ libattr
 libffi
 lsb_release
 m4
-mysql
 ncurses
 openssl
 patch
@@ -52,73 +51,8 @@ valgrind
 vim
 wget
 which
-xrootd
 zlib
 };
-
-my $builder = [
-	'mkdir -p /opt/vc3/utils',
-	'mkdir -p /opt/vc3/cctools-deps',
-	'cd /opt/vc3/utils',
-	'curl -o vc3-builder https://raw.githubusercontent.com/vc3-project/vc3-builder/master/vc3-builder-static',
-	'chmod 755 ./vc3-builder',
-];
-
-my $musl = [
-	'cd /opt/vc3/utils',
-	'./vc3-builder --make-jobs=4 --require musl -- ln -s \$VC3_ROOT_MUSL /opt/vc3/cctools-deps/musl',
-	'./vc3-builder --make-jobs=4 --require musl-zlib -- ln -s \$VC3_ROOT_MUSL_ZLIB /opt/vc3/cctools-deps/musl-zlib',
-];
-
-my $swig = [
-	'cd /opt/vc3/utils',
-	'./vc3-builder --make-jobs=4 --require swig -- ln -s \$VC3_ROOT_SWIG /opt/vc3/cctools-deps/swig',
-];
-
-my $uuid = [
-	'./vc3-builder --make-jobs=4 --require uuid -- ln -s \$VC3_ROOT_UUID /opt/vc3/cctools-deps/uuid',
-];
-
-my $cvmfs = [
-	'cd /opt/vc3/utils',
-	'./vc3-builder --make-jobs=4 --sys gettext:0.19=/usr --sys libffi:3.0=/usr --sys attr:2.4=/usr --require libcvmfs --install /opt/vc3 --distfiles /opt/vc3/distfiles -- ln -s \$VC3_ROOT_LIBCVMFS /opt/vc3/cctools-deps/cvmfs',
-];
-
-my $fuse = [
-	'cd /opt/vc3/utils',
-	'./vc3-builder --make-jobs=4 --require fuse -- ln -s \$VC3_ROOT_FUSE /opt/vc3/cctools-deps/fuse'
-];
-
-my $e2fsprogs = [
-	'cd /opt/vc3/utils',
-	'./vc3-builder --make-jobs=4 --require e2fsprogs -- ln -s \$VC3_ROOT_E2FSPROGS /opt/vc3/cctools-deps/ext2fs'
-];
-
-
-# using builder to provide .a library
-my $mysql = [
-	'cd /opt/vc3/utils',
-	'./vc3-builder --make-jobs=4 --require libmysql -- ln -s \$VC3_ROOT_LIBMYSQL /opt/vc3/cctools-deps/mysql',
-];
-
-# globus does not quite work, errors when linking
-my $globus = [
-	'cd /opt/vc3/utils',
-	'./vc3-builder --make-jobs=1 --require gridftp -- ln -s \$VC3_ROOT_GRIDFTP /opt/vc3/cctools-deps/globus',
-];
-
-
-my $irods = [
-	'cd /opt/vc3/utils',
-	'./vc3-builder --var INSIDE_CONTAINER=yes --make-jobs=4 --require irods --install /opt/vc3 --distfiles /opt/vc3/distfiles -- ln -s \$VC3_ROOT_IRODS /opt/vc3/cctools-deps/irods',
-];
-
-
-my $xrootd = [
-	'cd /opt/vc3/utils',
-	'./vc3-builder --make-jobs=4 --sys fuse:2.9=/usr --sys zlib:1.2=/usr --require xrootd:3:3 --install /opt/vc3 --distfiles /opt/vc3/distfiles -- ln -s \$VC3_ROOT_XROOTD /opt/vc3/cctools-deps/xrootd',
-];
-
 
 my @dependencies = (@dev_dependencies);
 
@@ -149,7 +83,7 @@ $command_for{almalinux} = 'dnf install -y';
 #$versions_of{debian} = [ qw{ 9.9 } ];
 #$command_for{debian} = 'apt-get install -y';
 
-$versions_of{ubuntu} = [ qw{ 16.04 20.04 } ];
+$versions_of{ubuntu} = [ qw{ 20.04 22.04 24.04 } ];
 $command_for{ubuntu} = 'apt-get install -y';
 
 # e.g., $package_for{distro}{version}{dependency} == 'package'
@@ -177,8 +111,6 @@ libattr                  => 'libattr-devel',
 libffi                   => 'libffi',
 lsb_release              => [],
 m4                       => 'm4',
-musl					 => [],             # from builder
-mysql                    => [],             # from builder
 ncurses                  => 'ncurses-devel',
 openssl                  => ['openssl', 'openssl-devel'],
 patch                    => 'patch',
@@ -189,14 +121,13 @@ python                   => [],			    # native (7), or disabled (8)
 python3					 => [],				# from epel (7), or native (8)
 readline                 => 'readline-devel',
 strace                   => 'strace',
-swig                     => [],				# from builder (7), or native (8)
+swig                     => 'swig',
 troff                    => 'groff',
 unzip                    => 'unzip',
 valgrind                 => 'valgrind',
 vim                      => 'vim',
 wget                     => 'wget',
 which                    => 'which',
-xrootd                   => [],             # from builder
 zlib                     => 'zlib-devel',
 };
 
@@ -219,8 +150,6 @@ $preinstall_for{almalinux}{9} = [
 
 $postinstall_for{almalinux}{8} = [
 	'ln -s /usr/bin/python3 /usr/bin/python',
-	@{$builder},
-	@{$mysql}, # does not compile in alma9
 	'dnf -y clean all',
 ];
 
@@ -230,7 +159,6 @@ $postinstall_for{almalinux}{9} = [
 ];
 
 $package_for{almalinux}{default}{python3}  = ['python3-devel', 'python3-setuptools', 'python3-pip'];
-$package_for{almalinux}{default}{swig}     = ['swig'];
 $extras_for{almalinux}{default} = ['glibc-devel', 'libuuid-devel', 'diffutils'];
 
 $package_for{almalinux}{9}{lsb_release} = []; # there is no redhat-lsb package for redhat9
@@ -246,7 +174,6 @@ $package_for{centos}{7}{python3}  = ['python36-devel', 'python36-setuptools', 'p
 $package_for{centos}{7}{lsb_release} = ['redhat-lsb-core'];
 
 $package_for{centos}{8}{python3}  = ['python39-devel', 'python39-setuptools', 'python39-pip'];
-$package_for{centos}{8}{swig}     = ['swig'];
 $package_for{centos}{8}{lsb_release} = ['redhat-lsb-core'];
 
 $extras_for{centos}{6} = ['libc-devel'];
@@ -265,12 +192,6 @@ $preinstall_for{centos}{7} = [
 ];
 
 $postinstall_for{centos}{7} = [
-	@{$builder},
-	@{$fuse},
-	@{$e2fsprogs},
-	@{$mysql},
-	@{$uuid},
-	@{$swig},
 	'yum -y install cvmfs-devel',
 	'ln -sf /usr/bin/python3.6 /usr/bin/python3',
 	'ln -sf /usr/bin/python3.6-config /usr/bin/python3-config',
@@ -294,10 +215,7 @@ $extras_for{fedora}{default}      = [ ];
 
 $preinstall_for{fedora}{default}  = [ ];
 
-$postinstall_for{fedora}{default} = [
-	@{$builder},
-	@{$musl},
-];
+$postinstall_for{fedora}{default} = [ ];
 
 ########## debian ########## 
 $package_for{debian}{default} = {
@@ -310,7 +228,7 @@ cvmfs                    => [],             # from postinstall
 doxygen                  => 'doxygen',
 e2fsprogs                => [],             # fails linking
 find                     => 'findutils',
-fuse                     => [],          #from builder to get libfuse.a
+fuse                     => ['fuse3'],
 gdb                      => 'gdb',
 gettext                  => 'gettext',
 git                      => 'git',
@@ -321,15 +239,13 @@ libattr                  => 'attr-dev',
 libffi                   => 'libffi-dev',
 lsb_release              => 'lsb-release',
 m4                       => 'm4',
-mysql                    => [],             # from builder
 ncurses                  => 'libncurses-dev',
 openssl                  => ['openssl', 'libssl-dev'],
 patch                    => 'patch',
 perl                     => 'libperl-dev',
 pkg_config               => 'pkg-config',
 pip                      => 'python3-pip',
-python                   => ['python-dev', 'python-setuptools'],
-python3                  => ['python3-dev', 'python3-setuptools'],
+python                   => ['python3-dev', 'python3-setuptools'],
 readline                 => 'libreadline-dev',
 swig                     => 'swig',
 strace                   => 'strace',
@@ -339,7 +255,6 @@ valgrind                 => 'valgrind',
 vim                      => 'vim',
 wget                     => 'wget',
 which                    => 'debianutils',
-xrootd                   => [],             # from builder
 zlib                     => 'libz-dev',
 };
 
@@ -353,21 +268,10 @@ $postinstall_for{debian}{default} = [
 	'echo en_US.UTF-8 UTF-8 >> /etc/locale.gen',
 	'/usr/sbin/locale-gen',
 
-	@{$builder},
-	@{$fuse},
-	@{$uuid},
-
 	'apt-get install -y python-is-python3 || update-alternatives --install /usr/bin/python python /usr/bin/python3 10',
-
-	# install cvmfs-devel:
-	'apt-get install -y lsb-release',
-	'wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest_all.deb',
-	'dpkg -i cvmfs-release-latest_all.deb',
-	'rm -f cvmfs-release-latest_all.deb',
-	'apt-get update --allow-unauthenticated',
-	'apt-get install -y cvmfs-dev',
 	'apt-get clean',
 ];
+
 
 ########## ubuntu ##########
 $package_for{ubuntu}{default} = $package_for{debian}{default};
@@ -376,11 +280,21 @@ $preinstall_for{ubuntu}{default} = $preinstall_for{debian}{default};
 $extras_for{ubuntu}{default} = $extras_for{debian}{default};
 $postinstall_for{ubuntu}{default} = $postinstall_for{debian}{default};
 
+$package_for{ubuntu}{24.04}{python} = ['python3', 'python-dev-is-python3', 'python3-setuptools'];
+$package_for{ubuntu}{22.04}{python} = ['python3', 'python-dev-is-python3', 'python3-setuptools'];
+
+$package_for{ubuntu}{16.04}{python} = ['python', 'python-dev', 'python-setuptools'],
+$package_for{ubuntu}{16.04}{python3} = ['python3', 'python3-dev', 'python3-setuptools'];
+
+$package_for{ubuntu}{20.04}{python} = ['python', 'python-dev', 'python-setuptools'],
+$package_for{ubuntu}{20.04}{python3} = ['python3', 'python3-dev', 'python3-setuptools'];
+
+
 ########## ALL ##########
 
 # finishing installation steps for all:
 my $epilogue = [
-	'python3 -m pip install cloudpickle threadpoolctl conda-pack packaging'
+	'python3 -m pip install --break-system-packages cloudpickle threadpoolctl conda-pack packaging'
 ];
 
 
