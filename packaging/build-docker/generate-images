@@ -149,7 +149,7 @@ $command_for{almalinux} = 'dnf install -y';
 #$versions_of{debian} = [ qw{ 9.9 } ];
 #$command_for{debian} = 'apt-get install -y';
 
-$versions_of{ubuntu} = [ qw{ 16.04 20.04 } ];
+$versions_of{ubuntu} = [ qw{ 20.04 22.04 24.04 } ];
 $command_for{ubuntu} = 'apt-get install -y';
 
 # e.g., $package_for{distro}{version}{dependency} == 'package'
@@ -220,6 +220,8 @@ $preinstall_for{almalinux}{9} = [
 $postinstall_for{almalinux}{8} = [
 	'ln -s /usr/bin/python3 /usr/bin/python',
 	@{$builder},
+	@{$fuse},
+	@{$e2fsprogs},
 	@{$mysql}, # does not compile in alma9
 	'dnf -y clean all',
 ];
@@ -310,7 +312,7 @@ cvmfs                    => [],             # from postinstall
 doxygen                  => 'doxygen',
 e2fsprogs                => [],             # fails linking
 find                     => 'findutils',
-fuse                     => [],          #from builder to get libfuse.a
+fuse                     => ['fuse3'],
 gdb                      => 'gdb',
 gettext                  => 'gettext',
 git                      => 'git',
@@ -328,8 +330,7 @@ patch                    => 'patch',
 perl                     => 'libperl-dev',
 pkg_config               => 'pkg-config',
 pip                      => 'python3-pip',
-python                   => ['python-dev', 'python-setuptools'],
-python3                  => ['python3-dev', 'python3-setuptools'],
+python                   => ['python3-dev', 'python3-setuptools'],
 readline                 => 'libreadline-dev',
 swig                     => 'swig',
 strace                   => 'strace',
@@ -353,10 +354,6 @@ $postinstall_for{debian}{default} = [
 	'echo en_US.UTF-8 UTF-8 >> /etc/locale.gen',
 	'/usr/sbin/locale-gen',
 
-	@{$builder},
-	@{$fuse},
-	@{$uuid},
-
 	'apt-get install -y python-is-python3 || update-alternatives --install /usr/bin/python python /usr/bin/python3 10',
 
 	# install cvmfs-devel:
@@ -369,12 +366,23 @@ $postinstall_for{debian}{default} = [
 	'apt-get clean',
 ];
 
+
 ########## ubuntu ##########
 $package_for{ubuntu}{default} = $package_for{debian}{default};
 $preinstall_for{ubuntu}{default} = $preinstall_for{debian}{default};
 
 $extras_for{ubuntu}{default} = $extras_for{debian}{default};
 $postinstall_for{ubuntu}{default} = $postinstall_for{debian}{default};
+
+$package_for{ubuntu}{24.04}{python} = ['python3', 'python-dev-is-python3', 'python3-setuptools'];
+$package_for{ubuntu}{22.04}{python} = ['python3', 'python-dev-is-python3', 'python3-setuptools'];
+
+$package_for{ubuntu}{16.04}{python} = ['python', 'python-dev', 'python-setuptools'],
+$package_for{ubuntu}{16.04}{python3} = ['python3', 'python3-dev', 'python3-setuptools'];
+
+$package_for{ubuntu}{20.04}{python} = ['python', 'python-dev', 'python-setuptools'],
+$package_for{ubuntu}{20.04}{python3} = ['python3', 'python3-dev', 'python3-setuptools'];
+
 
 ########## ALL ##########
 
