@@ -34,7 +34,6 @@ libattr
 libffi
 lsb_release
 m4
-mysql
 ncurses
 openssl
 patch
@@ -52,7 +51,6 @@ valgrind
 vim
 wget
 which
-xrootd
 zlib
 };
 
@@ -272,13 +270,7 @@ $postinstall_for{debian}{default} = [
 
 	'apt-get install -y python-is-python3 || update-alternatives --install /usr/bin/python python /usr/bin/python3 10',
 
-	# install cvmfs-devel:
 	'apt-get install -y lsb-release',
-	'wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest_all.deb',
-	'dpkg -i cvmfs-release-latest_all.deb',
-	'rm -f cvmfs-release-latest_all.deb',
-	'apt-get update --allow-unauthenticated',
-	'apt-get install -y cvmfs-dev',
 	'apt-get clean',
 ];
 
