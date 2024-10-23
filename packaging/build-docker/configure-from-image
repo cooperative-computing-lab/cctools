@@ -41,11 +41,8 @@ fi
 # disable perl bindings (to compile as we do in conda)
 perl_option='--with-perl-path no'
 
-# using rpm/deb for cvmfs from cclnd docker containers
 if [[ -n "${CCTOOLS_DOCKER_GITHUB}" ]]
 then
-    cvmfs_option='--with-cvmfs-path /usr'
-
     # ensure both python2 and python3 are built for centos7
     python_option='--with-python3-path /usr'
     if [[ "${CCTOOLS_DOCKER_GITHUB}" = centos7 ]]
