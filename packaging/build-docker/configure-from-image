@@ -16,27 +16,7 @@ function finish {
 trap finish EXIT
 
 
-# dependencies to be included statically in parrot live in /opt/vc3 in the
-# container images.
-DEPS_DIR=/opt/vc3/cctools-deps
-DEPS=$(/bin/ls "$DEPS_DIR" || true)
-DEP_ARGS=""
-for dep in $DEPS; do
-    DEP_ARGS="$DEP_ARGS --with-$dep-path $DEPS_DIR/$dep"
-done
-
 cd ${CCTOOLS_SRC}
-
-if [[ -d /opt/vc3/cctools-deps/musl ]]
-then
-    # compile work_queue binaries statically
-    [[ -f config.mk ]] && make clean
-    CFLAGS=-D__MUSL__ CC=/opt/vc3/cctools-deps/musl/bin/musl-gcc LD=/opt/vc3/cctools-deps/musl/bin/musl-gcc ./configure --without-system-{doc,apps,chirp} --with-readline-path=no --static  --with-zlib-path=/opt/vc3/cctools-deps/musl-zlib "$@"
-    (cd dttools/src && make)
-    (cd work_queue/src && make)
-    (cp work_queue/src/work_queue_{worker,status,example} .)
-    STATIC_WORKER=1
-fi
 
 # disable perl bindings (to compile as we do in conda)
 perl_option='--with-perl-path no'
