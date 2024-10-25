@@ -38,7 +38,6 @@ See the file COPYING for details.
 
 struct vine_cache {
 	struct hash_table *table;
-	struct list *current_transfers;
 	char *cache_dir;
 };
 
@@ -53,7 +52,6 @@ struct vine_cache *vine_cache_create(const char *cache_dir)
 	struct vine_cache *c = malloc(sizeof(*c));
 	c->cache_dir = strdup(cache_dir);
 	c->table = hash_table_create(0, 0);
-	c->current_transfers = list_create();
 	return c;
 }
 
@@ -171,7 +169,6 @@ void vine_cache_delete(struct vine_cache *c)
 
 	hash_table_clear(c->table, (void *)vine_cache_file_delete);
 	hash_table_delete(c->table);
-	list_delete(c->current_transfers);
 	free(c->cache_dir);
 	free(c);
 }
@@ -647,17 +644,18 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 		f->process = p;
 	}
 
-	while (list_size(c->current_transfers) > 5) {
-		struct vine_cache_file *xfr;
-		LIST_ITERATE(c->current_transfers, xfr)
-		{
-			siginfo_t status;
-			int returned = waitid(P_PID, xfr->pid, &status, WEXITED | WNOHANG | WNOWAIT);
-			if ((returned == 0) && (status.si_pid == xfr->pid)) {
-				list_remove(c->current_transfers, xfr);
-			}
+	int num_processing = 0;
+	char *table_cachename;
+	struct vine_cache_file *table_f;
+	HASH_TABLE_ITERATE(c->table, table_cachename, table_f){
+		if(table_f->status == VINE_CACHE_STATUS_PROCESSING){
+			num_processing++;
 		}
 	}
+	if(num_processing > 5) {
+		return VINE_CACHE_STATUS_PENDING;
+	}
+
 	f->pid = fork();
 
 	if (f->pid < 0) {
@@ -666,7 +664,6 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 		return f->status;
 	} else if (f->pid > 0) {
 		f->status = VINE_CACHE_STATUS_PROCESSING;
-		list_push_head(c->current_transfers, f);
 		switch (f->cache_type) {
 		case VINE_CACHE_TRANSFER:
 			debug(D_VINE, "cache: transferring %s to %s", f->source, cachename);
@@ -822,11 +819,9 @@ static void vine_cache_wait_for_file(struct vine_cache *c, struct vine_cache_fil
 			// process still executing
 		} else if (result < 0) {
 			debug(D_VINE, "cache: wait4 on pid %d returned an error: %s", (int)f->pid, strerror(errno));
-			list_remove(c->current_transfers, f);
 		} else if (result > 0) {
 			vine_cache_handle_exit_status(c, f, cachename, status, manager);
 			vine_cache_check_outputs(c, f, cachename, manager);
-			list_remove(c->current_transfers, f);
 		}
 	}
 }
