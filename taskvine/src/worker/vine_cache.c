@@ -647,12 +647,13 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 	int num_processing = 0;
 	char *table_cachename;
 	struct vine_cache_file *table_f;
-	HASH_TABLE_ITERATE(c->table, table_cachename, table_f){
-		if(table_f->status == VINE_CACHE_STATUS_PROCESSING){
+	HASH_TABLE_ITERATE(c->table, table_cachename, table_f)
+	{
+		if (table_f->status == VINE_CACHE_STATUS_PROCESSING) {
 			num_processing++;
 		}
 	}
-	if(num_processing > 5) {
+	if (num_processing > 5) {
 		return VINE_CACHE_STATUS_PENDING;
 	}
 
