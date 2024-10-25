@@ -653,7 +653,7 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 			num_processing++;
 		}
 	}
-	if (num_processing > 5) {
+	if (num_processing > VINE_CACHE_MAX_TRANSFER_PROC) {
 		return VINE_CACHE_STATUS_PENDING;
 	}
 

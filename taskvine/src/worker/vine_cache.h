@@ -24,6 +24,8 @@ for file transfers to occur asynchronously of the manager.
 
 #include "link.h"
 
+#define VINE_CACHE_MAX_TRANSFER_PROC 5
+
 typedef enum {
 	VINE_CACHE_FILE,               /**< A normal file provided by the manager. */
 	VINE_CACHE_TRANSFER,           /**< Obtain the file by performing a transfer. */
