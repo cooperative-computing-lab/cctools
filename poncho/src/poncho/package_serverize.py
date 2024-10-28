@@ -8,7 +8,7 @@
 from ndcctools.poncho import package_analyze as analyze
 from ndcctools.poncho import package_create as create
 from ndcctools.poncho.wq_network_code import wq_network_code
-from ndcctools.poncho.library_network_code import library_network_code
+from ndcctools.poncho import library_network_code
 
 import json
 import os
@@ -269,9 +269,7 @@ def generate_taskvine_library_code(library_path, hoisting_modules=None):
                 output_file.write(f"{hoisting_code}\n")
 
         raw_source_code = inspect.getsource(library_network_code)
-        network_code = "\n".join([line[4:] for line in raw_source_code.split("\n")[1:]])
-        output_file.write(network_code)
-        output_file.write(init_function)
+        output_file.write(raw_source_code)
 
     st = os.stat(library_path)
     os.chmod(library_path, st.st_mode | stat.S_IEXEC)
