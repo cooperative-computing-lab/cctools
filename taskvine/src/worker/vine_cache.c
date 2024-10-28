@@ -39,6 +39,7 @@ See the file COPYING for details.
 struct vine_cache {
 	struct hash_table *table;
 	char *cache_dir;
+	int max_transfer_procs;
 };
 
 static void vine_cache_wait_for_file(struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager);
@@ -47,11 +48,12 @@ static void vine_cache_wait_for_file(struct vine_cache *c, struct vine_cache_fil
 Create the cache manager structure for a given cache directory.
 */
 
-struct vine_cache *vine_cache_create(const char *cache_dir)
+struct vine_cache *vine_cache_create(const char *cache_dir, int max_procs)
 {
 	struct vine_cache *c = malloc(sizeof(*c));
 	c->cache_dir = strdup(cache_dir);
 	c->table = hash_table_create(0, 0);
+	c->max_transfer_procs = max_procs;
 	return c;
 }
 
@@ -642,6 +644,19 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 			return f->status;
 		}
 		f->process = p;
+	}
+
+	int num_processing = 0;
+	char *table_cachename;
+	struct vine_cache_file *table_f;
+	HASH_TABLE_ITERATE(c->table, table_cachename, table_f)
+	{
+		if (table_f->status == VINE_CACHE_STATUS_PROCESSING) {
+			num_processing++;
+		}
+	}
+	if (num_processing > c->max_transfer_procs) {
+		return VINE_CACHE_STATUS_PENDING;
 	}
 
 	f->pid = fork();
