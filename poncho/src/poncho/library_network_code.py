@@ -348,11 +348,29 @@ def main():
     # mapping of child pid to function id of currently running functions
     pid_to_func_id = {}
 
+    # read in information about this library
+    with open('library_info.clpk', 'rb') as f:
+        library_info = cloudpickle.load(f)
+
+    # register functions in this library to the global namespace
+    for func_name in library_info['function_list']:
+        func_code = cloudpickle.loads(library_info['function_list'][func_name])
+        globals()[func_name] = func_code
+
+    # load and execute this library's context
+    library_context_info = cloudpickle.loads(library_info['context_info'])
+    context_func = library_context_info[0]
+    context_args = library_context_info[1]
+    context_kwargs = library_context_info[2]
+    context_func(*context_args, **context_kwargs)
+
     # send configuration of library, just its name for now
     config = {
-        "name": name(),  # noqa: F821
+        "name": library_info['library_name']
     }
     send_configuration(config, out_pipe_fd, args.worker_pid)
+
+    exec_mode = library_info['exec_mode']
 
     # register sigchld handler to turn a sigchld signal into an I/O event
     signal.signal(signal.SIGCHLD, sigchld_handler)
