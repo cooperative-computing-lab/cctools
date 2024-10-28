@@ -933,7 +933,7 @@ class Manager(object):
     # @param exec_mode       Execution mode that the library should use to run function calls. Either 'direct' or 'fork'
     # @param library_context_info   A list containing [library_context_func, library_context_args, library_context_kwargs]. Used to create the library context on remote nodes.
     # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
-    def create_library_from_functions(self, library_name, *function_list, poncho_env=None, init_command=None, add_env=True, hoisting_modules=None, exec_mode='direct', library_context_info=None):
+    def create_library_from_functions(self, library_name, *function_list, poncho_env=None, init_command=None, add_env=True, hoisting_modules=None, exec_mode='fork', library_context_info=None):
         # Delay loading of poncho until here, to avoid bringing in poncho dependencies unless needed.
         # Ensure poncho python library is available.
         from ndcctools.poncho import package_serverize
@@ -943,7 +943,7 @@ class Manager(object):
             raise ValueError('A library cannot have 0 functions.')
 
         # Create a unique hash of a library from all information that determine a library's uniqueness.
-        library_hash = package_serverize.generate_library_hash(library_name, function_list, poncho_env, init_command, add_env, hoisting_modules, exec_mode, library_context_info)
+        library_hash = package_serverize.generate_library_hash(library_name, function_list, poncho_env, init_command, add_env, hoisting_modules, library_context_info)
 
         # Create path for caching library code and environment based on function hash.
         library_cache_dir_name = "vine-library-cache"
@@ -990,7 +990,6 @@ class Manager(object):
                                                library_name=library_name,
                                                need_pack=need_pack,
                                                hoisting_modules=hoisting_modules,
-                                               library_exec_mode=exec_mode,
                                                library_context_info=library_context_info)
 
             # enable correct permissions for library code
@@ -1012,6 +1011,11 @@ class Manager(object):
         t.add_input(f, library_code_name)
         f = self.declare_file(library_info_path, cache=True, peer_transfer=True)
         t.add_input(f, library_info_name)
+
+        # Register execution mode of functions in this library
+        t.set_function_exec_mode(exec_mode)
+        if exec_mode == 'direct':
+            t.set_function_slots(1)
         return t
 
     # does not include default arguments of a function

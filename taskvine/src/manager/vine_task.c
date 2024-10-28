@@ -314,6 +314,13 @@ void vine_task_set_function_slots(struct vine_task *t, int nslots)
 	t->function_slots_requested = nslots;
 }
 
+void vine_task_set_function_exec_mode(struct vine_task *t, const char *exec_mode)
+{
+        if (exec_mode && t->provides_library) {
+                t->func_exec_mode = xxstrdup(exec_mode);
+        }
+}
+
 void vine_task_set_env_var(struct vine_task *t, const char *name, const char *value)
 {
 	if (value) {

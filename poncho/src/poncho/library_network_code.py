@@ -354,7 +354,7 @@ def main():
 
     # register functions in this library to the global namespace
     for func_name in library_info['function_list']:
-        func_code = cloudpickle.loads(library_info['function_list'][func_name])
+        func_code = remote_execute(cloudpickle.loads(library_info['function_list'][func_name]))
         globals()[func_name] = func_code
 
     # load and execute this library's context

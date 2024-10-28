@@ -176,10 +176,15 @@ def pack_library_code(path, envpath):
 # @param init_command   A string describing a shell command to execute before the library task is run
 # @param add_env         Whether to automatically create and/or add environment to the library
 # @param hoisting_modules  A list of modules imported at the preamble of library, including packages, functions and classes.
-# @param exec_mode       Execution mode that the library should use to run function calls. Either 'direct' or 'fork'
 # @param library_context_info   A list containing [library_context_func, library_context_args, library_context_kwargs]. Used to create the library context on remote nodes.
 # @return               A hash value.
-def generate_library_hash(library_name, function_list, poncho_env, init_command, add_env, hoisting_modules, exec_mode, library_context_info):
+def generate_library_hash(library_name,
+                          function_list,
+                          poncho_env,
+                          init_command,
+                          add_env,
+                          hoisting_modules,
+                          library_context_info):
     library_info = [library_name]
     function_list = list(function_list)
     function_names = set()
@@ -217,7 +222,6 @@ def generate_library_hash(library_name, function_list, poncho_env, init_command,
     library_info.append(str(init_command))
     library_info.append(str(add_env))
     library_info.append(str(hoisting_modules))
-    library_info.append(str(exec_mode))
 
     if library_context_info:
         if isinstance(library_context_info[1], list):
@@ -284,7 +288,6 @@ def generate_taskvine_library_code(library_path, hoisting_modules=None):
 # @param    library_name            name of the library
 # @param    need_pack               whether to create a poncho environment tarball
 # @param    hoisting_modules        a list of modules to be imported at the preamble of library
-# @param    exec_mode               whether to execute invocations directly or by forking
 # @param    library_context_info    a list containing a library's context to be created remotely
 # @return   name of the file containing serialized information about the library
 def generate_library(library_cache_path,
@@ -295,7 +298,6 @@ def generate_library(library_cache_path,
                      library_name,
                      need_pack=True,
                      hoisting_modules=None,
-                     library_exec_mode='direct',
                      library_context_info=None
 ):
     # create library_info.clpk
@@ -304,7 +306,6 @@ def generate_library(library_cache_path,
     for func in functions:
         library_info['function_list'][func.__name__] = cloudpickle.dumps(func)
     library_info['library_name'] = library_name
-    library_info['exec_mode'] = library_exec_mode
     library_info['context_info'] = cloudpickle.dumps(library_context_info)
     with open(library_info_path, 'wb') as f:
         cloudpickle.dump(library_info, f) 
@@ -326,18 +327,8 @@ def generate_library(library_cache_path,
 # @param    library_context_info    a list containing a library's context to be created remotely
 # @return   name of the file containing serialized information about functions
 def serverize_library_from_code(
-    path, functions, name, need_pack=True, hoisting_modules=None, exec_mode='direct', library_context_info=None
+    path, functions, name, need_pack=True, hoisting_modules=None, exec_mode='fork', library_context_info=None
 ):
-    library_info = {}
-    library_info['function_list'] = {}
-    for func in functions:
-        library_info['function_list'][func.__name__] = cloudpickle.dumps(func)
-
-    library_info['library_name'] = name
-    library_info['hoisting_modules'] = hoisting_modules
-    library_info['exec_mode'] = exec_mode
-    library_info['context_info'] = cloudpickle.dumps(library_context_info)
-
     with open(f'{path}/library_info.clpk', 'wb') as f:
         cloudpickle.dump(library_info, f)
 
