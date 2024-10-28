@@ -56,6 +56,8 @@ struct vine_worker_options *vine_worker_options_create()
 	self->transfer_port_min = 0;
 	self->transfer_port_max = 0;
 
+	self->max_transfer_procs = 5;
+
 	self->reported_transfer_host = 0;
 
 	return self;
@@ -140,6 +142,7 @@ void vine_worker_options_show_help(const char *cmd, struct vine_worker_options *
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
 	printf(" %-30s Listening port for worker-worker transfers. Either port or port_min:port_max (default: any)\n", "--transfer-port");
 	printf(" %-30s Explicit contact host:port for worker-worker transfers, e.g., when routing is used. (default: :<transfer_port>)\n", "--contact-hostport");
+	printf(" %-30s Maximum number of concurrent worker transfer requests (default=%d)\n", "--max-transfer-procs", options->max_transfer_procs);
 
 	printf(" %-30s Enable tls connection to manager (manager should support it).\n", "--ssl");
 	printf(" %-30s SNI domain name if different from manager hostname. Implies --ssl.\n", "--tls-sni=<domain name>");
@@ -170,6 +173,7 @@ enum {
 	LONG_OPT_CONTACT_HOSTPORT,
 	LONG_OPT_WORKSPACE,
 	LONG_OPT_KEEP_WORKSPACE,
+	LONG_OPT_MAX_TRANSFER_PROCS,
 };
 
 static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
@@ -210,6 +214,7 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"tls-sni", required_argument, 0, LONG_OPT_TLS_SNI},
 		{"from-factory", required_argument, 0, LONG_OPT_FROM_FACTORY},
 		{"transfer-port", required_argument, 0, LONG_OPT_TRANSFER_PORT},
+		{"max-transfer-procs", required_argument, 0, LONG_OPT_MAX_TRANSFER_PROCS},
 		{"contact-hostport", required_argument, 0, LONG_OPT_CONTACT_HOSTPORT},
 		{0, 0, 0, 0}};
 
@@ -289,6 +294,7 @@ void set_min_max_ports(struct vine_worker_options *options, const char *range)
 
 	free(r);
 }
+
 
 void vine_worker_options_get(struct vine_worker_options *options, int argc, char *argv[])
 {
@@ -457,6 +463,9 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 			break;
 		case LONG_OPT_CONTACT_HOSTPORT:
 			set_transfer_host(options, optarg);
+			break;
+		case LONG_OPT_MAX_TRANSFER_PROCS:
+			options->max_transfer_procs = atoi(optarg);
 			break;
 		default:
 			vine_worker_options_show_help(argv[0], options);

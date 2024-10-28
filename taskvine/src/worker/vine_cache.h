@@ -24,8 +24,6 @@ for file transfers to occur asynchronously of the manager.
 
 #include "link.h"
 
-#define VINE_CACHE_MAX_TRANSFER_PROC 5
-
 typedef enum {
 	VINE_CACHE_FILE,               /**< A normal file provided by the manager. */
 	VINE_CACHE_TRANSFER,           /**< Obtain the file by performing a transfer. */
@@ -46,7 +44,7 @@ typedef enum {
 	VINE_CACHE_STATUS_UNKNOWN,      /**< File is not known at all to the cache manager. */
 } vine_cache_status_t;
 
-struct vine_cache * vine_cache_create( const char *cachedir );
+struct vine_cache * vine_cache_create( const char *cachedir, int max_procs );
 void vine_cache_delete( struct vine_cache *c );
 void vine_cache_load( struct vine_cache *c );
 void vine_cache_scan( struct vine_cache *c, struct link *manager );
