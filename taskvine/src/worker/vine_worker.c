@@ -1828,7 +1828,7 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 	vine_workspace_prepare(workspace);
 
 	/* Start the cache manager and scan for existing files. */
-	cache_manager = vine_cache_create(workspace->cache_dir);
+	cache_manager = vine_cache_create(workspace->cache_dir, options->max_transfer_procs);
 	vine_cache_load(cache_manager);
 
 	/* Start the transfer server, which serves up the cache directory. */
