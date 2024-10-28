@@ -295,7 +295,6 @@ void set_min_max_ports(struct vine_worker_options *options, const char *range)
 	free(r);
 }
 
-
 void vine_worker_options_get(struct vine_worker_options *options, int argc, char *argv[])
 {
 	int c;
