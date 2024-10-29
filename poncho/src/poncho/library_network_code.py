@@ -26,6 +26,7 @@ from ndcctools.taskvine.utils import load_variable_from_library
 # self-pipe to turn a sigchld signal when a child finishes execution
 # into an I/O event.
 r, w = os.pipe()
+exec_method = None
 
 # This class captures how results from FunctionCalls are conveyed from
 # the library to the manager.
@@ -119,9 +120,7 @@ def start_function(in_pipe_fd, thread_limit=1):
         exit(1)
 
     with threadpool_limits(limits=thread_limit):
-
-        # exec method for now is fork only, direct will be supported later
-        exec_method = "fork"
+        global exec_method
         if exec_method == "direct":
             library_sandbox = os.getcwd()
             try:
@@ -137,7 +136,7 @@ def start_function(in_pipe_fd, thread_limit=1):
                     with open("outfile", "wb") as f:
                         cloudpickle.dump(result, f)
                 except Exception:
-                    if os.path.exits("outfile"):
+                    if os.path.exists("outfile"):
                         os.remove("outfile")
                     raise
 
@@ -377,7 +376,9 @@ def main():
     }
     send_configuration(config, out_pipe_fd, args.worker_pid)
 
-    exec_mode = library_info['exec_mode']
+    # set execution mode of functions in this library
+    global exec_method
+    exec_method = library_info['exec_mode']
 
     # register sigchld handler to turn a sigchld signal into an I/O event
     signal.signal(signal.SIGCHLD, sigchld_handler)
