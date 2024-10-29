@@ -192,7 +192,7 @@ def generate_library_hash(library_name,
     function_names = set()
 
     if library_context_info:
-        function_list += library_context_info[0]
+        function_list += [library_context_info[0]]
 
     for function in function_list:
         if function.__name__ is None:
