@@ -21,16 +21,7 @@ import time
 from datetime import datetime
 import socket
 from threadpoolctl import threadpool_limits
-from ndcctools.taskvine.utils import load_variable_from_state
-
-def dd(msg):
-    if os.path.isfile('/tmp/tmp.log'):
-        mode = 'a'
-    else:
-        mode = 'w'
-    timestamp = datetime.now().strftime("%m/%d/%y %H:%M:%S.%f")
-    with open('/tmp/tmp.log', mode) as f:
-        print(timestamp, msg, file=f)
+from ndcctools.taskvine.utils import load_variable_from_library
 
 # self-pipe to turn a sigchld signal when a child finishes execution
 # into an I/O event.
@@ -72,9 +63,6 @@ def remote_execute(func):
         args = tuple(new_args)
 
         try:
-            global base_val
-            dd(f'in remote wrapper {base_val}')
-            dd(globals())
             result = func(*args, **kwargs)
             success = True
             reason = None
@@ -315,7 +303,7 @@ def main():
         help="pid of main vine worker to send sigchild to let it know theres some result.",
     )
     args = parser.parse_args()
-    dd('args parsed ok')
+    
     # check if library cores and function slots are valid
     if args.function_slots > args.library_cores:
         stdout_timed_message("error: function slots cannot be more than library cores")
@@ -364,7 +352,6 @@ def main():
     # read in information about this library
     with open('library_info.clpk', 'rb') as f:
         library_info = cloudpickle.load(f)
-    dd('library_info loaded ok')
     
     # load and execute this library's context
     library_context_info = cloudpickle.loads(library_info['context_info'])
@@ -374,33 +361,15 @@ def main():
         context_args = library_context_info[1]
         context_kwargs = library_context_info[2]
         context_vars = context_func(*context_args, **context_kwargs)
-        globals().update(context_vars)
-    dd('library-context-info loaded ok')
-    dd(context_vars)
-    try:
-        dd(f'value: {globals()["base_val"]}')
-    except Exception as e:
-        dd(e)
-        raise e
-    global base_val
-    dd(f'global {base_val}')
 
     # register functions in this library to the global namespace
     for func_name in library_info['function_list']:
-        func_code = cloudpickle.loads(library_info['function_list'][func_name])
-        if context_vars:
-            (func_code.__globals__).update(context_vars)
-        func_code = remote_execute(func_code)
+        func_code = remote_execute(cloudpickle.loads(library_info['function_list'][func_name]))
         globals()[func_name] = func_code
-        dd(f'f{func_name} registered')
 
+    # update library's context to the load function
     if context_vars:
-        (load_variable_from_state.__globals__).update(context_vars)
-
-    # update namespace of functions
-    #for func_name in library_info['function_list']:
-    #    ((globals()[func_name]).__globals__).update(globals())
-    #    dd(f'{func_name}: {(globals()[func_name]).__globals__}')
+        (load_variable_from_library.__globals__).update(context_vars)
 
     # send configuration of library, just its name for now
     config = {
@@ -465,7 +434,6 @@ def main():
 
 
 if __name__ == '__main__':
-    dd('start main')
     main()
 
 

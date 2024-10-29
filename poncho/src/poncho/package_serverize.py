@@ -329,15 +329,10 @@ def generate_library(library_cache_path,
 # @param    functions               list of functions to include in the library
 # @param    need_pack               whether to create a poncho environment tarball
 # @param    hoisting_modules        a list of modules to be imported at the preamble of library
-# @param    exec_mode               whether to execute invocations directly or by forking
-# @param    library_context_info    a list containing a library's context to be created remotely
 # @return   name of the file containing serialized information about functions
 def serverize_library_from_code(
-    path, functions, name, need_pack=True, hoisting_modules=None, exec_mode='fork', library_context_info=None
+    path, functions, name, need_pack=True, hoisting_modules=None
 ):
-    with open(f'{path}/library_info.clpk', 'wb') as f:
-        cloudpickle.dump(library_info, f)
-
     tmp_library_path = f"{path}/tmp_library.py"
 
     # Write out functions into a temporary python file.

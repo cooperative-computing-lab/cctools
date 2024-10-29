@@ -1201,20 +1201,4 @@ class LibraryTask(Task):
         self.provides_library(library_name)
 
 
-class Function:
-    def __init__(self, name, func, func_context=None, func_context_args=[], func_context_kwargs={}):
-        self.name = name
-        self.func = func
-        self.func_context = func_context
-        self.func_context_args = func_context_args
-        self.func_context_kwargs = func_context_kwargs
-
-        if self.name is None:
-            self.name = self.func.__name__
-            if self.name is None:
-                raise Exception('a Function needs a name')
-
-        if self.func is None:
-            raise Exception(f'a Function cannot be {self.func}')
-
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
