@@ -943,7 +943,14 @@ class Manager(object):
             raise ValueError('A library cannot have 0 functions.')
 
         # Create a unique hash of a library from all information that determine a library's uniqueness.
-        library_hash = package_serverize.generate_library_hash(library_name, function_list, poncho_env, init_command, add_env, hoisting_modules, library_context_info)
+        library_hash = package_serverize.generate_library_hash(library_name=library_name,
+                                                               function_list=function_list,
+                                                               poncho_env=poncho_env,
+                                                               init_command=init_command,
+                                                               add_env=add_env,
+                                                               exec_mode=exec_mode,
+                                                               hoisting_modules=hoisting_modules,
+                                                               library_context_info=library_context_info)
 
         # Create path for caching library code and environment based on function hash.
         library_cache_dir_name = "vine-library-cache"
@@ -989,6 +996,7 @@ class Manager(object):
                                                functions=function_list,
                                                library_name=library_name,
                                                need_pack=need_pack,
+                                               exec_mode=exec_mode,
                                                hoisting_modules=hoisting_modules,
                                                library_context_info=library_context_info)
 

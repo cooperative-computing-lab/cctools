@@ -174,7 +174,8 @@ def pack_library_code(path, envpath):
 # @param function_list  A list of functions in the library
 # @param poncho_env     The name of an already prepared poncho environment
 # @param init_command   A string describing a shell command to execute before the library task is run
-# @param add_env         Whether to automatically create and/or add environment to the library
+# @param add_env        Whether to automatically create and/or add environment to the library
+# @param exec_mode      The execution mode of functions in this library.
 # @param hoisting_modules  A list of modules imported at the preamble of library, including packages, functions and classes.
 # @param library_context_info   A list containing [library_context_func, library_context_args, library_context_kwargs]. Used to create the library context on remote nodes.
 # @return               A hash value.
@@ -183,6 +184,7 @@ def generate_library_hash(library_name,
                           poncho_env,
                           init_command,
                           add_env,
+                          exec_mode,
                           hoisting_modules,
                           library_context_info):
     library_info = [library_name]
@@ -221,6 +223,7 @@ def generate_library_hash(library_name,
     library_info.append(str(poncho_env))
     library_info.append(str(init_command))
     library_info.append(str(add_env))
+    library_info.append(str(exec_mode))
     library_info.append(str(hoisting_modules))
 
     if library_context_info:
@@ -287,6 +290,7 @@ def generate_taskvine_library_code(library_path, hoisting_modules=None):
 # @param    functions               list of functions to include in the library
 # @param    library_name            name of the library
 # @param    need_pack               whether to create a poncho environment tarball
+# @param    exec_mode               execution mode of functions in this library
 # @param    hoisting_modules        a list of modules to be imported at the preamble of library
 # @param    library_context_info    a list containing a library's context to be created remotely
 # @return   name of the file containing serialized information about the library
@@ -297,6 +301,7 @@ def generate_library(library_cache_path,
                      functions,
                      library_name,
                      need_pack=True,
+                     exec_mode='fork',
                      hoisting_modules=None,
                      library_context_info=None
 ):
@@ -306,6 +311,7 @@ def generate_library(library_cache_path,
     for func in functions:
         library_info['function_list'][func.__name__] = cloudpickle.dumps(func)
     library_info['library_name'] = library_name
+    library_info['exec_mode'] = exec_mode
     library_info['context_info'] = cloudpickle.dumps(library_context_info)
     with open(library_info_path, 'wb') as f:
         cloudpickle.dump(library_info, f) 

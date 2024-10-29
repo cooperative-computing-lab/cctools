@@ -211,6 +211,8 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 		vine_task_set_library_required(new, task->needs_library);
 	if (task->provides_library)
 		vine_task_set_library_provided(new, task->provides_library);
+        if (task->func_exec_mode)
+                vine_task_set_function_exec_mode(new, task->func_exec_mode);
 	if (task->tag)
 		vine_task_set_tag(new, task->tag);
 	if (task->category)
