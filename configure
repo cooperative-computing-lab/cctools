@@ -700,7 +700,7 @@ if [ $config_fuse_path != no ]
 then
 	fuse_avail=yes
 	fuse_path=${fuse_path:-${base_root}}
-	if library_search fuse ${fuse_path} || library_search fuse /
+	if library_search fuse3 ${fuse_path} || library_search fuse /
 	then
 		fuse_ccflags="-DHAS_FUSE"
 		if [ "${fuse_path}" != / -a "${fuse_path}" != ${base_root} ]

@@ -10,9 +10,9 @@ This module written by James Fitzgerald, B.S. 2006.
 #ifdef HAS_FUSE
 
 #define _FILE_OFFSET_BITS 64
-#define FUSE_USE_VERSION 27
+#define FUSE_USE_VERSION 30
 
-#include <fuse.h>
+#include <fuse3/fuse.h>
 
 #include <unistd.h>
 #include <dirent.h>
