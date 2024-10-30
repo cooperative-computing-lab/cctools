@@ -10,7 +10,7 @@ This module written by James Fitzgerald, B.S. 2006.
 #ifdef HAS_FUSE
 
 #define _FILE_OFFSET_BITS 64
-#define FUSE_USE_VERSION 30
+#define FUSE_USE_VERSION 31
 
 #include <fuse3/fuse.h>
 
@@ -553,14 +553,13 @@ static struct fuse_operations chirp_fuse_operations = {
 };
 
 static struct fuse *fuse_instance = 0;
-static struct fuse_chan *fuse_chan = 0;
 static char *fuse_mountpoint;
 
 static void exit_handler(int sig)
 {
 	if(fuse_instance) {
 		fuse_exit(fuse_instance);
-		fuse_unmount(fuse_mountpoint, fuse_chan);
+		fuse_unmount(fuse_instance);
 		fuse_destroy(fuse_instance);
 	}
 	_exit(0);
@@ -568,7 +567,7 @@ static void exit_handler(int sig)
 
 static void show_help(const char *cmd)
 {
-	fprintf(stdout, "use: %s <mountpath>\n", cmd);
+	fprintf(stdout, "use: %s <options> <mountpath>\n", cmd);
 	fprintf(stdout, "where options are:\n");
 	fprintf(stdout, " %-30s Require this authentication mode.\n", "-a,--auth=<flag>");
 	fprintf(stdout, " %-30s Block size for network I/O. (default is %ds)\n", "-b,--block-size=<bytes>", (int) chirp_reli_blocksize_get());
@@ -680,15 +679,13 @@ int main(int argc, char *argv[])
 	signal(SIGINT, exit_handler);
 	signal(SIGTERM, exit_handler);
 
-	fuse_chan = fuse_mount(fuse_mountpoint, &fa);
-	if(!fuse_chan) {
-		fprintf(stderr, "chirp_fuse: couldn't access %s\n", fuse_mountpoint);
+	fuse_instance = fuse_new(&fa, &chirp_fuse_operations, sizeof(chirp_fuse_operations), 0);
+	if(!fuse_instance) {
+		fprintf(stderr, "chirp_fuse: couldn't create fuse instance for %s\n", fuse_mountpoint);
 		return 1;
 	}
 
-	fuse_instance = fuse_new(fuse_chan, &fa, &chirp_fuse_operations, sizeof(chirp_fuse_operations), 0);
-	if(!fuse_instance) {
-		fuse_unmount(fuse_mountpoint, fuse_chan);
+	if(fuse_mount(fuse_instance, fuse_mountpoint) != 0) {
 		fprintf(stderr, "chirp_fuse: couldn't access %s\n", fuse_mountpoint);
 		return 1;
 	}
@@ -707,7 +704,7 @@ int main(int argc, char *argv[])
 
 	fuse_loop(fuse_instance);
 
-	fuse_unmount(fuse_mountpoint, fuse_chan);
+	fuse_unmount(fuse_instance);
 	fuse_destroy(fuse_instance);
 
 	free(fa.argv);
