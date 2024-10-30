@@ -3992,6 +3992,7 @@ int vine_enable_peer_transfers(struct vine_manager *q)
 int vine_disable_peer_transfers(struct vine_manager *q)
 {
 	debug(D_VINE, "Peer Transfers disabled");
+	fprintf(stderr, "warning: Peer Transfers disabled. Using temporary files will force dependent tasks to run on a single worker");
 	q->peer_transfers_enabled = 0;
 	return 1;
 }
