@@ -37,6 +37,7 @@ This module written by James Fitzgerald, B.S. 2006.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <utime.h>
 
 static int chirp_fuse_timeout = 60;
 static int run_in_foreground = 0;
@@ -86,7 +87,7 @@ static void chirp_stat_to_fuse_stat(struct chirp_stat *c, struct stat *f)
 	f->st_ctime = c->cst_ctime;
 }
 
-static int chirp_fuse_getattr(const char *path, struct stat *info)
+static int chirp_fuse_getattr(const char *path, struct stat *info, struct fuse_file_info *fi)
 {
 	INT64_T result;
 	struct chirp_stat cinfo;
@@ -130,10 +131,10 @@ static void longdir_callback(const char *name, struct chirp_stat *cinfo, void *a
 {
 	struct stat info;
 	chirp_stat_to_fuse_stat(cinfo, &info);
-	longdir_filler(longdir_buf, name, &info, 0);
+	longdir_filler(longdir_buf, name, &info, 0, 0);
 }
 
-static int chirp_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
+static int chirp_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags)
 {
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
@@ -150,9 +151,9 @@ static int chirp_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t fille
 
 	pthread_mutex_unlock(&mutex);
 
-	if(result < 0)
+	if(result < 0) {
 		return -errno;
-	return 0;
+	}
 
 	return 0;
 }
@@ -233,7 +234,7 @@ static int chirp_fuse_symlink(const char *source, const char *target)
 	return 0;
 }
 
-static int chirp_fuse_rename(const char *from, const char *to)
+static int chirp_fuse_rename(const char *from, const char *to, unsigned int flags)
 {
 	INT64_T result;
 	char frompath[CHIRP_PATH_MAX], topath[CHIRP_PATH_MAX];
@@ -267,7 +268,7 @@ static int chirp_fuse_link(const char *from, const char *to)
 	return 0;
 }
 
-static int chirp_fuse_chmod(const char *path, mode_t mode)
+static int chirp_fuse_chmod(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
@@ -284,7 +285,7 @@ static int chirp_fuse_chmod(const char *path, mode_t mode)
 	return 0;
 }
 
-static int chirp_fuse_chown(const char *path, uid_t uid, gid_t gid)
+static int chirp_fuse_chown(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *fi)
 {
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
@@ -301,7 +302,7 @@ static int chirp_fuse_chown(const char *path, uid_t uid, gid_t gid)
 	return 0;
 }
 
-static int chirp_fuse_truncate(const char *path, off_t size)
+static int chirp_fuse_truncate(const char *path, off_t size, struct fuse_file_info *fi)
 {
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
@@ -349,7 +350,7 @@ static int chirp_fuse_access(const char *path, int flags)
 }
 
 
-static int chirp_fuse_utime(const char *path, struct utimbuf *buf)
+static int chirp_fuse_utimens(const char *path, struct timespec *buf, struct fuse_file_info *fi)
 {
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
@@ -500,11 +501,7 @@ static int chirp_fuse_create(const char *path, mode_t mode, struct fuse_file_inf
 
 
 
-#if FUSE_USE_VERSION==22
-static int chirp_fuse_statfs(const char *path, struct statfs *info)
-#else
 static int chirp_fuse_statfs(const char *path, struct statvfs *info)
-#endif
 {
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
@@ -521,9 +518,6 @@ static int chirp_fuse_statfs(const char *path, struct statvfs *info)
 
 	memset(info, 0, sizeof(*info));
 
-#if FUSE_USE_VERSION==22
-	info->f_type = cinfo.f_type;
-#endif
 	info->f_bsize = cinfo.f_bsize;
 	info->f_blocks = cinfo.f_blocks;
 	info->f_bfree = cinfo.f_bfree;
@@ -554,7 +548,7 @@ static struct fuse_operations chirp_fuse_operations = {
 	.symlink = chirp_fuse_symlink,
 	.truncate = chirp_fuse_truncate,
 	.unlink = chirp_fuse_unlink,
-	.utime = chirp_fuse_utime,
+	.utimens = chirp_fuse_utimens,
 	.write = chirp_fuse_write,
 };
 
