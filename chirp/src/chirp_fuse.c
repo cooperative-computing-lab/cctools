@@ -350,7 +350,7 @@ static int chirp_fuse_access(const char *path, int flags)
 }
 
 
-static int chirp_fuse_utimens(const char *path, struct timespec *buf, struct fuse_file_info *fi)
+static int chirp_fuse_utimens(const char *path, const struct timespec *tv, struct fuse_file_info *fi)
 {
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
@@ -358,7 +358,7 @@ static int chirp_fuse_utimens(const char *path, struct timespec *buf, struct fus
 	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_utime(host, newpath, buf->actime, buf->modtime, time(0) + chirp_fuse_timeout);
+	result = chirp_global_utime(host, newpath, tv->tv_sec, tv->tv_sec, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
 	if(result < 0)
