@@ -154,6 +154,7 @@ def start_function(in_pipe_fd, thread_limit=1):
                 sys.exit(1)
             finally:
                 os.chdir(library_sandbox)
+            return -1, function_id
         else:
             try:
                 arg_infile = os.path.join(function_sandbox, "infile")
@@ -401,7 +402,8 @@ def main():
             stdout_timed_message(f"{len(pid_to_func_id)} functions running concurrently")
             last_check_time = current_check_time
 
-        # wait for messages from worker or child to return
+        # in case of "fork" exec method, wait for messages from worker or child to return
+        # in case of "direct" exec method, wait for messages from worker
         try:
             rlist, wlist, xlist = select.select([in_pipe_fd, r], [], [], timeout)
         except Exception as e:
@@ -410,8 +412,17 @@ def main():
         for re in rlist:
             # worker has a function, run it
             if re == in_pipe_fd:
-                pid, func_id = start_function(in_pipe_fd, thread_limit)
-                pid_to_func_id[pid] = func_id
+                if exec_method == 'direct':
+                    _, func_id = start_function(in_pipe_fd, thread_limit)
+                    send_result(
+                        out_pipe_fd,
+                        args.worker_pid,
+                        func_id,
+                        0,
+                    )
+                else:
+                    pid, func_id = start_function(in_pipe_fd, thread_limit)
+                    pid_to_func_id[pid] = func_id
             else:
                 # at least 1 child exits, reap all.
                 # read only once as os.read is blocking if there's nothing to read.
