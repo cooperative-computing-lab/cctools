@@ -257,7 +257,7 @@ class Manager(object):
     # Get the caching directory of the manager
     @property
     def cache_directory(self):
-        return cvine.vine_get_path_staging(self._taskvine, None)
+        return cvine.vine_get_path_cache(self._taskvine, None)
 
     ##
     # Get manager statistics.
