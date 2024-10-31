@@ -164,7 +164,7 @@ def analyze_function_from_bytecode(func):
             imports.add(import_pkg)
 
     return imports
-   
+
 
 def analyze_functions_from_bytecode(func_list):
     imports = set()

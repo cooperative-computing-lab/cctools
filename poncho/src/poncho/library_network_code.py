@@ -28,6 +28,7 @@ from ndcctools.taskvine.utils import load_variable_from_library
 r, w = os.pipe()
 exec_method = None
 
+
 # This class captures how results from FunctionCalls are conveyed from
 # the library to the manager.
 # For now, all communication details should use this class to generate responses.
@@ -45,6 +46,7 @@ class LibraryResponse:
             "Success": self.success,
             "Reason": self.reason,
         }
+
 
 # A wrapper around functions in library to extract arguments and formulate responses.
 def remote_execute(func):
@@ -75,10 +77,12 @@ def remote_execute(func):
 
     return remote_wrapper
 
+
 # Handler to sigchld when child exits.
 def sigchld_handler(signum, frame):
     # write any byte to signal that there's at least 1 child
     os.writev(w, [b"a"])
+
 
 # Read data from worker, start function, and dump result to `outfile`.
 def start_function(in_pipe_fd, thread_limit=1):
@@ -237,12 +241,14 @@ def start_function(in_pipe_fd, thread_limit=1):
 
     return -1
 
+
 # Send result of a function execution to worker. Wake worker up to do work with SIGCHLD.
 def send_result(out_pipe_fd, worker_pid, task_id, exit_code):
     buff = bytes(f"{task_id} {exit_code}", "utf-8")
     buff = bytes(str(len(buff)), "utf-8") + b"\n" + buff
     os.writev(out_pipe_fd, [buff])
     os.kill(worker_pid, signal.SIGCHLD)
+
 
 # Self-identifying message to send back to the worker, including the name of this library.
 # Send back a SIGCHLD to interrupt worker sleep and get it to work.
@@ -252,10 +258,12 @@ def send_configuration(config, out_pipe_fd, worker_pid):
     os.writev(out_pipe_fd, [bytes(config_cmd, "utf-8")])
     os.kill(worker_pid, signal.SIGCHLD)
 
+
 # Use os.write to stdout instead of print for multi-processing safety
 def stdout_timed_message(message):
     timestamp = datetime.now().strftime("%m/%d/%y %H:%M:%S.%f")
     os.write(sys.stdout.fileno(), f"{timestamp} {message}\n".encode())
+
 
 def main():
     ppid = os.getppid()
@@ -303,7 +311,7 @@ def main():
         help="pid of main vine worker to send sigchild to let it know theres some result.",
     )
     args = parser.parse_args()
-    
+
     # check if library cores and function slots are valid
     if args.function_slots > args.library_cores:
         stdout_timed_message("error: function slots cannot be more than library cores")
@@ -352,7 +360,7 @@ def main():
     # read in information about this library
     with open('library_info.clpk', 'rb') as f:
         library_info = cloudpickle.load(f)
-    
+
     # load and execute this library's context
     library_context_info = cloudpickle.loads(library_info['context_info'])
     context_vars = None

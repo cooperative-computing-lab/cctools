@@ -937,7 +937,7 @@ class Manager(object):
         # Delay loading of poncho until here, to avoid bringing in poncho dependencies unless needed.
         # Ensure poncho python library is available.
         from ndcctools.poncho import package_serverize
-    
+
         # Check if the library is empty
         if len(function_list) == 0:
             raise ValueError('A library cannot have 0 functions.')
