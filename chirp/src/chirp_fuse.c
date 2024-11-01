@@ -587,10 +587,9 @@ int main(int argc, char *argv[])
 	signed char c;
 	int did_explicit_auth = 0;
 	char *tickets = NULL;
-	struct fuse_args fa;
-	fa.argc = 0;
-	fa.argv = string_array_new();
-	fa.allocated = 1;
+
+	struct fuse_args fa = FUSE_ARGS_INIT(0, NULL);
+	fuse_opt_add_arg(&fa, argv[0]);
 
 	debug_config(argv[0]);
 
@@ -624,8 +623,7 @@ int main(int argc, char *argv[])
 			tickets = xxstrdup(optarg);
 			break;
 		case 'm':
-			fa.argc += 1;
-			fa.argv = string_array_append(fa.argv, optarg);
+			fuse_opt_add_arg(&fa, optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);
