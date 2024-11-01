@@ -245,14 +245,14 @@ struct vine_file *vine_file_temp()
 	return vine_file_create("temp", 0, 0, 0, VINE_TEMP, 0, cache, 0);
 }
 
-struct vine_file *vine_file_pseudo_temp()
+struct vine_file *vine_file_temp_no_peers()
 {
 	// temp files are always cached at workers until explicitely removed.
 	vine_cache_level_t cache = VINE_CACHE_LEVEL_WORKFLOW;
 	uid_t uid = getuid();
 
 	char *name = string_format("temp-local-%u", uid);
-	return vine_file_create(name, 0, 0, 0, VINE_FILE, 0, cache, 0);
+	return vine_file_create(name, 0, 0, 0, VINE_FILE, 0, cache, VINE_UNLINK_WHEN_DONE);
 	free(name);
 }
 
