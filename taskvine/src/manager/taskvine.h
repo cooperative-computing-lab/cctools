@@ -320,7 +320,7 @@ Note that "direct" will limit the number of function slots in a library to 1.
 @param t                A library object.
 @param exec_mode        A string denoting the execution mode of the library.
 */
-void vine_task_set_function_exec_mode(struct vine_task *t, const char *exec_mode);
+void vine_task_set_function_exec_mode_from_string(struct vine_task *t, const char *exec_mode);
 
 /** Add a general file object as a input to a task.
 @param t A task object.

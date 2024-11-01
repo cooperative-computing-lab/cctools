@@ -942,6 +942,11 @@ class Manager(object):
         if len(function_list) == 0:
             raise ValueError('A library cannot have 0 functions.')
 
+        # Check if exec_mode is valid
+        # Currently taskvine only supports 'fork' and 'direct'.
+        if exec_mode != 'fork' and exec_mode != 'direct':
+            raise ValueError(f'A library cannot have exec_mode as {exec_mode}. Only "fork" and "direct" are supported.')
+
         # Create a unique hash of a library from all information that determine a library's uniqueness.
         library_hash = package_serverize.generate_library_hash(library_name=library_name,
                                                                function_list=function_list,
@@ -1021,7 +1026,7 @@ class Manager(object):
         t.add_input(f, library_info_name)
 
         # Register execution mode of functions in this library
-        t.set_function_exec_mode(exec_mode)
+        t.set_function_exec_mode_from_string(exec_mode)
         return t
 
     ##

@@ -284,9 +284,9 @@ class Task(object):
     # This is not needed for regular tasks.
     #
     # @param self       Reference to the current task object.
-    # @param exec_mode  The execution mode of functions in a library.
-    def set_function_exec_mode(self, exec_mode):
-        return cvine.vine_task_set_function_exec_mode(self._task, exec_mode)
+    # @param exec_mode  The execution mode of functions in a library. Either 'fork' or 'direct'.
+    def set_function_exec_mode_from_string(self, exec_mode):
+        return cvine.vine_task_set_function_exec_mode_from_string(self._task, exec_mode)
 
     ##
     # Set the worker selection scheduler for task.

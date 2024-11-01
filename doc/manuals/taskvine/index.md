@@ -1625,7 +1625,7 @@ Note that both library tasks and function invocations consume
 resources at the worker, and the number of running tasks will be
 constrained by the available resources in the same way as normal tasks.
 
-### Advanced Serverless Computing
+### Stateful Serverless Computing
 A function typically sets up its states (e.g., load modules/packages, build internal models or states) before executing its computation. With advanced serverless computing in TaskVine, you can set up a shared state between function invocations so the cost of setting up states doesn't have to be paid for every invocation, but instead is paid once and shared many times. TaskVine supports this technique as demonstrated via the below example.
 
 Assume that you program has two functions `my_sum` and `my_mul`, and they both use `base` to set up a common value in their computations.

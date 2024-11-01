@@ -316,10 +316,21 @@ void vine_task_set_function_slots(struct vine_task *t, int nslots)
 	t->function_slots_requested = nslots;
 }
 
-void vine_task_set_function_exec_mode(struct vine_task *t, const char *exec_mode)
+void vine_task_set_function_exec_mode(struct vine_task *t, vine_task_func_exec_mode_t exec_mode)
+{
+	if (t->provides_library) {
+		t->func_exec_mode = exec_mode;
+	}
+}
+
+void vine_task_set_function_exec_mode_from_string(struct vine_task *t, const char *exec_mode)
 {
 	if (exec_mode && t->provides_library) {
-		t->func_exec_mode = xxstrdup(exec_mode);
+		if (!strncmp(exec_mode, "fork", strlen("fork"))) {
+			t->func_exec_mode = VINE_TASK_FUNC_EXEC_MODE_FORK;
+		} else {
+			t->func_exec_mode = VINE_TASK_FUNC_EXEC_MODE_DIRECT;
+		}
 	}
 }
 

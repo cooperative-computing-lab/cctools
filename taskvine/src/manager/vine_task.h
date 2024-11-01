@@ -37,6 +37,11 @@ typedef enum {
 	VINE_TASK_DONE,              /**< Task is done, and returned through vine_wait >**/
 } vine_task_state_t;
 
+typedef enum {
+        VINE_TASK_FUNC_EXEC_MODE_DIRECT = 0,    /**< A library task will execute function calls directly in its process **/
+        VINE_TASK_FUNC_EXEC_MODE_FORK,          /**< A library task will fork and execute each function call. **/
+} vine_task_func_exec_mode_t;
+
 struct vine_task {
     /***** Fixed properties of task at submit time. ******/
 
@@ -52,7 +57,7 @@ struct vine_task {
 	char *needs_library;         /**< If this is a FunctionTask, the name of the library used */
 	char *provides_library;      /**< If this is a LibraryTask, the name of the library provided. */
 	int   function_slots_requested; /**< If this is a LibraryTask, the number of function slots requested by the user. -1 causes the number of slots to match the number of cores. */
-        const char *func_exec_mode;    /**< If this a LibraryTask, the execution mode of its functions. */
+        vine_task_func_exec_mode_t func_exec_mode;    /**< If this a LibraryTask, the execution mode of its functions. */
 	
 	struct list *input_mounts;    /**< The mounted files expected as inputs. */
 	struct list *output_mounts;   /**< The mounted files expected as outputs. */
