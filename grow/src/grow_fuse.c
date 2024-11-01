@@ -4,13 +4,13 @@
  * See the file COPYING for details.
  */
 
-#define FUSE_USE_VERSION 26
+#define FUSE_USE_VERSION 31
 
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fuse.h>
+#include <fuse3/fuse.h>
 #include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -139,7 +139,7 @@ static int deny_create(const char *path) {
 	return -EROFS;
 }
 
-static void *grow_fuse_init(struct fuse_conn_info *conn) {
+static void *grow_fuse_init(struct fuse_conn_info *conn, struct fuse_config *cfg) {
 	GETCONTEXT
 	return ctx->private_data;
 }
@@ -152,7 +152,7 @@ static void grow_fuse_destroy(void *x) {
 	}
 }
 
-static int grow_fuse_getattr(const char *path, struct stat *stbuf) {
+static int grow_fuse_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fa) {
 	stats_inc("grow.fuse.getattr", 1);
 	GETROOT
 	struct grow_dirent *e = grow_lookup(path, root->metadata, 0);
@@ -189,14 +189,14 @@ static int grow_fuse_opendir(const char *path, struct fuse_file_info *fi) {
 	return 0;
 }
 
-static int grow_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
+static int grow_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags flags) {
 	stats_inc("grow.fuse.readdir", 1);
 	GETROOT
 	struct grow_dirent *e = grow_lookup(path, root->metadata, 1);
 	if (!e) return -errno;
 	if (!S_ISDIR(e->mode)) return -ENOTDIR;
 	for (struct grow_dirent *c = e->children; c; c = c->next) {
-		if (filler(buf, c->name, NULL, 0)) return -ENOMEM;
+		if (filler(buf, c->name, NULL, 0, 0)) return -ENOMEM;
 	}
 	return 0;
 }
@@ -226,7 +226,7 @@ static int grow_fuse_symlink(const char *from, const char *to) {
 	return deny_create(to);
 }
 
-static int grow_fuse_rename(const char *from, const char *to) {
+static int grow_fuse_rename(const char *from, const char *to, unsigned int flags) {
 	stats_inc("grow.fuse.rename", 1);
 	GETROOT
 	// this isn't exactly correct, but rename has an annoying number of cases
@@ -258,17 +258,17 @@ static int grow_fuse_link(const char *from, const char *to) {
 	return from_err == -EROFS ? to_err : from_err;
 }
 
-static int grow_fuse_chmod(const char *path, mode_t mode) {
+static int grow_fuse_chmod(const char *path, mode_t mode, struct fuse_file_info *fa) {
 	stats_inc("grow.fuse.chmod", 1);
 	return deny_write(path);
 }
 
-static int grow_fuse_chown(const char *path, uid_t uid, gid_t gid) {
+static int grow_fuse_chown(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *fa) {
 	stats_inc("grow.fuse.chown", 1);
 	return deny_write(path);
 }
 
-static int grow_fuse_truncate(const char *path, off_t size) {
+static int grow_fuse_truncate(const char *path, off_t size, struct fuse_file_info *fa) {
 	stats_inc("grow.fuse.truncate", 1);
 	return deny_write(path);
 }
