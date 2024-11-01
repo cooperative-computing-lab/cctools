@@ -26,6 +26,8 @@ See the file COPYING for details.
 #include <string.h>
 #include <unistd.h>
 
+void vine_task_set_function_exec_mode(struct vine_task *t, vine_task_func_exec_mode_t exec_mode);
+
 struct vine_task *vine_task_create(const char *command_line)
 {
 	struct vine_task *t = malloc(sizeof(*t));
