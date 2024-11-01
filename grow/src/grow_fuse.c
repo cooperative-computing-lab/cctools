@@ -388,7 +388,6 @@ int main(int argc, char *argv[]) {
 		show_help(argv[0]);
 		exit(EXIT_FAILURE);
 	} else {
-		assert(fuse_opt_add_arg(&args, "-ononempty") == 0);
 		assert(fuse_opt_add_arg(&args, "-okernel_cache") == 0);
 
 		cache_data = options.cache_data;
