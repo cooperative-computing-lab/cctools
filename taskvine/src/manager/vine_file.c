@@ -249,8 +249,11 @@ struct vine_file *vine_file_pseudo_temp()
 {
 	// temp files are always cached at workers until explicitely removed.
 	vine_cache_level_t cache = VINE_CACHE_LEVEL_WORKFLOW;
+	uid_t uid = getuid();
 
-	return vine_file_create("temp", 0, 0, 0, VINE_FILE, 0, cache, 0);
+	char *name = string_format("temp-local-%u", uid);
+	return vine_file_create(name, 0, 0, 0, VINE_FILE, 0, cache, 0);
+	free(name);
 }
 
 struct vine_file *vine_file_buffer(const char *data, size_t size, vine_cache_level_t cache, vine_file_flags_t flags)
