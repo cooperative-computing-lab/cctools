@@ -111,7 +111,7 @@ config_swig_path=auto
 config_perl_path=no
 config_golang_path=no
 config_curl_path=no
-config_cvmfs_path=no
+config_cvmfs_path=auto
 config_globus_path=no
 config_irods_path=no
 config_uuid_path=no
@@ -702,11 +702,12 @@ then
 	fuse_path=${fuse_path:-${base_root}}
 	if library_search fuse ${fuse_path} || library_search fuse /
 	then
+		fuse_ccflags="-DHAS_FUSE"
 		if [ "${fuse_path}" != / -a "${fuse_path}" != ${base_root} ]
 		then
-			fuse_ccflags="-I${fuse_path}/include"
+			fuse_ccflags="${fuse_ccflags} -I${fuse_path}/include"
 		fi
-		fuse_ldflags="-DHAS_FUSE ${library_search_result}"
+		fuse_ldflags="${library_search_result}"
 	else
 		fuse_avail=no
 	fi
