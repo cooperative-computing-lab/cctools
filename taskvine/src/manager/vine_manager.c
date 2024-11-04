@@ -1358,23 +1358,18 @@ static int expire_waiting_tasks(struct vine_manager *q)
 	int t_idx;
 	int expired = 0;
 
-	int tasks_considered = 0;
 	double current_time = timestamp_get() / ONE_SECOND;
 
-	PRIORITY_QUEUE_STATIC_ITERATE(q->ready_tasks, t_idx, t)
+	int iter_count = 0;
+	int iter_depth = q->attempt_schedule_depth;
+	PRIORITY_QUEUE_STATIC_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
 	{
-		if (tasks_considered > q->attempt_schedule_depth) {
-			return expired;
-		}
-
 		if (t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
 			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
 			priority_queue_remove(q->ready_tasks, t_idx);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			expired++;
 		}
-
-		tasks_considered++;
 	}
 
 	return expired;
@@ -3334,8 +3329,8 @@ static int send_one_task(struct vine_manager *q)
 	struct vine_task *t;
 	struct vine_worker_info *w = NULL;
 
-	int tasks_considered = 0;
-	int tasks_to_consider = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
+	int iter_count = 0;
+	int iter_depth = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
 
 	// Iterate over the ready tasks by priority.
 	// The first time we arrive here, the task with the highest priority is considered. However, there may be various reasons
@@ -3349,19 +3344,15 @@ static int send_one_task(struct vine_manager *q)
 	// 	1. Task retrieval from worker (resources released or inputs available)
 	// 	2. New worker connection (more resources available)
 	//  3. Delete/Insert an element prior/equal to the rotate cursor (tasks prior to the current cursor changed)
-	// 1 and 2 are explicitly handled by the manager, while 3 is implicitly handled by the priority queue data structure
-	PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t)
+	// 1 and 2 are explicitly handled by the manager where calls priority_queue_rotate_reset, while 3 is implicitly handled by
+	// the priority queue data structure where also invokes priority_queue_rotate_reset.
+	PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
 	{
 		w = consider_task(q, t);
 		if (w) {
 			priority_queue_remove(q->ready_tasks, t_idx);
 			commit_task_to_worker(q, w, t);
 			return 1;
-		}
-		// The break check must go after the task is considered, as the rotate cursor is
-		// advanced in the macro and must be considered
-		if (++tasks_considered >= tasks_to_consider) {
-			return 0;
 		}
 	}
 
