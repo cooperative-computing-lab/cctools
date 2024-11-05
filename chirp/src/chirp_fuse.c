@@ -495,6 +495,8 @@ static int chirp_fuse_create(const char *path, mode_t mode, struct fuse_file_inf
 	if(error != 0)
 		return error;
 
+	fi->flags &= ~(O_CREAT|O_TRUNC);
+
 	return chirp_fuse_open(path, fi);
 }
 
