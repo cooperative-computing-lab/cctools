@@ -60,7 +60,7 @@ clean()
 
 	kill -9 $(cat $CHIRP_PID_FILE)
 
-	rm -rf ${CHIRP_DIR}
+	rmdir ${CHIRP_DIR}
 	rm -f "$c" "$CHIRP_DIR_FILE" "$CHIRP_HOSTPORT_FILE"
 	return 0
 }
