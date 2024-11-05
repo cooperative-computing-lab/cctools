@@ -37,7 +37,6 @@ run()
 	mktemp -d /tmp/chirp.fuse.XXXXXX > "$CHIRP_DIR_FILE"
 	CHIRP_DIR=$(cat $CHIRP_DIR_FILE)
 
-	echo ../src/chirp_fuse -dall -aunix ${CHIRP_DIR}
 	../src/chirp_fuse -dall -aunix -f ${CHIRP_DIR} &
 	echo $! > ${CHIRP_PID_FILE}
 	
