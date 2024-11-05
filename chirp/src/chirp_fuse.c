@@ -134,7 +134,7 @@ static void longdir_callback(const char *name, struct chirp_stat *cinfo, void *a
 	longdir_filler(longdir_buf, name, &info, 0, 0);
 }
 
-static int chirp_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags)
+static int chirp_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags flags)
 {
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
