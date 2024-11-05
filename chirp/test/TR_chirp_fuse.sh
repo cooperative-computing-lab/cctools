@@ -14,6 +14,9 @@ import_config_val CCTOOLS_FUSE_AVAILABLE
 check_needed()
 {
 	[ "${CCTOOLS_FUSE_AVAILABLE}" = yes ] || return 1
+
+	# Do not run this test in github actions because fuse needs privileges
+	[ ! -n "$GITHUB_ACTION" ]
 }
 
 prepare()
