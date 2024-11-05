@@ -2136,6 +2136,7 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	jx_insert_string(j, "version", CCTOOLS_VERSION);
 	jx_insert_string(j, "type", "vine_manager");
 	jx_insert_integer(j, "port", vine_port(q));
+	jx_insert_integer(j, "protocol", VINE_PROTOCOL_VERSION);
 
 	char *name, *key;
 	HASH_TABLE_ITERATE(q->properties, name, key)
