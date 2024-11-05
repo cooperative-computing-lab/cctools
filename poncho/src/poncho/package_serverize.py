@@ -206,7 +206,7 @@ def generate_library_hash(library_name,
             library_info.append(inspect.getsource(function))
         except OSError:
             # process the function's code object
-            function_co = function.__code__
+            func_co = function.__code__
             library_info.append(str(func_co.co_name))
             library_info.append(str(func_co.co_argcount))
             library_info.append(str(func_co.co_posonlyargcount))

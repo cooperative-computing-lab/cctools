@@ -71,6 +71,13 @@ def main():
     
     libtask_with_context_fork = q.create_library_from_functions('test-library-with-context-fork', divide, double, cube, hoisting_modules=hoisting_modules, add_env=False, exec_mode='fork', library_context_info=[exp, [2], {'y': 3}])
 
+    # define special functions (1 lambda function and 1 dynamically executed function
+    # lambda functions can be specified with a custom name, otherwise it will be assigned a default name by Python as "<lambda>".
+    lambda_fn = lambda x : x + 1
+    exec("def dyn_fn(x):\n    return x + 2", globals(), globals())
+    libtask_with_special_fns = q.create_library_from_functions('test-library-with-special-fns', lambda_fn, dyn_fn, add_env=False, exec_mode='fork')
+
+
     # Just take default resources for the library, this will cause it to fill the whole worker. 
     # And the number of functions slots will match the number of cores available.
 
@@ -78,7 +85,8 @@ def main():
     q.install_library(libtask_no_context_fork)
     q.install_library(libtask_with_context_direct)
     q.install_library(libtask_with_context_fork)
-    lib_task_names = ['test-library-no-context-direct', 'test-library-no-context-fork', 'test-library-with-context-direct', 'test-library-with-context-fork']
+    q.install_library(libtask_with_special_fns)
+    lib_task_names = ['test-library-no-context-direct', 'test-library-no-context-fork', 'test-library-with-context-direct', 'test-library-with-context-fork', 'test-library-with-special-fns']
     print("Submitting function call tasks...")
     
     tasks = 100
@@ -88,14 +96,21 @@ def main():
         if lib_name.find('with-context') != -1:
             with_library=True
         for _ in range(0, tasks):
-            s_task = vine.FunctionCall(lib_name, 'divide', 2, 2**2, with_library=with_library)
-            q.submit(s_task)
-        
-            s_task = vine.FunctionCall(lib_name, 'double', 3, with_library=with_library)
-            q.submit(s_task)
+            if lib_name == 'test-library-with-special-fns':
+                s_task = vine.FunctionCall(lib_name, '<lambda>', 1)
+                q.submit(s_task)
 
-            s_task = vine.FunctionCall(lib_name, 'cube', 4, with_library=with_library)
-            q.submit(s_task)
+                s_task = vine.FunctionCall(lib_name, 'dyn_fn', 1)
+                q.submit(s_task)
+            else:
+                s_task = vine.FunctionCall(lib_name, 'divide', 2, 2**2, with_library=with_library)
+                q.submit(s_task)
+            
+                s_task = vine.FunctionCall(lib_name, 'double', 3, with_library=with_library)
+                q.submit(s_task)
+
+                s_task = vine.FunctionCall(lib_name, 'cube', 4, with_library=with_library)
+                q.submit(s_task)
 
         while not q.empty():
             t = q.wait(5)
@@ -115,7 +130,8 @@ def main():
     base_val = exp(2, 3)['base_val']
     with_context_direct_expected = (tasks * (divide(2, 2**2) + double(3) + cube(4) + base_val * 3))
     with_context_fork_expected = (tasks * (divide(2, 2**2) + double(3) + cube(4) + base_val * 3))
-    expected = no_context_direct_expected + no_context_fork_expected + with_context_direct_expected + with_context_fork_expected 
+    special_fns_expected = (tasks * (lambda_fn(1) + dyn_fn(1)))
+    expected = no_context_direct_expected + no_context_fork_expected + with_context_direct_expected + with_context_fork_expected + special_fns_expected
 
     print(f"Total:    {total_sum}")
     print(f"Expected: {expected}")
