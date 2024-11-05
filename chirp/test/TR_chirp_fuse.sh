@@ -38,8 +38,8 @@ run()
 	CHIRP_DIR=$(cat $CHIRP_DIR_FILE)
 
 	echo ../src/chirp_fuse -dall -aunix ${CHIRP_DIR}
-	../src/chirp_fuse -dall -aunix ${CHIRP_DIR}
-	echo $? > ${CHIRP_PID_FILE}
+	../src/chirp_fuse -dall -aunix -f ${CHIRP_DIR} &
+	echo $! > ${CHIRP_PID_FILE}
 	
 
 	echo hello > ${CHIRP_DIR}/${hostport}/hello.txt
