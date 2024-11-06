@@ -13,7 +13,9 @@ worker, and catalog, but should not be visible to the public user API.
 #ifndef VINE_PROTOCOL_H
 #define VINE_PROTOCOL_H
 
-#define VINE_PROTOCOL_VERSION 11
+#define VINE_PROTOCOL_VERSION 12
+
+#define VINE_LIBRARY_PROTOCOL_VERSION 1
 
 #define VINE_LINE_MAX 4096       /**< Maximum length of a vine message line. */
 

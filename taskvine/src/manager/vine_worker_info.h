@@ -28,6 +28,9 @@ struct vine_worker_info {
 	/* Connection to the worker or other client. */
 	struct link *link;
 
+        /* Library protocol version of this worker. */
+        int library_protocol_version;
+
 	/* Static properties reported by worker when it connects. */
 	char *hostname;
 	char *os;

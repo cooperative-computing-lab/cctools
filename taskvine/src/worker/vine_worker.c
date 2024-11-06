@@ -564,8 +564,9 @@ static void report_worker_ready(struct link *manager)
 	}
 
 	send_async_message(manager,
-			"taskvine %d %s %s %s %d.%d.%d\n",
+			"taskvine %d %d %s %s %s %d.%d.%d\n",
 			VINE_PROTOCOL_VERSION,
+			VINE_LIBRARY_PROTOCOL_VERSION,
 			hostname,
 			options->os_name,
 			options->arch_name,
