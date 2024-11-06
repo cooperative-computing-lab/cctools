@@ -3252,6 +3252,13 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 				vine_manager_consider_recovery_task(q, f, f->recovery_task);
 				all_available = 0;
 			}
+		} // this is probably a local-temp
+		else if (f->flags && VINE_UNLINK_WHEN_DONE) {
+			struct stat info;
+			int result = lstat(f->source, &info);
+			if (result != 0) {
+				all_available = 0;
+			}
 		}
 	}
 	return all_available;
