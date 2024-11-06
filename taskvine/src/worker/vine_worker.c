@@ -1716,7 +1716,7 @@ static void vine_worker_serve_manager(struct link *manager)
 				} else if (process_can_run_eventually(p, cache_manager, manager)) {
 					list_push_tail(procs_waiting, p);
 				} else {
-					debug(D_VINE, "No suitable library found for task %d", p->task->task_id);
+					debug(D_VINE, "task does not have necessary recourses to run %d", p->task->task_id);
 					forsake_waiting_process(manager, p);
 					task_event++;
 				}
