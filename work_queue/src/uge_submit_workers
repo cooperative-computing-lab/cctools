@@ -1,0 +1,79 @@
+#!/bin/sh
+
+UGE_WARNING=1
+
+SUBMIT_COMMON=$(which work_queue_submit_common)
+if [ -z "$SUBMIT_COMMON" ];
+then
+	echo "Please add 'work_queue_submit_common' to your PATH." 1>&2
+	exit 1
+else
+	. $SUBMIT_COMMON
+fi
+
+
+show_help()
+{
+
+	echo "  -j                       Use job array to submit workers."
+	echo "  -p <parameters>          UGE qsub parameters."
+}
+
+use_jobarray=0
+uge_parameters=""
+
+# Used options (as in the getopts format):  aM:N:C:t:d:w:i:b:z:A:O:s:P:jp:h
+parse_arguments()
+{
+	if [ -z "$cores" -o "$cores" = 0 ]
+	then
+		cores=1
+	fi
+
+	while [ $# -gt 0 ]
+	do
+		case $1 in
+			-j)
+			use_jobarray=1
+			;;
+			-p)
+			shift
+			uge_parameters="$uge_parameters $1"
+			;;
+			*)
+			break
+			;;
+		esac
+		shift
+	done
+}
+
+submit_workers_command()
+{
+	qsub=`which qsub 2>/dev/null`
+	if [ $? != 0 ]
+	then
+		echo "$0: please add 'qsub' to your PATH."
+		exit 1
+	fi
+
+	cat >worker.sh <<EOF
+#!/bin/sh
+UGE_CUSTOM_PARAMETERS
+./work_queue_worker $arguments $host $port
+EOF
+
+	chmod 755 worker.sh
+
+	if [ $use_jobarray = 1 ]
+	then
+		qsub -t 1-$count:1 -cwd $uge_parameters worker.sh
+	else
+		for n in `seq 1 $count`
+		do
+			qsub -cwd $uge_parameters worker.sh
+		done
+	fi
+}
+
+submit_workers "$@"

@@ -8,16 +8,19 @@
 from ndcctools.poncho import package_analyze as analyze
 from ndcctools.poncho import package_create as create
 from ndcctools.poncho.wq_network_code import wq_network_code
-from ndcctools.poncho.library_network_code import library_network_code
+from ndcctools.poncho import library_network_code
 
 import json
 import os
+import sys
 import stat
 import ast
 import types
 import tarfile
 import hashlib
 import inspect
+
+import cloudpickle
 
 shebang = "#! /usr/bin/env python3\n\n"
 
@@ -166,14 +169,84 @@ def pack_library_code(path, envpath):
         create.pack_env("/tmp/tmp.json", envpath)
 
 
+# Generate a hash value from all information about a library
+# @param library_name   The name of the library
+# @param function_list  A list of functions in the library
+# @param poncho_env     The name of an already prepared poncho environment
+# @param init_command   A string describing a shell command to execute before the library task is run
+# @param add_env        Whether to automatically create and/or add environment to the library
+# @param exec_mode      The execution mode of functions in this library.
+# @param hoisting_modules  A list of modules imported at the preamble of library, including packages, functions and classes.
+# @param library_context_info   A list containing [library_context_func, library_context_args, library_context_kwargs]. Used to create the library context on remote nodes.
+# @return               A hash value.
+def generate_library_hash(library_name,
+                          function_list,
+                          poncho_env,
+                          init_command,
+                          add_env,
+                          exec_mode,
+                          hoisting_modules,
+                          library_context_info):
+    library_info = [library_name]
+    function_list = list(function_list)
+    function_names = set()
+
+    if library_context_info:
+        function_list += [library_context_info[0]]
+
+    for function in function_list:
+        if function.__name__ is None:
+            raise ValueError('A function must have a name.')
+        if function.__name__ in function_names:
+            raise ValueError('A library cannot have two functions with the same name.')
+        else:
+            function_names.add(function.__name__)
+        
+        try:
+            library_info.append(inspect.getsource(function))
+        except OSError:
+            # process the function's code object
+            func_co = function.__code__
+            library_info.append(str(func_co.co_name))
+            library_info.append(str(func_co.co_argcount))
+            library_info.append(str(func_co.co_posonlyargcount))
+            library_info.append(str(func_co.co_kwonlyargcount))
+            library_info.append(str(func_co.co_nlocals))
+            library_info.append(str(func_co.co_varnames))
+            library_info.append(str(func_co.co_cellvars))
+            library_info.append(str(func_co.co_freevars))
+            library_info.append(str(func_co.co_code))
+            library_info.append(str(func_co.co_consts))
+            library_info.append(str(func_co.co_names))
+            library_info.append(str(func_co.co_stacksize))
+
+    library_info.append(str(poncho_env))
+    library_info.append(str(init_command))
+    library_info.append(str(add_env))
+    library_info.append(str(exec_mode))
+    library_info.append(str(hoisting_modules))
+
+    if library_context_info:
+        if isinstance(library_context_info[1], list):
+            for arg in library_context_info[1]:
+                library_info.append(str(arg))
+        if isinstance(library_context_info[2], dict):
+            for kwarg in library_context_info[2]:
+                library_info.append(str(kwarg))
+                library_info.append(str(library_context_info[2][kwarg]))
+    
+    library_info = ''.join(library_info)    # linear time complexity
+    msg = hashlib.sha1()
+    msg.update(library_info.encode('utf-8'))
+    return msg.hexdigest()
+
+
 # Combine function names and function bodies to create a unique hash of the functions.
 # Note that these functions must have source code, so dynamic functions generated from
 # Python's exec or Jupyter Notebooks won't work here.
 # @param functions  A list of functions to generate the hash value from.
 # @return           a string of hex characters resulted from hashing the contents and names of functions.
 def generate_functions_hash(functions: list, hoisting_modules=None) -> str:
-    import sys
-
     source_code = []
     if hoisting_modules:
         source_code.extend(["import " + module.__name__ + "\n" for module in hoisting_modules])
@@ -191,11 +264,72 @@ def generate_functions_hash(functions: list, hoisting_modules=None) -> str:
     return hashlib.md5(" ".join(source_code).encode("utf-8")).hexdigest()
 
 
+def generate_taskvine_library_code(library_path, hoisting_modules=None):
+    # create output file
+    with open(library_path, "w") as output_file:
+        # write shebang to file
+        output_file.write(shebang)
+        # write imports to file
+        hoisting_code_list = generate_hoisting_code(hoisting_modules)
+        if hoisting_code_list:
+            for hoisting_code in hoisting_code_list:
+                output_file.write(f"{hoisting_code}\n")
+
+        raw_source_code = inspect.getsource(library_network_code)
+        output_file.write(raw_source_code)
+
+    st = os.stat(library_path)
+    os.chmod(library_path, st.st_mode | stat.S_IEXEC)
+
+
 # Create a library file and a poncho environment tarball from a list of functions as needed.
-# The functions in the list must have source code for this code to work.
-# @param path             path to directory to create the library python file and the environment tarball.
-# @param functions        list of functions to include in the
-# @param hoisting_modules   a list of modules to be imported at the preamble of library
+# @param    library_cache_path      path to directory to create the library python file and the environment tarball.
+# @param    library_code_path       path to the to-be-created library code.
+# @param    library_env_path        path to the to-be-created poncho environment tarball.
+# @param    library_info_path       path to the to-be-created library information in serialized format.
+# @param    functions               list of functions to include in the library
+# @param    library_name            name of the library
+# @param    need_pack               whether to create a poncho environment tarball
+# @param    exec_mode               execution mode of functions in this library
+# @param    hoisting_modules        a list of modules to be imported at the preamble of library
+# @param    library_context_info    a list containing a library's context to be created remotely
+# @return   name of the file containing serialized information about the library
+def generate_library(library_cache_path,
+                     library_code_path,
+                     library_env_path,
+                     library_info_path,
+                     functions,
+                     library_name,
+                     need_pack=True,
+                     exec_mode='fork',
+                     hoisting_modules=None,
+                     library_context_info=None
+):
+    # create library_info.clpk
+    library_info = {}
+    library_info['function_list'] = {}
+    for func in functions:
+        library_info['function_list'][func.__name__] = cloudpickle.dumps(func)
+    library_info['library_name'] = library_name
+    library_info['exec_mode'] = exec_mode
+    library_info['context_info'] = cloudpickle.dumps(library_context_info)
+    with open(library_info_path, 'wb') as f:
+        cloudpickle.dump(library_info, f) 
+
+    # create library_code.py
+    generate_taskvine_library_code(library_code_path, hoisting_modules=hoisting_modules)
+
+    # pack environment
+    if need_pack:
+        pack_library_code(library_code_path, library_env_path)
+
+
+# Create a library file and a poncho environment tarball from a list of functions as needed.
+# @param    path                    path to directory to create the library python file and the environment tarball.
+# @param    functions               list of functions to include in the library
+# @param    need_pack               whether to create a poncho environment tarball
+# @param    hoisting_modules        a list of modules to be imported at the preamble of library
+# @return   name of the file containing serialized information about functions
 def serverize_library_from_code(
     path, functions, name, need_pack=True, hoisting_modules=None
 ):

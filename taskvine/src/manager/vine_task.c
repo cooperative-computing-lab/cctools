@@ -26,6 +26,8 @@ See the file COPYING for details.
 #include <string.h>
 #include <unistd.h>
 
+void vine_task_set_function_exec_mode(struct vine_task *t, vine_task_func_exec_mode_t exec_mode);
+
 struct vine_task *vine_task_create(const char *command_line)
 {
 	struct vine_task *t = malloc(sizeof(*t));
@@ -211,6 +213,8 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 		vine_task_set_library_required(new, task->needs_library);
 	if (task->provides_library)
 		vine_task_set_library_provided(new, task->provides_library);
+	if (task->func_exec_mode)
+		vine_task_set_function_exec_mode(new, task->func_exec_mode);
 	if (task->tag)
 		vine_task_set_tag(new, task->tag);
 	if (task->category)
@@ -312,6 +316,24 @@ const char *vine_task_get_library_provided(struct vine_task *t)
 void vine_task_set_function_slots(struct vine_task *t, int nslots)
 {
 	t->function_slots_requested = nslots;
+}
+
+void vine_task_set_function_exec_mode(struct vine_task *t, vine_task_func_exec_mode_t exec_mode)
+{
+	if (t->provides_library) {
+		t->func_exec_mode = exec_mode;
+	}
+}
+
+void vine_task_set_function_exec_mode_from_string(struct vine_task *t, const char *exec_mode)
+{
+	if (exec_mode && t->provides_library) {
+		if (!strncmp(exec_mode, "fork", strlen("fork"))) {
+			t->func_exec_mode = VINE_TASK_FUNC_EXEC_MODE_FORK;
+		} else {
+			t->func_exec_mode = VINE_TASK_FUNC_EXEC_MODE_DIRECT;
+		}
+	}
 }
 
 void vine_task_set_env_var(struct vine_task *t, const char *name, const char *value)

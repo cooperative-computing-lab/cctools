@@ -78,6 +78,7 @@ clean()
 	rm -f $STATUS_FILE
 	rm -f $PORT_FILE
 	rm -rf vine-run-info
+        rm worker.log
 	exit 0
 }
 

@@ -280,6 +280,15 @@ class Task(object):
         return cvine.vine_task_set_function_slots(self._task, nslots)
 
     ##
+    # Set the execution mode of functions in a library.
+    # This is not needed for regular tasks.
+    #
+    # @param self       Reference to the current task object.
+    # @param exec_mode  The execution mode of functions in a library. Either 'fork' or 'direct'.
+    def set_function_exec_mode_from_string(self, exec_mode):
+        return cvine.vine_task_set_function_exec_mode_from_string(self._task, exec_mode)
+
+    ##
     # Set the worker selection scheduler for task.
     #
     # @param self       Reference to the current task object.
@@ -1190,5 +1199,6 @@ class LibraryTask(Task):
         Task.__init__(self, fn)
         self._manager_will_free = True
         self.provides_library(library_name)
+
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
