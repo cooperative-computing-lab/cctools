@@ -9,6 +9,7 @@ dependencies:
  - make                 # required for build
  - zlib                 # required for compressed catalog updates
  - swig                 # required for WorkQueue/TaskVine language bindings
+ - libfuse              # required for chirp_fuse
  - perl                 # optional for WorkQueue Perl bindings
  - libopenssl-static    # optional for WorkQueue/TaskVine SSL connection
  - openssl              # optional for WorkQueue/TaskVine SSL connection
