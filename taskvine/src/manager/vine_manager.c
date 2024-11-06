@@ -2695,7 +2695,9 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	*/
 
 	if (t->provides_library) {
-		if (t->function_slots_requested <= 0) {
+		if (t->func_exec_mode == VINE_TASK_FUNC_EXEC_MODE_DIRECT) {
+			t->function_slots_total = 1;
+		} else if (t->function_slots_requested <= 0) {
 			t->function_slots_total = limits->cores;
 		} else {
 			t->function_slots_total = t->function_slots_requested;
