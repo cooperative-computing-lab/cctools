@@ -4721,6 +4721,11 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 		vine_task_set_scheduler(t, VINE_SCHEDULE_FILES);
 	}
 
+	/* Attempt to group this task based on temp dependencies. */
+	if (q->task_groups_enabled) {
+		vine_task_groups_assign_task(q, t);
+	}
+
 	/* If the task produces temporary files, create recovery tasks for those. */
 	vine_manager_create_recovery_tasks(q, t);
 
@@ -4732,11 +4737,6 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 	/* Ensure category structure is created. */
 	vine_category_lookup_or_create(q, t->category);
-
-	/* Attempt to group this task based on temp dependencies. */
-	if (q->task_groups_enabled) {
-		vine_task_groups_assign_task(q, t);
-	}
 
 	change_task_state(q, t, VINE_TASK_READY);
 
