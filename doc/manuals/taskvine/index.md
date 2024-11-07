@@ -2815,13 +2815,24 @@ The `compute` call above may receive the following keyword arguments:
 | resources\_mode | [Automatic resource management](#automatic-resource-management) to use, e.g., "fixed", "max", or "max throughput"| 
 | task\_mode | Mode to execute individual tasks, such as [function calls](#serverless-computing). to use, e.g., "tasks", or "function-calls"|
 
+## Appendix for Developers
 
+### Library - Worker Communication Patterns
 
-### Further Information
+This subsection describes the communication patterns between a library and a worker, agnostic of programming languages a library is implemented in.
+
+Upon library startup, it should send to its worker a json object as a byte stream.
+The json object should have the following keys and associated values' types: `{"name": type-string, "taskid": type-int, "exec\_mode": type-string}`.
+`"name"` should be the name of the library.
+`"taskid"` should be the library' taskid as assigned by a taskvine manager.
+`"exec\_mode"` should be the function execution mode of the library.
+A worker upon receiving a proper library startup message should check all keys against what it knows about the library, and mark the library as ready to receive function calls if the library passes the worker's startup check.
+
+## Further Information
 
 For more information, please see [Getting Help](../help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
-### Copyright
+## Copyright
 
 CCTools is Copyright (C) 2022 The University of Notre Dame. This software is distributed under the GNU General Public License Version 2. See the file COPYING for
 details.
