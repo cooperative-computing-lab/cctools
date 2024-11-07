@@ -1563,18 +1563,19 @@ static int check_library_startup(struct vine_process *p)
 	if (!name || !taskid || !exec_mode) {
 		ok = 0;	
 	}
+	else {
+		vine_task_func_exec_mode_t converted_exec_mode = vine_task_func_exec_mode_from_string(exec_mode);
+		int taskid_int = atoi(taskid);
 
-	vine_task_func_exec_mode_t converted_exec_mode = vine_task_func_exec_mode_from_string(exec_mode);
-	int taskid_int = atoi(taskid);
-
-	if (p->task->provides_library && strcmp(name, p->task->provides_library)) {
-		ok = 0;
-	}
-	if (taskid_int != p->task->task_id) {
-		ok = 0;
-	}
-	if (p->task->func_exec_mode && converted_exec_mode != p->task->func_exec_mode) {
-		ok = 0;	
+		if (!p->task->provides_library || strcmp(name, p->task->provides_library)) {
+			ok = 0;
+		}
+		if (taskid_int != p->task->task_id) {
+			ok = 0;
+		}
+		if (p->task->func_exec_mode && converted_exec_mode != p->task->func_exec_mode) {
+			ok = 0;	
+		}
 	}
 	if (response) {
 		jx_delete(response);
