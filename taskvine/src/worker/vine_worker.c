@@ -875,10 +875,10 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			vine_hack_do_not_compute_cached_name = 1;
 			vine_task_add_output_file(task, localname, taskname, flags);
-		} else if (sscanf(line, "symlink %s %s", taskname_encoded, target_encoded)==2) {
+		} else if (sscanf(line, "symlink %s %s", taskname_encoded, target_encoded) == 2) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			url_decode(target_encoded, target, VINE_LINE_MAX);
-			vine_task_add_symlink(task,taskname,target);
+			vine_task_add_symlink(task, taskname, target);
 		} else if (sscanf(line, "cores %" PRId64, &n)) {
 			vine_task_set_cores(task, n);
 		} else if (sscanf(line, "memory %" PRId64, &n)) {

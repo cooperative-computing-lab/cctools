@@ -652,7 +652,7 @@ int vine_task_add_environment(struct vine_task *t, struct vine_file *f)
 
 void vine_task_add_symlink(struct vine_task *t, const char *name, const char *target)
 {
-	list_push_tail(t->symlink_list,vine_symlink_create(name,target));
+	list_push_tail(t->symlink_list, vine_symlink_create(name, target));
 }
 
 int vine_task_add_execution_context(struct vine_task *t, struct vine_file *context_file)
@@ -773,9 +773,9 @@ void vine_task_delete(struct vine_task *t)
 	list_clear(t->output_mounts, (void *)vine_mount_delete);
 	list_delete(t->output_mounts);
 
-	list_clear(t->symlink_list, (void*)vine_symlink_delete);
+	list_clear(t->symlink_list, (void *)vine_symlink_delete);
 	list_delete(t->symlink_list);
-	
+
 	list_clear(t->env_list, (void *)free);
 	list_delete(t->env_list);
 

@@ -569,10 +569,10 @@ vine_result_code_t vine_manager_put_task(
 			char target_encoded[PATH_MAX];
 			url_encode(s->name, name_encoded, PATH_MAX);
 			url_encode(s->target, target_encoded, PATH_MAX);
-			vine_manager_send(q, w, "symlink %s %s\n", name_encoded, target_encoded );
+			vine_manager_send(q, w, "symlink %s %s\n", name_encoded, target_encoded);
 		}
 	}
-	
+
 	// vine_manager_send returns the number of bytes sent, or a number less than
 	// zero to indicate errors. We are lazy here, we only check the last
 	// message we sent to the worker (other messages may have failed above).

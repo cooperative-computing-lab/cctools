@@ -150,13 +150,13 @@ int vine_sandbox_stagein(struct vine_process *p, struct vine_cache *cache)
 
 	LIST_ITERATE(t->symlink_list, s)
 	{
-		result = symlink(s->target,s->name);
-		if(result!=0) {
-			debug(D_VINE,"unable to symlink %s -> %s: %s",s->name,s->target,strerror(errno));
+		result = symlink(s->target, s->name);
+		if (result != 0) {
+			debug(D_VINE, "unable to symlink %s -> %s: %s", s->name, s->target, strerror(errno));
 			break;
 		}
 	}
-	
+
 	/* If any of the output mounts have the MKDIR flag, then create those empty dirs. */
 
 	LIST_ITERATE(t->output_mounts, m)
