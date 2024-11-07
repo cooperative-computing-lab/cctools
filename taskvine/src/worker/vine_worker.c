@@ -867,7 +867,7 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 			/* Also set the total number determined by the manager. */
 			task->function_slots_total = n;
 		} else if (sscanf(line, "func_exec_mode %" PRId64, &n) == 1) {
-			func_exec_mode = vine_task_func_exec_mode_from_int64_t(n);
+			vine_task_func_exec_mode_t func_exec_mode = vine_task_func_exec_mode_from_int64_t(n);
 			if (func_exec_mode == VINE_TASK_FUNC_EXEC_MODE_INVALID) {
 				debug(D_VINE | D_NOTICE, "invalid func_exec_mode from manager: %s", line);
 				vine_task_delete(task);
@@ -1565,14 +1565,15 @@ static int check_library_startup(struct vine_process *p)
 	}
 
 	vine_task_func_exec_mode_t converted_exec_mode = vine_task_func_exec_mode_from_string(exec_mode);
+	int taskid_int = atoi(taskid);
 
 	if (p->task->provides_library && strcmp(name, p->task->provides_library)) {
 		ok = 0;
 	}
-	if (taskid != p->task->task_id) {
+	if (taskid_int != p->task->task_id) {
 		ok = 0;
 	}
-	if (p->task->exec_mode && converted_exec_mode != p->task->exec_mode) {
+	if (p->task->func_exec_mode && converted_exec_mode != p->task->func_exec_mode) {
 		ok = 0;	
 	}
 	if (response) {

@@ -38,7 +38,8 @@ typedef enum {
 } vine_task_state_t;
 
 typedef enum {
-        VINE_TASK_FUNC_EXEC_MODE_DIRECT = 0,    /**< A library task will execute function calls directly in its process **/
+        VINE_TASK_FUNC_EXEC_MODE_INVALID = -1,
+        VINE_TASK_FUNC_EXEC_MODE_DIRECT = 1,    /**< A library task will execute function calls directly in its process **/
         VINE_TASK_FUNC_EXEC_MODE_FORK,          /**< A library task will fork and execute each function call. **/
 } vine_task_func_exec_mode_t;
 
