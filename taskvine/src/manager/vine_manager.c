@@ -3249,6 +3249,9 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 	LIST_ITERATE(t->input_mounts, m)
 	{
 		struct vine_file *f = m->file;
+		if (f->type == VINE_FILE && f->state != VINE_FILE_STATE_CREATED) {
+			all_available = 0;
+		}
 		if (f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED) {
 			if (!vine_file_replica_table_exists_somewhere(q, f->cached_name)) {
 				vine_manager_consider_recovery_task(q, f, f->recovery_task);
