@@ -8,13 +8,14 @@ See the file COPYING for details.
 #include "debug.h"
 #include "vine_mount.h"
 #include "vine_task.h"
+#include "stringtools.h"
 
 // create a new task group for this task based on the temp mount file
 static int vine_task_groups_create_group(struct vine_manager *q, struct vine_task *t, struct vine_mount *m)
 {
-	cctools_uuid_t uuid;
-	cctools_uuid_create(&uuid);
-	char *id = strdup(uuid.str);
+	static int group_id_counter = 1;
+
+	char *id = string_format("%d", group_id_counter++);
 	struct list *l = list_create();
 
 	t->group_id = id;
@@ -29,25 +30,15 @@ static int vine_task_groups_create_group(struct vine_manager *q, struct vine_tas
 // locate the group with the task which outputs the desired file, and add the new task
 static int vine_task_groups_add_to_group(struct vine_manager *q, struct vine_task *t, struct vine_mount *m)
 {
-	struct list *l;
-	char *id;
-	HASH_TABLE_ITERATE(q->task_group_table, id, l)
-	{
-		struct vine_task *lt;
-		LIST_ITERATE(l, lt)
-		{
-			struct vine_mount *lm;
-			LIST_ITERATE(lt->output_mounts, lm)
-			{
-				if (m->file == lm->file) {
-					t->group_id = lt->group_id;
-					struct vine_task *tc = vine_task_addref(t);
-					list_push_tail(l, tc);
-					return 1;
-				}
-			}
-		}
+	char *id = m->file->recovery_task->group_id;
+
+	if (id) {
+		struct list *group = hash_table_lookup(q->task_group_table, id);
+		t->group_id = id;
+		struct vine_task *tc = vine_task_addref(t);
+		list_push_tail(group, tc);
 	}
+
 	return 0;
 }
 
