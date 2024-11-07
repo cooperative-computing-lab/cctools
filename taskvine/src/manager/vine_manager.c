@@ -3253,7 +3253,7 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 				all_available = 0;
 			}
 		} // this is probably a local-temp
-		else if (f->flags && VINE_UNLINK_WHEN_DONE) {
+		else if (f->flags & VINE_LOCAL_TEMP) {
 			struct stat info;
 			int result = lstat(f->source, &info);
 			if (result != 0) {

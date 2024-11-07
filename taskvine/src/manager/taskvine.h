@@ -64,10 +64,11 @@ typedef enum {
 
 /** Control sharing and garbage collection behavior of file objects. **/
 typedef enum {
-	VINE_PEER_NOSHARE = 1,	  /**< Schedule this file to be shared between peers where available. See @ref
+	VINE_PEER_NOSHARE = 1,	   /**< Schedule this file to be shared between peers where available. See @ref
 				     vine_enable_peer_transfers **/
-	VINE_UNLINK_WHEN_DONE = 2 /**< Whether to delete the file when its reference count is 0. (Warning: Only use on
+	VINE_UNLINK_WHEN_DONE = 2, /**< Whether to delete the file when its reference count is 0. (Warning: Only use on
 				     files produced by the application, and never on irreplaceable input files.) */
+	VINE_LOCAL_TEMP = 4	   /**< A temp substitute created when peer transfers are not enabled **/
 } vine_file_flags_t;
 
 /** Select overall scheduling algorithm for matching tasks to workers. */

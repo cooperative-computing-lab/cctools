@@ -254,7 +254,7 @@ struct vine_file *vine_file_temp_no_peers()
 	cctools_uuid_create(&uuid);
 
 	char *name = string_format("temp-local-%s", uuid.str);
-	return vine_file_create(name, 0, 0, 0, VINE_FILE, 0, cache, VINE_UNLINK_WHEN_DONE);
+	return vine_file_create(name, 0, 0, 0, VINE_FILE, 0, cache, VINE_UNLINK_WHEN_DONE | VINE_LOCAL_TEMP);
 	free(name);
 }
 
