@@ -6154,6 +6154,12 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 		hash_table_insert(m->file_table, f->cached_name, f);
 	}
 
+	struct stat info;
+	int result = lstat(f->source, &info);
+	if (result == 0) {
+		f->state = VINE_FILE_STATE_CREATED;
+	}
+
 	vine_taskgraph_log_write_file(m, f);
 
 	return f;
