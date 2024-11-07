@@ -663,7 +663,7 @@ int vine_task_add_execution_context(struct vine_task *t, struct vine_file *conte
 	}
 
 	char *env_name = string_format("__vine_env_%s", context_file->cached_name);
-	vine_task_add_input(t, context_file, env_name, VINE_MOUNT_SYMLINK);
+	vine_task_add_input(t, context_file, env_name, 0);
 
 	char *new_cmd = string_format("%s/bin/run_in_env %s", env_name, t->command_line);
 	vine_task_set_command(t, new_cmd);
