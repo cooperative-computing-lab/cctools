@@ -446,6 +446,15 @@ feature.
 */
 void vine_task_add_feature(struct vine_task *t, const char *name);
 
+/** Add a symbolic link to the sandbox namespace of the task.
+This can be used to access a file within a shared filesystem,
+without causing the file to be transferred using the taskvine caching infrastructure.
+@param t A task object;
+@param name The name of the symlink; must be a relative path in the task sandbox.
+@param target The target of the symlink; must be an absolute path to an outside filesystem.
+*/
+void vine_task_add_symlink(struct vine_task *t, const char *name, const char *target);
+
 /** Specify the priority of this task relative to others in the manager.
 Tasks with a higher priority value run first. If no priority is given, a task is placed at the end of the ready list,
 regardless of the priority.

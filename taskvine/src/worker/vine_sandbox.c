@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "vine_cache_file.h"
 #include "vine_file.h"
 #include "vine_mount.h"
+#include "vine_symlink.h"
 #include "vine_task.h"
 #include "vine_worker.h"
 
@@ -134,6 +135,7 @@ int vine_sandbox_stagein(struct vine_process *p, struct vine_cache *cache)
 	int result = 1;
 
 	struct vine_mount *m;
+	struct vine_symlink *s;
 
 	/* For each input mount, stage it into the sandbox. */
 
@@ -144,6 +146,17 @@ int vine_sandbox_stagein(struct vine_process *p, struct vine_cache *cache)
 			break;
 	}
 
+	/* For each requested symlink, create it in the sandbox */
+
+	LIST_ITERATE(t->symlink_list, s)
+	{
+		result = symlink(s->target,s->name);
+		if(result!=0) {
+			debug(D_VINE,"unable to symlink %s -> %s: %s",s->name,s->target,strerror(errno));
+			break;
+		}
+	}
+	
 	/* If any of the output mounts have the MKDIR flag, then create those empty dirs. */
 
 	LIST_ITERATE(t->output_mounts, m)

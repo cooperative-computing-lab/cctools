@@ -59,8 +59,9 @@ struct vine_task {
 	int   function_slots_requested; /**< If this is a LibraryTask, the number of function slots requested by the user. -1 causes the number of slots to match the number of cores. */
         vine_task_func_exec_mode_t func_exec_mode;    /**< If this a LibraryTask, the execution mode of its functions. */
 	
-	struct list *input_mounts;    /**< The mounted files expected as inputs. */
-	struct list *output_mounts;   /**< The mounted files expected as outputs. */
+	struct list *input_mounts;   /**< The mounted files expected as inputs. */
+	struct list *output_mounts;  /**< The mounted files expected as outputs. */
+	struct list *symlink_list;   /**< Additional symlinks to add to the sandbox namespace. */
 	struct list *env_list;       /**< Environment variables applied to the task. */
 	struct list *feature_list;   /**< User-defined features this task requires. (See vine_worker's --feature option.) */
 

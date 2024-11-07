@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "vine_file.h"
 #include "vine_manager.h"
 #include "vine_mount.h"
+#include "vine_symlink.h"
 #include "vine_worker_info.h"
 
 #include "debug.h"
@@ -51,6 +52,7 @@ struct vine_task *vine_task_create(const char *command_line)
 
 	t->input_mounts = list_create();
 	t->output_mounts = list_create();
+	t->symlink_list = list_create();
 	t->env_list = list_create();
 	t->feature_list = list_create();
 
@@ -177,6 +179,17 @@ static void vine_task_mount_list_copy(struct list *destination, struct list *lis
 	}
 }
 
+static void vine_task_symlink_list_copy(struct list *destination, struct list *list)
+{
+	struct vine_symlink *old_symlink, *new_symlink;
+
+	LIST_ITERATE(list, old_symlink)
+	{
+		new_symlink = vine_symlink_copy(old_symlink);
+		list_push_tail(destination, new_symlink);
+	}
+}
+
 static void vine_task_string_list_copy(struct list *destination, struct list *string_list)
 {
 	char *var;
@@ -230,6 +243,7 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 
 	vine_task_mount_list_copy(new->input_mounts, task->input_mounts);
 	vine_task_mount_list_copy(new->output_mounts, task->output_mounts);
+	vine_task_symlink_list_copy(new->symlink_list, task->symlink_list);
 	vine_task_string_list_copy(new->env_list, task->env_list);
 	vine_task_string_list_copy(new->feature_list, task->feature_list);
 	new->function_slots_requested = task->function_slots_requested;
@@ -636,6 +650,11 @@ int vine_task_add_environment(struct vine_task *t, struct vine_file *f)
 	return vine_task_add_execution_context(t, f);
 }
 
+void vine_task_add_symlink(struct vine_task *t, const char *name, const char *target)
+{
+	list_push_tail(t->symlink_list,vine_symlink_create(name,target));
+}
+
 int vine_task_add_execution_context(struct vine_task *t, struct vine_file *context_file)
 {
 	if (!context_file) {
@@ -754,6 +773,9 @@ void vine_task_delete(struct vine_task *t)
 	list_clear(t->output_mounts, (void *)vine_mount_delete);
 	list_delete(t->output_mounts);
 
+	list_clear(t->symlink_list, (void*)vine_symlink_delete);
+	list_delete(t->symlink_list);
+	
 	list_clear(t->env_list, (void *)free);
 	list_delete(t->env_list);
 
