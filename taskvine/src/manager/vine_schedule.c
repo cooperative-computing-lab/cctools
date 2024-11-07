@@ -204,11 +204,11 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		return 0;
 	}
 
-        /* Check if the library and the worker have the same library protocol version. */
-        if (t->provides_library && (w->library_protocol_version != VINE_LIBRARY_PROTOCOL_VERSION)) {
-                debug(D_VINE, "Worker %s can't run library with id %d due to mismatched library protocol version.", w->workerid, t->task_id);
-                return 0;
-        }
+	/* Check if the library and the worker have the same library protocol version. */
+	if (t->provides_library && (w->library_protocol_version != VINE_LIBRARY_PROTOCOL_VERSION)) {
+		debug(D_VINE, "Worker %s can't run library with id %d due to mismatched library protocol version.", w->workerid, t->task_id);
+		return 0;
+	}
 
 	/* Compute the resources to allocate to this task. */
 	struct rmsummary *l = vine_manager_choose_resources_for_task(q, w, t);

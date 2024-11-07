@@ -1559,11 +1559,10 @@ static int check_library_startup(struct vine_process *p)
 	const char *exec_mode = jx_lookup_string(response, "exec_mode");
 
 	int ok = 1;
-	
+
 	if (!name || !taskid || !exec_mode) {
-		ok = 0;	
-	}
-	else {
+		ok = 0;
+	} else {
 		vine_task_func_exec_mode_t converted_exec_mode = vine_task_func_exec_mode_from_string(exec_mode);
 
 		if (!p->task->provides_library || strcmp(name, p->task->provides_library)) {
@@ -1573,7 +1572,7 @@ static int check_library_startup(struct vine_process *p)
 			ok = 0;
 		}
 		if (p->task->func_exec_mode && converted_exec_mode != p->task->func_exec_mode) {
-			ok = 0;	
+			ok = 0;
 		}
 	}
 	if (response) {
