@@ -573,6 +573,8 @@ int vine_task_add_output(struct vine_task *t, struct vine_file *f, const char *r
 		return 0;
 	}
 
+	f->state = VINE_FILE_STATE_PENDING;
+
 	struct vine_mount *m = vine_mount_create(f, remote_name, flags, 0);
 
 	list_push_tail(t->output_mounts, m);

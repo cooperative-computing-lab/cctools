@@ -3249,10 +3249,9 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 	LIST_ITERATE(t->input_mounts, m)
 	{
 		struct vine_file *f = m->file;
-		if (f->type == VINE_FILE && f->state != VINE_FILE_STATE_CREATED) {
+		if (f->type == VINE_FILE && f->state == VINE_FILE_STATE_PENDING) {
 			all_available = 0;
-		}
-		if (f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED) {
+		} else if (f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED) {
 			if (!vine_file_replica_table_exists_somewhere(q, f->cached_name)) {
 				vine_manager_consider_recovery_task(q, f, f->recovery_task);
 				all_available = 0;
@@ -6152,12 +6151,6 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 	} else {
 		/* Otherwise add it to the table. */
 		hash_table_insert(m->file_table, f->cached_name, f);
-	}
-
-	struct stat info;
-	int result = lstat(f->source, &info);
-	if (result == 0) {
-		f->state = VINE_FILE_STATE_CREATED;
 	}
 
 	vine_taskgraph_log_write_file(m, f);
