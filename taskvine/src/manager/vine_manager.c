@@ -2935,8 +2935,13 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 {
 	vine_result_code_t result = VINE_SUCCESS;
 
+<<<<<<< HEAD
 	/* Kill unused libraries on this worker to reclaim resources. */
 	/* Matches assumption in vine_schedule.c:check_available_resources() */
+=======
+	/* Kill empty libraries to reclaim resources. Match the assumption of
+	 * @vine.schedule.c:check_worker_have_enough_resources() */
+>>>>>>> 09771acca (merge in priority queue)
 	kill_empty_libraries_on_worker(q, w, t);
 
 	/* If this is a function needing a library, dispatch the library. */
@@ -2946,6 +2951,7 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 		if (!t->library_task) {
 			/* Otherwise send the library to the worker. */
 			/* Note that this call will re-enter commit_task_to_worker. */
+<<<<<<< HEAD
 			t->library_task = send_library_to_worker(q, w, t->needs_library);
 
 			/*
@@ -2960,6 +2966,14 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 
 			if (!t->library_task) {
 				return VINE_MGR_FAILURE;
+=======
+			t->library_task = send_library_to_worker(q, w, t->needs_library, &result);
+
+			/* Careful: if the above failed, then w may no longer be valid */
+			/* In that case return immediately without making further changes. */
+			if (!t->library_task) {
+				return result;
+>>>>>>> 09771acca (merge in priority queue)
 			}
 		}
 		/* If start_one_task_fails, this will be decremented in handle_failure below. */
@@ -2970,8 +2984,37 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 	t->addrport = xxstrdup(w->addrport);
 
 	t->time_when_commit_start = timestamp_get();
+<<<<<<< HEAD
 	result = VINE_SUCCESS;
 	struct list *l = 0;
+=======
+	result = start_one_task(q, w, t);
+	t->time_when_commit_end = timestamp_get();
+
+	itable_insert(w->current_tasks, t->task_id, t);
+	t->worker = w;
+
+	change_task_state(q, t, VINE_TASK_RUNNING);
+
+	t->try_count += 1;
+	q->stats->tasks_dispatched += 1;
+
+	count_worker_resources(q, w);
+
+	if (result != VINE_SUCCESS) {
+		debug(D_VINE, "Failed to send task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
+		handle_failure(q, w, t, result);
+	}
+
+	return result;
+}
+
+static vine_result_code_t commit_task_group_to_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	vine_result_code_t result = VINE_SUCCESS;
+
+	struct list *l = NULL;
+>>>>>>> 09771acca (merge in priority queue)
 	if (t->group_id) {
 		debug(D_VINE, "Task %d has GroupID of %s. Should Send:", t->task_id, t->group_id);
 		l = hash_table_lookup(q->task_group_table, t->group_id);
@@ -2990,64 +3033,17 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 	int counter = 0;
 	do {
 
-		/* Kill empty libraries to reclaim resources. Match the assumption of
-		 * @vine.schedule.c:check_worker_have_enough_resources() */
-		kill_empty_libraries_on_worker(q, w, t);
-
-		/* If this is a function needing a library, dispatch the library. */
-		if (t->needs_library) {
-			/* Consider whether the library task is already on that machine. */
-			t->library_task = vine_schedule_find_library(q, w, t->needs_library);
-			if (!t->library_task) {
-				/* Otherwise send the library to the worker. */
-				/* Note that this call will re-enter commit_task_to_worker. */
-				t->library_task = send_library_to_worker(q, w, t->needs_library, &result);
-
-				/* Careful: if the above failed, then w may no longer be valid */
-				/* In that case return immediately without making further changes. */
-				if (!t->library_task) {
-					list_push_head(l, t);
-					return result;
-				}
-			}
-			/* If start_one_task_fails, this will be decremented in handle_failure below. */
-			t->library_task->function_slots_inuse++;
-		}
-
-		t->hostname = xxstrdup(w->hostname);
-		t->addrport = xxstrdup(w->addrport);
-
-		t->time_when_commit_start = timestamp_get();
-		result = start_one_task(q, w, t);
-		t->time_when_commit_end = timestamp_get();
-
-		itable_insert(w->current_tasks, t->task_id, t);
-		t->worker = w;
-
-		change_task_state(q, t, VINE_TASK_RUNNING);
-
-		t->try_count += 1;
-		q->stats->tasks_dispatched += 1;
-
-		count_worker_resources(q, w);
-
-		if (result != VINE_SUCCESS) {
-			debug(D_VINE, "Failed to send task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
-			handle_failure(q, w, t, result);
-		}
-
-		if (counter) {
-			list_remove(q->ready_list, t);
+		result = commit_task_to_worker(q, w, t);
+		if (counter && (result == VINE_SUCCESS)) {
+			int t_idx = priority_queue_find_idx(q->ready_tasks, t);
+			priority_queue_remove(q->ready_tasks, t_idx);
 			// decrement refcount
 			vine_task_delete(t);
 		}
-
 		counter++;
-
 	} while ((l && (t = list_pop_head(l))));
 
 	debug(D_VINE, "Sent batch of %d tasks to worker %s", counter, w->hostname);
-
 	return result;
 }
 
@@ -3499,7 +3495,14 @@ static int send_one_task(struct vine_manager *q)
 
 		if (w) {
 			priority_queue_remove(q->ready_tasks, t_idx);
-			vine_result_code_t result = commit_task_to_worker(q, w, t);
+			
+			vine_result_code_t result;
+			if (q->task_groups_enabled) {
+				result = commit_task_group_to_worker(q, w, t);
+			} else {
+				result = commit_task_to_worker(q, w, t);
+			}
+
 			switch (result) {
 			case VINE_SUCCESS:
 				/* return on successful commit. */
