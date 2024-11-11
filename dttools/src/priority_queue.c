@@ -87,10 +87,7 @@ static int priority_queue_double_capacity(struct priority_queue *pq)
 	int new_capacity = pq->capacity * 2;
 	struct element **new_elements = (struct element **)malloc(sizeof(struct element *) * new_capacity);
 	if (!new_elements) {
-		free(pq->elements);
-		free(pq);
-		fprintf(stderr, "Fatal error: Memory allocation failed.\n");
-		exit(EXIT_FAILURE);
+		return 0;
 	}
 
 	memcpy(new_elements, pq->elements, sizeof(struct element *) * pq->size);
@@ -163,7 +160,6 @@ int priority_queue_push(struct priority_queue *pq, void *data, double priority)
 	pq->elements[pq->size++] = e;
 
 	int new_idx = swim(pq, pq->size - 1);
-	printf("new_idx: %d\n", new_idx);
 
 	if (new_idx <= pq->rotate_cursor) {
 		// reset the rotate cursor if the new element is inserted before/equal to it
@@ -269,12 +265,14 @@ int priority_queue_static_next(struct priority_queue *pq)
 		return 0;
 	}
 
+	int static_idx = pq->static_cursor;
 	pq->static_cursor++;
+
 	if (pq->static_cursor > pq->size - 1) {
 		pq->static_cursor = 0;
 	}
 
-	return pq->static_cursor;
+	return static_idx;
 }
 
 void priority_queue_base_reset(struct priority_queue *pq)
@@ -296,13 +294,14 @@ int priority_queue_base_next(struct priority_queue *pq)
 		return 0;
 	}
 
+	int base_idx = pq->base_cursor;
 	pq->base_cursor++;
+
 	if (pq->base_cursor > pq->size - 1) {
 		priority_queue_base_reset(pq);
-		return 0;
 	}
 
-	return pq->base_cursor;
+	return base_idx;
 }
 
 void priority_queue_rotate_reset(struct priority_queue *pq)
@@ -320,12 +319,14 @@ int priority_queue_rotate_next(struct priority_queue *pq)
 		return 0;
 	}
 
+	int rotate_idx = pq->rotate_cursor;
 	pq->rotate_cursor++;
+
 	if (pq->rotate_cursor > pq->size - 1) {
 		priority_queue_rotate_reset(pq);
 	}
 
-	return pq->rotate_cursor;
+	return rotate_idx;
 }
 
 int priority_queue_remove(struct priority_queue *pq, int idx)
@@ -339,9 +340,7 @@ int priority_queue_remove(struct priority_queue *pq, int idx)
 	pq->elements[idx] = pq->elements[pq->size];
 	pq->elements[pq->size] = NULL;
 
-	printf("starting sink\n");
 	sink(pq, idx);
-	printf("finished sink\n");
 
 	if (pq->static_cursor == idx) {
 		pq->static_cursor--;

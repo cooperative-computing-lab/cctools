@@ -226,22 +226,20 @@ PRIORITY_QUEUE_ROTATE_ITERATE( pq, idx, data, iter_count, iter_depth ) {
 </pre>
 */
 
-/* Iterate from begining every time starts, ends when manually set a depth or reach the end. */
-#define PRIORITY_QUEUE_BASE_ITERATE( pq, idx, data ) \
-    priority_queue_base_reset(pq); while ((idx = priority_queue_base_next(pq)) && (data = priority_queue_peak_at(pq, idx)))
+/* Iterate from begining to the end every time starts. */
+#define PRIORITY_QUEUE_BASE_ITERATE( pq, idx, data, iter_count, iter_depth ) \
+    iter_count = 0; \
+    priority_queue_base_reset(pq); \
+    while ((iter_count < iter_depth) && ((idx = priority_queue_base_next(pq)) >= 0) && (data = priority_queue_peak_at(pq, idx)) && (iter_count += 1))
 
 /* Iterate from last position, never reset. */
 #define PRIORITY_QUEUE_STATIC_ITERATE( pq, idx, data, iter_count, iter_depth ) \
     iter_count = 0; \
-    iter_depth = iter_depth > priority_queue_size(pq) ? priority_queue_size(pq) : iter_depth; \
-    iter_depth = iter_depth < 0 ? 0 : iter_depth; \
-    while ((iter_count < iter_depth) && (idx = priority_queue_static_next(pq)) && (data = priority_queue_peak_at(pq, idx)) && (iter_count += 1))
+    while ((iter_count < iter_depth) && ((idx = priority_queue_static_next(pq)) >= 0) && (data = priority_queue_peak_at(pq, idx)) && (iter_count += 1))
 
 /* Iterate from last position, reset to the begining when needed. */
 #define PRIORITY_QUEUE_ROTATE_ITERATE( pq, idx, data, iter_count, iter_depth ) \
     iter_count = 0; \
-    iter_depth = iter_depth > priority_queue_size(pq) ? priority_queue_size(pq) : iter_depth; \
-    iter_depth = iter_depth < 0 ? 0 : iter_depth; \
-    while ((iter_count < iter_depth) && (idx = priority_queue_rotate_next(pq)) && (data = priority_queue_peak_at(pq, idx)) && (iter_count += 1))
+    while ((iter_count < iter_depth) && ((idx = priority_queue_rotate_next(pq)) >= 0) && (data = priority_queue_peak_at(pq, idx)) && (iter_count += 1))
 
 #endif
