@@ -80,7 +80,9 @@ Or use the PRIORITY_QUEUE_BASE_ITERATE macro:
 <pre>
 int idx;
 void *data;
-PRIORITY_QUEUE_BASE_ITERATE (pq, idx, data) {
+int iter_count = 0;
+int iter_depth = priority_queue_size(q->ready_tasks);
+PRIORITY_QUEUE_BASE_ITERATE (pq, idx, data, iter_count, iter_depth) {
     printf("Data idx: %d\n", idx);
 }
 </pre>
@@ -206,7 +208,10 @@ Use as follows:
 int idx;
 char *data;
 
-PRIORITY_QUEUE_BASE_ITERATE(pq, idx, data) {
+int iter_count = 0;
+int iter_depth = priority_queue_size(q->ready_tasks);
+
+PRIORITY_QUEUE_BASE_ITERATE(pq, idx, data, iter_count, iter_depth) {
 	printf("Data idx: %d\n", idx);
 }
 

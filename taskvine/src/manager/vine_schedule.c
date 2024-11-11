@@ -613,7 +613,10 @@ void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 
 	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
 
-	PRIORITY_QUEUE_BASE_ITERATE(q->ready_tasks, t_idx, t)
+	int iter_count = 0;
+	int iter_depth = priority_queue_size(q->ready_tasks);
+
+	PRIORITY_QUEUE_BASE_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
 	{
 		// check each task against the queue of connected workers
 		vine_resource_bitmask_t bit_set = is_task_larger_than_any_worker(q, t);

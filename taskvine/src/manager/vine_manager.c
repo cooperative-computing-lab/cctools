@@ -1385,7 +1385,10 @@ static int enforce_waiting_fixed_locations(struct vine_manager *q)
 	struct vine_task *t;
 	int terminated = 0;
 
-	PRIORITY_QUEUE_BASE_ITERATE(q->ready_tasks, t_idx, t)
+	int iter_count = 0;
+	int iter_depth = priority_queue_size(q->ready_tasks);
+
+	PRIORITY_QUEUE_BASE_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
 	{
 		if (t->has_fixed_locations && !vine_schedule_check_fixed_location(q, t)) {
 			vine_task_set_result(t, VINE_RESULT_FIXED_LOCATION_MISSING);
@@ -1748,8 +1751,11 @@ static struct rmsummary *total_resources_needed(struct vine_manager *q)
 
 	struct rmsummary *total = rmsummary_create(0);
 
+	int iter_count = 0;
+	int iter_depth = priority_queue_size(q->ready_tasks);
+
 	/* for waiting tasks, we use what they would request if dispatched right now. */
-	PRIORITY_QUEUE_BASE_ITERATE(q->ready_tasks, t_idx, t)
+	PRIORITY_QUEUE_BASE_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
 	{
 		const struct rmsummary *s = vine_manager_task_resources_min(q, t);
 		rmsummary_add(total, s);
@@ -5231,8 +5237,10 @@ int vine_hungry(struct vine_manager *q)
 
 	int t_idx;
 	struct vine_task *t;
+	int iter_count = 0;
+	int iter_depth = priority_queue_size(q->ready_tasks);
 
-	PRIORITY_QUEUE_BASE_ITERATE(q->ready_tasks, t_idx, t)
+	PRIORITY_QUEUE_BASE_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
 	{
 		ready_task_cores += MAX(1, t->resources_requested->cores);
 		ready_task_memory += t->resources_requested->memory;
