@@ -56,7 +56,7 @@ For complete details with examples, see the
 - **-D**,**--no-optimize**<br />Disable small file optimizations such as recursive delete.
 - **-f**,**--foreground**<br />Run in foreground for debugging.
 - **-i**,**--tickets=_&lt;files&gt;_**<br />Comma-delimited list of tickets to use for authentication.
-- **-m**,**--mount-options=_&lt;option&gt;_**<br />Pass mount option to FUSE. Can be specified multiple times.
+- **-m**,**--mount-option=_&lt;option&gt;_**<br />Pass mount option to FUSE. Can be specified multiple times.
 - **-o**,**--debug-file=_&lt;file&gt;_**<br />Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 - **-t**,**--timeout=_&lt;timeout&gt;_**<br />Timeout for network operations. (default is 60s)
 - **-v**,**--version**<br />Show program version.

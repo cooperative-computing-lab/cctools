@@ -1547,7 +1547,7 @@ We strongly recommend to specify the modules the function needs inside the funct
 
 You can certainly embed `import` statements within the function and install any necessary packages:
 
-=== Python
+=== "Python"
     ```python
     def divide(dividend, divisor): 
         import math 
@@ -1559,7 +1559,7 @@ You can certainly embed `import` statements within the function and install any 
 If the overhead of importing modules per function is noticeable, modules can be optionally imported as a common preamble to the function executions. Common modules can be specified with the `hoisting_modules` argument to `create_library_from_functions`. This reduces the overhead by eliminating redundant imports:
 
 
-=== Python
+=== "Python"
     ```python
     import numpy
     import math
@@ -1569,7 +1569,7 @@ If the overhead of importing modules per function is noticeable, modules can be 
 
 `hoisting_modules` only accepts modules as arguments (e.g. it can't be used to import functions, or select particular names with `from ... import ...` statements. Such statements should be made inside functions after specifying the modules with `hoisting_modules`.
 
-=== Python
+=== "Python"
     ```python
     def cube(x):
         # whenever using FromImport statments, put them inside of functions
@@ -1624,6 +1624,98 @@ and when it is returned, the result is present as `t.output`:
 Note that both library tasks and function invocations consume
 resources at the worker, and the number of running tasks will be
 constrained by the available resources in the same way as normal tasks.
+
+### Stateful Serverless Computing
+A function typically sets up its states (e.g., load modules/packages, build internal models or states) before executing its computation. With advanced serverless computing in TaskVine, you can set up a shared state between function invocations so the cost of setting up states doesn't have to be paid for every invocation, but instead is paid once and shared many times. TaskVine supports this technique as demonstrated via the below example.
+
+Assume that you program has two functions `my_sum` and `my_mul`, and they both use `base` to set up a common value in their computations.
+
+=== "Python"
+    ```python
+    def base(x, y=1):
+        return x**y
+    
+    A = 2
+    B = 3
+
+    def my_sum(x, y):
+        base_val = base(A, B)
+        return base_val + x+y
+
+    def my_mul(x, y):
+        base_val = base(A, B)
+        return base_val + x*y
+    ```
+
+With this setup, `base(A, B)` has to be called repeatedly for every function invocation of `my_sum` and `my_mul`. What you want instead is to have the value of `base(A, B)` created and computed once and stored in a library. `my_sum` and `my_mul` thus only have to load such value, instead of computing the value, from a library's state, as follows.
+
+=== "Python"
+    ```python
+    from ndcctools.taskvine.utils import load_variable_from_library
+    def base(x, y=1):
+        return {'base_val': x**y}
+
+    A = 2
+    B = 3
+
+    def my_sum(x, y):
+        base_val = load_variable_from_library('base_val')
+        return base_val + x+y
+
+    def my_mul(x, y):
+        base_val = load_variable_from_library('base_val')
+        return base_val + x*y
+    
+    libtask = m.create_library_from_functions("my_library", my_sum, my_mul, library_context_info=[base, [A], {'y': B})
+    m.install(libtask)
+    # application continues as usual with submitting FunctionCalls and waiting for results.
+    ...
+    ```
+
+This technique enables maximum sharing between invocations of functions that share some common states, and between invocations of the same function in a library. This is especially helpful in ML/AI workloads where one has to build an ML/AI model on a remote node to best configure it against the remote node's local resources (e.g., GPU). Thus, instead of loading and creating a model for every invocation:
+
+=== "Python"
+    ```python
+    def infer(image):
+        # load model parameters
+        ...
+        # build model
+        model = tf.ResNet50(...)
+        # load model in GPU
+        model.to_gpu(1)
+        # execute an inference
+        return model.infer(image)
+    ```
+
+One can do this to have the model created and loaded in a GPU once and separate the model creation from the actual inference:
+
+=== "Python"
+    ```python
+    from ndcctools.taskvine.utils import load_variable_from_library
+    def model_setup():
+        # load model parameters
+        ...
+        # build model
+        model = tf.ResNet50(...)
+        # load model in GPU
+        model.to_gpu(1)
+        return {'model': model}
+
+    def infer(image):
+        model = load_variable_from_library('model')
+        # execute an inference
+        return model.infer(image)
+    
+    libtask = m.create_library_from_functions('infer_library',
+                                              infer,
+                                              library_context_info=[model_setup, [], {})
+    m.install(libtask)
+
+    # application continues as usual with submitting FunctionCalls and waiting for results.
+    ...
+    ```
+
+
 
 ### Futures
 

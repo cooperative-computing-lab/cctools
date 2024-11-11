@@ -62,6 +62,7 @@ char * vine_file_make_file_url( const char * source);
 struct vine_file *vine_file_local( const char *source, vine_cache_level_t cache, vine_file_flags_t flags );
 struct vine_file *vine_file_url( const char *source, vine_cache_level_t cache, vine_file_flags_t flags );
 struct vine_file *vine_file_temp();
+struct vine_file *vine_file_temp_no_peers();
 struct vine_file *vine_file_buffer( const char *buffer, size_t size, vine_cache_level_t cache, vine_file_flags_t flags );
 struct vine_file *vine_file_mini_task( struct vine_task *t, const char *name, vine_cache_level_t cache, vine_file_flags_t flags );
 struct vine_file *vine_file_untar( struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags );

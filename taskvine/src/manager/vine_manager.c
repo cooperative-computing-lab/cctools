@@ -2146,6 +2146,7 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	jx_insert_string(j, "version", CCTOOLS_VERSION);
 	jx_insert_string(j, "type", "vine_manager");
 	jx_insert_integer(j, "port", vine_port(q));
+	jx_insert_integer(j, "protocol", VINE_PROTOCOL_VERSION);
 
 	char *name, *key;
 	HASH_TABLE_ITERATE(q->properties, name, key)
@@ -2726,7 +2727,9 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	*/
 
 	if (t->provides_library) {
-		if (t->function_slots_requested <= 0) {
+		if (t->func_exec_mode == VINE_TASK_FUNC_EXEC_MODE_DIRECT) {
+			t->function_slots_total = 1;
+		} else if (t->function_slots_requested <= 0) {
 			t->function_slots_total = limits->cores;
 		} else {
 			t->function_slots_total = t->function_slots_requested;
@@ -3244,7 +3247,9 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 	LIST_ITERATE(t->input_mounts, m)
 	{
 		struct vine_file *f = m->file;
-		if (f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED) {
+		if (f->type == VINE_FILE && f->state == VINE_FILE_STATE_PENDING) {
+			all_available = 0;
+		} else if (f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED) {
 			if (!vine_file_replica_table_exists_somewhere(q, f->cached_name)) {
 				vine_manager_consider_recovery_task(q, f, f->recovery_task);
 				all_available = 0;
@@ -4009,6 +4014,7 @@ int vine_enable_peer_transfers(struct vine_manager *q)
 int vine_disable_peer_transfers(struct vine_manager *q)
 {
 	debug(D_VINE, "Peer Transfers disabled");
+	fprintf(stderr, "warning: Peer Transfers disabled. Temporary files will be returned to the manager upon creation.");
 	q->peer_transfers_enabled = 0;
 	return 1;
 }
@@ -6166,8 +6172,13 @@ struct vine_file *vine_declare_url(struct vine_manager *m, const char *source, v
 
 struct vine_file *vine_declare_temp(struct vine_manager *m)
 {
-	struct vine_file *f = vine_file_temp();
-	return vine_manager_declare_file(m, f);
+	if (m->peer_transfers_enabled) {
+		struct vine_file *f = vine_file_temp();
+		return vine_manager_declare_file(m, f);
+	} else {
+		struct vine_file *f = vine_file_temp_no_peers();
+		return vine_manager_declare_file(m, f);
+	}
 }
 
 struct vine_file *vine_declare_buffer(struct vine_manager *m, const char *buffer, size_t size, vine_cache_level_t cache, vine_file_flags_t flags)

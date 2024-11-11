@@ -38,3 +38,5 @@ mq_wait_test
 mq_store_test
 bucketing_base_test
 bucketing_manager_test
+hash_table_fromkey_test
+hash_table_offset_test

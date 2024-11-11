@@ -21,4 +21,11 @@ def set_port_range(low_port, high_port):
         raise TypeError("low_port {} should be smaller than high_port {}".format(low_port, high_port))
     os.environ["TCP_LOW_PORT"] = str(low_port)
     os.environ["TCP_HIGH_PORT"] = str(high_port)
+
+
+# helper function that allows a function call to access a variable from a library's state
+def load_variable_from_library(var_name):
+    return globals()[var_name]
+
+
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
