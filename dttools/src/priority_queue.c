@@ -49,10 +49,10 @@ static int swim(struct priority_queue *pq, int k)
 		return 1;
 	}
 
-    while (k > 0 && pq->elements[(k - 1) / 2]->priority <= pq->elements[k]->priority) {
-        swap_elements(pq, k, (k - 1) / 2);
-        k = (k - 1) / 2;
-    }
+	while (k > 0 && pq->elements[(k - 1) / 2]->priority <= pq->elements[k]->priority) {
+		swap_elements(pq, k, (k - 1) / 2);
+		k = (k - 1) / 2;
+	}
 
 	return k;
 }
@@ -63,17 +63,17 @@ static int sink(struct priority_queue *pq, int k)
 		return -1;
 	}
 
-    while (2 * k + 1 < pq->size) {
-        int j = 2 * k + 1;
-        if (j + 1 < pq->size && pq->elements[j]->priority <= pq->elements[j + 1]->priority) {
-            j++;
-        }
-        if (pq->elements[k]->priority >= pq->elements[j]->priority) {
-            break;
-        }
-        swap_elements(pq, k, j);
-        k = j;
-    }
+	while (2 * k + 1 < pq->size) {
+		int j = 2 * k + 1;
+		if (j + 1 < pq->size && pq->elements[j]->priority <= pq->elements[j + 1]->priority) {
+			j++;
+		}
+		if (pq->elements[k]->priority >= pq->elements[j]->priority) {
+			break;
+		}
+		swap_elements(pq, k, j);
+		k = j;
+	}
 
 	return k;
 }
