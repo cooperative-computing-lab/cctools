@@ -64,12 +64,12 @@ void *data = someDataPointer;
 
 priority_queue_push(pq, data, priority);
 data = priority_queue_pop(pq);
-void *headData = priority_queue_peak(pq);
+void *headData = priority_queue_peak_top(pq);
 </pre>
 
 To list all of the items in a priority queue, use a simple loop:
 <pre>
-for (int i = 1; i <= priority_queue_size(pq); i++) {
+for (int i = 0; i < priority_queue_size(pq); i++) {
     void *data = priority_queue_peak_at(pq, i);
     printf("Priority queue contains: %p\n", data);
 }
@@ -120,10 +120,10 @@ Similar to @ref priority_queue_pop, but the element is not removed.
 @param pq A pointer to a priority queue.
 @return The pointer to the top of the queue if any, failure otherwise
 */
-void *priority_queue_peak(struct priority_queue *pq);
+void *priority_queue_peak_top(struct priority_queue *pq);
 
 /** Get an element from a priority queue by a specified index.
-The first accessible element is at index 1.
+The first accessible element is at index 0.
 @param pq A pointer to a priority queue.
 @param index The index of the element to get.
 @return The pointer to the element if any, failure otherwise
