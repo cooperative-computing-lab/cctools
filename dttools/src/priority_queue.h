@@ -109,16 +109,6 @@ The standard push operation. New elements are placed lower than existing element
 */
 int priority_queue_push(struct priority_queue *pq, void *data, double priority);
 
-/** Push an element into a priority queue.
-New elements are placed upper than existing elements of the same priority.
-Used when a task is resubmitted given resource exhaustion, we want it to get to run as soon as possible among tasks of the same priority.
-@param pq A pointer to a priority queue.
-@param data A pointer to store in the queue.
-@param priority The specified priority with the given object.
-@return The idex of data if the push succeeded, -1 on failure.
-*/
-int priority_queue_push_upward(struct priority_queue *pq, void *data, double priority);
-
 /** Pop the element with the highest priority from a priority queue.
 @param pq A pointer to a priority queue.
 @return The pointer to the top of the queue if any, failure otherwise.

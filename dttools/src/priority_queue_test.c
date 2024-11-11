@@ -78,11 +78,11 @@ int main()
 	}
 
 	// Insert an element
-	int upward_idx = priority_queue_push_upward(pq, "Task G", 9.0);
-	if (upward_idx > 0) {
-		printf("Inserted 'Task G' with priority 9.0 at index %d\n", upward_idx);
+	int ins_idx = priority_queue_push(pq, "Task G", 9.0);
+	if (ins_idx > 0) {
+		printf("Inserted 'Task G' with priority 9.0 at index %d\n", ins_idx);
 	} else {
-		printf("Failed to insert 'Task F'.\n");
+		printf("Failed to insert 'Task G'.\n");
 	}
 
 	// Iterate over elements using PRIORITY_QUEUE_BASE_ITERATE

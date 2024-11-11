@@ -49,28 +49,6 @@ static int swim(struct priority_queue *pq, int k)
 		return 1;
 	}
 
-	while (k > 1 && pq->elements[k / 2]->priority < pq->elements[k]->priority) {
-		swap_elements(pq, k, k / 2);
-		k /= 2;
-	}
-
-	return k;
-}
-
-/*
-The only difference between swim and swim_upward is the comparison operator in the while loop.
-When two different elements have the same priority, the swim is likely to keep the newly inserted
-element behind the existing one, while the swim_upward tends to replace the existing one with the
-new one. This is useful when a large number of elements have the same priority and the order of
-insertion matters, particularly in task scheduling, where a task is resubmitted given resource
-exhaustion, we want it to get to run as soon as possible among tasks of the same priority.
-*/
-static int swim_upward(struct priority_queue *pq, int k)
-{
-	if (!pq) {
-		return 1;
-	}
-
 	while (k > 1 && pq->elements[k / 2]->priority <= pq->elements[k]->priority) {
 		swap_elements(pq, k, k / 2);
 		k /= 2;
@@ -87,7 +65,7 @@ static int sink(struct priority_queue *pq, int k)
 
 	while (2 * k <= pq->size) {
 		int j = 2 * k;
-		if (j < pq->size && pq->elements[j]->priority < pq->elements[j + 1]->priority) {
+		if (j < pq->size && pq->elements[j]->priority <= pq->elements[j + 1]->priority) {
 			j++;
 		}
 		if (pq->elements[k]->priority >= pq->elements[j]->priority) {
@@ -198,36 +176,6 @@ int priority_queue_push(struct priority_queue *pq, void *data, double priority)
 	pq->elements[++pq->size] = e;
 
 	int new_idx = swim(pq, pq->size);
-
-	if (new_idx <= pq->rotate_cursor) {
-		// reset the rotate cursor if the new element is inserted before/equal to it
-		priority_queue_rotate_reset(pq);
-	}
-
-	return new_idx;
-}
-
-int priority_queue_push_upward(struct priority_queue *pq, void *data, double priority)
-{
-	if (!pq) {
-		return 0;
-	}
-
-	if (pq->size >= pq->capacity) {
-		if (!priority_queue_double_capacity(pq)) {
-			return 0;
-		}
-	}
-	struct element *e = (struct element *)malloc(sizeof(struct element));
-	if (!e) {
-		return 0;
-	}
-	e->data = data;
-	e->priority = priority;
-
-	pq->elements[++pq->size] = e;
-
-	int new_idx = swim_upward(pq, pq->size);
 
 	if (new_idx <= pq->rotate_cursor) {
 		// reset the rotate cursor if the new element is inserted before/equal to it

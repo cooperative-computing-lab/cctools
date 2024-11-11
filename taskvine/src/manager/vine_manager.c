@@ -4360,7 +4360,7 @@ static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t
 		 * push it at the head of the list, so it gets to run as soon
 		 * as possible. This avoids the issue in which all 'big' tasks
 		 * fail because the first allocation is too small. */
-		priority_queue_push_upward(q->ready_tasks, t, t->priority);
+		priority_queue_push(q->ready_tasks, t, t->priority);
 	} else {
 		priority_queue_push(q->ready_tasks, t, t->priority);
 	}
