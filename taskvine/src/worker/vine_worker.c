@@ -867,7 +867,7 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 			/* Also set the total number determined by the manager. */
 			task->function_slots_total = n;
 		} else if (sscanf(line, "func_exec_mode %" PRId64, &n) == 1) {
-			vine_task_func_exec_mode_t func_exec_mode = vine_task_func_exec_mode_from_int64_t(n);
+			vine_task_func_exec_mode_t func_exec_mode = n;
 			if (func_exec_mode == VINE_TASK_FUNC_EXEC_MODE_INVALID) {
 				debug(D_VINE | D_NOTICE, "invalid func_exec_mode from manager: %s", line);
 				vine_task_delete(task);

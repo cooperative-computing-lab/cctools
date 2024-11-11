@@ -165,7 +165,6 @@ const char *vine_task_state_to_string( vine_task_state_t task_state );
 struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t );
 char * vine_task_to_json(struct vine_task *t);
 
-vine_task_func_exec_mode_t vine_task_func_exec_mode_from_int64_t(int64_t n);
 vine_task_func_exec_mode_t vine_task_func_exec_mode_from_string(const char *exec_mode);
 
 

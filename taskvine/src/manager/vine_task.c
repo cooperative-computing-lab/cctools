@@ -1002,19 +1002,6 @@ char *vine_task_to_json(struct vine_task *t)
 	return json;
 }
 
-/* Converts an int64_t to a valid vine_task_func_exec_mode_t.
- * Returns VINE_TASK_FUNC_EXEC_MODE_INVALID if there's no valid mode for the integer. */
-vine_task_func_exec_mode_t vine_task_func_exec_mode_from_int64_t(int64_t n)
-{
-	if (n == 1) {
-		return VINE_TASK_FUNC_EXEC_MODE_DIRECT;
-	}
-	if (n == 2) {
-		return VINE_TASK_FUNC_EXEC_MODE_FORK;
-	}
-	return VINE_TASK_FUNC_EXEC_MODE_INVALID;
-}
-
 /* Converts a string to a valid vine_task_func_exec_mode_t.
  * Returns VINE_TASK_FUNC_EXEC_MODE_INVALID if there's no valid mode for the string. */
 vine_task_func_exec_mode_t vine_task_func_exec_mode_from_string(const char *exec_mode)
