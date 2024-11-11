@@ -1400,8 +1400,8 @@ static int process_ready_to_run_now(struct vine_process *p, struct vine_cache *c
 			return 0;
 	}
 
-	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager);
-	if (status == VINE_CACHE_STATUS_PROCESSING)
+	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager, procs_table);
+	if (status != VINE_CACHE_STATUS_READY)
 		return 0;
 
 	return 1;
@@ -1445,7 +1445,7 @@ static int process_can_run_eventually(struct vine_process *p, struct vine_cache 
 		}
 	}
 
-	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager);
+	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager, procs_table);
 	switch (status) {
 	case VINE_CACHE_STATUS_FAILED:
 	case VINE_CACHE_STATUS_UNKNOWN:
