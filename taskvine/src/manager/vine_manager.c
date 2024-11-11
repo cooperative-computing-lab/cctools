@@ -3033,13 +3033,13 @@ static vine_result_code_t commit_task_group_to_worker(struct vine_manager *q, st
 	int counter = 0;
 	do {
 
-		result = commit_task_to_worker(q, w, t);
 		if (counter && (result == VINE_SUCCESS)) {
 			int t_idx = priority_queue_find_idx(q->ready_tasks, t);
 			priority_queue_remove(q->ready_tasks, t_idx);
 			// decrement refcount
 			vine_task_delete(t);
 		}
+		result = commit_task_to_worker(q, w, t);
 		counter++;
 	} while ((l && (t = list_pop_head(l))));
 

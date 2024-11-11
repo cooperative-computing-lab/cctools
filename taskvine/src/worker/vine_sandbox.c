@@ -56,15 +56,11 @@ vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cach
 			struct vine_process *lp;
 			uint64_t task_id;
 			int found_file = 0;
-			debug(D_VINE, "iterate proc list");
-			debug(D_VINE, "procs table %p", procs_table);
 			ITABLE_ITERATE(procs_table, task_id, lp)
 			{
-				debug(D_VINE, "index proc");
 				struct vine_mount *lm;
 				LIST_ITERATE(lp->task->output_mounts, lm)
 				{
-					debug(D_VINE, "comparing %s and %s", lm->file->cached_name, m->file->cached_name);
 					if (strcmp(lm->file->cached_name, m->file->cached_name) == 0) {
 						found_file = 1;
 						break;
@@ -75,7 +71,6 @@ vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cach
 				}
 			}
 			if (found_file) {
-				debug(D_VINE, "Found file in process queue");
 				processing++;
 				break;
 			}
