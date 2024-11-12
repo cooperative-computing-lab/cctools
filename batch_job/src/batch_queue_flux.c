@@ -37,6 +37,7 @@ static int batch_queue_flux_remove(struct batch_queue *q, batch_queue_id_t jobid
 
 static int batch_queue_flux_create(struct batch_queue *q)
 {
+	batch_queue_set_option(q, "experimental", "yes");
 	return 0;
 }
 
