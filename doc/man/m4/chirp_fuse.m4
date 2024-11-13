@@ -33,6 +33,7 @@ OPTION_ARG(b,block-size,bytes)Block size for network I/O. (default is 65536s)
 OPTION_ARG(d,debug,flag)Enable debugging for this subsystem.
 OPTION_FLAG(D,no-optimize)Disable small file optimizations such as recursive delete.
 OPTION_FLAG(f,foreground)Run in foreground for debugging.
+OPTION_ARG(s,single-server,hostport)Connect only to the named host:port and hide the global namespace.
 OPTION_ARG(i,tickets,files)Comma-delimited list of tickets to use for authentication.
 OPTION_ARG(m,mount-option,option)Pass mount option to FUSE. Can be specified multiple times.
 OPTION_ARG(o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
