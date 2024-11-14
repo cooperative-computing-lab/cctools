@@ -166,6 +166,18 @@ def main():
     print(f"Total:    {total_sum}")
     print(f"Expected: {expected}")
 
+    # Check that IO test passed
+    with open(input_filename, 'r') as f:
+        content_input = f.read()
+
+    with open(output_filename, 'r') as f:
+        content_output = f.read()
+    
+    print(f"Input: {content_input}", end='')
+    print(f"Output: {content_output}", end='')
+
+    assert content_input == content_output
+
     assert total_sum == expected
 
 if __name__ == '__main__':
