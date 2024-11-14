@@ -1,0 +1,79 @@
+2024/10/03 14:08:20.86 vine_factory[3644166] debug: /afs/crc.nd.edu/user/k/kxue2/cctools/batch_job/src/vine_factory version 8.0.0 DEVELOPMENT (released 2024-09-10 15:04:37 -0400)
+2024/10/03 14:08:20.86 vine_factory[3644166] debug: Built by kxue2@cclws17.cse.nd.edu on 2024-09-10 15:04:37 -0400
+2024/10/03 14:08:20.86 vine_factory[3644166] debug: System: Linux cclws17.cse.nd.edu 4.18.0-477.15.1.el8_8.x86_64 #1 SMP Fri Jun 2 08:27:19 EDT 2023 x86_64 x86_64 x86_64 GNU/Linux
+2024/10/03 14:08:20.86 vine_factory[3644166] debug: Configuration:
+2024/10/03 14:08:21.36 vine_factory[3644166] batch: set feature `local_job_queue' to `yes'
+2024/10/03 14:08:21.36 vine_factory[3644166] batch: set feature `absolute_path' to `yes'
+2024/10/03 14:08:21.36 vine_factory[3644166] batch: set feature `output_directories' to `yes'
+2024/10/03 14:08:21.36 vine_factory[3644166] batch: set feature `batch_log_name' to `%s.batchlog'
+2024/10/03 14:08:21.36 vine_factory[3644166] batch: set feature `gc_size' to `yes'
+2024/10/03 14:08:21.36 vine_factory[3644166] batch: cleared feature `local_job_queue'
+2024/10/03 14:08:21.36 vine_factory[3644166] batch: created queue 0x5617c38b6120 (local)
+2024/10/03 14:08:21.36 vine_factory[3644166] batch: cleared option `batch-options'
+2024/10/03 14:08:21.36 vine_factory[3644166] batch: cleared option `autosize'
+2024/10/03 14:08:21.36 vine_factory[3644166] batch: cleared option `condor-requirements'
+2024/10/03 14:08:21.36 vine_factory[3644166] batch: cleared option `autosize'
+2024/10/03 14:08:21.36 vine_factory[3644166] dns: looking up name localhost
+2024/10/03 14:08:21.36 vine_factory[3644166] dns: localhost is 127.0.0.1
+2024/10/03 14:08:21.36 vine_factory[3644166] tcp: connecting to 127.0.0.1 port 1024
+2024/10/03 14:08:21.36 vine_factory[3644166] tcp: made connection to 127.0.0.1 port 1024
+2024/10/03 14:08:21.81 vine_factory[3644166] tcp: disconnected from 127.0.0.1 port 1024
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: evaluating manager list...
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: capacity_tasks: 10
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: capacity_cores: 10
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: capacity_memory: 5120
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: capacity_disk: 10240
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: capacity_gpus: 0
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: (null) (null):1024 kxue2 tasks: 1 capacity: 1 workers needed: 1 tasks running: 0
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: 1 total workers needed across 1 managers
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: raw workers needed: 1
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: workers needed: 1
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: workers submitted: 0
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: workers requested: 1
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: Sending status to the catalog server(s) at catalog.cse.nd.edu,backup-catalog.cse.nd.edu ...
+2024/10/03 14:08:21.81 vine_factory[3644166] dns: looking up name catalog.cse.nd.edu
+2024/10/03 14:08:21.81 vine_factory[3644166] dns: catalog.cse.nd.edu is 129.74.152.177
+2024/10/03 14:08:21.81 vine_factory[3644166] debug: sending update via tcp to catalog.cse.nd.edu(129.74.152.177):9098
+2024/10/03 14:08:21.81 vine_factory[3644166] tcp: connecting to 129.74.152.177 port 9098
+2024/10/03 14:08:21.81 vine_factory[3644166] tcp: made connection to 129.74.152.177 port 9098
+2024/10/03 14:08:21.81 vine_factory[3644166] tcp: disconnected from 129.74.152.177 port 9098
+2024/10/03 14:08:21.81 vine_factory[3644166] dns: looking up name backup-catalog.cse.nd.edu
+2024/10/03 14:08:21.81 vine_factory[3644166] dns: backup-catalog.cse.nd.edu is 129.74.247.43
+2024/10/03 14:08:21.81 vine_factory[3644166] debug: sending update via tcp to backup-catalog.cse.nd.edu(129.74.247.43):9098
+2024/10/03 14:08:21.81 vine_factory[3644166] tcp: connecting to 129.74.247.43 port 9098
+2024/10/03 14:08:21.81 vine_factory[3644166] tcp: made connection to 129.74.247.43 port 9098
+2024/10/03 14:08:21.81 vine_factory[3644166] tcp: disconnected from 129.74.247.43 port 9098
+Configuration file '/afs/crc.nd.edu/user/k/kxue2/cctools/taskvine/test/vine-factory-242396/vine-factory-7u7n64w0/config.json' has been loaded.manager-name: (null)
+max-workers: 1
+min-workers: 1
+workers-per-cycle: 5
+tasks-per-worker: 4
+timeout: 300 s
+cores: 4.000
+memory: 2000 MB
+disk: 2000 MB
+gpus: 8
+worker-extra-options:  --parent-death
+2024/10/03 14:08:21: |submitted: 0 |needed: 1 |waiting connection: 0 |requested: 1 
+PROJECT            HOST                   PORT WAITING RUNNING COMPLETE WORKERS 
+localhost          localhost              1024       1       0        0       0 
+
+2024/10/03 14:08:21.81 vine_factory[3644166] batch: cleared option `workers-blocked'
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: submitting 1 new workers to reach target
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: submitting worker: ./vine_worker --parent-death localhost 1024 -t 300 -C 'catalog.cse.nd.edu,backup-catalog.cse.nd.edu'    --cores=4.000 --memory=2000 --disk=2000 --gpus=8    --parent-death
+2024/10/03 14:08:21.81 vine_factory[3644166] batch: started process 3644181: ./vine_worker --parent-death localhost 1024 -t 300 -C 'catalog.cse.nd.edu,backup-catalog.cse.nd.edu'    --cores=4.000 --memory=2000 --disk=2000 --gpus=8    --parent-death
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: worker job 3644181 submitted
+2024/10/03 14:08:21.81 vine_factory[3644166] vine: checking for exited workers...
+vine_worker: creating workspace /tmp/worker-242396-3644181
+vine_worker: using 4 cores, 2000 MB memory, 2000 MB disk, 8 gpus
+vine_worker: gpu is called feature "NVIDIA RTX A2000 12GB"
+connected to manager localhost:1024 via local address 127.0.0.1:34214
+received abort signal, shutting down workers...
+2024/10/03 14:08:26.81 vine_factory[3644166] vine: removing all remaining worker jobs...
+2024/10/03 14:08:26.81 vine_factory[3644166] vine: removing job 3644181
+disconnected from manager localhost:1024
+vine_worker: deleting workspace /tmp/worker-242396-3644181
+2024/10/03 14:08:26.81 vine_factory[3644166] vine: 1 workers removed.
+2024/10/03 14:08:26.81 vine_factory[3644166] batch: deleting queue 0x5617c38b6120
+removing 1 workers...
+all workers removed.
