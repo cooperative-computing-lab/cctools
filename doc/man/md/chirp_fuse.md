@@ -55,6 +55,7 @@ For complete details with examples, see the
 - **-d**,**--debug=_&lt;flag&gt;_**<br />Enable debugging for this subsystem.
 - **-D**,**--no-optimize**<br />Disable small file optimizations such as recursive delete.
 - **-f**,**--foreground**<br />Run in foreground for debugging.
+- **-s**,**--single-server=_&lt;hostport&gt;_**<br />Connect only to the named host:port and hide the global namespace.
 - **-i**,**--tickets=_&lt;files&gt;_**<br />Comma-delimited list of tickets to use for authentication.
 - **-m**,**--mount-option=_&lt;option&gt;_**<br />Pass mount option to FUSE. Can be specified multiple times.
 - **-o**,**--debug-file=_&lt;file&gt;_**<br />Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
