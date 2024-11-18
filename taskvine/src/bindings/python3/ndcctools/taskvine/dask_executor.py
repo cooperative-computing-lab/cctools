@@ -355,10 +355,10 @@ class DaskVine(Manager):
                 priority = -task_depth
             elif self.scheduling_mode == 'longest-first':
                 # if no tasks have been executed in this category, set a high priority so that we know more information about each category
-                priority = sum(self.category_execution_time[category]) / len(self.category_execution_time[category]) if len(self.category_execution_time[category]) else self.max_priority
+                priority = sum(self.category_execution_time[cat]) / len(self.category_execution_time[cat]) if len(self.category_execution_time[cat]) else self.max_priority
             elif self.scheduling_mode == 'shortest-first':
                 # if no tasks have been executed in this category, set a high priority so that we know more information about each category
-                priority = -sum(self.category_execution_time[category]) / len(self.category_execution_time[category]) if len(self.category_execution_time[category]) else self.max_priority
+                priority = -sum(self.category_execution_time[cat]) / len(self.category_execution_time[cat]) if len(self.category_execution_time[cat]) else self.max_priority
             elif self.scheduling_mode == 'FIFO':
                 priority = -round(time.time(), 6)
             elif self.scheduling_mode == 'LIFO':
