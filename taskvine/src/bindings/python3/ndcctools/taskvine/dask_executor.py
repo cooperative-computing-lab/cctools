@@ -175,6 +175,7 @@ class DaskVine(Manager):
             self.wrapper = wrapper
             self.wrapper_proc = wrapper_proc
             self.prune_files = prune_files
+            self.category_execution_time = defaultdict(list)
             self.max_priority = 1e100
             self.min_priority = -1e100
 
@@ -280,6 +281,7 @@ class DaskVine(Manager):
                         print(f"{t.key} ran on {t.hostname}")
 
                     if t.successful():
+                        self.category_execution_time[t.category].append(t.execution_time)
                         result_file = DaskVineFile(t.output_file, t.key, dag, self.task_mode)
                         rs = dag.set_result(t.key, result_file)
                         self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
@@ -351,6 +353,12 @@ class DaskVine(Manager):
                 priority = task_depth
             elif self.scheduling_mode == 'breadth-first':
                 priority = -task_depth
+            elif self.scheduling_mode == 'longest-first':
+                # if no tasks have been executed in this category, set a high priority so that we know more information about each category
+                priority = sum(self.category_execution_time[category]) / len(self.category_execution_time[category]) if len(self.category_execution_time[category]) else self.max_priority
+            elif self.scheduling_mode == 'shortest-first':
+                # if no tasks have been executed in this category, set a high priority so that we know more information about each category
+                priority = -sum(self.category_execution_time[category]) / len(self.category_execution_time[category]) if len(self.category_execution_time[category]) else self.max_priority
             elif self.scheduling_mode == 'FIFO':
                 priority = -round(time.time(), 6)
             elif self.scheduling_mode == 'LIFO':
@@ -389,7 +397,7 @@ class DaskVine(Manager):
             if self.task_mode == 'function-calls':
                 t = FunctionCallDask(self,
                                      dag, k, sexpr,
-                                     category=category,
+                                     category=cat,
                                      extra_files=self.extra_files,
                                      retries=retries,
                                      worker_transfers=lazy,
