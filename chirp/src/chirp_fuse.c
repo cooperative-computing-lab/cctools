@@ -46,8 +46,26 @@ static int enable_small_file_optimizations = 1;
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
+/* If set, connect the client to this hostport and no other. */
+
+static const char *single_hostport = 0;
+
+/*
+Given an input path string, determine the hostname and subpath to use with chirp.
+When a single host is configured, the host part is fixed and path -> newpath.
+Otherwise, the path is parsed to separate the host and path.
+*/
+
 static void parsepath(const char *path, char *newpath, char *host)
 {
+	/* Shortcut to handle case of single host. */
+	if(single_hostport) {
+		strcpy(host,single_hostport);
+		strcpy(newpath,path);
+		return;
+	}
+
+	/* Otherwise parse out the host and path in global mode. */
 	memset(newpath, 0, CHIRP_PATH_MAX);
 	memset(host, 0, CHIRP_PATH_MAX);
 
@@ -574,6 +592,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Require this authentication mode.\n", "-a,--auth=<flag>");
 	fprintf(stdout, " %-30s Block size for network I/O. (default is %ds)\n", "-b,--block-size=<bytes>", (int) chirp_reli_blocksize_get());
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<flag>");
+	fprintf(stdout, " %-30s Connect only to the named host:port and hide the global namespace.\n", "-s --single-server");
 	fprintf(stdout, " %-30s Disable small file optimizations such as recursive delete.\n", "-D,--no-optimize");
 	fprintf(stdout, " %-30s Run in foreground for debugging.\n", "-f,--foreground");
 	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
@@ -601,6 +620,7 @@ int main(int argc, char *argv[])
 		{"debug", required_argument, 0, 'd'},
 		{"no-optimize", no_argument, 0, 'D'},
 		{"foreground", no_argument, 0, 'f'},
+		{"single-server", required_argument, 0, 's'},
 		{"tickets", required_argument, 0, 'i'},
 		{"mount-option", required_argument, 0, 'm'},
 		{"debug-file", required_argument, 0, 'o'},
@@ -610,7 +630,7 @@ int main(int argc, char *argv[])
 		{0, 0, 0, 0}
 	};
 
-	while((c = getopt_long(argc, argv, "a:b:d:Dfhi:m:o:t:v", long_options, NULL)) > -1) {
+	while((c = getopt_long(argc, argv, "a:b:d:Dfhi:m:o:s:t:v", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'd':
 			debug_flags_set(optarg);
@@ -634,6 +654,9 @@ int main(int argc, char *argv[])
 			if (!auth_register_byname(optarg))
 				fatal("could not register authentication method `%s': %s", optarg, strerror(errno));
 			did_explicit_auth = 1;
+			break;
+		case 's':
+			single_hostport = optarg;
 			break;
 		case 't':
 			chirp_fuse_timeout = string_time_parse(optarg);
