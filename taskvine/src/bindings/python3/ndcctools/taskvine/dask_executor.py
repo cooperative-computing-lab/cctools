@@ -175,7 +175,6 @@ class DaskVine(Manager):
             self.wrapper = wrapper
             self.wrapper_proc = wrapper_proc
             self.prune_files = prune_files
-            self.category_execution_time = defaultdict(list)
             self.max_priority = 1e100
             self.min_priority = -1e100
 
@@ -281,7 +280,6 @@ class DaskVine(Manager):
                         print(f"{t.key} ran on {t.hostname}")
 
                     if t.successful():
-                        self.category_execution_time[t.category].append(t.execution_time)
                         result_file = DaskVineFile(t.output_file, t.key, dag, self.task_mode)
                         rs = dag.set_result(t.key, result_file)
                         self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
@@ -344,7 +342,7 @@ class DaskVine(Manager):
                 lazy = self.checkpoint_fn(dag, k)
 
             # each task has a category name
-            category = self.category_name(sexpr)
+            cat = self.category_name(sexpr)
 
             task_depth = dag.depth_of(k)
             if self.scheduling_mode == 'random':
@@ -353,33 +351,25 @@ class DaskVine(Manager):
                 priority = task_depth
             elif self.scheduling_mode == 'breadth-first':
                 priority = -task_depth
-            elif self.scheduling_mode == 'longest-first':
-                # if no tasks have been executed in this category, set a high priority so that we know more information about each category
-                priority = sum(self.category_execution_time[category]) / len(self.category_execution_time[category]) if len(self.category_execution_time[category]) else self.max_priority
-            elif self.scheduling_mode == 'shortest-first':
-                # if no tasks have been executed in this category, set a high priority so that we know more information about each category
-                priority = -sum(self.category_execution_time[category]) / len(self.category_execution_time[category]) if len(self.category_execution_time[category]) else self.max_priority
             elif self.scheduling_mode == 'FIFO':
                 priority = -round(time.time(), 6)
             elif self.scheduling_mode == 'LIFO':
                 priority = round(time.time(), 6)
-            else:
-                priority = 0
 
             if self.task_mode == 'tasks':
-                if category not in self._categories_known:
+                if cat not in self._categories_known:
                     if self.resources:
-                        self.set_category_resources_max(category, self.resources)
+                        self.set_category_resources_max(cat, self.resources)
                     if self.resources_mode:
-                        self.set_category_mode(category, self.resources_mode)
+                        self.set_category_mode(cat, self.resources_mode)
 
                         if not self._categories_known:
                             self.enable_monitoring()
-                    self._categories_known.add(category)
+                    self._categories_known.add(cat)
 
                 t = PythonTaskDask(self,
                                    dag, k, sexpr,
-                                   category=category,
+                                   category=cat,
                                    environment=self.environment,
                                    extra_files=self.extra_files,
                                    env_vars=self.env_vars,
