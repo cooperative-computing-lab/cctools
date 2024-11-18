@@ -848,7 +848,7 @@ class Manager(object):
     # - "max-retrievals" Sets the max number of tasks to retrieve per manager wait(). If less than 1, the manager prefers to retrieve all completed tasks before dispatching new tasks to workers. (default=1)
     # - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=10)
     # - "monitor-interval" Parameter to change how frequently the resource monitor records resource consumption of a task in a times series, if this feature is enabled. See @ref enable_monitoring.
-    # - "prefer-dispatch" If 1, try to dispatch tasks even if there are retrieved tasks ready to be reportedas done. (default=0)
+    # - "prefer-dispatch" If 1, try to dispatch tasks even if there are retrieved tasks ready to be reported as done. (default=0)
     # - "proportional-resources" If set to 0, do not assign resources proportionally to tasks. The default is to use proportions.
     # - "proportional-whole-tasks" Round up resource proportions such that only an integer number of tasks could be fit in the worker. The default is to use proportions.
     # - "ramp-down-heuristic" If set to 1 and there are more workers than tasks waiting, then tasks are allocated all the free resources of a worker large enough to run them. If monitoring watchdog is not enabled, then this heuristic has no effect. (default=0)

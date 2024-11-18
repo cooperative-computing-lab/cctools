@@ -78,6 +78,7 @@ struct vine_task *vine_task_create(const char *command_line)
 
 	t->refcount = 1;
 	t->output_received = 0;
+	t->priority = 0;
 
 	vine_counters.task.created++;
 
