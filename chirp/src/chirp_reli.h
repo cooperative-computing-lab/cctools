@@ -337,13 +337,69 @@ Note that this function has no timeoutbecause it operates solely on memory struc
 
 void chirp_reli_closedir(struct chirp_dir *dir);
 
-/* FIXME document */
+/** Create a new blank access control ticket.
+@param host The name and port of the Chirp server to access.
+@param name An empty array that will be filled with a unique ticket filename.
+@param bits The cryptographic length of the ticket, in bits. (typically 1024)
+@param stoptime The absolute time at which to abort.
+@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
+*/
+
 INT64_T chirp_reli_ticket_create(const char *host, char name[CHIRP_PATH_MAX], unsigned bits, time_t stoptime);
+
+/** Register an access control ticket with a file serer.
+@param host The name and port of the Chirp server to access.
+@param name The name of an existing ticket.
+@param subject The subject to be granted access with this ticket, which should be "self" for normal users.
+@param duration The lifetime of this ticket, in seconds.
+@param stoptime The absolute time at which to abort.
+@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
+*/
+
 INT64_T chirp_reli_ticket_register(const char *host, const char *name, const char *subject, time_t duration, time_t stoptime);
-INT64_T chirp_reli_ticket_delete(const char *host, const char *name, time_t stoptime);
-INT64_T chirp_reli_ticket_list(const char *host, const char *subject, char ***list, time_t stoptime);
-INT64_T chirp_reli_ticket_get(const char *host, const char *name, char **subject, char **ticket, time_t * duration, char ***rights, time_t stoptime);
+
+/** Modify an access control ticket to grant futher access.
+@param host The name and port of the Chirp server to access.
+@param name The name of an existing ticket.
+@param path The filesystem path that will be added to the ticket.
+@param aclmask The access rights that will be added to the ticket, any of "rwldax".
+@param stoptime The absolute time at which to abort.
+@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
+*/
+
 INT64_T chirp_reli_ticket_modify(const char *host, const char *name, const char *path, const char *aclmask, time_t stoptime);
+
+/** Get the details of a registered ticket.
+@param host The name and port of the Chirp server to access.
+@param name The name of an existing ticket.
+@param subject A pointer to a string that will be allocated with the name of the ticket owner.
+@param ticket A pointer to a string that will be allocated with the name of the ticket.  (XXX)
+@param duration A pointer to an integer that will be filled with the duration of the ticket.
+@param rights A pointer to a list of strings that will be filled with ticket rights.
+@param stoptime The absolute time at which to abort.
+@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
+*/
+
+INT64_T chirp_reli_ticket_get(const char *host, const char *name, char **subject, char **ticket, time_t * duration, char ***rights, time_t stoptime);
+
+/** List registered tikets on a server.
+@param host The name and port of the Chirp server to access.
+@param subject The user whose tickets to list, typically "self" for a normal user.
+@param list A pointer to an (unallocated) list of strings which will be filled in with registered tickets.
+@param stoptime The absolute time at which to abort.
+@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
+*/
+
+INT64_T chirp_reli_ticket_list(const char *host, const char *subject, char ***list, time_t stoptime);
+
+/** Delete an access control ticket.
+@param host The name and port of the Chirp server to access.
+@param name The name of an existing ticket file on the local filesystem.
+@param stoptime The absolute time at which to abort.
+@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
+*/
+
+INT64_T chirp_reli_ticket_delete(const char *host, const char *name, time_t stoptime);
 
 /** Get an access control list.
 @param host The name and port of the Chirp server to access.
