@@ -126,7 +126,7 @@ class DaskVine(Manager):
             lib_command=None,
             lib_modules=None,
             task_mode='tasks',
-            scheduling_mode=None,
+            scheduling_mode='FIFO',
             env_per_task=False,
             progress_disable=False,
             progress_label="[green]tasks",
@@ -363,6 +363,11 @@ class DaskVine(Manager):
                 priority = -round(time.time(), 6)
             elif self.scheduling_mode == 'LIFO':
                 priority = round(time.time(), 6)
+            elif self.scheduling_mode == 'largest-input-first':
+                # best for saving disk space (with pruing)
+                priority = sum([len(dag.get_result(c)._file) for c in dag.get_children(k)])
+            else:
+                raise ValueError(f"Unknown scheduling mode {self.scheduling_mode}")
 
             if self.task_mode == 'tasks':
                 if cat not in self._categories_known:
