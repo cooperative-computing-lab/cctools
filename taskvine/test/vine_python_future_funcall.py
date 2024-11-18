@@ -22,6 +22,10 @@ def my_sum(x, y, negate=False):
     return s
 
 
+def failure():
+    raise Exception('Expected failure.')
+
+
 def main():
     executor = vine.FuturesExecutor(
         port=[9123, 9129], manager_name="test-executor", factory=False
@@ -33,7 +37,7 @@ def main():
     # Create library task
     print("creating library from functions...")
     libtask = executor.create_library_from_functions(
-        "test-library", my_sum, hoisting_modules=None, add_env=False
+        "test-library", my_sum, failure, hoisting_modules=None, add_env=False
     )
 
     # Install library on executor.manager
@@ -58,6 +62,21 @@ def main():
     b = a + a
     c = a + b
     assert res == c
+
+    # Test failure handling
+    f1 = executor.future_funcall("test-library", "failure")
+    future = executor.submit(f1)
+
+    try:
+        future.result()
+    except Exception as e:
+        # FutureFunctionCall wraps the exception string in a
+        # FunctionCallNoResult so we check the original error message is
+        # present in the raised error.
+        assert "Expected failure." in str(e)
+        assert future.exception() is not None
+    else:
+        raise RuntimeError("Future did not raise exception.")
 
 
 if __name__ == "__main__":

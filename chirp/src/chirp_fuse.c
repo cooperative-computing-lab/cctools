@@ -10,9 +10,9 @@ This module written by James Fitzgerald, B.S. 2006.
 #ifdef HAS_FUSE
 
 #define _FILE_OFFSET_BITS 64
-#define FUSE_USE_VERSION 27
+#define FUSE_USE_VERSION 31
 
-#include <fuse.h>
+#include <fuse3/fuse.h>
 
 #include <unistd.h>
 #include <dirent.h>
@@ -37,6 +37,7 @@ This module written by James Fitzgerald, B.S. 2006.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <utime.h>
 
 static int chirp_fuse_timeout = 60;
 static int run_in_foreground = 0;
@@ -45,8 +46,26 @@ static int enable_small_file_optimizations = 1;
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
+/* If set, connect the client to this hostport and no other. */
+
+static const char *single_hostport = 0;
+
+/*
+Given an input path string, determine the hostname and subpath to use with chirp.
+When a single host is configured, the host part is fixed and path -> newpath.
+Otherwise, the path is parsed to separate the host and path.
+*/
+
 static void parsepath(const char *path, char *newpath, char *host)
 {
+	/* Shortcut to handle case of single host. */
+	if(single_hostport) {
+		strcpy(host,single_hostport);
+		strcpy(newpath,path);
+		return;
+	}
+
+	/* Otherwise parse out the host and path in global mode. */
 	memset(newpath, 0, CHIRP_PATH_MAX);
 	memset(host, 0, CHIRP_PATH_MAX);
 
@@ -86,7 +105,7 @@ static void chirp_stat_to_fuse_stat(struct chirp_stat *c, struct stat *f)
 	f->st_ctime = c->cst_ctime;
 }
 
-static int chirp_fuse_getattr(const char *path, struct stat *info)
+static int chirp_fuse_getattr(const char *path, struct stat *info, struct fuse_file_info *fi)
 {
 	INT64_T result;
 	struct chirp_stat cinfo;
@@ -130,10 +149,10 @@ static void longdir_callback(const char *name, struct chirp_stat *cinfo, void *a
 {
 	struct stat info;
 	chirp_stat_to_fuse_stat(cinfo, &info);
-	longdir_filler(longdir_buf, name, &info, 0);
+	longdir_filler(longdir_buf, name, &info, 0, 0);
 }
 
-static int chirp_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
+static int chirp_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags flags)
 {
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
@@ -150,9 +169,9 @@ static int chirp_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t fille
 
 	pthread_mutex_unlock(&mutex);
 
-	if(result < 0)
+	if(result < 0) {
 		return -errno;
-	return 0;
+	}
 
 	return 0;
 }
@@ -233,7 +252,7 @@ static int chirp_fuse_symlink(const char *source, const char *target)
 	return 0;
 }
 
-static int chirp_fuse_rename(const char *from, const char *to)
+static int chirp_fuse_rename(const char *from, const char *to, unsigned int flags)
 {
 	INT64_T result;
 	char frompath[CHIRP_PATH_MAX], topath[CHIRP_PATH_MAX];
@@ -267,7 +286,7 @@ static int chirp_fuse_link(const char *from, const char *to)
 	return 0;
 }
 
-static int chirp_fuse_chmod(const char *path, mode_t mode)
+static int chirp_fuse_chmod(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
@@ -284,7 +303,7 @@ static int chirp_fuse_chmod(const char *path, mode_t mode)
 	return 0;
 }
 
-static int chirp_fuse_chown(const char *path, uid_t uid, gid_t gid)
+static int chirp_fuse_chown(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *fi)
 {
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
@@ -301,7 +320,7 @@ static int chirp_fuse_chown(const char *path, uid_t uid, gid_t gid)
 	return 0;
 }
 
-static int chirp_fuse_truncate(const char *path, off_t size)
+static int chirp_fuse_truncate(const char *path, off_t size, struct fuse_file_info *fi)
 {
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
@@ -349,7 +368,7 @@ static int chirp_fuse_access(const char *path, int flags)
 }
 
 
-static int chirp_fuse_utime(const char *path, struct utimbuf *buf)
+static int chirp_fuse_utimens(const char *path, const struct timespec *tv, struct fuse_file_info *fi)
 {
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
@@ -357,7 +376,7 @@ static int chirp_fuse_utime(const char *path, struct utimbuf *buf)
 	parsepath(path, newpath, host);
 
 	pthread_mutex_lock(&mutex);
-	result = chirp_global_utime(host, newpath, buf->actime, buf->modtime, time(0) + chirp_fuse_timeout);
+	result = chirp_global_utime(host, newpath, tv->tv_sec, tv->tv_sec, time(0) + chirp_fuse_timeout);
 	pthread_mutex_unlock(&mutex);
 
 	if(result < 0)
@@ -494,17 +513,15 @@ static int chirp_fuse_create(const char *path, mode_t mode, struct fuse_file_inf
 	if(error != 0)
 		return error;
 
+	fi->flags &= ~(O_CREAT|O_TRUNC);
+
 	return chirp_fuse_open(path, fi);
 }
 
 
 
 
-#if FUSE_USE_VERSION==22
-static int chirp_fuse_statfs(const char *path, struct statfs *info)
-#else
 static int chirp_fuse_statfs(const char *path, struct statvfs *info)
-#endif
 {
 	INT64_T result;
 	char newpath[CHIRP_PATH_MAX];
@@ -521,9 +538,6 @@ static int chirp_fuse_statfs(const char *path, struct statvfs *info)
 
 	memset(info, 0, sizeof(*info));
 
-#if FUSE_USE_VERSION==22
-	info->f_type = cinfo.f_type;
-#endif
 	info->f_bsize = cinfo.f_bsize;
 	info->f_blocks = cinfo.f_blocks;
 	info->f_bfree = cinfo.f_bfree;
@@ -554,19 +568,18 @@ static struct fuse_operations chirp_fuse_operations = {
 	.symlink = chirp_fuse_symlink,
 	.truncate = chirp_fuse_truncate,
 	.unlink = chirp_fuse_unlink,
-	.utime = chirp_fuse_utime,
+	.utimens = chirp_fuse_utimens,
 	.write = chirp_fuse_write,
 };
 
 static struct fuse *fuse_instance = 0;
-static struct fuse_chan *fuse_chan = 0;
 static char *fuse_mountpoint;
 
 static void exit_handler(int sig)
 {
 	if(fuse_instance) {
 		fuse_exit(fuse_instance);
-		fuse_unmount(fuse_mountpoint, fuse_chan);
+		fuse_unmount(fuse_instance);
 		fuse_destroy(fuse_instance);
 	}
 	_exit(0);
@@ -574,15 +587,16 @@ static void exit_handler(int sig)
 
 static void show_help(const char *cmd)
 {
-	fprintf(stdout, "use: %s <mountpath>\n", cmd);
+	fprintf(stdout, "use: %s <options> <mountpath>\n", cmd);
 	fprintf(stdout, "where options are:\n");
 	fprintf(stdout, " %-30s Require this authentication mode.\n", "-a,--auth=<flag>");
 	fprintf(stdout, " %-30s Block size for network I/O. (default is %ds)\n", "-b,--block-size=<bytes>", (int) chirp_reli_blocksize_get());
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<flag>");
+	fprintf(stdout, " %-30s Connect only to the named host:port and hide the global namespace.\n", "-s --single-server");
 	fprintf(stdout, " %-30s Disable small file optimizations such as recursive delete.\n", "-D,--no-optimize");
 	fprintf(stdout, " %-30s Run in foreground for debugging.\n", "-f,--foreground");
 	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
-	fprintf(stdout, " %-30s Mount options passed to FUSE.\n", "-m,--mount-options=<options>");
+	fprintf(stdout, " %-30s Mount option passed to FUSE. May be specified multiple times.\n", "-m,--mount-option=<option>");
 	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, or :stdout)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Timeout for network operations. (default is %ds)\n", "-t,--timeout=<timeout>", chirp_fuse_timeout);
 	fprintf(stdout, " %-30s Show program version.\n", "-v,--version");
@@ -594,10 +608,9 @@ int main(int argc, char *argv[])
 	signed char c;
 	int did_explicit_auth = 0;
 	char *tickets = NULL;
-	struct fuse_args fa;
-	fa.argc = 0;
-	fa.argv = string_array_new();
-	fa.allocated = 1;
+
+	struct fuse_args fa = FUSE_ARGS_INIT(0, NULL);
+	fuse_opt_add_arg(&fa, argv[0]);
 
 	debug_config(argv[0]);
 
@@ -607,8 +620,9 @@ int main(int argc, char *argv[])
 		{"debug", required_argument, 0, 'd'},
 		{"no-optimize", no_argument, 0, 'D'},
 		{"foreground", no_argument, 0, 'f'},
+		{"single-server", required_argument, 0, 's'},
 		{"tickets", required_argument, 0, 'i'},
-		{"mount-options", required_argument, 0, 'm'},
+		{"mount-option", required_argument, 0, 'm'},
 		{"debug-file", required_argument, 0, 'o'},
 		{"timeout", required_argument, 0, 't'},
 		{"version", no_argument, 0, 'v'},
@@ -616,7 +630,7 @@ int main(int argc, char *argv[])
 		{0, 0, 0, 0}
 	};
 
-	while((c = getopt_long(argc, argv, "a:b:d:Dfhi:m:o:t:v", long_options, NULL)) > -1) {
+	while((c = getopt_long(argc, argv, "a:b:d:Dfhi:m:o:s:t:v", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'd':
 			debug_flags_set(optarg);
@@ -631,8 +645,7 @@ int main(int argc, char *argv[])
 			tickets = xxstrdup(optarg);
 			break;
 		case 'm':
-			fa.argc += 1;
-			fa.argv = string_array_append(fa.argv, optarg);
+			fuse_opt_add_arg(&fa, optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);
@@ -641,6 +654,9 @@ int main(int argc, char *argv[])
 			if (!auth_register_byname(optarg))
 				fatal("could not register authentication method `%s': %s", optarg, strerror(errno));
 			did_explicit_auth = 1;
+			break;
+		case 's':
+			single_hostport = optarg;
 			break;
 		case 't':
 			chirp_fuse_timeout = string_time_parse(optarg);
@@ -686,15 +702,13 @@ int main(int argc, char *argv[])
 	signal(SIGINT, exit_handler);
 	signal(SIGTERM, exit_handler);
 
-	fuse_chan = fuse_mount(fuse_mountpoint, &fa);
-	if(!fuse_chan) {
-		fprintf(stderr, "chirp_fuse: couldn't access %s\n", fuse_mountpoint);
+	fuse_instance = fuse_new(&fa, &chirp_fuse_operations, sizeof(chirp_fuse_operations), 0);
+	if(!fuse_instance) {
+		fprintf(stderr, "chirp_fuse: couldn't create fuse instance for %s\n", fuse_mountpoint);
 		return 1;
 	}
 
-	fuse_instance = fuse_new(fuse_chan, &fa, &chirp_fuse_operations, sizeof(chirp_fuse_operations), 0);
-	if(!fuse_instance) {
-		fuse_unmount(fuse_mountpoint, fuse_chan);
+	if(fuse_mount(fuse_instance, fuse_mountpoint) != 0) {
 		fprintf(stderr, "chirp_fuse: couldn't access %s\n", fuse_mountpoint);
 		return 1;
 	}
@@ -713,7 +727,7 @@ int main(int argc, char *argv[])
 
 	fuse_loop(fuse_instance);
 
-	fuse_unmount(fuse_mountpoint, fuse_chan);
+	fuse_unmount(fuse_instance);
 	fuse_destroy(fuse_instance);
 
 	free(fa.argv);

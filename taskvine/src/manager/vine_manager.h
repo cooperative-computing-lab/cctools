@@ -102,7 +102,7 @@ struct vine_manager {
 	/* Primary data structures for tracking task state. */
 
 	struct itable *tasks;           /* Maps task_id -> vine_task of all tasks in any state. */
-	struct list   *ready_list;      /* List of vine_task that are waiting to execute. */
+	struct priority_queue   *ready_tasks;       /* Priority queue of vine_task that are waiting to execute. */
 	struct itable   *running_table;      /* Table of vine_task that are running at workers. */
 	struct list   *waiting_retrieval_list;      /* List of vine_task that are waiting to be retrieved. */
 	struct list   *retrieved_list;      /* List of vine_task that have been retrieved. */
@@ -143,7 +143,6 @@ struct vine_manager {
 
 	struct vine_stats *stats;
 	struct vine_stats *stats_measure;
-	struct vine_stats *stats_disconnected_workers;
 
 	/* Time of most recent events for computing various timeouts */
 
@@ -218,6 +217,8 @@ struct vine_manager {
 
 	int max_library_retries;        /* The maximum time that a library can be failed and retry another one, if over this count the library template will be removed */
 	int watch_library_logfiles;     /* If true, watch the output files produced by each of the library processes running on the remote workers, take them back the current logging directory */
+
+	double sandbox_grow_factor;         /* When task disk sandboxes are exhausted, increase the allocation using their measured valued times this factor */
 
 	/*todo: confirm datatype. int or int64*/
 	int max_task_stdout_storage;	/* Maximum size of standard output from task.  (If larger, send to a separate file.) */

@@ -91,6 +91,8 @@ SOURCES = \
 	pattern.c \
 	ppoll_compat.c \
 	preadwrite.c \
+	priority_queue.c \
+	priority_queue_test.c \
 	process.c \
 	random.c \
 	rmonitor.c \
@@ -161,6 +163,7 @@ HEADERS_PUBLIC = \
 	md5.h \
 	macros.h \
 	path.h \
+	priority_queue.h \
 	rmonitor_poll.h \
 	rmsummary.h \
 	stringtools.h \
@@ -190,7 +193,7 @@ PROGRAMS = $(MOST_PROGRAMS) catalog_query
 
 SCRIPTS = cctools_gpu_autodetect
 TARGETS = $(LIBRARIES) $(PRELOAD_LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
-TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test jx_canonicalize_test jx_merge_test hash_table_offset_test hash_table_fromkey_test histogram_test category_test jx_binary_test bucketing_base_test bucketing_manager_test
+TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test jx_canonicalize_test jx_merge_test hash_table_offset_test hash_table_fromkey_test histogram_test category_test jx_binary_test bucketing_base_test bucketing_manager_test priority_queue_test
 
 all: $(TARGETS) catalog_query
 

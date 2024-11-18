@@ -31,7 +31,7 @@ There are a variety of ways to install Work Queue, depending on your local envir
 In most cases, installing via `conda` is the easiest method.
 Please see our [full installation instructions](../install/index.md) for other options.
 
-First, [Install Miniconda](https://docs.conda.io/en/latest/miniconda.html) if you haven't done so before.
+First, [Install Miniforge](https://github.com/conda-forge/miniforge#install) if you don't already have `conda` installed.
 Then, open a terminal and install `ndcctools` like this:
 
 ```

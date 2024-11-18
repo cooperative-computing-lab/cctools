@@ -105,15 +105,15 @@ with all the same tasks on the worker.""",
     print("Declaring files...")
     blast_url = m.declare_url(
         "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.13.0/ncbi-blast-2.13.0+-x64-linux.tar.gz",
-        cache="always",  # with "always", workers keep this file until they are terminated
+        cache="forever",  # with "forever", workers keep this file even after they are terminated
     )
-    blast = m.declare_untar(blast_url, cache="always")
+    blast = m.declare_untar(blast_url, cache="forever")
 
     landmark_url = m.declare_url(
         "https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz",
-        cache="always",
+        cache="forever",
     )
-    landmark = m.declare_untar(landmark_url)
+    landmark = m.declare_untar(landmark_url, cache="forever")
 
     print("Declaring tasks...")
     for i in range(args.task_count):

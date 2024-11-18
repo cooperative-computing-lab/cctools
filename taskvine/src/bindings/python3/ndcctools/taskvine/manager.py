@@ -257,7 +257,7 @@ class Manager(object):
     # Get the caching directory of the manager
     @property
     def cache_directory(self):
-        return cvine.vine_get_path_staging(self._taskvine, None)
+        return cvine.vine_get_path_cache(self._taskvine, None)
 
     ##
     # Get manager statistics.
@@ -848,7 +848,7 @@ class Manager(object):
     # - "max-retrievals" Sets the max number of tasks to retrieve per manager wait(). If less than 1, the manager prefers to retrieve all completed tasks before dispatching new tasks to workers. (default=1)
     # - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=10)
     # - "monitor-interval" Parameter to change how frequently the resource monitor records resource consumption of a task in a times series, if this feature is enabled. See @ref enable_monitoring.
-    # - "prefer-dispatch" If 1, try to dispatch tasks even if there are retrieved tasks ready to be reportedas done. (default=0)
+    # - "prefer-dispatch" If 1, try to dispatch tasks even if there are retrieved tasks ready to be reported as done. (default=0)
     # - "proportional-resources" If set to 0, do not assign resources proportionally to tasks. The default is to use proportions.
     # - "proportional-whole-tasks" Round up resource proportions such that only an integer number of tasks could be fit in the worker. The default is to use proportions.
     # - "ramp-down-heuristic" If set to 1 and there are more workers than tasks waiting, then tasks are allocated all the free resources of a worker large enough to run them. If monitoring watchdog is not enabled, then this heuristic has no effect. (default=0)
@@ -926,53 +926,93 @@ class Manager(object):
     # @param self            Reference to the current manager object.
     # @param library_name    Name of the Library to be created
     # @param function_list   List of all functions to be included in the library
-    # @param poncho_env      Name of an already prepared poncho environment
+    # @param poncho_env      Name of an already prepared poncho environment or a conda environment
     # @param init_command    A string describing a shell command to execute before the library task is run
     # @param add_env         Whether to automatically create and/or add environment to the library
-    # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
     # @param hoisting_modules  A list of modules imported at the preamble of library, including packages, functions and classes.
-    def create_library_from_functions(self, library_name, *function_list, poncho_env=None, init_command=None, add_env=True, hoisting_modules=None):
+    # @param exec_mode       Execution mode that the library should use to run function calls. Either 'direct' or 'fork'
+    # @param library_context_info   A list containing [library_context_func, library_context_args, library_context_kwargs]. Used to create the library context on remote nodes.
+    # @returns               A task to be used with @ref ndcctools.taskvine.manager.Manager.install_library.
+    def create_library_from_functions(self, library_name, *function_list, poncho_env=None, init_command=None, add_env=True, hoisting_modules=None, exec_mode='fork', library_context_info=None):
         # Delay loading of poncho until here, to avoid bringing in poncho dependencies unless needed.
         # Ensure poncho python library is available.
         from ndcctools.poncho import package_serverize
 
-        # Positional arguments are the list of functions to include in the library.
-        # Create a unique hash of a combination of function names and bodies.
-        functions_hash = package_serverize.generate_functions_hash(function_list, hoisting_modules)
+        # Check if the library is empty
+        if len(function_list) == 0:
+            raise ValueError('A library cannot have 0 functions.')
+
+        # Check if exec_mode is valid
+        # Currently taskvine only supports 'fork' and 'direct'.
+        if exec_mode != 'fork' and exec_mode != 'direct':
+            raise ValueError(f'A library cannot have exec_mode as {exec_mode}. Only "fork" and "direct" are supported.')
+
+        # Create a unique hash of a library from all information that determine a library's uniqueness.
+        library_hash = package_serverize.generate_library_hash(library_name=library_name,
+                                                               function_list=function_list,
+                                                               poncho_env=poncho_env,
+                                                               init_command=init_command,
+                                                               add_env=add_env,
+                                                               exec_mode=exec_mode,
+                                                               hoisting_modules=hoisting_modules,
+                                                               library_context_info=library_context_info)
 
         # Create path for caching library code and environment based on function hash.
-        library_cache_path = f"{self.cache_directory}/vine-library-cache/{functions_hash}"
-        library_code_path = f"{library_cache_path}/library_code.py"
-
-        # Don't create a custom poncho environment if it's already given.
-        if poncho_env:
-            library_env_path = poncho_env
-        else:
-            library_env_path = f"{library_cache_path}/library_env.tar.gz"
+        library_cache_dir_name = "vine-library-cache"
+        library_code_name = "library_code.py"
+        library_info_name = "library_info.clpk"
+        library_cache_path = os.path.join(self.cache_directory, library_cache_dir_name, library_hash)
+        library_code_path = os.path.join(library_cache_path, library_code_name)
+        library_info_path = os.path.join(library_cache_path, library_info_name)
 
         # If library cache directory doesn't exist, create it.
         pathlib.Path(library_cache_path).mkdir(mode=0o755, parents=True, exist_ok=True)
 
+        # Don't create a custom poncho environment if it's already given.
+        if poncho_env:
+            library_env_path = poncho_env
+            if not os.path.isfile(library_env_path) and add_env is True:
+                # library_env_path must be the name of a conda environment
+                conda_env_name = library_env_path
+                library_env_path = os.path.join(library_cache_path, library_env_path)
+                library_env_path += '.tar.gz'
+                if not os.path.isfile(library_env_path):
+                    from ndcctools.poncho.package_create import pack_env
+                    pack_env(conda_env_name, library_env_path)
+        else:
+            default_poncho_tarball = 'library_env.tar.gz'
+            library_env_path = os.path.join(library_cache_path, default_poncho_tarball)
+
         # If the library code and environment exist, move on to creating the Library Task.
         # Else create them in the relevant paths.
         if not (os.path.isfile(library_code_path) and os.path.isfile(library_env_path)):
-            # Don't create a new poncho environment tarball is one is already provided or
-            # user explicitly tells not to via `add_env`.
+            # Don't create a new poncho environment tarball if one is already provided or
+            # user explicitly tells not to via `add_env` or the poncho tarball already exists.
             need_pack = True
-            if poncho_env or not add_env:
+            if poncho_env or not add_env or os.path.isfile(library_env_path):
                 need_pack = False
 
-            # create library code and environment, if appropriate
-            package_serverize.serverize_library_from_code(library_cache_path, function_list, library_name, need_pack=need_pack, hoisting_modules=hoisting_modules)
+            # create library code
+            # environment is also created if need_pack is True
+            package_serverize.generate_library(library_cache_path=library_cache_path,
+                                               library_code_path=library_code_path,
+                                               library_env_path=library_env_path,
+                                               library_info_path=library_info_path,
+                                               functions=function_list,
+                                               library_name=library_name,
+                                               need_pack=need_pack,
+                                               exec_mode=exec_mode,
+                                               hoisting_modules=hoisting_modules,
+                                               library_context_info=library_context_info)
 
             # enable correct permissions for library code
             os.chmod(library_code_path, 0o775)
 
         # Create Task to execute the Library and prepend it with some setup code if needed.
         if init_command:
-            t = LibraryTask(f"{init_command} python ./library_code.py", library_name)
+            t = LibraryTask(f"{init_command} python {library_code_name}", library_name)
         else:
-            t = LibraryTask("python ./library_code.py", library_name)
+            t = LibraryTask(f"python {library_code_name}", library_name)
 
         # Declare the environment if needed.
         if add_env:
@@ -980,8 +1020,13 @@ class Manager(object):
             t.add_environment(f)
 
         # Declare the library code as an input.
-        f = self.declare_file(library_code_path, cache=True)
-        t.add_input(f, "library_code.py")
+        f = self.declare_file(library_code_path, cache=True, peer_transfer=True)
+        t.add_input(f, library_code_name)
+        f = self.declare_file(library_info_path, cache=True, peer_transfer=True)
+        t.add_input(f, library_info_name)
+
+        # Register execution mode of functions in this library
+        t.set_function_exec_mode_from_string(exec_mode)
         return t
 
     ##

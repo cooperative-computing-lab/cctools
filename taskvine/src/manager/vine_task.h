@@ -37,6 +37,11 @@ typedef enum {
 	VINE_TASK_DONE,              /**< Task is done, and returned through vine_wait >**/
 } vine_task_state_t;
 
+typedef enum {
+        VINE_TASK_FUNC_EXEC_MODE_DIRECT = 0,    /**< A library task will execute function calls directly in its process **/
+        VINE_TASK_FUNC_EXEC_MODE_FORK,          /**< A library task will fork and execute each function call. **/
+} vine_task_func_exec_mode_t;
+
 struct vine_task {
     /***** Fixed properties of task at submit time. ******/
 
@@ -52,6 +57,7 @@ struct vine_task {
 	char *needs_library;         /**< If this is a FunctionTask, the name of the library used */
 	char *provides_library;      /**< If this is a LibraryTask, the name of the library provided. */
 	int   function_slots_requested; /**< If this is a LibraryTask, the number of function slots requested by the user. -1 causes the number of slots to match the number of cores. */
+        vine_task_func_exec_mode_t func_exec_mode;    /**< If this a LibraryTask, the execution mode of its functions. */
 	
 	struct list *input_mounts;    /**< The mounted files expected as inputs. */
 	struct list *output_mounts;   /**< The mounted files expected as outputs. */
@@ -64,6 +70,7 @@ struct vine_task {
 	int max_retries;             /**< Number of times the task is tried to be executed on some workers until success. If less than one, the task is retried indefinitely. See try_count below.*/
 	int max_forsaken;            /**< Number of times the task is submitted to workers without being executed. If less than one, the task is retried indefinitely. See forsaken_count below.*/
 	int64_t min_running_time;    /**< Minimum time (in seconds) the task needs to run. (see vine_worker --wall-time)*/
+	int64_t input_files_size;    /**< Size (in bytes) of input files. < 0 if the size of at least one of the input files is unknown. */
 
 	/***** Internal state of task as it works towards completion. *****/
 
@@ -121,6 +128,8 @@ struct vine_task {
 	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task in its latest attempt. */
 	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
 	struct rmsummary *current_resource_box;                /**< Resources allocated to the task on this specific worker. */
+
+	double sandbox_measured;                              /**< On completion, the maximum size observed of the disk used by the task for output and ephemeral files. */
 		
 	int has_fixed_locations;                               /**< Whether at least one file was added with the VINE_FIXED_LOCATION flag. Task fails immediately if no
 															 worker can satisfy all the strict inputs of the task. */

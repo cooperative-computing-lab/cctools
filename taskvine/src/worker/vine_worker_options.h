@@ -105,6 +105,9 @@ struct vine_worker_options {
 	int transfer_port_min;
 	int transfer_port_max;
 
+	/* Maximum number of concurrent worker transfer requests made by worker */
+	int max_transfer_procs;
+
   /* Explicit contact host (address or hostname) for transfers bewteen workers. */
   char *reported_transfer_host;
   int reported_transfer_port;

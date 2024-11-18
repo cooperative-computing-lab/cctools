@@ -61,6 +61,9 @@ $(FORMAT_PACKAGES): config.mk
 	@$(MAKE) -C $(@:format-%=%) format
 format: $(FORMAT_PACKAGES)
 
+doc_serve:
+	mkdocs serve -f doc/mkdocs.yml
+
 rpm:
 	./packaging/rpm/rpm_creator.sh $(RPM_VERSION) $(RPM_RELEASE)
 

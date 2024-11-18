@@ -23,7 +23,7 @@ struct DIR_with_name {
 	char *name;
 };
 
-int path_disk_size_info_get(const char *path, int64_t *measured_size, int64_t *number_of_files)
+int path_disk_size_info_get(const char *path, int64_t *measured_size, int64_t *number_of_files, struct hash_table *exclude_paths)
 {
 
 	struct stat info;
@@ -31,7 +31,7 @@ int path_disk_size_info_get(const char *path, int64_t *measured_size, int64_t *n
 	if (result == 0) {
 		if (S_ISDIR(info.st_mode)) {
 			struct path_disk_size_info *state = NULL;
-			result = path_disk_size_info_get_r(path, -1, &state);
+			result = path_disk_size_info_get_r(path, -1, &state, exclude_paths);
 
 			*measured_size = state->last_byte_size_complete;
 			*number_of_files = state->last_file_count_complete;
@@ -46,7 +46,7 @@ int path_disk_size_info_get(const char *path, int64_t *measured_size, int64_t *n
 	return result;
 }
 
-int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_disk_size_info **state)
+int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_disk_size_info **state, struct hash_table *exclude_paths)
 {
 	int64_t start_time = time(0);
 	int result = 0;
@@ -113,6 +113,10 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 				strncpy(composed_path, entry->d_name, PATH_MAX);
 			} else {
 				snprintf(composed_path, PATH_MAX, "%s/%s", tail->name, entry->d_name);
+			}
+
+			if (exclude_paths && hash_table_lookup(exclude_paths, composed_path)) {
+				continue;
 			}
 
 			if (lstat(composed_path, &file_info) < 0) {

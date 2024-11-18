@@ -72,7 +72,7 @@ if __name__ == "__main__":
         m.disable_peer_transfers()
 
     # declare all urls in the manager:
-    urls = map(lambda u: m.declare_url(u, cache=True), urls_sources)
+    urls = map(lambda u: m.declare_url(u, cache="forever"), urls_sources)
 
     # script to process the files
     my_script = m.declare_buffer(compare_script, cache=True)

@@ -148,7 +148,11 @@ class DaskVine(Manager):
                 self.environment = environment
 
             self.extra_files = extra_files
-            self.worker_transfers = worker_transfers or lazy_transfers
+            # if one of both is False, then worker_transfers is False, otherwise True
+            if not worker_transfers or not lazy_transfers:
+                self.worker_transfers = False
+            else:
+                self.worker_transfers = True
             self.env_vars = env_vars
             self.low_memory_mode = low_memory_mode
             self.checkpoint_fn = checkpoint_fn

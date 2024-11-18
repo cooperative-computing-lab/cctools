@@ -136,6 +136,9 @@ struct hash_table *features_table = NULL;
 // Disable the check for invalid use of AFS with HTCondor.
 static int disable_afs_check = 0;
 
+// Remove workers upon manager disconnection
+static int single_shot = 0;
+
 /*
 In a signal handler, only a limited number of functions are safe to
 invoke, so we construct a string and emit it with a low-level write.
@@ -447,10 +450,10 @@ static int submit_worker( struct batch_queue *queue )
 	}
 
 	char *features_string = make_features_string(features_table);
-	
+
 	if(using_catalog) {
 		cmd = string_format(
-		"./%s --parent-death -M %s -t %d -C '%s' %s %s %s %s %s %s %s",
+		"./%s --parent-death -M %s -t %d -C '%s' %s %s %s %s %s %s %s %s",
 		worker_command,
 		submission_regex,
 		worker_timeout,
@@ -461,11 +464,12 @@ static int submit_worker( struct batch_queue *queue )
 		resource_args ? resource_args : "",
 		manual_ssl_option ? "--ssl" : "",
 		features_string,
+		single_shot ? "--single-shot" : "",
 		extra_worker_args ? extra_worker_args : ""
 		);
 	} else {
 		cmd = string_format(
-		"./%s --parent-death %s %d -t %d -C '%s' %s %s %s %s %s %s",
+		"./%s --parent-death %s %d -t %d -C '%s' %s %s %s %s %s %s %s",
 		worker_command,
 		manager_host,
 		manager_port,
@@ -476,6 +480,7 @@ static int submit_worker( struct batch_queue *queue )
 		resource_args ? resource_args : "",
 		manual_ssl_option ? "--ssl" : "",
 		features_string,
+		single_shot ? "--single-shot" : "",
 		extra_worker_args ? extra_worker_args : ""
 		);
 	}
@@ -996,7 +1001,7 @@ static void mainloop( struct batch_queue *queue )
 				}
 			}
 		}
-	
+
 		debug(D_VINE,"evaluating manager list...");
 		int workers_connected = count_workers_connected(managers_list);
 		int workers_needed = 0;
@@ -1168,8 +1173,9 @@ static void show_help(const char *cmd)
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
 	printf(" %-30s Specify the size of the debug file.\n", "-O,--debug-file-size=<mb>");
-	printf(" %-30s Workers should use SSL to connect to managers. (Not needed if project names.)", "--ssl");
+	printf(" %-30s Workers should use SSL to connect to managers. (Not needed if project names.)\n", "--ssl");
 	printf(" %-30s SNI domain name if different from manager hostname. Implies --ssl.\n", "--tls-sni=<domain name>");
+	printf(" %-30s Set a custom factory name.\n", "--factory-name");
 
 	printf(" %-30s Show the version string.\n", "-v,--version");
 	printf(" %-30s Show this screen.\n", "-h,--help");
@@ -1198,7 +1204,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Alternate binary instead of vine_worker.\n", "--worker-binary=<file>");
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
-	printf(" %-30s Run each worker inside this python environment.\n","--python-env=<file.tar.gz>");
+	printf(" %-30s Run each worker inside this poncho environment.\n","--poncho-env=<file.tar.gz>");
 
 	printf("\nOptions specific to batch systems:\n");
 	printf(" %-30s Generic batch system options.\n", "-B,--batch-options=<options>");
@@ -1236,6 +1242,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_FACTORY_NAME,
 		LONG_OPT_DEBUG_WORKERS,
 		LONG_OPT_DISABLE_AFS_CHECK,
+		LONG_OPT_SINGLE_SHOT,
 };
 
 static const struct option long_options[] = {
@@ -1284,6 +1291,7 @@ static const struct option long_options[] = {
 	{"ssl",no_argument, 0, LONG_OPT_USE_SSL},
 	{"tls-sni", required_argument, 0, LONG_OPT_TLS_SNI},
 	{"factory-name",required_argument, 0, LONG_OPT_FACTORY_NAME},
+	{"single-shot", no_argument, 0, LONG_OPT_SINGLE_SHOT},
 	{0,0,0,0}
 };
 
@@ -1476,6 +1484,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_DISABLE_AFS_CHECK:
 				disable_afs_check = 1;
+				break;
+			case LONG_OPT_SINGLE_SHOT:
+				single_shot = 1;
 				break;
 			default:
 				show_help(argv[0]);

@@ -71,7 +71,7 @@ and machine learning.
 ## Quick Start
 
 Installing via `conda` is the easiest method for most users.
-First, [Install Miniconda](https://docs.conda.io/en/latest/miniconda.html) if you haven't done so before.
+First, [Install Miniforge](https://github.com/conda-forge/miniforge#install) if you don't already have `conda` installed.
 Then, open a terminal and install `ndcctools` like this:
 
 ```
@@ -734,7 +734,7 @@ that are specific to one task, and one task only.
 should be retained as long as the workflow runs, and then deleted at the end.
 - A cache value of **worker** indicates that the file should be retained
 by the worker until the worker's end-of-life.
-- A cache value of **always** indicates that the file should be retained
+- A cache value of **forever** indicates that the file should be retained
 by the worker, even across workflows.  This is appropriate for widely used
 software packages and reference datasets. This level of cache leaves files on
 the execution sites even when workers terminate, thus use with care.
@@ -1547,7 +1547,7 @@ We strongly recommend to specify the modules the function needs inside the funct
 
 You can certainly embed `import` statements within the function and install any necessary packages:
 
-=== Python
+=== "Python"
     ```python
     def divide(dividend, divisor): 
         import math 
@@ -1559,7 +1559,7 @@ You can certainly embed `import` statements within the function and install any 
 If the overhead of importing modules per function is noticeable, modules can be optionally imported as a common preamble to the function executions. Common modules can be specified with the `hoisting_modules` argument to `create_library_from_functions`. This reduces the overhead by eliminating redundant imports:
 
 
-=== Python
+=== "Python"
     ```python
     import numpy
     import math
@@ -1569,7 +1569,7 @@ If the overhead of importing modules per function is noticeable, modules can be 
 
 `hoisting_modules` only accepts modules as arguments (e.g. it can't be used to import functions, or select particular names with `from ... import ...` statements. Such statements should be made inside functions after specifying the modules with `hoisting_modules`.
 
-=== Python
+=== "Python"
     ```python
     def cube(x):
         # whenever using FromImport statments, put them inside of functions
@@ -1625,6 +1625,98 @@ Note that both library tasks and function invocations consume
 resources at the worker, and the number of running tasks will be
 constrained by the available resources in the same way as normal tasks.
 
+### Stateful Serverless Computing
+A function typically sets up its states (e.g., load modules/packages, build internal models or states) before executing its computation. With advanced serverless computing in TaskVine, you can set up a shared state between function invocations so the cost of setting up states doesn't have to be paid for every invocation, but instead is paid once and shared many times. TaskVine supports this technique as demonstrated via the below example.
+
+Assume that you program has two functions `my_sum` and `my_mul`, and they both use `base` to set up a common value in their computations.
+
+=== "Python"
+    ```python
+    def base(x, y=1):
+        return x**y
+    
+    A = 2
+    B = 3
+
+    def my_sum(x, y):
+        base_val = base(A, B)
+        return base_val + x+y
+
+    def my_mul(x, y):
+        base_val = base(A, B)
+        return base_val + x*y
+    ```
+
+With this setup, `base(A, B)` has to be called repeatedly for every function invocation of `my_sum` and `my_mul`. What you want instead is to have the value of `base(A, B)` created and computed once and stored in a library. `my_sum` and `my_mul` thus only have to load such value, instead of computing the value, from a library's state, as follows.
+
+=== "Python"
+    ```python
+    from ndcctools.taskvine.utils import load_variable_from_library
+    def base(x, y=1):
+        return {'base_val': x**y}
+
+    A = 2
+    B = 3
+
+    def my_sum(x, y):
+        base_val = load_variable_from_library('base_val')
+        return base_val + x+y
+
+    def my_mul(x, y):
+        base_val = load_variable_from_library('base_val')
+        return base_val + x*y
+    
+    libtask = m.create_library_from_functions("my_library", my_sum, my_mul, library_context_info=[base, [A], {'y': B})
+    m.install(libtask)
+    # application continues as usual with submitting FunctionCalls and waiting for results.
+    ...
+    ```
+
+This technique enables maximum sharing between invocations of functions that share some common states, and between invocations of the same function in a library. This is especially helpful in ML/AI workloads where one has to build an ML/AI model on a remote node to best configure it against the remote node's local resources (e.g., GPU). Thus, instead of loading and creating a model for every invocation:
+
+=== "Python"
+    ```python
+    def infer(image):
+        # load model parameters
+        ...
+        # build model
+        model = tf.ResNet50(...)
+        # load model in GPU
+        model.to_gpu(1)
+        # execute an inference
+        return model.infer(image)
+    ```
+
+One can do this to have the model created and loaded in a GPU once and separate the model creation from the actual inference:
+
+=== "Python"
+    ```python
+    from ndcctools.taskvine.utils import load_variable_from_library
+    def model_setup():
+        # load model parameters
+        ...
+        # build model
+        model = tf.ResNet50(...)
+        # load model in GPU
+        model.to_gpu(1)
+        return {'model': model}
+
+    def infer(image):
+        model = load_variable_from_library('model')
+        # execute an inference
+        return model.infer(image)
+    
+    libtask = m.create_library_from_functions('infer_library',
+                                              infer,
+                                              library_context_info=[model_setup, [], {})
+    m.install(libtask)
+
+    # application continues as usual with submitting FunctionCalls and waiting for results.
+    ...
+    ```
+
+
+
 ### Futures
 
 TaskVine provides a futures executor model which is a subclass
@@ -1648,7 +1740,7 @@ a Future object. The result of the task can retrieved by calling `future.result(
     a = m.submit(my_sum, 3, 4)
     b = m.submit(my_sum, 5, 2)
     c = m.submit(my_sum, a, b)  # note that the futures a and b are
-                                # a passed as any other argument.
+                                # passed as any other argument.
 
     print(c.result())
     ```
@@ -1674,6 +1766,26 @@ can be tailored as any other task:
 
     print(f.result())
     ```
+
+Additionally, the executor the Vine Factory to submit TaskVine workers.
+Specifications for the workers can be provided via the `opts` keyword argument when creating to executor.
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+
+    def my_sum(x, y):
+        return x + y
+
+    opts = {"memory": 8000, "disk":8000, "cores":8, "min-workers": 5}
+    m = vine.FuturesExecutor(manager_name='my_manager', batch_type="condor", opts=opts)
+
+    t = m.future_task(my_sum, 3, 4)
+    t.set_cores(1)
+
+    f = m.submit(t)
+
+    print(f.result())
 
 Instead of tasks, the futures may also executed using [function calls](#serverless-computing) with the `future_funcall` method:
 
@@ -1908,8 +2020,8 @@ Consider now that the task requires 1 cores, 6GB of memory, and 27 GB of disk:
 
 !!! note
     If you want TaskVine to exactly allocate the resources you have
-    specified, use the `proportional-resources` and `proportional-whole-tasks`
-    parameters as shown [here](#tuning-specialized-execution-parameters).  In
+    specified, use `m.disable_proportional_resources()` (see also `proportional-whole-tasks`
+    [here](#tuning-specialized-execution-parameters).  In
     general, however, we have found that using proportions nicely adapts to the
     underlying available resources, and leads to very few resource exhaustion
     failures while still using worker resources efficiently.
@@ -2515,10 +2627,10 @@ change.
 | min-transfer-timeout | Set the minimum number of seconds to wait for files to be transferred to or from a worker. | 10 |
 | monitor-interval        | Maximum number of seconds between resource monitor measurements. If less than 1, use default. | 5 |
 | prefer-dispatch | If 1, try to dispatch tasks even if there are retrieved tasks ready to be reportedas done. | 0 |
-| proportional-resources | If set to 0, do not assign resources proportionally to tasks. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
 | proportional-whole-tasks | Round up resource proportions such that only an integer number of tasks could be fit in the worker. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
 | ramp-down-heuristic     | If set to 1 and there are more workers than tasks waiting, then tasks are allocated all the free resources of a worker large enough to run them. If monitoring watchdog is not enabled, then this heuristic has no effect. | 0 |
 | resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
+| sandbox-grow-factor    | When task disk sandboxes are exhausted, increase the allocation using their measured valued times this factor. Minimum is 1.1. | 2 |
 | short-timeout | Set the minimum timeout in seconds when sending a brief message to a single worker. | 5 |
 | temp-replica-count    | Number of temp file replicas created across workers | 0 |
 | transfer-outlier-factor | Transfer that are this many times slower than the average will be terminated. | 10 |
@@ -2701,6 +2813,8 @@ The `compute` call above may receive the following keyword arguments:
 | lazy\_transfer | Whether to bring each result back from the workers (False, default), or keep transient results at workers (True) |
 | resources   | A dictionary to specify [maximum resources](#task-resources), e.g. `{"cores": 1, "memory": 2000"}` |
 | resources\_mode | [Automatic resource management](#automatic-resource-management) to use, e.g., "fixed", "max", or "max throughput"| 
+| task\_mode | Mode to execute individual tasks, such as [function calls](#serverless-computing). to use, e.g., "tasks", or "function-calls"|
+
 
 
 ### Further Information

@@ -105,7 +105,8 @@ typedef enum {
 	VINE_RESULT_FIXED_LOCATION_MISSING = 10 << 3, /**< The task failed because no worker could satisfy the fixed
 							 location input file requirements. */
 	VINE_RESULT_CANCELLED = 11 << 3,	      /**< The task was cancelled by the caller. */
-	VINE_RESULT_LIBRARY_EXIT = 12 << 3	      /**< Task is a library that has terminated. **/
+	VINE_RESULT_LIBRARY_EXIT = 12 << 3,	      /**< Task is a library that has terminated. **/
+	VINE_RESULT_SANDBOX_EXHAUSTION = 13 << 3	      /**< The task used more disk than the allowed sandbox. **/
 } vine_result_t;
 
 /** Select how to allocate resources for similar tasks with @ref vine_set_category_mode */
@@ -312,12 +313,21 @@ If unset, the library will runs as many functions as it has cores available.
 */
 void vine_task_set_function_slots(struct vine_task *t, int nslots);
 
+/** Set the execution mode of functions inside a library.
+A mode can either be "fork" where the library forks and executes functions, or
+"direct" where the library executes a function in its memory space.
+Note that "direct" will limit the number of function slots in a library to 1.
+@param t                A library object.
+@param exec_mode        A string denoting the execution mode of the library.
+*/
+void vine_task_set_function_exec_mode_from_string(struct vine_task *t, const char *exec_mode);
+
 /** Add a general file object as a input to a task.
 @param t A task object.
 @param f A file object, created by @ref vine_declare_file, @ref vine_declare_url, @ref vine_declare_buffer, @ref
 vine_declare_mini_task.
 @param remote_name The name of the file as it should appear in the task's sandbox.
-@param flags May be zero or more @ref vine_mount_flags_t or'd together. See @ref vine_task_add_input.
+@param flags May be zero or more @ref vine_mount_flags_t or'd together. See @ref vine_task_add_output.
 @return True on success, false on failure.
 */
 
@@ -474,6 +484,13 @@ also written to that directory.
 */
 
 int vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output);
+
+/** Get the state line of the task.
+@param t A task object.
+@return a string of the task's state.
+*/
+
+const char *vine_task_get_state(struct vine_task *t);
 
 /** Get the command line of the task.
 @param t A task object.
@@ -1087,6 +1104,21 @@ int vine_enable_peer_transfers(struct vine_manager *m);
 
 /** Disable taskvine peer transfers to be scheduled by the manager **/
 int vine_disable_peer_transfers(struct vine_manager *m);
+
+/** When enabled, resources to tasks in are assigned in proportion to the size
+of the worker. If a resource is specified (e.g. with @ref vine_task_set_cores),
+proportional resources never go below explicit specifications. This mode is most
+useful when only some of the resources are explicitely specified, or
+with automatic resource allocation. By default it is enabled.
+@param m A manager object
+ **/
+int vine_enable_proportional_resources(struct vine_manager *m);
+
+/** Disable proportional resources. See @ref vine_enable_proportional_resources.
+ * Proportional resources are enabled by default.
+@param m A manager object
+ **/
+int vine_disable_proportional_resources(struct vine_manager *m);
 
 /** Set the minimum task_id of future submitted tasks.
 Further submitted tasks are guaranteed to have a task_id larger or equal to

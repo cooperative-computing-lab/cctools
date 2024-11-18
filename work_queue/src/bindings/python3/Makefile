@@ -31,5 +31,5 @@ install: all
 	chmod 755 work_queue_example.py
 	cp ndcctools/work_queue.py ndcctools/work_queue_display.py ndcctools/work_queue_dask.py ndcctools/cwork_queue.py $(WQPYTHONSO) $(CCTOOLS_PYTHON3_PATH)/ndcctools
 	cp work_queue.py $(CCTOOLS_PYTHON3_PATH)
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/cctools/doc/examples/work_queue/python
-	cp work_queue_example.py $(CCTOOLS_INSTALL_DIR)/cctools/doc/examples/work_queue/python
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/cctools/examples/work_queue/python
+	cp work_queue_example.py $(CCTOOLS_INSTALL_DIR)/doc/cctools/examples/work_queue/python

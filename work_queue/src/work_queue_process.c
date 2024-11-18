@@ -377,7 +377,7 @@ int work_queue_process_measure_disk(struct work_queue_process *p, int max_time_o
 
 	struct path_disk_size_info *state = p->disk_measurement_state;
 
-	int result = path_disk_size_info_get_r(p->sandbox, max_time_on_measurement, &state);
+	int result = path_disk_size_info_get_r(p->sandbox, max_time_on_measurement, &state, NULL);
 
 	/* not a memory leak... Either disk_measurement_state was NULL or the same as state. */
 	p->disk_measurement_state = state;
