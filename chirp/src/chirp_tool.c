@@ -257,6 +257,30 @@ static INT64_T do_put(int argc, char **argv)
 	return result;
 }
 
+static INT64_T do_register_aux(const char *host, const char *name, const char *subject, time_t duration, time_t stoptime) {
+	INT64_T status = chirp_reli_ticket_register(host, name, subject, duration, stoptime);
+	if (status < 0) {
+		return status;
+	}
+
+	char *subject_actual;
+	char *ticket_actual;
+	time_t duration_actual;
+	char **rights_actual;
+	status = chirp_reli_ticket_get(current_host, name, &subject_actual, &ticket_actual, &duration_actual, &rights_actual, stoptime);
+
+	if (status < 0) {
+		fprintf(stderr, "Could not get ticket after registering it.\n");
+		return status;
+	}
+
+	if (duration != duration_actual) {
+		fprintf(stderr, "ticket '%s': limit imposed by server, duration is: %llu\n", name, (unsigned long long) duration_actual);
+	}
+
+	return 0;
+}
+
 static INT64_T do_ticket_create(int argc, char **argv)
 {
 	char name[CHIRP_PATH_MAX] = "";
@@ -308,7 +332,7 @@ static INT64_T do_ticket_create(int argc, char **argv)
 	}
 	fprintf(stderr, "ticket '%s': successfully created with %zu bits.\n", name, bits);
 
-	result = chirp_reli_ticket_register(current_host, name, subject, duration, stoptime);
+	result = do_register_aux(current_host, name, subject, duration, stoptime);
 	if(result < 0) {
 		fprintf(stderr, "could not register ticket\n");
 		return result;
@@ -338,9 +362,9 @@ static INT64_T do_ticket_register(int argc, char **argv)
 {
 	assert(argc == 3 || argc == 4);
 	if(argc == 3) {
-		return chirp_reli_ticket_register(current_host, argv[1], NULL, (time_t) strtoull(argv[2], NULL, 10), stoptime);
+		return do_register_aux(current_host, argv[1], NULL, (time_t) strtoull(argv[2], NULL, 10), stoptime);
 	} else {
-		return chirp_reli_ticket_register(current_host, argv[1], argv[2], (time_t) strtoull(argv[3], NULL, 10), stoptime);
+		return do_register_aux(current_host, argv[1], argv[2], (time_t) strtoull(argv[3], NULL, 10), stoptime);
 	}
 }
 

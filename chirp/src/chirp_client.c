@@ -714,7 +714,7 @@ INT64_T chirp_client_ticket_register(struct chirp_client * c, const char *name, 
 				result = -1;
 				goto out;
 			}
-			fprintf(file, "# %s: Registered with %s as \"%s\". Expires on %s\n", now, c->hostport, subject, expiration);
+			fprintf(file, "# %s: Registered with %s as \"%s\". Requested expiration on %s\n", now, c->hostport, subject, expiration);
 			fclose(file);
 		}
 	}
