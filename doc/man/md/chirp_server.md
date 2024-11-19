@@ -59,6 +59,7 @@ For complete details with examples, see the [Chirp User's Manual](http://ccl.cse
 - **-h**,**--help**<br />Give help information.
 - **-I**,**--interface=_&lt;addr&gt;_**<br />Listen only on this network interface.
 - **-M**,**--max-clients=_&lt;count&gt;_**<br />Set the maximum number of clients to accept at once. (default unlimited)
+- **--max-ticket-duration=_&lt;time&gt;_**<br />Set max duration for authentication tickets, in seconds. (default is unlimited)
 - **-n**,**--catalog-name=_&lt;name&gt;_**<br />Use this name when reporting to the catalog.
 - **-o**,**--debug-file=_&lt;file&gt;_**<br />Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 - **-O**,**--debug-rotate-max=_&lt;bytes&gt;_**<br />Rotate debug file once it reaches this size.
