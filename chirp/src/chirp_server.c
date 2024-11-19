@@ -99,6 +99,7 @@ static const char *safe_username = 0;
 static int         sim_latency = 0;
 static int         stall_timeout = 3600; /* one hour */
 static time_t      starttime;
+static char       *ticket_duration_limit = 0;
 
 /* space_available() is a simple mechanism to ensure that a runaway client does
  * not use up every last drop of disk space on a machine.  This function
@@ -531,6 +532,22 @@ static INT64_T getvarstring (struct link *l, time_t stalltime, void *buffer, INT
 		return count;
 	}
 }
+
+static const char *impose_ticket_duration_limit(const char *duration_requested) {
+	if (!ticket_duration_limit) {
+		return duration_requested;
+	}
+
+	INT64_T requested = strtoul(duration_requested, NULL, 10);
+	INT64_T limit = strtoul(ticket_duration_limit, NULL, 10);
+
+	if (requested < limit) {
+		return duration_requested;
+	}
+
+	return ticket_duration_limit;
+}
+
 
 /* A note on integers:
  *
@@ -1261,7 +1278,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if ((length = getvarstring(l, stalltime, buffer, length, 0)) == -1)
 				goto failure;
 			char *newsubject = chararg1;
-			char *duration = chararg2;
+			const char *duration = impose_ticket_duration_limit(chararg2);
 			if(strcmp(newsubject, "self") == 0)
 				strcpy(newsubject, esubject);
 			if(strcmp(esubject, newsubject) != 0 && strcmp(esubject, chirp_super_user) != 0) {	/* must be superuser to create a ticket for someone else */
