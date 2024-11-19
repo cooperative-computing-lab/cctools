@@ -99,6 +99,7 @@ static const char *safe_username = 0;
 static int         sim_latency = 0;
 static int         stall_timeout = 3600; /* one hour */
 static time_t      starttime;
+static char       *ticket_duration_limit = 0;
 
 /* space_available() is a simple mechanism to ensure that a runaway client does
  * not use up every last drop of disk space on a machine.  This function
@@ -531,6 +532,22 @@ static INT64_T getvarstring (struct link *l, time_t stalltime, void *buffer, INT
 		return count;
 	}
 }
+
+static const char *impose_ticket_duration_limit(const char *duration_requested) {
+	if (!ticket_duration_limit) {
+		return duration_requested;
+	}
+
+	INT64_T requested = strtoul(duration_requested, NULL, 10);
+	INT64_T limit = strtoul(ticket_duration_limit, NULL, 10);
+
+	if (requested < limit) {
+		return duration_requested;
+	}
+
+	return ticket_duration_limit;
+}
+
 
 /* A note on integers:
  *
@@ -1261,7 +1278,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if ((length = getvarstring(l, stalltime, buffer, length, 0)) == -1)
 				goto failure;
 			char *newsubject = chararg1;
-			char *duration = chararg2;
+			const char *duration = impose_ticket_duration_limit(chararg2);
 			if(strcmp(newsubject, "self") == 0)
 				strcpy(newsubject, esubject);
 			if(strcmp(esubject, newsubject) != 0 && strcmp(esubject, chirp_super_user) != 0) {	/* must be superuser to create a ticket for someone else */
@@ -1824,6 +1841,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Location of transient data. (default: `.')\n", "-y,--transient=<dir>");
 	fprintf(stdout, " %-30s Select port at random and write it to this file. (default: disabled)\n", "-Z,--port-file=<file>");
 	fprintf(stdout, " %-30s Set max timeout for unix filesystem authentication. (default: 5s)\n", "-z,--unix-timeout=<file>");
+	fprintf(stdout, " %-30s Set max duration for authentication tickets, in seconds. (default is unlimited)\n", "--max-ticket-duration=<time>");
 	fprintf(stdout, "\n");
 	fprintf(stdout, "Where debug flags are: ");
 	debug_flags_print(stdout);
@@ -1838,6 +1856,7 @@ int main(int argc, char *argv[])
 		LONGOPT_JOB_TIME_LIMIT                   = INT_MAX-2,
 		LONGOPT_INHERIT_DEFAULT_ACL              = INT_MAX-3,
 		LONGOPT_PROJECT_NAME                     = INT_MAX-4,
+		LONGOPT_MAX_TICKET_DURATION              = INT_MAX-5,
 	};
 
 	static const struct option long_options[] = {
@@ -1861,6 +1880,7 @@ int main(int argc, char *argv[])
 		{"job-concurrency", required_argument, 0, LONGOPT_JOB_CONCURRENCY},
 		{"job-time-limit", required_argument, 0, LONGOPT_JOB_TIME_LIMIT},
 		{"max-clients", required_argument, 0, 'M'},
+		{"max-ticket-duration", required_argument, 0, LONGOPT_MAX_TICKET_DURATION},
 		{"no-core-dump", no_argument, 0, 'C'},
 		{"owner", required_argument, 0, 'w'},
 		{"parent-check", required_argument, 0, 'e'},
@@ -2043,6 +2063,10 @@ int main(int argc, char *argv[])
 			break;
 		case LONGOPT_PROJECT_NAME:
 			strncpy(chirp_project_name, optarg, sizeof(chirp_project_name)-1);
+			break;
+		case LONGOPT_MAX_TICKET_DURATION:
+			free(ticket_duration_limit);
+			ticket_duration_limit = strdup(optarg);
 			break;
 		case 'h':
 		default:
