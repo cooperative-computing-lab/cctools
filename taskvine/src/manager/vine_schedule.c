@@ -10,7 +10,6 @@ See the file COPYING for details.
 #include "vine_file.h"
 #include "vine_file_replica.h"
 #include "vine_mount.h"
-#include "vine_protocol.h"
 
 #include "debug.h"
 #include "hash_table.h"
@@ -201,12 +200,6 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 
 	/* Check if worker is blocked from the manager. */
 	if (vine_blocklist_is_blocked(q, w->hostname)) {
-		return 0;
-	}
-
-	/* Check if the library and the worker have the same library protocol version. */
-	if (t->provides_library && (w->library_protocol_version != VINE_LIBRARY_PROTOCOL_VERSION)) {
-		debug(D_VINE, "Worker %s can't run library with id %d due to mismatched library protocol version.", w->workerid, t->task_id);
 		return 0;
 	}
 

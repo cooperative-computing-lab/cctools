@@ -1461,10 +1461,9 @@ static vine_msg_code_t handle_taskvine(struct vine_manager *q, struct vine_worke
 {
 	char items[4][VINE_LINE_MAX];
 	int worker_protocol;
-	int worker_library_protocol;
 
-	int n = sscanf(line, "taskvine %d %d %s %s %s %s", &worker_protocol, &worker_library_protocol, items[0], items[1], items[2], items[3]);
-	if (n != 6)
+	int n = sscanf(line, "taskvine %d %s %s %s %s", &worker_protocol, items[0], items[1], items[2], items[3]);
+	if (n != 5)
 		return VINE_MSG_FAILURE;
 
 	if (worker_protocol != VINE_PROTOCOL_VERSION) {
@@ -1472,8 +1471,6 @@ static vine_msg_code_t handle_taskvine(struct vine_manager *q, struct vine_worke
 		vine_block_host(q, w->hostname);
 		return VINE_MSG_FAILURE;
 	}
-
-	w->library_protocol_version = worker_library_protocol;
 
 	if (w->hostname)
 		free(w->hostname);
