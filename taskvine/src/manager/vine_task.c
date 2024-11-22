@@ -329,11 +329,7 @@ void vine_task_set_function_exec_mode(struct vine_task *t, vine_task_func_exec_m
 void vine_task_set_function_exec_mode_from_string(struct vine_task *t, const char *exec_mode)
 {
 	if (exec_mode && t->provides_library) {
-		if (!strncmp(exec_mode, "fork", strlen("fork"))) {
-			t->func_exec_mode = VINE_TASK_FUNC_EXEC_MODE_FORK;
-		} else {
-			t->func_exec_mode = VINE_TASK_FUNC_EXEC_MODE_DIRECT;
-		}
+		t->func_exec_mode = vine_task_func_exec_mode_from_string(exec_mode);
 	}
 }
 
@@ -1007,4 +1003,17 @@ char *vine_task_to_json(struct vine_task *t)
 	char *json = xxstrdup(buffer_tostring(&b));
 	buffer_free(&b);
 	return json;
+}
+
+/* Converts a string to a valid vine_task_func_exec_mode_t.
+ * Returns VINE_TASK_FUNC_EXEC_MODE_INVALID if there's no valid mode for the string. */
+vine_task_func_exec_mode_t vine_task_func_exec_mode_from_string(const char *exec_mode)
+{
+	if (!strncmp(exec_mode, "direct", strlen("direct"))) {
+		return VINE_TASK_FUNC_EXEC_MODE_DIRECT;
+	}
+	if (!strncmp(exec_mode, "fork", strlen("fork"))) {
+		return VINE_TASK_FUNC_EXEC_MODE_FORK;
+	}
+	return VINE_TASK_FUNC_EXEC_MODE_INVALID;
 }

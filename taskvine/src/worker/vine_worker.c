@@ -865,6 +865,14 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 			task->function_slots_requested = n;
 			/* Also set the total number determined by the manager. */
 			task->function_slots_total = n;
+		} else if (sscanf(line, "func_exec_mode %" PRId64, &n) == 1) {
+			vine_task_func_exec_mode_t func_exec_mode = n;
+			if (func_exec_mode == VINE_TASK_FUNC_EXEC_MODE_INVALID) {
+				debug(D_VINE | D_NOTICE, "invalid func_exec_mode from manager: %s", line);
+				vine_task_delete(task);
+				return 0;
+			}
+			task->func_exec_mode = func_exec_mode;
 		} else if (sscanf(line, "infile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			vine_hack_do_not_compute_cached_name = 1;
@@ -1546,10 +1554,25 @@ static int check_library_startup(struct vine_process *p)
 	struct jx *response = jx_parse_string(buffer);
 
 	const char *name = jx_lookup_string(response, "name");
+	int taskid = jx_lookup_integer(response, "taskid");
+	const char *exec_mode = jx_lookup_string(response, "exec_mode");
 
-	int ok = 0;
-	if (!strcmp(name, p->task->provides_library)) {
-		ok = 1;
+	int ok = 1;
+
+	if (!name || !taskid || !exec_mode) {
+		ok = 0;
+	} else {
+		vine_task_func_exec_mode_t converted_exec_mode = vine_task_func_exec_mode_from_string(exec_mode);
+
+		if (!p->task->provides_library || strcmp(name, p->task->provides_library)) {
+			ok = 0;
+		}
+		if (taskid != p->task->task_id) {
+			ok = 0;
+		}
+		if (p->task->func_exec_mode && converted_exec_mode != p->task->func_exec_mode) {
+			ok = 0;
+		}
 	}
 	if (response) {
 		jx_delete(response);
@@ -1585,8 +1608,7 @@ static void check_libraries_ready(struct link *manager)
 				debug(D_VINE, "Library %s reports ready to execute functions.", library_process->task->provides_library);
 				library_process->library_ready = 1;
 			} else {
-				/* Kill library if the name reported back doesn't match its name or
-				 * if there's any problem. */
+				/* Kill library if it fails the startup check. */
 				debug(D_VINE,
 						"Library %s task id %" PRIu64 " verification failed (unexpected response). Killing it.",
 						library_process->task->provides_library,
