@@ -455,6 +455,13 @@ regardless of the priority.
 
 void vine_task_set_priority(struct vine_task *t, double priority);
 
+/** Get the actual execution time of the task.
+execution_time = t->time_workers_execute_last_end - t->time_workers_execute_last_start.
+@param t A task object.
+@return The actual execution time of the task in seconds.
+*/
+double vine_task_get_execution_time(struct vine_task *t);
+
 /** Specify an environment variable to be added to the task.
 @param t A task object
 @param name Name of the variable.

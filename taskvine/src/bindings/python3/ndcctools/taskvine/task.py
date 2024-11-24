@@ -830,6 +830,13 @@ class Task(object):
         return cvine.vine_task_get_resources(self._task, "allocated")
 
     ##
+    # Get the execution time of the task in seconds.
+    #
+    @property
+    def execution_time(self):
+        return cvine.vine_task_get_execution_time(self._task) / 1e6
+
+    ##
     # Adds inputs for nopen library and rules file and sets LD_PRELOAD
     #
     def add_nopen(self, manager):
