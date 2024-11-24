@@ -38,7 +38,8 @@ typedef enum {
 } vine_task_state_t;
 
 typedef enum {
-        VINE_TASK_FUNC_EXEC_MODE_DIRECT = 0,    /**< A library task will execute function calls directly in its process **/
+        VINE_TASK_FUNC_EXEC_MODE_INVALID = -1,
+        VINE_TASK_FUNC_EXEC_MODE_DIRECT = 1,    /**< A library task will execute function calls directly in its process **/
         VINE_TASK_FUNC_EXEC_MODE_FORK,          /**< A library task will fork and execute each function call. **/
 } vine_task_func_exec_mode_t;
 
@@ -163,6 +164,8 @@ const char *vine_task_state_to_string( vine_task_state_t task_state );
 
 struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t );
 char * vine_task_to_json(struct vine_task *t);
+
+vine_task_func_exec_mode_t vine_task_func_exec_mode_from_string(const char *exec_mode);
 
 
 /** Attach an input or outputs to tasks without declaring files to manager.

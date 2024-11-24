@@ -9,6 +9,7 @@ import argparse
 import math
 import json
 from ndcctools.taskvine.utils import load_variable_from_library
+import os
 
 def exp(x, y=3):
     return {'base_val': x**y}
@@ -41,6 +42,12 @@ def double(x, with_library=False):
         return base_val + m.prod([x,2])
     return m.prod([x, 2])
 
+def func_copy_input_to_output(input_filename, output_filename):
+    with open(input_filename, 'r') as f:
+        contents = f.read()
+    with open(output_filename, 'w') as f:
+        f.write(contents)
+    return 0
 
 def main():
     parser = argparse.ArgumentParser("Test for taskvine python bindings.")
@@ -77,6 +84,9 @@ def main():
     exec("def dyn_fn(x):\n    return x + 2", globals(), globals())
     libtask_with_special_fns = q.create_library_from_functions('test-library-with-special-fns', lambda_fn, dyn_fn, add_env=False, exec_mode='fork')
 
+    # define a function that copies an input file to an output file.
+    # this is to test the input/output staging of function calls
+    libtask_with_io_fn = q.create_library_from_functions('test-library-with-io-fn', func_copy_input_to_output, add_env=False, exec_mode='fork')
 
     # Just take default resources for the library, this will cause it to fill the whole worker. 
     # And the number of functions slots will match the number of cores available.
@@ -86,7 +96,13 @@ def main():
     q.install_library(libtask_with_context_direct)
     q.install_library(libtask_with_context_fork)
     q.install_library(libtask_with_special_fns)
-    lib_task_names = ['test-library-no-context-direct', 'test-library-no-context-fork', 'test-library-with-context-direct', 'test-library-with-context-fork', 'test-library-with-special-fns']
+    q.install_library(libtask_with_io_fn)
+    lib_task_names = ['test-library-no-context-direct',
+                      'test-library-no-context-fork',
+                      'test-library-with-context-direct',
+                      'test-library-with-context-fork',
+                      'test-library-with-special-fns',
+                      'test-library-with-io-fn']
     print("Submitting function call tasks...")
     
     tasks = 100
@@ -102,6 +118,20 @@ def main():
 
                 s_task = vine.FunctionCall(lib_name, 'dyn_fn', 1)
                 q.submit(s_task)
+            elif lib_name == 'test-library-with-io-fn':
+                input_filename = os.path.basename(__file__) + '.input'
+                output_filename = os.path.basename(__file__) + '.output'
+                with open(input_filename, 'w') as f:
+                    print('Test IO with function calls', file=f)
+                s_task = vine.FunctionCall(lib_name, 'func_copy_input_to_output', input_filename, output_filename)
+                input_file = q.declare_file(input_filename)
+                output_file = q.declare_file(output_filename)
+                s_task.add_input(input_file, input_filename)
+                s_task.add_output(output_file, output_filename)
+                q.submit(s_task)
+
+                # do this test once only
+                break
             else:
                 s_task = vine.FunctionCall(lib_name, 'divide', 2, 2**2, with_library=with_library)
                 q.submit(s_task)
@@ -135,6 +165,18 @@ def main():
 
     print(f"Total:    {total_sum}")
     print(f"Expected: {expected}")
+
+    # Check that IO test passed
+    with open(input_filename, 'r') as f:
+        content_input = f.read()
+
+    with open(output_filename, 'r') as f:
+        content_output = f.read()
+    
+    print(f"Input: {content_input}", end='')
+    print(f"Output: {content_output}", end='')
+
+    assert content_input == content_output
 
     assert total_sum == expected
 

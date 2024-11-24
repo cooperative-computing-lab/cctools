@@ -379,15 +379,17 @@ def main():
     if context_vars:
         (load_variable_from_library.__globals__).update(context_vars)
 
-    # send configuration of library, just its name for now
-    config = {
-        "name": library_info['library_name']
-    }
-    send_configuration(config, out_pipe_fd, args.worker_pid)
-
     # set execution mode of functions in this library
     global exec_method
     exec_method = library_info['exec_mode']
+
+    # send configuration of library, just its name for now
+    config = {
+        "name": library_info['library_name'],
+        "taskid": args.task_id,
+        "exec_mode": exec_method,
+    }
+    send_configuration(config, out_pipe_fd, args.worker_pid)
 
     # register sigchld handler to turn a sigchld signal into an I/O event
     signal.signal(signal.SIGCHLD, sigchld_handler)

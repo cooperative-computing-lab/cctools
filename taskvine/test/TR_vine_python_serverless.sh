@@ -11,6 +11,9 @@ export PYTHONPATH=$(pwd)/../../test_support/python_modules/${CCTOOLS_PYTHON_TEST
 
 STATUS_FILE=vine.status
 PORT_FILE=vine.port
+PYTHON_SCRIPT=vine_python_serverless.py
+TEST_INPUT_FILE=${PYTHON_SCRIPT}.input
+TEST_OUTPUT_FILE=${PYTHON_SCRIPT}.output
 
 check_needed()
 {
@@ -33,12 +36,14 @@ prepare()
 {
 	rm -f $STATUS_FILE
 	rm -f $PORT_FILE
+        rm -f $TEST_INPUT_FILE
+        rm -f $TEST_OUTPUT_FILE
 	return 0
 }
 
 run()
 {
-	( ${CCTOOLS_PYTHON_TEST_EXEC} vine_python_serverless.py $PORT_FILE; echo $? > $STATUS_FILE ) &
+	( ${CCTOOLS_PYTHON_TEST_EXEC} ${PYTHON_SCRIPT} $PORT_FILE; echo $? > $STATUS_FILE ) &
 
 	# wait at most 15 seconds for vine to find a port.
 	wait_for_file_creation $PORT_FILE 15
@@ -77,6 +82,8 @@ clean()
 {
 	rm -f $STATUS_FILE
 	rm -f $PORT_FILE
+        rm -f $TEST_INPUT_FILE
+        rm -f $TEST_OUTPUT_FILE
 	rm -rf vine-run-info
         rm worker.log
 	exit 0
