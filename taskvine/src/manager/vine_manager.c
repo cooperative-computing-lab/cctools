@@ -5248,20 +5248,20 @@ int vine_hungry(struct vine_manager *q)
 
 	int64_t tasks_needed = 0;
 	if (qstats.tasks_waiting < 1) {
-	    tasks_needed = DIV_INT_ROUND_UP(workers_total_avail_cores, avg_commited_tasks_cores);
-	    if (avg_commited_tasks_memory > 0) {
-		tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_memory, avg_commited_tasks_memory));
-	    }
+		tasks_needed = DIV_INT_ROUND_UP(workers_total_avail_cores, avg_commited_tasks_cores);
+		if (avg_commited_tasks_memory > 0) {
+			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_memory, avg_commited_tasks_memory));
+		}
 
-	    if (avg_commited_tasks_disk > 0) {
-		tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_disk, avg_commited_tasks_disk));
-	    }
+		if (avg_commited_tasks_disk > 0) {
+			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_disk, avg_commited_tasks_disk));
+		}
 
-	    if (avg_commited_tasks_gpus > 0) {
-		tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_gpus, avg_commited_tasks_gpus));
-	    }
+		if (avg_commited_tasks_gpus > 0) {
+			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_gpus, avg_commited_tasks_gpus));
+		}
 
-	    return MAX(tasks_needed, q->hungry_minimum);
+		return MAX(tasks_needed, q->hungry_minimum);
 	}
 
 	// from here on we can assume that qstats.tasks_waiting > 0.
