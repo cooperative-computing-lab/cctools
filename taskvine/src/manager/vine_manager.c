@@ -5212,6 +5212,14 @@ int vine_hungry(struct vine_manager *q)
 
 	// set min tasks running to 1. if it was 0, then committed resource would be 0 anyway so average works out to 0.
 	int64_t tasks_running = MAX(qstats.tasks_running, 1);
+	int64_t tasks_waiting = qstats.tasks_waiting;
+
+	/* queue is hungry according to the number of workers available (assume each worker can run at least one task) */
+	int hungry_minimum = MAX(q->hungry_minimum, qstats.workers_connected * q->hungry_minimum_factor);
+
+	if (tasks_running < 1 && tasks_waiting < 1) {
+		return hungry_minimum;
+	}
 
 	/* assume a task uses at least one core, otherwise if no resource is specified, the queue is infinitely hungry */
 	int64_t avg_commited_tasks_cores = MAX(1, DIV_INT_ROUND_UP(qstats.committed_cores, tasks_running));
@@ -5228,7 +5236,7 @@ int vine_hungry(struct vine_manager *q)
 
 	int t_idx;
 	struct vine_task *t;
-	int iter_depth = MIN(q->attempt_schedule_depth, qstats.tasks_waiting);
+	int iter_depth = MIN(q->attempt_schedule_depth, tasks_waiting);
 	int sampled_tasks_waiting = 0;
 	PRIORITY_QUEUE_BASE_ITERATE(q->ready_tasks, t_idx, t, sampled_tasks_waiting, iter_depth)
 	{
@@ -5261,10 +5269,10 @@ int vine_hungry(struct vine_manager *q)
 			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_gpus, avg_commited_tasks_gpus));
 		}
 
-		return MAX(tasks_needed, q->hungry_minimum);
+		return MAX(tasks_needed, hungry_minimum);
 	}
 
-	// from here on we can assume that qstats.tasks_waiting > 0.
+	// from here on we can assume that sampled_tasks_waiting > 0.
 
 	int64_t avg_ready_tasks_cores = DIV_INT_ROUND_UP(ready_task_cores, sampled_tasks_waiting);
 	int64_t avg_ready_tasks_memory = DIV_INT_ROUND_UP(ready_task_memory, sampled_tasks_waiting);
@@ -5286,7 +5294,7 @@ int vine_hungry(struct vine_manager *q)
 		tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_gpus, avg_ready_tasks_gpus));
 	}
 
-	tasks_needed = MAX(tasks_needed, q->hungry_minimum - qstats.tasks_waiting);
+	tasks_needed = MAX(0, MAX(tasks_needed, hungry_minimum - tasks_waiting));
 
 	return tasks_needed;
 }
