@@ -5227,6 +5227,33 @@ int vine_hungry(struct vine_manager *q)
 	int64_t avg_commited_tasks_disk = DIV_INT_ROUND_UP(qstats.committed_disk, tasks_running);
 	int64_t avg_commited_tasks_gpus = DIV_INT_ROUND_UP(qstats.committed_gpus, tasks_running);
 
+	// get total available resources consumption (cores, memory, disk, gpus) of all workers of this manager
+	// available = factor*total (all) - committed (actual in use)
+	int64_t workers_total_avail_cores = q->hungry_minimum_factor * qstats.total_cores - qstats.committed_cores;
+	int64_t workers_total_avail_memory = q->hungry_minimum_factor * qstats.total_memory - qstats.committed_memory;
+	int64_t workers_total_avail_disk = q->hungry_minimum_factor * qstats.total_disk - qstats.committed_disk;
+	int64_t workers_total_avail_gpus = q->hungry_minimum_factor * qstats.total_gpus - qstats.committed_gpus;
+
+	int64_t tasks_needed = 0;
+	if (tasks_waiting < 1) {
+		tasks_needed = DIV_INT_ROUND_UP(workers_total_avail_cores, avg_commited_tasks_cores);
+		if (avg_commited_tasks_memory > 0) {
+			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_memory, avg_commited_tasks_memory));
+		}
+
+		if (avg_commited_tasks_disk > 0) {
+			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_disk, avg_commited_tasks_disk));
+		}
+
+		if (avg_commited_tasks_gpus > 0) {
+			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_gpus, avg_commited_tasks_gpus));
+		}
+
+		return MAX(tasks_needed, hungry_minimum);
+	}
+
+	// from here on we can assume that tasks_waiting > 0.
+
 	// get required resources (cores, memory, disk, gpus) of one (all?) waiting tasks
 	// seems to iterate through all tasks counted in the queue.
 	int64_t ready_task_cores = 0;
@@ -5246,33 +5273,6 @@ int vine_hungry(struct vine_manager *q)
 		ready_task_disk += t->resources_requested->disk > 0 ? t->resources_requested->disk : avg_commited_tasks_disk;
 		ready_task_gpus += t->resources_requested->gpus > 0 ? t->resources_requested->gpus : avg_commited_tasks_gpus;
 	}
-
-	// get total available resources consumption (cores, memory, disk, gpus) of all workers of this manager
-	// available = factor*total (all) - committed (actual in use)
-	int64_t workers_total_avail_cores = q->hungry_minimum_factor * qstats.total_cores - qstats.committed_cores - ready_task_cores;
-	int64_t workers_total_avail_memory = q->hungry_minimum_factor * qstats.total_memory - qstats.committed_memory - ready_task_memory;
-	int64_t workers_total_avail_disk = q->hungry_minimum_factor * qstats.total_disk - qstats.committed_disk - ready_task_disk;
-	int64_t workers_total_avail_gpus = q->hungry_minimum_factor * qstats.total_gpus - qstats.committed_gpus - ready_task_gpus;
-
-	int64_t tasks_needed = 0;
-	if (sampled_tasks_waiting < 1) {
-		tasks_needed = DIV_INT_ROUND_UP(workers_total_avail_cores, avg_commited_tasks_cores);
-		if (avg_commited_tasks_memory > 0) {
-			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_memory, avg_commited_tasks_memory));
-		}
-
-		if (avg_commited_tasks_disk > 0) {
-			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_disk, avg_commited_tasks_disk));
-		}
-
-		if (avg_commited_tasks_gpus > 0) {
-			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_gpus, avg_commited_tasks_gpus));
-		}
-
-		return MAX(tasks_needed, hungry_minimum);
-	}
-
-	// from here on we can assume that sampled_tasks_waiting > 0.
 
 	int64_t avg_ready_tasks_cores = DIV_INT_ROUND_UP(ready_task_cores, sampled_tasks_waiting);
 	int64_t avg_ready_tasks_memory = DIV_INT_ROUND_UP(ready_task_memory, sampled_tasks_waiting);
@@ -5294,7 +5294,7 @@ int vine_hungry(struct vine_manager *q)
 		tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_gpus, avg_ready_tasks_gpus));
 	}
 
-	tasks_needed = MAX(0, MAX(tasks_needed, hungry_minimum - tasks_waiting));
+	tasks_needed = MAX(0, MAX(tasks_needed, hungry_minimum) - tasks_waiting);
 
 	return tasks_needed;
 }
