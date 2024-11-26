@@ -3256,7 +3256,7 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 		if (f->type == VINE_FILE) {
 			if (f->state == VINE_FILE_STATE_PENDING) {
 				all_available = 0;
-			} else if (vine_file_has_changed(f)) {
+			} else if (f->state == VINE_FILE_STATE_CREATED && vine_file_has_changed(f)) {
 				/* this only happens if the input file is missing in the staging directory */
 				vine_manager_consider_recovery_task(q, f, f->recovery_task);
 				all_available = 0;
