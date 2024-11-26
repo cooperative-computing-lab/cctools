@@ -5228,9 +5228,9 @@ int vine_hungry(struct vine_manager *q)
 
 	int t_idx;
 	struct vine_task *t;
-	int iter_count = 0;
-	int iter_depth = qstats.tasks_waiting;
-	PRIORITY_QUEUE_BASE_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
+	int iter_depth = MIN(q->attempt_schedule_depth, qstats.tasks_waiting);
+	int sampled_tasks_waiting = 0;
+	PRIORITY_QUEUE_BASE_ITERATE(q->ready_tasks, t_idx, t, sampled_tasks_waiting, iter_depth)
 	{
 		/* unset resources are marked with -1, so we added what we know about currently running tasks */
 		ready_task_cores += t->resources_requested->cores > 0 ? t->resources_requested->cores : avg_commited_tasks_cores;
@@ -5247,7 +5247,7 @@ int vine_hungry(struct vine_manager *q)
 	int64_t workers_total_avail_gpus = q->hungry_minimum_factor * qstats.total_gpus - qstats.committed_gpus - ready_task_gpus;
 
 	int64_t tasks_needed = 0;
-	if (qstats.tasks_waiting < 1) {
+	if (sampled_tasks_waiting < 1) {
 		tasks_needed = DIV_INT_ROUND_UP(workers_total_avail_cores, avg_commited_tasks_cores);
 		if (avg_commited_tasks_memory > 0) {
 			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_memory, avg_commited_tasks_memory));
@@ -5266,12 +5266,12 @@ int vine_hungry(struct vine_manager *q)
 
 	// from here on we can assume that qstats.tasks_waiting > 0.
 
-	int64_t avg_ready_tasks_cores = DIV_INT_ROUND_UP(ready_task_cores, qstats.tasks_waiting);
-	int64_t avg_ready_tasks_memory = DIV_INT_ROUND_UP(ready_task_memory, qstats.tasks_waiting);
-	int64_t avg_ready_tasks_disk = DIV_INT_ROUND_UP(ready_task_disk, qstats.tasks_waiting);
-	int64_t avg_ready_tasks_gpus = DIV_INT_ROUND_UP(ready_task_gpus, qstats.tasks_waiting);
+	int64_t avg_ready_tasks_cores = DIV_INT_ROUND_UP(ready_task_cores, sampled_tasks_waiting);
+	int64_t avg_ready_tasks_memory = DIV_INT_ROUND_UP(ready_task_memory, sampled_tasks_waiting);
+	int64_t avg_ready_tasks_disk = DIV_INT_ROUND_UP(ready_task_disk, sampled_tasks_waiting);
+	int64_t avg_ready_tasks_gpus = DIV_INT_ROUND_UP(ready_task_gpus, sampled_tasks_waiting);
 
-	// since qstats.tasks_waiting > 0 and avg_commited_tasks_cores > 0, then ready_task_cores > 0 and avg_ready_tasks_cores > 0
+	// since sampled_tasks_waiting > 0 and avg_commited_tasks_cores > 0, then ready_task_cores > 0 and avg_ready_tasks_cores > 0
 	tasks_needed = DIV_INT_ROUND_UP(workers_total_avail_cores, avg_ready_tasks_cores);
 
 	if (avg_ready_tasks_memory > 0) {
