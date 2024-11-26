@@ -1281,6 +1281,9 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 			if (result == VINE_SUCCESS) {
 				t->output_received = 1;
 			}
+			else {
+				break;
+			}
 		}
 		result = vine_manager_get_output_files(q, w, t);
 		break;
