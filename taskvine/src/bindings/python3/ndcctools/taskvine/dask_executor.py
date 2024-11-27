@@ -105,6 +105,7 @@ class DaskVine(Manager):
     #                      Should return a tuple of (wrapper result, dask call result). Use for debugging.
     # @param wrapper_proc  Function to process results from wrapper on completion. (default is print)
     # @param prune_files If True, remove files from the cluster after they are no longer needed.
+    # @param expand_hlg  If True, expand super tasks into their subtasks.
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
@@ -129,6 +130,8 @@ class DaskVine(Manager):
             wrapper=None,
             wrapper_proc=print,
             prune_files=False,
+            expand_hlg=False,
+            save_expanded_hlg_dir=None,
             hoisting_modules=None,  # Deprecated, use lib_modules
             import_modules=None,    # Deprecated, use lib_modules
             lazy_transfers=True,    # Deprecated, use worker_tranfers
@@ -170,6 +173,8 @@ class DaskVine(Manager):
             self.wrapper = wrapper
             self.wrapper_proc = wrapper_proc
             self.prune_files = prune_files
+            self.expand_hlg = expand_hlg
+            self.save_expanded_hlg_dir = save_expanded_hlg_dir
 
             if submit_per_cycle is not None and submit_per_cycle < 1:
                 submit_per_cycle = None
@@ -204,7 +209,7 @@ class DaskVine(Manager):
         indices = {k: inds for (k, inds) in find_dask_keys(keys)}
         keys_flatten = indices.keys()
 
-        dag = DaskVineDag(dsk, low_memory_mode=self.low_memory_mode)
+        dag = DaskVineDag(dsk, keys, low_memory_mode=self.low_memory_mode, expand_hlg=self.expand_hlg, save_expanded_hlg_dir=self.save_expanded_hlg_dir)
         tag = f"dag-{id(dag)}"
 
         # create Library if using 'function-calls' task mode.
@@ -260,6 +265,7 @@ class DaskVine(Manager):
                     enqueued_calls
                     and (not self.submit_per_cycle or submitted < self.submit_per_cycle)
                     and (not self.max_pending or pending < self.max_pending)
+                    and self.hungry()
                 ):
                     self.submit(enqueued_calls.pop())
                     submitted += 1
@@ -280,7 +286,7 @@ class DaskVine(Manager):
                         if self.wrapper:
                             self.wrapper_proc(t.load_wrapper_output(self))
 
-                        if t.key in dsk:
+                        if t.key in dag._dsk:
                             bar_update(advance=1)
 
                         if self.prune_files:

@@ -2,8 +2,67 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
+import os
+import time
+import types
+import dask
+import json
+import hashlib
+import cloudpickle
 from uuid import uuid4
 from collections import defaultdict
+from dask.utils import ensure_dict
+from dask.highlevelgraph import HighLevelGraph, MaterializedLayer
+
+
+def hash_name(*args):
+    out_str = ""
+    for arg in args:
+        out_str += str(arg)
+    return hashlib.sha256(out_str.encode('utf-8')).hexdigest()[:12]
+
+def convert_args(dsk_key, dsk, args, blockwise_args):
+    try:
+        if args in dsk:
+            return hash_name(dsk_key, args)
+    except:
+        pass
+    if isinstance(args, list):
+        return [convert_args(dsk_key, dsk, item, blockwise_args) for item in args]
+    elif isinstance(args, tuple):
+        # nested tuple is not allowed
+        return tuple(convert_args(dsk_key, dsk, item, blockwise_args) for item in args)
+    else:
+        if isinstance(args, str) and args.startswith('__dask_blockwise__'):
+            blockwise_arg_idx = int(args.split('__')[-1])
+            return blockwise_args[blockwise_arg_idx]
+        return args
+
+def save_to_json(data, filename):
+    def map_keys_to_str(d, hlg):
+        if isinstance(d, dict):
+            return {str(k): map_keys_to_str(v, hlg) for k, v in d.items()}
+        elif isinstance(d, list):
+            return [map_keys_to_str(i, hlg) for i in d]
+        elif isinstance(d, tuple):
+            try:
+                if d in hlg:
+                    return str(d)
+            except:
+                # in case there is list type nested in tuple
+                pass
+            return tuple(map_keys_to_str(i, hlg) for i in d)
+        else:
+            return d
+    def customer_serializer(obj):
+        try:
+            return str(obj)
+        except Exception:
+            print(f"ERROR: Unexpected type: {type(obj)}")
+            exit(1)
+    data_with_str_keys = map_keys_to_str(data, data)
+    with open(filename, "w") as f:
+        json.dump(data_with_str_keys, f, indent=4, default=customer_serializer)
 
 
 class DaskVineDag:
@@ -58,8 +117,13 @@ class DaskVineDag:
         except TypeError:
             return False
 
-    def __init__(self, dsk, low_memory_mode=False):
-        self._dsk = dsk
+    def __init__(self, dsk, keys, low_memory_mode=False, expand_hlg=False, save_expanded_hlg_dir=None):
+        self._keys = keys
+
+        if expand_hlg:
+            self._dsk = self._expand_hlg(dsk, save_dir=save_expanded_hlg_dir)
+        else:
+            self._dsk = dsk
 
         # child -> parents. I.e., which parents needs the result of child
         self._parents_of = defaultdict(lambda: set())
@@ -82,11 +146,49 @@ class DaskVineDag:
         # target keys that the dag should compute
         self._targets = set()
 
-        self._working_graph = dict(dsk)
+        self._working_graph = dict(self._dsk)
         if low_memory_mode:
             self._flatten_graph()
 
         self.initialize_graph()
+
+    def _expand_hlg(self, dsk, save_dir=None):
+    
+        print(f"expanding {len(dsk)} tasks in the original hlg......")
+        time_start = time.time()
+        task_dict = {}
+
+        for k, sexpr in dsk.items():
+            callable = sexpr[0]
+            args = sexpr[1:]
+
+            if isinstance(callable, dask.optimization.SubgraphCallable):
+                task_dict[k] = hash_name(k, callable.outkey)
+                for sub_key, sub_sexpr in callable.dsk.items():
+                    unique_key = hash_name(k, sub_key)
+                    task_dict[unique_key] = convert_args(k, callable.dsk, sub_sexpr, args)
+            elif isinstance(callable, types.FunctionType):
+                task_dict[k] = sexpr
+            else:
+                print(f"ERROR: unexpected type: {type(callable)}")
+                exit(1)
+
+        layers = ensure_dict({'layer': task_dict})
+        dependencies = {'layer': set()}
+        hlg = HighLevelGraph(layers, dependencies)
+
+        if save_dir:
+            assert os.path.exists(save_dir)
+            with open(os.path.join(save_dir, 'expanded_hlg.pkl'), 'wb') as f:
+                cloudpickle.dump(hlg, f)
+            with open(os.path.join(save_dir, 'keys.pkl'), 'wb') as f:
+                cloudpickle.dump(self._keys, f)
+
+            save_to_json(task_dict, os.path.join(save_dir, 'expanded_hlg.json'))
+
+        print(f"expanding hlg done, now the dag has {len(hlg)} tasks, time taken: {round(time.time() - time_start, 6)}s")
+
+        return hlg
 
     def left_to_compute(self):
         return len(self._working_graph) - len(self._result_of)
@@ -145,6 +247,7 @@ class DaskVineDag:
         of computations that become ready to be executed """
         rs = {}
         self._result_of[key] = value
+
         for p in self._parents_of[key]:
             self._missing_of[p].discard(key)
 
@@ -152,14 +255,7 @@ class DaskVineDag:
                 continue
 
             sexpr = self._working_graph[p]
-            if self.graph_keyp(sexpr):
-                rs.update(
-                    self.set_result(p, self.get_result(sexpr))
-                )  # case e.g, "x": "y", and we just set the value of "y"
-            elif self.symbolp(sexpr):
-                rs.update(self.set_result(p, sexpr))
-            else:
-                rs[p] = (p, sexpr)
+            rs[p] = (p, sexpr)
 
         for c in self._children_of[key]:
             self._pending_parents_of[c].discard(key)
