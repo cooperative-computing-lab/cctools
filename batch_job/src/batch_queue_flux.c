@@ -95,7 +95,8 @@ static batch_queue_id_t batch_queue_flux_submit(struct batch_queue *q, struct ba
 			}
 			while (fread(buffer, sizeof(char), sizeof(buffer) / sizeof(char), archive_create_pipe) > 0) {
 			}
-			int archive_create_status = WEXITSTATUS(pclose(archive_create_pipe));
+			int archive_create_status = pclose(archive_create_pipe);
+			archive_create_status = WEXITSTATUS(archive_create_status);
 			if (archive_create_status != EXIT_SUCCESS) {
 				debug(D_BATCH, "flux failed to create archive with file %s", bf->outer_name);
 				return -1;
@@ -173,8 +174,10 @@ static void fill_batch_job_info(struct batch_job_info *info_out, uint64_t flux_j
 	info_out->started = jx_lookup_double(json, "t_run");
 	info_out->disk_allocation_exhausted = 0;
 	info_out->exit_code = jx_lookup_integer(json, "returncode");
-	info_out->exit_signal = WSTOPSIG(jx_lookup_integer(json, "waitstatus"));
-	info_out->exited_normally = WIFEXITED(jx_lookup_integer(json, "waitstatus"));
+	info_out->exit_signal = jx_lookup_integer(json, "waitstatus");
+	info_out->exit_signal = WSTOPSIG(info_out->exit_signal);
+	info_out->exited_normally = jx_lookup_integer(json, "waitstatus");
+	info_out->exited_normally = WIFEXITED(info_out->exited_normally);
 	info_out->finished = jx_lookup_boolean(json, "success");
 
 	jx_delete(json);
@@ -212,7 +215,8 @@ static batch_queue_id_t batch_queue_flux_wait_jobid(struct batch_queue *q, struc
 		while (fread(wait_output, sizeof(char), sizeof(wait_output) / sizeof(char), wait_pipe) > 0) {
 		}
 		string_chomp(wait_output);
-		int wait_status = WEXITSTATUS(pclose(wait_pipe));
+		int wait_status = pclose(wait_pipe);
+		wait_status = WEXITSTATUS(wait_status);
 
 		if (wait_status == 124) {
 			// timeout killed the wait command
@@ -270,7 +274,8 @@ static int batch_queue_flux_remove(struct batch_queue *q, batch_queue_id_t jobid
 	while (fread(buffer, sizeof(char), sizeof(buffer) / sizeof(char), kill_pipe) > 0) {
 	}
 
-	int kill_status = WEXITSTATUS(pclose(kill_pipe));
+	int kill_status = pclose(kill_pipe);
+	kill_status = WEXITSTATUS(kill_status);
 	if (kill_status == EXIT_SUCCESS) {
 		// Kill signal sent successfully, try to wait on specific job
 		struct batch_job_info info_out;
@@ -317,7 +322,8 @@ static int batch_queue_flux_create(struct batch_queue *q)
 	while (fread(buffer, sizeof(char), sizeof(buffer) / sizeof(char), uptime_pipe) > 0) {
 	}
 
-	int uptime_status = WEXITSTATUS(pclose(uptime_pipe));
+	int uptime_status = pclose(uptime_pipe);
+	uptime_status = WEXITSTATUS(uptime_status);
 	if (uptime_status != EXIT_SUCCESS) {
 		debug(D_BATCH, "batch_queue_flux_create failed: not connected to flux environment");
 		return -1;
