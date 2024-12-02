@@ -5302,6 +5302,15 @@ int vine_hungry_computation(struct vine_manager *q)
 	return tasks_needed;
 }
 
+/*
+ * Finding out the number of tasks needed when the manager is hungry is a potentially
+ * expensive operation if there are many workers connected or there already many waiting
+ * tasks. However, the number of tasks needed only changes significantly when the number
+ * of connected workers changes, and this does not happen very often. Thus we only call
+ * the expensive computation every few seconds, and in between these calls we just
+ * keep track how many tasks have been added/removed to the ready queue since last
+ * time we really checked.
+ * */
 int vine_hungry(struct vine_manager *q)
 {
 	if (!q) {
@@ -5316,9 +5325,9 @@ int vine_hungry(struct vine_manager *q)
 		q->tasks_to_sate_hungry = vine_hungry_computation(q);
 	}
 
-	int dispatched_since = q->tasks_waiting_last_hungry - priority_queue_size(q->ready_tasks);
+	int change = q->tasks_waiting_last_hungry - priority_queue_size(q->ready_tasks);
 
-	return MAX(0, q->tasks_to_sate_hungry - dispatched_since);
+	return MAX(0, q->tasks_to_sate_hungry - change);
 }
 
 int vine_workers_shutdown(struct vine_manager *q, int n)
