@@ -731,6 +731,13 @@ const char *vine_file_source(struct vine_file *f);
 */
 vine_file_type_t vine_file_type(struct vine_file *f);
 
+/** Get the number of replicas of a file.
+@param m A manager object
+@param f A file object.
+@return The number of replicas of the file.
+*/
+int vine_file_replica_count(struct vine_manager *m, struct vine_file *f);
+
 /** Declare a file object from a local file
 @param m A manager object
 @param source The path of the file on the local filesystem
