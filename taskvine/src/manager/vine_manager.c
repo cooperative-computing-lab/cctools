@@ -1277,10 +1277,12 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 	default:
 		/* Otherwise get all of the output files. */
 		if (!t->output_received) {
-			result &= retrieve_output(q, w, t);
-			t->output_received = 1;
+			result = retrieve_output(q, w, t);
+			if (result == VINE_SUCCESS) {
+				t->output_received = 1;
+			}
 		}
-		result &= vine_manager_get_output_files(q, w, t);
+		result = vine_manager_get_output_files(q, w, t);
 		break;
 	}
 
