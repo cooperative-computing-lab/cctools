@@ -175,7 +175,7 @@ class DaskVine(Manager):
             self.wrapper = wrapper
             self.wrapper_proc = wrapper_proc
             self.prune_files = prune_files
-            self.category_execution_time = defaultdict(list)
+            self.category_execution_time = defaultdict(lambda: {"num_tasks": 0, "avg_execution_time": 0})
             self.max_priority = float('inf')
             self.min_priority = float('-inf')
 
@@ -281,7 +281,9 @@ class DaskVine(Manager):
                         print(f"{t.key} ran on {t.hostname}")
 
                     if t.successful():
-                        self.category_execution_time[t.category].append(t.execution_time)
+                        cat_total_time = self.category_execution_time[t.category]["avg_execution_time"] * self.category_execution_time[t.category]["num_tasks"]
+                        self.category_execution_time[t.category]["num_tasks"] += 1
+                        self.category_execution_time[t.category]["avg_execution_time"] = (cat_total_time + t.resources_measured.wall_time) / self.category_execution_time[t.category]["num_tasks"]
                         result_file = DaskVineFile(t.output_file, t.key, dag, self.task_mode)
                         rs = dag.set_result(t.key, result_file)
                         self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
@@ -355,12 +357,12 @@ class DaskVine(Manager):
             elif self.scheduling_mode == 'breadth-first':
                 # prefer to start all branches as soon as possible
                 priority = -task_depth
-            elif self.scheduling_mode == 'longest-first':
+            elif self.scheduling_mode == 'longest-category-first':
                 # if no tasks have been executed in this category, set a high priority so that we know more information about each category
-                priority = sum(self.category_execution_time[cat]) / len(self.category_execution_time[cat]) if len(self.category_execution_time[cat]) else self.max_priority
-            elif self.scheduling_mode == 'shortest-first':
+                priority = self.category_execution_time[cat]["avg_execution_time"] if self.category_execution_time[cat]["num_tasks"] else self.max_priority
+            elif self.scheduling_mode == 'shortest-category-first':
                 # if no tasks have been executed in this category, set a high priority so that we know more information about each category
-                priority = -sum(self.category_execution_time[cat]) / len(self.category_execution_time[cat]) if len(self.category_execution_time[cat]) else self.max_priority
+                priority = -self.category_execution_time[cat]["avg_execution_time"] if self.category_execution_time[cat]["num_tasks"] else self.max_priority
             elif self.scheduling_mode == 'FIFO':
                 # first in first out, the default behavior
                 priority = -round(time.time(), 6)
