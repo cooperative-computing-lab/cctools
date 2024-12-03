@@ -77,7 +77,7 @@ class DaskVineDag:
         self._pending_parents_of = defaultdict(lambda: set())
 
         # key->depth. The shallowest level the key is found
-        self._depth_of = defaultdict(lambda: float("inf"))
+        self._depth_of = defaultdict(lambda: float('inf'))
 
         # target keys that the dag should compute
         self._targets = set()
