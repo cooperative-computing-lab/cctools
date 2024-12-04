@@ -742,6 +742,21 @@ void rmsummary_merge_override_basic(struct rmsummary *dest, const struct rmsumma
 	RM_BIN_OP_BASIC(dest, src, override_field);
 }
 
+/* Copy the value for all the fields in src to dest when dest < 0 */
+static inline double default_field(double d, double s)
+{
+	return (d > -1) ? d : s;
+}
+
+void rmsummary_merge_default(struct rmsummary *dest, const struct rmsummary *src)
+{
+	if (!src) {
+		return;
+	}
+
+	RM_BIN_OP(dest, src, default_field);
+}
+
 struct rmsummary *rmsummary_copy(const struct rmsummary *src, int deep_copy)
 {
 	struct rmsummary *dest = rmsummary_create(-1);

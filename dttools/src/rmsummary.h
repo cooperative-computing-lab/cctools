@@ -111,6 +111,7 @@ void rmsummary_merge_max_w_time(struct rmsummary *dest, const struct rmsummary *
 struct rmsummary *rmsummary_copy(const struct rmsummary *src, int deep_copy);
 void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_merge_override_basic(struct rmsummary *dest, const struct rmsummary *src);
+void rmsummary_merge_default(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_add(struct rmsummary *dest, const struct rmsummary *src);
