@@ -50,7 +50,6 @@ typedef enum {
 	VINE_SUCCESS_ONLY = 8,	 /**< Only return this output file if the task succeeded. */
 	VINE_RETRACT_ON_RESET = 16, /**< Remove this file from the mount lists if the task is reset. (TaskVine internal
 				       use only.) */
-	VINE_MOUNT_SYMLINK = 32,    /**< Permit this directory to be mounted via symlink instead of hardlink. */
 	VINE_MOUNT_MKDIR = 64	    /**< Create this empty output directory in the task sandbox prior to execution. */
 } vine_mount_flags_t;
 
@@ -445,6 +444,15 @@ feature.
 @param name The name of the feature.
 */
 void vine_task_add_feature(struct vine_task *t, const char *name);
+
+/** Add a symbolic link to the sandbox namespace of the task.
+This can be used to access a file within a shared filesystem,
+without causing the file to be transferred using the taskvine caching infrastructure.
+@param t A task object;
+@param name The name of the symlink; must be a relative path in the task sandbox.
+@param target The target of the symlink; must be an absolute path to an outside filesystem.
+*/
+void vine_task_add_symlink(struct vine_task *t, const char *name, const char *target);
 
 /** Specify the priority of this task relative to others in the manager.
 Tasks with a higher priority value run first. If no priority is given, a task is placed at the end of the ready list,
