@@ -451,7 +451,6 @@ regardless of the priority.
 @param t A task object.
 @param priority The priority of the task.
 */
-
 void vine_task_set_priority(struct vine_task *t, double priority);
 
 /** Specify an environment variable to be added to the task.

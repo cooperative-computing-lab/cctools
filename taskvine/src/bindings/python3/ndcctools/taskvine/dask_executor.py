@@ -14,10 +14,13 @@ from .task import FunctionCall
 from .dask_dag import DaskVineDag
 from .cvine import VINE_TEMP
 
+import os
+import time
+import random
 import contextlib
 import cloudpickle
-import os
 from uuid import uuid4
+from collections import defaultdict
 
 try:
     import rich
@@ -123,6 +126,7 @@ class DaskVine(Manager):
             lib_command=None,
             lib_modules=None,
             task_mode='tasks',
+            scheduling_mode='FIFO',
             env_per_task=False,
             progress_disable=False,
             progress_label="[green]tasks",
@@ -164,12 +168,16 @@ class DaskVine(Manager):
             else:
                 self.lib_modules = hoisting_modules if hoisting_modules else import_modules  # Deprecated
             self.task_mode = task_mode
+            self.scheduling_mode = scheduling_mode
             self.env_per_task = env_per_task
             self.progress_disable = progress_disable
             self.progress_label = progress_label
             self.wrapper = wrapper
             self.wrapper_proc = wrapper_proc
             self.prune_files = prune_files
+            self.category_info = defaultdict(lambda: {"num_tasks": 0, "total_execution_time": 0})
+            self.max_priority = float('inf')
+            self.min_priority = float('-inf')
 
             if submit_per_cycle is not None and submit_per_cycle < 1:
                 submit_per_cycle = None
@@ -274,6 +282,8 @@ class DaskVine(Manager):
                         print(f"{t.key} ran on {t.hostname}")
 
                     if t.successful():
+                        self.category_info[t.category]["num_tasks"] += 1
+                        self.category_info[t.category]["total_execution_time"] += t.resources_measured.wall_time
                         result_file = DaskVineFile(t.output_file, t.key, dag, self.task_mode)
                         rs = dag.set_result(t.key, result_file)
                         self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
@@ -335,7 +345,42 @@ class DaskVine(Manager):
             if lazy and self.checkpoint_fn:
                 lazy = self.checkpoint_fn(dag, k)
 
+            # each task has a category name
             cat = self.category_name(sexpr)
+
+            task_depth = dag.depth_of(k)
+            if self.scheduling_mode == 'random':
+                priority = random.randint(self.min_priority, self.max_priority)
+            elif self.scheduling_mode == 'depth-first':
+                # dig more information about different kinds of tasks
+                priority = task_depth
+            elif self.scheduling_mode == 'breadth-first':
+                # prefer to start all branches as soon as possible
+                priority = -task_depth
+            elif self.scheduling_mode == 'longest-category-first':
+                # if no tasks have been executed in this category, set a high priority so that we know more information about each category
+                if self.category_info[cat]["num_tasks"]:
+                    priority = self.category_info[cat]["total_execution_time"] / self.category_info[cat]["num_tasks"]
+                else:
+                    priority = self.max_priority
+            elif self.scheduling_mode == 'shortest-category-first':
+                # if no tasks have been executed in this category, set a high priority so that we know more information about each category
+                if self.category_info[cat]["num_tasks"]:
+                    priority = -self.category_info[cat]["total_execution_time"] / self.category_info[cat]["num_tasks"]
+                else:
+                    priority = self.max_priority
+            elif self.scheduling_mode == 'FIFO':
+                # first in first out, the default behavior
+                priority = -round(time.time(), 6)
+            elif self.scheduling_mode == 'LIFO':
+                # last in first out, the opposite of FIFO
+                priority = round(time.time(), 6)
+            elif self.scheduling_mode == 'largest-input-first':
+                # best for saving disk space (with pruing)
+                priority = sum([len(dag.get_result(c)._file) for c in dag.get_children(k)])
+            else:
+                raise ValueError(f"Unknown scheduling mode {self.scheduling_mode}")
+
             if self.task_mode == 'tasks':
                 if cat not in self._categories_known:
                     if self.resources:
@@ -357,6 +402,7 @@ class DaskVine(Manager):
                                    worker_transfers=lazy,
                                    wrapper=self.wrapper)
 
+                t.set_priority(priority)
                 if self.env_per_task:
                     t.set_command(
                         f"mkdir envdir && tar -xf {self._environment_name} -C envdir && envdir/bin/run_in_env {t._command}")
@@ -374,6 +420,7 @@ class DaskVine(Manager):
                                      worker_transfers=lazy,
                                      wrapper=self.wrapper)
 
+                t.set_priority(priority)
                 t.set_tag(tag)  # tag that identifies this dag
 
                 enqueued_calls.append(t)
@@ -632,6 +679,7 @@ class FunctionCallDask(FunctionCall):
             self.set_category(category)
         if worker_transfers:
             self.enable_temp_output()
+
         if extra_files:
             for f, name in extra_files.items():
                 self.add_input(f, name)
