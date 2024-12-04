@@ -564,11 +564,16 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		t->time_workers_execute_last = observed_execution_time > execution_time ? execution_time : observed_execution_time;
 		t->time_workers_execute_last_start = start_time;
 		t->time_workers_execute_last_end = end_time;
-		t->resources_measured->wall_time = t->time_workers_execute_last_end - t->time_workers_execute_last_start;
 		t->time_workers_execute_all += t->time_workers_execute_last;
 		t->output_length = output_length;
 		t->result = task_status;
 		t->exit_code = exit_status;
+
+		/* fill resources measured with whatever vine reported/committed, as a fallback when task ran without monitoring enabled */
+		t->resources_measured->start = ((double)start_time) / ONE_SECOND;
+		t->resources_measured->end = ((double)end_time) / ONE_SECOND;
+		t->resources_measured->wall_time = ((double)t->time_workers_execute_last) / ONE_SECOND;
+		rmsummary_merge_override_basic(t->resources_measured, t->resources_allocated);
 
 		/* If output is less than 1KB stdout is sent along with completion msg. retrieve it from the link. */
 		if (bytes_sent) {
@@ -1156,11 +1161,13 @@ static void read_measured_resources(struct vine_manager *q, struct vine_task *t)
 {
 	char *summary = monitor_file_name(q, t, ".summary", 0);
 
-	if (t->resources_measured) {
-		rmsummary_delete(t->resources_measured);
-	}
-
+	struct rmsummary *tmp = t->resources_measured;
 	t->resources_measured = rmsummary_parse_file_single(summary);
+
+	/* read the fallback values set by get_completion_result, if any */
+	/* if tmp is null that's ok, both delete and merge_default check for it */
+	rmsummary_merge_default(t->resources_measured, tmp);
+	rmsummary_delete(tmp);
 
 	if (t->resources_measured) {
 		t->exit_code = t->resources_measured->exit_status;
