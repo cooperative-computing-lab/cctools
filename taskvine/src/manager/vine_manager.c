@@ -571,7 +571,11 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		t->result = task_status;
 		t->exit_code = exit_status;
 
-		t->resources_measured->wall_time = execution_time;
+		/* fill resources measured with whatever vine reported/committed, as a fallback when task ran without monitoring enabled */
+		t->resources_measured->start = ((double)start_time) / ONE_SECOND;
+		t->resources_measured->end = ((double)end_time) / ONE_SECOND;
+		t->resources_measured->wall_time = ((double)t->time_workers_execute_last) / ONE_SECOND;
+		rmsummary_merge_override_basic(t->resources_measured, t->resources_allocated);
 
 		/* If output is less than 1KB stdout is sent along with completion msg. retrieve it from the link. */
 		if (bytes_sent) {
