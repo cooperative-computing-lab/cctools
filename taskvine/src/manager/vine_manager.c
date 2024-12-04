@@ -566,6 +566,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		t->time_workers_execute_last = observed_execution_time > execution_time ? execution_time : observed_execution_time;
 		t->time_workers_execute_last_start = start_time;
 		t->time_workers_execute_last_end = end_time;
+		t->resources_measured->wall_time = t->time_workers_execute_last_end - t->time_workers_execute_last_start;
 		t->time_workers_execute_all += t->time_workers_execute_last;
 		t->output_length = output_length;
 		t->result = task_status;

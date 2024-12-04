@@ -115,7 +115,10 @@ class DaskVineDag:
 
     def set_relations(self, key, sexpr):
         sexpr = self._working_graph[key]
+
         self._children_of[key] = self.find_dependencies(sexpr)
+        self._depth_of[key] = max([self._depth_of[c] for c in self._children_of[key]]) + 1 if self._children_of[key] else 0
+
         self._missing_of[key] = set(self._children_of[key])
 
         for c in self._children_of[key]:
