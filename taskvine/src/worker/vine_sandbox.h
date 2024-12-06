@@ -13,7 +13,7 @@ See the file COPYING for details.
 
 char *vine_sandbox_full_path(struct vine_process *p, const char *sandbox_name);
 
-vine_cache_status_t vine_sandbox_ensure( struct vine_process *p, struct vine_cache *c, struct link *manager );
+vine_cache_status_t vine_sandbox_ensure( struct vine_process *p, struct vine_cache *c, struct link *manager, struct itable  *procs_table );
 
 int vine_sandbox_stagein( struct vine_process *p, struct vine_cache *c);
 

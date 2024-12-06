@@ -35,7 +35,7 @@ Return VINE_STATUS_PROCESSING if some are not ready.
 Return VINE_STATUS_FAILED if some have definitely failed.
 */
 
-vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cache *cache, struct link *manager)
+vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cache *cache, struct link *manager, struct itable *procs_table)
 {
 	int processing = 0;
 
@@ -52,7 +52,30 @@ vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cach
 			break;
 		case VINE_CACHE_STATUS_READY:
 			break;
-		case VINE_CACHE_STATUS_UNKNOWN:
+		case VINE_CACHE_STATUS_UNKNOWN: {
+			struct vine_process *lp;
+			uint64_t task_id;
+			int found_file = 0;
+			ITABLE_ITERATE(procs_table, task_id, lp)
+			{
+				struct vine_mount *lm;
+				LIST_ITERATE(lp->task->output_mounts, lm)
+				{
+					if (strcmp(lm->file->cached_name, m->file->cached_name) == 0) {
+						found_file = 1;
+						break;
+					}
+				}
+				if (found_file) {
+					break;
+				}
+			}
+			if (found_file) {
+				processing++;
+				break;
+			}
+		}
+			return VINE_CACHE_STATUS_FAILED;
 		case VINE_CACHE_STATUS_FAILED:
 			return VINE_CACHE_STATUS_FAILED;
 		}
