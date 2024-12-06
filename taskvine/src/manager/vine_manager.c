@@ -1323,17 +1323,29 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 		break;
 	}
 
-	if (result != VINE_SUCCESS) {
-		debug(D_VINE, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
-		handle_failure(q, w, t, result);
-	}
+	/* reap task, delete output files, or do nothing if task succeeded. */
+	handle_failure(q, w, t, result);
 
-	if (result == VINE_WORKER_FAILURE) {
+	switch (result) {
+	case VINE_MGR_FAILURE:
+	case VINE_WORKER_FAILURE:
+		debug(D_VINE, "Failed to receive output because of worker failure at %s (%s).", w->hostname, w->addrport);
 		t->time_when_done = timestamp_get();
 		return 0;
+		break;
+	case VINE_APP_FAILURE:
+		/* task reaped in handle_failure */
+		debug(D_VINE, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
+		break;
+	case VINE_SUCCESS:
+		reap_task_from_worker(q, w, t, VINE_TASK_RETRIEVED);
+		break;
+	case VINE_END_OF_LIST:
+		/* nothing to do, sentinel */
+		break;
 	}
-	delete_uncacheable_files(q, w, t);
 
+	delete_uncacheable_files(q, w, t);
 	/* if q is monitoring, update t->resources_measured, and delete the task
 	 * summary. */
 	if (q->monitor_mode) {
@@ -1353,7 +1365,6 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 	vine_accumulate_task(q, t);
 
 	// At this point, a task is completed.
-	reap_task_from_worker(q, w, t, VINE_TASK_RETRIEVED);
 	vine_manager_send(q, w, "kill %d\n", t->task_id);
 
 	switch (t->result) {
@@ -1482,12 +1493,19 @@ this is due to an application-level issue or a problem with the worker alone.
 
 static void handle_failure(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, vine_result_code_t fail_type)
 {
-	if (fail_type == VINE_APP_FAILURE) {
+	switch (fail_type) {
+	case VINE_APP_FAILURE:
 		handle_app_failure(q, w, t);
-	} else {
+		break;
+	case VINE_MGR_FAILURE:
+	case VINE_WORKER_FAILURE:
 		handle_worker_failure(q, w);
+		break;
+	case VINE_SUCCESS:
+	case VINE_END_OF_LIST:
+		/* nothing to do, these are not failures. */
+		break;
 	}
-	return;
 }
 
 /*
