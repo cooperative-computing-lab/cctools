@@ -1851,6 +1851,12 @@ class Factory(object):
         "condor-requirements",
     ]
 
+    # subset of command line options that need special handling once the factory object has been created.
+    _config_init_options = [
+        "batch-type",
+        "manager-name",
+    ]
+
     ##
     # Create a factory for the given batch_type and manager name.
     #
@@ -1956,6 +1962,9 @@ class Factory(object):
             else:
                 raise AttributeError("{} is not a supported option".format(name))
         else:
+            if name_with_hyphens in Factory._config_init_options:
+                raise AttributeError("{} cannot be changed after the factory initial configuration.".format(name))
+
             if name_with_hyphens in Factory._command_line_options:
                 self._opts[name_with_hyphens] = value
             else:
