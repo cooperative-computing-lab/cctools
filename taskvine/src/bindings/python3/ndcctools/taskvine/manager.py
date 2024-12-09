@@ -1907,9 +1907,6 @@ class Factory(object):
         else:
             raise ValueError("Either manager, manager_host_port, or manager_name or manager should be specified.")
 
-
-
-
     def _find_exe(self, path, default):
         if path is None:
             out = shutil.which(default)
