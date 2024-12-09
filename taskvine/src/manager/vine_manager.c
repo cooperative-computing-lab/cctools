@@ -2972,6 +2972,11 @@ and change the task state.
 
 static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, vine_task_state_t new_state)
 {
+	/* hotfix: do not reap the task if it has been reaped before */
+	if (!t->worker) {
+		return;
+	}
+
 	/* Make sure the task and worker agree before changing anything. */
 	assert(t->worker == w);
 
