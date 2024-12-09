@@ -1327,7 +1327,6 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 	handle_failure(q, w, t, result);
 
 	switch (result) {
-	case VINE_MGR_FAILURE:
 	case VINE_WORKER_FAILURE:
 		debug(D_VINE, "Failed to receive output because of worker failure at %s (%s).", w->hostname, w->addrport);
 		t->time_when_done = timestamp_get();
@@ -1337,6 +1336,7 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 		/* task reaped in handle_failure */
 		debug(D_VINE, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
 		break;
+	case VINE_MGR_FAILURE:
 	case VINE_SUCCESS:
 		reap_task_from_worker(q, w, t, VINE_TASK_RETRIEVED);
 		break;
