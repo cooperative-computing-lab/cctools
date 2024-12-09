@@ -1851,6 +1851,12 @@ class Factory(object):
         "condor-requirements",
     ]
 
+    # subset of command line options that need special handling once the factory object has been created.
+    _config_init_options = [
+        "batch-type",
+        "manager-name",
+    ]
+
     ##
     # Create a factory for the given batch_type and manager name.
     #
@@ -1880,20 +1886,19 @@ class Factory(object):
             pathlib.Path.mkdir(pathlib.Path(self._opts["scratch-dir"]), exist_ok=True, parents=True)
 
     def _set_manager(self, batch_type, manager, manager_host_port, manager_name):
-        if not (manager or manager_host_port or manager_name):
-            raise ValueError("Either manager, manager_host_port, or manager_name or manager should be specified.")
-
-        if manager_name:
-            self._opts["manager-name"] = manager_name
-
         if manager:
+            if manager.using_ssl:
+                self._opts["ssl"] = True
             if batch_type == "local":
                 manager_host_port = f"localhost:{manager.port}"
             elif manager.name:
-                self._opts["manager-name"] = manager_name
-
-            if manager.using_ssl:
-                self._opts["ssl"] = True
+                if manager_name:
+                    if manager.name != manager_name:
+                        RuntimeError(
+                            "The manager and Factory were assigned different names ({manager.name}, {manager_name})"
+                        )
+                else:
+                    manager_name = manager.name
 
         if manager_host_port:
             try:
@@ -1903,6 +1908,10 @@ class Factory(object):
                 return
             except (TypeError, ValueError):
                 raise ValueError("manager_host_port is not of the form HOST:PORT")
+        elif manager_name:
+            self._opts["manager-name"] = manager_name
+        else:
+            raise ValueError("Either manager, manager_host_port, or manager_name or manager should be specified.")
 
     def _find_exe(self, path, default):
         if path is None:
@@ -1953,6 +1962,9 @@ class Factory(object):
             else:
                 raise AttributeError("{} is not a supported option".format(name))
         else:
+            if name_with_hyphens in Factory._config_init_options:
+                raise AttributeError("{} cannot be changed after the factory initial configuration.".format(name))
+
             if name_with_hyphens in Factory._command_line_options:
                 self._opts[name_with_hyphens] = value
             else:
