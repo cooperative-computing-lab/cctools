@@ -1880,20 +1880,19 @@ class Factory(object):
             pathlib.Path.mkdir(pathlib.Path(self._opts["scratch-dir"]), exist_ok=True, parents=True)
 
     def _set_manager(self, batch_type, manager, manager_host_port, manager_name):
-        if not (manager or manager_host_port or manager_name):
-            raise ValueError("Either manager, manager_host_port, or manager_name or manager should be specified.")
-
-        if manager_name:
-            self._opts["manager-name"] = manager_name
-
         if manager:
+            if manager.using_ssl:
+                self._opts["ssl"] = True
             if batch_type == "local":
                 manager_host_port = f"localhost:{manager.port}"
             elif manager.name:
-                self._opts["manager-name"] = manager_name
-
-            if manager.using_ssl:
-                self._opts["ssl"] = True
+                if manager_name:
+                    if manager.name != manager_name:
+                        RuntimeError(
+                            "The manager and Factory were assigned different names ({manager.name}, {manager_name})"
+                        )
+                else:
+                    manager_name = manager.name
 
         if manager_host_port:
             try:
@@ -1903,6 +1902,13 @@ class Factory(object):
                 return
             except (TypeError, ValueError):
                 raise ValueError("manager_host_port is not of the form HOST:PORT")
+        elif manager_name:
+            self._opts["manager-name"] = manager_name
+        else:
+            raise ValueError("Either manager, manager_host_port, or manager_name or manager should be specified.")
+
+
+
 
     def _find_exe(self, path, default):
         if path is None:
