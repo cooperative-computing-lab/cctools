@@ -934,12 +934,15 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 }
 
 /* Start replicating files that may need replication */
-
-static int recover_temp_files(struct vine_manager *q)
+static int consider_tempfile_replications(struct vine_manager *q)
 {
+	if (hash_table_size(q->temp_files_to_replicate) <= 0) {
+		return 0;
+	}
+
 	char *cached_name = NULL;
 	void *empty_val = NULL;
-	int total_replication_count = 0;
+	int total_replication_request_sent = 0;
 
 	static char key_start[PATH_MAX] = "random init";
 	int iter_control;
@@ -949,32 +952,55 @@ static int recover_temp_files(struct vine_manager *q)
 	{
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
 
-		if (f) {
-			int round_replication_count = vine_file_replica_table_replicate(q, f);
+		if (!f) {
+			continue;
+		}
 
-			/* Worker busy or no replicas found */
-			if (round_replication_count < 1) {
-				/*
-				If no replicas are found, it indicates that the file doesn't exist, either pruned or lost.
-				Because a pruned file is removed from the recovery queue, so it definitely indicates that the file is lost.
-				*/
-				if (!vine_file_replica_table_exists_somewhere(q, f->cached_name) && q->transfer_temps_recovery) {
-					vine_manager_consider_recovery_task(q, f, f->recovery_task);
-				}
-				hash_table_remove(q->temp_files_to_replicate, cached_name);
-			} else {
-				if (iter_count_var > q->attempt_schedule_depth) {
-					strncpy(key_start, cached_name, PATH_MAX - 1);
-					key_start[PATH_MAX - 1] = '\0';
-					break;
-				}
+		/* are there any available sources? */
+		struct set *sources = hash_table_lookup(q->file_worker_table, f->cached_name);
+		if (!sources) {
+			/* If no sources found, it indicates that the file doesn't exist, either pruned or lost.
+			Because a pruned file is removed from the recovery queue, so it definitely indicates that the file is lost. */
+			if (q->transfer_temps_recovery) {
+				vine_manager_consider_recovery_task(q, f, f->recovery_task);
 			}
+			hash_table_remove(q->temp_files_to_replicate, f->cached_name);
+			continue;
+		}
 
-			total_replication_count += round_replication_count;
+		/* at least one source is able to transfer? */
+		int has_valid_source = 0;
+		struct vine_worker_info *s;
+		SET_ITERATE(sources, s)
+		{
+			if (s->transfer_port_active && vine_current_transfers_source_in_use(q, s) < q->worker_source_max_transfers) {
+				has_valid_source = 1;
+				break;
+			}
+		}
+		if (!has_valid_source) {
+			continue;
+		}
+
+		/* has this file been fully replicated? */
+		int nsources = set_size(sources);
+		int to_find = MIN(q->temp_replica_count - nsources, q->transfer_replica_per_cycle);
+		if (to_find <= 0) {
+			hash_table_remove(q->temp_files_to_replicate, f->cached_name);
+			continue;
+		}
+
+		debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsources, f->cached_name, to_find);
+
+		int round_replication_request_sent = vine_file_replica_table_replicate(q, f, sources, to_find);
+		total_replication_request_sent += round_replication_request_sent;
+
+		if (total_replication_request_sent >= q->attempt_schedule_depth) {
+			break;
 		}
 	}
 
-	return total_replication_count;
+	return total_replication_request_sent;
 }
 
 /* Insert into hashtable temp files that may need replication. */
@@ -5136,6 +5162,16 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 		}
 
+		// Check if any temp files need replication and start replicating
+		BEGIN_ACCUM_TIME(q, time_internal);
+		result = consider_tempfile_replications(q);
+		END_ACCUM_TIME(q, time_internal);
+		if (result) {
+			// recovered at least one temp file
+			events++;
+			continue;
+		}
+
 		// send keepalives to appropriate workers
 		BEGIN_ACCUM_TIME(q, time_status_msgs);
 		ask_for_workers_updates(q);
@@ -5156,16 +5192,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			// accepted at least one worker
 			// reset the rotate cursor on worker connection
 			priority_queue_rotate_reset(q->ready_tasks);
-			events++;
-			continue;
-		}
-
-		// Check if any temp files need replication and start replicating
-		BEGIN_ACCUM_TIME(q, time_internal);
-		result = recover_temp_files(q);
-		END_ACCUM_TIME(q, time_internal);
-		if (result) {
-			// recovered at least one temp file
 			events++;
 			continue;
 		}
@@ -6124,9 +6150,7 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 		}
 	}
 
-	/*
-	Pruned files do not need to be scheduled for replication anymore.
-	*/
+	/* Also remove from the replication table. */
 	hash_table_remove(m->temp_files_to_replicate, f->cached_name);
 }
 

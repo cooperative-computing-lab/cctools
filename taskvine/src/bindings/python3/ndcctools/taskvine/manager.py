@@ -1766,6 +1766,14 @@ class Manager(object):
     def log_debug_app(self, entry):
         cvine.vine_log_debug_app(self._taskvine, entry)
 
+    ##
+    # Gets the number of replicas of a file.
+    #
+    # @param self   The manager to register this file
+    # @param file   The File object
+    def get_file_replica_count(self, file):
+        return cvine.vine_file_replica_count(self._taskvine, file._file)
+
 
 ##
 # @class ndcctools.taskvine.manager.Factory
