@@ -56,7 +56,7 @@ struct vine_worker_options *vine_worker_options_create()
 	self->transfer_port_min = 0;
 	self->transfer_port_max = 0;
 
-	self->max_transfer_procs = 5;
+	self->max_transfer_procs = 10;
 
 	self->reported_transfer_host = 0;
 
