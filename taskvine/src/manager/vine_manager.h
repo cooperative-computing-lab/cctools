@@ -176,6 +176,12 @@ struct vine_manager {
 	int file_source_max_transfers;
 	int worker_source_max_transfers;
 
+	/* Hungry call optimization */
+	timestamp_t time_last_hungry;      /* Last time vine_hungry_computation was called. */
+	int tasks_to_sate_hungry;          /* Number of tasks that would sate the queue since last call to vine_hungry_computation. */
+	int tasks_waiting_last_hungry;     /* Number of tasks originally waiting when call to vine_hungry_computation was made. */
+	timestamp_t hungry_check_interval; /* Maximum interval between vine_hungry_computation checks. */
+
 	/* Various performance knobs that can be tuned. */
 	int short_timeout;            /* Timeout in seconds to send/recv a brief message from worker */
 	int long_timeout;             /* Timeout if in the middle of an incomplete message. */
