@@ -941,9 +941,7 @@ static int recover_temp_files(struct vine_manager *q)
 	int iter_count_var;
 
 	// ^^^
-	q->transfer_replica_per_cycle = 100;
 	q->file_source_max_transfers = 1;
-	q->worker_source_max_transfers = 10;
 
 	HASH_TABLE_ITERATE_FROM_KEY(q->temp_files_to_replicate, iter_control, iter_count_var, key_start, cached_name, empty_val)
 	{
