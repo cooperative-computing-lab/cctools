@@ -274,7 +274,6 @@ class DaskVine(Manager):
 
                     if t.successful():
                         result_file = DaskVineFile(t.output_file, t.key, dag, self.task_mode)
-
                         rs = dag.set_result(t.key, result_file)
                         self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
 
