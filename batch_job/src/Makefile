@@ -25,7 +25,8 @@ SOURCES = \
 	batch_queue_work_queue.c \
 	batch_queue_cluster.c \
 	batch_queue_k8s.c \
-	batch_queue_amazon.c
+	batch_queue_amazon.c \
+	batch_queue_flux.c
 
 PUBLIC_HEADERS = batch_queue.h batch_job.h batch_job_info.h batch_file.h batch_wrapper.h
 

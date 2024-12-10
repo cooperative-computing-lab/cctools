@@ -33,7 +33,7 @@ Basic use is as follows:
 
 <pre>
 // Create a queue for submitting to HTCondor.
-struct batch_queue *queue = batch_queue_create(BATCH_QUEUE_TYPE_CONDOR);
+struct batch_queue *queue = batch_queue_create(BATCH_QUEUE_TYPE_CONDOR,0,0);
 
 // Define a batch job consiting of a command with input and output files.
 struct batch_job *job = batch_job_create(queue);
@@ -43,7 +43,7 @@ batch_job_add_input_file(job,"/usr/share/dict/words","words.txt");
 batch_job_add_output_file(job,"output.txt","output.txt");
 
 // Submit the job to the queue, which returns a jobid 
-batch_job_id_t jobid = batch_queue_submit(queue,job);
+batch_queue_id_t jobid = batch_queue_submit(queue,job);
 printf("jobid %" PRIbjid" submitted\n",jobid);
 
 // Wait for a job to complete, which returns the jobid and info.
@@ -79,6 +79,7 @@ typedef enum {
 	BATCH_QUEUE_TYPE_TORQUE,              /**< Batch jobs will be send to the Torque scheduler. */
 	BATCH_QUEUE_TYPE_AMAZON,              /**< Batch jobs will be run inside Amazon EC2 Instances */
 	BATCH_QUEUE_TYPE_K8S,                 /**< Batch jobs will be run inside Kubernetes pods. */
+	BATCH_QUEUE_TYPE_FLUX,                /**< Batch jobs will be run on Flux. */
 	BATCH_QUEUE_TYPE_DRYRUN,              /**< Batch jobs will not actually run. */
 	BATCH_QUEUE_TYPE_UNKNOWN = -1         /**< An invalid batch queue type. */
 } batch_queue_type_t;
