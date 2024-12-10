@@ -139,11 +139,12 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 	struct vine_worker_info **sources_frozen = (struct vine_worker_info **)set_values(sources);
 	struct vine_worker_info *source;
 
-	int i = 0;
-	for (source = sources_frozen[i]; i < nsources; i++) {
+	for (int i = 0; i < nsources; i++) {
 
+		source = sources_frozen[i];
 		int dest_found = 0;
 
+		// skip if the file on the source is not ready to transfer
 		struct vine_file_replica *replica = hash_table_lookup(source->current_files, f->cached_name);
 		if (!replica || replica->state != VINE_FILE_REPLICA_STATE_READY) {
 			continue;
@@ -152,13 +153,18 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		char *source_addr = string_format("%s/%s", source->transfer_url, f->cached_name);
 		int source_in_use = vine_current_transfers_source_in_use(m, source);
 
+		// skip if the source is busy with other transfers
+		if (source_in_use >= m->worker_source_max_transfers) {
+			continue;
+		}
+
 		char *id;
 		struct vine_worker_info *dest;
 		int offset_bookkeep;
 
 		HASH_TABLE_ITERATE_RANDOM_START(m->worker_table, offset_bookkeep, id, dest)
 		{
-			// skip if the source is the same as the destination
+			// skip if the source and destination are on the same host
 			if (set_lookup(sources, dest) || strcmp(source->hostname, dest->hostname) == 0) {
 				continue;
 			}
@@ -177,27 +183,25 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 			vine_manager_put_url_now(m, dest, source_addr, f);
 
-			// break if the source has paired with enough destinations for this file
+			round_replication_request_sent++;
+
+			// break if we have found enough destinations for this source
 			if (++dest_found >= MIN(m->file_source_max_transfers, to_find)) {
 				break;
 			}
 
-			// break if the source is busy with multiple transfers
+			// break if the source becomes busy with transfers
 			if (++source_in_use >= m->worker_source_max_transfers) {
 				break;
 			}
-
-			// break if we have found enough destinations
-			if (++round_replication_request_sent >= to_find) {
-				break;
-			}
-		}
-
-		if (round_replication_request_sent >= to_find) {
-			break;
 		}
 
 		free(source_addr);
+
+		// break if we have sent enough replication requests for this file
+		if (round_replication_request_sent >= to_find) {
+			break;
+		}
 	}
 
 	free(sources_frozen);

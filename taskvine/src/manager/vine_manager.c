@@ -925,8 +925,7 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 }
 
 /* Start replicating files that may need replication */
-
-static int recover_temp_files(struct vine_manager *q)
+static int consider_tempfile_replications(struct vine_manager *q)
 {
 	if (hash_table_size(q->temp_files_to_replicate) <= 0) {
 		return 0;
@@ -5110,16 +5109,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 		}
 
-		// Check if any temp files need replication and start replicating
-		BEGIN_ACCUM_TIME(q, time_internal);
-		result = recover_temp_files(q);
-		END_ACCUM_TIME(q, time_internal);
-		if (result) {
-			// recovered at least one temp file
-			events++;
-			continue;
-		}
-
 		sent_in_previous_cycle = 0;
 		if (q->wait_for_workers <= hash_table_size(q->worker_table)) {
 			if (q->wait_for_workers > 0) {
@@ -5136,6 +5125,16 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				sent_in_previous_cycle = 1;
 				continue;
 			}
+		}
+
+		// Check if any temp files need replication and start replicating
+		BEGIN_ACCUM_TIME(q, time_internal);
+		result = consider_tempfile_replications(q);
+		END_ACCUM_TIME(q, time_internal);
+		if (result) {
+			// recovered at least one temp file
+			events++;
+			continue;
 		}
 
 		// send keepalives to appropriate workers
@@ -6105,9 +6104,7 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 		}
 	}
 
-	/*
-	Pruned files do not need to be scheduled for replication anymore.
-	*/
+	/* Also remove from the replication table. */
 	hash_table_remove(m->temp_files_to_replicate, f->cached_name);
 }
 
