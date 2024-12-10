@@ -130,25 +130,13 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 }
 
 // trigger replications of file to satisfy temp_replica_count
-int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *f)
+int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *f, struct set *sources, int to_find)
 {
-	/* the number of replicated copies in this round */
-	int round_replication_count = 0;
-
-	if (vine_current_transfers_get_table_size(m) >= hash_table_size(m->worker_table) * m->worker_source_max_transfers) {
-		return round_replication_count;
-	}
-
-	struct set *sources = hash_table_lookup(m->file_worker_table, f->cached_name);
-	if (!sources) {
-		return round_replication_count;
-	}
-
 	int nsources = set_size(sources);
-	int to_find = MIN(m->temp_replica_count - nsources, m->transfer_replica_per_cycle);
-	if (to_find < 1) {
-		return round_replication_count;
-	}
+	
+	/* the number of replicated copies in this round */
+	int round_replication_request_sent = 0;
+	to_find = MIN(to_find, m->transfer_replica_per_cycle);
 
 	debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsources, f->cached_name, to_find);
 
@@ -158,11 +146,11 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 	int i = 0;
 	for (source = sources_frozen[i]; i < nsources; i++) {
-		if (round_replication_count >= to_find) {
+		if (round_replication_request_sent >= to_find) {
 			break;
 		}
 
-		int found_per_source = 0;
+		int dest_found = 0;
 
 		struct vine_file_replica *replica = hash_table_lookup(source->current_files, f->cached_name);
 		if (!replica || replica->state != VINE_FILE_REPLICA_STATE_READY) {
@@ -177,20 +165,12 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		int offset_bookkeep;
 		HASH_TABLE_ITERATE_RANDOM_START(m->worker_table, offset_bookkeep, id, peer)
 		{
-
-			if (found_per_source >= MIN(m->file_source_max_transfers, to_find)) {
-				break;
-			}
-
-			if (source_in_use >= m->worker_source_max_transfers) {
-				break;
-			}
-
-			if (!peer->transfer_port_active) {
+			// skip the source worker or if they are in the same host
+			if (set_lookup(sources, peer) || strcmp(source->hostname, peer->hostname) == 0) {
 				continue;
 			}
 
-			if (set_lookup(sources, peer)) {
+			if (!peer->transfer_port_active) {
 				continue;
 			}
 
@@ -198,17 +178,19 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 				continue;
 			}
 
-			if (strcmp(source->hostname, peer->hostname) == 0) {
-				continue;
-			}
-
 			debug(D_VINE, "replicating %s from %s to %s", f->cached_name, source->addrport, peer->addrport);
 
 			vine_manager_put_url_now(m, peer, source_addr, f);
 
-			source_in_use++;
-			found_per_source++;
-			round_replication_count++;
+			round_replication_request_sent++;
+
+			if (++source_in_use >= m->worker_source_max_transfers) {
+				break;
+			}
+
+			if (++dest_found >= MIN(m->file_source_max_transfers, to_find)) {
+				break;
+			}
 		}
 
 		free(source_addr);
@@ -216,7 +198,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 	free(sources_frozen);
 
-	return round_replication_count;
+	return round_replication_request_sent;
 }
 
 /*
