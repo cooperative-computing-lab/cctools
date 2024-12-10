@@ -130,6 +130,24 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 	if ((tr->gpus > worker_net_resources->gpus.total) || (worker_net_resources->gpus.inuse + tr->gpus > overcommitted_resource_total(q, worker_net_resources->gpus.total))) {
 		ok = 0;
 	}
+
+
+    const char *filename = "resource_allocation.csv";
+    FILE *file = fopen(filename, "a");
+
+    if (file == NULL) {
+        perror("failed to open file");
+        return EXIT_FAILURE;
+    }
+
+	fprintf(file, "%d,%f,%f,%f,%ld,%ld,%ld\n", t->task_id, tr->cores, tr->memory, tr->disk, 
+											   worker_net_resources->cores.total - worker_net_resources->cores.inuse, 
+											   worker_net_resources->memory.total - worker_net_resources->memory.inuse, 
+											   worker_net_resources->disk.total - worker_net_resources->disk.inuse);
+
+    fclose(file);
+
+
 	vine_resources_delete(worker_net_resources);
 	return ok;
 }
