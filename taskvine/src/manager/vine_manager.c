@@ -940,9 +940,6 @@ static int recover_temp_files(struct vine_manager *q)
 	int iter_control;
 	int iter_count_var;
 
-	// ^^^
-	q->file_source_max_transfers = 1;
-
 	HASH_TABLE_ITERATE_FROM_KEY(q->temp_files_to_replicate, iter_control, iter_count_var, key_start, cached_name, empty_val)
 	{
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
@@ -979,15 +976,15 @@ static int recover_temp_files(struct vine_manager *q)
 
 		/* Has this file been fully replicated? */
 		int nsources = set_size(sources);
-		int to_find = q->temp_replica_count - nsources;
+		int to_find = MIN(q->temp_replica_count - nsources, q->transfer_replica_per_cycle);
 		if (to_find <= 0) {
 			hash_table_remove(q->temp_files_to_replicate, f->cached_name);
 			continue;
 		}
 
-		int round_replication_request_sent = vine_file_replica_table_replicate(q, f, sources, to_find);
+		debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsources, f->cached_name, to_find);
 
-		printf("\nto_find = %d  replicated = %d", to_find, round_replication_request_sent);
+		int round_replication_request_sent = vine_file_replica_table_replicate(q, f, sources, to_find);
 
 		total_replication_request_sent += round_replication_request_sent;
 	}
