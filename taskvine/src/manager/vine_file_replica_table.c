@@ -80,7 +80,7 @@ struct vine_file_replica *vine_file_replica_table_lookup(struct vine_worker_info
 // count the number of in-cluster replicas of a file
 int vine_file_replica_count(struct vine_manager *m, struct vine_file *f)
 {
-    return set_size(hash_table_lookup(m->file_worker_table, f->cached_name));
+	return set_size(hash_table_lookup(m->file_worker_table, f->cached_name));
 }
 
 // find a worker (randomly) in posession of a specific file, and is ready to transfer it.
@@ -141,7 +141,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 	int i = 0;
 	for (source = sources_frozen[i]; i < nsources; i++) {
-	
+
 		int dest_found = 0;
 
 		struct vine_file_replica *replica = hash_table_lookup(source->current_files, f->cached_name);
@@ -158,15 +158,17 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 		HASH_TABLE_ITERATE_RANDOM_START(m->worker_table, offset_bookkeep, id, dest)
 		{
-			// skip the source worker or if they are in the same host
+			// skip if the source is the same as the destination
 			if (set_lookup(sources, dest) || strcmp(source->hostname, dest->hostname) == 0) {
 				continue;
 			}
 
+			// skip if the destination is not ready to transfer
 			if (!dest->transfer_port_active) {
 				continue;
 			}
 
+			// skip if the destination is busy with other transfers
 			if (vine_current_transfers_dest_in_use(m, dest) >= m->worker_source_max_transfers) {
 				continue;
 			}
@@ -175,15 +177,18 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 			vine_manager_put_url_now(m, dest, source_addr, f);
 
-			if (++round_replication_request_sent >= to_find) {
+			// break if the source has paired with enough destinations for this file
+			if (++dest_found >= MIN(m->file_source_max_transfers, to_find)) {
 				break;
 			}
 
+			// break if the source is busy with multiple transfers
 			if (++source_in_use >= m->worker_source_max_transfers) {
 				break;
 			}
 
-			if (++dest_found >= MIN(m->file_source_max_transfers, to_find)) {
+			// break if we have found enough destinations
+			if (++round_replication_request_sent >= to_find) {
 				break;
 			}
 		}

@@ -989,7 +989,6 @@ static int recover_temp_files(struct vine_manager *q)
 		total_replication_request_sent += round_replication_request_sent;
 	}
 
-
 	return total_replication_request_sent;
 }
 
