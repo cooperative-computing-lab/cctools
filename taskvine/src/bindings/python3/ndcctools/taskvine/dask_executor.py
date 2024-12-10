@@ -309,7 +309,7 @@ class DaskVine(Manager):
             return self._load_results(dag, indices, keys)
 
     def _make_progress_bar(self, total):
-        if rich:
+        if rich and not self.progress_disable:
             from rich.progress import Progress, TextColumn, BarColumn, MofNCompleteColumn, TimeRemainingColumn
 
             progress = Progress(
@@ -317,7 +317,6 @@ class DaskVine(Manager):
                 BarColumn(),
                 MofNCompleteColumn(),
                 TimeRemainingColumn(),
-                disable=self.progress_disable,
             )
             graph_bar = progress.add_task(self.progress_label, total=total)
 
