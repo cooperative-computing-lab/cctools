@@ -948,7 +948,7 @@ static int recover_temp_files(struct vine_manager *q)
 			continue;
 		}
 
-		/* Are there any available sources? */
+		/* are there any available sources? */
 		struct set *sources = hash_table_lookup(q->file_worker_table, f->cached_name);
 		if (!sources) {
 			/* If no sources found, it indicates that the file doesn't exist, either pruned or lost.
@@ -960,7 +960,7 @@ static int recover_temp_files(struct vine_manager *q)
 			continue;
 		}
 
-		/* At least one source is able to transfer? */
+		/* at least one source is able to transfer? */
 		int has_valid_source = 0;
 		struct vine_worker_info *s;
 		SET_ITERATE(sources, s)
@@ -974,7 +974,7 @@ static int recover_temp_files(struct vine_manager *q)
 			continue;
 		}
 
-		/* Has this file been fully replicated? */
+		/* has this file been fully replicated? */
 		int nsources = set_size(sources);
 		int to_find = MIN(q->temp_replica_count - nsources, q->transfer_replica_per_cycle);
 		if (to_find <= 0) {
@@ -985,8 +985,11 @@ static int recover_temp_files(struct vine_manager *q)
 		debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsources, f->cached_name, to_find);
 
 		int round_replication_request_sent = vine_file_replica_table_replicate(q, f, sources, to_find);
-
 		total_replication_request_sent += round_replication_request_sent;
+
+		if (total_replication_request_sent >= q->attempt_schedule_depth) {
+			break;
+		}
 	}
 
 	return total_replication_request_sent;
