@@ -113,24 +113,29 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 	}
 
 	int ok = 1;
-	if (worker_net_resources->disk.inuse + tr->disk > worker_net_resources->disk.total) { /* No overcommit disk */
+
+	int64_t available_disk = overcommitted_resource_total(q, worker_net_resources->disk.total) - worker_net_resources->disk.inuse;
+	if (t->input_files_size > 0) {
+		available_disk -= t->input_files_size;
+	}
+	if (tr->disk > available_disk) {
 		ok = 0;
 	}
 
-	if ((tr->cores > worker_net_resources->cores.total) ||
-			(worker_net_resources->cores.inuse + tr->cores > overcommitted_resource_total(q, worker_net_resources->cores.total))) {
+	int64_t available_cores = overcommitted_resource_total(q, worker_net_resources->cores.total) - worker_net_resources->cores.inuse;
+	if (tr->cores > available_cores) {
 		ok = 0;
 	}
 
-	if ((tr->memory > worker_net_resources->memory.total) ||
-			(worker_net_resources->memory.inuse + tr->memory > overcommitted_resource_total(q, worker_net_resources->memory.total))) {
+	int64_t available_memory = overcommitted_resource_total(q, worker_net_resources->memory.total) - worker_net_resources->memory.inuse;
+	if (tr->memory > available_memory) {
 		ok = 0;
 	}
 
-	if ((tr->gpus > worker_net_resources->gpus.total) || (worker_net_resources->gpus.inuse + tr->gpus > overcommitted_resource_total(q, worker_net_resources->gpus.total))) {
+	int64_t available_gpus = overcommitted_resource_total(q, worker_net_resources->gpus.total) - worker_net_resources->gpus.inuse;
+	if (tr->gpus > available_gpus) {
 		ok = 0;
 	}
-
 
     const char *filename = "resource_allocation.csv";
     FILE *file = fopen(filename, "a");

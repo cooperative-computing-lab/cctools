@@ -2611,7 +2611,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	const struct rmsummary *max = vine_manager_task_resources_max(q, t);
 
 	/* available disk for all sandboxes */
-	int64_t available_disk = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
+	int64_t available_disk = w->resources->disk.total - w->resources->disk.inuse;
 
 	/* do not count the size of input files as available.
 	 * TODO: efficiently discount the size of files already at worker. */
@@ -3382,10 +3382,32 @@ static int send_one_task(struct vine_manager *q)
 {
 	int t_idx;
 	struct vine_task *t;
+	uint64_t task_id;
 	struct vine_worker_info *w = NULL;
 
 	int iter_count = 0;
 	int iter_depth = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
+
+	/* first see if there are any available cores */
+	int has_available_cores = 0;
+	char *key;
+	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	{
+		if (w->resources->cores.total - w->resources->cores.inuse > 0) {
+			has_available_cores = 1;
+			break;
+		}
+		ITABLE_ITERATE(w->current_tasks, task_id, t)
+		{
+			if (t->type == VINE_TASK_TYPE_LIBRARY_INSTANCE && t->provides_library && t->function_slots_inuse < t->function_slots_total) {
+				has_available_cores = 1;
+				break;
+			}
+		}
+	}
+	if (!has_available_cores) {
+		return 0;
+	}
 
 	// Iterate over the ready tasks by priority.
 	// The first time we arrive here, the task with the highest priority is considered. However, there may be various reasons
