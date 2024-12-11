@@ -371,7 +371,7 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 
 		vine_txn_log_write_cache_update(q, w, size, transfer_time, start_time, cachename);
 
-		w->resources->disk.inuse += size / 1e6;
+		w->resources->disk.inuse += BYTES_TO_MEGABYTES(size);
 
 		/* If the replica corresponds to a declared file. */
 
@@ -2615,9 +2615,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 
 	/* do not count the size of input files as available.
 	 * TODO: efficiently discount the size of files already at worker. */
-	if (t->input_files_size > 0) {
-		available_disk -= t->input_files_size;
-	}
+	available_disk -= t->input_files_size;
 
 	rmsummary_merge_override_basic(limits, max);
 
