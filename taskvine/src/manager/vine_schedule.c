@@ -114,10 +114,7 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 
 	int ok = 1;
 
-	int64_t available_disk = overcommitted_resource_total(q, worker_net_resources->disk.total) - worker_net_resources->disk.inuse;
-	if (t->input_files_size > 0) {
-		available_disk -= t->input_files_size;
-	}
+	int64_t available_disk = overcommitted_resource_total(q, worker_net_resources->disk.total) - worker_net_resources->disk.inuse - t->input_files_size;
 	if (tr->disk > available_disk) {
 		ok = 0;
 	}
@@ -137,7 +134,7 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 		ok = 0;
 	}
 
-	/* TEST
+	/* TEST ^^^
 
 		const char *filename = "resource_allocation.csv";
 		FILE *file = fopen(filename, "a");
