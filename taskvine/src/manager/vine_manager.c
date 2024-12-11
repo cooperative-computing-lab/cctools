@@ -2611,7 +2611,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	const struct rmsummary *max = vine_manager_task_resources_max(q, t);
 
 	/* available disk for all sandboxes */
-	int64_t available_disk = w->resources->disk.total - w->resources->disk.inuse;
+	int64_t available_disk = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
 
 	/* do not count the size of input files as available.
 	 * TODO: efficiently discount the size of files already at worker. */
@@ -2834,8 +2834,9 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
-	if (!w)
+	if (!w) {
 		return;
+	}
 
 	if (w->resources->workers.total < 1) {
 		return;
@@ -2849,8 +2850,8 @@ static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w
 		q->current_max_worker->memory = w->resources->memory.total;
 	}
 
-	if (q->current_max_worker->disk < (w->resources->disk.total - w->inuse_cache)) {
-		q->current_max_worker->disk = w->resources->disk.total - w->inuse_cache;
+	if (q->current_max_worker->disk < (w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache))) {
+		q->current_max_worker->disk = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
 	}
 
 	if (q->current_max_worker->gpus < w->resources->gpus.total) {
