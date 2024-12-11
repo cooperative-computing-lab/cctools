@@ -144,8 +144,8 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 			return EXIT_FAILURE;
 		}
 
-		fprintf(file, "%d,%f,%f,%f,%ld,%ld,%ld,%d\n", t->task_id, 
-												   tr->cores, tr->memory, tr->disk, 
+		fprintf(file, "%d,%f,%f,%f,%ld,%ld,%ld,%d\n", t->task_id,
+												   tr->cores, tr->memory, tr->disk,
 												   cores_available, memory_available, disk_available,
 												   ok);
 

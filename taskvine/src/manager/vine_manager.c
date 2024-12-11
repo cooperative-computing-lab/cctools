@@ -2610,18 +2610,18 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	const struct rmsummary *min = vine_manager_task_resources_min(q, t);
 	const struct rmsummary *max = vine_manager_task_resources_max(q, t);
 
-	/* available disk for all sandboxes */
+	/* total disk for all sandboxes */
 	int64_t disk_total = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
 
-	/* do not count the size of input files as available.
+	/* do not count the size of input files as the total.
 	 * TODO: efficiently discount the size of files already at worker. */
 	disk_total -= t->input_files_size;
 
 	/* current available resources on this worker */
 	int64_t disk_available = w->resources->disk.total - w->resources->disk.inuse - t->input_files_size;
-	int64_t cores_available = w->resources->cores.total -  w->resources->cores.inuse;
-	int64_t memory_available = w->resources->memory.total -  w->resources->memory.inuse;
-	int64_t gpus_available = w->resources->gpus.total -  w->resources->gpus.inuse;
+	int64_t cores_available = w->resources->cores.total - w->resources->cores.inuse;
+	int64_t memory_available = w->resources->memory.total - w->resources->memory.inuse;
+	int64_t gpus_available = w->resources->gpus.total - w->resources->gpus.inuse;
 
 	rmsummary_merge_override_basic(limits, max);
 
