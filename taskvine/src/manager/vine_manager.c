@@ -2611,11 +2611,17 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	const struct rmsummary *max = vine_manager_task_resources_max(q, t);
 
 	/* available disk for all sandboxes */
-	int64_t disk_for_sandboxes = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
+	int64_t disk_total = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
 
 	/* do not count the size of input files as available.
 	 * TODO: efficiently discount the size of files already at worker. */
-	disk_for_sandboxes -= t->input_files_size;
+	disk_total -= t->input_files_size;
+
+	/* current available resources on this worker */
+	int64_t disk_available = w->resources->disk.total - w->resources->disk.inuse - t->input_files_size;
+	int64_t cores_available = w->resources->cores.total -  w->resources->cores.inuse;
+	int64_t memory_available = w->resources->memory.total -  w->resources->memory.inuse;
+	int64_t gpus_available = w->resources->gpus.total -  w->resources->gpus.inuse;
 
 	rmsummary_merge_override_basic(limits, max);
 
@@ -2646,9 +2652,9 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 			min_proportion = MAX(min_proportion, min->memory / w->resources->memory.total);
 		}
 
-		if (disk_for_sandboxes > 0) {
-			max_proportion = MAX(max_proportion, limits->disk / disk_for_sandboxes);
-			min_proportion = MAX(min_proportion, min->disk / disk_for_sandboxes);
+		if (disk_total > 0) {
+			max_proportion = MAX(max_proportion, limits->disk / disk_total);
+			min_proportion = MAX(min_proportion, min->disk / disk_total);
 		}
 
 		if (w->resources->gpus.total > 0) {
@@ -2696,7 +2702,13 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 			/* worker's disk is shared evenly among tasks that are not running,
 			 * thus the proportion is modified by the current overcommit
 			 * multiplier */
-			limits->disk = MAX(1, MAX(limits->disk, floor(disk_for_sandboxes * max_proportion / q->resource_submit_multiplier)));
+			limits->disk = MAX(1, MAX(limits->disk, floor(disk_total * max_proportion / q->resource_submit_multiplier)));
+
+			/* when the proportional resource allocation is larger than the available, use the available instead */
+			limits->cores = MIN(limits->cores, cores_available);
+			limits->memory = MIN(limits->memory, memory_available);
+			limits->disk = MIN(limits->disk, disk_available);
+			limits->gpus = MIN(limits->gpus, gpus_available);
 		}
 	}
 
@@ -2707,7 +2719,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	/* At least one specified resource would use the whole worker, thus
 	 * using whole worker for all unspecified resources. */
 	if ((limits->cores > 0 && limits->cores >= w->resources->cores.total) || (limits->gpus > 0 && limits->gpus >= w->resources->gpus.total) ||
-			(limits->memory > 0 && limits->memory >= w->resources->memory.total) || (limits->disk > 0 && limits->disk >= disk_for_sandboxes)) {
+			(limits->memory > 0 && limits->memory >= w->resources->memory.total) || (limits->disk > 0 && limits->disk >= disk_total)) {
 
 		use_whole_worker = 1;
 	}
@@ -2728,20 +2740,20 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		}
 
 		if (limits->disk <= 0) {
-			limits->disk = disk_for_sandboxes;
+			limits->disk = disk_total;
 		}
 	} else if (vine_schedule_in_ramp_down(q)) {
 		/* if in ramp down, use all the free space of that worker. note that we don't use
 		 * resource_submit_multiplier, as by definition in ramp down there are more workers than tasks. */
-		limits->cores = limits->gpus > 0 ? 0 : (w->resources->cores.total - w->resources->cores.inuse);
+		limits->cores = limits->gpus > 0 ? 0 : cores_available;
 
 		/* default gpus is 0 */
 		if (limits->gpus <= 0) {
 			limits->gpus = 0;
 		}
 
-		limits->memory = w->resources->memory.total - w->resources->memory.inuse;
-		limits->disk = disk_for_sandboxes;
+		limits->memory = memory_available;
+		limits->disk = disk_available;
 	}
 
 	/* never go below specified min resources. */

@@ -114,23 +114,23 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 
 	int ok = 1;
 
-	int64_t available_disk = overcommitted_resource_total(q, worker_net_resources->disk.total) - worker_net_resources->disk.inuse - t->input_files_size;
-	if (tr->disk > available_disk) {
+	int64_t disk_available = overcommitted_resource_total(q, worker_net_resources->disk.total) - worker_net_resources->disk.inuse - t->input_files_size;
+	if (tr->disk > disk_available) {
 		ok = 0;
 	}
 
-	int64_t available_cores = overcommitted_resource_total(q, worker_net_resources->cores.total) - worker_net_resources->cores.inuse;
-	if (tr->cores > available_cores) {
+	int64_t cores_available = overcommitted_resource_total(q, worker_net_resources->cores.total) - worker_net_resources->cores.inuse;
+	if (tr->cores > cores_available) {
 		ok = 0;
 	}
 
-	int64_t available_memory = overcommitted_resource_total(q, worker_net_resources->memory.total) - worker_net_resources->memory.inuse;
-	if (tr->memory > available_memory) {
+	int64_t memory_available = overcommitted_resource_total(q, worker_net_resources->memory.total) - worker_net_resources->memory.inuse;
+	if (tr->memory > memory_available) {
 		ok = 0;
 	}
 
-	int64_t available_gpus = overcommitted_resource_total(q, worker_net_resources->gpus.total) - worker_net_resources->gpus.inuse;
-	if (tr->gpus > available_gpus) {
+	int64_t gpus_available = overcommitted_resource_total(q, worker_net_resources->gpus.total) - worker_net_resources->gpus.inuse;
+	if (tr->gpus > gpus_available) {
 		ok = 0;
 	}
 
@@ -146,7 +146,7 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 
 		fprintf(file, "%d,%f,%f,%f,%ld,%ld,%ld,%d\n", t->task_id, 
 												   tr->cores, tr->memory, tr->disk, 
-												   available_cores, available_memory, available_disk,
+												   cores_available, memory_available, disk_available,
 												   ok);
 
 		fclose(file);
