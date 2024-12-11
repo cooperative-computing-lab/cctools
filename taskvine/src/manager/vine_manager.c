@@ -3386,7 +3386,7 @@ static int send_one_task(struct vine_manager *q)
 	struct vine_worker_info *w = NULL;
 
 	int iter_count = 0;
-	int test = 0;
+
 	int iter_depth = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
 
 	/* first see if there are any available cores */
