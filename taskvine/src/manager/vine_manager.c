@@ -2409,7 +2409,7 @@ static vine_msg_code_t handle_resources(struct vine_manager *q, struct vine_work
 		debug(D_VINE, "%s", line);
 
 		if (sscanf(line, "cores %" PRId64, &total)) {
-			q->available_cores += (total - w->resources->cores.total);
+			q->total_available_cores += (total - w->resources->cores.total);
 			w->resources->cores.total = total;
 		} else if (sscanf(line, "memory %" PRId64, &total)) {
 			w->resources->memory.total = total;
@@ -2790,7 +2790,7 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 		} else {
 			t->function_slots_total = t->function_slots_requested;
 		}
-		q->available_slots += t->function_slots_total;
+		q->total_available_slots += t->function_slots_total;
 	}
 
 	char *command_line;
@@ -2818,7 +2818,7 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
-	q->available_cores -= (w->resources->cores.total - w->resources->cores.inuse);
+	q->total_available_cores -= (w->resources->cores.total - w->resources->cores.inuse);
 
 	w->resources->cores.inuse = 0;
 	w->resources->memory.inuse = 0;
@@ -2847,7 +2847,7 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 
 	w->resources->disk.inuse += ceil(BYTES_TO_MEGABYTES(w->inuse_cache));
 
-	q->available_cores += (w->resources->cores.total - w->resources->cores.inuse);
+	q->total_available_cores += (w->resources->cores.total - w->resources->cores.inuse);
 }
 
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w)
@@ -2944,7 +2944,7 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 		}
 		/* If start_one_task_fails, this will be decremented in handle_failure below. */
 		t->library_task->function_slots_inuse++;
-		q->available_slots--;
+		q->total_available_slots--;
 	}
 
 	t->hostname = xxstrdup(w->hostname);
@@ -3107,11 +3107,11 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 	if (t->needs_library) {
 		int previous_slots_inuse = t->library_task->function_slots_inuse;
 		t->library_task->function_slots_inuse = MAX(0, t->library_task->function_slots_inuse - 1);
-		q->available_slots += (previous_slots_inuse - t->library_task->function_slots_inuse);
+		q->total_available_slots += (previous_slots_inuse - t->library_task->function_slots_inuse);
 	}
 
 	if (t->provides_library) {
-		q->available_slots -= t->function_slots_total;
+		q->total_available_slots -= t->function_slots_total;
 	}
 
 	t->worker = 0;
@@ -3409,7 +3409,7 @@ the task to the worker.
 
 static int send_one_task(struct vine_manager *q)
 {
-	if (q->available_cores + q->available_slots <= 0 || priority_queue_size(q->ready_tasks) == 0) {
+	if (q->total_available_cores + q->total_available_slots <= 0 || priority_queue_size(q->ready_tasks) == 0) {
 		return 0;
 	}
 
@@ -3915,8 +3915,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->next_task_id = 1;
 	q->fixed_location_in_queue = 0;
-	q->available_cores = 0;
-	q->available_slots = 0;
+	q->total_available_cores = 0;
+	q->total_available_slots = 0;
 
 	q->ready_tasks = priority_queue_create(0);
 	q->running_table = itable_create(0);
