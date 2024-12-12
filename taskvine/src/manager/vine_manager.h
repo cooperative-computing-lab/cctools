@@ -138,8 +138,8 @@ struct vine_manager {
 	int fixed_location_in_queue; /* Number of fixed location tasks currently being managed */
 	int num_tasks_left;    /* Optional: Number of tasks remaining, if given by user.  @ref vine_set_num_tasks */
 	int busy_waiting_flag; /* Set internally in main loop if no messages were processed -> wait longer. */
-	int available_cores;   /* Number of cores available among all workers. */
-	int available_slots;   /* Number of function slots available among all workers. */
+	int total_available_cores;   /* Number of cores available among all workers. */
+	int total_available_slots;   /* Number of function slots available among all workers. */
 
 	/* Accumulation of statistics for reporting to the caller. */
 
