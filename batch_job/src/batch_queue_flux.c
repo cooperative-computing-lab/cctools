@@ -29,7 +29,7 @@ static struct itable *flux_job_info_table = NULL;
 // itable mapping batch_queue_jobid_t to flux_job_info
 static struct itable *batch_queue_jobid_info_table = NULL;
 
-static int count = 1;
+static int job_count = 1;
 
 struct flux_job_info {
 	batch_queue_id_t job_id;
@@ -55,6 +55,7 @@ static void delete_flux_job_info(struct flux_job_info *job_info)
 static batch_queue_id_t batch_queue_flux_submit(struct batch_queue *q, struct batch_job *bt)
 {
 	// Set same defaults as batch_queue_condor and condor_submit_workers
+	// Flux does not support setting memory and disk requirements
 	int64_t cores = 1;
 	int64_t gpus = 0;
 
@@ -111,7 +112,7 @@ static batch_queue_id_t batch_queue_flux_submit(struct batch_queue *q, struct ba
 	// Flux does not support staging files out of the worker environment, so warn for each file
 	if (bt->output_files) {
 		struct batch_file *bf;
-		LIST_ITERATE(bt->input_files, bf)
+		LIST_ITERATE(bt->output_files, bf)
 		{
 			debug(D_BATCH, "warn: flux does not support output files (%s)", bf->outer_name);
 		}
@@ -129,7 +130,7 @@ static batch_queue_id_t batch_queue_flux_submit(struct batch_queue *q, struct ba
 	uint64_t flux_job_id;
 	while (fgets(buffer, sizeof(buffer), submit_pipe)) {
 		if (sscanf(buffer, "%" PRIu64, &flux_job_id) == 1) {
-			batch_queue_id_t job_id = count++;
+			batch_queue_id_t job_id = job_count++;
 			struct batch_job_info *info = calloc(1, sizeof(*info));
 			info->submitted = time(0);
 			info->started = time(0);
