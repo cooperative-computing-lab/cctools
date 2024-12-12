@@ -188,7 +188,7 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	}
 
 	/* worker is fully occupied */
-	if (w->resources->cores.total == w->resources->cores.inuse) {
+	if ((w->resources->cores.total == w->resources->cores.inuse) || w->resources->memory.total == w->resources->memory.inuse || w->resources->disk.total == w->resources->disk.inuse) {
 		return 0;
 	}
 
