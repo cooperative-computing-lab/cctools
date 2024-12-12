@@ -2790,6 +2790,7 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 		} else {
 			t->function_slots_total = t->function_slots_requested;
 		}
+		q->available_slots += t->function_slots_total;
 	}
 
 	char *command_line;
@@ -2943,6 +2944,7 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 		}
 		/* If start_one_task_fails, this will be decremented in handle_failure below. */
 		t->library_task->function_slots_inuse++;
+		q->available_slots--;
 	}
 
 	t->hostname = xxstrdup(w->hostname);
@@ -3103,7 +3105,13 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 	*/
 
 	if (t->needs_library) {
+		int previous_slots_inuse = t->library_task->function_slots_inuse;
 		t->library_task->function_slots_inuse = MAX(0, t->library_task->function_slots_inuse - 1);
+		q->available_slots += (previous_slots_inuse - t->library_task->function_slots_inuse);
+	}
+
+	if (t->provides_library) {
+		q->available_slots -= t->function_slots_total;
 	}
 
 	t->worker = 0;
@@ -3346,27 +3354,32 @@ static struct vine_worker_info *consider_task(struct vine_manager *q, struct vin
 
 	// Skip task if min requested start time not met.
 	if (t->resources_requested->start > now_secs) {
+		printf("1\n");
 		return NULL;
 	}
 
 	// Skip if this task failed recently
 	if (t->time_when_last_failure + q->transient_error_interval > now_usecs) {
+		printf("2\n");
 		return NULL;
 	}
 
 	// Skip if category already running maximum allowed tasks
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 	if (c->max_concurrent > -1 && c->max_concurrent <= c->vine_stats->tasks_running) {
+		printf("3\n");
 		return NULL;
 	}
 
 	// Skip task if temp input files have not been materialized.
 	if (!vine_manager_check_inputs_available(q, t)) {
+		printf("4\n");
 		return NULL;
 	}
 
 	// Skip function call task if no suitable library template was installed
 	if (!vine_manager_check_library_for_function_call(q, t)) {
+		printf("5\n");
 		return NULL;
 	}
 
@@ -3396,7 +3409,7 @@ the task to the worker.
 
 static int send_one_task(struct vine_manager *q)
 {
-	if (q->available_cores <= 0) {
+	if (q->available_cores + q->available_slots <= 0 || priority_queue_size(q->ready_tasks) == 0) {
 		return 0;
 	}
 
@@ -3903,6 +3916,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->next_task_id = 1;
 	q->fixed_location_in_queue = 0;
 	q->available_cores = 0;
+	q->available_slots = 0;
 
 	q->ready_tasks = priority_queue_create(0);
 	q->running_table = itable_create(0);

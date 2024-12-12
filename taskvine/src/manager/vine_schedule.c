@@ -134,24 +134,6 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 		ok = 0;
 	}
 
-//	/* TEST ^^^
-
-		const char *filename = "resource_allocation.csv";
-		FILE *file = fopen(filename, "a");
-
-		if (file == NULL) {
-			perror("failed to open file");
-			return EXIT_FAILURE;
-		}
-
-		fprintf(file, "%d,%f,%f,%f,%ld,%ld,%ld,%d\n", t->task_id,
-												   tr->cores, tr->memory, tr->disk,
-												   cores_available, memory_available, disk_available,
-												   ok);
-
-		fclose(file);
-//	*/
-
 	vine_resources_delete(worker_net_resources);
 	return ok;
 }
