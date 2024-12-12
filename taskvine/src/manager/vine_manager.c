@@ -2409,6 +2409,7 @@ static vine_msg_code_t handle_resources(struct vine_manager *q, struct vine_work
 		debug(D_VINE, "%s", line);
 
 		if (sscanf(line, "cores %" PRId64, &total)) {
+			q->available_cores += (total - w->resources->cores.total);
 			w->resources->cores.total = total;
 		} else if (sscanf(line, "memory %" PRId64, &total)) {
 			w->resources->memory.total = total;
@@ -2816,6 +2817,8 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
+	q->available_cores -= (w->resources->cores.total - w->resources->cores.inuse);
+
 	w->resources->cores.inuse = 0;
 	w->resources->memory.inuse = 0;
 	w->resources->disk.inuse = 0;
@@ -2842,6 +2845,8 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 	}
 
 	w->resources->disk.inuse += ceil(BYTES_TO_MEGABYTES(w->inuse_cache));
+
+	q->available_cores += (w->resources->cores.total - w->resources->cores.inuse);
 }
 
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w)
@@ -3391,35 +3396,16 @@ the task to the worker.
 
 static int send_one_task(struct vine_manager *q)
 {
+	if (q->available_cores <= 0) {
+		return 0;
+	}
+
 	int t_idx;
 	struct vine_task *t;
-	uint64_t task_id;
 	struct vine_worker_info *w = NULL;
 
 	int iter_count = 0;
-
 	int iter_depth = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
-
-	/* first see if there are any available cores */
-	int has_available_cores = 0;
-	char *key;
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
-	{
-		if (w->resources->cores.total - w->resources->cores.inuse > 0) {
-			has_available_cores = 1;
-			break;
-		}
-		ITABLE_ITERATE(w->current_tasks, task_id, t)
-		{
-			if (t->type == VINE_TASK_TYPE_LIBRARY_INSTANCE && t->provides_library && t->function_slots_inuse < t->function_slots_total) {
-				has_available_cores = 1;
-				break;
-			}
-		}
-	}
-	if (!has_available_cores) {
-		return 0;
-	}
 
 	// Iterate over the ready tasks by priority.
 	// The first time we arrive here, the task with the highest priority is considered. However, there may be various reasons
@@ -3916,6 +3902,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->next_task_id = 1;
 	q->fixed_location_in_queue = 0;
+	q->available_cores = 0;
 
 	q->ready_tasks = priority_queue_create(0);
 	q->running_table = itable_create(0);
