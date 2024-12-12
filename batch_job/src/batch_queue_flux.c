@@ -128,6 +128,7 @@ static batch_queue_id_t batch_queue_flux_submit(struct batch_queue *q, struct ba
 	free(submit_command);
 
 	uint64_t flux_job_id;
+	memset(buffer, 0, sizeof(buffer));
 	while (fgets(buffer, sizeof(buffer), submit_pipe)) {
 		if (sscanf(buffer, "%" PRIu64, &flux_job_id) == 1) {
 			batch_queue_id_t job_id = job_count++;
@@ -336,7 +337,7 @@ static int batch_queue_flux_create(struct batch_queue *q)
 	return 0;
 }
 
-static int batch_queue_flux_free(struct batch_queue *Q)
+static int batch_queue_flux_free(struct batch_queue *q)
 {
 	if (flux_job_info_table) {
 		struct flux_job_info *info;
