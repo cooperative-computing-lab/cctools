@@ -182,6 +182,11 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		return 0;
 	}
 
+	/* worker is fully occupied */
+	if (w->resources->cores.total == w->resources->cores.inuse) {
+		return 0;
+	}
+
 	/* Don't send tasks to this worker if it is in draining mode (no more tasks). */
 	if (w->draining) {
 		return 0;
