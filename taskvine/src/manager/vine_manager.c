@@ -3354,32 +3354,27 @@ static struct vine_worker_info *consider_task(struct vine_manager *q, struct vin
 
 	// Skip task if min requested start time not met.
 	if (t->resources_requested->start > now_secs) {
-		printf("1\n");
 		return NULL;
 	}
 
 	// Skip if this task failed recently
 	if (t->time_when_last_failure + q->transient_error_interval > now_usecs) {
-		printf("2\n");
 		return NULL;
 	}
 
 	// Skip if category already running maximum allowed tasks
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 	if (c->max_concurrent > -1 && c->max_concurrent <= c->vine_stats->tasks_running) {
-		printf("3\n");
 		return NULL;
 	}
 
 	// Skip task if temp input files have not been materialized.
 	if (!vine_manager_check_inputs_available(q, t)) {
-		printf("4\n");
 		return NULL;
 	}
 
 	// Skip function call task if no suitable library template was installed
 	if (!vine_manager_check_library_for_function_call(q, t)) {
-		printf("5\n");
 		return NULL;
 	}
 
