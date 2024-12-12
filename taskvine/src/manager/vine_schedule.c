@@ -134,6 +134,12 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 		ok = 0;
 	}
 
+	// it is concerning if the resource allocation fails
+	if (!ok) {
+		debug(D_VINE, "Resource allocation for task %d on worker %s fails: %.0f, %.2f, %.2f, %ld, %ld, %ld", 
+					  t->task_id, w->hostname, tr->cores, tr->memory, tr->disk, cores_available, memory_available, disk_available);
+	}
+
 	vine_resources_delete(worker_net_resources);
 	return ok;
 }
