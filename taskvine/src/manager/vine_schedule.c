@@ -112,35 +112,29 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 		}
 	}
 
-	int ok = 1;
-
 	int64_t disk_available = overcommitted_resource_total(q, worker_net_resources->disk.total) - worker_net_resources->disk.inuse - t->input_files_size;
 	if (tr->disk > disk_available) {
-		ok = 0;
+		return 0;
 	}
 
 	int64_t cores_available = overcommitted_resource_total(q, worker_net_resources->cores.total) - worker_net_resources->cores.inuse;
 	if (tr->cores > cores_available) {
-		ok = 0;
+		return 0;
 	}
 
 	int64_t memory_available = overcommitted_resource_total(q, worker_net_resources->memory.total) - worker_net_resources->memory.inuse;
 	if (tr->memory > memory_available) {
-		ok = 0;
+		return 0;
 	}
 
 	int64_t gpus_available = overcommitted_resource_total(q, worker_net_resources->gpus.total) - worker_net_resources->gpus.inuse;
 	if (tr->gpus > gpus_available) {
-		ok = 0;
-	}
-
-	// it is concerning if the resource allocation fails
-	if (!ok) {
-		debug(D_VINE, "Resource allocation for task %d on worker %s fails: %.0f, %.2f, %.2f, %" PRId64 ", %" PRId64 ", %" PRId64 "", t->task_id, w->hostname, tr->cores, tr->memory, tr->disk, cores_available, memory_available, disk_available);
+		return 0;
 	}
 
 	vine_resources_delete(worker_net_resources);
-	return ok;
+
+	return 1;
 }
 
 /* t->disk only specifies the size of output and ephemeral files. Here we check if the task would fit together with all its input files
