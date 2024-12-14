@@ -5279,11 +5279,11 @@ int vine_hungry(struct vine_manager *q)
 
 	if (current_time - q->time_last_hungry + q->hungry_check_interval > 0) {
 		q->time_last_hungry = current_time;
-		q->tasks_waiting_last_hungry = priority_queue_size(q->ready_tasks);
+		q->tasks_waiting_last_hungry = list_size(q->ready_list);
 		q->tasks_to_sate_hungry = vine_hungry_computation(q);
 	}
 
-	int change = q->tasks_waiting_last_hungry - priority_queue_size(q->ready_tasks);
+	int change = q->tasks_waiting_last_hungry - list_size(q->ready_list);
 
 	return MAX(0, q->tasks_to_sate_hungry - change);
 }
