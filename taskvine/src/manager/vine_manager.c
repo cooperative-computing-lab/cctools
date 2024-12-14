@@ -5222,10 +5222,9 @@ int vine_hungry_computation(struct vine_manager *q)
 	struct vine_task *t;
 
 	int iter_depth = MIN(q->attempt_schedule_depth, tasks_waiting);
-	int iter_considered = 0;
 	int sampled_tasks_waiting = 0;
 	while ((t = list_rotate(q->ready_list))) {
-		if (iter_considered++ > iter_depth) {
+		if (sampled_tasks_waiting >= iter_depth) {
 			break;
 		}
 		/* unset resources are marked with -1, so we added what we know about currently running tasks */
@@ -5233,6 +5232,8 @@ int vine_hungry_computation(struct vine_manager *q)
 		ready_task_memory += t->resources_requested->memory > 0 ? t->resources_requested->memory : avg_commited_tasks_memory;
 		ready_task_disk += t->resources_requested->disk > 0 ? t->resources_requested->disk : avg_commited_tasks_disk;
 		ready_task_gpus += t->resources_requested->gpus > 0 ? t->resources_requested->gpus : avg_commited_tasks_gpus;
+
+		sampled_tasks_waiting++;
 	}
 
 	int64_t avg_ready_tasks_cores = DIV_INT_ROUND_UP(ready_task_cores, sampled_tasks_waiting);
@@ -5279,11 +5280,11 @@ int vine_hungry(struct vine_manager *q)
 
 	if (current_time - q->time_last_hungry + q->hungry_check_interval > 0) {
 		q->time_last_hungry = current_time;
-		q->tasks_waiting_last_hungry = priority_queue_size(q->ready_tasks);
+		q->tasks_waiting_last_hungry = list_size(q->ready_list);
 		q->tasks_to_sate_hungry = vine_hungry_computation(q);
 	}
 
-	int change = q->tasks_waiting_last_hungry - priority_queue_size(q->ready_tasks);
+	int change = q->tasks_waiting_last_hungry - list_size(q->ready_list);
 
 	return MAX(0, q->tasks_to_sate_hungry - change);
 }

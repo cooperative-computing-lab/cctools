@@ -140,4 +140,5 @@ with workers:
 
     # avg cores waiting should be the limiting factor
     # each task would get two cores, minus one task of the already waiting task
+    print(m.hungry(), (factor * worker_cores - cores_t_6 - cores_t_7) / cores_t_8 - 1)
     assert m.hungry() == (factor * worker_cores - cores_t_6 - cores_t_7) / cores_t_8 - 1
