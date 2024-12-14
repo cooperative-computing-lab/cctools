@@ -1,5 +1,6 @@
 mpi_queue_worker
 sge_submit_workers
+uge_submit_workers
 work_queue_example
 work_queue_priority_test
 work_queue_status
