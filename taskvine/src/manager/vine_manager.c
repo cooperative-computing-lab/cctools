@@ -2594,7 +2594,6 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 
 	/* Special case: A function-call task consumes no resources. */
 	/* Return early, otherwise these zeroes are expanded to use the whole worker. */
-
 	if (t->needs_library) {
 		limits->cores = 0;
 		limits->memory = 0;
@@ -2603,164 +2602,106 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		return limits;
 	}
 
+	/* For disk, do not count the size of input files
+	 * TODO: efficiently discount the size of files already at worker. */
 	if (t->input_files_size < 0) {
 		vine_manager_compute_input_size(q, t);
 	}
 
+	/* Shortcut if the task explicitly requests all resources */
+	if (t->resources_requested->memory != -1 && t->resources_requested->disk != -1 && (t->resources_requested->cores + t->resources_requested->gpus != -1)) {
+		rmsummary_merge_override_basic(limits, t->resources_requested);
+		return limits;
+	}
+
+	/* The total resources we take into account for resource estimate */
+	int64_t cores_total = w->resources->cores.total;
+	int64_t memory_total = w->resources->memory.total;
+	int64_t disk_total = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache) - t->input_files_size;
+	int64_t gpus_total = w->resources->gpus.total;
+
+	/* The current available resources on this worker */
+	int64_t cores_available =  w->resources->cores.total - w->resources->cores.inuse;
+	int64_t memory_available = w->resources->memory.total - w->resources->memory.inuse;
+	int64_t disk_available = w->resources->disk.total - w->resources->disk.inuse - t->input_files_size;
+	int64_t gpus_available = w->resources->gpus.total - w->resources->gpus.inuse;
+
+	/* Shortcut if the ramp down mode is enabled. In this case, use all the free space of that worker if the user has not specified.
+	 * Note that we don't use resource_submit_multiplier, as by definition in ramp down there are more workers than tasks. */ 
+	if (vine_schedule_in_ramp_down(q)) {
+		limits->cores = cores_available;
+		limits->memory = memory_available;
+		limits->disk = disk_available;
+		limits->gpus = gpus_available;
+		rmsummary_merge_override_basic(limits, t->resources_requested);
+		return limits;
+	}
+
+	/* When arrive here, we estimate some of the unspecified resources. Different strategies can be used. */
 	/* Compute the minimum and maximum resources for this task. */
 	const struct rmsummary *min = vine_manager_task_resources_min(q, t);
 	const struct rmsummary *max = vine_manager_task_resources_max(q, t);
 
-	/* total disk for all sandboxes */
-	int64_t disk_total = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
-
-	/* do not count the size of input files as the total.
-	 * TODO: efficiently discount the size of files already at worker. */
-	disk_total -= t->input_files_size;
-
-	/* current available resources on this worker */
-	int64_t disk_available = w->resources->disk.total - w->resources->disk.inuse - t->input_files_size;
-	int64_t cores_available = w->resources->cores.total - w->resources->cores.inuse;
-	int64_t memory_available = w->resources->memory.total - w->resources->memory.inuse;
-	int64_t gpus_available = w->resources->gpus.total - w->resources->gpus.inuse;
-
+	/* Use the max as the limits */
 	rmsummary_merge_override_basic(limits, max);
 
-	int use_whole_worker = 1;
+	/* Never go below min resources. */
+	// rmsummary_merge_max(limits, min);
 
-	int proportional_whole_tasks = q->proportional_whole_tasks;
-	if (t->resources_requested->memory > -1 || t->resources_requested->disk > -1) {
-		/* if mem or disk are specified explicitely, do not expand resources to fill an integer number of tasks. With this,
-		 * the task is assigned exactly the memory and disk specified. We do not do this for cores and gpus, as the use case
-		 * here is to specify the number of cores and allocated the rest of the resources evenly. */
-		proportional_whole_tasks = 0;
-	}
-
-	/* Proportionally assign the worker's resources to the task if configured. */
 	if (q->proportional_resources) {
+		int conservative_proportional_resources = 0;
 
 		/* Compute the proportion of the worker the task shall have across resource types. */
 		double max_proportion = -1;
-		double min_proportion = -1;
 
-		if (w->resources->cores.total > 0) {
-			max_proportion = MAX(max_proportion, limits->cores / w->resources->cores.total);
-			min_proportion = MAX(min_proportion, min->cores / w->resources->cores.total);
+		int64_t cores_portion = conservative_proportional_resources ? cores_total : cores_available;
+		int64_t memory_portion = conservative_proportional_resources ? memory_total : memory_available;
+		int64_t disk_portion = conservative_proportional_resources ? disk_total : disk_available;
+		int64_t gpus_portion = conservative_proportional_resources ? gpus_total : gpus_available;
+
+		if (cores_portion > 0) {
+			max_proportion = MAX(max_proportion, (double)limits->cores / cores_portion);
+		}
+		if (memory_portion > 0) {
+			max_proportion = MAX(max_proportion, (double)limits->memory / memory_portion);
+		}
+		if (disk_portion > 0) {
+			max_proportion = MAX(max_proportion, (double)limits->disk / disk_portion);
+		}
+		if (gpus_portion > 0) {
+			max_proportion = MAX(max_proportion, (double)limits->gpus / gpus_portion);
 		}
 
-		if (w->resources->memory.total > 0) {
-			max_proportion = MAX(max_proportion, limits->memory / w->resources->memory.total);
-			min_proportion = MAX(min_proportion, min->memory / w->resources->memory.total);
+		/* Adjust max_proportion so that an integer number of tasks fit the worker. */
+		/* If mem or disk are specified explicitely, do not expand resources to fill an integer number of tasks. With this,
+		 * the task is assigned exactly the memory and disk specified. We do not do this for cores and gpus, as the use case
+		 * here is to specify the number of cores and allocated the rest of the resources evenly. */
+		if (q->proportional_whole_tasks && (t->resources_requested->memory == -1 && t->resources_requested->disk == -1)) {
+			max_proportion = 1.0 / floor(1.0 / max_proportion);
 		}
 
-		if (disk_total > 0) {
-			max_proportion = MAX(max_proportion, limits->disk / disk_total);
-			min_proportion = MAX(min_proportion, min->disk / disk_total);
+		/* If the estimated portion is invalid, use the entire portion. */
+		if (max_proportion <= 0 || max_proportion > 1) {
+			max_proportion = 1;
 		}
 
-		if (w->resources->gpus.total > 0) {
-			max_proportion = MAX(max_proportion, limits->gpus / w->resources->gpus.total);
-			min_proportion = MAX(min_proportion, min->gpus / w->resources->gpus.total);
-		}
+		limits->cores = MAX(1, MAX(limits->cores, floor(cores_portion * max_proportion)));
+		limits->memory = MAX(1, MAX(limits->memory, floor(memory_portion * max_proportion)));
+		limits->disk = MAX(1, MAX(limits->disk, floor(disk_portion * max_proportion / q->resource_submit_multiplier)));
+		limits->gpus = MAX(1, MAX(limits->gpus, floor(gpus_portion * max_proportion)));
 
-		/* If a max_proportion was defined, it cannot be less than a proportion using the minimum
-		 * resources for the category. If it was defined, then the min_proportion is not relevant as the
-		 * task will try to use the whole worker. */
-		if (max_proportion != -1) {
-			max_proportion = MAX(max_proportion, min_proportion);
-		}
-
-		/* If max_proportion or min_proportion > 1, then the task does not fit the worker for the
-		 * specified resources. For the unspecified resources we use the whole
-		 * worker as not to trigger a warning when checking for tasks that can't
-		 * run on any available worker. */
-		if (max_proportion > 1 || min_proportion > 1) {
-			use_whole_worker = 1;
-		} else if (max_proportion > 0) {
-			use_whole_worker = 0;
-
-			// adjust max_proportion so that an integer number of tasks fit the worker.
-			if (proportional_whole_tasks) {
-				max_proportion = 1.0 / (floor(1.0 / max_proportion));
-			}
-
-			/* when cores are unspecified, they are set to 0 if gpus are specified.
-			 * Otherwise they get a proportion according to specified
-			 * resources. Tasks will get at least one core. */
-			if (limits->cores < 0 && limits->gpus > 0) {
-				limits->cores = 0;
-			} else {
-				limits->cores = MAX(1, MAX(limits->cores, floor(w->resources->cores.total * max_proportion)));
-			}
-
-			/* unspecified gpus are always 0 */
-			if (limits->gpus < 0) {
-				limits->gpus = 0;
-			}
-
-			limits->memory = MAX(1, MAX(limits->memory, floor(w->resources->memory.total * max_proportion)));
-
-			/* worker's disk is shared evenly among tasks that are not running,
-			 * thus the proportion is modified by the current overcommit
-			 * multiplier */
-			limits->disk = MAX(1, MAX(limits->disk, floor(disk_total * max_proportion / q->resource_submit_multiplier)));
-
-			/* when the proportional resource allocation is larger than the available, use the available instead */
-			limits->cores = MIN(limits->cores, cores_available);
-			limits->memory = MIN(limits->memory, memory_available);
-			limits->disk = MIN(limits->disk, disk_available);
-			limits->gpus = MIN(limits->gpus, gpus_available);
-		}
-	}
-
-	/* If no resource was specified, use whole worker. */
-	if (limits->cores < 1 && limits->gpus < 1 && limits->memory < 1 && limits->disk < 1) {
-		use_whole_worker = 1;
-	}
-	/* At least one specified resource would use the whole worker, thus
-	 * using whole worker for all unspecified resources. */
-	if ((limits->cores > 0 && limits->cores >= w->resources->cores.total) || (limits->gpus > 0 && limits->gpus >= w->resources->gpus.total) ||
-			(limits->memory > 0 && limits->memory >= w->resources->memory.total) || (limits->disk > 0 && limits->disk >= disk_total)) {
-
-		use_whole_worker = 1;
-	}
-
-	if (use_whole_worker) {
-		/* default cores for tasks that define gpus is 0 */
-		if (limits->cores <= 0) {
-			limits->cores = limits->gpus > 0 ? 0 : w->resources->cores.total;
-		}
-
-		/* default gpus is 0 */
-		if (limits->gpus <= 0) {
-			limits->gpus = 0;
-		}
-
-		if (limits->memory <= 0) {
-			limits->memory = w->resources->memory.total;
-		}
-
-		if (limits->disk <= 0) {
-			limits->disk = disk_total;
-		}
-	} else if (vine_schedule_in_ramp_down(q)) {
-		/* if in ramp down, use all the free space of that worker. note that we don't use
-		 * resource_submit_multiplier, as by definition in ramp down there are more workers than tasks. */
-		limits->cores = limits->gpus > 0 ? 0 : cores_available;
-
-		/* default gpus is 0 */
-		if (limits->gpus <= 0) {
-			limits->gpus = 0;
-		}
-
+	} else {
+		/* If not proportional, choose the entire available resources. */
+		limits->cores = cores_available;
 		limits->memory = memory_available;
 		limits->disk = disk_available;
+		limits->gpus = gpus_available;
 	}
 
-	/* never go below specified min resources. */
+	/* Never go below min resources. */
 	rmsummary_merge_max(limits, min);
 
-	/* assume the user knows what they are doing... */
+	/* Overwrite those that have been requested. */
 	rmsummary_merge_override_basic(limits, t->resources_requested);
 
 	return limits;
@@ -3173,8 +3114,9 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		/* Is the file already present on that worker? */
 		struct vine_file_replica *replica;
 
-		if ((replica = vine_file_replica_table_lookup(w, m->file->cached_name)))
+		if ((replica = vine_file_replica_table_lookup(w, m->file->cached_name))) {
 			continue;
+		}
 
 		struct vine_worker_info *peer;
 		int found_match = 0;
@@ -3198,8 +3140,9 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		}
 
 		/* If that resulted in a match, move on to the next file. */
-		if (found_match)
+		if (found_match) {
 			continue;
+		}
 
 		/*
 		If no match was found, the behavior depends on the original file type.
@@ -3388,8 +3331,9 @@ static struct vine_worker_info *consider_task(struct vine_manager *q, struct vin
 
 	// Check if there is transfer capacity available.
 	if (q->peer_transfers_enabled) {
-		if (!vine_manager_transfer_capacity_available(q, w, t))
+		if (!vine_manager_transfer_capacity_available(q, w, t)) {
 			return NULL;
+		}
 	}
 
 	// All checks passed
@@ -4655,8 +4599,16 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	t->time_when_submitted = timestamp_get();
 	q->stats->tasks_submitted++;
 
-	if (q->monitor_mode != VINE_MON_DISABLED)
+	if (q->monitor_mode != VINE_MON_DISABLED) {
 		vine_monitor_add_files(q, t);
+	}
+
+	/* If the task requests gpus, it can't request cores */
+	if (t->resources_requested->gpus > 0) {
+		t->resources_requested->cores = 0;
+	} else {
+		t->resources_requested->gpus = 0;
+	}
 
 	rmsummary_merge_max(q->max_task_resources_requested, t->resources_requested);
 
@@ -4920,6 +4872,7 @@ static int connect_new_workers(struct vine_manager *q, int stoptime, int max_new
 	// If the manager link was awake, then accept at most max_new_workers.
 	// Note we are using the information gathered in poll_active_workers, which
 	// is a little ugly.
+
 	if (q->poll_table[0].revents) {
 		do {
 			add_worker(q);
