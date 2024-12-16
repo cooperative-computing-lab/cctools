@@ -2621,13 +2621,13 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	int64_t gpus_total = w->resources->gpus.total;
 
 	/* The current available resources on this worker */
-	int64_t cores_available =  w->resources->cores.total - w->resources->cores.inuse;
+	int64_t cores_available = w->resources->cores.total - w->resources->cores.inuse;
 	int64_t memory_available = w->resources->memory.total - w->resources->memory.inuse;
 	int64_t disk_available = w->resources->disk.total - w->resources->disk.inuse - t->input_files_size;
 	int64_t gpus_available = w->resources->gpus.total - w->resources->gpus.inuse;
 
 	/* Shortcut if the ramp down mode is enabled. In this case, use all the free space of that worker if the user has not specified.
-	 * Note that we don't use resource_submit_multiplier, as by definition in ramp down there are more workers than tasks. */ 
+	 * Note that we don't use resource_submit_multiplier, as by definition in ramp down there are more workers than tasks. */
 	if (vine_schedule_in_ramp_down(q)) {
 		limits->cores = cores_available;
 		limits->memory = memory_available;
@@ -2646,7 +2646,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	rmsummary_merge_override_basic(limits, max);
 
 	/* Never go below min resources. */
-	// rmsummary_merge_max(limits, min);
+	rmsummary_merge_max(limits, min);
 
 	if (q->proportional_resources) {
 		int conservative_proportional_resources = 0;
@@ -2685,17 +2685,38 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 			max_proportion = 1;
 		}
 
-		limits->cores = MAX(1, MAX(limits->cores, floor(cores_portion * max_proportion)));
-		limits->memory = MAX(1, MAX(limits->memory, floor(memory_portion * max_proportion)));
-		limits->disk = MAX(1, MAX(limits->disk, floor(disk_portion * max_proportion / q->resource_submit_multiplier)));
-		limits->gpus = MAX(1, MAX(limits->gpus, floor(gpus_portion * max_proportion)));
+		/* When cores are unspecified, they are set to 0 if gpus are specified.
+		 * Otherwise they get a proportion according to specified resources.
+		 * Tasks will get at least one core */
+		if (limits->cores == -1 && limits->gpus > 0) {
+			limits->cores = 0;
+		} else {
+			limits->cores = MAX(1, MAX(limits->cores, floor(cores_portion * max_proportion)));
+		}
 
-	} else {
-		/* If not proportional, choose the entire available resources. */
-		limits->cores = cores_available;
+		/* When gpus are unspecified, they are set to 0 if cores are specified. */
+		if (limits->gpus == -1 && limits->cores > 0) {
+			limits->gpus = 0;
+		} else {
+			/* Do not allocate a proportion of gpus */
+		}
+
+		limits->disk = MAX(1, MAX(limits->disk, floor(disk_portion * max_proportion / q->resource_submit_multiplier)));
+		limits->memory = MAX(1, MAX(limits->memory, floor(memory_portion * max_proportion)));
+	}
+
+	/* If one resource is not specified, use the available instead */
+	if (limits->cores <= 0) {
+		limits->cores = limits->gpus <= 0 ? cores_available : 0;
+	}
+	if (limits->memory <= 0) {
 		limits->memory = memory_available;
+	}
+	if (limits->disk <= 0) {
 		limits->disk = disk_available;
-		limits->gpus = gpus_available;
+	}
+	if (limits->gpus <= 0) {
+		limits->gpus = limits->cores <= 0 ? gpus_available : 0;
 	}
 
 	/* Never go below min resources. */
@@ -4601,13 +4622,6 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 	if (q->monitor_mode != VINE_MON_DISABLED) {
 		vine_monitor_add_files(q, t);
-	}
-
-	/* If the task requests gpus, it can't request cores */
-	if (t->resources_requested->gpus > 0) {
-		t->resources_requested->cores = 0;
-	} else {
-		t->resources_requested->gpus = 0;
 	}
 
 	rmsummary_merge_max(q->max_task_resources_requested, t->resources_requested);
