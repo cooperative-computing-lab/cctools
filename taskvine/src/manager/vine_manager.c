@@ -2602,12 +2602,6 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		return limits;
 	}
 
-	/* For disk, do not count the size of input files
-	 * TODO: efficiently discount the size of files already at worker. */
-	if (t->input_files_size < 0) {
-		vine_manager_compute_input_size(q, t);
-	}
-
 	/* Shortcut if the task explicitly requests all resources */
 	if (t->resources_requested->memory != -1 && t->resources_requested->disk != -1 && (t->resources_requested->cores + t->resources_requested->gpus != -1)) {
 		rmsummary_merge_override_basic(limits, t->resources_requested);
@@ -2617,14 +2611,24 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	/* The total resources we take into account for resource estimate */
 	int64_t cores_total = w->resources->cores.total;
 	int64_t memory_total = w->resources->memory.total;
-	int64_t disk_total = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache) - t->input_files_size;
+	int64_t disk_total = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
 	int64_t gpus_total = w->resources->gpus.total;
 
 	/* The current available resources on this worker */
 	int64_t cores_available = w->resources->cores.total - w->resources->cores.inuse;
 	int64_t memory_available = w->resources->memory.total - w->resources->memory.inuse;
-	int64_t disk_available = w->resources->disk.total - w->resources->disk.inuse - t->input_files_size;
+	int64_t disk_available = w->resources->disk.total - w->resources->disk.inuse;
 	int64_t gpus_available = w->resources->gpus.total - w->resources->gpus.inuse;
+
+	/* For disk, do not count the size of input files
+	 * TODO: efficiently discount the size of files already at worker. */
+	if (t->input_files_size < 0) {
+		vine_manager_compute_input_size(q, t);
+	}
+	if (t->input_files_size > 0) {
+		disk_total -= t->input_files_size;
+		disk_available -= t->input_files_size;
+	}
 
 	/* Shortcut if the ramp down mode is enabled. In this case, use all the free space of that worker if the user has not specified.
 	 * Note that we don't use resource_submit_multiplier, as by definition in ramp down there are more workers than tasks. */
@@ -2705,7 +2709,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		limits->memory = MAX(1, MAX(limits->memory, floor(memory_portion * max_proportion)));
 	}
 
-	/* If one resource is not specified, use the available instead */
+	/* If one of the resources is not specified, use the available instead */
 	if (limits->cores <= 0) {
 		limits->cores = limits->gpus <= 0 ? cores_available : 0;
 	}
