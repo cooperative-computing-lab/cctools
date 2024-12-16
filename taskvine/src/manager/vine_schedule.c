@@ -112,26 +112,29 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 		}
 	}
 
-	int ok = 1;
-	if (worker_net_resources->disk.inuse + tr->disk > worker_net_resources->disk.total) { /* No overcommit disk */
-		ok = 0;
+	int64_t disk_available = overcommitted_resource_total(q, worker_net_resources->disk.total) - worker_net_resources->disk.inuse - t->input_files_size;
+	if (tr->disk > disk_available) {
+		return 0;
 	}
 
-	if ((tr->cores > worker_net_resources->cores.total) ||
-			(worker_net_resources->cores.inuse + tr->cores > overcommitted_resource_total(q, worker_net_resources->cores.total))) {
-		ok = 0;
+	int64_t cores_available = overcommitted_resource_total(q, worker_net_resources->cores.total) - worker_net_resources->cores.inuse;
+	if (tr->cores > cores_available) {
+		return 0;
 	}
 
-	if ((tr->memory > worker_net_resources->memory.total) ||
-			(worker_net_resources->memory.inuse + tr->memory > overcommitted_resource_total(q, worker_net_resources->memory.total))) {
-		ok = 0;
+	int64_t memory_available = overcommitted_resource_total(q, worker_net_resources->memory.total) - worker_net_resources->memory.inuse;
+	if (tr->memory > memory_available) {
+		return 0;
 	}
 
-	if ((tr->gpus > worker_net_resources->gpus.total) || (worker_net_resources->gpus.inuse + tr->gpus > overcommitted_resource_total(q, worker_net_resources->gpus.total))) {
-		ok = 0;
+	int64_t gpus_available = overcommitted_resource_total(q, worker_net_resources->gpus.total) - worker_net_resources->gpus.inuse;
+	if (tr->gpus > gpus_available) {
+		return 0;
 	}
+
 	vine_resources_delete(worker_net_resources);
-	return ok;
+
+	return 1;
 }
 
 /* t->disk only specifies the size of output and ephemeral files. Here we check if the task would fit together with all its input files
@@ -175,6 +178,11 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 
 	/* worker has not reported any resources yet */
 	if (w->resources->tag < 0 || w->resources->workers.total < 1 || w->end_time < 0) {
+		return 0;
+	}
+
+	/* worker is fully occupied */
+	if ((w->resources->cores.total <= w->resources->cores.inuse) || w->resources->memory.total <= w->resources->memory.inuse || w->resources->disk.total <= w->resources->disk.inuse) {
 		return 0;
 	}
 
