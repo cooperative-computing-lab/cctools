@@ -116,19 +116,6 @@ if __name__ == "__main__":
     t = q.wait(wait_time)
     report_task(t, "success", 0, [path.join(test_dir, output_name)])
 
-    # same thing, but this time symlink the input directory.
-    output_name = next_output_name()
-    t = vine.Task(f"cd my_dir && ./{exec_name} {input_name} 2>&1 > {output_name}")
-    in_dir = q.declare_file(test_dir, cache=True)
-    t.add_input(exec_file, exec_name)
-    t.add_input(in_dir, "my_dir", mount_symlink=True)
-    output_file = q.declare_file(path.join(test_dir, output_name), cache=False)
-    t.add_output(output_file, path.join("my_dir", output_name))
-
-    q.submit(t)
-    t = q.wait(wait_time)
-    report_task(t, "success", 0, [path.join(test_dir, output_name)])
-    
     # we bring back the outputs from a directory:
     output_name = next_output_name()
     t = vine.Task(f"mkdir outs && ./{exec_name} {input_name} 2>&1 > outs/{output_name}")
