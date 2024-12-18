@@ -2935,13 +2935,8 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 {
 	vine_result_code_t result = VINE_SUCCESS;
 
-<<<<<<< HEAD
 	/* Kill unused libraries on this worker to reclaim resources. */
 	/* Matches assumption in vine_schedule.c:check_available_resources() */
-=======
-	/* Kill empty libraries to reclaim resources. Match the assumption of
-	 * @vine.schedule.c:check_worker_have_enough_resources() */
->>>>>>> 09771acca (merge in priority queue)
 	kill_empty_libraries_on_worker(q, w, t);
 
 	/* If this is a function needing a library, dispatch the library. */
@@ -2951,7 +2946,6 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 		if (!t->library_task) {
 			/* Otherwise send the library to the worker. */
 			/* Note that this call will re-enter commit_task_to_worker. */
-<<<<<<< HEAD
 			t->library_task = send_library_to_worker(q, w, t->needs_library);
 
 			/*
@@ -2966,14 +2960,6 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 
 			if (!t->library_task) {
 				return VINE_MGR_FAILURE;
-=======
-			t->library_task = send_library_to_worker(q, w, t->needs_library, &result);
-
-			/* Careful: if the above failed, then w may no longer be valid */
-			/* In that case return immediately without making further changes. */
-			if (!t->library_task) {
-				return result;
->>>>>>> 09771acca (merge in priority queue)
 			}
 		}
 		/* If start_one_task_fails, this will be decremented in handle_failure below. */
@@ -2984,10 +2970,6 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 	t->addrport = xxstrdup(w->addrport);
 
 	t->time_when_commit_start = timestamp_get();
-<<<<<<< HEAD
-	result = VINE_SUCCESS;
-	struct list *l = 0;
-=======
 	result = start_one_task(q, w, t);
 	t->time_when_commit_end = timestamp_get();
 
@@ -3014,7 +2996,6 @@ static vine_result_code_t commit_task_group_to_worker(struct vine_manager *q, st
 	vine_result_code_t result = VINE_SUCCESS;
 
 	struct list *l = NULL;
->>>>>>> 09771acca (merge in priority queue)
 	if (t->group_id) {
 		debug(D_VINE, "Task %d has GroupID of %s. Should Send:", t->task_id, t->group_id);
 		l = hash_table_lookup(q->task_group_table, t->group_id);
@@ -3353,6 +3334,9 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 {
 	if (!rt)
 		return;
+
+	/* Do not try to group recovery tasks */
+	rt->group_id = NULL;
 
 	switch (rt->state) {
 	case VINE_TASK_INITIAL:
