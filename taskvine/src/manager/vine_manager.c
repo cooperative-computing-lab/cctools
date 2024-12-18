@@ -3266,6 +3266,9 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 	if (!rt)
 		return;
 
+	/* Do not try to group recovery tasks */
+	rt->group_id = NULL;
+
 	switch (rt->state) {
 	case VINE_TASK_INITIAL:
 		/* The recovery task has never been run, so submit it now. */
@@ -3369,6 +3372,16 @@ static struct vine_worker_info *consider_task(struct vine_manager *q, struct vin
 		return NULL;
 	}
 	q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
+
+	// do not continue if this worker is running a group task
+	struct vine_task *it;
+	uint64_t taskid;
+	ITABLE_ITERATE(w->current_tasks, taskid, it){
+		if(it->group_id)
+		{
+			return NULL;
+		}
+	}
 
 	// Check if there is transfer capacity available.
 	if (q->peer_transfers_enabled) {
