@@ -26,6 +26,7 @@ import os
 import time
 import textwrap
 import inspect
+from functools import partial
 
 RESULT_PENDING = 'result_pending'
 
@@ -177,13 +178,13 @@ def reduction_tree(fn, *args):
         curr_size = len(entries)
     return_val = entries if len(entries) > 1 else entries[0]
     return entries[0]
-
 ##
 # \class FuturesExecutor
 #
 # TaskVine FuturesExecutor object
 #
 # This class acts as an interface for the creation of Futures
+
 class FuturesExecutor(Executor):
     def __init__(self, port=9123, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull, factory=True, opts={}):
         self.manager = Manager(port=port)
@@ -209,7 +210,7 @@ class FuturesExecutor(Executor):
         else:
             self.factory = None 
 
-    def map(self, fn, iterable, library_name=None, method=None, chunk_size=1):
+    def map(self, fn, iterable, library_name="Some_Library", method=None, chunk_size=1):
         def wait_for_map_resolution(*futures_batch):
             result = []
             for computed_result in futures_batch:
@@ -217,18 +218,22 @@ class FuturesExecutor(Executor):
             return result
         if (hasattr(iterable, '__iter__') or hasattr(iterable, '__getitem__')) and not isinstance(iterable, str): 
             tasks = []
-            for i in range(0, len(iterable), chunk_size):
-                if method == "FutureFunctionCall":
-                    future_batch_task = self.submit(self.future_funcall(library_name, run_iterable, fn, iterable[i:i+chunk_size]))
-                else: # Method is FuturePythonTask
+            if method == "FutureFunctionCall": # this currently does not work (error described in PR)
+                partial_obj = partial(run_iterable, fn)
+                def partial_func(*args, **kwargs):
+                    return partial_obj(*args, **kwargs)
+                libtask = self.create_library_from_functions(library_name, partial_func)
+                self.install_library(libtask)
+                for i in range(0, len(iterable), chunk_size):
+                    future_batch_task = self.submit(self.future_funcall(library_name, partial_func, iterable[i:i+chunk_size]))
+                    tasks.append(future_batch_task)
+            else:
+                for i in range(0, len(iterable), chunk_size):
                     future_batch_task = self.submit(run_iterable, fn, iterable[i:i+chunk_size])
-                tasks.append(future_batch_task)
+                    tasks.append(future_batch_task)
             future = self.submit(wait_for_map_resolution, *tasks)
         else:
-            if method == "FutureFunctionCall":
-                future = self.submit(self.future_funcall(library_name, run_iterable, fn, iterable))
-            else: # Method is FuturePythonTask
-                future = self.submit(run_iterable, fn, iterable)
+            raise Exception('Error: Map function takes in an iterable')
         return future
 
     # Reduce performs a reduction tree on the iterable and currently returns a single value
@@ -449,7 +454,6 @@ class FutureFunctionCall(FunctionCall):
                         self._saved_output = output['Result']
                     else:
                         self._saved_output = FunctionCallNoResult(output['Reason'])
-
                 except Exception as e:
                     self._saved_output = e
             else:
