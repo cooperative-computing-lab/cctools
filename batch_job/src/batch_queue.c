@@ -21,6 +21,7 @@ See the file COPYING for details.
 extern const struct batch_queue_module batch_queue_amazon;
 extern const struct batch_queue_module batch_queue_cluster;
 extern const struct batch_queue_module batch_queue_condor;
+extern const struct batch_queue_module batch_queue_flux;
 extern const struct batch_queue_module batch_queue_local;
 extern const struct batch_queue_module batch_queue_moab;
 extern const struct batch_queue_module batch_queue_uge;
@@ -45,13 +46,14 @@ static struct batch_queue_module batch_queue_unknown = {
 		NULL,
 };
 
-#define BATCH_JOB_SYSTEMS "local, vine, wq, condor, uge (sge), pbs, lsf, torque, moab, slurm, amazon, k8s, dryrun"
+#define BATCH_JOB_SYSTEMS "local, vine, wq, condor, uge (sge), pbs, lsf, torque, moab, slurm, amazon, k8s, flux, dryrun"
 
 const struct batch_queue_module *const batch_queue_modules[] = {
 		&batch_queue_amazon,
 		&batch_queue_cluster,
 		&batch_queue_condor,
 		&batch_queue_dryrun,
+		&batch_queue_flux,
 		&batch_queue_local,
 		&batch_queue_moab,
 		&batch_queue_uge,
