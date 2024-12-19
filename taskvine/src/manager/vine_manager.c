@@ -2704,7 +2704,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		/* We divide the estimated disk by 2 for two reasons:
 		 * 1. Inputs and outputs are moved around between the task sandbox and the cache, the task is using two "virtual" sandboxes;
 		 * 2. We want to leave some space for the cache to grow. */
-		limits->disk /= 2; 
+		limits->disk /= 2;
 	}
 
 	/* If one of the resources is not specified, use the available instead */

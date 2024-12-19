@@ -162,7 +162,7 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 	return ok;
 }
 
-/* Check if the worker is fully occupied by other tasks, or the disk is full. 
+/* Check if the worker is fully occupied by other tasks, or the disk is full.
  * @param w The worker info structure. */
 static int worker_fully_occupied(struct vine_worker_info *w)
 {
