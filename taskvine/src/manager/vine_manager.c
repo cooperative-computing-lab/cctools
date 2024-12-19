@@ -2564,7 +2564,7 @@ static int build_poll_table(struct vine_manager *q)
 	return n;
 }
 
-static void vine_manager_compute_input_size(struct vine_manager *q, struct vine_task *t)
+void vine_manager_compute_input_size(struct vine_manager *q, struct vine_task *t)
 {
 	t->input_files_size = -1;
 

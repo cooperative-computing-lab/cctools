@@ -272,6 +272,8 @@ struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q
 
 int64_t overcommitted_resource_total(struct vine_manager *q, int64_t total);
 
+void vine_manager_compute_input_size(struct vine_manager *q, struct vine_task *t);
+
 /* Internal: Shut down a specific worker. */
 int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_info *w);
 
