@@ -162,6 +162,22 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 	return ok;
 }
 
+/* Check if the worker is fully occupied by other tasks, or the disk is full. 
+ * @param w The worker info structure. */
+static int worker_fully_occupied(struct vine_worker_info *w)
+{
+	if (w->resources->cores.total + w->resources->gpus.total >= w->resources->cores.inuse + w->resources->gpus.inuse) {
+		return 0;
+	}
+	if (w->resources->memory.total >= w->resources->memory.inuse) {
+		return 0;
+	}
+	if (w->resources->disk.total >= w->resources->disk.inuse) {
+		return 0;
+	}
+	return 1;
+}
+
 /* Check if this task is compatible with this given worker by considering
  * resources availability, features, blocklist, and all other relevant factors.
  * Used by all scheduling methods for basic compatibility.
@@ -181,8 +197,8 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		return 0;
 	}
 
-	/* worker is fully occupied */
-	if ((w->resources->cores.total <= w->resources->cores.inuse) || w->resources->memory.total <= w->resources->memory.inuse || w->resources->disk.total <= w->resources->disk.inuse) {
+	/* if the worker has been fully occupied */
+	if (worker_fully_occupied(w)) {
 		return 0;
 	}
 
