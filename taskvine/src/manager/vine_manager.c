@@ -2653,27 +2653,20 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	rmsummary_merge_max(limits, min);
 
 	if (q->proportional_resources) {
-		int conservative_proportional_resources = 0;
-
 		/* Compute the proportion of the worker the task shall have across resource types. */
 		double max_proportion = -1;
 
-		int64_t cores_portion = conservative_proportional_resources ? cores_total : cores_available;
-		int64_t memory_portion = conservative_proportional_resources ? memory_total : memory_available;
-		int64_t disk_portion = conservative_proportional_resources ? disk_total : disk_available;
-		int64_t gpus_portion = conservative_proportional_resources ? gpus_total : gpus_available;
-
-		if (cores_portion > 0) {
-			max_proportion = MAX(max_proportion, (double)limits->cores / cores_portion);
+		if (cores_total > 0) {
+			max_proportion = MAX(max_proportion, (double)limits->cores / cores_total);
 		}
-		if (memory_portion > 0) {
-			max_proportion = MAX(max_proportion, (double)limits->memory / memory_portion);
+		if (memory_total > 0) {
+			max_proportion = MAX(max_proportion, (double)limits->memory / memory_total);
 		}
-		if (disk_portion > 0) {
-			max_proportion = MAX(max_proportion, (double)limits->disk / disk_portion);
+		if (disk_total > 0) {
+			max_proportion = MAX(max_proportion, (double)limits->disk / disk_total);
 		}
-		if (gpus_portion > 0) {
-			max_proportion = MAX(max_proportion, (double)limits->gpus / gpus_portion);
+		if (gpus_total > 0) {
+			max_proportion = MAX(max_proportion, (double)limits->gpus / gpus_total);
 		}
 
 		/* Adjust max_proportion so that an integer number of tasks fit the worker. */
@@ -2695,7 +2688,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		if (limits->cores == -1 && limits->gpus > 0) {
 			limits->cores = 0;
 		} else {
-			limits->cores = MAX(1, MAX(limits->cores, floor(cores_portion * max_proportion)));
+			limits->cores = MAX(1, MAX(limits->cores, floor(cores_total * max_proportion)));
 		}
 
 		/* When gpus are unspecified, they are set to 0 if cores are specified. */
@@ -2705,8 +2698,13 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 			/* Do not allocate a proportion of gpus */
 		}
 
-		limits->disk = MAX(1, MAX(limits->disk, floor(disk_portion * max_proportion / q->resource_submit_multiplier)));
-		limits->memory = MAX(1, MAX(limits->memory, floor(memory_portion * max_proportion)));
+		limits->disk = MAX(1, MAX(limits->disk, floor(disk_total * max_proportion / q->resource_submit_multiplier)));
+		limits->memory = MAX(1, MAX(limits->memory, floor(memory_total * max_proportion)));
+
+		/* We divide the estimated disk by 2 for two reasons:
+		 * 1. Inputs and outputs are moved around between the task sandbox and the cache, the task is using two "virtual" sandboxes;
+		 * 2. We want to leave some space for the cache to grow. */
+		limits->disk /= 2; 
 	}
 
 	/* If one of the resources is not specified, use the available instead */
