@@ -144,6 +144,15 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 	int ok = 1;
 	double available = w->resources->disk.total - MAX(0, t->resources_requested->disk) - w->resources->disk.inuse;
 
+	if (t->input_files_size < 0) {
+		vine_manager_compute_input_size(q, t);
+	}
+
+	/* shortcut if the available disk is larger than the size of inputs, as traversing all the existing files is quite expensive. */
+	if (available >= t->input_files_size) {
+		return 1;
+	}
+
 	struct vine_mount *m;
 	LIST_ITERATE(t->input_mounts, m)
 	{
@@ -154,7 +163,7 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 		available -= m->file->size;
 
 		if (available < 0) {
-			ok = 1;
+			ok = 0;
 			break;
 		}
 	}
