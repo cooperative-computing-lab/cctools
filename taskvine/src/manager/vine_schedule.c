@@ -233,7 +233,7 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		return 0;
 	}
 
-	/* if the worker has been fully occupied */
+	/* if the worker has available room for this task */
 	if (!worker_has_available_resources(q, w, t)) {
 		return 0;
 	}
