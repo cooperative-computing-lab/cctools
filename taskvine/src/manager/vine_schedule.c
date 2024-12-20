@@ -80,7 +80,7 @@ static struct vine_resources *count_worker_net_resources(struct vine_manager *q,
 {
 	struct vine_resources *worker_net_resources = vine_resources_copy(w->resources);
 
-	if (!t->needs_library) {
+	if (!t->needs_library && !t->provides_library) {
 		return worker_net_resources;
 	}
 
@@ -88,19 +88,11 @@ static struct vine_resources *count_worker_net_resources(struct vine_manager *q,
 	struct vine_task *ti;
 	ITABLE_ITERATE(w->current_tasks, task_id, ti)
 	{
-		/* If a library task that provides the library, substract the inuse resources */
-		if (ti->provides_library && strcmp(t->needs_library, ti->provides_library) == 0) {
+		if (ti->provides_library && ti->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, ti->provides_library))) {
+			worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
 			worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
 			worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
-			worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
 			worker_net_resources->gpus.inuse -= ti->current_resource_box->gpus;
-		}
-		/* If a function task that uses the same library, add to the inuse resources  */
-		if (ti->needs_library && strcmp(t->needs_library, ti->needs_library) == 0) {
-			worker_net_resources->cores.inuse += ti->current_resource_box->cores;
-			worker_net_resources->memory.inuse += ti->current_resource_box->memory;
-			worker_net_resources->disk.inuse += ti->current_resource_box->disk;
-			worker_net_resources->gpus.inuse += ti->current_resource_box->gpus;
 		}
 	}
 
@@ -123,10 +115,12 @@ static struct rmsummary *count_worker_available_resources(struct vine_manager *q
 	}
 
 	struct vine_resources *worker_net_resources = count_worker_net_resources(q, w, t);
+
 	worker_available_resources->cores = overcommitted_resource_total(q, worker_net_resources->cores.total) - (double)worker_net_resources->cores.inuse;
 	worker_available_resources->disk = overcommitted_resource_total(q, worker_net_resources->disk.total) - (double)worker_net_resources->disk.inuse - t->input_files_size;
 	worker_available_resources->memory = overcommitted_resource_total(q, worker_net_resources->memory.total) - (double)worker_net_resources->memory.inuse;
 	worker_available_resources->gpus = overcommitted_resource_total(q, worker_net_resources->gpus.total) - (double)worker_net_resources->gpus.inuse;
+
 	vine_resources_delete(worker_net_resources);
 
 	return worker_available_resources;
@@ -143,6 +137,19 @@ static struct rmsummary *count_worker_available_resources(struct vine_manager *q
  * @return 1 if yes, 0 otherwise. */
 int check_worker_has_enough_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *tr)
 {
+	/*
+	This is a temporary hack in order to get Greg's application running.
+	The problem is in line with the problem pointed out in PR #3909 but a special case in the manager's end.
+
+	The problem here is that the manager always allocates the whole disk the the library task,
+	so that libtask->current_resource_box->disk is always equal to worker_net_resources->disk.total.
+	For the first task, the ti->current_resource_box->disk == 0, it is able to run because the expr in line 114 doesn't satisfy.
+	However, if the first task causes any increase in the worker's disk, worker_net_resources->disk.inuse will go above the total,
+	which causes the consistent true of the expr in line 114.
+	*/
+	if (t->needs_library) {
+		return 1;
+	}
 	int ok = 1;
 
 	struct rmsummary *worker_available_resources = count_worker_available_resources(q, w, t);
@@ -160,6 +167,13 @@ int check_worker_has_enough_resources(struct vine_manager *q, struct vine_worker
 /* Check if the worker is fully occupied by other tasks, or the disk is full. */
 static int check_worker_has_available_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
+	/*
+	This is the same hack as in check_worker_has_enough_resources.
+	Another PR is going on to fix the problem of library/function task allocation.
+	*/
+	if (t->needs_library) {
+		return 1;
+	}
 	int ok = 1;
 
 	struct rmsummary *worker_available_resources = count_worker_available_resources(q, w, t);
