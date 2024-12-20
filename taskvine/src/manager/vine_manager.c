@@ -3371,7 +3371,7 @@ the task to the worker.
 
 static int send_one_task(struct vine_manager *q)
 {
-	if (q->total_available_cores + q->total_available_slots <= 0 || priority_queue_size(q->ready_tasks) == 0) {
+	if ((q->total_available_cores + q->total_available_slots <= 0) || priority_queue_size(q->ready_tasks) == 0) {
 		return 0;
 	}
 
