@@ -69,38 +69,7 @@ int vine_schedule_in_ramp_down(struct vine_manager *q)
 	return 0;
 }
 
-/* Count the net resources of a worker after taking into account the resources used by the library task.
- * If the task is not a function task, the net resources are the same as the worker's resources.
- * If the task is a function task, the inuse resources are adjusted by the resources used by the library task.
- * @param q The manager structure.
- * @param w The worker info structure.
- * @param t The task structure.
- * */
-static struct vine_resources *count_worker_net_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
-{
-	struct vine_resources *worker_net_resources = vine_resources_copy(w->resources);
-
-	if (!t->needs_library && !t->provides_library) {
-		return worker_net_resources;
-	}
-
-	uint64_t task_id;
-	struct vine_task *ti;
-	ITABLE_ITERATE(w->current_tasks, task_id, ti)
-	{
-		if (ti->provides_library && ti->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, ti->provides_library))) {
-			worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
-			worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
-			worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
-			worker_net_resources->gpus.inuse -= ti->current_resource_box->gpus;
-		}
-	}
-
-	return worker_net_resources;
-}
-
 /* Count the available resources of a worker for a task.
- * For disk, if the available disk minus the task's input files size is negative, then the task cannot run.
  * @param q The manager structure.
  * @param w The worker info structure.
  * @param t The task structure.
@@ -108,17 +77,32 @@ static struct vine_resources *count_worker_net_resources(struct vine_manager *q,
  */
 static struct rmsummary *count_worker_available_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	struct rmsummary *worker_available_resources = rmsummary_create(-1);
+	/* Count the net resources of a worker after taking into account the resources used by the library task.
+	 * If the task is not a function task, the net resources are the same as the worker's resources.
+	 * If the task is a function task, the inuse resources are adjusted by the resources used by the library task. */
+	struct vine_resources *worker_net_resources = vine_resources_copy(w->resources);
 
-	if (t->input_files_size < 0) {
-		vine_manager_compute_input_size(q, t);
+	/* Function resource allocation is going to be addressed in the next PR. */
+	if (t->needs_library || t->provides_library) {
+		uint64_t task_id;
+		struct vine_task *ti;
+		ITABLE_ITERATE(w->current_tasks, task_id, ti)
+		{
+			if (ti->provides_library && ti->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, ti->provides_library))) {
+				worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
+				worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
+				worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
+				worker_net_resources->gpus.inuse -= ti->current_resource_box->gpus;
+			}
+		}
 	}
 
-	struct vine_resources *worker_net_resources = count_worker_net_resources(q, w, t);
+	/* The worker's available resources are the net resources minus the resources in use by the worker. */
+	struct rmsummary *worker_available_resources = rmsummary_create(-1);
 
 	worker_available_resources->cores = overcommitted_resource_total(q, worker_net_resources->cores.total) - (double)worker_net_resources->cores.inuse;
-	worker_available_resources->disk = overcommitted_resource_total(q, worker_net_resources->disk.total) - (double)worker_net_resources->disk.inuse - t->input_files_size;
 	worker_available_resources->memory = overcommitted_resource_total(q, worker_net_resources->memory.total) - (double)worker_net_resources->memory.inuse;
+	worker_available_resources->disk = overcommitted_resource_total(q, worker_net_resources->disk.total) - (double)worker_net_resources->disk.inuse;
 	worker_available_resources->gpus = overcommitted_resource_total(q, worker_net_resources->gpus.total) - (double)worker_net_resources->gpus.inuse;
 
 	vine_resources_delete(worker_net_resources);
@@ -159,6 +143,38 @@ int check_worker_has_enough_resources(struct vine_manager *q, struct vine_worker
 		ok = 0;
 	}
 
+	if (t->input_files_size < 0) {
+		vine_manager_compute_input_size(q, t);
+	}
+
+	/* check if the sandbox can store the inputs */
+	if (t->input_files_size > tr->disk) {
+		ok = 0;
+	}
+
+	/* check if the cache can store the inputs, if the input is larger than the rest of the disk, check if some of the inputs have been existing in the cache */
+	int64_t cache_available = worker_available_resources->disk - tr->disk;
+	if (t->input_files_size > cache_available) {
+		ok = 0;
+
+		int64_t cache_needed_for_inputs = t->input_files_size;
+
+		struct vine_mount *m;
+		LIST_ITERATE(t->input_mounts, m)
+		{
+			if (hash_table_lookup(w->current_files, m->file->cached_name)) {
+				continue;
+			}
+
+			cache_needed_for_inputs -= m->file->size;
+
+			if (cache_needed_for_inputs < cache_available) {
+				ok = 1;
+				break;
+			}
+		}
+	}
+
 	rmsummary_delete(worker_available_resources);
 
 	return ok;
@@ -182,28 +198,6 @@ static int check_worker_has_available_resources(struct vine_manager *q, struct v
 	if (((worker_available_resources->cores + worker_available_resources->gpus <= 0)) ||
 			worker_available_resources->memory <= 0 || worker_available_resources->disk <= 0) {
 		ok = 0;
-	}
-
-	/* check if the worker has enough disk for the inputs, some of the inputs might have already been existing on the worker */
-	if (t->input_files_size < 0) {
-		vine_manager_compute_input_size(q, t);
-	}
-
-	double disk_needed_for_inputs = t->input_files_size;
-	if (t->input_files_size > worker_available_resources->disk) {
-		struct vine_mount *m;
-		LIST_ITERATE(t->input_mounts, m)
-		{
-			if (hash_table_lookup(w->current_files, m->file->cached_name)) {
-				continue;
-			}
-
-			disk_needed_for_inputs -= m->file->size;
-
-			if (disk_needed_for_inputs < 0) {
-				ok = 0;
-			}
-		}
 	}
 
 	rmsummary_delete(worker_available_resources);

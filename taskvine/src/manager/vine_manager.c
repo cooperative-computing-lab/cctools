@@ -2701,9 +2701,8 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		limits->disk = MAX(1, MAX(limits->disk, floor(disk_total * max_proportion / q->resource_submit_multiplier)));
 		limits->memory = MAX(1, MAX(limits->memory, floor(memory_total * max_proportion)));
 
-		/* We divide the estimated disk by 2 for two reasons:
-		 * 1. Inputs and outputs are moved around between the task sandbox and the cache, the task is using two "virtual" sandboxes;
-		 * 2. We want to leave some space for the cache to grow. */
+		/* We divide the estimated disk by 2 because inputs and outputs are moved around between the sandbox and
+		 * the cache, we leave some space for that, and we want to leave some space for the cache to grow. */
 		limits->disk /= 2;
 	}
 
