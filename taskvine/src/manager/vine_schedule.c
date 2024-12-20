@@ -157,57 +157,39 @@ int check_worker_has_enough_resources(struct vine_manager *q, struct vine_worker
 	return ok;
 }
 
-/* t->disk only specifies the size of output and ephemeral files. Here we check if the task would fit together with all its input files
- * taking into account that some files may be already at the worker. */
-int worker_has_available_disk_with_inputs(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
-{
-	double disk_available = w->resources->disk.total - MAX(0, t->resources_requested->disk) - w->resources->disk.inuse;
-
-	if (t->input_files_size < 0) {
-		vine_manager_compute_input_size(q, t);
-	}
-
-	if (t->input_files_size <= 0) {
-		return 1;
-	}
-
-	/* shortcut if the available disk is larger than the size of inputs, note that traversing all the existing files is quite expensive. */
-	if (disk_available >= t->input_files_size) {
-		return 1;
-	}
-
-	struct vine_mount *m;
-	LIST_ITERATE(t->input_mounts, m)
-	{
-		if (hash_table_lookup(w->current_files, m->file->cached_name)) {
-			continue;
-		}
-
-		disk_available -= m->file->size;
-
-		if (disk_available < 0) {
-			return 0;
-		}
-	}
-
-	return 1;
-}
-
 /* Check if the worker is fully occupied by other tasks, or the disk is full. */
 static int check_worker_has_available_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	int ok = 1;
 
-	/* If the worker doesn't have enough resources for the inputs. */
-	if (!worker_has_available_disk_with_inputs(q, w, t)) {
-		return 0;
-	}
-
 	struct rmsummary *worker_available_resources = count_worker_available_resources(q, w, t);
 
+	/* check if any of the resources is currently unavailable */
 	if (((worker_available_resources->cores + worker_available_resources->gpus <= 0)) ||
 			worker_available_resources->memory <= 0 || worker_available_resources->disk <= 0) {
 		ok = 0;
+	}
+
+	/* check if the worker has enough disk for the inputs, some of the inputs might have already been existing on the worker */
+	if (t->input_files_size < 0) {
+		vine_manager_compute_input_size(q, t);
+	}
+
+	double disk_needed_for_inputs = t->input_files_size;
+	if (t->input_files_size > worker_available_resources->disk) {
+		struct vine_mount *m;
+		LIST_ITERATE(t->input_mounts, m)
+		{
+			if (hash_table_lookup(w->current_files, m->file->cached_name)) {
+				continue;
+			}
+
+			disk_needed_for_inputs -= m->file->size;
+
+			if (disk_needed_for_inputs < 0) {
+				ok = 0;
+			}
+		}
 	}
 
 	rmsummary_delete(worker_available_resources);
