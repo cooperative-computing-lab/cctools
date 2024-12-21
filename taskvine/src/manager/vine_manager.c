@@ -2699,14 +2699,14 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	if (limits->cores <= 0) {
 		limits->cores = limits->gpus <= 0 ? cores_available : 0;
 	}
+	if (limits->gpus <= 0) {
+		limits->gpus = limits->cores <= 0 ? gpus_available : 0;
+	}
 	if (limits->memory <= 0) {
 		limits->memory = memory_available;
 	}
 	if (limits->disk <= 0) {
 		limits->disk = disk_available;
-	}
-	if (limits->gpus <= 0) {
-		limits->gpus = limits->cores <= 0 ? gpus_available : 0;
 	}
 
 	/* Never go below min resources. */
