@@ -3321,7 +3321,7 @@ static int vine_manager_check_library_for_function_call(struct vine_manager *q, 
 }
 
 /*
-Consider if a task is eligible to run, and if so, find the best worker for it.
+Consider if a task is eligible to run.
 */
 int consider_task(struct vine_manager *q, struct vine_task *t)
 {
