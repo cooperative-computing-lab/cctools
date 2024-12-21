@@ -2620,16 +2620,6 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	int64_t disk_available = w->resources->disk.total - w->resources->disk.inuse;
 	int64_t gpus_available = w->resources->gpus.total - w->resources->gpus.inuse;
 
-	/* For disk, do not count the size of input files
-	 * TODO: efficiently discount the size of files already at worker. */
-	if (t->input_files_size < 0) {
-		vine_manager_compute_input_size(q, t);
-	}
-	if (t->input_files_size > 0) {
-		disk_total -= t->input_files_size;
-		disk_available -= t->input_files_size;
-	}
-
 	/* Shortcut if the ramp down mode is enabled. In this case, use all the free space of that worker if the user has not specified.
 	 * Note that we don't use resource_submit_multiplier, as by definition in ramp down there are more workers than tasks. */
 	if (vine_schedule_in_ramp_down(q)) {
