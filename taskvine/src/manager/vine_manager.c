@@ -3349,7 +3349,7 @@ int consider_task(struct vine_manager *q, struct vine_task *t)
 		return 0;
 	}
 
-	// Skip function call task if no suitable library template was installed
+	// Skip function call task if no suitable library template was installed.
 	if (!vine_manager_check_library_for_function_call(q, t)) {
 		return 0;
 	}
