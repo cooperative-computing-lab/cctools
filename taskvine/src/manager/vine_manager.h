@@ -138,6 +138,8 @@ struct vine_manager {
 	int fixed_location_in_queue; /* Number of fixed location tasks currently being managed */
 	int num_tasks_left;    /* Optional: Number of tasks remaining, if given by user.  @ref vine_set_num_tasks */
 	int busy_waiting_flag; /* Set internally in main loop if no messages were processed -> wait longer. */
+	int total_available_cores;   /* Number of cores available among all workers. */
+	int total_available_slots;   /* Number of function slots available among all workers. */
 
 	/* Accumulation of statistics for reporting to the caller. */
 
@@ -269,6 +271,8 @@ void vine_manager_enable_process_shortcut(struct vine_manager *q);
 struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t );
 
 int64_t overcommitted_resource_total(struct vine_manager *q, int64_t total);
+
+void vine_manager_compute_input_size(struct vine_manager *q, struct vine_task *t);
 
 /* Internal: Shut down a specific worker. */
 int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_info *w);
