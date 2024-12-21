@@ -2673,8 +2673,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		}
 
 		/* When cores are unspecified, they are set to 0 if gpus are specified.
-		 * Otherwise they get a proportion according to specified resources.
-		 * Tasks will get at least one core */
+		 * Otherwise they get a proportion according to specified resources. */
 		if (limits->cores == -1 && limits->gpus > 0) {
 			limits->cores = 0;
 		} else {
