@@ -677,7 +677,7 @@ class FunctionCallDask(FunctionCall):
         self._wrapper_output_file = None
         self._wrapper_output = None
 
-        super().__init__(f'Dask-Library-{id(dag)}', 'execute_graph_vertex', wrapper,  dask_task, args, keys_of_files)
+        super().__init__(f'Dask-Library-{id(dag)}', 'execute_graph_vertex', wrapper, dask_task, args, keys_of_files)
         if wrapper:
             wo = m.declare_buffer()
             self.add_output(wo, "wrapper.output")
