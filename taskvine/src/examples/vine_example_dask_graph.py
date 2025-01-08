@@ -12,8 +12,8 @@ import ndcctools.taskvine as vine
 import argparse
 import getpass
 import sys
-
 import traceback
+import dask
 
 
 from operator import add  # use add function in the example graph
@@ -26,7 +26,7 @@ dsk_graph = {
     "t": (sum, "v")
 }
 
-expected_result = 11
+expected_result = dask.get(dsk_graph, "t")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -65,9 +65,9 @@ is constructed by dask.""")
     if args.disable_peer_transfers:
         m.disable_peer_transfers()
 
-    # checkpoint at even levels when nodes have at least one children
+    # checkpoint at even levels when nodes have at least one dependency
     def checkpoint(dag, key):
-        if dag.depth_of(key) % 2 == 0 and len(dag.get_children(key)) > 0:
+        if dag.depth_of(key) % 2 == 0 and len(dag.get_dependencies(key)) > 0:
             print(f"checkpoint for {key}")
             return True
         return False
