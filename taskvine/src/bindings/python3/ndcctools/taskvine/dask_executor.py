@@ -646,7 +646,7 @@ class FunctionCallDask(FunctionCall):
     # @param self  This task object.
     # @param m     TaskVine manager object.
     # @param dag   Dask graph object.
-    # @param key   Key of task in graph.
+    # @param dask_task  Dask task encoding a computation.
     # @param sexpr          Positional arguments to function.
     # @param category       TaskVine category name.
     # @param resources      Resources to be set for a FunctionCall.
@@ -656,7 +656,7 @@ class FunctionCallDask(FunctionCall):
     #
 
     def __init__(self, m,
-                 dag, key, sexpr, *,
+                 dag, dask_task, *,
                  category=None,
                  resources=None,
                  extra_files=None,
@@ -664,12 +664,11 @@ class FunctionCallDask(FunctionCall):
                  worker_transfers=False,
                  wrapper=None):
 
-        self._key = key
+        self._dask_task = dask_task
         self.resources = resources
-        self._sexpr = sexpr
 
         self._retries_left = retries
-        args_raw = {k: dag.get_result(k) for k in dag.get_dependencies(key)}
+        args_raw = {k: dag.get_result(k) for k in dag.get_dependencies(self.key)}
         args = {k: f"{uuid4()}.p" for k, v in args_raw.items() if isinstance(v, DaskVineFile)}
 
         keys_of_files = list(args.keys())
@@ -678,7 +677,7 @@ class FunctionCallDask(FunctionCall):
         self._wrapper_output_file = None
         self._wrapper_output = None
 
-        super().__init__(f'Dask-Library-{id(dag)}', 'execute_graph_vertex', wrapper, key, sexpr, args, keys_of_files)
+        super().__init__(f'Dask-Library-{id(dag)}', 'execute_graph_vertex', wrapper,  dask_task, args, keys_of_files)
         if wrapper:
             wo = m.declare_buffer()
             self.add_output(wo, "wrapper.output")
@@ -701,11 +700,11 @@ class FunctionCallDask(FunctionCall):
 
     @property
     def key(self):
-        return self._key
+        return self.dask_task.key
 
     @property
-    def sexpr(self):
-        return self._sexpr
+    def dask_task(self):
+        return self._dask_task
 
     def decrement_retry(self):
         self._retries_left -= 1
