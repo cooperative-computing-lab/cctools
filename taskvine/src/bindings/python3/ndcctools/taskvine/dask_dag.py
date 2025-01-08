@@ -127,7 +127,10 @@ class DaskVineDag:
                 rs[key] = node
 
         for r in rs:
-            self._depth_of[r] = min(self._depth_of[d] for d in self._dependencies_of[r]) + 1
+            if self._dependencies_of[r]:
+                self._depth_of[r] = min(self._depth_of[d] for d in self._dependencies_of[r]) + 1
+            else:
+                self._depth_of[r] = 0
 
         return rs.values()
 
@@ -154,7 +157,10 @@ class DaskVineDag:
                 rs[p] = node
 
         for r in rs:
-            self._depth_of[r] = min(self._depth_of[d] for d in self._dependencies_of[r]) + 1
+            if self._dependencies_of[r]:
+                self._depth_of[r] = min(self._depth_of[d] for d in self._dependencies_of[r]) + 1
+            else:
+                self._depth_of[r] = 0
 
         for c in self._dependencies_of[key]:
             self._pending_needed_by[c].discard(key)
