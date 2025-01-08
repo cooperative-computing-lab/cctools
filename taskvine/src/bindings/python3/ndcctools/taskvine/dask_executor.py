@@ -138,8 +138,8 @@ class DaskVine(Manager):
             ):
         try:
 
-            if isinstance(dsk, dict):
-                dsk = dts.convert_legacy_graph(dsk)
+            # just in case, convert any tuple task to dts.Task
+            dsk = dts.convert_legacy_graph(dsk)
 
             self.set_property("framework", "dask")
             if retries and retries < 1:
