@@ -14,7 +14,12 @@ from .task import FunctionCall
 from .dask_dag import DaskVineDag
 from .cvine import VINE_TEMP
 
-import dask._task_spec as dts
+try:
+    import dask._task_spec as dts
+except ModuleNotFoundError:
+    print("Dask version 2024.12.0 or greater not found.")
+    raise
+
 
 import os
 import time
