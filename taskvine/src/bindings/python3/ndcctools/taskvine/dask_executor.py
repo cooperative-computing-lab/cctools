@@ -453,7 +453,7 @@ class DaskVine(Manager):
 
     def _fill_key_result(self, dag, key):
         raw = dag.get_result(key)
-        if DaskVineDag.listlikep(raw):
+        if DaskVineDag.containerp(raw):
             result = list(raw)
             file_indices = find_result_files(raw)
             for (f, inds) in file_indices:

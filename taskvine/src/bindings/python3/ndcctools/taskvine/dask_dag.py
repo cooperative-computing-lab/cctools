@@ -49,8 +49,8 @@ class DaskVineDag:
         return isinstance(s, dts.Task)
 
     @staticmethod
-    def listlikep(s):
-        return isinstance(s, (list, tuple))
+    def containerp(s):
+        return isinstance(s, dts.NestedContainer)
 
     @staticmethod
     def symbolp(s):
@@ -171,7 +171,7 @@ class DaskVineDag:
         v = self._working_graph[key]
         if self.taskref(v):
             lst = [v]
-        elif DaskVineDag.listlikep(v):
+        elif DaskVineDag.containerp(v):
             lst = v
         else:
             return
