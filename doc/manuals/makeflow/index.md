@@ -444,6 +444,19 @@ output: input
     srun $(BATCH_OPTIONS) --mpi=pmi2 -- ./my-mpi-job -i input -o output
 ```
 
+### Flux
+
+The [Flux resource manager](https://flux-framework.readthedocs.io/en/latest/)
+is available as an experimental backend by passing the `-T flux` option.
+
+To use the Flux batch system, you must run Makeflow in a shell connected to a
+Flux instance (i.e. `$FLUX_URI` must be set and valid). This is validated by
+ensuring `flux uptime` runs successfully.
+
+While the Flux backend supports staging in files into the execution
+environment, it currently does not support staging files out, instead assuming
+a shared filesystem. Simple programs that use `batch_job` but do not require
+output files, like `vine_factory`, should work fine.
 
 ### Moab Scheduler
 
