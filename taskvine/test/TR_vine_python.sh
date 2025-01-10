@@ -52,6 +52,9 @@ run()
 
 	run_taskvine_worker $PORT_FILE worker.log
 
+	cat $(latest_vine_debug_log)
+	cat worker.log
+
 	# wait for vine to exit.
 	wait_for_file_creation $STATUS_FILE 30
 
