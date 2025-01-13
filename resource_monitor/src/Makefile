@@ -69,13 +69,13 @@ clean:
 	$(MAKE) -C bindings clean
 
 install: all
-ifeq ($(CCTOOLS_OPSYS),DARWIN)
-	$(MAKE) -C bindings install
-else
+ifeq ($(CCTOOLS_LINUX_NATIVE_X86_64),yes)
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
 	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
+	$(MAKE) -C bindings install
+else
 	$(MAKE) -C bindings install
 endif
 
