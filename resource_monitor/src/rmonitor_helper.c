@@ -270,6 +270,7 @@ int close(int fd)
 	return status;
 }
 
+#if defined(SYS_open)
 static int open_for_writing(int fd)
 {
 	int flags, access_mode;
@@ -369,6 +370,7 @@ int open64(const char *path, int flags, ...)
 	return fd;
 }
 #endif /* defined linux && __USE_LARGEFILE64 */
+#endif /* defined SYS_open */
 
 int socket(int domain, int type, int protocol)
 {
