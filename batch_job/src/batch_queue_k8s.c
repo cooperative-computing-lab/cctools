@@ -489,9 +489,9 @@ static int batch_queue_k8s_gen_running_pod_lst(struct list **running_pod_lst,
 		pod_state = strtok(NULL, " \t");
 
 		int i = 0;
-		while (pod_state[i] != '\n' && pod_state[i] != EOF)
+		while (pod_state[i] != '\n' && pod_state[i] != '\0')
 			i++;
-		if (pod_state[i] == '\n' || pod_state[i] == EOF)
+		if (pod_state[i] == '\n')
 			pod_state[i] = '\0';
 
 		if (strcmp(pod_state, "Running") == 0) {
@@ -607,9 +607,9 @@ static batch_queue_id_t batch_queue_k8s_wait(struct batch_queue *q,
 
 			// trim the tailing new line
 			int i = 0;
-			while (log_tail_content[i] != '\n' && log_tail_content[i] != EOF)
+			while (log_tail_content[i] != '\n' && log_tail_content[i] != '\0')
 				i++;
-			if (log_tail_content[i] == '\n' || log_tail_content[i] == EOF)
+			if (log_tail_content[i] == '\n' || log_tail_content[i] == '\0')
 				log_tail_content[i] = '\0';
 
 			free(get_log_cmd);
