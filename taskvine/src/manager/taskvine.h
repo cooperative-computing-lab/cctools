@@ -1436,6 +1436,7 @@ a times series, if this feature is enabled. See @ref vine_enable_monitoring.
  - "large_task_check_interval" How frequently to check for tasks that do not fit any worker. (default=180000000)
  - "option_blocklist_slow_workers_timeout" Timeout for slow workers to come back to the pool. (default=900)
  - "watch-library-logfiles" If 1, watch the output files produced by each of the library processes running on the remote workers, take them back the current logging directory. (default=0)
+ - "max-library-retries" The number of times a library task can fail and be retried before it is permanently removed.
 @param value The value to set the parameter to.
 @return 0 on succes, -1 on failure.
 */

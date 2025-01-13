@@ -5673,6 +5673,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "sandbox-grow-factor")) {
 		q->sandbox_grow_factor = MAX(1.1, value);
 
+	} else if (!strcmp(name, "max-library-retries")) {
+		q->max_library_retries = MIN(1, value);
+
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
