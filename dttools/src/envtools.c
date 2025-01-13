@@ -63,7 +63,7 @@ int env_replace(const char *infile, const char *outfile)
 	int var_index = 0;
 	int valid_var = 0;
 
-	char c = fgetc(INPUT);
+	int c = fgetc(INPUT);
 	while (c != EOF) {
 		if (c == '$') {
 			valid_var = 1;
