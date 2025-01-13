@@ -502,8 +502,8 @@ int vine_process_library_get_result(struct vine_process *p, uint64_t *done_task_
 
 	/* is the received message properly formatted as two integers? */
 	ok = sscanf(buffer_data, "%" SCNu64 " %d", done_task_id, done_exit_code);
-	if(ok!=2) {
-		debug(D_VINE,"Invalid message received from library: %s",buffer_data);
+	if (ok != 2) {
+		debug(D_VINE, "Invalid message received from library: %s", buffer_data);
 		return 0;
 	}
 
