@@ -742,7 +742,9 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 	ITABLE_ITERATE(procs_running, task_id, p_running)
 	{
 		if (p_running->library_process == p) {
+			debug(D_VINE,"killing function task %d running on library task %d",(int)task_id,p->task->task_id);
 			finish_running_task(p_running, VINE_RESULT_FORSAKEN);
+			reap_process(p_running,manager);
 		}
 	}
 }
