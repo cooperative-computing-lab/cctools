@@ -1387,8 +1387,10 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 
 /*
 Consider the set of tasks that are waiting but not running.
-Cancel those that have exceeded their expressed end time,
-exceeded the maximum number of retries, or other policy issues.
+Cancel those that cannot run for unfixable policy reasons,
+such as exceeded the absolute end time, no library task available, etc.
+This is done in a separate iteration outside of scheduling
+to avoid the cost of these checks in the critical path.
 */
 
 static int expire_waiting_tasks(struct vine_manager *q)
@@ -1397,20 +1399,38 @@ static int expire_waiting_tasks(struct vine_manager *q)
 	int t_idx;
 	int expired = 0;
 
+	/* Measure the current time once for the whole iteration. */
 	double current_time = timestamp_get() / ONE_SECOND;
 
+	/* Only work through the queue up to iter_depth. */
 	int iter_count = 0;
 	int iter_depth = q->attempt_schedule_depth;
+
 	PRIORITY_QUEUE_STATIC_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
 	{
+		/* In this loop, use VINE_RESULT_SUCCESS as an indication of "still ok to run". */
+		vine_result_t result = VINE_RESULT_SUCCESS;
+
+		/* Consider each of the possible task expiration reasons. */
+
 		if (t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
-			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
+			/* If the task has run past its explicit end time, it cannot run. */
+			result = VINE_RESULT_MAX_END_TIME;
+		} else if (t->needs_library && !hash_table_lookup(q->library_templates, t->needs_library)) {
+			/* If the corresponding library was *never* submitted, this task cannot run. */
+			result = VINE_RESULT_MISSING_LIBRARY;
+		}
+
+		/* If any of the reasons fired, then expire the task and put in the retrieved queue. */
+		if (result != VINE_RESULT_SUCCESS) {
+			vine_task_set_result(t, result);
 			priority_queue_remove(q->ready_tasks, t_idx);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			expired++;
 		}
 	}
 
+	/* Return the number of tasks expired. */
 	return expired;
 }
 
@@ -1418,6 +1438,7 @@ static int expire_waiting_tasks(struct vine_manager *q)
 Consider the set of tasks that are waiting with strict inputs
 Terminate those to which no such worker exists.
 */
+
 static int enforce_waiting_fixed_locations(struct vine_manager *q)
 {
 	int t_idx;
@@ -4566,6 +4587,9 @@ const char *vine_result_string(vine_result_t result)
 	case VINE_RESULT_SANDBOX_EXHAUSTION:
 		str = "SANDBOX_EXHAUSTION";
 		break;
+	case VINE_RESULT_MISSING_LIBRARY:
+		str = "MISSING_LIBRARY";
+		break;
 	}
 
 	return str;
@@ -5097,7 +5121,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		} while (q->max_retrievals < 0 || retrieved_this_cycle < q->max_retrievals || !priority_queue_size(q->ready_tasks));
 		END_ACCUM_TIME(q, time_receive);
 
-		// expired tasks
+		// check for tasks that cannot run at all
 		BEGIN_ACCUM_TIME(q, time_internal);
 		result = expire_waiting_tasks(q);
 		END_ACCUM_TIME(q, time_internal);
@@ -5961,6 +5985,7 @@ void vine_accumulate_task(struct vine_manager *q, struct vine_task *t)
 	case VINE_RESULT_FORSAKEN:
 	case VINE_RESULT_MAX_RETRIES:
 	case VINE_RESULT_LIBRARY_EXIT:
+	case VINE_RESULT_MISSING_LIBRARY:
 		break;
 	}
 }

@@ -106,7 +106,8 @@ typedef enum {
 							 location input file requirements. */
 	VINE_RESULT_CANCELLED = 11 << 3,	      /**< The task was cancelled by the caller. */
 	VINE_RESULT_LIBRARY_EXIT = 12 << 3,	      /**< Task is a library that has terminated. **/
-	VINE_RESULT_SANDBOX_EXHAUSTION = 13 << 3	      /**< The task used more disk than the allowed sandbox. **/
+	VINE_RESULT_SANDBOX_EXHAUSTION = 13 << 3,     /**< The task used more disk than the allowed sandbox. **/
+	VINE_RESULT_MISSING_LIBRARY = 14 << 3         /**< The task is a function requiring a library that does not exist. */
 } vine_result_t;
 
 /** Select how to allocate resources for similar tasks with @ref vine_set_category_mode */
