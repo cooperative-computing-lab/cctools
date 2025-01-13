@@ -902,6 +902,7 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 			t->time_workers_execute_all += delta_time;
 		}
 
+		/* Remove the unfinished task and update data structures. */
 		reap_task_from_worker(q, w, t, VINE_TASK_READY);
 
 		// recreate inputs lost
@@ -1337,9 +1338,8 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 
 	vine_accumulate_task(q, t);
 
-	// At this point, a task is completed.
+	/* Remove the completed task and update all data structures. */
 	reap_task_from_worker(q, w, t, VINE_TASK_RETRIEVED);
-	vine_manager_send(q, w, "kill %d\n", t->task_id);
 
 	switch (t->result) {
 	case VINE_RESULT_INPUT_MISSING:
@@ -2991,7 +2991,7 @@ static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w
 }
 
 /*
-Collect a completed task from a worker, and then update
+Remove a running or completed task from a worker, and then update
 all auxiliary data structures to remove the association
 and change the task state.
 */
@@ -3005,6 +3005,9 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 
 	/* Make sure the task and worker agree before changing anything. */
 	assert(t->worker == w);
+
+	/* Tell worker to remove the task sandbox (and if necessary, the running process) */
+	vine_manager_send(q, w, "kill %d\n", t->task_id);
 
 	w->total_task_time += t->time_workers_execute_last;
 
@@ -3660,22 +3663,17 @@ static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vin
 
 	case VINE_TASK_RUNNING:
 
-		// t->worker must be set if in RUNNING state.
+		/* t->worker must be set if in RUNNING state */
 		assert(w);
 
-		// send message to worker asking to kill its task.
-		vine_manager_send(q, w, "kill %d\n", t->task_id);
-		debug(D_VINE, "Task with id %d has been cancelled at worker %s (%s) and removed.", t->task_id, w->hostname, w->addrport);
+		/* Remove the running task and update all data structures. */
+		reap_task_from_worker(q, w, t, new_state);
 
-		// Delete any input files that are not to be cached.
+		/* After task is killed, delete non-cacheable inputs and all (incomplete) output files from the worker cache. */
 		delete_worker_files(q, w, t->input_mounts, VINE_CACHE_LEVEL_TASK);
-
-		// Delete all output files since they are not needed as the task was cancelled.
 		delete_worker_files(q, w, t->output_mounts, VINE_CACHE_LEVEL_FOREVER);
 
-		// Collect task structure from worker.
-		// Note that this calls change_task_state internally.
-		reap_task_from_worker(q, w, t, new_state);
+		/* change_task_state() happened inside reap_task_from_worker */
 
 		break;
 
