@@ -64,6 +64,14 @@ case "$BUILD_CPU" in
 	;;
 esac
 
+if [ "$BUILD_CPU" = X86_64 -a "$BUILD_SYS" = LINUX -a "$CONDA_BUILD_CROSS_COMPILATION" != 1 ]
+then
+	BUILD_LINUX_NATIVE_X86_64=yes
+else
+	BUILD_LINUX_NATIVE_X86_64=no
+fi
+
+
 include_package_chirp="chirp"
 include_package_deltadb="deltadb"
 include_package_doc="doc"
@@ -1241,7 +1249,7 @@ fi
 
 if [ "$include_package_resource_monitor" = resource_monitor ]
 then
-	if [ -d resource_monitor -a $BUILD_SYS = LINUX ]
+	if [ -d resource_monitor -a "$BUILD_LINUX_NATIVE_X86_64" = yes ]
 	then
 		echo "resource_monitor IS supported on ${BUILD_SYS}"
 	else
@@ -1428,6 +1436,8 @@ CCTOOLS_HOME=${source_path}
 CCTOOLS_INSTALL_DIR=${install_path}
 
 CCTOOLS_OPSYS=${BUILD_SYS}
+
+CCTOOLS_LINUX_NATIVE_X86_64=${BUILD_LINUX_NATIVE_X86_64}
 
 CCTOOLS_PACKAGES=${packages}
 

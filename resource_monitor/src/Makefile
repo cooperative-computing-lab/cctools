@@ -20,11 +20,11 @@ LOCAL_LINKAGE = ../../dttools/src/libdttools.a
 
 PROGRAMS = resource_monitor piggybacker rmonitor_poll_example rmonitor_snapshot
 
-ifeq ($(CCTOOLS_OPSYS),DARWIN)
+ifeq ($(CCTOOLS_LINUX_NATIVE_X86_64),yes)
+	TARGETS = $(LIBRARIES) $(PROGRAMS)
+else
 	TARGETS =
 	PROGRAMS =
-else
-	TARGETS = $(LIBRARIES) $(PROGRAMS)
 endif
 
 all: $(TARGETS) bindings
