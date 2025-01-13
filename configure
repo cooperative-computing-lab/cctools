@@ -1280,7 +1280,7 @@ then
 	fi
 fi
 
-potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} ${include_package_work_queue} ${include_package_ftplite} ${include_package_taskvine} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_deltadb} ${include_package_doc} ${include_package_poncho}"
+potential_packages="dttools batch_job ${include_package_taskvine} ${include_package_grow} ${include_package_makeflow} ${include_package_work_queue} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_deltadb} ${include_package_doc} ${include_package_poncho}"
 
 echo "checking for all the things I know how to build..."
 for p in $potential_packages
