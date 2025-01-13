@@ -24,6 +24,8 @@ struct vine_file_replica *vine_file_replica_create(vine_file_type_t type, vine_c
 
 void vine_file_replica_delete(struct vine_file_replica *r)
 {
+	if (!r)
+		return;
 	free(r);
 	vine_counters.replica.deleted++;
 }

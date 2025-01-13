@@ -1138,7 +1138,9 @@ static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w
 		vine_manager_send(q, w, "unlink %s\n", filename);
 		struct vine_file_replica *replica;
 		replica = vine_file_replica_table_remove(q, w, filename);
-		vine_file_replica_delete(replica);
+		if (replica) {
+			vine_file_replica_delete(replica);
+		}
 		return 1;
 	}
 
