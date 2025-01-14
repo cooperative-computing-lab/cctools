@@ -554,12 +554,11 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 			original->library_failed_count++;
 			original->time_when_last_failure = timestamp_get();
 		}
-		itable_remove(q->running_library_instances, t->task_id);
-		printf("Library %s failed on worker %s (%s)", t->provides_library, w->hostname, w->addrport);
+		debug(D_VINE | D_NOTICE, "Library %s failed on worker %s (%s)", t->provides_library, w->hostname, w->addrport);
 		if (q->watch_library_logfiles) {
-			printf(", check the library log file %s\n", t->library_log_path);
+			debug(D_VINE | D_NOTICE, ", check the library log file %s\n", t->library_log_path);
 		} else {
-			printf(", enable watch-library-logfiles for debug\n");
+			debug(D_VINE | D_NOTICE, ", enable watch-library-logfiles for debug\n");
 		}
 	} else {
 		/* Update task stats for this completion. */
@@ -618,6 +617,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	/* Finally update data structures to reflect the completion. */
 	change_task_state(q, t, VINE_TASK_WAITING_RETRIEVAL);
 	itable_remove(q->running_table, t->task_id);
+	itable_remove(q->running_library_instances, t->task_id);
 	vine_task_set_result(t, task_status);
 
 	return VINE_SUCCESS;
@@ -3329,7 +3329,9 @@ int consider_task(struct vine_manager *q, struct vine_task *t)
 }
 
 /*
-Determine whether there is a worker available to run a task.
+This is a "conservative" estimate of the resources available.
+If this returns false, then there is definitely no worker available to run any task.
+If it returns true, then there may be a suitable worker, and we have to check them all in detail.
 */
 static int has_exec_capacity(struct vine_manager *q)
 {
@@ -3874,7 +3876,6 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->uuid = strdup(local_uuid.str);
 
 	q->next_task_id = 1;
-	q->next_library_id = 1;
 
 	q->fixed_location_in_queue = 0;
 
@@ -4655,7 +4656,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	if (original->library_failed_count > q->max_library_retries) {
 		vine_manager_remove_library(q, name);
 		debug(D_VINE, "library %s has reached the maximum failure count %d, it has been removed", name, q->max_library_retries);
-		printf("library %s has reached the maximum failure count %d, it has been removed\n", name, q->max_library_retries);
+		debug(D_VINE|D_NOTICE, "library %s has reached the maximum failure count %d, it has been removed\n", name, q->max_library_retries);
 		return 0;
 	}
 
@@ -4687,7 +4688,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	/* If watch-library-logfiles is tuned, watch the output file of every duplicated library instance */
 	if (q->watch_library_logfiles) {
 		char *remote_stdout_filename = string_format(".taskvine.stdout");
-		char *local_library_log_filename = string_format("library-%d.debug.log", q->next_library_id++);
+		char *local_library_log_filename = string_format("library-task-%d.log", t->task_id);
 		t->library_log_path = vine_get_path_library_log(q, local_library_log_filename);
 
 		struct vine_file *library_local_stdout_file = vine_declare_file(q, t->library_log_path, VINE_CACHE_LEVEL_TASK, 0);
