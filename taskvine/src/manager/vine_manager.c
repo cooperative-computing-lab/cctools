@@ -4656,7 +4656,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	if (original->library_failed_count > q->max_library_retries) {
 		vine_manager_remove_library(q, name);
 		debug(D_VINE, "library %s has reached the maximum failure count %d, it has been removed", name, q->max_library_retries);
-		debug(D_VINE|D_NOTICE, "library %s has reached the maximum failure count %d, it has been removed\n", name, q->max_library_retries);
+		debug(D_VINE | D_NOTICE, "library %s has reached the maximum failure count %d, it has been removed\n", name, q->max_library_retries);
 		return 0;
 	}
 
