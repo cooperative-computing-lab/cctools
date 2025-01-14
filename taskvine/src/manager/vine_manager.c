@@ -914,6 +914,7 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 			t->time_workers_execute_all += delta_time;
 		}
 
+		/* Remove the unfinished task and update data structures. */
 		reap_task_from_worker(q, w, t, VINE_TASK_READY);
 
 		// recreate inputs lost
@@ -1352,9 +1353,8 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 
 	vine_accumulate_task(q, t);
 
-	// At this point, a task is completed.
+	/* Remove the completed task and update all data structures. */
 	reap_task_from_worker(q, w, t, VINE_TASK_RETRIEVED);
-	vine_manager_send(q, w, "kill %d\n", t->task_id);
 
 	switch (t->result) {
 	case VINE_RESULT_INPUT_MISSING:
@@ -3028,7 +3028,7 @@ static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w
 }
 
 /*
-Collect a completed task from a worker, and then update
+Remove a running or completed task from a worker, and then update
 all auxiliary data structures to remove the association
 and change the task state.
 */
@@ -3042,6 +3042,9 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 
 	/* Make sure the task and worker agree before changing anything. */
 	assert(t->worker == w);
+
+	/* Tell worker to remove the task sandbox (and if necessary, the running process) */
+	vine_manager_send(q, w, "kill %d\n", t->task_id);
 
 	w->total_task_time += t->time_workers_execute_last;
 
@@ -3116,7 +3119,7 @@ If a file can be fetched from a substitute source,
 this function modifies the file->substitute field to reflect that source.
 */
 
-static int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	struct vine_mount *m;
 
@@ -3299,56 +3302,41 @@ static int vine_manager_check_library_for_function_call(struct vine_manager *q, 
 }
 
 /*
-Consider if a task is eligible to run, and if so, find the best worker for it.
+Consider if a task is eligible to run.
 */
-static struct vine_worker_info *consider_task(struct vine_manager *q, struct vine_task *t)
+int consider_task(struct vine_manager *q, struct vine_task *t)
 {
 	timestamp_t now_usecs = timestamp_get();
 	double now_secs = ((double)now_usecs) / ONE_SECOND;
 
 	// Skip task if min requested start time not met.
 	if (t->resources_requested->start > now_secs) {
-		return NULL;
+		return 0;
 	}
 
 	// Skip if this task failed recently
 	if (t->time_when_last_failure + q->transient_error_interval > now_usecs) {
-		return NULL;
+		return 0;
 	}
 
 	// Skip if category already running maximum allowed tasks
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 	if (c->max_concurrent > -1 && c->max_concurrent <= c->vine_stats->tasks_running) {
-		return NULL;
+		return 0;
 	}
 
 	// Skip task if temp input files have not been materialized.
 	if (!vine_manager_check_inputs_available(q, t)) {
-		return NULL;
+		return 0;
 	}
 
-	// Skip function call task if no suitable library template was installed
+	// Skip function call task if no suitable library template was installed.
 	if (!vine_manager_check_library_for_function_call(q, t)) {
-		return NULL;
+		return 0;
 	}
 
-	// Find the best worker for the task
-	q->stats_measure->time_scheduling = timestamp_get();
-	struct vine_worker_info *w = vine_schedule_task_to_worker(q, t);
-	if (!w) {
-		return NULL;
-	}
-	q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
-
-	// Check if there is transfer capacity available.
-	if (q->peer_transfers_enabled) {
-		if (!vine_manager_transfer_capacity_available(q, w, t)) {
-			return NULL;
-		}
-	}
-
-	// All checks passed
-	return w;
+	// All checks passed, task is eligible to run.
+	return 1;
 }
 
 /*
@@ -3365,7 +3353,6 @@ static int send_one_task(struct vine_manager *q)
 
 	int t_idx;
 	struct vine_task *t;
-	struct vine_worker_info *w = NULL;
 
 	int iter_count = 0;
 	int iter_depth = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
@@ -3386,7 +3373,15 @@ static int send_one_task(struct vine_manager *q)
 	// the priority queue data structure where also invokes priority_queue_rotate_reset.
 	PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
 	{
-		w = consider_task(q, t);
+		if (!consider_task(q, t)) {
+			continue;
+		}
+
+		// Find the best worker for the task
+		q->stats_measure->time_scheduling = timestamp_get();
+		struct vine_worker_info *w = vine_schedule_task_to_worker(q, t);
+		q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
+
 		if (w) {
 			priority_queue_remove(q->ready_tasks, t_idx);
 			commit_task_to_worker(q, w, t);
@@ -3729,22 +3724,17 @@ static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vin
 		break;
 
 	case VINE_TASK_RUNNING:
-		// t->worker must be set if in RUNNING state.
+		/* t->worker must be set if in RUNNING state */
 		assert(w);
 
-		// send message to worker asking to kill its task.
-		vine_manager_send(q, w, "kill %d\n", t->task_id);
-		debug(D_VINE, "Task with id %d has been cancelled at worker %s (%s) and removed.", t->task_id, w->hostname, w->addrport);
+		/* Remove the running task and update all data structures. */
+		reap_task_from_worker(q, w, t, new_state);
 
-		// Delete any input files that are not to be cached.
+		/* After task is killed, delete non-cacheable inputs and all (incomplete) output files from the worker cache. */
 		delete_worker_files(q, w, t->input_mounts, VINE_CACHE_LEVEL_TASK);
-
-		// Delete all output files since they are not needed as the task was cancelled.
 		delete_worker_files(q, w, t->output_mounts, VINE_CACHE_LEVEL_FOREVER);
 
-		// Collect task structure from worker.
-		// Note that this calls change_task_state internally.
-		reap_task_from_worker(q, w, t, new_state);
+		/* change_task_state() happened inside reap_task_from_worker */
 
 		break;
 
