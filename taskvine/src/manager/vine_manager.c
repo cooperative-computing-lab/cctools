@@ -3328,15 +3328,18 @@ int consider_task(struct vine_manager *q, struct vine_task *t)
 	return 1;
 }
 
+/*
+Determine whether there is a worker available to run a task.
+*/
 static int has_exec_capacity(struct vine_manager *q)
 {
-	/* First check if there is a free slot on a library instance */
+	/* First check if there is a free slot on any library instances */
 	uint64_t task_id;
 	struct vine_task *t;
 
 	ITABLE_ITERATE(q->running_library_instances, task_id, t)
 	{
-		/* A task must use at least one core */
+		/* A function task must use at least one slot */
 		if (t->function_slots_inuse < t->function_slots_total) {
 			return 1;
 		}
@@ -3348,7 +3351,7 @@ static int has_exec_capacity(struct vine_manager *q)
 
 	HASH_TABLE_ITERATE(q->worker_table, worker_key, w)
 	{
-		/* A task may use a gpu but not use cores */
+		/* A normal task may use a gpu but not use cores */
 		if (w->resources->cores.inuse + w->resources->gpus.inuse < w->resources->cores.total + w->resources->gpus.total) {
 			return 1;
 		}
