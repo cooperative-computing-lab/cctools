@@ -82,13 +82,13 @@ static struct rmsummary *count_worker_available_resources(struct vine_manager *q
 	 * If the task is a function task, the inuse resources are adjusted by the resources used by the library task. */
 	struct vine_resources *worker_net_resources = vine_resources_copy(w->resources);
 
-	/* Function resource allocation is going to be addressed in the next PR. */
-	if (t->needs_library || t->provides_library) {
+	/* If the task is a library task, skip those idle libraries as if they are not using any resources */
+	if (t->provides_library) {
 		uint64_t task_id;
 		struct vine_task *ti;
 		ITABLE_ITERATE(w->current_tasks, task_id, ti)
 		{
-			if (ti->provides_library && ti->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, ti->provides_library))) {
+			if (ti->provides_library && ti->function_slots_inuse == 0) {
 				worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
 				worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
 				worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
@@ -121,16 +121,7 @@ static struct rmsummary *count_worker_available_resources(struct vine_manager *q
  * @return 1 if yes, 0 otherwise. */
 int check_worker_has_enough_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *tr)
 {
-	/*
-	This is a temporary hack in order to get Greg's application running.
-	The problem is in line with the problem pointed out in PR #3909 but a special case in the manager's end.
-
-	The problem here is that the manager always allocates the whole disk the the library task,
-	so that libtask->current_resource_box->disk is always equal to worker_net_resources->disk.total.
-	For the first task, the ti->current_resource_box->disk == 0, it is able to run because the expr in line 114 doesn't satisfy.
-	However, if the first task causes any increase in the worker's disk, worker_net_resources->disk.inuse will go above the total,
-	which causes the consistent true of the expr in line 114.
-	*/
+	/* Skip if it is a function task */
 	if (t->needs_library) {
 		return 1;
 	}
@@ -183,10 +174,7 @@ int check_worker_has_enough_resources(struct vine_manager *q, struct vine_worker
 /* Check if the worker is fully occupied by other tasks, or the disk is full. */
 static int check_worker_has_available_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	/*
-	This is the same hack as in check_worker_has_enough_resources.
-	Another PR is going on to fix the problem of library/function task allocation.
-	*/
+	/* Skip if it is a function task */
 	if (t->needs_library) {
 		return 1;
 	}
