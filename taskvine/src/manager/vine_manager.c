@@ -166,7 +166,7 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
 
-struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name, vine_result_code_t *result);
+struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
@@ -1139,7 +1139,9 @@ static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w
 		vine_manager_send(q, w, "unlink %s\n", filename);
 		struct vine_file_replica *replica;
 		replica = vine_file_replica_table_remove(q, w, filename);
-		vine_file_replica_delete(replica);
+		if (replica) {
+			vine_file_replica_delete(replica);
+		}
 		return 1;
 	}
 
@@ -1387,8 +1389,10 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 
 /*
 Consider the set of tasks that are waiting but not running.
-Cancel those that have exceeded their expressed end time,
-exceeded the maximum number of retries, or other policy issues.
+Cancel those that cannot run for unfixable policy reasons,
+such as exceeded the absolute end time, no library task available, etc.
+This is done in a separate iteration outside of scheduling
+to avoid the cost of these checks in the critical path.
 */
 
 static int expire_waiting_tasks(struct vine_manager *q)
@@ -1397,20 +1401,38 @@ static int expire_waiting_tasks(struct vine_manager *q)
 	int t_idx;
 	int expired = 0;
 
+	/* Measure the current time once for the whole iteration. */
 	double current_time = timestamp_get() / ONE_SECOND;
 
+	/* Only work through the queue up to iter_depth. */
 	int iter_count = 0;
-	int iter_depth = q->attempt_schedule_depth;
+	int iter_depth = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
+
 	PRIORITY_QUEUE_STATIC_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
 	{
+		/* In this loop, use VINE_RESULT_SUCCESS as an indication of "still ok to run". */
+		vine_result_t result = VINE_RESULT_SUCCESS;
+
+		/* Consider each of the possible task expiration reasons. */
+
 		if (t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
-			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
+			debug(D_VINE, "task %d has exceeded its end time", t->task_id);
+			result = VINE_RESULT_MAX_END_TIME;
+		} else if (t->needs_library && !hash_table_lookup(q->library_templates, t->needs_library)) {
+			debug(D_VINE, "task %d does not match any submitted library named \"%s\"", t->task_id, t->needs_library);
+			result = VINE_RESULT_MISSING_LIBRARY;
+		}
+
+		/* If any of the reasons fired, then expire the task and put in the retrieved queue. */
+		if (result != VINE_RESULT_SUCCESS) {
+			vine_task_set_result(t, result);
 			priority_queue_remove(q->ready_tasks, t_idx);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			expired++;
 		}
 	}
 
+	/* Return the number of tasks expired. */
 	return expired;
 }
 
@@ -1418,6 +1440,7 @@ static int expire_waiting_tasks(struct vine_manager *q)
 Consider the set of tasks that are waiting with strict inputs
 Terminate those to which no such worker exists.
 */
+
 static int enforce_waiting_fixed_locations(struct vine_manager *q)
 {
 	int t_idx;
@@ -2901,6 +2924,10 @@ static void kill_empty_libraries_on_worker(struct vine_manager *q, struct vine_w
 Commit a given task to a worker by sending the task details,
 then updating all auxiliary data structures to note the
 assignment and the new task state.
+
+If the commit should fail for any reason, then this function
+is responsible for invoke handle_failure in order to put the
+task/worker back into the proper state.
 */
 
 static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
@@ -2918,12 +2945,21 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 		if (!t->library_task) {
 			/* Otherwise send the library to the worker. */
 			/* Note that this call will re-enter commit_task_to_worker. */
-			t->library_task = send_library_to_worker(q, w, t->needs_library, &result);
+			t->library_task = send_library_to_worker(q, w, t->needs_library);
 
-			/* Careful: if the above failed, then w may no longer be valid */
-			/* In that case return immediately without making further changes. */
-			if (!t->library_task)
-				return result;
+			/*
+			Careful, this is an ugly special case.
+			The library dispatch could have failed for any number of reasons,
+			including a problem with the worker, or a problem or limitation
+			with the library task.  The function call task doesn't necessarily
+			have a problem, but we haven't committed it to anything either.
+			So, we fail with code VINE_MGR_FAILURE, which tells the caller
+			to put it back in the queue without doing anything.
+			*/
+
+			if (!t->library_task) {
+				return VINE_MGR_FAILURE;
+			}
 		}
 		/* If start_one_task_fails, this will be decremented in handle_failure below. */
 		t->library_task->function_slots_inuse++;
@@ -3402,8 +3438,24 @@ static int send_one_task(struct vine_manager *q)
 
 		if (w) {
 			priority_queue_remove(q->ready_tasks, t_idx);
-			commit_task_to_worker(q, w, t);
-			return 1;
+			vine_result_code_t result = commit_task_to_worker(q, w, t);
+			switch (result) {
+			case VINE_SUCCESS:
+				/* return on successful commit. */
+				return 1;
+				break;
+			case VINE_APP_FAILURE:
+			case VINE_WORKER_FAILURE:
+				/* failed to dispatch, commit put the task back in the right place. */
+				break;
+			case VINE_MGR_FAILURE:
+				/* special case, commit had a chained failure. */
+				priority_queue_push(q->ready_tasks, t, t->priority);
+				break;
+			case VINE_END_OF_LIST:
+				/* shouldn't happen, keep going */
+				break;
+			}
 		}
 	}
 
@@ -4557,6 +4609,9 @@ const char *vine_result_string(vine_result_t result)
 	case VINE_RESULT_SANDBOX_EXHAUSTION:
 		str = "SANDBOX_EXHAUSTION";
 		break;
+	case VINE_RESULT_MISSING_LIBRARY:
+		str = "MISSING_LIBRARY";
+		break;
 	}
 
 	return str;
@@ -4630,10 +4685,9 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
  * @param q The manager structure.
  * @param w The worker info structure.
  * @param name The name of the library to be sent.
- * @param result A pointer to a result reflecting the reason for any failure.
  * @return pointer to the library task if the operation succeeds, 0 otherwise.
  */
-struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name, vine_result_code_t *result)
+struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name)
 {
 	/* Find the original prototype library task by name, if it exists. */
 	struct vine_task *original = hash_table_lookup(q->library_templates, name);
@@ -4697,10 +4751,10 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 
 	/* Send the task to the worker in the usual way. */
 	/* Careful: If this failed, then the worker object or task object may no longer be valid! */
-	*result = commit_task_to_worker(q, w, t);
+	vine_result_code_t result = commit_task_to_worker(q, w, t);
 
 	/* Careful again: If commit_task_to_worker failed the worker object or task object may no longer be valid! */
-	if (*result == VINE_SUCCESS) {
+	if (result == VINE_SUCCESS) {
 		vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
 		return t;
 	} else {
@@ -5088,7 +5142,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		} while (q->max_retrievals < 0 || retrieved_this_cycle < q->max_retrievals || !priority_queue_size(q->ready_tasks));
 		END_ACCUM_TIME(q, time_receive);
 
-		// expired tasks
+		// check for tasks that cannot run at all
 		BEGIN_ACCUM_TIME(q, time_internal);
 		result = expire_waiting_tasks(q);
 		END_ACCUM_TIME(q, time_internal);
@@ -5640,6 +5694,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "sandbox-grow-factor")) {
 		q->sandbox_grow_factor = MAX(1.1, value);
 
+	} else if (!strcmp(name, "max-library-retries")) {
+		q->max_library_retries = MIN(1, value);
+
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
@@ -5952,6 +6009,7 @@ void vine_accumulate_task(struct vine_manager *q, struct vine_task *t)
 	case VINE_RESULT_FORSAKEN:
 	case VINE_RESULT_MAX_RETRIES:
 	case VINE_RESULT_LIBRARY_EXIT:
+	case VINE_RESULT_MISSING_LIBRARY:
 		break;
 	}
 }

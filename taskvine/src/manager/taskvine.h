@@ -106,7 +106,8 @@ typedef enum {
 							 location input file requirements. */
 	VINE_RESULT_CANCELLED = 11 << 3,	      /**< The task was cancelled by the caller. */
 	VINE_RESULT_LIBRARY_EXIT = 12 << 3,	      /**< Task is a library that has terminated. **/
-	VINE_RESULT_SANDBOX_EXHAUSTION = 13 << 3	      /**< The task used more disk than the allowed sandbox. **/
+	VINE_RESULT_SANDBOX_EXHAUSTION = 13 << 3,     /**< The task used more disk than the allowed sandbox. **/
+	VINE_RESULT_MISSING_LIBRARY = 14 << 3         /**< The task is a function requiring a library that does not exist. */
 } vine_result_t;
 
 /** Select how to allocate resources for similar tasks with @ref vine_set_category_mode */
@@ -1435,6 +1436,7 @@ a times series, if this feature is enabled. See @ref vine_enable_monitoring.
  - "large_task_check_interval" How frequently to check for tasks that do not fit any worker. (default=180000000)
  - "option_blocklist_slow_workers_timeout" Timeout for slow workers to come back to the pool. (default=900)
  - "watch-library-logfiles" If 1, watch the output files produced by each of the library processes running on the remote workers, take them back the current logging directory. (default=0)
+ - "max-library-retries" The number of times a library task can fail and be retried before it is permanently removed.
 @param value The value to set the parameter to.
 @return 0 on succes, -1 on failure.
 */
