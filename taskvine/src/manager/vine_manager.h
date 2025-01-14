@@ -108,7 +108,8 @@ struct vine_manager {
 	struct list   *retrieved_list;      /* List of vine_task that have been retrieved. */
 	struct list   *task_info_list;  /* List of last N vine_task_infos for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */
-	struct hash_table *library_templates; /* Maps library name -> vine_task of library with that name. */
+	struct hash_table *library_templates;     /* Maps library name -> vine_task of library with that name. */
+	struct itable     *running_library_instances;     /* Maps task_id -> vine_task of library instance. */
 
 	/* Primary data structures for tracking worker state. */
 
@@ -133,13 +134,11 @@ struct vine_manager {
 
 	/* Internal state modified by the manager */
 
-	int next_task_id;       /* Next integer task_id to be assigned to a created task. */
-	int duplicated_libraries;  /* The number of duplicated libraries */
+	int next_task_id;            /* Next integer task_id to be assigned to a created task. */
+	int next_library_id;         /* Next integer library_id to be assigned to a library instance. */
 	int fixed_location_in_queue; /* Number of fixed location tasks currently being managed */
 	int num_tasks_left;    /* Optional: Number of tasks remaining, if given by user.  @ref vine_set_num_tasks */
 	int busy_waiting_flag; /* Set internally in main loop if no messages were processed -> wait longer. */
-	int total_available_cores;   /* Number of cores available among all workers. */
-	int total_available_slots;   /* Number of function slots available among all workers. */
 
 	/* Accumulation of statistics for reporting to the caller. */
 

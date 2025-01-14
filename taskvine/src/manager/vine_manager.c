@@ -554,11 +554,13 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 			original->library_failed_count++;
 			original->time_when_last_failure = timestamp_get();
 		}
+		itable_remove(q->running_library_instances, t->task_id);
 		printf("Library %s failed on worker %s (%s)", t->provides_library, w->hostname, w->addrport);
-		if (q->watch_library_logfiles)
+		if (q->watch_library_logfiles) {
 			printf(", check the library log file %s\n", t->library_log_path);
-		else
+		} else {
 			printf(", enable watch-library-logfiles for debug\n");
+		}
 	} else {
 		/* Update task stats for this completion. */
 		observed_execution_time = timestamp_get() - t->time_when_commit_end;
@@ -2409,7 +2411,6 @@ static vine_msg_code_t handle_resources(struct vine_manager *q, struct vine_work
 		debug(D_VINE, "%s", line);
 
 		if (sscanf(line, "cores %" PRId64, &total)) {
-			q->total_available_cores += (total - w->resources->cores.total);
 			w->resources->cores.total = total;
 		} else if (sscanf(line, "memory %" PRId64, &total)) {
 			w->resources->memory.total = total;
@@ -2742,7 +2743,6 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 		} else {
 			t->function_slots_total = t->function_slots_requested;
 		}
-		q->total_available_slots += t->function_slots_total;
 	}
 
 	char *command_line;
@@ -2770,8 +2770,6 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
-	q->total_available_cores -= (w->resources->cores.total - w->resources->cores.inuse);
-
 	w->resources->cores.inuse = 0;
 	w->resources->memory.inuse = 0;
 	w->resources->disk.inuse = 0;
@@ -2798,8 +2796,6 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 	}
 
 	w->resources->disk.inuse += ceil(BYTES_TO_MEGABYTES(w->inuse_cache));
-
-	q->total_available_cores += (w->resources->cores.total - w->resources->cores.inuse);
 }
 
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w)
@@ -2896,7 +2892,6 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 		}
 		/* If start_one_task_fails, this will be decremented in handle_failure below. */
 		t->library_task->function_slots_inuse++;
-		q->total_available_slots--;
 	}
 
 	t->hostname = xxstrdup(w->hostname);
@@ -3060,13 +3055,7 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 	*/
 
 	if (t->needs_library) {
-		int previous_slots_inuse = t->library_task->function_slots_inuse;
 		t->library_task->function_slots_inuse = MAX(0, t->library_task->function_slots_inuse - 1);
-		q->total_available_slots += (previous_slots_inuse - t->library_task->function_slots_inuse);
-	}
-
-	if (t->provides_library) {
-		q->total_available_slots -= t->function_slots_total;
 	}
 
 	t->worker = 0;
@@ -3339,15 +3328,44 @@ int consider_task(struct vine_manager *q, struct vine_task *t)
 	return 1;
 }
 
+static int has_exec_capacity(struct vine_manager *q)
+{
+	/* First check if there is a free slot on a library instance */
+	uint64_t task_id;
+	struct vine_task *t;
+
+	ITABLE_ITERATE(q->running_library_instances, task_id, t)
+	{
+		/* A task must use at least one core */
+		if (t->function_slots_inuse < t->function_slots_total) {
+			return 1;
+		}
+	}
+
+	/* If no slots are available, or no library instances at all, check the worker cores */
+	char *worker_key;
+	struct vine_worker_info *w;
+
+	HASH_TABLE_ITERATE(q->worker_table, worker_key, w)
+	{
+		/* A task may use a gpu but not use cores */
+		if (w->resources->cores.inuse + w->resources->gpus.inuse < w->resources->cores.total + w->resources->gpus.total) {
+			return 1;
+		}
+	}
+
+	/* No available slots / cores / gpus */
+	return 0;
+}
+
 /*
 Advance the state of the system by selecting one task available
 to run, finding the best worker for that task, and then committing
 the task to the worker.
 */
-
 static int send_one_task(struct vine_manager *q)
 {
-	if ((q->total_available_cores + q->total_available_slots <= 0) || priority_queue_size(q->ready_tasks) == 0) {
+	if (!has_exec_capacity(q)) {
 		return 0;
 	}
 
@@ -3851,12 +3869,11 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	cctools_uuid_t local_uuid;
 	cctools_uuid_create(&local_uuid);
 	q->uuid = strdup(local_uuid.str);
-	q->duplicated_libraries = 0;
 
 	q->next_task_id = 1;
+	q->next_library_id = 1;
+
 	q->fixed_location_in_queue = 0;
-	q->total_available_cores = 0;
-	q->total_available_slots = 0;
 
 	q->ready_tasks = priority_queue_create(0);
 	q->running_table = itable_create(0);
@@ -3865,6 +3882,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->tasks = itable_create(0);
 	q->library_templates = hash_table_create(0, 0);
+	q->running_library_instances = itable_create(0);
 
 	q->worker_table = hash_table_create(0, 0);
 	q->file_worker_table = hash_table_create(0, 0);
@@ -4237,6 +4255,7 @@ void vine_delete(struct vine_manager *q)
 
 	priority_queue_delete(q->ready_tasks);
 	itable_delete(q->running_table);
+	itable_delete(q->running_library_instances);
 	list_delete(q->waiting_retrieval_list);
 	list_delete(q->retrieved_list);
 	hash_table_delete(q->workers_with_watched_file_updates);
@@ -4654,8 +4673,6 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	if (!check_worker_against_task(q, w, original)) {
 		return 0;
 	}
-	/* Track the number of duplicated libraries */
-	q->duplicated_libraries += 1;
 
 	/* Duplicate the original task */
 	struct vine_task *t = vine_task_copy(original);
@@ -4667,7 +4684,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	/* If watch-library-logfiles is tuned, watch the output file of every duplicated library instance */
 	if (q->watch_library_logfiles) {
 		char *remote_stdout_filename = string_format(".taskvine.stdout");
-		char *local_library_log_filename = string_format("library-%d.debug.log", q->duplicated_libraries);
+		char *local_library_log_filename = string_format("library-%d.debug.log", q->next_library_id++);
 		t->library_log_path = vine_get_path_library_log(q, local_library_log_filename);
 
 		struct vine_file *library_local_stdout_file = vine_declare_file(q, t->library_log_path, VINE_CACHE_LEVEL_TASK, 0);
@@ -4679,6 +4696,9 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 
 	/* Add reference to task when adding it to primary table. */
 	itable_insert(q->tasks, t->task_id, vine_task_addref(t));
+
+	/* Bookkeep the active library instances */
+	itable_insert(q->running_library_instances, t->task_id, t);
 
 	/* Send the task to the worker in the usual way. */
 	/* Careful: If this failed, then the worker object or task object may no longer be valid! */
