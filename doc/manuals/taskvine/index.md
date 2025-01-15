@@ -1517,19 +1517,18 @@ conda install -y -p my-env -c conda-forge conda-pack
 conda run -p my-env conda-pack
 ```
 
-#### Managing Dependencies in Distributed Environments
+#### Unknown Python Dependencies? SciUnit Helps
 
-When running Python tasks in distributed environments without shared storage, you may need to manage dependencies explicitly. You can use SciUnit to capture and distribute the dependencies.
-For more information about managing dependencies with SciUnit, please visit the [SciUnit documentation](https://github.com/depaul-dice/sciunit/wiki).
+When running Python tasks on distributed systems without shared storage or consistent environments, you must manage dependencies explicitly. If you’re unsure which libraries your script requires, you can use **[SciUnit](https://github.com/depaul-dice/sciunit/wiki)** to detect them automatically:
 
-Here's an example:
+**Example: Generating a `requirements.txt` with SciUnit**
 
 To generate the `requirements.txt` file, use SciUnit to capture dependencies:
 ```sh
 sciunit exec python <python_script>
-# it will return the eid
+# SciUnit returns an EID (Execution ID)
 sciunit export <eid>
-# it will create a requirements.txt file in the current working directory
+# SciUnit creates requirements.txt in the current directory
 ```
 
 ### Serverless Computing
