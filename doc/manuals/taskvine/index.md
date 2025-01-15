@@ -143,7 +143,7 @@ To scale up, simply run more workers on a cluster or cloud facility.
 
 ## Example Applications
 
-The following examples show more complex applications and various features of TaskVine: 
+The following examples show more complex applications and various features of TaskVine:
 
 - [BLAST Example](example-blast.md)
 - [Gutenberg Example](example-gutenberg.md)
@@ -258,7 +258,7 @@ If a temporary file is unexpectedly lost due to the crash or failure
 of a worker, then the task that created it will be re-executed. Temp files
 may also be replicated across workers to a degree set by the `vine_tune` parameter
 `temp-replica-count`. Temp file replicas are useful if significant work
-is required to re-execute the task that created it. 
+is required to re-execute the task that created it.
 The contents of a temporary file can be obtained with `fetch_file`
 
 If it is necessary to unpack a file before it is used,
@@ -1517,6 +1517,21 @@ conda install -y -p my-env -c conda-forge conda-pack
 conda run -p my-env conda-pack
 ```
 
+#### Managing Dependencies in Distributed Environments
+
+When running Python tasks in distributed environments without shared storage, you may need to manage dependencies explicitly. You can use SciUnit to capture and distribute the dependencies.
+For more information about managing dependencies with SciUnit, please visit the [SciUnit documentation](https://github.com/depaul-dice/sciunit/wiki).
+
+Here's an example:
+
+To generate the `requirements.txt` file, use SciUnit to capture dependencies:
+```sh
+sciunit exec python <python_script>
+# it will return the eid
+sciunit export <eid>
+# it will create a requirements.txt file in the current working directory
+```
+
 ### Serverless Computing
 
 TaskVine offers a serverless computing model which is
@@ -1550,8 +1565,8 @@ You can certainly embed `import` statements within the function and install any 
 
 === "Python"
     ```python
-    def divide(dividend, divisor): 
-        import math 
+    def divide(dividend, divisor):
+        import math
         return dividend / math.sqrt(divisor)
 
     libtask = m.create_library_from_functions("my_library", divide)
@@ -1635,7 +1650,7 @@ Assume that you program has two functions `my_sum` and `my_mul`, and they both u
     ```python
     def base(x, y=1):
         return x**y
-    
+
     A = 2
     B = 3
 
@@ -1666,7 +1681,7 @@ With this setup, `base(A, B)` has to be called repeatedly for every function inv
     def my_mul(x, y):
         base_val = load_variable_from_library('base_val')
         return base_val + x*y
-    
+
     libtask = m.create_library_from_functions("my_library", my_sum, my_mul, library_context_info=[base, [A], {'y': B})
     m.install(libtask)
     # application continues as usual with submitting FunctionCalls and waiting for results.
@@ -1706,7 +1721,7 @@ One can do this to have the model created and loaded in a GPU once and separate 
         model = load_variable_from_library('model')
         # execute an inference
         return model.infer(image)
-    
+
     libtask = m.create_library_from_functions('infer_library',
                                               infer,
                                               library_context_info=[model_setup, [], {})
@@ -1722,11 +1737,11 @@ One can do this to have the model created and loaded in a GPU once and separate 
 
 TaskVine provides a futures executor model which is a subclass
 of Python's concurrent futures executor. A function along with its
-arguments are submitted to the executor to be executed. A future is 
+arguments are submitted to the executor to be executed. A future is
 returned whose value will be resolved at some later point.
 
-To create a future, a `FuturesExecutor` object must first be created. Tasks can 
-then be submitted through the `submit` function. This will return 
+To create a future, a `FuturesExecutor` object must first be created. Tasks can
+then be submitted through the `submit` function. This will return
 a Future object. The result of the task can retrieved by calling `future.result()`
 
 === "Python"
@@ -2070,7 +2085,7 @@ In combination with the worker option `--wall-time`, tasks can request a
 minimum time to execute with `set_time_min`, as explained (below)[#setting-task-resources].
 
 You may also use the same `--cores`, `--memory`, `--disk`, and `--gpus` options when using
-batch submission script `vine_submit_workers`, and the script will correctly ask the right 
+batch submission script `vine_submit_workers`, and the script will correctly ask the right
 batch system for a node of the desired size.
 
 The only caveat is when using `vine_submit_workers -T uge`, as there are many
@@ -2182,7 +2197,7 @@ these limits. You can enable monitoring and enforcement as follows:
     # above declared resources, and generate a time series per task. These time
     # series are written to the logs directory `vine-logs/time-series`.
     # Use with caution, as time series for long running tasks may be in the
-    # order of gigabytes. 
+    # order of gigabytes.
     m.enable_monitoring(m, watchdog=False, time_series=True)
     ```
 
@@ -2584,8 +2599,8 @@ Note that very large task graphs may be impractical to graph at this level of de
 
 ### Other Tools
 
-`vine_plot_compose` visualizes workflow executions in a variety of ways, creating a composition of multiple plots in a single visualiztion. This tool may be useful in 
-comparing performance across multiple executions. 
+`vine_plot_compose` visualizes workflow executions in a variety of ways, creating a composition of multiple plots in a single visualiztion. This tool may be useful in
+comparing performance across multiple executions.
 
 ```sh
 vine_plot_compose transactions_log_1 ... transactions_log_N --worker-view --task-view --worker-cache --scale --sublabels --out composition.png
@@ -2640,7 +2655,7 @@ change.
 | transient-error-interval | Time to wait in seconds after a resource failure before attempting to use it again | 15 |
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
 | worker-retrievals | If 1, retrieve all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |
-| watch-library-logfiles | If 1, watch the output files produced by each of the library processes running on the remote workers, take 
+| watch-library-logfiles | If 1, watch the output files produced by each of the library processes running on the remote workers, take
 them back the current logging directory. | 0 |
 
 === "Python"
@@ -2681,7 +2696,7 @@ below is a simple Parsl application executing a function remotely.
         future = double(1)
         assert future.result() == 2
     ```
-Save this file as `parsl_vine_example.py`. Running 
+Save this file as `parsl_vine_example.py`. Running
 `python parsl_vine_example.py`
 will automatically spawn a local worker to execute the function call.
 
@@ -2728,9 +2743,9 @@ In order to use the TaskVineExecutor with remote resources, you will need to cre
             print(i.result())
     ```
 
-For more details on how to configure Parsl+TaskVine to scale applications 
-with compute resources of 
-local clusters and various performance optimizations, please refer to 
+For more details on how to configure Parsl+TaskVine to scale applications
+with compute resources of
+local clusters and various performance optimizations, please refer to
 the [Parsl documentation](https://parsl.readthedocs.io/en/stable/userguide/configuring.html).
 
 ### Dask
@@ -2801,7 +2816,7 @@ scheduler. The class `DaskVine` implements a TaskVine manager that has a
                 result = distance.compute(resources={"cores": 1}, resources_mode="max", lazy_transfers=True)
                 print(f"distance = {result}")
             print("Terminating workers...", end="")
-        print("done!") 
+        print("done!")
     ```
 
 The `compute` call above may receive the following keyword arguments:
@@ -2813,7 +2828,7 @@ The `compute` call above may receive the following keyword arguments:
 | extra\_files | A dictionary of {taskvine.File: "remote_name"} of input files to attach to each task.|
 | lazy\_transfer | Whether to bring each result back from the workers (False, default), or keep transient results at workers (True) |
 | resources   | A dictionary to specify [maximum resources](#task-resources), e.g. `{"cores": 1, "memory": 2000"}` |
-| resources\_mode | [Automatic resource management](#automatic-resource-management) to use, e.g., "fixed", "max", or "max throughput"| 
+| resources\_mode | [Automatic resource management](#automatic-resource-management) to use, e.g., "fixed", "max", or "max throughput"|
 | task\_mode | Mode to execute individual tasks, such as [function calls](#serverless-computing). to use, e.g., "tasks", or "function-calls"|
 
 ## Appendix for Developers
