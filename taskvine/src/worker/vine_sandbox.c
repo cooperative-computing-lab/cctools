@@ -82,11 +82,22 @@ static int stage_input_file(struct vine_process *p, struct vine_mount *m, struct
 	vine_cache_status_t status;
 	status = vine_cache_ensure(cache, f->cached_name);
 	if (status == VINE_CACHE_STATUS_READY) {
+		/* The sandbox path is permitted to have leading directory elements. */
 		create_dir_parents(sandbox_path, 0777);
-		debug(D_VINE, "input: link %s -> %s", cache_path, sandbox_path);
-		result = symlink(cache_path, sandbox_path);
-		/* Change sense of Unix result to true/false. */
-		result = !result;
+
+		if(m->flags&VINE_MOUNT_HARDLINK) {
+			/* Rare case: If requested, hard-link each element of the cache object */
+			/* This can be quite expensive for large directory trees. */
+			debug(D_VINE, "input: hardlink %s -> %s", cache_path, sandbox_path);
+			result = file_link_recursive(cache_path, sandbox_path, 1);
+		} else {
+			/* Normally, just symlink from the sandbox to the cache path. */
+			/* This is a relatively cheap operation, and most apps won't notice. */
+			debug(D_VINE, "input: symlink %s -> %s", cache_path, sandbox_path);
+			result = symlink(cache_path, sandbox_path);
+			/* Change sense of Unix result to true/false. */
+			result = !result;
+		}
 		if (!result)
 			debug(D_VINE, "couldn't link %s into sandbox as %s: %s", cache_path, sandbox_path, strerror(errno));
 

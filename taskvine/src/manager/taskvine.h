@@ -38,7 +38,7 @@ expected events.
 #define VINE_RANDOM_PORT 0     /**< Indicates that any port may be chosen. */
 #define VINE_WAIT_FOREVER -1   /**< Timeout value to wait for a task to complete before returning. */
 
-/** Select optional handling for input and output files: caching, unpacking, watching, etc. **/
+/** Select optional handling for mounting input and output files to the task namespace. */
 
 typedef enum {
 	VINE_TRANSFER_ALWAYS = 0, /**< Always transfer this file when needed. */
@@ -50,7 +50,8 @@ typedef enum {
 	VINE_SUCCESS_ONLY = 8,	 /**< Only return this output file if the task succeeded. */
 	VINE_RETRACT_ON_RESET = 16, /**< Remove this file from the mount lists if the task is reset. (TaskVine internal
 				       use only.) */
-	VINE_MOUNT_MKDIR = 64	    /**< Create this empty output directory in the task sandbox prior to execution. */
+	VINE_MOUNT_MKDIR = 64,      /**< Create this empty output directory in the task sandbox prior to execution. */
+	VINE_MOUNT_HARDLINK = 128,  /**< Hard-link this input file (or directory) from the cache to the sandbox. */
 } vine_mount_flags_t;
 
 /** Control caching and sharing behavior of file objects. **/
