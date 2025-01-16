@@ -121,10 +121,12 @@ static struct rmsummary *count_worker_available_resources(struct vine_manager *q
  * @return 1 if yes, 0 otherwise. */
 int check_worker_has_enough_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *tr)
 {
-	/* Skip if it is a function task */
+	/* Skip if it is a function task. Resource guarantees for function calls are handled at the end of @check_worker_against_task, which calls
+	 * @vine_schedule_find_library to locate a suitable library for the function call, it directly returns false if no appropriate library is found  */
 	if (t->needs_library) {
 		return 1;
 	}
+
 	int ok = 1;
 
 	struct rmsummary *worker_available_resources = count_worker_available_resources(q, w, t);
@@ -174,10 +176,12 @@ int check_worker_has_enough_resources(struct vine_manager *q, struct vine_worker
 /* Check if the worker is fully occupied by other tasks, or the disk is full. */
 static int check_worker_has_available_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	/* Skip if it is a function task */
+	/* Skip if it is a function task. Resource guarantees for function calls are handled at the end of @check_worker_against_task, which calls
+	 * @vine_schedule_find_library to locate a suitable library for the function call, it directly returns false if no appropriate library is found  */
 	if (t->needs_library) {
 		return 1;
 	}
+
 	int ok = 1;
 
 	struct rmsummary *worker_available_resources = count_worker_available_resources(q, w, t);

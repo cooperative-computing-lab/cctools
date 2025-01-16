@@ -3329,51 +3329,12 @@ int consider_task(struct vine_manager *q, struct vine_task *t)
 }
 
 /*
-This is a "conservative" estimate of the resources available.
-If this returns false, then there is definitely no worker available to run any task.
-If it returns true, then there may be a suitable worker, and we have to check them all in detail.
-*/
-static int has_exec_capacity(struct vine_manager *q)
-{
-	/* First check if there is a free slot on any library instances */
-	uint64_t task_id;
-	struct vine_task *t;
-
-	ITABLE_ITERATE(q->running_library_instances, task_id, t)
-	{
-		/* A function task must use at least one slot */
-		if (t->function_slots_inuse < t->function_slots_total) {
-			return 1;
-		}
-	}
-
-	/* If no slots are available, or no library instances at all, check the worker cores */
-	char *worker_key;
-	struct vine_worker_info *w;
-
-	HASH_TABLE_ITERATE(q->worker_table, worker_key, w)
-	{
-		/* A normal task may use a gpu but not use cores */
-		if (w->resources->cores.inuse + w->resources->gpus.inuse < w->resources->cores.total + w->resources->gpus.total) {
-			return 1;
-		}
-	}
-
-	/* No available slots / cores / gpus */
-	return 0;
-}
-
-/*
 Advance the state of the system by selecting one task available
 to run, finding the best worker for that task, and then committing
 the task to the worker.
 */
 static int send_one_task(struct vine_manager *q)
 {
-	if (!has_exec_capacity(q)) {
-		return 0;
-	}
-
 	int t_idx;
 	struct vine_task *t;
 
