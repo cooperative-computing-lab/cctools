@@ -1517,9 +1517,11 @@ conda install -y -p my-env -c conda-forge conda-pack
 conda run -p my-env conda-pack
 ```
 
-#### Unknown Python Dependencies? SciUnit Helps
+#### Using SciUnit to Discover Python Dependencies
 
-When running Python tasks on distributed systems without shared storage or consistent environments, you must manage dependencies explicitly. If you’re unsure which libraries your script requires, you can use **[SciUnit](https://github.com/depaul-dice/sciunit/wiki)** to detect them automatically:
+If you're unsure which libraries your python tasks require, you can use
+**[SciUnit](https://github.com/depaul-dice/sciunit/wiki)** to detect them
+automatically:
 
 **Example: Generating a `requirements.txt` with SciUnit**
 
