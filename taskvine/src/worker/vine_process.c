@@ -499,10 +499,16 @@ int vine_process_library_get_result(struct vine_process *p, uint64_t *done_task_
 
 	/* null terminate the buffer before treating it as a string. */
 	buffer_data[ok] = 0;
-	sscanf(buffer_data, "%" SCNu64 " %d", done_task_id, done_exit_code);
-	debug(D_VINE, "Received result for function %" PRIu64 ", exit code %d", *done_task_id, *done_exit_code);
 
-	return ok;
+	/* is the received message properly formatted as two integers? */
+	ok = sscanf(buffer_data, "%" SCNu64 " %d", done_task_id, done_exit_code);
+	if (ok != 2) {
+		debug(D_VINE, "Invalid message received from library: %s", buffer_data);
+		return 0;
+	}
+
+	debug(D_VINE, "Received result for function %" PRIu64 ", exit code %d", *done_task_id, *done_exit_code);
+	return 1;
 }
 
 /*

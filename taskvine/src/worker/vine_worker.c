@@ -742,7 +742,9 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 	ITABLE_ITERATE(procs_running, task_id, p_running)
 	{
 		if (p_running->library_process == p) {
+			debug(D_VINE, "killing function task %d running on library task %d", (int)task_id, p->task->task_id);
 			finish_running_task(p_running, VINE_RESULT_FORSAKEN);
+			reap_process(p_running, manager);
 		}
 	}
 }
@@ -1426,20 +1428,25 @@ Return true if this process can run eventually, supposing that other processes w
 
 static int process_can_run_eventually(struct vine_process *p, struct vine_cache *cache, struct link *manager)
 {
-	if (!task_resources_fit_eventually(p->task))
+	if (!task_resources_fit_eventually(p->task)) {
+		debug(D_VINE, "task %d does not fit the total resources", p->task->task_id);
 		return 0;
+	}
 
 	if (p->task->needs_library) {
 		/* Note that we check for *some* library but do not bind to it. */
 		struct vine_process *p_future = find_future_library_for_function(p->task->needs_library);
-		if (!p || p_future->result == VINE_RESULT_LIBRARY_EXIT)
+		if (!p || p_future->result == VINE_RESULT_LIBRARY_EXIT) {
+			debug(D_VINE, "task %d does not match any library \"%s\"", p->task->task_id, p->task->needs_library);
 			return 0;
+		}
 	}
 
 	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager);
 	switch (status) {
 	case VINE_CACHE_STATUS_FAILED:
 	case VINE_CACHE_STATUS_UNKNOWN:
+		debug(D_VINE, "task %d requires failed input cache transfers", p->task->task_id);
 		return 0;
 	default:
 		break;
@@ -1738,7 +1745,6 @@ static void vine_worker_serve_manager(struct link *manager)
 				} else if (process_can_run_eventually(p, cache_manager, manager)) {
 					list_push_tail(procs_waiting, p);
 				} else {
-					debug(D_VINE, "task does not have necessary resources to run %d", p->task->task_id);
 					forsake_waiting_process(manager, p);
 					task_event++;
 				}
