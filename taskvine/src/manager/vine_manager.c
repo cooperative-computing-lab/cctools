@@ -4002,6 +4002,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->large_task_check_interval = VINE_LARGE_TASK_CHECK_INTERVAL;
 	q->hungry_check_interval = VINE_HUNGRY_CHECK_INTERVAL;
 	q->option_blocklist_slow_workers_timeout = vine_option_blocklist_slow_workers_timeout;
+	q->disk_allocation_throttle_factor = 0.75;
 
 	q->manager_preferred_connection = xxstrdup("by_ip");
 
