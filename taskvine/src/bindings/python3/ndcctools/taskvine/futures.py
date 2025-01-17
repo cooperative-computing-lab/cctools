@@ -460,6 +460,7 @@ class FuturePythonTask(PythonTask):
                         args = [vineLoadArg(arg) if isinstance(arg, dict) and "VineFutureFile" in arg else arg for arg in args]
                         error = None
                         try:
+                            print(args, kwargs)
                             exec_out = exec_function(*args, **kwargs)
                         except Exception as e:
                             exec_out = e
