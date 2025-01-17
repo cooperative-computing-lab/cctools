@@ -3477,9 +3477,22 @@ static int send_one_task(struct vine_manager *q)
 		struct vine_worker_info *w = vine_schedule_task_to_worker(q, t);
 		q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
 
+
 		if (w) {
 			priority_queue_remove(q->ready_tasks, t_idx);
 			
+			// do not continue if this worker is running a group task
+			if (q->task_groups_enabled) {
+				struct vine_task *it;
+				uint64_t taskid;
+				ITABLE_ITERATE(w->current_tasks, taskid, it)
+				{
+					if (it->group_id) {
+						return 0;
+					}
+				}
+			}
+
 			vine_result_code_t result;
 			if (q->task_groups_enabled) {
 				result = commit_task_group_to_worker(q, w, t);
