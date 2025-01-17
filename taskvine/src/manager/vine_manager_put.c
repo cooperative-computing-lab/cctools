@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "vine_file_replica_table.h"
 #include "vine_mount.h"
 #include "vine_protocol.h"
+#include "vine_symlink.h"
 #include "vine_task.h"
 #include "vine_txn_log.h"
 #include "vine_worker_info.h"
@@ -558,6 +559,18 @@ vine_result_code_t vine_manager_put_task(
 			char remote_name_encoded[PATH_MAX];
 			url_encode(m->remote_name, remote_name_encoded, PATH_MAX);
 			vine_manager_send(q, w, "outfile %s %s %d\n", m->file->cached_name, remote_name_encoded, m->flags);
+		}
+	}
+
+	if (t->symlink_list) {
+		struct vine_symlink *s;
+		LIST_ITERATE(t->symlink_list, s)
+		{
+			char name_encoded[PATH_MAX];
+			char target_encoded[PATH_MAX];
+			url_encode(s->name, name_encoded, PATH_MAX);
+			url_encode(s->target, target_encoded, PATH_MAX);
+			vine_manager_send(q, w, "symlink %s %s\n", name_encoded, target_encoded);
 		}
 	}
 
