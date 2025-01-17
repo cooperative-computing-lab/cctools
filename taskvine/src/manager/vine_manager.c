@@ -5667,7 +5667,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "sandbox-grow-factor")) {
 		q->sandbox_grow_factor = MAX(1.1, value);
 
-	} else if (!strcmp(name, "disk-allocation-throttle-factor")) {
+	} else if (!strcmp(name, "disk-proportion-available-to-task")) {
 		q->disk_proportion_available_to_task = MAX(0.0, MIN(1.0, value)); /* has to be in [0, 1] */
 
 	} else if (!strcmp(name, "max-library-retries")) {
