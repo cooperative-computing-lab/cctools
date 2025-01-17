@@ -2696,9 +2696,13 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 			max_proportion = 1;
 		}
 
-		/* Perform the standard proportional memory and disk allocations */
+		/* Perform the standard proportional memory allocation */
 		limits->memory = MAX(1, MAX(limits->memory, floor(memory_total * max_proportion)));
+
+		/* For disk, scale the estimated disk allocation by a [0, 1] number (by default 0.75) to intentionally reserve
+		* some space for data movement between the sandbox and cache (output files) and allow room for cache growth. */
 		limits->disk = MAX(1, MAX(limits->disk, floor(disk_total * max_proportion / q->resource_submit_multiplier)));
+		limits->disk *= q->disk_proportion_available_to_task;
 
 		/* When cores are unspecified, they are set to 0 if gpus are specified.
 		 * Otherwise they get a proportion according to specified resources. */
@@ -2729,10 +2733,6 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	if (limits->disk <= 0) {
 		limits->disk = disk_available;
 	}
-
-	/* After the guess is done, scale the estimated disk allocation by a [0, 1] number (by default 0.75) to intentionally
-	 * reserve some space for data movement between the sandbox and cache (output files) and allow room for cache growth. */
-	limits->disk *= q->disk_allocation_throttle_factor;
 
 	/* Never go below min resources. */
 	rmsummary_merge_max(limits, min);
@@ -4002,7 +4002,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->large_task_check_interval = VINE_LARGE_TASK_CHECK_INTERVAL;
 	q->hungry_check_interval = VINE_HUNGRY_CHECK_INTERVAL;
 	q->option_blocklist_slow_workers_timeout = vine_option_blocklist_slow_workers_timeout;
-	q->disk_allocation_throttle_factor = 0.75;
+	q->disk_proportion_available_to_task = 0.75;
 
 	q->manager_preferred_connection = xxstrdup("by_ip");
 
@@ -5668,7 +5668,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		q->sandbox_grow_factor = MAX(1.1, value);
 
 	} else if (!strcmp(name, "disk-allocation-throttle-factor")) {
-		q->disk_allocation_throttle_factor = MAX(0.0, MIN(1.0, value)); /* has to be in [0, 1] */
+		q->disk_proportion_available_to_task = MAX(0.0, MIN(1.0, value)); /* has to be in [0, 1] */
 
 	} else if (!strcmp(name, "max-library-retries")) {
 		q->max_library_retries = MIN(1, value);

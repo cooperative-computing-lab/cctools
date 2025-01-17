@@ -76,18 +76,19 @@ with worker:
 
     # note that the disk is divided by 2 if using proportional resource allocations
     q.tune("force-proportional-resources", 1)
+    disk_proportion_available_to_task = 0.75
 
-    check_task("only_memory", "fixed", max={"memory": worker_memory / 2}, min={}, expected={"cores": worker_cores / 2, "memory": worker_memory / 2, "disk": worker_disk / 2 / 2, "gpus": 0})
+    check_task("only_memory", "fixed", max={"memory": worker_memory / 2}, min={}, expected={"cores": worker_cores / 2, "memory": worker_memory / 2, "disk": worker_disk / 2 * disk_proportion_available_to_task, "gpus": 0})
 
-    check_task("only_memory_w_minimum", "fixed", max={"memory": worker_memory / 2}, min={"cores": 3, "gpus": 2}, expected={"cores": 4, "memory": worker_memory, "disk": worker_disk / 2, "gpus": 2})
+    check_task("only_memory_w_minimum", "fixed", max={"memory": worker_memory / 2}, min={"cores": 3, "gpus": 2}, expected={"cores": 4, "memory": worker_memory, "disk": worker_disk * disk_proportion_available_to_task, "gpus": 2})
 
-    check_task("only_cores", "fixed", max={"cores": worker_cores}, min={}, expected={"cores": worker_cores, "memory": worker_memory, "disk": worker_disk / 2, "gpus": 0})
+    check_task("only_cores", "fixed", max={"cores": worker_cores}, min={}, expected={"cores": worker_cores, "memory": worker_memory, "disk": worker_disk * disk_proportion_available_to_task, "gpus": 0})
 
-    check_task("auto_whole_worker", "min_waste", max={}, min={}, expected={"cores": worker_cores, "memory": worker_memory, "disk": worker_disk / 2, "gpus": 0})
+    check_task("auto_whole_worker", "min_waste", max={}, min={}, expected={"cores": worker_cores, "memory": worker_memory, "disk": worker_disk * disk_proportion_available_to_task, "gpus": 0})
 
     p = 1 / worker_cores
     r = {"cores": 1}
-    e = {"cores": 1, "memory": math.floor(worker_memory * p), "disk": math.floor(worker_disk * p) / 2, "gpus": 0}
+    e = {"cores": 1, "memory": math.floor(worker_memory * p), "disk": math.floor(worker_disk * p) * disk_proportion_available_to_task, "gpus": 0}
     check_task("only_cores_proportional", "fixed", max=r, min={}, expected=e)
 
     p = 2 / worker_cores
