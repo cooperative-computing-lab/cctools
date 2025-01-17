@@ -57,12 +57,11 @@ from .task import (
     LibraryTask,
     FunctionCall,
 )
-from .dask_dag import DaskVineDag
-
 from . import cvine
 
 try:
     from .dask_executor import DaskVine
+    from .dask_dag import DaskVineDag
 except ImportError as e:
     print(f"DaskVine not available. Couldn't find module: {e.name}")
 
