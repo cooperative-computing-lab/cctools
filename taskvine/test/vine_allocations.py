@@ -76,7 +76,7 @@ with worker:
 
     # note that the disk is divided by 2 if using proportional resource allocations
     q.tune("force-proportional-resources", 1)
-    disk_proportion_available_to_task = 0.75
+    disk_proportion_available_to_task = 0.75   # the default factor
 
     check_task("only_memory", "fixed", max={"memory": worker_memory / 2}, min={}, expected={"cores": worker_cores / 2, "memory": worker_memory / 2, "disk": worker_disk / 2 * disk_proportion_available_to_task, "gpus": 0})
 
