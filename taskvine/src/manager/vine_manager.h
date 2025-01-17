@@ -108,7 +108,8 @@ struct vine_manager {
 	struct list   *retrieved_list;      /* List of vine_task that have been retrieved. */
 	struct list   *task_info_list;  /* List of last N vine_task_infos for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */
-	struct hash_table *library_templates; /* Maps library name -> vine_task of library with that name. */
+	struct hash_table *library_templates;     /* Maps library name -> vine_task of library with that name. */
+	struct itable     *running_library_instances;     /* Maps task_id -> vine_task of library instance. */
 
 	/* Primary data structures for tracking worker state. */
 
@@ -133,8 +134,7 @@ struct vine_manager {
 
 	/* Internal state modified by the manager */
 
-	int next_task_id;       /* Next integer task_id to be assigned to a created task. */
-	int duplicated_libraries;  /* The number of duplicated libraries */
+	int next_task_id;            /* Next integer task_id to be assigned to a created task. */
 	int fixed_location_in_queue; /* Number of fixed location tasks currently being managed */
 	int num_tasks_left;    /* Optional: Number of tasks remaining, if given by user.  @ref vine_set_num_tasks */
 	int busy_waiting_flag; /* Set internally in main loop if no messages were processed -> wait longer. */
@@ -225,6 +225,7 @@ struct vine_manager {
 	int watch_library_logfiles;     /* If true, watch the output files produced by each of the library processes running on the remote workers, take them back the current logging directory */
 
 	double sandbox_grow_factor;         /* When task disk sandboxes are exhausted, increase the allocation using their measured valued times this factor */
+	double disk_proportion_available_to_task;     /* intentionally reduces disk allocation for tasks to reserve some space for cache growth. */
 
 	/*todo: confirm datatype. int or int64*/
 	int max_task_stdout_storage;	/* Maximum size of standard output from task.  (If larger, send to a separate file.) */
@@ -269,6 +270,8 @@ void vine_manager_enable_process_shortcut(struct vine_manager *q);
 struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t );
 
 int64_t overcommitted_resource_total(struct vine_manager *q, int64_t total);
+
+void vine_manager_compute_input_size(struct vine_manager *q, struct vine_task *t);
 
 /* Internal: Shut down a specific worker. */
 int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_info *w);
