@@ -8,11 +8,11 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-from .manager import Manager
-from .task import PythonTask
-from .task import FunctionCall
-from .dask_dag import DaskVineDag
-from .cvine import VINE_TEMP
+from ..compat.dask_dag import DaskVineDag
+from ..manager import Manager
+from ..task import PythonTask
+from ..task import FunctionCall
+from ..cvine import VINE_TEMP
 
 import os
 import time
@@ -711,7 +711,7 @@ class FunctionCallDask(FunctionCall):
 def execute_graph_vertex(wrapper, key, sexpr, args, keys_of_files):
     import traceback
     import cloudpickle
-    from ndcctools.taskvine import DaskVineDag
+    from ndcctools.taskvine.compat import DaskVineDag
 
     def rec_call(sexpr):
         if DaskVineDag.keyp(sexpr) and sexpr in args:
