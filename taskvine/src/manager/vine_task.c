@@ -259,7 +259,7 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 
 	/* Group ID is copied. */
 	if (task->group_id) {
-		new->group_id = strdup(task->group_id);
+		new->group_id = task->group_id;
 	}
 
 	return new;

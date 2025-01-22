@@ -562,7 +562,7 @@ vine_result_code_t vine_manager_put_task(
 	}
 
 	if (t->group_id) {
-		vine_manager_send(q, w, "groupid %s\n", t->group_id);
+		vine_manager_send(q, w, "groupid %d\n", t->group_id);
 	}
 
 	// vine_manager_send returns the number of bytes sent, or a number less than

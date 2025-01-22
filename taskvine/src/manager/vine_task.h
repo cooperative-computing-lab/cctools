@@ -136,7 +136,7 @@ struct vine_task {
 	int has_fixed_locations;                               /**< Whether at least one file was added with the VINE_FIXED_LOCATION flag. Task fails immediately if no
 															 worker can satisfy all the strict inputs of the task. */
 
-	char *group_id;					       /**< When enabled, group ID will be assigned based on temp file dependencies of this task */	
+	int group_id;					       /**< When enabled, group ID will be assigned based on temp file dependencies of this task */	
 
 	int refcount;                                          /**< Number of remaining references to this object. */
 };

@@ -2997,7 +2997,7 @@ static vine_result_code_t commit_task_group_to_worker(struct vine_manager *q, st
 
 	struct list *l = NULL;
 	if (t->group_id) {
-		l = hash_table_lookup(q->task_group_table, t->group_id);
+		l = itable_lookup(q->task_group_table, t->group_id);
 		list_remove(l, t);
 		// decrement refcount
 		vine_task_delete(t);
@@ -3328,7 +3328,7 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 		return;
 
 	/* Do not try to group recovery tasks */
-	rt->group_id = NULL;
+	rt->group_id = 0;
 
 	switch (rt->state) {
 	case VINE_TASK_INITIAL:
@@ -3995,7 +3995,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->factory_table = hash_table_create(0, 0);
 	q->current_transfer_table = hash_table_create(0, 0);
-	q->task_group_table = hash_table_create(0, 0);
+	q->task_group_table = itable_create(0);
 	q->group_id_counter = 1;
 	q->fetch_factory = 0;
 
@@ -4342,7 +4342,7 @@ void vine_delete(struct vine_manager *q)
 	hash_table_delete(q->current_transfer_table);
 
 	vine_task_groups_clear(q);
-	hash_table_delete(q->task_group_table);
+	itable_delete(q->task_group_table);
 
 	itable_clear(q->tasks, (void *)delete_task_at_exit);
 	itable_delete(q->tasks);
@@ -5537,11 +5537,11 @@ int vine_cancel_by_task_id(struct vine_manager *q, int task_id)
 	}
 
 	if (task->group_id) {
-		struct list *l = hash_table_lookup(q->task_group_table, task->group_id);
+		struct list *l = itable_lookup(q->task_group_table, task->group_id);
 		if (l) {
 			list_remove(l, task);
 		}
-		task->group_id = NULL;
+		task->group_id = 0;
 		vine_task_delete(task);
 	}
 
