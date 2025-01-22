@@ -60,6 +60,14 @@ from .task import (
 from . import cvine
 
 try:
+    import dask
+    import warnings
+    from packaging.version import Version
+    vd = Version(dask.__version__)
+    vr = Version("2024.12.0")
+    if vd < vr:
+        warnings.warn("ndcctools.taskvine.DaskVine only works with dask version >= 2024.12.0")
+
     from .dask_executor import DaskVine
     from .dask_dag import DaskVineDag
 except ImportError as e:
