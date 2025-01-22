@@ -838,8 +838,7 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 	char taskname_encoded[VINE_LINE_MAX];
 	char library_name[VINE_LINE_MAX];
 	char category[VINE_LINE_MAX];
-	char groupid[VINE_LINE_MAX];
-	int flags, length;
+	int flags, length, groupid;
 	int64_t n;
 
 	timestamp_t nt;
@@ -892,8 +891,8 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 			vine_task_set_disk(task, n);
 		} else if (sscanf(line, "gpus %" PRId64, &n)) {
 			vine_task_set_gpus(task, n);
-		} else if (sscanf(line, "groupid %s", groupid)) {
-			task->group_id = xxstrdup(groupid);
+		} else if (sscanf(line, "groupid %d", &groupid)) {
+			task->group_id = groupid;
 		} else if (sscanf(line, "wall_time %" PRIu64, &nt)) {
 			vine_task_set_time_max(task, nt);
 		} else if (sscanf(line, "end_time %" PRIu64, &nt)) {
