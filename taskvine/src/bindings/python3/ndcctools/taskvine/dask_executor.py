@@ -760,7 +760,6 @@ def execute_graph_vertex(wrapper, dask_task, task_args, keys_of_files):
                     print(f"Wrapped call for {dask_task.key} failed to write output.")
                     raise
         else:
-            print(f"args {dask_task} {task_args} {keys_of_files} {dask_task.dependencies}")
             return dask_task(task_args)
     except Exception:
         print(traceback.format_exc())
