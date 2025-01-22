@@ -31,6 +31,7 @@ clean:
 	rm -rf $(OBJECTS) $(TARGETS) ndcctools/taskvine/cvine.py vine_wrap.c vine_wrap.o *.pyc __pycache__
 
 install: all
-	mkdir -p $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine
+	mkdir -p $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/compat
 	cp ndcctools/taskvine/*.py $(DSPYTHONSO) $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine
+	cp ndcctools/taskvine/compat/*.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/compat
 	cp taskvine.py $(CCTOOLS_PYTHON3_PATH)/
