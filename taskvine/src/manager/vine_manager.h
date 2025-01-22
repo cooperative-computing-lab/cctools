@@ -185,6 +185,7 @@ struct vine_manager {
 
 	/* Task Groups Configuration */
 	int task_groups_enabled; 
+	int group_id_counter; 
 
 	/* Various performance knobs that can be tuned. */
 	int short_timeout;            /* Timeout in seconds to send/recv a brief message from worker */

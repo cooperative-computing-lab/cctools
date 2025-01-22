@@ -2997,15 +2997,7 @@ static vine_result_code_t commit_task_group_to_worker(struct vine_manager *q, st
 
 	struct list *l = NULL;
 	if (t->group_id) {
-		debug(D_VINE, "Task %d has GroupID of %s. Should Send:", t->task_id, t->group_id);
 		l = hash_table_lookup(q->task_group_table, t->group_id);
-
-		struct vine_task *logt;
-		LIST_ITERATE(l, logt)
-		{
-			debug(D_VINE, "Task ID: %d", logt->task_id);
-		}
-
 		list_remove(l, t);
 		// decrement refcount
 		vine_task_delete(t);
@@ -4004,6 +3996,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->factory_table = hash_table_create(0, 0);
 	q->current_transfer_table = hash_table_create(0, 0);
 	q->task_group_table = hash_table_create(0, 0);
+	q->group_id_counter = 1;
 	q->fetch_factory = 0;
 
 	q->measured_local_resources = rmsummary_create(-1);

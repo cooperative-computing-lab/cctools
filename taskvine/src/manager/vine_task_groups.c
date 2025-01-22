@@ -13,9 +13,7 @@ See the file COPYING for details.
 // create a new task group for this task based on the temp mount file
 static int vine_task_groups_create_group(struct vine_manager *q, struct vine_task *t, struct vine_mount *m)
 {
-	static int group_id_counter = 1;
-
-	char *id = string_format("%d", group_id_counter++);
+	char *id = string_format("%d", q->group_id_counter++);
 	struct list *l = list_create();
 
 	t->group_id = id;
