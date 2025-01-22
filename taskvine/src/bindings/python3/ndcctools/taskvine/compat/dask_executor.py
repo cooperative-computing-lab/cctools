@@ -8,18 +8,11 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-from .manager import Manager
-from .task import PythonTask
-from .task import FunctionCall
-from .dask_dag import DaskVineDag
-from .cvine import VINE_TEMP
-
-try:
-    import dask._task_spec as dts
-except ModuleNotFoundError:
-    print("Dask version 2024.12.0 or greater not found.")
-    raise
-
+from ..compat.dask_dag import DaskVineDag
+from ..manager import Manager
+from ..task import PythonTask
+from ..task import FunctionCall
+from ..cvine import VINE_TEMP
 
 import os
 import time
@@ -84,6 +77,8 @@ class DaskVine(Manager):
     # @param env_vars      A dictionary of VAR=VALUE environment variables to set per task. A value
     #                      should be either a string, or a function that accepts as arguments the manager
     #                      and task, and that returns a string.
+    # @param low_memory_mode Split graph vertices to reduce memory needed per function call. It
+    #                      removes some of the dask graph optimizations, thus proceed with care.
     # @param checkpoint_fn When using worker_transfers, a predicate with arguments (dag, key)
     #                      called before submitting a task. If True, the result is brought back
     #                      to the manager.
@@ -118,6 +113,7 @@ class DaskVine(Manager):
             extra_files=None,
             worker_transfers=True,
             env_vars=None,
+            low_memory_mode=False,
             checkpoint_fn=None,
             resources=None,
             resources_mode=None,
@@ -142,10 +138,6 @@ class DaskVine(Manager):
             lazy_transfers=True,    # Deprecated, use worker_tranfers
             ):
         try:
-
-            # just in case, convert any tuple task to dts.Task
-            dsk = dts.convert_legacy_graph(dsk)
-
             self.set_property("framework", "dask")
             if retries and retries < 1:
                 raise ValueError("retries should be larger than 0")
@@ -162,6 +154,7 @@ class DaskVine(Manager):
             else:
                 self.worker_transfers = True
             self.env_vars = env_vars
+            self.low_memory_mode = low_memory_mode
             self.checkpoint_fn = checkpoint_fn
             self.resources = resources
             self.resources_mode = resources_mode
@@ -219,7 +212,7 @@ class DaskVine(Manager):
         indices = {k: inds for (k, inds) in find_dask_keys(keys)}
         keys_flatten = indices.keys()
 
-        dag = DaskVineDag(dsk)
+        dag = DaskVineDag(dsk, low_memory_mode=self.low_memory_mode)
         tag = f"dag-{id(dag)}"
 
         # create Library if using 'function-calls' task mode.
@@ -307,7 +300,7 @@ class DaskVine(Manager):
                         retries_left = t.decrement_retry()
                         print(f"task id {t.id} key {t.key} failed: {t.result}. {retries_left} attempts left.\n{t.std_output}")
                         if retries_left > 0:
-                            self._enqueue_dask_calls(dag, tag, [t.dask_task], retries_left, enqueued_calls)
+                            self._enqueue_dask_calls(dag, tag, [(t.key, t.sexpr)], retries_left, enqueued_calls)
                         else:
                             raise Exception(f"tasks for key {t.key} failed permanently")
                     t = None  # drop task reference
@@ -339,68 +332,54 @@ class DaskVine(Manager):
 
         return (progress, update)
 
-    def category_name(self, node):
-        if DaskVineDag.taskp(node):
-            return str(node.func).replace(" ", "_")
+    def category_name(self, sexpr):
+        if DaskVineDag.taskp(sexpr):
+            return str(sexpr[0]).replace(" ", "_")
         else:
             return "other"
 
-    def _task_priority(self, dag, cat, key):
-        task_depth = dag.depth_of(key)
-
-        if self.scheduling_mode == "random":
-            priority = random.randint(self.min_priority, self.max_priority)
-        elif self.scheduling_mode == "depth-first":
-            # dig more information about different kinds of tasks
-            priority = task_depth
-        elif self.scheduling_mode == "breadth-first":
-            # prefer to start all branches as soon as possible
-            priority = -task_depth
-        elif self.scheduling_mode == "longest-category-first":
-            # if no tasks have been executed in this category, set a high priority
-            # so that we know more information about each category
-            if self.category_info[cat]["num_tasks"]:
-                priority = (
-                    self.category_info[cat]["total_execution_time"]
-                    / self.category_info[cat]["num_tasks"]
-                )
-            else:
-                priority = self.max_priority
-        elif self.scheduling_mode == "shortest-category-first":
-            # if no tasks have been executed in this category, set a high priority
-            # so that we know more information about each category
-            if self.category_info[cat]["num_tasks"]:
-                priority = (
-                    -self.category_info[cat]["total_execution_time"]
-                    / self.category_info[cat]["num_tasks"]
-                )
-            else:
-                priority = self.max_priority
-        elif self.scheduling_mode == "FIFO":
-            # first in first out, the default behavior
-            priority = -round(time.time(), 6)
-        elif self.scheduling_mode == "LIFO":
-            # last in first out, the opposite of FIFO
-            priority = round(time.time(), 6)
-        elif self.scheduling_mode == "largest-input-first":
-            # best for saving disk space (with pruing)
-            priority = sum([len(dag.get_result(c)._file) for c in dag.get_dependencies(key)])
-        else:
-            raise ValueError(f"Unknown scheduling mode {self.scheduling_mode}")
-
-        return priority
-
     def _enqueue_dask_calls(self, dag, tag, rs, retries, enqueued_calls):
         targets = dag.get_targets()
-        for dask_task in rs:
-            k = dask_task.key
+        for (k, sexpr) in rs:
             lazy = self.worker_transfers and k not in targets
             if lazy and self.checkpoint_fn:
                 lazy = self.checkpoint_fn(dag, k)
 
             # each task has a category name
-            cat = self.category_name(dask_task)
-            priority = self._task_priority(dag, cat, k)
+            cat = self.category_name(sexpr)
+
+            task_depth = dag.depth_of(k)
+            if self.scheduling_mode == 'random':
+                priority = random.randint(self.min_priority, self.max_priority)
+            elif self.scheduling_mode == 'depth-first':
+                # dig more information about different kinds of tasks
+                priority = task_depth
+            elif self.scheduling_mode == 'breadth-first':
+                # prefer to start all branches as soon as possible
+                priority = -task_depth
+            elif self.scheduling_mode == 'longest-category-first':
+                # if no tasks have been executed in this category, set a high priority so that we know more information about each category
+                if self.category_info[cat]["num_tasks"]:
+                    priority = self.category_info[cat]["total_execution_time"] / self.category_info[cat]["num_tasks"]
+                else:
+                    priority = self.max_priority
+            elif self.scheduling_mode == 'shortest-category-first':
+                # if no tasks have been executed in this category, set a high priority so that we know more information about each category
+                if self.category_info[cat]["num_tasks"]:
+                    priority = -self.category_info[cat]["total_execution_time"] / self.category_info[cat]["num_tasks"]
+                else:
+                    priority = self.max_priority
+            elif self.scheduling_mode == 'FIFO':
+                # first in first out, the default behavior
+                priority = -round(time.time(), 6)
+            elif self.scheduling_mode == 'LIFO':
+                # last in first out, the opposite of FIFO
+                priority = round(time.time(), 6)
+            elif self.scheduling_mode == 'largest-input-first':
+                # best for saving disk space (with pruing)
+                priority = sum([len(dag.get_result(c)._file) for c in dag.get_children(k)])
+            else:
+                raise ValueError(f"Unknown scheduling mode {self.scheduling_mode}")
 
             if self.task_mode == 'tasks':
                 if cat not in self._categories_known:
@@ -414,7 +393,7 @@ class DaskVine(Manager):
                     self._categories_known.add(cat)
 
                 t = PythonTaskDask(self,
-                                   dag, dask_task,
+                                   dag, k, sexpr,
                                    category=cat,
                                    environment=self.environment,
                                    extra_files=self.extra_files,
@@ -426,8 +405,7 @@ class DaskVine(Manager):
                 t.set_priority(priority)
                 if self.env_per_task:
                     t.set_command(
-                        f"mkdir envdir && tar -xf {self._environment_name} -C envdir && envdir/bin/run_in_env {t._command}"
-                    )
+                        f"mkdir envdir && tar -xf {self._environment_name} -C envdir && envdir/bin/run_in_env {t._command}")
                     t.add_input(self.environment_file, self.environment_name)
 
                 t.set_tag(tag)  # tag that identifies this dag
@@ -435,7 +413,7 @@ class DaskVine(Manager):
 
             if self.task_mode == 'function-calls':
                 t = FunctionCallDask(self,
-                                     dag, dask_task,
+                                     dag, k, sexpr,
                                      category=cat,
                                      extra_files=self.extra_files,
                                      retries=retries,
@@ -458,7 +436,7 @@ class DaskVine(Manager):
 
     def _fill_key_result(self, dag, key):
         raw = dag.get_result(key)
-        if DaskVineDag.containerp(raw):
+        if DaskVineDag.listp(raw):
             result = list(raw)
             file_indices = find_result_files(raw)
             for (f, inds) in file_indices:
@@ -470,9 +448,9 @@ class DaskVine(Manager):
             return raw
 
     def _prune_file(self, dag, key):
-        children = dag.get_dependencies(key)
+        children = dag.get_children(key)
         for c in children:
-            if len(dag.get_pending_needed_by(c)) == 0:
+            if len(dag.get_pending_parents(c)) == 0:
                 c_result = dag.get_result(c)
                 self.prune_file(c_result._file)
 
@@ -519,7 +497,7 @@ class DaskVineFile:
     def ready_for_gc(self):
         # file on disk ready to be gc if the keys that needed as an input for computation are themselves ready.
         if not self._ready_for_gc:
-            self._ready_for_gc = all(f.ready_for_gc() for f in self._dag.get_needed_by().values())
+            self._ready_for_gc = all(f.ready_for_gc() for f in self._dag.get_parents().values())
         return self._ready_for_gc
 
 
@@ -550,7 +528,8 @@ class PythonTaskDask(PythonTask):
     # @param self  This task object.
     # @param m     TaskVine manager object.
     # @param dag   Dask graph object.
-    # @param dask_task  Dask task encoding a computation.
+    # @param key   Key of task in graph.
+    # @param sexpr          Positional arguments to function.
     # @param category       TaskVine category name.
     # @param environment    TaskVine execution environment.
     # @param extra_files    Additional files to provide to the task.
@@ -560,7 +539,7 @@ class PythonTaskDask(PythonTask):
     # @param wrapper
     #
     def __init__(self, m,
-                 dag, dask_task, *,
+                 dag, key, sexpr, *,
                  category=None,
                  environment=None,
                  extra_files=None,
@@ -568,13 +547,14 @@ class PythonTaskDask(PythonTask):
                  retries=5,
                  worker_transfers=False,
                  wrapper=None):
-        self._dask_task = dask_task
+        self._key = key
+        self._sexpr = sexpr
 
         self._retries_left = retries
         self._wrapper_output_file = None
         self._wrapper_output = None
 
-        args_raw = {k: dag.get_result(k) for k in dag.get_dependencies(self.key)}
+        args_raw = {k: dag.get_result(k) for k in dag.get_children(key)}
         args = {
             k: f"{uuid4()}.p"
             for k, v in args_raw.items()
@@ -584,7 +564,7 @@ class PythonTaskDask(PythonTask):
         keys_of_files = list(args.keys())
         args = args_raw | args
 
-        super().__init__(execute_graph_vertex, wrapper, dask_task, args, keys_of_files)
+        super().__init__(execute_graph_vertex, wrapper, key, sexpr, args, keys_of_files)
         if wrapper:
             wo = m.declare_buffer()
             self.add_output(wo, "wrapper.output")
@@ -615,11 +595,11 @@ class PythonTaskDask(PythonTask):
 
     @property
     def key(self):
-        return self._dask_task.key
+        return self._key
 
     @property
-    def dask_task(self):
-        return self._dask_task
+    def sexpr(self):
+        return self._sexpr
 
     def decrement_retry(self):
         self._retries_left -= 1
@@ -651,7 +631,7 @@ class FunctionCallDask(FunctionCall):
     # @param self  This task object.
     # @param m     TaskVine manager object.
     # @param dag   Dask graph object.
-    # @param dask_task  Dask task encoding a computation.
+    # @param key   Key of task in graph.
     # @param sexpr          Positional arguments to function.
     # @param category       TaskVine category name.
     # @param resources      Resources to be set for a FunctionCall.
@@ -661,7 +641,7 @@ class FunctionCallDask(FunctionCall):
     #
 
     def __init__(self, m,
-                 dag, dask_task, *,
+                 dag, key, sexpr, *,
                  category=None,
                  resources=None,
                  extra_files=None,
@@ -669,11 +649,12 @@ class FunctionCallDask(FunctionCall):
                  worker_transfers=False,
                  wrapper=None):
 
-        self._dask_task = dask_task
+        self._key = key
         self.resources = resources
+        self._sexpr = sexpr
 
         self._retries_left = retries
-        args_raw = {k: dag.get_result(k) for k in dag.get_dependencies(self.key)}
+        args_raw = {k: dag.get_result(k) for k in dag.get_children(key)}
         args = {k: f"{uuid4()}.p" for k, v in args_raw.items() if isinstance(v, DaskVineFile)}
 
         keys_of_files = list(args.keys())
@@ -682,7 +663,7 @@ class FunctionCallDask(FunctionCall):
         self._wrapper_output_file = None
         self._wrapper_output = None
 
-        super().__init__(f'Dask-Library-{id(dag)}', 'execute_graph_vertex', wrapper, dask_task, args, keys_of_files)
+        super().__init__(f'Dask-Library-{id(dag)}', 'execute_graph_vertex', wrapper, key, sexpr, args, keys_of_files)
         if wrapper:
             wo = m.declare_buffer()
             self.add_output(wo, "wrapper.output")
@@ -705,11 +686,11 @@ class FunctionCallDask(FunctionCall):
 
     @property
     def key(self):
-        return self.dask_task.key
+        return self._key
 
     @property
-    def dask_task(self):
-        return self._dask_task
+    def sexpr(self):
+        return self._sexpr
 
     def decrement_retry(self):
         self._retries_left -= 1
@@ -727,40 +708,50 @@ class FunctionCallDask(FunctionCall):
         return self._wrapper_output
 
 
-def execute_graph_vertex(wrapper, dask_task, task_args, keys_of_files):
+def execute_graph_vertex(wrapper, key, sexpr, args, keys_of_files):
     import traceback
     import cloudpickle
+    from ndcctools.taskvine.compat import DaskVineDag
 
-    for key in keys_of_files:
-        filename = task_args[key]
+    def rec_call(sexpr):
+        if DaskVineDag.keyp(sexpr) and sexpr in args:
+            return args[sexpr]
+        elif DaskVineDag.taskp(sexpr):
+            return sexpr[0](*[rec_call(a) for a in sexpr[1:]])
+        elif DaskVineDag.listp(sexpr):
+            return [rec_call(a) for a in sexpr]
+        else:
+            return sexpr
+
+    for k in keys_of_files:
         try:
-            with open(filename, "rb") as f:
+            with open(args[k], "rb") as f:
                 arg = cloudpickle.load(f)
                 if isinstance(arg, dict) and 'Result' in arg and arg['Result'] is not None:
                     arg = arg['Result']
-                task_args[key] = arg
+                args[k] = arg
         except Exception as e:
-            print(f"Could not read input file {filename} for key {key}: {e}")
+            print(f"Could not read input file {args[k]} for key {k}: {e}")
             raise
 
     try:
         if wrapper:
             try:
                 wrapper_result = None
-                (wrapper_result, call_result) = wrapper(dask_task, task_args)
+                (wrapper_result, call_result) = wrapper(key, rec_call, sexpr)
                 return call_result
             except Exception:
-                print(f"Wrapped call for {dask_task} failed.")
+                print(f"Wrapped call for {key} failed.")
                 raise
             finally:
                 try:
                     with open("wrapper.output", "wb") as f:
                         cloudpickle.dump(wrapper_result, f)
                 except Exception:
-                    print(f"Wrapped call for {dask_task.key} failed to write output.")
+                    print(f"Wrapped call for {key} failed to write output.")
                     raise
         else:
-            return dask_task(task_args)
+            return rec_call(sexpr)
     except Exception:
         print(traceback.format_exc())
         raise
