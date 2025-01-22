@@ -38,6 +38,7 @@
 # - @ref ndcctools.taskvine.dask_executor.DaskVine "vine.DaskVine"
 #
 
+import warnings
 
 from .manager import (
     Manager,
@@ -59,19 +60,23 @@ from .task import (
 )
 from . import cvine
 
+
+class DaskVineWarning(UserWarning):
+    pass
+
+
 try:
     import dask
-    import warnings
     from packaging.version import Version
     vd = Version(dask.__version__)
     vr = Version("2024.12.0")
     if vd < vr:
-        warnings.warn("ndcctools.taskvine.DaskVine only works with dask version >= 2024.12.0")
+        warnings.warn("ndcctools.taskvine.DaskVine only works with dask version >= 2024.12.0", DaskVineWarning)
 
     from .dask_executor import DaskVine
     from .dask_dag import DaskVineDag
 except ImportError as e:
-    print(f"DaskVine not available. Couldn't find module: {e.name}")
+    warnings.warn(f"DaskVine not available. Couldn't find module: {e.name}", DaskVineWarning)
 
     ##
     # DaskVine compatibility class.
