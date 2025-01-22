@@ -5536,11 +5536,12 @@ int vine_cancel_by_task_id(struct vine_manager *q, int task_id)
 		return 0;
 	}
 
-	if (task->group_id && (task->refcount > 1)) {
+	if (task->group_id) {
 		struct list *l = hash_table_lookup(q->task_group_table, task->group_id);
 		if (l) {
 			list_remove(l, task);
 		}
+		task->group_id = NULL;
 		vine_task_delete(task);
 	}
 
