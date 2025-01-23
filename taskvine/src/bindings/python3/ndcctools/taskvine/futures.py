@@ -151,7 +151,6 @@ def run_iterable(fn, iterable):
 def reduction_tree(fn, *args, n=2):
     # n is the arity of the reduction function fn
     # if less than 2, we have an infinite loop
-    print(fn, args, n)
     assert n > 1
     entries = [f.result() if isinstance(f, VineFuture) else f for f in args]
     if len(entries) < 2:
