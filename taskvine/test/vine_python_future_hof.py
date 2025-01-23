@@ -21,6 +21,12 @@ def main():
 
     nums = list(range(101))
 
+    doubles = executor.map(lambda x: 2*x, nums, chunk_size=10)
+    assert sum(doubles.result()) == sum(nums)*2
+
+    doubles = executor.map(lambda x: 2*x, nums, chunk_size=13)
+    assert sum(doubles.result()) == sum(nums)*2
+
     maximum = executor.reduce(max, nums, fn_arity=2)
     assert maximum.result() == 100
 

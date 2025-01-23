@@ -27,7 +27,7 @@ import os
 import time
 import textwrap
 from functools import partial
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Sequence
 
 RESULT_PENDING = 'result_pending'
 
@@ -142,10 +142,8 @@ def as_completed(fs, timeout=None):
     return _iterator()
 
 
-def run_iterable(fn, iterable):
-    if not isinstance(iterable, Iterator):
-        return fn(iterable)
-    return list(map(fn, iterable))
+def run_iterable(fn, *args):
+    return list(map(fn, args))
 
 
 def reduction_tree(fn, *args, n=2):
@@ -195,30 +193,33 @@ class FuturesExecutor(Executor):
         else:
             self.factory = None
 
-    def map(self, fn, iterable, library_name="Some_Library", method=None, chunk_size=1):
+    def map(self, fn, iterable, library_name=None, chunk_size=1):
+        assert chunk_size > 0
+        assert isinstance(iterable, Sequence)
+
         def wait_for_map_resolution(*futures_batch):
             result = []
-            for computed_result in futures_batch:
-                result.extend(computed_result)
+            for f in futures_batch:
+                result.extend(f.result() if isinstance(f, VineFuture) else f)
             return result
-        if isinstance(iterable, Iterator):
-            tasks = []
-            if method == "FutureFunctionCall":  # this currently does not work (error described in PR)
-                partial_obj = partial(run_iterable, fn)
-                libtask = self.create_library_from_functions(library_name, partial_obj)
 
-                self.install_library(libtask)
-                for i in range(0, len(iterable), chunk_size):
-                    future_batch_task = self.submit(self.future_funcall(library_name, partial_obj, iterable[i:i + chunk_size]))
-                    tasks.append(future_batch_task)
+        tasks = []
+        fn_wrapped = partial(run_iterable, fn)
+        if library_name:
+            libtask = self.create_library_from_functions(library_name, fn_wrapped)
+            self.install_library(libtask)
+
+        while iterable:
+            heads, iterable = iterable[:chunk_size], iterable[chunk_size:]
+
+            if library_name:
+                future_batch_task = self.submit(self.future_funcall(library_name, fn_wrapped, *heads))
             else:
-                for i in range(0, len(iterable), chunk_size):
-                    future_batch_task = self.submit(run_iterable, fn, iterable[i:i + chunk_size])
-                    tasks.append(future_batch_task)
-            future = self.submit(wait_for_map_resolution, *tasks)
-        else:
-            raise Exception('Error: Map function takes in an iterable')
-        return future
+                future_batch_task = self.submit(self.future_task(fn_wrapped, *heads))
+
+            tasks.append(future_batch_task)
+
+        return self.submit(self.future_task(wait_for_map_resolution, *tasks))
 
     # Reduce performs a reduction tree on the iterable and currently returns a single value
     #
