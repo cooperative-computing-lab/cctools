@@ -22,12 +22,12 @@ from .manager import (
     Manager,
 )
 
+import math
 import os
 import time
 import textwrap
-import inspect
 from functools import partial
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 
 RESULT_PENDING = 'result_pending'
 
@@ -112,7 +112,7 @@ def as_completed(fs, timeout=None):
             f.module_manager.submit(f._task)
 
     start = time.perf_counter()
-    result_timeout = min(timeout, 5) if timeout is not None else 5
+    result_timeout = max(1, min(timeout, 5)) if timeout else 5
 
     def _iterator():
         # iterate of queue of futures, yeilding completed futures and
@@ -136,10 +136,7 @@ def as_completed(fs, timeout=None):
                 assert result != RESULT_PENDING
                 yield f
 
-            if (
-                fs and timeout is not None
-                and time.perf_counter() - start > timeout
-            ):
+            if fs and timeout and time.perf_counter() - start > timeout:
                 raise TimeoutError()
 
     return _iterator()
@@ -151,22 +148,19 @@ def run_iterable(fn, iterable):
     return list(map(fn, iterable))
 
 
-def reduction_tree(fn, *args):
-    minimum_parameters = len(inspect.signature(fn).parameters)
-    curr_size = len(args)
-    entries = deque([f.result() if isinstance(f, VineFuture) else f for f in args])
-    while curr_size >= minimum_parameters:
-        parameters = []
-        for _ in range(minimum_parameters):
-            parameters.append(entries.popleft())
-        new_result = fn(*parameters)
-        if isinstance(new_result):
-            for result in new_result:
-                entries.appendleft(result)
-        else:
-            entries.appendleft(new_result)
-        curr_size = len(entries)
-    return entries[0]
+def reduction_tree(fn, *args, n=2):
+    # n is the arity of the reduction function fn
+    # if less than 2, we have an infinite loop
+    print(fn, args, n)
+    assert n > 1
+    entries = [f.result() if isinstance(f, VineFuture) else f for f in args]
+    if len(entries) < 2:
+        return entries[0]
+
+    len_multiple = int(math.ceil(len(entries)/n) * n)
+    new_args = map(fn, [entries[i:i+n] for i in range(0, len_multiple, n)])
+
+    return reduction_tree(fn, *new_args, n=n)
 
 ##
 # \class FuturesExecutor
@@ -231,51 +225,36 @@ class FuturesExecutor(Executor):
     #
     # parameters:
     # - Function
-    # - Iterable of parameters that function will take
-    # - a library_name for a library function call
-    # - a method
-    # - a chunk_size, which is the number of iterations to complete in one task. if c is chunk_size, a single task will reduce c(n-1) + 1 nodes to 1 node
+    # - a function that receives fn_arity arguments
+    # - A sequence of parameters that function will take
+    # - a chunk_size to group elements in sequence to dispatch to a single task
+    # - arity of the function, elements of a chunk are reduce arity-wise.
+    # - an optional library_name for a library function call
+    def reduce(self, fn, iterable, library_name=None, chunk_size=2, fn_arity=2):
+        assert chunk_size > 1
+        assert fn_arity > 1
+        assert isinstance(iterable, Sequence)
+        chunk_size = max(fn_arity, chunk_size)
 
-    def reduce(self, fn, iterable, library_name=None, method=None, chunk_size=1):
-        # This line is just the identity - since when a future is pickled, it actually becomes some file, which means it is evaluated immediately/sent to queue
-        if isinstance(iterable, Iterator):
-            sub_futures = [iterable]
-            num_parameters = len(inspect.signature(fn).parameters)
-            reduction_size = chunk_size * (num_parameters - 1)
-            while len(sub_futures[-1]) > 1 or len(sub_futures) == 1:
-                layer = []
-                for i in range(0, len(sub_futures[-1]), reduction_size):
-                    if method == "FutureFunctionCall":
-                        future_batch_task = self.submit(
-                            self.future_funcall(
-                                library_name,
-                                reduction_tree,
-                                fn,
-                                *[
-                                    f if isinstance(f, VineFuture) else f
-                                    for f in sub_futures[-1][i:i + reduction_size]
-                                ]
-                            )
-                        )
-                    else:  # Method is FuturePythonTask
-                        future_batch_task = self.submit(
-                            reduction_tree,
-                            fn,
-                            *[
-                                f if isinstance(f, VineFuture) else f
-                                for f in sub_futures[-1][i:i + reduction_size]
-                            ]
-                        )
-                    layer.append(future_batch_task)
-                sub_futures.append(layer)
-            future = sub_futures[-1][0]
-        # if this is a single value
-        else:
-            if method == "FutureFunctionCall":
-                future = self.submit(self.future_funcall(library_name, reduction_tree, fn, iterable))
+        new_iterable = []
+        while iterable:
+            heads, iterable = iterable[:chunk_size], iterable[chunk_size:]
+            heads = [f.result() if isinstance(f, VineFuture) else f for f in heads]
+            if library_name:
+                future_batch_task = self.submit(
+                    self.future_funcall(
+                        library_name, reduction_tree, fn, *heads, n=fn_arity
+                    )
+                )
             else:
-                future = self.submit(reduction_tree, fn, iterable)
-        return future
+                future_batch_task = self.submit(self.future_task(reduction_tree, fn, *heads, n=fn_arity))
+
+            new_iterable.append(future_batch_task)
+
+        if len(new_iterable) > 1:
+            return self.reduce(fn, new_iterable, library_name, chunk_size, fn_arity)
+        else:
+            return new_iterable[0]
 
     def allpairs(self, fn, iterable_a, iterable_b, library_name=None, method=None, chunk_size=1):
         def wait_for_allpairs_resolution(row_size, *futures_batch):
