@@ -27,7 +27,7 @@ import os
 import time
 import textwrap
 from functools import partial
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 
 RESULT_PENDING = 'result_pending'
 
@@ -154,8 +154,8 @@ def reduction_tree(fn, *args, n=2):
     if len(entries) < 2:
         return entries[0]
 
-    len_multiple = int(math.ceil(len(entries)/n) * n)
-    new_args = map(fn, [entries[i:i+n] for i in range(0, len_multiple, n)])
+    len_multiple = int(math.ceil(len(entries) / n) * n)
+    new_args = map(fn, [entries[i:i + n] for i in range(0, len_multiple, n)])
 
     return reduction_tree(fn, *new_args, n=n)
 
