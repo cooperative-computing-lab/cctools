@@ -195,8 +195,9 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	/* Don't send tasks if the factory is used and has too many connected workers. */
 	if (w->factory_name) {
 		struct vine_factory_info *f = vine_factory_info_lookup(q, w->factory_name);
-		if (f && f->connected_workers > f->max_workers)
+		if (f && f->connected_workers > f->max_workers) {
 			return 0;
+		}
 	}
 
 	/* Check if worker is blocked from the manager. */
