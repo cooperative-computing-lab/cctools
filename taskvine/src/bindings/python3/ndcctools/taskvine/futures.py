@@ -1,20 +1,22 @@
 from . import cvine
 import hashlib
 from collections import deque, namedtuple
-from concurrent.futures import Executor
-from concurrent.futures import Future
-from concurrent.futures import FIRST_COMPLETED
-from concurrent.futures import FIRST_EXCEPTION
-from concurrent.futures import ALL_COMPLETED
-from concurrent.futures._base import PENDING
-from concurrent.futures._base import CANCELLED
-from concurrent.futures._base import FINISHED
+from concurrent.futures import (
+    Executor,
+    Future,
+    FIRST_COMPLETED,
+    FIRST_EXCEPTION,
+    ALL_COMPLETED,
+)
+from concurrent.futures._base import PENDING, CANCELLED, FINISHED
 from concurrent.futures import TimeoutError
+
 from .task import (
     PythonTask,
     FunctionCall,
     FunctionCallNoResult,
 )
+
 from .manager import (
     Factory,
     Manager,
@@ -25,6 +27,7 @@ import time
 import textwrap
 import inspect
 from functools import partial
+from collections.abc import Iterator
 
 RESULT_PENDING = 'result_pending'
 
@@ -142,27 +145,13 @@ def as_completed(fs, timeout=None):
     return _iterator()
 
 
-def run_iterable(fn, iterable, dimensions=1):
-
-    if not ((hasattr(iterable, '__iter__') or hasattr(iterable, '__getitem__')) and not isinstance(iterable, str)):
+def run_iterable(fn, iterable):
+    if not isinstance(iterable, Iterator):
         return fn(iterable)
-    if dimensions < 1:
-        return None
-    result = []
-    if dimensions == 1:
-        for element in iterable:
-            if (hasattr(element, '__iter__') or hasattr(element, '__getitem__')) and not isinstance(element, str):
-                result.append(fn(*element))
-            else:
-                result.append(fn(element))
-    else:
-        for inner_iterable in iterable:
-            result.append(run_iterable(fn, inner_iterable, dimensions - 1))
-    return result
+    return list(map(fn, iterable))
 
 
 def reduction_tree(fn, *args):
-
     minimum_parameters = len(inspect.signature(fn).parameters)
     curr_size = len(args)
     entries = deque([f.result() if isinstance(f, VineFuture) else f for f in args])
@@ -171,13 +160,14 @@ def reduction_tree(fn, *args):
         for _ in range(minimum_parameters):
             parameters.append(entries.popleft())
         new_result = fn(*parameters)
-        if (hasattr(new_result, '__getitem__') or hasattr(new_result, '__iter__')) and not isinstance(new_result, str):
+        if isinstance(new_result):
             for result in new_result:
                 entries.appendleft(result)
         else:
             entries.appendleft(new_result)
         curr_size = len(entries)
     return entries[0]
+
 ##
 # \class FuturesExecutor
 #
@@ -218,17 +208,15 @@ class FuturesExecutor(Executor):
             for computed_result in futures_batch:
                 result.extend(computed_result)
             return result
-        if (hasattr(iterable, '__iter__') or hasattr(iterable, '__getitem__')) and not isinstance(iterable, str):
+        if isinstance(iterable, Iterator):
             tasks = []
             if method == "FutureFunctionCall":  # this currently does not work (error described in PR)
                 partial_obj = partial(run_iterable, fn)
+                libtask = self.create_library_from_functions(library_name, partial_obj)
 
-                def partial_func(*args, **kwargs):
-                    return partial_obj(*args, **kwargs)
-                libtask = self.create_library_from_functions(library_name, partial_func)
                 self.install_library(libtask)
                 for i in range(0, len(iterable), chunk_size):
-                    future_batch_task = self.submit(self.future_funcall(library_name, partial_func, iterable[i:i + chunk_size]))
+                    future_batch_task = self.submit(self.future_funcall(library_name, partial_obj, iterable[i:i + chunk_size]))
                     tasks.append(future_batch_task)
             else:
                 for i in range(0, len(iterable), chunk_size):
@@ -250,7 +238,7 @@ class FuturesExecutor(Executor):
 
     def reduce(self, fn, iterable, library_name=None, method=None, chunk_size=1):
         # This line is just the identity - since when a future is pickled, it actually becomes some file, which means it is evaluated immediately/sent to queue
-        if (hasattr(iterable, '__iter__') or hasattr(iterable, '__getitem__')) and not isinstance(iterable, str):
+        if isinstance(iterable, Iterator):
             sub_futures = [iterable]
             num_parameters = len(inspect.signature(fn).parameters)
             reduction_size = chunk_size * (num_parameters - 1)
@@ -258,9 +246,26 @@ class FuturesExecutor(Executor):
                 layer = []
                 for i in range(0, len(sub_futures[-1]), reduction_size):
                     if method == "FutureFunctionCall":
-                        future_batch_task = self.submit(self.future_funcall(library_name, reduction_tree, fn, *[f if isinstance(f, VineFuture) else f for f in sub_futures[-1][i:i + reduction_size]]))
+                        future_batch_task = self.submit(
+                            self.future_funcall(
+                                library_name,
+                                reduction_tree,
+                                fn,
+                                *[
+                                    f if isinstance(f, VineFuture) else f
+                                    for f in sub_futures[-1][i:i + reduction_size]
+                                ]
+                            )
+                        )
                     else:  # Method is FuturePythonTask
-                        future_batch_task = self.submit(reduction_tree, fn, *[f if isinstance(f, VineFuture) else f for f in sub_futures[-1][i:i + reduction_size]])
+                        future_batch_task = self.submit(
+                            reduction_tree,
+                            fn,
+                            *[
+                                f if isinstance(f, VineFuture) else f
+                                for f in sub_futures[-1][i:i + reduction_size]
+                            ]
+                        )
                     layer.append(future_batch_task)
                 sub_futures.append(layer)
             future = sub_futures[-1][0]
@@ -283,20 +288,18 @@ class FuturesExecutor(Executor):
                 processed_result.append(row)
             return processed_result
         iterable = [(a, b) for b in iterable_b for a in iterable_a]
-        if (hasattr(iterable, '__iter__') or hasattr(iterable, '__getitem__')) and not isinstance(iterable, str):
-            tasks = []
-            for i in range(0, len(iterable), chunk_size):
-                if method == "FutureFunctionCall":
-                    future_batch_task = self.submit(self.future_funcall(library_name, run_iterable, fn, iterable[i:i + chunk_size]))
-                else:  # Method is FuturePythonTask
-                    future_batch_task = self.submit(run_iterable, fn, iterable[i:i + chunk_size])
-                tasks.append(future_batch_task)
-            future = self.submit(wait_for_allpairs_resolution, len(iterable_b), *tasks)
-        else:
+        tasks = []
+        for i in range(0, len(iterable), chunk_size):
             if method == "FutureFunctionCall":
-                future = self.submit(self.future_funcall(library_name, run_iterable, fn, iterable))
+                future_batch_task = self.submit(
+                    self.future_funcall(
+                        library_name, run_iterable, fn, iterable[i:i + chunk_size]
+                    )
+                )
             else:  # Method is FuturePythonTask
-                future = self.submit(run_iterable, fn, iterable)
+                future_batch_task = self.submit(run_iterable, fn, iterable[i:i + chunk_size])
+            tasks.append(future_batch_task)
+        future = self.submit(wait_for_allpairs_resolution, len(iterable_b), *tasks)
         return future
 
     def submit(self, fn, *args, **kwargs):
