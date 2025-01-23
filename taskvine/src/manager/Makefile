@@ -15,6 +15,7 @@ SOURCES = \
 	vine_task.c \
 	vine_file.c \
 	vine_mount.c \
+	vine_symlink.c \
 	vine_txn_log.c \
 	vine_taskgraph_log.c \
 	vine_cached_name.c \
