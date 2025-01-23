@@ -4672,8 +4672,9 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	t->time_when_submitted = timestamp_get();
 	q->stats->tasks_submitted++;
 
-	if (q->monitor_mode != VINE_MON_DISABLED)
+	if (q->monitor_mode != VINE_MON_DISABLED) {
 		vine_monitor_add_files(q, t);
+	}
 
 	rmsummary_merge_max(q->max_task_resources_requested, t->resources_requested);
 
