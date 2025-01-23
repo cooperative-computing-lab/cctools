@@ -3214,8 +3214,9 @@ int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine
 		}
 
 		/* If that resulted in a match, move on to the next file. */
-		if (found_match)
+		if (found_match) {
 			continue;
+		}
 
 		/*
 		If no match was found, the behavior depends on the original file type.
