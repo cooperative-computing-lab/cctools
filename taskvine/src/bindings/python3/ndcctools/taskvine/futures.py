@@ -174,20 +174,14 @@ class FuturesExecutor(Executor):
             self.factory = None
 
     def submit(self, fn, *args, **kwargs):
-        if isinstance(fn, FuturePythonTask):
+        if isinstance(fn, (FuturePythonTask, FutureFunctionCall)):
             self.manager.submit(fn)
             fn._future._is_submitted = True
-            return fn._future
-        if isinstance(fn, FutureFunctionCall):
-            self.manager.submit(fn)
             self.task_table.append(fn)
-            fn._future._is_submitted = True
             return fn._future
-        future_task = self.future_task(fn, *args, **kwargs)
-        self.task_table.append(future_task)
-        future_task._future._is_submitted = True
-        self.submit(future_task)
-        return future_task._future
+        else:
+            future_task = self.future_task(fn, *args, **kwargs)
+            return self.submit(future_task)
 
     def future_task(self, fn, *args, **kwargs):
         return FuturePythonTask(self.manager, fn, *args, **kwargs)
