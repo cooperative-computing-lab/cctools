@@ -371,7 +371,7 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 
 		vine_txn_log_write_cache_update(q, w, size, transfer_time, start_time, cachename);
 
-		w->resources->disk.inuse += size / 1e6;
+		w->resources->disk.inuse += BYTES_TO_MEGABYTES(size);
 
 		/* If the replica corresponds to a declared file. */
 
@@ -2874,8 +2874,8 @@ static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w
 		q->current_max_worker->memory = w->resources->memory.total;
 	}
 
-	if (q->current_max_worker->disk < (w->resources->disk.total - w->inuse_cache)) {
-		q->current_max_worker->disk = w->resources->disk.total - w->inuse_cache;
+	if (q->current_max_worker->disk < (w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache))) {
+		q->current_max_worker->disk = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
 	}
 
 	if (q->current_max_worker->gpus < w->resources->gpus.total) {
@@ -5869,7 +5869,7 @@ static void aggregate_workers_resources(
 	}
 
 	// vine_stats wants MB
-	*inuse_cache = (int64_t)ceil(*inuse_cache / (1.0 * MEGA));
+	*inuse_cache = (int64_t)ceil(BYTES_TO_MEGABYTES(*inuse_cache));
 }
 
 /* This simple wrapper function allows us to hide the debug.h interface from the end user. */
