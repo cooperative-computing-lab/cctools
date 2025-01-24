@@ -3921,7 +3921,6 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	cctools_uuid_t local_uuid;
 	cctools_uuid_create(&local_uuid);
 	q->uuid = strdup(local_uuid.str);
-	q->duplicated_libraries = 0;
 
 	q->next_task_id = 1;
 	q->fixed_location_in_queue = 0;
@@ -4723,8 +4722,6 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	if (!check_worker_against_task(q, w, original)) {
 		return 0;
 	}
-	/* Track the number of duplicated libraries */
-	q->duplicated_libraries += 1;
 
 	/* Duplicate the original task */
 	struct vine_task *t = vine_task_copy(original);
@@ -4736,7 +4733,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	/* If watch-library-logfiles is tuned, watch the output file of every duplicated library instance */
 	if (q->watch_library_logfiles) {
 		char *remote_stdout_filename = string_format(".taskvine.stdout");
-		char *local_library_log_filename = string_format("library-%d.debug.log", q->duplicated_libraries);
+		char *local_library_log_filename = string_format("library-task-%d.log", t->task_id);
 		t->library_log_path = vine_get_path_library_log(q, local_library_log_filename);
 
 		struct vine_file *library_local_stdout_file = vine_declare_file(q, t->library_log_path, VINE_CACHE_LEVEL_TASK, 0);
