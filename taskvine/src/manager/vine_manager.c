@@ -5779,6 +5779,8 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "disk-proportion-available-to-task")) {
 		if (value > 1 || value < 0) {
 			q->disk_proportion_available_to_task = 0.75;
+		} else {
+			q->disk_proportion_available_to_task = value;
 		}
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
