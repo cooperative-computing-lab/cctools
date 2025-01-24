@@ -256,30 +256,39 @@ class FuturesExecutor(Executor):
         else:
             return new_iterable[0]
 
-    def allpairs(self, fn, iterable_a, iterable_b, library_name=None, method=None, chunk_size=1):
-        def wait_for_allpairs_resolution(row_size, *futures_batch):
+    def allpairs(self, fn, iterable_rows, iterable_cols, library_name=None, chunk_size=1):
+        assert chunk_size > 0
+        assert isinstance(iterable_rows, Sequence)
+        assert isinstance(iterable_cols, Sequence)
+
+        def wait_for_allpairs_resolution(row_size, col_size, mapped):
             result = []
-            for computed_result in futures_batch:
-                result.extend(computed_result)
-            processed_result = []
-            for i in range(len(result) // row_size):
-                row = result[i * row_size:i * row_size + row_size]
-                processed_result.append(row)
-            return processed_result
-        iterable = [(a, b) for b in iterable_b for a in iterable_a]
-        tasks = []
-        for i in range(0, len(iterable), chunk_size):
-            if method == "FutureFunctionCall":
-                future_batch_task = self.submit(
-                    self.future_funcall(
-                        library_name, run_iterable, fn, iterable[i:i + chunk_size]
-                    )
-                )
-            else:  # Method is FuturePythonTask
-                future_batch_task = self.submit(run_iterable, fn, iterable[i:i + chunk_size])
-            tasks.append(future_batch_task)
-        future = self.submit(wait_for_allpairs_resolution, len(iterable_b), *tasks)
-        return future
+            for _ in range(row_size):
+                result.append([0] * col_size)
+
+            mapped = mapped.result() if isinstance(mapped, VineFuture) else mapped
+            for p in mapped:
+                (i, j, r) = p.result() if isinstance(p, VineFuture) else p
+                result[i][j] = r
+
+            return result
+
+        def wrap_idx(args):
+            i, j, a, b = args
+            return (i, j, fn(a, b))
+
+        iterable = [(i, j, a, b) for (i, a) in enumerate(iterable_rows) for (j, b) in enumerate(iterable_cols)]
+        mapped = self.map(wrap_idx, iterable, library_name, chunk_size)
+
+        return self.submit(
+            self.future_task(
+                wait_for_allpairs_resolution,
+                len(iterable_rows),
+                len(iterable_cols),
+                mapped,
+            )
+        )
+
 
     def submit(self, fn, *args, **kwargs):
         if isinstance(fn, FuturePythonTask):
