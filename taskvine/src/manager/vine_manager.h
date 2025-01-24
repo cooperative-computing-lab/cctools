@@ -118,6 +118,7 @@ struct vine_manager {
 	struct hash_table *workers_with_watched_file_updates;  /* Maps link -> vine_worker_info */
 	struct hash_table *workers_with_complete_tasks;  /* Maps link -> vine_worker_info */
 	struct hash_table *current_transfer_table; 	/* Maps uuid -> struct transfer_pair */
+	struct itable     *task_group_table; 	/* Maps group id -> list vine_task */
 
 	/* Primary data structures for tracking files. */
 
@@ -180,6 +181,10 @@ struct vine_manager {
 	int tasks_to_sate_hungry;          /* Number of tasks that would sate the queue since last call to vine_hungry_computation. */
 	int tasks_waiting_last_hungry;     /* Number of tasks originally waiting when call to vine_hungry_computation was made. */
 	timestamp_t hungry_check_interval; /* Maximum interval between vine_hungry_computation checks. */
+
+	/* Task Groups Configuration */
+	int task_groups_enabled; 
+	int group_id_counter; 
 
 	/* Various performance knobs that can be tuned. */
 	int short_timeout;            /* Timeout in seconds to send/recv a brief message from worker */

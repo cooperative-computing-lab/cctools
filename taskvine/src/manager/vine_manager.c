@@ -24,6 +24,7 @@ See the file COPYING for details.
 #include "vine_runtime_dir.h"
 #include "vine_schedule.h"
 #include "vine_task.h"
+#include "vine_task_groups.h"
 #include "vine_task_info.h"
 #include "vine_taskgraph_log.h"
 #include "vine_txn_log.h"
@@ -2992,6 +2993,35 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 	return result;
 }
 
+static vine_result_code_t commit_task_group_to_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	vine_result_code_t result = VINE_SUCCESS;
+
+	struct list *l = NULL;
+	if (t->group_id) {
+		l = itable_lookup(q->task_group_table, t->group_id);
+		list_remove(l, t);
+		// decrement refcount
+		vine_task_delete(t);
+	}
+
+	int counter = 0;
+	do {
+
+		if (counter && (result == VINE_SUCCESS)) {
+			int t_idx = priority_queue_find_idx(q->ready_tasks, t);
+			priority_queue_remove(q->ready_tasks, t_idx);
+			// decrement refcount
+			vine_task_delete(t);
+		}
+		result = commit_task_to_worker(q, w, t);
+		counter++;
+	} while ((l && (t = list_pop_head(l))));
+
+	debug(D_VINE, "Sent batch of %d tasks to worker %s", counter, w->hostname);
+	return result;
+}
+
 /* 1 if task resubmitted, 0 otherwise */
 static int resubmit_task_on_exhaustion(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
@@ -3300,6 +3330,9 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 	if (!rt)
 		return;
 
+	/* Do not try to group recovery tasks */
+	rt->group_id = 0;
+
 	switch (rt->state) {
 	case VINE_TASK_INITIAL:
 		/* The recovery task has never been run, so submit it now. */
@@ -3441,7 +3474,26 @@ static int send_one_task(struct vine_manager *q)
 
 		if (w) {
 			priority_queue_remove(q->ready_tasks, t_idx);
-			vine_result_code_t result = commit_task_to_worker(q, w, t);
+
+			// do not continue if this worker is running a group task
+			if (q->task_groups_enabled) {
+				struct vine_task *it;
+				uint64_t taskid;
+				ITABLE_ITERATE(w->current_tasks, taskid, it)
+				{
+					if (it->group_id) {
+						return 0;
+					}
+				}
+			}
+
+			vine_result_code_t result;
+			if (q->task_groups_enabled) {
+				result = commit_task_group_to_worker(q, w, t);
+			} else {
+				result = commit_task_to_worker(q, w, t);
+			}
+
 			switch (result) {
 			case VINE_SUCCESS:
 				/* return on successful commit. */
@@ -3945,6 +3997,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->factory_table = hash_table_create(0, 0);
 	q->current_transfer_table = hash_table_create(0, 0);
+	q->task_group_table = itable_create(0);
+	q->group_id_counter = 1;
 	q->fetch_factory = 0;
 
 	q->measured_local_resources = rmsummary_create(-1);
@@ -4009,6 +4063,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	// peer transfers enabled by default
 	q->peer_transfers_enabled = 1;
+
+	q->task_groups_enabled = 0;
 
 	q->load_from_shared_fs_enabled = 0;
 
@@ -4286,6 +4342,9 @@ void vine_delete(struct vine_manager *q)
 
 	vine_current_transfers_clear(q);
 	hash_table_delete(q->current_transfer_table);
+
+	vine_task_groups_clear(q);
+	itable_delete(q->task_group_table);
 
 	itable_clear(q->tasks, (void *)delete_task_at_exit);
 	itable_delete(q->tasks);
@@ -4654,6 +4713,11 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	if (t->has_fixed_locations) {
 		q->fixed_location_in_queue++;
 		vine_task_set_scheduler(t, VINE_SCHEDULE_FILES);
+	}
+
+	/* Attempt to group this task based on temp dependencies. */
+	if (q->task_groups_enabled) {
+		vine_task_groups_assign_task(q, t);
 	}
 
 	/* If the task produces temporary files, create recovery tasks for those. */
@@ -5472,6 +5536,15 @@ int vine_cancel_by_task_id(struct vine_manager *q, int task_id)
 		return 0;
 	}
 
+	if (task->group_id) {
+		struct list *l = itable_lookup(q->task_group_table, task->group_id);
+		if (l) {
+			list_remove(l, task);
+		}
+		task->group_id = 0;
+		vine_task_delete(task);
+	}
+
 	reset_task_to_state(q, task, VINE_TASK_RETRIEVED);
 
 	task->result = VINE_RESULT_CANCELLED;
@@ -5672,6 +5745,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "update-interval")) {
 		q->update_interval = MAX(1, (int)value);
+
+	} else if (!strcmp(name, "task-groups")) {
+		q->task_groups_enabled = MIN(1, (int)value);
 
 	} else if (!strcmp(name, "resource-management-interval")) {
 		q->resource_management_interval = MAX(1, (int)value);

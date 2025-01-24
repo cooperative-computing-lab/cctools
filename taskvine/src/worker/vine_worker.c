@@ -838,7 +838,7 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 	char taskname_encoded[VINE_LINE_MAX];
 	char library_name[VINE_LINE_MAX];
 	char category[VINE_LINE_MAX];
-	int flags, length;
+	int flags, length, groupid;
 	int64_t n;
 
 	timestamp_t nt;
@@ -891,6 +891,8 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 			vine_task_set_disk(task, n);
 		} else if (sscanf(line, "gpus %" PRId64, &n)) {
 			vine_task_set_gpus(task, n);
+		} else if (sscanf(line, "groupid %d", &groupid)) {
+			task->group_id = groupid;
 		} else if (sscanf(line, "wall_time %" PRIu64, &nt)) {
 			vine_task_set_time_max(task, nt);
 		} else if (sscanf(line, "end_time %" PRIu64, &nt)) {
@@ -1397,8 +1399,8 @@ static int process_ready_to_run_now(struct vine_process *p, struct vine_cache *c
 			return 0;
 	}
 
-	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager);
-	if (status == VINE_CACHE_STATUS_PROCESSING)
+	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager, procs_table);
+	if (status != VINE_CACHE_STATUS_READY)
 		return 0;
 
 	return 1;
@@ -1442,7 +1444,7 @@ static int process_can_run_eventually(struct vine_process *p, struct vine_cache 
 		}
 	}
 
-	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager);
+	vine_cache_status_t status = vine_sandbox_ensure(p, cache, manager, procs_table);
 	switch (status) {
 	case VINE_CACHE_STATUS_FAILED:
 	case VINE_CACHE_STATUS_UNKNOWN:

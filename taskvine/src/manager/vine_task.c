@@ -81,6 +81,7 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->priority = 0;
 
 	vine_counters.task.created++;
+	t->group_id = 0;
 
 	return t;
 }
@@ -254,6 +255,11 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 	if (task->resources_requested) {
 		rmsummary_delete(new->resources_requested);
 		new->resources_requested = rmsummary_copy(task->resources_requested, 0);
+	}
+
+	/* Group ID is copied. */
+	if (task->group_id) {
+		new->group_id = task->group_id;
 	}
 
 	return new;

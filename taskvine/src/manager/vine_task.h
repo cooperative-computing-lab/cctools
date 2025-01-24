@@ -18,6 +18,7 @@ End user may only use the API described in taskvine.h
 
 #include "list.h"
 #include "category.h"
+#include "uuid.h"
 
 #include <stdint.h>
 
@@ -130,10 +131,12 @@ struct vine_task {
 	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
 	struct rmsummary *current_resource_box;                /**< Resources allocated to the task on this specific worker. */
 
-	double sandbox_measured;                              /**< On completion, the maximum size observed of the disk used by the task for output and ephemeral files. */
+	double sandbox_measured;                               /**< On completion, the maximum size observed of the disk used by the task for output and ephemeral files. */
 		
 	int has_fixed_locations;                               /**< Whether at least one file was added with the VINE_FIXED_LOCATION flag. Task fails immediately if no
 															 worker can satisfy all the strict inputs of the task. */
+
+	int group_id;					       /**< When enabled, group ID will be assigned based on temp file dependencies of this task */	
 
 	int refcount;                                          /**< Number of remaining references to this object. */
 };
