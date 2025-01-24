@@ -126,7 +126,7 @@ class Task(object):
             pass
 
     @staticmethod
-    def _determine_mount_flags(watch=False, failure_only=False, success_only=False, strict_input=False ):
+    def _determine_mount_flags(watch=False, failure_only=False, success_only=False, strict_input=False, mount_hardlink=False ):
         flags = cvine.VINE_TRANSFER_ALWAYS
         if watch:
             flags |= cvine.VINE_WATCH
@@ -136,6 +136,8 @@ class Task(object):
             flags |= cvine.VINE_SUCCESS_ONLY
         if strict_input:
             flags |= cvine.VINE_FIXED_LOCATION
+        if mount_hardlink:
+            flags |= cvine.VINE_MOUNT_HARDLINK
         return flags
 
     @staticmethod
@@ -339,12 +341,12 @@ class Task(object):
     # >>> f = m.declare_untar(url)
     # >>> task.add_input(f,"data")
     # @endcode
-    def add_input(self, file, remote_name, strict_input=False ):
+    def add_input(self, file, remote_name, strict_input=False, mount_hardlink=False ):
         # SWIG expects strings
         if not isinstance(remote_name, str):
             raise TypeError(f"remote_name {remote_name} is not a str")
 
-        flags = Task._determine_mount_flags(strict_input=strict_input)
+        flags = Task._determine_mount_flags(strict_input=strict_input,mount_hardlink=mount_hardlink)
 
         if cvine.vine_task_add_input(self._task, file._file, remote_name, flags) == 0:
             raise ValueError("invalid file description")
