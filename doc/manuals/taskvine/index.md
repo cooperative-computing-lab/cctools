@@ -2525,6 +2525,12 @@ total number of cores available, etc. The log is located by default at:
 vine-run-info/%Y-%m-%dT%H:%M:%S/vine-logs/performance
 ```
 
+Install gnuplot to enable the use of `vine_graph_log`
+
+```sh
+conda install conda-forge::gnuplot
+```
+
 The script `vine_graph_log` is a wrapper for `gnuplot`, and with it you
 can plot some of the statistics, such as total time spent transfering tasks,
 number of tasks running, and workers connected.  For example, this command:
