@@ -46,7 +46,7 @@ class File(object):
             return cvine.vine_file_type(self._file)
 
     ##
-    # Set the Unix mode permissions bits for non-regular files.
+    # Set the Unix mode permission bits for the remote file.
     #
     # @param self       A file object.
     # @param mode       Unix mode bits.
