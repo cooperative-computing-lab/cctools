@@ -66,8 +66,7 @@ The transfer time is controlled by the size of the file.
 If the transfer takes too long, then cancel it.
 */
 
-static int vine_manager_put_file(
-		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localname, const char *remotename, struct stat info, int64_t *total_bytes)
+static int vine_manager_put_file( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localname, const char *remotename, struct stat info, int override_mode, int64_t *total_bytes )
 {
 	time_t stoptime;
 	timestamp_t effective_stoptime = 0;
@@ -76,6 +75,9 @@ static int vine_manager_put_file(
 	/* normalize the mode so as not to set up invalid permissions */
 	int mode = (info.st_mode | 0x600) & 0777;
 
+	/* If user provided override mode bits at the top level, use those instead. */
+	if(override_mode) mode = override_mode;
+	
 	int64_t length = info.st_size;
 
 	int fd = open(localname, O_RDONLY, 0);
@@ -113,7 +115,7 @@ static int vine_manager_put_file(
 /* Need prototype here to address mutually recursive code. */
 
 static vine_result_code_t vine_manager_put_file_or_dir(
-		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *name, const char *remotename, int64_t *total_bytes, int follow_links);
+						       struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *name, const char *remotename, int override_mode, int64_t *total_bytes, int follow_links);
 
 /*
 Send a directory and all of its contents using the new streaming protocol.
@@ -121,8 +123,7 @@ Do this by sending a "dir" prefix, then all of the directory contents,
 and then an "end" marker.
 */
 
-static vine_result_code_t vine_manager_put_directory(
-		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localname, const char *remotename, int64_t *total_bytes)
+static vine_result_code_t vine_manager_put_directory( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localname, const char *remotename, int override_mode, int64_t *total_bytes)
 {
 	struct stat info;
 	if (stat(localname, &info) != 0) {
@@ -130,6 +131,10 @@ static vine_result_code_t vine_manager_put_directory(
 		return VINE_APP_FAILURE;
 	}
 
+	/* If user provided override mode bits at the top level, use those instead. */
+	int mode = info.st_mode;
+	if(override_mode) mode = override_mode;
+	
 	DIR *dir = opendir(localname);
 	if (!dir) {
 		debug(D_NOTICE, "Cannot open dir %s: %s", localname, strerror(errno));
@@ -141,7 +146,7 @@ static vine_result_code_t vine_manager_put_directory(
 	char remotename_encoded[VINE_LINE_MAX];
 	url_encode(remotename, remotename_encoded, sizeof(remotename_encoded));
 
-	vine_manager_send(q, w, "dir %s %0o %lld\n", remotename_encoded, info.st_mode, (long long)info.st_mtime);
+	vine_manager_send(q, w, "dir %s %0o %lld\n", remotename_encoded, mode, (long long)info.st_mtime);
 
 	struct dirent *d;
 	while ((d = readdir(dir))) {
@@ -150,7 +155,7 @@ static vine_result_code_t vine_manager_put_directory(
 
 		char *localpath = string_format("%s/%s", localname, d->d_name);
 
-		result = vine_manager_put_file_or_dir(q, w, t, localpath, d->d_name, total_bytes, 0);
+		result = vine_manager_put_file_or_dir(q, w, t, localpath, d->d_name, 0, total_bytes, 0);
 
 		free(localpath);
 
@@ -177,8 +182,7 @@ However, in recursive calls, follow_links is set to zero,
 and internal links are not followed, they are sent natively.
 */
 
-static vine_result_code_t vine_manager_put_file_or_dir(
-		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localpath, const char *remotepath, int64_t *total_bytes, int follow_links)
+static vine_result_code_t vine_manager_put_file_or_dir( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localpath, const char *remotepath, int override_mode, int64_t *total_bytes, int follow_links)
 {
 	struct stat info;
 	int result = VINE_SUCCESS;
@@ -191,11 +195,11 @@ static vine_result_code_t vine_manager_put_file_or_dir(
 
 	if (result >= 0) {
 		if (S_ISDIR(info.st_mode)) {
-			result = vine_manager_put_directory(q, w, t, localpath, remotepath, total_bytes);
+			result = vine_manager_put_directory(q, w, t, localpath, remotepath, override_mode, total_bytes);
 		} else if (S_ISLNK(info.st_mode)) {
 			result = vine_manager_put_symlink(q, w, t, localpath, remotepath, total_bytes);
 		} else if (S_ISREG(info.st_mode)) {
-			result = vine_manager_put_file(q, w, t, localpath, remotepath, info, total_bytes);
+			result = vine_manager_put_file(q, w, t, localpath, remotepath, info, override_mode, total_bytes);
 		} else {
 			debug(D_NOTICE, "skipping unusual file: %s", strerror(errno));
 		}
@@ -321,7 +325,7 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 	case VINE_FILE:
 		debug(D_VINE, "%s (%s) needs file %s as %s", w->hostname, w->addrport, f->source, m->remote_name);
 		vine_manager_send(q, w, "put %s %d %lld\n", f->cached_name, f->cache_level, (long long)f->size);
-		result = vine_manager_put_file_or_dir(q, w, t, f->source, f->cached_name, &total_bytes, 1);
+		result = vine_manager_put_file_or_dir(q, w, t, f->source, f->cached_name, f->mode, &total_bytes, 1);
 		break;
 
 	case VINE_BUFFER:

@@ -890,9 +890,10 @@ struct vine_file *vine_declare_starch(
 		struct vine_manager *m, struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags);
 
 /** Set the Unix mode permission bits of a declared file.
-Sets the Unix mode permission bits of a file, as it is presented to the application.
-This is particularly useful after declaring
-a file coming from a source (e.g. @ref vine_declare_url) that does not inherently contain mode bits.
+Sets (or overrides) the Unix mode permissions of any file object,
+as the application will see it.  This applies to any file type,
+but is particularly useful for controlling buffers, urls, and mini-tasks
+that do not inherently contain mode bits.
 @param f A file object of any kind.
 @param mode The Unix mode bits to be applied to the file.
 */
