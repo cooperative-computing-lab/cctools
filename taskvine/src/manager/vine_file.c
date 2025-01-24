@@ -85,6 +85,7 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 	f->source_worker = 0;
 	f->type = type;
 	f->size = size;
+	f->mode = 0;
 	f->mini_task = mini_task;
 	f->recovery_task = 0;
 	f->state = VINE_FILE_STATE_CREATED; /* Assume state created until told otherwise */
@@ -369,6 +370,12 @@ vine_file_type_t vine_file_type(struct vine_file *f)
 const char *vine_file_source(struct vine_file *f)
 {
 	return f->source;
+}
+
+void vine_file_set_mode( struct vine_file *f, int mode )
+{
+	/* The mode must contain, at a minimum, owner-read (0400) and must not go beyond the standard 0700. */
+	f->mode = (mode|0400)&0777;
 }
 
 /* vim: set noexpandtab tabstop=8: */

@@ -222,9 +222,11 @@ vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_
 		return VINE_SUCCESS;
 	}
 
-	/* XXX The API does not allow the user to choose the mode bits of the target file, so we make it permissive
-	 * here.*/
-	int mode = 0755;
+	/* A URL source does not naturally provide mode bits. */
+	/* If the user provided them manually via vine_file_set_mode, use that. */
+	/* Otherwise default to a permissive 0755. */
+	int mode = f->mode;
+	if(mode==0) mode=0755;
 
 	char source_encoded[VINE_LINE_MAX];
 	char cached_name_encoded[VINE_LINE_MAX];
@@ -258,9 +260,11 @@ vine_result_code_t vine_manager_put_url(struct vine_manager *q, struct vine_work
 		return VINE_SUCCESS;
 	}
 
-	/* XXX The API does not allow the user to choose the mode bits of the target file, so we make it permissive
-	 * here.*/
-	int mode = 0755;
+	/* A URL source does not naturally provide mode bits. */
+	/* If the user provided them manually via vine_file_set_mode, use that. */
+	/* Otherwise default to a permissive 0755. */
+	int mode = f->mode;
+	if(mode==0) mode=0755;
 
 	char source_encoded[VINE_LINE_MAX];
 	char cached_name_encoded[VINE_LINE_MAX];
@@ -283,8 +287,14 @@ vine_result_code_t vine_manager_put_url(struct vine_manager *q, struct vine_work
 
 vine_result_code_t vine_manager_put_buffer(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f, int64_t *total_bytes)
 {
+	/* A buffer source does not naturally provide mode bits. */
+	/* If the user provided them manually via vine_file_set_mode, use that. */
+	/* Otherwise default to a permissive 0755. */
+	int mode = f->mode;
+	if(mode==0) mode=0755;
+
 	time_t stoptime = time(0) + vine_manager_transfer_time(q, w, f->size);
-	vine_manager_send(q, w, "file %s %lld 0755 0\n", f->cached_name, (long long)f->size);
+	vine_manager_send(q, w, "file %s %lld 0%o 0\n", f->cached_name, (long long)f->size,(int)mode);
 	int64_t actual = link_putlstring(w->link, f->data, f->size, stoptime);
 	if (actual >= 0 && (size_t)actual == f->size) {
 		*total_bytes = actual;
@@ -488,8 +498,13 @@ vine_result_code_t vine_manager_put_task(
 		return result;
 
 	if (target) {
-		vine_manager_send(q, w, "mini_task %s %s %d %lld %o\n", target->source, target->cached_name, target->cache_level, (long long)target->size, 0777);
+		/* If the user provide mode bits manually, use them here. */
+		int mode = target->mode;
+		if(mode==0) mode = 0755;
+		/* A mini-task is identified by the file it creates. */
+		vine_manager_send(q, w, "mini_task %s %s %d %lld 0%o\n", target->source, target->cached_name, target->cache_level, (long long)target->size, mode);
 	} else {
+		/* A regular task is simply identified by a task id. */
 		vine_manager_send(q, w, "task %lld\n", (long long)t->task_id);
 	}
 
