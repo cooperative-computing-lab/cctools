@@ -80,31 +80,21 @@ int vine_schedule_in_ramp_down(struct vine_manager *q)
  * @return 1 if yes, 0 otherwise. */
 int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *tr)
 {
-	/*
-	This is a temporary hack in order to get Greg's application running.
-	The problem is in line with the problem pointed out in PR #3909 but a special case in the manager's end.
-
-	The problem here is that the manager always allocates the whole disk the the library task,
-	so that libtask->current_resource_box->disk is always equal to worker_net_resources->disk.total.
-	For the first task, the ti->current_resource_box->disk == 0, it is able to run because the expr in line 114 doesn't satisfy.
-	However, if the first task causes any increase in the worker's disk, worker_net_resources->disk.inuse will go above the total,
-	which causes the consistent true of the expr in line 114.
-	*/
+	/* Skip if it is a function task. Resource guarantees for function calls are handled at the end of @check_worker_against_task, which calls
+	 * @vine_schedule.c:vine_schedule_find_library to locate a suitable library for the function call, it directly returns false if no appropriate library is found  */
 	if (t->needs_library) {
 		return 1;
 	}
 
 	struct vine_resources *worker_net_resources = vine_resources_copy(w->resources);
 
-	/* Subtract resources from libraries that have slots unused and don't match the current task. */
-	/* These will be killed anyway as needed in commit_task_to_worker. */
-	/* Matches assumption in vine_manager.c:commit_task_to_worker() */
-
+	/* Subtract resources from libraries that are not running any functions at all.
+	 * This matches the assumption in @vine_manager.c:commit_task_to_worker(), where empty libraries are being killed right before a task is committed. */
 	uint64_t task_id;
 	struct vine_task *ti;
 	ITABLE_ITERATE(w->current_tasks, task_id, ti)
 	{
-		if (ti->provides_library && ti->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, ti->provides_library))) {
+		if (ti->provides_library && ti->function_slots_inuse == 0) {
 			worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
 			worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
 			worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
