@@ -372,10 +372,10 @@ const char *vine_file_source(struct vine_file *f)
 	return f->source;
 }
 
-void vine_file_set_mode( struct vine_file *f, int mode )
+void vine_file_set_mode(struct vine_file *f, int mode)
 {
 	/* The mode must contain, at a minimum, owner-read (0400) and must not go beyond the standard 0700. */
-	f->mode = (mode|0400)&0777;
+	f->mode = (mode | 0400) & 0777;
 }
 
 /* vim: set noexpandtab tabstop=8: */
