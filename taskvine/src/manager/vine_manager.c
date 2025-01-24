@@ -2724,6 +2724,9 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 			 * thus the proportion is modified by the current overcommit
 			 * multiplier */
 			limits->disk = MAX(1, MAX(limits->disk, floor(available_disk * max_proportion / q->resource_submit_multiplier)));
+			/* For disk, scale the estimated disk allocation by a [0, 1] number (by default 0.75) to intentionally reserve
+		 	 * some space for data movement between the sandbox and cache (output files) and allow room for cache growth. */
+			limits->disk *= q->disk_proportion_available_to_task;
 		}
 	}
 
@@ -4006,6 +4009,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->max_task_resources_requested = rmsummary_create(-1);
 
 	q->sandbox_grow_factor = 2.0;
+	q->disk_proportion_available_to_task = 0.75;
 
 	q->stats = calloc(1, sizeof(struct vine_stats));
 	q->stats_measure = calloc(1, sizeof(struct vine_stats));
@@ -5772,7 +5776,10 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "max-library-retries")) {
 		q->max_library_retries = MIN(1, value);
-
+	} else if (!strcmp(name, "disk-proportion-available-to-task")) {
+		if (value > 1 || value < 0) {
+			q->disk_proportion_available_to_task = 0.75;
+		}
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;

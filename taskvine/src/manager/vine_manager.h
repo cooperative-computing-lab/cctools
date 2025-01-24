@@ -229,6 +229,7 @@ struct vine_manager {
 	int watch_library_logfiles;     /* If true, watch the output files produced by each of the library processes running on the remote workers, take them back the current logging directory */
 
 	double sandbox_grow_factor;         /* When task disk sandboxes are exhausted, increase the allocation using their measured valued times this factor */
+	double disk_proportion_available_to_task;   /* intentionally reduces disk allocation for tasks to reserve some space for cache growth. */
 
 	/*todo: confirm datatype. int or int64*/
 	int max_task_stdout_storage;	/* Maximum size of standard output from task.  (If larger, send to a separate file.) */
