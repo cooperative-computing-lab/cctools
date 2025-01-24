@@ -289,7 +289,6 @@ class FuturesExecutor(Executor):
             )
         )
 
-
     def submit(self, fn, *args, **kwargs):
         if isinstance(fn, FuturePythonTask):
             self.manager.submit(fn)
