@@ -554,11 +554,12 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 			original->library_failed_count++;
 			original->time_when_last_failure = timestamp_get();
 		}
-		printf("Library %s failed on worker %s (%s)", t->provides_library, w->hostname, w->addrport);
-		if (q->watch_library_logfiles)
-			printf(", check the library log file %s\n", t->library_log_path);
-		else
-			printf(", enable watch-library-logfiles for debug\n");
+		debug(D_VINE | D_NOTICE, "Library %s failed on worker %s (%s)", t->provides_library, w->hostname, w->addrport);
+		if (q->watch_library_logfiles) {
+			debug(D_VINE | D_NOTICE, ", check the library log file %s\n", t->library_log_path);
+		} else {
+			debug(D_VINE | D_NOTICE, ", enable watch-library-logfiles for debug\n");
+		}
 	} else {
 		/* Update task stats for this completion. */
 		observed_execution_time = timestamp_get() - t->time_when_commit_end;
@@ -2859,8 +2860,9 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
-	if (!w)
+	if (!w) {
 		return;
+	}
 
 	if (w->resources->workers.total < 1) {
 		return;
@@ -3213,8 +3215,9 @@ int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine
 		}
 
 		/* If that resulted in a match, move on to the next file. */
-		if (found_match)
+		if (found_match) {
 			continue;
+		}
 
 		/*
 		If no match was found, the behavior depends on the original file type.
@@ -4670,8 +4673,9 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	t->time_when_submitted = timestamp_get();
 	q->stats->tasks_submitted++;
 
-	if (q->monitor_mode != VINE_MON_DISABLED)
+	if (q->monitor_mode != VINE_MON_DISABLED) {
 		vine_monitor_add_files(q, t);
+	}
 
 	rmsummary_merge_max(q->max_task_resources_requested, t->resources_requested);
 
@@ -4700,8 +4704,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	*/
 	if (original->library_failed_count > q->max_library_retries) {
 		vine_manager_remove_library(q, name);
-		debug(D_VINE, "library %s has reached the maximum failure count %d, it has been removed", name, q->max_library_retries);
-		printf("library %s has reached the maximum failure count %d, it has been removed\n", name, q->max_library_retries);
+		debug(D_VINE | D_NOTICE, "library %s has reached the maximum failure count %d, it has been removed\n", name, q->max_library_retries);
 		return 0;
 	}
 
