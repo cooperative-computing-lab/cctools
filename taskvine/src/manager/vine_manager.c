@@ -2860,8 +2860,9 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
-	if (!w)
+	if (!w) {
 		return;
+	}
 
 	if (w->resources->workers.total < 1) {
 		return;
