@@ -2724,9 +2724,6 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 			 * thus the proportion is modified by the current overcommit
 			 * multiplier */
 			limits->disk = MAX(1, MAX(limits->disk, floor(available_disk * max_proportion / q->resource_submit_multiplier)));
-			/* For disk, scale the estimated disk allocation by a [0, 1] number (by default 0.75) to intentionally reserve
-			 * some space for data movement between the sandbox and cache (output files) and allow room for cache growth. */
-			limits->disk *= q->disk_proportion_available_to_task;
 		}
 	}
 
@@ -2772,6 +2769,12 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 
 		limits->memory = w->resources->memory.total - w->resources->memory.inuse;
 		limits->disk = available_disk;
+	}
+
+	if (q->proportional_resources) {
+		/* For disk, if using proportional allocation, scale the estimated disk allocation by a [0, 1] factor (by default 0.75) to intentionally 
+		 * reserve some space for data movement between the sandbox and cache, and allow extra room for potential cache growth. */
+		limits->disk *= q->disk_proportion_available_to_task;
 	}
 
 	/* never go below specified min resources. */
