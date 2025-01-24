@@ -2725,7 +2725,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 			 * multiplier */
 			limits->disk = MAX(1, MAX(limits->disk, floor(available_disk * max_proportion / q->resource_submit_multiplier)));
 			/* For disk, scale the estimated disk allocation by a [0, 1] number (by default 0.75) to intentionally reserve
-		 	 * some space for data movement between the sandbox and cache (output files) and allow room for cache growth. */
+			 * some space for data movement between the sandbox and cache (output files) and allow room for cache growth. */
 			limits->disk *= q->disk_proportion_available_to_task;
 		}
 	}
