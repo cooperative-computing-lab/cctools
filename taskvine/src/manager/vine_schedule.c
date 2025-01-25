@@ -126,7 +126,7 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
  * @param t The task structure.
  * @return The available resources of the worker for the task.
  */
-static struct rmsummary *count_worker_available_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+static struct rmsummary *count_worker_net_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	/* The "net" resources are those effective or adjusted resources available for computation. */
 	struct rmsummary *worker_net_resources = rmsummary_create(-1);
@@ -214,7 +214,7 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	}
 
 	/* Count the available resources on the worker for the task. */
-	struct rmsummary *worker_net_resources = count_worker_available_resources(q, w, t);
+	struct rmsummary *worker_net_resources = count_worker_net_resources(q, w, t);
 
 	/* Check if the worker has some idle resources to use. */
 	if (!check_worker_have_idle_resources(t, worker_net_resources)) {
