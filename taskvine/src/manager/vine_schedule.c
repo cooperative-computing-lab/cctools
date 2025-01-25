@@ -128,24 +128,20 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
  */
 static struct rmsummary *count_worker_available_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	/* Count the net resources of a worker after taking into account the resources used by the library task.
-	 *  - If the task is a python task, the net resources are the same as the worker's resources. 
-	 *  - If the task is a function task, the inuse resources are adjusted by the resources used by the library task.
-	 *  - If the task is a library task, skip those empty libraries as if they are not using any resources, this matches the assumption
-	      in @vine_manager.c:commit_task_to_worker(), where empty libraries are being killed right before a task is committed. */
+	/* The "net" resources are those effective or adjusted resources available for computation.
+	 * This requires to subtract resources from libraries that are not running any functions at all. 
+	 * This matches the assumption in @vine_manager.c:commit_task_to_worker(), where empty libraries are being killed right before a task is committed. */
 	struct vine_resources *worker_net_resources = vine_resources_copy(w->resources);
-
-	if (t->provides_library) {
-		uint64_t task_id;
-		struct vine_task *ti;
-		ITABLE_ITERATE(w->current_tasks, task_id, ti)
-		{
-			if (ti->provides_library && ti->function_slots_inuse == 0) {
-				worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
-				worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
-				worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
-				worker_net_resources->gpus.inuse -= ti->current_resource_box->gpus;
-			}
+	
+	uint64_t task_id;
+	struct vine_task *ti;
+	ITABLE_ITERATE(w->current_tasks, task_id, ti)
+	{
+		if (ti->provides_library && ti->function_slots_inuse == 0) {
+			worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
+			worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
+			worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
+			worker_net_resources->gpus.inuse -= ti->current_resource_box->gpus;
 		}
 	}
 
