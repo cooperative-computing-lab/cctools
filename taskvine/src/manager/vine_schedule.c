@@ -149,7 +149,7 @@ static struct rmsummary *count_worker_available_resources(struct vine_manager *q
 		}
 	}
 
-	/* The worker's available resources are the net resources minus the resources in use. */
+	/* The worker's available resources are the net minus those in use. */
 	struct rmsummary *worker_available_resources = rmsummary_create(-1);
 
 	/* Overcommit resources if needed */
