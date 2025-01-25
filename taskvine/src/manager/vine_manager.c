@@ -2938,7 +2938,7 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 	vine_result_code_t result = VINE_SUCCESS;
 
 	/* Kill unused libraries on this worker to reclaim resources. */
-	/* Matches assumption in vine_schedule.c:check_available_resources() */
+	/* Matches assumption in vine_schedule.c:check_worker_have_enough_resources() */
 	kill_empty_libraries_on_worker(q, w, t);
 
 	/* If this is a function needing a library, dispatch the library. */
