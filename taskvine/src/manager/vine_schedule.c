@@ -129,10 +129,10 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 static struct rmsummary *count_worker_available_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	/* The "net" resources are those effective or adjusted resources available for computation.
-	 * This requires to subtract resources from libraries that are not running any functions at all. 
+	 * This requires to subtract resources from libraries that are not running any functions at all.
 	 * This matches the assumption in @vine_manager.c:commit_task_to_worker(), where empty libraries are being killed right before a task is committed. */
 	struct vine_resources *worker_net_resources = vine_resources_copy(w->resources);
-	
+
 	uint64_t task_id;
 	struct vine_task *ti;
 	ITABLE_ITERATE(w->current_tasks, task_id, ti)
