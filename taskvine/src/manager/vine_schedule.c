@@ -145,10 +145,10 @@ static struct rmsummary *count_worker_net_resources(struct vine_manager *q, stru
 	ITABLE_ITERATE(w->current_tasks, task_id, ti)
 	{
 		if (ti->provides_library && ti->function_slots_inuse == 0) {
-			worker_net_resources->cores += ti->resources_provided->cores;
-			worker_net_resources->memory += ti->resources_provided->memory;
-			worker_net_resources->gpus += ti->resources_provided->gpus;
-			worker_net_resources->disk += ti->resources_provided->disk;
+			worker_net_resources->cores += ti->current_resource_box->cores;
+			worker_net_resources->memory += ti->current_resource_box->memory;
+			worker_net_resources->gpus += ti->current_resource_box->gpus;
+			worker_net_resources->disk += ti->current_resource_box->disk;
 		}
 	}
 
