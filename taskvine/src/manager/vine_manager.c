@@ -2772,7 +2772,7 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	}
 
 	if (q->proportional_resources) {
-		/* For disk, if using proportional allocation, scale the estimated disk allocation by a [0, 1] factor (by default 0.75) to intentionally 
+		/* For disk, if using proportional allocation, scale the estimated disk allocation by a [0, 1] factor (by default 0.75) to intentionally
 		 * reserve some space for data movement between the sandbox and cache, and allow extra room for potential cache growth. */
 		limits->disk *= q->disk_proportion_available_to_task;
 	}
