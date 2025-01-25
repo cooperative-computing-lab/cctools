@@ -78,7 +78,7 @@ int vine_schedule_in_ramp_down(struct vine_manager *q)
  * @param t     Task info structure.
  * @param tr    Chosen task resources.
  * @return 1 if yes, 0 otherwise. */
-int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *tr)
+int check_worker_have_enough_resources(struct vine_task *t, struct rmsummary *tr, struct rmsummary *worker_available_resources)
 {
 	/* Skip if it is a function task. Resource guarantees for function calls are handled at the end of @check_worker_against_task, which calls
 	 * @vine_schedule.c:vine_schedule_find_library to locate a suitable library for the function call, it directly returns false if no appropriate library is found  */
@@ -86,42 +86,13 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 		return 1;
 	}
 
-	struct vine_resources *worker_net_resources = vine_resources_copy(w->resources);
-
-	/* Subtract resources from libraries that are not running any functions at all.
-	 * This matches the assumption in @vine_manager.c:commit_task_to_worker(), where empty libraries are being killed right before a task is committed. */
-	uint64_t task_id;
-	struct vine_task *ti;
-	ITABLE_ITERATE(w->current_tasks, task_id, ti)
-	{
-		if (ti->provides_library && ti->function_slots_inuse == 0) {
-			worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
-			worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
-			worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
-			worker_net_resources->gpus.inuse -= ti->current_resource_box->gpus;
-		}
+	/* check if the allocated resources are enough for the task */
+	if (tr->cores > worker_available_resources->cores || tr->gpus > worker_available_resources->gpus ||
+			tr->memory > worker_available_resources->memory || tr->disk > worker_available_resources->disk) {
+		return 0;
 	}
 
-	int ok = 1;
-	if (worker_net_resources->disk.inuse + tr->disk > worker_net_resources->disk.total) { /* No overcommit disk */
-		ok = 0;
-	}
-
-	if ((tr->cores > worker_net_resources->cores.total) ||
-			(worker_net_resources->cores.inuse + tr->cores > overcommitted_resource_total(q, worker_net_resources->cores.total))) {
-		ok = 0;
-	}
-
-	if ((tr->memory > worker_net_resources->memory.total) ||
-			(worker_net_resources->memory.inuse + tr->memory > overcommitted_resource_total(q, worker_net_resources->memory.total))) {
-		ok = 0;
-	}
-
-	if ((tr->gpus > worker_net_resources->gpus.total) || (worker_net_resources->gpus.inuse + tr->gpus > overcommitted_resource_total(q, worker_net_resources->gpus.total))) {
-		ok = 0;
-	}
-	vine_resources_delete(worker_net_resources);
-	return ok;
+	return 1;
 }
 
 /* t->disk only specifies the size of output and ephemeral files. Here we check if the task would fit together with all its input files
@@ -149,6 +120,89 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 	return ok;
 }
 
+/* Count the available resources on a worker for a task.
+ * @param q The manager structure.
+ * @param w The worker info structure.
+ * @param t The task structure.
+ * @return The available resources of the worker for the task.
+ */
+static struct rmsummary *count_worker_available_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	/* Count the net resources of a worker after taking into account the resources used by the library task.
+	 * If the task is not a function task, the net resources are the same as the worker's resources.
+	 * If the task is a function task, the inuse resources are adjusted by the resources used by the library task. */
+	struct vine_resources *worker_net_resources = vine_resources_copy(w->resources);
+
+	/* If the task is a library task, skip those idle libraries as if they are not using any resources */
+	if (t->provides_library) {
+		uint64_t task_id;
+		struct vine_task *ti;
+		ITABLE_ITERATE(w->current_tasks, task_id, ti)
+		{
+			if (ti->provides_library && ti->function_slots_inuse == 0) {
+				worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
+				worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
+				worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
+				worker_net_resources->gpus.inuse -= ti->current_resource_box->gpus;
+			}
+		}
+	}
+
+	/* The worker's available resources are the net resources minus the resources in use by the worker. */
+	struct rmsummary *worker_available_resources = rmsummary_create(-1);
+
+	/* Overcommit resources if needed */
+	worker_available_resources->cores = overcommitted_resource_total(q, worker_net_resources->cores.total) - (double)worker_net_resources->cores.inuse;
+	worker_available_resources->gpus = overcommitted_resource_total(q, worker_net_resources->gpus.total) - (double)worker_net_resources->gpus.inuse;
+	worker_available_resources->memory = overcommitted_resource_total(q, worker_net_resources->memory.total) - (double)worker_net_resources->memory.inuse;
+	/* No overcommit disk */
+	worker_available_resources->disk = q, worker_net_resources->disk.total - (double)worker_net_resources->disk.inuse;
+
+	vine_resources_delete(worker_net_resources);
+
+	return worker_available_resources;
+}
+
+/* Check if the worker is fully occupied by other tasks, or the disk is full. */
+static int check_worker_have_available_resources(struct vine_task *t, struct rmsummary *worker_available_resources)
+{
+	/* Skip if it is a function task. Resource guarantees for function calls are handled at the end of @check_worker_against_task, which calls
+	 * @vine_schedule_find_library to locate a suitable library for the function call, it directly returns false if no appropriate library is found  */
+	if (t->needs_library) {
+		return 1;
+	}
+
+	/* If the task specifies any resources, check if they can be satisfied by the worker. */
+	if (t->resources_requested->cores > 0) {
+		if (worker_available_resources->cores < t->resources_requested->cores) {
+			return 0;
+		}
+	}
+	if (t->resources_requested->gpus > 0) {
+		if (worker_available_resources->gpus < t->resources_requested->gpus) {
+			return 0;
+		}
+	}
+	if (t->resources_requested->memory > 0) {
+		if (worker_available_resources->memory < t->resources_requested->memory) {
+			return 0;
+		}
+	}
+	if (t->resources_requested->disk > 0) {
+		if (worker_available_resources->disk < t->resources_requested->disk) {
+			return 0;
+		}
+	}
+
+	/* Otherwise, check if any of the resources on the worker is fully used */
+	if (((worker_available_resources->cores + worker_available_resources->gpus <= 0)) ||
+			worker_available_resources->memory <= 0 || worker_available_resources->disk <= 0) {
+		return 0;
+	}
+
+	return 1;
+}
+
 /* Check if this task is compatible with this given worker by considering
  * resources availability, features, blocklist, and all other relevant factors.
  * Used by all scheduling methods for basic compatibility.
@@ -157,7 +211,6 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
  * @param t The task structure.
  * @return 0 if the task is not compatible with the worker, 1 otherwise.
  */
-
 int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	/* THIS FUNCTION SHOULD NOT MODIFY t IN ANY WAY. */
@@ -168,11 +221,21 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		return 0;
 	}
 
+	/* Count the available resources of the worker for the task. */
+	struct rmsummary *worker_available_resources = count_worker_available_resources(q, w, t);
+
+	/* Check if the worker has some usable resources for the task. */
+	if (!check_worker_have_available_resources(t, worker_available_resources)) {
+		rmsummary_delete(worker_available_resources);
+		return 0;
+	}
+
 	/* Don't send tasks to this worker if it is in draining mode (no more tasks). */
 	if (w->draining) {
 		return 0;
 	}
-	// if worker's end time has not been received
+
+	/* if worker's end time has not been received */
 	if (w->end_time < 0) {
 		return 0;
 	}
@@ -198,13 +261,15 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	/* Compute the resources to allocate to this task. */
 	struct rmsummary *l = vine_manager_choose_resources_for_task(q, w, t);
 
-	if (!check_worker_have_enough_resources(q, w, t, l)) {
+	if (!check_worker_have_enough_resources(t, l, worker_available_resources)) {
 		rmsummary_delete(l);
+		rmsummary_delete(worker_available_resources);
 		return 0;
 	}
 	rmsummary_delete(l);
+	rmsummary_delete(worker_available_resources);
 
-	// if wall time for worker is specified and there's not enough time for task, then not ok
+	/* if wall time for worker is specified and there's not enough time for task, then not ok */
 	if (w->end_time > 0) {
 		double current_time = ((double)timestamp_get()) / ONE_SECOND;
 		if (t->resources_requested->end > 0 && w->end_time < t->resources_requested->end) {
