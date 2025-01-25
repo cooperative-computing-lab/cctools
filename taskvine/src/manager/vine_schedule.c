@@ -129,11 +129,12 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 static struct rmsummary *count_worker_available_resources(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	/* Count the net resources of a worker after taking into account the resources used by the library task.
-	 * If the task is not a function task, the net resources are the same as the worker's resources.
-	 * If the task is a function task, the inuse resources are adjusted by the resources used by the library task. */
+	 *  - If the task is a python task, the net resources are the same as the worker's resources. 
+	 *  - If the task is a function task, the inuse resources are adjusted by the resources used by the library task.
+	 *  - If the task is a library task, skip those empty libraries as if they are not using any resources, this matches the assumption
+	      in @vine_manager.c:commit_task_to_worker(), where empty libraries are being killed right before a task is committed. */
 	struct vine_resources *worker_net_resources = vine_resources_copy(w->resources);
 
-	/* If the task is a library task, skip those idle libraries as if they are not using any resources */
 	if (t->provides_library) {
 		uint64_t task_id;
 		struct vine_task *ti;
@@ -148,7 +149,7 @@ static struct rmsummary *count_worker_available_resources(struct vine_manager *q
 		}
 	}
 
-	/* The worker's available resources are the net resources minus the resources in use by the worker. */
+	/* The worker's available resources are the net resources minus the resources in use. */
 	struct rmsummary *worker_available_resources = rmsummary_create(-1);
 
 	/* Overcommit resources if needed */
