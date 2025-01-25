@@ -130,7 +130,7 @@ static struct rmsummary *count_worker_available_resources(struct vine_manager *q
 {
 	/* The "net" resources are those effective or adjusted resources available for computation. */
 	struct rmsummary *worker_net_resources = rmsummary_create(-1);
-	
+
 	/* Overcommit resources if needed */
 	worker_net_resources->cores = overcommitted_resource_total(q, w->resources->cores.total) - (double)w->resources->cores.inuse;
 	worker_net_resources->memory = overcommitted_resource_total(q, w->resources->memory.total) - (double)w->resources->memory.inuse;
