@@ -164,7 +164,7 @@ static struct rmsummary *count_worker_available_resources(struct vine_manager *q
 }
 
 /* Check if the worker is fully occupied by other tasks, or the disk is full. */
-static int check_worker_have_available_resources(struct vine_task *t, struct rmsummary *worker_available_resources)
+static int check_worker_have_idle_resources(struct vine_task *t, struct rmsummary *worker_available_resources)
 {
 	/* Skip if it is a function task. Resource guarantees for function calls are handled at the end of @check_worker_against_task, which calls
 	 * @vine_schedule_find_library to locate a suitable library for the function call, it directly returns false if no appropriate library is found  */
@@ -221,11 +221,11 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		return 0;
 	}
 
-	/* Count the available resources of the worker for the task. */
+	/* Count the available resources on the worker for the task. */
 	struct rmsummary *worker_available_resources = count_worker_available_resources(q, w, t);
 
-	/* Check if the worker has some usable resources for the task. */
-	if (!check_worker_have_available_resources(t, worker_available_resources)) {
+	/* Check if the worker has some idle resources to use. */
+	if (!check_worker_have_idle_resources(t, worker_available_resources)) {
 		rmsummary_delete(worker_available_resources);
 		return 0;
 	}
