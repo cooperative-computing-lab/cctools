@@ -153,7 +153,7 @@ static struct rmsummary *count_worker_available_resources(struct vine_manager *q
 	worker_available_resources->gpus = overcommitted_resource_total(q, worker_net_resources->gpus.total) - (double)worker_net_resources->gpus.inuse;
 	worker_available_resources->memory = overcommitted_resource_total(q, worker_net_resources->memory.total) - (double)worker_net_resources->memory.inuse;
 	/* No overcommit disk */
-	worker_available_resources->disk = q, worker_net_resources->disk.total - (double)worker_net_resources->disk.inuse;
+	worker_available_resources->disk = worker_net_resources->disk.total - (double)worker_net_resources->disk.inuse;
 
 	vine_resources_delete(worker_net_resources);
 
