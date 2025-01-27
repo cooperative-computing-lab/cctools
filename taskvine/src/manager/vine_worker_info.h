@@ -72,6 +72,7 @@ struct vine_worker_info {
 	int64_t     total_bytes_transferred;
 	int         forsaken_tasks;
 	int64_t     inuse_cache;
+	int         has_free_resources;
 
 	timestamp_t total_task_time;
 	timestamp_t total_transfer_time;

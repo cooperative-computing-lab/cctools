@@ -168,10 +168,16 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		return 0;
 	}
 
+	/* if worker has free resources to use */
+	if (!w->has_free_resources) {
+		return 0;
+	}
+
 	/* Don't send tasks to this worker if it is in draining mode (no more tasks). */
 	if (w->draining) {
 		return 0;
 	}
+
 	// if worker's end time has not been received
 	if (w->end_time < 0) {
 		return 0;
