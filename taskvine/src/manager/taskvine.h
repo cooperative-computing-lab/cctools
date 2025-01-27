@@ -1489,6 +1489,11 @@ void vine_initialize_categories(struct vine_manager *m, struct rmsummary *max, c
 */
 void vine_set_runtime_info_path(const char *path);
 
+/** Sets the directory where a workflow-specific runtime logs are directly written into.
+@param dir A directory
+*/
+void vine_set_runtime_info_dir(const char *dir);
+
 /** Adds a custom APPLICATION entry to the debug log.
 @param m     Reference to the current manager object.
 @param entry A custom debug message.
