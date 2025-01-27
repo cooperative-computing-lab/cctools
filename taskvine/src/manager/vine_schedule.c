@@ -86,41 +86,29 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 		return 1;
 	}
 
-	struct vine_resources *worker_net_resources = vine_resources_copy(w->resources);
-
-	/* Subtract resources from libraries that are not running any functions at all.
-	 * This matches the assumption in @vine_manager.c:commit_task_to_worker(), where empty libraries are being killed right before a task is committed. */
-	uint64_t task_id;
-	struct vine_task *ti;
-	ITABLE_ITERATE(w->current_tasks, task_id, ti)
-	{
-		if (ti->provides_library && ti->function_slots_inuse == 0) {
-			worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
-			worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
-			worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
-			worker_net_resources->gpus.inuse -= ti->current_resource_box->gpus;
-		}
-	}
+	/* w->resources->xxx.inuse are net resources that equal to the actual inuse resources substract those used by empty libraries,
+	 * as if the empty resources are not using any resources, this is calculated in @vine_manager.c:count_worker_resources */
 
 	int ok = 1;
-	if (worker_net_resources->disk.inuse + tr->disk > worker_net_resources->disk.total) { /* No overcommit disk */
+
+	if (w->resources->disk.inuse + tr->disk > w->resources->disk.total) { /* No overcommit disk */
 		ok = 0;
 	}
 
-	if ((tr->cores > worker_net_resources->cores.total) ||
-			(worker_net_resources->cores.inuse + tr->cores > overcommitted_resource_total(q, worker_net_resources->cores.total))) {
+	if ((tr->cores > w->resources->cores.total) ||
+			(w->resources->cores.inuse + tr->cores > overcommitted_resource_total(q, w->resources->cores.total))) {
 		ok = 0;
 	}
 
-	if ((tr->memory > worker_net_resources->memory.total) ||
-			(worker_net_resources->memory.inuse + tr->memory > overcommitted_resource_total(q, worker_net_resources->memory.total))) {
+	if ((tr->memory > w->resources->memory.total) ||
+			(w->resources->memory.inuse + tr->memory > overcommitted_resource_total(q, w->resources->memory.total))) {
 		ok = 0;
 	}
 
-	if ((tr->gpus > worker_net_resources->gpus.total) || (worker_net_resources->gpus.inuse + tr->gpus > overcommitted_resource_total(q, worker_net_resources->gpus.total))) {
+	if ((tr->gpus > w->resources->gpus.total) || (w->resources->gpus.inuse + tr->gpus > overcommitted_resource_total(q, w->resources->gpus.total))) {
 		ok = 0;
 	}
-	vine_resources_delete(worker_net_resources);
+
 	return ok;
 }
 
