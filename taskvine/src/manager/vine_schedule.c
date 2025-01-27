@@ -124,15 +124,17 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 	/* Count the available resources on the worker for the task. */
 	struct rmsummary *worker_net_resources = count_worker_net_resources(q, w, t);
 
+	int ok = 1;
+
 	/* check if the allocated resources are enough for the task */
 	if (tr->cores > worker_net_resources->cores || tr->gpus > worker_net_resources->gpus ||
 			tr->memory > worker_net_resources->memory || tr->disk > worker_net_resources->disk) {
-		return 0;
+		ok = 0;
 	}
 
 	rmsummary_delete(worker_net_resources);
 
-	return 1;
+	return ok;
 }
 
 /* t->disk only specifies the size of output and ephemeral files. Here we check if the task would fit together with all its input files
