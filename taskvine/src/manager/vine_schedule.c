@@ -130,6 +130,8 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 		return 0;
 	}
 
+	rmsummary_delete(worker_net_resources);
+
 	return 1;
 }
 
