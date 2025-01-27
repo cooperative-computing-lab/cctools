@@ -46,6 +46,15 @@ class File(object):
             return cvine.vine_file_type(self._file)
 
     ##
+    # Set the Unix mode permission bits for the remote file.
+    #
+    # @param self       A file object.
+    # @param mode       Unix mode bits.
+    def set_mode(self, mode):
+        if self._file:
+            return cvine.vine_file_set_mode(self._file, mode)
+
+    ##
     # Return the contents of a file object as a string.
     # Typically used to return the contents of an output buffer.
     #

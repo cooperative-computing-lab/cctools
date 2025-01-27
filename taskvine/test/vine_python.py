@@ -234,18 +234,19 @@ if __name__ == "__main__":
 
     # Create an explicit minitask description to run curl
     minitask = vine.Task("curl https://www.nd.edu -o output")
-    intask = q.declare_minitask(minitask,"output")
+    infile = q.declare_minitask(minitask,"output")
+    infile.set_mode(0o600)
 
     # Now generate an input file from a shell command:
     t = vine.Task("wc -l infile")
-    t.add_input(intask, "infile")
+    t.add_input(infile, "infile")
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, "success", 0)
 
     # second time should have it cached (though we can't tell from here)
     t = vine.Task("wc -l infile")
-    t.add_input(intask, "infile")
+    t.add_input(infile, "infile")
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, "success", 0)
