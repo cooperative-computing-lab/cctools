@@ -85,7 +85,7 @@ static struct rmsummary *count_worker_net_resources(struct vine_manager *q, stru
 	worker_net_resources->memory = overcommitted_resource_total(q, w->resources->memory.total) - (double)w->resources->memory.inuse;
 	worker_net_resources->gpus = overcommitted_resource_total(q, w->resources->gpus.total) - (double)w->resources->gpus.inuse;
 	/* No overcommit disk */
-	worker_net_resources->disk = w->resources->disk.total - (double)w->resources->disk.inuse;
+	worker_net_resources->disk = w->resources->disk.total - w->resources->disk.inuse;
 
 	/* Add resources from empty libraries that are not running any functions at all.
 	 * This matches the assumption in @vine_manager.c:commit_task_to_worker(), where empty libraries are being killed right before a task is committed. */
