@@ -74,22 +74,25 @@ with worker:
 
     check_task("all_zero", "fixed", max={"cores": 0, "memory": 0, "disk": 0, "gpus": 0}, min={}, expected={"cores": worker_cores, "memory": worker_memory, "disk": worker_disk, "gpus": 0})
 
+    # note that the disk is divided by a factor if enabling proportional resource allocation
     q.tune("force-proportional-resources", 1)
-    check_task("only_memory", "fixed", max={"memory": worker_memory / 2}, min={}, expected={"cores": worker_cores / 2, "memory": worker_memory / 2, "disk": worker_disk / 2, "gpus": 0})
+    disk_proportion_available_to_task = 0.75   # the default factor
 
-    check_task("only_memory_w_minimum", "fixed", max={"memory": worker_memory / 2}, min={"cores": 3, "gpus": 2}, expected={"cores": 4, "memory": worker_memory, "disk": worker_disk, "gpus": 2})
+    check_task("only_memory", "fixed", max={"memory": worker_memory / 2}, min={}, expected={"cores": worker_cores / 2, "memory": worker_memory / 2, "disk": worker_disk / 2 * disk_proportion_available_to_task, "gpus": 0})
 
-    check_task("only_cores", "fixed", max={"cores": worker_cores}, min={}, expected={"cores": worker_cores, "memory": worker_memory, "disk": worker_disk, "gpus": 0})
+    check_task("only_memory_w_minimum", "fixed", max={"memory": worker_memory / 2}, min={"cores": 3, "gpus": 2}, expected={"cores": 4, "memory": worker_memory, "disk": worker_disk * disk_proportion_available_to_task, "gpus": 2})
 
-    check_task("auto_whole_worker", "min_waste", max={}, min={}, expected={"cores": worker_cores, "memory": worker_memory, "disk": worker_disk, "gpus": 0})
+    check_task("only_cores", "fixed", max={"cores": worker_cores}, min={}, expected={"cores": worker_cores, "memory": worker_memory, "disk": worker_disk * disk_proportion_available_to_task, "gpus": 0})
+
+    check_task("auto_whole_worker", "min_waste", max={}, min={}, expected={"cores": worker_cores, "memory": worker_memory, "disk": worker_disk * disk_proportion_available_to_task, "gpus": 0})
 
     p = 1 / worker_cores
     r = {"cores": 1}
-    e = {"cores": 1, "memory": math.floor(worker_memory * p), "disk": math.floor(worker_disk * p), "gpus": 0}
+    e = {"cores": 1, "memory": math.floor(worker_memory * p), "disk": math.floor(worker_disk * p) * disk_proportion_available_to_task, "gpus": 0}
     check_task("only_cores_proportional", "fixed", max=r, min={}, expected=e)
 
     p = 2 / worker_cores
-    e = {"cores": 2, "memory": math.floor(worker_memory * p), "disk": math.floor(worker_disk * p), "gpus": 0}
+    e = {"cores": 2, "memory": math.floor(worker_memory * p), "disk": math.floor(worker_disk * p) , "gpus": 0}
     check_task("exhaustive_bucketing", "exhaustive_bucketing", max={}, min={}, expected=e)
 
     check_task("greedy_bucketing", "greedy_bucketing", max={}, min={}, expected=e)
