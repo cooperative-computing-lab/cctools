@@ -205,10 +205,6 @@ class FuturesExecutor(Executor):
 
         tasks = []
         fn_wrapped = partial(run_iterable, fn)
-        if library_name:
-            libtask = self.create_library_from_functions(library_name, fn_wrapped)
-            self.install_library(libtask)
-
         while iterable:
             heads, iterable = iterable[:chunk_size], iterable[chunk_size:]
 
