@@ -28,6 +28,7 @@ struct vine_worker_info *vine_worker_create(struct link *lnk)
 	w->version = strdup("unknown");
 	w->factory_name = 0;
 	w->workerid = 0;
+	w->has_free_resources = 0;
 
 	w->resources = vine_resources_create();
 	w->features = hash_table_create(4, 0);
