@@ -888,6 +888,16 @@ be delete at the manager's site after it is not needed by the workflow (@ref vin
 struct vine_file *vine_declare_starch(
 		struct vine_manager *m, struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags);
 
+/** Set the Unix mode permission bits of a declared file.
+Sets (or overrides) the Unix mode permissions of any file object,
+as the application will see it.  This applies to any file type,
+but is particularly useful for controlling buffers, urls, and mini-tasks
+that do not inherently contain mode bits.
+@param f A file object of any kind.
+@param mode The Unix mode bits to be applied to the file.
+*/
+void vine_file_set_mode( struct vine_file *f, int mode );
+
 /** Fetch the contents of a file.
 The contents of the given file will be loaded from disk or pulled back from the cluster
 and loaded into manager memory.  This is particularly useful for temporary files and mini-tasks
