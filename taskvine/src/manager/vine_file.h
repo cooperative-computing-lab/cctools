@@ -38,6 +38,7 @@ struct vine_file {
 	char *cached_name;  // Name of file in the worker's cache directory.
 	size_t size;        // Length of source data, if known.
 	time_t mtime;       // Modification time of source data, if known.
+	mode_t mode;        // Manual override for Unix mode bits sent to worker.  Zero if unset.
 	char *data;         // Raw data for an input or output buffer.
 	struct vine_task *mini_task; // Mini task used to generate the desired output file.
 	struct vine_task *recovery_task; // For temp files, a copy of the task that created it.
