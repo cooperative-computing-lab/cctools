@@ -2830,15 +2830,15 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 }
 
 /* Check if any of the resources is overcommitted on a given worker. */
-static int is_resource_overcommitted(struct vine_manager *q, struct vine_resource resource)
+static int is_resource_fully_allocated(struct vine_manager *q, struct vine_resource resource)
 {
 	return resource.inuse >= overcommitted_resource_total(q, resource.total);
 }
 static int worker_has_free_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
 	// Always check memory and disk
-	if (is_resource_overcommitted(q, w->resources->memory) ||
-			is_resource_overcommitted(q, w->resources->disk)) {
+	if (is_resource_fully_allocated(q, w->resources->memory) ||
+			is_resource_fully_allocated(q, w->resources->disk)) {
 		return 0;
 	}
 
@@ -2850,15 +2850,15 @@ static int worker_has_free_resources(struct vine_manager *q, struct vine_worker_
 		return 0;
 	}
 
-	if (has_cores && is_resource_overcommitted(q, w->resources->cores)) {
+	if (has_cores && is_resource_fully_allocated(q, w->resources->cores)) {
 		return 0;
 	}
 
-	if (has_gpus && is_resource_overcommitted(q, w->resources->gpus)) {
+	if (has_gpus && is_resource_fully_allocated(q, w->resources->gpus)) {
 		return 0;
 	}
 
-	// If all checks pass, the worker is committable
+	// If all checks pass, the worker has free resources for tasks
 	return 1;
 }
 
