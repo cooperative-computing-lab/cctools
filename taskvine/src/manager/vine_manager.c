@@ -2829,6 +2829,49 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	return result;
 }
 
+/* Check if any of the resources is overcommitted on a given worker. */
+static int is_resource_fully_allocated(struct vine_manager *q, struct vine_resource resource)
+{
+	return resource.inuse >= overcommitted_resource_total(q, resource.total);
+}
+static int worker_has_free_resources(struct vine_manager *q, struct vine_worker_info *w)
+{
+	/* Always check memory and disk */
+	if (is_resource_fully_allocated(q, w->resources->memory) || is_resource_fully_allocated(q, w->resources->disk)) {
+		return 0;
+	}
+
+	/* Check cores and gpus only if they are defined */
+	int has_cores = w->resources->cores.total > 0;
+	int has_gpus = w->resources->gpus.total > 0;
+
+	/* Has no cores and gpus */
+	if (!has_cores && !has_gpus) {
+		return 0;
+	}
+
+	/* Has both cores and gpus, return false if both fully allocated, true otherwise */
+	if (has_cores && has_gpus) {
+		if (is_resource_fully_allocated(q, w->resources->cores) && is_resource_fully_allocated(q, w->resources->gpus)) {
+			return 0;
+		}
+		return 1;
+	}
+
+	/* Has cores but no gpus, return false if cores are used up */
+	if (has_cores && is_resource_fully_allocated(q, w->resources->cores)) {
+		return 0;
+	}
+
+	/* Has gpus but no cores, return false if gpus are used up */
+	if (has_gpus && is_resource_fully_allocated(q, w->resources->gpus)) {
+		return 0;
+	}
+
+	/* All check passed */
+	return 1;
+}
+
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
 	w->resources->cores.inuse = 0;
@@ -2854,9 +2897,20 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 		w->resources->memory.inuse += box->memory;
 		w->resources->disk.inuse += box->disk;
 		w->resources->gpus.inuse += box->gpus;
+
+		/* Subtract resources from libraries that are not running any functions at all.
+		 * This matches the assumption in @vine_manager.c:commit_task_to_worker(), where empty libraries are being killed right before a task is committed. */
+		if (task->provides_library && task->function_slots_inuse == 0) {
+			w->resources->cores.inuse -= task->current_resource_box->cores;
+			w->resources->gpus.inuse -= task->current_resource_box->gpus;
+			w->resources->memory.inuse -= task->current_resource_box->memory;
+			w->resources->disk.inuse -= task->current_resource_box->disk;
+		}
 	}
 
 	w->resources->disk.inuse += ceil(BYTES_TO_MEGABYTES(w->inuse_cache));
+
+	w->has_free_resources = worker_has_free_resources(q, w);
 }
 
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w)
