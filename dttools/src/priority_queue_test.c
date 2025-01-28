@@ -47,7 +47,7 @@ int main()
 	}
 
 	// Get the head of the priority queue
-	char *head = (char *)priority_queue_peak_top(pq);
+	char *head = (char *)priority_queue_peek_top(pq);
 	if (head) {
 		printf("\nElement at the head of the queue: %s\n", head);
 	} else {
@@ -56,7 +56,7 @@ int main()
 
 	// Access an element by index
 	idx = 4;
-	char *element = (char *)priority_queue_peak_at(pq, idx);
+	char *element = (char *)priority_queue_peek_at(pq, idx);
 	if (element) {
 		printf("\nElement at index %d: %s\n", idx, element);
 	} else {
@@ -164,7 +164,7 @@ int main()
 
 	// Pop elements from the priority queue using priority_queue_pop
 	printf("\nPopping elements from the priority queue:\n");
-	while ((item = (char *)priority_queue_peak_top(pq)) != NULL) {
+	while ((item = (char *)priority_queue_peek_top(pq)) != NULL) {
 		printf("Popped element: %s  Priority: %d\n", item, (int)priority_queue_get_priority(pq, 0));
 		priority_queue_pop(pq);
 	}
