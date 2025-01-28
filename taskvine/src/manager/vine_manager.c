@@ -2836,29 +2836,39 @@ static int is_resource_fully_allocated(struct vine_manager *q, struct vine_resou
 }
 static int worker_has_free_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
-	// Always check memory and disk
-	if (is_resource_fully_allocated(q, w->resources->memory) ||
-			is_resource_fully_allocated(q, w->resources->disk)) {
+	/* Always check memory and disk */
+	if (is_resource_fully_allocated(q, w->resources->memory) || is_resource_fully_allocated(q, w->resources->disk)) {
 		return 0;
 	}
 
-	// Check cores and gpus only if they are defined
+	/* Check cores and gpus only if they are defined */
 	int has_cores = w->resources->cores.total > 0;
 	int has_gpus = w->resources->gpus.total > 0;
 
+	/* Has no cores and gpus */
 	if (!has_cores && !has_gpus) {
 		return 0;
 	}
 
+	/* Has both cores and gpus, return false if both fully allocated, true otherwise */
+	if (has_cores && has_gpus) {
+		if (is_resource_fully_allocated(q, w->resources->cores) && is_resource_fully_allocated(q, w->resources->gpus)) {
+			return 0;
+		}
+		return 1;
+	}
+
+	/* Has cores but no gpus, return false if cores are used up */
 	if (has_cores && is_resource_fully_allocated(q, w->resources->cores)) {
 		return 0;
 	}
 
+	/* Has gpus but no cores, return false if gpus are used up */
 	if (has_gpus && is_resource_fully_allocated(q, w->resources->gpus)) {
 		return 0;
 	}
 
-	// If all checks pass, the worker has free resources for tasks
+	/* All check passed */
 	return 1;
 }
 
