@@ -226,7 +226,7 @@ int priority_queue_update_priority(struct priority_queue *pq, void *data, double
 
 	/* If the data isn’t already in the queue, enqueue it. */
 	if (idx == -1) {
-		return priority_queue_push(pq, data, new_priority); 
+		return priority_queue_push(pq, data, new_priority);
 	}
 
 	double old_priority = pq->elements[idx]->priority;
