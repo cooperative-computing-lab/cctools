@@ -65,6 +65,10 @@ worker.debug_file = "factory.log"
 with worker:
     q.tune("force-proportional-resources", 0)
 
+    # note that the disk is divided by a factor to reserve space for cache growth unless the users specify the disk
+    disk_proportion_available_to_task = 0.75
+    q.tune("disk-proportion-available-to-task", disk_proportion_available_to_task)  # the default factor is 0.75
+
     r = {"cores": 1, "memory": 2, "disk": 3, "gpus": 4}
     check_task("all_specified", "fixed", max=r, min={}, expected=r)
 
@@ -72,11 +76,9 @@ with worker:
 
     check_task("all_specified_no_cores", "fixed", max={"gpus": 4, "memory": 2, "disk": 3}, min={}, expected={"cores": 0, "memory": 2, "disk": 3, "gpus": 4})
 
-    check_task("all_zero", "fixed", max={"cores": 0, "memory": 0, "disk": 0, "gpus": 0}, min={}, expected={"cores": worker_cores, "memory": worker_memory, "disk": worker_disk, "gpus": 0})
+    check_task("all_zero", "fixed", max={"cores": 0, "memory": 0, "disk": 0, "gpus": 0}, min={}, expected={"cores": worker_cores, "memory": worker_memory, "disk": worker_disk * disk_proportion_available_to_task, "gpus": 0})
 
-    # note that the disk is divided by a factor if enabling proportional resource allocation
     q.tune("force-proportional-resources", 1)
-    disk_proportion_available_to_task = 0.75   # the default factor
 
     check_task("only_memory", "fixed", max={"memory": worker_memory / 2}, min={}, expected={"cores": worker_cores / 2, "memory": worker_memory / 2, "disk": worker_disk / 2 * disk_proportion_available_to_task, "gpus": 0})
 
