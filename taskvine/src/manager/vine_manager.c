@@ -930,6 +930,7 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	}
 
 	itable_clear(w->current_tasks, 0);
+	itable_clear(w->current_libraries, 0);
 
 	w->finished_tasks = 0;
 
