@@ -94,7 +94,7 @@ with worker:
     check_task("only_cores_proportional", "fixed", max=r, min={}, expected=e)
 
     p = 2 / worker_cores
-    e = {"cores": 2, "memory": math.floor(worker_memory * p), "disk": math.floor(worker_disk * p) , "gpus": 0}
+    e = {"cores": 2, "memory": math.floor(worker_memory * p), "disk": math.floor(worker_disk * p), "gpus": 0}
     check_task("exhaustive_bucketing", "exhaustive_bucketing", max={}, min={}, expected=e)
 
     check_task("greedy_bucketing", "greedy_bucketing", max={}, min={}, expected=e)
