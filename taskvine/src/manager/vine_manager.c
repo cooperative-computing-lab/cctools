@@ -2967,6 +2967,10 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 		/* If start_one_task_fails, this will be decremented in handle_failure below. */
 		t->library_task->function_slots_inuse++;
 	}
+	/* If this is a library task, bookkeep it on the worker's side */
+	if (t->provides_library) {
+		itable_insert(w->current_libraries, t->task_id, t);
+	}
 
 	t->hostname = xxstrdup(w->hostname);
 	t->addrport = xxstrdup(w->addrport);
@@ -3150,6 +3154,10 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 	t->current_resource_box = 0;
 
 	itable_remove(w->current_tasks, t->task_id);
+
+	if (t->provides_library) {
+		itable_remove(w->current_libraries, t->task_id);
+	}
 
 	/*
 	If this was a function call assigned to a library,
