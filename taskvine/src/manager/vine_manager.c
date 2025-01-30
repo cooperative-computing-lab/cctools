@@ -5779,9 +5779,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "max-library-retries")) {
 		q->max_library_retries = MIN(1, value);
 	} else if (!strcmp(name, "disk-proportion-available-to-task")) {
-		if (value > 1 || value <= 0) {
-			q->disk_proportion_available_to_task = 0.75;
-		} else {
+		if (value < 1 && value > 0) {
 			q->disk_proportion_available_to_task = value;
 		}
 	} else {
