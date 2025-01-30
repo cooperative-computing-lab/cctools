@@ -245,8 +245,8 @@ vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_
 
 	vine_manager_send(q, w, "puturl_now %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, mode, transfer_id);
 
-	struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
-	vine_file_replica_table_insert(q, w, f->cached_name, replica);
+	// struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
+	// vine_file_replica_table_insert(q, w, f->cached_name, replica);
 
 	free(transfer_id);
 	return VINE_SUCCESS;
