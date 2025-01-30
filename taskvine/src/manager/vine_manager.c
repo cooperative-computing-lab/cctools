@@ -2703,6 +2703,11 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		limits->disk = w->resources->disk.total - w->resources->disk.inuse;
 	}
 
+	/* For disk, scale the estimated disk allocation by a [0, 1] factor (by default 0.75) to intentionally
+	 * reserve some space for data movement between the sandbox and cache, and allow extra room for potential cache growth.
+	 * This applies to tasks except function calls. */
+	limits->disk *= q->disk_proportion_available_to_task;
+
 	/* never go below specified min resources. */
 	rmsummary_merge_max(limits, min);
 
@@ -3828,6 +3833,9 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->measured_local_resources = rmsummary_create(-1);
 	q->current_max_worker = rmsummary_create(-1);
 	q->max_task_resources_requested = rmsummary_create(-1);
+
+	q->sandbox_grow_factor = 2.0;
+	q->disk_proportion_available_to_task = 0.75;
 
 	q->stats = calloc(1, sizeof(struct vine_stats));
 	q->stats_measure = calloc(1, sizeof(struct vine_stats));
@@ -5568,8 +5576,21 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "option-blocklist-slow-workers-timeout")) {
 		q->option_blocklist_slow_workers_timeout = MAX(0, value); /*todo: confirm 0 or 1*/
+
 	} else if (!strcmp(name, "watch-library-logfiles")) {
 		q->watch_library_logfiles = !!((int)value);
+
+	} else if (!strcmp(name, "sandbox-grow-factor")) {
+		q->sandbox_grow_factor = MAX(1.1, value);
+
+	} else if (!strcmp(name, "max-library-retries")) {
+		q->max_library_retries = MIN(1, value);
+
+	} else if (!strcmp(name, "disk-proportion-available-to-task")) {
+		if (value < 1 && value > 0) {
+			q->disk_proportion_available_to_task = value;
+		}
+
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
