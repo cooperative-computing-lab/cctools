@@ -209,6 +209,7 @@ class FuturesExecutor(Executor):
             heads, iterable = iterable[:chunk_size], iterable[chunk_size:]
 
             if library_name:
+                raise NotImplementedError("Using a library not currently supported.")
                 future_batch_task = self.submit(self.future_funcall(library_name, fn_wrapped, *heads))
             else:
                 future_batch_task = self.submit(self.future_task(fn_wrapped, *heads))
@@ -237,6 +238,7 @@ class FuturesExecutor(Executor):
             heads, iterable = iterable[:chunk_size], iterable[chunk_size:]
             heads = [f.result() if isinstance(f, VineFuture) else f for f in heads]
             if library_name:
+                raise NotImplementedError("Using a library not currently supported.")
                 future_batch_task = self.submit(
                     self.future_funcall(
                         library_name, reduction_tree, fn, *heads, n=fn_arity
