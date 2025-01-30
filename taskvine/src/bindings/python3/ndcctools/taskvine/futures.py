@@ -1,30 +1,33 @@
-
 from . import cvine
 import hashlib
-from collections import deque
-from concurrent.futures import Executor
-from concurrent.futures import Future
-from concurrent.futures import FIRST_COMPLETED
-from concurrent.futures import FIRST_EXCEPTION
-from concurrent.futures import ALL_COMPLETED
-from concurrent.futures._base import PENDING
-from concurrent.futures._base import CANCELLED
-from concurrent.futures._base import FINISHED
+from collections import deque, namedtuple
+from concurrent.futures import (
+    Executor,
+    Future,
+    FIRST_COMPLETED,
+    FIRST_EXCEPTION,
+    ALL_COMPLETED,
+)
+from concurrent.futures._base import PENDING, CANCELLED, FINISHED
 from concurrent.futures import TimeoutError
-from collections import namedtuple
+
 from .task import (
     PythonTask,
     FunctionCall,
     FunctionCallNoResult,
 )
+
 from .manager import (
     Factory,
     Manager,
 )
 
+import math
 import os
 import time
 import textwrap
+from functools import partial
+from collections.abc import Sequence
 
 RESULT_PENDING = 'result_pending'
 
@@ -109,7 +112,7 @@ def as_completed(fs, timeout=None):
             f.module_manager.submit(f._task)
 
     start = time.perf_counter()
-    result_timeout = min(timeout, 5) if timeout is not None else 5
+    result_timeout = max(1, min(timeout, 5)) if timeout else 5
 
     def _iterator():
         # iterate of queue of futures, yeilding completed futures and
@@ -133,14 +136,28 @@ def as_completed(fs, timeout=None):
                 assert result != RESULT_PENDING
                 yield f
 
-            if (
-                fs and timeout is not None
-                and time.perf_counter() - start > timeout
-            ):
+            if fs and timeout and time.perf_counter() - start > timeout:
                 raise TimeoutError()
 
     return _iterator()
 
+
+def run_iterable(fn, *args):
+    return list(map(fn, args))
+
+
+def reduction_tree(fn, *args, n=2):
+    # n is the arity of the reduction function fn
+    # if less than 2, we have an infinite loop
+    assert n > 1
+    entries = [f.result() if isinstance(f, VineFuture) else f for f in args]
+    if len(entries) < 2:
+        return entries[0]
+
+    len_multiple = int(math.ceil(len(entries) / n) * n)
+    new_args = map(fn, [entries[i:i + n] for i in range(0, len_multiple, n)])
+
+    return reduction_tree(fn, *new_args, n=n)
 
 ##
 # \class FuturesExecutor
@@ -148,7 +165,10 @@ def as_completed(fs, timeout=None):
 # TaskVine FuturesExecutor object
 #
 # This class acts as an interface for the creation of Futures
+
+
 class FuturesExecutor(Executor):
+
     def __init__(self, port=9123, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull, factory=True, opts={}):
         self.manager = Manager(port=port)
         self.port = self.manager.port
@@ -172,6 +192,100 @@ class FuturesExecutor(Executor):
             self.factory.start()
         else:
             self.factory = None
+
+    def map(self, fn, iterable, library_name=None, chunk_size=1):
+        assert chunk_size > 0
+        assert isinstance(iterable, Sequence)
+
+        def wait_for_map_resolution(*futures_batch):
+            result = []
+            for f in futures_batch:
+                result.extend(f.result() if isinstance(f, VineFuture) else f)
+            return result
+
+        tasks = []
+        fn_wrapped = partial(run_iterable, fn)
+        while iterable:
+            heads, iterable = iterable[:chunk_size], iterable[chunk_size:]
+
+            if library_name:
+                raise NotImplementedError("Using a library not currently supported.")
+                future_batch_task = self.submit(self.future_funcall(library_name, fn_wrapped, *heads))
+            else:
+                future_batch_task = self.submit(self.future_task(fn_wrapped, *heads))
+
+            tasks.append(future_batch_task)
+
+        return self.submit(self.future_task(wait_for_map_resolution, *tasks))
+
+    # Reduce performs a reduction tree on the iterable and currently returns a single value
+    #
+    # parameters:
+    # - Function
+    # - a function that receives fn_arity arguments
+    # - A sequence of parameters that function will take
+    # - a chunk_size to group elements in sequence to dispatch to a single task
+    # - arity of the function, elements of a chunk are reduce arity-wise.
+    # - an optional library_name for a library function call
+    def reduce(self, fn, iterable, library_name=None, chunk_size=2, fn_arity=2):
+        assert chunk_size > 1
+        assert fn_arity > 1
+        assert isinstance(iterable, Sequence)
+        chunk_size = max(fn_arity, chunk_size)
+
+        new_iterable = []
+        while iterable:
+            heads, iterable = iterable[:chunk_size], iterable[chunk_size:]
+            heads = [f.result() if isinstance(f, VineFuture) else f for f in heads]
+            if library_name:
+                raise NotImplementedError("Using a library not currently supported.")
+                future_batch_task = self.submit(
+                    self.future_funcall(
+                        library_name, reduction_tree, fn, *heads, n=fn_arity
+                    )
+                )
+            else:
+                future_batch_task = self.submit(self.future_task(reduction_tree, fn, *heads, n=fn_arity))
+
+            new_iterable.append(future_batch_task)
+
+        if len(new_iterable) > 1:
+            return self.reduce(fn, new_iterable, library_name, chunk_size, fn_arity)
+        else:
+            return new_iterable[0]
+
+    def allpairs(self, fn, iterable_rows, iterable_cols, library_name=None, chunk_size=1):
+        assert chunk_size > 0
+        assert isinstance(iterable_rows, Sequence)
+        assert isinstance(iterable_cols, Sequence)
+
+        def wait_for_allpairs_resolution(row_size, col_size, mapped):
+            result = []
+            for _ in range(row_size):
+                result.append([0] * col_size)
+
+            mapped = mapped.result() if isinstance(mapped, VineFuture) else mapped
+            for p in mapped:
+                (i, j, r) = p.result() if isinstance(p, VineFuture) else p
+                result[i][j] = r
+
+            return result
+
+        def wrap_idx(args):
+            i, j, a, b = args
+            return (i, j, fn(a, b))
+
+        iterable = [(i, j, a, b) for (i, a) in enumerate(iterable_rows) for (j, b) in enumerate(iterable_cols)]
+        mapped = self.map(wrap_idx, iterable, library_name, chunk_size)
+
+        return self.submit(
+            self.future_task(
+                wait_for_allpairs_resolution,
+                len(iterable_rows),
+                len(iterable_cols),
+                mapped,
+            )
+        )
 
     def submit(self, fn, *args, **kwargs):
         if isinstance(fn, (FuturePythonTask, FutureFunctionCall)):
@@ -240,15 +354,15 @@ class VineFuture(Future):
             return False
 
     def running(self):
-        state = self._task.state
-        if state == "RUNNING":
+        state = self._task._module_manager.task_state(self._task.id)
+        if state == cvine.VINE_TASK_RUNNING:
             return True
         else:
             return False
 
     def done(self):
-        state = self._task.state
-        if state == "DONE" or state == "RETRIEVED":
+        state = self._task._module_manager.task_state(self._task.id)
+        if state == cvine.VINE_TASK_DONE:
             return True
         else:
             return False
@@ -301,7 +415,6 @@ class FutureFunctionCall(FunctionCall):
         self.manager = manager
         self.library_name = library_name
         self._envs = []
-
         self._future = VineFuture(self)
         self._has_retrieved = False
 
@@ -326,7 +439,6 @@ class FutureFunctionCall(FunctionCall):
                         self._saved_output = output['Result']
                     else:
                         self._saved_output = FunctionCallNoResult(output['Reason'])
-
                 except Exception as e:
                     self._saved_output = e
             else:
@@ -400,6 +512,7 @@ class FuturePythonTask(PythonTask):
                 # task or the exception object of a failed task.
                 self._output = cloudpickle.loads(self._output_file.contents())
             except Exception as e:
+                print(self._output_file.contents())
                 # handle output file fetch/deserialization failures
                 self._output = e
             self._output_loaded = True
