@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <math.h>
 #include <float.h>
+#include <stdint.h>
 
 #define DEFAULT_CAPACITY 127
 #define MAX_PRIORITY DBL_MAX
@@ -25,6 +26,7 @@ struct priority_queue {
 	int size;
 	int capacity;
 	struct element **elements;
+	struct hash_table *index_table;  // Hash table for data to index mapping
 
 	/* The following three cursors are used to iterate over the elements in the numerical order they are stored in the array, which is
 	   different from the order of priorities.  Each of them has different concerns when traverse the queue Though the tipical priority-based
@@ -34,6 +36,13 @@ struct priority_queue {
 	int rotate_cursor; // Used in PRIORITY_QUEUE_ROTATE_ITERATE. It iterates from the last position and can be reset when certain events happen.
 };
 
+// Add declarations for the hash table functions if they are not included from another header
+// If these functions are declared in a header file, include that header instead
+int hash_table_insert(struct hash_table *table, char *key, void *value);
+struct hash_table *hash_table_create(int size, void *(*hash_func)(void *));
+void *hash_table_lookup(struct hash_table *table, char *key);
+void hash_table_delete(struct hash_table *table);
+
 /****** Static Methods ******/
 
 static void swap_elements(struct priority_queue *pq, int i, int j)
@@ -41,6 +50,10 @@ static void swap_elements(struct priority_queue *pq, int i, int j)
 	struct element *temp = pq->elements[i];
 	pq->elements[i] = pq->elements[j];
 	pq->elements[j] = temp;
+
+	// Update indices in hash table
+	hash_table_insert(pq->index_table, (char *)pq->elements[i]->data, (void *)(intptr_t)i);
+	hash_table_insert(pq->index_table, (char *)pq->elements[j]->data, (void *)(intptr_t)j);
 }
 
 static int swim(struct priority_queue *pq, int k)
@@ -127,6 +140,13 @@ struct priority_queue *priority_queue_create(double init_capacity)
 	pq->base_cursor = 0;
 	pq->rotate_cursor = 0;
 
+	pq->index_table = hash_table_create(0, NULL);  // Initialize hash table
+	if (!pq->index_table) {
+		free(pq->elements);
+		free(pq);
+		return NULL;
+	}
+
 	return pq;
 }
 
@@ -150,6 +170,7 @@ int priority_queue_push(struct priority_queue *pq, void *data, double priority)
 			return 0;
 		}
 	}
+
 	struct element *e = (struct element *)malloc(sizeof(struct element));
 	if (!e) {
 		return 0;
@@ -157,12 +178,16 @@ int priority_queue_push(struct priority_queue *pq, void *data, double priority)
 	e->data = data;
 	e->priority = priority;
 
-	pq->elements[pq->size++] = e;
+	pq->elements[pq->size] = e;
 
-	int new_idx = swim(pq, pq->size - 1);
+	// Insert data pointer and index into hash table
+	if (!hash_table_insert(pq->index_table, (char *)data, (void *)(intptr_t)pq->size)) {
+		free(e);
+		return 0;
+	}
 
+	int new_idx = swim(pq, pq->size++);
 	if (new_idx <= pq->rotate_cursor) {
-		// reset the rotate cursor if the new element is inserted before/equal to it
 		priority_queue_rotate_reset(pq);
 	}
 
@@ -247,16 +272,15 @@ int priority_queue_update_priority(struct priority_queue *pq, void *data, double
 int priority_queue_find_idx(struct priority_queue *pq, void *data)
 {
 	if (!pq) {
-		return 0;
+		return -1;
 	}
 
-	for (int i = 0; i < pq->size; i++) {
-		if (pq->elements[i]->data == data) {
-			return i;
-		}
+	void *idx_ptr = hash_table_lookup(pq->index_table, (char *)data);
+	if (!idx_ptr) {
+		return -1;
 	}
 
-	return 0;
+	return (int)(intptr_t)idx_ptr;
 }
 
 int priority_queue_static_next(struct priority_queue *pq)
@@ -371,5 +395,6 @@ void priority_queue_delete(struct priority_queue *pq)
 		free(pq->elements[i]);
 	}
 	free(pq->elements);
+	hash_table_delete(pq->index_table);
 	free(pq);
 }
