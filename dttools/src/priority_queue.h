@@ -64,13 +64,13 @@ void *data = someDataPointer;
 
 priority_queue_push(pq, data, priority);
 data = priority_queue_pop(pq);
-void *headData = priority_queue_peak_top(pq);
+void *headData = priority_queue_peek_top(pq);
 </pre>
 
 To list all of the items in a priority queue, use a simple loop:
 <pre>
 for (int i = 0; i < priority_queue_size(pq); i++) {
-    void *data = priority_queue_peak_at(pq, i);
+    void *data = priority_queue_peek_at(pq, i);
     printf("Priority queue contains: %p\n", data);
 }
 </pre>
@@ -94,7 +94,7 @@ Element with a higher priority is at the top of the heap.
 @param init_capacity The initial number of elements in the queue. If zero, a default value will be used.
 @return A pointer to a new priority queue.
 */
-struct priority_queue *priority_queue_create(double init_capacity);
+struct priority_queue *priority_queue_create(int init_capacity);
 
 /** Count the elements in a priority queue.
 @param pq A pointer to a priority queue.
@@ -122,7 +122,7 @@ Similar to @ref priority_queue_pop, but the element is not removed.
 @param pq A pointer to a priority queue.
 @return The pointer to the top of the queue if any, failure otherwise
 */
-void *priority_queue_peak_top(struct priority_queue *pq);
+void *priority_queue_peek_top(struct priority_queue *pq);
 
 /** Get an element from a priority queue by a specified index.
 The first accessible element is at index 0.
@@ -130,7 +130,7 @@ The first accessible element is at index 0.
 @param index The index of the element to get.
 @return The pointer to the element if any, failure otherwise
 */
-void *priority_queue_peak_at(struct priority_queue *pq, int index);
+void *priority_queue_peek_at(struct priority_queue *pq, int index);
 
 /** Get the priority of an element at a specified index.
 @param pq A pointer to a priority queue.
@@ -150,7 +150,7 @@ int priority_queue_update_priority(struct priority_queue *pq, void *data, double
 /** Find the index of an element in a priority queue.
 @param pq A pointer to a priority queue.
 @param data The pointer to the element to find.
-@return The index of the element if found, 0 on failure.
+@return The index of the element if found, -1 on failure.
 */
 int priority_queue_find_idx(struct priority_queue *pq, void *data);
 
@@ -158,7 +158,7 @@ int priority_queue_find_idx(struct priority_queue *pq, void *data);
 The static_cursor is used to globally iterate over the elements by sequential index.
 The position of the static_cursor is automatically remembered and never reset.
 @param pq A pointer to a priority queue.
-@return The index of the next element if any, 0 on failure.
+@return The index of the next element if any, -1 on failure.
 */
 int priority_queue_static_next(struct priority_queue *pq);
 
@@ -170,7 +170,7 @@ void priority_queue_base_reset(struct priority_queue *pq);
 
 /** Advance the base_cursor to the next element and return the index.
 @param pq A pointer to a priority queue.
-@return The index of the next element if any, 0 on failure.
+@return The index of the next element if any, -1 on failure.
 */
 int priority_queue_base_next(struct priority_queue *pq);
 
@@ -185,7 +185,7 @@ void priority_queue_rotate_reset(struct priority_queue *pq);
 
 /** Advance the rotate_cursor to the next element and return the index.
 @param pq A pointer to a priority queue.
-@return The index of the next element if any, 0 on failure.
+@return The index of the next element if any, -1 on failure.
 */
 int priority_queue_rotate_next(struct priority_queue *pq);
 
@@ -235,16 +235,16 @@ PRIORITY_QUEUE_ROTATE_ITERATE( pq, idx, data, iter_count, iter_depth ) {
 #define PRIORITY_QUEUE_BASE_ITERATE( pq, idx, data, iter_count, iter_depth ) \
     iter_count = 0; \
     priority_queue_base_reset(pq); \
-    while ((iter_count < iter_depth) && ((idx = priority_queue_base_next(pq)) >= 0) && (data = priority_queue_peak_at(pq, idx)) && (iter_count += 1))
+    while ((iter_count < iter_depth) && ((idx = priority_queue_base_next(pq)) >= 0) && (data = priority_queue_peek_at(pq, idx)) && (iter_count += 1))
 
 /* Iterate from last position, never reset. */
 #define PRIORITY_QUEUE_STATIC_ITERATE( pq, idx, data, iter_count, iter_depth ) \
     iter_count = 0; \
-    while ((iter_count < iter_depth) && ((idx = priority_queue_static_next(pq)) >= 0) && (data = priority_queue_peak_at(pq, idx)) && (iter_count += 1))
+    while ((iter_count < iter_depth) && ((idx = priority_queue_static_next(pq)) >= 0) && (data = priority_queue_peek_at(pq, idx)) && (iter_count += 1))
 
 /* Iterate from last position, reset to the begining when needed. */
 #define PRIORITY_QUEUE_ROTATE_ITERATE( pq, idx, data, iter_count, iter_depth ) \
     iter_count = 0; \
-    while ((iter_count < iter_depth) && ((idx = priority_queue_rotate_next(pq)) >= 0) && (data = priority_queue_peak_at(pq, idx)) && (iter_count += 1))
+    while ((iter_count < iter_depth) && ((idx = priority_queue_rotate_next(pq)) >= 0) && (data = priority_queue_peek_at(pq, idx)) && (iter_count += 1))
 
 #endif
