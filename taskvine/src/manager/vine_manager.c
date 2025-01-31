@@ -981,7 +981,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 			continue;
 		}
 
-		debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsources, f->cached_name, to_find);
+		// debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsources, f->cached_name, to_find);
 
 		int round_replication_request_sent = vine_file_replica_table_replicate(q, f, sources, to_find);
 		total_replication_request_sent += round_replication_request_sent;
