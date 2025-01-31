@@ -133,7 +133,7 @@ struct priority_queue *priority_queue_create(double init_capacity)
 	pq->base_cursor = 0;
 	pq->rotate_cursor = 0;
 
-	pq->index_table = hash_table_create(0, NULL); // Initialize hash table
+	pq->index_table = hash_table_create(0, NULL);
 	if (!pq->index_table) {
 		free(pq->elements);
 		free(pq);
