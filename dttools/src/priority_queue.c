@@ -36,13 +36,6 @@ struct priority_queue {
 	int rotate_cursor; // Used in PRIORITY_QUEUE_ROTATE_ITERATE. It iterates from the last position and can be reset when certain events happen.
 };
 
-// Add declarations for the hash table functions if they are not included from another header
-// If these functions are declared in a header file, include that header instead
-int hash_table_insert(struct hash_table *table, char *key, void *value);
-struct hash_table *hash_table_create(int size, void *(*hash_func)(void *));
-void *hash_table_lookup(struct hash_table *table, char *key);
-void hash_table_delete(struct hash_table *table);
-
 /****** Static Methods ******/
 
 static void swap_elements(struct priority_queue *pq, int i, int j)
