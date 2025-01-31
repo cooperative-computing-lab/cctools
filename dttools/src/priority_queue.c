@@ -26,7 +26,7 @@ struct priority_queue {
 	int size;
 	int capacity;
 	struct element **elements;
-	struct hash_table *index_table;  // Hash table for data to index mapping
+	struct hash_table *index_table; // Hash table for data to index mapping
 
 	/* The following three cursors are used to iterate over the elements in the numerical order they are stored in the array, which is
 	   different from the order of priorities.  Each of them has different concerns when traverse the queue Though the tipical priority-based
@@ -133,7 +133,7 @@ struct priority_queue *priority_queue_create(double init_capacity)
 	pq->base_cursor = 0;
 	pq->rotate_cursor = 0;
 
-	pq->index_table = hash_table_create(0, NULL);  // Initialize hash table
+	pq->index_table = hash_table_create(0, NULL); // Initialize hash table
 	if (!pq->index_table) {
 		free(pq->elements);
 		free(pq);
