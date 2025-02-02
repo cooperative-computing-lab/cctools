@@ -124,7 +124,7 @@ modify the linker namespace we are using.
 #define debug_config_file      cctools_debug_config_file
 #define debug_config_file_size cctools_debug_config_file_size
 #define debug_config_fatal     cctools_debug_config_fatal
-#define debug_config_getpid    cctools_debug_config_getpid
+#define debug_config_child_getpid    cctools_debug_config_child_getpid
 #define debug_flags_set        cctools_debug_flags_set
 #define debug_flags_print      cctools_debug_flags_print
 #define debug_flags_clear      cctools_debug_flags_clear
@@ -206,7 +206,7 @@ void debug_config_file_size(off_t size);
 
 void debug_config_fatal(void (*callback) (void));
 
-void debug_config_getpid (pid_t (*getpidf)(void));
+void debug_config_child_getpid (pid_t (*getpidf)(void));
 
 /** Set debugging flags to enable output.
 Accepts a debug flag in ASCII form, and enables that subsystem.  For example: <tt>debug_flags_set("chirp");</tt>
