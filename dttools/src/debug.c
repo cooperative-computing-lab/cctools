@@ -190,9 +190,9 @@ static void do_debug(int64_t flags, const char *fmt, va_list args)
 		the minimum latency of a debug event.
 		*/
 
-		if(!debug_time_zone_cached) {
-			if(!getenv("TZ")) {
-				setenv("TZ",tm->tm_zone,0);
+		if (!debug_time_zone_cached) {
+			if (!getenv("TZ")) {
+				setenv("TZ", tm->tm_zone, 0);
 			}
 			debug_time_zone_cached = 1;
 		}
