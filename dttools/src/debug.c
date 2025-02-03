@@ -34,9 +34,11 @@ extern int debug_file_reopen(void);
 extern int debug_file_close(void);
 
 static void (*debug_write)(int64_t flags, const char *str) = debug_stderr_write;
-static pid_t (*debug_getpid)(void) = getpid;
+static pid_t (*debug_child_getpid)(void) = 0;
 static char debug_program_name[PATH_MAX];
 static int64_t debug_flags = D_NOTICE | D_ERROR | D_FATAL;
+static pid_t debug_cached_pid = 0;
+static int debug_time_zone_cached = 0;
 
 struct flag_info {
 	const char *name;
@@ -182,20 +184,37 @@ static void do_debug(int64_t flags, const char *fmt, va_list args)
 		gettimeofday(&tv, 0);
 		tm = localtime(&tv.tv_sec);
 
+		/*
+		If the TZ environment variable is not set, then every single call
+		to localtime() results in a stat("/etc/localtime") which impacts
+		the minimum latency of a debug event.
+		*/
+
+		if (!debug_time_zone_cached) {
+			if (!getenv("TZ")) {
+				setenv("TZ", tm->tm_zone, 0);
+			}
+			debug_time_zone_cached = 1;
+		}
+
+		/* Fetch the pid just once and use it multiple times. */
+		pid_t pid = getpid();
+
 		buffer_putfstring(&B,
-				"%04d/%02d/%02d %02d:%02d:%02d.%02ld ",
+				"%04d/%02d/%02d %02d:%02d:%02d.%02ld %s[%d]",
 				tm->tm_year + 1900,
 				tm->tm_mon + 1,
 				tm->tm_mday,
 				tm->tm_hour,
 				tm->tm_min,
 				tm->tm_sec,
-				(long)tv.tv_usec / 10000);
-		buffer_putfstring(&B, "%s[%d] ", debug_program_name, getpid());
+				(long)tv.tv_usec / 10000,
+				debug_program_name,
+				pid);
 	}
 	/* Parrot prints debug messages for children: */
-	if (getpid() != debug_getpid()) {
-		buffer_putfstring(&B, "<child:%d> ", (int)debug_getpid());
+	if (debug_child_getpid) {
+		buffer_putfstring(&B, "<child:%d> ", (int)debug_child_getpid());
 	}
 	buffer_putfstring(&B, "%s: ", debug_flags_to_name(flags));
 
@@ -309,6 +328,7 @@ void debug_config_file(const char *path)
 void debug_config(const char *name)
 {
 	strncpy(debug_program_name, path_basename(name), sizeof(debug_program_name) - 1);
+	debug_cached_pid = getpid();
 }
 
 void debug_config_file_size(off_t size)
@@ -316,9 +336,9 @@ void debug_config_file_size(off_t size)
 	debug_file_size(size);
 }
 
-void debug_config_getpid(pid_t (*getpidf)(void))
+void debug_config_child_getpid(pid_t (*getpidf)(void))
 {
-	debug_getpid = getpidf;
+	debug_child_getpid = getpidf;
 }
 
 int64_t debug_flags_clear()

@@ -612,7 +612,7 @@ int main( int argc, char *argv[] )
 	debug_config(argv[0]);
 	debug_config_file_size(0); /* do not rotate debug file by default */
 	debug_config_fatal(pfs_process_killall);
-	debug_config_getpid(pfs_process_getpid);
+	debug_config_child_getpid(pfs_process_getpid);
 
 	/* Special file descriptors (currently the channel and the Parrot
 	 * directory) are allocated from the top of our file descriptor pool. After
