@@ -171,7 +171,7 @@ void vine_set_runtime_info_template(const char *dir)
 	char absolute_template_path[512];
 	snprintf(absolute_template_path, sizeof(absolute_template_path), "%s/%s", vine_runtime_info_path, dir);
 
-	// Check if the template path has already exists, if yes, append a suffix with the current time.
+	/* Check if the template path has already exists, if yes, append a suffix with the current time. */
 	struct stat st;
 	if (stat(absolute_template_path, &st) == 0 && S_ISDIR(st.st_mode)) {
 		char buf[20];
