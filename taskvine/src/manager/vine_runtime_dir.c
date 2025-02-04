@@ -164,8 +164,13 @@ void vine_set_runtime_info_path(const char *path)
 	vine_runtime_info_path = xxstrdup(path);
 }
 
-void vine_set_runtime_info_dir(const char *dir)
+void vine_set_runtime_info_template(const char *dir)
 {
 	assert(dir);
 	setenv("VINE_RUNTIME_INFO_DIR", dir, 1);
+}
+
+void vine_unset_runtime_info_template()
+{
+	unsetenv("VINE_RUNTIME_INFO_DIR");
 }
