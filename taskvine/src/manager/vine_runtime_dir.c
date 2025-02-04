@@ -167,7 +167,31 @@ void vine_set_runtime_info_path(const char *path)
 void vine_set_runtime_info_template(const char *dir)
 {
 	assert(dir);
-	setenv("VINE_RUNTIME_INFO_DIR", dir, 1);
+
+	char absolute_template_path[512];
+	snprintf(absolute_template_path, sizeof(absolute_template_path), "%s/%s", vine_runtime_info_path, dir);
+
+	// Check if the template path has already exists, if yes, append a suffix with the current time.
+	struct stat st;
+	if (stat(absolute_template_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+		char buf[20];
+		time_t now = time(NULL);
+		struct tm *tm_info = localtime(&now);
+		strftime(buf, sizeof(buf), "%Y-%m-%dT%H%M%S", tm_info);
+
+		size_t new_dir_len = strlen(dir) + strlen(buf) + 2;
+		char *new_dir = (char *)malloc(new_dir_len);
+		if (new_dir == NULL) {
+			perror("Error: cannot set runtime template path");
+			exit(EXIT_FAILURE);
+		}
+		snprintf(new_dir, new_dir_len, "%s-%s", dir, buf);
+
+		setenv("VINE_RUNTIME_INFO_DIR", new_dir, 1);
+		free(new_dir);
+	} else {
+		setenv("VINE_RUNTIME_INFO_DIR", dir, 1);
+	}
 }
 
 void vine_unset_runtime_info_template()

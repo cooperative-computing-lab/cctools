@@ -66,7 +66,7 @@ class Manager(object):
     # @param name       The project name to use.
     # @param shutdown   Automatically shutdown workers when manager is finished. Disabled by default.
     # @param run_info_path      Directory to archive workflow log directories, it is the upper level directory to run_info_template. If None, defaults to "vine-run-info"
-    # @param run_info_template  Directory to write log (and staging if staging_path not given) files per run. If None, defaults by a %Y-%m-%dT%H%M%S format.
+    # @param run_info_template  Directory to write log (and staging if staging_path not given) files per run, append a time-based suffix if the path has already exists. If None, defaults by a %Y-%m-%dT%H%M%S format.
     # @param staging_path Directory to write temporary files. Defaults to run_info_path if not given.
     # @param ssl        A tuple of filenames (ssl_key, ssl_cert) in pem format, or True.
     #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
