@@ -2836,13 +2836,13 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 }
 
 /* Check if any of the resources is overcommitted on a given worker. */
-static int is_resource_fully_allocated(struct vine_manager *q, struct vine_resource resource)
+static int is_resource_committable(struct vine_manager *q, struct vine_resource resource)
 {
-	return resource.inuse >= overcommitted_resource_total(q, resource.total);
+	return resource.inuse < overcommitted_resource_total(q, resource.total);
 }
 static int worker_has_free_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
-	/* If there are free slots on any libraries */
+	/* If any slots are committable */
 	uint64_t task_id;
 	struct vine_task *t;
 	ITABLE_ITERATE(w->current_libraries, task_id, t)
@@ -2852,40 +2852,17 @@ static int worker_has_free_resources(struct vine_manager *q, struct vine_worker_
 		}
 	}
 
-	/* Always check memory and disk */
-	if (is_resource_fully_allocated(q, w->resources->memory) || is_resource_fully_allocated(q, w->resources->disk)) {
-		return 0;
-	}
-
-	/* Check cores and gpus only if they are defined */
-	int has_cores = w->resources->cores.total > 0;
-	int has_gpus = w->resources->gpus.total > 0;
-
-	/* Has no cores and gpus */
-	if (!has_cores && !has_gpus) {
-		return 0;
-	}
-
-	/* Has both cores and gpus, return false if both fully allocated, true otherwise */
-	if (has_cores && has_gpus) {
-		if (is_resource_fully_allocated(q, w->resources->cores) && is_resource_fully_allocated(q, w->resources->gpus)) {
-			return 0;
+	/* If both memory and disk are committable */
+	if (is_resource_committable(q, w->resources->memory) && is_resource_committable(q, w->resources->disk)) {
+		/* Return true if either cores or GPUs are defined and committable. */
+		if ((w->resources->cores.total > 0 && is_resource_committable(q, w->resources->cores)) ||
+			(w->resources->gpus.total > 0 && is_resource_committable(q, w->resources->gpus))) {
+			return 1;
 		}
-		return 1;
 	}
 
-	/* Has cores but no gpus, return false if cores are used up */
-	if (has_cores && is_resource_fully_allocated(q, w->resources->cores)) {
-		return 0;
-	}
-
-	/* Has gpus but no cores, return false if gpus are used up */
-	if (has_gpus && is_resource_fully_allocated(q, w->resources->gpus)) {
-		return 0;
-	}
-
-	/* All check passed */
-	return 1;
+	/* If reach here, no free resources on this worker */
+	return 0;
 }
 
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w)
