@@ -1492,7 +1492,7 @@ void vine_set_runtime_info_path(const char *path);
 /** Sets the directory where a workflow-specific runtime logs are directly written into.
 @param dir A directory
 */
-void vine_set_runtime_info_template(const char *dir);
+void vine_set_runtime_info_template(const char *template);
 
 /** Adds a custom APPLICATION entry to the debug log.
 @param m     Reference to the current manager object.
