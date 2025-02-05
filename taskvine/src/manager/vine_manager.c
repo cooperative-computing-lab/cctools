@@ -2860,15 +2860,6 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 		w->resources->memory.inuse += box->memory;
 		w->resources->disk.inuse += box->disk;
 		w->resources->gpus.inuse += box->gpus;
-
-		/* Subtract resources from libraries that are not running any functions at all.
-		 * This matches the assumption in @vine_manager.c:commit_task_to_worker(), where empty libraries are being killed right before a task is committed. */
-		if (task->provides_library && task->function_slots_inuse == 0) {
-			w->resources->cores.inuse -= task->current_resource_box->cores;
-			w->resources->gpus.inuse -= task->current_resource_box->gpus;
-			w->resources->memory.inuse -= task->current_resource_box->memory;
-			w->resources->disk.inuse -= task->current_resource_box->disk;
-		}
 	}
 
 	w->resources->disk.inuse += ceil(BYTES_TO_MEGABYTES(w->inuse_cache));
