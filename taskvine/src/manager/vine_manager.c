@@ -2835,36 +2835,6 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	return result;
 }
 
-/* Check if any of the resources is overcommitted on a given worker. */
-static int is_resource_committable(struct vine_manager *q, struct vine_resource resource)
-{
-	return resource.inuse < overcommitted_resource_total(q, resource.total);
-}
-static int worker_has_free_resources(struct vine_manager *q, struct vine_worker_info *w)
-{
-	/* If any slots are committable */
-	uint64_t task_id;
-	struct vine_task *t;
-	ITABLE_ITERATE(w->current_libraries, task_id, t)
-	{
-		if (t->function_slots_inuse < t->function_slots_total) {
-			return 1;
-		}
-	}
-
-	/* If both memory and disk are committable */
-	if (is_resource_committable(q, w->resources->memory) && is_resource_committable(q, w->resources->disk)) {
-		/* Return true if either cores or GPUs are defined and committable. */
-		if ((w->resources->cores.total > 0 && is_resource_committable(q, w->resources->cores)) ||
-			(w->resources->gpus.total > 0 && is_resource_committable(q, w->resources->gpus))) {
-			return 1;
-		}
-	}
-
-	/* If reach here, no free resources on this worker */
-	return 0;
-}
-
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
 	w->resources->cores.inuse = 0;
@@ -2902,8 +2872,6 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 	}
 
 	w->resources->disk.inuse += ceil(BYTES_TO_MEGABYTES(w->inuse_cache));
-
-	w->has_free_resources = worker_has_free_resources(q, w);
 }
 
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w)

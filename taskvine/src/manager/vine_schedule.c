@@ -137,6 +137,46 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 	return ok;
 }
 
+/* Check if any of the resources is defined and committable on a given worker.
+ * @param q         Manager info structure
+ * @param resource  @vine_resources.h:struct vine_resources
+ * @return 1 if the resource type is defined and can be allocated to a task, 0 otherwise.
+ */
+static int is_resource_committable(struct vine_manager *q, struct vine_resource resource)
+{
+	return resource.total > 0 && resource.inuse < overcommitted_resource_total(q, resource.total);
+}
+
+/* Check if this worker has committable resources for any type of task.
+ * If it returns false, neither a function task, library task nor a regular task can run on this worker.
+ * If it returns true, the worker has either free slots for function calls or sufficient resources for regular tasks.
+ * @param q         Manager info structure
+ * @param w The worker info structure.
+ */
+static int check_worker_have_committable_resources(struct vine_manager *q, struct vine_worker_info *w)
+{
+	/* If any slots are committable */
+	uint64_t task_id;
+	struct vine_task *t;
+	ITABLE_ITERATE(w->current_libraries, task_id, t)
+	{
+		if (t->function_slots_inuse < t->function_slots_total) {
+			return 1;
+		}
+	}
+
+	/* A regular task has to use both memory and disk */
+	if (is_resource_committable(q, w->resources->memory) && is_resource_committable(q, w->resources->disk)) {
+		/* If either cores or gpus are committable. */
+		if (is_resource_committable(q, w->resources->cores) || is_resource_committable(q, w->resources->gpus)) {
+			return 1;
+		}
+	}
+
+	/* If reach here, no free resources on this worker */
+	return 0;
+}
+
 /* Check if this task is compatible with this given worker by considering
  * resources availability, features, blocklist, and all other relevant factors.
  * Used by all scheduling methods for basic compatibility.
@@ -153,11 +193,6 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 
 	/* worker has not reported any resources yet */
 	if (w->resources->tag < 0 || w->resources->workers.total < 1 || w->end_time < 0) {
-		return 0;
-	}
-
-	/* if worker has free resources to use */
-	if (!w->has_free_resources) {
 		return 0;
 	}
 
@@ -186,6 +221,11 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 
 	/* Check if worker is blocked from the manager. */
 	if (vine_blocklist_is_blocked(q, w->hostname)) {
+		return 0;
+	}
+
+	/* if worker has free resources to use */
+	if (!check_worker_have_committable_resources(q, w)) {
 		return 0;
 	}
 
