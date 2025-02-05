@@ -2842,6 +2842,16 @@ static int is_resource_fully_allocated(struct vine_manager *q, struct vine_resou
 }
 static int worker_has_free_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
+	/* If there are free slots on any libraries */
+	uint64_t task_id;
+	struct vine_task *t;
+	ITABLE_ITERATE(w->current_libraries, task_id, t)
+	{
+		if (t->function_slots_inuse < t->function_slots_total) {
+			return 1;
+		}
+	}
+
 	/* Always check memory and disk */
 	if (is_resource_fully_allocated(q, w->resources->memory) || is_resource_fully_allocated(q, w->resources->disk)) {
 		return 0;
