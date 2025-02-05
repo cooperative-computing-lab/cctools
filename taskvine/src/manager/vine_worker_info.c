@@ -35,6 +35,7 @@ struct vine_worker_info *vine_worker_create(struct link *lnk)
 
 	w->current_files = hash_table_create(0, 0);
 	w->current_tasks = itable_create(0);
+	w->current_libraries = itable_create(0);
 
 	w->start_time = timestamp_get();
 	w->end_time = -1;
@@ -70,6 +71,7 @@ void vine_worker_delete(struct vine_worker_info *w)
 	hash_table_clear(w->current_files, (void *)vine_file_replica_delete);
 	hash_table_delete(w->current_files);
 	itable_delete(w->current_tasks);
+	itable_delete(w->current_libraries);
 
 	free(w);
 

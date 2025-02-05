@@ -228,6 +228,12 @@ we break once a message would overflow the window.
 
 void deliver_async_messages(struct link *l)
 {
+	/* If no pending messages, return right away. */
+	int messages = list_size(pending_async_messages);
+	if (messages < 1)
+		return;
+
+	/* Determine how much space is available for sending */
 	int recv_window;
 	int send_window;
 	link_window_get(l, &send_window, &recv_window);
@@ -235,14 +241,19 @@ void deliver_async_messages(struct link *l)
 	int bytes_in_buffer = link_get_buffer_bytes(l);
 	int bytes_available = send_window - bytes_in_buffer;
 
-	int messages = list_size(pending_async_messages);
 	int visited;
-	char *message;
 
+	/* Consider each message in the pending queue: */
 	for (visited = 0; visited < messages; visited++) {
-		message = list_peek_head(pending_async_messages);
+		char *message = list_peek_head(pending_async_messages);
 		int message_size = strlen(message);
-		if (message_size < bytes_available) {
+		/*
+		If the message fits in the available space, send it.
+		OR: If it is larger than the whole window, send it anyway
+		because we will have to block one way or the other.
+		Otherwise, stop here and return later.
+		*/
+		if (message_size < bytes_available || message_size > send_window) {
 			message = list_pop_head(pending_async_messages);
 			bytes_available -= message_size;
 			debug(D_VINE, "tx: %s", message);
