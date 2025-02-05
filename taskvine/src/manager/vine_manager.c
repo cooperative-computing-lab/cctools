@@ -930,6 +930,7 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	}
 
 	itable_clear(w->current_tasks, 0);
+	itable_clear(w->current_libraries, 0);
 
 	w->finished_tasks = 0;
 
@@ -993,7 +994,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 			continue;
 		}
 
-		debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsources, f->cached_name, to_find);
+		// debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsources, f->cached_name, to_find);
 
 		int round_replication_request_sent = vine_file_replica_table_replicate(q, f, sources, to_find);
 		total_replication_request_sent += round_replication_request_sent;
@@ -2771,6 +2772,11 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 		limits->disk = available_disk;
 	}
 
+	/* For disk, scale the estimated disk allocation by a [0, 1] factor (by default 0.75) to intentionally
+	 * reserve some space for data movement between the sandbox and cache, and allow extra room for potential cache growth.
+	 * This applies to tasks except function calls. */
+	limits->disk *= q->disk_proportion_available_to_task;
+
 	/* never go below specified min resources. */
 	rmsummary_merge_max(limits, min);
 
@@ -2967,6 +2973,10 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 		/* If start_one_task_fails, this will be decremented in handle_failure below. */
 		t->library_task->function_slots_inuse++;
 	}
+	/* If this is a library task, bookkeep it on the worker's side */
+	if (t->provides_library) {
+		itable_insert(w->current_libraries, t->task_id, t);
+	}
 
 	t->hostname = xxstrdup(w->hostname);
 	t->addrport = xxstrdup(w->addrport);
@@ -3150,6 +3160,10 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 	t->current_resource_box = 0;
 
 	itable_remove(w->current_tasks, t->task_id);
+
+	if (t->provides_library) {
+		itable_remove(w->current_libraries, t->task_id);
+	}
 
 	/*
 	If this was a function call assigned to a library,
@@ -4006,6 +4020,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->max_task_resources_requested = rmsummary_create(-1);
 
 	q->sandbox_grow_factor = 2.0;
+	q->disk_proportion_available_to_task = 0.75;
 
 	q->stats = calloc(1, sizeof(struct vine_stats));
 	q->stats_measure = calloc(1, sizeof(struct vine_stats));
@@ -5772,7 +5787,10 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "max-library-retries")) {
 		q->max_library_retries = MIN(1, value);
-
+	} else if (!strcmp(name, "disk-proportion-available-to-task")) {
+		if (value < 1 && value > 0) {
+			q->disk_proportion_available_to_task = value;
+		}
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
