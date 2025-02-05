@@ -62,6 +62,7 @@ struct vine_worker_info {
 	/* Current files and tasks that have been transfered to this worker */
 	struct hash_table   *current_files;
 	struct itable       *current_tasks;
+	struct itable		*current_libraries;
 
 	/* The number of tasks running last reported by the worker */
 	int         dynamic_tasks_running;
