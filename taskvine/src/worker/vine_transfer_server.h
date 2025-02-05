@@ -10,7 +10,11 @@ See the file COPYING for details.
 #include "vine_cache.h"
 #include "link.h"
 
-#define VINE_TRANSFER_PROC_MAX_CHILD 8
+/* This number defines the maximum allowable concurrent forking processes for file transfers. However, it is the manager's 
+ * responsibility to allocate transfer tasks efficiently among workers, to ensure that no worker excessively forks processes 
+ * to complete the job. In this case, this value serves more as a theoretical safety threshold and should never be reached under 
+ * normal conditions. If a worker reaches this limit, it indicates a bug on the manager's side. */
+#define VINE_TRANSFER_PROC_MAX_CHILD 128
 
 void vine_transfer_server_start( struct vine_cache *cache, int port_min, int port_max );
 void vine_transfer_server_stop();
