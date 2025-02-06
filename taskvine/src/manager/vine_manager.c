@@ -4991,14 +4991,17 @@ static int poll_active_workers(struct vine_manager *q, int stoptime)
 
 	BEGIN_ACCUM_TIME(q, time_status_msgs);
 
-	int i, j = 1;
+	int i;
 	int workers_failed = 0;
 	// Then consider all existing active workers
-	for (i = j; i < n; i++) {
+	for (i = 1; i < n; i++) {
 		if (q->poll_table[i].revents) {
-			if (handle_worker(q, q->poll_table[i].link) == VINE_WORKER_FAILURE) {
-				workers_failed++;
-			}
+			do {
+				if (handle_worker(q, q->poll_table[i].link) == VINE_WORKER_FAILURE) {
+					workers_failed++;
+					break;
+				}
+			} while (!link_buffer_empty(q->poll_table[i].link));
 		}
 	}
 
