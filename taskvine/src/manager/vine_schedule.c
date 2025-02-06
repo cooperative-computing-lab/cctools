@@ -149,6 +149,44 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 	return ok;
 }
 
+/* Check if this worker has committable resources for any type of task.
+ * If it returns false, neither a function task, library task nor a regular task can run on this worker.
+ * If it returns true, the worker has either free slots for function calls or sufficient resources for regular tasks.
+ * @param q         Manager info structure
+ * @param w The worker info structure.
+ */
+static int check_worker_have_committable_resources(struct vine_manager *q, struct vine_worker_info *w)
+{
+	/* Check if there are free slots on any of the running libraries */
+	if (w->current_libraries && itable_size(w->current_libraries) > 0) {
+		uint64_t task_id;
+		struct vine_task *t;
+		ITABLE_ITERATE(w->current_libraries, task_id, t)
+		{
+			if (t->function_slots_inuse < t->function_slots_total) {
+				return 1;
+			}
+		}
+	}
+
+	/* Check if there are free resources for tasks except function calls */
+	int cores_committable = w->resources->cores.total > 0 && (w->resources->cores.inuse < overcommitted_resource_total(q, w->resources->cores.total));
+	int gpus_committable = w->resources->gpus.total > 0 && (w->resources->gpus.inuse < overcommitted_resource_total(q, w->resources->gpus.total));
+	int memory_committable = w->resources->memory.total > 0 && (w->resources->memory.inuse < overcommitted_resource_total(q, w->resources->memory.total));
+	int disk_committable = w->resources->disk.total > 0 && (w->resources->disk.inuse < overcommitted_resource_total(q, w->resources->disk.total));
+
+	/* A regular task has to use both memory and disk */
+	if (memory_committable && disk_committable) {
+		/* A regular task can use either cores or gpus */
+		if (cores_committable || gpus_committable) {
+			return 1;
+		}
+	}
+
+	/* If reach here, no free slots for function calls, and no committable resources for other tasks. */
+	return 0;
+}
+
 /* Check if this task is compatible with this given worker by considering
  * resources availability, features, blocklist, and all other relevant factors.
  * Used by all scheduling methods for basic compatibility.
@@ -172,6 +210,7 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 	if (w->draining) {
 		return 0;
 	}
+
 	// if worker's end time has not been received
 	if (w->end_time < 0) {
 		return 0;
@@ -192,6 +231,11 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 
 	/* Check if worker is blocked from the manager. */
 	if (vine_blocklist_is_blocked(q, w->hostname)) {
+		return 0;
+	}
+
+	/* if worker has free resources to use */
+	if (!check_worker_have_committable_resources(q, w)) {
 		return 0;
 	}
 
