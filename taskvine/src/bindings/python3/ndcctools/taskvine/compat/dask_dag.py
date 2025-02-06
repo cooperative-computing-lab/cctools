@@ -58,7 +58,7 @@ class DaskVineDag:
         except TypeError:
             return False
 
-    def __init__(self, dsk, low_memory_mode=False):
+    def __init__(self, dsk, low_memory_mode=False, prune_depth=0):
         self._dsk = dsk
 
         # child -> parents. I.e., which parents needs the result of child
@@ -73,9 +73,6 @@ class DaskVineDag:
         # key->value of its computation
         self._result_of = {}
 
-        # child -> nodes that use the child as an input, and that have not been completed
-        self._pending_parents_of = defaultdict(lambda: set())
-
         # key->depth. The shallowest level the key is found
         self._depth_of = defaultdict(lambda: float('inf'))
 
@@ -85,6 +82,10 @@ class DaskVineDag:
         self._working_graph = dict(dsk)
         if low_memory_mode:
             self._flatten_graph()
+
+        self.prune_depth = prune_depth
+        self.pending_consumers = defaultdict(int)
+        self.pending_producers = defaultdict(lambda: set())
 
         self.initialize_graph()
 
@@ -102,6 +103,11 @@ class DaskVineDag:
     def initialize_graph(self):
         for key, sexpr in self._working_graph.items():
             self.set_relations(key, sexpr)
+
+        # Then initialize pending consumers if pruning is enabled
+        if self.prune_depth > 0:
+            self._initialize_pending_consumers()
+            self._initialize_pending_producers()
 
     def find_dependencies(self, sexpr, depth=0):
         dependencies = set()
@@ -123,7 +129,53 @@ class DaskVineDag:
 
         for c in self._children_of[key]:
             self._parents_of[c].add(key)
-            self._pending_parents_of[c].add(key)
+
+    def _initialize_pending_consumers(self):
+        """Initialize pending consumers counts based on prune_depth"""
+        for key in self._working_graph:
+            if key not in self.pending_consumers:
+                count = 0
+                # BFS to count consumers up to prune_depth
+                visited = set()
+                queue = [(c, 1) for c in self._parents_of[key]]  # (consumer, depth)
+
+                while queue:
+                    consumer, depth = queue.pop(0)
+                    if depth <= self.prune_depth and consumer not in visited:
+                        visited.add(consumer)
+                        count += 1
+
+                        # Add next level consumers if we haven't reached max depth
+                        if depth < self.prune_depth:
+                            next_consumers = [(c, depth + 1) for c in self._parents_of[consumer]]
+                            queue.extend(next_consumers)
+
+                self.pending_consumers[key] = count
+
+    def _initialize_pending_producers(self):
+        """Initialize pending producers based on prune_depth"""
+        if self.prune_depth <= 0:
+            return
+
+        for key in self._working_graph:
+            # Use set to store unique producers
+            producers = set()
+            visited = set()
+            queue = [(p, 1) for p in self._children_of[key]]  # (producer, depth)
+
+            while queue:
+                producer, depth = queue.pop(0)
+                if depth <= self.prune_depth and producer not in visited:
+                    visited.add(producer)
+                    producers.add(producer)
+
+                    # Add next level producers if we haven't reached max depth
+                    if depth < self.prune_depth:
+                        next_producers = [(p, depth + 1) for p in self._children_of[producer]]
+                        queue.extend(next_producers)
+
+            # Store all producers for this key in pending_producers
+            self.pending_producers[key] = producers
 
     def get_ready(self):
         """ List of [(key, sexpr),...] ready for computation.
@@ -148,6 +200,7 @@ class DaskVineDag:
         of computations that become ready to be executed """
         rs = {}
         self._result_of[key] = value
+
         for p in self._parents_of[key]:
             self._missing_of[p].discard(key)
 
@@ -163,9 +216,6 @@ class DaskVineDag:
                 rs.update(self.set_result(p, sexpr))
             else:
                 rs[p] = (p, sexpr)
-
-        for c in self._children_of[key]:
-            self._pending_parents_of[c].discard(key)
 
         return rs.values()
 
@@ -227,9 +277,6 @@ class DaskVineDag:
 
     def get_parents(self, key):
         return self._parents_of[key]
-
-    def get_pending_parents(self, key):
-        return self._pending_parents_of[key]
 
     def set_targets(self, keys):
         """ Values of keys that need to be computed. """
