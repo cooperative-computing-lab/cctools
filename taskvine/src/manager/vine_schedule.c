@@ -149,16 +149,6 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 	return ok;
 }
 
-/* Check if any of the resources is defined and committable on a given worker.
- * @param q         Manager info structure
- * @param resource  @vine_resources.h:struct vine_resources
- * @return 1 if the resource type is defined and can be allocated to a task, 0 otherwise.
- */
-static int is_resource_committable(struct vine_manager *q, struct vine_resource resource)
-{
-	return resource.total > 0 && resource.inuse < overcommitted_resource_total(q, resource.total);
-}
-
 /* Check if this worker has committable resources for any type of task.
  * If it returns false, neither a function task, library task nor a regular task can run on this worker.
  * If it returns true, the worker has either free slots for function calls or sufficient resources for regular tasks.
@@ -167,25 +157,33 @@ static int is_resource_committable(struct vine_manager *q, struct vine_resource 
  */
 static int check_worker_have_committable_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
-	/* If any slots are committable */
-	uint64_t task_id;
-	struct vine_task *t;
-	ITABLE_ITERATE(w->current_libraries, task_id, t)
-	{
-		if (t->function_slots_inuse < t->function_slots_total) {
-			return 1;
+	/* Check if there are free slots on any of the running libraries */
+	if (w->current_libraries && itable_size(w->current_libraries) > 0) {
+		uint64_t task_id;
+		struct vine_task *t;
+		ITABLE_ITERATE(w->current_libraries, task_id, t)
+		{
+			if (t->function_slots_inuse < t->function_slots_total) {
+				return 1;
+			}
 		}
 	}
+
+	/* Check if there are free resources for tasks except function calls */
+	int cores_committable = w->resources->cores.total > 0 && (w->resources->cores.inuse < overcommitted_resource_total(q, w->resources->cores.total));
+	int gpus_committable = w->resources->gpus.total > 0 && (w->resources->gpus.inuse < overcommitted_resource_total(q, w->resources->gpus.total));
+	int memory_committable = w->resources->memory.total > 0 && (w->resources->memory.inuse < overcommitted_resource_total(q, w->resources->memory.total));
+	int disk_committable = w->resources->disk.total > 0 && (w->resources->disk.inuse < overcommitted_resource_total(q, w->resources->disk.total));
 
 	/* A regular task has to use both memory and disk */
-	if (is_resource_committable(q, w->resources->memory) && is_resource_committable(q, w->resources->disk)) {
-		/* If either cores or gpus are committable. */
-		if (is_resource_committable(q, w->resources->cores) || is_resource_committable(q, w->resources->gpus)) {
+	if (memory_committable && disk_committable) {
+		/* A regular task can use either cores or gpus */
+		if (cores_committable || gpus_committable) {
 			return 1;
 		}
 	}
 
-	/* If reach here, no free resources on this worker */
+	/* If reach here, no free slots for function calls, and no committable resources for other tasks. */
 	return 0;
 }
 
