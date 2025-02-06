@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 
 static char *vine_runtime_info_path = "vine-run-info";
+static char *vine_runtime_info_template = "%Y-%m-%dT%H%M%S";
 
 static struct list *known_staging_dirs = NULL;
 
@@ -58,10 +59,12 @@ char *vine_runtime_directory_create()
 	/* runtime directories are created at vine_runtime_info_path, which defaults
 	 * to "vine-run-info" of the current working directory.
 	 * Each workflow run has its own directory of the form: %Y-%m-%dT%H%M%S,
-	 * but this can be changed with VINE_RUNTIME_INFO_DIR.
+	 * but this can be changed with vine_set_runtime_info_template(...).
 	 *
-	 * If VINE_RUNTIME_INFO_DIR is not an absolute path, then it is
-	 * interpreted as a suffix to vine_runtime_info_path.
+	 * If the value set by vine_runtime_info_template(...) is not an absolute path, then it is
+	 * interpreted as a suffix to vine_set_runtime_info_path.
+	 *
+	 * The value of the directory created is setenv to VINE_RUNTIME_INFO_DIR.
 	 *
 	 * VINE_RUNTIME_INFO_DIR has the subdirectories: logs and staging
 	 *
@@ -71,17 +74,14 @@ char *vine_runtime_directory_create()
 
 	char *runtime_dir = NULL;
 	int symlink_most_recent = 0;
-	if (getenv("VINE_RUNTIME_INFO_DIR")) {
-		runtime_dir = xxstrdup(getenv("VINE_RUNTIME_INFO_DIR"));
-	} else {
-		char buf[20];
-		time_t now = time(NULL);
-		struct tm *tm_info = localtime(&now);
-		strftime(buf, sizeof(buf), "%Y-%m-%dT%H%M%S", tm_info);
-		runtime_dir = xxstrdup(buf);
 
-		symlink_most_recent = 1;
-	}
+	char buf[20];
+	time_t now = time(NULL);
+	struct tm *tm_info = localtime(&now);
+	strftime(buf, sizeof(buf), vine_runtime_info_template, tm_info);
+	runtime_dir = xxstrdup(buf);
+
+	symlink_most_recent = 1;
 
 	if (strncmp(runtime_dir, "/", 1)) {
 		char *tmp = path_concat(vine_runtime_info_path, runtime_dir);
@@ -162,4 +162,10 @@ void vine_set_runtime_info_path(const char *path)
 {
 	assert(path);
 	vine_runtime_info_path = xxstrdup(path);
+}
+
+void vine_set_runtime_info_template(const char *template)
+{
+	assert(template);
+	vine_runtime_info_template = xxstrdup(template);
 }

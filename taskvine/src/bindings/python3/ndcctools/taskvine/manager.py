@@ -65,7 +65,8 @@ class Manager(object):
     # @param port       The port number to listen on. If zero, then a random port is chosen. A range of possible ports (low, hight) can be also specified instead of a single integer. Default is 9123
     # @param name       The project name to use.
     # @param shutdown   Automatically shutdown workers when manager is finished. Disabled by default.
-    # @param run_info_path Directory to write log (and staging if staging_path not given) files per run. If None, defaults to "vine-run-info"
+    # @param run_info_path      Directory to archive workflow log directories, it is the upper level directory to run_info_template. If None, defaults to "vine-run-info"
+    # @param run_info_template  See run_info_path. If None, defaults by a %Y-%m-%dT%H%M%S format.
     # @param staging_path Directory to write temporary files. Defaults to run_info_path if not given.
     # @param ssl        A tuple of filenames (ssl_key, ssl_cert) in pem format, or True.
     #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
@@ -78,6 +79,7 @@ class Manager(object):
                  name=None,
                  shutdown=False,
                  run_info_path="vine-run-info",
+                 run_info_template=None,
                  staging_path=None,
                  ssl=None,
                  init_fn=None,
@@ -111,8 +113,13 @@ class Manager(object):
             self._info_widget = JupyterDisplay(interval=status_display_interval)
 
         try:
+            # Set an internal variable in the C code.
+            # No need to unset it explicitly as it doesn't rely on environment variables.
             if run_info_path:
-                self.set_runtime_info_path(run_info_path)
+                cvine.vine_set_runtime_info_path(run_info_path)
+
+            if run_info_template:
+                cvine.vine_set_runtime_info_template(run_info_template)
 
             self._stats = cvine.vine_stats()
             self._stats_hierarchy = cvine.vine_stats()
@@ -553,14 +560,6 @@ class Manager(object):
     # @param value The value of the property.
     def set_property(self, name, value):
         cvine.vine_set_property(self._taskvine, name, value)
-
-    ##
-    # Specify a directory to write logs and staging files.
-    #
-    # @param self     Reference to the current manager object.
-    # @param dirname  A directory name
-    def set_runtime_info_path(self, dirname):
-        cvine.vine_set_runtime_info_path(dirname)
 
     ##
     # Add a mandatory password that each worker must present.
