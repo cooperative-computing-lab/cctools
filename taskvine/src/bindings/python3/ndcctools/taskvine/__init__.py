@@ -71,23 +71,16 @@ try:
     vd = Version(dask.__version__)
     vr = Version("2024.12.0")
     if vd < vr:
-        warnings.warn("ndcctools.taskvine.DaskVine only works with dask version >= 2024.12.0", DaskVineWarning)
+        raise ImportError
 
     from .dask_executor import DaskVine
     from .dask_dag import DaskVineDag
-except ImportError as e:
-    warnings.warn(f"DaskVine not available. Couldn't find module: {e.name}", DaskVineWarning)
+except ImportError:
+    warnings.warn("Dask >= 2024.12.0 not available, using DaskVine legacy task graph representation.", DaskVineWarning)
 
-    ##
-    # DaskVine compatibility class.
-    # See @ref dask_executor.DaskVine
-    class DaskVine:
-        exception = ImportError()
+    from .compat import DaskVine
+    from .compat import DaskVineDag
 
-        def __init__(*args, **kwargs):
-            raise DaskVine.exception
-
-    DaskVine.exception = e
 
 __all__ = [
     "Manager",
