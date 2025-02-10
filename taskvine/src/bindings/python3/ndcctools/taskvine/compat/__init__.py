@@ -35,7 +35,7 @@ try:
 
     if vd >= vr:
         warnings.warn("ndcctools.taskvine.compat only works with dask version < 2024.12.0")
-except ImportError:
+except (ImportError, ModuleNotFoundError):
     pass
 
 

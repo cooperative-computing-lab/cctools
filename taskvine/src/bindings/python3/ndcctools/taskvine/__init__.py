@@ -75,7 +75,7 @@ try:
 
     from .dask_executor import DaskVine
     from .dask_dag import DaskVineDag
-except ImportError:
+except (ImportError, ModuleNotFoundError):
     warnings.warn("Dask >= 2024.12.0 not available, using DaskVine legacy task graph representation.", DaskVineWarning)
 
     from .compat import DaskVine
