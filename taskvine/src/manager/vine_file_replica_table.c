@@ -22,6 +22,10 @@ See the file COPYING for details.
 // add a file to the remote file table.
 int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_info *w, const char *cachename, struct vine_file_replica *replica)
 {
+	if (hash_table_lookup(w->current_files, cachename)) {
+		return 0;
+	}
+
 	w->inuse_cache += replica->size;
 	hash_table_insert(w->current_files, cachename, replica);
 
@@ -39,6 +43,10 @@ int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_in
 // remove a file from the remote file table.
 struct vine_file_replica *vine_file_replica_table_remove(struct vine_manager *m, struct vine_worker_info *w, const char *cachename)
 {
+	if (!hash_table_lookup(w->current_files, cachename)) {
+		return 0;
+	}
+
 	struct vine_file_replica *replica = hash_table_remove(w->current_files, cachename);
 	if (replica) {
 		w->inuse_cache -= replica->size;
