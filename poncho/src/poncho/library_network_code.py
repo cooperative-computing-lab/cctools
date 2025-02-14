@@ -50,7 +50,7 @@ class LibraryResponse:
 
 # A wrapper around functions in library to extract arguments and formulate responses.
 def remote_execute(func):
-    def remote_wrapper(event):
+    def wrapped(event):
         args = event.get("fn_args", [])
         kwargs = event.get("fn_kwargs", {})
 
@@ -74,6 +74,11 @@ def remote_execute(func):
             success = False
             reason = traceback.format_exc()
         return LibraryResponse(result, success, reason).generate()
+
+    def remote_wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+
+    remote_wrapper.wrapped = wrapped
 
     return remote_wrapper
 
@@ -135,7 +140,7 @@ def start_function(in_pipe_fd, thread_limit=1):
                     event = cloudpickle.load(f)
 
                 # output of execution should be dumped to outfile.
-                result = globals()[function_name](event)
+                result = globals()[function_name].wrapped(event)
                 try:
                     with open("outfile", "wb") as f:
                         cloudpickle.dump(result, f)
@@ -194,7 +199,7 @@ def start_function(in_pipe_fd, thread_limit=1):
                         # otherwise use the library's stdout
                         os.dup2(function_stdout_fd, sys.stdout.fileno())
                         os.dup2(function_stdout_fd, sys.stderr.fileno())
-                        result = globals()[function_name](event)
+                        result = globals()[function_name].wrapped(event)
 
                         # restore to the library's stdout fd on completion
                         os.dup2(library_fd, sys.stdout.fileno())
