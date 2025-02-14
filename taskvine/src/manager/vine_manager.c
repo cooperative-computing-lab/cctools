@@ -2519,8 +2519,9 @@ static vine_result_code_t handle_worker(struct vine_manager *q, struct link *l)
 	free(key);
 
 	/* This should not happen, but just in case: */
-	if(!w) return VINE_WORKER_FAILURE;
-		       
+	if (!w)
+		return VINE_WORKER_FAILURE;
+
 	vine_msg_code_t mcode;
 	mcode = vine_manager_recv_no_retry(q, w, line, sizeof(line));
 
