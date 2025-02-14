@@ -156,7 +156,7 @@ class Manager(object):
         try:
             if self._taskvine:
                 if self._shutdown:
-                    self.shutdown_workers(0)
+                    self.workers_shutdown(0)
                 self._update_status_display(force=True)
                 cvine.vine_delete(self._taskvine)
                 self._taskvine = None
