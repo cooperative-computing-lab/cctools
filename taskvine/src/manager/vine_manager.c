@@ -888,6 +888,15 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 			replica = vine_file_replica_table_remove(q, w, cached_name);
 			if (replica) {
 				vine_file_replica_delete(replica);
+
+				// recreate tmps lost with this worker if needed
+				if (q->immediate_recovery) {
+					if (f && f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED) {
+						if (!vine_file_replica_table_exists_somewhere(q, f->cached_name)) {
+							vine_manager_consider_recovery_task(q, f, f->recovery_task);
+						}
+					}
+				}
 			}
 		}
 	}
@@ -916,11 +925,6 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 
 		/* Remove the unfinished task and update data structures. */
 		reap_task_from_worker(q, w, t, VINE_TASK_READY);
-
-		// recreate inputs lost
-		if (q->immediate_recovery) {
-			vine_manager_check_inputs_available(q, t);
-		}
 
 		vine_task_clean(t);
 
