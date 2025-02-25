@@ -19,6 +19,7 @@ typedef struct {
 	int num_reads;
 	int num_writes;
 	int num_stat;
+	int flags;
 } table_entry;
 
 
@@ -38,9 +39,10 @@ void __attribute__((destructor)) filetrace_exit() {
 
 void file_table_event_open(int fd, const char *pathname, int flags) {
 	if(!itable_lookup(file_table, fd)){
-		table_entry *e = malloc(sizeof(table_entry));
+		table_entry *e = calloc(1, sizeof(table_entry));
 		e->num_open = 1;
-		e->pathname = strdup(pathname); 
+		e->pathname = strdup(pathname);
+	        e->flags = flags;	
 		itable_insert(file_table, fd, e);
 	} else {
 		table_entry *e = itable_lookup(file_table, fd);
@@ -50,23 +52,37 @@ void file_table_event_open(int fd, const char *pathname, int flags) {
 
 FILE *fopen(const char *pathname, const char *mode) {
 	fopen_t real_fopen = dlsym(RTLD_NEXT, "fopen");
-	return real_fopen(pathname,mode);
+	FILE *f = real_fopen(pathname,mode);
+	if(f){
+		file_table_event_open(fileno(f), pathname, 0);
+	}
+	return f;
 }
 
 int open(const char *pathname, int flags) {
 	open_t real_open = dlsym(RTLD_NEXT, "open");
 	int fd = real_open(pathname,flags);
-	file_table_event_open(fd, pathname, flags);
+	file_table_event_open(fd, pathname, 1);
 	return fd;
 }
 
 ssize_t read(int fd, void *buf, size_t count){
 	rw_t real_read = dlsym(RTLD_NEXT, "read");
+	table_entry *e = itable_lookup(file_table, fd);
+	if(e){
+		e->num_reads += 1;
+		e->bytes_read += count;
+	}
 	return real_read(fd, buf, count);
 }
 
 ssize_t write(int fd, void *buf, size_t count){
 	rw_t real_write = dlsym(RTLD_NEXT, "write");
+	table_entry *e = itable_lookup(file_table, fd);
+	if(e){
+		e->num_writes += 1;
+		e->bytes_write += count;
+	}
 	return real_write(fd, buf, count);
 }
 
@@ -86,8 +102,13 @@ void print_file_table(struct itable *t){
 	uint64_t fd;
 	table_entry *e;
 	ITABLE_ITERATE(t, fd, e){
-		printf("File Descriptor: %d\n", fd);
+		printf("File Descriptor: %ld\n", fd);
 		printf("\tpathname: %s\n", e->pathname);
-		printf("\tnum_open: %d\n\n", e->num_open);
+		printf("\tnum_open: %d\n", e->num_open);
+		printf("\tnum_read: %d\n", e->num_reads);
+		printf("\tnum_write: %d\n", e->num_writes);
+		printf("\tbytes_read: %d\n", e->bytes_read);
+		printf("\tbytes_written: %d\n", e->bytes_write);
+		printf("\topened with: %s\n\n", e->flags ? "fopen" : "open");
 	}
 }
