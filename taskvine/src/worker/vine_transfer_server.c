@@ -68,12 +68,26 @@ static void vine_transfer_process(struct vine_cache *cache)
 	static int child_count = 0;
 
 	/*
-	If link is real, fork. Check if we are at the max
-	child count. If we are over, or link_accept timed out,
-	do a blocking wait on an exited child. If we are under
-	the limit, collect all exited tasks and return to recv
+		1. Perform a non-blocking check for any child processes that have exited, this runs very fast.
+		2. If the number of child processes has reached the maximum allowed, perform a blocking wait for a child process to exit.
+		3. Once arrives here, the server is safe to accept a new connection, as the child_count is less than the maximum allowed.
+		4. Upon accepting a connection, fork a new child process to handle it; if timeout, simply continue.
+		5. lnk should be closed in the parent process to prevent file descriptor exhaustion.
 	*/
 	while (1) {
+		/* Do a non-blocking wait for any exited children. */
+		while (waitpid(-1, NULL, WNOHANG) > 0) {
+			child_count--;
+		}
+		/* If the child count is at the maximum allowed, do a blocking wait for an exited child. */
+		if (child_count >= VINE_TRANSFER_PROC_MAX_CHILD) {
+			debug(D_VINE, "Transfer Server: waiting on exited child. Reached %d", child_count);
+			if (waitpid(-1, NULL, 0) > 0) {
+				child_count--;
+			}
+		}
+
+		/* The server is safe to accept a new connection. */
 		struct link *lnk = link_accept(transfer_link, time(0) + 10);
 
 		if (lnk) {
@@ -88,26 +102,14 @@ static void vine_transfer_process(struct vine_cache *cache)
 				/* Also close the link in the parent process, otherwise the opened file descriptors will not be closed.
 			     * This caused a problem where incoming transfers were all failing due to the file descriptor limit per process being reached. */
 				link_close(lnk);
-				/* If the child count is less than the maximum allowed, wait for any exited children and decrement the child count. */
-				if (child_count < VINE_TRANSFER_PROC_MAX_CHILD) {
-					while (waitpid(-1, NULL, WNOHANG) > 0) {
-						child_count--;
-					}
-					continue;
-				}
 			} else {
-				/* If fork fails, close the link. */
-				debug(D_VINE, "fork failed: %s", strerror(errno));
+				/* If fork fails, also close the link. */
 				link_close(lnk);
 			}
 		} else {
 			/* If lnk is NULL, it means link_accept failed to accept a connection.
 			 * This could be due to a timeout or other transient issues. */
-		}
-
-		debug(D_VINE, "Transfer Server: waiting on exited child. Reached %d", child_count);
-		if (waitpid(-1, NULL, 0) > 0) {
-			child_count--;
+			 continue;
 		}
 	}
 }
