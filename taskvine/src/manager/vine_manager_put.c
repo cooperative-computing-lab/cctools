@@ -427,7 +427,7 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 	if (replica) {
 		if (f->cache_level < VINE_CACHE_LEVEL_WORKFLOW) {
 			debug(D_VINE, "File %s is not marked as a cachable file, but it is used by more than one task. Marking as cachable.", f->source);
-			f->flags |= VINE_CACHE_LEVEL_WORKFLOW;
+			f->cache_level = VINE_CACHE_LEVEL_WORKFLOW;
 		}
 
 		return VINE_SUCCESS;
