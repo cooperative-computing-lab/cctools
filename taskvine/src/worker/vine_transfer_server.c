@@ -80,7 +80,7 @@ static void vine_transfer_process(struct vine_cache *cache)
 			child_count--;
 		}
 		/* If the child count is at the maximum allowed, do a blocking wait for an exited child. */
-		if (child_count >= VINE_TRANSFER_PROC_MAX_CHILD) {
+		while (child_count >= VINE_TRANSFER_PROC_MAX_CHILD) {
 			debug(D_VINE, "Transfer Server: waiting on exited child. Reached %d", child_count);
 			if (waitpid(-1, NULL, 0) > 0) {
 				child_count--;
