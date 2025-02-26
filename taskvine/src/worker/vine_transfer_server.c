@@ -100,7 +100,7 @@ static void vine_transfer_process(struct vine_cache *cache)
 				/* Increment the child count when a new child is successfully forked. */
 				child_count++;
 				/* Also close the link in the parent process, otherwise the opened file descriptors will not be closed.
-			     * This caused a problem where incoming transfers were all failing due to the file descriptor limit per process being reached. */
+				 * This caused a problem where incoming transfers were all failing due to the file descriptor limit per process being reached. */
 				link_close(lnk);
 			} else {
 				/* If fork fails, also close the link. */
@@ -109,7 +109,7 @@ static void vine_transfer_process(struct vine_cache *cache)
 		} else {
 			/* If lnk is NULL, it means link_accept failed to accept a connection.
 			 * This could be due to a timeout or other transient issues. */
-			 continue;
+			continue;
 		}
 	}
 }
