@@ -96,7 +96,7 @@ static void vine_transfer_process(struct vine_cache *cache)
 					continue;
 				}
 			} else {
-				/* If fork fails, log the error and close the link. */
+				/* If fork fails, close the link. */
 				debug(D_VINE, "fork failed: %s", strerror(errno));
 				link_close(lnk);
 			}
