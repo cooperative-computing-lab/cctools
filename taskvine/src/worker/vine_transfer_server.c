@@ -68,11 +68,11 @@ static void vine_transfer_process(struct vine_cache *cache)
 	static int child_count = 0;
 
 	/*
-		1. Perform a non-blocking check for any child processes that have exited, this runs very fast.
-		2. If the number of child processes has reached the maximum allowed, perform a blocking wait for a child process to exit.
-		3. Once arrives here, the server is safe to accept a new connection, as the child_count is less than the maximum allowed.
-		4. Upon accepting a connection, fork a new child process to handle it; if timeout, simply continue.
-		5. lnk should be closed in the parent process to prevent file descriptor exhaustion.
+	1. Perform a non-blocking check for any child processes that have exited, this runs very fast.
+	2. If the number of child processes has reached the maximum allowed, perform a blocking wait for a child process to exit.
+	3. Once arrives here, the server is safe to accept a new connection, as the child_count is less than the maximum allowed.
+	4. Upon accepting a connection, fork a new child process to handle it; if timeout, simply continue.
+	5. lnk should be closed in the parent process to prevent file descriptor exhaustion.
 	*/
 	while (1) {
 		/* Do a non-blocking wait for any exited children. */
