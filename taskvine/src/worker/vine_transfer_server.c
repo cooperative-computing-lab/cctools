@@ -76,26 +76,33 @@ static void vine_transfer_process(struct vine_cache *cache)
 	while (1) {
 		struct link *lnk = link_accept(transfer_link, time(0) + 10);
 
-		child_count++;
-		pid_t p = fork();
-		if (p == 0) {
-			if (lnk) {
+		if (lnk) {
+			pid_t p = fork();
+			if (p == 0) {
 				vine_transfer_handler(lnk, cache);
 				link_close(lnk);
-			}
-			_exit(0);
-		} else {
-			/* Also close the link in the parent process, otherwise the opened file descriptors will not be closed.
-			 * This caused a problem where incoming transfers were all failing due to the file descriptor limit per process being reached. */
-			if (lnk) {
+				_exit(0);
+			} else if (p > 0) {
+				/* Increment the child count when a new child is successfully forked. */
+				child_count++;
+				/* Also close the link in the parent process, otherwise the opened file descriptors will not be closed.
+			     * This caused a problem where incoming transfers were all failing due to the file descriptor limit per process being reached. */
+				link_close(lnk);
+				/* If the child count is less than the maximum allowed, wait for any exited children and decrement the child count. */
+				if (child_count < VINE_TRANSFER_PROC_MAX_CHILD) {
+					while (waitpid(-1, NULL, WNOHANG) > 0) {
+						child_count--;
+					}
+					continue;
+				}
+			} else {
+				/* If fork fails, log the error and close the link. */
+				debug(D_VINE, "fork failed: %s", strerror(errno));
 				link_close(lnk);
 			}
-			if (child_count < VINE_TRANSFER_PROC_MAX_CHILD) {
-				while (waitpid(-1, NULL, WNOHANG) > 0) {
-					child_count--;
-				}
-				continue;
-			}
+		} else {
+			/* If lnk is NULL, it means link_accept failed to accept a connection.
+			 * This could be due to a timeout or other transient issues. */
 		}
 
 		debug(D_VINE, "Transfer Server: waiting on exited child. Reached %d", child_count);
