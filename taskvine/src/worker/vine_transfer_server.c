@@ -85,6 +85,11 @@ static void vine_transfer_process(struct vine_cache *cache)
 			}
 			_exit(0);
 		} else {
+			/* Also close the link in the parent process, otherwise the opened file descriptors will not be closed.
+			 * This caused a problem where incoming transfers were all failing due to the file descriptor limit per process being reached. */
+			if (lnk) {
+				link_close(lnk);
+			}
 			if (child_count < VINE_TRANSFER_PROC_MAX_CHILD) {
 				while (waitpid(-1, NULL, WNOHANG) > 0) {
 					child_count--;
