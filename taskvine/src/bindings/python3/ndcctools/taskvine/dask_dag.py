@@ -119,9 +119,9 @@ class DaskVineDag:
             if self.has_result(key) or cs:
                 continue
             node = self._working_graph[key]
-            if self.taskref(node):
+            if DaskVineDag.taskref(node):
                 rs.update(self.set_result(key, self.get_result(node.key)))
-            elif self.symbolp(node):
+            elif DaskVineDag.symbolp(node):
                 rs.update(self.set_result(key, node))
             else:
                 rs[key] = node
@@ -147,11 +147,11 @@ class DaskVineDag:
                 continue
 
             node = self._working_graph[p]
-            if self.taskref(node):
+            if DaskVineDag.taskref(node):
                 rs.update(
                     self.set_result(p, self.get_result(node))
                 )  # case e.g, "x": "y", and we just set the value of "y"
-            elif self.symbolp(node):
+            elif DaskVineDag.symbolp(node):
                 rs.update(self.set_result(p, node))
             else:
                 rs[p] = node
@@ -169,14 +169,14 @@ class DaskVineDag:
 
     def _add_second_targets(self, key):
         v = self._working_graph[key]
-        if self.taskref(v):
+        if DaskVineDag.taskref(v):
             lst = [v]
         elif DaskVineDag.containerp(v):
             lst = v
         else:
             return
         for c in lst:
-            if self.taskref(c):
+            if DaskVineDag.taskref(c):
                 self._targets.add(c.key)
                 self._add_second_targets(c.key)
 
