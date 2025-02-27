@@ -149,7 +149,7 @@ class DaskVineDag:
             node = self._working_graph[p]
             if DaskVineDag.taskref(node):
                 rs.update(
-                    self.set_result(p, self.get_result(node))
+                    self.set_result(p, self.get_result(node.key))
                 )  # case e.g, "x": "y", and we just set the value of "y"
             elif DaskVineDag.symbolp(node):
                 rs.update(self.set_result(p, node))
