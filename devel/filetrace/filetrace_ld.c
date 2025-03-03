@@ -6,7 +6,8 @@
 #include "itable.h"
 
 typedef FILE *(*fopen_t)(const char *p, const char *m);
-typedef int (*open_t)(const char *p, int f, ...);
+typedef int (*open_t)(const char *p, int f, int mode);
+//typedef int (*open_t)(const char *p, int f, ...);
 typedef ssize_t(*rw_t)(int fd, void *b, ssize_t c);
 typedef int (*stat_t)(const char *p, void *s);
 typedef int (*fstat_t)(int fd, void *s);
@@ -69,11 +70,21 @@ FILE *fopen(const char *pathname, const char *mode) {
 	return f;
 }
 
-inline __attribute__((always_inline)) int open(const char *pathname, int flags, ...) {
+//inline __attribute__((always_inline)) int open(const char *pathname, int flags, ...) {
+//	open_t real_open = dlsym(RTLD_NEXT, "open");
+//	int fd = real_open(pathname, flags, __builtin_va_arg_pack());
+//	
+//	/* The table may not exist inside the constructors of other shared libraries */
+//	if(file_table){
+//		file_table_event_open(fd, pathname, 1);
+//	}
+//	return fd;
+//}
+
+int open(const char *pathname, int flags, int mode) {
 	open_t real_open = dlsym(RTLD_NEXT, "open");
-	int fd = real_open(pathname, flags, __builtin_va_arg_pack());
-	
-	/* The table may not exist inside the constructors of other shared libraries */
+	int fd = real_open(pathname, flags, mode);
+
 	if(file_table){
 		file_table_event_open(fd, pathname, 1);
 	}
@@ -129,7 +140,7 @@ int fstat(int fd, void *statbuf){
 }
 
 void log_file_table_plain(struct itable *t){
-	FILE *log = fopen("filetrace_log", "w");
+	FILE *log = fopen("filetrace_log", "a");
 
 	fprintf(log, "Filetrace Summary\n");
 	uint64_t fd;
@@ -149,7 +160,7 @@ void log_file_table_plain(struct itable *t){
 }
 
 void log_file_table_json(struct itable *t){
-	FILE *log = fopen("filetrace_log.json", "w");
+	FILE *log = fopen("filetrace_log.json", "a");
 	//flock_t flock = dlsym(RTLD_NEXT, "flock");
 
 	
