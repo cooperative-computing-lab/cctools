@@ -219,7 +219,8 @@ int vine_current_transfers_wipe_worker(struct vine_manager *q, struct vine_worke
 
 	char *id;
 	struct vine_transfer_pair *t;
-	HASH_TABLE_ITERATE(q->current_transfer_table, id, t) {
+	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
+	{
 		if (t->to == w || t->source_worker == w) {
 			ids_to_remove[n_ids] = xxstrdup(id);
 			n_ids++;
