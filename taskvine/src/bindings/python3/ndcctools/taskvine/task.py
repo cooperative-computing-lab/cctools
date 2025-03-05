@@ -1041,13 +1041,16 @@ class PythonTask(Task):
                                         except Exception as e:
                                             exec_out = e
                                             error = e
-                                        finally:
+                                        else:
                                             with open(out, "wb") as f:
                                                 if {serialize}:
                                                     cloudpickle.dump(exec_out, f)
                                                 else:
                                                     f.write(exec_out)
+                                        finally:
                                             if error:
+                                                import traceback
+                                                traceback.print_exc()
                                                 raise error
                                         """))
                 manager._function_buffers[base] = manager.declare_file(name, cache=True)
