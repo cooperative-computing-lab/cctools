@@ -38,8 +38,6 @@
 # - @ref ndcctools.taskvine.dask_executor.DaskVine "vine.DaskVine"
 #
 
-import warnings
-
 from .manager import (
     Manager,
     Factory,
