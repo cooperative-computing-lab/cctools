@@ -38,8 +38,6 @@
 # - @ref ndcctools.taskvine.dask_executor.DaskVine "vine.DaskVine"
 #
 
-import warnings
-
 from .manager import (
     Manager,
     Factory,
@@ -76,8 +74,6 @@ try:
     from .dask_executor import DaskVine
     from .dask_dag import DaskVineDag
 except (ImportError, ModuleNotFoundError):
-    warnings.warn("Dask >= 2024.12.0 not available, using DaskVine legacy task graph representation.", DaskVineWarning)
-
     from .compat import DaskVine
     from .compat import DaskVineDag
 
