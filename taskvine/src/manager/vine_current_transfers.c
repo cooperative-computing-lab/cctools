@@ -214,15 +214,26 @@ int vine_current_transfers_wipe_worker(struct vine_manager *q, struct vine_worke
 		return removed;
 	}
 
+	struct list *ids_to_remove = list_create();
+
 	char *id;
 	struct vine_transfer_pair *t;
 	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
 	{
 		if (t->to == w || t->source_worker == w) {
-			vine_current_transfers_remove(q, id);
-			removed++;
+			list_push_tail(ids_to_remove, xxstrdup(id));
 		}
 	}
+
+	list_first_item(ids_to_remove);
+	char *transfer_id;
+	while ((transfer_id = list_pop_head(ids_to_remove))) {
+		vine_current_transfers_remove(q, transfer_id);
+		free(transfer_id);
+		removed++;
+	}
+
+	list_delete(ids_to_remove);
 
 	return removed;
 }
