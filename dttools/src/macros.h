@@ -39,7 +39,7 @@ See the file COPYING for details.
 #define TERABYTE TERA
 #define PETABYTE PETA
 
-#define BYTES_TO_STORAGE_UNIT(x, unit) (((double) x) / unit)
+#define BYTES_TO_STORAGE_UNIT(x, unit) (ceil(((double) x) / unit))
 #define BYTES_TO_KILOBYTES(x) BYTES_TO_STORAGE_UNIT(x, KILOBYTE)
 #define BYTES_TO_MEGABYTES(x) BYTES_TO_STORAGE_UNIT(x, MEGABYTE)
 #define BYTES_TO_GIGABYTES(x) BYTES_TO_STORAGE_UNIT(x, GIGABYTE)

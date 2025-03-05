@@ -2881,7 +2881,7 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 		w->resources->gpus.inuse += box->gpus;
 	}
 
-	w->resources->disk.inuse += ceil(BYTES_TO_MEGABYTES(w->inuse_cache));
+	w->resources->disk.inuse += BYTES_TO_MEGABYTES(w->inuse_cache);
 }
 
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w)
@@ -5995,7 +5995,7 @@ static void aggregate_workers_resources(
 	}
 
 	// vine_stats wants MB
-	*inuse_cache = (int64_t)ceil(BYTES_TO_MEGABYTES(*inuse_cache));
+	*inuse_cache = (int64_t)BYTES_TO_MEGABYTES(*inuse_cache);
 }
 
 /* This simple wrapper function allows us to hide the debug.h interface from the end user. */
