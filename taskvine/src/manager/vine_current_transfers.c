@@ -11,6 +11,8 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 
 #include "debug.h"
+#include "path.h"
+#include "vine_file_replica_table.h"
 
 struct vine_transfer_pair {
 	struct vine_worker_info *to;
@@ -52,6 +54,19 @@ char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info
 int vine_current_transfers_remove(struct vine_manager *q, const char *id)
 {
 	struct vine_transfer_pair *p;
+	p = hash_table_lookup(q->current_transfer_table, id);
+
+	// remove the pending replica from the worker's file table
+	if (p && p->to && p->source_url) {
+		const char *cachename = path_basename(p->source_url);
+		if (cachename) {
+			struct vine_file_replica *replica = vine_file_replica_table_remove(q, p->to, cachename);
+			if (replica) {
+				vine_file_replica_delete(replica);
+			}
+		}
+	}
+
 	p = hash_table_remove(q->current_transfer_table, id);
 	if (p) {
 		vine_transfer_pair_delete(p);
