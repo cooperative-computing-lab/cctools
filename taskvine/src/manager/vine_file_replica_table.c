@@ -31,10 +31,10 @@ int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_in
 	w->inuse_cache += replica->size;
 	hash_table_insert(w->current_files, cachename, replica);
 
-	double prev_available = w->resources->disk.total - ceil(BYTES_TO_MEGABYTES(w->inuse_cache + replica->size));
+	double prev_available = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache + replica->size);
 	if (prev_available >= m->current_max_worker->disk) {
 		/* the current worker may have been the one with the maximum available space, so we update it. */
-		m->current_max_worker->disk = w->resources->disk.total - ceil(BYTES_TO_MEGABYTES(w->inuse_cache));
+		m->current_max_worker->disk = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
 	}
 
 	struct set *workers = hash_table_lookup(m->file_worker_table, cachename);
