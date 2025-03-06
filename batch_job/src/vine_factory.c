@@ -146,9 +146,10 @@ invoke, so we construct a string and emit it with a low-level write.
 
 static void handle_abort( int sig )
 {
-	const char *msg = "received abort signal, shutting down workers...\n";
+	char *msg = string_format("received signal(%d), shutting down workers...\n", sig);
 	write(1,msg,strlen(msg));
 	abort_flag = 1;
+	free(msg);
 }
 
 static void ignore_signal( int sig )
