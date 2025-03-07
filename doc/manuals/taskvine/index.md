@@ -18,7 +18,7 @@ worker processes.  The application generates a large number of small
 tasks, which are distributed to workers.
 As tasks access external data sources and produce their own outputs,
 more and more data is pulled into local storage on cluster nodes.
-This data is used to accelerate future tasks and avoid re-computing exisiting results.
+This data is used to accelerate future tasks and avoid re-computing existing results.
 The application gradually grows "like a vine" through
 the cluster.
 
@@ -489,14 +489,14 @@ additional setup, depending on the language in use:
 
 #### Python Setup
 
-If you installed via Conda, then no further setup is needed.
+If you installed via conda, then no further setup is needed.
 
-If you are running a Python application and did *not* install via Conda,
+If you are running a Python application and did *not* install via conda,
 then you will need to set the `PYTHONPATH` to point to the cctools
 installation, like this:
 
 ```sh
-# Note: This is only needed if not using Conda:
+# Note: This is only needed if not using conda:
 $ PYVER=$(python -c 'import sys; print("%s.%s" % sys.version_info[:2])')
 $ export PYTHONPATH=${HOME}/cctools/lib/python${PYVER}/site-packages:${PYTHONPATH}
 ```
@@ -699,7 +699,7 @@ We can also create a factory directly in python. Creating a factory object does 
 immediately launch it, so this is a good time to configure the resources,
 number of workers, etc. Factory objects function as Python context managers, so
 to indicate that a set of commands should be run with a factory running, wrap
-them in a with statement. The factory will be cleaned up automtically at the
+them in a with statement. The factory will be cleaned up automatically at the
 end of the block. As an example:
 
 ```python
@@ -793,7 +793,7 @@ If peer transfers have been disabled, they may be re-enabled accordingly:
     ```
 
 Transfers between workers may be impacted by transient issues which may cause intermittent transfer failures. In these situations we take note of the
-failure that occured, and avoid using the same worker as a source for a period of time. This time period has a default value of 15 seconds.
+failure that occurred, and avoid using the same worker as a source for a period of time. This time period has a default value of 15 seconds.
 It may be changed by the user using `vine_tune` with the parameter `transient-error-interval`.
 
 ### MiniTasks
@@ -1003,7 +1003,7 @@ Now we are ready to declare the execution context from its local directory "my_c
     ```
 
 
-##### Apptainer Execution Cpntext From a Mini Task
+##### Apptainer Execution Context From a Mini Task
 
 In the previous section we manually built the directory structure needed for
 the execution context. This is not very flexible, as we need to create one such
@@ -1115,7 +1115,7 @@ openssl rand -hex 32 > vine.password
 ```
 
 This password will be particular to your application, and only managers and
-workers with the same password will be able to interoperator.
+workers with the same password will be able to interoperate.
 Then, modify your manager program to use the password:
 
 === "Python"
@@ -1350,7 +1350,7 @@ with an i686 architecture. These files will be named "my_exe" in the task's
 sandbox, which means that the command line of the tasks does not need to
 change.
 
-Note this feature is specifically designed for specifying and distingushing
+Note this feature is specifically designed for specifying and distinguishing
 input file names for different platforms and architectures. Also, this is
 different from the $VINE_SANDBOX shell environment variable that exports
 the location of the working directory of the worker to its execution
@@ -1496,7 +1496,7 @@ controlling scheduling, managing resources, and setting performance options
 all apply to `PythonTask` as well.
 
 When running a Python function remotely, it is assumed that the Python interpreter
-and libraries available at the worker correspond to the appropiate python environment for the task.
+and libraries available at the worker correspond to the appropriate python environment for the task.
 If this is not the case, an environment file can be provided with t.set_environment:
 
 === "Python"
@@ -1863,8 +1863,8 @@ m.pair(fn, seq1, seq2, chunk_size)
 The **treeReduce** function combines an array using a given function by
 breaking up the array into chunk_sized chunks, computing the results, and returning
 the results to a new array. It then does the same process on the new array until there
-only one element left and then returns it. The given fucntion must accept an iterable,
-and must be an associative fucntion, or else the same result cannot be gaurenteed for
+only one element left and then returns it. The given function must accept an iterable,
+and must be an associative function, or else the same result cannot be guaranteed for
 different chunk sizes. Again, cheaper functions work better with larger chunk_sizes,
 more expensive functions work better with smaller ones. Errors will be placed in results.
 Also, the minimum chunk size is 2, as going 1 element at time would not reduce the array
@@ -2092,7 +2092,7 @@ batch system for a node of the desired size.
 The only caveat is when using `vine_submit_workers -T uge`, as there are many
 differences across systems that the script cannot manage. For `
 vine_submit_workers -T uge` you have to set **both** the resources used by the
-worker (i.e., with `--cores`, etc.) and the appropiate computing node with the `
+worker (i.e., with `--cores`, etc.) and the appropriate computing node with the `
 -p ` option.
 
 For example, say that your local UGE installation requires you to set the
@@ -2103,7 +2103,7 @@ cores:
 $ vine_submit_workers -T uge --cores 4 -p "-pe smp 4" MACHINENAME 9123
 ```
 
-If you find that there are options that are needed everytime, you can compile
+If you find that there are options that are needed every time, you can compile
 CCTools using the ` --uge-parameter `. For example, at Notre Dame we
 automatically set the number of cores as follows:
 
@@ -2456,7 +2456,7 @@ cores, memory and disk have modifiers `~` and `>` as follows:
 
 A TaskVine manager produces several logs: `debug`, `taskgraph`, `performance`,
 and `transactions`. These logs are always enabled, and appear in the current
-working directory in the sudirectories:
+working directory in the subdirectories:
 
 ```sh
 vine-run-info/YYYY-mm-ddTHH:MM:SS/vine-logs
@@ -2532,7 +2532,7 @@ conda install conda-forge::gnuplot
 ```
 
 The script `vine_graph_log` is a wrapper for `gnuplot`, and with it you
-can plot some of the statistics, such as total time spent transfering tasks,
+can plot some of the statistics, such as total time spent transferring tasks,
 number of tasks running, and workers connected.  For example, this command:
 
 ```sh
@@ -2606,7 +2606,7 @@ Note that very large task graphs may be impractical to graph at this level of de
 
 ### Other Tools
 
-`vine_plot_compose` visualizes workflow executions in a variety of ways, creating a composition of multiple plots in a single visualiztion. This tool may be useful in
+`vine_plot_compose` visualizes workflow executions in a variety of ways, creating a composition of multiple plots in a single visualization. This tool may be useful in
 comparing performance across multiple executions.
 
 ```sh
@@ -2844,8 +2844,8 @@ The `compute` call above may receive the following keyword arguments:
 
 This subsection describes the communication patterns between a library and a worker, agnostic of programming languages a library is implemented in.
 
-Upon library startup, it should send to its worker a json object as a byte stream.
-The json object should have the following keys and associated values' types: `{"name": type-string, "taskid": type-int, "exec\_mode": type-string}`.
+Upon library startup, it should send to its worker a JSON object as a byte stream.
+The JSON object should have the following keys and associated values' types: `{"name": type-string, "taskid": type-int, "exec\_mode": type-string}`.
 `"name"` should be the name of the library.
 `"taskid"` should be the library' taskid as assigned by a taskvine manager.
 `"exec\_mode"` should be the function execution mode of the library.
