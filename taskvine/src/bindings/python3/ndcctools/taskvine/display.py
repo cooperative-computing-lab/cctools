@@ -57,7 +57,7 @@ class StatusDisplay:
         if not manager_s:
             return None
 
-        suffixes = [("largest", "largest worker"), ("inuse", "allocated"), ("total", "total")]
+        suffixes = [("inuse", "allocated"), ("total", "total")]
 
         rs = []
         header = ["application resources"] + StatusDisplay.resources
@@ -74,9 +74,6 @@ class StatusDisplay:
             return None
 
         categories = manager_s["categories"]
-        largest_worker = None
-        if manager_s["workers_connected"] > 0:
-            largest_worker = self._dict_from_q(manager_s, "largest")
 
         categories.sort(key=lambda c: c["category"])
         cs = []
@@ -85,10 +82,6 @@ class StatusDisplay:
             header = [c["category"]] + StatusDisplay.resources
 
             ct.append(header)
-
-            larger_worker = self.resources_check_limits(c["max_allocation"], largest_worker)
-            if larger_worker:
-                ct.append(["current workers are too small!"] + larger_worker)
 
             allocs = [
                 ("max_seen", "largest seen", "na"),
@@ -174,26 +167,6 @@ class StatusDisplay:
                 value_with_units = na
             rs.append(value_with_units)
         return rs
-
-    def resources_check_limits(self, values, limit):
-        if not limit:
-            return None
-        limits_broken = False
-        rs = []
-        for r in StatusDisplay.resources:
-            try:
-                largest = limit[r]
-                value = values[r]
-                check = "ok"
-                if isinstance(value, numbers.Number) and isinstance(largest, numbers.Number) and value > largest:
-                    limits_broken = True
-                    check = f"{self.with_units(r, largest, '')} is too small"
-            except KeyError:
-                pass
-            rs.append(check)
-        if limits_broken:
-            return rs
-        return None
 
     def with_units(self, resource, value, na):
         if value is None:
