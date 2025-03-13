@@ -2217,6 +2217,7 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "starttime",
 			(q->stats->time_when_started / 1000000)); // catalog expects time_t not timestamp_t
 	jx_insert_string(j, "manager_preferred_connection", q->manager_preferred_connection);
+	jx_insert_integer(j, "protocol", VINE_PROTOCOL_VERSION);
 
 	struct jx *interfaces = interfaces_of_host();
 	if (interfaces) {
