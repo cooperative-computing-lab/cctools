@@ -1965,8 +1965,23 @@ static struct rmsummary *category_alloc_info(struct vine_manager *q, struct cate
 
 	/* XXX this seems like a hack: a vine_worker is being created by malloc instead of vine_worker_create */
 
-	struct vine_worker_info *w = malloc(sizeof(*w));
+	// Allocate memory for the worker info structure and initialize it to zero
+	struct vine_worker_info *w = calloc(1, sizeof(*w));
+	
+	// Ensure memory was successfully allocated
+	if (!w) {
+	    // Handle malloc failure
+	    printf("FAILURE to calloc for w\n");
+	}
+	
+	// Create and initialize the resources for the worker
 	w->resources = vine_resources_create();
+	
+	// Ensure resources were successfully created
+	if (!w->resources) {
+	    // Handle resource creation failure
+	    printf("ERROR with initializing resources\n");
+	}
 	w->resources->cores.total = q->current_max_worker->cores;
 	w->resources->memory.total = q->current_max_worker->memory;
 	w->resources->disk.total = q->current_max_worker->disk;
