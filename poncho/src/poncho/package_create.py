@@ -325,7 +325,7 @@ def _run_conda_command(environment, needs_confirmation, command, *args):
     all_args = all_args + ["--prefix={}/env".format(str(environment))] + list(args)
 
     try:
-        subprocess.check_output(all_args)
+        subprocess.check_output(all_args, stdin=subprocess.DEVNULL)
     except subprocess.CalledProcessError as e:
         logger.warning("error executing: {}".format(" ".join(all_args)))
         print(e.output.decode())
