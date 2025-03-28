@@ -898,10 +898,13 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 		// may correspond to a cache-update of a file that has not been declared
 		// yet.
 		if (!f || !delete_worker_file(q, w, f->cached_name, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW)) {
-			replica = vine_file_replica_table_remove(q, w, cached_name);
+			if(cached_name){
+				replica = vine_file_replica_table_remove(q, w, cached_name);
+			}
+
 			if (replica) {
 				vine_file_replica_delete(replica);
-
+				
 				// recreate tmps lost with this worker if needed
 				if (q->immediate_recovery) {
 					if (f && f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED) {
@@ -1791,6 +1794,7 @@ static vine_result_code_t get_available_results(struct vine_manager *q, struct v
 	debug(D_VINE, "Reading result(s) from %s (%s)", w->hostname, w->addrport);
 
 	char line[VINE_LINE_MAX];
+	
 
 	vine_result_code_t result = VINE_SUCCESS; // return success unless something fails below.
 
@@ -1968,20 +1972,8 @@ static struct rmsummary *category_alloc_info(struct vine_manager *q, struct cate
 	// Allocate memory for the worker info structure and initialize it to zero
 	struct vine_worker_info *w = calloc(1, sizeof(*w));
 	
-	// Ensure memory was successfully allocated
-	if (!w) {
-	    // Handle malloc failure
-	    printf("FAILURE to calloc for w\n");
-	}
-	
 	// Create and initialize the resources for the worker
 	w->resources = vine_resources_create();
-	
-	// Ensure resources were successfully created
-	if (!w->resources) {
-	    // Handle resource creation failure
-	    printf("ERROR with initializing resources\n");
-	}
 	w->resources->cores.total = q->current_max_worker->cores;
 	w->resources->memory.total = q->current_max_worker->memory;
 	w->resources->disk.total = q->current_max_worker->disk;
