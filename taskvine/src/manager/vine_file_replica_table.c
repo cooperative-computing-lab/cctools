@@ -51,7 +51,7 @@ int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_in
 // remove a file from the remote file table.
 struct vine_file_replica *vine_file_replica_table_remove(struct vine_manager *m, struct vine_worker_info *w, const char *cachename)
 {
-	if (!w->current_files || !m->file_worker_table) {
+	if (!w) {
 	    // Handle error: invalid pointer
 	    return 0;
 	}
@@ -59,6 +59,8 @@ struct vine_file_replica *vine_file_replica_table_remove(struct vine_manager *m,
 	if (!hash_table_lookup(w->current_files, cachename)) {
 		return 0;
 	}
+
+	char *cachename2 = strdup(cachename);	
 
 	struct vine_file_replica *replica = hash_table_remove(w->current_files, cachename);
 	if (replica) {
@@ -71,12 +73,12 @@ struct vine_file_replica *vine_file_replica_table_remove(struct vine_manager *m,
 		m->current_max_worker->disk = available;
 	}
 
-	struct set *workers = hash_table_lookup(m->file_worker_table, cachename);
+	struct set *workers = hash_table_lookup(m->file_worker_table, cachename2);
 
 	if (workers) {
 		set_remove(workers, w);
 		if (set_size(workers) < 1) {
-			hash_table_remove(m->file_worker_table, cachename);
+			hash_table_remove(m->file_worker_table, cachename2);
 			set_delete(workers);
 		}
 	}
