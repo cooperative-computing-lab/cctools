@@ -759,10 +759,10 @@ static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_fil
 			vine_worker_send_cache_update(manager, cachename, f->original_type, f->cache_level, f->size, f->mode, transfer_time, f->start_time);
 		} else {
 			char *error_path = vine_cache_error_path(c, cachename);
-			char *error_message;
+			char *error_message = NULL;
 			size_t error_length;
 
-			if (copy_file_to_buffer(error_path, &error_message, &error_length)) {
+			if (copy_file_to_buffer(error_path, &error_message, &error_length) > 0 && error_message) {
 				/* got a message string */
 			} else {
 				error_message = strdup("unknown error");
