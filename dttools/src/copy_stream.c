@@ -124,7 +124,6 @@ int64_t copy_file_to_buffer(const char *filename, char **buffer, size_t *len)
 	}
 
 	*len = info.st_size;
-	*buffer = NULL;
 	*buffer = malloc(*len + 1);
 	if (*buffer == NULL) {
 		close(fd);
