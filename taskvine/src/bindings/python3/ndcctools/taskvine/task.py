@@ -186,10 +186,10 @@ class Task(object):
     ##
     # Return a copy of this task
     #
-    def clone(self):
+    def addref(self):
         """Return a (deep)copy this task that can also be submitted to the ndcctools.taskvine."""
         new = copy.copy(self)
-        new._task = cvine.vine_task_clone(self._task)
+        new._task = cvine.vine_task_addref(self._task)
         return new
 
     ##
