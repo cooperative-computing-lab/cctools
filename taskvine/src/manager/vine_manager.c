@@ -5355,8 +5355,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 			if (done) {
 				if (retrieved_this_cycle > 0) {
-					continue; // we only get here with prefer-dispatch, continue to find a task to
-						  // return
+					continue;	// we only get here with prefer-dispatch, continue to find a task to
+							// return
 				} else {
 					break;
 				}
