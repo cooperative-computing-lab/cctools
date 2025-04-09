@@ -98,6 +98,7 @@ static const char *scratch_dir = 0;
 static char *config_file = 0;
 static char *amazon_config = NULL;
 static char *condor_requirements = NULL;
+static int condor_spool = 0;
 static char *batch_submit_options = NULL;
 static const char *password_file = 0;
 char *password;
@@ -1212,6 +1213,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Specify Amazon config file.\n", "--amazon-config");
 	printf(" %-30s Disable check for use of AFS with HTCondor.\n", "--disable-afs-check");
 	printf(" %-30s Set requirements for the workers as Condor jobs.\n", "--condor-requirements");
+	printf(" %-30s Use spool mechanism for condor factory input files.\n", "--condor-spool");
 
 }
 
@@ -1226,6 +1228,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_FACTORY_TIMEOUT, 
 		LONG_OPT_AUTOSIZE, 
 		LONG_OPT_CONDOR_REQUIREMENTS, 
+		LONG_OPT_CONDOR_SPOOL, 
 		LONG_OPT_WORKERS_PER_CYCLE, 
 		LONG_OPT_WRAPPER, 
 		LONG_OPT_WRAPPER_INPUT,
@@ -1254,6 +1257,7 @@ static const struct option long_options[] = {
 	{"capacity", no_argument, 0, 'c' },
 	{"catalog", required_argument, 0, LONG_OPT_CATALOG},
 	{"condor-requirements", required_argument, 0, LONG_OPT_CONDOR_REQUIREMENTS},
+	{"condor-spool", no_argument, 0, LONG_OPT_CONDOR_SPOOL},
 	{"config-file", required_argument, 0, 'C'},
 	{"cores",  required_argument,  0,  LONG_OPT_CORES},
 	{"debug", required_argument, 0, 'd'},
@@ -1409,6 +1413,9 @@ int main(int argc, char *argv[])
 				} else {
 					condor_requirements = string_format("(%s)", optarg);
 				}
+				break;
+			case LONG_OPT_CONDOR_SPOOL:
+				condor_spool = 1;
 				break;
 			case LONG_OPT_PONCHO_ENV:
 				{
@@ -1676,9 +1683,15 @@ int main(int argc, char *argv[])
 	}
 
 	if(condor_requirements != NULL && batch_queue_type != BATCH_QUEUE_TYPE_CONDOR) {
-		debug(D_NOTICE, "condor_requirements will be ignored as workers will not be running in condor.");
+		debug(D_NOTICE, "condor-requirements will be ignored as workers will not be running in condor.");
 	} else {
 		batch_queue_set_option(queue, "condor-requirements", condor_requirements);
+	}
+
+	if(condor_spool && BATCH_QUEUE_TYPE_CONDOR) {
+		debug(D_NOTICE, "condor-spool will be ignored as workers will not be running in condor.");
+	} else {
+		batch_queue_set_option(queue, "condor-spool", "yes");
 	}
 
 	mainloop( queue );
