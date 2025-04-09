@@ -875,27 +875,26 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 		return;
 	}
 
-	char *cached_name = NULL;
-	char **cached_names = hash_table_keys_array(w->current_files);
-
 	struct vine_file_replica *replica = NULL;
-
-	int i = 0;
-	while ((cached_name = cached_names[i])) {
-		i++;
-		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
+	char *cached_name = NULL;
+	HASH_TABLE_ITERATE(w->current_files, cached_name, replica)
+	{
+		// make a copy of the cached name because the file may be deleted from the file tables,
+		// which corrupts the cached_name given from HASH_TABLE_ITERATE.
+		char *cached_name_copy = xxstrdup(cached_name);
+		struct vine_file *f = hash_table_lookup(q->file_table, cached_name_copy);
 
 		// check that the manager actually knows about that file, as the file
 		// may correspond to a cache-update of a file that has not been declared
 		// yet.
 		if (!f || !delete_worker_file(q, w, f->cached_name, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW)) {
-			if(cached_name){
-				replica = vine_file_replica_table_remove(q, w, cached_name);
+			if (cached_name_copy) {
+				replica = vine_file_replica_table_remove(q, w, cached_name_copy);
 			}
 
 			if (replica) {
 				vine_file_replica_delete(replica);
-				
+
 				// recreate tmps lost with this worker if needed
 				if (q->immediate_recovery) {
 					if (f && f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED) {
@@ -906,9 +905,8 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 				}
 			}
 		}
+		free(cached_name_copy);
 	}
-
-	hash_table_free_keys_array(cached_names);
 }
 
 /* Remove all tasks and other associated state from a given worker. */
@@ -1792,7 +1790,6 @@ static vine_result_code_t get_available_results(struct vine_manager *q, struct v
 	debug(D_VINE, "Reading result(s) from %s (%s)", w->hostname, w->addrport);
 
 	char line[VINE_LINE_MAX];
-	
 
 	vine_result_code_t result = VINE_SUCCESS; // return success unless something fails below.
 
@@ -1969,7 +1966,7 @@ static struct rmsummary *category_alloc_info(struct vine_manager *q, struct cate
 
 	// Allocate memory for the worker info structure and initialize it to zero
 	struct vine_worker_info *w = calloc(1, sizeof(*w));
-	
+
 	// Create and initialize the resources for the worker
 	w->resources = vine_resources_create();
 	w->resources->cores.total = q->current_max_worker->cores;
