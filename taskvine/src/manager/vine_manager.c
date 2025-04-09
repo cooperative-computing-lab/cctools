@@ -2293,6 +2293,15 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "workers", info.workers_connected);
 	jx_insert_integer(j, "workers_connected", info.workers_connected);
 
+	// time information the taskvine status web display needs
+	jx_insert_integer(j, "time_send", info.time_send);
+	jx_insert_integer(j, "time_receive", info.time_receive);
+	jx_insert_integer(j, "time_status_msgs", info.time_status_msgs);
+	jx_insert_integer(j, "time_internal", info.time_internal);
+	jx_insert_integer(j, "time_polling", info.time_polling);
+	jx_insert_integer(j, "time_application", info.time_application);
+	jx_insert_integer(j, "time_scheduling", info.time_scheduling);
+
 	// additional worker information the factory needs
 	struct jx *blocklist = vine_blocklist_to_jx(q);
 	if (blocklist) {
