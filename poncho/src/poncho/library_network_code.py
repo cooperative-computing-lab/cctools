@@ -124,7 +124,6 @@ def start_function(in_pipe_fd, thread_limit=1):
         exit(1)
 
     with threadpool_limits(limits=thread_limit):
-        global exec_method
         if exec_method == "direct":
             library_sandbox = os.getcwd()
             try:
