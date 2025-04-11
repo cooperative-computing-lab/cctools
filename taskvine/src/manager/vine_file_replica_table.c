@@ -51,6 +51,11 @@ int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_in
 // remove a file from the remote file table.
 struct vine_file_replica *vine_file_replica_table_remove(struct vine_manager *m, struct vine_worker_info *w, const char *cachename)
 {
+	if (!w) {
+		// Handle error: invalid pointer
+		return 0;
+	}
+
 	if (!hash_table_lookup(w->current_files, cachename)) {
 		return 0;
 	}

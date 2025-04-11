@@ -873,32 +873,27 @@ void vine_update_catalog(struct vine_manager *m)
 
 static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info *w)
 {
-	int i = 0;
-	int nfiles = hash_table_size(w->current_files);
-
-	if (nfiles < 1) {
+	if (hash_table_size(w->current_files) < 1) {
 		return;
 	}
 
-	char *cached_name = NULL;
 	struct vine_file_replica *replica = NULL;
-	char **cached_names = malloc(nfiles * sizeof(char *));
-
+	char *cached_name = NULL;
 	HASH_TABLE_ITERATE(w->current_files, cached_name, replica)
 	{
-		cached_names[i] = cached_name;
-		i++;
-	}
-
-	for (i = 0; i < nfiles; i++) {
-		cached_name = cached_names[i];
-		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
+		// make a copy of the cached name because the file may be deleted from the file tables,
+		// which corrupts the cached_name given from HASH_TABLE_ITERATE.
+		char *cached_name_copy = xxstrdup(cached_name);
+		struct vine_file *f = hash_table_lookup(q->file_table, cached_name_copy);
 
 		// check that the manager actually knows about that file, as the file
 		// may correspond to a cache-update of a file that has not been declared
 		// yet.
 		if (!f || !delete_worker_file(q, w, f->cached_name, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW)) {
-			replica = vine_file_replica_table_remove(q, w, cached_name);
+			if (cached_name_copy) {
+				replica = vine_file_replica_table_remove(q, w, cached_name_copy);
+			}
+
 			if (replica) {
 				vine_file_replica_delete(replica);
 
@@ -912,9 +907,8 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 				}
 			}
 		}
+		free(cached_name_copy);
 	}
-
-	free(cached_names);
 }
 
 /* Remove all tasks and other associated state from a given worker. */
@@ -1965,7 +1959,10 @@ static struct rmsummary *category_alloc_info(struct vine_manager *q, struct cate
 
 	/* XXX this seems like a hack: a vine_worker is being created by malloc instead of vine_worker_create */
 
-	struct vine_worker_info *w = malloc(sizeof(*w));
+	// Allocate memory for the worker info structure and initialize it to zero
+	struct vine_worker_info *w = calloc(1, sizeof(*w));
+
+	// Create and initialize the resources for the worker
 	w->resources = vine_resources_create();
 	w->resources->cores.total = q->current_max_worker->cores;
 	w->resources->memory.total = q->current_max_worker->memory;
