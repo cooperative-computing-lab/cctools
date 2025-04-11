@@ -1343,7 +1343,7 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 		handle_failure(q, w, t, result);
 	}
 
-	if (result == VINE_WORKER_FAILURE) {
+	if (result != VINE_APP_FAILURE ) {
 		t->time_when_done = timestamp_get();
 		return 0;
 	}
