@@ -1341,12 +1341,13 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 	if (result != VINE_SUCCESS) {
 		debug(D_VINE, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
+
+		if (result != VINE_APP_FAILURE) {
+			t->time_when_done = timestamp_get();
+			return 0;
+		}
 	}
 
-	if (result == VINE_WORKER_FAILURE) {
-		t->time_when_done = timestamp_get();
-		return 0;
-	}
 	delete_uncacheable_files(q, w, t);
 
 	/* if q is monitoring, update t->resources_measured, and delete the task
