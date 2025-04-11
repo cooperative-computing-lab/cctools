@@ -134,6 +134,7 @@ int64_t copy_file_to_buffer(const char *filename, char **buffer, size_t *len)
 	int64_t total = full_read(fd, *buffer, *len);
 	if (total == -1) {
 		free(*buffer);
+		*buffer = NULL;
 	}
 
 	close(fd);
