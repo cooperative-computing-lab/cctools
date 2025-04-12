@@ -1688,10 +1688,14 @@ int main(int argc, char *argv[])
 		batch_queue_set_option(queue, "condor-requirements", condor_requirements);
 	}
 
-	if(condor_spool && BATCH_QUEUE_TYPE_CONDOR) {
+	if(condor_spool) {
+	    if(BATCH_QUEUE_TYPE_CONDOR) {
 		debug(D_NOTICE, "condor-spool will be ignored as workers will not be running in condor.");
-	} else {
+	    } else {
 		batch_queue_set_option(queue, "condor-spool", "yes");
+	    }
+	} else {
+	    batch_queue_set_option(queue, "condor-spool", "no");
 	}
 
 	mainloop( queue );
