@@ -6,6 +6,7 @@ submit_dir=
 use_manager_name=0
 pwfile=""
 arguments=""
+wrapper=
 input_files=
 
 poncho_env=""
@@ -99,6 +100,7 @@ show_help()
 	echo "  --disk <size>             Manually set the amount of disk (in MB) reported by this worker."
 	echo "  --scratch-dir             Set the scratch directory location created on the local machine (default=/tmp/USER-workers)." 
 	echo "  -E,--worker-options <str> Extra options passed to vine_worker."
+    echo "  --wrapper <str>           Command line to prepend to worker cxommand."
 	echo "  --poncho-env <file.tar.gz>  Run each worker inside this poncho environment."
 	echo "  -h,--help                 Show this help message."
 	echo ""
@@ -194,13 +196,21 @@ condor_submit_workers_command()
     condor_setup
     condor_transfer_input_files=${condor_transfer_input_files}
 
-    if [ -n "$poncho_env" ]; then
-        executable="poncho_package_run"
-        arguments="-e $poncho_env -- ./vine_worker $arguments $host $port"
-    else
-        executable="vine_worker"
-        arguments="$arguments $host $port"
+    worker_command="./vine_worker"
+    if [ -n "$wrapper" ]
+    then
+        worker_command="$wrapper $worker_command"
     fi
+
+    if [ -n "$poncho_env" ]; then
+        worker_command="./poncho_package_run -e $poncho_env -- ${worker_command}"
+    fi
+
+    cat > worker.sh <<EOF
+#!/bin/sh
+${worker_command} "\$@"
+EOF
+    chmod 755 worker.sh
 
     if [ -n "${condor_docker_universe}" ]
     then
@@ -215,9 +225,9 @@ EOF
     fi
 
     cat >> condor_submit_file <<EOF
-executable = $executable
-arguments = $arguments
-transfer_input_files = ${condor_transfer_input_files}
+executable = worker.sh
+arguments = ${arguments} ${host} ${port}
+transfer_input_files = worker.sh,${condor_transfer_input_files}
 should_transfer_files = yes
 when_to_transfer_output = on_exit
 output = worker.\$(CLUSTER).\$(PROCESS).output
@@ -249,6 +259,10 @@ EOF
 
     if [ "${dry_run}" = 1 ]
     then
+        condor_submit_cmd="echo worker command"
+        echo "######## worker.sh ########"
+        cat worker.sh
+        echo "####################################"
         condor_submit_cmd="echo condor_submit"
         echo "######## condor_submit_file ########"
         cat condor_submit_file
@@ -291,12 +305,22 @@ slurm_parse_arguments()
 slurm_submit_workers_command()
 {
     slurm_setup
+    worker_command="${submit_dir}/vine_worker $arguments $host $port"
+    if [ -n "$wrapper" ]
+    then
+        worker_command="$wrapper $worker_command"
+    fi
 
     if [ -n "$poncho_env" ]; then
-        worker_command="${submit_dir}/poncho_package_run -e ${submit_dir}/$(basename "$poncho_env") -- ${submit_dir}/vine_worker $arguments $host $port"
-    else
-        worker_command="${submit_dir}/vine_worker $arguments $host $port"
+        worker_command="${submit_dir}/poncho_package_run -e ${submit_dir}/$poncho_env -- ${worker_command}"
     fi
+
+    cat > ${submit_dir}/worker.sh <<EOF
+#!/bin/sh
+${worker_command}
+EOF
+
+    chmod 755 ${submit_dir}/worker.sh
 
     if [ "${dry_run}" = 0 ]
     then
@@ -309,8 +333,7 @@ slurm_submit_workers_command()
     else
         sbatch="echo sbatch"
         echo "######## worker.sh ########"
-        echo "#!/bin/sh"
-        echo "${worker_command}"
+        cat ${submit_dir}/worker.sh
         echo "####################################"
     fi
 
@@ -318,10 +341,7 @@ slurm_submit_workers_command()
     while [ "$to_submit" -gt 0 ]
     do
         to_submit=$((to_submit-1))
-        ${sbatch} --job-name vineWorker --ntasks=1 --nodes=1 $slurm_parameters <<EOF
-#!/bin/sh
-${worker_command}
-EOF
+        ${sbatch} --job-name vineWorker --ntasks=1 --nodes=1 $slurm_parameters ${submit_dir}/worker.sh
     done
 
 }
@@ -366,16 +386,18 @@ uge_parse_arguments()
 uge_submit_workers_command()
 {
     uge_setup
+    worker_command="${submit_dir}/vine_worker $arguments $host $port"
+    if [ -n "$wrapper" ]
+    then
+        worker_command="$wrapper $worker_command"
+    fi
 
     if [ -n "$poncho_env" ]; then
-        worker_command="${submit_dir}/poncho_package_run -e ${submit_dir}/$(basename "$poncho_env") -- ${submit_dir}/vine_worker $arguments $host $port"
-    else
-        worker_command="${submit_dir}/vine_worker $arguments $host $port"
+        worker_command="${submit_dir}/poncho_package_run -e ${submit_dir}/$poncho_env -- ${worker_command}"
     fi
 
     cat >worker.sh <<EOF
 #!/bin/sh
-
 ${worker_command}
 EOF
 
@@ -440,7 +462,7 @@ parse_arguments_general()
                 condor)
                     parse_arguments_batch=condor_parse_arguments
                 ;;
-                uge)
+                uge|sge)
                     parse_arguments_batch=uge_parse_arguments
                 ;;
                 slurm)
@@ -628,9 +650,13 @@ parse_arguments_worker()
             shift
             arguments="$arguments $1"
         ;;
-        --poncho-env)
+        --poncho-env|--python-env)
             shift
             poncho_env="$1"
+        ;;
+        --wrapper)
+            shift
+            wrapper="$1"
         ;;
         -h | --help)
             show_help 0
@@ -784,7 +810,7 @@ submit_workers_command()
         "slurm")
             slurm_submit_workers_command
         ;;
-        "uge")
+        "uge"|"sge")
             uge_submit_workers_command
         ;;
         *)
