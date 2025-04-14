@@ -6,6 +6,7 @@ submit_dir=
 use_manager_name=0
 pwfile=""
 arguments=""
+input_files=
 
 poncho_env=""
 
@@ -25,7 +26,7 @@ condor_docker_universe=
 condor_class_ads=
 condor_requirements=
 condor_parameters=
-condor_transfer_input_files="vine_worker, cctools_gpu_autodetect"
+condor_transfer_input_files=
 
 uge_use_jobarray=0
 uge_parameters=""
@@ -45,6 +46,7 @@ condor_show_help()
     echo "  --autosize                Condor will automatically size the worker to the slot."
     echo "  --spool                   Spool required input files."
     echo "  --docker-universe <image> Run worker inside <image> using condor's docker universe."
+	echo "  --extra-file <path>       Extra file to ship with worker job."
     echo "  -p <parameters>           HTCondor condor_submit parameters."
     echo ""
 }
@@ -187,18 +189,12 @@ condor_parse_arguments()
     return "$consumed"
 }
 
-condor_set_up_password_file()
-{
-    condor_transfer_input_files="${condor_transfer_input_files}, $pwfile"
-}
-
 condor_submit_workers_command()
 {
     condor_setup
+    condor_transfer_input_files=${condor_transfer_input_files}
 
     if [ -n "$poncho_env" ]; then
-        condor_transfer_input_files="${condor_transfer_input_files}, poncho_package_run, $poncho_env"
-
         executable="poncho_package_run"
         arguments="-e $poncho_env -- ./vine_worker $arguments $host $port"
     else
@@ -414,6 +410,19 @@ EOF
     fi
 }
 
+add_input_file()
+{
+    base=$(basename $1)
+
+    if [ -z "${input_files}" ]
+    then
+        input_files="$1"
+    else
+        input_files="${input_files} $1"
+    fi
+}
+
+
 
 parse_arguments_general()
 {
@@ -442,6 +451,11 @@ parse_arguments_general()
                     exit 1
                 ;;
             esac
+            consumed=2
+        ;;
+        --extra-file)
+            shift
+            add_input_file $1
             consumed=2
         ;;
         --dry-run)
@@ -694,6 +708,8 @@ set_up_working_directory()
 	then
 		echo "$0: please add 'vine_worker' to your PATH." 1>&2
 		exit 1
+    else
+        add_input_file $worker
 	fi
 
     gpu_detection=$(which cctools_gpu_autodetect 2>/dev/null)
@@ -701,7 +717,7 @@ set_up_working_directory()
 	then
 		echo "$0: could not find cctools_gpu_autodetect in PATH. gpus will not be automatically detected." 1>&2
 	else
-		cp "$gpu_detection" "${submit_dir}"
+        add_input_file $gpu_detection
 	fi
 
 	if [ -n "$poncho_env" ]; then
@@ -712,12 +728,15 @@ set_up_working_directory()
 			exit 1
 		fi
 
-		cp "$poncho_bin" "${submit_dir}"
-		cp "$poncho_env" "${submit_dir}"
+        add_input_file $poncho_bin
+        add_input_file $poncho_env
+
+        poncho_bin=$(basename ${poncho_bin})
+        poncho_env=$(basename ${poncho_env})
 	fi
 
-    cp "${worker}" "${submit_dir}"
 	set_up_password_file
+    set_up_input_files
 
 	cd "${submit_dir}" || exit 1
 }
@@ -735,14 +754,25 @@ set_up_password_file()
 			echo "$script_name password file $pwfile not found" 1>&2
 			exit 1
 		fi
+        add_input_file ${pwfile}
+    fi
+}
 
-		cp "$pwfile" "${submit_dir}"
-
-        if [ "$batch_option" = condor ]
+set_up_input_files()
+{
+    sep=""
+    for file in ${input_files}
+    do
+        if ! cp ${file} ${submit_dir}
         then
-		    condor_set_up_password_file
+			echo "Could not copy $file to $submit_dir" 1>&2
+			echo "Please check that the file exists and that the targe directory has write permissions $submit_dir" 1>&2
+			exit 1
         fi
-	fi
+
+        condor_transfer_input_files="${condor_transfer_input_files}$sep$(basename ${file})"
+        sep=","
+    done
 }
 
 submit_workers_command()
