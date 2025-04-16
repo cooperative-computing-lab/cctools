@@ -213,6 +213,9 @@ struct vine_stats {
 	timestamp_t time_workers_execute_exhaustion; /**< Total time workers spent executing tasks that exhausted
 							resources. */
 
+	/* Workflow time statistics: */
+	timestamp_t time_first_task_started;          /**< Time the first task started. */
+
 	/* BW statistics */
 	int64_t bytes_sent; /**< Total number of file bytes (not including protocol control msg bytes) sent out to the
 			       workers by the manager. */
