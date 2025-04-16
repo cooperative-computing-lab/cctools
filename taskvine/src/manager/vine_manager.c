@@ -166,6 +166,7 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 
 static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
+static int release_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
