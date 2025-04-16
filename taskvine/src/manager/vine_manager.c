@@ -911,6 +911,58 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 	}
 }
 
+/*
+This function enforces a target worker eviction rate (1 every X seconds).
+If the observed eviction interval is shorter than the desired one, we randomly evict one worker
+to keep the eviction pace aligned with the target.
+This includes all types of removals, whether graceful or due to failures.
+*/
+static int enforce_worker_eviction_interval(struct vine_manager *q)
+{
+	/* do not consider eviction if the workflow has not started yet, because wait-for-workers might delay the task executions for a while */
+	if (!q || q->enforce_worker_eviction_interval <= 0 || q->stats->time_first_task_started == 0 || hash_table_size(q->worker_table) == 0) {
+		return 0;
+	}
+
+	timestamp_t total_execution_time = timestamp_get() - q->stats->time_first_task_started;
+
+	double current_eviction_interval = 0;
+	if (q->stats->workers_removed > 0) {
+		current_eviction_interval = total_execution_time / ((double)q->stats->workers_removed + 1);
+	}
+
+	if (current_eviction_interval > q->enforce_worker_eviction_interval) {
+		return 0;
+	}
+
+	/* collect removable workers */
+	struct vine_worker_info **candidates = NULL;
+	int count = 0;
+	char *key;
+	struct vine_worker_info *w;
+	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	{
+		candidates = realloc(candidates, (count + 1) * sizeof(*candidates));
+		if (!candidates) {
+			return 0;
+		}
+		candidates[count++] = w;
+	}
+
+	if (count == 0) {
+		free(candidates);
+		return 0;
+	}
+
+	/* release a random worker */
+	int index = random() % count;
+	struct vine_worker_info *selected = candidates[index];
+	release_worker(q, selected);
+	free(candidates);
+
+	return 1;
+}
+
 /* Remove all tasks and other associated state from a given worker. */
 static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
@@ -3538,6 +3590,7 @@ static int send_one_task(struct vine_manager *q)
 			switch (result) {
 			case VINE_SUCCESS:
 				/* return on successful commit. */
+				q->stats->time_first_task_started = q->stats->time_first_task_started == 0 ? timestamp_get() : q->stats->time_first_task_started;
 				return 1;
 				break;
 			case VINE_APP_FAILURE:
@@ -4083,6 +4136,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->hungry_minimum_factor = 2;
 
 	q->wait_for_workers = 0;
+	q->max_workers = -1;
 	q->attempt_schedule_depth = 100;
 
 	q->max_retrievals = 1;
@@ -5049,6 +5103,10 @@ static int poll_active_workers(struct vine_manager *q, int stoptime)
 
 static int connect_new_workers(struct vine_manager *q, int stoptime, int max_new_workers)
 {
+	if (q->max_workers > 0 && hash_table_size(q->worker_table) >= q->max_workers) {
+		return 0;
+	}
+
 	int new_workers = 0;
 
 	// If the manager link was awake, then accept at most max_new_workers.
@@ -5351,6 +5409,15 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				events++;
 				break;
 			}
+		}
+
+		// check if we need to kill any workers if the user has specified an eviction interval
+		BEGIN_ACCUM_TIME(q, time_internal);
+		result = enforce_worker_eviction_interval(q);
+		END_ACCUM_TIME(q, time_internal);
+		if (result > 0) {
+			events++;
+			continue;
 		}
 
 		// return if manager is empty and something interesting already happened
@@ -5783,6 +5850,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
 
+	} else if (!strcmp(name, "max-workers")) {
+		q->max_workers = MAX(0, (int)value);
+
 	} else if (!strcmp(name, "worker-retrievals")) {
 		q->worker_retrievals = MAX(0, (int)value);
 
@@ -5831,6 +5901,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		if (value < 1 && value > 0) {
 			q->disk_proportion_available_to_task = value;
 		}
+	} else if (!strcmp(name, "enforce-worker-eviction-interval")) {
+		q->enforce_worker_eviction_interval = MAX(0, (int)value);
+
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
