@@ -609,7 +609,7 @@ all string fields with NULL. Usual values are 0, or -1. */
 struct rmsummary *rmsummary_create(double default_value)
 {
 	struct rmsummary *s = malloc(sizeof(struct rmsummary));
-	memset(s, default_value, sizeof(struct rmsummary));
+	memset(s, 0, sizeof(struct rmsummary));
 
 	s->command = NULL;
 	s->category = NULL;
