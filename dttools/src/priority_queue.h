@@ -161,35 +161,17 @@ void priority_queue_delete(struct priority_queue *pq);
 struct priority_queue *priority_queue_duplicate(struct priority_queue *src);
 
 /*
- * PRIORITY_QUEUE_SORTED_ITERATE(pq, idx, data, iter_count, iter_depth)
+ * PRIORITY_QUEUE_ITERATE(pq, idx, data_ptr, iter_count, iter_depth)
  *
- * Iterate over the priority queue in descending priority order.
- * Internally uses a deep copy of the heap and pops elements one by one.
- * For each popped element `data`, its corresponding `idx` in the original
- * queue is determined via priority_queue_find_idx().
- *
- * You may perform operations such as:
- *   - priority_queue_remove_at(pq, idx)
- *   - priority_queue_update_priority_at(pq, idx, new_priority)
- *   - priority_queue_push(pq, ...)
- *
- * BUT: Any such operation can change the structure of the original heap.
- * If you use `idx` after such changes, it may no longer point to the original `data`.
- * Always retrieve a fresh `idx` with priority_queue_find_idx() if needed again.
- *
- * Do not cache `idx` across modifications.
+ * Read-only, fast iteration over the priority queue.
+ * You may NOT modify the queue during iteration.
  */
-#define PRIORITY_QUEUE_SORTED_ITERATE(pq, idx, data, iter_count, iter_depth) \
-	for ( \
-		struct priority_queue *__pq_iter_copy = priority_queue_duplicate(pq); \
-		__pq_iter_copy != NULL; \
-		priority_queue_delete(__pq_iter_copy), __pq_iter_copy = NULL \
-	) \
-		for ((iter_count) = 0; \
-		     (iter_count) < (iter_depth) && \
-		     priority_queue_size(__pq_iter_copy) > 0 && \
-		     (data = priority_queue_pop(__pq_iter_copy)) && \
-		     (idx = priority_queue_find_idx(pq, data)) >= 0; \
-		     (iter_count)++)
+extern void *priority_queue_internal_peek_data(struct priority_queue *pq, int idx);
+
+#define PRIORITY_QUEUE_ITERATE(pq, idx, data_ptr, iter_count, iter_depth) \
+    for ((iter_count) = 0, (idx) = 0; \
+         (iter_count) < (iter_depth) && (idx) < priority_queue_size(pq) && \
+         ((data_ptr) = priority_queue_internal_peek_data(pq, idx), 1); \
+         (iter_count)++, (idx)++)
 
 #endif

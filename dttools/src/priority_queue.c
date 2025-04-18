@@ -297,3 +297,11 @@ void priority_queue_delete(struct priority_queue *pq)
 	free(pq->elements);
 	free(pq);
 }
+
+void *priority_queue_internal_peek_data(struct priority_queue *pq, int idx)
+{
+	if (!pq || idx < 0 || idx >= pq->size) {
+		return NULL;
+	}
+	return pq->elements[idx]->data;
+}
