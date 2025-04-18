@@ -88,15 +88,16 @@ struct vine_task *vine_task_create(const char *command_line)
 
 char *vine_task_key_generator(const void *ptr)
 {
-    if (!ptr) return NULL;
-    
-    const struct vine_task *t = (const struct vine_task *)ptr;
-    
-    char *key = malloc(32);
-    if (key) {
-        snprintf(key, 32, "task_%d", t->task_id);
-    }
-    return key;
+	if (!ptr)
+		return NULL;
+
+	const struct vine_task *t = (const struct vine_task *)ptr;
+
+	char *key = malloc(32);
+	if (key) {
+		snprintf(key, 32, "task_%d", t->task_id);
+	}
+	return key;
 }
 
 void vine_task_clean(struct vine_task *t)

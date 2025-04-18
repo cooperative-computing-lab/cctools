@@ -132,39 +132,39 @@ void test_performance(int ops)
 
 void test_push_or_update(int ops)
 {
-    printf("[PQUEUE find+update] running with %d ops...\n", ops);
-    struct priority_queue *pq = priority_queue_create(0);
-    int *pool = malloc(sizeof(int) * ops);
+	printf("[PQUEUE find+update] running with %d ops...\n", ops);
+	struct priority_queue *pq = priority_queue_create(0);
+	int *pool = malloc(sizeof(int) * ops);
 
-    for (int i = 0; i < ops; i++) {
-        pool[i] = i;
-    }
+	for (int i = 0; i < ops; i++) {
+		pool[i] = i;
+	}
 
-    srand(42);
-    timestamp_t t_start = timestamp_get();
+	srand(42);
+	timestamp_t t_start = timestamp_get();
 
-    for (int i = 0; i < ops; i++) {
-        int *ref = &pool[rand() % ops];
-        double new_prio = rand() % 10000000;
+	for (int i = 0; i < ops; i++) {
+		int *ref = &pool[rand() % ops];
+		double new_prio = rand() % 10000000;
 
-        int idx = priority_queue_find_idx(pq, ref);
-        if (idx >= 0) {
-            priority_queue_update_priority_at(pq, idx, new_prio);
-        } else {
-            priority_queue_push(pq, ref, new_prio);
-        }
-    }
+		int idx = priority_queue_find_idx(pq, ref);
+		if (idx >= 0) {
+			priority_queue_update_priority_at(pq, idx, new_prio);
+		} else {
+			priority_queue_push(pq, ref, new_prio);
+		}
+	}
 
-    while (priority_queue_size(pq) > 0) {
-        int *x = priority_queue_pop(pq);
-        assert(x != NULL);
-    }
+	while (priority_queue_size(pq) > 0) {
+		int *x = priority_queue_pop(pq);
+		assert(x != NULL);
+	}
 
-    timestamp_t t_end = timestamp_get();
-    printf("[PQUEUE find+update] total time: %.2fs\n", (t_end - t_start) / 1e6);
+	timestamp_t t_end = timestamp_get();
+	printf("[PQUEUE find+update] total time: %.2fs\n", (t_end - t_start) / 1e6);
 
-    priority_queue_delete(pq);
-    free(pool);
+	priority_queue_delete(pq);
+	free(pool);
 }
 
 int main()
