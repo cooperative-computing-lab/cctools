@@ -136,8 +136,6 @@ static vine_result_code_t retrieve_output(struct vine_manager *q, struct vine_wo
 static void find_max_worker(struct vine_manager *q);
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w);
 
-// vine_task_state_t change_task_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state);
-
 static int task_request_count(struct vine_manager *q, const char *category, category_allocation_t request);
 
 static vine_msg_code_t handle_http_request(struct vine_manager *q, struct vine_worker_info *w, const char *path, time_t stoptime);
