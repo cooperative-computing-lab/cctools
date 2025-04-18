@@ -75,19 +75,7 @@ for (int i = 0; i < priority_queue_size(pq); i++) {
 }
 </pre>
 
-Or use the PRIORITY_QUEUE_BASE_ITERATE macro:
-
-<pre>
-int idx;
-void *data;
-int iter_count = 0;
-int iter_depth = priority_queue_size(q->ready_tasks);
-PRIORITY_QUEUE_BASE_ITERATE (pq, idx, data, iter_count, iter_depth) {
-    printf("Data idx: %d\n", idx);
-}
-</pre>
 */
-
 
 /** Create a new priority queue.
 Element with a higher priority is at the top of the heap.
@@ -137,15 +125,15 @@ void *priority_queue_peek_at(struct priority_queue *pq, int index);
 @param index The index of the element.
 @return The priority of the element if any, NAN on failure.
 */
-double priority_queue_get_priority(struct priority_queue *pq, int index);
+double priority_queue_get_priority_at(struct priority_queue *pq, int index);
 
 /** Update the priority of an element in a priority queue.
 @param pq A pointer to a priority queue.
-@param data The pointer to the element to update.
+@param idx The index of the element to update.
 @param new_priority The new priority of the element.
 @return The new index if the update succeeded, -1 on failure.
 */
-int priority_queue_update_priority(struct priority_queue *pq, void *data, double new_priority);
+int priority_queue_update_priority_at(struct priority_queue *pq, int idx, double new_priority);
 
 /** Find the index of an element in a priority queue.
 @param pq A pointer to a priority queue.
@@ -154,97 +142,54 @@ int priority_queue_update_priority(struct priority_queue *pq, void *data, double
 */
 int priority_queue_find_idx(struct priority_queue *pq, void *data);
 
-/** Advance the static_cursor to the next element and return the index.
-The static_cursor is used to globally iterate over the elements by sequential index.
-The position of the static_cursor is automatically remembered and never reset.
-@param pq A pointer to a priority queue.
-@return The index of the next element if any, -1 on failure.
-*/
-int priority_queue_static_next(struct priority_queue *pq);
-
-/** Reset the base_cursor to 0.
-The base_cursor is used in PRIORITY_QUEUE_BASE_ITERATE to iterate over the elements from the beginning.
-@param pq A pointer to a priority queue.
-*/
-void priority_queue_base_reset(struct priority_queue *pq);
-
-/** Advance the base_cursor to the next element and return the index.
-@param pq A pointer to a priority queue.
-@return The index of the next element if any, -1 on failure.
-*/
-int priority_queue_base_next(struct priority_queue *pq);
-
-/** Reset the rotate_cursor to 0.
-The rotate_cursor is used to iterate over the elements from the beginning, and reset on demand.
-In task scheduling, we tipically iterate over a amall number of tasks at a time. If there is no task to execute,
-we remember the position of the cursor and we can start from there the next time.
-If there are interesting events happening, we reset the cursor and start from the beginning.
-@param pq A pointer to a priority queue.
-*/
-void priority_queue_rotate_reset(struct priority_queue *pq);
-
-/** Advance the rotate_cursor to the next element and return the index.
-@param pq A pointer to a priority queue.
-@return The index of the next element if any, -1 on failure.
-*/
-int priority_queue_rotate_next(struct priority_queue *pq);
-
 /** Remove the element with the specified index from a priority queue.
 @param pq A pointer to a priority queue.
 @param idx The index of the element to remove.
 @return One if the remove succeeded, failure otherwise
 */
-int priority_queue_remove(struct priority_queue *pq, int idx);
+int priority_queue_remove_at(struct priority_queue *pq, int idx);
 
 /** Delete a priority queue.
 @param pq A pointer to a priority queue.
 */
 void priority_queue_delete(struct priority_queue *pq);
 
-/** Utility macro to simplify common case of iterating over a priority queue.
-Use as follows:
-
-<pre>
-int idx;
-char *data;
-
-int iter_count = 0;
-int iter_depth = priority_queue_size(q->ready_tasks);
-
-PRIORITY_QUEUE_BASE_ITERATE(pq, idx, data, iter_count, iter_depth) {
-	printf("Data idx: %d\n", idx);
-}
-
-int iter_count = 0;
-int iter_depth = 4;
-PRIORITY_QUEUE_STATIC_ITERATE( pq, idx, data, iter_count, iter_depth ) {
-    printf("Has accessed %d of %d elements\n", iter_count, iter_depth);
-    printf("Data idx: %d\n", idx);
-}
-
-iter_count = 0;
-iter_depth = 7;
-PRIORITY_QUEUE_ROTATE_ITERATE( pq, idx, data, iter_count, iter_depth ) {
-    printf("Has accessed %d of %d elements\n", iter_count, iter_depth);
-    printf("Data idx: %d\n", idx);
-}
-</pre>
+/** Duplicate a priority queue.
+@param src A pointer to a priority queue.
+@return A pointer to a new priority queue.
 */
+struct priority_queue *priority_queue_duplicate(struct priority_queue *src);
 
-/* Iterate from begining to the end every time starts. */
-#define PRIORITY_QUEUE_BASE_ITERATE( pq, idx, data, iter_count, iter_depth ) \
-    iter_count = 0; \
-    priority_queue_base_reset(pq); \
-    while ((iter_count < iter_depth) && ((idx = priority_queue_base_next(pq)) >= 0) && (data = priority_queue_peek_at(pq, idx)) && (iter_count += 1))
-
-/* Iterate from last position, never reset. */
-#define PRIORITY_QUEUE_STATIC_ITERATE( pq, idx, data, iter_count, iter_depth ) \
-    iter_count = 0; \
-    while ((iter_count < iter_depth) && ((idx = priority_queue_static_next(pq)) >= 0) && (data = priority_queue_peek_at(pq, idx)) && (iter_count += 1))
-
-/* Iterate from last position, reset to the begining when needed. */
-#define PRIORITY_QUEUE_ROTATE_ITERATE( pq, idx, data, iter_count, iter_depth ) \
-    iter_count = 0; \
-    while ((iter_count < iter_depth) && ((idx = priority_queue_rotate_next(pq)) >= 0) && (data = priority_queue_peek_at(pq, idx)) && (iter_count += 1))
+/*
+ * PRIORITY_QUEUE_SORTED_ITERATE(pq, idx, data, iter_count, iter_depth)
+ *
+ * Iterate over the priority queue in descending priority order.
+ * Internally uses a deep copy of the heap and pops elements one by one.
+ * For each popped element `data`, its corresponding `idx` in the original
+ * queue is determined via priority_queue_find_idx().
+ *
+ * You may perform operations such as:
+ *   - priority_queue_remove_at(pq, idx)
+ *   - priority_queue_update_priority_at(pq, idx, new_priority)
+ *   - priority_queue_push(pq, ...)
+ *
+ * BUT: Any such operation can change the structure of the original heap.
+ * If you use `idx` after such changes, it may no longer point to the original `data`.
+ * Always retrieve a fresh `idx` with priority_queue_find_idx() if needed again.
+ *
+ * Do not cache `idx` across modifications.
+ */
+#define PRIORITY_QUEUE_SORTED_ITERATE(pq, idx, data, iter_count, iter_depth) \
+	for ( \
+		struct priority_queue *__pq_iter_copy = priority_queue_duplicate(pq); \
+		__pq_iter_copy != NULL; \
+		priority_queue_delete(__pq_iter_copy), __pq_iter_copy = NULL \
+	) \
+		for ((iter_count) = 0; \
+		     (iter_count) < (iter_depth) && \
+		     priority_queue_size(__pq_iter_copy) > 0 && \
+		     (data = priority_queue_pop(__pq_iter_copy)) && \
+		     (idx = priority_queue_find_idx(pq, data)) >= 0; \
+		     (iter_count)++)
 
 #endif

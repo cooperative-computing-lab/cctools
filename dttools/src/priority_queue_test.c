@@ -1,179 +1,184 @@
-/*
-Copyright (C) 2024 The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-*/
-
+#include "priority_queue.h"
+#include "timestamp.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "priority_queue.h"
+#include <math.h>
+#include <assert.h>
 
-int main()
+int priority_queue_validate(struct priority_queue *pq)
 {
-	struct priority_queue *pq = priority_queue_create(2);
 	if (!pq) {
-		fprintf(stderr, "Failed to create priority queue.\n");
-		return EXIT_FAILURE;
+		return 0;
 	}
 
-	char *data[] = {"Task A", "Task B", "Task C", "Task D", "Task E", "Task F"};
-	double priorities[] = {3.0, 5.0, 1.0, 4.0, 2.0, 6.0};
+	for (int i = 0; i < priority_queue_size(pq); i++) {
+		int left = 2 * i + 1;
+		int right = 2 * i + 2;
+		if (left < priority_queue_size(pq) &&
+				priority_queue_get_priority_at(pq, i) < priority_queue_get_priority_at(pq, left)) {
+			fprintf(stderr, "heap violation: parent[%d] < left[%d]\n", i, left);
+			return 0;
+		}
+		if (right < priority_queue_size(pq) &&
+				priority_queue_get_priority_at(pq, i) < priority_queue_get_priority_at(pq, right)) {
+			fprintf(stderr, "heap violation: parent[%d] < right[%d]\n", i, right);
+			return 0;
+		}
+	}
+	return 1;
+}
 
-	// Insert elements
-	printf("Inserting elements:\n");
-	for (int i = 0; i < 6; i++) {
-		int idx = priority_queue_push(pq, data[i], priorities[i]);
-		if (idx >= 0) {
-			printf("Inserted '%s' with priority %.1f at index %d\n", data[i], priorities[i], idx);
-		} else {
-			printf("Failed to insert '%s'.\n", data[i]);
+void test_correctness(int ops)
+{
+	int check_interval = ops / 100;
+	printf("[Correctness] running with %d ops...\n", ops);
+	srand(42);
+	struct priority_queue *pq = priority_queue_create(0);
+
+	for (int i = 0; i < ops; i++) {
+		int *x = malloc(sizeof(int));
+		*x = i;
+		priority_queue_push(pq, x, rand() % 10000000);
+
+		if (i % check_interval == 0) {
+			assert(priority_queue_validate(pq));
 		}
 	}
 
-	// Get the size of the priority queue
-	int size = priority_queue_size(pq);
-	printf("\nCurrent priority queue size: %d\n", size);
+	for (int i = 0; i < 1000; i++) {
+		int idx = rand() % priority_queue_size(pq);
+		priority_queue_update_priority_at(pq, idx, rand() % 10000000);
+		assert(priority_queue_validate(pq));
+	}
 
-	// BASE ITERATE: Starts from the beginning of the queue to the end
-	int idx;
-	char *item;
+	for (int i = 0; i < 1000; i++) {
+		int idx = rand() % priority_queue_size(pq);
+		priority_queue_remove_at(pq, idx);
+		assert(priority_queue_validate(pq));
+	}
+
 	int iter_count = 0;
-	int iter_depth = priority_queue_size(pq);
-	printf("\nIterating over the priority queue using PRIORITY_QUEUE_BASE_ITERATE:\n");
-	PRIORITY_QUEUE_BASE_ITERATE(pq, idx, item, iter_count, iter_depth)
+	int idx;
+	void *data;
+	int seen = 0;
+
+	int removed_count = 0;
+	int before_size = priority_queue_size(pq);
+
+	PRIORITY_QUEUE_SORTED_ITERATE(pq, idx, data, iter_count, before_size)
 	{
-		double prio = priority_queue_get_priority(pq, idx);
-		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
+		assert(data != NULL);
+		assert(idx >= 0 && idx < priority_queue_size(pq));
+		if (priority_queue_get_priority_at(pq, idx) < rand() % 1000000) {
+			int ok = priority_queue_remove_at(pq, idx);
+			removed_count++;
+			assert(ok == 1);
+			assert(priority_queue_size(pq) == before_size - removed_count);
+		}
+		seen++;
+	}
+	assert(seen == before_size);
+	assert(priority_queue_size(pq) == before_size - removed_count);
+	assert(priority_queue_validate(pq));
+
+	while (priority_queue_size(pq) > 0) {
+		void *x = priority_queue_pop(pq);
+		free(x);
+		assert(priority_queue_validate(pq));
 	}
 
-	// Get the head of the priority queue
-	char *head = (char *)priority_queue_peek_top(pq);
-	if (head) {
-		printf("\nElement at the head of the queue: %s\n", head);
-	} else {
-		printf("\nThe queue is empty.\n");
-	}
-
-	// Access an element by index
-	idx = 4;
-	char *element = (char *)priority_queue_peek_at(pq, idx);
-	if (element) {
-		printf("\nElement at index %d: %s\n", idx, element);
-	} else {
-		printf("\nNo element found at index %d.\n", idx);
-	}
-
-	// Find an element
-	char *element_to_find = "Task D";
-	int found_idx = priority_queue_find_idx(pq, element_to_find);
-	printf("\nFinding element '%s':\n", element_to_find);
-	if (found_idx >= 0) {
-		printf("Element '%s' found at index %d\n", element_to_find, found_idx);
-	} else {
-		printf("Element '%s' not found in the queue.\n", element_to_find);
-	}
-
-	// Update the priority of an element
-	int update_idx = priority_queue_update_priority(pq, "Task A", 9.0);
-	printf("\nUpdating the priority of 'Task A' to 9.0:\n");
-	if (update_idx >= 0) {
-		printf("Task A new index after priority update: %d\n", update_idx);
-	} else {
-		printf("Failed to update priority.\n");
-	}
-
-	// Insert an element
-	int ins_idx = priority_queue_push(pq, "Task G", 11.0);
-	printf("\nInserting Task G with priority 11.0:\n");
-	if (ins_idx >= 0) {
-		printf("Inserted Task G at index %d\n", ins_idx);
-	} else {
-		printf("Failed to insert Task G.\n");
-	}
-
-	// Iterate over elements using PRIORITY_QUEUE_BASE_ITERATE
-	printf("\nIterating over the priority queue using PRIORITY_QUEUE_BASE_ITERATE:\n");
-	idx = 0;
-	item = NULL;
-	iter_depth = priority_queue_size(pq);
-	PRIORITY_QUEUE_BASE_ITERATE(pq, idx, item, iter_count, iter_depth)
-	{
-		double prio = priority_queue_get_priority(pq, idx);
-		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
-	}
-
-	// Iterate over elements using PRIORITY_QUEUE_ROTATE_ITERATE with a depth 3
-	idx = 0;
-	item = NULL;
-	iter_count = 0;
-	iter_depth = 4; // Maximum depth of the iteration
-	printf("\nIterating over the priority queue using PRIORITY_QUEUE_ROTATE_ITERATE with a depth %d:\n", iter_depth);
-	PRIORITY_QUEUE_ROTATE_ITERATE(pq, idx, item, iter_count, iter_depth)
-	{
-		double prio = priority_queue_get_priority(pq, idx);
-		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
-		// The break check must go after the task is considered, as the rotate cursor is advanced in the macro and must be considered
-	}
-
-	priority_queue_rotate_reset(pq);
-	iter_count = 0;
-	iter_depth = 5;
-	printf("\nReset the rotate cursor and Iterate from beginning with a depth %d:\n", iter_depth);
-	PRIORITY_QUEUE_ROTATE_ITERATE(pq, idx, item, iter_count, iter_depth)
-	{
-		double prio = priority_queue_get_priority(pq, idx);
-		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
-	}
-
-	// Iterate over elements using PRIORITY_QUEUE_STATIC_ITERATE
-	idx = 0;
-	item = NULL;
-	iter_count = 0;
-	iter_depth = 4;
-	printf("\nIterating over the priority queue using PRIORITY_QUEUE_STATIC_ITERATE with a depth %d:\n", iter_depth);
-	PRIORITY_QUEUE_STATIC_ITERATE(pq, idx, item, iter_count, iter_depth)
-	{
-		double prio = priority_queue_get_priority(pq, idx);
-		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
-	}
-	iter_count = 0;
-	iter_depth = 12;
-	printf("Continue iterating from the last position with a depth %d\n", iter_depth);
-	PRIORITY_QUEUE_STATIC_ITERATE(pq, idx, item, iter_count, iter_depth)
-	{
-		double prio = priority_queue_get_priority(pq, idx);
-		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
-	}
-
-	// Remove an element by index using priority_queue_remove
-	printf("\nRemoving element at index 2.\n");
-	if (priority_queue_remove(pq, 2)) {
-		printf("Element at index 2 removed successfully.\n");
-	} else {
-		printf("Failed to remove element at index 2.\n");
-	}
-
-	iter_count = 0;
-	iter_depth = priority_queue_size(pq);
-	printf("\nIterating over the priority queue using PRIORITY_QUEUE_BASE_ITERATE:\n");
-	PRIORITY_QUEUE_BASE_ITERATE(pq, idx, item, iter_count, iter_depth)
-	{
-		double prio = priority_queue_get_priority(pq, idx);
-		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
-	}
-
-	// Pop elements from the priority queue using priority_queue_pop
-	printf("\nPopping elements from the priority queue:\n");
-	while ((item = (char *)priority_queue_peek_top(pq)) != NULL) {
-		printf("Popped element: %s  Priority: %d\n", item, (int)priority_queue_get_priority(pq, 0));
-		priority_queue_pop(pq);
-	}
-
-	// Check the size after popping all elements
-	size = priority_queue_size(pq);
-	printf("\nPriority queue size after popping all elements: %d\n", size);
+	assert(priority_queue_size(pq) == 0);
+	assert(priority_queue_pop(pq) == NULL);
+	assert(priority_queue_peek_top(pq) == NULL);
+	assert(isnan(priority_queue_get_priority_at(pq, 0)));
 
 	priority_queue_delete(pq);
+	printf("[Correctness] passed. Sorted macro tested on %d elements.\n", seen);
+}
 
-	return EXIT_SUCCESS;
+void test_performance(int ops)
+{
+	printf("[Performance] running with %d ops...\n", ops);
+	struct priority_queue *pq = priority_queue_create(0);
+	void **refs = malloc(sizeof(void *) * ops);
+
+	timestamp_t t_push_start = timestamp_get();
+	for (int i = 0; i < ops; i++) {
+		refs[i] = malloc(sizeof(int));
+		*(int *)refs[i] = i;
+		priority_queue_push(pq, refs[i], rand() % 10000000);
+	}
+	timestamp_t t_push_end = timestamp_get();
+
+	timestamp_t t_peek_start = timestamp_get();
+	for (int i = 0; i < ops; i++) {
+		int idx = rand() % priority_queue_size(pq);
+		priority_queue_peek_at(pq, idx);
+	}
+	timestamp_t t_peek_end = timestamp_get();
+
+	timestamp_t t_pop_start = timestamp_get();
+	for (int i = 0; i < ops; i++) {
+		void *x = priority_queue_pop(pq);
+		free(x);
+	}
+	timestamp_t t_pop_end = timestamp_get();
+
+	free(refs);
+	priority_queue_delete(pq);
+
+	printf("[Performance] push: %.2fs, peek: %.2fs, pop: %.2fs\n", (t_push_end - t_push_start) / 1e6, (t_peek_end - t_peek_start) / 1e6, (t_pop_end - t_pop_start) / 1e6);
+}
+
+void test_push_or_update(int ops)
+{
+    printf("[PQUEUE find+update] running with %d ops...\n", ops);
+    struct priority_queue *pq = priority_queue_create(0);
+    int *pool = malloc(sizeof(int) * ops);
+
+    for (int i = 0; i < ops; i++) {
+        pool[i] = i;
+    }
+
+    srand(42);
+    timestamp_t t_start = timestamp_get();
+
+    for (int i = 0; i < ops; i++) {
+        int *ref = &pool[rand() % ops];
+        double new_prio = rand() % 10000000;
+
+        int idx = priority_queue_find_idx(pq, ref);
+        if (idx >= 0) {
+            priority_queue_update_priority_at(pq, idx, new_prio);
+        } else {
+            priority_queue_push(pq, ref, new_prio);
+        }
+    }
+
+    while (priority_queue_size(pq) > 0) {
+        int *x = priority_queue_pop(pq);
+        assert(x != NULL);
+    }
+
+    timestamp_t t_end = timestamp_get();
+    printf("[PQUEUE find+update] total time: %.2fs\n", (t_end - t_start) / 1e6);
+
+    priority_queue_delete(pq);
+    free(pool);
+}
+
+int main()
+{
+	timestamp_t t1 = timestamp_get();
+	test_correctness(1e4);
+	timestamp_t t2 = timestamp_get();
+	test_performance(1e6);
+	timestamp_t t3 = timestamp_get();
+	test_push_or_update(1e6);
+	timestamp_t t4 = timestamp_get();
+
+	printf("Correctness test time: %.2fs\n", (t2 - t1) / 1e6);
+	printf("Performance test time: %.2fs\n", (t3 - t2) / 1e6);
+	printf("Push or update test time: %.2fs\n", (t4 - t3) / 1e6);
+	return 0;
 }
