@@ -26,5 +26,6 @@ struct vine_task *vine_schedule_find_library(struct vine_manager *q, struct vine
 int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 int vine_schedule_rotate_pending_tasks(struct vine_manager *q);
 int vine_schedule_commit_ready_tasks(struct vine_manager *q);
+void vine_schedule_push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t);
 
 #endif

@@ -4389,25 +4389,6 @@ char *vine_monitor_wrap(struct vine_manager *q, struct vine_worker_info *w, stru
 	return wrap_cmd;
 }
 
-/* Put a given task on the ready list, taking into account the task priority and the manager schedule. */
-
-static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t)
-{
-	if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
-		/* when a task is resubmitted given resource exhaustion, we
-		 * increment its priority by 1, so it gets to run as soon
-		 * as possible among those with the same priority. This avoids
-		 * the issue in which all 'big' tasks fail because the first
-		 * allocation is too small. */
-		priority_map_push_or_update(q->ready_tasks, t, t->priority + 1);
-	} else {
-		priority_map_push_or_update(q->ready_tasks, t, t->priority);
-	}
-
-	/* If the task has been used before, clear out accumulated state. */
-	vine_task_clean(t);
-}
-
 /*
 Changes task to a target state, and performs the associated
 accounting needed to log the event and put the task into the
@@ -4456,7 +4437,7 @@ vine_task_state_t change_task_state(struct vine_manager *q, struct vine_task *t,
 		break;
 	case VINE_TASK_READY:
 		vine_task_set_result(t, VINE_RESULT_UNKNOWN);
-		push_task_to_ready_tasks(q, t);
+		vine_schedule_push_task_to_ready_tasks(q, t);
 		c->vine_stats->tasks_waiting++;
 		break;
 	case VINE_TASK_RUNNING:
@@ -5118,6 +5099,16 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				sent_in_previous_cycle = 1;
 				continue;
 			}
+		}
+
+		// Check if any pending tasks need to be committed
+		BEGIN_ACCUM_TIME(q, time_internal);
+		result = vine_schedule_rotate_pending_tasks(q);
+		END_ACCUM_TIME(q, time_internal);
+		if (result) {
+			// found at least one pending task that is runnable
+			events++;
+			continue;
 		}
 
 		// Check if any temp files need replication and start replicating

@@ -637,50 +637,102 @@ static vine_resource_bitmask_t is_task_larger_than_any_worker(struct vine_manage
 	return bit_set;
 }
 
-int vine_task_runnable(struct vine_manager *q, struct vine_task *t)
+/* Put a given task on the ready list, taking into account the task priority and the manager schedule. */
+void vine_schedule_push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t)
+{
+	if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
+		/* when a task is resubmitted given resource exhaustion, we
+		 * increment its priority by 1, so it gets to run as soon
+		 * as possible among those with the same priority. This avoids
+		 * the issue in which all 'big' tasks fail because the first
+		 * allocation is too small. */
+		t->priority *= 1.05;
+	}
+	priority_map_push_or_update(q->ready_tasks, t, t->priority);
+
+	/* If the task has been used before, clear out accumulated state. */
+	vine_task_clean(t);
+}
+
+/* Find the number of committable cores across all connected workers. */
+static int vine_schedule_find_commitable_cores(struct vine_manager *q)
+{
+	int committable_cores = 0;
+	uint64_t library_task_id = 0;
+	struct vine_task *library_task = NULL;
+	char *key;
+	struct vine_worker_info *w;
+
+	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	{
+		if (!w->resources || w->resources->cores.total <= 0) {
+			continue;
+		}
+		if (w->current_libraries && itable_size(w->current_libraries) > 0) {
+			ITABLE_ITERATE(w->current_libraries, library_task_id, library_task)
+			{
+				if (!library_task || !library_task->provides_library) {
+					continue;
+				}
+				committable_cores += (library_task->function_slots_total - library_task->function_slots_inuse);
+			}
+		}
+		committable_cores += (overcommitted_resource_total(q, w->resources->cores.total) - w->resources->cores.inuse);
+	}
+
+	return committable_cores;
+}
+
+int vine_schedule_check_task_runnable(struct vine_manager *q, struct vine_task *t)
 {
 	timestamp_t now_usecs = timestamp_get();
 	double now_secs = ((double)now_usecs) / ONE_SECOND;
 
-	// Skip task if min requested start time not met.
+	/* Skip task if min requested start time not met. */
 	if (t->resources_requested->start > now_secs) {
 		return 0;
 	}
 
-	// Skip if this task failed recently
+	/* Skip if this task failed recently */
 	if (t->time_when_last_failure + q->transient_error_interval > now_usecs) {
 		return 0;
 	}
 
-	// Skip if category already running maximum allowed tasks
+	/* Skip if category already running maximum allowed tasks */
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 	if (c->max_concurrent > -1 && c->max_concurrent <= c->vine_stats->tasks_running) {
 		return 0;
 	}
 
-	// Skip task if temp input files have not been materialized.
+	/* Skip task if temp input files have not been materialized. */
 	if (!vine_manager_check_inputs_available(q, t)) {
 		return 0;
 	}
 
-	// Skip function call task if no suitable library template was installed.
+	/* Skip function call task if no suitable library template was installed. */
 	if (!vine_manager_check_library_for_function_call(q, t)) {
 		return 0;
 	}
 
-	// All checks passed, task is eligible to run.
+	/* All checks passed, task is eligible to run. */
 	return 1;
 }
 
 int vine_schedule_commit_ready_tasks(struct vine_manager *q)
 {
-	int success = 0;
+	int committable_cores = vine_schedule_find_commitable_cores(q);
+	if (committable_cores == 0) {
+		return 0;
+	}
+
+	int committed_tasks = 0;
 	int tasks_considered = 0;
-	int tasks_to_consider = MIN(list_size(q->pending_tasks), q->attempt_schedule_depth);
+	int tasks_to_consider = MIN(priority_map_size(q->ready_tasks), q->attempt_schedule_depth);
 
-	struct list *skipped_tasks = list_create();
+	/* temporarily skipped tasks that are runnable but cannot fit on any current worker */
+	struct list *deferred_runnable_tasks = list_create();
 
-	while (tasks_considered++ < tasks_to_consider) {
+	while ((tasks_considered++ < tasks_to_consider) && (committed_tasks < committable_cores)) {
 
 		struct vine_task *t = priority_map_pop(q->ready_tasks);
 		if (!t) {
@@ -688,46 +740,50 @@ int vine_schedule_commit_ready_tasks(struct vine_manager *q)
 		}
 
 		/* this task is not runnable at all, put it back in the pending queue */
-		if (!vine_task_runnable(q, t)) {
+		if (!vine_schedule_check_task_runnable(q, t)) {
 			list_push_tail(q->pending_tasks, t);
 			continue;
 		}
 
+		/* select a worker for the task */
 		struct vine_worker_info *w = vine_schedule_task_to_worker(q, t);
 
 		/* task is runnable but no worker is fit, silently skip it */
 		if (!w) {
-			list_push_tail(skipped_tasks, t);
+			list_push_tail(deferred_runnable_tasks, t);
 			continue;
 		}
 
-		/* otherwise, commit the task to the worker */
+		/* commit the task to the worker */
 		vine_result_code_t result;
 		if (q->task_groups_enabled) {
 			result = commit_task_group_to_worker(q, w, t);
 		} else {
 			result = commit_task_to_worker(q, w, t);
 		}
-		
-		if (result != VINE_SUCCESS) {
-			priority_map_push_or_update(q->ready_tasks, t, t->priority);
-		} else {
-			success++;
-		}
 
-		break;
+		/* if the task was not committed, defer it */
+		if (result != VINE_SUCCESS) {
+			list_push_tail(deferred_runnable_tasks, t);
+		} else {
+			committed_tasks++;
+		}
 	}
 
 	/* put back all tasks that were skipped */
 	struct vine_task *t;
-	LIST_ITERATE(skipped_tasks, t) {
-		priority_map_push_or_update(q->ready_tasks, t, t->priority);
+	LIST_ITERATE(deferred_runnable_tasks, t)
+	{
+		vine_schedule_push_task_to_ready_tasks(q, t);
 	}
-	list_delete(skipped_tasks);
+	list_delete(deferred_runnable_tasks);
 
-	return success;
+	return committed_tasks;
 }
 
+/*
+Rotate pending tasks to the ready queue if they are runnable.
+*/
 int vine_schedule_rotate_pending_tasks(struct vine_manager *q)
 {
 	int runnable_tasks = 0;
@@ -744,7 +800,14 @@ int vine_schedule_rotate_pending_tasks(struct vine_manager *q)
 			break;
 		}
 
-		/* expire pending tasks */
+		/* if the task is runnable, push it to the ready queue */
+		if (vine_schedule_check_task_runnable(q, t)) {
+			vine_schedule_push_task_to_ready_tasks(q, t);
+			runnable_tasks++;
+			continue;
+		}
+
+		/* otherwise, perform various checks */
 		/* In this loop, use VINE_RESULT_SUCCESS as an indication of "still ok to run". */
 		vine_result_t result = VINE_RESULT_SUCCESS;
 		if (t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
@@ -768,14 +831,8 @@ int vine_schedule_rotate_pending_tasks(struct vine_manager *q)
 			continue;
 		}
 
-		/* this task is not runnable at all, put it back in the pending queue */
-		if (!vine_task_runnable(q, t)) {
-			list_push_tail(q->pending_tasks, t);
-		} else {
-			/* otherwise, push it to the ready queue for later scheduling */
-			priority_map_push_or_update(q->ready_tasks, t, t->priority);
-			runnable_tasks++;
-		}
+		/* if the task is not runnable, put it back in the pending queue */
+		list_push_tail(q->pending_tasks, t);
 	}
 
 	return runnable_tasks;
@@ -790,7 +847,6 @@ This is quite an expensive function and so is invoked only periodically.
 
 void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 {
-	int t_idx;
 	struct vine_task *t;
 	int unfit_core = 0;
 	int unfit_mem = 0;
@@ -799,10 +855,7 @@ void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 
 	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
 
-	int iter_count = 0;
-	int iter_depth = priority_map_size(q->ready_tasks);
-
-	PRIORITY_MAP_ITERATE(q->ready_tasks, t, t_idx, iter_count, iter_depth)
+	LIST_ITERATE(q->pending_tasks, t)
 	{
 		// check each task against the queue of connected workers
 		vine_resource_bitmask_t bit_set = is_task_larger_than_any_worker(q, t);
