@@ -1752,7 +1752,7 @@ static struct rmsummary *total_resources_needed(struct vine_manager *q)
 	int iter_depth = priority_map_size(q->ready_tasks);
 
 	/* for waiting tasks, we use what they would request if dispatched right now. */
-	PRIORITY_MAP_ITERATE(q->ready_tasks, t, t_idx, iter_count, iter_depth)
+	PRIORITY_MAP_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
 	{
 		const struct rmsummary *s = vine_manager_task_resources_min(q, t);
 		rmsummary_add(total, s);
@@ -5272,7 +5272,7 @@ int vine_hungry_computation(struct vine_manager *q)
 	struct vine_task *t;
 	int iter_depth = MIN(q->attempt_schedule_depth, tasks_waiting);
 	int sampled_tasks_waiting = 0;
-	PRIORITY_MAP_ITERATE(q->ready_tasks, t, t_idx, sampled_tasks_waiting, iter_depth)
+	PRIORITY_MAP_ITERATE(q->ready_tasks, t_idx, t, sampled_tasks_waiting, iter_depth)
 	{
 		/* unset resources are marked with -1, so we added what we know about currently running tasks */
 		ready_task_cores += t->resources_requested->cores > 0 ? t->resources_requested->cores : avg_commited_tasks_cores;

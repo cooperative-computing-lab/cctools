@@ -28,15 +28,14 @@ void priority_map_delete(struct priority_map *pmap);
 int priority_map_validate(struct priority_map *pmap);
 
 /*
- * PRIORITY_MAP_ITERATE(pmap, data_ptr, idx, iter_count, iter_depth)
+ * PRIORITY_MAP_ITERATE(pmap, idx, data_ptr, iter_count, iter_depth)
  *
  * Read-only, fast iteration over the priority map.
- * Does NOT require internal struct visibility.
  * You may NOT modify the map during iteration.
  */
 extern void *priority_map_internal_peek_data(struct priority_map *pmap, int idx);
 
-#define PRIORITY_MAP_ITERATE(pmap, data_ptr, idx, iter_count, iter_depth) \
+#define PRIORITY_MAP_ITERATE(pmap, idx, data_ptr, iter_count, iter_depth) \
     for ((iter_count) = 0, (idx) = 0; \
          (iter_count) < (iter_depth) && (idx) < priority_map_size(pmap) && \
          ((data_ptr) = priority_map_internal_peek_data(pmap, idx), 1); \
