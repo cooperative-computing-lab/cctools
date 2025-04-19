@@ -1736,6 +1736,9 @@ static void vine_worker_serve_manager(struct link *manager)
 			break;
 		}
 
+		/* Periodically process pending transfers. */
+		vine_cache_process_pending_transfers(cache_manager);
+
 		/* Check all known libraries if they are ready to execute functions. */
 		check_libraries_ready(manager);
 
