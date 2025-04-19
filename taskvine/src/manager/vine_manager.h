@@ -13,6 +13,7 @@ This module is private to the manager and should not be invoked by the end user.
 */
 
 #include "taskvine.h"
+#include "vine_task.h"
 #include <limits.h>
 
 /*
@@ -102,7 +103,8 @@ struct vine_manager {
 	/* Primary data structures for tracking task state. */
 
 	struct itable *tasks;           /* Maps task_id -> vine_task of all tasks in any state. */
-	struct priority_queue   *ready_tasks;       /* Priority queue of vine_task that are waiting to execute. */
+	struct priority_map *ready_tasks;           /* Priority map of vine_task that are waiting to execute. */
+	struct list         *pending_tasks;          /* List of vine_task that are pending. */
 	struct itable   *running_table;      /* Table of vine_task that are running at workers. */
 	struct list   *waiting_retrieval_list;      /* List of vine_task that are waiting to be retrieved. */
 	struct list   *retrieved_list;      /* List of vine_task that have been retrieved. */
@@ -283,6 +285,14 @@ struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, 
 
 void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason);
 
+struct category *vine_category_lookup_or_create(struct vine_manager *q, const char *name);
+
+int vine_manager_check_inputs_available(struct vine_manager *q, struct vine_task *t);
+
+vine_task_state_t change_task_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state);
+vine_result_code_t commit_task_group_to_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
+vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
+int vine_manager_check_library_for_function_call(struct vine_manager *q, struct vine_task *t);
 /* Check if the worker is able to transfer the necessary files for this task. */
 int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 

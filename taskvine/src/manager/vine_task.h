@@ -141,6 +141,7 @@ struct vine_task {
 	int refcount;                                          /**< Number of remaining references to this object. */
 };
 
+char *vine_task_key_generator(const void *ptr);
 void vine_task_delete(struct vine_task *t);
 /* Add a reference to an existing task object, return the same object. */
 struct vine_task * vine_task_addref( struct vine_task *t );
