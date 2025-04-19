@@ -762,16 +762,9 @@ int vine_schedule_commit_ready_tasks(struct vine_manager *q)
 			result = commit_task_to_worker(q, w, t);
 		}
 
-		/* if the task was not committed, defer it */
-		if (result != VINE_SUCCESS) {
-			// list_push_tail(deferred_runnable_tasks, t);
-		} else {
-			committed_tasks++;
-			printf("committed task_id %d, still %d tasks to consider\n", t->task_id, tasks_to_consider - tasks_considered);
-		}
-
 		switch (result) {
 		case VINE_SUCCESS:
+			committed_tasks++;
 			break;
 		case VINE_APP_FAILURE:
 		case VINE_WORKER_FAILURE:
