@@ -220,7 +220,10 @@ int vine_cache_process_pending_transfers(struct vine_cache *c)
 		}
 		vine_cache_status_t status = vine_cache_ensure(c, queue_cachename);
 		if (status == VINE_CACHE_STATUS_PROCESSING) {
+			vine_cache_insert_processing_transfer(c, queue_cachename);
 			processed++;
+		} else if (status == VINE_CACHE_STATUS_PENDING) {
+			vine_cache_insert_pending_transfer(c, queue_cachename);
 		}
 		free(queue_cachename);
 	}
@@ -373,6 +376,7 @@ int vine_cache_add_transfer(struct vine_cache *c, const char *cachename, const c
 	f->transfer_time = 0;
 
 	hash_table_insert(c->table, cachename, f);
+	vine_cache_insert_pending_transfer(c, cachename);
 
 	/* Note metadata is not saved here but when transfer is completed. */
 
@@ -406,6 +410,7 @@ int vine_cache_add_mini_task(struct vine_cache *c, const char *cachename, const 
 	f->size = size;
 
 	hash_table_insert(c->table, cachename, f);
+	vine_cache_insert_pending_transfer(c, cachename);
 
 	/* Note metadata is not saved here but when mini task is completed. */
 
@@ -426,6 +431,9 @@ int vine_cache_remove(struct vine_cache *c, const char *cachename, struct link *
 
 	/* Ensure that any child process associated with the entry is stopped. */
 	vine_cache_kill(c, f, cachename, manager);
+
+	vine_cache_remove_pending_transfer(c, cachename);
+	vine_cache_remove_processing_transfer(c, cachename);
 
 	/* Then remove the disk state associated with the file. */
 	char *data_path = vine_cache_data_path(c, cachename);
@@ -732,7 +740,6 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 
 	int num_processing = list_size(c->processing_transfers);
 	if (num_processing >= c->max_transfer_procs) {
-		vine_cache_insert_pending_transfer(c, cachename);
 		return VINE_CACHE_STATUS_PENDING;
 	}
 
@@ -743,8 +750,6 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 		f->status = VINE_CACHE_STATUS_FAILED;
 		return f->status;
 	} else if (f->pid > 0) {
-		vine_cache_remove_pending_transfer(c, cachename);
-		vine_cache_insert_processing_transfer(c, cachename);
 		f->status = VINE_CACHE_STATUS_PROCESSING;
 		switch (f->cache_type) {
 		case VINE_CACHE_TRANSFER:
