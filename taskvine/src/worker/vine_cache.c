@@ -246,11 +246,11 @@ void vine_cache_delete(struct vine_cache *c)
 	while ((queue_cachename = list_pop_head(c->pending_transfers))) {
 		free(queue_cachename);
 	}
-	free(c->pending_transfers);
+	list_delete(c->pending_transfers);
 	while ((queue_cachename = list_pop_head(c->processing_transfers))) {
 		free(queue_cachename);
 	}
-	free(c->processing_transfers);
+	list_delete(c->processing_transfers);
 
 	hash_table_clear(c->table, (void *)vine_cache_file_delete);
 	hash_table_delete(c->table);
