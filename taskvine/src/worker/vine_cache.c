@@ -160,6 +160,16 @@ static void vine_cache_kill(struct vine_cache *c, struct vine_cache_file *f, con
 	}
 }
 
+static int vine_cache_insert_pending_transfer(struct vine_cache *c, const char *cachename)
+{
+	return list_push_tail(c->pending_transfers, strdup(cachename));
+}
+
+static int vine_cache_insert_processing_transfer(struct vine_cache *c, const char *cachename)
+{
+	return list_push_tail(c->processing_transfers, strdup(cachename));
+}
+
 static int vine_cache_remove_pending_transfer(struct vine_cache *c, const char *cachename)
 {
 	int removed = 0;
@@ -194,16 +204,6 @@ static int vine_cache_remove_processing_transfer(struct vine_cache *c, const cha
 	list_cursor_destroy(cur);
 
 	return removed;
-}
-
-static int vine_cache_insert_pending_transfer(struct vine_cache *c, const char *cachename)
-{
-	return list_push_tail(c->pending_transfers, strdup(cachename));
-}
-
-static int vine_cache_insert_processing_transfer(struct vine_cache *c, const char *cachename)
-{
-	return list_push_tail(c->processing_transfers, strdup(cachename));
 }
 
 /*
