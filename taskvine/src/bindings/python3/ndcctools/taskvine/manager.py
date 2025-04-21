@@ -97,17 +97,7 @@ class Manager(object):
         else:
             self._staging_explicit = None
 
-        # if we were given a range ports, rather than a single port to try.
-        lower, upper = None, None
-        try:
-            lower, upper = port
-            set_port_range(lower, upper)
-            port = 0
-        except TypeError:
-            # if not a range, ignore
-            pass
-        except ValueError:
-            raise ValueError("port should be a single integer, or a sequence of two integers")
+        set_port_range(port)
 
         if status_display_interval and status_display_interval >= 1:
             self._info_widget = JupyterDisplay(interval=status_display_interval)
@@ -125,13 +115,22 @@ class Manager(object):
             self._stats_hierarchy = cvine.vine_stats()
 
             ssl_key, ssl_cert = self._setup_ssl(ssl, run_info_path)
-            self._taskvine = cvine.vine_ssl_create(port, ssl_key, ssl_cert)
+
+            # use port = 0, as a port range has been set with set_port_range
+            self._taskvine = cvine.vine_ssl_create(0, ssl_key, ssl_cert)
 
             if ssl_key:
                 self._using_ssl = True
 
             if not self._taskvine:
-                raise Exception("Could not create manager on port {}".format(port))
+                msg = "Could not create manager on:"
+                msg += f"\nport: {port}"
+                if run_info_path:
+                    msg += f"\nrun_info_path: {os.path.abspath(run_info_path)}"
+                if staging_path:
+                    msg += f"\nstaging_path: {os.path.abspath(staging_path)}"
+
+                raise Exception(msg)
 
             if name:
                 cvine.vine_set_name(self._taskvine, name)
