@@ -168,30 +168,30 @@ int vine_cache_process_pending_transfers(struct vine_cache *c)
 {
 	int processed = 0;
 
-	char **to_process = xxmalloc(hash_table_size(c->pending_transfers) * sizeof(char *));
-	int count = 0;
-	char *queue_cachename;
+	struct list *to_process = list_create();
+	char *cachename;
 	void *dummy;
-	HASH_TABLE_ITERATE(c->pending_transfers, queue_cachename, dummy)
+	HASH_TABLE_ITERATE(c->pending_transfers, cachename, dummy)
 	{
-		to_process[count++] = xxstrdup(queue_cachename);
-		if (count >= c->max_transfer_procs - hash_table_size(c->processing_transfers)) {
+		list_push_tail(to_process, xxstrdup(cachename));
+		if (list_size(to_process) >= c->max_transfer_procs - hash_table_size(c->processing_transfers)) {
 			break;
 		}
 	}
 
-	for (int i = 0; i < count; i++) {
-		hash_table_remove(c->pending_transfers, to_process[i]);
-		vine_cache_status_t status = vine_cache_ensure(c, to_process[i]);
+	while ((cachename = list_pop_head(to_process))) {
+		hash_table_remove(c->pending_transfers, cachename);
+		vine_cache_status_t status = vine_cache_ensure(c, cachename);
 		if (status == VINE_CACHE_STATUS_PROCESSING) {
-			hash_table_insert(c->processing_transfers, to_process[i], NULL);
+			hash_table_insert(c->processing_transfers, cachename, NULL);
 			processed++;
 		} else {
 			/* otherwise, we silently skip this transfer */
 		}
-		free(to_process[i]);
+		free(cachename);
 	}
-	free(to_process);
+
+	list_delete(to_process);
 
 	return processed;
 }
@@ -209,9 +209,11 @@ void vine_cache_delete(struct vine_cache *c)
 		vine_cache_kill(c, file, cachename, 0);
 	}
 
-	/* clean up processing and pending transfers */
 	hash_table_clear(c->pending_transfers, NULL);
 	hash_table_clear(c->processing_transfers, NULL);
+
+	hash_table_delete(c->pending_transfers);
+	hash_table_delete(c->processing_transfers);
 
 	hash_table_clear(c->table, (void *)vine_cache_file_delete);
 	hash_table_delete(c->table);
