@@ -168,26 +168,18 @@ int vine_cache_process_pending_transfers(struct vine_cache *c)
 {
 	int processed = 0;
 
-	struct list *to_process = list_create();
-	char *cachename;
 	void *dummy;
-	HASH_TABLE_ITERATE(c->pending_transfers, cachename, dummy)
-	{
-		list_push_tail(to_process, xxstrdup(cachename));
-		if (list_size(to_process) >= c->max_transfer_procs - hash_table_size(c->processing_transfers)) {
-			break;
-		}
-	}
-
-	while ((cachename = list_pop_head(to_process))) {
+	char *cachename;
+	hash_table_firstkey(c->pending_transfers);
+	while (hash_table_nextkey(c->pending_transfers, &cachename, &dummy)) {
 		vine_cache_status_t status = vine_cache_ensure(c, cachename);
 		if (status == VINE_CACHE_STATUS_PROCESSING) {
 			processed++;
+		} else {
+			/* we hit the concurrency limit, or something else went wrong */
+			break;
 		}
-		free(cachename);
 	}
-
-	list_delete(to_process);
 
 	return processed;
 }
@@ -644,6 +636,7 @@ or VINE_CACHE_STATUS_TRANSFERRED. On failure return VINE_CACHE_STATUS_FAILED.
 vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachename)
 {
 	hash_table_remove(c->pending_transfers, cachename);
+	hash_table_firstkey(c->pending_transfers);
 
 	if (!strcmp(cachename, "0"))
 		return VINE_CACHE_STATUS_READY;
