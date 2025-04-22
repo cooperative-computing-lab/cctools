@@ -448,9 +448,23 @@ static int handle_cache_invalid(struct vine_manager *q, struct vine_worker_info 
 
 		/* If the third argument was given, also remove the transfer record */
 		if (n >= 3) {
+			/* delete the file from the source and destination workers */
+			struct vine_worker_info *source_worker = vine_current_transfers_get_source_worker(q, transfer_id);
+			struct vine_worker_info *to_worker = vine_current_transfers_get_dest_worker(q, transfer_id);
+
+			if (source_worker) {
+				delete_worker_file(q, source_worker, cachename, 0, 0);
+			}
+			if (to_worker) {
+				delete_worker_file(q, to_worker, cachename, 0, 0);
+			}
+
 			vine_current_transfers_set_failure(q, transfer_id);
 			vine_current_transfers_remove(q, transfer_id);
 		} else {
+			/* delete the file from the worker that sent the invalid message */
+			delete_worker_file(q, w, cachename, 0, 0);
+
 			/* throttle workers that could transfer a file */
 			w->last_failure_time = timestamp_get();
 		}

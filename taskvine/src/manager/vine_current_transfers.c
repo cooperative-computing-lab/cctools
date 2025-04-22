@@ -35,6 +35,18 @@ static void vine_transfer_pair_delete(struct vine_transfer_pair *p)
 	}
 }
 
+struct vine_worker_info *vine_current_transfers_get_source_worker(struct vine_manager *q, const char *id)
+{
+	struct vine_transfer_pair *p = hash_table_lookup(q->current_transfer_table, id);
+	return p ? p->source_worker : NULL;
+}
+
+struct vine_worker_info *vine_current_transfers_get_dest_worker(struct vine_manager *q, const char *id)
+{
+	struct vine_transfer_pair *p = hash_table_lookup(q->current_transfer_table, id);
+	return p ? p->to : NULL;
+}
+
 // add a current transaction to the transfer table
 char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info *to, struct vine_worker_info *source_worker, const char *source_url)
 {
