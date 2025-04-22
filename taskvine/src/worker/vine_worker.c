@@ -1449,7 +1449,7 @@ static int process_can_run_eventually(struct vine_process *p, struct vine_cache 
 	if (p->task->needs_library) {
 		/* Note that we check for *some* library but do not bind to it. */
 		struct vine_process *p_future = find_future_library_for_function(p->task->needs_library);
-		if (!p || p_future->result == VINE_RESULT_LIBRARY_EXIT) {
+		if (!p_future || p_future->result == VINE_RESULT_LIBRARY_EXIT) {
 			debug(D_VINE, "task %d does not match any library \"%s\"", p->task->task_id, p->task->needs_library);
 			return 0;
 		}
