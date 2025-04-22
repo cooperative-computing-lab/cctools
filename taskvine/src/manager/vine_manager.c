@@ -5240,8 +5240,13 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				free(key);
 
 				if (w) {
-					// found a worker that is still connected...
+					// found a worker that is still connected.
 					break;
+				} else {
+					// if the worker is not in the worker_table anymore,
+					// this means that it disconnected before we got to it
+					// in the workers_with_complete_tasks list. Elements
+					// of that list are only removed in the pop above.
 				}
 			}
 
