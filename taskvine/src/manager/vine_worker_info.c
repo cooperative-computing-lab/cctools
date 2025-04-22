@@ -43,6 +43,8 @@ struct vine_worker_info *vine_worker_create(struct link *lnk)
 	w->last_transfer_failure = 0;
 	w->last_failure_time = 0;
 
+	w->tasks_waiting_retrieval = 0;
+
 	vine_counters.worker.created++;
 
 	return w;
