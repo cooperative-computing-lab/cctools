@@ -927,12 +927,16 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 
 	timestamp_t total_execution_time = timestamp_get() - q->stats->time_first_task_started;
 
-	double current_eviction_interval = 0;
-	if (q->stats->workers_removed > 0) {
-		current_eviction_interval = total_execution_time / ((double)q->stats->workers_removed + 1);
+	/* the time to remove the first worker is when the workflow has run for q->enforce_worker_eviction_interval */
+	if (q->stats->workers_removed == 0 && total_execution_time <= q->enforce_worker_eviction_interval) {
+		return 0;
 	}
 
-	if (current_eviction_interval > q->enforce_worker_eviction_interval) {
+	/* calculate the current eviction interval */
+	double current_eviction_interval = MIN(total_execution_time / (q->stats->workers_removed + 0.1), total_execution_time);
+
+	/* skip if the current eviction is too frequent */
+	if (current_eviction_interval <= q->enforce_worker_eviction_interval) {
 		return 0;
 	}
 
