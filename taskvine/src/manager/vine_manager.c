@@ -5903,7 +5903,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 			q->disk_proportion_available_to_task = value;
 		}
 	} else if (!strcmp(name, "enforce-worker-eviction-interval")) {
-		q->enforce_worker_eviction_interval = MAX(0, (int)value);
+		q->enforce_worker_eviction_interval = MAX(0, (int)value) * ONE_SECOND;
 
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
