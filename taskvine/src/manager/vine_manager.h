@@ -238,7 +238,7 @@ struct vine_manager {
 	timestamp_t large_task_check_interval;	/* How frequently to check for tasks that do not fit any worker. */
 	double option_blocklist_slow_workers_timeout;	/* Default timeout for slow workers to come back to the pool, can be set prior to creating a manager. */
 
-	int enforce_worker_eviction_interval;   /* Used in testing mode to enforce worker eviction interval in seconds */
+	timestamp_t enforce_worker_eviction_interval;   /* Used in testing mode to enforce worker eviction interval in seconds */
 	int max_workers;                        /* Used in testing mode to limit the number of workers */
 };
 
