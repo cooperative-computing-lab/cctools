@@ -85,17 +85,10 @@ void chirp_stats_summary( struct jx *j )
 
 void chirp_stats_cleanup()
 {
-	char *addr;
-	struct chirp_stats *s;
-
 	if(!stats_table)
 		stats_table = hash_table_create(0, 0);
 
-	hash_table_firstkey(stats_table);
-	while(hash_table_nextkey(stats_table, &addr, (void **) &s)) {
-		hash_table_remove(stats_table, addr);
-		free(s);
-	}
+	hash_table_clear(stats_table, free);
 }
 
 static UINT64_T child_ops = 0;
