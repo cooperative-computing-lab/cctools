@@ -29,6 +29,13 @@ struct hash_table {
 	struct entry **buckets;
 	int ibucket;
 	struct entry *ientry;
+
+	/* for memory safety, hash_table_nextkey cannot be called in the same
+	 * iteration if hash_table_insert or hash_table_remove has been called.
+	 * In such case, the executable will be terminated with a fatal message.
+	 * If the table should be modified during iterations, consider
+	 * using the array keys from hash_table_keys_array. (If so, remember
+	 * to free it afterwards with hash_table_free_keys_array.) */
 	int cant_iterate_yet;
 };
 

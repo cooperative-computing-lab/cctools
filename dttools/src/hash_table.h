@@ -109,6 +109,9 @@ void hash_table_firstkey(struct hash_table *h);
 
 /** Continue iteration over all keys.
 This function returns the next key and value in the iteration.
+Warning: It cannot be called after either hash_table_insert or hash_table_remove
+during the same iteration. If this is needed, consider
+iterating using manual hash_table_lookup with keys from hash_table_keys_array.
 @param h A pointer to a hash table.
 @param key A pointer to a key pointer.
 @param value A pointer to a value pointer.
