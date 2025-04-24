@@ -274,8 +274,8 @@ void hash_table_firstkey(struct hash_table *h)
 
 int hash_table_nextkey(struct hash_table *h, char **key, void **value)
 {
-	if(h->cant_iterate_yet) {
-	    fatal("cctools bug: the hash table iteration has not been reset since last modification");
+	if (h->cant_iterate_yet) {
+		fatal("cctools bug: the hash table iteration has not been reset since last modification");
 	}
 
 	if (h->ientry) {
@@ -327,8 +327,8 @@ void hash_table_randomkey(struct hash_table *h, int *offset_bookkeep)
 
 int hash_table_nextkey_with_offset(struct hash_table *h, int offset_bookkeep, char **key, void **value)
 {
-	if(h->cant_iterate_yet) {
-	    fatal("cctools bug: the hash table iteration has not been reset since last modification");
+	if (h->cant_iterate_yet) {
+		fatal("cctools bug: the hash table iteration has not been reset since last modification");
 	}
 
 	if (h->bucket_count < 1) {
