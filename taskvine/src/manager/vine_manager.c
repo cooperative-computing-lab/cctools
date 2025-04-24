@@ -510,6 +510,11 @@ static int handle_transfer_hostport(struct vine_manager *q, struct vine_worker_i
 
 static void register_waiting_retrieval(struct vine_manager *q, struct vine_worker_info *w)
 {
+	/* Here we increment the counter of tasks ready to be retrieved at the worker.
+	 * In case no other task at the worker was ready to be retrieved, we add it
+	 * to the list for the manager to eventually process in the wait loop.
+	 * The counter is decremented as tasks are retrieved. */
+
 	w->tasks_waiting_retrieval += 1;
 	if (w->tasks_waiting_retrieval == 1) {
 		/* if this is the first task waiting retrieval, then tell manager about it. */
@@ -3593,7 +3598,7 @@ static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_
 		/* If the task is waiting to be retrieved... */
 		if (t->state == VINE_TASK_WAITING_RETRIEVAL) {
 			if (tasks_received >= max_to_receive) {
-				/* but we are over the max_to_receive, then re-add worker to list. */
+				/* but we are over the max_to_receive, then re-add worker to list to be processed later. */
 				list_push_head(q->workers_with_complete_tasks, xxstrdup(w->hashkey));
 				break;
 			}
@@ -3602,6 +3607,9 @@ static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_
 			if (fetch_outputs_from_worker(q, w, task_id)) {
 				/* If it was fetched, update stats and keep going. */
 				tasks_received++;
+
+				/* Pair the increment of register_waiting_retrieval with 
+				 * a decrement as the tasks has been retrieved. */
 				w->tasks_waiting_retrieval--;
 			} else {
 				/* But if the fetch failed, the worker is no longer vaild, bail out. */
