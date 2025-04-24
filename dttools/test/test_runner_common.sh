@@ -6,7 +6,7 @@ export CC=${CC:-gcc}
 WORK_QUEUE_WORKER=$(cd "$(dirname "$0")/../../work_queue/src/"; pwd)/work_queue_worker
 TASKVINE_WORKER=$(cd "$(dirname "$0")/../../taskvine/src/worker"; pwd)/vine_worker
 
-export GDB_WRAPPER="gdb --batch -ex run -ex 'bt 10' -ex exit --args "
+export GDB_WRAPPER="gdb --batch -ex run -ex bt -ex exit --args "
 
 # Obtain a config value from the master config file.
 
