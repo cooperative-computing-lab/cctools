@@ -156,6 +156,21 @@ int hash_table_fromkey(struct hash_table *h, const char *key);
 
 unsigned hash_string(const char *s);
 
+/** Return a NULL-termianted array with a copy of all the current keys.
+It is the responsibility of the caller to free this array with
+hash_table_free_keys_array.
+@param h A pointer to a hash table.
+@return NULL-termianted array of size with a copy of all the current keys.
+*/
+
+char **hash_table_keys_array(struct hash_table *h);
+
+
+/** Free an array generated from hash_table_free_keys_array.
+@param keys NULL-termianted array of size with a copy of keys.
+*/
+void hash_table_free_keys_array(char **keys);
+
 /** Utility macro to simplify common case of iterating over a hash table.
 Use as follows:
 

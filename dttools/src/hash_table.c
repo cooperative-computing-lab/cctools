@@ -90,6 +90,39 @@ void hash_table_delete(struct hash_table *h)
 	free(h);
 }
 
+char **hash_table_keys_array(struct hash_table *h)
+{
+	char **keys = (char **)malloc(sizeof(char *) * (h->size + 1));
+	int ikey = 0;
+
+	struct entry *e, *f;
+	int i;
+
+	for (i = 0; i < h->bucket_count; i++) {
+		e = h->buckets[i];
+		while (e) {
+			keys[ikey] = strdup(e->key);
+			ikey++;
+			f = e->next;
+			e = f;
+		}
+	}
+
+	keys[h->size] = NULL;
+
+	return keys;
+}
+
+void hash_table_free_keys_array(char **keys)
+{
+	int i = 0;
+	while (keys[i]) {
+		free(keys[i]);
+	}
+
+	free(keys);
+}
+
 void *hash_table_lookup(struct hash_table *h, const char *key)
 {
 	struct entry *e;
