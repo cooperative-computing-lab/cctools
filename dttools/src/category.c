@@ -229,15 +229,8 @@ static void category_delete_histograms(struct category *c)
 	itable_delete(c->histograms);
 }
 
-void category_delete(struct hash_table *categories, const char *name)
+void category_free(struct category *c)
 {
-	struct category *c = hash_table_lookup(categories, name);
-
-	if (!c)
-		return;
-
-	hash_table_remove(categories, name);
-
 	if (c->name)
 		free(c->name);
 
@@ -260,6 +253,17 @@ void category_delete(struct hash_table *categories, const char *name)
 	rmsummary_delete(c->max_resources_seen);
 
 	free(c);
+}
+
+void category_delete(struct hash_table *categories, const char *name)
+{
+	struct category *c = hash_table_lookup(categories, name);
+
+	if (!c)
+		return;
+
+	hash_table_remove(categories, name);
+	category_free(c);
 }
 
 void category_inc_histogram_count(struct histogram *h, double value, double wall_time)
