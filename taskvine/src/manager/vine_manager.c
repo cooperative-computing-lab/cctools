@@ -4907,10 +4907,11 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 		debug(D_VINE, "All instances and the template for library %s have been removed", name);
 	}
 
-	LIST_ITERATE(to_remove, name)
+	char *name_to_remove;
+	LIST_ITERATE(to_remove, name_to_remove)
 	{
-		hash_table_remove(q->library_templates, name);
-		free(name);
+		hash_table_remove(q->library_templates, name_to_remove);
+		free(name_to_remove);
 	}
 	list_delete(to_remove);
 }
