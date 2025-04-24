@@ -123,6 +123,7 @@ void category_specify_first_allocation_guess(struct category *c, const struct rm
 
 struct category *category_create(const char *name);
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name);
+void category_free(struct category *c);
 void category_delete(struct hash_table *categories, const char *name);
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file);
 

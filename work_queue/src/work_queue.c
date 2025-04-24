@@ -6206,11 +6206,7 @@ void work_queue_delete(struct work_queue *q)
 		hash_table_delete(q->worker_blocklist);
 		itable_delete(q->worker_task_map);
 
-		struct category *c;
-		hash_table_firstkey(q->categories);
-		while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
-			category_delete(q->categories, key);
-		}
+		hash_table_clear(q->categories, (void *)category_free);
 		hash_table_delete(q->categories);
 
 		list_delete(q->ready_list);
