@@ -5231,20 +5231,11 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 			struct vine_worker_info *w;
 			char *key;
-
-			struct list *to_remove = list_create();
 			HASH_TABLE_ITERATE(q->worker_table, key, w)
 			{
 				get_available_results(q, w);
-				list_push_tail(to_remove, xxstrdup(w->hashkey));
+				hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
 			}
-
-			LIST_ITERATE(to_remove, key)
-			{
-				hash_table_remove(q->workers_with_watched_file_updates, key);
-				free(key);
-			}
-			list_delete(to_remove);
 		}
 
 		q->busy_waiting_flag = 0;
