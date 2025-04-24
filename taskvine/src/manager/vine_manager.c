@@ -3608,7 +3608,7 @@ static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_
 				/* If it was fetched, update stats and keep going. */
 				tasks_received++;
 
-				/* Pair the increment of register_waiting_retrieval with 
+				/* Pair the increment of register_waiting_retrieval with
 				 * a decrement as the tasks has been retrieved. */
 				w->tasks_waiting_retrieval--;
 			} else {
