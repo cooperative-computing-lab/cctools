@@ -39,15 +39,8 @@ pfs_dircache::~pfs_dircache()
 
 void pfs_dircache::invalidate()
 {
-	char *key;
-	void *value;
-
 	if (dircache_table) {
-		hash_table_firstkey(dircache_table);
-		while (hash_table_nextkey(dircache_table, &key, &value)) {
-			hash_table_remove(dircache_table, key);
-			free(value);
-		}
+		hash_table_clear(dircache_table, free);
 	}
 
 	if (dircache_path) {
