@@ -141,6 +141,8 @@ void vine_cache_prune(struct vine_cache *c, vine_cache_level_t level)
 			vine_cache_remove(c, cachename, 0);
 		}
 	}
+
+	hash_table_free_keys_array(cachenames);
 }
 
 /*

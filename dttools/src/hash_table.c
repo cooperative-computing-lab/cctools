@@ -125,6 +125,7 @@ void hash_table_free_keys_array(char **keys)
 	int i = 0;
 	while (keys[i]) {
 		free(keys[i]);
+		i++;
 	}
 
 	free(keys);

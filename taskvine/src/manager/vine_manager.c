@@ -909,6 +909,8 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 			}
 		}
 	}
+
+	hash_table_free_keys_array(cached_names);
 }
 
 /* Remove all tasks and other associated state from a given worker. */
