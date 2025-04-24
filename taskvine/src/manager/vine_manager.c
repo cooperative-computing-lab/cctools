@@ -4892,8 +4892,6 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 	char *worker_key;
 	struct vine_worker_info *w;
 
-	struct list *to_remove = list_create();
-
 	HASH_TABLE_ITERATE(q->worker_table, worker_key, w)
 	{
 		/* A worker might contain multiple library instances */
@@ -4902,18 +4900,10 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 			vine_cancel_by_task_id(q, library->task_id);
 			library = vine_schedule_find_library(q, w, name);
 		}
-		list_push_tail(to_remove, xxstrdup(name));
+		hash_table_remove(q->library_templates, name);
 
 		debug(D_VINE, "All instances and the template for library %s have been removed", name);
 	}
-
-	char *name_to_remove;
-	LIST_ITERATE(to_remove, name_to_remove)
-	{
-		hash_table_remove(q->library_templates, name_to_remove);
-		free(name_to_remove);
-	}
-	list_delete(to_remove);
 }
 
 struct vine_task *vine_manager_find_library_template(struct vine_manager *q, const char *library_name)
