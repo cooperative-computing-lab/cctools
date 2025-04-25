@@ -17,7 +17,7 @@ See the file COPYING for details.
 #include "vine_manager_get.h"
 #include "vine_manager_put.h"
 #include "vine_manager_summarize.h"
-#include "vine_mount.h"
+#include "vine_mount.h" 
 #include "vine_perf_log.h"
 #include "vine_protocol.h"
 #include "vine_resources.h"
@@ -29,6 +29,7 @@ See the file COPYING for details.
 #include "vine_taskgraph_log.h"
 #include "vine_txn_log.h"
 #include "vine_worker_info.h"
+#include "vine_checkpoint.h"
 
 #include "address.h"
 #include "buffer.h"
@@ -4121,6 +4122,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->transfer_temps_recovery = 0;
 	q->transfer_replica_per_cycle = 10;
 
+	q->checkpoint_threshold = -1;
+
 	q->resource_submit_multiplier = 1.0;
 
 	q->minimum_transfer_timeout = 60;
@@ -5331,6 +5334,16 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			continue;
 		}
 
+		// Check if any temp files need checkpointing and start checkpointing
+		BEGIN_ACCUM_TIME(q, time_internal);
+		result = process_checkpoint_queue(q);
+		END_ACCUM_TIME(q, time_internal);
+		if (result) {
+			// checkpointed at least one temp file
+			events++;
+			continue;
+		}
+
 		// send keepalives to appropriate workers
 		BEGIN_ACCUM_TIME(q, time_status_msgs);
 		ask_for_workers_updates(q);
@@ -5776,6 +5789,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "temp-replica-count")) {
 		q->temp_replica_count = MAX(1, (int)value);
+
+	} else if (!strcmp(name, "checkpoint-threshold")) {
+		q->checkpoint_threshold = (timestamp_t)((int)value * 1e6);
 
 	} else if (!strcmp(name, "transfer-outlier-factor")) {
 		q->transfer_outlier_factor = value;

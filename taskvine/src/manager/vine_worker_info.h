@@ -94,6 +94,10 @@ struct vine_worker_info {
 	int xfer_total_bad_source_counter;
 	int xfer_total_good_destination_counter;
 	int xfer_total_bad_destination_counter;
+
+	/* checkpoint info */
+	int is_checkpoint_worker;
+	struct priority_map *checkpointed_files;
 };
 
 struct vine_worker_info * vine_worker_create( struct link * lnk );

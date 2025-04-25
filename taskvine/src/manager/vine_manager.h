@@ -221,6 +221,8 @@ struct vine_manager {
 	int transfer_replica_per_cycle;  /* Maximum number of replica to request per temp file per iteration */
 	int temp_replica_count;       /* Number of replicas per temp file */
 
+	timestamp_t checkpoint_threshold;    /* Checkpoint a file if it's penalty exceeds this threshold (TODO: make it a heuristic parameter) */
+
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
 	int disk_avail_threshold; /* Ensure this minimum amount of available disk space. (in MB) */
