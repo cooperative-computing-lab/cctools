@@ -96,7 +96,7 @@ class DaskVineDag:
         graph_copy = self._working_graph.copy()
         to_remove = []
         for key, sexpr in graph_copy.items():
-            if  isinstance(sexpr, dts.Task):
+            if isinstance(sexpr, dts.Task):
                 if callable(sexpr.func) and hasattr(sexpr.func, '__name__') and sexpr.func.__name__ == "flex_merge":
                     new_key = self.rebuild_merge(key, sexpr, merge_size)
                     to_remove.append(key)
@@ -114,22 +114,20 @@ class DaskVineDag:
                                 new_args.apped(arg)
                         self._working_graph[key].args = new_args
                         self._working_graph[key]._dependencies = new_deps
-                        
         for key in to_remove:
             del self._working_graph[key]
-                
 
     def rebuild_merge(self, key, sexpr, merge_size):
         chunk_size = merge_size
         new_sexprs = []
-        
+
         base_key = sexpr.key
-        jumps = math.ceil(len(sexpr.args)/chunk_size)
+        jumps = math.ceil(len(sexpr.args) / chunk_size)
         count = 0
         for i in range(jumps):
             count += 1
             sexpr_copy = sexpr.copy()
-            new_args = sexpr.args[i*chunk_size:i*chunk_size+chunk_size]
+            new_args = sexpr.args[i * chunk_size:i * chunk_size + chunk_size]
             new_dependencies = set()
             for arg in new_args:
                 new_dependencies.add(arg.key)
@@ -142,7 +140,7 @@ class DaskVineDag:
             new_sexprs.append(sexpr_copy)
             self._working_graph[new_key] = sexpr_copy
 
-        while(len(new_sexprs) > 1):
+        while (len(new_sexprs) > 1):
             count += 1
             sexpr_copy = sexpr.copy()
             new_args = [dts.Alias(new_sexprs.pop(0).key) for i in range(chunk_size) if new_sexprs]
@@ -297,7 +295,7 @@ class DaskVineDag:
         nodes = []
         dot = graphviz.Digraph(name)
         for item in self._working_graph:
-            sexpr = self._working_graph[item] 
+            sexpr = self._working_graph[item]
             if isinstance(sexpr, dts.Task):
                 if str(item) not in nodes:
                     dot.node(str(item), str(item))
@@ -310,7 +308,7 @@ class DaskVineDag:
                                 nodes.append(str(value))
                             dot.edge(str(value), str(item))
                         elif isinstance(self._working_graph[value], dts.Alias):
-                            value = self._working_graph[value].target 
+                            value = self._working_graph[value].target
                             if str(value) not in nodes:
                                 dot.node(str(value), str(value))
                                 nodes.append(str(value))
@@ -318,6 +316,7 @@ class DaskVineDag:
                         else:
                             pass
         dot.render(f'doctest-output/{name}')
+
 
 class DaskVineNoResult(Exception):
     """Exception raised when asking for a result from a computation that has not been performed."""

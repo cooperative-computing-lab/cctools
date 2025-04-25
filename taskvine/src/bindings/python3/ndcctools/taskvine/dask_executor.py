@@ -35,6 +35,7 @@ try:
 except ImportError:
     rich = None
 
+
 def daskvine_merge(func):
     def flex_merge(*args, **kwargs):
         result = func(*args, **kwargs)
@@ -322,7 +323,7 @@ class DaskVine(Manager):
 
                         if t.key in dsk:
                             bar_update(advance=1)
-                        
+
                         if self.prune_files:
                             self._prune_file(dag, t.key)
                     else:
@@ -607,7 +608,6 @@ class PythonTaskDask(PythonTask):
         keys_of_files = list(args.keys())
         args = args_raw | args
 
-        import sys
         super().__init__(execute_graph_vertex, wrapper, dask_task, args, keys_of_files)
         if wrapper:
             wo = m.declare_buffer()

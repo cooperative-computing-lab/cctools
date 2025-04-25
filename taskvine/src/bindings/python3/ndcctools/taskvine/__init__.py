@@ -72,7 +72,6 @@ try:
         raise ImportError
 
     from .dask_executor import DaskVine
-    from .dask_executor import daskvine_merge
     from .dask_dag import DaskVineDag
 except (ImportError, ModuleNotFoundError):
     from .compat import DaskVine
