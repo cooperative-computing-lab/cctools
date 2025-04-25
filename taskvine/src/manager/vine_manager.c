@@ -1031,12 +1031,10 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		}
 	}
 
-	LIST_ITERATE(to_remove, cached_name)
-	{
+	while (cached_name = list_pop_head(to_remove)) {
 		hash_table_remove(q->temp_files_to_replicate, cached_name);
 		free(cached_name);
 	}
-	list_delete(to_remove);
 
 	return total_replication_request_sent;
 }
