@@ -129,7 +129,7 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 		}
 
 		if ((replica = hash_table_lookup(peer->current_files, cachename)) && replica->state == VINE_FILE_REPLICA_STATE_READY) {
-			int current_transfers = vine_current_transfers_source_in_use(q, peer);
+			int current_transfers = peer->num_outgoing_transfers;
 			if (current_transfers < q->worker_source_max_transfers) {
 				peer_selected = peer;
 				if (random_index < 0) {
@@ -164,10 +164,9 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		}
 
 		char *source_addr = string_format("%s/%s", source->transfer_url, f->cached_name);
-		int source_in_use = vine_current_transfers_source_in_use(m, source);
 
 		// skip if the source is busy with other transfers
-		if (source_in_use >= m->worker_source_max_transfers) {
+		if (source->num_outgoing_transfers >= m->worker_source_max_transfers) {
 			continue;
 		}
 
@@ -188,7 +187,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 			}
 
 			// skip if the destination is busy with other transfers
-			if (vine_current_transfers_dest_in_use(m, dest) >= m->worker_source_max_transfers) {
+			if (dest->num_incoming_transfers >= m->worker_source_max_transfers) {
 				continue;
 			}
 
@@ -204,7 +203,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 			}
 
 			// break if the source becomes busy with transfers
-			if (++source_in_use >= m->worker_source_max_transfers) {
+			if (source->num_outgoing_transfers >= m->worker_source_max_transfers) {
 				break;
 			}
 		}

@@ -24,12 +24,26 @@ static struct vine_transfer_pair *vine_transfer_pair_create(struct vine_worker_i
 	t->to = to;
 	t->source_worker = source_worker;
 	t->source_url = source_url ? xxstrdup(source_url) : 0;
+
+	if (t->to) {
+		t->to->num_incoming_transfers++;
+	}
+	if (t->source_worker) {
+		t->source_worker->num_outgoing_transfers++;
+	}
+
 	return t;
 }
 
 static void vine_transfer_pair_delete(struct vine_transfer_pair *p)
 {
 	if (p) {
+		if (p->to) {
+			p->to->num_incoming_transfers--;
+		}
+		if (p->source_worker) {
+			p->source_worker->num_outgoing_transfers--;
+		}
 		free(p->source_url);
 		free(p);
 	}
@@ -161,20 +175,6 @@ void vine_current_transfers_set_success(struct vine_manager *q, char *id)
 	}
 }
 
-// count the number transfers coming from a specific source
-int vine_current_transfers_source_in_use(struct vine_manager *q, struct vine_worker_info *source_worker)
-{
-	char *id;
-	struct vine_transfer_pair *t;
-	int c = 0;
-	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
-	{
-		if (source_worker == t->source_worker)
-			c++;
-	}
-	return c;
-}
-
 // count the number transfers coming from a specific remote url (not a worker)
 int vine_current_transfers_url_in_use(struct vine_manager *q, const char *source)
 {
@@ -184,20 +184,6 @@ int vine_current_transfers_url_in_use(struct vine_manager *q, const char *source
 	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
 	{
 		if (source == t->source_url)
-			c++;
-	}
-	return c;
-}
-
-// count the number of ongoing transfers to a specific worker
-int vine_current_transfers_dest_in_use(struct vine_manager *q, struct vine_worker_info *w)
-{
-	char *id;
-	struct vine_transfer_pair *t;
-	int c = 0;
-	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
-	{
-		if (t->to == w)
 			c++;
 	}
 	return c;

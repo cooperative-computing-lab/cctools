@@ -1002,7 +1002,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		struct vine_worker_info *s;
 		SET_ITERATE(sources, s)
 		{
-			if (s->transfer_port_active && vine_current_transfers_source_in_use(q, s) < q->worker_source_max_transfers) {
+			if (s->transfer_port_active && s->num_outgoing_transfers < q->worker_source_max_transfers) {
 				has_valid_source = 1;
 				break;
 			}
