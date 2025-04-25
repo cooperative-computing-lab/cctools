@@ -52,6 +52,9 @@ struct vine_worker_info *vine_worker_create(struct link *lnk)
 	w->is_checkpoint_worker = 0;
 	w->checkpointed_files = priority_map_create(0, vine_file_key_generator);
 
+	w->incoming_xfer_counter = 0;
+	w->outgoing_xfer_counter = 0;
+
 	return w;
 }
 
