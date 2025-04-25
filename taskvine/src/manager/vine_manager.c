@@ -1031,7 +1031,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		}
 	}
 
-	while (cached_name = list_pop_head(to_remove)) {
+	while ((cached_name = list_pop_head(to_remove))) {
 		hash_table_remove(q->temp_files_to_replicate, cached_name);
 		free(cached_name);
 	}
