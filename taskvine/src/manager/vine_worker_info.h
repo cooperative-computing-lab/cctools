@@ -95,8 +95,8 @@ struct vine_worker_info {
 	int xfer_total_good_destination_counter;
 	int xfer_total_bad_destination_counter;
 
-	int num_incoming_transfers;
-	int num_outgoing_transfers;
+	int incoming_xfer_counter;
+	int outgoing_xfer_counter;
 };
 
 struct vine_worker_info * vine_worker_create( struct link * lnk );

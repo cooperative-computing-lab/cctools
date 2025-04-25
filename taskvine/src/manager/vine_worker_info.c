@@ -47,8 +47,8 @@ struct vine_worker_info *vine_worker_create(struct link *lnk)
 
 	vine_counters.worker.created++;
 
-	w->num_incoming_transfers = 0;
-	w->num_outgoing_transfers = 0;
+	w->incoming_xfer_counter = 0;
+	w->outgoing_xfer_counter = 0;
 
 	return w;
 }

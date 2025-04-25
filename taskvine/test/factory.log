@@ -1,0 +1,79 @@
+2025/04/25 15:41:52.92 vine_factory[708054]debug: /afs/crc.nd.edu/user/j/jzhou24/cctools_repo/transfer_values_matained_directly/batch_job/src/vine_factory version 8.0.0 DEVELOPMENT (released 2025-04-25 10:38:27 -0400)
+2025/04/25 15:41:52.92 vine_factory[708054]debug: Built by jzhou24@condorfe.crc.nd.edu on 2025-04-25 10:38:27 -0400
+2025/04/25 15:41:52.92 vine_factory[708054]debug: System: Linux condorfe.crc.nd.edu 5.14.0-503.33.1.el9_5.x86_64 #1 SMP PREEMPT_DYNAMIC Wed Mar 12 12:08:50 EDT 2025 x86_64 x86_64 x86_64 GNU/Linux
+2025/04/25 15:41:52.92 vine_factory[708054]debug: Configuration: --with-base-dir /afs/crc.nd.edu/user/j/jzhou24/miniconda3/envs/coffea2024.4.0 --prefix /afs/crc.nd.edu/user/j/jzhou24/miniconda3/envs/coffea2024.4.0
+2025/04/25 15:41:52.98 vine_factory[708054]batch: set feature `local_job_queue' to `yes'
+2025/04/25 15:41:52.98 vine_factory[708054]batch: set feature `absolute_path' to `yes'
+2025/04/25 15:41:52.98 vine_factory[708054]batch: set feature `output_directories' to `yes'
+2025/04/25 15:41:52.98 vine_factory[708054]batch: set feature `batch_log_name' to `%s.batchlog'
+2025/04/25 15:41:52.98 vine_factory[708054]batch: set feature `gc_size' to `yes'
+2025/04/25 15:41:52.98 vine_factory[708054]batch: cleared feature `local_job_queue'
+2025/04/25 15:41:52.98 vine_factory[708054]batch: created queue 0x5591ab50c9e0 (local)
+2025/04/25 15:41:52.98 vine_factory[708054]batch: cleared option `batch-options'
+2025/04/25 15:41:52.98 vine_factory[708054]batch: cleared option `autosize'
+2025/04/25 15:41:52.98 vine_factory[708054]batch: cleared option `condor-requirements'
+2025/04/25 15:41:52.98 vine_factory[708054]batch: set option `condor-spool' to `no'
+2025/04/25 15:41:52.98 vine_factory[708054]batch: cleared option `autosize'
+2025/04/25 15:41:52.98 vine_factory[708054]dns: looking up name localhost
+2025/04/25 15:41:52.98 vine_factory[708054]dns: localhost is 127.0.0.1
+2025/04/25 15:41:52.98 vine_factory[708054]tcp: connecting to 127.0.0.1 port 39523
+2025/04/25 15:41:52.98 vine_factory[708054]tcp: made connection to 127.0.0.1 port 39523
+2025/04/25 15:41:53.92 vine_factory[708054]tcp: disconnected from 127.0.0.1 port 39523
+2025/04/25 15:41:53.92 vine_factory[708054]vine: evaluating manager list...
+2025/04/25 15:41:53.92 vine_factory[708054]vine: capacity_tasks: 10
+2025/04/25 15:41:53.92 vine_factory[708054]vine: capacity_cores: 10
+2025/04/25 15:41:53.92 vine_factory[708054]vine: capacity_memory: 5120
+2025/04/25 15:41:53.92 vine_factory[708054]vine: capacity_disk: 10240
+2025/04/25 15:41:53.92 vine_factory[708054]vine: capacity_gpus: 0
+2025/04/25 15:41:53.92 vine_factory[708054]vine: (null) (null):39523 jzhou24 tasks: 1 capacity: 1 workers needed: 1 tasks running: 0
+2025/04/25 15:41:53.92 vine_factory[708054]vine: 1 total workers needed across 1 managers
+2025/04/25 15:41:53.92 vine_factory[708054]vine: raw workers needed: 1
+2025/04/25 15:41:53.92 vine_factory[708054]vine: workers needed: 1
+2025/04/25 15:41:53.92 vine_factory[708054]vine: workers submitted: 0
+2025/04/25 15:41:53.92 vine_factory[708054]vine: workers requested: 1
+2025/04/25 15:41:53.92 vine_factory[708054]vine: Sending status to the catalog server(s) at catalog.cse.nd.edu,backup-catalog.cse.nd.edu ...
+2025/04/25 15:41:53.92 vine_factory[708054]dns: looking up name catalog.cse.nd.edu
+2025/04/25 15:41:53.92 vine_factory[708054]dns: catalog.cse.nd.edu is 129.74.152.177
+2025/04/25 15:41:53.92 vine_factory[708054]debug: sending update via tcp to catalog.cse.nd.edu(129.74.152.177):9098
+2025/04/25 15:41:53.92 vine_factory[708054]tcp: connecting to 129.74.152.177 port 9098
+2025/04/25 15:41:53.92 vine_factory[708054]tcp: made connection to 129.74.152.177 port 9098
+2025/04/25 15:41:53.92 vine_factory[708054]tcp: disconnected from 129.74.152.177 port 9098
+2025/04/25 15:41:53.92 vine_factory[708054]dns: looking up name backup-catalog.cse.nd.edu
+2025/04/25 15:41:53.92 vine_factory[708054]dns: backup-catalog.cse.nd.edu is 129.74.247.43
+2025/04/25 15:41:53.92 vine_factory[708054]debug: sending update via tcp to backup-catalog.cse.nd.edu(129.74.247.43):9098
+2025/04/25 15:41:53.92 vine_factory[708054]tcp: connecting to 129.74.247.43 port 9098
+2025/04/25 15:41:53.92 vine_factory[708054]tcp: made connection to 129.74.247.43 port 9098
+2025/04/25 15:41:53.92 vine_factory[708054]tcp: disconnected from 129.74.247.43 port 9098
+Configuration file '/afs/crc.nd.edu/user/j/jzhou24/cctools_repo/transfer_values_matained_directly/taskvine/test/vine-factory-241627/vine-factory-iqplsrwi/config.json' has been loaded.manager-name: (null)
+max-workers: 1
+min-workers: 1
+workers-per-cycle: 5
+tasks-per-worker: 4
+timeout: 300 s
+cores: 4.000
+memory: 2000 MB
+disk: 2000 MB
+gpus: 8
+worker-extra-options:  --parent-death
+2025/04/25 15:41:53: |submitted: 0 |needed: 1 |waiting connection: 0 |requested: 1 
+PROJECT            HOST                   PORT WAITING RUNNING COMPLETE WORKERS 
+localhost          localhost             39523       1       0        0       0 
+
+2025/04/25 15:41:53.92 vine_factory[708054]batch: cleared option `workers-blocked'
+2025/04/25 15:41:53.92 vine_factory[708054]vine: submitting 1 new workers to reach target
+2025/04/25 15:41:53.92 vine_factory[708054]vine: submitting worker: ./vine_worker --parent-death localhost 39523 -t 300 -C 'catalog.cse.nd.edu,backup-catalog.cse.nd.edu'    --cores=4.000 --memory=2000 --disk=2000 --gpus=8     --parent-death
+2025/04/25 15:41:53.92 vine_factory[708054]batch: started process 708075: ./vine_worker --parent-death localhost 39523 -t 300 -C 'catalog.cse.nd.edu,backup-catalog.cse.nd.edu'    --cores=4.000 --memory=2000 --disk=2000 --gpus=8     --parent-death
+2025/04/25 15:41:53.92 vine_factory[708054]vine: worker job 708075 submitted
+2025/04/25 15:41:53.92 vine_factory[708054]vine: checking for exited workers...
+vine_worker: creating workspace /tmp/worker-241627-708075
+vine_worker: using 4 cores, 2000 MB memory, 2000 MB disk, 8 gpus
+connected to manager localhost:39523 via local address 127.0.0.1:45544
+received signal(15), shutting down workers...
+2025/04/25 15:41:58.92 vine_factory[708054]vine: removing all remaining worker jobs...
+2025/04/25 15:41:58.92 vine_factory[708054]vine: removing job 708075
+disconnected from manager localhost:39523
+vine_worker: deleting workspace /tmp/worker-241627-708075
+2025/04/25 15:41:58.92 vine_factory[708054]vine: 1 workers removed.
+2025/04/25 15:41:58.92 vine_factory[708054]batch: deleting queue 0x5591ab50c9e0
+removing 1 workers...
+all workers removed.
