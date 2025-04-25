@@ -15,10 +15,19 @@ def get_c_constant(constant):
     return getattr(cvine, constant)
 
 
-def set_port_range(low_port, high_port):
+def set_port_range(port):
     """ Sets the range for CCTools to look for free ports. """
+    if isinstance(port, int):
+        low_port = port
+        high_port = port
+    else:
+        try:
+            low_port, high_port = port
+        except Exception:
+            raise ValueError("port should be a single integer, or a sequence of two integers")
+
     if low_port > high_port:
-        raise TypeError("low_port {} should be smaller than high_port {}".format(low_port, high_port))
+        raise TypeError("high_port {} cannot be smaller than low_port {}".format(high_port, low_port))
     os.environ["TCP_LOW_PORT"] = str(low_port)
     os.environ["TCP_HIGH_PORT"] = str(high_port)
 

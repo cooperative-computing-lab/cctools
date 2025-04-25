@@ -128,14 +128,21 @@ Remove all entries with a cache level <= level.
 
 void vine_cache_prune(struct vine_cache *c, vine_cache_level_t level)
 {
-	struct vine_cache_file *f;
 	char *cachename;
-	HASH_TABLE_ITERATE(c->table, cachename, f)
-	{
+	char **cachenames = hash_table_keys_array(c->table);
+	int i = 0;
+
+	struct vine_cache_file *f;
+	while ((cachename = cachenames[i])) {
+		i++;
+		f = hash_table_lookup(c->table, cachename);
+
 		if (f->cache_level <= level) {
 			vine_cache_remove(c, cachename, 0);
 		}
 	}
+
+	hash_table_free_keys_array(cachenames);
 }
 
 /*
@@ -759,10 +766,10 @@ static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_fil
 			vine_worker_send_cache_update(manager, cachename, f->original_type, f->cache_level, f->size, f->mode, transfer_time, f->start_time);
 		} else {
 			char *error_path = vine_cache_error_path(c, cachename);
-			char *error_message;
+			char *error_message = NULL;
 			size_t error_length;
 
-			if (copy_file_to_buffer(error_path, &error_message, &error_length)) {
+			if (copy_file_to_buffer(error_path, &error_message, &error_length) > 0 && error_message) {
 				/* got a message string */
 			} else {
 				error_message = strdup("unknown error");
@@ -776,6 +783,9 @@ static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_fil
 			free(error_path);
 		}
 	}
+
+	/* The transfer path is either moved to the cache or failed, so we can delete it safely. */
+	trash_file(transfer_path);
 
 	free(cache_path);
 	free(transfer_path);

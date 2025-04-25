@@ -202,9 +202,15 @@ static batch_queue_id_t batch_queue_condor_submit(struct batch_queue *q, struct 
 	fprintf(file, "queue\n");
 	fclose(file);
 
-	file = popen("condor_submit condor.submit", "r");
-	if (!file)
+	int spool = batch_queue_option_is_yes(q, "condor-spool");
+	char *cmd = string_format("condor_submit %s condor.submit", spool ? "-spool" : "");
+
+	file = popen(cmd, "r");
+	free(cmd);
+
+	if (!file) {
 		return -1;
+	}
 
 	char line[BATCH_JOB_LINE_MAX];
 	while (fgets(line, sizeof(line), file)) {

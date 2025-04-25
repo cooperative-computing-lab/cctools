@@ -144,14 +144,7 @@ struct hash_table *chirp_audit(const char *path)
 
 void chirp_audit_delete(struct hash_table *table)
 {
-	char *key;
-	struct chirp_audit *entry;
-
-	hash_table_firstkey(table);
-	while(hash_table_nextkey(table, &key, (void *) &entry)) {
-		free(hash_table_remove(table, key));
-	}
-
+	hash_table_clear(table, free);
 	hash_table_delete(table);
 }
 

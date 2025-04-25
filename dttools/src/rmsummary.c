@@ -468,7 +468,7 @@ struct rmsummary *rmsummary_parse_file_single(const char *filename)
 	stream = fopen(filename, "r");
 
 	if (!stream) {
-		debug(D_NOTICE, "Cannot open resources summary file: %s : %s\n", filename, strerror(errno));
+		debug(D_RMON, "Cannot open resources summary file: %s : %s\n", filename, strerror(errno));
 		return NULL;
 	}
 
@@ -507,7 +507,7 @@ struct list *rmsummary_parse_file_multiple(const char *filename)
 	FILE *stream;
 	stream = fopen(filename, "r");
 	if (!stream) {
-		debug(D_NOTICE, "Cannot open resources summary file: %s : %s\n", filename, strerror(errno));
+		debug(D_RMON, "Cannot open resources summary file: %s : %s\n", filename, strerror(errno));
 		return NULL;
 	}
 

@@ -31,17 +31,17 @@ run()
 	
 	diff $expected $from_parrot
 
-	if ! parrot_run --check-driver cvmfs
+	if ! parrot --check-driver cvmfs
 	then
 		return 0
 	fi
 
 	# check that symlinks are correctly detected
 	cvmfs_symlink=/cvmfs/cms.cern.ch/bin/scramv1
-	parrot_run -t${tmp_dir} -- sh -c "[ -L ${cvmfs_symlink} ]";
+	parrot -t${tmp_dir} -- sh -c "[ -L ${cvmfs_symlink} ]";
 
 	target=$(parrot -t${tmp_dir} -- realpath $cvmfs_symlink | tail -n1)
-	parrot_run -t${tmp_dir}  /bin/sh -c "[ -f $target ]";
+	parrot -t${tmp_dir}  /bin/sh -c "[ -f $target ]";
 
 	return 0
 }
