@@ -5294,6 +5294,17 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 		}
 
+		// check if we need to kill any workers if the user has specified an eviction interval.
+		// note that this check should be put before retrieving tasks, otherwise it may be delayed
+		// to nearly the end because the manager is busy with other operations.
+		BEGIN_ACCUM_TIME(q, time_internal);
+		result = enforce_worker_eviction_interval(q);
+		END_ACCUM_TIME(q, time_internal);
+		if (result > 0) {
+			events++;
+			continue;
+		}
+
 		q->busy_waiting_flag = 0;
 
 		// retrieve results from workers
@@ -5415,15 +5426,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				events++;
 				break;
 			}
-		}
-
-		// check if we need to kill any workers if the user has specified an eviction interval
-		BEGIN_ACCUM_TIME(q, time_internal);
-		result = enforce_worker_eviction_interval(q);
-		END_ACCUM_TIME(q, time_internal);
-		if (result > 0) {
-			events++;
-			continue;
 		}
 
 		// return if manager is empty and something interesting already happened
