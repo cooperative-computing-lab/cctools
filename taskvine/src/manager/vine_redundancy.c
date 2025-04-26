@@ -2,7 +2,7 @@
 
 static struct list *get_reachable_files_by_topo_order(struct vine_manager *q, struct vine_file *start_file);
 static void vine_checkpoint_update_file_penalty(struct vine_manager *q, struct vine_file *f);
-static int checkpoint_worker_ensure_space(struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f);
+static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f);
 static int checkpoint_demand(struct vine_manager *q, struct vine_file *f);
 static int vine_checkpoint_evict(struct vine_manager *q, struct vine_file *f, struct vine_worker_info *checkpoint_worker);
 static double vine_file_checkpoint_efficiency(struct vine_file *f);
@@ -76,9 +76,8 @@ static struct priority_queue *get_valid_destinations(struct vine_manager *q, str
 		if (replica) {
 			continue;
 		}
-		/* skip if no space to checkpoint this file */
-		/* if this is not a checkpoint worker, simply check the available disk space against the file size */
 		int64_t available_disk_space = (int64_t)MEGABYTES_TO_BYTES(w->resources->disk.total) - w->inuse_cache;
+		/* if this is not a checkpoint worker, simply check the available disk space against the file size */
 		if (!w->is_checkpoint_worker) {
 			if ((int64_t)f->size > available_disk_space) {
 				continue;
@@ -86,7 +85,7 @@ static struct priority_queue *get_valid_destinations(struct vine_manager *q, str
 		}
 		/* if this is a checkpoint worker, and checkpointing is enabled, ensure the space by evicting files */
 		if (w->is_checkpoint_worker && (q->checkpoint_threshold >= 0)) {
-			if (!checkpoint_worker_ensure_space(q, w, f)) {
+			if (!ensure_checkpoint_worker_space(q, w, f)) {
 				continue;
 			}
 		}
@@ -154,13 +153,15 @@ static double vine_file_checkpoint_efficiency(struct vine_file *f)
 	return (double)f->penalty / f->size;
 }
 
-static int checkpoint_worker_ensure_space(struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f)
+static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f)
 {
 	if (!q || !f || f->type != VINE_TEMP || !w || !w->is_checkpoint_worker) {
 		return 0;
 	}
 
 	int64_t disk_available = MEGABYTES_TO_BYTES(w->resources->disk.total) - w->inuse_cache;
+	/* reserve a factor for eviction */
+	disk_available *= 0.9;
 
 	/* return immediately if the worker has enough space */
 	if ((int64_t)f->size <= disk_available) {
@@ -361,7 +362,6 @@ void vine_checkpoint_update_file_penalty(struct vine_manager *q, struct vine_fil
 	f->recovery_total_time += f->producer_task_execution_time;
 
 	f->penalty = (double)(0.5 * f->recovery_total_time) + (double)(0.5 * f->recovery_critical_time);
-	printf("Updated penalty for file %s to %f\n", f->cached_name, f->penalty);
 }
 
 static int checkpoint_demand(struct vine_manager *q, struct vine_file *f)
@@ -475,9 +475,7 @@ int vine_redundancy_process_temp_files(struct vine_manager *q)
 
 	int iter_count = 0;
 	int iter_depth = MIN(q->attempt_schedule_depth, priority_map_size(q->temp_files_to_process));
-
 	struct list *no_source_files = list_create();
-
 	struct vine_file *f;
 	while ((f = priority_map_pop(q->temp_files_to_process)) && (iter_count < iter_depth)) {
 		assert(f != NULL);
@@ -518,7 +516,6 @@ int vine_redundancy_process_temp_files(struct vine_manager *q)
 				}
 				/* perform checkpointing */
 				if (destination->is_checkpoint_worker && checkpoint_demand(q, f) > 0) {
-					printf("Checkpointing file %s, penalty: %f\n", f->cached_name, f->penalty);
 					replicate_file(q, f, source, destination);
 					f->recovery_critical_time = 0;
 					f->recovery_total_time = 0;
