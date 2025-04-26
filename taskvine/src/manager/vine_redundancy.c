@@ -504,8 +504,13 @@ int vine_redundancy_process_temp_files(struct vine_manager *q)
 		struct vine_worker_info *source = NULL;
 		while ((destination = priority_queue_pop(valid_destinations))) {
 			int success = 0;
-			LIST_ITERATE(valid_sources, source)
-			{
+			int source_considered = 0;
+			while ((source = list_pop_head(valid_sources))) {
+				/* rotate the source to give equal chance to each source */
+				list_push_tail(valid_sources, source);
+				if (source_considered++ > list_size(valid_sources)) {
+					break;
+				}
 				/* skip this source if they are on the same node */
 				if (strcmp(source->hostname, destination->hostname) == 0) {
 					continue;
