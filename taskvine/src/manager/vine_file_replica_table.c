@@ -93,7 +93,12 @@ struct vine_file_replica *vine_file_replica_table_lookup(struct vine_worker_info
 // count the number of in-cluster replicas of a file
 int vine_file_replica_count(struct vine_manager *m, struct vine_file *f)
 {
-	return set_size(hash_table_lookup(m->file_worker_table, f->cached_name));
+	struct set *sources = hash_table_lookup(m->file_worker_table, f->cached_name);
+	if (!sources) {
+		return 0;
+	}
+
+	return set_size(sources);
 }
 
 // find a worker (randomly) in posession of a specific file, and is ready to transfer it.
