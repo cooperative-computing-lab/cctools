@@ -171,7 +171,7 @@ static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_wo
 
 		double popped_efficiency = -priority_queue_get_priority(w->checkpointed_files, 0);
 		popped_file = priority_queue_pop(w->checkpointed_files);
-		
+
 		assert(popped_file != NULL);
 		assert(popped_file->type == VINE_TEMP);
 
