@@ -272,7 +272,7 @@ int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totals
 		*mode &= 0777;
 
 		char *subname = string_format("%s/%s", dirname, name);
-		r = vine_transfer_getle_internal(lnk, subname, size, *mode, *mtime, stoptime);
+		r = vine_transfer_get_file_internal(lnk, subname, size, *mode, *mtime, stoptime);
 		if (!r && error_message && *error_message == NULL) {
 			*error_message = string_format("Failed processing file '%s': %s", name, strerror(errno));
 		}
@@ -313,7 +313,7 @@ int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totals
 	} else if (sscanf(line, "error %s %d", name_encoded, &errornum) == 2) {
 
 		url_decode(name_encoded, name, sizeof(name));
-		
+
 		const char *err_str = strerror(errornum);
 		debug(D_VINE, "Received error from peer for '%s': %s (errno %d)", name, err_str, errornum);
 
