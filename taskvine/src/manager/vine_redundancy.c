@@ -512,7 +512,7 @@ int vine_redundancy_process_temp_files(struct vine_manager *q)
 				}
 				/* perform checkpointing */
 				if (destination->is_checkpoint_worker && checkpoint_demand(q, f) > 0) {
-					printf("Checkpointing file %s\n", f->cached_name);
+					printf("Checkpointing file %s, penalty: %f\n", f->cached_name, f->penalty);
 					replicate_file(q, f, source, destination);
 					f->recovery_critical_time = 0;
 					f->recovery_total_time = 0;

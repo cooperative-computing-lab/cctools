@@ -6246,29 +6246,39 @@ from workers when the file is no longer needed by the manager.
 */
 void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 {
-	if (!f) {
+	if (!m || !f) {
 		return;
 	}
 
-	if (!m) {
+	if (f->cache_level == VINE_CACHE_LEVEL_FOREVER) {
 		return;
 	}
 
-	const char *filename = f->cached_name;
 	/*
 	If this is not a file that should be cached forever,
 	delete all of the replicas present at remote workers.
 	*/
-	if (f->cache_level < VINE_CACHE_LEVEL_FOREVER) {
-		char *key;
-		struct vine_worker_info *w;
-		HASH_TABLE_ITERATE(m->worker_table, key, w)
-		{
-			if (vine_file_replica_table_lookup(w, filename)) {
-				delete_worker_file(m, w, filename, 0, 0);
-			}
+	struct set *sources = hash_table_lookup(q->file_worker_table, f->cached_name);
+	if (!sources) {
+		return;
+	}
+
+	struct list *to_remove = list_create();
+
+	struct vine_worker_info *w;
+	SET_ITERATE(sources, w)
+	{
+		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, f->cached_name);
+		assert(replica != NULL);
+		if (replica->state == VINE_FILE_REPLICA_STATE_READY) {
+			list_add_tail(to_remove, w);
 		}
 	}
+
+	while ((w = list_pop_head(to_remove))) {
+		delete_worker_file(m, w, f->cached_name, 0, 0);
+	}
+	list_delete(to_remove);
 
 	/* Also remove from the replication table. */
 	vine_redundancy_handle_file_pruning(m, f);
