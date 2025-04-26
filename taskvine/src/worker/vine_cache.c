@@ -584,7 +584,11 @@ static void vine_cache_worker_process(struct vine_cache_file *f, struct vine_cac
 		char *error_path = vine_cache_error_path(c, cachename);
 		FILE *file = fopen(error_path, "w");
 		if (file) {
-			fprintf(file, "error creating file at worker: %s\n", error_message);
+			if (f->cache_type == VINE_CACHE_MINI_TASK) {
+				fprintf(file, "error creating file via mini task: %s\n", error_message);
+			} else {
+				fprintf(file, "error transferring file: %s\n", error_message);
+			}
 			fclose(file);
 		}
 		free(error_path);
