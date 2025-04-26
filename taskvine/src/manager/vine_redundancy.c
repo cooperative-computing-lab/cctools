@@ -326,8 +326,8 @@ static struct list *get_reachable_files_by_topo_order(struct vine_manager *q, st
 			}
 
 			list_push_head(stack, child_state);
-			hash_table_insert(visited, next_child->cached_name, (void *)VISIT_STATE_IN_PROGRESS);
-		} else if ((visit_state_t)visit_state == VISIT_STATE_IN_PROGRESS) {
+			hash_table_insert(visited, next_child->cached_name, (void *)(uintptr_t)VISIT_STATE_IN_PROGRESS);
+		} else if ((visit_state_t)(uintptr_t)visit_state == VISIT_STATE_IN_PROGRESS) {
 			/* cycle detected, skip this child (should not happen) */
 			continue;
 		}
