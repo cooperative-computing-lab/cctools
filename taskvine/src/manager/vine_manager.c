@@ -6271,7 +6271,7 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, f->cached_name);
 		assert(replica != NULL);
 		if (replica->state == VINE_FILE_REPLICA_STATE_READY) {
-			list_add_tail(to_remove, w);
+			list_push_tail(to_remove, w);
 		}
 	}
 
