@@ -64,6 +64,13 @@ int vine_file_delete(struct vine_file *f)
 			debug(D_VINE, "vine_file_delete: deleting %s on reference count took: %.03lfs", f->source, (end_time - start_time) / 1000000.00);
 		}
 
+		if (f->child_temp_files) {
+			hash_table_delete(f->child_temp_files);
+		}
+		if (f->parent_temp_files) {
+			hash_table_delete(f->parent_temp_files);
+		}
+
 		vine_task_delete(f->mini_task);
 		free(f->source);
 		free(f->cached_name);
@@ -91,6 +98,14 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 	f->state = VINE_FILE_STATE_CREATED; /* Assume state created until told otherwise */
 	f->cache_level = cache_level;
 	f->flags = flags;
+
+	f->producer_task_execution_time = 0;
+	f->recovery_critical_time = 0;
+	f->recovery_total_time = 0;
+	f->penalty = 0;
+
+	f->child_temp_files = hash_table_create(0, 0);
+	f->parent_temp_files = hash_table_create(0, 0);
 
 	if (data) {
 		/* Terminate with a null, just in case the user tries to treat this as a C string. */
@@ -150,16 +165,16 @@ struct vine_file *vine_file_addref(struct vine_file *f)
 
 char *vine_file_key_generator(const void *ptr)
 {
-    if (!ptr) {
+	if (!ptr) {
 		return NULL;
 	}
 
-    const struct vine_file *f = (const struct vine_file *)ptr;
-    if (!f->cached_name) {
+	const struct vine_file *f = (const struct vine_file *)ptr;
+	if (!f->cached_name) {
 		return NULL;
 	}
 
-    return xxstrdup(f->cached_name);
+	return xxstrdup(f->cached_name);
 }
 
 /* Make a URL reference to a file source*/
@@ -393,6 +408,32 @@ void vine_file_set_mode(struct vine_file *f, int mode)
 	/* The mode must contain, at a minimum, owner-rw (0600) (so that we can delete it) */
 	/* And it should not contain anything beyond the standard 0777. */
 	f->mode = (mode | 0600) & 0777;
+}
+
+int vine_file_add_child_temp_file(struct vine_file *f, struct vine_file *child)
+{
+	if (!f || !child || child->type != VINE_TEMP) {
+		return 0;
+	}
+
+	if (!hash_table_lookup(f->child_temp_files, child->cached_name)) {
+		hash_table_insert(f->child_temp_files, child->cached_name, child);
+	}
+
+	return 1;
+}
+
+int vine_file_add_parent_temp_file(struct vine_file *f, struct vine_file *parent)
+{
+	if (!f || !parent || parent->type != VINE_TEMP) {
+		return 0;
+	}
+
+	if (!hash_table_lookup(f->parent_temp_files, parent->cached_name)) {
+		hash_table_insert(f->parent_temp_files, parent->cached_name, parent);
+	}
+
+	return 1;
 }
 
 /* vim: set noexpandtab tabstop=8: */

@@ -45,6 +45,13 @@ struct vine_file {
 	struct vine_worker_info *source_worker; // if this is a substitute file, attach the worker serving it. 
 	int change_message_shown; // True if error message already shown.
 	int refcount;       // Number of references from a task object, delete when zero.
+
+	struct hash_table *child_temp_files;
+	struct hash_table *parent_temp_files;
+	uint64_t producer_task_execution_time;
+	uint64_t recovery_critical_time;
+	uint64_t recovery_total_time;
+	double penalty;
 };
 
 struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_type_t type, struct vine_task *mini_task, vine_cache_level_t cache_level, vine_file_flags_t flags);
@@ -73,5 +80,8 @@ struct vine_file *vine_file_poncho( struct vine_file *f, vine_cache_level_t cach
 struct vine_file *vine_file_starch( struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags );
 struct vine_file *vine_file_xrootd( const char *source, struct vine_file *proxy, struct vine_file *env, vine_cache_level_t cache, vine_file_flags_t flags );
 struct vine_file *vine_file_chirp( const char *server, const char *source, struct vine_file *ticket, struct vine_file *env, vine_cache_level_t cache, vine_file_flags_t flags );
+
+int vine_file_add_child_temp_file(struct vine_file *f, struct vine_file *child);
+int vine_file_add_parent_temp_file(struct vine_file *f, struct vine_file *parent);
 
 #endif

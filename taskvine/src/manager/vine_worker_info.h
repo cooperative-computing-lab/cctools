@@ -97,7 +97,7 @@ struct vine_worker_info {
 
 	/* checkpoint info */
 	int is_checkpoint_worker;
-	struct priority_map *checkpointed_files;
+	struct priority_queue *checkpointed_files;
 
 	int incoming_xfer_counter;
 	int outgoing_xfer_counter;

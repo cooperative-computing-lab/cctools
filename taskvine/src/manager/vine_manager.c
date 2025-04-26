@@ -17,7 +17,7 @@ See the file COPYING for details.
 #include "vine_manager_get.h"
 #include "vine_manager_put.h"
 #include "vine_manager_summarize.h"
-#include "vine_mount.h" 
+#include "vine_mount.h"
 #include "vine_perf_log.h"
 #include "vine_protocol.h"
 #include "vine_resources.h"
@@ -29,7 +29,7 @@ See the file COPYING for details.
 #include "vine_taskgraph_log.h"
 #include "vine_txn_log.h"
 #include "vine_worker_info.h"
-#include "vine_checkpoint.h"
+#include "vine_redundancy.h"
 
 #include "address.h"
 #include "buffer.h"
@@ -164,10 +164,9 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 static void release_all_workers(struct vine_manager *q);
 
 static int vine_manager_check_inputs_available(struct vine_manager *q, struct vine_task *t);
-static void vine_manager_consider_recovery_task(struct vine_manager *q, struct vine_file *lost_file, struct vine_task *rt);
 
 static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
-static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
+int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
@@ -396,8 +395,8 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 			f->size = size;
 
 			/* And if the file is a newly created temporary, replicate as needed. */
-			if (f->type == VINE_TEMP && *id == 'X' && q->temp_replica_count > 1) {
-				priority_map_push_or_update(q->temp_files_to_process, f, 0);
+			if (f->type == VINE_TEMP && *id == 'X') {
+				vine_redundancy_handle_cache_update(q, f);
 			}
 		}
 	}
@@ -599,6 +598,9 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		t->output_length = output_length;
 		t->result = task_status;
 		t->exit_code = exit_status;
+
+		/* handle redundancy */
+		vine_redundancy_handle_task_completion(q, t);
 
 		/* fill resources measured with whatever vine reported/committed, as a fallback when task ran without monitoring enabled */
 		t->resources_measured->start = ((double)start_time) / ONE_SECOND;
@@ -1092,7 +1094,7 @@ static void add_worker(struct vine_manager *q)
 
 /* Delete a single file on a remote worker except those with greater delete_upto_level cache level */
 
-static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_flags, vine_cache_level_t delete_upto_level)
+int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_flags, vine_cache_level_t delete_upto_level)
 {
 	if (cache_flags <= delete_upto_level) {
 		vine_manager_send(q, w, "unlink %s\n", filename);
@@ -3313,7 +3315,7 @@ the necessary output files.  This should only happen if the output files have no
 generated yet.
 */
 
-static void vine_manager_consider_recovery_task(struct vine_manager *q, struct vine_file *lost_file, struct vine_task *rt)
+void vine_manager_consider_recovery_task(struct vine_manager *q, struct vine_file *lost_file, struct vine_task *rt)
 {
 	if (!rt)
 		return;
@@ -5711,7 +5713,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		q->temp_replica_count = MAX(1, (int)value);
 
 	} else if (!strcmp(name, "checkpoint-threshold")) {
-		q->checkpoint_threshold = (timestamp_t)((int)value * 1e6);
+		q->checkpoint_threshold = (int)value * 1e6;
 
 	} else if (!strcmp(name, "transfer-outlier-factor")) {
 		q->transfer_outlier_factor = value;
@@ -6265,7 +6267,7 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 	}
 
 	/* Also remove from the replication table. */
-	priority_map_remove(m->temp_files_to_process, f);
+	vine_redundancy_handle_file_pruning(m, f);
 }
 
 /*
