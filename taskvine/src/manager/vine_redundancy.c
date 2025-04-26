@@ -160,8 +160,6 @@ static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_wo
 		return 1;
 	}
 
-	printf("considerring eviction, f->size: %zu, disk_available: %" PRId64 "\n", f->size, disk_available);
-
 	struct priority_queue *to_evict = priority_queue_create(0);
 	double eviction_efficiency = 0;
 	int64_t eviction_size = 0;
