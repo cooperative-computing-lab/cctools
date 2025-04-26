@@ -481,10 +481,10 @@ static int do_worker_transfer(struct vine_cache *c, struct vine_cache_file *f, c
 	timestamp_t time_start_connect = timestamp_get();
 	worker_link = link_connect(addr, port_num, stoptime);
 	timestamp_t time_end_connect = timestamp_get();
-	timestamp_t time_duration_connect = (time_end_connect - time_start_connect) / ONE_SECOND;
+	timestamp_t time_duration_connect = (time_end_connect - time_start_connect) / 1e6;
 
 	if (worker_link == NULL) {
-		*error_message = string_format("Could not establish connection with worker at: %s:%d after %d seconds", addr, port_num, time_duration_connect);
+		*error_message = string_format("Could not establish connection with worker at: %s:%d after %ld seconds", addr, port_num, time_duration_connect);
 		return 0;
 	}
 
