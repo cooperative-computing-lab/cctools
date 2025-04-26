@@ -18,6 +18,6 @@
 #include <assert.h>
 
 
-int process_checkpoint_queue(struct vine_manager *q);
+int vine_redundancy_process_temp_files(struct vine_manager *q);
 
 #endif /* VINE_CHECKPOINT_H */

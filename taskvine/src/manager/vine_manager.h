@@ -222,6 +222,7 @@ struct vine_manager {
 	int temp_replica_count;       /* Number of replicas per temp file */
 
 	timestamp_t checkpoint_threshold;    /* Checkpoint a file if it's penalty exceeds this threshold (TODO: make it a heuristic parameter) */
+	struct priority_map *temp_files_to_checkpoint;   /* temp files to consider for checkpointing, sorted by penalty */
 
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
