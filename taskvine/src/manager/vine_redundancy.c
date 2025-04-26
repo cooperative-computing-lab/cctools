@@ -197,7 +197,7 @@ static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_wo
 
 		/* try to evict this file */
 		list_push_tail(to_evict, popped_file);
-		eviction_penalty += popped_file->penalty;
+		eviction_penalty += (double)(0.5 * popped_file->recovery_total_time) + (double)(0.5 * popped_file->recovery_critical_time);
 		eviction_size += popped_file->size;
 
 		/* do we have enough space after evicting this file? */
@@ -213,12 +213,16 @@ static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_wo
 	list_delete(skipped_files);
 
 	int ok = 1;
+	double eviction_efficiency = 0;
+	if (eviction_size > 0) {
+		eviction_efficiency = eviction_penalty / eviction_size;
+	}
 
 	/* return if we don't have enough space, or the efficiency is not better */
-	if (ok && disk_available + eviction_size < (int64_t)f->size) {
+	if (disk_available + eviction_size < (int64_t)f->size) {
 		ok = 0;
 	}
-	if (ok && ((eviction_penalty / eviction_size) > vine_file_checkpoint_efficiency(f))) {
+	if (eviction_efficiency > vine_file_checkpoint_efficiency(f)) {
 		ok = 0;
 	}
 
@@ -232,8 +236,8 @@ static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_wo
 	}
 
 	/* evict the files to free up space */
+	printf("eviction_efficiency: %f, this_efficiency: %f\n", eviction_efficiency, vine_file_checkpoint_efficiency(f));
 	while ((popped_file = list_pop_head(to_evict))) {
-		printf("Evicting file %s, penalty: %f\n", popped_file->cached_name, popped_file->penalty);
 		vine_checkpoint_evict(q, popped_file, w);
 	}
 	list_delete(to_evict);
