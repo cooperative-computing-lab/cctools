@@ -477,11 +477,10 @@ static int do_worker_transfer(struct vine_cache *c, struct vine_cache_file *f, c
 
 	debug(D_VINE, "cache: setting up worker transfer file %s", f->source);
 
-	stoptime = time(0) + 300;
 	timestamp_t time_start_connect = timestamp_get();
-	worker_link = link_connect(addr, port_num, stoptime);
+	worker_link = link_connect(addr, port_num, time(0) + 300);
 	timestamp_t time_end_connect = timestamp_get();
-	timestamp_t time_duration_connect = timestamp_t((time_end_connect - time_start_connect) / 1e6);
+	timestamp_t time_duration_connect = (time_end_connect - time_start_connect) / 1e6;
 
 	if (worker_link == NULL) {
 		*error_message = string_format("Could not establish connection with worker at: %s:%d after %ld seconds: %s", addr, port_num, time_duration_connect, strerror(errno));
