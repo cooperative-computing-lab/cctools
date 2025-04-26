@@ -237,7 +237,7 @@ static int vine_transfer_get_file_internal(struct link *lnk, const char *filenam
 	return 1;
 }
 
-static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname, int64_t *totalsize, int mode, int mtime, time_t stoptime);
+static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname, int64_t *totalsize, int mode, int mtime, time_t stoptime, char **error_message);
 
 /*
 Receive a single item of unknown type into the directory "dirname".
@@ -246,7 +246,7 @@ Returns 1 on successful transfer of one item.
 Returns 2 on successful receipt of "end" of list.
 */
 
-int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totalsize, int *mode, int *mtime, time_t stoptime)
+int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totalsize, int *mode, int *mtime, time_t stoptime, char **error_message)
 {
 	char line[VINE_LINE_MAX];
 	char name_encoded[VINE_LINE_MAX];
@@ -254,8 +254,13 @@ int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totals
 	int64_t size;
 	int errornum;
 
-	if (!recv_message(lnk, line, sizeof(line), stoptime))
+	if (!recv_message(lnk, line, sizeof(line), stoptime)) {
+		/* network error before getting any message type */
+		if (error_message && *error_message == NULL) {
+			*error_message = string_format("Failed to receive message from worker %s", strerror(errno));
+		}
 		return 0;
+	}
 
 	int r = 0;
 
@@ -267,7 +272,10 @@ int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totals
 		*mode &= 0777;
 
 		char *subname = string_format("%s/%s", dirname, name);
-		r = vine_transfer_get_file_internal(lnk, subname, size, *mode, *mtime, stoptime);
+		r = vine_transfer_getle_internal(lnk, subname, size, *mode, *mtime, stoptime);
+		if (!r && error_message && *error_message == NULL) {
+			*error_message = string_format("Failed processing file '%s': %s", name, strerror(errno));
+		}
 		free(subname);
 
 		*totalsize += size;
@@ -278,6 +286,9 @@ int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totals
 
 		char *subname = string_format("%s/%s", dirname, name);
 		r = vine_transfer_get_symlink_internal(lnk, subname, size, stoptime);
+		if (!r && error_message && *error_message == NULL) {
+			*error_message = string_format("Failed processing symlink '%s': %s", name, strerror(errno));
+		}
 		free(subname);
 
 		// The symlink doesn't really have an inherent mtime or mode
@@ -293,16 +304,35 @@ int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totals
 		*mode &= 0777;
 
 		char *subname = string_format("%s/%s", dirname, name);
-		r = vine_transfer_get_dir_internal(lnk, subname, totalsize, *mode, *mtime, stoptime);
+		r = vine_transfer_get_dir_internal(lnk, subname, totalsize, *mode, *mtime, stoptime, error_message);
+		if (!r && error_message && *error_message == NULL) {
+			*error_message = string_format("Failed processing directory '%s': %s", name, strerror(errno));
+		}
 		free(subname);
 
 	} else if (sscanf(line, "error %s %d", name_encoded, &errornum) == 2) {
 
-		debug(D_VINE, "unable to transfer %s: %s", name_encoded, strerror(errornum));
+		url_decode(name_encoded, name, sizeof(name));
+		
+		const char *err_str = strerror(errornum);
+		debug(D_VINE, "Received error from peer for '%s': %s (errno %d)", name, err_str, errornum);
+
+		if (error_message && *error_message == NULL) {
+			*error_message = string_format("Remote worker reported error for '%s': %s (error %d)", name, err_str, errornum);
+		}
 		r = 0;
 
 	} else if (!strcmp(line, "end")) {
 		r = 2;
+	} else {
+		char line_preview[101];
+		snprintf(line_preview, sizeof(line_preview), "%.100s", line);
+
+		debug(D_VINE, "Received invalid line from peer: %s", line_preview);
+		if (error_message && *error_message == NULL) {
+			*error_message = string_format("Received invalid line from peer: %s", line_preview);
+		}
+		r = 0;
 	}
 
 	return r;
@@ -315,7 +345,7 @@ and now we process "file" and "dir" commands within the list
 until "end" is reached.
 */
 
-static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname, int64_t *totalsize, int mode, int mtime, time_t stoptime)
+static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname, int64_t *totalsize, int mode, int mtime, time_t stoptime, char **error_message)
 {
 	/* Only use the normal mode bits. */
 	mode &= 0777;
@@ -323,6 +353,9 @@ static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname,
 	int result = mkdir(dirname, mode);
 	if (result < 0) {
 		debug(D_VINE, "unable to create %s: %s", dirname, strerror(errno));
+		if (error_message && *error_message == NULL) {
+			*error_message = string_format("Unable to create directory '%s': %s", dirname, strerror(errno));
+		}
 		return 0;
 	}
 
@@ -330,7 +363,7 @@ static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname,
 		/* dummy values that won't get used. */
 		int temp_mode, temp_mtime;
 
-		int r = vine_transfer_get_any(lnk, dirname, totalsize, &temp_mode, &temp_mtime, stoptime);
+		int r = vine_transfer_get_any(lnk, dirname, totalsize, &temp_mode, &temp_mtime, stoptime, error_message);
 		if (r == 1) {
 			// Successfully received one item.
 			continue;
@@ -346,8 +379,8 @@ static int vine_transfer_get_dir_internal(struct link *lnk, const char *dirname,
 	return 0;
 }
 
-int vine_transfer_request_any(struct link *lnk, const char *request_path, const char *dirname, int64_t *totalsize, int *mode, int *mtime, time_t stoptime)
+int vine_transfer_request_any(struct link *lnk, const char *request_path, const char *dirname, int64_t *totalsize, int *mode, int *mtime, time_t stoptime, char **error_message)
 {
 	send_message(lnk, "get %s\n", request_path);
-	return vine_transfer_get_any(lnk, dirname, totalsize, mode, mtime, stoptime);
+	return vine_transfer_get_any(lnk, dirname, totalsize, mode, mtime, stoptime, error_message);
 }

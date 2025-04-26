@@ -477,7 +477,7 @@ static int do_worker_transfer(struct vine_cache *c, struct vine_cache_file *f, c
 
 	debug(D_VINE, "cache: setting up worker transfer file %s", f->source);
 
-	stoptime = time(0) + 15;
+	stoptime = time(0) + 300;
 	worker_link = link_connect(addr, port_num, stoptime);
 
 	if (worker_link == NULL) {
@@ -499,8 +499,10 @@ static int do_worker_transfer(struct vine_cache *c, struct vine_cache_file *f, c
 	int64_t totalsize;
 	int mode, mtime;
 
-	if (!vine_transfer_request_any(worker_link, source_path, transfer_dir, &totalsize, &mode, &mtime, time(0) + 900)) {
-		*error_message = string_format("Could not transfer file from %s", f->source);
+	if (!vine_transfer_request_any(worker_link, source_path, transfer_dir, &totalsize, &mode, &mtime, time(0) + 900, error_message)) {
+		if (error_message && *error_message == NULL) {
+			*error_message = string_format("Could not transfer file from %s", f->source);
+		}
 		link_close(worker_link);
 		return 0;
 	}
