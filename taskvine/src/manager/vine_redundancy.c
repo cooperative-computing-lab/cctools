@@ -5,7 +5,6 @@ static void vine_checkpoint_update_file_penalty(struct vine_manager *q, struct v
 static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f);
 static int checkpoint_demand(struct vine_manager *q, struct vine_file *f);
 static int vine_checkpoint_evict(struct vine_manager *q, struct vine_file *f, struct vine_worker_info *checkpoint_worker);
-static double vine_file_checkpoint_efficiency(struct vine_file *f);
 
 static struct list *get_valid_sources(struct vine_manager *q, struct vine_file *f)
 {
@@ -150,15 +149,6 @@ static int vine_checkpoint_evict(struct vine_manager *q, struct vine_file *f, st
 	return 1;
 }
 
-static double vine_file_checkpoint_efficiency(struct vine_file *f)
-{
-	if (!f || f->type != VINE_TEMP) {
-		return 0;
-	}
-
-	return (double)f->penalty / f->size;
-}
-
 static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f)
 {
 	if (!q || !f || f->type != VINE_TEMP || !w || !w->is_checkpoint_worker) {
@@ -166,22 +156,26 @@ static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_wo
 	}
 
 	int64_t disk_available = MEGABYTES_TO_BYTES(w->resources->disk.total) - w->inuse_cache;
-	/* reserve a factor for eviction */
-	disk_available *= 0.9;
 
 	/* return immediately if the worker has enough space */
 	if ((int64_t)f->size <= disk_available) {
 		return 1;
 	}
 
-	struct list *to_evict = list_create();
+	printf("considerring eviction, f->size: %ld, disk_available: %ld\n", f->size, disk_available);
+
+	struct priority_queue *to_evict = priority_queue_create(0);
 	double eviction_penalty = 0;
 	int64_t eviction_size = 0;
 
-	struct list *skipped_files = list_create();
+	struct priority_queue *skipped_files = priority_queue_create(0);
 	struct vine_file *popped_file;
 
-	while ((popped_file = priority_queue_pop(w->checkpointed_files))) {
+	while (priority_queue_size(w->checkpointed_files) > 0) {
+
+		double popped_efficiency = -priority_queue_get_priority(w->checkpointed_files, 0);
+		popped_file = priority_queue_pop(w->checkpointed_files);
+		
 		assert(popped_file != NULL);
 		assert(popped_file->type == VINE_TEMP);
 
@@ -191,13 +185,13 @@ static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_wo
 
 		/* skip if the file is not ready */
 		if (replica->state != VINE_FILE_REPLICA_STATE_READY) {
-			list_push_tail(skipped_files, popped_file);
+			priority_queue_push(skipped_files, popped_file, -popped_efficiency);
 			continue;
 		}
 
 		/* try to evict this file */
-		list_push_tail(to_evict, popped_file);
-		eviction_penalty += (double)(0.5 * popped_file->recovery_total_time) + (double)(0.5 * popped_file->recovery_critical_time);
+		priority_queue_push(to_evict, popped_file, -popped_efficiency);
+		eviction_penalty += popped_efficiency;
 		eviction_size += popped_file->size;
 
 		/* do we have enough space after evicting this file? */
@@ -207,10 +201,12 @@ static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_wo
 	}
 
 	/* first pop back the skipped files */
-	while ((popped_file = list_pop_head(skipped_files))) {
-		priority_queue_push(w->checkpointed_files, popped_file, -popped_file->penalty / popped_file->size);
+	while (priority_queue_size(skipped_files) > 0) {
+		double popped_efficiency = priority_queue_get_priority(skipped_files, 0);
+		popped_file = priority_queue_pop(skipped_files);
+		priority_queue_push(w->checkpointed_files, popped_file, -popped_efficiency);
 	}
-	list_delete(skipped_files);
+	priority_queue_delete(skipped_files);
 
 	int ok = 1;
 	double eviction_efficiency = 0;
@@ -222,25 +218,28 @@ static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_wo
 	if (disk_available + eviction_size < (int64_t)f->size) {
 		ok = 0;
 	}
-	if (eviction_efficiency > vine_file_checkpoint_efficiency(f)) {
+	if (eviction_efficiency > (f->penalty / f->size)) {
 		ok = 0;
 	}
 
 	if (!ok) {
 		/* no need to evict, pop back the files */
-		while ((popped_file = list_pop_head(to_evict))) {
-			priority_queue_push(w->checkpointed_files, popped_file, -vine_file_checkpoint_efficiency(popped_file));
+		while (priority_queue_size(to_evict) > 0) {
+			double popped_efficiency = priority_queue_get_priority(to_evict, 0);
+			popped_file = priority_queue_pop(to_evict);
+			priority_queue_push(w->checkpointed_files, popped_file, -popped_efficiency);
 		}
-		list_delete(to_evict);
+		priority_queue_delete(to_evict);
 		return 0;
 	}
 
 	/* evict the files to free up space */
-	printf("eviction_efficiency: %f, this_efficiency: %f\n", eviction_efficiency, vine_file_checkpoint_efficiency(f));
-	while ((popped_file = list_pop_head(to_evict))) {
+	printf("eviction_efficiency: %f, this_efficiency: %f\n", eviction_efficiency, f->penalty / f->size);
+	while (priority_queue_size(to_evict) > 0) {
+		popped_file = priority_queue_pop(to_evict);
 		vine_checkpoint_evict(q, popped_file, w);
 	}
-	list_delete(to_evict);
+	priority_queue_delete(to_evict);
 
 	return 1;
 }
@@ -361,9 +360,7 @@ void vine_checkpoint_update_file_penalty(struct vine_manager *q, struct vine_fil
 	char *parent_file_name;
 	HASH_TABLE_ITERATE(f->parent_temp_files, parent_file_name, parent_file)
 	{
-		if (!parent_file) {
-			continue;
-		}
+		assert(parent_file != NULL);
 		f->recovery_critical_time = MAX(f->recovery_critical_time, parent_file->recovery_critical_time);
 		f->recovery_total_time += parent_file->recovery_total_time;
 	}
@@ -526,8 +523,8 @@ int vine_redundancy_process_temp_files(struct vine_manager *q)
 				}
 				/* perform checkpointing */
 				if (destination->is_checkpoint_worker && checkpoint_demand(q, f) > 0) {
+					priority_queue_push(destination->checkpointed_files, f, -f->penalty / f->size);
 					replicate_file(q, f, source, destination);
-					priority_queue_push(destination->checkpointed_files, f, -f->penalty);
 					f->recovery_critical_time = 0;
 					f->recovery_total_time = 0;
 					vine_checkpoint_update_file_penalty(q, f);
