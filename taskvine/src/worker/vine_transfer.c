@@ -257,7 +257,7 @@ int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totals
 	if (!recv_message(lnk, line, sizeof(line), stoptime)) {
 		/* network error before getting any message type */
 		if (error_message && *error_message == NULL) {
-			*error_message = string_format("Failed to receive message from worker %s", strerror(errno));
+			*error_message = string_format("Failed to receive message from worker: %s", strerror(errno));
 		}
 		return 0;
 	}
@@ -315,10 +315,10 @@ int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totals
 		url_decode(name_encoded, name, sizeof(name));
 
 		const char *err_str = strerror(errornum);
-		debug(D_VINE, "Received error from peer for '%s': %s (errno %d)", name, err_str, errornum);
+		debug(D_VINE, "Received error from peer for '%s': %s", name, err_str);
 
 		if (error_message && *error_message == NULL) {
-			*error_message = string_format("Remote worker reported error for '%s': %s (error %d)", name, err_str, errornum);
+			*error_message = string_format("Remote worker reported error for '%s': %s", name, err_str);
 		}
 		r = 0;
 

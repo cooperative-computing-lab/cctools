@@ -478,10 +478,13 @@ static int do_worker_transfer(struct vine_cache *c, struct vine_cache_file *f, c
 	debug(D_VINE, "cache: setting up worker transfer file %s", f->source);
 
 	stoptime = time(0) + 300;
+	timestamp_t time_start_connect = timestamp_get();
 	worker_link = link_connect(addr, port_num, stoptime);
+	timestamp_t time_end_connect = timestamp_get();
+	timestamp_t time_duration_connect = (time_end_connect - time_start_connect) / ONE_SECOND;
 
 	if (worker_link == NULL) {
-		*error_message = string_format("Could not establish connection with worker at: %s:%d", addr, port_num);
+		*error_message = string_format("Could not establish connection with worker at: %s:%d after %d seconds", addr, port_num, time_duration_connect);
 		return 0;
 	}
 
@@ -774,8 +777,7 @@ static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_fil
 			if (copy_file_to_buffer(error_path, &error_message, &error_length) > 0 && error_message) {
 				/* got a message string */
 			} else {
-				char *err_str = strerror(errno);
-				error_message = string_format("Failed to copy error message to buffer: %s", err_str);
+				error_message = string_format("Failed to copy error message to buffer: %s", strerror(errno));
 			}
 
 			vine_worker_send_cache_invalid(manager, cachename, error_message);
