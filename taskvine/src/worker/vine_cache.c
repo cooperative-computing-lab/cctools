@@ -774,7 +774,8 @@ static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_fil
 			if (copy_file_to_buffer(error_path, &error_message, &error_length) > 0 && error_message) {
 				/* got a message string */
 			} else {
-				error_message = strdup("unknown error");
+				char *err_str = strerror(errno);
+				error_message = string_format("Failed to copy error message to buffer: %s", err_str);
 			}
 
 			vine_worker_send_cache_invalid(manager, cachename, error_message);
