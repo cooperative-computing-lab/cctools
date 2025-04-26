@@ -469,7 +469,6 @@ static int do_worker_transfer(struct vine_cache *c, struct vine_cache_file *f, c
 {
 	int port_num;
 	char addr[VINE_LINE_MAX], source_path[VINE_LINE_MAX];
-	int stoptime;
 	struct link *worker_link;
 
 	// expect the form: workerip://host:port/path/to/file
