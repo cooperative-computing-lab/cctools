@@ -6258,7 +6258,7 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 	If this is not a file that should be cached forever,
 	delete all of the replicas present at remote workers.
 	*/
-	struct set *sources = hash_table_lookup(q->file_worker_table, f->cached_name);
+	struct set *sources = hash_table_lookup(m->file_worker_table, f->cached_name);
 	if (!sources) {
 		return;
 	}
