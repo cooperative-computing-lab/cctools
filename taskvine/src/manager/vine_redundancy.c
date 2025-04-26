@@ -84,9 +84,7 @@ static struct priority_queue *get_valid_destinations(struct vine_manager *q, str
 		}
 		/* if this is a checkpoint worker, and checkpointing is enabled, ensure the space by evicting files */
 		if (w->is_checkpoint_worker && (q->checkpoint_threshold >= 0)) {
-			if (!ensure_checkpoint_worker_space(q, w, f)) {
-				continue;
-			}
+			/* do nothing, the space will be ensured later */
 		}
 		/* workers with more available disk space are preferred */
 		priority_queue_push(valid_destinations, w, available_disk_space);
@@ -521,19 +519,22 @@ int vine_redundancy_process_temp_files(struct vine_manager *q)
 				if (strcmp(source->hostname, destination->hostname) == 0) {
 					continue;
 				}
+				/* perform replication */
+				if (!destination->is_checkpoint_worker && replica_demand(q, f) > 0) {
+					replicate_file(q, f, source, destination);
+					success = 1;
+					break;
+				}
 				/* perform checkpointing */
 				if (destination->is_checkpoint_worker && checkpoint_demand(q, f) > 0) {
+					if (!ensure_checkpoint_worker_space(q, destination, f)) {
+						continue;
+					}
 					priority_queue_push(destination->checkpointed_files, f, -f->penalty / f->size);
 					replicate_file(q, f, source, destination);
 					f->recovery_critical_time = 0;
 					f->recovery_total_time = 0;
 					vine_checkpoint_update_file_penalty(q, f);
-					success = 1;
-					break;
-				}
-				/* perform replication */
-				if (!destination->is_checkpoint_worker && replica_demand(q, f) > 0) {
-					replicate_file(q, f, source, destination);
 					success = 1;
 					break;
 				}
