@@ -204,17 +204,8 @@ static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_wo
 	}
 	priority_queue_delete(skipped_files);
 
-	int ok = 1;
-
 	/* return if we don't have enough space, or the efficiency is not better */
-	if (disk_available + eviction_size < (int64_t)f->size) {
-		ok = 0;
-	}
-	if (eviction_efficiency > (f->penalty / f->size)) {
-		ok = 0;
-	}
-
-	if (!ok) {
+	if ((disk_available + eviction_size < (int64_t)f->size) || (eviction_efficiency > (f->penalty / f->size))) {
 		/* no need to evict, pop back the files */
 		while (priority_queue_size(to_evict) > 0) {
 			double popped_efficiency = -priority_queue_get_priority(to_evict, 0);

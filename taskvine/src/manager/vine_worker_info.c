@@ -82,6 +82,8 @@ void vine_worker_delete(struct vine_worker_info *w)
 	itable_delete(w->current_tasks);
 	itable_delete(w->current_libraries);
 
+	priority_queue_delete(w->checkpointed_files);
+
 	free(w);
 
 	vine_counters.worker.deleted++;
