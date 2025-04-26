@@ -2461,6 +2461,10 @@ static vine_msg_code_t handle_feature(struct vine_manager *q, struct vine_worker
 
 	hash_table_insert(w->features, fdec, (void **)1);
 
+	if (strcmp(fdec, "checkpoint-worker") == 0) {
+		w->is_checkpoint_worker = 1;
+	}
+
 	return VINE_MSG_PROCESSED;
 }
 
