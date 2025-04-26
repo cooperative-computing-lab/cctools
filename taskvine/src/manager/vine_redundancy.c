@@ -226,6 +226,7 @@ static int checkpoint_worker_ensure_space(struct vine_manager *q, struct vine_wo
 
 	/* evict the files to free up space */
 	while ((popped_file = list_pop_head(to_evict))) {
+		printf("Evicting file %s, penalty: %f\n", popped_file->cached_name, popped_file->penalty);
 		vine_checkpoint_evict(q, popped_file, w);
 	}
 	list_delete(to_evict);
@@ -511,6 +512,7 @@ int vine_redundancy_process_temp_files(struct vine_manager *q)
 				}
 				/* perform checkpointing */
 				if (destination->is_checkpoint_worker && checkpoint_demand(q, f) > 0) {
+					printf("Checkpointing file %s\n", f->cached_name);
 					replicate_file(q, f, source, destination);
 					f->recovery_critical_time = 0;
 					f->recovery_total_time = 0;
