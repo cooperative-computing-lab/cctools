@@ -163,7 +163,7 @@ static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_wo
 	printf("considerring eviction, f->size: %zu, disk_available: %" PRId64 "\n", f->size, disk_available);
 
 	struct priority_queue *to_evict = priority_queue_create(0);
-	double eviction_penalty = 0;
+	double eviction_efficiency = 0;
 	int64_t eviction_size = 0;
 
 	struct priority_queue *skipped_files = priority_queue_create(0);
@@ -189,7 +189,7 @@ static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_wo
 
 		/* try to evict this file */
 		priority_queue_push(to_evict, popped_file, -popped_efficiency);
-		eviction_penalty += popped_efficiency;
+		eviction_efficiency += popped_efficiency;
 		eviction_size += popped_file->size;
 
 		/* do we have enough space after evicting this file? */
@@ -207,10 +207,6 @@ static int ensure_checkpoint_worker_space(struct vine_manager *q, struct vine_wo
 	priority_queue_delete(skipped_files);
 
 	int ok = 1;
-	double eviction_efficiency = 0;
-	if (eviction_size > 0) {
-		eviction_efficiency = eviction_penalty / eviction_size;
-	}
 
 	/* return if we don't have enough space, or the efficiency is not better */
 	if (disk_available + eviction_size < (int64_t)f->size) {
