@@ -966,26 +966,6 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	cleanup_worker_files(q, w);
 }
 
-/* Insert into hashtable temp files that may need replication. */
-
-static void recall_worker_lost_temp_files(struct vine_manager *q, struct vine_worker_info *w)
-{
-	char *cached_name = NULL;
-	struct vine_file_replica *info = NULL;
-
-	debug(D_VINE, "Recalling worker %s's temp files", w->hostname);
-
-	// Iterate over files we want might want to recover
-	HASH_TABLE_ITERATE(w->current_files, cached_name, info)
-	{
-		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
-
-		if (f && f->type == VINE_TEMP) {
-			priority_map_push_or_update(q->temp_files_to_process, f, 0);
-		}
-	}
-}
-
 /* Remove a worker from this master by removing all remote state, all local state, and disconnecting. */
 
 void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason)
@@ -1004,9 +984,7 @@ void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info 
 	hash_table_remove(q->worker_table, w->hashkey);
 	hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
 
-	if (q->transfer_temps_recovery) {
-		recall_worker_lost_temp_files(q, w);
-	}
+	vine_redundancy_handle_worker_removal(q, w);
 
 	cleanup_worker(q, w);
 

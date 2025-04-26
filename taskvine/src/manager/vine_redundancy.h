@@ -19,6 +19,7 @@
 #include <assert.h>
 
 int vine_redundancy_handle_file_pruning(struct vine_manager *q, struct vine_file *f);
+int vine_redundancy_handle_worker_removal(struct vine_manager *q, struct vine_worker_info *w);
 int vine_redundancy_handle_task_completion(struct vine_manager *q, struct vine_task *t);
 int vine_redundancy_handle_cache_update(struct vine_manager *q, struct vine_file *f);
 int vine_redundancy_process_temp_files(struct vine_manager *q);

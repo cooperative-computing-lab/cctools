@@ -401,6 +401,30 @@ int vine_redundancy_handle_file_pruning(struct vine_manager *q, struct vine_file
 	return 1;
 }
 
+int vine_redundancy_handle_worker_removal(struct vine_manager *q, struct vine_worker_info *w)
+{
+	if (!q || !w || !q->transfer_temps_recovery) {
+		return 0;
+	}
+
+	debug(D_VINE, "Recalling worker %s's temp files", w->hostname);
+
+	char *cached_name = NULL;
+	struct vine_file_replica *replica = NULL;
+
+	HASH_TABLE_ITERATE(w->current_files, cached_name, replica)
+	{
+		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
+		assert(f != NULL);
+
+		if (f->type == VINE_TEMP && replica_demand(q, f) > 0) {
+			priority_map_push_or_update(q->temp_files_to_process, f, replica_demand(q, f));
+		}
+	}
+	
+	return 1;
+}
+
 int vine_redundancy_handle_task_completion(struct vine_manager *q, struct vine_task *t)
 {
 	if (!q || !t || q->checkpoint_threshold < 0) {
@@ -515,6 +539,8 @@ int vine_redundancy_process_temp_files(struct vine_manager *q)
 					if (!ensure_checkpoint_worker_space(q, destination, f)) {
 						continue;
 					}
+					vine_checkpoint_update_file_penalty(q, f);
+					assert(f->penalty > 0);
 					priority_queue_push(destination->checkpointed_files, f, -f->penalty / f->size);
 					replicate_file(q, f, source, destination);
 					f->recovery_critical_time = 0;
