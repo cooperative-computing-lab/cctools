@@ -107,6 +107,12 @@ static int replicate_file(struct vine_manager *q, struct vine_file *f, struct vi
 		return 0;
 	}
 
+	/* return if the space is not enough */
+	int64_t available_disk_space = (int64_t)MEGABYTES_TO_BYTES(destination->resources->disk.total) - destination->inuse_cache;
+	if ((int64_t)f->size > available_disk_space) {
+		return 0;
+	}
+
 	char *source_addr = string_format("%s/%s", source->transfer_url, f->cached_name);
 	vine_manager_put_url_now(q, destination, source_addr, f);
 	free(source_addr);
@@ -517,6 +523,7 @@ int vine_redundancy_process_temp_files(struct vine_manager *q)
 				/* perform checkpointing */
 				if (destination->is_checkpoint_worker && checkpoint_demand(q, f) > 0) {
 					replicate_file(q, f, source, destination);
+					priority_queue_push(destination->checkpointed_files, f, -f->penalty);
 					f->recovery_critical_time = 0;
 					f->recovery_total_time = 0;
 					vine_checkpoint_update_file_penalty(q, f);
