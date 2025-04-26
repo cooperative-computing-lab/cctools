@@ -361,6 +361,7 @@ void vine_checkpoint_update_file_penalty(struct vine_manager *q, struct vine_fil
 	f->recovery_total_time += f->producer_task_execution_time;
 
 	f->penalty = (double)(0.5 * f->recovery_total_time) + (double)(0.5 * f->recovery_critical_time);
+	printf("Updated penalty for file %s to %f\n", f->cached_name, f->penalty);
 }
 
 static int checkpoint_demand(struct vine_manager *q, struct vine_file *f)
