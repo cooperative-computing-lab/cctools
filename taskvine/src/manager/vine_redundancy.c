@@ -352,13 +352,14 @@ void vine_checkpoint_update_file_penalty(struct vine_manager *q, struct vine_fil
 	f->recovery_total_time += f->producer_task_execution_time;
 
 	f->penalty = (double)(0.5 * f->recovery_total_time) + (double)(0.5 * f->recovery_critical_time);
+	assert(f->penalty > 0);
 }
 
 static int checkpoint_demand(struct vine_manager *q, struct vine_file *f)
 {
-	if (!q || !f || f->type != VINE_TEMP || q->checkpoint_threshold < 0) {
-		return 0;
-	}
+	assert(f != NULL);
+	assert(f->type == VINE_TEMP);
+	assert(q->checkpoint_threshold >= 0);
 
 	char *key;
 	struct vine_worker_info *w;
@@ -540,6 +541,7 @@ int vine_redundancy_process_temp_files(struct vine_manager *q)
 						continue;
 					}
 					vine_checkpoint_update_file_penalty(q, f);
+
 					assert(f->penalty > 0);
 					priority_queue_push(destination->checkpointed_files, f, -f->penalty / f->size);
 					replicate_file(q, f, source, destination);
