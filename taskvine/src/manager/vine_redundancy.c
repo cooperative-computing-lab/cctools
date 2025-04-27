@@ -357,9 +357,9 @@ void vine_checkpoint_update_file_penalty(struct vine_manager *q, struct vine_fil
 
 static int checkpoint_demand(struct vine_manager *q, struct vine_file *f)
 {
-	assert(f != NULL);
-	assert(f->type == VINE_TEMP);
-	assert(q->checkpoint_threshold >= 0);
+	if (!f || f->type != VINE_TEMP || q->checkpoint_threshold < 0) {
+		return 0;
+	}
 
 	char *key;
 	struct vine_worker_info *w;
