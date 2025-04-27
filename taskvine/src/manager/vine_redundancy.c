@@ -351,8 +351,8 @@ void vine_checkpoint_update_file_penalty(struct vine_manager *q, struct vine_fil
 	f->recovery_critical_time += f->producer_task_execution_time;
 	f->recovery_total_time += f->producer_task_execution_time;
 
+	/* note: the penalty might be 0, if the completion message of its producer task has not been received yet */
 	f->penalty = (double)(0.5 * f->recovery_total_time) + (double)(0.5 * f->recovery_critical_time);
-	assert(f->penalty > 0);
 }
 
 static int checkpoint_demand(struct vine_manager *q, struct vine_file *f)
@@ -537,16 +537,16 @@ int vine_redundancy_process_temp_files(struct vine_manager *q)
 				}
 				/* perform checkpointing */
 				if (destination->is_checkpoint_worker && checkpoint_demand(q, f) > 0) {
+					/* the completion message of its producer task may have not been received yet, so the penalty might be 0
+					 * in this case, we skip it */
+					if (f->penalty == 0) {
+						continue;
+					}
 					if (!ensure_checkpoint_worker_space(q, destination, f)) {
 						continue;
 					}
-					vine_checkpoint_update_file_penalty(q, f);
-
-					assert(f->penalty > 0);
 					priority_queue_push(destination->checkpointed_files, f, -f->penalty / f->size);
 					replicate_file(q, f, source, destination);
-					f->recovery_critical_time = 0;
-					f->recovery_total_time = 0;
 					vine_checkpoint_update_file_penalty(q, f);
 					success = 1;
 					break;
