@@ -422,7 +422,7 @@ int vine_redundancy_handle_worker_removal(struct vine_manager *q, struct vine_wo
 			priority_map_push_or_update(q->temp_files_to_process, f, replica_demand(q, f));
 		}
 	}
-	
+
 	return 1;
 }
 
