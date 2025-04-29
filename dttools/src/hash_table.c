@@ -203,13 +203,10 @@ static int hash_table_double_buckets(struct hash_table *h)
 
 static int hash_table_halve_buckets(struct hash_table *h)
 {
-	if (h->bucket_count <= DEFAULT_SIZE) 
+	if (h->bucket_count/2 < DEFAULT_SIZE) 
 		return 1;
 
-	int new_bucket_count = h->bucket_count / 2;
-	if (new_bucket_count < DEFAULT_SIZE)
-		new_bucket_count = DEFAULT_SIZE;
-	struct hash_table *hn = hash_table_create(new_bucket_count, h->hash_func);
+	struct hash_table *hn = hash_table_create(h->bucket_count/2, h->hash_func);
 
 	if (!hn)
 		return 0;
@@ -248,6 +245,7 @@ static int hash_table_halve_buckets(struct hash_table *h)
 
 	return 1;
 }
+int (*hash_table_half_buckets)(struct hash_table*) = hash_table_halve_buckets;
 
 int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 {
@@ -312,8 +310,6 @@ void *hash_table_remove(struct hash_table *h, const char *key)
 			free(e->key);
 			free(e);
 			h->size--;
-			if (((float)h->size / h->bucket_count) < DEFAULT_MIN_LOAD)
-				hash_table_halve_buckets(h);
 			return value;
 		}
 		f = e;
