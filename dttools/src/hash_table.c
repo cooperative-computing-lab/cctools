@@ -317,7 +317,7 @@ int hash_table_nextkey(struct hash_table *h, char **key, void **value)
 {
 	if (h->cant_iterate_yet) {
 		// commenting out fatal in production
-		//fatal("cctools bug: the hash table iteration has not been reset since last modification");
+		// fatal("cctools bug: the hash table iteration has not been reset since last modification");
 		debug(D_DEBUG, "cctools bug: the hash table iteration has not been reset since last modification");
 	}
 
