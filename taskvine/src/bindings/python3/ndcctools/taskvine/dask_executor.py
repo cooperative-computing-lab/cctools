@@ -392,7 +392,7 @@ class DaskVine(Manager):
 
     def _enqueue_dask_calls(self, dag, tag, rs, retries, enqueued_calls):
         targets = dag.get_targets()
-        for dask_task in rs:
+        for dask_task in rs.values():
             k = dask_task.key
             lazy = self.worker_transfers and k not in targets
             if lazy and self.checkpoint_fn:

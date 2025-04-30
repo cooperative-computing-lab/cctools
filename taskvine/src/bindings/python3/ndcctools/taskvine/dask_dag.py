@@ -23,8 +23,8 @@ class DaskVineDag:
     Computation is done lazily. The DaskVineDag is initialized from a task graph, but not
     computation is decoded. To use the DaskVineDag:
         - DaskVineDag.set_targets(keys): Request the computation associated with key to be decoded.
-        - DaskVineDag.get_ready(): A list of dts.Task that are ready to be executed.
-        - DaskVineDag.set_result(key, value): Sets the result of key to value.
+        - DaskVineDag.get_ready(): A dict of key->dts.Task that are ready to be executed.
+        - DaskVineDag.set_result(key, value): Sets the result key = value. Returns dict key->dts.Task of ready tasks.
         - DaskVineDag.get_result(key): Get result associated with key. Raises DagNoResult
         - DaskVineDag.has_result(key): Whether the key has a computed result. """
 
@@ -38,11 +38,20 @@ class DaskVineDag:
 
     @staticmethod
     def keyp(s):
-        return DaskVineDag.hashable(s) and not DaskVineDag.taskref(s) and not DaskVineDag.taskp(s)
+        return (
+            DaskVineDag.hashable(s)
+            and not DaskVineDag.taskrefp(s)
+            and not DaskVineDag.aliasp(s)
+            and not DaskVineDag.taskp(s)
+        )
 
     @staticmethod
-    def taskref(s):
-        return isinstance(s, (dts.TaskRef, dts.Alias))
+    def taskrefp(s):
+        return isinstance(s, (dts.TaskRef,))
+
+    @staticmethod
+    def aliasp(s):
+        return isinstance(s, (dts.Alias,))
 
     @staticmethod
     def taskp(s):
@@ -119,7 +128,7 @@ class DaskVineDag:
             if self.has_result(key) or cs:
                 continue
             node = self._working_graph[key]
-            if DaskVineDag.taskref(node):
+            if DaskVineDag.taskrefp(node):
                 rs.update(self.set_result(key, self.get_result(node.key)))
             elif DaskVineDag.symbolp(node):
                 rs.update(self.set_result(key, node))
@@ -132,14 +141,15 @@ class DaskVineDag:
             else:
                 self._depth_of[r] = 0
 
-        return rs.values()
+        return rs
 
     def set_result(self, key, value):
         """ Sets new result and propagates in the DaskVineDag. Returns a list of dts.Task
         of computations that become ready to be executed """
+
         rs = {}
         self._result_of[key] = value
-        for p in self._pending_needed_by[key]:
+        for p in list(self._pending_needed_by[key]):
             self._missing_of[p].discard(key)
 
             if self._missing_of[p]:
@@ -147,10 +157,14 @@ class DaskVineDag:
                 continue
 
             node = self._working_graph[p]
-            if DaskVineDag.taskref(node):
+            if DaskVineDag.aliasp(node):
+                rs.update(
+                    self.set_result(p, value)
+                )  # case e.g, "x": "y", and we just set the value of "y"
+            if DaskVineDag.taskrefp(node):
                 rs.update(
                     self.set_result(p, self.get_result(node.key))
-                )  # case e.g, "x": "y", and we just set the value of "y"
+                )
             elif DaskVineDag.symbolp(node):
                 rs.update(self.set_result(p, node))
             else:
@@ -165,20 +179,16 @@ class DaskVineDag:
         for c in self._dependencies_of[key]:
             self._pending_needed_by[c].discard(key)
 
-        return rs.values()
+        return rs
 
     def _add_second_targets(self, key):
         v = self._working_graph[key]
-        if DaskVineDag.taskref(v):
-            lst = [v]
-        elif DaskVineDag.containerp(v):
-            lst = v
-        else:
-            return
-        for c in lst:
-            if DaskVineDag.taskref(c):
-                self._targets.add(c.key)
-                self._add_second_targets(c.key)
+        if DaskVineDag.taskrefp(v) or DaskVineDag.aliasp(v) or DaskVineDag.containerp(v):
+            for c in self.get_dependencies(key):
+                # check c and key are different, in case we have an Alias to itself.
+                if c != key:
+                    self._targets.add(c)
+                    self._add_second_targets(c)
 
     def has_result(self, key):
         return key in self._result_of
