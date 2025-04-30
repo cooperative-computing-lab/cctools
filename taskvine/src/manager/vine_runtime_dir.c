@@ -75,7 +75,7 @@ char *vine_runtime_directory_create()
 	char *runtime_dir = NULL;
 	int symlink_most_recent = 0;
 
-	char buf[256];
+	char buf[PATH_MAX];
 	time_t now = time(NULL);
 	struct tm *tm_info = localtime(&now);
 	strftime(buf, sizeof(buf), vine_runtime_info_template, tm_info);
