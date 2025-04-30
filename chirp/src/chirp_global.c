@@ -99,8 +99,6 @@ static int server_table_load(time_t stoptime)
 {
 	struct catalog_query *q;
 	struct jx *j;
-	char *key;
-	void *item;
 
 	if((last_update + update_interval) > time(0)) {
 		return 1;
@@ -117,11 +115,7 @@ static int server_table_load(time_t stoptime)
 		return 1;
 	}
 
-	hash_table_firstkey(server_table);
-	while(hash_table_nextkey(server_table, &key, &item)) {
-		hash_table_remove(server_table, key);
-		jx_delete(item);
-	}
+	hash_table_clear(server_table, (void *) jx_delete);
 
 	debug(D_CHIRP, "querying catalog at %s", CATALOG_HOST);
 

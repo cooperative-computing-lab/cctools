@@ -43,6 +43,24 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	char **keys = hash_table_keys_array(h);
+	char *key;
+	int j = 0;
+	int sum = 0;
+
+	while ((key = keys[j])) {
+		struct boxed_int *box = hash_table_lookup(h, key);
+		sum += box->value;
+		j++;
+	}
+
+	hash_table_free_keys_array(keys);
+
+	if(sum != 55) {
+		return 1;
+	}
+
+	hash_table_clear(h, free);
 	hash_table_delete(h);
 
 	return 0;

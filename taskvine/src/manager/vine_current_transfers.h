@@ -18,11 +18,7 @@ int vine_current_transfers_set_failure(struct vine_manager *q, char *id);
 
 void vine_current_transfers_set_success(struct vine_manager *q, char *id);
 
-int vine_current_transfers_source_in_use(struct vine_manager *q, struct vine_worker_info *source);
-
 int vine_current_transfers_url_in_use(struct vine_manager *q, const char *source);
-
-int vine_current_transfers_dest_in_use(struct vine_manager *q,struct vine_worker_info *w);
 
 int vine_current_transfers_wipe_worker(struct vine_manager *q, struct vine_worker_info *w);
 

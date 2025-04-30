@@ -41,15 +41,8 @@ static char * chirp_dircache_path = 0;
 
 static void chirp_dircache_invalidate()
 {
-	char *key;
-	void *value;
-
 	if(chirp_dircache) {
-		hash_table_firstkey(chirp_dircache);
-		while(hash_table_nextkey(chirp_dircache,&key,&value)) {
-			hash_table_remove(chirp_dircache,key);
-			free(value);
-		}
+		hash_table_clear(chirp_dircache, free);
 	}
 
 	if(chirp_dircache_path) {

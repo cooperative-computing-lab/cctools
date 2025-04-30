@@ -49,15 +49,9 @@ void pfs_resolve_init(void) {
 
 static void pfs_resolve_cache_flush()
 {
-	char *key, *value;
-
 	if(!resolve_cache) return;
 
-	hash_table_firstkey(resolve_cache);
-	while(hash_table_nextkey(resolve_cache,&key,(void**)&value)) {
-		hash_table_remove(resolve_cache,key);
-		free(value);
-	}
+	hash_table_clear(resolve_cache, free);
 }
 
 static struct pfs_mount_entry *find_parent_ns(struct pfs_mount_entry *ns) {
