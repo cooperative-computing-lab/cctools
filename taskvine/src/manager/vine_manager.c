@@ -977,6 +977,8 @@ static int consider_tempfile_replications(struct vine_manager *q)
 	int iter_control;
 	int iter_count_var;
 
+	struct list *to_remove = list_create();
+
 	HASH_TABLE_ITERATE_FROM_KEY(q->temp_files_to_replicate, iter_control, iter_count_var, key_start, cached_name, empty_val)
 	{
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
@@ -993,7 +995,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 			if (q->transfer_temps_recovery) {
 				vine_manager_consider_recovery_task(q, f, f->recovery_task);
 			}
-			hash_table_remove(q->temp_files_to_replicate, f->cached_name);
+			list_push_tail(to_remove, xxstrdup(f->cached_name));
 			continue;
 		}
 
@@ -1015,7 +1017,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		int nsources = set_size(sources);
 		int to_find = MIN(q->temp_replica_count - nsources, q->transfer_replica_per_cycle);
 		if (to_find <= 0) {
-			hash_table_remove(q->temp_files_to_replicate, f->cached_name);
+			list_push_tail(to_remove, xxstrdup(f->cached_name));
 			continue;
 		}
 
@@ -1027,6 +1029,11 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		if (total_replication_request_sent >= q->attempt_schedule_depth) {
 			break;
 		}
+	}
+
+	while ((cached_name = list_pop_head(to_remove))) {
+		hash_table_remove(q->temp_files_to_replicate, cached_name);
+		free(cached_name);
 	}
 
 	return total_replication_request_sent;
