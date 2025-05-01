@@ -977,6 +977,8 @@ static int consider_tempfile_replications(struct vine_manager *q)
 	int iter_control;
 	int iter_count_var;
 
+	struct list *to_remove = list_create();
+
 	HASH_TABLE_ITERATE_FROM_KEY(q->temp_files_to_replicate, iter_control, iter_count_var, key_start, cached_name, empty_val)
 	{
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
@@ -993,7 +995,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 			if (q->transfer_temps_recovery) {
 				vine_manager_consider_recovery_task(q, f, f->recovery_task);
 			}
-			hash_table_remove(q->temp_files_to_replicate, f->cached_name);
+			list_push_tail(to_remove, xxstrdup(f->cached_name));
 			continue;
 		}
 
@@ -1002,7 +1004,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		struct vine_worker_info *s;
 		SET_ITERATE(sources, s)
 		{
-			if (s->transfer_port_active && vine_current_transfers_source_in_use(q, s) < q->worker_source_max_transfers) {
+			if (s->transfer_port_active && s->outgoing_xfer_counter < q->worker_source_max_transfers) {
 				has_valid_source = 1;
 				break;
 			}
@@ -1015,7 +1017,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		int nsources = set_size(sources);
 		int to_find = MIN(q->temp_replica_count - nsources, q->transfer_replica_per_cycle);
 		if (to_find <= 0) {
-			hash_table_remove(q->temp_files_to_replicate, f->cached_name);
+			list_push_tail(to_remove, xxstrdup(f->cached_name));
 			continue;
 		}
 
@@ -1027,6 +1029,11 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		if (total_replication_request_sent >= q->attempt_schedule_depth) {
 			break;
 		}
+	}
+
+	while ((cached_name = list_pop_head(to_remove))) {
+		hash_table_remove(q->temp_files_to_replicate, cached_name);
+		free(cached_name);
 	}
 
 	return total_replication_request_sent;
@@ -3012,6 +3019,13 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 				return VINE_MGR_FAILURE;
 			}
 		}
+		/* add a reference to the library task, since it may exit unexpectedly.
+		 * its completion message could arrive before the associated function tasks finish.
+		 * once the manager sees the completion, the library task may be freed,
+		 * but other function tasks could still hold dangling references.
+		 * to avoid this, we increment the library task’s reference count when a function task starts,
+		 * and decrement it when the function task completes. */
+		vine_task_addref(t->library_task);
 		/* If start_one_task_fails, this will be decremented in handle_failure below. */
 		t->library_task->function_slots_inuse++;
 	}
@@ -3207,14 +3221,12 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 		itable_remove(w->current_libraries, t->task_id);
 	}
 
-	/*
-	If this was a function call assigned to a library,
-	then decrease the count of functions assigned,
-	and disassociate the task from the library.
-	*/
-
-	if (t->needs_library) {
+	/* if t is a function task, t->library_task should not be invalidated, and we decrement the reference count of the library task.
+	 * if t->library_task is NULL or it had been released before, then something is going wrong. */
+	if (t->needs_library && t->library_task) {
 		t->library_task->function_slots_inuse = MAX(0, t->library_task->function_slots_inuse - 1);
+		vine_task_delete(t->library_task);
+		t->library_task = NULL;
 	}
 
 	t->worker = 0;
@@ -5114,8 +5126,16 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			/* do nothing and let vine_manager_consider_recovery_task do its job */
 			break;
 		case VINE_TASK_TYPE_LIBRARY_INSTANCE:
-			/* silently delete it */
-			vine_task_delete(t); // delete as manager created this task
+			/* silently delete the task, since it was created by the manager.
+			 * note: other functions may still hold references to this library task.
+			 * those references will be released once the functions complete.
+			 *
+			 * change_task_state above internally removes the reference from q->tasks,
+			 * and this following call drops the manager's own reference.
+			 * remaining references will be released gradually upon the completion of relavant
+			 * function tasks, and the task will be automatically freed once no
+			 * references remain, regardless of whether the functions complete successfully. */
+			vine_task_delete(t);
 			break;
 		case VINE_TASK_TYPE_LIBRARY_TEMPLATE:
 			/* A template shouldn't be scheduled. It's deleted when template table is deleted.*/
