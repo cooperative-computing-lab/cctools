@@ -458,7 +458,7 @@ static int handle_cache_invalid(struct vine_manager *q, struct vine_worker_info 
 		/* now that the replica is lost, handle such event */
 		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
 		if (f) {
-			vine_redundancy_handle_replica_loss(q, )
+			vine_redundancy_handle_replica_loss(q, f);
 		}
 
 		/* Successfully processed this message. */
