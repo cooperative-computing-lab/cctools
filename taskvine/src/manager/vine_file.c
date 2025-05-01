@@ -161,22 +161,6 @@ struct vine_file *vine_file_addref(struct vine_file *f)
 	return f;
 }
 
-/* Generate a key for the priority map */
-
-char *vine_file_key_generator(const void *ptr)
-{
-	if (!ptr) {
-		return NULL;
-	}
-
-	const struct vine_file *f = (const struct vine_file *)ptr;
-	if (!f->cached_name) {
-		return NULL;
-	}
-
-	return xxstrdup(f->cached_name);
-}
-
 /* Make a URL reference to a file source*/
 
 char *vine_file_make_file_url(const char *source)

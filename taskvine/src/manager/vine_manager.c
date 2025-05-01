@@ -43,7 +43,6 @@ See the file COPYING for details.
 #include "envtools.h"
 #include "hash_table.h"
 #include "priority_queue.h"
-#include "priority_map.h"
 #include "int_sizes.h"
 #include "interfaces_address.h"
 #include "itable.h"
@@ -3955,7 +3954,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->worker_table = hash_table_create(0, 0);
 	q->file_worker_table = hash_table_create(0, 0);
-	q->temp_files_to_process = priority_map_create(0, vine_file_key_generator);
+	q->temp_files_to_process = priority_queue_create(0);
 	q->worker_blocklist = hash_table_create(0, 0);
 
 	q->file_table = hash_table_create(0, 0);
@@ -4335,7 +4334,7 @@ void vine_delete(struct vine_manager *q)
 	list_clear(q->task_info_list, (void *)vine_task_info_delete);
 	list_delete(q->task_info_list);
 
-	priority_map_delete(q->temp_files_to_process);
+	priority_queue_delete(q->temp_files_to_process);
 
 	char *staging = vine_get_path_staging(q, NULL);
 	if (!access(staging, F_OK)) {

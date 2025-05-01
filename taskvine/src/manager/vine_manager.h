@@ -128,7 +128,7 @@ struct vine_manager {
 
 	struct hash_table *file_table;      /* Maps fileid -> struct vine_file.* */
 	struct hash_table *file_worker_table; /* Maps cachename -> struct set of workers with a replica of the file.* */
-	struct priority_map *temp_files_to_process;  /* files to replicate or checkpoint */
+	struct priority_queue *temp_files_to_process;  /* files to replicate or checkpoint */
 
 
 	/* Primary scheduling controls. */
@@ -222,7 +222,7 @@ struct vine_manager {
 	int temp_replica_count;       /* Number of replicas per temp file */
 
 	int checkpoint_threshold;    /* Checkpoint a file if it's penalty exceeds this threshold (TODO: make it a heuristic parameter) */
-	struct priority_map *temp_files_to_checkpoint;   /* temp files to consider for checkpointing, sorted by penalty */
+	struct priority_queue *temp_files_to_checkpoint;   /* temp files to consider for checkpointing, sorted by penalty */
 
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */

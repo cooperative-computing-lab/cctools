@@ -397,7 +397,11 @@ int vine_redundancy_handle_file_pruning(struct vine_manager *q, struct vine_file
 		return 0;
 	}
 
-	priority_map_remove(q->temp_files_to_process, f);
+
+	int idx = priority_queue_find_idx(q->temp_files_to_process, f);
+	if (idx != -1) {
+		priority_queue_remove(q->temp_files_to_process, idx);
+	}
 
 	return 1;
 }
@@ -419,7 +423,12 @@ int vine_redundancy_handle_worker_removal(struct vine_manager *q, struct vine_wo
 		assert(f != NULL);
 
 		if (f->type == VINE_TEMP && replica_demand(q, f) > 0) {
-			priority_map_push_or_update(q->temp_files_to_process, f, replica_demand(q, f));
+			int idx = priority_queue_find_idx(q->temp_files_to_process, f);
+			if (idx != -1) {
+				priority_queue_update_priority(q->temp_files_to_process, f, replica_demand(q, f));
+			} else {
+				priority_queue_push(q->temp_files_to_process, f, replica_demand(q, f));
+			}
 		}
 	}
 
@@ -472,7 +481,12 @@ int vine_redundancy_handle_cache_update(struct vine_manager *q, struct vine_file
 	}
 
 	if (replica_demand(q, f) > 0 || checkpoint_demand(q, f) > 0) {
-		priority_map_push_or_update(q->temp_files_to_process, f, replica_demand(q, f));
+		int idx = priority_queue_find_idx(q->temp_files_to_process, f);
+		if (idx != -1) {
+			priority_queue_update_priority(q->temp_files_to_process, f, replica_demand(q, f));
+		} else {
+			priority_queue_push(q->temp_files_to_process, f, replica_demand(q, f));
+		}
 		return 1;
 	}
 
@@ -489,10 +503,10 @@ int vine_redundancy_process_temp_files(struct vine_manager *q)
 	int processed = 0;
 
 	int iter_count = 0;
-	int iter_depth = MIN(q->attempt_schedule_depth, priority_map_size(q->temp_files_to_process));
+	int iter_depth = MIN(q->attempt_schedule_depth, priority_queue_size(q->temp_files_to_process));
 	struct list *no_source_files = list_create();
 	struct vine_file *f;
-	while ((f = priority_map_pop(q->temp_files_to_process)) && (iter_count < iter_depth)) {
+	while ((f = priority_queue_pop(q->temp_files_to_process)) && (iter_count < iter_depth)) {
 		assert(f != NULL);
 		assert(f->type == VINE_TEMP);
 
@@ -561,7 +575,12 @@ int vine_redundancy_process_temp_files(struct vine_manager *q)
 
 		/* push back the file if we need more redundancy, files with less replicas are prioritized to consider */
 		if (checkpoint_demand(q, f) > 0 || replica_demand(q, f) > 0) {
-			priority_map_push_or_update(q->temp_files_to_process, f, replica_demand(q, f));
+			int idx = priority_queue_find_idx(q->temp_files_to_process, f);
+			if (idx != -1) {
+				priority_queue_update_priority(q->temp_files_to_process, f, replica_demand(q, f));
+			} else {
+				priority_queue_push(q->temp_files_to_process, f, replica_demand(q, f));
+			}
 		}
 
 		if (++iter_count >= iter_depth) {
@@ -589,12 +608,21 @@ int vine_redundancy_process_temp_files(struct vine_manager *q)
 
 		if (!has_valid_source) {
 			vine_prune_file(q, no_source_file);
-			priority_map_remove(q->temp_files_to_process, no_source_file);
+			int idx = priority_queue_find_idx(q->temp_files_to_process, no_source_file);
+			if (idx != -1) {
+				priority_queue_remove(q->temp_files_to_process, idx);
+			}
+			/* if the file is a temp file, we need to consider it for recovery */
 			if (q->transfer_temps_recovery) {
 				vine_manager_consider_recovery_task(q, no_source_file, no_source_file->recovery_task);
 			}
 		} else {
-			priority_map_push_or_update(q->temp_files_to_process, no_source_file, replica_demand(q, no_source_file));
+			int idx = priority_queue_find_idx(q->temp_files_to_process, no_source_file);
+			if (idx != -1) {
+				priority_queue_update_priority(q->temp_files_to_process, no_source_file, replica_demand(q, no_source_file));
+			} else {
+				priority_queue_push(q->temp_files_to_process, no_source_file, replica_demand(q, no_source_file));
+			}
 		}
 	}
 	list_delete(no_source_files);

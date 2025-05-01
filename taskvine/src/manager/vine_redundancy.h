@@ -12,7 +12,6 @@
 #include "vine_manager_put.h"
 #include "vine_mount.h"
 #include "vine_file_replica_table.h"
-#include "priority_map.h"
 #include "vine_task.h"
 
 #include <float.h>

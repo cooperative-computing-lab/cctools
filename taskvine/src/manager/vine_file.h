@@ -60,8 +60,6 @@ struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *so
 
 struct vine_file *vine_file_addref( struct vine_file *f );
 
-char *vine_file_key_generator( const void *ptr );
-
 /* Decreases reference count of file, and frees if zero. */
 int vine_file_delete( struct vine_file *f );
 
