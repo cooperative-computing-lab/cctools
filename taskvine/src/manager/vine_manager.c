@@ -455,6 +455,12 @@ static int handle_cache_invalid(struct vine_manager *q, struct vine_worker_info 
 			w->last_failure_time = timestamp_get();
 		}
 
+		/* now that the replica is lost, handle such event */
+		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
+		if (f) {
+			vine_redundancy_handle_replica_loss(q, )
+		}
+
 		/* Successfully processed this message. */
 		return VINE_MSG_PROCESSED;
 	} else {
@@ -923,14 +929,14 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 		return;
 	}
 
-	/* otherwise, ensure temp file redundancy */
+	/* otherwise, handle the replica loss event */
 	for (int i = 0; (cached_name = cached_names_copy[i]); i++) {
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_names_copy[i]);
 		/* skip if the file was not declared */
 		if (!f) {
 			continue;
 		}
-		vine_redundancy_handle_worker_removal(q, f);
+		vine_redundancy_handle_replica_loss(q, f);
 	}
 
 	hash_table_free_keys_array(cached_names_copy);

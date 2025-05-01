@@ -408,7 +408,7 @@ int vine_redundancy_handle_file_pruning(struct vine_manager *q, struct vine_file
 	return 1;
 }
 
-int vine_redundancy_handle_worker_removal(struct vine_manager *q, struct vine_file *f)
+int vine_redundancy_handle_replica_loss(struct vine_manager *q, struct vine_file *f)
 {
 	if (!q || !f) {
 		return 0;
