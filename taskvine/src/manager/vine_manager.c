@@ -2928,6 +2928,13 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 				return VINE_MGR_FAILURE;
 			}
 		}
+		/* add a reference to the library task, since it may exit unexpectedly.
+		 * its completion message could arrive before the associated function tasks finish.
+		 * once the manager sees the completion, the library task may be freed,
+		 * but other function tasks could still hold dangling references.
+		 * to avoid this, we increment the library task’s reference count when a function task starts,
+		 * and decrement it when the function task completes. */
+		vine_task_addref(t->library_task);
 		/* If start_one_task_fails, this will be decremented in handle_failure below. */
 		t->library_task->function_slots_inuse++;
 	}
@@ -3123,14 +3130,12 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 		itable_remove(w->current_libraries, t->task_id);
 	}
 
-	/*
-	If this was a function call assigned to a library,
-	then decrease the count of functions assigned,
-	and disassociate the task from the library.
-	*/
-
-	if (t->needs_library) {
+	/* if t is a function task, t->library_task should not be invalidated, and we decrement the reference count of the library task.
+	 * if t->library_task is NULL or it had been released before, then something is going wrong. */
+	if (t->needs_library && t->library_task) {
 		t->library_task->function_slots_inuse = MAX(0, t->library_task->function_slots_inuse - 1);
+		vine_task_delete(t->library_task);
+		t->library_task = NULL;
 	}
 
 	t->worker = 0;
@@ -5031,8 +5036,16 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			/* do nothing and let vine_manager_consider_recovery_task do its job */
 			break;
 		case VINE_TASK_TYPE_LIBRARY_INSTANCE:
-			/* silently delete it */
-			vine_task_delete(t); // delete as manager created this task
+			/* silently delete the task, since it was created by the manager.
+			 * note: other functions may still hold references to this library task.
+			 * those references will be released once the functions complete.
+			 *
+			 * change_task_state above internally removes the reference from q->tasks,
+			 * and this following call drops the manager's own reference.
+			 * remaining references will be released gradually upon the completion of relavant
+			 * function tasks, and the task will be automatically freed once no
+			 * references remain, regardless of whether the functions complete successfully. */
+			vine_task_delete(t);
 			break;
 		case VINE_TASK_TYPE_LIBRARY_TEMPLATE:
 			/* A template shouldn't be scheduled. It's deleted when template table is deleted.*/
