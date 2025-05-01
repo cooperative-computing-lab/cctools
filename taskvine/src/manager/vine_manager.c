@@ -918,7 +918,12 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 		}
 	}
 
-	/* ensure temp file redundancy */
+	/* return if the workflow has finished and the worker is removed in the cleanup phase */
+	if (vine_empty(q)) {
+		return;
+	}
+
+	/* otherwise, ensure temp file redundancy */
 	for (int i = 0; (cached_name = cached_names_copy[i]); i++) {
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_names_copy[i]);
 		/* skip if the file was not declared */
