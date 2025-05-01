@@ -101,6 +101,50 @@ int vine_file_replica_count(struct vine_manager *m, struct vine_file *f)
 	return set_size(sources);
 }
 
+// count the number of pending replicas of a file
+int vine_file_replica_table_count_pending_replicas(struct vine_manager *m, struct vine_file *f)
+{
+	struct set *sources = hash_table_lookup(m->file_worker_table, f->cached_name);
+	if (!sources) {
+		return 0;
+	}
+
+	int count = 0;
+	struct vine_worker_info *w;
+	SET_ITERATE(sources, w)
+	{
+		struct vine_file_replica *replica = hash_table_lookup(w->current_files, f->cached_name);
+		assert(replica != NULL);
+		if (replica->state == VINE_FILE_REPLICA_STATE_PENDING) {
+			count++;
+		}
+	}
+
+	return count;
+}
+
+// count the number of ready replicas of a file
+int vine_file_replica_table_count_ready_replicas(struct vine_manager *m, struct vine_file *f)
+{
+	struct set *sources = hash_table_lookup(m->file_worker_table, f->cached_name);
+	if (!sources) {
+		return 0;
+	}
+
+	int count = 0;
+	struct vine_worker_info *w;
+	SET_ITERATE(sources, w)
+	{
+		struct vine_file_replica *replica = hash_table_lookup(w->current_files, f->cached_name);
+		assert(replica != NULL);
+		if (replica->state == VINE_FILE_REPLICA_STATE_READY) {
+			count++;
+		}
+	}
+
+	return count;
+}
+
 // find a worker (randomly) in posession of a specific file, and is ready to transfer it.
 struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager *q, const char *cachename)
 {

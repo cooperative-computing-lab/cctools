@@ -147,6 +147,14 @@ double priority_queue_get_priority(struct priority_queue *pq, int index);
 */
 int priority_queue_update_priority(struct priority_queue *pq, void *data, double new_priority);
 
+/** Update the priority of an element at a specified index.
+@param pq A pointer to a priority queue.
+@param idx The index of the element to update.
+@param new_priority The new priority of the element.
+@return The new index if the update succeeded, -1 on failure.
+*/
+int priority_queue_update_priority_at(struct priority_queue *pq, int idx, double new_priority);
+
 /** Find the index of an element in a priority queue.
 @param pq A pointer to a priority queue.
 @param data The pointer to the element to find.

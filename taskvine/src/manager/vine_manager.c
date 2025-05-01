@@ -395,7 +395,7 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 
 			/* And if the file is a newly created temporary, replicate as needed. */
 			if (f->type == VINE_TEMP && *id == 'X') {
-				vine_redundancy_handle_cache_update(q, f);
+				vine_redundancy_handle_file_creation(q, f);
 			}
 		}
 	}
@@ -890,44 +890,47 @@ void vine_update_catalog(struct vine_manager *m)
 
 static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info *w)
 {
-	if (hash_table_size(w->current_files) < 1) {
+	if (!q || !w || !w->current_files || hash_table_size(w->current_files) < 1) {
+		return;
+	}
+
+	char **cached_names_copy = hash_table_keys_array(w->current_files);
+	if (!cached_names_copy) {
 		return;
 	}
 
 	char *cached_name = NULL;
-	char **cached_names = hash_table_keys_array(w->current_files);
 
-	struct vine_file_replica *replica = NULL;
+	/* remove all files */
+	for (int i = 0; (cached_name = cached_names_copy[i]); i++) {
+		struct vine_file *f = hash_table_lookup(q->file_table, cached_names_copy[i]);
+		assert(cached_name != NULL);
 
-	int i = 0;
-	while ((cached_name = cached_names[i])) {
-		i++;
-		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
+		/* skip if the file was declared, and we successfully remove it */
+		if (f && delete_worker_file(q, w, cached_name, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW)) {
+			continue;
+		}
 
-		// check that the manager actually knows about that file, as the file
-		// may correspond to a cache-update of a file that has not been declared
-		// yet.
-		if (!f || !delete_worker_file(q, w, f->cached_name, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW)) {
-			if (cached_name) {
-				replica = vine_file_replica_table_remove(q, w, cached_name);
-			}
-
-			if (replica) {
-				vine_file_replica_delete(replica);
-
-				// recreate tmps lost with this worker if needed
-				if (q->immediate_recovery) {
-					if (f && f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED) {
-						if (!vine_file_replica_table_exists_somewhere(q, f->cached_name)) {
-							vine_manager_consider_recovery_task(q, f, f->recovery_task);
-						}
-					}
-				}
-			}
+		/* otherwise, we enforce a deletion of the file replica */
+		struct vine_file_replica *replica = vine_file_replica_table_remove(q, w, cached_name);
+		if (replica) {
+			vine_file_replica_delete(replica);
 		}
 	}
 
-	hash_table_free_keys_array(cached_names);
+	/* ensure temp file redundancy */
+	for (int i = 0; (cached_name = cached_names_copy[i]); i++) {
+		struct vine_file *f = hash_table_lookup(q->file_table, cached_names_copy[i]);
+		/* skip if the file was not declared */
+		if (!f) {
+			continue;
+		}
+		vine_redundancy_handle_worker_removal(q, f);
+	}
+
+	hash_table_free_keys_array(cached_names_copy);
+
+	return;
 }
 
 /* Remove all tasks and other associated state from a given worker. */
@@ -982,8 +985,6 @@ void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info 
 
 	hash_table_remove(q->worker_table, w->hashkey);
 	hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
-
-	vine_redundancy_handle_worker_removal(q, w);
 
 	cleanup_worker(q, w);
 
@@ -4039,6 +4040,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->temp_replica_count = 1;
 	q->transfer_temps_recovery = 0;
+	q->immediate_recovery = 0;
 	q->transfer_replica_per_cycle = 10;
 
 	q->checkpoint_threshold = -1;
