@@ -925,10 +925,10 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 		return 0;
 	}
 
-	/* Before we begin evicting workers intentionally, we want to wait until the workflow actually starts. 
-	 * That timing is determined by when the first task is dispatched. Otherwise, if we set wait-for-workers 
+	/* Before we begin evicting workers intentionally, we want to wait until the workflow actually starts.
+	 * That timing is determined by when the first task is dispatched. Otherwise, if we set wait-for-workers
 	 * to a high number, nothing happens in the first stage, the manager still evict workers while connecting
-	 * new ones simultaneously, which slows things down early on. So, we track the time when the first task is 
+	 * new ones simultaneously, which slows things down early on. So, we track the time when the first task is
 	 * dispatched and only start evicting workers after that time. */
 	if (q->time_start_worker_eviction == 0) {
 		q->time_start_worker_eviction = timestamp_get();
