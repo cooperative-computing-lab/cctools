@@ -921,11 +921,11 @@ This includes all types of removals, whether graceful or due to failures.
 static int enforce_worker_eviction_interval(struct vine_manager *q)
 {
 	/* do not consider eviction if the workflow has not started yet, because wait-for-workers might delay the task executions for a while */
-	if (!q || q->enforce_worker_eviction_interval <= 0 || q->stats->time_first_task_started == 0 || hash_table_size(q->worker_table) == 0) {
+	if (!q || q->enforce_worker_eviction_interval <= 0 || q->stats->time_first_task_dispatched == 0 || hash_table_size(q->worker_table) == 0) {
 		return 0;
 	}
 
-	timestamp_t total_execution_time = timestamp_get() - q->stats->time_first_task_started;
+	timestamp_t total_execution_time = timestamp_get() - q->stats->time_first_task_dispatched;
 
 	/* the time to remove the first worker is when the workflow has run for q->enforce_worker_eviction_interval */
 	if (q->stats->workers_removed == 0 && total_execution_time <= q->enforce_worker_eviction_interval) {
@@ -3596,7 +3596,7 @@ static int send_one_task(struct vine_manager *q)
 			switch (result) {
 			case VINE_SUCCESS:
 				/* return on successful commit. */
-				q->stats->time_first_task_started = q->stats->time_first_task_started == 0 ? timestamp_get() : q->stats->time_first_task_started;
+				q->stats->time_first_task_dispatched = q->stats->time_first_task_dispatched == 0 ? timestamp_get() : q->stats->time_first_task_dispatched;
 				return 1;
 				break;
 			case VINE_APP_FAILURE:

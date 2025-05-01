@@ -214,7 +214,7 @@ struct vine_stats {
 							resources. */
 
 	/* Workflow time statistics: */
-	timestamp_t time_first_task_started;          /**< Time the first task started. */
+	timestamp_t time_first_task_dispatched;          /**< Time the first task started. */
 
 	/* BW statistics */
 	int64_t bytes_sent; /**< Total number of file bytes (not including protocol control msg bytes) sent out to the
