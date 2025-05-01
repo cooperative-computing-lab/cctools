@@ -149,6 +149,35 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 	return ok;
 }
 
+/* Find the number of committable cores across all connected workers. */
+int vine_schedule_find_commitable_cores(struct vine_manager *q)
+{
+	int committable_cores = 0;
+	uint64_t library_task_id = 0;
+	struct vine_task *library_task = NULL;
+	char *key;
+	struct vine_worker_info *w;
+
+	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	{
+		if (!w->resources || w->resources->cores.total <= 0) {
+			continue;
+		}
+		if (w->current_libraries && itable_size(w->current_libraries) > 0) {
+			ITABLE_ITERATE(w->current_libraries, library_task_id, library_task)
+			{
+				if (!library_task || !library_task->provides_library) {
+					continue;
+				}
+				committable_cores += (library_task->function_slots_total - library_task->function_slots_inuse);
+			}
+		}
+		committable_cores += (overcommitted_resource_total(q, w->resources->cores.total) - w->resources->cores.inuse);
+	}
+
+	return committable_cores;
+}
+
 /* Check if this worker has committable resources for any type of task.
  * If it returns false, neither a function task, library task nor a regular task can run on this worker.
  * If it returns true, the worker has either free slots for function calls or sufficient resources for regular tasks.
@@ -644,7 +673,6 @@ This is quite an expensive function and so is invoked only periodically.
 
 void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 {
-	int t_idx;
 	struct vine_task *t;
 	int unfit_core = 0;
 	int unfit_mem = 0;
@@ -653,10 +681,7 @@ void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 
 	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
 
-	int iter_count = 0;
-	int iter_depth = priority_queue_size(q->ready_tasks);
-
-	PRIORITY_QUEUE_BASE_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
+	LIST_ITERATE(q->pending_tasks, t)
 	{
 		// check each task against the queue of connected workers
 		vine_resource_bitmask_t bit_set = is_task_larger_than_any_worker(q, t);
