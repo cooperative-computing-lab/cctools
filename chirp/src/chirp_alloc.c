@@ -344,7 +344,7 @@ int chirp_alloc_init(INT64_T size)
 
 void chirp_alloc_flush()
 {
-	char *path, *root;
+	char *path;
 	struct alloc_state *s;
 
 	if(!alloc_enabled)
@@ -353,18 +353,17 @@ void chirp_alloc_flush()
 	debug(D_ALLOC, "flushing allocation states...");
 
 
-	hash_table_firstkey(alloc_table);
-	while(hash_table_nextkey(alloc_table, &path, (void **) &s)) {
-		alloc_state_save(path, s);
-		hash_table_remove(alloc_table, path);
+	char **paths = hash_table_keys_array(alloc_table);
+	int i = 0;
+	while ((path = paths[i])) {
+	    i++;
+	    s = hash_table_lookup(alloc_table, path);
+	    alloc_state_save(path, s);
+	    hash_table_remove(alloc_table, path);
 	}
+	hash_table_free_keys_array(paths);
 
-
-	hash_table_firstkey(root_table);
-	while(hash_table_nextkey(root_table, &path, (void **) &root)) {
-		free(root);
-		hash_table_remove(root_table, path);
-	}
+	hash_table_clear(root_table, free);
 
 	last_flush_time = time(0);
 }

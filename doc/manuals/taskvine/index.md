@@ -47,7 +47,7 @@ g = m.declare_file("myoutput.txt")
 
 t = Task("grep needle warandpeace.txt > output.txt")
 t.add_input(f, "warandpeace.txt")
-t.add_output(g, "outfile.txt")
+t.add_output(g, "output.txt")
 ```
 
 Tasks share a common set of options.  Each task can be labelled with the resources
