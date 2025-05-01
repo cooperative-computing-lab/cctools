@@ -924,19 +924,14 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 		}
 	}
 
-	/* return if the workflow has finished and the worker is removed in the cleanup phase */
-	if (vine_empty(q)) {
-		return;
-	}
-
-	/* otherwise, handle the replica loss event */
-	for (int i = 0; (cached_name = cached_names_copy[i]); i++) {
-		struct vine_file *f = hash_table_lookup(q->file_table, cached_names_copy[i]);
-		/* skip if the file was not declared */
-		if (!f) {
-			continue;
+	/* if the workflow has not finished, handle the replica loss event */
+	if (!vine_empty(q)) {
+		for (int i = 0; (cached_name = cached_names_copy[i]); i++) {
+			struct vine_file *f = hash_table_lookup(q->file_table, cached_names_copy[i]);
+			if (f) {
+				vine_redundancy_handle_replica_loss(q, f);
+			}
 		}
-		vine_redundancy_handle_replica_loss(q, f);
 	}
 
 	hash_table_free_keys_array(cached_names_copy);
