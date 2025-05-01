@@ -925,8 +925,12 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 		return 0;
 	}
 
-	/* set the start time after at least one task is dispatched */
-	if (q->time_start_worker_eviction == -1) {
+	/* Before we begin evicting workers intentionally, we want to wait until the workflow actually starts. 
+	 * That timing is determined by when the first task is dispatched. Otherwise, if we set wait-for-workers 
+	 * to a high number, nothing happens in the first stage, the manager still evict workers while connecting
+	 * new ones simultaneously, which slows things down early on. So, we track the time when the first task is 
+	 * dispatched and only start evicting workers after that time. */
+	if (q->time_start_worker_eviction == 0) {
 		q->time_start_worker_eviction = timestamp_get();
 	}
 	timestamp_t current_makespan = timestamp_get() - q->time_start_worker_eviction;
@@ -966,7 +970,7 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 	/* release a random worker */
 	int index = random() % count;
 	struct vine_worker_info *selected = candidates[index];
-	debug(D_VINE | D_NOTICE, "Intentionally removing worker %s", selected->hostname);
+	debug(D_VINE | D_NOTICE, "Intentionally evicting worker %s", selected->hostname);
 	release_worker(q, selected);
 	free(candidates);
 
@@ -4201,7 +4205,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->manager_preferred_connection = xxstrdup("by_ip");
 
 	q->enforce_worker_eviction_interval = 0;
-	q->time_start_worker_eviction = -1;
+	q->time_start_worker_eviction = 0;
 
 	if ((envstring = getenv("VINE_BANDWIDTH"))) {
 		q->bandwidth_limit = string_metric_parse(envstring);
