@@ -73,6 +73,7 @@ struct vine_worker_info {
 	int64_t     total_bytes_transferred;
 	int         forsaken_tasks;
 	int64_t     inuse_cache;
+	int         tasks_waiting_retrieval;
 
 	timestamp_t total_task_time;
 	timestamp_t total_transfer_time;
@@ -93,6 +94,9 @@ struct vine_worker_info {
 	int xfer_total_bad_source_counter;
 	int xfer_total_good_destination_counter;
 	int xfer_total_bad_destination_counter;
+
+	int incoming_xfer_counter;
+	int outgoing_xfer_counter;
 };
 
 struct vine_worker_info * vine_worker_create( struct link * lnk );

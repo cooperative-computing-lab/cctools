@@ -132,14 +132,21 @@ Remove all entries with a cache level <= level.
 
 void vine_cache_prune(struct vine_cache *c, vine_cache_level_t level)
 {
-	struct vine_cache_file *f;
 	char *cachename;
-	HASH_TABLE_ITERATE(c->table, cachename, f)
-	{
+	char **cachenames = hash_table_keys_array(c->table);
+	int i = 0;
+
+	struct vine_cache_file *f;
+	while ((cachename = cachenames[i])) {
+		i++;
+		f = hash_table_lookup(c->table, cachename);
+
 		if (f->cache_level <= level) {
 			vine_cache_remove(c, cachename, 0);
 		}
 	}
+
+	hash_table_free_keys_array(cachenames);
 }
 
 /*

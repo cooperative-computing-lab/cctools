@@ -508,6 +508,20 @@ static int handle_transfer_hostport(struct vine_manager *q, struct vine_worker_i
 	return VINE_MSG_PROCESSED;
 }
 
+static void register_waiting_retrieval(struct vine_manager *q, struct vine_worker_info *w)
+{
+	/* Here we increment the counter of tasks ready to be retrieved at the worker.
+	 * In case no other task at the worker was ready to be retrieved, we add it
+	 * to the list for the manager to eventually process in the wait loop.
+	 * The counter is decremented as tasks are retrieved. */
+
+	w->tasks_waiting_retrieval += 1;
+	if (w->tasks_waiting_retrieval == 1) {
+		/* if this is the first task waiting retrieval, then tell manager about it. */
+		list_push_tail(q->workers_with_complete_tasks, xxstrdup(w->hashkey));
+	}
+}
+
 static vine_result_code_t get_completion_result(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
 	if (!q || !w || !line)
@@ -623,7 +637,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 			c->min_vine_sandbox = sandbox_used;
 		}
 
-		hash_table_insert(q->workers_with_complete_tasks, w->hashkey, w);
+		register_waiting_retrieval(q, w);
 	}
 
 	/* Finally update data structures to reflect the completion. */
@@ -877,21 +891,22 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 		return;
 	}
 
-	struct vine_file_replica *replica = NULL;
 	char *cached_name = NULL;
-	HASH_TABLE_ITERATE(w->current_files, cached_name, replica)
-	{
-		// make a copy of the cached name because the file may be deleted from the file tables,
-		// which corrupts the cached_name given from HASH_TABLE_ITERATE.
-		char *cached_name_copy = xxstrdup(cached_name);
-		struct vine_file *f = hash_table_lookup(q->file_table, cached_name_copy);
+	char **cached_names = hash_table_keys_array(w->current_files);
+
+	struct vine_file_replica *replica = NULL;
+
+	int i = 0;
+	while ((cached_name = cached_names[i])) {
+		i++;
+		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
 
 		// check that the manager actually knows about that file, as the file
 		// may correspond to a cache-update of a file that has not been declared
 		// yet.
 		if (!f || !delete_worker_file(q, w, f->cached_name, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW)) {
-			if (cached_name_copy) {
-				replica = vine_file_replica_table_remove(q, w, cached_name_copy);
+			if (cached_name) {
+				replica = vine_file_replica_table_remove(q, w, cached_name);
 			}
 
 			if (replica) {
@@ -907,8 +922,9 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 				}
 			}
 		}
-		free(cached_name_copy);
 	}
+
+	hash_table_free_keys_array(cached_names);
 }
 
 /* Remove all tasks and other associated state from a given worker. */
@@ -961,6 +977,8 @@ static int consider_tempfile_replications(struct vine_manager *q)
 	int iter_control;
 	int iter_count_var;
 
+	struct list *to_remove = list_create();
+
 	HASH_TABLE_ITERATE_FROM_KEY(q->temp_files_to_replicate, iter_control, iter_count_var, key_start, cached_name, empty_val)
 	{
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
@@ -977,7 +995,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 			if (q->transfer_temps_recovery) {
 				vine_manager_consider_recovery_task(q, f, f->recovery_task);
 			}
-			hash_table_remove(q->temp_files_to_replicate, f->cached_name);
+			list_push_tail(to_remove, xxstrdup(f->cached_name));
 			continue;
 		}
 
@@ -986,7 +1004,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		struct vine_worker_info *s;
 		SET_ITERATE(sources, s)
 		{
-			if (s->transfer_port_active && vine_current_transfers_source_in_use(q, s) < q->worker_source_max_transfers) {
+			if (s->transfer_port_active && s->outgoing_xfer_counter < q->worker_source_max_transfers) {
 				has_valid_source = 1;
 				break;
 			}
@@ -999,7 +1017,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		int nsources = set_size(sources);
 		int to_find = MIN(q->temp_replica_count - nsources, q->transfer_replica_per_cycle);
 		if (to_find <= 0) {
-			hash_table_remove(q->temp_files_to_replicate, f->cached_name);
+			list_push_tail(to_remove, xxstrdup(f->cached_name));
 			continue;
 		}
 
@@ -1011,6 +1029,11 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		if (total_replication_request_sent >= q->attempt_schedule_depth) {
 			break;
 		}
+	}
+
+	while ((cached_name = list_pop_head(to_remove))) {
+		hash_table_remove(q->temp_files_to_replicate, cached_name);
+		free(cached_name);
 	}
 
 	return total_replication_request_sent;
@@ -1053,7 +1076,6 @@ void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info 
 
 	hash_table_remove(q->worker_table, w->hashkey);
 	hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
-	hash_table_remove(q->workers_with_complete_tasks, w->hashkey);
 
 	if (q->transfer_temps_recovery) {
 		recall_worker_lost_temp_files(q, w);
@@ -2997,6 +3019,13 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 				return VINE_MGR_FAILURE;
 			}
 		}
+		/* add a reference to the library task, since it may exit unexpectedly.
+		 * its completion message could arrive before the associated function tasks finish.
+		 * once the manager sees the completion, the library task may be freed,
+		 * but other function tasks could still hold dangling references.
+		 * to avoid this, we increment the library task’s reference count when a function task starts,
+		 * and decrement it when the function task completes. */
+		vine_task_addref(t->library_task);
 		/* If start_one_task_fails, this will be decremented in handle_failure below. */
 		t->library_task->function_slots_inuse++;
 	}
@@ -3192,14 +3221,12 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 		itable_remove(w->current_libraries, t->task_id);
 	}
 
-	/*
-	If this was a function call assigned to a library,
-	then decrease the count of functions assigned,
-	and disassociate the task from the library.
-	*/
-
-	if (t->needs_library) {
+	/* if t is a function task, t->library_task should not be invalidated, and we decrement the reference count of the library task.
+	 * if t->library_task is NULL or it had been released before, then something is going wrong. */
+	if (t->needs_library && t->library_task) {
 		t->library_task->function_slots_inuse = MAX(0, t->library_task->function_slots_inuse - 1);
+		vine_task_delete(t->library_task);
+		t->library_task = NULL;
 	}
 
 	t->worker = 0;
@@ -3559,20 +3586,6 @@ static int send_one_task(struct vine_manager *q)
 }
 
 /*
-get available results from a worker. This is typically used for signaling watched files.
-*/
-int get_results_from_worker(struct vine_manager *q, struct vine_worker_info *w)
-{
-	/* get available results from the worker, bail out if that also fails. */
-	vine_result_code_t r = get_available_results(q, w);
-	if (r != VINE_SUCCESS) {
-		handle_worker_failure(q, w);
-		return 0;
-	}
-	return 1;
-}
-
-/*
 Finding a worker that has tasks waiting to be retrieved, then fetch the outputs
 of those tasks. Returns the number of tasks received.
 */
@@ -3591,23 +3604,25 @@ static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_
 		max_to_receive = itable_size(w->current_tasks);
 	}
 
-	/* Reset the available results table now that the worker is removed */
-	hash_table_remove(q->workers_with_complete_tasks, w->hashkey);
-	hash_table_firstkey(q->workers_with_complete_tasks);
-
 	/* Now consider all tasks assigned to that worker .*/
 	ITABLE_ITERATE(w->current_tasks, task_id, t)
 	{
 		/* If the task is waiting to be retrieved... */
 		if (t->state == VINE_TASK_WAITING_RETRIEVAL) {
+			if (tasks_received >= max_to_receive) {
+				/* but we are over the max_to_receive, then re-add worker to list to be processed later. */
+				list_push_head(q->workers_with_complete_tasks, xxstrdup(w->hashkey));
+				break;
+			}
+
 			/* Attempt to fetch it. */
 			if (fetch_outputs_from_worker(q, w, task_id)) {
 				/* If it was fetched, update stats and keep going. */
 				tasks_received++;
 
-				if (tasks_received >= max_to_receive) {
-					break;
-				}
+				/* Pair the increment of register_waiting_retrieval with
+				 * a decrement as the tasks has been retrieved. */
+				w->tasks_waiting_retrieval--;
 			} else {
 				/* But if the fetch failed, the worker is no longer vaild, bail out. */
 				return tasks_received;
@@ -4053,7 +4068,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->stats_measure = calloc(1, sizeof(struct vine_stats));
 
 	q->workers_with_watched_file_updates = hash_table_create(0, 0);
-	q->workers_with_complete_tasks = hash_table_create(0, 0);
+	q->workers_with_complete_tasks = list_create();
 
 	// The poll table is initially null, and will be created
 	// (and resized) as needed by build_poll_table.
@@ -4398,12 +4413,7 @@ void vine_delete(struct vine_manager *q)
 	hash_table_clear(q->file_table, (void *)vine_file_delete);
 	hash_table_delete(q->file_table);
 
-	char *key;
-	struct category *c;
-	HASH_TABLE_ITERATE(q->categories, key, c)
-	{
-		category_delete(q->categories, key);
-	}
+	hash_table_clear(q->categories, (void *)category_free);
 	hash_table_delete(q->categories);
 
 	priority_queue_delete(q->ready_tasks);
@@ -4411,7 +4421,8 @@ void vine_delete(struct vine_manager *q)
 	list_delete(q->waiting_retrieval_list);
 	list_delete(q->retrieved_list);
 	hash_table_delete(q->workers_with_watched_file_updates);
-	hash_table_delete(q->workers_with_complete_tasks);
+	list_clear(q->workers_with_complete_tasks, free);
+	list_delete(q->workers_with_complete_tasks);
 
 	list_clear(q->task_info_list, (void *)vine_task_info_delete);
 	list_delete(q->task_info_list);
@@ -5115,8 +5126,16 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			/* do nothing and let vine_manager_consider_recovery_task do its job */
 			break;
 		case VINE_TASK_TYPE_LIBRARY_INSTANCE:
-			/* silently delete it */
-			vine_task_delete(t); // delete as manager created this task
+			/* silently delete the task, since it was created by the manager.
+			 * note: other functions may still hold references to this library task.
+			 * those references will be released once the functions complete.
+			 *
+			 * change_task_state above internally removes the reference from q->tasks,
+			 * and this following call drops the manager's own reference.
+			 * remaining references will be released gradually upon the completion of relavant
+			 * function tasks, and the task will be automatically freed once no
+			 * references remain, regardless of whether the functions complete successfully. */
+			vine_task_delete(t);
 			break;
 		case VINE_TASK_TYPE_LIBRARY_TEMPLATE:
 			/* A template shouldn't be scheduled. It's deleted when template table is deleted.*/
@@ -5239,13 +5258,27 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		int retrieved_this_cycle = 0;
 		BEGIN_ACCUM_TIME(q, time_receive);
 		do {
-			char *key;
-			struct vine_worker_info *w;
+			char *key = NULL;
+			struct vine_worker_info *w = NULL;
 
 			// consider one worker at a time
+			while (list_size(q->workers_with_complete_tasks) > 0) {
+				key = list_pop_head(q->workers_with_complete_tasks);
+				w = hash_table_lookup(q->worker_table, key);
+				free(key);
 
-			hash_table_firstkey(q->workers_with_complete_tasks);
-			if (hash_table_nextkey(q->workers_with_complete_tasks, &key, (void **)&w)) {
+				if (w) {
+					// found a worker that is still connected.
+					break;
+				} else {
+					// if the worker is not in the worker_table anymore,
+					// this means that it disconnected before we got to it
+					// in the workers_with_complete_tasks list. Elements
+					// of that list are only removed in the pop above.
+				}
+			}
+
+			if (w) {
 				int retrieved_from_worker = receive_tasks_from_worker(q, w, retrieved_this_cycle);
 				retrieved_this_cycle += retrieved_from_worker;
 				events += retrieved_from_worker;
