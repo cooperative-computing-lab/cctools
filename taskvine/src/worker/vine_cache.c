@@ -341,7 +341,33 @@ int vine_cache_add_transfer(struct vine_cache *c, const char *cachename, const c
 	f->mtime = 0;
 	f->transfer_time = 0;
 
-	hash_table_insert(c->table, cachename, f);
+	int status = hash_table_insert(c->table, cachename, f);
+	if(!status) {
+		int bad_cache = 0;
+		struct vine_cache_file *previous = hash_table_remove(c->table, cachename);
+		if(!previous) {
+			bad_cache = 1;
+		} else {
+			switch (previous->status) {
+			case VINE_CACHE_STATUS_PROCESSING:
+			case VINE_CACHE_STATUS_TRANSFERRED:
+			case VINE_CACHE_STATUS_READY:
+			case VINE_CACHE_STATUS_PENDING:
+				bad_cache = 1;
+				break;
+			case VINE_CACHE_STATUS_FAILED:
+			case VINE_CACHE_STATUS_UNKNOWN:
+				break;
+			}
+			vine_cache_file_delete(previous);
+			hash_table_insert(c->table, cachename, f);
+		}
+
+		if (bad_cache) {
+			fatal("Manager sent conflicting cache information.");
+		}
+	}
+
 	hash_table_insert(c->pending_transfers, cachename, NULL);
 
 	/* Note metadata is not saved here but when transfer is completed. */
@@ -823,7 +849,6 @@ static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_fil
 			}
 
 			vine_worker_send_cache_invalid(manager, cachename, error_message);
-			vine_cache_remove(c, cachename, manager);
 			trash_file(error_path);
 
 			free(error_message);
