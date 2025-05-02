@@ -3433,8 +3433,7 @@ the task to the worker.
 */
 static int send_one_task(struct vine_manager *q)
 {
-	int committable_cores = vine_schedule_find_commitable_cores(q);
-	if (committable_cores == 0) {
+	if (vine_schedule_count_commitable_cores(q) == 0) {
 		return 0;
 	}
 
@@ -3445,9 +3444,9 @@ static int send_one_task(struct vine_manager *q)
 	/* temporarily skipped tasks that are runnable but cannot fit on any current worker */
 	struct list *skipped_tasks = list_create();
 
-	while ((tasks_considered++ < tasks_to_consider) && (committed_tasks < committable_cores)) {
+	struct vine_task *t;
 
-		struct vine_task *t = priority_queue_pop(q->ready_tasks);
+	while ((tasks_considered++ < tasks_to_consider) && (t = priority_queue_pop(q->ready_tasks))) {
 		if (!t) {
 			break;
 		}
@@ -3491,10 +3490,14 @@ static int send_one_task(struct vine_manager *q)
 			/* shouldn't happen, keep going */
 			break;
 		}
+
+		/* if we have committed a task, we are done */
+		if (committed_tasks > 0) {
+			break;
+		}
 	}
 
 	/* put back all tasks that were skipped */
-	struct vine_task *t;
 	while ((t = list_pop_head(skipped_tasks))) {
 		push_task_to_ready_tasks(q, t);
 	}
@@ -3503,9 +3506,7 @@ static int send_one_task(struct vine_manager *q)
 	return committed_tasks;
 }
 
-/*
-Rotate pending tasks to the ready queue if they are runnable.
-*/
+/* Rotate pending tasks to the ready queue if they are runnable. */
 int rotate_pending_tasks(struct vine_manager *q)
 {
 	int runnable_tasks = 0;
@@ -5285,6 +5286,9 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 			// tasks waiting to be dispatched?
 			BEGIN_ACCUM_TIME(q, time_send);
+			// rotate pending tasks before dispatching
+			rotate_pending_tasks(q);
+			// find a task to dispatch
 			result = send_one_task(q);
 			END_ACCUM_TIME(q, time_send);
 			if (result) {

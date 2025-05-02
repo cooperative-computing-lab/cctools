@@ -150,7 +150,7 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 }
 
 /* Find the number of committable cores across all connected workers. */
-int vine_schedule_find_commitable_cores(struct vine_manager *q)
+int vine_schedule_count_commitable_cores(struct vine_manager *q)
 {
 	int committable_cores = 0;
 	uint64_t library_task_id = 0;
