@@ -823,7 +823,7 @@ static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_fil
 			}
 
 			vine_worker_send_cache_invalid(manager, cachename, error_message);
-
+			vine_cache_remove(c, cachename, manager);
 			trash_file(error_path);
 
 			free(error_message);
