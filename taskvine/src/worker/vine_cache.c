@@ -342,10 +342,10 @@ int vine_cache_add_transfer(struct vine_cache *c, const char *cachename, const c
 	f->transfer_time = 0;
 
 	int status = hash_table_insert(c->table, cachename, f);
-	if(!status) {
+	if (!status) {
 		int bad_cache = 0;
 		struct vine_cache_file *previous = hash_table_remove(c->table, cachename);
-		if(!previous) {
+		if (!previous) {
 			bad_cache = 1;
 		} else {
 			switch (previous->status) {
