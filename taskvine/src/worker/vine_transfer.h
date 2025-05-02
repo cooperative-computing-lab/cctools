@@ -21,10 +21,10 @@ int vine_transfer_put_any( struct link *lnk, struct vine_cache *cache, const cha
 
 /* Receive a named file/dir from the connection to a local transfer path. */
 
-int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totalsize, int *mode, int *mtime, time_t stoptime);
+int vine_transfer_get_any(struct link *lnk, const char *dirname, int64_t *totalsize, int *mode, int *mtime, time_t stoptime, char **error_message);
 
 /* Request an item by name, and then receive it in the same way as vine_transfer_get_any. */
 
-int vine_transfer_request_any(struct link *lnk, const char *request_name, const char *dirname, int64_t *totalsize, int *mode, int *mtime, time_t stoptime);
+int vine_transfer_request_any(struct link *lnk, const char *request_name, const char *dirname, int64_t *totalsize, int *mode, int *mtime, time_t stoptime, char **error_message);
 
 #endif
