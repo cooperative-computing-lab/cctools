@@ -38,6 +38,8 @@ See the file COPYING for details.
 
 struct vine_cache {
 	struct hash_table *table;
+	struct hash_table *pending_transfers;
+	struct hash_table *processing_transfers;
 	char *cache_dir;
 	int max_transfer_procs;
 };
@@ -51,8 +53,10 @@ Create the cache manager structure for a given cache directory.
 struct vine_cache *vine_cache_create(const char *cache_dir, int max_procs)
 {
 	struct vine_cache *c = malloc(sizeof(*c));
-	c->cache_dir = strdup(cache_dir);
 	c->table = hash_table_create(0, 0);
+	c->pending_transfers = hash_table_create(0, 0);
+	c->processing_transfers = hash_table_create(0, 0);
+	c->cache_dir = strdup(cache_dir);
 	c->max_transfer_procs = max_procs;
 	return c;
 }
@@ -164,6 +168,41 @@ static void vine_cache_kill(struct vine_cache *c, struct vine_cache_file *f, con
 }
 
 /*
+Process pending transfers until we reach the maximum number of processing transfers or there are no more pending transfers.
+*/
+
+int vine_cache_process_pending_transfers(struct vine_cache *c)
+{
+	int processed = 0;
+
+	struct list *to_process = list_create();
+	char *cachename;
+	void *dummy;
+	HASH_TABLE_ITERATE(c->pending_transfers, cachename, dummy)
+	{
+		list_push_tail(to_process, xxstrdup(cachename));
+		if (list_size(to_process) >= c->max_transfer_procs - hash_table_size(c->processing_transfers)) {
+			break;
+		}
+	}
+
+	while ((cachename = list_pop_head(to_process))) {
+		vine_cache_status_t status = vine_cache_ensure(c, cachename);
+		free(cachename);
+		if (status == VINE_CACHE_STATUS_PROCESSING) {
+			processed++;
+		} else {
+			/* we hit the concurrency limit, or something else went wrong */
+			break;
+		}
+	}
+
+	list_delete(to_process);
+
+	return processed;
+}
+
+/*
 Delete the cache manager structure, though not the underlying files.
 */
 void vine_cache_delete(struct vine_cache *c)
@@ -175,6 +214,12 @@ void vine_cache_delete(struct vine_cache *c)
 	{
 		vine_cache_kill(c, file, cachename, 0);
 	}
+
+	hash_table_clear(c->pending_transfers, NULL);
+	hash_table_clear(c->processing_transfers, NULL);
+
+	hash_table_delete(c->pending_transfers);
+	hash_table_delete(c->processing_transfers);
 
 	hash_table_clear(c->table, (void *)vine_cache_file_delete);
 	hash_table_delete(c->table);
@@ -297,11 +342,13 @@ int vine_cache_add_transfer(struct vine_cache *c, const char *cachename, const c
 	f->transfer_time = 0;
 
 	hash_table_insert(c->table, cachename, f);
+	hash_table_insert(c->pending_transfers, cachename, NULL);
 
 	/* Note metadata is not saved here but when transfer is completed. */
 
-	if (flags & VINE_CACHE_FLAGS_NOW)
+	if (flags & VINE_CACHE_FLAGS_NOW) {
 		vine_cache_ensure(c, cachename);
+	}
 
 	return 1;
 }
@@ -329,6 +376,7 @@ int vine_cache_add_mini_task(struct vine_cache *c, const char *cachename, const 
 	f->size = size;
 
 	hash_table_insert(c->table, cachename, f);
+	hash_table_insert(c->pending_transfers, cachename, NULL);
 
 	/* Note metadata is not saved here but when mini task is completed. */
 
@@ -349,6 +397,9 @@ int vine_cache_remove(struct vine_cache *c, const char *cachename, struct link *
 
 	/* Ensure that any child process associated with the entry is stopped. */
 	vine_cache_kill(c, f, cachename, manager);
+
+	hash_table_remove(c->pending_transfers, cachename);
+	hash_table_remove(c->processing_transfers, cachename);
 
 	/* Then remove the disk state associated with the file. */
 	char *data_path = vine_cache_data_path(c, cachename);
@@ -602,8 +653,11 @@ or VINE_CACHE_STATUS_TRANSFERRED. On failure return VINE_CACHE_STATUS_FAILED.
 
 vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachename)
 {
-	if (!strcmp(cachename, "0"))
+	hash_table_remove(c->pending_transfers, cachename);
+
+	if (!strcmp(cachename, "0")) {
 		return VINE_CACHE_STATUS_READY;
+	}
 
 	struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
 	if (!f) {
@@ -653,16 +707,8 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 		f->process = p;
 	}
 
-	int num_processing = 0;
-	char *table_cachename;
-	struct vine_cache_file *table_f;
-	HASH_TABLE_ITERATE(c->table, table_cachename, table_f)
-	{
-		if (table_f->status == VINE_CACHE_STATUS_PROCESSING) {
-			num_processing++;
-		}
-	}
-	if (num_processing > c->max_transfer_procs) {
+	if (hash_table_size(c->processing_transfers) >= c->max_transfer_procs) {
+		hash_table_insert(c->pending_transfers, cachename, NULL);
 		return VINE_CACHE_STATUS_PENDING;
 	}
 
@@ -674,6 +720,7 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 		return f->status;
 	} else if (f->pid > 0) {
 		f->status = VINE_CACHE_STATUS_PROCESSING;
+		hash_table_insert(c->processing_transfers, cachename, NULL);
 		switch (f->cache_type) {
 		case VINE_CACHE_TRANSFER:
 			debug(D_VINE, "cache: transferring %s to %s", f->source, cachename);
@@ -833,6 +880,7 @@ static void vine_cache_wait_for_file(struct vine_cache *c, struct vine_cache_fil
 		} else if (result < 0) {
 			debug(D_VINE, "cache: wait4 on pid %d returned an error: %s", (int)f->pid, strerror(errno));
 		} else if (result > 0) {
+			hash_table_remove(c->processing_transfers, cachename);
 			vine_cache_handle_exit_status(c, f, cachename, status, manager);
 			vine_cache_check_outputs(c, f, cachename, manager);
 		}
