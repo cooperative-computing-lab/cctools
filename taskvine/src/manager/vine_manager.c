@@ -3433,8 +3433,8 @@ the task to the worker.
 */
 static int send_one_task(struct vine_manager *q)
 {
-	int committable_cores = vine_schedule_count_commitable_cores(q);
-	if (committable_cores == 0) {
+	/* return if no committable cores */
+	if (vine_schedule_count_commitable_cores(q) < 1) {
 		return 0;
 	}
 
@@ -3447,7 +3447,7 @@ static int send_one_task(struct vine_manager *q)
 
 	struct vine_task *t;
 
-	while ((committable_cores > 0) && (tasks_considered++ < tasks_to_consider) && (t = priority_queue_pop(q->ready_tasks))) {
+	while ((committed_tasks == 0) && (tasks_considered++ < tasks_to_consider) && (t = priority_queue_pop(q->ready_tasks))) {
 		if (!t) {
 			break;
 		}
@@ -3478,7 +3478,6 @@ static int send_one_task(struct vine_manager *q)
 		switch (result) {
 		case VINE_SUCCESS:
 			committed_tasks++;
-			committable_cores--;
 			break;
 		case VINE_APP_FAILURE:
 		case VINE_WORKER_FAILURE:
