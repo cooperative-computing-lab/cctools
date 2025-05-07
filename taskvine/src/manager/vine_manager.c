@@ -622,8 +622,6 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		if (sandbox_used > c->min_vine_sandbox) {
 			c->min_vine_sandbox = sandbox_used;
 		}
-
-		hash_table_insert(q->workers_with_complete_tasks, w->hashkey, w);
 	}
 
 	/* Finally update data structures to reflect the completion. */
@@ -1062,7 +1060,6 @@ void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info 
 
 	hash_table_remove(q->worker_table, w->hashkey);
 	hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
-	hash_table_remove(q->workers_with_complete_tasks, w->hashkey);
 
 	if (q->transfer_temps_recovery) {
 		recall_worker_lost_temp_files(q, w);
@@ -3605,10 +3602,6 @@ static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_
 		max_to_receive = itable_size(w->current_tasks);
 	}
 
-	/* Reset the available results table now that the worker is removed */
-	hash_table_remove(q->workers_with_complete_tasks, w->hashkey);
-	hash_table_firstkey(q->workers_with_complete_tasks);
-
 	/* Now consider all tasks assigned to that worker .*/
 	ITABLE_ITERATE(w->current_tasks, task_id, t)
 	{
@@ -3633,32 +3626,6 @@ static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_
 	vine_manager_factory_worker_prune(q, w);
 
 	return tasks_received;
-}
-
-/*
-Advance the state of the system by finding any task that is
-waiting to be retrieved, then fetch the outputs of that task,
-and mark it as done.
-*/
-
-static int receive_one_task(struct vine_manager *q)
-{
-	struct vine_task *t;
-
-	if ((t = list_peek_head(q->waiting_retrieval_list))) {
-		struct vine_worker_info *w = t->worker;
-		/* Attempt to fetch from this worker. */
-		if (fetch_outputs_from_worker(q, w, t->task_id)) {
-			/* Consider whether this worker should be removed. */
-			vine_manager_factory_worker_prune(q, w);
-			/* If we got a task, then we are done. */
-			return 1;
-		} else {
-			/* But if not, the worker pointer is no longer valid. */
-		}
-	}
-
-	return 0;
 }
 
 /*
@@ -4067,7 +4034,6 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->stats_measure = calloc(1, sizeof(struct vine_stats));
 
 	q->workers_with_watched_file_updates = hash_table_create(0, 0);
-	q->workers_with_complete_tasks = hash_table_create(0, 0);
 
 	// The poll table is initially null, and will be created
 	// (and resized) as needed by build_poll_table.
@@ -4420,7 +4386,6 @@ void vine_delete(struct vine_manager *q)
 	list_delete(q->waiting_retrieval_list);
 	list_delete(q->retrieved_list);
 	hash_table_delete(q->workers_with_watched_file_updates);
-	hash_table_delete(q->workers_with_complete_tasks);
 
 	list_clear(q->task_info_list, (void *)vine_task_info_delete);
 	list_delete(q->task_info_list);
@@ -5249,32 +5214,25 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 		q->busy_waiting_flag = 0;
 
-		// retrieve results from workers
-		// if worker_retrievals, then all the tasks from a worker
-		// are retrieved. (this is the default)
-		// otherwise, retrieve at most q->max_retrievals (default is 1)
+		// Retrieve results from workers. We do a worker at a time to be more efficient.
+		// We get a known worker with results from the first task in the waiting_retrieval_list,
+		// and get as many tasks as possible under the q->max_retrievals constraint.
+		// (Note that the tasks retrieved may not include first on the list, we just the
+		// the first task for its worker.) The waiting_retrieval_list is updated when results
+		// are retrieved.
 		int retrieved_this_cycle = 0;
 		BEGIN_ACCUM_TIME(q, time_receive);
 		do {
-			char *key;
-			struct vine_worker_info *w;
-
-			// consider one worker at a time
-
-			hash_table_firstkey(q->workers_with_complete_tasks);
-			if (hash_table_nextkey(q->workers_with_complete_tasks, &key, (void **)&w)) {
-				int retrieved_from_worker = receive_tasks_from_worker(q, w, retrieved_this_cycle);
-				retrieved_this_cycle += retrieved_from_worker;
-				events += retrieved_from_worker;
-			} else if (receive_one_task(q)) {
-				// retrieved at least one task
-				retrieved_this_cycle++;
-				events++;
-			} else {
-				// didn't received a task this cycle, thus there are no
-				// task to be received
+			struct vine_task *head = list_peek_head(q->waiting_retrieval_list);
+			if (!head) {
+				// there are no tasks to be received
 				break;
 			}
+
+			struct vine_worker_info *w = head->worker;
+			int retrieved_from_worker = receive_tasks_from_worker(q, w, retrieved_this_cycle);
+			retrieved_this_cycle += retrieved_from_worker;
+			events += retrieved_from_worker;
 		} while (q->max_retrievals < 0 || retrieved_this_cycle < q->max_retrievals || !priority_queue_size(q->ready_tasks));
 		END_ACCUM_TIME(q, time_receive);
 
