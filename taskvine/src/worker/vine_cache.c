@@ -700,7 +700,7 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 			LIST_ITERATE(f->mini_task->input_mounts, m)
 			{
 				result = vine_cache_ensure(c, m->file->cached_name);
-				if (result == VINE_CACHE_STATUS_FAILED) {
+				if (result == VINE_CACHE_STATUS_FAILED || result == VINE_CACHE_STATUS_UNKNOWN) {
 					/* an input file for the mini task failed to transfer,
 					 * thus the mini task is marked also as failed */
 					mini_task_inputs_permanent_failure = 1;
