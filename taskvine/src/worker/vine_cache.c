@@ -159,7 +159,9 @@ static void vine_cache_kill(struct vine_cache *c, struct vine_cache_file *f, con
 	while (f->status == VINE_CACHE_STATUS_PROCESSING) {
 		debug(D_VINE, "cache: killing pending transfer process %d...", f->pid);
 		kill(f->pid, SIGKILL);
-		vine_cache_wait_for_file(c, f, cachename, manager);
+		if (manager) {
+			vine_cache_wait_for_file(c, f, cachename, manager);
+		}
 		if (f->status == VINE_CACHE_STATUS_PROCESSING) {
 			debug(D_VINE, "cache:still not killed, trying again!");
 			sleep(1);
@@ -407,9 +409,8 @@ int vine_cache_remove(struct vine_cache *c, const char *cachename, struct link *
 		return 0;
 
 	/* Ensure that any child process associated with the entry is stopped. */
-	if (manager) {
-		vine_cache_kill(c, f, cachename, manager);
-	}
+
+	vine_cache_kill(c, f, cachename, manager);
 
 	hash_table_remove(c->pending_transfers, cachename);
 	hash_table_remove(c->processing_transfers, cachename);
