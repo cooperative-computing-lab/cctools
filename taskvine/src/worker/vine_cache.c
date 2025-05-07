@@ -159,7 +159,9 @@ static void vine_cache_kill(struct vine_cache *c, struct vine_cache_file *f, con
 	while (f->status == VINE_CACHE_STATUS_PROCESSING) {
 		debug(D_VINE, "cache: killing pending transfer process %d...", f->pid);
 		kill(f->pid, SIGKILL);
-		vine_cache_wait_for_file(c, f, cachename, manager);
+		if (manager) {
+			vine_cache_wait_for_file(c, f, cachename, manager);
+		}
 		if (f->status == VINE_CACHE_STATUS_PROCESSING) {
 			debug(D_VINE, "cache:still not killed, trying again!");
 			sleep(1);
@@ -320,8 +322,19 @@ int vine_cache_add_transfer(struct vine_cache *c, const char *cachename, const c
 	/* Has this transfer already been queued? */
 	struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
 	if (f) {
-		/* The transfer is already queued up. */
-		return 1;
+		switch (f->status) {
+		case VINE_CACHE_STATUS_PROCESSING:
+		case VINE_CACHE_STATUS_TRANSFERRED:
+		case VINE_CACHE_STATUS_READY:
+		case VINE_CACHE_STATUS_PENDING:
+			/* The transfer is already queued up. */
+			return 1;
+			break;
+		case VINE_CACHE_STATUS_FAILED:
+		case VINE_CACHE_STATUS_UNKNOWN:
+			vine_cache_remove(c, cachename, NULL);
+			break;
+		}
 	}
 
 	/* Create the object and fill in the metadata. */
@@ -341,33 +354,7 @@ int vine_cache_add_transfer(struct vine_cache *c, const char *cachename, const c
 	f->mtime = 0;
 	f->transfer_time = 0;
 
-	int status = hash_table_insert(c->table, cachename, f);
-	if (!status) {
-		int bad_cache = 0;
-		struct vine_cache_file *previous = hash_table_remove(c->table, cachename);
-		if (!previous) {
-			bad_cache = 1;
-		} else {
-			switch (previous->status) {
-			case VINE_CACHE_STATUS_PROCESSING:
-			case VINE_CACHE_STATUS_TRANSFERRED:
-			case VINE_CACHE_STATUS_READY:
-			case VINE_CACHE_STATUS_PENDING:
-				bad_cache = 1;
-				break;
-			case VINE_CACHE_STATUS_FAILED:
-			case VINE_CACHE_STATUS_UNKNOWN:
-				break;
-			}
-			vine_cache_file_delete(previous);
-			hash_table_insert(c->table, cachename, f);
-		}
-
-		if (bad_cache) {
-			fatal("Manager sent conflicting cache information.");
-		}
-	}
-
+	hash_table_insert(c->table, cachename, f);
 	hash_table_insert(c->pending_transfers, cachename, NULL);
 
 	/* Note metadata is not saved here but when transfer is completed. */
@@ -422,6 +409,7 @@ int vine_cache_remove(struct vine_cache *c, const char *cachename, struct link *
 		return 0;
 
 	/* Ensure that any child process associated with the entry is stopped. */
+
 	vine_cache_kill(c, f, cachename, manager);
 
 	hash_table_remove(c->pending_transfers, cachename);
@@ -703,6 +691,7 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 		break;
 	}
 
+	int mini_task_inputs_permanent_failure = 0;
 	/* For a mini-task, we must also insure the inputs to the task exist. */
 	if (f->cache_type == VINE_CACHE_MINI_TASK) {
 		if (f->mini_task->input_mounts) {
@@ -711,8 +700,14 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 			LIST_ITERATE(f->mini_task->input_mounts, m)
 			{
 				result = vine_cache_ensure(c, m->file->cached_name);
-				if (result != VINE_CACHE_STATUS_READY)
+				if (result == VINE_CACHE_STATUS_FAILED || result == VINE_CACHE_STATUS_UNKNOWN) {
+					/* an input file for the mini task failed to transfer,
+					 * thus the mini task is marked also as failed */
+					mini_task_inputs_permanent_failure = 1;
+					break;
+				} else if (result != VINE_CACHE_STATUS_READY) {
 					return result;
+				}
 			}
 		}
 	}
@@ -725,10 +720,9 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 		struct vine_process *p = vine_process_create(f->mini_task, VINE_PROCESS_TYPE_MINI_TASK);
 		if (!vine_sandbox_stagein(p, c)) {
 			debug(D_VINE, "cache: can't stage input files for task %d.", p->task->task_id);
-			p->task = 0;
-			vine_process_delete(p);
-			f->status = VINE_CACHE_STATUS_FAILED;
-			return f->status;
+			/* we know mini task will fail because of lack of inputs, here we set the flag
+			   to terminate the transfer child process immediately. */
+			mini_task_inputs_permanent_failure = 1;
 		}
 		f->process = p;
 	}
@@ -760,7 +754,9 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 		}
 		return f->status;
 	} else {
-		vine_cache_worker_process(f, c, cachename);
+		if (!mini_task_inputs_permanent_failure) {
+			vine_cache_worker_process(f, c, cachename);
+		}
 		_exit(1);
 	}
 }
