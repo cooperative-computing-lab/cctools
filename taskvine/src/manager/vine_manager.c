@@ -3570,20 +3570,6 @@ static int send_one_task(struct vine_manager *q)
 }
 
 /*
-get available results from a worker. This is typically used for signaling watched files.
-*/
-int get_results_from_worker(struct vine_manager *q, struct vine_worker_info *w)
-{
-	/* get available results from the worker, bail out if that also fails. */
-	vine_result_code_t r = get_available_results(q, w);
-	if (r != VINE_SUCCESS) {
-		handle_worker_failure(q, w);
-		return 0;
-	}
-	return 1;
-}
-
-/*
 Finding a worker that has tasks waiting to be retrieved, then fetch the outputs
 of those tasks. Returns the number of tasks received.
 */
