@@ -159,9 +159,7 @@ static void vine_cache_kill(struct vine_cache *c, struct vine_cache_file *f, con
 	while (f->status == VINE_CACHE_STATUS_PROCESSING) {
 		debug(D_VINE, "cache: killing pending transfer process %d...", f->pid);
 		kill(f->pid, SIGKILL);
-		if (manager) {
-			vine_cache_wait_for_file(c, f, cachename, manager);
-		}
+		vine_cache_wait_for_file(c, f, cachename, manager);
 		if (f->status == VINE_CACHE_STATUS_PROCESSING) {
 			debug(D_VINE, "cache:still not killed, trying again!");
 			sleep(1);
@@ -863,7 +861,7 @@ static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_fil
 Evaluate the exit status of a transfer process to determine if it succeeded.
 */
 
-static void vine_cache_handle_exit_status(struct vine_cache *c, struct vine_cache_file *f, const char *cachename, int status, struct link *manager)
+static void vine_cache_handle_exit_status(struct vine_cache *c, struct vine_cache_file *f, const char *cachename, int status)
 {
 	f->stop_time = timestamp_get();
 
@@ -902,7 +900,7 @@ static void vine_cache_wait_for_file(struct vine_cache *c, struct vine_cache_fil
 			debug(D_VINE, "cache: wait4 on pid %d returned an error: %s", (int)f->pid, strerror(errno));
 		} else if (result > 0) {
 			hash_table_remove(c->processing_transfers, cachename);
-			vine_cache_handle_exit_status(c, f, cachename, status, manager);
+			vine_cache_handle_exit_status(c, f, cachename, status);
 			vine_cache_check_outputs(c, f, cachename, manager);
 		}
 	}
