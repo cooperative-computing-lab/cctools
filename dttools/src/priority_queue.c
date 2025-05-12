@@ -243,6 +243,26 @@ int priority_queue_update_priority(struct priority_queue *pq, void *data, double
 	return new_idx;
 }
 
+int priority_queue_update_priority_at(struct priority_queue *pq, int idx, double new_priority)
+{
+	if (!pq || pq->size < 1 || idx < 0 || idx > pq->size - 1) {
+		return -1;
+	}
+
+	double old_priority = pq->elements[idx]->priority;
+	pq->elements[idx]->priority = new_priority;
+
+	int new_idx = -1;
+
+	if (new_priority > old_priority) {
+		new_idx = swim(pq, idx);
+	} else if (new_priority < old_priority) {
+		new_idx = sink(pq, idx);
+	}
+
+	return new_idx;
+}
+
 int priority_queue_find_idx(struct priority_queue *pq, void *data)
 {
 	if (!pq) {
