@@ -979,7 +979,8 @@ static int do_put(struct link *manager, const char *cachename, vine_cache_level_
 	char *transfer_path = vine_cache_transfer_path(cache_manager, cachename);
 
 	timestamp_t start = timestamp_get();
-	int r = vine_transfer_get_any(manager, transfer_dir, &actual_size, &mode, &mtime, time(0) + options->active_timeout);
+	char *error_message = NULL;
+	int r = vine_transfer_get_any(manager, transfer_dir, &actual_size, &mode, &mtime, time(0) + options->active_timeout, &error_message);
 	timestamp_t stop = timestamp_get();
 
 	/* XXX actual_size should equal expected size, but only for a simple file, not a dir. */
