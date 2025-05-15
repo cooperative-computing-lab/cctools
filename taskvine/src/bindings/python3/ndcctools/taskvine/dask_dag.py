@@ -108,10 +108,10 @@ class DaskVineDag:
                         new_deps = frozenset([self._target_map[d] if d in self._target_map else d for d in sexpr.dependencies])
                         new_args = []
                         for arg in sexpr.args:
-                            if arg.key in self._target_map:
+                            if not isinstance(arg, str) and arg.key in self._target_map:
                                 new_args.append(dts.Alias(self._target_map[arg.key]))
                             else:
-                                new_args.apped(arg)
+                                new_args.append(arg)
                         self._working_graph[key].args = new_args
                         self._working_graph[key]._dependencies = new_deps
         for key in to_remove:
@@ -126,6 +126,7 @@ class DaskVineDag:
         count = 0
         for i in range(jumps):
             count += 1
+            print(count)
             sexpr_copy = sexpr.copy()
             new_args = sexpr.args[i * chunk_size:i * chunk_size + chunk_size]
             new_dependencies = set()
@@ -141,6 +142,7 @@ class DaskVineDag:
             self._working_graph[new_key] = sexpr_copy
 
         while (len(new_sexprs) > 1):
+            print(count)
             count += 1
             sexpr_copy = sexpr.copy()
             new_args = [dts.Alias(new_sexprs.pop(0).key) for i in range(chunk_size) if new_sexprs]
@@ -209,6 +211,8 @@ class DaskVineDag:
         """ Sets new result and propagates in the DaskVineDag. Returns a list of dts.Task
         of computations that become ready to be executed """
         rs = {}
+        if 'merge' in key:
+            print(key)
         self._result_of[key] = value
         for p in self._pending_needed_by[key]:
             self._missing_of[p].discard(key)
