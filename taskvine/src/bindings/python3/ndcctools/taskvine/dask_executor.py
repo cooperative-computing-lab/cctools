@@ -330,7 +330,7 @@ class DaskVine(Manager):
                         retries_left = t.decrement_retry()
                         print(f"task id {t.id} key {t.key} failed: {t.result}. {retries_left} attempts left.\n{t.std_output}")
                         if retries_left > 0:
-                            self._enqueue_dask_calls(dag, tag, [t.dask_task], retries_left, enqueued_calls)
+                            self._enqueue_dask_calls(dag, tag, {t.key: t.dask_task}, retries_left, enqueued_calls)
                         else:
                             raise Exception(f"tasks for key {t.key} failed permanently")
                     t = None  # drop task reference
@@ -415,7 +415,7 @@ class DaskVine(Manager):
 
     def _enqueue_dask_calls(self, dag, tag, rs, retries, enqueued_calls):
         targets = dag.get_targets()
-        for dask_task in rs:
+        for dask_task in rs.values():
             k = dask_task.key
             lazy = self.worker_transfers and k not in targets
             if lazy and self.checkpoint_fn:
