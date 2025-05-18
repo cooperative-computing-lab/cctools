@@ -201,9 +201,8 @@ static int stage_output_file(struct vine_process *p, struct vine_mount *m, struc
 	debug(D_VINE, "output: measuring %s", sandbox_path);
 	if (vine_cache_file_measure_metadata(sandbox_path, &mode, &size, &mtime)) {
 		debug(D_VINE, "output: moving %s to %s", sandbox_path, cache_path);
-		if (vine_cache_add_file(cache, f->cached_name, sandbox_path, f->cache_level, mode, size, mtime, transfer_time)) {
+		if (vine_cache_add_file(cache, f->cached_name, sandbox_path, f->cache_level, mode, size, mtime, p->execution_start, transfer_time, manager)) {
 			f->size = size;
-			vine_worker_send_cache_update(manager, f->cached_name, f->type, f->cache_level, f->size, mode, transfer_time, p->execution_start);
 			result = 1;
 		} else {
 			debug(D_VINE, "output: unable to move %s to %s: %s\n", sandbox_path, cache_path, strerror(errno));
