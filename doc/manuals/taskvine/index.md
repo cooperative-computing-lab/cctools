@@ -2603,6 +2603,20 @@ Note that very large task graphs may be impractical to graph at this level of de
     conda install -c conda-forge graphviz
     ```
 
+### TaskVine Report Tool
+
+The [TaskVine Report Tool](https://github.com/cooperative-computing-lab/taskvine-report-tool) is a separate repository maintained by our team that provides web-based visualization capabilities for TaskVine workflows. This tool offers several advantages for analyzing large-scale workflow data:
+
+- Interactive web interface for exploring workflow performance data by mouse hover or selection
+- Customizable axis ranges and legend to focus on specific time periods or metrics
+- Export capabilities for both SVG/PDF/PNG/JPG graphics and CSV raw data
+
+Here are some screenshots of this tool:
+
+![Visualization Example](images/taskvine_report_tool_example.png)
+
+For detailed usage instructions and plot explanations, please refer to the repository's README.
+
 ### Other Tools
 
 `vine_plot_compose` visualizes workflow executions in a variety of ways, creating a composition of multiple plots in a single visualization. This tool may be useful in
@@ -2623,20 +2637,6 @@ vine_plot_animate debug_log
 produces an animation like this:
 
 ![Example Animation](images/anim.gif)
-
-### TaskVine Report Tool
-
-The [TaskVine Report Tool](https://github.com/cooperative-computing-lab/taskvine-report-tool) is a separate repository maintained by our team that provides web-based visualization capabilities for TaskVine workflows. This tool offers several advantages for analyzing large-scale workflow data:
-
-- Interactive web interface for exploring workflow performance data
-- Customizable axis ranges to focus on specific time periods or metrics
-- Mouse-based selection tools for detailed analysis of interesting data points
-- Export capabilities for both SVG graphics and CSV raw data
-- Support for custom visualization creation using the exported data
-
-The tool provides an intuitive interface for data exploration and visualization, capable of efficiently parsing and visualizing workflows containing millions of tasks. As a separate repository, it can be updated more frequently than the main TaskVine codebase. For detailed usage instructions and plot explanations, please refer to the repository's README.
-
-![Visualization Example](images/taskvine_report_tool_example.png)
 
 ### Tuning Specialized Execution Parameters
 
