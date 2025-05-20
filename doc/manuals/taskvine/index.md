@@ -2609,7 +2609,7 @@ The [TaskVine Report Tool](https://github.com/cooperative-computing-lab/taskvine
 
 - Interactive web interface for exploring workflow performance data by mouse hover or selection
 - Customizable axis ranges and legend to focus on specific time periods or metrics
-- Export capabilities for both SVG/PDF/PNG/JPG graphics and CSV raw data
+- Export capabilities for various image formats (SVG, PDF, PNG, JPG) and raw data (CSV)
 
 Here are some screenshots of this tool:
 
