@@ -10,6 +10,8 @@ See the file COPYING for details.
 #include "vine_protocol.h"
 #include "vine_resources.h"
 #include "vine_task.h"
+#include "priority_queue.h"
+#include "vine_file.h"
 
 struct vine_worker_info *vine_worker_create(struct link *lnk)
 {
@@ -45,6 +47,9 @@ struct vine_worker_info *vine_worker_create(struct link *lnk)
 
 	vine_counters.worker.created++;
 
+	w->is_checkpoint_worker = 0;
+	w->checkpointed_files = priority_queue_create(0);
+
 	w->incoming_xfer_counter = 0;
 	w->outgoing_xfer_counter = 0;
 
@@ -74,6 +79,8 @@ void vine_worker_delete(struct vine_worker_info *w)
 	hash_table_delete(w->current_files);
 	itable_delete(w->current_tasks);
 	itable_delete(w->current_libraries);
+
+	priority_queue_delete(w->checkpointed_files);
 
 	free(w);
 
