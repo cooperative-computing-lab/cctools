@@ -275,13 +275,15 @@ DELETING -> DELETED           : receive "unlink-complete" — worker confirms de
 DELETING -> DELETED           : worker disconnect — deletion in progress, but worker is now unreachable
 
 DELETED  -> (no transition)   : terminal state,
+
+Additionally, we allow self-transitions to all states.
 */
 static const int vine_file_replica_allowed_state_transitions[4][4] = {
 		// From/To:   PENDING  READY  DELETING   DELETED
-		/* PENDING   */ {0, 1, 1, 1},
-		/* READY     */ {0, 0, 1, 1},
-		/* DELETING  */ {0, 0, 0, 1},
-		/* DELETED   */ {0, 0, 0, 0}};
+		/* PENDING   */ {1, 1, 1, 1},
+		/* READY     */ {0, 1, 1, 1},
+		/* DELETING  */ {0, 0, 1, 1},
+		/* DELETED   */ {0, 0, 0, 1}};
 
 static int vine_file_replica_is_state_transition_allowed(vine_file_replica_state_t from, vine_file_replica_state_t to)
 {
@@ -312,8 +314,22 @@ static int vine_file_replica_table_change_replica_state(struct vine_manager *q, 
 
 	vine_file_replica_state_t old_state = r->state;
 
+	/* if the self-to-self transition happens, something might be stinky there... */
+	if (old_state == new_state) {
+		debug(D_VINE,
+				"Self state transition for file %s from %s to %s\n",
+				cachename,
+				vine_file_replica_state_to_string(old_state),
+				vine_file_replica_state_to_string(new_state));
+	}
+
+	/* check if the state transition is allowed */
 	if (!vine_file_replica_is_state_transition_allowed(old_state, new_state)) {
-		debug(D_ERROR, "Invalid state transition from %s to %s", vine_file_replica_state_to_string(old_state), vine_file_replica_state_to_string(new_state));
+		debug(D_ERROR,
+				"Invalid state transition for file %s from %s to %s\n",
+				cachename,
+				vine_file_replica_state_to_string(old_state),
+				vine_file_replica_state_to_string(new_state));
 		return 0;
 	}
 
