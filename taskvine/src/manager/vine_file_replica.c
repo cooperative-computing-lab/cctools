@@ -8,6 +8,47 @@ See the file COPYING for details.
 #include "debug.h"
 #include "vine_counters.h"
 
+/* === File Replica State Machine:
+PENDING ->  READY             : receive "cache-update" — file has physically arrived on the worker
+PENDING ->  DELETING          : receive "cache-invalid" — file was expected but not found on the worker
+PENDING ->  DELETED           : worker disconnect — file was never ready and worker is now unreachable
+
+READY   ->  DELETING          : send "unlink" — manager initiates deletion of a valid file
+READY   ->  DELETED           : worker disconnect — file was on a worker that has now disconnected
+
+DELETING -> DELETED           : receive "unlink-complete" — worker confirms deletion
+DELETING -> DELETED           : worker disconnect — deletion in progress, but worker is now unreachable
+
+DELETED  -> (no transition)   : terminal state,
+*/
+static const int vine_file_replica_allowed_state_transitions[4][4] = {
+		// From/To:   PENDING  READY  DELETING   DELETED
+		/* PENDING   */ {0, 1, 1, 1},
+		/* READY     */ {0, 0, 1, 1},
+		/* DELETING  */ {0, 0, 0, 1},
+		/* DELETED   */ {0, 0, 0, 0}};
+
+static int vine_file_replica_is_state_transition_allowed(vine_file_replica_state_t from, vine_file_replica_state_t to)
+{
+	return vine_file_replica_allowed_state_transitions[from][to];
+}
+
+static const char *vine_file_replica_state_to_string(vine_file_replica_state_t state)
+{
+	switch (state) {
+	case VINE_FILE_REPLICA_STATE_PENDING:
+		return "PENDING";
+	case VINE_FILE_REPLICA_STATE_READY:
+		return "READY";
+	case VINE_FILE_REPLICA_STATE_DELETING:
+		return "DELETING";
+	case VINE_FILE_REPLICA_STATE_DELETED:
+		return "DELETED";
+	default:
+		return "UNKNOWN";
+	}
+}
+
 struct vine_file_replica *vine_file_replica_create(vine_file_type_t type, vine_cache_level_t cache_level, int64_t size, time_t mtime)
 {
 	struct vine_file_replica *r = malloc(sizeof(*r));
@@ -39,50 +80,11 @@ int vine_file_replica_change_state(struct vine_file_replica *r, vine_file_replic
 
 	vine_file_replica_state_t old_state = r->state;
 
-	/* if no change, technically a success */
-	if (old_state == new_state) {
-		return 1;
-	}
-
-	/* check allowed transitions */
-	int allowed = 0;
-	switch (old_state) {
-	case VINE_FILE_REPLICA_STATE_PENDING:
-		allowed = (new_state == VINE_FILE_REPLICA_STATE_READY ||
-				new_state == VINE_FILE_REPLICA_STATE_DELETING ||
-				new_state == VINE_FILE_REPLICA_STATE_DELETED);
-		break;
-	case VINE_FILE_REPLICA_STATE_READY:
-		allowed = (new_state == VINE_FILE_REPLICA_STATE_DELETING ||
-				new_state == VINE_FILE_REPLICA_STATE_DELETED);
-		break;
-	case VINE_FILE_REPLICA_STATE_DELETING:
-		allowed = (new_state == VINE_FILE_REPLICA_STATE_DELETED ||
-				new_state == VINE_FILE_REPLICA_STATE_READY);
-		break;
-	case VINE_FILE_REPLICA_STATE_DELETED:
-		/* can't transition from DELETED to any other state */
-		allowed = 0;
-		break;
-	}
-
-	if (!allowed) {
-		debug(D_VINE, "Invalid state transition from %s to %s", old_state == VINE_FILE_REPLICA_STATE_PENDING ? "PENDING" : old_state == VINE_FILE_REPLICA_STATE_READY ? "READY"
-														   : old_state == VINE_FILE_REPLICA_STATE_DELETING	      ? "DELETING"
-																					      : "DELETED",
-				new_state == VINE_FILE_REPLICA_STATE_PENDING ? "PENDING" : new_state == VINE_FILE_REPLICA_STATE_READY ? "READY"
-									   : new_state == VINE_FILE_REPLICA_STATE_DELETING	      ? "DELETING"
-																      : "DELETED");
+	if (!vine_file_replica_is_state_transition_allowed(old_state, new_state)) {
+		debug(D_ERROR, "Invalid state transition from %s to %s", vine_file_replica_state_to_string(old_state), vine_file_replica_state_to_string(new_state));
 		return 0;
 	}
 
-	/* change the state */
 	r->state = new_state;
-	debug(D_VINE, "File replica state transition: %s -> %s", old_state == VINE_FILE_REPLICA_STATE_PENDING ? "PENDING" : old_state == VINE_FILE_REPLICA_STATE_READY ? "READY"
-													    : old_state == VINE_FILE_REPLICA_STATE_DELETING	       ? "DELETING"
-																				       : "DELETED",
-			new_state == VINE_FILE_REPLICA_STATE_PENDING ? "PENDING" : new_state == VINE_FILE_REPLICA_STATE_READY ? "READY"
-								   : new_state == VINE_FILE_REPLICA_STATE_DELETING	      ? "DELETING"
-															      : "DELETED");
 	return 1;
 }

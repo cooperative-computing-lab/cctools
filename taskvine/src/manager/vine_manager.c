@@ -371,7 +371,9 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 			vine_file_replica_table_insert(q, w, cachename, replica);
 		}
 
-		/* handle cache update for the file replica, return success if we found a race condition */
+		/* handle cache-update for the file replica
+		 * failure here likely indicates a race: cache-update arrived just after an unlink was sent
+		 * silently ignore without reporting issues or updating other structures */
 		if (!vine_file_replica_table_handle_receive_cache_update(q, w, cachename, size, mtime)) {
 			return VINE_MSG_PROCESSED;
 		}
