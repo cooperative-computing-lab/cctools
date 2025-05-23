@@ -33,7 +33,5 @@ struct vine_file_replica * vine_file_replica_create(vine_file_type_t type, vine_
 
 void vine_file_replica_delete(struct vine_file_replica *r);
 
-int vine_file_replica_change_state(struct vine_file_replica *r, vine_file_replica_state_t new_state);
-
 #endif
 
