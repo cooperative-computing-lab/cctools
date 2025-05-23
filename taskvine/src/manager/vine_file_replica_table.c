@@ -262,3 +262,141 @@ int vine_file_replica_table_exists_somewhere(struct vine_manager *q, const char 
 
 	return 0;
 }
+
+int vine_file_replica_table_handle_receive_cache_update(struct vine_manager *q, struct vine_worker_info *w, const char *filename, int64_t size, time_t mtime)
+{
+	if (!q || !w || !filename) {
+		return 0;
+	}
+
+	struct vine_file_replica *replica = vine_file_replica_table_lookup(w, filename);
+	if (!replica) {
+		/* this is OK, the file may have been deleted already */
+		return 1;
+	}
+
+	/* race condition check: if file is in DELETING state, reject cache-update.
+	 * we do not check for DELETED state as all deleted files are removed immediately in the current implementation */
+	if (replica->state == VINE_FILE_REPLICA_STATE_DELETING) {
+		return 1;
+	}
+
+	replica->size = size;
+	replica->mtime = mtime;
+	replica->transfer_time = timestamp_get();
+
+	/* change state from PENDING to READY */
+	return vine_file_replica_change_state(replica, VINE_FILE_REPLICA_STATE_READY);
+}
+
+int vine_file_replica_table_handle_receive_cache_invalid(struct vine_manager *q, struct vine_worker_info *w, const char *filename)
+{
+	if (!q || !w || !filename) {
+		return 0;
+	}
+
+	struct vine_file_replica *replica = vine_file_replica_table_lookup(w, filename);
+	if (!replica) {
+		/* this is OK, the file may have been deleted already */
+		return 1;
+	}
+
+	/* change state to DELETED */
+	if (!vine_file_replica_change_state(replica, VINE_FILE_REPLICA_STATE_DELETED)) {
+		return 0;
+	}
+
+	/* when state becomes DELETED, remove the replica from our records */
+	struct vine_file_replica *removed_replica = vine_file_replica_table_remove(q, w, filename);
+	if (removed_replica) {
+		vine_file_replica_delete(removed_replica);
+	}
+
+	return 1;
+}
+
+int vine_file_replica_table_handle_send_unlink(struct vine_manager *q, struct vine_worker_info *w, const char *filename)
+{
+	if (!q || !w || !filename) {
+		return 0;
+	}
+
+	struct vine_file_replica *replica = vine_file_replica_table_lookup(w, filename);
+	if (!replica) {
+		/* this is OK, the file may have been deleted already */
+		return 1;
+	}
+
+	/* only send unlink if state is PENDING or READY */
+	if (replica->state != VINE_FILE_REPLICA_STATE_PENDING &&
+			replica->state != VINE_FILE_REPLICA_STATE_READY) {
+		debug(D_ERROR, "Cannot send unlink for %s in state %d", filename, replica->state);
+		return 0;
+	}
+
+	/* send unlink message to worker */
+	vine_manager_send(q, w, "unlink %s\n", filename);
+
+	return vine_file_replica_change_state(replica, VINE_FILE_REPLICA_STATE_DELETING);
+}
+
+int vine_file_replica_table_handle_receive_unlink_complete(struct vine_manager *q, struct vine_worker_info *w, const char *filename, int success)
+{
+	if (!q || !w || !filename)
+		return 0;
+
+	struct vine_file_replica *replica = vine_file_replica_table_lookup(w, filename);
+	if (!replica) {
+		/* this is OK as the replica may have been deleted already */
+		return 1;
+	}
+
+	if (success) {
+		/* if unlink was successful, change state to DELETED */
+		if (!vine_file_replica_change_state(replica, VINE_FILE_REPLICA_STATE_DELETED)) {
+			return 0;
+		}
+
+		/* when state becomes DELETED, remove the replica from our records */
+		struct vine_file_replica *removed_replica = vine_file_replica_table_remove(q, w, filename);
+		if (removed_replica) {
+			vine_file_replica_delete(removed_replica);
+		}
+	} else {
+		/* this should not happen, in the worker's end we currently always send a success state */
+		if (replica->state == VINE_FILE_REPLICA_STATE_DELETING) {
+			vine_file_replica_change_state(replica, VINE_FILE_REPLICA_STATE_READY);
+		}
+	}
+
+	return 1;
+}
+
+void vine_file_replica_table_handle_worker_disconnect(struct vine_manager *q, struct vine_worker_info *w)
+{
+	if (!q || !w)
+		return;
+
+	char *cached_name = NULL;
+	char **cached_names = hash_table_keys_array(w->current_files);
+
+	if (!cached_names)
+		return;
+
+	int i = 0;
+	while ((cached_name = cached_names[i])) {
+		i++;
+
+		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, cached_name);
+		if (!replica) {
+			continue;
+		}
+
+		replica = vine_file_replica_table_remove(q, w, cached_name);
+		if (replica) {
+			vine_file_replica_delete(replica);
+		}
+	}
+
+	hash_table_free_keys_array(cached_names);
+}

@@ -34,6 +34,15 @@ int vine_file_replica_table_exists_somewhere( struct vine_manager *q, const char
 
 int vine_file_replica_table_count_replicas( struct vine_manager *q, const char *cachename, vine_file_replica_state_t state );
 
+int vine_file_replica_table_handle_receive_cache_update(struct vine_manager *q, struct vine_worker_info *w, const char *filename, int64_t size, time_t mtime);
+
+int vine_file_replica_table_handle_receive_cache_invalid(struct vine_manager *q, struct vine_worker_info *w, const char *filename);
+
+int vine_file_replica_table_handle_receive_unlink_complete(struct vine_manager *q, struct vine_worker_info *w, const char *filename, int success);
+
+int vine_file_replica_table_handle_send_unlink(struct vine_manager *q, struct vine_worker_info *w, const char *filename);
+
+void vine_file_replica_table_handle_worker_disconnect(struct vine_manager *q, struct vine_worker_info *w);
 
 #endif
 
