@@ -271,19 +271,18 @@ PENDING ->  DELETED           : worker disconnect — file was never ready and w
 READY   ->  DELETING          : send "unlink" — manager initiates deletion of a valid file
 READY   ->  DELETED           : worker disconnect — file was on a worker that has now disconnected
 
+DELETING -> DELETING          : we allow this transition as multiple tasks may share the same replica and delete on their own
 DELETING -> DELETED           : receive "unlink-complete" — worker confirms deletion
 DELETING -> DELETED           : worker disconnect — deletion in progress, but worker is now unreachable
 
-DELETED  -> (no transition)   : terminal state,
-
-Additionally, we allow self-transitions to all states.
+DELETED  -> (no transition)   : terminal state, if reached, we remove the replica completely
 */
 static const int vine_file_replica_allowed_state_transitions[4][4] = {
 		// From/To:   PENDING  READY  DELETING   DELETED
-		/* PENDING   */ {1, 1, 1, 1},
-		/* READY     */ {0, 1, 1, 1},
+		/* PENDING   */ {0, 1, 1, 1},
+		/* READY     */ {0, 0, 1, 1},
 		/* DELETING  */ {0, 0, 1, 1},
-		/* DELETED   */ {0, 0, 0, 1}};
+		/* DELETED   */ {0, 0, 0, 0}};
 
 static int vine_file_replica_is_state_transition_allowed(vine_file_replica_state_t from, vine_file_replica_state_t to)
 {
@@ -314,23 +313,14 @@ static int vine_file_replica_table_change_replica_state(struct vine_manager *q, 
 
 	vine_file_replica_state_t old_state = r->state;
 
-	/* if the self-to-self transition happens, something might be stinky there... */
-	if (old_state == new_state) {
-		debug(D_VINE,
-				"Self state transition for file %s from %s to %s\n",
-				cachename,
-				vine_file_replica_state_to_string(old_state),
-				vine_file_replica_state_to_string(new_state));
-	}
-
-	/* check if the state transition is allowed */
+	/* if the state transition is not allowed, log an error but still continue
+	 * this does not necessarily mean a critical bug, but something might be stinky there... */
 	if (!vine_file_replica_is_state_transition_allowed(old_state, new_state)) {
 		debug(D_ERROR,
 				"Invalid state transition for file %s from %s to %s\n",
 				cachename,
 				vine_file_replica_state_to_string(old_state),
 				vine_file_replica_state_to_string(new_state));
-		return 0;
 	}
 
 	r->state = new_state;

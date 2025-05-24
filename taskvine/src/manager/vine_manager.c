@@ -896,27 +896,30 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 		return;
 	}
 
+	/* get the list of cached files before they are removed by worker disconnect */
+	char *cached_name = NULL;
+	char **cached_names = hash_table_keys_array(w->current_files);
+
 	/* handle worker disconnect for the file replicas */
 	vine_file_replica_table_handle_worker_disconnect(q, w);
 
 	/* process any temp files that might need recovery */
-	if (q->immediate_recovery) {
-		char *cached_name = NULL;
-		char **cached_names = hash_table_keys_array(w->current_files);
-
-		if (cached_names) {
-			int i = 0;
-			while ((cached_name = cached_names[i])) {
-				i++;
-				struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
-				if (f && f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED) {
-					if (!vine_file_replica_table_exists_somewhere(q, f->cached_name)) {
-						vine_manager_consider_recovery_task(q, f, f->recovery_task);
-					}
+	if (q->immediate_recovery && cached_names) {
+		int i = 0;
+		while ((cached_name = cached_names[i])) {
+			i++;
+			struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
+			if (f && f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED) {
+				if (!vine_file_replica_table_exists_somewhere(q, f->cached_name)) {
+					vine_manager_consider_recovery_task(q, f, f->recovery_task);
 				}
 			}
-			hash_table_free_keys_array(cached_names);
 		}
+	}
+
+	/* clean up the cached names array */
+	if (cached_names) {
+		hash_table_free_keys_array(cached_names);
 	}
 }
 
@@ -1174,8 +1177,10 @@ static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w
 
 static void delete_worker_files(struct vine_manager *q, struct vine_worker_info *w, struct list *mount_list, vine_cache_level_t delete_upto_level)
 {
-	if (!mount_list)
+	if (!mount_list) {
 		return;
+	}
+
 	struct vine_mount *m;
 	LIST_ITERATE(mount_list, m)
 	{
