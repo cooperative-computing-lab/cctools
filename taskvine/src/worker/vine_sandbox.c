@@ -74,9 +74,9 @@ vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cach
 				processing++;
 				break;
 			}
-		}
-			return VINE_CACHE_STATUS_FAILED;
+		} break;
 		case VINE_CACHE_STATUS_FAILED:
+			debug(D_VINE, "unavailable in cache for task sandbox: %s", m->file->cached_name);
 			return VINE_CACHE_STATUS_FAILED;
 		}
 	}
