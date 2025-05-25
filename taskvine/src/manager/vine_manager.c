@@ -3413,8 +3413,11 @@ int consider_task(struct vine_manager *q, struct vine_task *t)
 /* Rotate pending tasks to the ready queue if they are runnable. */
 static int rotate_pending_tasks(struct vine_manager *q)
 {
-	int runnable_tasks = 0;
+	if (list_size(q->pending_tasks) == 0) {
+		return 0;
+	}
 
+	int runnable_tasks = 0;
 	int tasks_considered = 0;
 	int tasks_to_consider = MIN(list_size(q->pending_tasks), q->attempt_schedule_depth);
 	struct vine_task *t = NULL;
@@ -3448,15 +3451,12 @@ static int rotate_pending_tasks(struct vine_manager *q)
 			continue;
 		}
 
-		/* eligible to run, push it to the ready queue */
 		if (consider_task(q, t)) {
 			enqueue_ready_task(q, t);
 			runnable_tasks++;
-			continue;
+		} else {
+			list_push_tail(q->pending_tasks, t);
 		}
-
-		/* if the task is not runnable, put it back in the pending queue */
-		list_push_tail(q->pending_tasks, t);
 	}
 
 	return runnable_tasks;
@@ -3469,7 +3469,7 @@ the task to the worker.
 */
 static int send_one_task(struct vine_manager *q)
 {
-	/* return if no committable cores */
+	/* return early if no committable cores */
 	if (!vine_schedule_have_committable_resources(q)) {
 		return 0;
 	}
@@ -5273,7 +5273,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// in this wait.
 		if (events > 0) {
 			BEGIN_ACCUM_TIME(q, time_internal);
-			int done = !priority_queue_size(q->ready_tasks) && !list_size(q->waiting_retrieval_list) && !itable_size(q->running_table);
+			int done = !priority_queue_size(q->ready_tasks) && !list_size(q->pending_tasks) && !list_size(q->waiting_retrieval_list) && !itable_size(q->running_table);
 			END_ACCUM_TIME(q, time_internal);
 
 			if (done) {
