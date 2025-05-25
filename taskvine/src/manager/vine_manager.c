@@ -3493,7 +3493,7 @@ static int send_one_task(struct vine_manager *q)
 }
 
 /* Rotate pending tasks to the ready queue if they are runnable. */
-int rotate_pending_tasks(struct vine_manager *q)
+static int rotate_pending_tasks(struct vine_manager *q)
 {
 	int runnable_tasks = 0;
 
