@@ -3418,9 +3418,12 @@ the task to the worker.
 static int send_one_task(struct vine_manager *q)
 {
 	/* return if no committable cores */
-	if (vine_schedule_count_commitable_cores(q) < 1) {
+	if (!vine_schedule_have_committable_resources(q)) {
 		return 0;
 	}
+
+	/* rotate pending tasks before dispatching any tasks */
+	rotate_pending_tasks(q);
 
 	int committed_tasks = 0;
 	int tasks_considered = 0;
@@ -3431,10 +3434,12 @@ static int send_one_task(struct vine_manager *q)
 
 	struct vine_task *t;
 
-	while ((committed_tasks == 0) && (tasks_considered++ < tasks_to_consider) && (t = priority_queue_pop(q->ready_tasks))) {
+	while ((committed_tasks == 0) && (tasks_considered < tasks_to_consider)) {
+		t = priority_queue_pop(q->ready_tasks);
 		if (!t) {
 			break;
 		}
+		tasks_considered++;
 
 		/* this task is not runnable at all, put it back in the pending queue */
 		if (!consider_task(q, t)) {
@@ -3469,7 +3474,8 @@ static int send_one_task(struct vine_manager *q)
 			break;
 		case VINE_MGR_FAILURE:
 			/* special case, commit had a chained failure. */
-			list_push_tail(skipped_tasks, t);
+			debug(D_VINE, "Special case, failed to commit task %d to worker %s", t->task_id, w->hostname);
+			list_push_tail(q->pending_tasks, t);
 			break;
 		case VINE_END_OF_LIST:
 			/* shouldn't happen, keep going */
@@ -5210,8 +5216,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 			// tasks waiting to be dispatched?
 			BEGIN_ACCUM_TIME(q, time_send);
-			// rotate pending tasks before dispatching
-			rotate_pending_tasks(q);
 			// find a task to dispatch
 			result = send_one_task(q);
 			END_ACCUM_TIME(q, time_send);
