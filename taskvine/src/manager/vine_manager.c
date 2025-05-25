@@ -168,7 +168,7 @@ static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_
 static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
-static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t);
+static void enqueue_ready_task(struct vine_manager *q, struct vine_task *t);
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
@@ -3427,34 +3427,31 @@ static int rotate_pending_tasks(struct vine_manager *q)
 			break;
 		}
 
-		/* if the task is runnable, push it to the ready queue */
-		if (consider_task(q, t)) {
-			push_task_to_ready_tasks(q, t);
-			runnable_tasks++;
-			continue;
-		}
-
-		/* otherwise, check if the task has exceeded its end time or does not match any submitted library */
-		/* In this loop, use VINE_RESULT_SUCCESS as an indication of "still ok to run". */
-		vine_result_t result = VINE_RESULT_SUCCESS;
+		/* first check if the task has exceeded its end time or does not match any submitted library */
+		/* If any of the reasons fired, then expire the task and put in the retrieved queue. */
 		if (t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
 			debug(D_VINE, "task %d has exceeded its end time", t->task_id);
-			result = VINE_RESULT_MAX_END_TIME;
+			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
+			change_task_state(q, t, VINE_TASK_RETRIEVED);
+			continue;
 		}
 		if (t->needs_library && !hash_table_lookup(q->library_templates, t->needs_library)) {
 			debug(D_VINE, "task %d does not match any submitted library named \"%s\"", t->task_id, t->needs_library);
-			result = VINE_RESULT_MISSING_LIBRARY;
+			vine_task_set_result(t, VINE_RESULT_MISSING_LIBRARY);
+			change_task_state(q, t, VINE_TASK_RETRIEVED);
+			continue;
 		}
-		if (result != VINE_RESULT_SUCCESS) {
-			vine_task_set_result(t, result);
+		if (q->fixed_location_in_queue && t->has_fixed_locations && !vine_schedule_check_fixed_location(q, t)) {
+			debug(D_VINE, "Missing fixed_location dependencies for task: %d", t->task_id);
+			vine_task_set_result(t, VINE_RESULT_FIXED_LOCATION_MISSING);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			continue;
 		}
 
-		/* enforce fixed locations */
-		if (q->fixed_location_in_queue && t->has_fixed_locations && !vine_schedule_check_fixed_location(q, t)) {
-			vine_task_set_result(t, VINE_RESULT_FIXED_LOCATION_MISSING);
-			change_task_state(q, t, VINE_TASK_RETRIEVED);
+		/* eligible to run, push it to the ready queue */
+		if (consider_task(q, t)) {
+			enqueue_ready_task(q, t);
+			runnable_tasks++;
 			continue;
 		}
 
@@ -3540,7 +3537,7 @@ static int send_one_task(struct vine_manager *q)
 
 	/* put back all tasks that were skipped */
 	while ((t = list_pop_head(skipped_tasks))) {
-		push_task_to_ready_tasks(q, t);
+		enqueue_ready_task(q, t);
 	}
 	list_delete(skipped_tasks);
 
@@ -4494,8 +4491,8 @@ char *vine_monitor_wrap(struct vine_manager *q, struct vine_worker_info *w, stru
 	return wrap_cmd;
 }
 
-/* Put a given task on the ready list, taking into account the task priority and the manager schedule. */
-static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t)
+/* Put a given task on the ready queue, taking into account the task priority and the manager schedule. */
+static void enqueue_ready_task(struct vine_manager *q, struct vine_task *t)
 {
 	if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
 		/* when a task is resubmitted given resource exhaustion, we
@@ -4559,7 +4556,7 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 		break;
 	case VINE_TASK_READY:
 		vine_task_set_result(t, VINE_RESULT_UNKNOWN);
-		push_task_to_ready_tasks(q, t);
+		enqueue_ready_task(q, t);
 		c->vine_stats->tasks_waiting++;
 		break;
 	case VINE_TASK_RUNNING:

@@ -743,6 +743,5 @@ int vine_schedule_check_fixed_location(struct vine_manager *q, struct vine_task 
 			return 1;
 		}
 	}
-	debug(D_VINE, "Missing fixed_location dependencies for task: %d", t->task_id);
 	return 0;
 }
