@@ -3423,7 +3423,7 @@ static int send_one_task(struct vine_manager *q)
 	}
 
 	/* rotate pending tasks before dispatching any tasks */
-	rotate_pending_tasks(q);
+	vine_schedule_rotate_pending_tasks(q);
 
 	int committed_tasks = 0;
 	int tasks_considered = 0;
@@ -3490,61 +3490,6 @@ static int send_one_task(struct vine_manager *q)
 	list_delete(skipped_tasks);
 
 	return committed_tasks;
-}
-
-/* Rotate pending tasks to the ready queue if they are runnable. */
-static int rotate_pending_tasks(struct vine_manager *q)
-{
-	int runnable_tasks = 0;
-
-	int tasks_considered = 0;
-	int tasks_to_consider = MIN(list_size(q->pending_tasks), q->attempt_schedule_depth);
-	struct vine_task *t = NULL;
-
-	double current_time = timestamp_get() / ONE_SECOND;
-
-	while (tasks_considered++ < tasks_to_consider) {
-		t = list_pop_head(q->pending_tasks);
-		if (!t) {
-			break;
-		}
-
-		/* if the task is runnable, push it to the ready queue */
-		if (consider_task(q, t)) {
-			push_task_to_ready_tasks(q, t);
-			runnable_tasks++;
-			continue;
-		}
-
-		/* otherwise, check if the task has exceeded its end time or does not match any submitted library */
-		/* In this loop, use VINE_RESULT_SUCCESS as an indication of "still ok to run". */
-		vine_result_t result = VINE_RESULT_SUCCESS;
-		if (t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
-			debug(D_VINE, "task %d has exceeded its end time", t->task_id);
-			result = VINE_RESULT_MAX_END_TIME;
-		}
-		if (t->needs_library && !hash_table_lookup(q->library_templates, t->needs_library)) {
-			debug(D_VINE, "task %d does not match any submitted library named \"%s\"", t->task_id, t->needs_library);
-			result = VINE_RESULT_MISSING_LIBRARY;
-		}
-		if (result != VINE_RESULT_SUCCESS) {
-			vine_task_set_result(t, result);
-			change_task_state(q, t, VINE_TASK_RETRIEVED);
-			continue;
-		}
-
-		/* enforce fixed locations */
-		if (q->fixed_location_in_queue && t->has_fixed_locations && !vine_schedule_check_fixed_location(q, t)) {
-			vine_task_set_result(t, VINE_RESULT_FIXED_LOCATION_MISSING);
-			change_task_state(q, t, VINE_TASK_RETRIEVED);
-			continue;
-		}
-
-		/* if the task is not runnable, put it back in the pending queue */
-		list_push_tail(q->pending_tasks, t);
-	}
-
-	return runnable_tasks;
 }
 
 /*
