@@ -204,41 +204,33 @@ static int hash_table_double_buckets(struct hash_table *h)
 
 static int hash_table_reduce_buckets(struct hash_table *h)
 {
-	/* DEFAULT_SIZE is the minimum size */
-	if (h->bucket_count / 2 <= DEFAULT_SIZE) {
-		return 1;
-	}
+	int new_count = ((h->bucket_count + 1) / 2) - 1;
 
-	/* Table should not be reduced if not below DEFAULT_MIN_LOAD */
-	if (((float)h->size / h->bucket_count) >= DEFAULT_MIN_LOAD) {
+	/* DEFAULT_SIZE is the minimum size */
+	if (new_count <= DEFAULT_SIZE) {
 		return 1;
 	}
 
 	/* Table cannot be reduced above DEFAULT_MAX_LOAD */
-	if (((float)h->size / h->bucket_count / 2) >= DEFAULT_MAX_LOAD) {
+	if (((float)h->size / new_count) >= DEFAULT_MAX_LOAD) {
 		return 1;
 	}
 
-	int new_count = h->bucket_count;
-	do {
-		/* halve new_count until we are above the DEFAULT_MIN_LOAD */
-		new_count = ((new_count + 1) / 2) - 1;
-	} while (((float)h->size / new_count) < DEFAULT_MIN_LOAD);
-
-
 	struct hash_table *hn = hash_table_create(new_count, h->hash_func);
-	if (!hn)
+	if (!hn) {
 		return 0;
+	}
 
 	/* Move pairs to new hash */
 	char *key;
 	void *value;
 	hash_table_firstkey(h);
-	while (hash_table_nextkey(h, &key, &value))
+	while (hash_table_nextkey(h, &key, &value)) {
 		if (!hash_table_insert(hn, key, value)) {
 			hash_table_delete(hn);
 			return 0;
 		}
+	}
 
 	/* Delete all old pairs */
 	struct entry *e, *f;
@@ -264,7 +256,6 @@ static int hash_table_reduce_buckets(struct hash_table *h)
 
 	return 1;
 }
-
 
 int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 {
@@ -335,8 +326,9 @@ void *hash_table_remove(struct hash_table *h, const char *key)
 		e = e->next;
 	}
 
-	if (((float)h->size / h->bucket_count) < DEFAULT_MIN_LOAD)
+	if (((float)h->size / h->bucket_count) < DEFAULT_MIN_LOAD) {
 		hash_table_reduce_buckets(h);
+	}
 
 	return 0;
 }
