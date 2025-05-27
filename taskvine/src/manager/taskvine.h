@@ -78,7 +78,7 @@ typedef enum {
 	VINE_SCHEDULE_TIME,            /**< Select worker that has the fastest execution time on previous tasks. */
 	VINE_SCHEDULE_RAND,            /**< Select a random worker. */
 	VINE_SCHEDULE_WORST,           /**< Select the worst fit worker (the worker with more unused resources). */
-	VINE_SCHEDULE_MAX_AVAILABLE_DISK,    /**< Select the worker with the least number of tasks. */
+	VINE_SCHEDULE_MAX_AVAILABLE_DISK,    /**< Select the worker with the most available disk space. */
 } vine_schedule_t;
 
 /** Possible outcomes for a task, returned by @ref vine_task_get_result.
