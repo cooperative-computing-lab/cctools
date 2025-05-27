@@ -188,9 +188,7 @@ HASH_TABLE_ITERATE(table,key,value) {
 </pre>
 */
 
-extern int (*hash_table_half_buckets)(struct hash_table *);
-
-#define HASH_TABLE_ITERATE( table, key, value ) if(((float) table->size/table->bucket_count) < 0.125){hash_table_half_buckets(table);} hash_table_firstkey(table); while(hash_table_nextkey(table,&key,(void**)&value))
+#define HASH_TABLE_ITERATE( table, key, value ) hash_table_firstkey(table); while(hash_table_nextkey(table,&key,(void**)&value))
 
 #define HASH_TABLE_ITERATE_RANDOM_START( table, offset_bookkeep, key, value ) hash_table_randomkey(table, &offset_bookkeep); while(hash_table_nextkey_with_offset(table, offset_bookkeep, &key, (void **)&value))
 
