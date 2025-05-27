@@ -6279,7 +6279,7 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 		}
 	}
 
-	/* Also remove from the replication table. */
+	/* also remove from the replication table. */
 	hash_table_remove(m->temp_files_to_replicate, f->cached_name);
 }
 
