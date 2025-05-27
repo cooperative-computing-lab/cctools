@@ -1166,7 +1166,7 @@ static void add_worker(struct vine_manager *q)
 static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_flags, vine_cache_level_t delete_upto_level)
 {
 	if (cache_flags <= delete_upto_level) {
-		vine_file_replica_table_handle_send_unlink(q, w, filename);
+		vine_file_replica_table_unlink(q, w, filename);
 		return 1;
 	}
 
@@ -6269,19 +6269,13 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 		return;
 	}
 
-	const char *filename = f->cached_name;
-	/*
-	If this is not a file that should be cached forever,
-	delete all of the replicas present at remote workers.
-	*/
-	if (f->cache_level < VINE_CACHE_LEVEL_FOREVER) {
-		char *key;
+	/* delete all of the replicas present at remote workers. */
+	struct set *sources = hash_table_lookup(m->file_worker_table, f->cached_name);
+	if (sources && set_size(sources) > 0) {
 		struct vine_worker_info *w;
-		HASH_TABLE_ITERATE(m->worker_table, key, w)
+		SET_ITERATE(sources, w)
 		{
-			if (vine_file_replica_table_lookup(w, filename)) {
-				delete_worker_file(m, w, filename, 0, 0);
-			}
+			delete_worker_file(m, w, f->cached_name, 0, 0);
 		}
 	}
 

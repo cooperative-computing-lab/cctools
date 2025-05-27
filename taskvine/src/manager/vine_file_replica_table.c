@@ -435,7 +435,7 @@ void vine_file_replica_table_handle_worker_disconnect(struct vine_manager *q, st
 	hash_table_free_keys_array(cached_names);
 }
 
-int vine_file_replica_table_handle_send_unlink(struct vine_manager *q, struct vine_worker_info *w, const char *cachename)
+int vine_file_replica_table_unlink(struct vine_manager *q, struct vine_worker_info *w, const char *cachename)
 {
 	if (!q || !w || !cachename) {
 		return 0;
