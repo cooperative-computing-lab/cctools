@@ -1737,6 +1737,9 @@ static void vine_worker_serve_manager(struct link *manager)
 			break;
 		}
 
+		/* Periodically process pending transfers. */
+		vine_cache_process_pending_transfers(cache_manager);
+
 		/* Check all known libraries if they are ready to execute functions. */
 		check_libraries_ready(manager);
 
@@ -2258,6 +2261,13 @@ int main(int argc, char *argv[])
 	vine_worker_options_get(options, argc, argv);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
+
+	/* Print command line when debugging output enabled */
+	debug(D_VINE, "worker command line:");
+	int i;
+	for (i = 0; i < argc; i++) {
+		debug(D_VINE, "    argv %d: %s", i, argv[i]);
+	}
 
 	/* The caller must either provide a project regex or an explicit manager host and port. */
 	if (!options->project_regex) {
