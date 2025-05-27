@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "vine_factory_info.h"
 #include "vine_file.h"
 #include "vine_file_replica.h"
+#include "vine_file_replica_table.h"
 #include "vine_mount.h"
 
 #include "debug.h"
@@ -18,6 +19,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "rmonitor_types.h"
 #include "rmsummary.h"
+#include "hash_table.h"
 
 #include <limits.h>
 #include <math.h>
@@ -536,6 +538,66 @@ static struct vine_worker_info *find_worker_by_time(struct vine_manager *q, stru
 }
 
 /*
+Find the worker with the largest available storage space.
+*/
+
+static struct vine_worker_info *find_worker_by_max_available_disk(struct vine_manager *q, struct vine_task *t)
+{
+	if (!q || !t) {
+		return NULL;
+	}
+
+	struct priority_queue *worker_queue = priority_queue_create(0);
+	if (!worker_queue) {
+		return NULL;
+	}
+
+	char *key;
+	struct vine_worker_info *w;
+	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	{
+		if (!w || !w->resources) {
+			continue;
+		}
+
+		int64_t input_size_to_be_transferred = 0;
+		struct vine_mount *m;
+		LIST_ITERATE(t->input_mounts, m)
+		{
+			if (!m || !m->file) {
+				continue;
+			}
+
+			struct vine_file_replica *replica = vine_file_replica_table_lookup(w, m->file->cached_name);
+			if (!replica) {
+				input_size_to_be_transferred += m->file->size;
+			}
+		}
+
+		int64_t disk_total = (int64_t)(w->resources->disk.total * 1024 * 1024);
+		int64_t disk_available_after_task = disk_total - w->inuse_cache - input_size_to_be_transferred;
+
+		if (disk_available_after_task <= 0) {
+			continue;
+		}
+
+		priority_queue_push(worker_queue, w, disk_available_after_task);
+	}
+
+	struct vine_worker_info *best_worker = NULL;
+	while ((w = priority_queue_pop(worker_queue))) {
+		if (check_worker_against_task(q, w, t)) {
+			best_worker = w;
+			break;
+		}
+	}
+
+	priority_queue_delete(worker_queue);
+
+	return best_worker;
+}
+
+/*
 Select the best worker for this task, based on the current scheduling mode.
 */
 
@@ -548,6 +610,8 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 	}
 
 	switch (a) {
+	case VINE_SCHEDULE_MAX_AVAILABLE_DISK:
+		return find_worker_by_max_available_disk(q, t);
 	case VINE_SCHEDULE_FILES:
 		return find_worker_by_files(q, t);
 	case VINE_SCHEDULE_TIME:
