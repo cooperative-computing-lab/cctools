@@ -8,9 +8,6 @@ See the file COPYING for details.
 #define VINE_FILE_REPLICA_H
 
 #include "taskvine.h"
-#include "vine_file.h"
-#include "vine_manager.h"
-#include "vine_worker_info.h"
 
 typedef enum {
 	VINE_FILE_REPLICA_STATE_PENDING,  // The replica is in the process of being transferred/created.

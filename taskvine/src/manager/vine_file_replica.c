@@ -5,7 +5,6 @@ See the file COPYING for details.
 */
 
 #include "vine_file_replica.h"
-#include "debug.h"
 #include "vine_counters.h"
 
 struct vine_file_replica *vine_file_replica_create(vine_file_type_t type, vine_cache_level_t cache_level, int64_t size, time_t mtime)
