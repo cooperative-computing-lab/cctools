@@ -347,7 +347,7 @@ remote transfer or command was successful, and know we know the size
 of the file for the purposes of cache storage management.
 */
 
-static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *w, const char *line)
+static vine_msg_code_t handle_cache_update(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
 	char cachename[VINE_LINE_MAX];
 	int type;
@@ -511,7 +511,7 @@ static int handle_transfer_hostport(struct vine_manager *q, struct vine_worker_i
 Handle an unlink-complete message from a worker, indicating that a file was successfully (or unsuccessfully) deleted.
 We currently only return success, the second argument is more of a placeholder for future use.
 */
-static int handle_unlink_complete(struct vine_manager *q, struct vine_worker_info *w, const char *line)
+static vine_msg_code_t handle_unlink_complete(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
 	char cachename[VINE_LINE_MAX];
 	int success;
