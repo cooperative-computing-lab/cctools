@@ -29,7 +29,7 @@ int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_in
 	}
 
 	double prev_available = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
-	
+
 	hash_table_insert(w->current_files, cachename, replica);
 	w->inuse_cache += replica->size;
 
