@@ -156,6 +156,11 @@ int hash_table_size(struct hash_table *h)
 	return h->size;
 }
 
+double hash_table_load(struct hash_table *h)
+{
+	return ((double)h->size) / h->bucket_count;
+}
+
 static int hash_table_double_buckets(struct hash_table *h)
 {
 	int new_count = (2 * (h->bucket_count + 1)) - 1;
