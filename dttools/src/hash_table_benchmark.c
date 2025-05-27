@@ -2,109 +2,80 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 #include <stdint.h>
 #include "hash_table.h"
 
 #define MAX_KEY_LEN 32
-struct entry {
-	char *key;
-	void *value;
-	unsigned hash;
-	struct entry *next;
-};
-
-struct hash_table {
-	hash_func_t hash_func;
-	int bucket_count;
-	int size;
-	struct entry **buckets;
-	int ibucket;
-	struct entry *ientry;
-};
 
 // Generate a unique string key from an integer
-void generate_key(int i, char *key) {
-    snprintf(key, MAX_KEY_LEN, "key%d", i);
+void generate_key(int i, char *key)
+{
+	snprintf(key, MAX_KEY_LEN, "key%d", i);
 }
-double measure_iteration_time(struct hash_table *h) {
-    struct timespec start, end;
-    clock_gettime(CLOCK_MONOTONIC, &start);
 
-    char *key;
-    void *value;
-    HASH_TABLE_ITERATE(h, key, value);
+double measure_iteration_time(struct hash_table *h)
+{
+	struct timespec start, end;
+	clock_gettime(CLOCK_MONOTONIC, &start);
 
-    clock_gettime(CLOCK_MONOTONIC, &end);
+	char *key;
+	void *value;
+	HASH_TABLE_ITERATE(h, key, value);
 
-    double start_sec = start.tv_sec + start.tv_nsec / 1e9;
-    double end_sec = end.tv_sec + end.tv_nsec / 1e9;
+	clock_gettime(CLOCK_MONOTONIC, &end);
 
-    return end_sec - start_sec;
+	double start_sec = start.tv_sec + start.tv_nsec / 1e9;
+	double end_sec = end.tv_sec + end.tv_nsec / 1e9;
+
+	return end_sec - start_sec;
 }
-// Measure iteration time over the hash table
-/*double measure_iteration_time(struct hash_table *h) {
-    clock_t start = clock();
 
-    char *key;
-    void *value;
-    HASH_TABLE_ITERATE(h, key, value);
+int main()
+{
+	int power_step = 0;
+	int power_max_step = 15;       // ~64k max entries
+	int entries_to_add_remove = 1; // 2^power_step = 2^0 = 1
 
-    clock_t end = clock();
-    return (double)(end - start) / CLOCKS_PER_SEC;
-}
-*/
-int main() {
-    const int step = 10000000;
-    const int max = 90000000;
+	struct hash_table *h = hash_table_create(0, 0);
 
-    struct hash_table *h = hash_table_create(127, NULL);
-    double start_sec;
-    double end_sec;
-    struct timespec start, end;
-    double total_time = 0;
+	char key[MAX_KEY_LEN];
+	int entries_counter = 0;
 
-    printf("INSERTION PHASE:\n");
-    for (int n = 0; n <= max; n += step) {
-	printf("Num buckets: %10d|", h->bucket_count);
-        double t = measure_iteration_time(h);
-        printf("Items: %10d, Iteration time: %.6f sec|", n, t);
-        printf("Insertion time: %.6f sec\n", total_time);
-    	clock_gettime(CLOCK_MONOTONIC, &start);
-	if(n==max){break;}
-        for (int i = n; i < n+step; ++i) {
-            char key[MAX_KEY_LEN];
-            generate_key(i, key);
-            hash_table_insert(h, key, (void*)(intptr_t)i);
-        }
-    	clock_gettime(CLOCK_MONOTONIC, &end);
+	printf("INSERTION PHASE:\n");
+	for (power_step = 0; power_step <= power_max_step; power_step++) {
+		double total_time = 0;
+		double max_load = hash_table_load(h);
+		for (int i = 0; i < entries_to_add_remove; i++) {
+			entries_counter++;
+			generate_key(entries_counter, key);
+			hash_table_insert(h, key, NULL);
+			max_load = hash_table_load(h) > max_load ? hash_table_load(h) : max_load;
+			total_time += measure_iteration_time(h);
+		}
+		printf("step %3d size %10d load_max %3.6f load_now %3.6f time %3.6f\n", power_step, hash_table_size(h), max_load, hash_table_load(h), total_time);
+		entries_to_add_remove = 2 * entries_to_add_remove;
+	}
 
-    	start_sec = start.tv_sec + start.tv_nsec / 1e9;
-   	end_sec = end.tv_sec + end.tv_nsec / 1e9;
+	printf("REMOVAL PHASE:\n");
+	entries_to_add_remove = entries_to_add_remove / 2;
 
-   	total_time = end_sec - start_sec;
-    }
+	entries_counter = 0;
+	for (power_step = power_max_step; power_step >= 0; power_step--) {
+		double total_time = 0;
+		double min_load = hash_table_load(h);
+		for (int i = 0; i < entries_to_add_remove; i++) {
+			entries_counter++;
+			generate_key(entries_counter, key);
+			hash_table_remove(h, key);
+			min_load = hash_table_load(h) < min_load ? hash_table_load(h) : min_load;
+			total_time += measure_iteration_time(h);
+		}
+		printf("step %3d size %10d load_min %3.6f load_now %3.6f time %3.6f\n", power_step, hash_table_size(h), min_load, hash_table_load(h), total_time);
+		entries_to_add_remove = entries_to_add_remove / 2;
+	}
 
-    printf("\nREMOVAL PHASE:\n");
-    for (int n = max; n >= 0; n -= step) {
-        double t = measure_iteration_time(h);
-	printf("Num buckets: %10d|", h->bucket_count);
-        printf("Items: %10d, Iteration time: %.6f sec|", n, t);	
-    	struct timespec start, end;
-    	clock_gettime(CLOCK_MONOTONIC, &start);
-        for (int i = n-step; i < n; ++i) {
-            char key[MAX_KEY_LEN];
-            generate_key(i, key);
-            hash_table_remove(h, key);
-        }
-    	clock_gettime(CLOCK_MONOTONIC, &end);
+	hash_table_delete(h);
 
-    	double start_sec = start.tv_sec + start.tv_nsec / 1e9;
-   	double end_sec = end.tv_sec + end.tv_nsec / 1e9;
-
-   	double total_time = end_sec - start_sec;
-        printf("Removal time: %.6f sec\n", total_time);
-    }
-
-    hash_table_delete(h);
-    return 0;
+	return 0;
 }
