@@ -2,7 +2,6 @@ include ../../config.mk
 include ../../rules.mk
 
 LOCAL_CCFLAGS = -D_FILE_OFFSET_BITS=64 -fstack-protector-all
-LOCAL_LDFLAGS = -L/lib64
 LOCAL_LINKAGE = ../../dttools/src/libdttools.a
 
 TARGETS =

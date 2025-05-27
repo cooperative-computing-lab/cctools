@@ -116,11 +116,6 @@ struct vine_manager {
 	struct hash_table *worker_blocklist; /* Maps hostname -> vine_blocklist_info */
 	struct hash_table *factory_table;    /* Maps factory_name -> vine_factory_info */
 	struct hash_table *workers_with_watched_file_updates;  /* Maps link -> vine_worker_info */
-	struct list       *workers_with_complete_tasks;  /* List of worker->hashkey. The hashkeys correspond to
-																											workers that have at least one task to be retrieve.
-																											We add only hashkeys and not vine_worker_info because the worker
-																											may have disconnected before the tasks are retrieved, which would
-																											invalidate the vine_worker_info structure.*/
 	struct hash_table *current_transfer_table; 	/* Maps uuid -> struct transfer_pair */
 	struct itable     *task_group_table; 	/* Maps group id -> list vine_task */
 
