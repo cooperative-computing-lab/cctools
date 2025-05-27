@@ -12,7 +12,7 @@ See the file COPYING for details.
 #include <string.h>
 
 #define DEFAULT_SIZE 127
-#define DEFAULT_LOAD 0.75
+#define DEFAULT_MAX_LOAD 0.75
 #define DEFAULT_MIN_LOAD 0.125
 #define DEFAULT_FUNC hash_string
 
@@ -158,7 +158,8 @@ int hash_table_size(struct hash_table *h)
 
 static int hash_table_double_buckets(struct hash_table *h)
 {
-	struct hash_table *hn = hash_table_create(2 * h->bucket_count, h->hash_func);
+	int new_count = (2 * (h->bucket_count + 1)) - 1;
+	struct hash_table *hn = hash_table_create(new_count, h->hash_func);
 
 	if (!hn)
 		return 0;
@@ -201,13 +202,31 @@ static int hash_table_double_buckets(struct hash_table *h)
 	return 1;
 }
 
-static int hash_table_halve_buckets(struct hash_table *h)
+static int hash_table_reduce_buckets(struct hash_table *h)
 {
-	if (h->bucket_count/2 < DEFAULT_SIZE) 
+	/* DEFAULT_SIZE is the minimum size */
+	if (h->bucket_count / 2 <= DEFAULT_SIZE) {
 		return 1;
+	}
 
-	struct hash_table *hn = hash_table_create(h->bucket_count/2, h->hash_func);
+	/* Table should not be reduced if not below DEFAULT_MIN_LOAD */
+	if (((float)h->size / h->bucket_count) >= DEFAULT_MIN_LOAD) {
+		return 1;
+	}
 
+	/* Table cannot be reduced above DEFAULT_MAX_LOAD */
+	if (((float)h->size / h->bucket_count / 2) >= DEFAULT_MAX_LOAD) {
+		return 1;
+	}
+
+	int new_count = h->bucket_count;
+	do {
+		/* halve new_count until we are above the DEFAULT_MIN_LOAD */
+		new_count = ((new_count + 1) / 2) - 1;
+	} while (((float)h->size / new_count) < DEFAULT_MIN_LOAD);
+
+
+	struct hash_table *hn = hash_table_create(new_count, h->hash_func);
 	if (!hn)
 		return 0;
 
@@ -245,14 +264,14 @@ static int hash_table_halve_buckets(struct hash_table *h)
 
 	return 1;
 }
-int (*hash_table_half_buckets)(struct hash_table*) = hash_table_halve_buckets;
+
 
 int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 {
 	struct entry *e;
 	unsigned hash, index;
 
-	if (((float)h->size / h->bucket_count) > DEFAULT_LOAD)
+	if (((float)h->size / h->bucket_count) > DEFAULT_MAX_LOAD)
 		hash_table_double_buckets(h);
 
 	hash = h->hash_func(key);
@@ -315,6 +334,9 @@ void *hash_table_remove(struct hash_table *h, const char *key)
 		f = e;
 		e = e->next;
 	}
+
+	if (((float)h->size / h->bucket_count) < DEFAULT_MIN_LOAD)
+		hash_table_reduce_buckets(h);
 
 	return 0;
 }
