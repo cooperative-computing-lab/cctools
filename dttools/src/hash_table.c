@@ -218,18 +218,13 @@ static int hash_table_reduce_buckets(struct hash_table *h)
 	int new_count = ((h->bucket_count + 1) / 2) - 1;
 
 	/* DEFAULT_SIZE is the minimum size */
-	if (new_count <= DEFAULT_SIZE) {
+	if (new_count < DEFAULT_SIZE) {
 		return 1;
 	}
 
 	/* Table cannot be reduced above DEFAULT_MAX_LOAD */
-	if (((float)h->size / new_count) >= DEFAULT_MAX_LOAD) {
+	if (((float)h->size / new_count) > DEFAULT_MAX_LOAD) {
 		return 1;
-	}
-
-	struct hash_table *hn = hash_table_create(new_count, h->hash_func);
-	if (!hn) {
-		return 0;
 	}
 
 	struct entry **new_buckets = (struct entry **)calloc(new_count, sizeof(struct entry *));
@@ -312,14 +307,15 @@ void *hash_table_remove(struct hash_table *h, const char *key)
 			free(e->key);
 			free(e);
 			h->size--;
+
+			if (((float)h->size / h->bucket_count) < DEFAULT_MIN_LOAD) {
+				hash_table_reduce_buckets(h);
+			}
+
 			return value;
 		}
 		f = e;
 		e = e->next;
-	}
-
-	if (((float)h->size / h->bucket_count) < DEFAULT_MIN_LOAD) {
-		hash_table_reduce_buckets(h);
 	}
 
 	return 0;
