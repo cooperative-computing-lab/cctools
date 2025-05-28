@@ -276,11 +276,23 @@ DELETING -> DELETED           : receive "unlink-complete" — worker confirms de
 DELETING -> DELETED           : worker disconnect — deletion in progress, but worker is now unreachable
 
 DELETED  -> (no transition)   : terminal state, if reached, we remove the replica completely
+
+Additionally, we temporarily allow the trasition from READY to READY due to a race condition observed: A task
+is considered complete when the manager receives a complete message. A file is considered physically present
+when the manager receives a cache-update message. The combination of a task and its output file is treated as
+completed only after both messages are received. However, a race condition may occur if a worker crashes midway.
+If a worker crashes after sending the cache-update but before the original task’s complete is sent or properly
+handled, the cleanup process will return the original task to the ready queue (from WAITING_RETRIEVAL to READY).
+At the same time, the file's recovery task is submitted to bring it back. As a result, both the original and
+recovery tasks may run concurrently, each attempting to produce the same output file, because the file recovery
+logic is unaware that the original task has been rescheduled, and the manager cannot correlate that both tasks
+are producing the same data.
+We will better handle this in a later version and update this part accordingly.
 */
 static const int vine_file_replica_allowed_state_transitions[4][4] = {
 		// From/To:   PENDING  READY  DELETING   DELETED
 		/* PENDING   */ {0, 1, 1, 1},
-		/* READY     */ {0, 0, 1, 1},
+		/* READY     */ {0, 1, 1, 1},
 		/* DELETING  */ {0, 0, 1, 1},
 		/* DELETED   */ {0, 0, 0, 0}};
 
