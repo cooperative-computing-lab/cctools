@@ -161,48 +161,54 @@ double hash_table_load(struct hash_table *h)
 	return ((double)h->size) / h->bucket_count;
 }
 
+static int insert_to_buckets_aux(struct entry **buckets, int bucket_count, struct entry *new_entry)
+{
+	unsigned index;
+	struct entry *e;
+
+	index = new_entry->hash % bucket_count;
+	e = buckets[index];
+
+	while (e) {
+		/* check that this key does not already exist in the table */
+		if (new_entry->hash == e->hash && !strcmp(new_entry->key, e->key)) {
+			return 0;
+		}
+		e = e->next;
+	}
+
+	new_entry->next = buckets[index];
+	buckets[index] = new_entry;
+
+	return 1;
+}
+
 static int hash_table_double_buckets(struct hash_table *h)
 {
 	int new_count = (2 * (h->bucket_count + 1)) - 1;
-	struct hash_table *hn = hash_table_create(new_count, h->hash_func);
-
-	if (!hn)
+	struct entry **new_buckets = (struct entry **)calloc(new_count, sizeof(struct entry *));
+	if (!new_buckets) {
 		return 0;
+	}
 
-	/* Move pairs to new hash */
-	char *key;
-	void *value;
-	hash_table_firstkey(h);
-	while (hash_table_nextkey(h, &key, &value))
-		if (!hash_table_insert(hn, key, value)) {
-			hash_table_delete(hn);
-			return 0;
-		}
-
-	/* Delete all old pairs */
 	struct entry *e, *f;
-	int i;
-	for (i = 0; i < h->bucket_count; i++) {
+	for (int i = 0; i < h->bucket_count; i++) {
 		e = h->buckets[i];
 		while (e) {
 			f = e->next;
-			free(e->key);
-			free(e);
+			e->next = NULL;
+			insert_to_buckets_aux(new_buckets, new_count, e);
 			e = f;
 		}
 	}
 
 	/* Make the old point to the new */
 	free(h->buckets);
-	h->buckets = hn->buckets;
-	h->bucket_count = hn->bucket_count;
-	h->size = hn->size;
+	h->buckets = new_buckets;
+	h->bucket_count = new_count;
 
 	/* structure of hash table changed completely, thus a nextkey would be incorrect. */
 	h->cant_iterate_yet = 1;
-
-	/* Delete reference to new, so old is safe */
-	free(hn);
 
 	return 1;
 }
@@ -226,60 +232,29 @@ static int hash_table_reduce_buckets(struct hash_table *h)
 		return 0;
 	}
 
-	/* Move pairs to new hash */
-	char *key;
-	void *value;
-	hash_table_firstkey(h);
-	while (hash_table_nextkey(h, &key, &value)) {
-		if (!hash_table_insert(hn, key, value)) {
-			hash_table_delete(hn);
-			return 0;
-		}
+	struct entry **new_buckets = (struct entry **)calloc(new_count, sizeof(struct entry *));
+	if (!new_buckets) {
+		return 0;
 	}
 
-	/* Delete all old pairs */
 	struct entry *e, *f;
-	int i;
-	for (i = 0; i < h->bucket_count; i++) {
+	for (int i = 0; i < h->bucket_count; i++) {
 		e = h->buckets[i];
 		while (e) {
 			f = e->next;
-			free(e->key);
-			free(e);
+			e->next = NULL;
+			insert_to_buckets_aux(new_buckets, new_count, e);
 			e = f;
 		}
 	}
 
 	/* Make the old point to the new */
 	free(h->buckets);
-	h->buckets = hn->buckets;
-	h->bucket_count = hn->bucket_count;
-	h->size = hn->size;
+	h->buckets = new_buckets;
+	h->bucket_count = new_count;
 
-	/* Delete reference to new, so old is safe */
-	free(hn);
-
-	return 1;
-}
-
-int insert_to_buckets_aux(struct entry **buckets, int bucket_count, struct entry *new_entry)
-{
-	unsigned index;
-	struct entry *e;
-
-	index = new_entry->hash % bucket_count;
-	e = buckets[index];
-
-	while (e) {
-		/* check that this key does not already exist in the table */
-		if (new_entry->hash == e->hash && !strcmp(new_entry->key, e->key)) {
-			return 0;
-		}
-		e = e->next;
-	}
-
-	new_entry->next = buckets[index];
-	buckets[index] = new_entry;
+	/* structure of hash table changed completely, thus a nextkey would be incorrect. */
+	h->cant_iterate_yet = 1;
 
 	return 1;
 }
