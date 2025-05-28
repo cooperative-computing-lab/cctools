@@ -53,7 +53,8 @@ int main()
 			max_load = hash_table_load(h) > max_load ? hash_table_load(h) : max_load;
 			total_time += measure_iteration_time(h);
 		}
-		printf("step %3d size %10d load_max %3.6f load_now %3.6f time %3.6f\n", power_step, hash_table_size(h), max_load, hash_table_load(h), total_time);
+
+		printf("step %3d size %8d buckets %8d load_max %3.6f load_now %3.6f time %3.6f time_norm %3.6f\n", power_step, hash_table_size(h), (int) ceil(hash_table_size(h)/hash_table_load(h)), max_load, hash_table_load(h), total_time, total_time/entries_to_add_remove);
 		entries_to_add_remove = 2 * entries_to_add_remove;
 	}
 
@@ -71,7 +72,8 @@ int main()
 			min_load = hash_table_load(h) < min_load ? hash_table_load(h) : min_load;
 			total_time += measure_iteration_time(h);
 		}
-		printf("step %3d size %10d load_min %3.6f load_now %3.6f time %3.6f\n", power_step, hash_table_size(h), min_load, hash_table_load(h), total_time);
+
+		printf("step %3d size %8d buckets %8d load_min %3.6f load_now %3.6f time %3.6f time_norm %3.6f\n", power_step, hash_table_size(h), (int) ceil(hash_table_size(h)/hash_table_load(h)), min_load, hash_table_load(h), total_time, total_time/entries_to_add_remove);
 		entries_to_add_remove = entries_to_add_remove / 2;
 	}
 
