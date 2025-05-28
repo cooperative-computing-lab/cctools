@@ -34,8 +34,7 @@ double measure_iteration_time(struct hash_table *h)
 int main()
 {
 	int power_step = 0;
-	int power_max_step = 15;       // ~64k max entries
-	int entries_to_add_remove = 1; // 2^power_step = 2^0 = 1
+	int power_max_step = 15; // ~64k max entries
 
 	struct hash_table *h = hash_table_create(0, 0);
 
@@ -46,6 +45,7 @@ int main()
 	for (power_step = 0; power_step <= power_max_step; power_step++) {
 		double total_time = 0;
 		double max_load = hash_table_load(h);
+		double entries_to_add_remove = pow(2, power_step);
 		for (int i = 0; i < entries_to_add_remove; i++) {
 			entries_counter++;
 			generate_key(entries_counter, key);
@@ -54,17 +54,16 @@ int main()
 			total_time += measure_iteration_time(h);
 		}
 
-		printf("step %3d size %8d buckets %8d load_max %3.6f load_now %3.6f time %3.6f time_norm %3.6f\n", power_step, hash_table_size(h), (int) ceil(hash_table_size(h)/hash_table_load(h)), max_load, hash_table_load(h), total_time, total_time/entries_to_add_remove);
-		entries_to_add_remove = 2 * entries_to_add_remove;
+		printf("step %3d size %8d buckets %8d load_max %3.6f load_now %3.6f time %3.6f time_norm %3.6f\n", power_step, hash_table_size(h), (int)ceil(hash_table_size(h) / hash_table_load(h)), max_load, hash_table_load(h), total_time, total_time / entries_to_add_remove);
 	}
 
 	printf("REMOVAL PHASE:\n");
-	entries_to_add_remove = entries_to_add_remove / 2;
 
 	entries_counter = 0;
-	for (power_step = power_max_step; power_step >= 0; power_step--) {
+	for (power_step = power_max_step; power_step > 0; power_step--) {
 		double total_time = 0;
 		double min_load = hash_table_load(h);
+		double entries_to_add_remove = pow(2, power_step);
 		for (int i = 0; i < entries_to_add_remove; i++) {
 			entries_counter++;
 			generate_key(entries_counter, key);
@@ -73,8 +72,7 @@ int main()
 			total_time += measure_iteration_time(h);
 		}
 
-		printf("step %3d size %8d buckets %8d load_min %3.6f load_now %3.6f time %3.6f time_norm %3.6f\n", power_step, hash_table_size(h), (int) ceil(hash_table_size(h)/hash_table_load(h)), min_load, hash_table_load(h), total_time, total_time/entries_to_add_remove);
-		entries_to_add_remove = entries_to_add_remove / 2;
+		printf("step %3d size %8d buckets %8d load_min %3.6f load_now %3.6f time %3.6f time_norm %3.6f\n", power_step, hash_table_size(h), (int)ceil(hash_table_size(h) / hash_table_load(h)), min_load, hash_table_load(h), total_time, total_time / entries_to_add_remove);
 	}
 
 	hash_table_delete(h);
