@@ -262,27 +262,37 @@ static int hash_table_reduce_buckets(struct hash_table *h)
 	return 1;
 }
 
-int hash_table_insert(struct hash_table *h, const char *key, const void *value)
+int insert_to_buckets_aux(struct entry **buckets, int bucket_count, struct entry *new_entry)
 {
+	unsigned index;
 	struct entry *e;
-	unsigned hash, index;
 
-	if (((float)h->size / h->bucket_count) > DEFAULT_MAX_LOAD)
-		hash_table_double_buckets(h);
-
-	hash = h->hash_func(key);
-	index = hash % h->bucket_count;
-	e = h->buckets[index];
+	index = new_entry->hash % bucket_count;
+	e = buckets[index];
 
 	while (e) {
-		if (hash == e->hash && !strcmp(key, e->key))
+		/* check that this key does not already exist in the table */
+		if (new_entry->hash == e->hash && !strcmp(new_entry->key, e->key)) {
 			return 0;
+		}
 		e = e->next;
 	}
 
-	e = (struct entry *)malloc(sizeof(struct entry));
-	if (!e)
+	new_entry->next = buckets[index];
+	buckets[index] = new_entry;
+
+	return 1;
+}
+
+int hash_table_insert(struct hash_table *h, const char *key, const void *value)
+{
+	if (((float)h->size / h->bucket_count) > DEFAULT_MAX_LOAD)
+		hash_table_double_buckets(h);
+
+	struct entry *e = (struct entry *)malloc(sizeof(struct entry));
+	if (!e) {
 		return 0;
+	}
 
 	e->key = strdup(key);
 	if (!e->key) {
@@ -291,16 +301,18 @@ int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 	}
 
 	e->value = (void *)value;
-	e->hash = hash;
-	e->next = h->buckets[index];
-	h->buckets[index] = e;
-	h->size++;
+	e->hash = h->hash_func(e->key);
 
-	/* inserting cause different behaviours with nextkey (e.g., sometimes the new
-	 * key would be included or skipped in the iteration */
-	h->cant_iterate_yet = 1;
+	int inserted = insert_to_buckets_aux(h->buckets, h->bucket_count, e);
+	if (inserted) {
+		h->size++;
 
-	return 1;
+		/* inserting cause different behaviours with nextkey (e.g., sometimes the new
+		 * key would be included or skipped in the iteration */
+		h->cant_iterate_yet = 1;
+	}
+
+	return inserted;
 }
 
 void *hash_table_remove(struct hash_table *h, const char *key)
