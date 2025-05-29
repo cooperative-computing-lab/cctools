@@ -70,6 +70,14 @@ void hash_table_delete(struct hash_table *h);
 
 int hash_table_size(struct hash_table *h);
 
+/** Return the proportion of elements
+vs buckets in the table.
+@return The load of the table.
+@param h A pointer to a hash table.
+*/
+
+double hash_table_load(struct hash_table *h);
+
 /** Insert a key and value.
 This call will fail if the table already contains the same key.
 You must call @ref hash_table_remove to remove it.
