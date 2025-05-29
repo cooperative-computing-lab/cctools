@@ -738,6 +738,20 @@ vine_file_type_t vine_file_type(struct vine_file *f);
 */
 int vine_file_replica_count(struct vine_manager *m, struct vine_file *f);
 
+/** Get the number of replicas of a file that are pending.
+@param m A manager object
+@param f A file object.
+@return The number of replicas of the file that are pending.
+*/
+int vine_file_replica_table_count_pending_replicas(struct vine_manager *m, struct vine_file *f);
+
+/** Get the number of replicas of a file that are ready.
+@param m A manager object
+@param f A file object.
+@return The number of replicas of the file that are ready.
+*/
+int vine_file_replica_table_count_ready_replicas(struct vine_manager *m, struct vine_file *f);
+
 /** Declare a file object from a local file
 @param m A manager object
 @param source The path of the file on the local filesystem
