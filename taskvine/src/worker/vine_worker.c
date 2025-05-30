@@ -757,17 +757,21 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 	/* Forsake the tasks that are running on this library */
 	/* It no available libraries on this worker, tasks waiting for this library will be forsaken */
 
-	struct vine_process *p_running;
-	uint64_t task_id;
+	uint64_t *task_ids = itable_keys_array(procs_running);
+	int total_procs = itable_size(procs_running);
 
-	ITABLE_ITERATE(procs_running, task_id, p_running)
-	{
+	for (int i = 0; i < total_procs; i++) {
+		uint64_t task_id = task_ids[i];
+		struct vine_process *p_running = itable_lookup(procs_running, task_id);
+
 		if (p_running->library_process == p) {
 			debug(D_VINE, "killing function task %d running on library task %d", (int)task_id, p->task->task_id);
 			finish_running_task(p_running, VINE_RESULT_FORSAKEN);
 			reap_process(p_running, manager);
 		}
 	}
+
+	itable_free_keys_array(task_ids);
 }
 
 /*
