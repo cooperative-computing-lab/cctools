@@ -1114,13 +1114,14 @@ then we need to abort to clean things up.
 
 static void kill_all_tasks()
 {
-	struct vine_process *p;
-	uint64_t task_id;
+	uint64_t *task_ids = itable_keys_array(procs_table);
+	int total_tasks = itable_size(procs_table);
 
-	ITABLE_ITERATE(procs_table, task_id, p)
-	{
-		do_kill(task_id);
+	for (int i = 0; i < total_tasks; i++) {
+		do_kill(task_ids[i]);
 	}
+
+	itable_free_keys_array(task_ids);
 
 	assert(itable_size(procs_table) == 0);
 	assert(itable_size(procs_running) == 0);
