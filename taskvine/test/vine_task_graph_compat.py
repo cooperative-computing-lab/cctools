@@ -78,6 +78,7 @@ is constructed by dask.""")
     f.memory = 2000
     f.max_workers = 1
     f.min_workers = 1
+    f.ssl = True
     with f:
         desired_keys = ["t", "v"]
         desired_keys = list(dsk_graph.keys())
