@@ -455,12 +455,6 @@ static int handle_cache_invalid(struct vine_manager *q, struct vine_worker_info 
 			w->last_failure_time = timestamp_get();
 		}
 
-		/* now that the replica is lost, handle such event */
-		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
-		if (f) {
-			vine_redundancy_handle_replica_loss(q, f);
-		}
-
 		/* Successfully processed this message. */
 		return VINE_MSG_PROCESSED;
 	} else {
@@ -908,12 +902,13 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 		}
 	}
 
-	/* if the workflow has not finished, handle the replica loss event */
-	if (!vine_empty(q)) {
+	/* if the workflow has not finished, and the worker dies unexpectedly, we need
+	 * to submit recovery tasks for all temp files if immediate_recovery is enabled */
+	if (!vine_empty(q) && q->immediate_recovery) {
 		for (int i = 0; (cached_name = cached_names_copy[i]); i++) {
 			struct vine_file *f = hash_table_lookup(q->file_table, cached_names_copy[i]);
-			if (f) {
-				vine_redundancy_handle_replica_loss(q, f);
+			if (f && f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED && vine_file_replica_table_count_ready_replicas(q, f) == 0) {
+				vine_manager_consider_recovery_task(q, f, f->recovery_task);
 			}
 		}
 	}
@@ -6205,9 +6200,6 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 		delete_worker_file(m, w, f->cached_name, 0, 0);
 	}
 	list_delete(to_remove);
-
-	/* Also remove from the replication table. */
-	vine_redundancy_handle_file_pruning(m, f);
 }
 
 /*

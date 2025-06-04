@@ -394,66 +394,6 @@ static int replica_demand(struct vine_manager *q, struct vine_file *f)
 	return 0;
 }
 
-int vine_redundancy_handle_file_pruning(struct vine_manager *q, struct vine_file *f)
-{
-	if (!q || !f || f->type != VINE_TEMP) {
-		return 0;
-	}
-
-	int idx = priority_queue_find_idx(q->temp_files_to_process, f);
-	if (idx != -1) {
-		priority_queue_remove(q->temp_files_to_process, idx);
-	}
-
-	return 1;
-}
-
-int vine_redundancy_handle_replica_loss(struct vine_manager *q, struct vine_file *f)
-{
-	if (!q || !f) {
-		return 0;
-	}
-
-	/* skip if this is not a temp file */
-	if (f->type != VINE_TEMP) {
-		return 0;
-	}
-
-	/* skip if this file has not been created yet */
-	if (f->state != VINE_FILE_STATE_CREATED) {
-		return 0;
-	}
-
-	/* skip if this file already has enough ready replicas */
-	int ready_replicas = vine_file_replica_table_count_ready_replicas(q, f);
-	if (ready_replicas >= q->temp_replica_count) {
-		return 0;
-	}
-
-	/* skip if this file has at least one pending file, because we will later receive a cache-update
-	 * or a cache-invalid message, and handle the replication or recovery there */
-	int pending_replicas = vine_file_replica_table_count_pending_replicas(q, f);
-	if (pending_replicas > 0) {
-		return 0;
-	}
-
-	/* now, the file needs additional redundancy */
-	if (ready_replicas == 0 && q->immediate_recovery) {
-		/* immediately recover it if specified */
-		vine_manager_consider_recovery_task(q, f, f->recovery_task);
-	} else {
-		/* or insert it into the queue for later process */
-		int idx = priority_queue_find_idx(q->temp_files_to_process, f);
-		if (idx != -1) {
-			priority_queue_update_priority_at(q->temp_files_to_process, idx, q->temp_replica_count - ready_replicas);
-		} else {
-			priority_queue_push(q->temp_files_to_process, f, q->temp_replica_count - ready_replicas);
-		}
-	}
-
-	return 1;
-}
-
 int vine_redundancy_handle_task_completion(struct vine_manager *q, struct vine_task *t)
 {
 	if (!q || !t || q->checkpoint_threshold < 0) {
@@ -542,12 +482,9 @@ int vine_redundancy_process_temp_files(struct vine_manager *q)
 		/* skip if this file doesn't have ready sources */
 		int ready_replicas = vine_file_replica_table_count_ready_replicas(q, f);
 		if (ready_replicas == 0) {
-			/* recover if no pending replicas as well, this means the file is completely lost.
-			 * if some replicas are pending, we will handle when receive the cache-invalid */
-			int pending_replicas = vine_file_replica_table_count_pending_replicas(q, f);
-			if (pending_replicas == 0 && q->transfer_temps_recovery) {
-				vine_manager_consider_recovery_task(q, f, f->recovery_task);
-			}
+			/* if no pending replicas, this means the file is completely lost.
+			 * but we do not recover it at this stage, the recovery tasks should be submitted
+			 * when worker dies or when task evaluates the inputs. */
 			continue;
 		}
 
