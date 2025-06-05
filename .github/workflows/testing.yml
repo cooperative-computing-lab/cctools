@@ -6,6 +6,8 @@ on:
     branches:
       - master
       - 'release/*'
+  schedule:
+      - cron: '0 0 * * *' # midnight UTC
   workflow_dispatch:
     inputs:
       version:
@@ -24,7 +26,7 @@ jobs:
     container: ${{ format('cclnd/cctools-env:x86_64-{0}', matrix.os-name) }}
     timeout-minutes: 30
     env:
-      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, matrix.os-name) }}
+      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version || 'nightly', matrix.os-name) }}
       CCTOOLS_DOCKER_GITHUB: ${{ matrix.os-name }}
     strategy: 
       matrix:
@@ -46,7 +48,7 @@ jobs:
         run: ${GITHUB_WORKSPACE}/packaging/build-docker/build.sh
       - name: deploy
         uses: ncipollo/release-action@v1
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
         with:
           artifacts: /tmp/${{ env.CCTOOLS_OUTPUT }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -58,7 +60,7 @@ jobs:
           prerelease: true
           replacesArtifacts: true
           commit: ${{ steps.vars.output.tag_sha }}
-          tag: ${{ github.event.inputs.tag }}
+          tag: ${{ github.event.inputs.tag || 'nightly' }}
 
   build-conda-linux:
     runs-on: ubuntu-latest
