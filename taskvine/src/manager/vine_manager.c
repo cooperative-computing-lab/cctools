@@ -29,6 +29,7 @@ See the file COPYING for details.
 #include "vine_taskgraph_log.h"
 #include "vine_txn_log.h"
 #include "vine_worker_info.h"
+#include "vine_redundancy.h"
 
 #include "address.h"
 #include "buffer.h"
@@ -162,10 +163,9 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 static void release_all_workers(struct vine_manager *q);
 
 static int vine_manager_check_inputs_available(struct vine_manager *q, struct vine_task *t);
-static void vine_manager_consider_recovery_task(struct vine_manager *q, struct vine_file *lost_file, struct vine_task *rt);
 
 static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
-static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
+int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
@@ -394,8 +394,8 @@ static int handle_cache_update(struct vine_manager *q, struct vine_worker_info *
 			f->size = size;
 
 			/* And if the file is a newly created temporary, replicate as needed. */
-			if (f->type == VINE_TEMP && *id == 'X' && q->temp_replica_count > 1) {
-				hash_table_insert(q->temp_files_to_replicate, f->cached_name, NULL);
+			if (f->type == VINE_TEMP && *id == 'X') {
+				vine_redundancy_handle_file_creation(q, f);
 			}
 		}
 	}
@@ -583,6 +583,9 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		t->output_length = output_length;
 		t->result = task_status;
 		t->exit_code = exit_status;
+
+		/* handle redundancy */
+		vine_redundancy_handle_task_completion(q, t);
 
 		/* fill resources measured with whatever vine reported/committed, as a fallback when task ran without monitoring enabled */
 		t->resources_measured->start = ((double)start_time) / ONE_SECOND;
@@ -871,44 +874,48 @@ void vine_update_catalog(struct vine_manager *m)
 
 static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info *w)
 {
-	if (hash_table_size(w->current_files) < 1) {
+	if (!q || !w || !w->current_files || hash_table_size(w->current_files) < 1) {
+		return;
+	}
+
+	char **cached_names_copy = hash_table_keys_array(w->current_files);
+	if (!cached_names_copy) {
 		return;
 	}
 
 	char *cached_name = NULL;
-	char **cached_names = hash_table_keys_array(w->current_files);
 
-	struct vine_file_replica *replica = NULL;
+	/* remove all files */
+	for (int i = 0; (cached_name = cached_names_copy[i]); i++) {
+		struct vine_file *f = hash_table_lookup(q->file_table, cached_names_copy[i]);
+		assert(cached_name != NULL);
 
-	int i = 0;
-	while ((cached_name = cached_names[i])) {
-		i++;
-		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
+		/* skip if the file was declared, and we successfully remove it */
+		if (f && delete_worker_file(q, w, cached_name, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW)) {
+			continue;
+		}
 
-		// check that the manager actually knows about that file, as the file
-		// may correspond to a cache-update of a file that has not been declared
-		// yet.
-		if (!f || !delete_worker_file(q, w, f->cached_name, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW)) {
-			if (cached_name) {
-				replica = vine_file_replica_table_remove(q, w, cached_name);
-			}
+		/* otherwise, we enforce a deletion of the file replica */
+		struct vine_file_replica *replica = vine_file_replica_table_remove(q, w, cached_name);
+		if (replica) {
+			vine_file_replica_delete(replica);
+		}
+	}
 
-			if (replica) {
-				vine_file_replica_delete(replica);
-
-				// recreate tmps lost with this worker if needed
-				if (q->immediate_recovery) {
-					if (f && f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED) {
-						if (!vine_file_replica_table_exists_somewhere(q, f->cached_name)) {
-							vine_manager_consider_recovery_task(q, f, f->recovery_task);
-						}
-					}
-				}
+	/* if the workflow has not finished, and the worker dies unexpectedly, we need
+	 * to submit recovery tasks for all temp files if immediate_recovery is enabled */
+	if (!vine_empty(q) && q->immediate_recovery) {
+		for (int i = 0; (cached_name = cached_names_copy[i]); i++) {
+			struct vine_file *f = hash_table_lookup(q->file_table, cached_names_copy[i]);
+			if (f && f->type == VINE_TEMP && f->state == VINE_FILE_STATE_CREATED && vine_file_replica_table_count_ready_replicas(q, f) == 0) {
+				vine_manager_consider_recovery_task(q, f, f->recovery_task);
 			}
 		}
 	}
 
-	hash_table_free_keys_array(cached_names);
+	hash_table_free_keys_array(cached_names_copy);
+
+	return;
 }
 
 /* Remove all tasks and other associated state from a given worker. */
@@ -946,103 +953,6 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	cleanup_worker_files(q, w);
 }
 
-/* Start replicating files that may need replication */
-static int consider_tempfile_replications(struct vine_manager *q)
-{
-	if (hash_table_size(q->temp_files_to_replicate) <= 0) {
-		return 0;
-	}
-
-	char *cached_name = NULL;
-	void *empty_val = NULL;
-	int total_replication_request_sent = 0;
-
-	static char key_start[PATH_MAX] = "random init";
-	int iter_control;
-	int iter_count_var;
-
-	struct list *to_remove = list_create();
-
-	HASH_TABLE_ITERATE_FROM_KEY(q->temp_files_to_replicate, iter_control, iter_count_var, key_start, cached_name, empty_val)
-	{
-		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
-
-		if (!f) {
-			continue;
-		}
-
-		/* are there any available sources? */
-		struct set *sources = hash_table_lookup(q->file_worker_table, f->cached_name);
-		if (!sources) {
-			/* If no sources found, it indicates that the file doesn't exist, either pruned or lost.
-			Because a pruned file is removed from the recovery queue, so it definitely indicates that the file is lost. */
-			if (q->transfer_temps_recovery) {
-				vine_manager_consider_recovery_task(q, f, f->recovery_task);
-			}
-			list_push_tail(to_remove, xxstrdup(f->cached_name));
-			continue;
-		}
-
-		/* at least one source is able to transfer? */
-		int has_valid_source = 0;
-		struct vine_worker_info *s;
-		SET_ITERATE(sources, s)
-		{
-			if (s->transfer_port_active && s->outgoing_xfer_counter < q->worker_source_max_transfers) {
-				has_valid_source = 1;
-				break;
-			}
-		}
-		if (!has_valid_source) {
-			continue;
-		}
-
-		/* has this file been fully replicated? */
-		int nsources = set_size(sources);
-		int to_find = MIN(q->temp_replica_count - nsources, q->transfer_replica_per_cycle);
-		if (to_find <= 0) {
-			list_push_tail(to_remove, xxstrdup(f->cached_name));
-			continue;
-		}
-
-		// debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsources, f->cached_name, to_find);
-
-		int round_replication_request_sent = vine_file_replica_table_replicate(q, f, sources, to_find);
-		total_replication_request_sent += round_replication_request_sent;
-
-		if (total_replication_request_sent >= q->attempt_schedule_depth) {
-			break;
-		}
-	}
-
-	while ((cached_name = list_pop_head(to_remove))) {
-		hash_table_remove(q->temp_files_to_replicate, cached_name);
-		free(cached_name);
-	}
-
-	return total_replication_request_sent;
-}
-
-/* Insert into hashtable temp files that may need replication. */
-
-static void recall_worker_lost_temp_files(struct vine_manager *q, struct vine_worker_info *w)
-{
-	char *cached_name = NULL;
-	struct vine_file_replica *info = NULL;
-
-	debug(D_VINE, "Recalling worker %s's temp files", w->hostname);
-
-	// Iterate over files we want might want to recover
-	HASH_TABLE_ITERATE(w->current_files, cached_name, info)
-	{
-		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
-
-		if (f && f->type == VINE_TEMP) {
-			hash_table_insert(q->temp_files_to_replicate, cached_name, NULL);
-		}
-	}
-}
-
 /* Remove a worker from this master by removing all remote state, all local state, and disconnecting. */
 
 void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason)
@@ -1060,10 +970,6 @@ void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info 
 
 	hash_table_remove(q->worker_table, w->hashkey);
 	hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
-
-	if (q->transfer_temps_recovery) {
-		recall_worker_lost_temp_files(q, w);
-	}
 
 	cleanup_worker(q, w);
 
@@ -1151,7 +1057,7 @@ static void add_worker(struct vine_manager *q)
 
 /* Delete a single file on a remote worker except those with greater delete_upto_level cache level */
 
-static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_flags, vine_cache_level_t delete_upto_level)
+int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_flags, vine_cache_level_t delete_upto_level)
 {
 	if (cache_flags <= delete_upto_level) {
 		vine_manager_send(q, w, "unlink %s\n", filename);
@@ -2518,6 +2424,10 @@ static vine_msg_code_t handle_feature(struct vine_manager *q, struct vine_worker
 
 	hash_table_insert(w->features, fdec, (void **)1);
 
+	if (strcmp(fdec, "checkpoint-worker") == 0) {
+		w->is_checkpoint_worker = 1;
+	}
+
 	return VINE_MSG_PROCESSED;
 }
 
@@ -3377,7 +3287,7 @@ the necessary output files.  This should only happen if the output files have no
 generated yet.
 */
 
-static void vine_manager_consider_recovery_task(struct vine_manager *q, struct vine_file *lost_file, struct vine_task *rt)
+void vine_manager_consider_recovery_task(struct vine_manager *q, struct vine_file *lost_file, struct vine_task *rt)
 {
 	if (!rt)
 		return;
@@ -3998,7 +3908,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->worker_table = hash_table_create(0, 0);
 	q->file_worker_table = hash_table_create(0, 0);
-	q->temp_files_to_replicate = hash_table_create(0, 0);
+	q->temp_files_to_process = priority_queue_create(0);
 	q->worker_blocklist = hash_table_create(0, 0);
 
 	q->file_table = hash_table_create(0, 0);
@@ -4082,7 +3992,10 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->temp_replica_count = 1;
 	q->transfer_temps_recovery = 0;
+	q->immediate_recovery = 0;
 	q->transfer_replica_per_cycle = 10;
+
+	q->checkpoint_threshold = -1;
 
 	q->resource_submit_multiplier = 1.0;
 
@@ -4315,8 +4228,12 @@ static void delete_task_at_exit(struct vine_task *t)
 
 void vine_delete(struct vine_manager *q)
 {
-	if (!q)
+	if (!q) {
 		return;
+	}
+
+	/* disable immediate recovery to avoid submitting recovery tasks upon worker cleanup */
+	q->immediate_recovery = 0;
 
 	vine_fair_write_workflow_info(q);
 
@@ -4324,23 +4241,22 @@ void vine_delete(struct vine_manager *q)
 
 	vine_perf_log_write_update(q, 1);
 
-	if (q->name)
+	if (q->name) {
 		update_catalog(q, 1);
+	}
 
 	/* we call this function here before any of the structures are freed. */
 	vine_disable_monitoring(q);
 
-	if (q->catalog_hosts)
+	if (q->catalog_hosts) {
 		free(q->catalog_hosts);
+	}
 
 	hash_table_clear(q->worker_table, (void *)vine_worker_delete);
 	hash_table_delete(q->worker_table);
 
 	hash_table_clear(q->file_worker_table, (void *)set_delete);
 	hash_table_delete(q->file_worker_table);
-
-	hash_table_clear(q->temp_files_to_replicate, 0);
-	hash_table_delete(q->temp_files_to_replicate);
 
 	hash_table_clear(q->factory_table, (void *)vine_factory_info_delete);
 	hash_table_delete(q->factory_table);
@@ -4375,6 +4291,8 @@ void vine_delete(struct vine_manager *q)
 
 	list_clear(q->task_info_list, (void *)vine_task_info_delete);
 	list_delete(q->task_info_list);
+
+	priority_queue_delete(q->temp_files_to_process);
 
 	char *staging = vine_get_path_staging(q, NULL);
 	if (!access(staging, F_OK)) {
@@ -5271,7 +5189,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 		// Check if any temp files need replication and start replicating
 		BEGIN_ACCUM_TIME(q, time_internal);
-		result = consider_tempfile_replications(q);
+		result = vine_redundancy_process_temp_files(q);
 		END_ACCUM_TIME(q, time_internal);
 		if (result) {
 			// recovered at least one temp file
@@ -5604,8 +5522,9 @@ static void release_all_workers(struct vine_manager *q)
 	struct vine_worker_info *w;
 	char *key;
 
-	if (!q)
+	if (!q) {
 		return;
+	}
 
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
@@ -5628,8 +5547,9 @@ int vine_empty(struct vine_manager *q)
 
 	ITABLE_ITERATE(q->tasks, task_id, t)
 	{
-		if (t->type == VINE_TASK_TYPE_STANDARD)
+		if (t->type == VINE_TASK_TYPE_STANDARD) {
 			return 0;
+		}
 	}
 
 	return 1;
@@ -5724,6 +5644,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "temp-replica-count")) {
 		q->temp_replica_count = MAX(1, (int)value);
+
+	} else if (!strcmp(name, "checkpoint-threshold")) {
+		q->checkpoint_threshold = (int)value * 1e6;
 
 	} else if (!strcmp(name, "transfer-outlier-factor")) {
 		q->transfer_outlier_factor = value;
@@ -6252,32 +6175,39 @@ from workers when the file is no longer needed by the manager.
 */
 void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 {
-	if (!f) {
+	if (!m || !f) {
 		return;
 	}
 
-	if (!m) {
+	if (f->cache_level == VINE_CACHE_LEVEL_FOREVER) {
 		return;
 	}
 
-	const char *filename = f->cached_name;
 	/*
 	If this is not a file that should be cached forever,
 	delete all of the replicas present at remote workers.
 	*/
-	if (f->cache_level < VINE_CACHE_LEVEL_FOREVER) {
-		char *key;
-		struct vine_worker_info *w;
-		HASH_TABLE_ITERATE(m->worker_table, key, w)
-		{
-			if (vine_file_replica_table_lookup(w, filename)) {
-				delete_worker_file(m, w, filename, 0, 0);
-			}
+	struct set *sources = hash_table_lookup(m->file_worker_table, f->cached_name);
+	if (!sources) {
+		return;
+	}
+
+	struct list *to_remove = list_create();
+
+	struct vine_worker_info *w;
+	SET_ITERATE(sources, w)
+	{
+		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, f->cached_name);
+		assert(replica != NULL);
+		if (replica->state == VINE_FILE_REPLICA_STATE_READY) {
+			list_push_tail(to_remove, w);
 		}
 	}
 
-	/* Also remove from the replication table. */
-	hash_table_remove(m->temp_files_to_replicate, f->cached_name);
+	while ((w = list_pop_head(to_remove))) {
+		delete_worker_file(m, w, f->cached_name, 0, 0);
+	}
+	list_delete(to_remove);
 }
 
 /*
