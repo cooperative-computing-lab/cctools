@@ -4228,8 +4228,12 @@ static void delete_task_at_exit(struct vine_task *t)
 
 void vine_delete(struct vine_manager *q)
 {
-	if (!q)
+	if (!q) {
 		return;
+	}
+
+	/* disable immediate recovery to avoid submitting recovery tasks upon worker cleanup */
+	q->immediate_recovery = 0;
 
 	vine_fair_write_workflow_info(q);
 
@@ -4237,14 +4241,16 @@ void vine_delete(struct vine_manager *q)
 
 	vine_perf_log_write_update(q, 1);
 
-	if (q->name)
+	if (q->name) {
 		update_catalog(q, 1);
+	}
 
 	/* we call this function here before any of the structures are freed. */
 	vine_disable_monitoring(q);
 
-	if (q->catalog_hosts)
+	if (q->catalog_hosts) {
 		free(q->catalog_hosts);
+	}
 
 	hash_table_clear(q->worker_table, (void *)vine_worker_delete);
 	hash_table_delete(q->worker_table);
@@ -5516,8 +5522,9 @@ static void release_all_workers(struct vine_manager *q)
 	struct vine_worker_info *w;
 	char *key;
 
-	if (!q)
+	if (!q) {
 		return;
+	}
 
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
@@ -5540,8 +5547,9 @@ int vine_empty(struct vine_manager *q)
 
 	ITABLE_ITERATE(q->tasks, task_id, t)
 	{
-		if (t->type == VINE_TASK_TYPE_STANDARD)
+		if (t->type == VINE_TASK_TYPE_STANDARD) {
 			return 0;
+		}
 	}
 
 	return 1;
