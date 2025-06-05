@@ -184,7 +184,7 @@ You may specify a specific port number to listen on like this:
     #include "taskvine.h"
 
     /* Create a new manager listening on port 9123 */
-    struct taskvine *m = vine_create(9123);
+    struct vine_manager *m = vine_create(9123);
     ```
 
 In a shared environment, that specific port might already be in use, and so you may find it more convenient
@@ -425,7 +425,7 @@ If no task completes within the timeout, it returns null.
 
 === "C"
     ```C
-    while(!vine_empty(q)) {
+    while(!vine_empty(m)) {
         struct vine_task *t = vine_wait(m, 5);
         if(t) {
             printf("Task %d has returned!\n", t->taskid);
@@ -507,7 +507,7 @@ If you are writing a TaskVine application in C, you should compile it into an ex
 been installed using the `conda` method.
 
 ```sh
-gcc taskvine_example.c -o taskvine_example -I${CONDA_PREFIX}/include/cctools -L${CONDA_PREFIX}/lib -ltaskvine -ldttools -lm -lz
+gcc taskvine_example.c -o taskvine_example -I${CONDA_PREFIX}/include/cctools -L${CONDA_PREFIX}/lib -ltaskvine -ldttools -lm -lz -lssl -lcrypto
 ```
 
 ### Running a Manager Program
@@ -1179,7 +1179,7 @@ creating the manager:
     #include "taskvine.h"
 
     /* Create a new manager listening on port 9123 */
-    struct taskvine *m = vine_ssl_create(9123, 'MY_KEY.pem', 'MY_CERT.pem');
+    struct vine_manager *m = vine_ssl_create(9123, 'MY_KEY.pem', 'MY_CERT.pem');
     ```
 
 
@@ -1240,7 +1240,7 @@ warranted:
 
 === "C"
     ```C
-    if(vine_hungry(q)) {
+    if(vine_hungry(m)) {
         // submit more tasks...
     }
     ```
@@ -2476,7 +2476,7 @@ If you need to change the prefix `vine-run-info` to some other directory, use
     ```C
     // logs appear at /new/desired/path/%Y-%m-%dT%H:%M:%S/vine-logs
     vine_set_runtime_info_path("/new/desired/path")
-    struct taskvine *m = vine_create(0);
+    struct vine_manager *m = vine_create(0);
     ```
 
 If the new path is not absolute, it is taken relative to the current working
