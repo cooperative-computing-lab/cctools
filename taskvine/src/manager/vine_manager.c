@@ -165,7 +165,7 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 static void vine_manager_consider_recovery_task(struct vine_manager *q, struct vine_file *lost_file, struct vine_task *rt);
 
 static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
-static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_flags, vine_cache_level_t delete_upto_level);
+static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
@@ -1177,9 +1177,9 @@ static void add_worker(struct vine_manager *q)
 
 /* Delete a single file on a remote worker except those with greater delete_upto_level cache level */
 
-static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_flags, vine_cache_level_t delete_upto_level)
+static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level)
 {
-	if (cache_flags <= delete_upto_level) {
+	if (cache_level <= delete_upto_level) {
 		handle_replica_state_transition_event(q, w, filename, VINE_FILE_REPLICA_STATE_TRANSITION_EVENT_UNLINK);
 		vine_manager_send(q, w, "unlink %s\n", filename);
 		return 1;
