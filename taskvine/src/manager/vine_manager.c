@@ -346,7 +346,7 @@ Change the state of a file replica on an event.
 If the final state is DELETED, remove the replica from the table.
 */
 
-static int handle_replica_state_transition_event(struct vine_manager *q, struct vine_worker_info *w, const char *cachename, vine_file_replica_state_transition_event_t event)
+static int process_replica_on_event(struct vine_manager *q, struct vine_worker_info *w, const char *cachename, vine_file_replica_state_transition_event_t event)
 {
 	struct vine_file_replica *replica = vine_file_replica_table_lookup(w, cachename);
 	if (!replica) {
@@ -403,7 +403,7 @@ static vine_msg_code_t handle_cache_update(struct vine_manager *q, struct vine_w
 		replica->mtime = mtime;
 		replica->transfer_time = transfer_time;
 
-		handle_replica_state_transition_event(q, w, cachename, VINE_FILE_REPLICA_STATE_TRANSITION_EVENT_CACHE_UPDATE);
+		process_replica_on_event(q, w, cachename, VINE_FILE_REPLICA_STATE_TRANSITION_EVENT_CACHE_UPDATE);
 
 		vine_current_transfers_set_success(q, id);
 		vine_current_transfers_remove(q, id);
@@ -467,7 +467,7 @@ static vine_msg_code_t handle_cache_invalid(struct vine_manager *q, struct vine_
 		debug(D_VINE, "%s (%s) invalidated %s with error: %s", w->hostname, w->addrport, cachename, message);
 		free(message);
 
-		handle_replica_state_transition_event(q, w, cachename, VINE_FILE_REPLICA_STATE_TRANSITION_EVENT_CACHE_INVALID);
+		process_replica_on_event(q, w, cachename, VINE_FILE_REPLICA_STATE_TRANSITION_EVENT_CACHE_INVALID);
 
 		/* If the third argument was given, also remove the transfer record */
 		if (n >= 3) {
@@ -1180,7 +1180,7 @@ static void add_worker(struct vine_manager *q)
 static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level)
 {
 	if (cache_level <= delete_upto_level) {
-		handle_replica_state_transition_event(q, w, filename, VINE_FILE_REPLICA_STATE_TRANSITION_EVENT_UNLINK);
+		process_replica_on_event(q, w, filename, VINE_FILE_REPLICA_STATE_TRANSITION_EVENT_UNLINK);
 		vine_manager_send(q, w, "unlink %s\n", filename);
 		return 1;
 	}
