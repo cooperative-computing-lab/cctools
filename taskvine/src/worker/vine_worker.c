@@ -1050,8 +1050,6 @@ static int do_unlink(struct link *manager, const char *path)
 		result = 0;
 	}
 
-	send_async_message(manager, "unlink-complete %s %d\n", path, result);
-
 	free(cached_path);
 	return result;
 }

@@ -244,228 +244,28 @@ int vine_file_replica_table_count_replicas(struct vine_manager *q, const char *c
 	return count;
 }
 
+/*
+Check if a file replica exists on a worker. We accept both PENDING and READY replicas,
+since a PENDING replica may already exist physically but hasn't yet received the cache-update
+message from the manager. However, we do not accept DELETING replicas, as they indicate
+the source worker has already been sent an unlink request—any subsequent cache-update or
+cache-invalid events will lead to deletion.
+*/
 int vine_file_replica_table_exists_somewhere(struct vine_manager *q, const char *cachename)
 {
 	struct set *workers = hash_table_lookup(q->file_worker_table, cachename);
-	if (!workers) {
+	if (!workers || set_size(workers) < 1) {
 		return 0;
 	}
 
-	struct vine_worker_info *peer;
-
-	SET_ITERATE(workers, peer)
+	struct vine_worker_info *w;
+	SET_ITERATE(workers, w)
 	{
-		if (peer->transfer_port_active) {
+		struct vine_file_replica *r = vine_file_replica_table_lookup(w, cachename);
+		if (r && (r->state == VINE_FILE_REPLICA_STATE_PENDING || r->state == VINE_FILE_REPLICA_STATE_READY)) {
 			return 1;
 		}
 	}
 
 	return 0;
-}
-
-/******* File Replica State Machine:
-PENDING ->  READY             : receive "cache-update" — file has physically arrived on the worker
-PENDING ->  DELETING          : receive "cache-invalid" — file was expected but not found on the worker
-PENDING ->  DELETED           : worker disconnect — file was never ready and worker is now unreachable
-
-READY   ->  DELETING          : send "unlink" — manager initiates deletion of a valid file
-READY   ->  DELETED           : worker disconnect — file was on a worker that has now disconnected
-
-DELETING -> DELETING          : we allow this transition as multiple tasks may share the same replica and delete on their own
-DELETING -> DELETED           : receive "unlink-complete" — worker confirms deletion
-DELETING -> DELETED           : worker disconnect — deletion in progress, but worker is now unreachable
-
-DELETED  -> (no transition)   : terminal state, if reached, we remove the replica completely
-
-Additionally, we temporarily allow the trasition from READY to READY due to a race condition observed: A task
-is considered complete when the manager receives a complete message. A file is considered physically present
-when the manager receives a cache-update message. The combination of a task and its output file is treated as
-completed only after both messages are received. However, a race condition may occur if a worker crashes midway.
-If a worker crashes after sending the cache-update but before the original task’s complete is sent or properly
-handled, the cleanup process will return the original task to the ready queue (from WAITING_RETRIEVAL to READY).
-At the same time, the file's recovery task is submitted to bring it back. As a result, both the original and
-recovery tasks may run concurrently, each attempting to produce the same output file, because the file recovery
-logic is unaware that the original task has been rescheduled, and the manager cannot correlate that both tasks
-are producing the same data.
-We will better handle this in a later version and update this part accordingly.
-*/
-static const int vine_file_replica_allowed_state_transitions[4][4] = {
-		// From/To:   PENDING  READY  DELETING   DELETED
-		/* PENDING   */ {0, 1, 1, 1},
-		/* READY     */ {0, 1, 1, 1},
-		/* DELETING  */ {0, 0, 1, 1},
-		/* DELETED   */ {0, 0, 0, 0}};
-
-static int vine_file_replica_is_state_transition_allowed(vine_file_replica_state_t from, vine_file_replica_state_t to)
-{
-	return vine_file_replica_allowed_state_transitions[from][to];
-}
-
-static const char *vine_file_replica_state_to_string(vine_file_replica_state_t state)
-{
-	switch (state) {
-	case VINE_FILE_REPLICA_STATE_PENDING:
-		return "PENDING";
-	case VINE_FILE_REPLICA_STATE_READY:
-		return "READY";
-	case VINE_FILE_REPLICA_STATE_DELETING:
-		return "DELETING";
-	case VINE_FILE_REPLICA_STATE_DELETED:
-		return "DELETED";
-	default:
-		return "UNKNOWN";
-	}
-}
-
-static int vine_file_replica_table_change_replica_state(struct vine_manager *q, struct vine_worker_info *w, struct vine_file_replica *r, const char *cachename, vine_file_replica_state_t new_state)
-{
-	if (!r) {
-		return 0;
-	}
-
-	vine_file_replica_state_t old_state = r->state;
-
-	/* if the state transition is not allowed, log an error but still continue
-	 * this does not necessarily mean a critical bug, but something might be stinky there... */
-	if (!vine_file_replica_is_state_transition_allowed(old_state, new_state)) {
-		debug(D_ERROR,
-				"Invalid state transition for file %s from %s to %s\n",
-				cachename,
-				vine_file_replica_state_to_string(old_state),
-				vine_file_replica_state_to_string(new_state));
-	}
-
-	r->state = new_state;
-
-	/* the replica is cleaned only when it's state is set to DELETED */
-	if (r->state == VINE_FILE_REPLICA_STATE_DELETED) {
-		struct vine_file_replica *removed_replica = vine_file_replica_table_remove(q, w, cachename);
-		if (removed_replica) {
-			vine_file_replica_delete(removed_replica);
-		}
-	}
-
-	return 1;
-}
-
-int vine_file_replica_table_handle_receive_cache_update(struct vine_manager *q, struct vine_worker_info *w, const char *cachename, int64_t size, time_t mtime)
-{
-	if (!q || !w || !cachename) {
-		return 0;
-	}
-
-	struct vine_file_replica *replica = vine_file_replica_table_lookup(w, cachename);
-	if (!replica) {
-		/* this is OK, the file may have been deleted already */
-		return 1;
-	}
-
-	/* race condition check: if file is in DELETING state, reject cache-update.
-	 * we do not check for DELETED state as all deleted files are removed immediately in the current implementation */
-	if (replica->state == VINE_FILE_REPLICA_STATE_DELETING) {
-		return 1;
-	}
-
-	/* update replica stat */
-	replica->size = size;
-	replica->mtime = mtime;
-	replica->transfer_time = timestamp_get();
-
-	/* change state from PENDING to READY */
-	return vine_file_replica_table_change_replica_state(q, w, replica, cachename, VINE_FILE_REPLICA_STATE_READY);
-}
-
-int vine_file_replica_table_handle_receive_cache_invalid(struct vine_manager *q, struct vine_worker_info *w, const char *cachename)
-{
-	if (!q || !w || !cachename) {
-		return 0;
-	}
-
-	struct vine_file_replica *replica = vine_file_replica_table_lookup(w, cachename);
-	if (!replica) {
-		/* this is OK, the file may have been deleted already */
-		return 1;
-	}
-
-	/* no race condition on cache-invalid */
-
-	/* change state to DELETED */
-	if (!vine_file_replica_table_change_replica_state(q, w, replica, cachename, VINE_FILE_REPLICA_STATE_DELETED)) {
-		return 0;
-	}
-
-	return 1;
-}
-
-int vine_file_replica_table_handle_receive_unlink_complete(struct vine_manager *q, struct vine_worker_info *w, const char *cachename, int success)
-{
-	if (!q || !w || !cachename) {
-		return 0;
-	}
-
-	struct vine_file_replica *replica = vine_file_replica_table_lookup(w, cachename);
-	if (!replica) {
-		/* this is OK as the replica may have been deleted already */
-		return 1;
-	}
-
-	/* no race condition on unlink-complete */
-
-	/* NOTE: in the current implementation, success is always true, but may be useful in the future */
-	return vine_file_replica_table_change_replica_state(q, w, replica, cachename, VINE_FILE_REPLICA_STATE_DELETED);
-}
-
-void vine_file_replica_table_handle_worker_disconnect(struct vine_manager *q, struct vine_worker_info *w)
-{
-	if (!q || !w) {
-		return;
-	}
-
-	/* remove all file replicas on this worker */
-
-	char *cached_name = NULL;
-	char **cached_names = hash_table_keys_array(w->current_files);
-
-	if (!cached_names) {
-		return;
-	}
-
-	int i = 0;
-	while ((cached_name = cached_names[i])) {
-		i++;
-
-		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, cached_name);
-		if (!replica) {
-			continue;
-		}
-
-		/* set state to DELETED before removal to comply with the state machine:
-		 * all operations must follow a valid state transition */
-		vine_file_replica_table_change_replica_state(q, w, replica, cached_name, VINE_FILE_REPLICA_STATE_DELETED);
-	}
-
-	hash_table_free_keys_array(cached_names);
-}
-
-int vine_file_replica_table_unlink(struct vine_manager *q, struct vine_worker_info *w, const char *cachename)
-{
-	if (!q || !w || !cachename) {
-		return 0;
-	}
-
-	struct vine_file_replica *replica = vine_file_replica_table_lookup(w, cachename);
-	if (!replica) {
-		/* this is OK, the file may have been deleted already */
-		return 1;
-	}
-
-	/* only send unlink if state is PENDING or READY */
-	if (!vine_file_replica_table_change_replica_state(q, w, replica, cachename, VINE_FILE_REPLICA_STATE_DELETING)) {
-		return 0;
-	}
-
-	/* send unlink message to worker */
-	vine_manager_send(q, w, "unlink %s\n", cachename);
-
-	return 1;
 }
