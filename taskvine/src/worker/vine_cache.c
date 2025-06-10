@@ -532,7 +532,6 @@ static int do_worker_transfer(struct vine_cache *c, struct vine_cache_file *f, c
 {
 	int port_num;
 	char addr[VINE_LINE_MAX], source_path[VINE_LINE_MAX];
-	int stoptime;
 	struct link *worker_link;
 
 	// expect the form: workerip://host:port/path/to/file
@@ -540,11 +539,13 @@ static int do_worker_transfer(struct vine_cache *c, struct vine_cache_file *f, c
 
 	debug(D_VINE, "cache: setting up worker transfer file %s", f->source);
 
-	stoptime = time(0) + 15;
-	worker_link = link_connect(addr, port_num, stoptime);
+	timestamp_t time_start_connect = timestamp_get();
+	worker_link = link_connect(addr, port_num, time(0) + 300);
+	timestamp_t time_end_connect = timestamp_get();
+	int time_duration_connect = (time_end_connect - time_start_connect) / 1e6;
 
 	if (worker_link == NULL) {
-		*error_message = string_format("Could not establish connection with worker at: %s:%d", addr, port_num);
+		*error_message = string_format("Could not establish connection with worker at: %s:%d after %d seconds: %s", addr, port_num, time_duration_connect, strerror(errno));
 		return 0;
 	}
 
@@ -562,8 +563,10 @@ static int do_worker_transfer(struct vine_cache *c, struct vine_cache_file *f, c
 	int64_t totalsize;
 	int mode, mtime;
 
-	if (!vine_transfer_request_any(worker_link, source_path, transfer_dir, &totalsize, &mode, &mtime, time(0) + 900)) {
-		*error_message = string_format("Could not transfer file from %s", f->source);
+	if (!vine_transfer_request_any(worker_link, source_path, transfer_dir, &totalsize, &mode, &mtime, time(0) + 900, error_message)) {
+		if (error_message && *error_message == NULL) {
+			*error_message = string_format("Could not transfer file from %s", f->source);
+		}
 		link_close(worker_link);
 		return 0;
 	}
@@ -643,7 +646,11 @@ static void vine_cache_worker_process(struct vine_cache_file *f, struct vine_cac
 		char *error_path = vine_cache_error_path(c, cachename);
 		FILE *file = fopen(error_path, "w");
 		if (file) {
-			fprintf(file, "error creating file at worker: %s\n", error_message);
+			if (f->cache_type == VINE_CACHE_MINI_TASK) {
+				fprintf(file, "error creating file via mini task: %s\n", error_message);
+			} else {
+				fprintf(file, "error transferring file: %s\n", error_message);
+			}
 			fclose(file);
 		}
 		free(error_path);
@@ -839,7 +846,7 @@ static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_fil
 			if (copy_file_to_buffer(error_path, &error_message, &error_length) > 0 && error_message) {
 				/* got a message string */
 			} else {
-				error_message = strdup("unknown error");
+				error_message = string_format("Failed to copy error message to buffer: %s", strerror(errno));
 			}
 
 			vine_worker_send_cache_invalid(manager, cachename, error_message);
