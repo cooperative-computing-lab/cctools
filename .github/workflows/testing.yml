@@ -32,8 +32,13 @@ jobs:
       matrix:
         os-name: ['almalinux8', 'almalinux9', 'ubuntu20.04', 'ubuntu22.04', 'ubuntu24.04']
     steps:
+      - name: checkout CCTools from master head
+        if: github.event_name == 'schedule'
+        uses: actions/checkout@v3
+        with:
+          ref: master
       - name: checkout CCTools from branch head
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
         uses: actions/checkout@v3
       - name: checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
@@ -60,7 +65,7 @@ jobs:
           prerelease: true
           replacesArtifacts: true
           commit: ${{ steps.vars.output.tag_sha }}
-          tag: ${{ github.event.inputs.tag || 'nightly' }}
+          tag: ${{ github.event.inputs.tag || 'master' }}
 
   build-conda-linux:
     runs-on: ubuntu-latest
@@ -68,8 +73,13 @@ jobs:
     env:
       CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-linux-conda.tar.gz', github.event.inputs.version) }}
     steps:
-      - name: Checkout CCTools from branch head
-        if: github.event_name != 'workflow_dispatch'
+      - name: checkout CCTools from master head
+        if: github.event_name == 'schedule'
+        uses: actions/checkout@v4
+        with:
+          ref: master
+      - name: checkout CCTools from branch head
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
         uses: actions/checkout@v4
       - name: Checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
