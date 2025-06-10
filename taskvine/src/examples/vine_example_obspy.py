@@ -1,50 +1,39 @@
 import ndcctools.taskvine as vine
 
-seed2png = """
-from obspy import read
-import os
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.gridspec as gridspec
-import matplotlib.pylab as plt
-import sys
-import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "filename",
-    help="Filename for a MiniSEED file in the cwd, from which we will extract the Z component from and process.",
-)
-args = parser.parse_args()
+def seed2png(filename):
+    from obspy import read
+    import matplotlib
 
-# Get filename from command line arguments
-filename_full = args.filename
+    matplotlib.use("Agg")
+    import matplotlib.pylab as plt
 
-# We read into an ObsPy stream
-st = read(filename_full)
+    # We read into an ObsPy stream
+    st = read(filename)
 
-fig = plt.figure(figsize=(15, 10))
+    fig = plt.figure(figsize=(15, 10))
 
-# Go through all the traces in the stream
-for x in st:
-    # For this simple example we only want the Z component
-    if x.stats.channel[-1] == "Z":
-        # Dump the stats of the trace
-        print(x.stats)
-        # Baseline correction (partial)
-        x.detrend("linear")
-        x.detrend("demean")
-        # Now we start the plotting
-        plt.plot(x.times("relative"), x.data, color="purple")
-        plt.title(f"{filename_full}")
-        plt.ylabel("Counts")
-        plt.xlabel(f"Time (s) relative to {x.stats.starttime}")
-        plt.tight_layout()
-        # Save figure to a file
-        plt.savefig(f"{filename_full}_Z_comp_processed.png")
-    else:
-        sys.stderr.write("No Z comp found")
-"""
+    # Go through all the traces in the stream
+    for x in st:
+        # For this simple example we only want the Z component
+        if x.stats.channel[-1] == "Z":
+            # Dump the stats of the trace
+            print(x.stats)
+            # Baseline correction (partial)
+            x.detrend("linear")
+            x.detrend("demean")
+            # Now we start the plotting
+            plt.plot(x.times("relative"), x.data, color="purple")
+            plt.title(f"{filename}")
+            plt.ylabel("Counts")
+            plt.xlabel(f"Time (s) relative to {x.stats.starttime}")
+            plt.tight_layout()
+            # Save figure to a file
+            plt.savefig(f"{filename}_Z_comp_processed.png")
+            return 0
+    # Return 1 because we didnt find a Z comp
+    return 1
+
 
 m = vine.Manager([9123, 9129])
 print(f"Listening on port {m.port}")
@@ -59,9 +48,6 @@ filenames = [
     "steim2.mseed",
 ]
 
-# Our script
-seed2png = m.declare_buffer(seed2png, cache="workflow")
-
 # Go through all the names and declare our input and output files
 seed_files = []
 for f in filenames:
@@ -73,14 +59,13 @@ for f in filenames:
 
 # Go through every seed file to generate the tasks
 for sf in seed_files:
-    task = vine.Task(f"python ./seed2png.py {sf['filename']}")
-    task.add_input(seed2png, "seed2png.py")
+    task = vine.PythonTask(seed2png, sf["filename"])
     task.add_input(sf["input_file"], sf["filename"])
     task.add_output(sf["output_file"],
                     f"{sf['filename']}_Z_comp_processed.png")
     m.submit(task)
 
-print("Waiting for tasks to complete")
+print("Waiting for tasks to complete...")
 while not m.empty():
     task = m.wait(5)
     if task:
