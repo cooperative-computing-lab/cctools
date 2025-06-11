@@ -71,6 +71,7 @@ static const char *vine_file_replica_state_to_string(vine_file_replica_state_t s
 	}
 
 	/* should never happen */
+	debug(D_ERROR, "Invalid replica state: %d\n", state);
 	return "UNKNOWN";
 }
 
@@ -86,6 +87,7 @@ static const char *vine_file_replica_state_transition_event_to_string(vine_file_
 	}
 
 	/* should never happen */
+	debug(D_ERROR, "Invalid replica state transition event: %d\n", event);
 	return "UNKNOWN";
 }
 
