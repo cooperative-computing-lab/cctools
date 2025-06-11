@@ -68,9 +68,10 @@ static const char *vine_file_replica_state_to_string(vine_file_replica_state_t s
 		return "DELETING";
 	case VINE_FILE_REPLICA_STATE_DELETED:
 		return "DELETED";
-	default:
-		return "UNKNOWN";
 	}
+
+	/* should never happen */
+	return "UNKNOWN";
 }
 
 static const char *vine_file_replica_state_transition_event_to_string(vine_file_replica_state_transition_event_t event)
@@ -82,9 +83,10 @@ static const char *vine_file_replica_state_transition_event_to_string(vine_file_
 		return "CACHE_UPDATE";
 	case VINE_FILE_REPLICA_STATE_TRANSITION_EVENT_CACHE_INVALID:
 		return "CACHE_INVALID";
-	default:
-		return "UNKNOWN";
 	}
+
+	/* should never happen */
+	return "UNKNOWN";
 }
 
 int vine_file_replica_change_state_on_event(struct vine_file_replica *replica, vine_file_replica_state_transition_event_t event)
@@ -107,8 +109,6 @@ int vine_file_replica_change_state_on_event(struct vine_file_replica *replica, v
 		case VINE_FILE_REPLICA_STATE_TRANSITION_EVENT_CACHE_INVALID:
 			replica->state = VINE_FILE_REPLICA_STATE_DELETED;
 			return 1;
-		default:
-			break;
 		}
 		break;
 	case VINE_FILE_REPLICA_STATE_READY:
@@ -120,8 +120,6 @@ int vine_file_replica_change_state_on_event(struct vine_file_replica *replica, v
 		case VINE_FILE_REPLICA_STATE_TRANSITION_EVENT_CACHE_INVALID:
 			replica->state = VINE_FILE_REPLICA_STATE_DELETED;
 			return 1;
-		default:
-			break;
 		}
 		break;
 	case VINE_FILE_REPLICA_STATE_DELETING:
@@ -132,12 +130,10 @@ int vine_file_replica_change_state_on_event(struct vine_file_replica *replica, v
 			return 1;
 		case VINE_FILE_REPLICA_STATE_TRANSITION_EVENT_UNLINK:
 			return 1;
-		default:
-			break;
 		}
 		break;
 	case VINE_FILE_REPLICA_STATE_DELETED:
-	default:
+		/* old state should never be DELETED as all those replicas are immediately deleted @process_replica_on_event */
 		break;
 	}
 
