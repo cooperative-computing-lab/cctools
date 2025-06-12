@@ -921,7 +921,7 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 		if (f) {
 			delete_worker_file(q, w, cachename, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW);
 		}
-		/* clean up worker replicas from the replica table, because deleting a PENDING replica will result in its
+		/* clean up worker replicas from the replica table, because deleting a CREATING replica will result in its
 		 * state being DELETING, and deleting a DELETING replica does not change its state, so we need to manually
 		 * delete the replicas. See definitions for state transition events in vine_file_replica.c for more details. */
 		struct vine_file_replica *removed_replica = vine_file_replica_table_remove(q, w, cachename);

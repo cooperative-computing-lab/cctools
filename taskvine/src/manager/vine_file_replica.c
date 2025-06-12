@@ -17,7 +17,7 @@ struct vine_file_replica *vine_file_replica_create(vine_file_type_t type, vine_c
 	r->mtime = mtime;
 	r->transfer_time = 0;
 	r->last_failure_time = 0;
-	r->state = VINE_FILE_REPLICA_STATE_PENDING;
+	r->state = VINE_FILE_REPLICA_STATE_CREATING;
 
 	vine_counters.replica.created++;
 	return r;
@@ -37,7 +37,7 @@ void vine_file_replica_delete(struct vine_file_replica *r)
 
 Current State | unlink    | cache-update  | cache-invalid
 +-------------+-----------+---------------+----------------
-PENDING       | DELETING  | READY         | DELETED
+CREATING       | DELETING  | READY         | DELETED
 READY         | DELETED   | *READY        | DELETED
 DELETING      | *DELETING | DELETED       | DELETED
 DELETED       | —         | —             | —
@@ -60,8 +60,8 @@ will manually clean up replicas in @cleanup_worker_files
 static const char *vine_file_replica_state_to_string(vine_file_replica_state_t state)
 {
 	switch (state) {
-	case VINE_FILE_REPLICA_STATE_PENDING:
-		return "PENDING";
+	case VINE_FILE_REPLICA_STATE_CREATING:
+		return "CREATING";
 	case VINE_FILE_REPLICA_STATE_READY:
 		return "READY";
 	case VINE_FILE_REPLICA_STATE_DELETING:
@@ -100,7 +100,7 @@ int vine_file_replica_change_state_on_event(struct vine_file_replica *replica, v
 	vine_file_replica_state_t old_state = replica->state;
 
 	switch (old_state) {
-	case VINE_FILE_REPLICA_STATE_PENDING:
+	case VINE_FILE_REPLICA_STATE_CREATING:
 		switch (event) {
 		case VINE_FILE_REPLICA_STATE_TRANSITION_EVENT_UNLINK:
 			replica->state = VINE_FILE_REPLICA_STATE_DELETING;

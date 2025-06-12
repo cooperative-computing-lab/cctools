@@ -10,7 +10,7 @@ See the file COPYING for details.
 #include "taskvine.h"
 
 typedef enum {
-	VINE_FILE_REPLICA_STATE_PENDING = 0,  // The replica is in the process of being transferred/created.
+	VINE_FILE_REPLICA_STATE_CREATING = 0,  // The replica is in the process of being transferred/created.
 	VINE_FILE_REPLICA_STATE_READY,    // The replica exists and is ready to be used.
 	VINE_FILE_REPLICA_STATE_DELETING, // The replica is in the process of being deleted.
 	VINE_FILE_REPLICA_STATE_DELETED,  // The replica has been deleted.

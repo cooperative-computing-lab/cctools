@@ -245,8 +245,8 @@ int vine_file_replica_table_count_replicas(struct vine_manager *q, const char *c
 }
 
 /*
-Check if a file replica exists on a worker. We accept both PENDING and READY replicas,
-since a PENDING replica may already exist physically but hasn't yet received the cache-update
+Check if a file replica exists on a worker. We accept both CREATING and READY replicas,
+since a CREATING replica may already exist physically but hasn't yet received the cache-update
 message from the manager. However, we do not accept DELETING replicas, as they indicate
 the source worker has already been sent an unlink request—any subsequent cache-update or
 cache-invalid events will lead to deletion.
@@ -262,7 +262,7 @@ int vine_file_replica_table_exists_somewhere(struct vine_manager *q, const char 
 	SET_ITERATE(workers, w)
 	{
 		struct vine_file_replica *r = vine_file_replica_table_lookup(w, cachename);
-		if (r && (r->state == VINE_FILE_REPLICA_STATE_PENDING || r->state == VINE_FILE_REPLICA_STATE_READY)) {
+		if (r && (r->state == VINE_FILE_REPLICA_STATE_CREATING || r->state == VINE_FILE_REPLICA_STATE_READY)) {
 			return 1;
 		}
 	}
