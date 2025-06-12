@@ -399,6 +399,8 @@ static vine_msg_code_t handle_cache_update(struct vine_manager *q, struct vine_w
 			vine_file_replica_table_insert(q, w, cachename, replica);
 		}
 
+		replica->type = type;
+		replica->cache_level = cache_level;
 		replica->size = size;
 		replica->mtime = mtime;
 		replica->transfer_time = transfer_time;
