@@ -452,7 +452,7 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 		case VINE_URL:
 		case VINE_TEMP:
 			/* For these types, a cache-update will arrive when the replica actually exists. */
-			replica->state = VINE_FILE_REPLICA_STATE_PENDING;
+			replica->state = VINE_FILE_REPLICA_STATE_CREATING;
 			break;
 		case VINE_FILE:
 		case VINE_MINI_TASK:

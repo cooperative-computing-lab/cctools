@@ -34,6 +34,4 @@ int vine_file_replica_table_exists_somewhere( struct vine_manager *q, const char
 
 int vine_file_replica_table_count_replicas( struct vine_manager *q, const char *cachename, vine_file_replica_state_t state );
 
-
 #endif
-
