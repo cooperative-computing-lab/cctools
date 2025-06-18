@@ -1359,11 +1359,18 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 	/* if q is monitoring, update t->resources_measured, and delete the task
 	 * summary. */
 	if (q->monitor_mode) {
-		read_measured_resources(q, t);
+		switch (t->result) {
+		case VINE_RESULT_INPUT_MISSING:
+		case VINE_RESULT_FORSAKEN:
+			break;
+		default:
+			read_measured_resources(q, t);
 
-		/* Further, if we got debug and series files, gzip them. */
-		if (q->monitor_mode & VINE_MON_FULL)
-			resource_monitor_compress_logs(q, t);
+			/* Further, if we got debug and series files, gzip them. */
+			if (q->monitor_mode & VINE_MON_FULL)
+				resource_monitor_compress_logs(q, t);
+			break;
+		}
 	}
 
 	// fill in measured disk as it comes from a different info source.
