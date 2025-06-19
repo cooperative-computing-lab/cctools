@@ -29,7 +29,7 @@
 
 import ndcctools.taskvine as vine
 import argparse
-from poncho import package_create
+from ndcctools.poncho import package_create
 
 def divide(dividend, divisor):
     import math

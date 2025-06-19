@@ -1,4 +1,7 @@
+#!/usr/bin/env python
+
 import ndcctools.taskvine as vine
+from ndcctools.poncho import package_create
 
 
 def seed2png(filename):
@@ -57,12 +60,31 @@ for f in filenames:
         "output_file": m.declare_file(f"Output/{f}_Z_comp_processed.png"),
     })
 
+# We make the spec file
+spec = {
+    "conda": {
+        "channels": ["conda-forge"],
+        "packages": [
+            "python",
+            "obspy",
+            "cartopy",
+            "pytest",
+            "pytest-json",
+            "pytest-json-report",
+            "geographiclib",
+            "cloudpickle",
+        ],
+    }
+}
+tarball = package_create.dict_to_env(spec, cache=True)
+package = m.declare_poncho(tarball, cache=True)
+
 # Go through every seed file to generate the tasks
 for sf in seed_files:
     task = vine.PythonTask(seed2png, sf["filename"])
     task.add_input(sf["input_file"], sf["filename"])
-    task.add_output(sf["output_file"],
-                    f"{sf['filename']}_Z_comp_processed.png")
+    task.add_output(sf["output_file"], f"{sf['filename']}_Z_comp_processed.png")
+    task.add_poncho_package(package)
     m.submit(task)
 
 print("Waiting for tasks to complete...")
