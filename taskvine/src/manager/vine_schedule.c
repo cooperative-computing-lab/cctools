@@ -149,17 +149,24 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 	return ok;
 }
 
-/* Check if any worker has committable resources for any type of task, for now only check for available cores or slots. */
-int vine_schedule_have_committable_resources(struct vine_manager *q)
+/* Count the number of committable cores for all workers. */
+int vine_schedule_count_committable_cores(struct vine_manager *q)
 {
+	int count = 0;
+
 	char *key;
 	struct vine_worker_info *w;
-
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
-		if (!w->resources || w->resources->cores.total <= 0) {
+		/* skip if the worker hasn't reported any resources yet */
+		if (!w->resources) {
 			continue;
 		}
+		/* skip if the worker has no cores or gpus */
+		if (w->resources->cores.total <= 0 && w->resources->gpus.total <= 0) {
+			continue;
+		}
+		/* count the number of free slots on running libraries */
 		if (w->current_libraries && itable_size(w->current_libraries) > 0) {
 			uint64_t library_task_id = 0;
 			struct vine_task *library_task = NULL;
@@ -169,16 +176,21 @@ int vine_schedule_have_committable_resources(struct vine_manager *q)
 					continue;
 				}
 				if (library_task->function_slots_total > library_task->function_slots_inuse) {
-					return 1;
+					count += library_task->function_slots_total - library_task->function_slots_inuse;
 				}
 			}
 		}
-		if (overcommitted_resource_total(q, w->resources->cores.total) > w->resources->cores.inuse) {
-			return 1;
+		/* count the number of free cores */
+		if (w->resources->cores.total > 0 && overcommitted_resource_total(q, w->resources->cores.total) > w->resources->cores.inuse) {
+			count += overcommitted_resource_total(q, w->resources->cores.total) - w->resources->cores.inuse;
+		}
+		/* count the number of free gpus */
+		if (w->resources->gpus.total > 0 && overcommitted_resource_total(q, w->resources->gpus.total) > w->resources->gpus.inuse) {
+			count += overcommitted_resource_total(q, w->resources->gpus.total) - w->resources->gpus.inuse;
 		}
 	}
 
-	return 0;
+	return count;
 }
 
 /* Check if this worker has committable resources for any type of task.

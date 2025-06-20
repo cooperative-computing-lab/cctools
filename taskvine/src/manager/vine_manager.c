@@ -3502,7 +3502,8 @@ the task to the worker.
 static int send_one_task(struct vine_manager *q)
 {
 	/* return early if no committable cores */
-	if (!vine_schedule_have_committable_resources(q)) {
+	int committable_cores = vine_schedule_count_committable_cores(q);
+	if (committable_cores == 0) {
 		return 0;
 	}
 
@@ -3518,7 +3519,7 @@ static int send_one_task(struct vine_manager *q)
 
 	struct vine_task *t;
 
-	while ((committed_tasks == 0) && (tasks_considered < tasks_to_consider)) {
+	while (tasks_considered < tasks_to_consider) {
 		t = priority_queue_pop(q->ready_tasks);
 		if (!t) {
 			break;
@@ -3563,6 +3564,17 @@ static int send_one_task(struct vine_manager *q)
 			break;
 		case VINE_END_OF_LIST:
 			/* shouldn't happen, keep going */
+			break;
+		}
+
+		/* continue dispatching tasks if q->prefer_dispatch is set */
+		if (q->prefer_dispatch && committed_tasks < committable_cores) {
+			continue;
+		}
+
+		/* stop when q->prefer_dispatch is not set and at least one task has been committed,
+		 * or when it is set and all committable cores have been used */
+		if (committed_tasks > 0) {
 			break;
 		}
 	}
