@@ -957,7 +957,7 @@ end:
 }
 
 /*
-Main loop of work queue pool.  Determine the number of workers needed by our
+Main loop of factory.  Determine the number of workers needed by our
 current list of managers, compare it to the number actually submitted, then
 submit more until the desired state is reached.
 */
@@ -1196,6 +1196,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Max number of new workers per %ds (default=%d)\n", "--workers-per-cycle", factory_period, workers_per_cycle);
 	printf(" %-30s Workers abort after idle time (default=%d).\n", "-t,--timeout=<time>",worker_timeout);
 	printf(" %-30s Exit after no manager seen in <n> seconds.\n", "--factory-timeout");
+	printf(" %-30s Evaluate worker needs every <n> seconds. (default=%d)\n", "--factory-period",factory_period);
 	printf(" %-30s Average tasks per worker (default=one per core).\n", "--tasks-per-worker");
 	printf(" %-30s Use worker capacity reported by managers.\n","-c,--capacity");
 
@@ -1233,6 +1234,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_CONF_FILE, 
 		LONG_OPT_AMAZON_CONFIG, 
 		LONG_OPT_FACTORY_TIMEOUT, 
+		LONG_OPT_FACTORY_PERIOD,
 		LONG_OPT_AUTOSIZE, 
 		LONG_OPT_CONDOR_REQUIREMENTS, 
 		LONG_OPT_CONDOR_SPOOL, 
@@ -1276,6 +1278,7 @@ static const struct option long_options[] = {
 	{"env", required_argument, 0, LONG_OPT_ENVIRONMENT_VARIABLE},
 	{"extra-options", required_argument, 0, 'E'},
 	{"factory-timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
+	{"factory-period", required_argument, 0, LONG_OPT_FACTORY_PERIOD},
 	{"feature", required_argument, 0, LONG_OPT_FEATURE},
 	{"foremen-name", required_argument, 0, 'F'},
 	{"gpus",   required_argument,  0,  LONG_OPT_GPUS},
@@ -1411,6 +1414,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_FACTORY_TIMEOUT:
 				factory_timeout = MAX(0, atoi(optarg));
+				break;
+			case LONG_OPT_FACTORY_PERIOD:
+				factory_period = MAX(5, atoi(optarg));
 				break;
 			case LONG_OPT_CONDOR_REQUIREMENTS:
 				if(condor_requirements) {
