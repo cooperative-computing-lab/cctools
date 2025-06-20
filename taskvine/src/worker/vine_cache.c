@@ -909,6 +909,13 @@ static void vine_cache_wait_for_file(struct vine_cache *c, struct vine_cache_fil
 			hash_table_remove(c->processing_transfers, cachename);
 			vine_cache_handle_exit_status(c, f, cachename, status);
 			vine_cache_check_outputs(c, f, cachename, manager);
+
+			if (f->status == VINE_CACHE_STATUS_FAILED) {
+				/* if transfer failed, then we delete all of our records of the file. The manager
+				 * assumes that the file is not at the worker after the manager receives
+				 * the cache invalid message sent from vine_cache_check_outputs. */
+				vine_cache_remove(c, cachename, manager);
+			}
 		}
 	}
 }
