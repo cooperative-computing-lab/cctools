@@ -68,8 +68,13 @@ static struct jx_table queue_headers[] = {
 
 static int vine_status_timeout = 30;
 
+// Name of the catalog server to query for updates.
 static const char *catalog_host = 0;
 
+// Last time an update was sent to the catalog server.
+static time_t last_catalog_update_time = 0;
+
+// Time in seconds to delay between each evaluation of the factory's position.
 static int factory_period = 30; // in seconds
 
 static int workers_min = 5;
@@ -142,7 +147,6 @@ static int single_shot = 0;
 
 // A pretend port number to unqiuely identify the factory in catalog updates.
 static int pretend_port = 0;
-
 
 /*
 In a signal handler, only a limited number of functions are safe to
@@ -1081,14 +1085,18 @@ static void mainloop( struct batch_queue *queue )
 		debug(D_VINE,"workers submitted: %d", workers_submitted);
 		debug(D_VINE,"workers requested: %d", MAX(0, new_workers_needed));
 
-		struct jx *j = factory_to_jx(managers_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
+		/* Regardless of all other settings, do not update catalog more than one per minute. */
+		if( (time(0)-last_catalog_update_time) > 59 ) {
+			struct jx *j = factory_to_jx(managers_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
 
-		char *update_str = jx_print_string(j);
-		debug(D_VINE, "Sending status to the catalog server(s) at %s ...", catalog_host);
-		catalog_query_send_update(catalog_host,update_str,0);
-		print_stats(j);
-		free(update_str);
-		jx_delete(j);
+			char *update_str = jx_print_string(j);
+			debug(D_VINE, "Sending status to the catalog server(s) at %s ...", catalog_host);
+			catalog_query_send_update(catalog_host,update_str,0);
+			print_stats(j);
+			free(update_str);
+			jx_delete(j);
+			last_catalog_update_time = time(0);
+		}
 
 		update_blocked_hosts(queue, managers_list);
 
