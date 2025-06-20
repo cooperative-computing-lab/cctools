@@ -77,7 +77,7 @@ jobs:
         run: ${GITHUB_WORKSPACE}/packaging/build-docker/build.sh
       - name: deploy
         uses: ncipollo/release-action@v1
-        if: ${{ (github.event_name == 'workflow_dispatch') || (github.event == 'push') }}
+        if: ${{ (github.event_name == 'workflow_dispatch') || (github.event_name == 'push') }}
         with:
           artifacts: /tmp/${{ env.CCTOOLS_OUTPUT }}
           token: ${{ secrets.GITHUB_TOKEN }}
