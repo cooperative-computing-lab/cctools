@@ -140,6 +140,10 @@ static int disable_afs_check = 0;
 // Remove workers upon manager disconnection
 static int single_shot = 0;
 
+// A pretend port number to unqiuely identify the factory in catalog updates.
+static int pretend_port = 0;
+
+
 /*
 In a signal handler, only a limited number of functions are safe to
 invoke, so we construct a string and emit it with a low-level write.
@@ -682,6 +686,8 @@ struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submit
 
 	struct jx *j= jx_object(NULL);
 	jx_insert_string(j, "type", "vine_factory");
+
+	jx_insert_integer(j, "port", pretend_port );
 
 	if(using_catalog) {
 		jx_insert_string(j, "project_regex",    project_regex);
@@ -1543,6 +1549,12 @@ int main(int argc, char *argv[])
 	} else {
 		using_catalog = 1;
 	}
+
+	/* When reporting to the catalog server, the factory is uniquely identified by name:address:port */
+	/* Since it does not have a "port", we select a pretend port outside the normal TCP/UDP port range */
+
+	srand( time(0) + getpid() );
+	pretend_port = 65536 + rand()%65536;
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
