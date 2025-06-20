@@ -59,11 +59,11 @@ jobs:
         shell: bash
         run: |
           if ${{ github.event_name == 'push' }}; then
-            echo "branch_tag=devel" >> $GITHUB_OUTPUT
-            echo "draft=false" >> $GITHUB_OUTPUT
+            echo "TAG=devel" >> $GITHUB_ENV
+            echo "DRAFT=false" >> $GITHUB_ENV
           elif ${{ github.event_name == 'workflow_dispatch' }}; then
-            echo "branch_tag=${{ github.event_name.inputs.tag }}" >> $GITHUB_OUTPUT
-            echo "draft=true" >> $GITHUB_OUTPUT
+            echo "TAG=${{ github.event_name.inputs.tag }}" >> $GITHUB_ENV
+            echo "DRAFT=true" >> $GITHUB_ENV
           fi
       - name: checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
@@ -72,7 +72,7 @@ jobs:
           ref: ${{ github.event.inputs.tag }}
       - name: Get sha of tag
         id: tag
-        run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        run: echo "TAG_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - name: build
         run: ${GITHUB_WORKSPACE}/packaging/build-docker/build.sh
       - name: deploy
@@ -83,13 +83,13 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
           artifactContentType: application/gzip
-          draft: ${{ steps.branch.output.draft }}
+          draft: ${{ env.DRAFT }}
           omitBody: true
           omitBodyDuringUpdate: true
           prerelease: true
           replacesArtifacts: true
-          commit: ${{ steps.tag.output.tag_sha }}
-          tag: ${{ steps.branch.output.branch_tag }}
+          commit: ${{ env.TAG_SHA }}
+          tag: ${{ env.TAG }}
 
   build-conda-linux:
     runs-on: ubuntu-latest
