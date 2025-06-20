@@ -1545,10 +1545,10 @@ int main(int argc, char *argv[])
 	}
 
 	/* When reporting to the catalog server, the factory is uniquely identified by name:address:port */
-	/* Since it does not have a "port", we select a pretend port outside the normal TCP/UDP port range */
+	/* Since it does not have a real "port", choose a negative value. */
 
 	srand( time(0) + getpid() );
-	pretend_port = 65536 + rand()%65536;
+	pretend_port = -(rand()%65536);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
