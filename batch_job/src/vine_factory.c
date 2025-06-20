@@ -1123,13 +1123,14 @@ static void mainloop( struct batch_queue *queue )
 
 		delete_projects_list(managers_list);
 		delete_projects_list(foremen_list);
-
-		int sleep_seconds = 0;
-		while(sleep_seconds < factory_period) {
+		
+		/* Now delay for the factory period */
+		/* Sleep 1s at a time to re-evaluate the abort flag */
+		stoptime = time(0) + factory_period;
+		while(time(0) < stoptime) {
 			if(abort_flag) {
 				break;
 			}
-			sleep_seconds += 1;
 			sleep(1);
 		}
 	}
