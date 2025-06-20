@@ -54,24 +54,24 @@ jobs:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
         uses: actions/checkout@v4
-      - name: Set tag and draft for master
-        if: github.event_name == 'push'
+      - name: Set branch tag, and draft status
+        id: branch
+        shell: bash
         run: |
-          echo "branch_tag=devel" >> $GITHUB_OUTPUT
-          echo "draft=false" >> $GITHUB_OUTPUT
+          if ${{ github.event_name == 'push' }}; then
+            echo "branch_tag=devel" >> $GITHUB_OUTPUT
+            echo "draft=false" >> $GITHUB_OUTPUT
+          elif ${{ github.event_name == 'workflow_dispatch' }}; then
+            echo "branch_tag=${{ github.event_name.inputs.tag }}" >> $GITHUB_OUTPUT
+            echo "draft=true" >> $GITHUB_OUTPUT
+          fi
       - name: checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.tag }}
-      - name: Set tag and draft for release
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          echo "branch_tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
-          echo "draft=true" >> $GITHUB_OUTPUT
       - name: Get sha of tag
-        id: vars
-        shell: bash
+        id: tag
         run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - name: build
         run: ${GITHUB_WORKSPACE}/packaging/build-docker/build.sh
@@ -83,13 +83,13 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
           artifactContentType: application/gzip
-          draft: ${{ steps.vars.output.draft }}
+          draft: ${{ steps.branch.output.draft }}
           omitBody: true
           omitBodyDuringUpdate: true
           prerelease: true
           replacesArtifacts: true
-          commit: ${{ steps.vars.output.tag_sha }}
-          tag: ${{ steps.vars.output.branch_tag }}
+          commit: ${{ steps.tag.output.tag_sha }}
+          tag: ${{ steps.branch.output.branch_tag }}
 
   build-conda-linux:
     runs-on: ubuntu-latest
