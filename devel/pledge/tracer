@@ -1,0 +1,269 @@
+#! /usr/bin/env python3
+
+import sys
+import subprocess
+import re
+import os
+import shutil
+
+
+# m for multiple paths in one line
+# s for a single path
+def get_paths(line, path_amount="m", call="none"):
+    path_re = re.compile("</.+?>")
+    if path_amount == "s":
+        paths = path_re.search(line)
+        if paths:
+            paths = paths.group().strip("<>")
+            return paths
+    elif path_amount == "m":
+        # find all is better suited for finding multiple paths
+        paths = [x.strip("<>") for x in path_re.findall(line)]
+        if call == "openat":
+            # Basically we can't get the path so we will build it ourselves
+            # the call didn't return, related to threads,
+            # might resume later
+            if "unfinished" in line:
+                open_at_rel_re = re.compile('".+?"')
+                # returns the first value of the form "abcdefg"
+                # which in this case is a path
+                rel_path = open_at_rel_re.search(line)
+                if rel_path:
+                    # remove quotations
+                    rel_path = rel_path.group(0).strip('"')
+                    # ensure that it's not a an absolute path to anything
+                    if rel_path[0] != "/":
+                        # first path in an openat syscall is AT_FDCWD
+                        # which is cwd with the form </c/w/d>
+                        if len(paths) >= 1:
+                            # check if last character is a / or nah
+                            if paths[0][-1] != "/":
+                                abs_path = paths[0] + "/" + rel_path
+                                paths.append(abs_path)
+                            else:
+                                abs_path = paths[0] + rel_path
+                                paths.append(abs_path)
+
+        return paths
+
+
+# This simply makes a new access dictionary member
+def new_path_access_dict(path, access):
+    t = {
+        "path": path,
+        "mode": access,
+    }
+    return t
+
+
+# This function updates the registry of paths we are holding
+def update_path_access_modes_registry(path_access_list, path, access):
+    # we go through all of our paths saved
+    # this block is for updating
+    # maybe we should separate into 2 functions add path
+    # and update path
+    for i, pt in enumerate(path_access_list):
+        # if we find it
+        if pt["path"] == path:
+            # get the value out so there's less noise?
+            p_type = pt["mode"]
+            # since our accesses have a priority,
+            # RW will always overwrite any other
+            # and S will be overwritten by anybody
+            match pt["mode"]:
+                case "S":
+                    path_access_list[i] = new_path_access_dict(path, access)
+                case "R":
+                    if access == "W" or access == "RW":
+                        path_access_list[i] = new_path_access_dict(path, "RW")
+                case "W":
+                    if access == "R" or access == "RW":
+                        path_access_list[i] = new_path_access_dict(path, "RW")
+                # NOTE: no RW because thats priority
+                case "RW":
+                    pass
+
+                # in theory we shouldn't ever fall to this case
+                case _:
+                    print("Invalid value in path registry:")
+                    print(f"{pt['path']} : [{pt['mode']}]")
+                    exit(-1)
+            return path_access_list
+
+    # NOTE: this block is for adding a new path
+    # i really miss pointers right now :(
+    n = new_path_access_dict(path, access)
+    # i miss passing by reference πππππ
+    path_access_list.append(n)
+    return path_access_list
+
+
+def update_paths(path_access_list, paths, access):
+    if isinstance(paths, list):
+        for p in paths:
+            path_access_list = update_path_access_modes_registry(
+                path_access_list, p, access
+            )
+    elif isinstance(paths, str):
+        path_access_list = update_path_access_modes_registry(
+            path_access_list, paths, access
+        )
+
+    return path_access_list
+
+
+def main():
+    argc = len(sys.argv)
+    strace_cmd = ["strace", "-f", "-y", "--trace=file,read,write,mmap"]
+    prog = sys.argv[1:]
+    # Add the actual user program to the list of commands
+    strace_cmd.extend(prog)
+    if not shutil.which(prog[0]):
+        print(f"Can't find command: {prog[0]}")
+        exit(-1)
+
+    # print(strace_cmd)
+
+    if argc == 1:
+        sys.stderr.write("No program to trace specified.")
+        exit(0)
+    log_name = f"{prog[0]}"
+
+    if len(prog) > 1:
+        log_name = f"{prog[0]}.{prog[1]}"
+    log_name = log_name.strip("-")
+
+    log1_fname = f"{log_name}.tracer.log"
+    log1 = open(log1_fname, "w+")
+
+    # a stdout file for organization
+    stdout_f_name = f"{log_name}.stdout.log"
+    stdout_f = open(stdout_f_name, "w")
+
+    # Our subprocess that will run the program
+    p = subprocess.Popen(strace_cmd, stdout=stdout_f, stderr=log1)
+    exit_code = p.wait()
+
+    log1.close()
+    sys.stderr.write(f"Tracer [{log_name}]: Strace log generated -> {log1_fname}\n")
+    stdout_f.close()
+    sys.stderr.write(f"Tracer [{log_name}]: stdout log generated -> {stdout_f_name}\n")
+
+    # NOTE: Access modes have a hierarchy here
+    #  WR > W = R > S
+
+    # NOTE: Ideally this is an array of dictionaries with the form
+    #  "path": "/hi/worm"
+    #  "mode": "RW" # should we add stat or nah
+    #  "mmap": True/False # this line im not sure tho
+    path_access_modes = []
+    with open(log1_fname) as log:
+        for line in log:
+            # SECTION: openat
+            # uhhhh what if the read command has an execve
+            # O_RDONLY O_WRONLY O_RDWR
+            # Reading the openat syscall man page andddd
+            # we need to literally ignore the first argument,
+            # because if the path given in 2nd parameter is relative
+            # then it is used but the second path we parse is the actual file
+            # if the 2nd parameter is absolute, first parameter is
+            # ignored and at the end of the day:
+            # the second path we parse is the actual file!!!!
+            if "openat(" in line:
+                paths = get_paths(line, "m", "openat")
+                if not paths:
+                    continue
+                if "O_RDONLY" in line:
+                    path_access_modes = update_paths(path_access_modes, paths, "R")
+                if "O_WRONLY" in line:
+                    path_access_modes = update_paths(path_access_modes, paths, "W")
+                if "O_RDRW" in line:
+                    path_access_modes = update_paths(path_access_modes, paths, "RW")
+            # SECTION: Stat
+            # For now we handling it like an R but perhaps it shouldnt be processed at all for now
+            elif "stat(" in line:
+                stat_path_re = re.compile('".+?"')
+                paths = stat_path_re.search(line)
+                if paths:
+                    paths = paths.group(0).strip('"')
+                    if paths[0] != "/":
+                        paths = os.path.join(os.getcwd(), paths)
+                    path_access_modes = update_paths(path_access_modes, paths, "R")
+                else:
+                    continue
+            # SECTION: read
+            # The syscall itself tells u the operation lol
+            # probably going to separate them
+            elif "read(" in line:
+                paths = get_paths(line, "s", "read")
+                if not paths:
+                    continue
+                path_access_modes = update_paths(path_access_modes, paths, "R")
+            elif "write(" in line:
+                paths = get_paths(line, "s", "write")
+                if not paths:
+                    continue
+                path_access_modes = update_paths(path_access_modes, paths, "W")
+            # SECTION: execve
+            # execve at the bottom because what if text containing
+            # execve is a parameter of one of the functions (like read)
+            elif "execve(" in line:
+                # XXX: Is there any reason we should care if it's a subprocess aside from the fact
+                # that we can find out if the user is calling more programs
+                # What about subprocess of subprocesses? Should we represent that too?
+                # elif "strace: Process" in line:
+
+                # if line.startswith("[pid"):
+                exec_re = re.compile('"/.+?"')
+                path_execs = exec_re.search(line)
+                if not path_execs:
+                    continue
+                elif path_execs:
+                    path_execs = path_execs.group(0).strip('"')
+                path_access_modes = update_paths(path_access_modes, path_execs, "R")
+
+            # SECTION: mmap
+            # PROT_READ
+            # PROT_WRITE
+            # but heres question, if the file is MAP_PRIVATE,
+            # do we want to care about it or no?
+            # im guessing somewhere in between
+            elif "mmap(" in line:
+                paths = get_paths(line, "m", "mmap")
+                if not paths:
+                    continue
+                # while we figure out what to do with it, we ignore
+                if "MAP_PRIVATE" in line:
+                    continue
+                elif "PROT_READ|PROT_WRITE" in line:
+                    path_access_modes = update_paths(
+                        path_access_modes, path_execs, "RW"
+                    )
+                elif "PROT_READ" in line:
+                    path_access_modes = update_paths(path_access_modes, path_execs, "R")
+                elif "PROT_WRITE" in line:
+                    path_access_modes = update_paths(
+                        path_access_modes, path_execs, "RW"
+                    )
+
+    # print(path_access_modes)
+    # SECTION: Finally, generate the consistency contract?
+    # PENDING: For now this, gotta be reduced somewhat
+    # IDEA: This has got to be condensed bruh
+    contract_name = f"{log_name}.contract"
+    contract_path_full = os.path.join(os.getcwd(), contract_name)
+    with open(contract_name, "w") as c_cntr:
+        c_cntr.write("%-13s %-30s\n" % ("action", "path"))
+        c_cntr.write("%-13s %-30s\n" % ("R", contract_path_full))
+        for p in path_access_modes:
+            c_cntr.write("%-13s %-30s\n" % (p["mode"], p["path"]))
+
+    sys.stderr.write(f"Tracer [{log_name}]: Contract generated   -> {contract_name}\n")
+    # TODO: Reduce
+
+
+# NOTE: Dictionary might be the best since we can save the path,
+#  and then just update its permissions
+
+if __name__ == "__main__":
+    main()
