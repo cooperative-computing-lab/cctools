@@ -126,7 +126,7 @@ class DaskVine(Manager):
             lib_command=None,
             lib_modules=None,
             task_mode='tasks',
-            scheduling_mode='FIFO',
+            scheduling_mode='largest-storage-footprint-first',
             env_per_task=False,
             init_command=None,
             progress_disable=False,
@@ -384,6 +384,17 @@ class DaskVine(Manager):
             elif self.scheduling_mode == 'largest-input-first':
                 # best for saving disk space (with pruing)
                 priority = sum([len(dag.get_result(c)._file) for c in dag.get_children(k)])
+            elif self.scheduling_mode == 'largest-storage-footprint-first':
+                # with respect to both storage consumption and file retention time
+                storage_footprint = 0
+                for c in dag.get_children(k):
+                    file_result = dag.get_result(c)
+                    if isinstance(file_result, DaskVineFile):
+                        file_size = len(file_result._file)
+                        file_creation_time = file_result.get_creation_time()
+                        file_retention_time = time.time() - file_creation_time
+                        storage_footprint += file_size * file_retention_time
+                priority = storage_footprint
             else:
                 raise ValueError(f"Unknown scheduling mode {self.scheduling_mode}")
 
@@ -474,8 +485,12 @@ class DaskVineFile:
         self._is_target = key in dag.get_targets()
 
         self._checkpointed = False
+        self._creation_time = time.time()
 
         assert file
+
+    def get_creation_time(self):
+        return self._creation_time
 
     def load(self):
         if not self._loaded:
