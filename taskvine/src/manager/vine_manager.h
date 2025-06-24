@@ -231,7 +231,7 @@ struct vine_manager {
 	double sandbox_grow_factor;         /* When task disk sandboxes are exhausted, increase the allocation using their measured valued times this factor */
 	double disk_proportion_available_to_task;   /* intentionally reduces disk allocation for tasks to reserve some space for cache growth. */
 
-	/*todo: confirm datatype. int or int64*/
+	/* todo: confirm datatype. int or int64 */
 	int max_task_stdout_storage;	/* Maximum size of standard output from task.  (If larger, send to a separate file.) */
 	int max_new_workers;			/* Maximum number of workers to add in a single cycle before dealing with other matters. */
 
@@ -241,6 +241,7 @@ struct vine_manager {
 	/* Testing mode parameters */
 	timestamp_t enforce_worker_eviction_interval;   /* Enforce worker eviction interval in seconds */
 	timestamp_t time_start_worker_eviction;         /* Track the time when we start evicting workers */
+	int intentionally_evicted_workers;              /* Track the number of workers that have been intentionally evicted */
 };
 
 /*
