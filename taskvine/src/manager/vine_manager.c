@@ -1691,9 +1691,6 @@ static vine_msg_code_t handle_taskvine(struct vine_manager *q, struct vine_worke
 		debug(D_VINE, "rejecting worker %s (%s) as max-workers (%d) has been reached.", w->hostname, w->addrport, q->max_workers);
 		release_worker(q, w);
 	}
-	if (q->wait_for_workers > 0 && q->wait_for_workers > q->max_workers) {
-		debug(D_ERROR, "wait-for-workers (%d) is greater than max-workers (%d), the program will never start", q->wait_for_workers, q->max_workers);
-	}
 
 	return VINE_MSG_PROCESSED;
 }
