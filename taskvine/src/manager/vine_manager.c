@@ -980,34 +980,29 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 	}
 
 	/* collect removable workers */
-	struct vine_worker_info **candidates = NULL;
-	int count = 0;
+	struct list *candidates_list = list_create();
 	char *key;
 	struct vine_worker_info *w;
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
-		candidates = realloc(candidates, (count + 1) * sizeof(*candidates));
-		if (!candidates) {
-			return 0;
+		if (w->type != VINE_WORKER_TYPE_WORKER) {
+			continue;
 		}
-		candidates[count++] = w;
+		list_push_tail(candidates_list, w);
 	}
 
-	if (count == 0) {
-		free(candidates);
-		return 0;
+	/* release a random worker if any */
+	int index = (int)(random_int64() % list_size(candidates_list));
+	int i = 0;
+	while ((w = list_pop_head(candidates_list))) {
+		if (i++ == index) {
+			/* evict this worker */
+			debug(D_VINE | D_NOTICE, "Intentionally evicting worker %s", w->hostname);
+			release_worker(q, w);
+			q->intentionally_evicted_workers++;
+		}
 	}
-
-	/* release a random worker */
-	int index = (int)(random_int64() % count);
-	struct vine_worker_info *selected = candidates[index];
-
-	debug(D_VINE | D_NOTICE, "Intentionally evicting worker %s, now %d workers remain", selected->hostname, hash_table_size(q->worker_table));
-
-	release_worker(q, selected);
-	q->intentionally_evicted_workers++;
-
-	free(candidates);
+	list_delete(candidates_list);
 
 	return 1;
 }
