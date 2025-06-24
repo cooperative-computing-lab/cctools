@@ -13,7 +13,7 @@ from ..manager import Manager
 from ..task import PythonTask
 from ..task import FunctionCall
 from ..cvine import VINE_TEMP
-from ..cvine import VINE_SCHEDULE_FILES, VINE_SCHEDULE_TIME, VINE_SCHEDULE_WORST, VINE_SCHEDULE_FCFS, VINE_SCHEDULE_RAND
+from ..cvine import VINE_SCHEDULE_FILES, VINE_SCHEDULE_TIME, VINE_SCHEDULE_WORST, VINE_SCHEDULE_FCFS, VINE_SCHEDULE_RAND, VINE_SCHEDULE_LCFS
 
 import os
 import time
@@ -358,6 +358,8 @@ class DaskVine(Manager):
             task.set_scheduler(VINE_SCHEDULE_FCFS)
         elif self.worker_scheduler == "random":
             task.set_scheduler(VINE_SCHEDULE_RAND)
+        elif self.worker_scheduler == "lcfs":
+            task.set_scheduler(VINE_SCHEDULE_LCFS)
         else:
             raise ValueError(f"Unknown worker scheduler {self.worker_scheduler}")
 

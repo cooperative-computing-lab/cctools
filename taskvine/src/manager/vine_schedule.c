@@ -341,6 +341,7 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 		return NULL;
 	}
 
+	/* first sort by the strategy-specific criterion, then run @check_worker_against_task on the sorted list */
 	struct priority_queue *workers = priority_queue_create(0);
 	if (!workers) {
 		return NULL;
@@ -400,6 +401,10 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 		case VINE_SCHEDULE_FCFS:
 			/* Find worker in first-come, first-served order. */
 			priority = -w->start_time;
+			break;
+		case VINE_SCHEDULE_LCFS:
+			/* Find worker in last-come, first-served order. */
+			priority = w->start_time;
 			break;
 		case VINE_SCHEDULE_TIME:
 			/* Find the worker that produced the fastest runtime of prior tasks. */

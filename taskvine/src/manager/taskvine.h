@@ -74,6 +74,7 @@ typedef enum {
 typedef enum {
 	VINE_SCHEDULE_UNSET = 0,       /**< Internal use only. */
 	VINE_SCHEDULE_FCFS,            /**< Select worker on a first-come-first-serve basis. */
+	VINE_SCHEDULE_LCFS,            /**< Select worker on a last-come-first-serve basis. */
 	VINE_SCHEDULE_FILES,           /**< Select worker that has the most data required by the task. (default) */
 	VINE_SCHEDULE_TIME,            /**< Select worker that has the fastest execution time on previous tasks. */
 	VINE_SCHEDULE_RAND,            /**< Select a random worker. */
