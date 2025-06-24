@@ -186,6 +186,11 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 				continue;
 			}
 
+			// skip if the destination is draining
+			if (dest->draining) {
+				continue;
+			}
+
 			// skip if the destination is busy with other transfers
 			if (dest->incoming_xfer_counter >= m->worker_source_max_transfers) {
 				continue;

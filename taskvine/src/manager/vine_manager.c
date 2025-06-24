@@ -1084,7 +1084,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		struct vine_worker_info *s;
 		SET_ITERATE(sources, s)
 		{
-			if (s->transfer_port_active && s->outgoing_xfer_counter < q->worker_source_max_transfers) {
+			if (s->transfer_port_active && s->outgoing_xfer_counter < q->worker_source_max_transfers && !s->draining) {
 				has_valid_source = 1;
 				break;
 			}
@@ -1688,8 +1688,12 @@ static vine_msg_code_t handle_taskvine(struct vine_manager *q, struct vine_worke
 	/* Instead of declining TCP connections in @connect_new_workers, we should check for if too many workers are
 	 * connected when a taskvine message is received, and then disconnect that worker. */
 	if (q->max_workers > 0 && count_workers(q, VINE_WORKER_TYPE_WORKER) > q->max_workers) {
-		debug(D_VINE, "rejecting worker %s (%s) as max-workers (%d) has been reached.", w->hostname, w->addrport, q->max_workers);
-		release_worker(q, w);
+		debug(D_VINE, "draining worker %s (%s) as max-workers (%d) has been reached.", w->hostname, w->addrport, q->max_workers);
+		/* Note: don't call release_worker() here, as it would free w->link immediately.
+		 * also, don't return VINE_MSG_PROCESSED, as it would trigger do-while loop in vine_manager_recv().
+		 * Must keep w pointer valid until message processing completes, then cleanup safely. */
+		w->draining = 1;
+		return VINE_MSG_FAILURE;
 	}
 
 	return VINE_MSG_PROCESSED;
@@ -3906,18 +3910,25 @@ int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_inf
 
 static int shutdown_drained_workers(struct vine_manager *q)
 {
+	struct list *workers_to_remove = list_create();
+
+	/* careful: don't remove workers from worker_table while iterating over it */
 	char *worker_hashkey = NULL;
 	struct vine_worker_info *w = NULL;
-
-	int removed = 0;
-
 	HASH_TABLE_ITERATE(q->worker_table, worker_hashkey, w)
 	{
 		if (w->draining && itable_size(w->current_tasks) == 0) {
-			removed++;
-			vine_manager_shut_down_worker(q, w);
+			list_push_tail(workers_to_remove, w);
 		}
 	}
+
+	int removed = 0;
+	while ((w = list_pop_head(workers_to_remove))) {
+		vine_manager_shut_down_worker(q, w);
+		removed++;
+	}
+
+	list_delete(workers_to_remove);
 
 	return removed;
 }
