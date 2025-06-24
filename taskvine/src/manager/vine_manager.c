@@ -949,7 +949,7 @@ This includes all types of removals, whether graceful or due to failures.
 static int enforce_worker_eviction_interval(struct vine_manager *q)
 {
 	/* do not consider eviction if the workflow has not started yet, because wait-for-workers might delay the task executions for a while */
-	if (!q || q->enforce_worker_eviction_interval <= 0 || q->stats->tasks_dispatched == 0 || hash_table_size(q->worker_table) == 0) {
+	if (!q || q->enforce_worker_eviction_interval <= 0 || q->stats->tasks_dispatched == 0 || count_workers(q, VINE_WORKER_TYPE_WORKER) == 0) {
 		return 0;
 	}
 
@@ -1687,7 +1687,7 @@ static vine_msg_code_t handle_taskvine(struct vine_manager *q, struct vine_worke
 
 	/* Instead of declining TCP connections in @connect_new_workers, we should check for if too many workers are
 	 * connected when a taskvine message is received, and then disconnect that worker. */
-	if (q->max_workers > 0 && hash_table_size(q->worker_table) > q->max_workers) {
+	if (q->max_workers > 0 && count_workers(q, VINE_WORKER_TYPE_WORKER) > q->max_workers) {
 		debug(D_VINE, "rejecting worker %s (%s) as max-workers (%d) has been reached.", w->hostname, w->addrport, q->max_workers);
 		release_worker(q, w);
 	}
