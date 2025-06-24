@@ -1685,9 +1685,12 @@ static vine_msg_code_t handle_taskvine(struct vine_manager *q, struct vine_worke
 
 	/* Instead of declining TCP connections in @connect_new_workers, we should check for if too many workers are
 	 * connected when a taskvine message is received, and then disconnect that worker. */
-	if (q->max_workers > 0 && hash_table_size(q->worker_table) >= q->max_workers) {
-		debug(D_VINE, "Rejecting worker %s (%s) as the maximum number of workers (%d) has been reached.", w->hostname, w->addrport, q->max_workers);
+	if (q->max_workers > 0 && hash_table_size(q->worker_table) > q->max_workers) {
+		debug(D_VINE, "rejecting worker %s (%s) as max-workers (%d) has been reached.", w->hostname, w->addrport, q->max_workers);
 		release_worker(q, w);
+	}
+	if (q->wait_for_workers > 0 && q->wait_for_workers > q->max_workers) {
+		debug(D_ERROR, "wait-for-workers (%d) is greater than max-workers (%d), the program will never start", q->wait_for_workers, q->max_workers);
 	}
 
 	return VINE_MSG_PROCESSED;
@@ -5315,8 +5318,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		}
 
 		// check if we need to kill any workers if the user has specified an eviction interval.
-		// note that this check should be put before retrieving tasks, otherwise it may be delayed
-		// to nearly the end because the manager is busy with other operations.
+		// note that this check should be placed before retrieving tasks, otherwise it may be delayed
+		// to nearly the end if the manager is busy with other operations.
 		BEGIN_ACCUM_TIME(q, time_internal);
 		result = enforce_worker_eviction_interval(q);
 		END_ACCUM_TIME(q, time_internal);
@@ -5872,7 +5875,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		q->wait_for_workers = MAX(0, (int)value);
 
 	} else if (!strcmp(name, "max-workers")) {
-		q->max_workers = MAX(0, (int)value);
+		q->max_workers = MAX(-1, (int)value);
 
 	} else if (!strcmp(name, "worker-retrievals")) {
 		q->worker_retrievals = MAX(0, (int)value);
