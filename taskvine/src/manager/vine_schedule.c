@@ -333,48 +333,6 @@ struct vine_task *vine_schedule_find_library(struct vine_manager *q, struct vine
 	return 0;
 }
 
-/* Find the total size of cached input files on a worker. */
-
-static int64_t cached_input_size_on_worker(struct vine_worker_info *w, struct vine_task *t)
-{
-	int64_t cached_input_size = 0;
-	struct vine_mount *m;
-	LIST_ITERATE(t->input_mounts, m)
-	{
-		if (!m || !m->file) {
-			continue;
-		}
-
-		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, m->file->cached_name);
-		if (replica) {
-			cached_input_size += m->file->size;
-		}
-	}
-
-	return cached_input_size;
-}
-
-/* Find the total size of uncached input files on a worker. */
-
-static int64_t uncached_input_size_on_worker(struct vine_worker_info *w, struct vine_task *t)
-{
-	int64_t uncached_input_size = 0;
-	struct vine_mount *m;
-	LIST_ITERATE(t->input_mounts, m)
-	{
-		if (!m || !m->file) {
-			continue;
-		}
-
-		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, m->file->cached_name);
-		if (!replica) {
-			uncached_input_size += m->file->size;
-		}
-	}
-
-	return uncached_input_size;
-}
-
 /* Find the average runtime of all tasks completed by a worker,
  * return HUGE_VAL if the worker has not completed any tasks. */
 
@@ -411,7 +369,26 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 			continue;
 		}
 
-		int64_t available_cache_space_after_task_dispatch = w->resources->disk.total * 1024 * 1024 - (w->inuse_cache + uncached_input_size_on_worker(w, t));
+		int64_t uncached_input_size = 0;
+		int64_t cached_input_size = 0;
+		struct vine_mount *m;
+		LIST_ITERATE(t->input_mounts, m)
+		{
+			if (!m || !m->file) {
+				continue;
+			}
+
+			struct vine_file_replica *replica = vine_file_replica_table_lookup(w, m->file->cached_name);
+			if (replica) {
+				cached_input_size += m->file->size;
+			} else {
+				uncached_input_size += m->file->size;
+			}
+		}
+
+		int64_t available_cache_space_after_task_dispatch = w->resources->disk.total * 1024 * 1024 - (w->inuse_cache + uncached_input_size);
+
+		/* skip this worker if the available cache space drops below 0 after the task is dispatched */
 		if (available_cache_space_after_task_dispatch <= 0) {
 			continue;
 		}
@@ -422,7 +399,7 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 		case VINE_SCHEDULE_FILES:
 			/* Find the worker that has the largest quantity of cached data needed by this task,
 			 * so as to minimize transfer work that must be done by the manager. */
-			priority = cached_input_size_on_worker(w, t);
+			priority = cached_input_size;
 			break;
 		case VINE_SCHEDULE_WORST:
 			/* Find the worker that is the "worst fit" for this task, meaning the worker that will have the
