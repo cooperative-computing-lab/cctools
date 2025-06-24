@@ -333,17 +333,6 @@ struct vine_task *vine_schedule_find_library(struct vine_manager *q, struct vine
 	return 0;
 }
 
-/* Find the average runtime of all tasks completed by a worker,
- * return HUGE_VAL if the worker has not completed any tasks. */
-
-static double average_task_runtime_for_worker(struct vine_worker_info *w)
-{
-	if (w->total_tasks_complete == 0) {
-		return HUGE_VAL;
-	}
-	return (w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
-}
-
 /* Select the best worker for this task, based on the current scheduling mode. */
 
 struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, struct vine_task *t)
@@ -365,10 +354,12 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 	struct vine_worker_info *w;
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
+		/* briefly skip uninitialized workers, more detailed checks are performed in @check_worker_against_task */
 		if (!w || !w->resources || w->type != VINE_WORKER_TYPE_WORKER || w->draining) {
 			continue;
 		}
 
+		/* compute the size of cached and uncached input files on the worker */
 		int64_t uncached_input_size = 0;
 		int64_t cached_input_size = 0;
 		struct vine_mount *m;
@@ -412,7 +403,7 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 			break;
 		case VINE_SCHEDULE_TIME:
 			/* Find the worker that produced the fastest runtime of prior tasks. */
-			priority = -average_task_runtime_for_worker(w);
+			priority = w->total_tasks_complete == 0 ? HUGE_VAL : -(w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
 			break;
 		case VINE_SCHEDULE_RAND:
 		default:
