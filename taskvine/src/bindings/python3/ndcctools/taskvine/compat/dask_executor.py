@@ -13,7 +13,7 @@ from ..manager import Manager
 from ..task import PythonTask
 from ..task import FunctionCall
 from ..cvine import VINE_TEMP
-from ..cvine import VINE_SCHEDULE_MAX_AVAILABLE_DISK, VINE_SCHEDULE_FILES, VINE_SCHEDULE_TIME, VINE_SCHEDULE_WORST, VINE_SCHEDULE_FCFS, VINE_SCHEDULE_RAND
+from ..cvine import VINE_SCHEDULE_FILES, VINE_SCHEDULE_TIME, VINE_SCHEDULE_WORST, VINE_SCHEDULE_FCFS, VINE_SCHEDULE_RAND
 
 import os
 import time
@@ -348,9 +348,7 @@ class DaskVine(Manager):
             return "other"
 
     def _set_worker_scheduler(self, task):
-        if self.worker_scheduler == "max-available-disk":
-            task.set_scheduler(VINE_SCHEDULE_MAX_AVAILABLE_DISK)
-        elif self.worker_scheduler == "files":
+        if self.worker_scheduler == "files":
             task.set_scheduler(VINE_SCHEDULE_FILES)
         elif self.worker_scheduler == "time":
             task.set_scheduler(VINE_SCHEDULE_TIME)
