@@ -12,7 +12,8 @@ See the file COPYING for details.
 #include <string.h>
 
 #define DEFAULT_SIZE 127
-#define DEFAULT_LOAD 0.75
+#define DEFAULT_MAX_LOAD 0.75
+#define DEFAULT_MIN_LOAD 0.125
 #define DEFAULT_FUNC hash_string
 
 struct entry {
@@ -155,72 +156,113 @@ int hash_table_size(struct hash_table *h)
 	return h->size;
 }
 
-static int hash_table_double_buckets(struct hash_table *h)
+double hash_table_load(struct hash_table *h)
 {
-	struct hash_table *hn = hash_table_create(2 * h->bucket_count, h->hash_func);
+	return ((double)h->size) / h->bucket_count;
+}
 
-	if (!hn)
-		return 0;
+static int insert_to_buckets_aux(struct entry **buckets, int bucket_count, struct entry *new_entry)
+{
+	unsigned index;
+	struct entry *e;
 
-	/* Move pairs to new hash */
-	char *key;
-	void *value;
-	hash_table_firstkey(h);
-	while (hash_table_nextkey(h, &key, &value))
-		if (!hash_table_insert(hn, key, value)) {
-			hash_table_delete(hn);
+	index = new_entry->hash % bucket_count;
+	e = buckets[index];
+
+	while (e) {
+		/* check that this key does not already exist in the table */
+		if (new_entry->hash == e->hash && !strcmp(new_entry->key, e->key)) {
 			return 0;
 		}
+		e = e->next;
+	}
 
-	/* Delete all old pairs */
+	new_entry->next = buckets[index];
+	buckets[index] = new_entry;
+
+	return 1;
+}
+
+static int hash_table_double_buckets(struct hash_table *h)
+{
+	int new_count = (2 * (h->bucket_count + 1)) - 1;
+	struct entry **new_buckets = (struct entry **)calloc(new_count, sizeof(struct entry *));
+	if (!new_buckets) {
+		return 0;
+	}
+
 	struct entry *e, *f;
-	int i;
-	for (i = 0; i < h->bucket_count; i++) {
+	for (int i = 0; i < h->bucket_count; i++) {
 		e = h->buckets[i];
 		while (e) {
 			f = e->next;
-			free(e->key);
-			free(e);
+			e->next = NULL;
+			insert_to_buckets_aux(new_buckets, new_count, e);
 			e = f;
 		}
 	}
 
 	/* Make the old point to the new */
 	free(h->buckets);
-	h->buckets = hn->buckets;
-	h->bucket_count = hn->bucket_count;
-	h->size = hn->size;
+	h->buckets = new_buckets;
+	h->bucket_count = new_count;
 
 	/* structure of hash table changed completely, thus a nextkey would be incorrect. */
 	h->cant_iterate_yet = 1;
 
-	/* Delete reference to new, so old is safe */
-	free(hn);
+	return 1;
+}
+
+static int hash_table_reduce_buckets(struct hash_table *h)
+{
+	int new_count = ((h->bucket_count + 1) / 2) - 1;
+
+	/* DEFAULT_SIZE is the minimum size */
+	if (new_count < DEFAULT_SIZE) {
+		return 1;
+	}
+
+	/* Table cannot be reduced above DEFAULT_MAX_LOAD */
+	if (((float)h->size / new_count) > DEFAULT_MAX_LOAD) {
+		return 1;
+	}
+
+	struct entry **new_buckets = (struct entry **)calloc(new_count, sizeof(struct entry *));
+	if (!new_buckets) {
+		return 0;
+	}
+
+	struct entry *e, *f;
+	for (int i = 0; i < h->bucket_count; i++) {
+		e = h->buckets[i];
+		while (e) {
+			f = e->next;
+			e->next = NULL;
+			insert_to_buckets_aux(new_buckets, new_count, e);
+			e = f;
+		}
+	}
+
+	/* Make the old point to the new */
+	free(h->buckets);
+	h->buckets = new_buckets;
+	h->bucket_count = new_count;
+
+	/* structure of hash table changed completely, thus a nextkey would be incorrect. */
+	h->cant_iterate_yet = 1;
 
 	return 1;
 }
 
 int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 {
-	struct entry *e;
-	unsigned hash, index;
-
-	if (((float)h->size / h->bucket_count) > DEFAULT_LOAD)
+	if (((float)h->size / h->bucket_count) > DEFAULT_MAX_LOAD)
 		hash_table_double_buckets(h);
 
-	hash = h->hash_func(key);
-	index = hash % h->bucket_count;
-	e = h->buckets[index];
-
-	while (e) {
-		if (hash == e->hash && !strcmp(key, e->key))
-			return 0;
-		e = e->next;
-	}
-
-	e = (struct entry *)malloc(sizeof(struct entry));
-	if (!e)
+	struct entry *e = (struct entry *)malloc(sizeof(struct entry));
+	if (!e) {
 		return 0;
+	}
 
 	e->key = strdup(key);
 	if (!e->key) {
@@ -229,16 +271,18 @@ int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 	}
 
 	e->value = (void *)value;
-	e->hash = hash;
-	e->next = h->buckets[index];
-	h->buckets[index] = e;
-	h->size++;
+	e->hash = h->hash_func(e->key);
 
-	/* inserting cause different behaviours with nextkey (e.g., sometimes the new
-	 * key would be included or skipped in the iteration */
-	h->cant_iterate_yet = 1;
+	int inserted = insert_to_buckets_aux(h->buckets, h->bucket_count, e);
+	if (inserted) {
+		h->size++;
 
-	return 1;
+		/* inserting cause different behaviours with nextkey (e.g., sometimes the new
+		 * key would be included or skipped in the iteration */
+		h->cant_iterate_yet = 1;
+	}
+
+	return inserted;
 }
 
 void *hash_table_remove(struct hash_table *h, const char *key)
@@ -264,8 +308,9 @@ void *hash_table_remove(struct hash_table *h, const char *key)
 			free(e);
 			h->size--;
 
-			/* the deletion may cause nextkey to fail */
-			h->cant_iterate_yet = 1;
+			if (((float)h->size / h->bucket_count) < DEFAULT_MIN_LOAD) {
+				hash_table_reduce_buckets(h);
+			}
 
 			return value;
 		}
