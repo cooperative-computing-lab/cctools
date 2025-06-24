@@ -1683,6 +1683,13 @@ static vine_msg_code_t handle_taskvine(struct vine_manager *q, struct vine_worke
 				CCTOOLS_VERSION);
 	}
 
+	/* Instead of declining TCP connections in @connect_new_workers, we should check for if too many workers are
+	 * connected when a taskvine message is received, and then disconnect that worker. */
+	if (q->max_workers > 0 && hash_table_size(q->worker_table) >= q->max_workers) {
+		debug(D_VINE, "Rejecting worker %s (%s) as the maximum number of workers (%d) has been reached.", w->hostname, w->addrport, q->max_workers);
+		release_worker(q, w);
+	}
+
 	return VINE_MSG_PROCESSED;
 }
 
@@ -5118,10 +5125,6 @@ static int poll_active_workers(struct vine_manager *q, int stoptime)
 
 static int connect_new_workers(struct vine_manager *q, int stoptime, int max_new_workers)
 {
-	if (q->max_workers > 0 && hash_table_size(q->worker_table) >= q->max_workers) {
-		return 0;
-	}
-
 	int new_workers = 0;
 
 	// If the manager link was awake, then accept at most max_new_workers.
