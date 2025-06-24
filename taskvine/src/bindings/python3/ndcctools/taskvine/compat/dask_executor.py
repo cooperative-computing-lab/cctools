@@ -135,7 +135,7 @@ class DaskVine(Manager):
             wrapper=None,
             wrapper_proc=print,
             prune_depth=0,
-            worker_scheduler="max-available-disk",
+            worker_scheduler="files",
             hoisting_modules=None,  # Deprecated, use lib_modules
             import_modules=None,    # Deprecated, use lib_modules
             lazy_transfers=True,    # Deprecated, use worker_tranfers
