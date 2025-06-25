@@ -126,8 +126,8 @@ class DaskVine(Manager):
             lib_command=None,
             lib_modules=None,
             task_mode='tasks',
-            schedule_tasks_by='largest-input-first',
-            worker_scheduler="files",
+            task_priority_mode='largest-input-first',
+            scheduling_mode="files",
             env_per_task=False,
             init_command=None,
             progress_disable=False,
@@ -170,8 +170,8 @@ class DaskVine(Manager):
             else:
                 self.lib_modules = hoisting_modules if hoisting_modules else import_modules  # Deprecated
             self.task_mode = task_mode
-            self.schedule_tasks_by = schedule_tasks_by
-            self.set_scheduler(worker_scheduler)
+            self.task_priority_mode = task_priority_mode
+            self.set_scheduler(scheduling_mode)
             self.env_per_task = env_per_task
             self.init_command = init_command
             self.progress_disable = progress_disable
@@ -357,37 +357,37 @@ class DaskVine(Manager):
             cat = self.category_name(sexpr)
 
             task_depth = dag.depth_of(k)
-            if self.schedule_tasks_by == 'random':
+            if self.task_priority_mode == 'random':
                 priority = random.randint(self.min_priority, self.max_priority)
-            elif self.schedule_tasks_by == 'depth-first':
+            elif self.task_priority_mode == 'depth-first':
                 # dig more information about different kinds of tasks
                 priority = task_depth
-            elif self.schedule_tasks_by == 'breadth-first':
+            elif self.task_priority_mode == 'breadth-first':
                 # prefer to start all branches as soon as possible
                 priority = -task_depth
-            elif self.schedule_tasks_by == 'longest-category-first':
+            elif self.task_priority_mode == 'longest-category-first':
                 # if no tasks have been executed in this category, set a high priority so that we know more information about each category
                 if self.category_info[cat]["num_tasks"]:
                     priority = self.category_info[cat]["total_execution_time"] / self.category_info[cat]["num_tasks"]
                 else:
                     priority = self.max_priority
-            elif self.schedule_tasks_by == 'shortest-category-first':
+            elif self.task_priority_mode == 'shortest-category-first':
                 # if no tasks have been executed in this category, set a high priority so that we know more information about each category
                 if self.category_info[cat]["num_tasks"]:
                     priority = -self.category_info[cat]["total_execution_time"] / self.category_info[cat]["num_tasks"]
                 else:
                     priority = self.max_priority
-            elif self.schedule_tasks_by == 'FIFO':
+            elif self.task_priority_mode == 'FIFO':
                 # first in first out, the default behavior
                 priority = -round(time.time(), 6)
-            elif self.schedule_tasks_by == 'LIFO':
+            elif self.task_priority_mode == 'LIFO':
                 # last in first out, the opposite of FIFO
                 priority = round(time.time(), 6)
-            elif self.schedule_tasks_by == 'largest-input-first':
+            elif self.task_priority_mode == 'largest-input-first':
                 # best for saving disk space (with pruing)
                 priority = sum([len(dag.get_result(c)._file) for c in dag.get_children(k)])
             else:
-                raise ValueError(f"Unknown scheduling mode {self.schedule_tasks_by}")
+                raise ValueError(f"Unknown task priority mode {self.task_priority_mode}")
 
             if self.task_mode == 'tasks':
                 if cat not in self._categories_known:
