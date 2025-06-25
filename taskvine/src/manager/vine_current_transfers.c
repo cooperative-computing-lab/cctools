@@ -124,14 +124,27 @@ void set_throttle(struct vine_manager *m, struct vine_worker_info *w, int is_des
 int vine_current_transfers_set_failure(struct vine_manager *q, char *id, const char *cachename)
 {
 	struct vine_transfer_pair *p = hash_table_lookup(q->current_transfer_table, id);
+
+	/* If there is no matching transfer record, then it means a worker failed and the record was removed b/c of wipe_worker. */
 	if (!p) {
 		return 0;
 	}
 
-	/* if any of the source or to workers don't exist, we shouldn't be surprised by this transfer failure */
 	struct vine_worker_info *source_worker = p->source_worker;
 	struct vine_worker_info *to_worker = p->to;
-	if (!source_worker || !to_worker) {
+
+	/* If p is valid, the elements of p should always be valid. A failed worker causes the transfer record to be removed,
+	 * not nulled out. This shouldn't happen, but we check and emit an error just in case. */
+	int error = 0;
+	if (!source_worker) {
+		debug(D_ERROR, "vine_current_transfers_set_failure: transfer record for file %s with id %s is found, but source worker is null", cachename, id);
+		error = 1;
+	}
+	if (!to_worker) {
+		debug(D_ERROR, "vine_current_transfers_set_failure: transfer record for file %s with id %s is found, but destination worker is null", cachename, id);
+		error = 1;
+	}
+	if (error) {
 		return 0;
 	}
 
