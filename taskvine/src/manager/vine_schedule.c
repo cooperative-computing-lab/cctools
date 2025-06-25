@@ -533,6 +533,7 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 	case VINE_SCHEDULE_TIME:
 		return find_worker_by_time(q, t);
 	case VINE_SCHEDULE_WORST:
+	case VINE_SCHEDULE_DISK:
 		return find_worker_by_worst_fit(q, t);
 	case VINE_SCHEDULE_FCFS:
 	case VINE_SCHEDULE_RAND:
