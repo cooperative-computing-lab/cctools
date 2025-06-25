@@ -3391,6 +3391,7 @@ static void vine_manager_create_recovery_tasks(struct vine_manager *q, struct vi
 			}
 
 			m->file->recovery_task = vine_task_addref(recovery_task);
+			m->file->original_producer_task_id = t->task_id;
 		}
 	}
 
@@ -3414,6 +3415,18 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 {
 	if (!rt) {
 		return;
+	}
+
+	/* Prevent race between original task and recovery task after worker crash.
+	 * Example: Task T completes on worker W, creates file F, T moves to WAITING_RETRIEVAL.
+	 * W crashes before stdout retrieval, T gets rescheduled to READY, F is lost and triggers
+	 * recovery task. Without this check, both original T and recovery task run concurrently. */
+	if (lost_file->original_producer_task_id > 0) {
+		struct vine_task *original_task = itable_lookup(q->tasks, lost_file->original_producer_task_id);
+		/* If original task is still active, don't submit recovery task */
+		if (original_task && original_task->state != VINE_TASK_DONE) {
+			return;
+		}
 	}
 
 	/* Do not try to group recovery tasks */
