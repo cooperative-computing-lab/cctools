@@ -388,11 +388,9 @@ class DaskVine(Manager):
                 # prioritize tasks that can consume larger or longer-retained inputs
                 storage_footprint = 0
                 for c in dag.get_children(k):
-                    task_completion_time = dag.get_completion_time(c)
-                    if task_completion_time > 0:
-                        file_result = dag.get_result(c)
-                        if isinstance(file_result, DaskVineFile):
-                            storage_footprint += len(file_result._file) * (time.time() - task_completion_time)
+                    file_result = dag.get_result(c)
+                    if isinstance(file_result, DaskVineFile):
+                        storage_footprint += len(file_result._file) * (time.time() - dag.get_result_set_time(c))
                 priority = storage_footprint
             else:
                 raise ValueError(f"Unknown scheduling mode {self.scheduling_mode}")
