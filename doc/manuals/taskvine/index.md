@@ -1267,6 +1267,7 @@ the application indicates that they will not be needed anymore:
     # once t2 is done, the following call will remove the file from the
     # taskvine workflow. Further, when no task refers to the file, the file
     # will be removed from the manager's disk because of unlink_when_done=True
+    # at its declaration.
     m.undeclare_file(partial_result)
     ```
 
@@ -2606,17 +2607,11 @@ Note that very large task graphs may be impractical to graph at this level of de
 
 ### TaskVine Report Tool
 
-The [TaskVine Report Tool](https://github.com/cooperative-computing-lab/taskvine-report-tool) is a separate repository maintained by our team that provides web-based visualization capabilities for TaskVine workflows. This tool offers several advantages for analyzing large-scale workflow data:
-
-- Interactive web interface for exploring workflow performance data by mouse hover or selection
-- Customizable axis ranges and legend to focus on specific time periods or metrics
-- Export capabilities for various image formats (SVG, PDF, PNG, JPG) and raw data (CSV)
-
-Here are some screenshots of this tool:
+The [TaskVine Report Tool](https://github.com/cooperative-computing-lab/taskvine-report-tool) is a separate repository maintained by our team that provides web-based visualization capabilities. It is highly optimized for parsing large log files and generating informative visualizations. Here are some screenshots of this tool:
 
 ![Visualization Example](images/taskvine_report_tool_example.png)
 
-For detailed usage instructions and plot explanations, please refer to the repository's README.
+For detailed usage instructions and plot explanations, please refer to the repository's GitHub page.
 
 ### Other Tools
 
