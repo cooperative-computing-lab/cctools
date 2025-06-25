@@ -128,7 +128,7 @@ class DaskVine(Manager):
             lib_modules=None,
             task_mode='tasks',
             schedule_tasks_by='FIFO',
-            worker_scheduler="schedule_files",
+            worker_scheduler="files",
             env_per_task=False,
             init_command=None,
             progress_disable=False,
@@ -172,7 +172,7 @@ class DaskVine(Manager):
                 self.lib_modules = hoisting_modules if hoisting_modules else import_modules  # Deprecated
             self.task_mode = task_mode
             self.schedule_tasks_by = schedule_tasks_by
-            self.set_scheduler(get_c_constant(worker_scheduler.replace(' ', '_').replace('-', '_')))
+            self.set_scheduler(worker_scheduler)
             self.env_per_task = env_per_task
             self.init_command = init_command
             self.progress_disable = progress_disable

@@ -332,6 +332,26 @@ struct vine_task *vine_schedule_find_library(struct vine_manager *q, struct vine
 	return 0;
 }
 
+/* Count the number of free cores on a worker. */
+
+static int count_worker_free_cores(struct vine_manager *q, struct vine_worker_info *w)
+{
+	int free_cores = 0;
+
+	/* library tasks may themselves consume many cores but can have free slots */
+	uint64_t task_id;
+	struct vine_task *t;
+	ITABLE_ITERATE(w->current_libraries, task_id, t)
+	{
+		free_cores += t->function_slots_total - t->function_slots_inuse;
+	}
+
+	/* count the free cores on the worker */
+	free_cores += overcommitted_resource_total(q, w->resources->cores.total) - w->resources->cores.inuse;
+
+	return free_cores;
+}
+
 /* Select the best worker for this task, based on the current scheduling mode. */
 
 struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, struct vine_task *t)
@@ -394,23 +414,20 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 			 * so as to minimize transfer work that must be done by the manager. */
 			priority = cached_input_size;
 			break;
-		case VINE_SCHEDULE_WORST:
-			/* Find the worker that is the "worst fit" for this task, meaning the worker that will have the
-			 * most resources unused once this task is placed there, only consider for cache space for now. */
+		case VINE_SCHEDULE_DISK:
+			/* Find the worker that will be left with the most disk space if the task is finished there */
 			priority = available_cache_space_after_task_dispatch;
 			break;
-		case VINE_SCHEDULE_FCFS:
-			/* Find worker in first-come, first-served order. */
-			priority = -w->start_time;
-			break;
-		case VINE_SCHEDULE_LCFS:
-			/* Find worker in last-come, first-served order. */
-			priority = w->start_time;
+		case VINE_SCHEDULE_WORST:
+			/* Find the worker that is the "worst fit" for this task, meaning the worker with the most free cores. */
+			priority = count_worker_free_cores(q, w);
 			break;
 		case VINE_SCHEDULE_TIME:
 			/* Find the worker that produced the fastest runtime of prior tasks. */
 			priority = w->total_tasks_complete == 0 ? HUGE_VAL : -(w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
 			break;
+		case VINE_SCHEDULE_FCFS:
+			/* Deprecated, same as random */
 		case VINE_SCHEDULE_RAND:
 		default:
 			/* Default to random selection. */
