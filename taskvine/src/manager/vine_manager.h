@@ -241,7 +241,6 @@ struct vine_manager {
 	/* Testing mode parameters */
 	timestamp_t enforce_worker_eviction_interval;   /* Enforce worker eviction interval in seconds */
 	timestamp_t time_start_worker_eviction;         /* Track the time when we start evicting workers */
-	int intentionally_evicted_workers;              /* Track the number of workers that have been intentionally evicted */
 };
 
 /*

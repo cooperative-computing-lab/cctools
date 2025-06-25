@@ -963,16 +963,15 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 	}
 	timestamp_t current_makespan = timestamp_get() - q->time_start_worker_eviction;
 
-	/* the time to remove the first worker is when the workflow has run for q->enforce_worker_eviction_interval */
-	if (q->intentionally_evicted_workers == 0 && current_makespan <= q->enforce_worker_eviction_interval) {
+	/* start removing the first worker only after the makespan exceeds q->enforce_worker_eviction_interval */
+	if (q->stats->workers_removed == 0 && current_makespan <= q->enforce_worker_eviction_interval) {
 		return 0;
 	}
 
-	/* calculate the current eviction interval. note: we don't use q->stats->workers_removed because worker removal
-	 * can occur naturally when q->max_workers is set and the number of workers hits that limit. in such cases,
-	 * the current eviction interval may be shorter than q->enforce_worker_eviction_interval without explicit eviction,
-	 * but we still want to enforce evictions within the q->max_workers constraint. */
-	double current_eviction_interval = MIN(current_makespan / (q->intentionally_evicted_workers + 0.1), current_makespan);
+	/* calculate the current eviction interval using q->stats->workers_removed, which includes both intentional and unintentional removals. */
+	/* note: worker removals due to q->max_workers are also counted in q->stats->workers_removed, which may unintentionally shorten the effective
+	 * eviction interval and prevent removals at the intended rate. it's recommended not to set max-workers when this value is configured. */
+	double current_eviction_interval = MIN(current_makespan / (q->stats->workers_removed + 0.1), current_makespan);
 
 	/* skip if the current eviction is too frequent */
 	if (current_eviction_interval <= q->enforce_worker_eviction_interval) {
@@ -999,7 +998,6 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 			/* evict this worker */
 			debug(D_VINE | D_NOTICE, "Intentionally evicting worker %s", w->hostname);
 			release_worker(q, w);
-			q->intentionally_evicted_workers++;
 		}
 	}
 	list_delete(candidates_list);
@@ -4224,7 +4222,6 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->enforce_worker_eviction_interval = 0;
 	q->time_start_worker_eviction = 0;
-	q->intentionally_evicted_workers = 0;
 
 	if ((envstring = getenv("VINE_BANDWIDTH"))) {
 		q->bandwidth_limit = string_metric_parse(envstring);
