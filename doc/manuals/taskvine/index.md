@@ -2636,6 +2636,7 @@ produces an animation like this:
 ![Example Animation](images/anim.gif)
 
 
+
 ### Tuning Specialized Execution Parameters
 
 The behaviour of TaskVine can be tuned by the following parameters. We advise
