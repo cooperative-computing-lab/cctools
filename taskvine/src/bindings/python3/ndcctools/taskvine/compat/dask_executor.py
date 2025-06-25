@@ -13,7 +13,7 @@ from ..manager import Manager
 from ..task import PythonTask
 from ..task import FunctionCall
 from ..cvine import VINE_TEMP
-from ..cvine import VINE_SCHEDULE_FILES, VINE_SCHEDULE_TIME, VINE_SCHEDULE_WORST, VINE_SCHEDULE_FCFS, VINE_SCHEDULE_RAND, VINE_SCHEDULE_LCFS
+from ..utils import get_c_constant
 
 import os
 import time
@@ -128,6 +128,7 @@ class DaskVine(Manager):
             lib_modules=None,
             task_mode='tasks',
             scheduling_mode='FIFO',
+            worker_scheduler="schedule_files",
             env_per_task=False,
             init_command=None,
             progress_disable=False,
@@ -135,7 +136,6 @@ class DaskVine(Manager):
             wrapper=None,
             wrapper_proc=print,
             prune_depth=0,
-            worker_scheduler="files",
             hoisting_modules=None,  # Deprecated, use lib_modules
             import_modules=None,    # Deprecated, use lib_modules
             lazy_transfers=True,    # Deprecated, use worker_tranfers
@@ -172,6 +172,7 @@ class DaskVine(Manager):
                 self.lib_modules = hoisting_modules if hoisting_modules else import_modules  # Deprecated
             self.task_mode = task_mode
             self.scheduling_mode = scheduling_mode
+            self.set_scheduler(get_c_constant(worker_scheduler.replace(' ', '_').replace('-', '_')))
             self.env_per_task = env_per_task
             self.init_command = init_command
             self.progress_disable = progress_disable
@@ -182,7 +183,6 @@ class DaskVine(Manager):
             self.category_info = defaultdict(lambda: {"num_tasks": 0, "total_execution_time": 0})
             self.max_priority = float('inf')
             self.min_priority = float('-inf')
-            self.worker_scheduler = worker_scheduler
 
             if submit_per_cycle is not None and submit_per_cycle < 1:
                 submit_per_cycle = None
@@ -347,22 +347,6 @@ class DaskVine(Manager):
         else:
             return "other"
 
-    def _set_worker_scheduler(self, task):
-        if self.worker_scheduler == "files":
-            task.set_scheduler(VINE_SCHEDULE_FILES)
-        elif self.worker_scheduler == "time":
-            task.set_scheduler(VINE_SCHEDULE_TIME)
-        elif self.worker_scheduler == "worst":
-            task.set_scheduler(VINE_SCHEDULE_WORST)
-        elif self.worker_scheduler == "fcfs":
-            task.set_scheduler(VINE_SCHEDULE_FCFS)
-        elif self.worker_scheduler == "random":
-            task.set_scheduler(VINE_SCHEDULE_RAND)
-        elif self.worker_scheduler == "lcfs":
-            task.set_scheduler(VINE_SCHEDULE_LCFS)
-        else:
-            raise ValueError(f"Unknown worker scheduler {self.worker_scheduler}")
-
     def _enqueue_dask_calls(self, dag, tag, rs, retries, enqueued_calls):
         targets = dag.get_targets()
         for (k, sexpr) in rs:
@@ -428,7 +412,6 @@ class DaskVine(Manager):
                                    wrapper=self.wrapper)
 
                 t.set_priority(priority)
-                self._set_worker_scheduler(t)
                 if self.env_per_task:
                     t.set_command(
                         f"mkdir envdir && tar -xf {self._environment_name} -C envdir && envdir/bin/run_in_env {t._command}")
@@ -450,7 +433,6 @@ class DaskVine(Manager):
                                      wrapper=self.wrapper)
 
                 t.set_priority(priority)
-                self._set_worker_scheduler(t)
                 t.set_tag(tag)  # tag that identifies this dag
 
                 enqueued_calls.append(t)

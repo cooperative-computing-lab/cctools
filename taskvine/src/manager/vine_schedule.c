@@ -346,8 +346,10 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 		return NULL;
 	}
 
-	if (t->worker_selection_algorithm == VINE_SCHEDULE_UNSET) {
-		t->worker_selection_algorithm = q->worker_selection_algorithm;
+	int a = t->worker_selection_algorithm;
+
+	if (a == VINE_SCHEDULE_UNSET) {
+		a = q->worker_selection_algorithm;
 	}
 
 	char *key;
@@ -386,7 +388,7 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 
 		double priority = 0;
 
-		switch (t->worker_selection_algorithm) {
+		switch (a) {
 		case VINE_SCHEDULE_FILES:
 			/* Find the worker that has the largest quantity of cached data needed by this task,
 			 * so as to minimize transfer work that must be done by the manager. */
