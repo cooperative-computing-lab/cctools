@@ -484,7 +484,8 @@ class Manager(object):
     #                   task to a worker. See @ref vine_schedule_t for
     #                   possible values.
     def set_scheduler(self, scheduler):
-        return cvine.vine_set_scheduler(self._taskvine, scheduler)
+        sched = get_c_constant(f"vine_schedule_{scheduler}")
+        return cvine.vine_set_scheduler(self._taskvine, sched)
 
     ##
     # Change the project name for the given manager.

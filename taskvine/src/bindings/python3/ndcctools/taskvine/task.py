@@ -11,6 +11,8 @@
 from . import cvine
 from .file import File
 
+from .utils import get_c_constant
+
 import copy
 import os
 import sys
@@ -296,7 +298,8 @@ class Task(object):
     #                   task to a worker. See @ref vine_schedule_t for
     #                   possible values.
     def set_scheduler(self, scheduler):
-        return cvine.vine_task_set_scheduler(self._task, scheduler)
+        sched = get_c_constant(f"vine_schedule_{scheduler}")
+        return cvine.vine_task_set_scheduler(self._task, sched)
 
     ##
     # Attach a user defined logical name to the task.
