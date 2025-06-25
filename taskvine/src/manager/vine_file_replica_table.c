@@ -28,10 +28,11 @@ int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_in
 		return 0;
 	}
 
-	w->inuse_cache += replica->size;
-	hash_table_insert(w->current_files, cachename, replica);
+	double prev_available = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
 
-	double prev_available = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache + replica->size);
+	hash_table_insert(w->current_files, cachename, replica);
+	w->inuse_cache += replica->size;
+
 	if (prev_available >= m->current_max_worker->disk) {
 		/* the current worker may have been the one with the maximum available space, so we update it. */
 		m->current_max_worker->disk = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
@@ -244,18 +245,25 @@ int vine_file_replica_table_count_replicas(struct vine_manager *q, const char *c
 	return count;
 }
 
+/*
+Check if a file replica exists on a worker. We accept both CREATING and READY replicas,
+since a CREATING replica may already exist physically but hasn't yet received the cache-update
+message from the manager. However, we do not accept DELETING replicas, as they indicate
+the source worker has already been sent an unlink request—any subsequent cache-update or
+cache-invalid events will lead to deletion.
+*/
 int vine_file_replica_table_exists_somewhere(struct vine_manager *q, const char *cachename)
 {
 	struct set *workers = hash_table_lookup(q->file_worker_table, cachename);
-	if (!workers) {
+	if (!workers || set_size(workers) < 1) {
 		return 0;
 	}
 
-	struct vine_worker_info *peer;
-
-	SET_ITERATE(workers, peer)
+	struct vine_worker_info *w;
+	SET_ITERATE(workers, w)
 	{
-		if (peer->transfer_port_active) {
+		struct vine_file_replica *r = vine_file_replica_table_lookup(w, cachename);
+		if (r && (r->state == VINE_FILE_REPLICA_STATE_CREATING || r->state == VINE_FILE_REPLICA_STATE_READY)) {
 			return 1;
 		}
 	}
