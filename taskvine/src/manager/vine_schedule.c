@@ -321,12 +321,11 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 struct vine_task *vine_schedule_find_library(struct vine_manager *q, struct vine_worker_info *w, const char *library_name)
 {
 	uint64_t task_id;
-	struct vine_task *task;
-	ITABLE_ITERATE(w->current_tasks, task_id, task)
+	struct vine_task *library_task;
+	ITABLE_ITERATE(w->current_libraries, task_id, library_task)
 	{
-		if (task->type == VINE_TASK_TYPE_LIBRARY_INSTANCE && task->provides_library && !strcmp(task->provides_library, library_name) &&
-				(task->function_slots_inuse < task->function_slots_total)) {
-			return task;
+		if (!strcmp(library_task->provides_library, library_name) && (library_task->function_slots_inuse < library_task->function_slots_total)) {
+			return library_task;
 		}
 	}
 
