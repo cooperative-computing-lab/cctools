@@ -459,6 +459,7 @@ struct link *link_serve_address(const char *addr, int port)
 	SOCKLEN_T address_length;
 	int success;
 	int value;
+	int save_errno;
 
 	if (!address_to_sockaddr(addr, /* port to be set */ 0, &address, &address_length)) {
 		goto failure;
@@ -501,7 +502,7 @@ struct link *link_serve_address(const char *addr, int port)
 	return link;
 
 failure:
-	int save_errno = errno;
+	save_errno = errno;
 
 	if (link)
 		link_close(link);
