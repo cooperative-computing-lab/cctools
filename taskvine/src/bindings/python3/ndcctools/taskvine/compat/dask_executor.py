@@ -385,14 +385,14 @@ class DaskVine(Manager):
                 # best for saving disk space (with pruing)
                 priority = sum([len(dag.get_result(c)._file) for c in dag.get_children(k)])
             elif self.scheduling_mode == 'largest-storage-footprint-first':
-                # with respect to both storage consumption and file retention time
+                # prioritize tasks that can consume larger or longer-retained inputs
                 storage_footprint = 0
                 for c in dag.get_children(k):
+                    task_completion_time = dag.get_completion_time(c)
                     file_result = dag.get_result(c)
-                    if isinstance(file_result, DaskVineFile):
+                    if task_completion_time > 0 and isinstance(file_result, DaskVineFile):
                         file_size = len(file_result._file)
-                        file_creation_time = file_result.get_creation_time()
-                        file_retention_time = time.time() - file_creation_time
+                        file_retention_time = time.time() - task_completion_time
                         storage_footprint += file_size * file_retention_time
                 priority = storage_footprint
             else:
@@ -485,12 +485,8 @@ class DaskVineFile:
         self._is_target = key in dag.get_targets()
 
         self._checkpointed = False
-        self._creation_time = time.time()
 
         assert file
-
-    def get_creation_time(self):
-        return self._creation_time
 
     def load(self):
         if not self._loaded:
