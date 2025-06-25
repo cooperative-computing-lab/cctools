@@ -497,6 +497,7 @@ class DaskVine(Manager):
         for c in children:
             if len(dag.get_pending_needed_by(c)) == 0:
                 c_result = dag.get_result(c)
+                print(isinstance(c_result, DaskVineFile))
                 if isinstance(c_result, DaskVineFile):
                     self.prune_file(c_result._file)
 

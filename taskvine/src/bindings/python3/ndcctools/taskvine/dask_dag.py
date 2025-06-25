@@ -252,7 +252,7 @@ class DaskVineDag:
             else:
                 self._depth_of[r] = 0
 
-        if not DaskVineDag.taskref(self._working_graph[key]):
+        if not DaskVineDag.taskrefp(self._working_graph[key]):
             for c in self._dependencies_of[key]:
                 self._pending_needed_by[c].discard(key)
 
