@@ -13,7 +13,6 @@ from ..manager import Manager
 from ..task import PythonTask
 from ..task import FunctionCall
 from ..cvine import VINE_TEMP
-from ..utils import get_c_constant
 
 import os
 import time
