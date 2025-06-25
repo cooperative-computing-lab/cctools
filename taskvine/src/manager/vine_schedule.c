@@ -399,7 +399,7 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 			}
 		}
 
-		int64_t available_cache_space_after_task_dispatch = w->resources->disk.total * 1024 * 1024 - (w->inuse_cache + uncached_input_size);
+		int64_t available_cache_space_after_task_dispatch = MEGABYTES_TO_BYTES(w->resources->disk.total) - (w->inuse_cache + uncached_input_size);
 
 		/* skip this worker if the available cache space drops below 0 after the task is dispatched */
 		if (available_cache_space_after_task_dispatch <= 0) {
