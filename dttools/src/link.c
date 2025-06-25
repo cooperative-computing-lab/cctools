@@ -452,7 +452,7 @@ A null address indicates all local addresses.
 A zero port indicates any available port.
 */
 
-struct link *link_serve_address(const char *addr, int port )
+struct link *link_serve_address(const char *addr, int port)
 {
 	struct link *link = 0;
 	struct sockaddr_storage address;
@@ -487,7 +487,7 @@ struct link *link_serve_address(const char *addr, int port )
 	sockaddr_set_port(&address, port);
 
 	success = bind(link->fd, (struct sockaddr *)&address, address_length);
-	if(success<0)
+	if (success < 0)
 		goto failure;
 
 	success = listen(link->fd, 5);
@@ -545,18 +545,18 @@ struct link *link_serve_address_range(const char *addr, int low, int high)
 		fatal("high port %d is less than low port %d in range", high, low);
 	}
 
-	if(high==low) {
-		return link_serve_address(addr,low);
+	if (high == low) {
+		return link_serve_address(addr, low);
 	}
 
 	int port;
-	
+
 	for (port = low; port <= high; port++) {
-		struct link *link = link_serve_address(addr,port);
-		if(link) {
+		struct link *link = link_serve_address(addr, port);
+		if (link) {
 			return link;
 		} else {
-			if(errno==EADDRINUSE) {
+			if (errno == EADDRINUSE) {
 				/* keep looking for a free port */
 				continue;
 			} else {
@@ -566,7 +566,7 @@ struct link *link_serve_address_range(const char *addr, int low, int high)
 		}
 	}
 
-	debug(D_TCP, "unable to listen on any port between %d and %d: %s",low,high,strerror(errno));
+	debug(D_TCP, "unable to listen on any port between %d and %d: %s", low, high, strerror(errno));
 	return 0;
 }
 
