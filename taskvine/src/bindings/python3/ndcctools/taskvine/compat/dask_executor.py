@@ -389,11 +389,10 @@ class DaskVine(Manager):
                 storage_footprint = 0
                 for c in dag.get_children(k):
                     task_completion_time = dag.get_completion_time(c)
-                    file_result = dag.get_result(c)
-                    if task_completion_time > 0 and isinstance(file_result, DaskVineFile):
-                        file_size = len(file_result._file)
-                        file_retention_time = time.time() - task_completion_time
-                        storage_footprint += file_size * file_retention_time
+                    if task_completion_time > 0:
+                        file_result = dag.get_result(c)
+                        if isinstance(file_result, DaskVineFile):
+                            storage_footprint += len(file_result._file) * (time.time() - task_completion_time)
                 priority = storage_footprint
             else:
                 raise ValueError(f"Unknown scheduling mode {self.scheduling_mode}")
