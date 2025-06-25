@@ -6,6 +6,8 @@ See the file COPYING for details.
 
 #include "vine_current_transfers.h"
 #include "macros.h"
+#include "vine_file_replica.h"
+#include "vine_file_replica_table.h"
 #include "vine_blocklist.h"
 #include "vine_manager.h"
 #include "xxmalloc.h"
@@ -119,35 +121,36 @@ void set_throttle(struct vine_manager *m, struct vine_worker_info *w, int is_des
 	}
 }
 
-int vine_current_transfers_set_failure(struct vine_manager *q, char *id)
+int vine_current_transfers_set_failure(struct vine_manager *q, char *id, const char *cachename)
 {
 	struct vine_transfer_pair *p = hash_table_lookup(q->current_transfer_table, id);
+	if (!p) {
+		return 0;
+	}
 
-	int throttled = 0;
-
-	if (!p)
-		return throttled;
-
+	/* if any of the source or to workers don't exist, we shouldn't be surprised by this transfer failure */
 	struct vine_worker_info *source_worker = p->source_worker;
-	if (source_worker) {
-		throttled++;
+	struct vine_worker_info *to_worker = p->to;
+	if (!source_worker || !to_worker) {
+		return 0;
+	}
 
+	/* The transfer is considered a worker fault only if the replica exists on the source worker
+	 * and its state is VINE_FILE_REPLICA_STATE_READY, meaning the source has the replica but, for
+	 * some reason, failed to transfer it to the destination. */
+	struct vine_file_replica *source_replica = vine_file_replica_table_lookup(source_worker, cachename);
+	if (source_replica && source_replica->state == VINE_FILE_REPLICA_STATE_READY) {
 		source_worker->xfer_streak_bad_source_counter++;
 		source_worker->xfer_total_bad_source_counter++;
+		set_throttle(q, source_worker, 0);
+
+		to_worker->xfer_streak_bad_destination_counter++;
+		to_worker->xfer_total_bad_destination_counter++;
+		set_throttle(q, to_worker, 1);
+		return 1;
 	}
 
-	struct vine_worker_info *to = p->to;
-	if (to) {
-		throttled++;
-
-		to->xfer_streak_bad_destination_counter++;
-		to->xfer_total_bad_destination_counter++;
-	}
-
-	set_throttle(q, source_worker, 0);
-	set_throttle(q, to, 1);
-
-	return throttled;
+	return 0;
 }
 
 void vine_current_transfers_set_success(struct vine_manager *q, char *id)
