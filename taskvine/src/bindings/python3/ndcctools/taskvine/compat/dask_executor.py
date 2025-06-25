@@ -126,7 +126,7 @@ class DaskVine(Manager):
             lib_command=None,
             lib_modules=None,
             task_mode='tasks',
-            schedule_tasks_by='FIFO',
+            schedule_tasks_by='largest-input-first',
             worker_scheduler="files",
             env_per_task=False,
             init_command=None,
