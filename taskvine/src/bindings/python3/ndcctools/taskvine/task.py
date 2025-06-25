@@ -294,9 +294,14 @@ class Task(object):
     # Set the worker selection scheduler for task.
     #
     # @param self       Reference to the current task object.
-    # @param scheduler  One of the following schedulers to use in assigning a
-    #                   task to a worker. See @ref vine_schedule_t for
-    #                   possible values.
+    # @param scheduler  One of the following schedulers set preference when assigning a
+    #                   task to a worker:
+    #                     - "files"         Prefer the available worker that has the most data required for the task.
+    #                     - "time"          Prefer the available worker that has completed previous tasks the fastest.
+    #                     - "rand"          Select a random available worker.
+    #                     - "worst"         Select a worker with the most unused resources (tie breakers: cores, memory, disk).
+    #                     - "disk"          Select a worker with the most unused disk.
+    #                   If not set for the task, defaults to the one set for the manager.
     def set_scheduler(self, scheduler):
         sched = get_c_constant(f"vine_schedule_{scheduler}")
         return cvine.vine_task_set_scheduler(self._task, sched)
