@@ -2613,6 +2613,7 @@ The [TaskVine Report Tool](https://github.com/cooperative-computing-lab/taskvine
 
 For detailed usage instructions and plot explanations, please refer to the repository's GitHub page.
 
+
 ### Other Tools
 
 `vine_plot_compose` visualizes workflow executions in a variety of ways, creating a composition of multiple plots in a single visualization. This tool may be useful in
@@ -2633,6 +2634,7 @@ vine_plot_animate debug_log
 produces an animation like this:
 
 ![Example Animation](images/anim.gif)
+
 
 ### Tuning Specialized Execution Parameters
 
