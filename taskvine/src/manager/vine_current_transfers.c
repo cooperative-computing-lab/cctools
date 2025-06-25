@@ -133,7 +133,7 @@ int vine_current_transfers_set_failure(struct vine_manager *q, char *id, const c
 	struct vine_worker_info *source_worker = p->source_worker;
 	struct vine_worker_info *to_worker = p->to;
 
-	/* If p is valid, the elements of p should always be valid. A failed worker causes the transfer record to be removed,
+	/* If p is valid, the elements of p should always be valid, because a failed worker causes the transfer record to be removed,
 	 * not nulled out. This shouldn't happen, but we check and emit an error just in case. */
 	int error = 0;
 	if (!source_worker) {
