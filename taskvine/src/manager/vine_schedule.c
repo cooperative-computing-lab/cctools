@@ -419,7 +419,8 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 			priority = available_cache_space_after_task_dispatch;
 			break;
 		case VINE_SCHEDULE_WORST:
-			/* Find the worker that is the "worst fit" for this task, meaning the worker with the most free cores. */
+			/* Find the worker that is the "worst fit" for this task, meaning the worker with the most free cores.
+			 * We don't check on memory or disk because if there are no free cores, then the task will not fit anyway. */
 			priority = count_worker_free_cores(q, w);
 			break;
 		case VINE_SCHEDULE_TIME:
