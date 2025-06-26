@@ -173,12 +173,13 @@ Remove all cached data associated with filename by looking up the file
 declaration, and then pruning the replicas of the file.
 */
 
-static int batch_queue_vine_prune( struct batch_queue *q, const char *filename )
+static int batch_queue_vine_prune(struct batch_queue *q, const char *filename)
 {
-	if(!q->tv_file_table) return 0;
+	if (!q->tv_file_table)
+		return 0;
 
-	struct vine_file *f = hash_table_lookup(q->tv_file_table, filename );
-	if(f) {
+	struct vine_file *f = hash_table_lookup(q->tv_file_table, filename);
+	if (f) {
 		vine_prune_file(q->tv_manager, f);
 		return 1;
 	} else {
