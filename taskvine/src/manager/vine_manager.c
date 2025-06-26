@@ -166,6 +166,7 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 
 static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
+static int release_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
@@ -473,7 +474,7 @@ static vine_msg_code_t handle_cache_invalid(struct vine_manager *q, struct vine_
 
 		/* If the third argument was given, also remove the transfer record */
 		if (n >= 3) {
-			vine_current_transfers_set_failure(q, transfer_id);
+			vine_current_transfers_set_failure(q, transfer_id, cachename);
 			vine_current_transfers_remove(q, transfer_id);
 		} else {
 			/* throttle workers that could transfer a file */
@@ -939,6 +940,71 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 	hash_table_free_keys_array(cachenames);
 }
 
+/*
+This function enforces a target worker eviction rate (1 every X seconds).
+If the observed eviction interval is shorter than the desired one, we randomly evict one worker
+to keep the eviction pace aligned with the target.
+This includes all types of removals, whether graceful or due to failures.
+*/
+static int enforce_worker_eviction_interval(struct vine_manager *q)
+{
+	/* do not consider eviction if the workflow has not started yet, because wait-for-workers might delay the task executions for a while */
+	if (!q || q->enforce_worker_eviction_interval <= 0 || q->stats->tasks_dispatched == 0 || count_workers(q, VINE_WORKER_TYPE_WORKER) == 0) {
+		return 0;
+	}
+
+	/* Before we begin evicting workers intentionally, we want to wait until the workflow actually starts.
+	 * That timing is determined by when the first task is dispatched. Otherwise, if we set wait-for-workers
+	 * to a high number, nothing happens in the first stage, the manager still evict workers while connecting
+	 * new ones simultaneously, which slows things down early on. So, we track the time when the first task is
+	 * dispatched and only start evicting workers after that time. */
+	if (q->time_start_worker_eviction == 0) {
+		q->time_start_worker_eviction = timestamp_get();
+	}
+	timestamp_t current_makespan = timestamp_get() - q->time_start_worker_eviction;
+
+	/* start removing the first worker only after the makespan exceeds q->enforce_worker_eviction_interval */
+	if (q->stats->workers_removed == 0 && current_makespan <= q->enforce_worker_eviction_interval) {
+		return 0;
+	}
+
+	/* calculate the current eviction interval using q->stats->workers_removed, which includes both intentional and unintentional removals. */
+	/* note: worker removals due to q->max_workers are also counted in q->stats->workers_removed, which may unintentionally shorten the effective
+	 * eviction interval and prevent removals at the intended rate. it's recommended not to set max-workers when this value is configured. */
+	double current_eviction_interval = MIN(current_makespan / (q->stats->workers_removed + 0.1), current_makespan);
+
+	/* skip if the current eviction is too frequent */
+	if (current_eviction_interval <= q->enforce_worker_eviction_interval) {
+		return 0;
+	}
+
+	/* collect removable workers */
+	struct list *candidates_list = list_create();
+	char *key;
+	struct vine_worker_info *w;
+	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	{
+		if (w->type != VINE_WORKER_TYPE_WORKER) {
+			continue;
+		}
+		list_push_tail(candidates_list, w);
+	}
+
+	/* release a random worker if any */
+	int index = (int)(random_int64() % list_size(candidates_list));
+	int i = 0;
+	while ((w = list_pop_head(candidates_list))) {
+		if (i++ == index) {
+			/* evict this worker */
+			debug(D_VINE | D_NOTICE, "Intentionally evicting worker %s", w->hostname);
+			release_worker(q, w);
+		}
+	}
+	list_delete(candidates_list);
+
+	return 1;
+}
+
 /* Remove all tasks and other associated state from a given worker. */
 static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
@@ -1016,7 +1082,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		struct vine_worker_info *s;
 		SET_ITERATE(sources, s)
 		{
-			if (s->transfer_port_active && s->outgoing_xfer_counter < q->worker_source_max_transfers) {
+			if (s->transfer_port_active && s->outgoing_xfer_counter < q->worker_source_max_transfers && !s->draining) {
 				has_valid_source = 1;
 				break;
 			}
@@ -1615,6 +1681,17 @@ static vine_msg_code_t handle_taskvine(struct vine_manager *q, struct vine_worke
 				w->addrport,
 				w->version,
 				CCTOOLS_VERSION);
+	}
+
+	/* Instead of declining TCP connections in @connect_new_workers, we should check for if too many workers are
+	 * connected when a taskvine message is received, and then disconnect that worker. */
+	if (q->max_workers > 0 && count_workers(q, VINE_WORKER_TYPE_WORKER) > q->max_workers) {
+		debug(D_VINE, "draining worker %s (%s) as max-workers (%d) has been reached.", w->hostname, w->addrport, q->max_workers);
+		/* Note: don't call release_worker() here, as it would free w->link immediately.
+		 * also, don't return VINE_MSG_PROCESSED, as it would trigger do-while loop in vine_manager_recv().
+		 * Must keep w pointer valid until message processing completes, then cleanup safely. */
+		w->draining = 1;
+		return VINE_MSG_FAILURE;
 	}
 
 	return VINE_MSG_PROCESSED;
@@ -3844,18 +3921,25 @@ int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_inf
 
 static int shutdown_drained_workers(struct vine_manager *q)
 {
+	struct list *workers_to_remove = list_create();
+
+	/* careful: don't remove workers from worker_table while iterating over it */
 	char *worker_hashkey = NULL;
 	struct vine_worker_info *w = NULL;
-
-	int removed = 0;
-
 	HASH_TABLE_ITERATE(q->worker_table, worker_hashkey, w)
 	{
 		if (w->draining && itable_size(w->current_tasks) == 0) {
-			removed++;
-			vine_manager_shut_down_worker(q, w);
+			list_push_tail(workers_to_remove, w);
 		}
 	}
+
+	int removed = 0;
+	while ((w = list_pop_head(workers_to_remove))) {
+		vine_manager_shut_down_worker(q, w);
+		removed++;
+	}
+
+	list_delete(workers_to_remove);
 
 	return removed;
 }
@@ -4094,6 +4178,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->hungry_minimum_factor = 2;
 
 	q->wait_for_workers = 0;
+	q->max_workers = -1;
 	q->attempt_schedule_depth = 100;
 
 	q->max_retrievals = 1;
@@ -4147,6 +4232,9 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->option_blocklist_slow_workers_timeout = vine_option_blocklist_slow_workers_timeout;
 
 	q->manager_preferred_connection = xxstrdup("by_ip");
+
+	q->enforce_worker_eviction_interval = 0;
+	q->time_start_worker_eviction = 0;
 
 	if ((envstring = getenv("VINE_BANDWIDTH"))) {
 		q->bandwidth_limit = string_metric_parse(envstring);
@@ -5250,6 +5338,17 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 		}
 
+		// check if we need to kill any workers if the user has specified an eviction interval.
+		// note that this check should be placed before retrieving tasks, otherwise it may be delayed
+		// to nearly the end if the manager is busy with other operations.
+		BEGIN_ACCUM_TIME(q, time_internal);
+		result = enforce_worker_eviction_interval(q);
+		END_ACCUM_TIME(q, time_internal);
+		if (result > 0) {
+			events++;
+			continue;
+		}
+
 		q->busy_waiting_flag = 0;
 
 		// Retrieve results from workers. We do a worker at a time to be more efficient.
@@ -5796,6 +5895,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
 
+	} else if (!strcmp(name, "max-workers")) {
+		q->max_workers = MAX(-1, (int)value);
+
 	} else if (!strcmp(name, "worker-retrievals")) {
 		q->worker_retrievals = MAX(0, (int)value);
 
@@ -5844,6 +5946,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		if (value < 1 && value > 0) {
 			q->disk_proportion_available_to_task = value;
 		}
+	} else if (!strcmp(name, "enforce-worker-eviction-interval")) {
+		q->enforce_worker_eviction_interval = (timestamp_t)(MAX(0, (int)value) * ONE_SECOND);
+
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;

@@ -384,8 +384,16 @@ class DaskVine(Manager):
                 # last in first out, the opposite of FIFO
                 priority = round(time.time(), 6)
             elif self.task_priority_mode == 'largest-input-first':
-                # best for saving disk space (with pruing)
+                # best for saving disk space (with pruning)
                 priority = sum([len(dag.get_result(c)._file) for c in dag.get_children(k)])
+            elif self.scheduling_mode == 'largest-storage-footprint-first':
+                # prioritize tasks that can consume larger or longer-retained inputs
+                storage_footprint = 0
+                for c in dag.get_children(k):
+                    file_result = dag.get_result(c)
+                    if isinstance(file_result, DaskVineFile):
+                        storage_footprint += len(file_result._file) * (time.time() - dag.get_result_set_time(c))
+                priority = storage_footprint
             else:
                 raise ValueError(f"Unknown task priority mode {self.task_priority_mode}")
 
