@@ -379,16 +379,6 @@ void sockaddr_set_port(struct sockaddr_storage *addr, int port)
 	}
 }
 
-struct link *link_serve_range(int low, int high)
-{
-	return link_serve_address_range(0, low, high);
-}
-
-struct link *link_serve(int port)
-{
-	return link_serve_address(0, port);
-}
-
 #ifdef HAS_OPENSSL
 static int _ssl_errors_cb(const char *str, size_t len, void *use_warn)
 {
@@ -456,18 +446,20 @@ static void _set_ssl_keys(SSL_CTX *ctx, const char *ssl_key, const char *ssl_cer
 }
 #endif
 
-struct link *link_serve_address(const char *addr, int port)
-{
-	return link_serve_address_range(addr, port, port);
-}
+/*
+Attempt to create a link listening on a specific address and port.
+A null address indicates all local addresses.
+A zero port indicates any available port.
+*/
 
-struct link *link_serve_address_range(const char *addr, int low, int high)
+struct link *link_serve_address(const char *addr, int port)
 {
 	struct link *link = 0;
 	struct sockaddr_storage address;
 	SOCKLEN_T address_length;
 	int success;
 	int value;
+	int save_errno;
 
 	if (!address_to_sockaddr(addr, /* port to be set */ 0, &address, &address_length)) {
 		goto failure;
@@ -493,6 +485,45 @@ struct link *link_serve_address_range(const char *addr, int low, int high)
 
 	link_window_configure(link);
 
+	sockaddr_set_port(&address, port);
+
+	success = bind(link->fd, (struct sockaddr *)&address, address_length);
+	if (success < 0)
+		goto failure;
+
+	success = listen(link->fd, 5);
+	if (success < 0)
+		goto failure;
+
+	if (!link_nonblocking(link, 1))
+		goto failure;
+
+	debug(D_TCP, "listening on port %d", port);
+	return link;
+
+failure:
+	save_errno = errno;
+
+	if (link)
+		link_close(link);
+
+	errno = save_errno;
+	return 0;
+}
+
+/*
+Attempt to listen on any available port between low and high,
+by attempting to create a link on all the ports in that range.
+If low or high are not specified, get ranges from the environment
+or the static configuration.
+
+We do this the "expensive" way by creating a new link object for every port attempt.
+This is because listen() can fail with EADDRINUSE even after a successful bind(),
+at which point you have to start over from scratch instead of rebinding.
+*/
+
+struct link *link_serve_address_range(const char *addr, int low, int high)
+{
 	if (low < 1) {
 		const char *lowstr = getenv("TCP_LOW_PORT");
 		if (lowstr) {
@@ -515,39 +546,39 @@ struct link *link_serve_address_range(const char *addr, int low, int high)
 		fatal("high port %d is less than low port %d in range", high, low);
 	}
 
-	int port;
-	for (port = low; port <= high; port++) {
-		sockaddr_set_port(&address, port);
-		success = bind(link->fd, (struct sockaddr *)&address, address_length);
-		if (success == -1) {
-			if (errno == EADDRINUSE) {
-				// If a port is specified, fail!
-				if (low == high) {
-					goto failure;
-				} else {
-					continue;
-				}
-			} else {
-				goto failure;
-			}
-		}
-		break;
+	if (high == low) {
+		return link_serve_address(addr, low);
 	}
 
-	success = listen(link->fd, 5);
-	if (success < 0)
-		goto failure;
+	int port;
 
-	if (!link_nonblocking(link, 1))
-		goto failure;
+	for (port = low; port <= high; port++) {
+		struct link *link = link_serve_address(addr, port);
+		if (link) {
+			return link;
+		} else {
+			if (errno == EADDRINUSE) {
+				/* keep looking for a free port */
+				continue;
+			} else {
+				/* some other problem means we shouldn't retry */
+				break;
+			}
+		}
+	}
 
-	debug(D_TCP, "listening on port %d", port);
-	return link;
-
-failure:
-	if (link)
-		link_close(link);
+	debug(D_TCP, "unable to listen on any port between %d and %d: %s", low, high, strerror(errno));
 	return 0;
+}
+
+struct link *link_serve_range(int low, int high)
+{
+	return link_serve_address_range(0, low, high);
+}
+
+struct link *link_serve(int port)
+{
+	return link_serve_address(0, port);
 }
 
 int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert)
