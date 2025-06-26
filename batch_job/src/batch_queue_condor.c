@@ -41,23 +41,23 @@ static int setup_condor_wrapper(const char *wrapperfile)
 	return 0;
 }
 
-static char *blacklisted_expression(struct batch_queue *q)
+static char *blocklist_expression(struct batch_queue *q)
 {
-	const char *blacklisted = hash_table_lookup(q->options, "workers-blacklisted");
-	static char *last_blacklist = NULL;
+	const char *blocklist = hash_table_lookup(q->options, "workers-blocked");
+	static char *last_blocklist = NULL;
 
-	if (!blacklisted)
+	if (!blocklist)
 		return NULL;
 
-	/* print blacklist only when it changes. */
-	if (!last_blacklist || strcmp(last_blacklist, blacklisted) != 0) {
-		debug(D_BATCH, "Blacklisted hostnames: %s\n", blacklisted);
+	/* print blocklist only when it changes. */
+	if (!last_blocklist || strcmp(last_blocklist, blocklist) != 0) {
+		debug(D_BATCH, "Blocklist hostnames: %s\n", blocklist);
 	}
 
 	buffer_t b;
 	buffer_init(&b);
 
-	char *blist = xxstrdup(blacklisted);
+	char *blist = xxstrdup(blocklist);
 
 	/* strsep updates blist, so we keep the original pointer in binit so we can free it later */
 	char *binit = blist;
@@ -76,11 +76,11 @@ static char *blacklisted_expression(struct batch_queue *q)
 	free(binit);
 	buffer_free(&b);
 
-	if (last_blacklist) {
-		free(last_blacklist);
+	if (last_blocklist) {
+		free(last_blocklist);
 	}
 
-	last_blacklist = xxstrdup(blacklisted);
+	last_blocklist = xxstrdup(blocklist);
 
 	return result;
 }
@@ -133,7 +133,7 @@ static batch_queue_id_t batch_queue_condor_submit(struct batch_queue *q, struct 
 	fprintf(file, "+JobMaxSuspendTime = 0\n");
 
 	const char *c_req = batch_queue_get_option(q, "condor-requirements");
-	char *bexp = blacklisted_expression(q);
+	char *bexp = blocklist_expression(q);
 
 	if (c_req && bexp) {
 		fprintf(file, "requirements = (%s) && (%s)\n", c_req, bexp);
