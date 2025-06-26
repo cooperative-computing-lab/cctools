@@ -197,6 +197,7 @@ struct vine_manager {
 	int hungry_minimum;           /* Minimum number of waiting tasks to consider queue not hungry. */
 	int hungry_minimum_factor;    /* queue is hungry if number of waiting tasks is less than hungry_minimum_factor * number of connected workers. */
 	int wait_for_workers;         /* Wait for these many workers to connect before dispatching tasks at start of execution. */
+	int max_workers;              /* Specify the maximum number of workers to use during execution. */
 	int attempt_schedule_depth;   /* number of submitted tasks to attempt scheduling before we continue to retrievals */
 	int max_retrievals;           /* Do at most this number of task retrievals of either receive_one_task or receive_all_tasks_from_worker. If less
                                      than 1, prefer to receive all completed tasks before submitting new tasks. */
@@ -230,12 +231,16 @@ struct vine_manager {
 	double sandbox_grow_factor;         /* When task disk sandboxes are exhausted, increase the allocation using their measured valued times this factor */
 	double disk_proportion_available_to_task;   /* intentionally reduces disk allocation for tasks to reserve some space for cache growth. */
 
-	/*todo: confirm datatype. int or int64*/
+	/* todo: confirm datatype. int or int64 */
 	int max_task_stdout_storage;	/* Maximum size of standard output from task.  (If larger, send to a separate file.) */
 	int max_new_workers;			/* Maximum number of workers to add in a single cycle before dealing with other matters. */
 
 	timestamp_t large_task_check_interval;	/* How frequently to check for tasks that do not fit any worker. */
 	double option_blocklist_slow_workers_timeout;	/* Default timeout for slow workers to come back to the pool, can be set prior to creating a manager. */
+
+	/* Testing mode parameters */
+	timestamp_t enforce_worker_eviction_interval;   /* Enforce worker eviction interval in seconds */
+	timestamp_t time_start_worker_eviction;         /* Track the time when we start evicting workers */
 };
 
 /*
