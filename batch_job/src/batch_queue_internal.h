@@ -33,6 +33,7 @@ struct batch_queue_module {
 	batch_queue_id_t (*submit) (struct batch_queue *Q, struct batch_job *bt );
 	batch_queue_id_t (*wait) (struct batch_queue *Q, struct batch_job_info *info, time_t stoptime);
 	int (*remove) (struct batch_queue *Q, batch_queue_id_t id);
+	int (*prune) (struct batch_queue *Q, const char *filename);
 };
 
 struct batch_queue {
@@ -52,7 +53,7 @@ struct batch_queue {
 #define batch_queue_stub_free(name)  static int batch_queue_##name##_free (struct batch_queue *Q) { return 0; }
 #define batch_queue_stub_port(name)  static int batch_queue_##name##_port (struct batch_queue *Q) { return 0; }
 #define batch_queue_stub_option_update(name)  static void batch_queue_##name##_option_update (struct batch_queue *Q, const char *what, const char *value) { return; }
-
+#define batch_queue_stub_prune(name) static void batch_queue_##name##_prune (struct batch_queue *Q, const char *filename ) { return; }
 #endif
 
 /* vim: set noexpandtab tabstop=8: */
