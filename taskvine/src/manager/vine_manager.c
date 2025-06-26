@@ -6593,7 +6593,7 @@ EIO    - something more serious went wrong.
 const char *vine_fetch_file(struct vine_manager *m, struct vine_file *f)
 {
 	/* If the file should not exist yet, bail out quickly. */
-	if(f->state==VINE_FILE_STATE_PENDING) {
+	if (f->state == VINE_FILE_STATE_PENDING) {
 		errno = ENOENT;
 		return 0;
 	}
@@ -6631,7 +6631,7 @@ const char *vine_fetch_file(struct vine_manager *m, struct vine_file *f)
 			struct vine_worker_info *w = vine_file_replica_table_find_worker(m, f->cached_name);
 			if (w) {
 				vine_manager_get_single_file(m, w, f);
-				if(f->data) {
+				if (f->data) {
 					return f->data;
 				} else {
 					/* Something went wrong in fetching a good replica. */
