@@ -908,6 +908,8 @@ whose contents are not returned to the manager by default.
 @param m A manager object
 @param f A file object.
 @return A pointer to the contents of the file.  This will be freed with the file object.
+On error, returns NULL with errno set to: ENOENT if the file was not yet created,
+EAGAIN is the fetch failed but can be tried again, EIO if some unexpected I/O error occured.
 */
 
 const char *vine_fetch_file(struct vine_manager *m, struct vine_file *f);
