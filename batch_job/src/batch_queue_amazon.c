@@ -827,6 +827,7 @@ static int batch_queue_amazon_create(struct batch_queue *q)
 batch_queue_stub_free(amazon);
 batch_queue_stub_port(amazon);
 batch_queue_stub_option_update(amazon);
+batch_queue_stub_prune(amazon);
 
 const struct batch_queue_module batch_queue_amazon = {
 		BATCH_QUEUE_TYPE_AMAZON,
@@ -840,4 +841,5 @@ const struct batch_queue_module batch_queue_amazon = {
 		batch_queue_amazon_submit,
 		batch_queue_amazon_wait,
 		batch_queue_amazon_remove,
+		batch_queue_amazon_prune,
 };

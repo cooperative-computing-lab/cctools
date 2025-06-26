@@ -390,6 +390,7 @@ static int batch_queue_condor_create(struct batch_queue *q)
 batch_queue_stub_free(condor);
 batch_queue_stub_port(condor);
 batch_queue_stub_option_update(condor);
+batch_queue_stub_prune(condor);
 
 const struct batch_queue_module batch_queue_condor = {
 		BATCH_QUEUE_TYPE_CONDOR,
@@ -403,6 +404,7 @@ const struct batch_queue_module batch_queue_condor = {
 		batch_queue_condor_submit,
 		batch_queue_condor_wait,
 		batch_queue_condor_remove,
+		batch_queue_condor_prune,
 };
 
 /* vim: set noexpandtab tabstop=8: */
