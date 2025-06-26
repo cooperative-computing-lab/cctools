@@ -2605,6 +2605,15 @@ Note that very large task graphs may be impractical to graph at this level of de
     conda install -c conda-forge graphviz
     ```
 
+### TaskVine Report Tool
+
+The [TaskVine Report Tool](https://github.com/cooperative-computing-lab/taskvine-report-tool) is a separate repository maintained by our team that provides web-based visualization capabilities. It is highly optimized for parsing large log files and generating informative visualizations. Here are some screenshots of this tool:
+
+![Visualization Example](images/taskvine_report_tool_example.png)
+
+For detailed usage instructions and plot explanations, please refer to the repository's GitHub page.
+
+
 ### Other Tools
 
 `vine_plot_compose` visualizes workflow executions in a variety of ways, creating a composition of multiple plots in a single visualization. This tool may be useful in
