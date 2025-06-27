@@ -488,7 +488,7 @@ class Manager(object):
     #                     - "worst"         Select a worker with the most unused resources (tie breakers: cores, memory, disk).
     #                     - "disk"          Select a worker with the most unused disk.
     def set_scheduler(self, scheduler):
-        sched = get_c_constant(f"vine_schedule_{scheduler}")
+        sched = get_c_constant(f"schedule_{scheduler}")
         return cvine.vine_set_scheduler(self._taskvine, sched)
 
     ##

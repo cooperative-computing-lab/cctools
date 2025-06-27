@@ -46,6 +46,8 @@ See the file COPYING for details.
 #define BYTES_TO_TERABYTES(x) BYTES_TO_STORAGE_UNIT(x, TERABYTE)
 #define BYTES_TO_PETABYTES(x) BYTES_TO_STORAGE_UNIT(x, PETABYTE)
 
+#define MEGABYTES_TO_BYTES(x) ((int64_t)(x) * MEGA)
+
 #define USECOND 1000000
 
 #endif
