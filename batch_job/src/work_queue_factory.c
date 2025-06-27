@@ -593,8 +593,6 @@ static int submit_workers( struct batch_queue *queue, struct itable *job_table, 
 
 void wait_all_workers( struct batch_queue *queue, struct itable *job_table, time_t stoptime)
 {
-	int count=0;
-
 	debug(D_WQ,"waiting for workers to exit...");
 	while(itable_size(job_table)) {
 		struct batch_job_info info;
@@ -602,7 +600,6 @@ void wait_all_workers( struct batch_queue *queue, struct itable *job_table, time
 		if(jobid>0) {
 			debug(D_WQ,"worker job %"PRId64" completed",jobid);
 			itable_remove(job_table,jobid);
-			count++;
 		} else if(jobid<=0) {
 			/* indicates no more jobs or time expired. */
 			break;
