@@ -137,7 +137,13 @@ void *priority_queue_peek_at(struct priority_queue *pq, int index);
 @param index The index of the element.
 @return The priority of the element if any, NAN on failure.
 */
-double priority_queue_get_priority(struct priority_queue *pq, int index);
+double priority_queue_get_priority_at(struct priority_queue *pq, int index);
+
+/** Get the priority of the top element in a priority queue.
+@param pq A pointer to a priority queue.
+@return The priority of the top element if any, NAN on failure.
+*/
+double priority_queue_get_top_priority(struct priority_queue *pq);
 
 /** Update the priority of an element in a priority queue.
 @param pq A pointer to a priority queue.

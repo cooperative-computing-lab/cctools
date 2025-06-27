@@ -42,7 +42,7 @@ int main()
 	printf("\nIterating over the priority queue using PRIORITY_QUEUE_BASE_ITERATE:\n");
 	PRIORITY_QUEUE_BASE_ITERATE(pq, idx, item, iter_count, iter_depth)
 	{
-		double prio = priority_queue_get_priority(pq, idx);
+		double prio = priority_queue_get_priority_at(pq, idx);
 		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
 	}
 
@@ -98,7 +98,7 @@ int main()
 	iter_depth = priority_queue_size(pq);
 	PRIORITY_QUEUE_BASE_ITERATE(pq, idx, item, iter_count, iter_depth)
 	{
-		double prio = priority_queue_get_priority(pq, idx);
+		double prio = priority_queue_get_priority_at(pq, idx);
 		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
 	}
 
@@ -110,7 +110,7 @@ int main()
 	printf("\nIterating over the priority queue using PRIORITY_QUEUE_ROTATE_ITERATE with a depth %d:\n", iter_depth);
 	PRIORITY_QUEUE_ROTATE_ITERATE(pq, idx, item, iter_count, iter_depth)
 	{
-		double prio = priority_queue_get_priority(pq, idx);
+		double prio = priority_queue_get_priority_at(pq, idx);
 		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
 		// The break check must go after the task is considered, as the rotate cursor is advanced in the macro and must be considered
 	}
@@ -121,7 +121,7 @@ int main()
 	printf("\nReset the rotate cursor and Iterate from beginning with a depth %d:\n", iter_depth);
 	PRIORITY_QUEUE_ROTATE_ITERATE(pq, idx, item, iter_count, iter_depth)
 	{
-		double prio = priority_queue_get_priority(pq, idx);
+		double prio = priority_queue_get_priority_at(pq, idx);
 		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
 	}
 
@@ -133,7 +133,7 @@ int main()
 	printf("\nIterating over the priority queue using PRIORITY_QUEUE_STATIC_ITERATE with a depth %d:\n", iter_depth);
 	PRIORITY_QUEUE_STATIC_ITERATE(pq, idx, item, iter_count, iter_depth)
 	{
-		double prio = priority_queue_get_priority(pq, idx);
+		double prio = priority_queue_get_priority_at(pq, idx);
 		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
 	}
 	iter_count = 0;
@@ -141,7 +141,7 @@ int main()
 	printf("Continue iterating from the last position with a depth %d\n", iter_depth);
 	PRIORITY_QUEUE_STATIC_ITERATE(pq, idx, item, iter_count, iter_depth)
 	{
-		double prio = priority_queue_get_priority(pq, idx);
+		double prio = priority_queue_get_priority_at(pq, idx);
 		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
 	}
 
@@ -158,14 +158,14 @@ int main()
 	printf("\nIterating over the priority queue using PRIORITY_QUEUE_BASE_ITERATE:\n");
 	PRIORITY_QUEUE_BASE_ITERATE(pq, idx, item, iter_count, iter_depth)
 	{
-		double prio = priority_queue_get_priority(pq, idx);
+		double prio = priority_queue_get_priority_at(pq, idx);
 		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
 	}
 
 	// Pop elements from the priority queue using priority_queue_pop
 	printf("\nPopping elements from the priority queue:\n");
 	while ((item = (char *)priority_queue_peek_top(pq)) != NULL) {
-		printf("Popped element: %s  Priority: %d\n", item, (int)priority_queue_get_priority(pq, 0));
+		printf("Popped element: %s  Priority: %d\n", item, (int)priority_queue_get_priority_at(pq, 0));
 		priority_queue_pop(pq);
 	}
 
