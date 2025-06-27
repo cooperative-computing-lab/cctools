@@ -4856,9 +4856,11 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	 * Recovery tasks should therefore be prioritized ahead of all other tasks.
 	 * If a recovery task is not runnable due to its own missing inputs, we submit additional recovery tasks to restore those files.
 	 * Each of these later-submitted recovery tasks is assigned a higher priority than all currently existing tasks,
-	 * so they are considered first. This ensures that the most recent recovery tasks have the best chance to run and succeed. */
+	 * so they are considered first. This ensures that the most recent recovery tasks have the best chance to run and succeed.
+	 * Additionally, we incorporate the priority of the original task, so not all recovery tasks receive the same priority,
+	 * this distinction is important when many files are lost and the workflow is effectively rerun from scratch. */
 	if (t->type == VINE_TASK_TYPE_RECOVERY) {
-		vine_task_set_priority(t, priority_queue_get_top_priority(q->ready_tasks) + 1);
+		vine_task_set_priority(t, t->priority + priority_queue_get_top_priority(q->ready_tasks) + 1);
 	}
 
 	if (t->has_fixed_locations) {
