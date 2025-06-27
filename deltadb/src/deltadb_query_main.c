@@ -300,7 +300,7 @@ int main( int argc, char *argv[] )
 		buffer_init(&buf);
 		char *filter_str = jx_print_string(filter_expr);
 		b64_encode(filter_str,strlen(filter_str),&buf);
-		char *cmd = string_format("curl -s http://%s:9097/history/%ld/%ld/%s",dbhost,start_time,stop_time,buffer_tostring(&buf));
+		char *cmd = string_format("curl -s http://%s:9097/updates/%ld/%ld/%s",dbhost,start_time,stop_time,buffer_tostring(&buf));
 		buffer_free(&buf);
 		free(filter_str);
 

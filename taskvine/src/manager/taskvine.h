@@ -73,11 +73,12 @@ typedef enum {
 /** Select overall scheduling algorithm for matching tasks to workers. */
 typedef enum {
 	VINE_SCHEDULE_UNSET = 0, /**< Internal use only. */
-	VINE_SCHEDULE_FCFS,      /**< Select worker on a first-come-first-serve basis. */
+	VINE_SCHEDULE_FCFS,      /**< Select worker on a first-come-first-serve basis. (deprecated, same as random) */
 	VINE_SCHEDULE_FILES,     /**< Select worker that has the most data required by the task. (default) */
 	VINE_SCHEDULE_TIME,      /**< Select worker that has the fastest execution time on previous tasks. */
 	VINE_SCHEDULE_RAND,      /**< Select a random worker. */
-	VINE_SCHEDULE_WORST      /**< Select the worst fit worker (the worker with more unused resources). */
+	VINE_SCHEDULE_WORST,     /**< Select the worst fit worker (the worker with more unused resources). */
+	VINE_SCHEDULE_DISK       /**< Select the worker with the largest free disk space. */
 } vine_schedule_t;
 
 /** Possible outcomes for a task, returned by @ref vine_task_get_result.

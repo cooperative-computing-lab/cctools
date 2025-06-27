@@ -462,26 +462,6 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 }
 
 /*
-Find the first available worker in first-come, first-served order.
-Since the order of workers in the hashtable is somewhat arbitrary,
-this amounts to simply "find the first available worker".
-*/
-
-static struct vine_worker_info *find_worker_by_fcfs(struct vine_manager *q, struct vine_task *t)
-{
-	char *key;
-	struct vine_worker_info *w;
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
-	{
-		/* Careful: If check_worker_against task fails, then w may no longer be valid. */
-		if (check_worker_against_task(q, w, t)) {
-			return w;
-		}
-	}
-	return NULL;
-}
-
-/*
 Select an available worker at random.
 This works by finding all compatible workers,
 putting them in a list, and then choosing from the list at random.
@@ -575,7 +555,7 @@ static struct vine_worker_info *find_worker_by_time(struct vine_manager *q, stru
 	} else if (vine_schedule_in_ramp_down(q)) {
 		return find_worker_by_worst_fit(q, t);
 	} else {
-		return find_worker_by_fcfs(q, t);
+		return find_worker_by_random(q, t);
 	}
 }
 
@@ -597,9 +577,9 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 	case VINE_SCHEDULE_TIME:
 		return find_worker_by_time(q, t);
 	case VINE_SCHEDULE_WORST:
+	case VINE_SCHEDULE_DISK:
 		return find_worker_by_worst_fit(q, t);
 	case VINE_SCHEDULE_FCFS:
-		return find_worker_by_fcfs(q, t);
 	case VINE_SCHEDULE_RAND:
 	default:
 		return find_worker_by_random(q, t);
