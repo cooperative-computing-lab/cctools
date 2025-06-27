@@ -3613,7 +3613,7 @@ to run, finding the best worker for that task, and then committing
 the task to the worker.
 */
 
-static int send_one_task(struct vine_manager *q)
+static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consider)
 {
 	int t_idx;
 	struct vine_task *t;
@@ -3637,6 +3637,8 @@ static int send_one_task(struct vine_manager *q)
 	// the priority queue data structure where also invokes priority_queue_rotate_reset.
 	PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
 	{
+		*tasks_ready_left_to_consider -= 1;
+
 		if (!consider_task(q, t)) {
 			continue;
 		}
@@ -5111,9 +5113,10 @@ static int poll_active_workers(struct vine_manager *q, int stoptime)
 
 	int n = build_poll_table(q);
 
-	// We poll in at most small time segments (of a second). This lets
-	// promptly dispatch tasks, while avoiding busy waiting.
-	int msec = q->busy_waiting_flag ? 1000 : 0;
+	// We poll in at most small time segments (of a half a second). This lets
+	// promptly dispatch tasks, while avoiding wasting cpu cycles when the
+	// state of the system cannot be advanced.
+	int msec = q->nothing_happened_last_wait_cycle ? 1000 : 0;
 	if (stoptime) {
 		msec = MIN(msec, (stoptime - time(0)) * 1000);
 	}
@@ -5268,7 +5271,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	   - send all libraries to all workers
 	   - replicate temp files
 	   - manager empty?                                           Yes: break
-	   - mark as busy-waiting and go to S
+	   - mark as nothing_happened_last_wait_cycle and go to S
 	*/
 
 	// account for time we spend outside vine_wait
@@ -5299,6 +5302,10 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 	// used for q->prefer_dispatch. If 0 and there is a task retrieved, then return task to app.
 	int sent_in_previous_cycle = 1;
+
+	// used to set nothing_happened_last_wait_cycle. nothing_happened_last_wait_cycle only set
+	// when tasks_ready_left_to_consider is less than 1.
+	int tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
 
 	// time left?
 	while ((stoptime == 0) || (time(0) < stoptime)) {
@@ -5360,7 +5367,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			continue;
 		}
 
-		q->busy_waiting_flag = 0;
+		q->nothing_happened_last_wait_cycle = 0;
 
 		// Retrieve results from workers. We do a worker at a time to be more efficient.
 		// We get a known worker with results from the first task in the waiting_retrieval_list,
@@ -5408,6 +5415,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		if (retrieved_this_cycle) {
 			// reset the rotate cursor on task retrieval
 			priority_queue_rotate_reset(q->ready_tasks);
+			tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
+
 			if (!q->prefer_dispatch) {
 				continue;
 			}
@@ -5421,7 +5430,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 			// tasks waiting to be dispatched?
 			BEGIN_ACCUM_TIME(q, time_send);
-			result = send_one_task(q);
+			result = send_one_task(q, &tasks_ready_left_to_consider);
 			END_ACCUM_TIME(q, time_send);
 			if (result) {
 				// sent at least one task
@@ -5461,6 +5470,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			// accepted at least one worker
 			// reset the rotate cursor on worker connection
 			priority_queue_rotate_reset(q->ready_tasks);
+			tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
+
 			events++;
 			continue;
 		}
@@ -5501,9 +5512,12 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		}
 
 		// if we got here, no events were triggered this time around.
-		// we set the busy_waiting flag so that link_poll waits for some time
+		// we set the nothing_happened_last_wait_cycle flag so that link_poll waits for some time
 		// the next time around, or return retrieved tasks if there some available.
-		q->busy_waiting_flag = 1;
+		if (tasks_ready_left_to_consider < 1) {
+			q->nothing_happened_last_wait_cycle = 1;
+			tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
+		}
 	}
 
 	if (events > 0) {
