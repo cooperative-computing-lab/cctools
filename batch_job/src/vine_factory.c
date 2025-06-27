@@ -148,6 +148,10 @@ static int single_shot = 0;
 // A pretend port number to unqiuely identify the factory in catalog updates.
 static int pretend_port = 0;
 
+// When killing a worker, how long to wait between sending SIGQUIT and SIGKILL
+static int worker_kill_timeout = 30;
+
+
 /*
 In a signal handler, only a limited number of functions are safe to
 invoke, so we construct a string and emit it with a low-level write.
@@ -599,20 +603,56 @@ static int submit_workers( struct batch_queue *queue, struct itable *job_table, 
 	return i;
 }
 
-void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
+void wait_all_workers( struct batch_queue *queue, struct itable *job_table, time_t stoptime)
+{
+	int count=0;
+
+	debug(D_VINE,"waiting for workers to exit...");
+	while(itable_size(job_table)) {
+		struct batch_job_info info;
+		uint64_t jobid = batch_queue_wait_timeout(queue,&info,stoptime);
+		if(jobid>0) {
+			debug(D_VINE,"worker job %"PRId64" completed",jobid);
+			itable_remove(job_table,jobid);
+			count++;
+		} else if(jobid<=0) {
+			/* indicates no more jobs or time expired. */
+			break;
+		}
+	}
+}
+
+void remove_all_workers( struct batch_queue *queue, struct itable *job_table, batch_queue_remove_mode_t mode )
 {
 	uint64_t jobid;
 	void *value;
 
-	debug(D_VINE,"removing all remaining worker jobs...");
-	int count = itable_size(job_table);
+	debug(D_VINE,"removing all workers...");
+
 	itable_firstkey(job_table);
 	while(itable_nextkey(job_table,&jobid,&value)) {
-		debug(D_VINE,"removing job %"PRId64,jobid);
-		batch_queue_remove(queue,jobid);
+		debug(D_VINE,"removing worker job %"PRId64,jobid);
+		batch_queue_remove(queue,jobid,mode);
 	}
-	debug(D_VINE,"%d workers removed.",count);
+}
 
+void remove_and_wait_all_workers( struct batch_queue *queue, struct itable *job_table )
+{
+	remove_all_workers(queue,job_table,BATCH_QUEUE_REMOVE_MODE_FRIENDLY);
+
+	/*
+	For non-local batch queues, we skip this be because our ability to
+	wait on removed jobs is unreliable.  For local jobs, we follow up
+	the friendly remove after 30s with an unfriendly kill, and we wait
+	for children to exit to ensure cleanup is complete.
+	*/
+
+	if(batch_queue_get_type(queue)==BATCH_QUEUE_TYPE_LOCAL) {
+		while(itable_size(job_table)) {
+			wait_all_workers(queue,job_table,time(0)+worker_kill_timeout);
+			remove_all_workers(queue,job_table,BATCH_QUEUE_REMOVE_MODE_KILL);
+		}
+	}
 }
 
 void print_stats(struct jx *j) {
@@ -1144,7 +1184,7 @@ static void mainloop( struct batch_queue *queue )
 	}
 
 	printf("removing %d workers...\n",itable_size(job_table));
-	remove_all_workers(queue,job_table);
+	remove_and_wait_all_workers(queue,job_table);
 	printf("all workers removed.\n");
 	itable_delete(job_table);
 }
