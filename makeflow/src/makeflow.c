@@ -391,7 +391,7 @@ static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_
 {
 	printf("aborting %s job %" PRIu64 "\n", name, jobid);
 
-	batch_queue_remove(q, jobid);
+	batch_queue_remove(q, jobid, BATCH_QUEUE_REMOVE_MODE_FRIENDLY);
 	makeflow_hook_node_abort(n);
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
 	makeflow_clean_node(d,q,n);
@@ -438,10 +438,10 @@ void makeflow_node_reset( struct dag *d, struct dag_node *n )
 
 	if(n->state == DAG_NODE_STATE_RUNNING) {
 		if(n->local_job && local_queue) {
-			batch_queue_remove(local_queue, n->jobid);
+			batch_queue_remove(local_queue, n->jobid, BATCH_QUEUE_REMOVE_MODE_FRIENDLY);
 			itable_remove(d->local_job_table, n->jobid);
 		} else {
-			batch_queue_remove(remote_queue, n->jobid);
+			batch_queue_remove(remote_queue, n->jobid, BATCH_QUEUE_REMOVE_MODE_FRIENDLY);
 			itable_remove(d->remote_job_table, n->jobid);
 		}
 	}

@@ -358,7 +358,7 @@ static batch_queue_id_t batch_queue_condor_wait(struct batch_queue *q, struct ba
 	return -1;
 }
 
-static int batch_queue_condor_remove(struct batch_queue *q, batch_queue_id_t jobid)
+static int batch_queue_condor_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode)
 {
 	char *command = string_format("condor_rm %" PRIbjid, jobid);
 
