@@ -393,7 +393,7 @@ static batch_queue_id_t batch_queue_cluster_wait(struct batch_queue *q, struct b
 	return -1;
 }
 
-static int batch_queue_cluster_remove(struct batch_queue *q, batch_queue_id_t jobid)
+static int batch_queue_cluster_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode )
 {
 	struct batch_job_info *info;
 

@@ -163,7 +163,7 @@ static batch_queue_id_t batch_queue_vine_wait(struct batch_queue *q, struct batc
 	}
 }
 
-static int batch_queue_vine_remove(struct batch_queue *q, batch_queue_id_t jobid)
+static int batch_queue_vine_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode )
 {
 	return 0;
 }

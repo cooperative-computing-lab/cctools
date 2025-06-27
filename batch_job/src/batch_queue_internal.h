@@ -32,7 +32,9 @@ struct batch_queue_module {
 
 	batch_queue_id_t (*submit) (struct batch_queue *Q, struct batch_job *bt );
 	batch_queue_id_t (*wait) (struct batch_queue *Q, struct batch_job_info *info, time_t stoptime);
-	int (*remove) (struct batch_queue *Q, batch_queue_id_t id);
+
+	int (*remove) (struct batch_queue *Q, batch_queue_id_t id, batch_queue_remove_mode_t mode );
+	int (*prune) (struct batch_queue *Q, const char *filename);
 };
 
 struct batch_queue {

@@ -244,9 +244,9 @@ batch_queue_id_t batch_queue_wait_timeout(struct batch_queue *q, struct batch_jo
 	return q->module->wait(q, info, stoptime);
 }
 
-int batch_queue_remove(struct batch_queue *q, batch_queue_id_t jobid)
+int batch_queue_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode )
 {
-	return q->module->remove(q, jobid);
+	return q->module->remove(q, jobid, mode);
 }
 
 /* vim: set noexpandtab tabstop=8: */
