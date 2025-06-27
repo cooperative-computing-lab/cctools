@@ -109,12 +109,12 @@ static batch_queue_id_t batch_queue_local_wait(struct batch_queue *q, struct bat
 
 /* Note that batch_queue_remove triggers a job to exit, but it must still be returned by batch_queue_wait */
 
-static int batch_queue_local_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode )
+static int batch_queue_local_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode)
 {
-	if(mode==BATCH_QUEUE_REMOVE_MODE_FRIENDLY) {
-		kill(jobid,SIGQUIT);
-	} else  {
-		kill(jobid,SIGKILL);
+	if (mode == BATCH_QUEUE_REMOVE_MODE_FRIENDLY) {
+		kill(jobid, SIGQUIT);
+	} else {
+		kill(jobid, SIGKILL);
 	}
 
 	return 0;

@@ -146,7 +146,7 @@ static batch_queue_id_t batch_queue_wq_wait(struct batch_queue *q, struct batch_
 	}
 }
 
-static int batch_queue_wq_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode )
+static int batch_queue_wq_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode)
 {
 	return 0;
 }

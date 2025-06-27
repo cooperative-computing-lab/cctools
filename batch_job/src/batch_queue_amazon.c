@@ -789,7 +789,7 @@ kill the local ssh process forcibly, and then we save
 the Amazon instance and delete other expired instances.
 */
 
-static int batch_queue_amazon_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode )
+static int batch_queue_amazon_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode)
 {
 	struct batch_queue_amazon_info *info;
 
