@@ -68,8 +68,13 @@ static struct jx_table queue_headers[] = {
 
 static int vine_status_timeout = 30;
 
+// Name of the catalog server to query for updates.
 static const char *catalog_host = 0;
 
+// Last time an update was sent to the catalog server.
+static time_t last_catalog_update_time = 0;
+
+// Time in seconds to delay between each evaluation of the factory's position.
 static int factory_period = 30; // in seconds
 
 static int workers_min = 5;
@@ -139,6 +144,9 @@ static int disable_afs_check = 0;
 
 // Remove workers upon manager disconnection
 static int single_shot = 0;
+
+// A pretend port number to unqiuely identify the factory in catalog updates.
+static int pretend_port = 0;
 
 /*
 In a signal handler, only a limited number of functions are safe to
@@ -683,6 +691,8 @@ struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submit
 	struct jx *j= jx_object(NULL);
 	jx_insert_string(j, "type", "vine_factory");
 
+	jx_insert_integer(j, "port", pretend_port );
+
 	if(using_catalog) {
 		jx_insert_string(j, "project_regex",    project_regex);
 		jx_insert_string(j, "submission_regex", submission_regex);
@@ -951,7 +961,7 @@ end:
 }
 
 /*
-Main loop of work queue pool.  Determine the number of workers needed by our
+Main loop of factory.  Determine the number of workers needed by our
 current list of managers, compare it to the number actually submitted, then
 submit more until the desired state is reached.
 */
@@ -1075,14 +1085,18 @@ static void mainloop( struct batch_queue *queue )
 		debug(D_VINE,"workers submitted: %d", workers_submitted);
 		debug(D_VINE,"workers requested: %d", MAX(0, new_workers_needed));
 
-		struct jx *j = factory_to_jx(managers_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
+		/* Regardless of all other settings, do not update catalog more than one per minute. */
+		if( (time(0)-last_catalog_update_time) > 59 ) {
+			struct jx *j = factory_to_jx(managers_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
 
-		char *update_str = jx_print_string(j);
-		debug(D_VINE, "Sending status to the catalog server(s) at %s ...", catalog_host);
-		catalog_query_send_update(catalog_host,update_str,0);
-		print_stats(j);
-		free(update_str);
-		jx_delete(j);
+			char *update_str = jx_print_string(j);
+			debug(D_VINE, "Sending status to the catalog server(s) at %s ...", catalog_host);
+			catalog_query_send_update(catalog_host,update_str,0);
+			print_stats(j);
+			free(update_str);
+			jx_delete(j);
+			last_catalog_update_time = time(0);
+		}
 
 		update_blocked_hosts(queue, managers_list);
 
@@ -1117,13 +1131,14 @@ static void mainloop( struct batch_queue *queue )
 
 		delete_projects_list(managers_list);
 		delete_projects_list(foremen_list);
-
-		int sleep_seconds = 0;
-		while(sleep_seconds < factory_period) {
+		
+		/* Now delay for the factory period */
+		/* Sleep 1s at a time to re-evaluate the abort flag */
+		stoptime = time(0) + factory_period;
+		while(time(0) < stoptime) {
 			if(abort_flag) {
 				break;
 			}
-			sleep_seconds += 1;
 			sleep(1);
 		}
 	}
@@ -1189,6 +1204,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Max number of new workers per %ds (default=%d)\n", "--workers-per-cycle", factory_period, workers_per_cycle);
 	printf(" %-30s Workers abort after idle time (default=%d).\n", "-t,--timeout=<time>",worker_timeout);
 	printf(" %-30s Exit after no manager seen in <n> seconds.\n", "--factory-timeout");
+	printf(" %-30s Evaluate worker needs every <n> seconds. (default=%d)\n", "--factory-period",factory_period);
 	printf(" %-30s Average tasks per worker (default=one per core).\n", "--tasks-per-worker");
 	printf(" %-30s Use worker capacity reported by managers.\n","-c,--capacity");
 
@@ -1226,6 +1242,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_CONF_FILE, 
 		LONG_OPT_AMAZON_CONFIG, 
 		LONG_OPT_FACTORY_TIMEOUT, 
+		LONG_OPT_FACTORY_PERIOD,
 		LONG_OPT_AUTOSIZE, 
 		LONG_OPT_CONDOR_REQUIREMENTS, 
 		LONG_OPT_CONDOR_SPOOL, 
@@ -1269,6 +1286,7 @@ static const struct option long_options[] = {
 	{"env", required_argument, 0, LONG_OPT_ENVIRONMENT_VARIABLE},
 	{"extra-options", required_argument, 0, 'E'},
 	{"factory-timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
+	{"factory-period", required_argument, 0, LONG_OPT_FACTORY_PERIOD},
 	{"feature", required_argument, 0, LONG_OPT_FEATURE},
 	{"foremen-name", required_argument, 0, 'F'},
 	{"gpus",   required_argument,  0,  LONG_OPT_GPUS},
@@ -1404,6 +1422,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_FACTORY_TIMEOUT:
 				factory_timeout = MAX(0, atoi(optarg));
+				break;
+			case LONG_OPT_FACTORY_PERIOD:
+				factory_period = MAX(5, atoi(optarg));
 				break;
 			case LONG_OPT_CONDOR_REQUIREMENTS:
 				if(condor_requirements) {
@@ -1543,6 +1564,12 @@ int main(int argc, char *argv[])
 	} else {
 		using_catalog = 1;
 	}
+
+	/* When reporting to the catalog server, the factory is uniquely identified by name:address:port */
+	/* Since it does not have a real "port", choose a negative value. */
+
+	srand( time(0) + getpid() );
+	pretend_port = -(rand()%65536);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
