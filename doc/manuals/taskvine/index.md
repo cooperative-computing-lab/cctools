@@ -152,6 +152,7 @@ The following examples show more complex applications and various features of Ta
 - [Watch Files Example](example-watch.md)
 - [Functional Example](example-functional.md)
 - [CFD Example](example-cfd.md)
+- [ObsPy Example](example-obspy.md)
 
 Read on to learn how to build applications from scratch and run large numbers of workers at scale.
 
@@ -664,7 +665,7 @@ which looks like this:
 ### Managing Workers with the TaskVine Factory
 
 Instead of launching each worker manually from the command line, the utility
-**vine_factory** may be used to launch workers are needed. The factory
+**vine_factory** may be used to launch workers as needed. The factory
 will submit and maintain a number of workers according to the tasks available
 in one or more managers.
 For example, we can supply a minimum of 2 workers and a maximum of 10 to
@@ -2603,6 +2604,15 @@ Note that very large task graphs may be impractical to graph at this level of de
     ```
     conda install -c conda-forge graphviz
     ```
+
+### TaskVine Report Tool
+
+The [TaskVine Report Tool](https://github.com/cooperative-computing-lab/taskvine-report-tool) is a separate repository maintained by our team that provides web-based visualization capabilities. It is highly optimized for parsing large log files and generating informative visualizations. Here are some screenshots of this tool:
+
+![Visualization Example](images/taskvine_report_tool_example.png)
+
+For detailed usage instructions and plot explanations, please refer to the repository's GitHub page.
+
 
 ### Other Tools
 
