@@ -3,6 +3,7 @@
 # See the file COPYING for details.
 
 from uuid import uuid4
+import time
 from collections import defaultdict
 
 
@@ -72,6 +73,9 @@ class DaskVineDag:
 
         # key->value of its computation
         self._result_of = {}
+
+        # key->result set time of its computation
+        self._result_set_time_of = {}
 
         # key->depth. The shallowest level the key is found
         self._depth_of = defaultdict(lambda: float('inf'))
@@ -200,6 +204,7 @@ class DaskVineDag:
         of computations that become ready to be executed """
         rs = {}
         self._result_of[key] = value
+        self._result_set_time_of[key] = time.time()
 
         for p in self._parents_of[key]:
             self._missing_of[p].discard(key)
@@ -287,6 +292,9 @@ class DaskVineDag:
 
     def get_targets(self):
         return self._targets
+
+    def get_result_set_time(self, key):
+        return self._result_set_time_of.get(key, 0)
 
 
 class DaskVineNoResult(Exception):
