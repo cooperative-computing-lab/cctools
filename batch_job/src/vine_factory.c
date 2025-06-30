@@ -640,14 +640,15 @@ void remove_and_wait_all_workers( struct batch_queue *queue, struct itable *job_
 	/*
 	For non-local batch queues, we skip this be because our ability to
 	wait on removed jobs is unreliable.  For local jobs, we follow up
-	the friendly remove after 30s with an unfriendly kill, and we wait
-	for children to exit to ensure cleanup is complete.
+	the friendly remove after 30s with an unfriendly kill every 5s,
+	and we wait for children to exit to ensure cleanup is complete.
 	*/
 
 	if(batch_queue_get_type(queue)==BATCH_QUEUE_TYPE_LOCAL) {
+		wait_all_workers(queue,job_table,time(0)+worker_kill_timeout);
 		while(itable_size(job_table)) {
-			wait_all_workers(queue,job_table,time(0)+worker_kill_timeout);
 			remove_all_workers(queue,job_table,BATCH_QUEUE_REMOVE_MODE_KILL);
+			wait_all_workers(queue,job_table,time(0)+5);
 		}
 	}
 }
