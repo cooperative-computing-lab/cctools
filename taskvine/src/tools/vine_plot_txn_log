@@ -123,7 +123,7 @@ class Manager:
             "measured_disk",
             "measured_gpus",
             "measured_wall_time",
-            "librar",
+            "library",
             "worker_id",
             "time_input_mgr",
             "time_output_mgr",
