@@ -386,7 +386,7 @@ class DaskVine(Manager):
             elif self.task_priority_mode == 'largest-input-first':
                 # best for saving disk space (with pruning)
                 priority = sum([len(dag.get_result(c)._file) for c in dag.get_children(k)])
-            elif self.scheduling_mode == 'largest-storage-footprint-first':
+            elif self.task_priority_mode == 'largest-storage-footprint-first':
                 # prioritize tasks that can consume larger or longer-retained inputs
                 storage_footprint = 0
                 for c in dag.get_children(k):
