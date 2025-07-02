@@ -66,7 +66,7 @@ class DaskVineDag:
     def symbolp(s):
         return isinstance(s, dts.DataNode)
 
-    def __init__(self, dsk, reconstruct=False, merge_size=2):
+    def __init__(self, dsk, reconstruct=False, merge_size=2, prune_depth=0):
         self._dsk = dsk
 
         #  For a key, the set of keys that need it to perform a computation.
@@ -98,6 +98,10 @@ class DaskVineDag:
 
         if reconstruct:
             self.expand_merge(merge_size)
+
+        self.prune_depth = prune_depth
+        self.pending_consumers = defaultdict(int)
+        self.pending_producers = defaultdict(lambda: set())
 
         self.initialize_graph()
 
@@ -184,6 +188,12 @@ class DaskVineDag:
                 self._depth_of[task.key] = 0
                 self.set_result(task.key, task.value)
 
+        # Then initializa pwnding consumers if pruning is enabled
+        if self.prune_depth > 0:
+            self._initialize_pending_consumers()
+            self._initialize_pending_producers()
+
+
     def set_relations(self, task):
         self._dependencies_of[task.key] = task.dependencies
         self._missing_of[task.key] = set(self._dependencies_of[task.key])
@@ -191,6 +201,50 @@ class DaskVineDag:
             self._needed_by[c].add(task.key)
             self._pending_needed_by[c].add(task.key)
 
+    def _initialize_pending_consumers(self):
+        """Initialize pending consumers based on prune_depth"""
+        print("hello")
+        for key in self._working_graph:
+            if key not in self.pending_consumers:
+                count = 0
+                # BFS to count consumers up to prune_depth
+                visited = set()
+                queue = [(c,1) for c in list(self._pending_needed_by[key])] # (consumer, depth)
+                
+                while queue:
+                    consumer, depth = queue.pop(0)
+                    if depth <= self.prune_depth and consumer not in visited:
+                        visited.add(consumer)
+                        count += 1
+
+                        # Add next level consumers if we haven't reached max depth
+                        if depth < self.prune_depth:
+                            next_consumers = [(c, depth + 1) for c in list(self._pending_needed_by[consumer])]
+                            queue.extend(next_consumers)
+                self.pending_consumers[key] = count
+
+    def _initialize_pending_producers(self):
+        """Initialize pending producers based on prune_depth"""
+        if self.prune_depth <= 0:
+            return
+
+        for key in self._working_graph:
+            # Use set to store unique producers
+            producers = set()
+            visited = set()
+            queue = [(p,1) for p in self._dependencies_of[key]]
+
+            while queue:
+                producer, depth = queue.pop(0)
+                if depth <= self.prune_depth and producer not in visited:
+                    visited.add(producer)
+                    producers.add(producer)
+
+                    if depth < self.prune_depth:
+                        next_producers = [(p, depth + 1) for p in self._children[producer]]
+                        queue.extedn(next_producers)
+            self.pending_producers[key] = producers
+            
     def get_ready(self):
         """ List of dts.Task ready for computation.
         This call should be used only for
@@ -221,9 +275,8 @@ class DaskVineDag:
         of computations that become ready to be executed """
 
         rs = {}
-        if 'merge' in key:
-            print(key)
         self._result_of[key] = value
+
         for p in list(self._pending_needed_by[key]):
             self._missing_of[p].discard(key)
 

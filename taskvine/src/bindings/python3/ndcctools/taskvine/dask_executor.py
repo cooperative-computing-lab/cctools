@@ -150,6 +150,7 @@ class DaskVine(Manager):
             wrapper=None,
             wrapper_proc=print,
             prune_files=False,
+            prune_depth=0,
             hoisting_modules=None,  # Deprecated, use lib_modules
             import_modules=None,    # Deprecated, use lib_modules
             lazy_transfers=True,    # Deprecated, use worker_tranfers
@@ -197,6 +198,7 @@ class DaskVine(Manager):
             self.progress_label = progress_label
             self.wrapper = wrapper
             self.wrapper_proc = wrapper_proc
+            self.prune_depth = prune_depth
             self.prune_files = prune_files
             self.category_info = defaultdict(lambda: {"num_tasks": 0, "total_execution_time": 0})
             self.max_priority = float('inf')
@@ -235,7 +237,7 @@ class DaskVine(Manager):
         indices = {k: inds for (k, inds) in find_dask_keys(keys)}
         keys_flatten = indices.keys()
 
-        dag = DaskVineDag(dsk, reconstruct=self.reconstruct, merge_size=self.merge_size)
+        dag = DaskVineDag(dsk, reconstruct=self.reconstruct, merge_size=self.merge_size, prune_depth=self.prune_depth)
 
         if self.visualize:
             dag.visualize()
