@@ -2654,7 +2654,7 @@ For the *transfers* file:
 | `filename`  | Name of the file in the transfer. |
 | `size`  | Size in MB of the file transfered. |
 
-For the *transfers* file:
+For the *workers* file:
 | Column | Description |
 |------------ |---------|
 | `worker_id` | Unique worker identifier from/which the file transfer occurred. |
@@ -2662,9 +2662,9 @@ For the *transfers* file:
 | `CONNECTION` | Time at which the worker connected to the manager. |
 | `DISCONNECTION` | Time at which the worker disconnected from the manager. |
 | `cores` | Total number of cores available at the worker.|
-| `gpus` | Total number of gpus available at the worker.|
 | `memory` | Total memory in MB available at the worker.|
 | `disk` | Total disk space in MB available at the worker.|
+| `gpus` | Total number of gpus available at the worker.|
 
 ### Task Graph Log
 
