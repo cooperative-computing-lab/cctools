@@ -220,7 +220,7 @@ may be an estimate at this point and will be updated by return
 message once the object is actually loaded into the cache.
 */
 
-vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_worker_info *w, const char *source, struct vine_file *f)
+vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_worker_info *w, struct vine_worker_info *source_worker, const char *source, struct vine_file *f)
 {
 	if (vine_file_replica_table_lookup(w, f->cached_name)) {
 		/* do nothing, file already at worker */
@@ -241,7 +241,7 @@ vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_
 	url_encode(source, source_encoded, sizeof(source_encoded));
 	url_encode(f->cached_name, cached_name_encoded, sizeof(cached_name_encoded));
 
-	char *transfer_id = vine_current_transfers_add(q, w, f->source_worker, source);
+	char *transfer_id = vine_current_transfers_add(q, w, source_worker, source);
 
 	vine_manager_send(q, w, "puturl_now %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, mode, transfer_id);
 
@@ -259,7 +259,7 @@ may be an estimate at this point and will be updated by return
 message once the object is actually loaded into the cache.
 */
 
-vine_result_code_t vine_manager_put_url(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f)
+vine_result_code_t vine_manager_put_url(struct vine_manager *q, struct vine_worker_info *w, struct vine_worker_info *source_worker, struct vine_task *t, struct vine_file *f)
 {
 	if (vine_file_replica_table_lookup(w, f->cached_name)) {
 		/* do nothing, file already at worker */
@@ -280,7 +280,7 @@ vine_result_code_t vine_manager_put_url(struct vine_manager *q, struct vine_work
 	url_encode(f->source, source_encoded, sizeof(source_encoded));
 	url_encode(f->cached_name, cached_name_encoded, sizeof(cached_name_encoded));
 
-	char *transfer_id = vine_current_transfers_add(q, w, f->source_worker, f->source);
+	char *transfer_id = vine_current_transfers_add(q, w, source_worker, f->source);
 
 	vine_manager_send(q, w, "puturl %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, mode, transfer_id);
 
@@ -346,7 +346,7 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 
 	case VINE_URL:
 		debug(D_VINE, "%s (%s) will get %s from url %s", w->hostname, w->addrport, m->remote_name, f->source);
-		result = vine_manager_put_url(q, w, t, f);
+		result = vine_manager_put_url(q, w, f->source_worker, t, f);
 		break;
 
 	case VINE_TEMP:

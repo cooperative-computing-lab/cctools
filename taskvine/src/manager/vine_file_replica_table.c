@@ -199,7 +199,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 
 			debug(D_VINE, "replicating %s from %s to %s", f->cached_name, source->addrport, dest->addrport);
 
-			vine_manager_put_url_now(m, dest, source_addr, f);
+			vine_manager_put_url_now(m, dest, source, source_addr, f);
 
 			round_replication_request_sent++;
 
