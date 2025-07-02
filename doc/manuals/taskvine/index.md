@@ -2601,23 +2601,34 @@ following columns:
 
 | Column | Description |
 |------------ |---------|
-| `READY` | Time at which the task attempt becomes available for scheduling. |
-| `last_state` | The last know state know for the task attempt. This is `DONE` for completed tasks attempts. |
-| `last_state_time` | Time at which the task attempt reached `last_state`. |
 | `task_id` | Unique integer identifier for the task. |
 | `attempt_number` | Sequential identifier for how many times this task has been tried. |
 | `category` | Custom to which the task belongs. (E.g., value set with `t.set_category(...)`).
+| `READY` | Time at which the task attempt becomes available for scheduling. |
+| `RUNNING` | Time at which the task attempt was dispatched to a worker. |
+| `WAITING_RETRIEVAL` | If present, time at which the manager becomes aware that the task attempt outputs are ready to be retrieved. |
+| `RETRIEVED` | If present, time at which the manager finishes transfering the task attempt outputs from the worker. |
+| `DONE` | If present, time at which the task attempt was returned to the application. Signals that the task has been completed and that no more attempts were tried. |
+| `reason` | One of `SUCCESS`, `SIGNAL`, `END_TIME`, `FORSAKEN`, `MAX_RETRIES`, `MAX_WALLTIME`, or `UNKNOWN`, indicating reason for the task attempt final status. |
+| `exit_code` | For tasks attempts that actually ran on a worker, their process exit status. |
+| `last_state` | The last know state know for the task attempt. This is `DONE` for completed tasks attempts. |
+| `last_state_time` | Time at which the task attempt reached `last_state`. |
+| `DISCONNECTION` | If present, time at which the task attempt was lost because the worker disconnected. |
 | `requested_cores` | Explicit number of cores requested by the task. |
 | `requested_memory` | Explicit memory size in MB requested by the task. |
 | `requested_disk` | Explicit disk size in MB requested by the task. |
 | `requested_gpus` | Explicit number of gpus requested by the task. |
-| `library` | Name of the library for tasks defined as `FunctionCall`s. |
-| `RUNNING` | Time at which the task attempt was dispatched to a worker. |
-| `worker_id` | Unique worker identifier that ran the task attempt. |
 | `allocated_cores` | Actual number of cores reserved for the task attempt at the worker. |
 | `allocated_memory` | Actual memory size in MB reserved for the task attempt at the worker. |
 | `allocated_disk` | Actual disk size in MB reserved for by the task attempt at the worker. |
 | `allocated_gpus` | Actual number of gpus reserved for the task attempt at the worker. |
+| `measured_cores` | If using resource monitoring, the number of cores used by the task attempt at the worker. |
+| `measured_memory` | If using resource monitoring, the memory size in MB used by the task attempt at the worker. |
+| `measured_disk` | If using resource monitoring, the disk size in MB used by by the task attempt at the worker. |
+| `measured_gpus` | If using resource monitoring, the number of gpus used by the task attempt at the worker. |
+| `measured_wall_time` | If using resource monitoring, the time it took to run the task attempt at the worker according to the monitor. |
+| `library` | Name of the library for tasks defined as `FunctionCall`s. |
+| `worker_id` | Unique worker identifier that ran the task attempt. |
 | `time_input_mgr` | Time it took the manager to dispatch the task attempt to the worker. |
 | `time_output_mgr` | Time it took the manager to fetch the output files of the task attempt from the worker. |
 | `size_input_mgr` | Size in bytes of the data transmited when dispatching the task attempt to the worker. |
@@ -2626,17 +2637,6 @@ following columns:
 | `time_worker_end` | Time at which the task attempt stopped running at the worker. |
 | `time_commit_start` | Time at which the task attempt started to be dispatched to the worker. |
 | `time_commit_end` | Time at which the task attempt finished to be dispatched to the worker. |
-| `DISCONNECTION` | If present, time at which the task attempt was lost because the worker disconnected. |
-| `WAITING_RETRIEVAL` | If present, time at which the manager becomes aware that the task attempt outputs are ready to be retrieved. |
-| `RETRIEVED` | If present, time at which the manager finishes transfering the task attempt outputs from the worker. |
-| `reason` | One of `SUCCESS`, `SIGNAL`, `END_TIME`, `FORSAKEN`, `MAX_RETRIES`, `MAX_WALLTIME`, or `UNKNOWN`, indicating reason for the task attempt final status. |
-| `exit_code` | For tasks attempts that actually ran on a worker, their process exit status. |
-| `measured_cores` | If using resource monitoring, the number of cores used by the task attempt at the worker. |
-| `measured_memory` | If using resource monitoring, the memory size in MB used by the task attempt at the worker. |
-| `measured_disk` | If using resource monitoring, the disk size in MB used by by the task attempt at the worker. |
-| `measured_gpus` | If using resource monitoring, the number of gpus used by the task attempt at the worker. |
-| `measured_wall_time` | If using resource monitoring, the time it took to run the task attempt at the worker according to the monitor. |
-| `DONE` | If present, time at which the task attempt was returned to the application. Signals that the task has been completed and that no more attempts were tried. |
 | `slot` | Virtual slot indicator whithin the worker to aid the visual representation of the allocation of resources. Never larger than the number of cores in the worker. |
 
 
@@ -2646,13 +2646,13 @@ For the *transfers* file:
 |------------ |---------|
 | `worker_id` | Unique worker identifier from/which the file transfer occurred. |
 | `hostport`  | Host and port of the worker as seen by the manager. |
-| `time`  | Time at which the transfer was completed. |
+| `time`  | Time at which the manager receive the transfer confirmation message. |
+| `wall_time`  | Time in seconds of the duration of the transfer. |
+| `start_time`  | Time in seconds the transfer started. |
 | `direction`  | One of `INPUT` (to the worker), `OUTPUT` (from the worker), `CACHE_UPDATE` (generated by a task, or copied from another worker) |
 | `filetype`  | One of `file`, `url`, `temp`, or `task` (for minitasks). |
 | `filename`  | Name of the file in the transfer. |
 | `size`  | Size in MB of the file transfered. |
-| `wall_time`  | Time in seconds of the duration of the transfer. |
-| `start_time`  | Time in seconds the transfer started. |
 
 For the *transfers* file:
 | Column | Description |
@@ -2664,7 +2664,7 @@ For the *transfers* file:
 | `cores` | Total number of cores available at the worker.|
 | `gpus` | Total number of gpus available at the worker.|
 | `memory` | Total memory in MB available at the worker.|
-| `memory` | Total disk space in MB available at the worker.|
+| `disk` | Total disk space in MB available at the worker.|
 
 ### Task Graph Log
 
