@@ -2655,6 +2655,7 @@ For the *transfers* file:
 | `size`  | Size in MB of the file transfered. |
 
 For the *workers* file:
+
 | Column | Description |
 |------------ |---------|
 | `worker_id` | Unique worker identifier from/which the file transfer occurred. |
