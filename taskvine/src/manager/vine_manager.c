@@ -1065,10 +1065,10 @@ static int consider_tempfile_replications(struct vine_manager *q)
 			continue;
 		}
 
-		/* are there any available sources? */
-		struct set *sources = hash_table_lookup(q->file_worker_table, f->cached_name);
-		if (!sources) {
-			/* If no sources found, it indicates that the file doesn't exist, either pruned or lost.
+		/* are there any available source workers? */
+		struct set *source_workers = hash_table_lookup(q->file_worker_table, f->cached_name);
+		if (!source_workers) {
+			/* If no source workers found, it indicates that the file doesn't exist, either pruned or lost.
 			Because a pruned file is removed from the recovery queue, so it definitely indicates that the file is lost. */
 			if (q->transfer_temps_recovery && file_needs_recovery(q, f)) {
 				vine_manager_consider_recovery_task(q, f, f->recovery_task);
@@ -1080,7 +1080,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		/* at least one source is able to transfer? */
 		int has_valid_source = 0;
 		struct vine_worker_info *s;
-		SET_ITERATE(sources, s)
+		SET_ITERATE(source_workers, s)
 		{
 			if (s->transfer_port_active && s->outgoing_xfer_counter < q->worker_source_max_transfers && !s->draining) {
 				has_valid_source = 1;
@@ -1092,16 +1092,16 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		}
 
 		/* has this file been fully replicated? */
-		int nsources = set_size(sources);
-		int to_find = MIN(q->temp_replica_count - nsources, q->transfer_replica_per_cycle);
+		int nsource_workers = set_size(source_workers);
+		int to_find = MIN(q->temp_replica_count - nsource_workers, q->transfer_replica_per_cycle);
 		if (to_find <= 0) {
 			list_push_tail(to_remove, xxstrdup(f->cached_name));
 			continue;
 		}
 
-		// debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsources, f->cached_name, to_find);
+		// debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsource_workers, f->cached_name, to_find);
 
-		int round_replication_request_sent = vine_file_replica_table_replicate(q, f, sources, to_find);
+		int round_replication_request_sent = vine_file_replica_table_replicate(q, f, source_workers, to_find);
 		total_replication_request_sent += round_replication_request_sent;
 
 		if (total_replication_request_sent >= q->attempt_schedule_depth) {
@@ -6443,10 +6443,10 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 	}
 
 	/* delete all of the replicas present at remote workers. */
-	struct set *sources = hash_table_lookup(m->file_worker_table, f->cached_name);
-	if (sources && set_size(sources) > 0) {
+	struct set *source_workers = hash_table_lookup(m->file_worker_table, f->cached_name);
+	if (source_workers && set_size(source_workers) > 0) {
 		struct vine_worker_info *w;
-		SET_ITERATE(sources, w)
+		SET_ITERATE(source_workers, w)
 		{
 			delete_worker_file(m, w, f->cached_name, 0, 0);
 		}
