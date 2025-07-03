@@ -14,6 +14,10 @@ char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info
 
 int vine_current_transfers_remove(struct vine_manager *q, const char *id);
 
+struct vine_worker_info *vine_current_transfers_lookup_source_worker(struct vine_manager *q, const char *id);
+
+struct vine_worker_info *vine_current_transfers_lookup_dest_worker(struct vine_manager *q, const char *id);
+
 int vine_current_transfers_set_failure(struct vine_manager *q, char *id, const char *cachename);
 
 void vine_current_transfers_set_success(struct vine_manager *q, char *id);

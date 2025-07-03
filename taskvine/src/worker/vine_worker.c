@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "vine_transfer.h"
 #include "vine_transfer_server.h"
 #include "vine_watcher.h"
+#include "vine_worker.h"
 #include "vine_worker_options.h"
 #include "vine_workspace.h"
 

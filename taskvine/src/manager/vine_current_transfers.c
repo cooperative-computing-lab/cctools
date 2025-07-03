@@ -77,6 +77,34 @@ int vine_current_transfers_remove(struct vine_manager *q, const char *id)
 	}
 }
 
+struct vine_worker_info *vine_current_transfers_lookup_source_worker(struct vine_manager *q, const char *id)
+{
+	if (!q || !id) {
+		return NULL;
+	}
+
+	struct vine_transfer_pair *p = hash_table_lookup(q->current_transfer_table, id);
+	if (p) {
+		return p->source_worker;
+	}
+
+	return NULL;
+}
+
+struct vine_worker_info *vine_current_transfers_lookup_dest_worker(struct vine_manager *q, const char *id)
+{
+	if (!q || !id) {
+		return NULL;
+	}
+
+	struct vine_transfer_pair *p = hash_table_lookup(q->current_transfer_table, id);
+	if (p) {
+		return p->dest_worker;
+	}
+
+	return NULL;
+}
+
 void set_throttle(struct vine_manager *m, struct vine_worker_info *w, int is_destination)
 {
 	if (!w) {

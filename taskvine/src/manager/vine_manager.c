@@ -470,7 +470,17 @@ static vine_msg_code_t handle_cache_invalid(struct vine_manager *q, struct vine_
 		debug(D_VINE, "%s (%s) invalidated %s with error: %s", w->hostname, w->addrport, cachename, message);
 		free(message);
 
+		/* the replica is definitely not on the dest worker */
 		process_replica_on_event(q, w, cachename, VINE_FILE_REPLICA_STATE_TRANSITION_EVENT_CACHE_INVALID);
+
+		/* if the replica state on the source worker is DELETING, we force it to DELETED */
+		struct vine_worker_info *source_worker = vine_current_transfers_lookup_source_worker(q, transfer_id);
+		if (source_worker) {
+			struct vine_file_replica *replica_on_source_worker = vine_file_replica_table_lookup(source_worker, cachename);
+			if (replica_on_source_worker && replica_on_source_worker->state == VINE_FILE_REPLICA_STATE_DELETING) {
+				process_replica_on_event(q, source_worker, cachename, VINE_FILE_REPLICA_STATE_TRANSITION_EVENT_CACHE_INVALID);
+			}
+		}
 
 		/* If the third argument was given, also remove the transfer record */
 		if (n >= 3) {
