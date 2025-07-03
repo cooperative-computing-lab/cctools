@@ -160,7 +160,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 	for (int i = 0; i < nsource_workers; i++) {
 
 		source_worker = source_workers_frozen[i];
-		int dest_found = 0;
+		int dest_workers_found = 0;
 
 		// skip if the file on the source is not ready to transfer
 		struct vine_file_replica *replica = hash_table_lookup(source_worker->current_files, f->cached_name);
@@ -176,39 +176,39 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		}
 
 		char *id;
-		struct vine_worker_info *dest;
+		struct vine_worker_info *dest_worker;
 		int offset_bookkeep;
 
-		HASH_TABLE_ITERATE_RANDOM_START(m->worker_table, offset_bookkeep, id, dest)
+		HASH_TABLE_ITERATE_RANDOM_START(m->worker_table, offset_bookkeep, id, dest_worker)
 		{
 			// skip if the source and destination are on the same host
-			if (set_lookup(source_workers, dest) || strcmp(source_worker->hostname, dest->hostname) == 0) {
+			if (set_lookup(source_workers, dest_worker) || strcmp(source_worker->hostname, dest_worker->hostname) == 0) {
 				continue;
 			}
 
 			// skip if the destination is not ready to transfer
-			if (!dest->transfer_port_active) {
+			if (!dest_worker->transfer_port_active) {
 				continue;
 			}
 
 			// skip if the destination is draining
-			if (dest->draining) {
+			if (dest_worker->draining) {
 				continue;
 			}
 
 			// skip if the destination is busy with other transfers
-			if (dest->incoming_xfer_counter >= m->worker_source_max_transfers) {
+			if (dest_worker->incoming_xfer_counter >= m->worker_source_max_transfers) {
 				continue;
 			}
 
-			debug(D_VINE, "replicating %s from %s to %s", f->cached_name, source_worker->addrport, dest->addrport);
+			debug(D_VINE, "replicating %s from %s to %s", f->cached_name, source_worker->addrport, dest_worker->addrport);
 
-			vine_manager_put_url_now(m, dest, source_worker, source_addr, f);
+			vine_manager_put_url_now(m, dest_worker, source_worker, source_addr, f);
 
 			round_replication_request_sent++;
 
 			// break if we have found enough destinations for this source
-			if (++dest_found >= MIN(m->file_source_max_transfers, to_find)) {
+			if (++dest_workers_found >= MIN(m->file_source_max_transfers, to_find)) {
 				break;
 			}
 

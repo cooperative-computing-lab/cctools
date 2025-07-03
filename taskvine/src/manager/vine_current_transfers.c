@@ -15,20 +15,20 @@ See the file COPYING for details.
 #include "debug.h"
 
 struct vine_transfer_pair {
-	struct vine_worker_info *to;
+	struct vine_worker_info *dest_worker;
 	struct vine_worker_info *source_worker;
 	char *source_url;
 };
 
-static struct vine_transfer_pair *vine_transfer_pair_create(struct vine_worker_info *to, struct vine_worker_info *source_worker, const char *source_url)
+static struct vine_transfer_pair *vine_transfer_pair_create(struct vine_worker_info *dest_worker, struct vine_worker_info *source_worker, const char *source_url)
 {
 	struct vine_transfer_pair *t = malloc(sizeof(struct vine_transfer_pair));
-	t->to = to;
+	t->dest_worker = dest_worker;
 	t->source_worker = source_worker;
 	t->source_url = source_url ? xxstrdup(source_url) : 0;
 
-	if (t->to) {
-		t->to->incoming_xfer_counter++;
+	if (t->dest_worker) {
+		t->dest_worker->incoming_xfer_counter++;
 	}
 	if (t->source_worker) {
 		t->source_worker->outgoing_xfer_counter++;
@@ -40,8 +40,8 @@ static struct vine_transfer_pair *vine_transfer_pair_create(struct vine_worker_i
 static void vine_transfer_pair_delete(struct vine_transfer_pair *p)
 {
 	if (p) {
-		if (p->to) {
-			p->to->incoming_xfer_counter--;
+		if (p->dest_worker) {
+			p->dest_worker->incoming_xfer_counter--;
 		}
 		if (p->source_worker) {
 			p->source_worker->outgoing_xfer_counter--;
@@ -52,13 +52,13 @@ static void vine_transfer_pair_delete(struct vine_transfer_pair *p)
 }
 
 // add a current transaction to the transfer table
-char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info *to, struct vine_worker_info *source_worker, const char *source_url)
+char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info *dest_worker, struct vine_worker_info *source_worker, const char *source_url)
 {
 	cctools_uuid_t uuid;
 	cctools_uuid_create(&uuid);
 
 	char *transfer_id = strdup(uuid.str);
-	struct vine_transfer_pair *t = vine_transfer_pair_create(to, source_worker, source_url);
+	struct vine_transfer_pair *t = vine_transfer_pair_create(dest_worker, source_worker, source_url);
 
 	hash_table_insert(q->current_transfer_table, transfer_id, t);
 	return transfer_id;
@@ -131,7 +131,7 @@ int vine_current_transfers_set_failure(struct vine_manager *q, char *id, const c
 	}
 
 	struct vine_worker_info *source_worker = p->source_worker;
-	struct vine_worker_info *to_worker = p->to;
+	struct vine_worker_info *dest_worker = p->dest_worker;
 
 	/* If p is valid, the elements of p should always be valid, because a failed worker causes the transfer record to be removed,
 	 * not nulled out. This shouldn't happen, but we check and emit an error just in case. */
@@ -140,7 +140,7 @@ int vine_current_transfers_set_failure(struct vine_manager *q, char *id, const c
 		debug(D_ERROR, "vine_current_transfers_set_failure: transfer record for file %s with id %s is found, but source worker is null", cachename, id);
 		error = 1;
 	}
-	if (!to_worker) {
+	if (!dest_worker) {
 		debug(D_ERROR, "vine_current_transfers_set_failure: transfer record for file %s with id %s is found, but destination worker is null", cachename, id);
 		error = 1;
 	}
@@ -157,9 +157,9 @@ int vine_current_transfers_set_failure(struct vine_manager *q, char *id, const c
 		source_worker->xfer_total_bad_source_counter++;
 		set_throttle(q, source_worker, 0);
 
-		to_worker->xfer_streak_bad_destination_counter++;
-		to_worker->xfer_total_bad_destination_counter++;
-		set_throttle(q, to_worker, 1);
+		dest_worker->xfer_streak_bad_destination_counter++;
+		dest_worker->xfer_total_bad_destination_counter++;
+		set_throttle(q, dest_worker, 1);
 		return 1;
 	}
 
@@ -182,12 +182,12 @@ void vine_current_transfers_set_success(struct vine_manager *q, char *id)
 		source->xfer_total_good_source_counter++;
 	}
 
-	struct vine_worker_info *to = p->to;
-	if (to) {
-		vine_blocklist_unblock(q, to->addrport);
+	struct vine_worker_info *dest_worker = p->dest_worker;
+	if (dest_worker) {
+		vine_blocklist_unblock(q, dest_worker->addrport);
 
-		to->xfer_streak_bad_destination_counter = 0;
-		to->xfer_total_good_destination_counter++;
+		dest_worker->xfer_streak_bad_destination_counter = 0;
+		dest_worker->xfer_total_good_destination_counter++;
 	}
 }
 
@@ -222,7 +222,7 @@ int vine_current_transfers_wipe_worker(struct vine_manager *q, struct vine_worke
 	struct vine_transfer_pair *t;
 	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
 	{
-		if (t->to == w || t->source_worker == w) {
+		if (t->dest_worker == w || t->source_worker == w) {
 			list_push_tail(ids_to_remove, xxstrdup(id));
 		}
 	}
