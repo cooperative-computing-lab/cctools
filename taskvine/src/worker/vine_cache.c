@@ -311,6 +311,16 @@ int vine_cache_contains(struct vine_cache *c, const char *cachename)
 }
 
 /*
+Return the status of the requested cache item.
+*/
+
+vine_cache_status_t vine_cache_get_status(struct vine_cache *c, const char *cachename)
+{
+	struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
+	return f ? f->status : VINE_CACHE_STATUS_UNKNOWN;
+}
+
+/*
 Queue a remote file transfer to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */
