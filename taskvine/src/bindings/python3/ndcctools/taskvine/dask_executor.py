@@ -326,8 +326,16 @@ class DaskVine(Manager):
                         if t.key in dsk:
                             bar_update(advance=1)
 
-                        if self.prune_files:
-                            self._prune_file(dag, t.key)
+                        if self.prune_depth > 0:
+                            for p in dag.pending_producers[t.key]:
+                                dag.pending_consumers[p] -= 1
+                                if dag.pending_consumers[p] == 0:
+                                    p_result = dag.get_result(p)
+                                    self.prune_file(p_result._file)
+
+
+                        #if self.prune_files:
+                        #    self._prune_file(dag, t.key)
                     else:
                         retries_left = t.decrement_retry()
                         print(f"task id {t.id} key {t.key} failed: {t.result}. {retries_left} attempts left.\n{t.std_output}")

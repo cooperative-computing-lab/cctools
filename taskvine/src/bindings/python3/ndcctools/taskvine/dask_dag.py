@@ -241,8 +241,8 @@ class DaskVineDag:
                     producers.add(producer)
 
                     if depth < self.prune_depth:
-                        next_producers = [(p, depth + 1) for p in self._children[producer]]
-                        queue.extedn(next_producers)
+                        next_producers = [(p, depth + 1) for p in self._dependencies_of[producer]]
+                        queue.extend(next_producers)
             self.pending_producers[key] = producers
             
     def get_ready(self):
