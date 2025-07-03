@@ -40,6 +40,7 @@ struct vine_cache {
 	struct hash_table *table;
 	struct hash_table *pending_transfers;
 	struct hash_table *processing_transfers;
+	struct hash_table *cache_update_sent;
 	char *cache_dir;
 	int max_transfer_procs;
 };
@@ -56,6 +57,7 @@ struct vine_cache *vine_cache_create(const char *cache_dir, int max_procs)
 	c->table = hash_table_create(0, 0);
 	c->pending_transfers = hash_table_create(0, 0);
 	c->processing_transfers = hash_table_create(0, 0);
+	c->cache_update_sent = hash_table_create(0, 0);
 	c->cache_dir = strdup(cache_dir);
 	c->max_transfer_procs = max_procs;
 	return c;
@@ -217,9 +219,11 @@ void vine_cache_delete(struct vine_cache *c)
 
 	hash_table_clear(c->pending_transfers, NULL);
 	hash_table_clear(c->processing_transfers, NULL);
+	hash_table_clear(c->cache_update_sent, NULL);
 
 	hash_table_delete(c->pending_transfers);
 	hash_table_delete(c->processing_transfers);
+	hash_table_delete(c->cache_update_sent);
 
 	hash_table_clear(c->table, (void *)vine_cache_file_delete);
 	hash_table_delete(c->table);
@@ -412,6 +416,7 @@ int vine_cache_remove(struct vine_cache *c, const char *cachename, struct link *
 
 	hash_table_remove(c->pending_transfers, cachename);
 	hash_table_remove(c->processing_transfers, cachename);
+	hash_table_remove(c->cache_update_sent, cachename);
 
 	/* Then remove the disk state associated with the file. */
 	char *data_path = vine_cache_data_path(c, cachename);

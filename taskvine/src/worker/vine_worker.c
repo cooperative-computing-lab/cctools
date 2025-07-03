@@ -289,20 +289,6 @@ void send_complete_tasks(struct link *l)
 	struct vine_process *p;
 	for (visited = 0; visited < size; visited++) {
 		p = itable_pop(procs_complete);
-
-		if (p->result == VINE_RESULT_FORSAKEN) {
-			struct vine_mount *m;
-			LIST_ITERATE(p->task->input_mounts, m)
-			{
-				vine_cache_status_t status = vine_cache_ensure(cache_manager, m->file->cached_name);
-				if (status == VINE_CACHE_STATUS_UNKNOWN || status == VINE_CACHE_STATUS_FAILED) {
-					char *error_message = string_format("Input file %s for task %d is unavailable in worker cache", m->file->cached_name, p->task->task_id);
-					vine_worker_send_cache_invalid(l, m->file->cached_name, error_message);
-					free(error_message);
-				}
-			}
-		}
-
 		if (p->output_length <= 1024 && p->output_length > 0) {
 
 			char *output;
@@ -528,6 +514,8 @@ void vine_worker_send_cache_update(struct link *manager, const char *cachename, 
 			(long long)transfer_time,
 			(long long)transfer_start,
 			transfer_id);
+
+	hash_table_insert(cache_manager->cache_update_sent, cachename, (void *)1);
 
 	free(transfer_id);
 }
@@ -1059,6 +1047,16 @@ static int do_unlink(struct link *manager, const char *path)
 	int result = 0;
 
 	if (path_within_dir(cached_path, workspace->workspace_dir)) {
+		/*
+		 * Manager's replica state machine expects a response to every unlink message.
+		 * If no cache-update was sent for this file, send cache-invalid to prevent
+		 * the replica state from getting stuck in DELETING and causing infinite
+		 * FORSAKEN task loops. */
+		if (!hash_table_lookup(cache_manager->cache_update_sent, path)) {
+			char *error_message = string_format("File '%s' unlinked without transfer completion.", path);
+			vine_worker_send_cache_invalid(manager, path, error_message);
+			free(error_message);
+		}
 		vine_cache_remove(cache_manager, path, manager);
 		result = 1;
 	} else {
