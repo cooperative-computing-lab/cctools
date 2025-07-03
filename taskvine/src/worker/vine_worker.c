@@ -288,6 +288,20 @@ void send_complete_tasks(struct link *l)
 	struct vine_process *p;
 	for (visited = 0; visited < size; visited++) {
 		p = itable_pop(procs_complete);
+
+		if (p->result == VINE_RESULT_FORSAKEN) {
+			struct vine_mount *m;
+			LIST_ITERATE(p->task->input_mounts, m)
+			{
+				vine_cache_status_t status = vine_cache_ensure(cache_manager, m->file->cached_name);
+				if (status == VINE_CACHE_STATUS_UNKNOWN || status == VINE_CACHE_STATUS_FAILED) {
+					char *error_message = string_format("Input file %s for task %d is unavailable in worker cache", m->file->cached_name, p->task->task_id);
+					vine_worker_send_cache_invalid(l, m->file->cached_name, error_message);
+					free(error_message);
+				}
+			}
+		}
+
 		if (p->output_length <= 1024 && p->output_length > 0) {
 
 			char *output;
