@@ -144,30 +144,34 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 }
 
 // trigger replications of file to satisfy temp_replica_count
-int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *f, struct set *sources, int to_find)
+int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *f, struct set *source_workers, int to_find)
 {
-	int nsources = set_size(sources);
+	if (!f || !source_workers) {
+		return 0;
+	}
+
+	int nsource_workers = set_size(source_workers);
 	int round_replication_request_sent = 0;
 
 	/* get the elements of set so we can insert new replicas to sources */
-	struct vine_worker_info **sources_frozen = (struct vine_worker_info **)set_values(sources);
-	struct vine_worker_info *source;
+	struct vine_worker_info **source_workers_frozen = (struct vine_worker_info **)set_values(source_workers);
+	struct vine_worker_info *source_worker;
 
-	for (int i = 0; i < nsources; i++) {
+	for (int i = 0; i < nsource_workers; i++) {
 
-		source = sources_frozen[i];
+		source_worker = source_workers_frozen[i];
 		int dest_found = 0;
 
 		// skip if the file on the source is not ready to transfer
-		struct vine_file_replica *replica = hash_table_lookup(source->current_files, f->cached_name);
+		struct vine_file_replica *replica = hash_table_lookup(source_worker->current_files, f->cached_name);
 		if (!replica || replica->state != VINE_FILE_REPLICA_STATE_READY) {
 			continue;
 		}
 
-		char *source_addr = string_format("%s/%s", source->transfer_url, f->cached_name);
+		char *source_addr = string_format("%s/%s", source_worker->transfer_url, f->cached_name);
 
 		// skip if the source is busy with other transfers
-		if (source->outgoing_xfer_counter >= m->worker_source_max_transfers) {
+		if (source_worker->outgoing_xfer_counter >= m->worker_source_max_transfers) {
 			continue;
 		}
 
@@ -178,7 +182,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		HASH_TABLE_ITERATE_RANDOM_START(m->worker_table, offset_bookkeep, id, dest)
 		{
 			// skip if the source and destination are on the same host
-			if (set_lookup(sources, dest) || strcmp(source->hostname, dest->hostname) == 0) {
+			if (set_lookup(source_workers, dest) || strcmp(source_worker->hostname, dest->hostname) == 0) {
 				continue;
 			}
 
@@ -197,9 +201,9 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 				continue;
 			}
 
-			debug(D_VINE, "replicating %s from %s to %s", f->cached_name, source->addrport, dest->addrport);
+			debug(D_VINE, "replicating %s from %s to %s", f->cached_name, source_worker->addrport, dest->addrport);
 
-			vine_manager_put_url_now(m, dest, source, source_addr, f);
+			vine_manager_put_url_now(m, dest, source_worker, source_addr, f);
 
 			round_replication_request_sent++;
 
@@ -209,7 +213,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 			}
 
 			// break if the source becomes busy with transfers
-			if (source->outgoing_xfer_counter >= m->worker_source_max_transfers) {
+			if (source_worker->outgoing_xfer_counter >= m->worker_source_max_transfers) {
 				break;
 			}
 		}
@@ -222,7 +226,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		}
 	}
 
-	free(sources_frozen);
+	free(source_workers_frozen);
 
 	return round_replication_request_sent;
 }
