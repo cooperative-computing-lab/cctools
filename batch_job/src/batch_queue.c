@@ -44,6 +44,7 @@ static struct batch_queue_module batch_queue_unknown = {
 		NULL,
 		NULL,
 		NULL,
+		NULL,
 };
 
 #define BATCH_JOB_SYSTEMS "local, vine, wq, condor, uge (sge), pbs, lsf, torque, moab, slurm, amazon, k8s, flux, dryrun"
@@ -247,6 +248,11 @@ batch_queue_id_t batch_queue_wait_timeout(struct batch_queue *q, struct batch_jo
 int batch_queue_remove(struct batch_queue *q, batch_queue_id_t jobid)
 {
 	return q->module->remove(q, jobid);
+}
+
+int batch_queue_prune(struct batch_queue *q, const char *filename)
+{
+	return q->module->prune(q, filename);
 }
 
 /* vim: set noexpandtab tabstop=8: */

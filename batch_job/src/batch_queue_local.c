@@ -123,6 +123,7 @@ static int batch_queue_local_create(struct batch_queue *q)
 batch_queue_stub_free(local);
 batch_queue_stub_port(local);
 batch_queue_stub_option_update(local);
+batch_queue_stub_prune(local);
 
 const struct batch_queue_module batch_queue_local = {
 		BATCH_QUEUE_TYPE_LOCAL,
@@ -136,6 +137,7 @@ const struct batch_queue_module batch_queue_local = {
 		batch_queue_local_submit,
 		batch_queue_local_wait,
 		batch_queue_local_remove,
+		batch_queue_local_prune,
 };
 
 /* vim: set noexpandtab tabstop=8: */
