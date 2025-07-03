@@ -135,16 +135,13 @@ int vine_current_transfers_set_failure(struct vine_manager *q, char *id, const c
 
 	/* If p is valid, the elements of p should always be valid, because a failed worker causes the transfer record to be removed,
 	 * not nulled out. This shouldn't happen, but we check and emit an error just in case. */
-	int error = 0;
-	if (!source_worker) {
-		debug(D_ERROR, "vine_current_transfers_set_failure: transfer record for file %s with id %s is found, but source worker is null", cachename, id);
-		error = 1;
-	}
-	if (!dest_worker) {
-		debug(D_ERROR, "vine_current_transfers_set_failure: transfer record for file %s with id %s is found, but destination worker is null", cachename, id);
-		error = 1;
-	}
-	if (error) {
+	if (!source_worker || !dest_worker) {
+		if (!source_worker) {
+			debug(D_ERROR, "%s: transfer record for file %s with id %s is found, but source worker is null", __func__, cachename, id);
+		}
+		if (!dest_worker) {
+			debug(D_ERROR, "%s: transfer record for file %s with id %s is found, but destination worker is null", __func__, cachename, id);
+		}
 		return 0;
 	}
 
