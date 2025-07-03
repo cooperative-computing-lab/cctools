@@ -939,3 +939,20 @@ int vine_cache_wait(struct vine_cache *c, struct link *manager)
 	}
 	return 1;
 }
+
+/*
+Check if a cache-update message was sent for this file
+*/
+int vine_cache_has_sent_update(struct vine_cache *c, const char *cachename)
+{
+	return hash_table_lookup(c->cache_update_sent, cachename) != NULL;
+}
+
+/*
+Record that a cache-update message was sent for this file
+*/
+
+void vine_cache_record_update_sent(struct vine_cache *c, const char *cachename)
+{
+	hash_table_insert(c->cache_update_sent, cachename, (void *)1);
+}

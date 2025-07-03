@@ -515,7 +515,7 @@ void vine_worker_send_cache_update(struct link *manager, const char *cachename, 
 			(long long)transfer_start,
 			transfer_id);
 
-	hash_table_insert(cache_manager->cache_update_sent, cachename, (void *)1);
+	vine_cache_record_update_sent(cache_manager, cachename);
 
 	free(transfer_id);
 }
@@ -1052,7 +1052,7 @@ static int do_unlink(struct link *manager, const char *path)
 		 * If no cache-update was sent for this file, send cache-invalid to prevent
 		 * the replica state from getting stuck in DELETING and causing infinite
 		 * FORSAKEN task loops. */
-		if (!hash_table_lookup(cache_manager->cache_update_sent, path)) {
+		if (!vine_cache_has_sent_update(cache_manager, path)) {
 			char *error_message = string_format("File '%s' unlinked without transfer completion.", path);
 			vine_worker_send_cache_invalid(manager, path, error_message);
 			free(error_message);

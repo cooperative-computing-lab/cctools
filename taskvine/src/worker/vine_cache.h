@@ -64,5 +64,7 @@ int vine_cache_remove( struct vine_cache *c, const char *cachename, struct link 
 int vine_cache_contains( struct vine_cache *c, const char *cachename );
 int vine_cache_wait( struct vine_cache *c, struct link *manager );
 int vine_cache_process_pending_transfers(struct vine_cache *c);
+int vine_cache_has_sent_update( struct vine_cache *c, const char *cachename );
+void vine_cache_record_update_sent( struct vine_cache *c, const char *cachename );
 
 #endif
