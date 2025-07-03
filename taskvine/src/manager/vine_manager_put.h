@@ -18,7 +18,7 @@ This module is private to the manager and should not be invoked by the end user.
 
 vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t );
 vine_result_code_t vine_manager_put_task( struct vine_manager *m, struct vine_worker_info *w, struct vine_task *t, const char *command_line, struct rmsummary *limits, struct vine_file *target );
-vine_result_code_t vine_manager_put_url_now( struct vine_manager *q, struct vine_worker_info *w, const char *source, struct vine_file *f );
+vine_result_code_t vine_manager_put_url_now( struct vine_manager *q, struct vine_worker_info *dest_worker, struct vine_worker_info *source_worker, const char *source_url, struct vine_file *f );
 
 #endif
 

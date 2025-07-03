@@ -32,6 +32,10 @@ struct vine_cache_file *vine_cache_file_create(vine_cache_type_t cache_type, con
 
 void vine_cache_file_delete(struct vine_cache_file *f)
 {
+	if (!f) {
+		return;
+	}
+
 	if (f->mini_task) {
 		vine_task_delete(f->mini_task);
 	}
