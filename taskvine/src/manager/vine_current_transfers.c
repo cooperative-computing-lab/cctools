@@ -150,6 +150,8 @@ int vine_current_transfers_set_failure(struct vine_manager *q, char *id, const c
 	 * some reason, failed to transfer it to the destination. */
 	struct vine_file_replica *source_replica = vine_file_replica_table_lookup(source_worker, cachename);
 	if (source_replica && source_replica->state == VINE_FILE_REPLICA_STATE_READY) {
+		debug(D_VINE, "Unable to transfer a READY replica from %s (%s) to %s (%s) for file %s \n", source_worker->hostname, source_worker->addrport, dest_worker->hostname, dest_worker->addrport, cachename);
+
 		source_worker->xfer_streak_bad_source_counter++;
 		source_worker->xfer_total_bad_source_counter++;
 		set_throttle(q, source_worker, 0);
