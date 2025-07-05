@@ -411,14 +411,10 @@ int vine_cache_remove(struct vine_cache *c, const char *cachename, struct link *
 	vine_cache_kill(c, f, cachename, manager);
 
 	/* Manager's replica state machine expects a response to every unlink message.
-	 * Other states except PENDING and UNKNOWN have already sent messages, so we only
-	 * send a message for these two states. */
+	 * Other states except PENDING have already sent messages, either cache-update or cache-invalid,
+	 * so we only send cache-invalid for transfers in PENDING state. */
 	if (f->status == VINE_CACHE_STATUS_PENDING) {
 		char *msg = string_format("File '%s' removed in PENDING state.", cachename);
-		vine_worker_send_cache_invalid(manager, cachename, msg);
-		free(msg);
-	} else if (f->status == VINE_CACHE_STATUS_UNKNOWN) {
-		char *msg = string_format("File '%s' removed in UNKNOWN state.", cachename);
 		vine_worker_send_cache_invalid(manager, cachename, msg);
 		free(msg);
 	}
