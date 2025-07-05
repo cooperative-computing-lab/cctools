@@ -272,7 +272,7 @@ void vine_txn_log_write_transfer(struct vine_manager *q, struct vine_worker_info
 	buffer_init(&B);
 	buffer_printf(&B, "WORKER %s TRANSFER ", w->workerid);
 	buffer_printf(&B, is_input ? "INPUT" : "OUTPUT");
-	buffer_printf(&B, " %s", m->remote_name);
+	buffer_printf(&B, " %s", m->file->cached_name);
 	buffer_printf(&B, " %lld", (long long)size_in_bytes);
 	buffer_printf(&B, " %llu", (unsigned long long)time_in_usecs);
 	buffer_printf(&B, " %llu", (unsigned long long)start_in_usecs);

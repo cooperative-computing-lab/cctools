@@ -95,7 +95,47 @@ class Manager:
         for attempts in self.tasks_attempts.values():
             for attempt in attempts.values():
                 all_tasks.append(attempt)
-        tasks_df = pd.DataFrame.from_records(all_tasks)
+
+        keys = [
+            "task_id",
+            "attempt_number",
+            "category",
+            "READY",
+            "RUNNING",
+            "WAITING_RETRIEVAL",
+            "RETRIEVED",
+            "DONE",
+            "reason",
+            "exit_code",
+            "last_state",
+            "last_state_time",
+            "DISCONNECTION",
+            "requested_cores",
+            "requested_memory",
+            "requested_disk",
+            "requested_gpus",
+            "allocated_cores",
+            "allocated_memory",
+            "allocated_disk",
+            "allocated_gpus",
+            "measured_cores",
+            "measured_memory",
+            "measured_disk",
+            "measured_gpus",
+            "measured_wall_time",
+            "library",
+            "worker_id",
+            "time_input_mgr",
+            "time_output_mgr",
+            "size_input_mgr",
+            "size_output_mgr",
+            "time_worker_start",
+            "time_worker_end",
+            "time_commit_start",
+            "time_commit_end",
+            "slot",
+        ]
+        tasks_df = pd.DataFrame.from_records(all_tasks, columns=keys)
 
         #  fix time_worker_start 0 bug
         tasks_df["time_worker_start"] = tasks_df[
@@ -164,7 +204,8 @@ class Manager:
         all_workers = []
         for worker in self.worker_lifetime.values():
             all_workers.append(worker)
-        workers_df = pd.DataFrame.from_records(all_workers)
+        keys = "worker_id hostport CONNECTION DISCONNECTION cores memory disk gpus".split()
+        workers_df = pd.DataFrame.from_records(all_workers, columns=keys)
 
         # fill up disconnect times for workers that survive the manager
         workers_df.loc[
@@ -174,7 +215,7 @@ class Manager:
 
     def make_table_transfers(self):
         all_transfers = []
-        keys = "worker_id hostport time direction filetype filename size wall_time start_time".split()
+        keys = "worker_id hostport time wall_time start_time direction filetype filename size".split()
         for per_worker in self.worker_transfers.values():
             all_transfers.extend(per_worker)
         transfers_df = pd.DataFrame(all_transfers, columns=keys)

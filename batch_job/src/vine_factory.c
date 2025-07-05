@@ -117,6 +117,9 @@ static char *worker_command = 0;
 /* Unique number assigned to each worker instance for troubleshooting. */
 static int worker_instance = 0;
 
+/* Space-separated string listing the hostnames of workers not to be used. */
+static char *workers_blocked = 0;
+
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
 
@@ -540,41 +543,59 @@ static int submit_worker( struct batch_queue *queue )
 	return status;
 }
 
-static void update_blocked_hosts( struct batch_queue *queue, struct list *managers_list ) {
+/*
+Generate a list of blocked workers, from two different sources:
+1 - The published info from the manager.
+2 - The workers_blocked propery of the factory.
+Put it into the form "host1 host2 host3 ..," and pass it to the batch queue as the workers-blocked property.
+*/
 
-	if(!managers_list || list_size(managers_list) < 1)
-		return;
-
+static void update_blocked_hosts( struct batch_queue *queue, struct list *managers_list )
+{
 	buffer_t b;
-	struct jx *j;
-
 	buffer_init(&b);
 
+	/* The separator is initially nothing, then converted to space after first item. */
 	const char *sep = "";
-	list_first_item(managers_list);
-	while((j=list_next_item(managers_list))) {
-		struct jx *blocked = jx_lookup(j,"workers_blocked");
 
-		if(!blocked) {
-			continue;
-		}
+	/* Iterate over all managers and extract the workers_blocked property. */
 
-		if(jx_istype(blocked, JX_STRING)) {
-			buffer_printf(&b, "%s%s", sep, blocked->u.string_value);
-			sep = " ";
-		}
+	if(managers_list) {
+		struct jx *j;
+		list_first_item(managers_list);
+		while((j=list_next_item(managers_list))) {
 
-		if(jx_istype(blocked, JX_ARRAY)) {
-			struct jx *item;
-			for (void *i = NULL; (item = jx_iterate_array(blocked, &i));) {
-				if(jx_istype(item, JX_STRING)) {
-					buffer_printf(&b, "%s%s", sep, item->u.string_value);
-					sep = " ";
+			/* Skip if no workers_blocked property */
+			struct jx *blocked = jx_lookup(j,"workers_blocked");
+			if(!blocked) {
+				continue;
+			}
+
+			/* If a single host, add that. */
+			if(jx_istype(blocked, JX_STRING)) {
+				buffer_printf(&b, "%s%s", sep, blocked->u.string_value);
+				sep = " ";
+			}
+
+			/* If an array, add each string item in the array. */
+			if(jx_istype(blocked, JX_ARRAY)) {
+				struct jx *item;
+				for (void *i = NULL; (item = jx_iterate_array(blocked, &i));) {
+					if(jx_istype(item, JX_STRING)) {
+						buffer_printf(&b, "%s%s", sep, item->u.string_value);
+						sep = " ";
+					}
 				}
 			}
 		}
 	}
 
+	/* Add on the workers_blocked property from the config file */
+	if(workers_blocked) {
+		buffer_printf(&b,"%s%s",sep,workers_blocked);
+	}
+
+	/* Now publish the list (if any contents) or null it out. */
 	if(buffer_pos(&b) > 0) {
 		batch_queue_set_option(queue, "workers-blocked", buffer_tostring(&b));
 	} else {
@@ -830,6 +851,8 @@ int read_config_file(const char *config_file) {
 
 	assign_new_value(new_condor_requirements, condor_requirements, condor-requirements, const char *, JX_STRING, string_value)
 
+	assign_new_value(new_workers_blocked, workers_blocked, workers-blocked, const char *, JX_STRING, string_value )
+
 	if(!manager_host) {
 		if(!new_project_regex) {
 			// if manager-name not given, try with the old master-name
@@ -910,6 +933,11 @@ int read_config_file(const char *config_file) {
 		factory_name = xxstrdup(new_factory_name);
 	}
 
+	if(workers_blocked != new_workers_blocked) {
+		free(workers_blocked);
+		workers_blocked = xxstrdup(new_workers_blocked);
+	}
+
 	last_time_modified = new_time_modified;
 	fprintf(stdout, "Configuration file '%s' has been loaded.", config_file);
 
@@ -951,6 +979,10 @@ int read_config_file(const char *config_file) {
 
 	if(extra_worker_args) {
 		fprintf(stdout, "worker-extra-options: %s", extra_worker_args);
+	}
+
+	if(workers_blocked) {
+		fprintf(stdout, "workers-blocked: %s", workers_blocked);
 	}
 
 	fprintf(stdout, "\n");
