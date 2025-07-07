@@ -578,7 +578,11 @@ struct link *link_serve_range(int low, int high)
 
 struct link *link_serve(int port)
 {
-	return link_serve_address(0, port);
+	if (port > 0) {
+		return link_serve_address(0, port);
+	} else {
+		return link_serve_address_range(0, -1, -1);
+	}
 }
 
 int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert)
