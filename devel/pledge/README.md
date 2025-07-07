@@ -1,40 +1,47 @@
 # Pledge
+
 Tool to track what a program does to the filesystem.
 
 ## Building
-### Tracer
-The tracer is a python script with no external dependencies.
 
-### Enforcer
-The enforcer can be built with CMake or with Make. It will generate a file called `libenforcer.so` inside of the `build/` directory. This is used with `LD_PRELOAD`.
+### CMake
 
-#### CMake
 To build with CMake do:
 
 ```sh
 cmake -B build -G Ninja
 ninja -C build
 ```
-#### Make
+
+### Make
+
 To build with Make do:
+
 ```sh
 make
 ```
+
 ## Using
+
 Pledge has 2 tools inside of it, the tracer and the enforcer.
 
 ### Tracer
-The tracing is ran like this:
+
+The tracer is ran like this:
+
 ```sh
-tracer cat sample.c
+pledge trace cat sample.c
 ```
+
 It's output should be something like this:
+
 ```
 Tracer [cat.sample.c]: Strace log generated -> cat.sample.c.tracer.log
-Tracer [cat.sample.c]: stdout log generated -> cat.sample.c.stdout.log
 Tracer [cat.sample.c]: Contract generated   -> cat.sample.c.contract
 ```
+
 The most important file here is the contract file, if we `cat` it we get:
+
 ```
 action        path
 R             /home/user/dummy/cat.sample.c.contract
@@ -60,16 +67,15 @@ R             /usr/lib/locale/C.utf8/LC_NUMERIC
 R             /usr/lib/locale/C.utf8/LC_CTYPE
 R             /home/user/dummy/sample.c
 ```
+
 ### Enforcer
+
 Now that we have a contract we can use the enforcer.
 We first have to set the environment variable:<br>
 `export CONTRACT=./cat.sample.c.contract`<br>
-Then set `LD_PRELOAD` to point to the shared library:<br>
-`export LD_PRELOAD=./build/libenforcer.so`<br>
-Finally we can run our command:<br>
-`cat sample.c`<br>
-Alternatively, we can set the environment variables only for this run:<br>
-`CONTRACT=./cat.sample.c.contract LD_PRELOAD=./build/libenforcer.so cat sample.c`<br>
+We use `LD_PRELOAD`, however, `PLEDGE` temporarily writes an `.so` called `minienforcer.so` and appends its path to the `LD_PRELOAD` environment variable, so the user does not have to set it.<br>
+We can run our command with:<br>
+`pledge enforce cat sample.c`<br>
 The output should be something like this:<br>
 
 ```
@@ -83,7 +89,7 @@ WRITING: caught path [/proc/self/fd/1] with link to [/dev/pts/0]
 WHITELISTED: Path [/dev/pts/0] is whitelisted internally.
 #include <stdio.h>
 
-    void
+void
 main()
 {
     printf("Meow!");
