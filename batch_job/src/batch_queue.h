@@ -84,6 +84,12 @@ typedef enum {
 	BATCH_QUEUE_TYPE_UNKNOWN = -1         /**< An invalid batch queue type. */
 } batch_queue_type_t;
 
+/** Indicates how aggressively to remove a batch job. */
+typedef enum {
+	BATCH_QUEUE_REMOVE_MODE_FRIENDLY,     /**< Remove a batch job with a friendly signal that allows it to clean up. */
+	BATCH_QUEUE_REMOVE_MODE_KILL,	      /**< Remove a batch job by sending a kill signal that terminates quickly. */
+} batch_queue_remove_mode_t;
+
 /** Create a new batch queue.
 @param type The type of the queue.
 @param ssl_key_file The location of the queue manager's ssl key file, if it has one.
@@ -134,7 +140,7 @@ You must still call @ref batch_queue_wait to wait for the removal to complete.
 @param jobid The job to be removed.
 @return Greater than zero if the job exists and was removed, zero otherwise.
 */
-int batch_queue_remove(struct batch_queue *q, batch_queue_id_t jobid);
+int batch_queue_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode );
 
 /** Converts a string into a batch queue type.
 @param str A string listing all of the known batch queue types (which changes over time.)
