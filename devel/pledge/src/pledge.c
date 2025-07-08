@@ -10,6 +10,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <getopt.h>
+
 #include "list.h"
 #include "util.h"
 
@@ -149,18 +151,23 @@ void quote_pattern(char *line,
 void pledge_help()
 {
 	fprintf(stderr, "PLEDGE: Tracing and enforcing\n");
-	fprintf(stderr, "USAGE: pledge [trace/enforce] command ...\n");
+	fprintf(stderr, "USAGE: pledge --[trace/enforce] command arg1 arg2 ...\n");
 }
 
+/// @param enf_cmd_idx: Enforcer command index, this is the index where the command for
+/// the enforcer starts
 void enforcer(int argc,
-		char **argv)
+		char **argv,
+		int enf_cmd_idx)
 {
 	char *prog[ARGC_MAX];
 	// I would add another check here for the argument count but I don't think its wise
 	// to have multiple places where we validate the same things (points of failure
 	// should be different no?)
+	// XXX: This can be turned into a function and we can pass the arguments array for
+	// execvp to the tracer and the enforcer but lets see
 	size_t j = 0;
-	for (size_t i = 2; (i < (size_t)argc && j < ARGC_MAX); i++) {
+	for (size_t i = enf_cmd_idx; (i < (size_t)argc && j < ARGC_MAX); i++) {
 		// Save the program into the array that will call execvp
 		prog[j] = argv[i];
 		j++;
@@ -207,12 +214,16 @@ void enforcer(int argc,
 		}
 	}
 }
+
+/// @param tr_cmd_idx: Tracer command index, its the index in the argv array of where
+/// the commands for the tracer start
 void tracer(int argc,
-		char **argv)
+		char **argv,
+		int tr_cmd_idx)
 {
 	// we could do a large array and just place
 	// In theory it should be fine because the pointers
-	// in argv do not decay
+	// in argv live for the entirety of the program
 	char *prog[ARGC_MAX];
 	prog[0] = "strace";
 	prog[1] = "-f";
@@ -224,37 +235,43 @@ void tracer(int argc,
 	// and just assign a default name thats seeded by time or sumn
 	char log_name[MAX_LOG_LEN] = {0};
 	char contract_name[MAX_LOG_LEN] = {0}; // \0 == 0 lol
-	if (argc > 2) {
-		size_t j = 4;
-		for (size_t i = 2, l = 0; i < (size_t)argc; i++, l++) {
-			// this makes the array for execvp
-			prog[j] = argv[i];
-			size_t arg_len = strlen(argv[i]) + strlen(log_name); // looooool
+	int tr_cmd_count = argc - tr_cmd_idx;
+	if (tr_cmd_count < 1) {
+		fprintf(stderr, "Error obtaining count of arguments\n");
+		return;
+	}
+	size_t j = 4;
+	// we set it to tr_cmd_idx because that's where we want to start saving
+	// commands
+	for (size_t i = tr_cmd_idx, l = 0; i < (size_t)argc; i++, l++) {
+		// this makes the array for execvp
+		prog[j] = argv[i];
+		size_t arg_len = strlen(argv[i]) + strlen(log_name); // looooool
 
-			// we just want to append the command and its first argument
-			if ((arg_len < MAX_LOG_LEN) && (l < 2) && argc > 3) {
-				strcat(log_name, argv[i]);
-				strcat(log_name, ".");
-				strcat(contract_name, argv[i]);
-				strcat(contract_name, ".");
-			}
-			j++;
-		}
-		// we ran the command "naked" of sorts
-		// so if we run the program like:
-		// pledge trace ls
-		// then we only need to do ls
-		if (argc == 3) {
-			strcat(log_name, argv[2]);
+		// we just want to append the command and its first argument
+		// but we only do it if theres more than 1 argc
+		if ((arg_len < MAX_LOG_LEN) && (l < 2) && argc > 1) {
+			strcat(log_name, argv[i]);
 			strcat(log_name, ".");
-			strcat(contract_name, argv[2]);
+			strcat(contract_name, argv[i]);
 			strcat(contract_name, ".");
 		}
-		strcat(log_name, "strace.log");
-		strcat(contract_name, "contract");
-		// We doing this with NULL at the end lol #execvp
-		prog[j] = NULL;
+		j++;
 	}
+	// we ran the command "naked" of sorts
+	// so if we run the program like:
+	// pledge trace ls
+	// then we only need to do ls
+	if (tr_cmd_count == 1) {
+		strcat(log_name, argv[tr_cmd_idx]);
+		strcat(log_name, ".");
+		strcat(contract_name, argv[tr_cmd_idx]);
+		strcat(contract_name, ".");
+	}
+	strcat(log_name, "strace.log");
+	strcat(contract_name, "contract");
+	// We doing this with NULL at the end lol #execvp
+	prog[j] = NULL;
 	pid_t pid;
 	pid = fork();
 	if (pid == -1) {
@@ -370,25 +387,53 @@ void tracer(int argc,
 int main(int argc,
 		char **argv)
 {
-	bool trace = false;
-	bool enforce = false;
-	// Command line handling
-	if (argc <= 2) {
-		fprintf(stderr, "Not enough arguments provided.\n");
-		pledge_help();
-		exit(EXIT_FAILURE);
-	} else if (argc > 2 && strcmp(argv[1], "trace") == 0) {
-		fprintf(stderr, "Tracing started...\n");
-		trace = true;
-	} else if (argc > 2 && strcmp(argv[1], "enforce") == 0) {
-		enforce = true;
-	} else {
-		pledge_help();
+	int enforce_f = 0;
+	int trace_f = 0;
+	int c;
+	int optidx = 0;
+	struct option pl_args[] = {
+			{
+					"enforce",
+					no_argument,
+					&enforce_f,
+					1,
+			},
+			{
+					"trace",
+					no_argument,
+					&trace_f,
+					1,
+			},
+			{NULL, 0, NULL, 0},
+	};
+
+	// We have 2 routes here:
+	// 1. We can let the user place the flag anywhere and we just obtain the
+	// program to execute through case 1: with getopt or
+	// 2. We make the user use the verb before passing the program to execute
+	// I think imma go with 2
+
+	// Index of the command to execute under tracer
+	int cmd_idx = 0;
+	while ((c = getopt_long(argc, argv, "-", pl_args, &optidx)) != -1) {
+		switch (c) {
+		case 0:
+			cmd_idx = optind;
+			break;
+			/* break; */
+		}
+		if ((enforce_f || trace_f)) {
+			break;
+		}
+	}
+	if (cmd_idx == argc) {
+		fprintf(stderr, "No command provided after [%s]\n", pl_args[optidx].name);
 		exit(EXIT_FAILURE);
 	}
-	if (trace) {
-		tracer(argc, argv);
-	} else if (enforce) {
+	if (trace_f) {
+		fprintf(stderr, "Tracing started...\n");
+		tracer(argc, argv, cmd_idx);
+	} else if (enforce_f) {
 		FILE *fl = fopen("minienforcer.so", "wb");
 		fwrite(minienforcer, 1, minienforcer_len, fl);
 		fclose(fl);
@@ -396,10 +441,13 @@ int main(int argc,
 		// -rwxr-xr-x
 		chmod("minienforcer.so",
 				S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
-		enforcer(argc, argv);
+		enforcer(argc, argv, cmd_idx);
 		// XXX: maybe dont remove everytime, maybe we can cache and let the user decide
 		// if we delete
 		remove("minienforcer.so");
+	} else {
+		fprintf(stderr, "ERROR: No action provided for PLEDGE...\n");
+		pledge_help();
 		exit(EXIT_FAILURE);
 	}
 }
