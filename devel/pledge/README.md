@@ -3,23 +3,12 @@
 Tool to track what a program does to the filesystem.
 
 ## Building
-
-### CMake
-
-To build with CMake do:
-
-```sh
-cmake -B build -G Ninja
-ninja -C build
-```
-
-### Make
-
-To build with Make do:
+We use `Make` as our build system, simply do:
 
 ```sh
 make
 ```
+And you're good to go.
 
 ## Using
 
@@ -92,7 +81,7 @@ WHITELISTED: Path [/dev/pts/0] is whitelisted internally.
 void
 main()
 {
-    printf("Meow!");
+printf("Meow!");
 }
 READING: caught path [/proc/self/fd/3] with link to [/home/user/dummy/sample.c]
 ALLOWED: Path [/home/user/dummy/sample.c] with permission [R] is not in violation of the contract.

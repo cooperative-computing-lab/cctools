@@ -1,3 +1,6 @@
+include ../../config.mk
+include ../../rules.mk
+
 CC = gcc
 CFLAGS = -Wall -Wextra -Wpedantic
 CFLAGS += -fdiagnostics-color=always
@@ -57,3 +60,4 @@ $(BUILDDIR):
 .PHONY : clean all
 clean:
 	rm -rf $(BUILDDIR)
+	rm src/libenforcer.h
