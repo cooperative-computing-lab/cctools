@@ -13,11 +13,24 @@
 #include "list_util.h"
 #include "util.h"
 
+#ifdef COLOR_ENFORCING
 #define PINK "\033[38;5;198m"
 #define PINKER "\033[38;5;217m"
 #define GREEN "\033[38;5;113m"
 #define YELLOW "\033[38;5;221m"
 #define RESET_TERM_C "\033[0m"
+#define PRINT_PINK() fprintf(stderr, PINK);
+#define PRINT_PINKER() fprintf(stderr, PINKER)
+#define PRINT_GREEN() fprintf(stderr, GREEN)
+#define PRINT_YELLOW() fprintf(stderr, YELLOW)
+#define PRINT_RESET_TERM_C() fprintf(stderr, RESET_TERM_C)
+#else
+#define PRINT_PINK()
+#define PRINT_PINKER()
+#define PRINT_GREEN()
+#define PRINT_YELLOW()
+#define PRINT_RESET_TERM_C()
+#endif
 
 // TODO: the enforcer should not stop wrong paths...?
 
@@ -105,10 +118,11 @@ init_enforce()
 		fprintf(stderr, "Enforcer path: %s\n", contract_env);
 		contract_f = real_fopen(contract_env, "r");
 		if (contract_f == NULL) {
-			fprintf(stderr, PINK);
+			PRINT_PINK();
 			fprintf(stderr,
 					"NO CONTRACT: "
 					"Couldn't open the contract file\n");
+			PRINT_RESET_TERM_C();
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -225,7 +239,7 @@ bool enforce(const char *pathname,
 		size_t wl_member_len = strlen(WHITELIST[i]);
 		if (strncmp(WHITELIST[i], pathname, wl_member_len) == 0) {
 			fprintf(stderr,
-					"WHITELISTED: "
+					"[WHITELISTED]: "
 					"Path [%s] is whitelisted internally.\n",
 					pathname);
 			return true;
@@ -235,58 +249,58 @@ bool enforce(const char *pathname,
 	struct path_access *a = find_path_in_list(ROOT, pathname);
 	// Is this good enough error handling? Probably not.
 	if (a == NULL) {
-		fprintf(stderr, PINKER);
+		PRINT_PINKER();
 		fprintf(stderr,
-				"NOT FOUND: "
+				"[NOT FOUND]: "
 				"Path [%s] is not part of the contract...\n",
 				pathname);
-		fprintf(stderr, RESET_TERM_C);
+		PRINT_RESET_TERM_C();
 		// we need to do some sort of blockage but perhaps that's got to be handled
 		// locally
 		return true;
 	} else if ((a->read && a->write) && (perm == 'R' || perm == 'W')) {
 		char a_perm = flag2letter(a);
-		fprintf(stderr, GREEN);
+		PRINT_GREEN();
 		fprintf(stderr,
-				"ALLOWED: "
+				"[ALLOWED]: "
 				"Path [%s] with permission [%c] is not in violation of the "
 				"contract.\n",
 				a->pathname,
 				a_perm);
-		fprintf(stderr, RESET_TERM_C);
+		PRINT_RESET_TERM_C();
 		return true;
 	} else if ((a->read && perm == 'R') || (a->write && perm == 'W')) {
 		char a_perm = flag2letter(a);
-		fprintf(stderr, GREEN);
+		PRINT_GREEN();
 		fprintf(stderr,
-				"ALLOWED: "
+				"[ALLOWED]: "
 				"Path [%s] with permission [%c] is not in violation of the "
 				"contract.\n",
 				a->pathname,
 				a_perm);
-		fprintf(stderr, RESET_TERM_C);
+		PRINT_RESET_TERM_C();
 		return true;
 	} else if (a->stat && perm == 'S') {
 		char a_perm = flag2letter(a);
-		fprintf(stderr, GREEN);
+		PRINT_GREEN();
 		fprintf(stderr,
-				"ALLOWED STAT: "
+				"[ALLOWED STAT]: "
 				"Path [%s] with permission [%c] is not in violation of the "
 				"contract.\n",
 				a->pathname,
 				a_perm);
-		fprintf(stderr, RESET_TERM_C);
+		PRINT_RESET_TERM_C();
 		return true;
 	} else {
 		char a_perm = flag2letter(a);
-		fprintf(stderr, PINK);
+		PRINT_PINK();
 		fprintf(stderr,
-				"BLOCKED: "
+				"[BLOCKED]: "
 				"Permission [%c] for path [%s] does not match contract, expected [%c]\n",
 				perm,
 				a->pathname,
 				a_perm);
-		fprintf(stderr, RESET_TERM_C);
+		PRINT_RESET_TERM_C();
 		return false;
 	}
 	return false;
@@ -312,10 +326,10 @@ int open(const char *pathname,
 		strncpy(full_path, pathname, MAXPATHLEN);
 	}
 
-	fprintf(stderr, YELLOW);
-	fprintf(stderr, "OPEN: caught open with path [%s]\n", pathname);
+	PRINT_YELLOW();
+	fprintf(stderr, "[OPEN]: caught open with path [%s]\n", pathname);
 	fprintf(stderr, "with absolute [%s]\n", full_path);
-	fprintf(stderr, RESET_TERM_C);
+	PRINT_RESET_TERM_C();
 
 	mode_t mode = 0;
 	/// If there is a flag in there, we need to extract it
@@ -361,9 +375,9 @@ read(int fd,
 	// readlink does not place the '\0' at the end
 	solved_path[solved_path_len] = '\0';
 
-	fprintf(stderr, YELLOW);
-	fprintf(stderr, "READING: caught path [%s] with link to [%s]\n", fd_link, solved_path);
-	fprintf(stderr, RESET_TERM_C);
+	PRINT_YELLOW();
+	fprintf(stderr, "[READ]: caught path [%s] with link to [%s]\n", fd_link, solved_path);
+	PRINT_RESET_TERM_C();
 
 	// SECTION: Enforce
 	if (enforce(solved_path, 'R') != true) {
@@ -388,9 +402,9 @@ write(int fd,
 	size_t solved_path_len = readlink(fd_link, solved_path, BUFSIZ);
 	solved_path[solved_path_len] = '\0';
 
-	fprintf(stderr, YELLOW);
-	fprintf(stderr, "WRITING: caught path [%s] with link to [%s]\n", fd_link, solved_path);
-	fprintf(stderr, RESET_TERM_C);
+	PRINT_YELLOW();
+	fprintf(stderr, "[WRITING]: caught path [%s] with link to [%s]\n", fd_link, solved_path);
+	PRINT_RESET_TERM_C();
 	// SECTION: Enforce
 	if (enforce(solved_path, 'W') != true) {
 		return -1;
@@ -408,9 +422,9 @@ FILE *
 fopen(const char *restrict pathname,
 		const char *restrict mode)
 {
-	fprintf(stderr, YELLOW);
-	fprintf(stderr, "FOPEN: Caught path [%s] with mode [%s]\n", pathname, mode);
-	fprintf(stderr, RESET_TERM_C);
+	PRINT_YELLOW();
+	fprintf(stderr, "[FOPEN]: Caught path [%s] with mode [%s]\n", pathname, mode);
+	PRINT_RESET_TERM_C();
 
 	// SECTION: Enforcing
 	char perm_val;
@@ -458,6 +472,11 @@ int fstatat(int dirfd,
 		struct stat *restrict statbuf,
 		int flags)
 {
+
+	PRINT_YELLOW();
+	fprintf(stderr, "[STAT]: Caught path [%s]\n", pathname);
+	PRINT_RESET_TERM_C();
+
 	// TODO: so the manpage for fstatat says
 	// if the path is relative and dirfd is AT_FDCWD
 	// if the path is relative and dirfd is actually set then its relative to that

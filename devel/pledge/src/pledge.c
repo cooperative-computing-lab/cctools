@@ -295,7 +295,7 @@ void tracer(int argc,
 			if (WEXITSTATUS(wait_status)) {
 				fprintf(stderr, "Error with strace...\n");
 			}
-			fprintf(stderr, "Tracer: Strace log generated -> %s\n", log_name);
+			fprintf(stderr, "[Tracer: Strace log generated -> %s]\n", log_name);
 		}
 		FILE *contract_s = fopen(log_name, "r");
 		char *str;
@@ -378,7 +378,7 @@ void tracer(int argc,
 
 		FILE *ctr = fopen(contract_name, "w");
 		generate_contract_from_list(ctr, root);
-		fprintf(stderr, "Tracer: Contract generated   -> %s\n", contract_name);
+		fprintf(stderr, "[Tracer: Contract generated   -> %s]\n", contract_name);
 		destroy_contract_list(root);
 		list_delete(root);
 		fclose(contract_s);
@@ -433,7 +433,7 @@ int main(int argc,
 		exit(EXIT_FAILURE);
 	}
 	if (trace_f) {
-		fprintf(stderr, "Tracing started...\n");
+		fprintf(stderr, "[Tracing started...]\n");
 		tracer(argc, argv, cmd_idx);
 	} else if (enforce_f) {
 		FILE *fl = fopen("minienforcer.so", "wb");

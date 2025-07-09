@@ -3,12 +3,24 @@
 Tool to track what a program does to the filesystem.
 
 ## Building
+
 We use `Make` as our build system, simply do:
 
 ```sh
 make
 ```
+
 And you're good to go.
+
+### Colors
+
+If you wish to have colored output, then you can run `make` like this instead:
+
+```sh
+make DEFS=-DCOLOR_ENFORCING
+```
+
+Do keep in mind that pipes sometimes have trouble dealing with colors.
 
 ## Using
 
