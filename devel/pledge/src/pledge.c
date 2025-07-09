@@ -12,7 +12,7 @@
 
 #include <getopt.h>
 
-#include "list.h"
+#include "list_util.h"
 #include "util.h"
 
 #include "libenforcer.h"
@@ -47,11 +47,11 @@
 // ---------------------------------
 
 /// Angle bracket pattern: </a/b/c>
-void ab_pattern(char *line,
+void ab_pattern(struct list **r,
+		char *line,
 		uint8_t access_fl,
 		char *buf,
-		size_t bufsiz,
-		struct path_list **r)
+		size_t bufsiz)
 {
 	// TODO: we do per pattern, so this is for successful calls
 	// but we should also add for the ENOENT calls, for now lets aim to
@@ -72,7 +72,7 @@ void ab_pattern(char *line,
 				i++;
 			}
 			buf[j] = '\0';
-			add_path_to_list(r, buf, access_fl);
+			add_path_to_contract_list(r, buf, access_fl);
 			// We save the pattern
 			// and just extract paths, should be straightforward
 		}
@@ -102,7 +102,7 @@ void ab_pattern(char *line,
 					rel2abspath(abs_path, buf, MAXPATHLEN);
 					// TODO: this function needs to be reworked to return the
 					// current, not the root
-					add_path_to_list(r, abs_path, access_fl);
+					add_path_to_contract_list(r, abs_path, access_fl);
 				}
 				return;
 			}
@@ -112,11 +112,11 @@ void ab_pattern(char *line,
 
 // TODO: This, along with the other might need to DIE, so we can make
 // 1 single function that return ALL the strings in a line... :)
-void quote_pattern(char *line,
+void quote_pattern(struct list **r,
+		char *line,
 		uint8_t access_fl,
 		char *buf,
-		size_t bufsiz,
-		struct path_list **r)
+		size_t bufsiz)
 {
 
 	for (size_t i = 0; line[i] != '\0'; i++) {
@@ -141,14 +141,14 @@ void quote_pattern(char *line,
 			rel2abspath(abs_path, buf, MAXPATHLEN);
 			// this function needs to be reworked to return the current, not
 			// the root
-			add_path_to_list(r, abs_path, access_fl);
+			add_path_to_contract_list(r, abs_path, access_fl);
 			// we return right away because we only want the first one
 			return;
 		}
 	}
 }
 
-void pledge_help()
+void pledge_help(void)
 {
 	fprintf(stderr, "PLEDGE: Tracing and enforcing\n");
 	fprintf(stderr, "USAGE: pledge --[trace/enforce] command arg1 arg2 ...\n");
@@ -302,7 +302,8 @@ void tracer(int argc,
 		size_t str_siz = LINE_MAX * sizeof(char);
 		str = malloc(str_siz);
 		char pattern[MAXPATHLEN];
-		struct path_list *root = NULL;
+		struct list *root = NULL;
+
 		// SECTION: Parsing
 		while (getline(&str, &str_siz, contract_s) != -1) {
 			// SECTION: openat
@@ -317,11 +318,11 @@ void tracer(int argc,
 			// the second path we parse is the actual file!!!!
 			if (strstr(str, "openat(") != NULL) {
 				if (strstr(str, "O_RDONLY") != NULL)
-					ab_pattern(str, READ_ACCESS, pattern, MAXPATHLEN, &root);
+					ab_pattern(&root, str, READ_ACCESS, pattern, MAXPATHLEN);
 				if (strstr(str, "O_WRONLY") != NULL)
-					ab_pattern(str, WRITE_ACCESS, pattern, MAXPATHLEN, &root);
+					ab_pattern(&root, str, WRITE_ACCESS, pattern, MAXPATHLEN);
 				if (strstr(str, "O_RDWR") != NULL)
-					ab_pattern(str, READ_ACCESS | WRITE_ACCESS, pattern, MAXPATHLEN, &root);
+					ab_pattern(&root, str, READ_ACCESS | WRITE_ACCESS, pattern, MAXPATHLEN);
 				// TODO: unfinished operations check
 			}
 			// SECTION: Stat
@@ -334,16 +335,16 @@ void tracer(int argc,
 			// new operation but there have to be restrictions, a write
 			// operation is more aggresive than a read
 			else if (strstr(str, "newfstatat(") != NULL) {
-				ab_pattern(str, STAT_ACCESS, pattern, MAXPATHLEN, &root);
-				quote_pattern(str, STAT_ACCESS, pattern, MAXPATHLEN, &root);
+				ab_pattern(&root, str, STAT_ACCESS, pattern, MAXPATHLEN);
+				quote_pattern(&root, str, STAT_ACCESS, pattern, MAXPATHLEN);
 			}
 			// SECTION: read
 			// The syscall itself tells u the operation lol
 			// probably going to separate them
 			else if (strstr(str, "read(") != NULL) {
-				ab_pattern(str, READ_ACCESS, pattern, MAXPATHLEN, &root);
+				ab_pattern(&root, str, READ_ACCESS, pattern, MAXPATHLEN);
 			} else if (strstr(str, "write(") != NULL) {
-				ab_pattern(str, WRITE_ACCESS, pattern, MAXPATHLEN, &root);
+				ab_pattern(&root, str, WRITE_ACCESS, pattern, MAXPATHLEN);
 			}
 			// SECTION: execve
 			// execve at the bottom because what if text containing
@@ -354,7 +355,7 @@ void tracer(int argc,
 				// user is calling more programs What about subprocess of
 				// subprocesses? Should we represent that too? elif "strace:
 				// Process" in line:
-				quote_pattern(str, READ_ACCESS, pattern, MAXPATHLEN, &root);
+				quote_pattern(&root, str, READ_ACCESS, pattern, MAXPATHLEN);
 			}
 			// SECTION: mmap
 			// PROT_READ
@@ -365,11 +366,11 @@ void tracer(int argc,
 			else if (strstr(str, "mmap(") != NULL) {
 				/* if (strstr(str, "MAP_PRIVATE")) */
 				if (strstr(str, "PROT_READ|PROT_WRITE") != NULL)
-					ab_pattern(str, READ_ACCESS | WRITE_ACCESS, pattern, MAXPATHLEN, &root);
+					ab_pattern(&root, str, READ_ACCESS | WRITE_ACCESS, pattern, MAXPATHLEN);
 				if (strstr(str, "PROT_READ") != NULL)
-					ab_pattern(str, READ_ACCESS, pattern, MAXPATHLEN, &root);
+					ab_pattern(&root, str, READ_ACCESS, pattern, MAXPATHLEN);
 				if (strstr(str, "PROT_WRITE") != NULL)
-					ab_pattern(str, WRITE_ACCESS, pattern, MAXPATHLEN, &root);
+					ab_pattern(&root, str, WRITE_ACCESS, pattern, MAXPATHLEN);
 			}
 		}
 		free(str);
@@ -378,7 +379,8 @@ void tracer(int argc,
 		FILE *ctr = fopen(contract_name, "w");
 		generate_contract_from_list(ctr, root);
 		fprintf(stderr, "Tracer: Contract generated   -> %s\n", contract_name);
-		free_path_list(root);
+		destroy_contract_list(root);
+		list_delete(root);
 		fclose(contract_s);
 		fclose(ctr);
 	}

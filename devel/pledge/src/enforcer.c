@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,7 +10,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "list.h"
+#include "list_util.h"
 #include "util.h"
 
 #define PINK "\033[38;5;198m"
@@ -38,7 +39,7 @@
 // Perhaps this is a signal to wrap everything under 1 language...?
 // --------------------------------------------------------------------------------------
 
-char flag2letter(struct path_list *r)
+char flag2letter(struct path_access *r)
 {
 	if (r->read && r->write)
 		return '+';
@@ -62,7 +63,7 @@ const char *WHITELIST[] = {"/dev/pts", "/dev/null", "/dev/tty", "/proc/self", "/
 /// after initialization in @ref init_enforce()
 /// THINK: thread locality and also hwo to not reinitialize after fork
 /// TODO: Read up on __attribute__((constructor)) in the context of forks and clones
-struct path_list *ROOT = NULL;
+struct list *ROOT = NULL;
 
 /// This function obtains the contract path,
 /// fopen's it, but using the real_fopen function because
@@ -132,8 +133,7 @@ init_enforce()
 	// not thinking too much about optimizing the size, more convenient
 	char path_val[MAXPATHLEN] = {0};
 	// Self explanatory
-	struct path_list *root = NULL;
-	struct path_list *current = NULL;
+	struct list *root = list_create();
 	// Start parsing
 	while ((c = fgetc(contract_f)) != EOF) {
 		// We ignoe characters that are not useful to us
@@ -190,10 +190,7 @@ init_enforce()
 			if (l == '\n' || l == ' ') {
 				path_val[i] = '\0';
 				i = 0;
-				current = new_path_node(current, path_val, access_fl);
-				if (root == NULL) {
-					root = current;
-				}
+				new_path_access_node(root, path_val, access_fl);
 				access_fl = 0x0;
 				got_perm = false;
 				continue;
@@ -212,7 +209,8 @@ __attribute__((destructor)) void
 deinit_enforce()
 {
 	// Bye
-	free_path_list(ROOT);
+	destroy_contract_list(ROOT);
+	list_delete(ROOT);
 }
 
 /// This is where the actual enforcing is done.
@@ -234,7 +232,7 @@ bool enforce(const char *pathname,
 		}
 	}
 
-	struct path_list *a = find_path(ROOT, pathname);
+	struct path_access *a = find_path_in_list(ROOT, pathname);
 	// Is this good enough error handling? Probably not.
 	if (a == NULL) {
 		fprintf(stderr, PINKER);
@@ -245,7 +243,7 @@ bool enforce(const char *pathname,
 		fprintf(stderr, RESET_TERM_C);
 		// we need to do some sort of blockage but perhaps that's got to be handled
 		// locally
-		return false;
+		return true;
 	} else if ((a->read && a->write) && (perm == 'R' || perm == 'W')) {
 		char a_perm = flag2letter(a);
 		fprintf(stderr, GREEN);
@@ -489,7 +487,7 @@ int fstatat(int dirfd,
 		char fd_link[MAXPATHLEN];
 		snprintf(fd_link, MAXPATHLEN, "/proc/self/fd/%d", dirfd);
 		char solved_path[MAXPATHLEN];
-		size_t solved_path_len = readlink(fd_link, solved_path, BUFSIZ);
+		size_t solved_path_len = readlink(fd_link, solved_path, MAXPATHLEN);
 		solved_path[solved_path_len] = '\0';
 		strcat(solved_path, pathname); // XXX: strncat()?
 		enforce(solved_path, 'S');
