@@ -24,9 +24,12 @@ $(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
 pledge: $(OBJECTS_PLEDGE) $(EXTERNAL_DEPENDENCIES)
 
 libenforcer.$(CCTOOLS_DYNAMIC_SUFFIX): enforcer.o $(EXTERNAL_DEPENDENCIES) $(COMMON_SRCS)
-	$(CCTOOLS_CC) $(CCTOOLS_BASE_CCFLAGS) $(CCTOOLS_INTERNAL_CCFLAGS) -ldl -shared -o $@ $^
-	xxd -i -n minienforcer libenforcer.so > libenforcer.h
+	$(CCTOOLS_CC) $(CCTOOLS_BASE_CCFLAGS) $(CCTOOLS_INTERNAL_CCFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE_NO_OPENSSL)  $(CCTOOLS_DYNAMIC_FLAG) -o $@ $^
 
+libenforcer.h: libenforcer.$(CCTOOLS_DYNAMIC_SUFFIX)
+	xxd -i -n minienforcer $< > $@
+
+pledge.o: pledge.c libenforcer.h
 
 enforcer.o: enforcer.c
 	 $(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $(DEFS) $<
