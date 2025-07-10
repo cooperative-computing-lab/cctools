@@ -76,7 +76,7 @@ const char *WHITELIST[] = {"/dev/pts", "/dev/null", "/dev/tty", "/proc/self", "/
 /// after initialization in @ref init_enforce()
 /// THINK: thread locality and also hwo to not reinitialize after fork
 /// TODO: Read up on __attribute__((constructor)) in the context of forks and clones
-struct list *ROOT = NULL;
+struct list *contract_list_root = NULL;
 
 /// This function obtains the contract path,
 /// fopen's it, but using the real_fopen function because
@@ -146,8 +146,7 @@ init_enforce()
 	// NOTE: A common pattern right now is using MAXPATHLEN arrays for paths and
 	// not thinking too much about optimizing the size, more convenient
 	char path_val[MAXPATHLEN] = {0};
-	// Self explanatory
-	struct list *root = list_create();
+	struct list *list_root_init = list_create();
 	// Start parsing
 	while ((c = fgetc(contract_f)) != EOF) {
 		// We ignoe characters that are not useful to us
@@ -204,7 +203,7 @@ init_enforce()
 			if (l == '\n' || l == ' ') {
 				path_val[i] = '\0';
 				i = 0;
-				new_path_access_node(root, path_val, access_fl);
+				new_path_access_node(list_root_init, path_val, access_fl);
 				access_fl = 0x0;
 				got_perm = false;
 				continue;
@@ -213,9 +212,11 @@ init_enforce()
 		// Reset to position before lookahead
 		fsetpos(contract_f, &pos);
 	}
-	// Our global READ-ONLY (in theory lmao) variable with our values
-	ROOT = root;
-	/* dump_path_list(ROOT); */
+	// The root of our global contract list,
+	// This is never really modified throughout the program, since enforcing
+	// only really validates things.
+	// NOTE: It could, in the future,
+	contract_list_root = list_root_init;
 	fclose(contract_f);
 }
 /// Bye bye enforcer
@@ -223,8 +224,8 @@ __attribute__((destructor)) void
 deinit_enforce()
 {
 	// Bye
-	destroy_contract_list(ROOT);
-	list_delete(ROOT);
+	destroy_contract_list(contract_list_root);
+	list_delete(contract_list_root);
 }
 
 /// This is where the actual enforcing is done.
@@ -246,8 +247,14 @@ bool enforce(const char *pathname,
 		}
 	}
 
-	struct path_access *a = find_path_in_list(ROOT, pathname);
+	struct path_access *a = find_path_in_list(contract_list_root, pathname);
 	// Is this good enough error handling? Probably not.
+	// Mostly saying this due to the fact that a path, that's not registered,
+	// was attempted to be used and this should tell us something about the workflow,
+	// however, labelling that is where it gets complicated.
+	// So it's not really about the error itself but about what it might imply
+	// and this is somewhat related to my comment about allowing a 'NOT FOUND' call
+	// to return true
 	if (a == NULL) {
 		PRINT_PINKER();
 		fprintf(stderr,
@@ -255,8 +262,8 @@ bool enforce(const char *pathname,
 				"Path [%s] is not part of the contract...\n",
 				pathname);
 		PRINT_RESET_TERM_C();
-		// we need to do some sort of blockage but perhaps that's got to be handled
-		// locally
+		// For now we should still allow the program to run even if something is not found
+		// the idea, for now, is not to stop a workflow but to monitor it (in a sense)
 		return true;
 	} else if ((a->read && a->write) && (perm == 'R' || perm == 'W')) {
 		char a_perm = flag2letter(a);
@@ -317,9 +324,9 @@ int open(const char *pathname,
 	// but for our contracts we need to check the pathname is absolute
 
 	// XXX: Is it our responsiblity to ensure it's not empty? probably not!
-	/* if (pathname != NULL) */
-	/* { */
-	/* } */
+	// The reason is that we are not here to ensure it's not empty,
+	// or if the usage of open is correct, its to just verify against contracts
+	// HOWEVER, this is a role that we COULD assume in the future.
 	char full_path[MAXPATHLEN];
 	if (rel2abspath(full_path, pathname, MAXPATHLEN) == NULL) {
 		// Couldn't convert so we fallback to pathname

@@ -46,6 +46,17 @@
 // maybe the user doesn't want and could benefit from keeping the file open
 // ---------------------------------
 
+/// Used to sanitize our paths.
+/// This functions replaces every occurrence of char a with char b
+void replace_in_str(char *src, char a, char b)
+{
+	size_t src_len = strlen(src);
+	for (size_t i = 0; i < src_len; i++) {
+		if (src[i] == a)
+			src[i] = b;
+	}
+}
+
 /// Angle bracket pattern: </a/b/c>
 void ab_pattern(struct list **r,
 		char *line,
@@ -136,7 +147,6 @@ void quote_pattern(struct list **r,
 				i++;
 			}
 			buf[j] = '\0';
-			/* size_t buf_len              = strlen(buf); */
 			char abs_path[MAXPATHLEN] = {0};
 			rel2abspath(abs_path, buf, MAXPATHLEN);
 			// this function needs to be reworked to return the current, not
@@ -230,11 +240,13 @@ void tracer(int argc,
 	prog[2] = "-y";
 	prog[3] = "--trace=file,read,write,mmap";
 
-#define MAX_LOG_LEN 127
 	// TODO: For this log name stuff we need something to catch long names
 	// and just assign a default name thats seeded by time or sumn
-	char log_name[MAX_LOG_LEN] = {0};
-	char contract_name[MAX_LOG_LEN] = {0}; // \0 == 0 lol
+	char log_name[FILENAME_MAX] = {0};
+	char contract_name[FILENAME_MAX] = {0}; // \0 == 0 lol
+
+	// Tracer command count, the amount of arguments we have, that we are going to feed
+	// strace
 	int tr_cmd_count = argc - tr_cmd_idx;
 	if (tr_cmd_count < 1) {
 		fprintf(stderr, "Error obtaining count of arguments\n");
@@ -250,7 +262,7 @@ void tracer(int argc,
 
 		// we just want to append the command and its first argument
 		// but we only do it if theres more than 1 argc
-		if ((arg_len < MAX_LOG_LEN) && (l < 2) && argc > 1) {
+		if ((arg_len < FILENAME_MAX) && (l < 2) && argc > 1) {
 			strcat(log_name, argv[i]);
 			strcat(log_name, ".");
 			strcat(contract_name, argv[i]);
@@ -270,6 +282,19 @@ void tracer(int argc,
 	}
 	strcat(log_name, "strace.log");
 	strcat(contract_name, "contract");
+	size_t log_name_len = strlen(log_name);
+	size_t contract_name_len = strlen(contract_name);
+	// we cant have leading slashes because otherwise its an absolute path
+	if (log_name[0] == '/') {
+		memmove(log_name, log_name + 1, log_name_len);
+	}
+	if (contract_name[0] == '/') {
+		memmove(contract_name, contract_name + 1, contract_name_len);
+	}
+
+	// Sanitize path, since we dont want those slashes in the name
+	replace_in_str(log_name, '/', '_');
+	replace_in_str(contract_name, '/', '_');
 	// We doing this with NULL at the end lol #execvp
 	prog[j] = NULL;
 	pid_t pid;
@@ -284,9 +309,6 @@ void tracer(int argc,
 			fprintf(stderr, "Could not start the process for the tracee.\n");
 			exit(EXIT_FAILURE);
 		}
-		/* /1* fflush(stderr); *1/ */
-		/* /1* freopen("/dev/tty", "w", stderr); *1/ */
-		/* fflush(stderr); */
 	} else if (pid > 0) // parent process
 	{
 		int wait_status;
@@ -297,15 +319,19 @@ void tracer(int argc,
 			}
 			fprintf(stderr, "[Tracer: Strace log generated -> %s]\n", log_name);
 		}
-		FILE *contract_s = fopen(log_name, "r");
-		char *str;
+		FILE *strace_raw = fopen(log_name, "r");
+		if (strace_raw == NULL) {
+			fprintf(stderr, "Failed to create the log file...\n");
+			exit(EXIT_FAILURE);
+		}
+		char *strace_line;
 		size_t str_siz = LINE_MAX * sizeof(char);
-		str = malloc(str_siz);
+		strace_line = malloc(str_siz);
 		char pattern[MAXPATHLEN];
 		struct list *root = NULL;
 
 		// SECTION: Parsing
-		while (getline(&str, &str_siz, contract_s) != -1) {
+		while (getline(&strace_line, &str_siz, strace_raw) != -1) {
 			// SECTION: openat
 			// uhhhh what if the read command has an execve
 			// O_RDONLY O_WRONLY O_RDWR
@@ -316,13 +342,13 @@ void tracer(int argc,
 			// if the 2nd parameter is absolute, first parameter is
 			// ignored and at the end of the day:
 			// the second path we parse is the actual file!!!!
-			if (strstr(str, "openat(") != NULL) {
-				if (strstr(str, "O_RDONLY") != NULL)
-					ab_pattern(&root, str, READ_ACCESS, pattern, MAXPATHLEN);
-				if (strstr(str, "O_WRONLY") != NULL)
-					ab_pattern(&root, str, WRITE_ACCESS, pattern, MAXPATHLEN);
-				if (strstr(str, "O_RDWR") != NULL)
-					ab_pattern(&root, str, READ_ACCESS | WRITE_ACCESS, pattern, MAXPATHLEN);
+			if (strstr(strace_line, "openat(") != NULL) {
+				if (strstr(strace_line, "O_RDONLY") != NULL)
+					ab_pattern(&root, strace_line, READ_ACCESS, pattern, MAXPATHLEN);
+				if (strstr(strace_line, "O_WRONLY") != NULL)
+					ab_pattern(&root, strace_line, WRITE_ACCESS, pattern, MAXPATHLEN);
+				if (strstr(strace_line, "O_RDWR") != NULL)
+					ab_pattern(&root, strace_line, READ_ACCESS | WRITE_ACCESS, pattern, MAXPATHLEN);
 				// TODO: unfinished operations check
 			}
 			// SECTION: Stat
@@ -334,28 +360,28 @@ void tracer(int argc,
 			// that path then we can upgrade said operation from stat to the
 			// new operation but there have to be restrictions, a write
 			// operation is more aggresive than a read
-			else if (strstr(str, "newfstatat(") != NULL) {
-				ab_pattern(&root, str, STAT_ACCESS, pattern, MAXPATHLEN);
-				quote_pattern(&root, str, STAT_ACCESS, pattern, MAXPATHLEN);
+			else if (strstr(strace_line, "newfstatat(") != NULL) {
+				ab_pattern(&root, strace_line, STAT_ACCESS, pattern, MAXPATHLEN);
+				quote_pattern(&root, strace_line, STAT_ACCESS, pattern, MAXPATHLEN);
 			}
 			// SECTION: read
 			// The syscall itself tells u the operation lol
 			// probably going to separate them
-			else if (strstr(str, "read(") != NULL) {
-				ab_pattern(&root, str, READ_ACCESS, pattern, MAXPATHLEN);
-			} else if (strstr(str, "write(") != NULL) {
-				ab_pattern(&root, str, WRITE_ACCESS, pattern, MAXPATHLEN);
+			else if (strstr(strace_line, "read(") != NULL) {
+				ab_pattern(&root, strace_line, READ_ACCESS, pattern, MAXPATHLEN);
+			} else if (strstr(strace_line, "write(") != NULL) {
+				ab_pattern(&root, strace_line, WRITE_ACCESS, pattern, MAXPATHLEN);
 			}
 			// SECTION: execve
 			// execve at the bottom because what if text containing
 			// execve is a parameter of one of the functions (like read)
-			else if (strstr(str, "execve(") != NULL) {
+			else if (strstr(strace_line, "execve(") != NULL) {
 				// XXX: Is there any reason we should care if it's a
 				// subprocess aside from the fact that we can find out if the
 				// user is calling more programs What about subprocess of
 				// subprocesses? Should we represent that too? elif "strace:
 				// Process" in line:
-				quote_pattern(&root, str, READ_ACCESS, pattern, MAXPATHLEN);
+				quote_pattern(&root, strace_line, READ_ACCESS, pattern, MAXPATHLEN);
 			}
 			// SECTION: mmap
 			// PROT_READ
@@ -363,25 +389,27 @@ void tracer(int argc,
 			// but heres question, if the file is MAP_PRIVATE,
 			// do we want to care about it or no?
 			// im guessing somewhere in between
-			else if (strstr(str, "mmap(") != NULL) {
-				/* if (strstr(str, "MAP_PRIVATE")) */
-				if (strstr(str, "PROT_READ|PROT_WRITE") != NULL)
-					ab_pattern(&root, str, READ_ACCESS | WRITE_ACCESS, pattern, MAXPATHLEN);
-				if (strstr(str, "PROT_READ") != NULL)
-					ab_pattern(&root, str, READ_ACCESS, pattern, MAXPATHLEN);
-				if (strstr(str, "PROT_WRITE") != NULL)
-					ab_pattern(&root, str, WRITE_ACCESS, pattern, MAXPATHLEN);
+			// THINK: Should MAP_PRIVATE be handled a certain way?
+			else if (strstr(strace_line, "mmap(") != NULL) {
+				if (strstr(strace_line, "PROT_READ|PROT_WRITE") != NULL)
+					ab_pattern(&root, strace_line, READ_ACCESS | WRITE_ACCESS, pattern, MAXPATHLEN);
+				if (strstr(strace_line, "PROT_READ") != NULL)
+					ab_pattern(&root, strace_line, READ_ACCESS, pattern, MAXPATHLEN);
+				if (strstr(strace_line, "PROT_WRITE") != NULL)
+					ab_pattern(&root, strace_line, WRITE_ACCESS, pattern, MAXPATHLEN);
 			}
 		}
-		free(str);
-		/* dump_path_list(root); */
+		free(strace_line);
 
 		FILE *ctr = fopen(contract_name, "w");
+		if (ctr == NULL) {
+			fprintf(stderr, "Failed to open contract file for writing...\n");
+		}
 		generate_contract_from_list(ctr, root);
 		fprintf(stderr, "[Tracer: Contract generated   -> %s]\n", contract_name);
 		destroy_contract_list(root);
 		list_delete(root);
-		fclose(contract_s);
+		fclose(strace_raw);
 		fclose(ctr);
 	}
 }
@@ -422,7 +450,6 @@ int main(int argc,
 		case 0:
 			cmd_idx = optind;
 			break;
-			/* break; */
 		}
 		if ((enforce_f || trace_f)) {
 			break;
@@ -436,9 +463,13 @@ int main(int argc,
 		fprintf(stderr, "[Tracing started...]\n");
 		tracer(argc, argv, cmd_idx);
 	} else if (enforce_f) {
-		FILE *fl = fopen("minienforcer.so", "wb");
-		fwrite(minienforcer, 1, minienforcer_len, fl);
-		fclose(fl);
+		FILE *mini_enf_f = fopen("minienforcer.so", "wb");
+		if (mini_enf_f == NULL) {
+			fprintf(stderr, "Failed to generate minienforcer.so...\n");
+			exit(EXIT_FAILURE);
+		}
+		fwrite(minienforcer, 1, minienforcer_len, mini_enf_f);
+		fclose(mini_enf_f);
 		// 0755 permissions
 		// -rwxr-xr-x
 		chmod("minienforcer.so",

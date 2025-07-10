@@ -1,78 +1,38 @@
 include ../../config.mk
 include ../../rules.mk
 
-INCDIR = ./src
-INCDIR += -I$(CCTOOLS_HOME)/dttools/src
-BUILDDIR = ./build
+PHONY_TARGETS ?= src
+TARGETS ?= $(PHONY_TARGETS)
 
-CC = gcc
-LOCAL_CFLAGS = -Wall -Wextra -Wpedantic
-LOCAL_CFLAGS += -fdiagnostics-color=always
+all: $(TARGETS)
 
-LDFLAGS += -lm
+$(TARGETS):
+	@$(MAKE) -C $@
 
-# If we want to color output while enforcing
-# DEFS = -DCOLOR_ENFORCING
+CLEAN_TARGETS = $(TARGETS:%=clean-%)
+$(CLEAN_TARGETS):
+	@$(MAKE) -C $(@:clean-%=%) clean
+clean: $(CLEAN_TARGETS)
 
-# some posix functions werent added to standard c until c23, so we have
-# to specify
-# POSIX_C_SOURCE is saying that we want to enable functionality from 2008 posix
-# LOCAL_CFLAGS += -std=c11 -D_POSIX_C_SOURCE=200809L
-# Alternatively, this enables extensions and all functionality
-LOCAL_CFLAGS += -std=gnu11
+LINT_TARGETS = $(TARGETS:%=lint-%)
+$(LINT_TARGETS):
+	@$(MAKE) -C $(@:lint-%=%) lint
+lint: $(LINT_TARGETS)
 
-LOCAL_CFLAGS += -I$(INCDIR)
+FORMAT_TARGETS = $(TARGETS:%=format-%)
+$(FORMAT_TARGETS):
+	@$(MAKE) -C $(@:format-%=%) format
+format: $(FORMAT_TARGETS)
 
-RELFLGS = -O3
+INSTALL_TARGETS = $(TARGETS:%=install-%)
+$(INSTALL_TARGETS):
+	@$(MAKE) -C $(@:install-%=%) install
+install: $(INSTALL_TARGETS)
 
-# LDFLAGS += $(CCTOOLS_HOME)/dttools/src/libdttools.a
+TEST_TARGETS = $(TARGETS:%=test-%)
+$(TEST_TARGETS):
+	@$(MAKE) -C $(@:test-%=%) test
+test: $(TEST_TARGETS)
 
-# COMMON_SRCS = src/pl_list.c src/util.c
-COMMON_SRCS = src/list_util.c src/util.c
-COMMON_SRCS += $(CCTOOLS_HOME)/dttools/src/libdttools.a
 
-#####################################################################
-# Enforcer
-#####################################################################
-ENFORCER = $(BUILDDIR)/libenforcer.so
-ENF_LDFLAGS += $(LDFLAGS) -ldl -shared
-ENF_LOCAL_CFLAGS += $(LOCAL_CFLAGS) -fPIC
-ENF_SRCS = src/enforcer.c
-ENF_OBJ = $(BUILDDIR)/enforcer.o
-
-ENFORCER_H = src/libenforcer.h
-
-#####################################################################
-# PLEDGE
-#####################################################################
-PLEDGE = $(BUILDDIR)/pledge
-PL_LDFLAGS += $(LDFLAGS)
-PL_LOCAL_CFLAGS += $(LOCAL_CFLAGS)
-PL_SRCS = src/pledge.c
-PL_OBJ = $(BUILDDIR)/pledge.o
-
-all: $(PLEDGE)
-
-$(PLEDGE): $(ENFORCER_H) $(PL_OBJ)
-	$(CC) $(PL_LOCAL_CFLAGS) $(PL_OBJ) $(COMMON_SRCS) -o $(PLEDGE) $(PL_LDFLAGS)
-
-$(ENFORCER_H): $(ENFORCER)
-	xxd -i -n minienforcer $(BUILDDIR)/libenforcer.so > src/libenforcer.h
-
-$(ENFORCER): $(ENF_OBJ)
-	$(CC) $(ENF_LOCAL_CFLAGS) $(ENF_OBJ) $(COMMON_SRCS) -o $(ENFORCER) $(ENF_LDFLAGS)
-
-$(PL_OBJ) : $(PL_SRCS) | $(BUILDDIR)
-	$(CC) $(PL_LOCAL_CFLAGS) -c $< -o $@
-
-# # Order only build dir
-$(ENF_OBJ) : $(ENF_SRCS) | $(BUILDDIR)
-	$(CC) $(ENF_LOCAL_CFLAGS) $(DEFS) -c $< -o $@
-
-$(BUILDDIR):
-	mkdir $@
-
-.PHONY : clean all
-clean:
-	rm -rf $(BUILDDIR)
-	rm src/libenforcer.h
+.PHONY: $(PHONY_TARGETS) $(CLEAN_TARGETS) $(INSTALL_TARGETS) $(TEST_TARGETS) all clean install test
