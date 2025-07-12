@@ -10,8 +10,13 @@ void new_path_access_node(struct list *c,
 	t->read = (access_fl & READ_ACCESS) ? true : false;
 	t->write = (access_fl & WRITE_ACCESS) ? true : false;
 	t->stat = (access_fl & STAT_ACCESS) ? true : false;
+	t->create = (access_fl & CREATE_ACCESS) ? true : false;
+	t->delete = (access_fl & DELETE_ACCESS) ? true : false;
+	t->list = (access_fl & LIST_ACCESS) ? true : false;
+
 	/// This string gotta be manually removed
 	t->pathname = strdup(path);
+
 	/// XXX: Maybe remove this from here?
 	list_push_tail(c, t);
 }
@@ -35,6 +40,14 @@ struct path_access *
 find_path_in_list(struct list *c,
 		char *path)
 {
+	// FIXME: /etc/gnutls/config seems to be loading before the tree is built so we cant
+	// even accept it, even though it is in the contract
+	if (c == NULL) {
+		// possible solution could be to build the tree ourselves in here
+		// as a last recourse
+		fprintf(stderr, "Unable to find path in list due to null contract list root\n");
+		return NULL;
+	}
 	list_first_item(c);
 	void *x;
 	while ((x = list_next_item(c))) {
@@ -57,7 +70,7 @@ update_path_perms(struct path_access *a,
 	}
 
 	// We want this to only be positive, because if its false, we dont want to
-	// changeone that was true to false
+	// change one that was true to false
 	if (access_fl & READ_ACCESS) {
 		a->read = true;
 	}
@@ -66,6 +79,15 @@ update_path_perms(struct path_access *a,
 	}
 	if (access_fl & STAT_ACCESS) {
 		a->stat = true;
+	}
+	if (access_fl & CREATE_ACCESS) {
+		a->create = true;
+	}
+	if (access_fl & DELETE_ACCESS) {
+		a->delete = true;
+	}
+	if (access_fl & LIST_ACCESS) {
+		a->list = true;
 	}
 	// USELESS?: Maybe remove this lol
 	return a;
@@ -91,24 +113,38 @@ void add_path_to_contract_list(struct list **r,
 }
 
 /// Dumps our contract into the contract file
+/// if @param f is NULL, then the contract gets dumped to stderr
 void generate_contract_from_list(FILE *f, struct list *r)
 {
 	list_first_item(r);
-	void *x;
-	char perms[8] = {0};
-	while ((x = list_next_item(r))) {
-		struct path_access *a = x;
-		if (a->stat) {
+	struct path_access *a;
+	char perms[16] = {0};
+	FILE *o = f;
+	if (f == NULL)
+		o = stderr;
+	while ((a = list_next_item(r))) {
+		// THINK: This might need to become a function
+		if (a->stat)
 			strcat(perms, "S");
-		}
-		if (a->read && a->write) {
+		if (a->create)
+			strcat(perms, "C");
+		if (a->delete)
+			strcat(perms, "D");
+
+		/// XXX: We should rewrite the enforcer wrapper functions to
+		/// use 2 separate letters for RW permission and not +
+		if (a->read && a->write)
 			strcat(perms, "+");
-		} else if (a->read) {
+		else if (a->read)
 			strcat(perms, "R");
-		} else if (a->write) {
+		else if (a->write)
 			strcat(perms, "W");
-		}
-		fprintf(f, "%-13s %-30s\n", perms, a->pathname);
+
+		if (a->list)
+			strcat(perms, "L");
+
+		fprintf(o, "%-12s <%s>\n", perms, a->pathname);
+
 		memset(perms, 0, sizeof(perms)); // reset
 	}
 	fflush(f);

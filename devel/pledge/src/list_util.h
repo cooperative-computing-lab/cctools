@@ -8,15 +8,26 @@
 
 #include "list.h"
 
-#define READ_ACCESS 0x1
-#define WRITE_ACCESS 0x2
-#define STAT_ACCESS 0x4
-#define CREATE_ACCESS 0x8
-#define DELETE_ACCESS 0x16
-#define LIST_ACCESS 0x32
+#define ACCESS_COUNT 6
 
+#define UNKOWN_ACCESS 0
+#define READ_ACCESS 1
+#define WRITE_ACCESS 2
+#define STAT_ACCESS 4
+#define CREATE_ACCESS 8
+#define DELETE_ACCESS 16
+#define LIST_ACCESS 32
+
+// In a text file Read and Write as true get dumped as +
+// THOUGHT: If we were to add a metadata flag, would open be a metadata flag
+// or something else? Like you can make the argument that open is a metadata operation
+// (which I already have done plenty of times) but,
+// in practice, it still asks for some sort of access,
+// so it's not like we cant read or write, and limit it to metadata operations
+// because otherwise we might not be able to do much
+// Now the real question is, do we LABEL an open call as whatever flag it carries
+// (aside from creat obviously)
 /// Singly linked list containing our paths with their permission
-/// In a text file Read and Write as true get dumped as +
 /// TODO: Change name
 struct path_access {
 	/// Pathname in absolute form, ideally it should never be relative
@@ -27,6 +38,12 @@ struct path_access {
 	bool write;
 	/// Flag for stat
 	bool stat;
+	/// Flag for file creation
+	bool create;
+	/// Flag for file deletion
+	bool delete;
+	/// Flag for retrieving directory list (getdents)
+	bool list;
 };
 
 /// Add a path_access node to our cctools list

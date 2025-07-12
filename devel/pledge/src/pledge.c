@@ -57,6 +57,14 @@ void replace_in_str(char *src, char a, char b)
 	}
 }
 
+// FIXME: The ab_pattern and quote_pattern parsers gotta go,
+// going to replace with a system that parses paths in various passes
+// It should:
+// 1. Do multiple passes extracting the paths in a line
+// 2. Label them as unfinished or not
+// 3. Return every path without doing rel2abspath
+// 4. Then we inspect the paths and decide how to turn it absolute, doing everything
+// in the parsing is WRONGGGGG
 /// Angle bracket pattern: </a/b/c>
 void ab_pattern(struct list **r,
 		char *line,
@@ -262,7 +270,7 @@ void tracer(int argc,
 
 		// we just want to append the command and its first argument
 		// but we only do it if theres more than 1 argc
-		if ((arg_len < FILENAME_MAX) && (l < 2) && argc > 1) {
+		if ((arg_len < FILENAME_MAX) && (l < 2) && tr_cmd_count > 1) {
 			strcat(log_name, argv[i]);
 			strcat(log_name, ".");
 			strcat(contract_name, argv[i]);
@@ -284,11 +292,28 @@ void tracer(int argc,
 	strcat(contract_name, "contract");
 	size_t log_name_len = strlen(log_name);
 	size_t contract_name_len = strlen(contract_name);
-	// we cant have leading slashes because otherwise its an absolute path
-	if (log_name[0] == '/') {
+
+	// We do not want these characters for the file names
+	// we remove the relative naming with leading dot and slash
+	// or we remove the leading slash
+	// everything else is ok
+	if (log_name[0] == '.') {
+		if (log_name[1] == '/') {
+			memmove(log_name, log_name + 2, log_name_len);
+		} else
+			memmove(log_name, log_name + 1, log_name_len);
+
+	} else if (log_name[0] == '/') {
 		memmove(log_name, log_name + 1, log_name_len);
 	}
-	if (contract_name[0] == '/') {
+
+	if (contract_name[0] == '.') {
+		if (contract_name[1] == '/') {
+			memmove(contract_name, contract_name + 2, contract_name_len);
+		} else
+			memmove(contract_name, contract_name + 1, contract_name_len);
+
+	} else if (contract_name[0] == '/') {
 		memmove(contract_name, contract_name + 1, contract_name_len);
 	}
 
@@ -329,6 +354,7 @@ void tracer(int argc,
 		strace_line = malloc(str_siz);
 		char pattern[MAXPATHLEN];
 		struct list *root = NULL;
+		uint8_t temp_access_fl = 0x0;
 
 		// SECTION: Parsing
 		while (getline(&strace_line, &str_siz, strace_raw) != -1) {
@@ -343,13 +369,19 @@ void tracer(int argc,
 			// ignored and at the end of the day:
 			// the second path we parse is the actual file!!!!
 			if (strstr(strace_line, "openat(") != NULL) {
+				if (strstr(strace_line, "O_CREAT") != NULL)
+					temp_access_fl |= CREATE_ACCESS;
 				if (strstr(strace_line, "O_RDONLY") != NULL)
-					ab_pattern(&root, strace_line, READ_ACCESS, pattern, MAXPATHLEN);
+					temp_access_fl |= READ_ACCESS;
 				if (strstr(strace_line, "O_WRONLY") != NULL)
-					ab_pattern(&root, strace_line, WRITE_ACCESS, pattern, MAXPATHLEN);
+					temp_access_fl |= WRITE_ACCESS;
 				if (strstr(strace_line, "O_RDWR") != NULL)
-					ab_pattern(&root, strace_line, READ_ACCESS | WRITE_ACCESS, pattern, MAXPATHLEN);
-				// TODO: unfinished operations check
+					temp_access_fl |= (READ_ACCESS | WRITE_ACCESS);
+
+				if (temp_access_fl) {
+					ab_pattern(&root, strace_line, temp_access_fl, pattern, MAXPATHLEN);
+				}
+				temp_access_fl = 0x0;
 			}
 			// SECTION: Stat
 			// We are going to treat stat as a read operation,
@@ -392,11 +424,23 @@ void tracer(int argc,
 			// THINK: Should MAP_PRIVATE be handled a certain way?
 			else if (strstr(strace_line, "mmap(") != NULL) {
 				if (strstr(strace_line, "PROT_READ|PROT_WRITE") != NULL)
-					ab_pattern(&root, strace_line, READ_ACCESS | WRITE_ACCESS, pattern, MAXPATHLEN);
+					temp_access_fl = (READ_ACCESS | WRITE_ACCESS);
 				if (strstr(strace_line, "PROT_READ") != NULL)
-					ab_pattern(&root, strace_line, READ_ACCESS, pattern, MAXPATHLEN);
+					temp_access_fl = READ_ACCESS;
 				if (strstr(strace_line, "PROT_WRITE") != NULL)
-					ab_pattern(&root, strace_line, WRITE_ACCESS, pattern, MAXPATHLEN);
+					temp_access_fl = WRITE_ACCESS;
+
+				if (temp_access_fl) {
+					ab_pattern(&root, strace_line, temp_access_fl, pattern, MAXPATHLEN);
+				}
+				temp_access_fl = 0x0;
+			}
+			// Delete operation needs write access,
+			// but we do not care about access rights, only what is actually done,
+			// although... deleting, even if its metadata,
+			// does write something to the disk kinda ish
+			else if (strstr(strace_line, "unlinkat(") != NULL) {
+				quote_pattern(&root, strace_line, DELETE_ACCESS | WRITE_ACCESS, pattern, MAXPATHLEN);
 			}
 		}
 		free(strace_line);

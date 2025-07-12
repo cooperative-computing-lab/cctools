@@ -22,6 +22,7 @@ rel2abspath(char *abs_p,
 	if (rel_p_len >= 1) {
 		if (rel_p[0] != '/') {
 			if (rel_p_len >= 2) {
+				// Check if its relative of the form ./
 				if (rel_p[0] == '.' && rel_p[1] == '/') {
 					rel_p = rel_p + 2;
 				}
