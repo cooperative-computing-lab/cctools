@@ -301,12 +301,12 @@ class ParseTxn:
             worker_id,
             hostport,
             time,
+            wall_time,
+            start_time,
             direction,
             filetype,
             filename,
             size,
-            wall_time,
-            start_time,
         ]
 
     def arg_to_values(self, ca, prefix, names, arg):
