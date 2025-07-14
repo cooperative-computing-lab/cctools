@@ -139,7 +139,6 @@ class DaskVineDag:
         count = 0
         for i in range(jumps):
             count += 1
-            print(count)
             sexpr_copy = sexpr.copy()
             new_args = sexpr.args[i * chunk_size:i * chunk_size + chunk_size]
             new_dependencies = set()
@@ -155,7 +154,6 @@ class DaskVineDag:
             self._working_graph[new_key] = sexpr_copy
 
         while (len(new_sexprs) > 1):
-            print(count)
             count += 1
             sexpr_copy = sexpr.copy()
             new_args = [dts.Alias(new_sexprs.pop(0).key) for i in range(chunk_size) if new_sexprs]
@@ -202,7 +200,6 @@ class DaskVineDag:
 
     def _initialize_pending_consumers(self):
         """Initialize pending consumers based on prune_depth"""
-        print("hello")
         for key in self._working_graph:
             if key not in self.pending_consumers:
                 count = 0
@@ -220,7 +217,6 @@ class DaskVineDag:
                             next_consumers = [(c, depth + 1) for c in list(self._pending_needed_by[consumer])]
                             queue.extend(next_consumers)
                 self.pending_consumers[key] = count
-        print(self.pending_consumers)
 
     def _initialize_pending_producers(self):
         """Initialize pending producers based on prune_depth"""
@@ -243,7 +239,6 @@ class DaskVineDag:
                         next_producers = [(p, depth + 1) for p in self._dependencies_of[producer]]
                         queue.extend(next_producers)
             self.pending_producers[key] = producers
-        print(self.pending_producers)
 
     def get_ready(self):
         """ List of dts.Task ready for computation.
