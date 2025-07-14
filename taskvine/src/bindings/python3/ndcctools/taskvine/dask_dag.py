@@ -193,7 +193,6 @@ class DaskVineDag:
             self._initialize_pending_consumers()
             self._initialize_pending_producers()
 
-
     def set_relations(self, task):
         self._dependencies_of[task.key] = task.dependencies
         self._missing_of[task.key] = set(self._dependencies_of[task.key])
@@ -209,8 +208,7 @@ class DaskVineDag:
                 count = 0
                 # BFS to count consumers up to prune_depth
                 visited = set()
-                queue = [(c,1) for c in list(self._pending_needed_by[key])] # (consumer, depth)
-                
+                queue = [(c, 1) for c in list(self._pending_needed_by[key])]  # (consumer, depth)
                 while queue:
                     consumer, depth = queue.pop(0)
                     if depth <= self.prune_depth and consumer not in visited:
@@ -233,7 +231,7 @@ class DaskVineDag:
             # Use set to store unique producers
             producers = set()
             visited = set()
-            queue = [(p,1) for p in self._dependencies_of[key]]
+            queue = [(p, 1) for p in self._dependencies_of[key]]
 
             while queue:
                 producer, depth = queue.pop(0)
@@ -246,7 +244,7 @@ class DaskVineDag:
                         queue.extend(next_producers)
             self.pending_producers[key] = producers
         print(self.pending_producers)
-            
+
     def get_ready(self):
         """ List of dts.Task ready for computation.
         This call should be used only for
@@ -355,6 +353,7 @@ class DaskVineDag:
 
     def get_targets(self):
         return self._targets
+
 
 class DaskVineNoResult(Exception):
     """Exception raised when asking for a result from a computation that has not been performed."""

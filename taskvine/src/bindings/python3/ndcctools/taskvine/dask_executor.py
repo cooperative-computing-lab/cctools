@@ -328,9 +328,6 @@ class DaskVine(Manager):
                                     p_result = dag.get_result(p)
                                     self.prune_file(p_result._file)
 
-
-                        #if self.prune_files:
-                        #    self._prune_file(dag, t.key)
                     else:
                         retries_left = t.decrement_retry()
                         print(f"task id {t.id} key {t.key} failed: {t.result}. {retries_left} attempts left.\n{t.std_output}")
