@@ -222,6 +222,7 @@ class DaskVineDag:
                             next_consumers = [(c, depth + 1) for c in list(self._pending_needed_by[consumer])]
                             queue.extend(next_consumers)
                 self.pending_consumers[key] = count
+        print(self.pending_consumers)
 
     def _initialize_pending_producers(self):
         """Initialize pending producers based on prune_depth"""
@@ -244,6 +245,7 @@ class DaskVineDag:
                         next_producers = [(p, depth + 1) for p in self._dependencies_of[producer]]
                         queue.extend(next_producers)
             self.pending_producers[key] = producers
+        print(self.pending_producers)
             
     def get_ready(self):
         """ List of dts.Task ready for computation.

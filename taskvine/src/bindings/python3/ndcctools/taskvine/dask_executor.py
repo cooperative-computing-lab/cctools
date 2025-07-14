@@ -328,6 +328,7 @@ class DaskVine(Manager):
 
                         if self.prune_depth > 0:
                             for p in dag.pending_producers[t.key]:
+                                print(f"Task Key: {t.key}, P {p}")
                                 dag.pending_consumers[p] -= 1
                                 if dag.pending_consumers[p] == 0:
                                     p_result = dag.get_result(p)
