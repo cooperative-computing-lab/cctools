@@ -356,34 +356,6 @@ class DaskVineDag:
     def get_targets(self):
         return self._targets
 
-    def visualize(self, name='DaskVine_DAG'):
-        import graphviz
-        nodes = []
-        dot = graphviz.Digraph(name)
-        for item in self._working_graph:
-            sexpr = self._working_graph[item]
-            if isinstance(sexpr, dts.Task):
-                if str(item) not in nodes:
-                    dot.node(str(item), str(item))
-                    nodes.append(str(item))
-                for value in sexpr.dependencies:
-                    if value in self._working_graph:
-                        if isinstance(self._working_graph[value], dts.Task):
-                            if str(value) not in nodes:
-                                dot.node(str(value), str(value))
-                                nodes.append(str(value))
-                            dot.edge(str(value), str(item))
-                        elif isinstance(self._working_graph[value], dts.Alias):
-                            value = self._working_graph[value].target
-                            if str(value) not in nodes:
-                                dot.node(str(value), str(value))
-                                nodes.append(str(value))
-                            dot.edge(str(value), str(item))
-                        else:
-                            pass
-        dot.render(f'doctest-output/{name}')
-
-
 class DaskVineNoResult(Exception):
     """Exception raised when asking for a result from a computation that has not been performed."""
     pass

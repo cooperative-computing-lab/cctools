@@ -115,7 +115,6 @@ class DaskVine(Manager):
     # @param env_per_task  if true, each task individually expands its own environment. Must use environment option as a str.
     # @param progress_disable If True, disable progress bar
     # @param progress_label Label to use in progress bar
-    # @param visualize     Create a dot graph representing the Dask Graph. Output is in doctest-output/DaskVine_DAG.pdf
     # @param reconstruct   Reconstrut graph based on annotated functions.
     # @param merge_size    When reconstructing a merge function, merge this many at a time
     # @param wrapper       Function to wrap dask calls. It should take as arguments (key, fn, *args). It should execute
@@ -143,7 +142,6 @@ class DaskVine(Manager):
             scheduling_mode='FIFO',
             env_per_task=False,
             progress_disable=False,
-            visualize=False,
             reconstruct=False,
             merge_size=2,
             progress_label="[green]tasks",
@@ -191,7 +189,6 @@ class DaskVine(Manager):
             self.task_mode = task_mode
             self.scheduling_mode = scheduling_mode
             self.env_per_task = env_per_task
-            self.visualize = visualize
             self.reconstruct = reconstruct
             self.merge_size = merge_size
             self.progress_disable = progress_disable
@@ -238,9 +235,6 @@ class DaskVine(Manager):
         keys_flatten = indices.keys()
 
         dag = DaskVineDag(dsk, reconstruct=self.reconstruct, merge_size=self.merge_size, prune_depth=self.prune_depth)
-
-        if self.visualize:
-            dag.visualize()
 
         tag = f"dag-{id(dag)}"
 
