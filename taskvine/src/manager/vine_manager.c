@@ -3393,8 +3393,10 @@ int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine
 		 * We modify the object each time we schedule a peer transfer by adding a substitute url.
 		 * We must clear the substitute pointer each task we send to ensure we aren't using
 		 * a previously scheduled url. */
-		vine_file_delete(m->substitute);
-		m->substitute = NULL;
+		if (m->substitute) {
+			vine_file_delete(m->substitute);
+			m->substitute = NULL;
+		}
 
 		/* Provide a substitute file object to describe the peer. */
 		if (!(m->file->flags & VINE_PEER_NOSHARE) && (m->file->cache_level > VINE_CACHE_LEVEL_TASK)) {
