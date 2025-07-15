@@ -36,33 +36,73 @@
 
 // TODO: Enforcer should not write to stderr no more
 
-// --------------------------------------------------------------------------------------
-// Something interesting to note that hecil has brought to my attention is that
-// Makeflow attempts to open the x.y.makeflowlog file on read but since it does not
-// find it because it's a clean run, it opens it on write mode but our strace parser
-// only catches paths of successful calls...
-// So the RDONLY access never gets registered.
-// 2 solutions to this could possibly be:
-// 1. We modify the tracer so it catches failed calls and adds them to the contract
-// anyways
-// 2. We modify the tracer so on subsequent runs it parses the file and
-// updates the permissions accordingly, but in a append type of way.
-// I think option Number 1 is easier but somewhat half-assed
-// But Number 2 implies writing the same parser in 2 different languages
-// Perhaps this is a signal to wrap everything under 1 language...?
-// --------------------------------------------------------------------------------------
-
-char flag2letter(struct path_access *r)
+void flag2letter(struct path_access *r, char *buff, size_t buff_len)
 {
-	if (r->read && r->write)
-		return '+';
-	if (r->read)
-		return 'R';
-	if (r->write)
-		return 'W';
+	// dont forget nul terminator..!
+	if (buff_len < (ACCESS_COUNT + 1)) {
+		fprintf(stderr, "Not enough space for all permissions\n");
+		return;
+	}
+	memset(buff, 0, buff_len);
 	if (r->stat)
-		return 'S';
-	return '_';
+		strncat(buff, "S", buff_len);
+	if (r->create)
+		strncat(buff, "C", buff_len);
+	if (r->delete)
+		strncat(buff, "D", buff_len);
+	if (r->read && r->write)
+		strncat(buff, "+", buff_len);
+	else if (r->read)
+		strncat(buff, "R", buff_len);
+	else if (r->write)
+		strncat(buff, "W", buff_len);
+	if (r->list)
+		strncat(buff, "L", buff_len);
+}
+
+// TODO: The bit flags need to be changed to a typedef so we can
+// change the bit count whenever
+uint8_t letter2bitflag(char x)
+{
+	switch (x) {
+	case 'S':
+		return STAT_ACCESS;
+		break;
+	case 'R':
+		return READ_ACCESS;
+		break;
+	case 'W':
+		return WRITE_ACCESS;
+		break;
+	case '+':
+		return READ_ACCESS | WRITE_ACCESS;
+		break;
+	case 'C':
+		return CREATE_ACCESS;
+		break;
+	case 'D':
+		return DELETE_ACCESS;
+		break;
+	case 'L':
+		return LIST_ACCESS;
+		break;
+	default:
+		return UNKOWN_ACCESS;
+		break;
+	}
+}
+
+/// This function finds the closing delimiter for a string
+/// starting from the back, this allows us to naively parse the path in the contract
+/// without worrying on if we find a closing delimiter and having to do lookahead
+void smart_delim_close(char *buff, char delim)
+{
+	size_t buff_len = strlen(buff);
+	for (int i = buff_len - 1; i != 0; i--) {
+		if (buff[i] == delim)
+			// we want to overwrite the delimiter since we wont need it
+			buff[i] = '\0';
+	}
 }
 
 /// These paths, and everything under them will be whitelisted
@@ -137,8 +177,8 @@ init_enforce()
 		;
 	// Variable to check that we extracted the permission from the line
 	bool got_perm = false;
-	// flag that will contain all of our flags
-	uint8_t access_fl;
+	// var that will contain all of our flags
+	uint8_t access_fl = 0x0;
 	// Position storing to make lookahead easy
 	fpos_t pos;
 	// index for our array that will store the path
@@ -149,68 +189,53 @@ init_enforce()
 	struct list *list_root_init = list_create();
 	// Start parsing
 	while ((c = fgetc(contract_f)) != EOF) {
-		// We ignoe characters that are not useful to us
-		// and despite contracts being line orientes, we dont actually track lines
-		if (c == ' ' || c == '\t' || c == '\n')
-			continue;
 		// Save position for lookahead
 		fgetpos(contract_f, &pos);
-		// get our char
+
+		// If we were to use delimiters (<>) then we could find clever ways to get around
+		// user mistakes.
 		l = fgetc(contract_f);
 		if (!got_perm) {
-			if (c == 'S') {
-				switch (l) {
-				case 'R':
-					access_fl |= READ_ACCESS;
-					access_fl |= STAT_ACCESS;
-					got_perm = true;
-					continue;
-				case 'W':
-					access_fl |= WRITE_ACCESS;
-					access_fl |= STAT_ACCESS;
-					got_perm = true;
-					continue;
-				case '+':
-					access_fl |= READ_ACCESS;
-					access_fl |= WRITE_ACCESS;
-					access_fl |= STAT_ACCESS;
-					got_perm = true;
-					continue;
-				}
-				access_fl |= STAT_ACCESS;
-				got_perm = true;
-			} else if (c == 'R') {
-				access_fl |= READ_ACCESS;
-				got_perm = true;
-			} else if (c == 'W') {
-				access_fl |= WRITE_ACCESS;
-				got_perm = true;
-			} else if (c == '+') {
-				access_fl |= READ_ACCESS;
-				access_fl |= WRITE_ACCESS;
-				got_perm = true;
-			} else {
+			// We are working based off of the assumption the first char is always
+			// a permission or a letter.
+			size_t temp_flag = letter2bitflag(c);
+			if (temp_flag == UNKOWN_ACCESS) {
 				fprintf(stderr, "Unrecognized permission [%x][%c]...\n", c, c);
+			} else
+				access_fl |= temp_flag;
+			if (l == ' ') {
+				got_perm = true;
+				// Skip characters until we get the marker for path
+				// IMPROVEMENT: How to handle erroneous whitespace at the beginning
+				// while trying to get perms
+				while ((c = fgetc(contract_f) != '<'))
+					;
+				continue;
 			}
 		} else {
 			// Since we already found our permission we need to store the path
 			path_val[i] = c;
 			i++;
-			// Ok this could be a potential issue since sometimes path might contain
-			// spaces... perhaps solution could be
-			// if (l == '\n' || (l == ' ' && c != '\\'))
-			// so we can check if the space character is escaped
-			if (l == '\n' || l == ' ') {
+			// we dont worry about the delimiter being closed just yet
+			if (l == '\n') {
 				path_val[i] = '\0';
-				i = 0;
+				// we want the users to feel they can just write a contract
+				// so we should deal with the trimming of trailing whitespace ourselves
+				smart_delim_close(path_val, '>');
 				new_path_access_node(list_root_init, path_val, access_fl);
+				i = 0;
 				access_fl = 0x0;
 				got_perm = false;
 				continue;
 			}
 		}
+
 		// Reset to position before lookahead
 		fsetpos(contract_f, &pos);
+
+		// THOUGHT: There is room for improvement when it comes to this parsing,
+		// we could warn the user that a permission set doesnt have a path or that
+		// we finished parsing while in an incomplete state
 	}
 	// The root of our global contract list,
 	// This is never really modified throughout the program, since enforcing
@@ -232,7 +257,7 @@ deinit_enforce()
 /// @param pathname: This is the pathname to check for enforcing
 /// @param perm: This is the permission that this path should have
 bool enforce(const char *pathname,
-		const char perm)
+		const uint8_t perm)
 {
 	// WHITELIST check
 	for (size_t i = 0; WHITELIST[i] != NULL; i++) {
@@ -247,6 +272,8 @@ bool enforce(const char *pathname,
 		}
 	}
 
+	char a_perm[11] = {0};
+	size_t a_perm_len = sizeof(a_perm);
 	struct path_access *a = find_path_in_list(contract_list_root, pathname);
 	// Is this good enough error handling? Probably not.
 	// Mostly saying this due to the fact that a path, that's not registered,
@@ -265,45 +292,96 @@ bool enforce(const char *pathname,
 		// For now we should still allow the program to run even if something is not found
 		// the idea, for now, is not to stop a workflow but to monitor it (in a sense)
 		return true;
-	} else if ((a->read && a->write) && (perm == 'R' || perm == 'W')) {
-		char a_perm = flag2letter(a);
+	}
+	// Order matters a lot for these operations
+	if (a->delete && (perm & DELETE_ACCESS)) {
+		flag2letter(a, a_perm, a_perm_len);
 		PRINT_GREEN();
 		fprintf(stderr,
-				"[ALLOWED]: "
-				"Path [%s] with permission [%c] is not in violation of the "
+				"[ALLOWED DELETE]: "
+				"Path [%s] with permission [%s] is not in violation of the "
 				"contract.\n",
 				a->pathname,
 				a_perm);
 		PRINT_RESET_TERM_C();
 		return true;
-	} else if ((a->read && perm == 'R') || (a->write && perm == 'W')) {
-		char a_perm = flag2letter(a);
+	}
+	if (a->list && (perm & LIST_ACCESS)) {
+		flag2letter(a, a_perm, a_perm_len);
 		PRINT_GREEN();
 		fprintf(stderr,
-				"[ALLOWED]: "
-				"Path [%s] with permission [%c] is not in violation of the "
+				"[ALLOWED LIST]: "
+				"Path [%s] with permission [%s] is not in violation of the "
 				"contract.\n",
 				a->pathname,
 				a_perm);
 		PRINT_RESET_TERM_C();
 		return true;
-	} else if (a->stat && perm == 'S') {
-		char a_perm = flag2letter(a);
+	}
+
+	// Also, moving away from char to bit flags in THIS specific function
+	// is something that needs to be explained:
+	// So despite the fact that we should (in theory) only be consuming one operation,
+	// bit flags lends themselves to allowing multiple operations at once,
+	// in this case we just don't want to lose information and we want everything to
+	// be unified, so we use bitflags to keep the info that the O_CREAT flag was used
+	// alongside some other permission but we don't actually return
+
+	// An interesting thing is that an O_CREAT flag on open does not guarantee
+	// that the OS will return the file descriptor with the permission that was requested
+	// if the file is created, the fd might be open with READ and WRITE permissions
+	if (a->create && (perm & CREATE_ACCESS)) {
+		flag2letter(a, a_perm, a_perm_len);
+		PRINT_GREEN();
+		fprintf(stderr,
+				"[ALLOWED CREATE]: "
+				"Path [%s] with permission [%s] is not in violation of the "
+				"contract.\n",
+				a->pathname,
+				a_perm);
+		PRINT_RESET_TERM_C();
+	}
+
+	// We are not trying to create or delete, so it doesnt matter
+	if ((a->read && a->write) && (perm & READ_ACCESS || perm & WRITE_ACCESS)) {
+		flag2letter(a, a_perm, a_perm_len);
+		PRINT_GREEN();
+		fprintf(stderr,
+				"[ALLOWED]: "
+				"Path [%s] with permission [%s] is not in violation of the "
+				"contract.\n",
+				a->pathname,
+				a_perm);
+		PRINT_RESET_TERM_C();
+		return true;
+	} else if ((a->read && (perm & READ_ACCESS)) || (a->write && (perm & WRITE_ACCESS))) {
+		flag2letter(a, a_perm, a_perm_len);
+		PRINT_GREEN();
+		fprintf(stderr,
+				"[ALLOWED]: "
+				"Path [%s] with permission [%s] is not in violation of the "
+				"contract.\n",
+				a->pathname,
+				a_perm);
+		PRINT_RESET_TERM_C();
+		return true;
+	} else if (a->stat && (perm & STAT_ACCESS)) {
+		flag2letter(a, a_perm, a_perm_len);
 		PRINT_GREEN();
 		fprintf(stderr,
 				"[ALLOWED STAT]: "
-				"Path [%s] with permission [%c] is not in violation of the "
+				"Path [%s] with permission [%s] is not in violation of the "
 				"contract.\n",
 				a->pathname,
 				a_perm);
 		PRINT_RESET_TERM_C();
 		return true;
 	} else {
-		char a_perm = flag2letter(a);
+		flag2letter(a, a_perm, a_perm_len);
 		PRINT_PINK();
 		fprintf(stderr,
 				"[BLOCKED]: "
-				"Permission [%c] for path [%s] does not match contract, expected [%c]\n",
+				"Permission [0x%x] for path [%s] does not match contract, expected [%s]\n",
 				perm,
 				a->pathname,
 				a_perm);
@@ -338,24 +416,27 @@ int open(const char *pathname,
 	fprintf(stderr, "with absolute [%s]\n", full_path);
 	PRINT_RESET_TERM_C();
 
+	// Get which permission we need
+	uint8_t path_perm = 0x0;
+
 	mode_t mode = 0;
 	/// If there is a flag in there, we need to extract it
 	if (flags & (O_CREAT)) {
 		va_list mode_va;
 		va_start(mode_va, flags);
 		mode = va_arg(mode_va, mode_t);
+
+		path_perm |= CREATE_ACCESS;
 	}
 
 	// SECTION: Enforce
-	// Get which permission we need
-	char path_perm;
 	if ((flags & O_RDONLY) == O_RDONLY) // O_RDONLY flag is 0 under the hood
 	{
-		path_perm = 'R';
+		path_perm |= READ_ACCESS;
 	} else if (flags & O_WRONLY) {
-		path_perm = 'W';
+		path_perm |= WRITE_ACCESS;
 	} else if (flags & O_RDWR) {
-		path_perm = '+';
+		path_perm |= READ_ACCESS | WRITE_ACCESS;
 	}
 	if (enforce(full_path, path_perm) != true) {
 		return -1;
@@ -387,7 +468,7 @@ read(int fd,
 	PRINT_RESET_TERM_C();
 
 	// SECTION: Enforce
-	if (enforce(solved_path, 'R') != true) {
+	if (enforce(solved_path, READ_ACCESS) != true) {
 		return -1;
 	}
 
@@ -413,7 +494,7 @@ write(int fd,
 	fprintf(stderr, "[WRITING]: caught path [%s] with link to [%s]\n", fd_link, solved_path);
 	PRINT_RESET_TERM_C();
 	// SECTION: Enforce
-	if (enforce(solved_path, 'W') != true) {
+	if (enforce(solved_path, WRITE_ACCESS) != true) {
 		return -1;
 	}
 
@@ -434,26 +515,29 @@ fopen(const char *restrict pathname,
 	PRINT_RESET_TERM_C();
 
 	// SECTION: Enforcing
-	char perm_val;
+	uint8_t perm_val = 0x0;
 	char mode_len = strlen(mode);
 	// We need to get the values out of the flags
 	if (strcmp(mode, "r") == 0) {
-		perm_val = 'R';
+		perm_val |= READ_ACCESS;
 	} else if (strcmp(mode, "w") == 0) {
-		perm_val = 'W';
+		perm_val |= WRITE_ACCESS;
 	} else if (strcmp(mode, "a") == 0) {
-		perm_val = 'W';
+		perm_val |= WRITE_ACCESS;
 	} else if (mode_len > 1) {
 		if (mode[1] == '+') {
-			perm_val = '+';
-		} else if (mode[1] == 'b') {
+			perm_val |= READ_ACCESS | WRITE_ACCESS;
+			// b and + are not the only things we can to an fopen mode flag call
+			// theres also e, but for now we only want to treat + like its special
+			// b and e, we dont really concern ourselves
+		} else {
 			// not a fan of this
 			switch (mode[0]) {
 			case 'r':
-				perm_val = 'R';
+				perm_val |= READ_ACCESS;
 				break;
 			case 'w':
-				perm_val = 'W';
+				perm_val |= WRITE_ACCESS;
 				break;
 			}
 		}
@@ -466,7 +550,9 @@ fopen(const char *restrict pathname,
 		// Couldn't convert so we fallback to pathname
 		strncpy(full_path, pathname, MAXPATHLEN);
 	}
-	enforce(full_path, perm_val);
+	if (enforce(full_path, perm_val) != true) {
+		return NULL;
+	}
 
 	FILE *(*real_fopen)(const char *restrict pathname, const char *restrict mode);
 	real_fopen = dlsym(RTLD_NEXT, "fopen");
@@ -507,7 +593,7 @@ int fstatat(int dirfd,
 	// TODO: This could be made to only have 1 call to enforce instead of 2 in separate
 	// branches
 	if (dirfd == AT_FDCWD) {
-		enforce(full_path, 'S');
+		enforce(full_path, STAT_ACCESS);
 	} else {
 		// Solve the dirfd and then glue it together with the absolute path
 		char fd_link[MAXPATHLEN];
@@ -516,7 +602,7 @@ int fstatat(int dirfd,
 		size_t solved_path_len = readlink(fd_link, solved_path, MAXPATHLEN);
 		solved_path[solved_path_len] = '\0';
 		strcat(solved_path, pathname); // XXX: strncat()?
-		enforce(solved_path, 'S');
+		enforce(solved_path, STAT_ACCESS);
 	}
 
 	int (*real_fstatat)(int dirfd, const char *restrict pathname, struct stat *restrict statbuf, int flags);
@@ -529,4 +615,21 @@ int fstatat(int dirfd,
 // I don't think this is as straightforward, since strace uses ptrace
 // here we injecting into the process itself
 
-// TODO: openat()
+int remove(const char *pathname)
+{
+	PRINT_YELLOW();
+	fprintf(stderr, "[UNLINK]: Caught path [%s]\n", pathname);
+	PRINT_RESET_TERM_C();
+
+	char full_path[MAXPATHLEN];
+	if (rel2abspath(full_path, pathname, MAXPATHLEN) == NULL) {
+		// Couldn't convert so we fallback to pathname
+		strncpy(full_path, pathname, MAXPATHLEN);
+	}
+	if (enforce(full_path, DELETE_ACCESS) != true) {
+		return -1;
+	}
+	int (*real_remove)(const char *pathname);
+	real_remove = dlsym(RTLD_NEXT, "remove");
+	return real_remove(pathname);
+}
