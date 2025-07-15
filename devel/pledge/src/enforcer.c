@@ -67,20 +67,28 @@ uint8_t letter2bitflag(char x)
 	switch (x) {
 	case 'S':
 		return STAT_ACCESS;
+		break;
 	case 'R':
 		return READ_ACCESS;
+		break;
 	case 'W':
 		return WRITE_ACCESS;
+		break;
 	case '+':
 		return READ_ACCESS | WRITE_ACCESS;
+		break;
 	case 'C':
 		return CREATE_ACCESS;
+		break;
 	case 'D':
 		return DELETE_ACCESS;
+		break;
 	case 'L':
 		return LIST_ACCESS;
+		break;
 	default:
 		return UNKOWN_ACCESS;
+		break;
 	}
 }
 
