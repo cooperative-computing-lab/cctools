@@ -1114,6 +1114,8 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		free(cached_name);
 	}
 
+	list_delete(to_remove);
+
 	return total_replication_request_sent;
 }
 
@@ -2402,6 +2404,7 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "tasks_total_memory", total->memory);
 	jx_insert_integer(j, "tasks_total_disk", total->disk);
 	jx_insert_integer(j, "tasks_total_gpus", total->gpus);
+	rmsummary_delete(total);
 
 	// worker information for general vine_status report
 	jx_insert_integer(j, "workers", info.workers_connected);
@@ -2664,7 +2667,10 @@ static vine_result_code_t handle_worker(struct vine_manager *q, struct link *l)
 	case VINE_MSG_PROCESSED_DISCONNECT:
 		// A status query was received and processed, so disconnect.
 		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_STATUS_WORKER);
-		return VINE_SUCCESS;
+		// It was not really a failure, but signals to the calling code that the worker
+		// is not available anymore.
+		return VINE_WORKER_FAILURE;
+		break;
 
 	case VINE_MSG_NOT_PROCESSED:
 		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
@@ -2678,6 +2684,7 @@ static vine_result_code_t handle_worker(struct vine_manager *q, struct link *l)
 		q->stats->workers_lost++;
 		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
 		return VINE_WORKER_FAILURE;
+		break;
 	}
 
 	return VINE_SUCCESS;
@@ -3393,8 +3400,10 @@ int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine
 		 * We modify the object each time we schedule a peer transfer by adding a substitute url.
 		 * We must clear the substitute pointer each task we send to ensure we aren't using
 		 * a previously scheduled url. */
-		vine_file_delete(m->substitute);
-		m->substitute = NULL;
+		if (m->substitute) {
+			vine_file_delete(m->substitute);
+			m->substitute = NULL;
+		}
 
 		/* Provide a substitute file object to describe the peer. */
 		if (!(m->file->flags & VINE_PEER_NOSHARE) && (m->file->cache_level > VINE_CACHE_LEVEL_TASK)) {
@@ -6444,10 +6453,13 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 	/* delete all of the replicas present at remote workers. */
 	struct set *source_workers = hash_table_lookup(m->file_worker_table, f->cached_name);
 	if (source_workers && set_size(source_workers) > 0) {
-		struct vine_worker_info *w;
-		SET_ITERATE(source_workers, w)
-		{
-			delete_worker_file(m, w, f->cached_name, 0, 0);
+		void **workers_array = set_values_array(source_workers);
+		if (workers_array) {
+			for (int i = 0; workers_array[i] != NULL; i++) {
+				struct vine_worker_info *w = (struct vine_worker_info *)workers_array[i];
+				delete_worker_file(m, w, f->cached_name, 0, 0);
+			}
+			set_free_values_array(workers_array);
 		}
 	}
 

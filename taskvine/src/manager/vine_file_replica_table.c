@@ -172,12 +172,12 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 			continue;
 		}
 
-		char *source_addr = string_format("%s/%s", source_worker->transfer_url, f->cached_name);
-
 		// skip if the source is busy with other transfers
 		if (source_worker->outgoing_xfer_counter >= m->worker_source_max_transfers) {
 			continue;
 		}
+
+		char *source_addr = string_format("%s/%s", source_worker->transfer_url, f->cached_name);
 
 		char *id;
 		struct vine_worker_info *dest_worker;
