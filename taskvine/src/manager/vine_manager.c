@@ -1114,6 +1114,8 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		free(cached_name);
 	}
 
+	list_delete(to_remove);
+
 	return total_replication_request_sent;
 }
 
