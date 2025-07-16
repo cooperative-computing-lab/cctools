@@ -6453,7 +6453,6 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 	/* delete all of the replicas present at remote workers. */
 	struct set *source_workers = hash_table_lookup(m->file_worker_table, f->cached_name);
 	if (source_workers && set_size(source_workers) > 0) {
-		struct vine_worker_info *w;
 		void **workers_array = set_values_array(source_workers);
 		if (workers_array) {
 			for (int i = 0; workers_array[i] != NULL; i++) {
