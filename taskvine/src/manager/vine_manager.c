@@ -2664,7 +2664,10 @@ static vine_result_code_t handle_worker(struct vine_manager *q, struct link *l)
 	case VINE_MSG_PROCESSED_DISCONNECT:
 		// A status query was received and processed, so disconnect.
 		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_STATUS_WORKER);
-		return VINE_SUCCESS;
+		// It was not really a failure, but signals to the calling code that the worker
+		// is not available anymore.
+		return VINE_WORKER_FAILURE;
+		break;
 
 	case VINE_MSG_NOT_PROCESSED:
 		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
@@ -2678,6 +2681,7 @@ static vine_result_code_t handle_worker(struct vine_manager *q, struct link *l)
 		q->stats->workers_lost++;
 		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
 		return VINE_WORKER_FAILURE;
+		break;
 	}
 
 	return VINE_SUCCESS;
