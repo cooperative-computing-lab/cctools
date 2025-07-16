@@ -193,4 +193,16 @@ Caller should free the array.
 */
 void **set_values(struct set *s);
 
+/** A set_size(s) + 1 array of the current elements in the set in a random order.
+The array is NULL-terminated. Caller should free the array with set_free_values_array.
+@param s A pointer to a set.
+@return An array of pointers terminated with NULL. NULL if there are no elements in the set.
+*/
+void **set_values_array(struct set *s);
+
+/** Free an array returned by set_values_array.
+@param values An array returned by set_values_array.
+*/
+void set_free_values_array(void **values);
+
 #endif
