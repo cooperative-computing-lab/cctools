@@ -6447,9 +6447,13 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 	struct set *source_workers = hash_table_lookup(m->file_worker_table, f->cached_name);
 	if (source_workers && set_size(source_workers) > 0) {
 		struct vine_worker_info *w;
-		SET_ITERATE(source_workers, w)
-		{
-			delete_worker_file(m, w, f->cached_name, 0, 0);
+		void **workers_array = set_values_array(source_workers);
+		if (workers_array) {
+			for (int i = 0; workers_array[i] != NULL; i++) {
+				struct vine_worker_info *w = (struct vine_worker_info *)workers_array[i];
+				delete_worker_file(m, w, f->cached_name, 0, 0);
+			}
+			set_free_values_array(workers_array);
 		}
 	}
 
