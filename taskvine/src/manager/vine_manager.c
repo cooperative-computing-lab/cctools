@@ -2404,6 +2404,7 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "tasks_total_memory", total->memory);
 	jx_insert_integer(j, "tasks_total_disk", total->disk);
 	jx_insert_integer(j, "tasks_total_gpus", total->gpus);
+	rmsummary_delete(total);
 
 	// worker information for general vine_status report
 	jx_insert_integer(j, "workers", info.workers_connected);
