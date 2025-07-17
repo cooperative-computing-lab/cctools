@@ -140,13 +140,23 @@ struct datagram *update_dgram = 0;
 struct link *update_port = 0;
 
 /*
-Upon receiving a shutdown signal, exit the process *without* performing cleanup,
-because cleanup hooks in the SSL library (and perhaps others) are not signal safe.
+Shutdown *without* performing cleanup, so as to avoid (surprisingly common)
+deadlocks when a SIGALRM is received while in the middle of SSL negotiation.
 */
 
 void shutdown_fast(int sig)
 {
 	_exit(0);
+}
+
+/*
+Shutdown normally, calling destructors, atexit, and so forth when a manual
+shutdown signal is received.
+*/
+
+void shutdown_clean(int sig)
+{
+	exit(0);
 }
 
 void ignore_signal(int sig)
@@ -947,9 +957,9 @@ int main(int argc, char *argv[])
 	install_handler(SIGPIPE, ignore_signal);
 	install_handler(SIGHUP, ignore_signal);
 	install_handler(SIGCHLD, ignore_signal);
-	install_handler(SIGINT, shutdown_fast);
-	install_handler(SIGTERM, shutdown_fast);
-	install_handler(SIGQUIT, shutdown_fast);
+	install_handler(SIGINT, shutdown_clean);
+	install_handler(SIGTERM, shutdown_clean);
+	install_handler(SIGQUIT, shutdown_clean);
 	install_handler(SIGALRM, shutdown_fast);
 
 	if(!preferred_hostname) {
