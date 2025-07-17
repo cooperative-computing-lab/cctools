@@ -139,9 +139,14 @@ static char data[1024*1024];
 struct datagram *update_dgram = 0;
 struct link *update_port = 0;
 
-void shutdown_clean(int sig)
+/*
+Upon receiving a shutdown signal, exit the process *without* performing cleanup,
+because cleanup hooks in the SSL library (and perhaps others) are not signal safe.
+*/
+
+void shutdown_fast(int sig)
 {
-	exit(0);
+	_exit(0);
 }
 
 void ignore_signal(int sig)
@@ -942,10 +947,10 @@ int main(int argc, char *argv[])
 	install_handler(SIGPIPE, ignore_signal);
 	install_handler(SIGHUP, ignore_signal);
 	install_handler(SIGCHLD, ignore_signal);
-	install_handler(SIGINT, shutdown_clean);
-	install_handler(SIGTERM, shutdown_clean);
-	install_handler(SIGQUIT, shutdown_clean);
-	install_handler(SIGALRM, shutdown_clean);
+	install_handler(SIGINT, shutdown_fast);
+	install_handler(SIGTERM, shutdown_fast);
+	install_handler(SIGQUIT, shutdown_fast);
+	install_handler(SIGALRM, shutdown_fast);
 
 	if(!preferred_hostname) {
 		domain_name_cache_guess(hostname);
