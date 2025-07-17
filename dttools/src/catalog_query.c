@@ -417,6 +417,7 @@ int catalog_query_send_update(const char *hosts, const char *text, catalog_updat
 
 		if (data_length > compress_limit && (flags & CATALOG_UPDATE_CONDITIONAL) && !use_udp) {
 			debug(D_DEBUG, "compressed update message exceeds limit of %d bytes (CATALOG_UPDATE_LIMIT)", (int)compress_limit);
+			free(update_data);
 			return 0;
 		}
 	}
