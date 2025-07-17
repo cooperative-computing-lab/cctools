@@ -245,8 +245,7 @@ vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_
 
 	vine_manager_send(q, dest_worker, "puturl_now %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, mode, transfer_id);
 
-	struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
-	vine_file_replica_table_insert(q, dest_worker, f->cached_name, replica);
+	vine_file_replica_table_get_or_create(q, dest_worker, f->cached_name, f->type, f->cache_level, f->size, f->mtime);
 
 	free(transfer_id);
 	return VINE_SUCCESS;
@@ -284,8 +283,7 @@ vine_result_code_t vine_manager_put_url(struct vine_manager *q, struct vine_work
 
 	vine_manager_send(q, dest_worker, "puturl %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, mode, transfer_id);
 
-	struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
-	vine_file_replica_table_insert(q, dest_worker, f->cached_name, replica);
+	vine_file_replica_table_get_or_create(q, dest_worker, f->cached_name, f->type, f->cache_level, f->size, f->mtime);
 
 	free(transfer_id);
 	return VINE_SUCCESS;
@@ -445,8 +443,7 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 
 	/* If the send succeeded, then record it in the worker */
 	if (result == VINE_SUCCESS) {
-		struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
-		vine_file_replica_table_insert(q, w, f->cached_name, replica);
+		struct vine_file_replica *replica = vine_file_replica_table_get_or_create(q, w, f->cached_name, f->type, f->cache_level, f->size, f->mtime);
 
 		switch (file_to_send->type) {
 		case VINE_URL:
@@ -597,8 +594,7 @@ vine_result_code_t vine_manager_put_task(
 	int r = vine_manager_send(q, w, "end\n");
 	if (r >= 0) {
 		if (target) {
-			struct vine_file_replica *replica = vine_file_replica_create(target->type, target->cache_level, target->size, target->mtime);
-			vine_file_replica_table_insert(q, w, target->cached_name, replica);
+			vine_file_replica_table_get_or_create(q, w, target->cached_name, target->type, target->cache_level, target->size, target->mtime);
 		}
 
 		return VINE_SUCCESS;
