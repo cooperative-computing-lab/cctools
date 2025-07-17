@@ -4,6 +4,7 @@
 
 from collections import defaultdict
 import dask._task_spec as dts
+import math
 
 
 class DaskVineDag:
@@ -65,7 +66,7 @@ class DaskVineDag:
     def symbolp(s):
         return isinstance(s, dts.DataNode)
 
-    def __init__(self, dsk):
+    def __init__(self, dsk, reconstruct=False, merge_size=2, prune_depth=0):
         self._dsk = dsk
 
         #  For a key, the set of keys that need it to perform a computation.
@@ -91,10 +92,84 @@ class DaskVineDag:
 
         # target keys that the dag should compute
         self._targets = set()
+        self._target_map = {}
 
         self._working_graph = dict(dsk)
 
+        if reconstruct:
+            self.expand_merge(merge_size)
+
+        self.prune_depth = prune_depth
+        self.pending_consumers = defaultdict(int)
+        self.pending_producers = defaultdict(lambda: set())
+
         self.initialize_graph()
+
+    def expand_merge(self, merge_size):
+        graph_copy = self._working_graph.copy()
+        to_remove = []
+        for key, sexpr in graph_copy.items():
+            if isinstance(sexpr, dts.Task):
+                if callable(sexpr.func) and hasattr(sexpr.func, '__name__') and sexpr.func.__name__ == "flex_merge":
+                    new_key = self.rebuild_merge(key, sexpr, merge_size)
+                    to_remove.append(key)
+                    self._target_map[key] = new_key
+        for key, sexpr in graph_copy.items():
+            if isinstance(sexpr, dts.Task):
+                for d in sexpr.dependencies:
+                    if d in self._target_map:
+                        new_deps = frozenset([self._target_map[d] if d in self._target_map else d for d in sexpr.dependencies])
+                        new_args = []
+                        for arg in sexpr.args:
+                            if not isinstance(arg, str) and arg.key in self._target_map:
+                                new_args.append(dts.Alias(self._target_map[arg.key]))
+                            else:
+                                new_args.append(arg)
+                        self._working_graph[key].args = new_args
+                        self._working_graph[key]._dependencies = new_deps
+        for key in to_remove:
+            del self._working_graph[key]
+
+    def rebuild_merge(self, key, sexpr, merge_size):
+        chunk_size = merge_size
+        new_sexprs = []
+
+        base_key = sexpr.key
+        jumps = math.ceil(len(sexpr.args) / chunk_size)
+        count = 0
+        for i in range(jumps):
+            count += 1
+            sexpr_copy = sexpr.copy()
+            new_args = sexpr.args[i * chunk_size:i * chunk_size + chunk_size]
+            new_dependencies = set()
+            for arg in new_args:
+                new_dependencies.add(arg.key)
+            new_dependencies = frozenset(new_dependencies)
+            new_key = f'{base_key}-{count}'
+
+            sexpr_copy.key = new_key
+            sexpr_copy.args = new_args
+            sexpr_copy._dependencies = new_dependencies
+            new_sexprs.append(sexpr_copy)
+            self._working_graph[new_key] = sexpr_copy
+
+        while (len(new_sexprs) > 1):
+            count += 1
+            sexpr_copy = sexpr.copy()
+            new_args = [dts.Alias(new_sexprs.pop(0).key) for i in range(chunk_size) if new_sexprs]
+            new_dependencies = set()
+            for arg in new_args:
+                new_dependencies.add(arg.key)
+            new_dependencies = frozenset(new_dependencies)
+            new_key = f'{base_key}-{count}'
+
+            sexpr_copy.key = new_key
+            sexpr_copy.args = new_args
+            sexpr_copy._dependencies = new_dependencies
+            new_sexprs.append(sexpr_copy)
+            self._working_graph[new_key] = sexpr_copy
+
+        return new_sexprs[0].key
 
     def left_to_compute(self):
         return len(self._working_graph) - len(self._result_of)
@@ -111,12 +186,59 @@ class DaskVineDag:
                 self._depth_of[task.key] = 0
                 self.set_result(task.key, task.value)
 
+        # Then initializa pwnding consumers if pruning is enabled
+        if self.prune_depth > 0:
+            self._initialize_pending_consumers()
+            self._initialize_pending_producers()
+
     def set_relations(self, task):
         self._dependencies_of[task.key] = task.dependencies
         self._missing_of[task.key] = set(self._dependencies_of[task.key])
         for c in self._dependencies_of[task.key]:
             self._needed_by[c].add(task.key)
             self._pending_needed_by[c].add(task.key)
+
+    def _initialize_pending_consumers(self):
+        """Initialize pending consumers based on prune_depth"""
+        for key in self._working_graph:
+            if key not in self.pending_consumers:
+                count = 0
+                # BFS to count consumers up to prune_depth
+                visited = set()
+                queue = [(c, 1) for c in list(self._pending_needed_by[key])]  # (consumer, depth)
+                while queue:
+                    consumer, depth = queue.pop(0)
+                    if depth <= self.prune_depth and consumer not in visited:
+                        visited.add(consumer)
+                        count += 1
+
+                        # Add next level consumers if we haven't reached max depth
+                        if depth < self.prune_depth:
+                            next_consumers = [(c, depth + 1) for c in list(self._pending_needed_by[consumer])]
+                            queue.extend(next_consumers)
+                self.pending_consumers[key] = count
+
+    def _initialize_pending_producers(self):
+        """Initialize pending producers based on prune_depth"""
+        if self.prune_depth <= 0:
+            return
+
+        for key in self._working_graph:
+            # Use set to store unique producers
+            producers = set()
+            visited = set()
+            queue = [(p, 1) for p in self._dependencies_of[key]]
+
+            while queue:
+                producer, depth = queue.pop(0)
+                if depth <= self.prune_depth and producer not in visited:
+                    visited.add(producer)
+                    producers.add(producer)
+
+                    if depth < self.prune_depth:
+                        next_producers = [(p, depth + 1) for p in self._dependencies_of[producer]]
+                        queue.extend(next_producers)
+            self.pending_producers[key] = producers
 
     def get_ready(self):
         """ List of dts.Task ready for computation.
@@ -149,13 +271,15 @@ class DaskVineDag:
 
         rs = {}
         self._result_of[key] = value
+
         for p in list(self._pending_needed_by[key]):
             self._missing_of[p].discard(key)
 
             if self._missing_of[p]:
                 # the key p still has dependencies unmet...
                 continue
-
+            if p in self._target_map:
+                continue
             node = self._working_graph[p]
             if DaskVineDag.aliasp(node):
                 rs.update(
@@ -210,6 +334,9 @@ class DaskVineDag:
 
     def get_pending_needed_by(self, key):
         return self._pending_needed_by[key]
+
+    def replace_targets(self, keys):
+        return [self._target_map[key] if key in self._target_map else key for key in keys]
 
     def set_targets(self, keys):
         """ Values of keys that need to be computed. """
