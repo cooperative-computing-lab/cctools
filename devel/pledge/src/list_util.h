@@ -30,6 +30,8 @@
 /// Singly linked list containing our paths with their permission
 /// TODO: Change name
 struct path_access {
+	/// How many times the file has been accessed
+	uint32_t count;
 	/// Pathname in absolute form, ideally it should never be relative
 	char *pathname;
 	/// Flag for read
