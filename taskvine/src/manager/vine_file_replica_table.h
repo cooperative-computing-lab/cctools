@@ -26,6 +26,8 @@ int vine_file_worker_table_remove(struct vine_manager *m, struct vine_worker_inf
 
 struct vine_file_replica *vine_file_replica_table_lookup(struct vine_worker_info *w, const char *cachename);
 
+struct vine_file_replica *vine_file_replica_table_get_or_create(struct vine_manager *m, struct vine_worker_info *w, const char *cachename, vine_file_type_t type, vine_cache_level_t cache_level, int64_t size, time_t mtime);
+
 struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager *q, const char *cachename);
 
 int vine_file_replica_table_replicate(struct vine_manager *q, struct vine_file *f, struct set *source_workers, int to_find);

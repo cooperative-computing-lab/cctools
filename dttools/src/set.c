@@ -380,4 +380,29 @@ void **set_values(struct set *s)
 	return elements;
 }
 
+void **set_values_array(struct set *s)
+{
+	if (s->size < 1) {
+		return NULL;
+	}
+
+	void **elements = malloc(sizeof(void *) * (s->size + 1));
+	void *element;
+	int i = 0;
+	SET_ITERATE(s, element)
+	{
+		elements[i] = element;
+		i++;
+	}
+
+	elements[s->size] = NULL;
+
+	return elements;
+}
+
+void set_free_values_array(void **values)
+{
+	free(values);
+}
+
 /* vim: set noexpandtab tabstop=8: */

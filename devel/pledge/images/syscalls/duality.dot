@@ -1,0 +1,28 @@
+digraph G
+{
+	rankdir="LR"
+	graph [compound=true labelloc=b]
+	node [shape=record];
+	subgraph cluster_composite{
+		label="Composite operation";
+		open [label="open() | Arbitrary file"]
+		creation [label="O_CREAT | Metadata"]
+		read [label="read() | I/O"]
+		write [label="write() | I/O"]
+		color="black"
+	}
+
+	open -> creation
+	open -> read
+	open -> write
+
+	rankdir="LR"
+	graph [compound=true labelloc=b]
+	node [shape=record];
+	subgraph cluster_plain{
+		label="Plain operation"
+		open_pl [label="open() | Ribbon file"]
+		creat_pl [label="O_CREAT | Metadata"]
+	}
+	open_pl -> creat_pl
+}
