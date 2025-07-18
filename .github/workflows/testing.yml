@@ -15,81 +15,50 @@ on:
         description: 'Tag to deploy (e.g. release/7.2.1)'
         required: true
 
-name: Regression Testing
-jobs:
-  tag-devel:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout master branch
-        if: ${{ (github.event_name == 'push') }}
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Tag latest commit as devel
-        if: ${{ (github.event_name == 'push') }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -d devel || true
-          git push --delete origin devel || true
-          git tag devel
-          git push origin devel
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+name: Regression Testing
+
+jobs:
   build-native-linux:
     runs-on: ubuntu-latest
     container: ${{ format('cclnd/cctools-env:x86_64-{0}', matrix.os-name) }}
     timeout-minutes: 30
-    needs: tag-devel
     env:
       CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, matrix.os-name) }}
       CCTOOLS_DOCKER_GITHUB: ${{ matrix.os-name }}
-    strategy:
+    strategy: 
       matrix:
         os-name: ['almalinux8', 'almalinux9', 'ubuntu20.04', 'ubuntu22.04', 'ubuntu24.04']
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
-        uses: actions/checkout@v4
-      - name: Set branch tag, and draft status
-        id: branch
-        shell: bash
-        run: |
-          if ${{ github.event_name == 'push' }}; then
-            echo "TAG=devel" >> $GITHUB_ENV
-            echo "DRAFT=false" >> $GITHUB_ENV
-          elif ${{ github.event_name == 'workflow_dispatch' }}; then
-            echo "TAG=${{ github.event_name.inputs.tag }}" >> $GITHUB_ENV
-            echo "DRAFT=true" >> $GITHUB_ENV
-          fi
+        uses: actions/checkout@v3
       - name: checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           ref: ${{ github.event.inputs.tag }}
       - name: Get sha of tag
-        id: tag
-        run: echo "TAG_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+        id: vars
+        shell: bash
+        run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - name: build
         run: ${GITHUB_WORKSPACE}/packaging/build-docker/build.sh
       - name: deploy
         uses: ncipollo/release-action@v1
-        if: ${{ (github.event_name == 'workflow_dispatch') || (github.event_name == 'push') }}
+        if: github.event_name == 'workflow_dispatch'
         with:
           artifacts: /tmp/${{ env.CCTOOLS_OUTPUT }}
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
           artifactContentType: application/gzip
-          draft: ${{ env.DRAFT }}
+          draft: true
           omitBody: true
           omitBodyDuringUpdate: true
           prerelease: true
           replacesArtifacts: true
-          commit: ${{ env.TAG_SHA }}
-          tag: ${{ env.TAG }}
+          commit: ${{ steps.vars.output.tag_sha }}
+          tag: ${{ github.event.inputs.tag }}
 
   build-conda-linux:
     runs-on: ubuntu-latest
@@ -135,89 +104,6 @@ jobs:
           commit: ${{ steps.vars.output.tag_sha }}
           tag: ${{ github.event.inputs.tag }}
 
-  build-conda-macos-x86_64:
-    runs-on: ${{ matrix.os-name }}
-    strategy:
-      matrix:
-        os-name: ['macos-14','macos-13']
-    timeout-minutes: 30
-    env:
-      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, matrix.os-name) }}
-      CCTOOLS_SOURCE_PROFILE: yes
-    steps:
-      - name: checkout CCTools from branch head
-        uses: actions/checkout@v4
-      - name: Get sha of tag
-        id: vars
-        shell: bash
-        run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-      - name: Conda-Setup
-        run: ${GITHUB_WORKSPACE}/packaging/build-conda/setup.sh
-      - name: Configure
-        run: ${GITHUB_WORKSPACE}/packaging/build-conda/configure.sh
-      - name: Build
-        run: ${GITHUB_WORKSPACE}/packaging/build-conda/build.sh
-      - name: Install
-        run: ${GITHUB_WORKSPACE}/packaging/build-conda/install.sh
-      - name: Test
-        run: ${GITHUB_WORKSPACE}/packaging/build-conda/test.sh
-      - name: deploy
-        uses: ncipollo/release-action@v1
-        if: github.event_name == 'workflow_dispatch'
-        with:
-          artifacts: /tmp/${{ env.CCTOOLS_OUTPUT }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          allowUpdates: true
-          artifactContentType: application/gzip
-          draft: true
-          omitBody: true
-          omitBodyDuringUpdate: true
-          prerelease: true
-          replacesArtifacts: true
-          commit: ${{ steps.vars.output.tag_sha }}
-          tag: ${{ github.event.inputs.tag }}
-
-  build-conda-macos-arm64:
-    runs-on: ${{ matrix.os-name }}
-    strategy:
-      matrix:
-        os-name: ['macos-14']
-    timeout-minutes: 30
-    env:
-      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-arm64-{1}.tar.gz', github.event.inputs.version, matrix.os-name) }}
-      CCTOOLS_SOURCE_PROFILE: yes
-    steps:
-      - name: checkout CCTools from branch head
-        uses: actions/checkout@v4
-      - name: Get sha of tag
-        id: vars
-        shell: bash
-        run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-      - name: Conda-Setup
-        run: ${GITHUB_WORKSPACE}/packaging/build-conda/setup.sh
-      - name: Configure
-        run: ${GITHUB_WORKSPACE}/packaging/build-conda/configure.sh
-      - name: Build
-        run: ${GITHUB_WORKSPACE}/packaging/build-conda/build.sh
-      - name: Install
-        run: ${GITHUB_WORKSPACE}/packaging/build-conda/install.sh
-      - name: Test
-        run: ${GITHUB_WORKSPACE}/packaging/build-conda/test.sh
-      - name: deploy
-        uses: ncipollo/release-action@v1
-        if: github.event_name == 'workflow_dispatch'
-        with:
-          artifacts: /tmp/${{ env.CCTOOLS_OUTPUT }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          allowUpdates: true
-          artifactContentType: application/gzip
-          draft: true
-          omitBody: true
-          omitBodyDuringUpdate: true
-          prerelease: true
-          replacesArtifacts: true
-          commit: ${{ steps.vars.output.tag_sha }}
-          tag: ${{ github.event.inputs.tag }}
 
   lint:
     runs-on: ubuntu-latest
