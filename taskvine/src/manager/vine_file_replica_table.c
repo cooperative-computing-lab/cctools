@@ -283,3 +283,29 @@ int vine_file_replica_table_exists_somewhere(struct vine_manager *q, const char 
 
 	return 0;
 }
+
+// get or create a replica for a worker and cachename
+struct vine_file_replica *vine_file_replica_table_get_or_create(struct vine_manager *m, struct vine_worker_info *w, const char *cachename, vine_file_type_t type, vine_cache_level_t cache_level, int64_t size, time_t mtime)
+{
+	// First check if the replica already exists
+	struct vine_file_replica *replica = vine_file_replica_table_lookup(w, cachename);
+	if (replica) {
+		// If the size is different, update accounting and fields
+		if (replica->size != size) {
+			w->inuse_cache -= replica->size;
+			w->inuse_cache += size;
+			replica->size = size;
+		}
+		// Always update these fields to match the latest info
+		replica->mtime = mtime;
+		replica->type = type;
+		replica->cache_level = cache_level;
+		return replica;
+	}
+
+	// Create a new replica
+	replica = vine_file_replica_create(type, cache_level, size, mtime);
+	vine_file_replica_table_insert(m, w, cachename, replica);
+
+	return replica;
+}
