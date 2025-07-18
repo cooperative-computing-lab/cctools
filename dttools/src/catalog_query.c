@@ -276,15 +276,14 @@ char *catalog_query_compress_update(const char *text, unsigned long *data_length
 
 	/* Estimates the bounds for the compressed data. */
 	compress_data_length = compressBound(*data_length);
-	char *compress_data = malloc(compress_data_length);
+	char *compress_data = malloc(compress_data_length + 1); // + 1 to add 0x1A prefix
 
 	success = compress((Bytef *)compress_data + 1, &compress_data_length, (const Bytef *)text, *data_length);
 	/* Prefix the data with 0x1A (Control-Z) to indicate a compressed packet. */
 	compress_data[0] = 0x1A;
 
-	/* Copy data over if not compressing or compression failed. */
 	if (success != Z_OK) {
-		/* Compression failed, fall back to original uncompressed update. */
+		/* Compression failed. Caller should fall back to original uncompressed update. */
 		debug(D_DEBUG, "warning: Unable to compress data for update.\n");
 		free(compress_data);
 		return NULL;
