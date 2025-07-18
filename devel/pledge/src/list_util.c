@@ -13,6 +13,7 @@ void new_path_access_node(struct list *c,
 	t->create = (access_fl & CREATE_ACCESS) ? true : false;
 	t->delete = (access_fl & DELETE_ACCESS) ? true : false;
 	t->list = (access_fl & LIST_ACCESS) ? true : false;
+	t->count = 1;
 
 	/// This string gotta be manually removed
 	t->pathname = strdup(path);
@@ -89,6 +90,7 @@ update_path_perms(struct path_access *a,
 	if (access_fl & LIST_ACCESS) {
 		a->list = true;
 	}
+	a->count += 1;
 	// USELESS?: Maybe remove this lol
 	return a;
 }
@@ -122,6 +124,10 @@ void generate_contract_from_list(FILE *f, struct list *r)
 	FILE *o = f;
 	if (f == NULL)
 		o = stderr;
+	char *col1_title = "Access";
+	char *col2_title = "<Path>";
+	char *col3_title = "Count";
+	fprintf(o, "%-12s %-14s %s\n", col1_title, col2_title, col3_title);
 	while ((a = list_next_item(r))) {
 		// THINK: This might need to become a function
 		if (a->stat)
@@ -143,7 +149,7 @@ void generate_contract_from_list(FILE *f, struct list *r)
 		if (a->list)
 			strcat(perms, "L");
 
-		fprintf(o, "%-12s <%s>\n", perms, a->pathname);
+		fprintf(o, "%-12s <%s> %d\n", perms, a->pathname, a->count);
 
 		memset(perms, 0, sizeof(perms)); // reset
 	}

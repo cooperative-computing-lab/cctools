@@ -44,29 +44,30 @@ Tracer [cat.sample.c]: Contract generated   -> cat.sample.c.contract
 The most important file here is the contract file, if we `cat` it we get:
 
 ```
-action        path
-R             /home/user/dummy/cat.sample.c.contract
-R             /usr/bin/cat
-R             /home/user/dummy
-R             /etc/ld.so.cache
-R             /usr/lib/aarch64-linux-gnu/libc.so.6
-R             /usr/lib/locale/locale-archive
-R             /etc/locale.alias
-R             /usr/lib/locale/C.utf8/LC_IDENTIFICATION
-R             /usr/lib/aarch64-linux-gnu/gconv/gconv-modules.cache
-R             /usr/lib/locale/C.utf8/LC_MEASUREMENT
-R             /usr/lib/locale/C.utf8/LC_TELEPHONE
-R             /usr/lib/locale/C.utf8/LC_ADDRESS
-R             /usr/lib/locale/C.utf8/LC_NAME
-R             /usr/lib/locale/C.utf8/LC_PAPER
-R             /usr/lib/locale/C.utf8/LC_MESSAGES
-R             /usr/lib/locale/C.utf8/LC_MESSAGES/SYS_LC_MESSAGES
-R             /usr/lib/locale/C.utf8/LC_MONETARY
-R             /usr/lib/locale/C.utf8/LC_COLLATE
-R             /usr/lib/locale/C.utf8/LC_TIME
-R             /usr/lib/locale/C.utf8/LC_NUMERIC
-R             /usr/lib/locale/C.utf8/LC_CTYPE
-R             /home/user/dummy/sample.c
+action        path          count
+R             </usr/bin/cat> 1
+SR            </home/user/dummy> 33
+S             </usr/lib/debug> 1
+R             </etc/ld.so.cache> 2
++             </usr/lib/aarch64-linux-gnu/libc.so.6> 4
+R             </usr/lib/locale/locale-archive> 2
+R             </etc/locale.alias> 3
+R             </usr/lib/locale/C.utf8/LC_IDENTIFICATION> 2
+R             </usr/lib/aarch64-linux-gnu/gconv/gconv-modules.cache> 2
+R             </usr/lib/locale/C.utf8/LC_MEASUREMENT> 2
+R             </usr/lib/locale/C.utf8/LC_TELEPHONE> 2
+R             </usr/lib/locale/C.utf8/LC_ADDRESS> 2
+R             </usr/lib/locale/C.utf8/LC_NAME> 2
+R             </usr/lib/locale/C.utf8/LC_PAPER> 2
+R             </usr/lib/locale/C.utf8/LC_MESSAGES> 1
+R             </usr/lib/locale/C.utf8/LC_MESSAGES/SYS_LC_MESSAGES> 2
+R             </usr/lib/locale/C.utf8/LC_MONETARY> 2
+R             </usr/lib/locale/C.utf8/LC_COLLATE> 2
+R             </usr/lib/locale/C.utf8/LC_TIME> 2
+R             </usr/lib/locale/C.utf8/LC_NUMERIC> 2
+R             </usr/lib/locale/C.utf8/LC_CTYPE> 2
+R             </home/user/dummy/sample.c> 3
+W             </dev/pts/0> 1
 ```
 
 ### Enforcer
