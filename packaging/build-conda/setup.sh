@@ -16,7 +16,7 @@ then
     # Install mamba for faster solves.
     conda install -n base conda-libmamba-solver
     # Remove Linux specific packages from environment.
-    grep -v linux environment.yml | grep -v gdb > environment.macos.yml
+    grep -v linux environment.yml | grep -v -E '(gdb|fuse)' > environment.macos.yml
     # Now install using modified environment
     conda env create --name cctools-build --quiet --solver=libmamba --file environment.macos.yml
 else
