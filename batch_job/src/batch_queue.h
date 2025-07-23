@@ -87,7 +87,7 @@ typedef enum {
 /** Create a new batch queue.
 @param type The type of the queue.
 @param ssl_key_file The location of the queue manager's ssl key file, if it has one.
-@param ssl_key_file The location of the queue manager's ssl certiciate file, if it has one.
+@param ssl_cert_file The location of the queue manager's ssl certiciate file, if it has one.
 @return A new batch queue object on success, null on failure.
 */
 struct batch_queue *batch_queue_create(batch_queue_type_t type, const char *ssl_key_file, const char *ssl_cert_file );
@@ -95,7 +95,6 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type, const char *ssl_
 /** Submit a batch job.
 @param q The queue to submit to.
 @param task The job description to submit.
-@param resources The computational resources needed by the job.
 @return On success, returns a positive unique identifier for the batch job.  On failure, returns a negative number.
 Zero is not a valid batch job id and indicates an internal failure.
 */

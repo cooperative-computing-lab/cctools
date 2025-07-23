@@ -31,7 +31,7 @@ void jx_parse_set_static_mode( bool mode );
 /** Parse a JSON string to a JX expression.  @param str A null-terminated C string containing JSON data.  @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
 struct jx * jx_parse_string( const char *str );
 
-/** Parse a JSON string to a JX expression.  @param str An unterminated string containing JSON data.  @param Length of the string in bytes.  @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
+/** Parse a JSON string to a JX expression.  @param str An unterminated string containing JSON data.  @param length of the string in bytes.  @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
 struct jx * jx_parse_string_and_length( const char *str, int length );
 
 /** Parse a standard IO stream to a JX expression.  @param file A stream containing JSON data.  @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
