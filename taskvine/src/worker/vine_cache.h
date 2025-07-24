@@ -62,7 +62,8 @@ int vine_cache_add_mini_task( struct vine_cache *c, const char *cachename, const
 vine_cache_status_t vine_cache_ensure( struct vine_cache *c, const char *cachename);
 int vine_cache_remove( struct vine_cache *c, const char *cachename, struct link *manager );
 int vine_cache_contains( struct vine_cache *c, const char *cachename );
-int vine_cache_wait( struct vine_cache *c, struct link *manager );
-int vine_cache_process_pending_transfers(struct vine_cache *c);
+
+int vine_cache_check_files( struct vine_cache *c, struct link *manager );
+int vine_cache_start_transfers(struct vine_cache *c);
 
 #endif

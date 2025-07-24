@@ -1713,7 +1713,7 @@ static void vine_worker_serve_manager(struct link *manager)
 		expire_procs_running();
 
 		ok &= handle_completed_tasks(manager);
-		ok &= vine_cache_wait(cache_manager, manager);
+		ok &= vine_cache_check_files(cache_manager, manager);
 
 		measure_worker_resources();
 
@@ -1737,8 +1737,8 @@ static void vine_worker_serve_manager(struct link *manager)
 			break;
 		}
 
-		/* Periodically process pending transfers. */
-		vine_cache_process_pending_transfers(cache_manager);
+		/* Periodically start some pending transfers. */
+		vine_cache_start_transfers(cache_manager);
 
 		/* Check all known libraries if they are ready to execute functions. */
 		check_libraries_ready(manager);

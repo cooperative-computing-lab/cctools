@@ -6565,7 +6565,7 @@ struct vine_file *vine_declare_temp(struct vine_manager *m)
 		struct vine_file *f = vine_file_temp();
 		return vine_manager_declare_file(m, f);
 	} else {
-		struct vine_file *f = vine_file_temp_no_peers();
+		struct vine_file *f = vine_file_temp_no_peers(vine_get_path_staging(m, NULL));
 		return vine_manager_declare_file(m, f);
 	}
 }

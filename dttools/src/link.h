@@ -115,6 +115,7 @@ struct link *link_serve_address(const char *addr, int port);
 
 /** Prepare to accept connections on one network interface.
 Functions like @ref link_serve, except that the server will only be visible on the given network interface.
+@param addr IP address of the network interface.
 @param low The low port in a range to listen on (inclusive).
 @param high The high port in a range to listen on (inclusive).
 @return link A server endpoint that can be passed to @ref link_accept, or null on failure.
