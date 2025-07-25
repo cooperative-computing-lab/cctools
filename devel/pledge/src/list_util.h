@@ -32,6 +32,8 @@
 struct path_access {
 	/// How many times the file has been accessed
 	uint32_t count;
+	/// XXX: For statistics and summarization, if there was an ENOENT on a certain path
+	/// it should be saved
 	/// Pathname in absolute form, ideally it should never be relative
 	char *pathname;
 	/// Flag for read

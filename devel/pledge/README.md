@@ -46,7 +46,6 @@ The most important file here is the contract file, if we `cat` it we get:
 ```
 action        path          count
 R             </usr/bin/cat> 1
-SR            </home/user/dummy> 33
 S             </usr/lib/debug> 1
 R             </etc/ld.so.cache> 2
 +             </usr/lib/aarch64-linux-gnu/libc.so.6> 4
