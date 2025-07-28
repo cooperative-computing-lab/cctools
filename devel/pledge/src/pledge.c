@@ -24,6 +24,9 @@
 
 // TODO: Add a flag in the contract that indicates if the file was created at runtime
 
+// TODO: We need to start tracking if, for example, a file is created and then
+// later used, and the processes that use them
+
 //------------------------------------------
 // Another thought I have is the closing of files, I think something worth letting the
 // user know about is if they keep opening or closing a file, that's a pattern that

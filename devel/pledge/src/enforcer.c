@@ -257,7 +257,7 @@ deinit_enforce()
 /// @param pathname: This is the pathname to check for enforcing
 /// @param perm: This is the permission that this path should have
 bool enforce(const char *pathname,
-		const uint8_t perm)
+		const uint8_t keys)
 {
 	// WHITELIST check
 	for (size_t i = 0; WHITELIST[i] != NULL; i++) {
@@ -294,7 +294,7 @@ bool enforce(const char *pathname,
 		return true;
 	}
 	// Order matters a lot for these operations
-	if (a->delete && (perm & DELETE_ACCESS)) {
+	if (a->delete && (keys & DELETE_ACCESS)) {
 		flag2letter(a, a_perm, a_perm_len);
 		PRINT_GREEN();
 		fprintf(stderr,
@@ -306,7 +306,7 @@ bool enforce(const char *pathname,
 		PRINT_RESET_TERM_C();
 		return true;
 	}
-	if (a->list && (perm & LIST_ACCESS)) {
+	if (a->list && (keys & LIST_ACCESS)) {
 		flag2letter(a, a_perm, a_perm_len);
 		PRINT_GREEN();
 		fprintf(stderr,
@@ -330,7 +330,7 @@ bool enforce(const char *pathname,
 	// An interesting thing is that an O_CREAT flag on open does not guarantee
 	// that the OS will return the file descriptor with the permission that was requested
 	// if the file is created, the fd might be open with READ and WRITE permissions
-	if (a->create && (perm & CREATE_ACCESS)) {
+	if (a->create && (keys & CREATE_ACCESS)) {
 		flag2letter(a, a_perm, a_perm_len);
 		PRINT_GREEN();
 		fprintf(stderr,
@@ -343,7 +343,7 @@ bool enforce(const char *pathname,
 	}
 
 	// We are not trying to create or delete, so it doesnt matter
-	if ((a->read && a->write) && (perm & READ_ACCESS || perm & WRITE_ACCESS)) {
+	if ((a->read && a->write) && (keys & READ_ACCESS || keys & WRITE_ACCESS)) {
 		flag2letter(a, a_perm, a_perm_len);
 		PRINT_GREEN();
 		fprintf(stderr,
@@ -354,7 +354,7 @@ bool enforce(const char *pathname,
 				a_perm);
 		PRINT_RESET_TERM_C();
 		return true;
-	} else if ((a->read && (perm & READ_ACCESS)) || (a->write && (perm & WRITE_ACCESS))) {
+	} else if ((a->read && (keys & READ_ACCESS)) || (a->write && (keys & WRITE_ACCESS))) {
 		flag2letter(a, a_perm, a_perm_len);
 		PRINT_GREEN();
 		fprintf(stderr,
@@ -365,7 +365,7 @@ bool enforce(const char *pathname,
 				a_perm);
 		PRINT_RESET_TERM_C();
 		return true;
-	} else if (a->stat && (perm & STAT_ACCESS)) {
+	} else if (a->stat && (keys & STAT_ACCESS)) {
 		flag2letter(a, a_perm, a_perm_len);
 		PRINT_GREEN();
 		fprintf(stderr,
@@ -382,7 +382,7 @@ bool enforce(const char *pathname,
 		fprintf(stderr,
 				"[BLOCKED]: "
 				"Permission [0x%x] for path [%s] does not match contract, expected [%s]\n",
-				perm,
+				keys,
 				a->pathname,
 				a_perm);
 		PRINT_RESET_TERM_C();
@@ -558,6 +558,35 @@ fopen(const char *restrict pathname,
 	real_fopen = dlsym(RTLD_NEXT, "fopen");
 
 	return real_fopen(pathname, mode);
+}
+
+int stat(const char *restrict pathname,
+		struct stat *restrict statbuf)
+{
+	PRINT_YELLOW();
+	fprintf(stderr, "[STAT]: Caught path [%s]\n", pathname);
+	PRINT_RESET_TERM_C();
+
+	size_t path_len = strlen(pathname);
+	if (path_len < 1) {
+		// TODO: Better error handling
+		return -1;
+	}
+
+	// 1. If pathname is relative then we make it absolute basing ourselves
+	// 2. If the path is absolute, we just use that path to verify
+	// In theory this is fine because rel2abspath leaves absolute paths as is
+	char full_path[MAXPATHLEN];
+	if (rel2abspath(full_path, pathname, MAXPATHLEN) == NULL) {
+		// Couldn't convert so we fallback to pathname
+		strncpy(full_path, pathname, MAXPATHLEN);
+	}
+	enforce(full_path, STAT_ACCESS);
+
+	int (*real_stat)(const char *restrict pathname, struct stat *restrict statbuf);
+	real_stat = dlsym(RTLD_NEXT, "stat");
+
+	return real_stat(pathname, statbuf);
 }
 
 int fstatat(int dirfd,

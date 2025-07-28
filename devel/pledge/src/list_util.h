@@ -27,7 +27,7 @@
 // because otherwise we might not be able to do much
 // Now the real question is, do we LABEL an open call as whatever flag it carries
 // (aside from creat obviously)
-/// Singly linked list containing our paths with their permission
+/// Struct containing our paths with their permission
 /// TODO: Change name
 struct path_access {
 	/// How many times the file has been accessed
