@@ -630,7 +630,14 @@ int fstatat(int dirfd,
 		char solved_path[MAXPATHLEN];
 		size_t solved_path_len = readlink(fd_link, solved_path, MAXPATHLEN);
 		solved_path[solved_path_len] = '\0';
-		strcat(solved_path, pathname); // XXX: strncat()?
+		// XXX: strncat()?
+		if (path_len > 2) {
+			if (pathname[0] == '.' && pathname[1] == '/') {
+				strcat(solved_path, pathname + 2);
+			}
+		} else {
+			strcat(solved_path, pathname);
+		}
 		enforce(solved_path, STAT_ACCESS);
 	}
 
