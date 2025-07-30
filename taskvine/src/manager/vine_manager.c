@@ -6613,38 +6613,67 @@ struct vine_file *vine_declare_chirp(
 	return vine_manager_declare_file(m, t);
 }
 
+/*
+Return the contents of a vine_file as a memory buffer.
+If the content is not available, set errno in one of three ways:
+ENOENT - file has not been created yet
+EAGAIN - file has been created, but not currently available, try again.
+EIO    - something more serious went wrong.
+*/
+
 const char *vine_fetch_file(struct vine_manager *m, struct vine_file *f)
 {
+	/* If the file should not exist yet, bail out quickly. */
+	if (f->state == VINE_FILE_STATE_PENDING) {
+		errno = ENOENT;
+		return 0;
+	}
+
 	/* If the data has already been loaded, just return it. */
-	if (f->data)
+	if (f->data) {
 		return f->data;
+	}
+
+	/* Now consider the various ways to get the file content. */
 
 	switch (f->type) {
 	case VINE_FILE:
-		/* If it is on the local filesystem, load it. */
+		/* It should already be on the local filesystem */
 		{
 			size_t length;
 			if (copy_file_to_buffer(f->source, &f->data, &length)) {
 				return f->data;
 			} else {
+				/* something went wrong in loading the file. */
+				errno = EIO;
 				return 0;
 			}
 		}
 		break;
 	case VINE_BUFFER:
-		/* Buffer files will already have their contents in memory, if available. */
-		return f->data;
-		break;
+		/* We shouldn't get here: f->data should be filled when file created. */
+		errno = EIO;
+		return 0;
 	case VINE_TEMP:
 	case VINE_URL:
 	case VINE_MINI_TASK:
 		/* If the file has been materialized remotely, go get it from a worker. */
 		{
 			struct vine_worker_info *w = vine_file_replica_table_find_worker(m, f->cached_name);
-			if (w)
+			if (w) {
 				vine_manager_get_single_file(m, w, f);
-			/* If that succeeded, then f->data is now set, null otherwise. */
-			return f->data;
+				if (f->data) {
+					return f->data;
+				} else {
+					/* Something went wrong in fetching a good replica. */
+					errno = EIO;
+					return 0;
+				}
+			} else {
+				/* No replicas were currently available, but you can try again later. */
+				errno = EAGAIN;
+				return 0;
+			}
 		}
 		break;
 	}
