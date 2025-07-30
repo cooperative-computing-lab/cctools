@@ -42,6 +42,7 @@ struct vine_file {
 	char *data;         // Raw data for an input or output buffer.
 	struct vine_task *mini_task; // Mini task used to generate the desired output file.
 	struct vine_task *recovery_task; // For temp files, a copy of the task that created it.
+	int original_producer_task_id;   // For temp files, the task ID of the original task that produces this file.
 	struct vine_worker_info *source_worker; // if this is a substitute file, attach the worker serving it. 
 	int change_message_shown; // True if error message already shown.
 	int refcount;       // Number of references from a task object, delete when zero.
@@ -63,7 +64,7 @@ char * vine_file_make_file_url( const char * source);
 struct vine_file *vine_file_local( const char *source, vine_cache_level_t cache, vine_file_flags_t flags );
 struct vine_file *vine_file_url( const char *source, vine_cache_level_t cache, vine_file_flags_t flags );
 struct vine_file *vine_file_temp();
-struct vine_file *vine_file_temp_no_peers();
+struct vine_file *vine_file_temp_no_peers( const char *staging_dir );
 struct vine_file *vine_file_buffer( const char *buffer, size_t size, vine_cache_level_t cache, vine_file_flags_t flags );
 struct vine_file *vine_file_mini_task( struct vine_task *t, const char *name, vine_cache_level_t cache, vine_file_flags_t flags );
 struct vine_file *vine_file_untar( struct vine_file *f, vine_cache_level_t cache, vine_file_flags_t flags );

@@ -38,11 +38,13 @@ See the file COPYING for details.
 
 struct vine_cache {
 	struct hash_table *table;
+	struct hash_table *pending_transfers;
+	struct hash_table *processing_transfers;
 	char *cache_dir;
 	int max_transfer_procs;
 };
 
-static void vine_cache_wait_for_file(struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager);
+static void vine_cache_check_file(struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager);
 
 /*
 Create the cache manager structure for a given cache directory.
@@ -51,8 +53,10 @@ Create the cache manager structure for a given cache directory.
 struct vine_cache *vine_cache_create(const char *cache_dir, int max_procs)
 {
 	struct vine_cache *c = malloc(sizeof(*c));
-	c->cache_dir = strdup(cache_dir);
 	c->table = hash_table_create(0, 0);
+	c->pending_transfers = hash_table_create(0, 0);
+	c->processing_transfers = hash_table_create(0, 0);
+	c->cache_dir = strdup(cache_dir);
 	c->max_transfer_procs = max_procs;
 	return c;
 }
@@ -128,18 +132,26 @@ Remove all entries with a cache level <= level.
 
 void vine_cache_prune(struct vine_cache *c, vine_cache_level_t level)
 {
-	struct vine_cache_file *f;
 	char *cachename;
-	HASH_TABLE_ITERATE(c->table, cachename, f)
-	{
+	char **cachenames = hash_table_keys_array(c->table);
+	int i = 0;
+
+	struct vine_cache_file *f;
+	while ((cachename = cachenames[i])) {
+		i++;
+		f = hash_table_lookup(c->table, cachename);
+
 		if (f->cache_level <= level) {
 			vine_cache_remove(c, cachename, 0);
 		}
 	}
+
+	hash_table_free_keys_array(cachenames);
 }
 
 /*
 Kill off any process associated with this file object.
+The cache_file object is still valid afterwards.
 Used by both vine_cache_remove and vine_cache_delete.
 */
 
@@ -148,12 +160,47 @@ static void vine_cache_kill(struct vine_cache *c, struct vine_cache_file *f, con
 	while (f->status == VINE_CACHE_STATUS_PROCESSING) {
 		debug(D_VINE, "cache: killing pending transfer process %d...", f->pid);
 		kill(f->pid, SIGKILL);
-		vine_cache_wait_for_file(c, f, cachename, manager);
+		vine_cache_check_file(c, f, cachename, manager);
 		if (f->status == VINE_CACHE_STATUS_PROCESSING) {
-			debug(D_VINE, "cache:still not killed, trying again!");
+			debug(D_VINE, "cache: still not killed, trying again!");
 			sleep(1);
 		}
 	}
+}
+
+/*
+Process pending transfers until we reach the maximum number of processing transfers or there are no more pending transfers.
+*/
+
+int vine_cache_start_transfers(struct vine_cache *c)
+{
+	int processed = 0;
+
+	struct list *to_process = list_create();
+	char *cachename;
+	void *dummy;
+	HASH_TABLE_ITERATE(c->pending_transfers, cachename, dummy)
+	{
+		list_push_tail(to_process, xxstrdup(cachename));
+		if (list_size(to_process) >= c->max_transfer_procs - hash_table_size(c->processing_transfers)) {
+			break;
+		}
+	}
+
+	while ((cachename = list_pop_head(to_process))) {
+		vine_cache_status_t status = vine_cache_ensure(c, cachename);
+		free(cachename);
+		if (status == VINE_CACHE_STATUS_PROCESSING) {
+			processed++;
+		} else {
+			/* we hit the concurrency limit, or something else went wrong */
+			break;
+		}
+	}
+
+	list_delete(to_process);
+
+	return processed;
 }
 
 /*
@@ -168,6 +215,12 @@ void vine_cache_delete(struct vine_cache *c)
 	{
 		vine_cache_kill(c, file, cachename, 0);
 	}
+
+	hash_table_clear(c->pending_transfers, NULL);
+	hash_table_clear(c->processing_transfers, NULL);
+
+	hash_table_delete(c->pending_transfers);
+	hash_table_delete(c->processing_transfers);
 
 	hash_table_clear(c->table, (void *)vine_cache_file_delete);
 	hash_table_delete(c->table);
@@ -272,8 +325,19 @@ int vine_cache_add_transfer(struct vine_cache *c, const char *cachename, const c
 	/* Has this transfer already been queued? */
 	struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
 	if (f) {
-		/* The transfer is already queued up. */
-		return 1;
+		switch (f->status) {
+		case VINE_CACHE_STATUS_PROCESSING:
+		case VINE_CACHE_STATUS_TRANSFERRED:
+		case VINE_CACHE_STATUS_READY:
+		case VINE_CACHE_STATUS_PENDING:
+			/* The transfer is already queued up. */
+			return 1;
+			break;
+		case VINE_CACHE_STATUS_FAILED:
+		case VINE_CACHE_STATUS_UNKNOWN:
+			vine_cache_remove(c, cachename, NULL);
+			break;
+		}
 	}
 
 	/* Create the object and fill in the metadata. */
@@ -294,11 +358,13 @@ int vine_cache_add_transfer(struct vine_cache *c, const char *cachename, const c
 	f->transfer_time = 0;
 
 	hash_table_insert(c->table, cachename, f);
+	hash_table_insert(c->pending_transfers, cachename, NULL);
 
 	/* Note metadata is not saved here but when transfer is completed. */
 
-	if (flags & VINE_CACHE_FLAGS_NOW)
+	if (flags & VINE_CACHE_FLAGS_NOW) {
 		vine_cache_ensure(c, cachename);
+	}
 
 	return 1;
 }
@@ -326,6 +392,7 @@ int vine_cache_add_mini_task(struct vine_cache *c, const char *cachename, const 
 	f->size = size;
 
 	hash_table_insert(c->table, cachename, f);
+	hash_table_insert(c->pending_transfers, cachename, NULL);
 
 	/* Note metadata is not saved here but when mini task is completed. */
 
@@ -345,7 +412,21 @@ int vine_cache_remove(struct vine_cache *c, const char *cachename, struct link *
 		return 0;
 
 	/* Ensure that any child process associated with the entry is stopped. */
+
 	vine_cache_kill(c, f, cachename, manager);
+
+	/* Manager's replica state machine expects a response to every unlink message.
+	 * Other states except PENDING have already sent messages, either cache-update or cache-invalid,
+	 * so we only send cache-invalid for transfers in PENDING state. */
+
+	if (f->status == VINE_CACHE_STATUS_PENDING) {
+		char *msg = string_format("File '%s' removed in PENDING state.", cachename);
+		vine_worker_send_cache_invalid(manager, cachename, msg);
+		free(msg);
+	}
+
+	hash_table_remove(c->pending_transfers, cachename);
+	hash_table_remove(c->processing_transfers, cachename);
 
 	/* Then remove the disk state associated with the file. */
 	char *data_path = vine_cache_data_path(c, cachename);
@@ -466,7 +547,6 @@ static int do_worker_transfer(struct vine_cache *c, struct vine_cache_file *f, c
 {
 	int port_num;
 	char addr[VINE_LINE_MAX], source_path[VINE_LINE_MAX];
-	int stoptime;
 	struct link *worker_link;
 
 	// expect the form: workerip://host:port/path/to/file
@@ -474,11 +554,13 @@ static int do_worker_transfer(struct vine_cache *c, struct vine_cache_file *f, c
 
 	debug(D_VINE, "cache: setting up worker transfer file %s", f->source);
 
-	stoptime = time(0) + 15;
-	worker_link = link_connect(addr, port_num, stoptime);
+	timestamp_t time_start_connect = timestamp_get();
+	worker_link = link_connect(addr, port_num, time(0) + 300);
+	timestamp_t time_end_connect = timestamp_get();
+	int time_duration_connect = (time_end_connect - time_start_connect) / 1e6;
 
 	if (worker_link == NULL) {
-		*error_message = string_format("Could not establish connection with worker at: %s:%d", addr, port_num);
+		*error_message = string_format("Could not establish connection with worker at: %s:%d after %d seconds: %s", addr, port_num, time_duration_connect, strerror(errno));
 		return 0;
 	}
 
@@ -496,8 +578,10 @@ static int do_worker_transfer(struct vine_cache *c, struct vine_cache_file *f, c
 	int64_t totalsize;
 	int mode, mtime;
 
-	if (!vine_transfer_request_any(worker_link, source_path, transfer_dir, &totalsize, &mode, &mtime, time(0) + 900)) {
-		*error_message = string_format("Could not transfer file from %s", f->source);
+	if (!vine_transfer_request_any(worker_link, source_path, transfer_dir, &totalsize, &mode, &mtime, time(0) + 900, error_message)) {
+		if (error_message && *error_message == NULL) {
+			*error_message = string_format("Could not transfer file from %s", f->source);
+		}
 		link_close(worker_link);
 		return 0;
 	}
@@ -577,7 +661,11 @@ static void vine_cache_worker_process(struct vine_cache_file *f, struct vine_cac
 		char *error_path = vine_cache_error_path(c, cachename);
 		FILE *file = fopen(error_path, "w");
 		if (file) {
-			fprintf(file, "error creating file at worker: %s\n", error_message);
+			if (f->cache_type == VINE_CACHE_MINI_TASK) {
+				fprintf(file, "error creating file via mini task: %s\n", error_message);
+			} else {
+				fprintf(file, "error transferring file: %s\n", error_message);
+			}
 			fclose(file);
 		}
 		free(error_path);
@@ -599,8 +687,11 @@ or VINE_CACHE_STATUS_TRANSFERRED. On failure return VINE_CACHE_STATUS_FAILED.
 
 vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachename)
 {
-	if (!strcmp(cachename, "0"))
+	hash_table_remove(c->pending_transfers, cachename);
+
+	if (!strcmp(cachename, "0")) {
 		return VINE_CACHE_STATUS_READY;
+	}
 
 	struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
 	if (!f) {
@@ -620,6 +711,7 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 		break;
 	}
 
+	int mini_task_inputs_permanent_failure = 0;
 	/* For a mini-task, we must also insure the inputs to the task exist. */
 	if (f->cache_type == VINE_CACHE_MINI_TASK) {
 		if (f->mini_task->input_mounts) {
@@ -628,8 +720,14 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 			LIST_ITERATE(f->mini_task->input_mounts, m)
 			{
 				result = vine_cache_ensure(c, m->file->cached_name);
-				if (result != VINE_CACHE_STATUS_READY)
+				if (result == VINE_CACHE_STATUS_FAILED || result == VINE_CACHE_STATUS_UNKNOWN) {
+					/* an input file for the mini task failed to transfer,
+					 * thus the mini task is marked also as failed */
+					mini_task_inputs_permanent_failure = 1;
+					break;
+				} else if (result != VINE_CACHE_STATUS_READY) {
 					return result;
+				}
 			}
 		}
 	}
@@ -642,24 +740,15 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 		struct vine_process *p = vine_process_create(f->mini_task, VINE_PROCESS_TYPE_MINI_TASK);
 		if (!vine_sandbox_stagein(p, c)) {
 			debug(D_VINE, "cache: can't stage input files for task %d.", p->task->task_id);
-			p->task = 0;
-			vine_process_delete(p);
-			f->status = VINE_CACHE_STATUS_FAILED;
-			return f->status;
+			/* we know mini task will fail because of lack of inputs, here we set the flag
+			   to terminate the transfer child process immediately. */
+			mini_task_inputs_permanent_failure = 1;
 		}
 		f->process = p;
 	}
 
-	int num_processing = 0;
-	char *table_cachename;
-	struct vine_cache_file *table_f;
-	HASH_TABLE_ITERATE(c->table, table_cachename, table_f)
-	{
-		if (table_f->status == VINE_CACHE_STATUS_PROCESSING) {
-			num_processing++;
-		}
-	}
-	if (num_processing > c->max_transfer_procs) {
+	if (hash_table_size(c->processing_transfers) >= c->max_transfer_procs) {
+		hash_table_insert(c->pending_transfers, cachename, NULL);
 		return VINE_CACHE_STATUS_PENDING;
 	}
 
@@ -671,6 +760,7 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 		return f->status;
 	} else if (f->pid > 0) {
 		f->status = VINE_CACHE_STATUS_PROCESSING;
+		hash_table_insert(c->processing_transfers, cachename, NULL);
 		switch (f->cache_type) {
 		case VINE_CACHE_TRANSFER:
 			debug(D_VINE, "cache: transferring %s to %s", f->source, cachename);
@@ -684,13 +774,16 @@ vine_cache_status_t vine_cache_ensure(struct vine_cache *c, const char *cachenam
 		}
 		return f->status;
 	} else {
-		vine_cache_worker_process(f, c, cachename);
+		if (!mini_task_inputs_permanent_failure) {
+			vine_cache_worker_process(f, c, cachename);
+		}
 		_exit(1);
 	}
 }
 
 /*
 Check the outputs of a transfer process to make sure they are valid.
+Will send either a cache-update or a cache-invalid depending on the outcome.
 */
 
 static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager)
@@ -769,11 +862,10 @@ static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_fil
 			if (copy_file_to_buffer(error_path, &error_message, &error_length) > 0 && error_message) {
 				/* got a message string */
 			} else {
-				error_message = strdup("unknown error");
+				error_message = string_format("Failed to copy error message to buffer: %s", strerror(errno));
 			}
 
 			vine_worker_send_cache_invalid(manager, cachename, error_message);
-
 			trash_file(error_path);
 
 			free(error_message);
@@ -792,7 +884,7 @@ static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_fil
 Evaluate the exit status of a transfer process to determine if it succeeded.
 */
 
-static void vine_cache_handle_exit_status(struct vine_cache *c, struct vine_cache_file *f, const char *cachename, int status, struct link *manager)
+static void vine_cache_handle_exit_status(struct vine_cache *c, struct vine_cache_file *f, const char *cachename, int status)
 {
 	f->stop_time = timestamp_get();
 
@@ -818,9 +910,11 @@ static void vine_cache_handle_exit_status(struct vine_cache *c, struct vine_cach
 
 /*
 Consider one cache table entry to determine if the transfer process has completed.
+If the transfer completed or failed, a cache-update or cache-invalid will be sent.
+Regardless of the outcome, the cache file object will still be valid.
 */
 
-static void vine_cache_wait_for_file(struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager)
+static void vine_cache_check_file(struct vine_cache *c, struct vine_cache_file *f, const char *cachename, struct link *manager)
 {
 	int status;
 	if (f->status == VINE_CACHE_STATUS_PROCESSING) {
@@ -830,23 +924,37 @@ static void vine_cache_wait_for_file(struct vine_cache *c, struct vine_cache_fil
 		} else if (result < 0) {
 			debug(D_VINE, "cache: wait4 on pid %d returned an error: %s", (int)f->pid, strerror(errno));
 		} else if (result > 0) {
-			vine_cache_handle_exit_status(c, f, cachename, status, manager);
+			hash_table_remove(c->processing_transfers, cachename);
+			vine_cache_handle_exit_status(c, f, cachename, status);
 			vine_cache_check_outputs(c, f, cachename, manager);
+
+			/* If the transfer failed, the vine_cache_file still remains here in the FAILED state. */
+			/* Various functions expect the vine_cache_file object to exist still. */
 		}
 	}
 }
 
 /*
 Search the cache table to determine if any transfer processes have completed.
+If any have definitively failed, they are removed from the cache.
 */
 
-int vine_cache_wait(struct vine_cache *c, struct link *manager)
+int vine_cache_check_files(struct vine_cache *c, struct link *manager)
 {
 	struct vine_cache_file *f;
 	char *cachename;
 	HASH_TABLE_ITERATE(c->table, cachename, f)
 	{
-		vine_cache_wait_for_file(c, f, cachename, manager);
+		vine_cache_check_file(c, f, cachename, manager);
+
+		if (f->status == VINE_CACHE_STATUS_FAILED) {
+			/* if transfer failed, then we delete all of our records of the file. The manager
+			 * assumes that the file is not at the worker after the manager receives
+			 * the cache invalid message sent from vine_cache_check_outputs. */
+			vine_cache_remove(c, cachename, manager);
+		}
+
+		/* Note that f may not longer be valid at this point */
 	}
 	return 1;
 }

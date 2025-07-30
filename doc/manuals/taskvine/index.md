@@ -47,7 +47,7 @@ g = m.declare_file("myoutput.txt")
 
 t = Task("grep needle warandpeace.txt > output.txt")
 t.add_input(f, "warandpeace.txt")
-t.add_output(g, "outfile.txt")
+t.add_output(g, "output.txt")
 ```
 
 Tasks share a common set of options.  Each task can be labelled with the resources
@@ -152,6 +152,7 @@ The following examples show more complex applications and various features of Ta
 - [Watch Files Example](example-watch.md)
 - [Functional Example](example-functional.md)
 - [CFD Example](example-cfd.md)
+- [ObsPy Example](example-obspy.md)
 
 Read on to learn how to build applications from scratch and run large numbers of workers at scale.
 
@@ -184,7 +185,7 @@ You may specify a specific port number to listen on like this:
     #include "taskvine.h"
 
     /* Create a new manager listening on port 9123 */
-    struct taskvine *m = vine_create(9123);
+    struct vine_manager *m = vine_create(9123);
     ```
 
 In a shared environment, that specific port might already be in use, and so you may find it more convenient
@@ -425,7 +426,7 @@ If no task completes within the timeout, it returns null.
 
 === "C"
     ```C
-    while(!vine_empty(q)) {
+    while(!vine_empty(m)) {
         struct vine_task *t = vine_wait(m, 5);
         if(t) {
             printf("Task %d has returned!\n", t->taskid);
@@ -507,7 +508,7 @@ If you are writing a TaskVine application in C, you should compile it into an ex
 been installed using the `conda` method.
 
 ```sh
-gcc taskvine_example.c -o taskvine_example -I${CONDA_PREFIX}/include/cctools -L${CONDA_PREFIX}/lib -ltaskvine -ldttools -lm -lz
+gcc taskvine_example.c -o taskvine_example -I${CONDA_PREFIX}/include/cctools -L${CONDA_PREFIX}/lib -ltaskvine -ldttools -lm -lz -lssl -lcrypto
 ```
 
 ### Running a Manager Program
@@ -664,7 +665,7 @@ which looks like this:
 ### Managing Workers with the TaskVine Factory
 
 Instead of launching each worker manually from the command line, the utility
-**vine_factory** may be used to launch workers are needed. The factory
+**vine_factory** may be used to launch workers as needed. The factory
 will submit and maintain a number of workers according to the tasks available
 in one or more managers.
 For example, we can supply a minimum of 2 workers and a maximum of 10 to
@@ -1179,7 +1180,7 @@ creating the manager:
     #include "taskvine.h"
 
     /* Create a new manager listening on port 9123 */
-    struct taskvine *m = vine_ssl_create(9123, 'MY_KEY.pem', 'MY_CERT.pem');
+    struct vine_manager *m = vine_ssl_create(9123, 'MY_KEY.pem', 'MY_CERT.pem');
     ```
 
 
@@ -1240,7 +1241,7 @@ warranted:
 
 === "C"
     ```C
-    if(vine_hungry(q)) {
+    if(vine_hungry(m)) {
         // submit more tasks...
     }
     ```
@@ -2476,7 +2477,7 @@ If you need to change the prefix `vine-run-info` to some other directory, use
     ```C
     // logs appear at /new/desired/path/%Y-%m-%dT%H:%M:%S/vine-logs
     vine_set_runtime_info_path("/new/desired/path")
-    struct taskvine *m = vine_create(0);
+    struct vine_manager *m = vine_create(0);
     ```
 
 If the new path is not absolute, it is taken relative to the current working
@@ -2582,6 +2583,90 @@ Custom APPLICATION messages can be added to the log with the calls:
     vine_log_txn_app("your custom log message")
     ```
 
+
+#### Transactions Data Frames
+
+`vine_plot_txn_log` can generate csv files ready to be consumed for tools such as `pandas`:
+
+```sh
+vine_plot_txn_log --mode csv transactions df
+```
+
+This generates the files `df_0_tasks.csv`, `df_0_transfers.csv`, and
+`df_0_workers.csv`. The *tasks* file has one row per task attempt, with the
+following columns:
+
+(All times are in seconds, and when not an interval, they are measured since the start of the manager.)
+(Uppercase column names refer to task states.)
+
+| Column | Description |
+|------------ |---------|
+| `task_id` | Unique integer identifier for the task. |
+| `attempt_number` | Sequential identifier for how many times this task has been tried. |
+| `category` | Custom to which the task belongs. (E.g., value set with `t.set_category(...)`).
+| `READY` | Time at which the task attempt becomes available for scheduling. |
+| `RUNNING` | Time at which the task attempt was dispatched to a worker. |
+| `WAITING_RETRIEVAL` | If present, time at which the manager becomes aware that the task attempt outputs are ready to be retrieved. |
+| `RETRIEVED` | If present, time at which the manager finishes transfering the task attempt outputs from the worker. |
+| `DONE` | If present, time at which the task attempt was returned to the application. Signals that the task has been completed and that no more attempts were tried. |
+| `reason` | One of `SUCCESS`, `SIGNAL`, `END_TIME`, `FORSAKEN`, `MAX_RETRIES`, `MAX_WALLTIME`, or `UNKNOWN`, indicating reason for the task attempt final status. |
+| `exit_code` | For tasks attempts that actually ran on a worker, their process exit status. |
+| `last_state` | The last know state know for the task attempt. This is `DONE` for completed tasks attempts. |
+| `last_state_time` | Time at which the task attempt reached `last_state`. |
+| `DISCONNECTION` | If present, time at which the task attempt was lost because the worker disconnected. |
+| `requested_cores` | Explicit number of cores requested by the task. |
+| `requested_memory` | Explicit memory size in MB requested by the task. |
+| `requested_disk` | Explicit disk size in MB requested by the task. |
+| `requested_gpus` | Explicit number of gpus requested by the task. |
+| `allocated_cores` | Actual number of cores reserved for the task attempt at the worker. |
+| `allocated_memory` | Actual memory size in MB reserved for the task attempt at the worker. |
+| `allocated_disk` | Actual disk size in MB reserved for by the task attempt at the worker. |
+| `allocated_gpus` | Actual number of gpus reserved for the task attempt at the worker. |
+| `measured_cores` | If using resource monitoring, the number of cores used by the task attempt at the worker. |
+| `measured_memory` | If using resource monitoring, the memory size in MB used by the task attempt at the worker. |
+| `measured_disk` | If using resource monitoring, the disk size in MB used by by the task attempt at the worker. |
+| `measured_gpus` | If using resource monitoring, the number of gpus used by the task attempt at the worker. |
+| `measured_wall_time` | If using resource monitoring, the time it took to run the task attempt at the worker according to the monitor. |
+| `library` | Name of the library for tasks defined as `FunctionCall`s. |
+| `worker_id` | Unique worker identifier that ran the task attempt. |
+| `time_input_mgr` | Time it took the manager to dispatch the task attempt to the worker. |
+| `time_output_mgr` | Time it took the manager to fetch the output files of the task attempt from the worker. |
+| `size_input_mgr` | Size in bytes of the data transmited when dispatching the task attempt to the worker. |
+| `size_output_mgr` | Size in bytes of the data transmited when fetching the task attempt outputs from the worker. |
+| `time_worker_start` | Time at which the worker started running the task attempt. |
+| `time_worker_end` | Time at which the task attempt stopped running at the worker. |
+| `time_commit_start` | Time at which the task attempt started to be dispatched to the worker. |
+| `time_commit_end` | Time at which the task attempt finished to be dispatched to the worker. |
+| `slot` | Virtual slot indicator whithin the worker to aid the visual representation of the allocation of resources. Never larger than the number of cores in the worker. |
+
+
+For the *transfers* file:
+
+| Column | Description |
+|------------ |---------|
+| `worker_id` | Unique worker identifier from/which the file transfer occurred. |
+| `hostport`  | Host and port of the worker as seen by the manager. |
+| `time`  | Time at which the manager receive the transfer confirmation message. |
+| `wall_time`  | Time in seconds of the duration of the transfer. |
+| `start_time`  | Time in seconds the transfer started. |
+| `direction`  | One of `INPUT` (to the worker), `OUTPUT` (from the worker), `CACHE_UPDATE` (generated by a task, or copied from another worker) |
+| `filetype`  | One of `file`, `url`, `temp`, or `task` (for minitasks). |
+| `filename`  | Name of the file in the transfer. |
+| `size`  | Size in MB of the file transfered. |
+
+For the *workers* file:
+
+| Column | Description |
+|------------ |---------|
+| `worker_id` | Unique worker identifier from/which the file transfer occurred. |
+| `hostport`  | Host and port of the worker as seen by the manager. |
+| `CONNECTION` | Time at which the worker connected to the manager. |
+| `DISCONNECTION` | Time at which the worker disconnected from the manager. |
+| `cores` | Total number of cores available at the worker.|
+| `memory` | Total memory in MB available at the worker.|
+| `disk` | Total disk space in MB available at the worker.|
+| `gpus` | Total number of gpus available at the worker.|
+
 ### Task Graph Log
 
 The complete graph of tasks and files is recorded in `taskgraph`
@@ -2603,6 +2688,15 @@ Note that very large task graphs may be impractical to graph at this level of de
     ```
     conda install -c conda-forge graphviz
     ```
+
+### TaskVine Report Tool
+
+The [TaskVine Report Tool](https://github.com/cooperative-computing-lab/taskvine-report-tool) is a separate repository maintained by our team that provides web-based visualization capabilities. It is highly optimized for parsing large log files and generating informative visualizations. Here are some screenshots of this tool:
+
+![Visualization Example](images/taskvine_report_tool_example.png)
+
+For detailed usage instructions and plot explanations, please refer to the repository's GitHub page.
+
 
 ### Other Tools
 

@@ -11,6 +11,8 @@
 from . import cvine
 from .file import File
 
+from .utils import get_c_constant
+
 import copy
 import os
 import sys
@@ -186,10 +188,10 @@ class Task(object):
     ##
     # Return a copy of this task
     #
-    def clone(self):
+    def addref(self):
         """Return a (deep)copy this task that can also be submitted to the ndcctools.taskvine."""
         new = copy.copy(self)
-        new._task = cvine.vine_task_clone(self._task)
+        new._task = cvine.vine_task_addref(self._task)
         return new
 
     ##
@@ -292,11 +294,17 @@ class Task(object):
     # Set the worker selection scheduler for task.
     #
     # @param self       Reference to the current task object.
-    # @param scheduler  One of the following schedulers to use in assigning a
-    #                   task to a worker. See @ref vine_schedule_t for
-    #                   possible values.
+    # @param scheduler  One of the following schedulers set preference when assigning a
+    #                   task to a worker:
+    #                     - "files"         Prefer the available worker that has the most data required for the task.
+    #                     - "time"          Prefer the available worker that has completed previous tasks the fastest.
+    #                     - "rand"          Select a random available worker.
+    #                     - "worst"         Select a worker with the most unused resources (tie breakers: cores, memory, disk).
+    #                     - "disk"          Select a worker with the most unused disk.
+    #                   If not set for the task, defaults to the one set for the manager.
     def set_scheduler(self, scheduler):
-        return cvine.vine_task_set_scheduler(self._task, scheduler)
+        sched = get_c_constant(f"vine_schedule_{scheduler}")
+        return cvine.vine_task_set_scheduler(self._task, sched)
 
     ##
     # Attach a user defined logical name to the task.
@@ -331,6 +339,7 @@ class Task(object):
     # @param self          Reference to the current task object.
     # @param file          A file object of class @ref ndcctools.taskvine.file.File, such as from @ref ndcctools.taskvine.manager.Manager.declare_file, @ref ndcctools.taskvine.manager.Manager.declare_buffer, @ref ndcctools.taskvine.manager.Manager.declare_url, etc.
     # @param remote_name   The name of the file at the execution site.
+    # @param mount_symlink Whether to mount file in task's sandbox as a symlink. The default (False) mounts it as a hard link.
     # @param strict_input  Whether the file should be transfered to the worker
     #                      for execution. If no worker has all the input files already cached marked
     #                      as strict inputs for the task, the task fails.
@@ -442,8 +451,8 @@ class Task(object):
     # The file given must refer to a (unpacked) package
     # containing libraries captured by the <tt>starch</tt> command.
     # The task will execute using this package as its environment.
-    # @param t A task object.
-    # @param f A file containing an unpacked Starch package.
+    # @param self The current task object.
+    # @param file A file containing an unpacked Starch package.
     def add_starch_package(self, file):
         return cvine.vine_task_add_starch_package(self._task, file._file)
 
@@ -452,8 +461,8 @@ class Task(object):
     # The file given must refer to a (unpacked) PONCHO package,
     # containing a set of Python modules needed by the task.
     # The task will execute using this package as its Python environment.
-    # @param t A task object.
-    # @param f A file containing an unpacked Poncho package.
+    # @param self The current task object.
+    # @param file A file containing an unpacked Poncho package.
     def add_poncho_package(self, file):
         return cvine.vine_task_add_poncho_package(self._task, file._file)
 
@@ -469,7 +478,7 @@ class Task(object):
     # nested in the order given (i.e. first added is the first applied).
     # @see add_poncho_package
     # @see add_starch_package
-    # @param t A task object.
+    # @param self The current task object.
     # @param f The execution context file.
     def add_execution_context(self, f):
         return cvine.vine_task_add_execution_context(self._task, f._file)
@@ -891,7 +900,6 @@ class PythonTask(Task):
     # execution.
     #
     # @param self 	Reference to the current python task object
-    # @param manager Manager to which the task was submitted
     def submit_finalize(self):
         super().submit_finalize()
         self._add_inputs_outputs(self.manager, *self._fn_def)

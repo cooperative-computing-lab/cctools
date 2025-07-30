@@ -68,8 +68,13 @@ static struct jx_table queue_headers[] = {
 
 static int vine_status_timeout = 30;
 
+// Name of the catalog server to query for updates.
 static const char *catalog_host = 0;
 
+// Last time an update was sent to the catalog server.
+static time_t last_catalog_update_time = 0;
+
+// Time in seconds to delay between each evaluation of the factory's position.
 static int factory_period = 30; // in seconds
 
 static int workers_min = 5;
@@ -112,6 +117,9 @@ static char *worker_command = 0;
 /* Unique number assigned to each worker instance for troubleshooting. */
 static int worker_instance = 0;
 
+/* Space-separated string listing the hostnames of workers not to be used. */
+static char *workers_blocked = 0;
+
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
 
@@ -139,6 +147,9 @@ static int disable_afs_check = 0;
 
 // Remove workers upon manager disconnection
 static int single_shot = 0;
+
+// A pretend port number to unqiuely identify the factory in catalog updates.
+static int pretend_port = 0;
 
 /*
 In a signal handler, only a limited number of functions are safe to
@@ -532,41 +543,59 @@ static int submit_worker( struct batch_queue *queue )
 	return status;
 }
 
-static void update_blocked_hosts( struct batch_queue *queue, struct list *managers_list ) {
+/*
+Generate a list of blocked workers, from two different sources:
+1 - The published info from the manager.
+2 - The workers_blocked propery of the factory.
+Put it into the form "host1 host2 host3 ..," and pass it to the batch queue as the workers-blocked property.
+*/
 
-	if(!managers_list || list_size(managers_list) < 1)
-		return;
-
+static void update_blocked_hosts( struct batch_queue *queue, struct list *managers_list )
+{
 	buffer_t b;
-	struct jx *j;
-
 	buffer_init(&b);
 
+	/* The separator is initially nothing, then converted to space after first item. */
 	const char *sep = "";
-	list_first_item(managers_list);
-	while((j=list_next_item(managers_list))) {
-		struct jx *blocked = jx_lookup(j,"workers_blocked");
 
-		if(!blocked) {
-			continue;
-		}
+	/* Iterate over all managers and extract the workers_blocked property. */
 
-		if(jx_istype(blocked, JX_STRING)) {
-			buffer_printf(&b, "%s%s", sep, blocked->u.string_value);
-			sep = " ";
-		}
+	if(managers_list) {
+		struct jx *j;
+		list_first_item(managers_list);
+		while((j=list_next_item(managers_list))) {
 
-		if(jx_istype(blocked, JX_ARRAY)) {
-			struct jx *item;
-			for (void *i = NULL; (item = jx_iterate_array(blocked, &i));) {
-				if(jx_istype(item, JX_STRING)) {
-					buffer_printf(&b, "%s%s", sep, item->u.string_value);
-					sep = " ";
+			/* Skip if no workers_blocked property */
+			struct jx *blocked = jx_lookup(j,"workers_blocked");
+			if(!blocked) {
+				continue;
+			}
+
+			/* If a single host, add that. */
+			if(jx_istype(blocked, JX_STRING)) {
+				buffer_printf(&b, "%s%s", sep, blocked->u.string_value);
+				sep = " ";
+			}
+
+			/* If an array, add each string item in the array. */
+			if(jx_istype(blocked, JX_ARRAY)) {
+				struct jx *item;
+				for (void *i = NULL; (item = jx_iterate_array(blocked, &i));) {
+					if(jx_istype(item, JX_STRING)) {
+						buffer_printf(&b, "%s%s", sep, item->u.string_value);
+						sep = " ";
+					}
 				}
 			}
 		}
 	}
 
+	/* Add on the workers_blocked property from the config file */
+	if(workers_blocked) {
+		buffer_printf(&b,"%s%s",sep,workers_blocked);
+	}
+
+	/* Now publish the list (if any contents) or null it out. */
 	if(buffer_pos(&b) > 0) {
 		batch_queue_set_option(queue, "workers-blocked", buffer_tostring(&b));
 	} else {
@@ -682,6 +711,8 @@ struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submit
 
 	struct jx *j= jx_object(NULL);
 	jx_insert_string(j, "type", "vine_factory");
+
+	jx_insert_integer(j, "port", pretend_port );
 
 	if(using_catalog) {
 		jx_insert_string(j, "project_regex",    project_regex);
@@ -820,6 +851,8 @@ int read_config_file(const char *config_file) {
 
 	assign_new_value(new_condor_requirements, condor_requirements, condor-requirements, const char *, JX_STRING, string_value)
 
+	assign_new_value(new_workers_blocked, workers_blocked, workers-blocked, const char *, JX_STRING, string_value )
+
 	if(!manager_host) {
 		if(!new_project_regex) {
 			// if manager-name not given, try with the old master-name
@@ -900,6 +933,11 @@ int read_config_file(const char *config_file) {
 		factory_name = xxstrdup(new_factory_name);
 	}
 
+	if(workers_blocked != new_workers_blocked) {
+		free(workers_blocked);
+		workers_blocked = xxstrdup(new_workers_blocked);
+	}
+
 	last_time_modified = new_time_modified;
 	fprintf(stdout, "Configuration file '%s' has been loaded.", config_file);
 
@@ -943,6 +981,10 @@ int read_config_file(const char *config_file) {
 		fprintf(stdout, "worker-extra-options: %s", extra_worker_args);
 	}
 
+	if(workers_blocked) {
+		fprintf(stdout, "workers-blocked: %s", workers_blocked);
+	}
+
 	fprintf(stdout, "\n");
 
 end:
@@ -951,7 +993,7 @@ end:
 }
 
 /*
-Main loop of work queue pool.  Determine the number of workers needed by our
+Main loop of factory.  Determine the number of workers needed by our
 current list of managers, compare it to the number actually submitted, then
 submit more until the desired state is reached.
 */
@@ -1075,14 +1117,18 @@ static void mainloop( struct batch_queue *queue )
 		debug(D_VINE,"workers submitted: %d", workers_submitted);
 		debug(D_VINE,"workers requested: %d", MAX(0, new_workers_needed));
 
-		struct jx *j = factory_to_jx(managers_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
+		/* Regardless of all other settings, do not update catalog more than one per minute. */
+		if( (time(0)-last_catalog_update_time) > 59 ) {
+			struct jx *j = factory_to_jx(managers_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
 
-		char *update_str = jx_print_string(j);
-		debug(D_VINE, "Sending status to the catalog server(s) at %s ...", catalog_host);
-		catalog_query_send_update(catalog_host,update_str,0);
-		print_stats(j);
-		free(update_str);
-		jx_delete(j);
+			char *update_str = jx_print_string(j);
+			debug(D_VINE, "Sending status to the catalog server(s) at %s ...", catalog_host);
+			catalog_query_send_update(catalog_host,update_str,0);
+			print_stats(j);
+			free(update_str);
+			jx_delete(j);
+			last_catalog_update_time = time(0);
+		}
 
 		update_blocked_hosts(queue, managers_list);
 
@@ -1117,13 +1163,14 @@ static void mainloop( struct batch_queue *queue )
 
 		delete_projects_list(managers_list);
 		delete_projects_list(foremen_list);
-
-		int sleep_seconds = 0;
-		while(sleep_seconds < factory_period) {
+		
+		/* Now delay for the factory period */
+		/* Sleep 1s at a time to re-evaluate the abort flag */
+		stoptime = time(0) + factory_period;
+		while(time(0) < stoptime) {
 			if(abort_flag) {
 				break;
 			}
-			sleep_seconds += 1;
 			sleep(1);
 		}
 	}
@@ -1189,6 +1236,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Max number of new workers per %ds (default=%d)\n", "--workers-per-cycle", factory_period, workers_per_cycle);
 	printf(" %-30s Workers abort after idle time (default=%d).\n", "-t,--timeout=<time>",worker_timeout);
 	printf(" %-30s Exit after no manager seen in <n> seconds.\n", "--factory-timeout");
+	printf(" %-30s Evaluate worker needs every <n> seconds. (default=%d)\n", "--factory-period",factory_period);
 	printf(" %-30s Average tasks per worker (default=one per core).\n", "--tasks-per-worker");
 	printf(" %-30s Use worker capacity reported by managers.\n","-c,--capacity");
 
@@ -1226,6 +1274,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_CONF_FILE, 
 		LONG_OPT_AMAZON_CONFIG, 
 		LONG_OPT_FACTORY_TIMEOUT, 
+		LONG_OPT_FACTORY_PERIOD,
 		LONG_OPT_AUTOSIZE, 
 		LONG_OPT_CONDOR_REQUIREMENTS, 
 		LONG_OPT_CONDOR_SPOOL, 
@@ -1269,6 +1318,7 @@ static const struct option long_options[] = {
 	{"env", required_argument, 0, LONG_OPT_ENVIRONMENT_VARIABLE},
 	{"extra-options", required_argument, 0, 'E'},
 	{"factory-timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
+	{"factory-period", required_argument, 0, LONG_OPT_FACTORY_PERIOD},
 	{"feature", required_argument, 0, LONG_OPT_FEATURE},
 	{"foremen-name", required_argument, 0, 'F'},
 	{"gpus",   required_argument,  0,  LONG_OPT_GPUS},
@@ -1404,6 +1454,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_FACTORY_TIMEOUT:
 				factory_timeout = MAX(0, atoi(optarg));
+				break;
+			case LONG_OPT_FACTORY_PERIOD:
+				factory_period = MAX(5, atoi(optarg));
 				break;
 			case LONG_OPT_CONDOR_REQUIREMENTS:
 				if(condor_requirements) {
@@ -1543,6 +1596,12 @@ int main(int argc, char *argv[])
 	} else {
 		using_catalog = 1;
 	}
+
+	/* When reporting to the catalog server, the factory is uniquely identified by name:address:port */
+	/* Since it does not have a real "port", choose a negative value. */
+
+	srand( time(0) + getpid() );
+	pretend_port = -(rand()%65536);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 

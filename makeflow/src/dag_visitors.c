@@ -916,19 +916,10 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 
 	printf( "}\n");
 
-	hash_table_firstkey(h);
-	while(hash_table_nextkey(h, &label, (void **) &t)) {
-		free(t);
-		hash_table_remove(h, label);
-	}
 
-	hash_table_firstkey(g);
-	while(hash_table_nextkey(g, &label, (void **) &e)) {
-		free(e);
-		hash_table_remove(g, label);
-	}
-
+	hash_table_clear(g, free);
 	hash_table_delete(g);
+	hash_table_clear(h, free);
 	hash_table_delete(h);
 }
 

@@ -28,10 +28,11 @@ int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_in
 		return 0;
 	}
 
-	w->inuse_cache += replica->size;
-	hash_table_insert(w->current_files, cachename, replica);
+	double prev_available = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
 
-	double prev_available = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache + replica->size);
+	hash_table_insert(w->current_files, cachename, replica);
+	w->inuse_cache += replica->size;
+
 	if (prev_available >= m->current_max_worker->disk) {
 		/* the current worker may have been the one with the maximum available space, so we update it. */
 		m->current_max_worker->disk = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
@@ -93,7 +94,11 @@ struct vine_file_replica *vine_file_replica_table_lookup(struct vine_worker_info
 // count the number of in-cluster replicas of a file
 int vine_file_replica_count(struct vine_manager *m, struct vine_file *f)
 {
-	return set_size(hash_table_lookup(m->file_worker_table, f->cached_name));
+	struct set *source_workers = hash_table_lookup(m->file_worker_table, f->cached_name);
+	if (!source_workers) {
+		return 0;
+	}
+	return set_size(source_workers);
 }
 
 // find a worker (randomly) in posession of a specific file, and is ready to transfer it.
@@ -129,7 +134,7 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 		}
 
 		if ((replica = hash_table_lookup(peer->current_files, cachename)) && replica->state == VINE_FILE_REPLICA_STATE_READY) {
-			int current_transfers = vine_current_transfers_source_in_use(q, peer);
+			int current_transfers = peer->outgoing_xfer_counter;
 			if (current_transfers < q->worker_source_max_transfers) {
 				peer_selected = peer;
 				if (random_index < 0) {
@@ -143,68 +148,76 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 }
 
 // trigger replications of file to satisfy temp_replica_count
-int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *f, struct set *sources, int to_find)
+int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *f, struct set *source_workers, int to_find)
 {
-	int nsources = set_size(sources);
+	if (!f || !source_workers) {
+		return 0;
+	}
+
+	int nsource_workers = set_size(source_workers);
 	int round_replication_request_sent = 0;
 
 	/* get the elements of set so we can insert new replicas to sources */
-	struct vine_worker_info **sources_frozen = (struct vine_worker_info **)set_values(sources);
-	struct vine_worker_info *source;
+	struct vine_worker_info **source_workers_frozen = (struct vine_worker_info **)set_values(source_workers);
+	struct vine_worker_info *source_worker;
 
-	for (int i = 0; i < nsources; i++) {
+	for (int i = 0; i < nsource_workers; i++) {
 
-		source = sources_frozen[i];
-		int dest_found = 0;
+		source_worker = source_workers_frozen[i];
+		int dest_workers_found = 0;
 
 		// skip if the file on the source is not ready to transfer
-		struct vine_file_replica *replica = hash_table_lookup(source->current_files, f->cached_name);
+		struct vine_file_replica *replica = hash_table_lookup(source_worker->current_files, f->cached_name);
 		if (!replica || replica->state != VINE_FILE_REPLICA_STATE_READY) {
 			continue;
 		}
 
-		char *source_addr = string_format("%s/%s", source->transfer_url, f->cached_name);
-		int source_in_use = vine_current_transfers_source_in_use(m, source);
-
 		// skip if the source is busy with other transfers
-		if (source_in_use >= m->worker_source_max_transfers) {
+		if (source_worker->outgoing_xfer_counter >= m->worker_source_max_transfers) {
 			continue;
 		}
 
+		char *source_addr = string_format("%s/%s", source_worker->transfer_url, f->cached_name);
+
 		char *id;
-		struct vine_worker_info *dest;
+		struct vine_worker_info *dest_worker;
 		int offset_bookkeep;
 
-		HASH_TABLE_ITERATE_RANDOM_START(m->worker_table, offset_bookkeep, id, dest)
+		HASH_TABLE_ITERATE_RANDOM_START(m->worker_table, offset_bookkeep, id, dest_worker)
 		{
 			// skip if the source and destination are on the same host
-			if (set_lookup(sources, dest) || strcmp(source->hostname, dest->hostname) == 0) {
+			if (set_lookup(source_workers, dest_worker) || strcmp(source_worker->hostname, dest_worker->hostname) == 0) {
 				continue;
 			}
 
 			// skip if the destination is not ready to transfer
-			if (!dest->transfer_port_active) {
+			if (!dest_worker->transfer_port_active) {
+				continue;
+			}
+
+			// skip if the destination is draining
+			if (dest_worker->draining) {
 				continue;
 			}
 
 			// skip if the destination is busy with other transfers
-			if (vine_current_transfers_dest_in_use(m, dest) >= m->worker_source_max_transfers) {
+			if (dest_worker->incoming_xfer_counter >= m->worker_source_max_transfers) {
 				continue;
 			}
 
-			debug(D_VINE, "replicating %s from %s to %s", f->cached_name, source->addrport, dest->addrport);
+			debug(D_VINE, "replicating %s from %s to %s", f->cached_name, source_worker->addrport, dest_worker->addrport);
 
-			vine_manager_put_url_now(m, dest, source_addr, f);
+			vine_manager_put_url_now(m, dest_worker, source_worker, source_addr, f);
 
 			round_replication_request_sent++;
 
 			// break if we have found enough destinations for this source
-			if (++dest_found >= MIN(m->file_source_max_transfers, to_find)) {
+			if (++dest_workers_found >= MIN(m->file_source_max_transfers, to_find)) {
 				break;
 			}
 
 			// break if the source becomes busy with transfers
-			if (++source_in_use >= m->worker_source_max_transfers) {
+			if (source_worker->outgoing_xfer_counter >= m->worker_source_max_transfers) {
 				break;
 			}
 		}
@@ -217,7 +230,7 @@ int vine_file_replica_table_replicate(struct vine_manager *m, struct vine_file *
 		}
 	}
 
-	free(sources_frozen);
+	free(source_workers_frozen);
 
 	return round_replication_request_sent;
 }
@@ -245,21 +258,54 @@ int vine_file_replica_table_count_replicas(struct vine_manager *q, const char *c
 	return count;
 }
 
+/*
+Check if a file replica exists on a worker. We accept both CREATING and READY replicas,
+since a CREATING replica may already exist physically but hasn't yet received the cache-update
+message from the manager. However, we do not accept DELETING replicas, as they indicate
+the source worker has already been sent an unlink request—any subsequent cache-update or
+cache-invalid events will lead to deletion.
+*/
 int vine_file_replica_table_exists_somewhere(struct vine_manager *q, const char *cachename)
 {
 	struct set *workers = hash_table_lookup(q->file_worker_table, cachename);
-	if (!workers) {
+	if (!workers || set_size(workers) < 1) {
 		return 0;
 	}
 
-	struct vine_worker_info *peer;
-
-	SET_ITERATE(workers, peer)
+	struct vine_worker_info *w;
+	SET_ITERATE(workers, w)
 	{
-		if (peer->transfer_port_active) {
+		struct vine_file_replica *r = vine_file_replica_table_lookup(w, cachename);
+		if (r && (r->state == VINE_FILE_REPLICA_STATE_CREATING || r->state == VINE_FILE_REPLICA_STATE_READY)) {
 			return 1;
 		}
 	}
 
 	return 0;
+}
+
+// get or create a replica for a worker and cachename
+struct vine_file_replica *vine_file_replica_table_get_or_create(struct vine_manager *m, struct vine_worker_info *w, const char *cachename, vine_file_type_t type, vine_cache_level_t cache_level, int64_t size, time_t mtime)
+{
+	// First check if the replica already exists
+	struct vine_file_replica *replica = vine_file_replica_table_lookup(w, cachename);
+	if (replica) {
+		// If the size is different, update accounting and fields
+		if (replica->size != size) {
+			w->inuse_cache -= replica->size;
+			w->inuse_cache += size;
+			replica->size = size;
+		}
+		// Always update these fields to match the latest info
+		replica->mtime = mtime;
+		replica->type = type;
+		replica->cache_level = cache_level;
+		return replica;
+	}
+
+	// Create a new replica
+	replica = vine_file_replica_create(type, cache_level, size, mtime);
+	vine_file_replica_table_insert(m, w, cachename, replica);
+
+	return replica;
 }

@@ -115,6 +115,9 @@ static int child_procs_count = 0;
 /* Maximum time to allow a child process to run. */
 static int child_procs_timeout = 60;
 
+/* Maximum time to allow a streaming child process to run. */
+static int streaming_procs_timeout = 3600;
+
 /* The maximum size of a server that will actually be believed. */
 static INT64_T max_server_size = 0;
 
@@ -135,6 +138,21 @@ static char data[1024*1024];
 
 struct datagram *update_dgram = 0;
 struct link *update_port = 0;
+
+/*
+Shutdown *without* performing cleanup, so as to avoid (surprisingly common)
+deadlocks when a SIGALRM is received while in the middle of SSL negotiation.
+*/
+
+void shutdown_fast(int sig)
+{
+	_exit(0);
+}
+
+/*
+Shutdown normally, calling destructors, atexit, and so forth when a manual
+shutdown signal is received.
+*/
 
 void shutdown_clean(int sig)
 {
@@ -414,9 +432,6 @@ static struct jx_table html_headers[] = {
 	{"name", "NAME", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 0},
 	{"port", "PORT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 0},
 	{"owner", "OWNER", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 0},
-	{"total", "TOTAL", JX_TABLE_MODE_METRIC, JX_TABLE_ALIGN_RIGHT, 0},
-	{"avail", "AVAIL", JX_TABLE_MODE_METRIC, JX_TABLE_ALIGN_RIGHT, 0},
-	{"load5", "LOAD5", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 0},
 	{"version", "VERSION", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 0},
 	{0,0,0,0,0}
 };
@@ -449,6 +464,8 @@ void send_html_header( struct link *l, time_t stoptime )
 	link_printf(l,stoptime, "</head>\n");
 }
 
+/* Handle an incoming HTTP query (or update) on an authenticated link. */
+
 static void handle_query( struct link *ql, time_t st )
 {
 	char line[LINE_MAX];
@@ -472,13 +489,16 @@ static void handle_query( struct link *ql, time_t st )
 	link_address_remote(ql, addr, &port);
 	debug(D_DEBUG, "%s query from %s:%d", link_using_ssl(ql) ? "https" : "http", addr, port);
 
+	/* Read the HTTP action, url, and version */
+
 	if(link_readline(ql, line, LINE_MAX, time(0) + HANDLE_QUERY_TIMEOUT)) {
 		string_chomp(line);
 		if(sscanf(line, "%s %s %s", action, url, version) != 3) {
 			return;
 		}
 
-		// Consume the rest of the query
+		/* Now consume the rest of the header name-value pairs, which we don't care about. */
+
 		while(1) {
 			/* If we read to end-of-stream on the request, that's ok. */
 			if(!link_readline(ql, line, LINE_MAX, time(0) + HANDLE_QUERY_TIMEOUT)) {
@@ -491,8 +511,11 @@ static void handle_query( struct link *ql, time_t st )
 			}
 		}
 	} else {
+		/* Read of initial HTTP line failed, so give up. */
 		return;
 	}
+
+	/* Extract the path from the full URL (or if a simple path, just use it. */
 
 	if(sscanf(url, "http://%[^/]%s", hostport, full_path) == 2) {
 		// continue on
@@ -500,11 +523,15 @@ static void handle_query( struct link *ql, time_t st )
 		strcpy(full_path, url);
 	}
 
+	/* If the query is asking for a raw update stream, process that now wihout loading data. */
 	if(3==sscanf(full_path, "/updates/%ld/%ld/%[^/]",&time_start,&time_stop,strexpr)) {
-		// check for updates request first, before processing deltadb state
 		struct buffer buf;
 		buffer_init(&buf);
+
+		/* The filter text is b64 encoded in strexpr */
 		if(b64_decode(strexpr,&buf)==0) {
+
+			/* And that filter text must be a constant JX expression */
 			struct jx *expr = jx_parse_string(buffer_tostring(&buf));
 			if(expr) {
 				if(link_using_ssl(ql)) {
@@ -513,7 +540,12 @@ static void handle_query( struct link *ql, time_t st )
 				} else {
 					send_http_response(ql,200,"OK","text/plain",st);
 
+					/* These can be long running, so set a longer timeout. */
+					alarm(streaming_procs_timeout);
+
 					struct deltadb_query *query = deltadb_query_create();
+
+					/* The query will only produce records matching the filter. */
 					deltadb_query_set_filter(query,expr);
 					// Note this leaks a stdio stream, but it will be shortly recovered on process exit.
 					deltadb_query_set_output(query,fdopen(link_fd(ql),"w"));
@@ -534,24 +566,20 @@ static void handle_query( struct link *ql, time_t st )
 		return;
 	}
 
-	// check for historical timestamp prefix
+	/* A /history prefix indicates a single snapshot from the given time. */
 	int matches = sscanf(full_path, "/history/%ld%s", &timestamp, path);
 	if (matches == 2) {
-		// continue on
+		/* Replace the current table with a snapshot table. */
+		table = deltadb_create_snapshot(history_dir, timestamp);
 	} else if (matches == 1) {
 		strncpy(path, "/", sizeof(path));
+		/* Replace the current table with a snapshot table. */
+		table = deltadb_create_snapshot(history_dir, timestamp);
 	} else {
 		strcpy(path, full_path);
 	}
 
-	// reset catalog to timestamp
-	if (timestamp > 0) {
-		//deltadb_delete(table);
-		printf("timestamp: %ld\n", timestamp);
-		table = deltadb_create_snapshot(history_dir, timestamp);
-	}
-	
-	/* load the hash table entries into one big array */
+	/* Now transform the hashtable into one big array for sorting. */
 	n = 0;
 	deltadb_firstkey(table);
 	while(deltadb_nextkey(table, &hkey, &j)) {
@@ -559,8 +587,10 @@ static void handle_query( struct link *ql, time_t st )
 		n++;
 	}
 
-	// sort the array by name before displaying
+	/* Sort the array by name before displaying. */
 	qsort(array, n, sizeof(struct jx *), compare_jx);
+
+	/* Now consider the various forms of a basic snapshot query. */
 
 	if(!strcmp(path, "/query.text")) {
 		send_http_response(ql,200,"OK","text/plain",st);
@@ -696,6 +726,8 @@ static void handle_query( struct link *ql, time_t st )
 	}
 }
 
+/* Handle an incoming TCP connection by forking, authenticating, and then processing the query. */
+
 void handle_tcp_query( struct link *port, int using_ssl )
 {
 	char raddr[LINK_ADDRESS_MAX];
@@ -760,6 +792,8 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Single process mode; do not work on queries.\n", "-S,--single");
 	fprintf(stdout, " %-30s Maximum time to allow a query process to run.\n", "-T,--timeout=<time>");
 	fprintf(stdout, " %-30s (default is %ds)\n", "", child_procs_timeout);
+	fprintf(stdout, " %-30s Maximum time to allow a streaming query process to run.\n", "-T,--timeout=<time>");
+	fprintf(stdout, " %-30s (default is %ds)\n", "", streaming_procs_timeout);
 	fprintf(stdout, " %-30s Send status updates to this host. (default is\n", "-u,--update-host=<host>");
 	fprintf(stdout, " %-30s %s)\n", "", CATALOG_HOST_DEFAULT);
 	fprintf(stdout, " %-30s Send status updates at this interval.\n", "-U,--update-interval=<time>");
@@ -807,6 +841,7 @@ int main(int argc, char *argv[])
 		{"ssl-key", required_argument, 0, 'K'},
 		{"single", no_argument, 0, 'S'},
 		{"timeout", required_argument, 0, 'T'},
+		{"streaming-timeout", required_argument, 0, 'Q'},
 		{"update-host", required_argument, 0, 'u'},
 		{"update-interval", required_argument, 0, 'U'},
 		{"version", no_argument, 0, 'v'},
@@ -815,7 +850,7 @@ int main(int argc, char *argv[])
 		{0,0,0,0}};
 
 
-	while((ch = getopt_long(argc, argv, "bB:C:d:hH:I:l:K:L:m:M:n:o:O:p:P:ST:u:U:vZ:", long_options, NULL)) > -1) {
+	while((ch = getopt_long(argc, argv, "bB:C:d:hH:I:l:K:L:m:M:n:o:O:p:P:Q:ST:u:U:vZ:", long_options, NULL)) > -1) {
 		switch (ch) {
 			case 'b':
 				is_daemon = 1;
@@ -877,6 +912,9 @@ int main(int argc, char *argv[])
 			case 'T':
 				child_procs_timeout = string_time_parse(optarg);
 				break;
+			case 'Q':
+				streaming_procs_timeout = string_time_parse(optarg);
+				break;
 			case 'u':
 				list_push_head(outgoing_host_list, xxstrdup(optarg));
 				break;
@@ -919,7 +957,7 @@ int main(int argc, char *argv[])
 	install_handler(SIGINT, shutdown_clean);
 	install_handler(SIGTERM, shutdown_clean);
 	install_handler(SIGQUIT, shutdown_clean);
-	install_handler(SIGALRM, shutdown_clean);
+	install_handler(SIGALRM, shutdown_fast);
 
 	if(!preferred_hostname) {
 		domain_name_cache_guess(hostname);

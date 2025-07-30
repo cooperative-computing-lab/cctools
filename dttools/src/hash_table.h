@@ -70,6 +70,14 @@ void hash_table_delete(struct hash_table *h);
 
 int hash_table_size(struct hash_table *h);
 
+/** Return the proportion of elements
+vs buckets in the table.
+@return The load of the table.
+@param h A pointer to a hash table.
+*/
+
+double hash_table_load(struct hash_table *h);
+
 /** Insert a key and value.
 This call will fail if the table already contains the same key.
 You must call @ref hash_table_remove to remove it.
@@ -109,6 +117,9 @@ void hash_table_firstkey(struct hash_table *h);
 
 /** Continue iteration over all keys.
 This function returns the next key and value in the iteration.
+Warning: It cannot be called after either hash_table_insert or hash_table_remove
+during the same iteration. If this is needed, consider
+iterating using manual hash_table_lookup with keys from hash_table_keys_array.
 @param h A pointer to a hash table.
 @param key A pointer to a key pointer.
 @param value A pointer to a value pointer.
@@ -155,6 +166,21 @@ int hash_table_fromkey(struct hash_table *h, const char *key);
 */
 
 unsigned hash_string(const char *s);
+
+/** Return a NULL-termianted array with a copy of all the current keys.
+It is the responsibility of the caller to free this array with
+hash_table_free_keys_array.
+@param h A pointer to a hash table.
+@return NULL-termianted array of size with a copy of all the current keys.
+*/
+
+char **hash_table_keys_array(struct hash_table *h);
+
+
+/** Free an array generated from hash_table_free_keys_array.
+@param keys NULL-termianted array of size with a copy of keys.
+*/
+void hash_table_free_keys_array(char **keys);
 
 /** Utility macro to simplify common case of iterating over a hash table.
 Use as follows:

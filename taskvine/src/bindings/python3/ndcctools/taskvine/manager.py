@@ -97,17 +97,7 @@ class Manager(object):
         else:
             self._staging_explicit = None
 
-        # if we were given a range ports, rather than a single port to try.
-        lower, upper = None, None
-        try:
-            lower, upper = port
-            set_port_range(lower, upper)
-            port = 0
-        except TypeError:
-            # if not a range, ignore
-            pass
-        except ValueError:
-            raise ValueError("port should be a single integer, or a sequence of two integers")
+        set_port_range(port)
 
         if status_display_interval and status_display_interval >= 1:
             self._info_widget = JupyterDisplay(interval=status_display_interval)
@@ -125,13 +115,22 @@ class Manager(object):
             self._stats_hierarchy = cvine.vine_stats()
 
             ssl_key, ssl_cert = self._setup_ssl(ssl, run_info_path)
-            self._taskvine = cvine.vine_ssl_create(port, ssl_key, ssl_cert)
+
+            # use port = 0, as a port range has been set with set_port_range
+            self._taskvine = cvine.vine_ssl_create(0, ssl_key, ssl_cert)
 
             if ssl_key:
                 self._using_ssl = True
 
             if not self._taskvine:
-                raise Exception("Could not create manager on port {}".format(port))
+                msg = "Could not create manager on:"
+                msg += f"\nport: {port}"
+                if run_info_path:
+                    msg += f"\nrun_info_path: {os.path.abspath(run_info_path)}"
+                if staging_path:
+                    msg += f"\nstaging_path: {os.path.abspath(staging_path)}"
+
+                raise Exception(msg)
 
             if name:
                 cvine.vine_set_name(self._taskvine, name)
@@ -393,6 +392,7 @@ class Manager(object):
 
     ##
     # Get current task state. See @ref vine_task_state_t for possible values.
+    # @param task_id  The task_id returned from @ref ndcctools.taskvine.manager.Manager.submit.
     # @code
     # >>> print(q.task_state(task_id))
     # @endcode
@@ -481,11 +481,16 @@ class Manager(object):
     # Set the worker selection scheduler for manager.
     #
     # @param self       Reference to the current manager object.
-    # @param scheduler  One of the following schedulers to use in assigning a
-    #                   task to a worker. See @ref vine_schedule_t for
-    #                   possible values.
+    # @param scheduler  One of the following schedulers set preference when assigning a
+    #                   task to a worker:
+    #                     - "files"         Prefer the available worker that has the most data required for the task.
+    #                     - "time"          Prefer the available worker that has completed previous tasks the fastest.
+    #                     - "rand"          Select a random available worker.
+    #                     - "worst"         Select a worker with the most unused resources (tie breakers: cores, memory, disk).
+    #                     - "disk"          Select a worker with the most unused disk.
     def set_scheduler(self, scheduler):
-        return cvine.vine_set_scheduler(self._taskvine, scheduler)
+        sched = get_c_constant(f"schedule_{scheduler}")
+        return cvine.vine_set_scheduler(self._taskvine, sched)
 
     ##
     # Change the project name for the given manager.
@@ -555,7 +560,7 @@ class Manager(object):
     # This is helpful for distinguishing higher level information about the entire run,
     # such as the name of the framework being used, or the logical name of the dataset
     # being processed.
-    # @param m A manager object
+    # @param self Reference to the current manager object.
     # @param name The name of the property.
     # @param value The value of the property.
     def set_property(self, name, value):
@@ -1752,8 +1757,8 @@ class Manager(object):
     ##
     # Adds a custom APPLICATION entry to the transactions log.
     #
-    # @param self   The manager to register this file.
-    # @param server A custom transaction message
+    # @param self The manager to register this file.
+    # @param entry A custom transaction message
     def log_txn_app(self, entry):
         cvine.vine_log_txn_app(self._taskvine, entry)
 
@@ -1761,7 +1766,7 @@ class Manager(object):
     # Adds a custom APPLICATION entry to the debug log.
     #
     # @param self   The manager to register this file.
-    # @param server A custom debug message
+    # @param entry A custom debug message
     def log_debug_app(self, entry):
         cvine.vine_log_debug_app(self._taskvine, entry)
 

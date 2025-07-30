@@ -979,7 +979,8 @@ static int do_put(struct link *manager, const char *cachename, vine_cache_level_
 	char *transfer_path = vine_cache_transfer_path(cache_manager, cachename);
 
 	timestamp_t start = timestamp_get();
-	int r = vine_transfer_get_any(manager, transfer_dir, &actual_size, &mode, &mtime, time(0) + options->active_timeout);
+	char *error_message = NULL;
+	int r = vine_transfer_get_any(manager, transfer_dir, &actual_size, &mode, &mtime, time(0) + options->active_timeout, &error_message);
 	timestamp_t stop = timestamp_get();
 
 	/* XXX actual_size should equal expected size, but only for a simple file, not a dir. */
@@ -1449,7 +1450,7 @@ static int process_can_run_eventually(struct vine_process *p, struct vine_cache 
 	if (p->task->needs_library) {
 		/* Note that we check for *some* library but do not bind to it. */
 		struct vine_process *p_future = find_future_library_for_function(p->task->needs_library);
-		if (!p || p_future->result == VINE_RESULT_LIBRARY_EXIT) {
+		if (!p_future || p_future->result == VINE_RESULT_LIBRARY_EXIT) {
 			debug(D_VINE, "task %d does not match any library \"%s\"", p->task->task_id, p->task->needs_library);
 			return 0;
 		}
@@ -1712,7 +1713,7 @@ static void vine_worker_serve_manager(struct link *manager)
 		expire_procs_running();
 
 		ok &= handle_completed_tasks(manager);
-		ok &= vine_cache_wait(cache_manager, manager);
+		ok &= vine_cache_check_files(cache_manager, manager);
 
 		measure_worker_resources();
 
@@ -1735,6 +1736,9 @@ static void vine_worker_serve_manager(struct link *manager)
 			// finish all tasks, disconnect from manager, but don't kill the worker (no abort_flag = 1)
 			break;
 		}
+
+		/* Periodically start some pending transfers. */
+		vine_cache_start_transfers(cache_manager);
 
 		/* Check all known libraries if they are ready to execute functions. */
 		check_libraries_ready(manager);
@@ -2257,6 +2261,13 @@ int main(int argc, char *argv[])
 	vine_worker_options_get(options, argc, argv);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
+
+	/* Print command line when debugging output enabled */
+	debug(D_VINE, "worker command line:");
+	int i;
+	for (i = 0; i < argc; i++) {
+		debug(D_VINE, "    argv %d: %s", i, argv[i]);
+	}
 
 	/* The caller must either provide a project regex or an explicit manager host and port. */
 	if (!options->project_regex) {
