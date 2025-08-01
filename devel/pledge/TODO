@@ -1,3 +1,4 @@
 * Enforcer should allow paths that have a Stat permission lead to other calls without issues
 * We need to trace failed calls (we should start with ENOENT)
-* Implement new tracer for creation, deletion, metadata and list operations
+* Dependency graph of our own?
+* mprotect
