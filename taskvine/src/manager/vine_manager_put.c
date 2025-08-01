@@ -441,24 +441,12 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 	/* Now send the actual file. */
 	vine_result_code_t result = vine_manager_put_input_file(q, w, t, m, file_to_send);
 
-	/* If the send succeeded, then record it in the worker */
-	if (result == VINE_SUCCESS) {
-		struct vine_file_replica *replica = vine_file_replica_table_get_or_create(q, w, f->cached_name, f->type, f->cache_level, f->size, f->mtime);
+	/* If the send succeeded, then note that we have a PENDING replica */
+	/* If will be marked as READY when a cache-update message comes back. */
 
-		switch (file_to_send->type) {
-		case VINE_URL:
-		case VINE_TEMP:
-			/* For these types, a cache-update will arrive when the replica actually exists. */
-			replica->state = VINE_FILE_REPLICA_STATE_CREATING;
-			break;
-		case VINE_FILE:
-		case VINE_MINI_TASK:
-		case VINE_BUFFER:
-			/* For these types, we sent the data, so we know it exists. */
-			replica->state = VINE_FILE_REPLICA_STATE_READY;
-			f->state = VINE_FILE_STATE_CREATED;
-			break;
-		}
+	if (result == VINE_SUCCESS) {
+		struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
+		vine_file_replica_table_insert(q, w, f->cached_name, replica);
 	}
 
 	return result;

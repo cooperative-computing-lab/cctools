@@ -122,7 +122,7 @@ void vine_cache_scan(struct vine_cache *c, struct link *manager)
 	char *cachename;
 	HASH_TABLE_ITERATE(c->table, cachename, f)
 	{
-		vine_worker_send_cache_update(manager, cachename, f->original_type, f->cache_level, f->size, f->mode, f->transfer_time, f->start_time);
+		vine_worker_send_cache_update(manager, cachename, f);
 	}
 }
 
@@ -262,7 +262,7 @@ and writing out the metadata to the proper location.
 */
 
 int vine_cache_add_file(
-		struct vine_cache *c, const char *cachename, const char *transfer_path, vine_cache_level_t level, int mode, uint64_t size, time_t mtime, timestamp_t transfer_time)
+		struct vine_cache *c, const char *cachename, const char *transfer_path, vine_cache_level_t level, int mode, uint64_t size, time_t mtime, timestamp_t start_time, timestamp_t transfer_time, struct link *manager)
 {
 	char *data_path = vine_cache_data_path(c, cachename);
 	char *meta_path = vine_cache_meta_path(c, cachename);
@@ -285,11 +285,15 @@ int vine_cache_add_file(
 		f->size = size;
 		f->mtime = mtime;
 		f->transfer_time = transfer_time;
+		f->start_time = start_time;
 
 		/* File has data and is ready to use. */
 		f->status = VINE_CACHE_STATUS_READY;
 
 		vine_cache_file_save_metadata(f, meta_path);
+
+		/* Inform the manager that we now have the file */
+		vine_worker_send_cache_update(manager, cachename, f);
 
 		result = 1;
 	} else {
@@ -829,7 +833,7 @@ static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_fil
 		debug(D_VINE, "cache: measuring %s", transfer_path);
 		if (vine_cache_file_measure_metadata(transfer_path, &mode, &size, &mtime)) {
 			debug(D_VINE, "cache: created %s with size %lld in %lld usec", cachename, (long long)size, (long long)transfer_time);
-			if (vine_cache_add_file(c, cachename, transfer_path, f->cache_level, mode, size, mtime, transfer_time)) {
+			if (vine_cache_add_file(c, cachename, transfer_path, f->cache_level, mode, size, mtime, f->start_time, transfer_time, manager)) {
 				f->status = VINE_CACHE_STATUS_READY;
 			} else {
 				debug(D_VINE, "cache: unable to move %s to %s: %s\n", transfer_path, cache_path, strerror(errno));
@@ -849,7 +853,7 @@ static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_fil
 
 	if (manager) {
 		if (f->status == VINE_CACHE_STATUS_READY) {
-			vine_worker_send_cache_update(manager, cachename, f->original_type, f->cache_level, f->size, f->mode, transfer_time, f->start_time);
+			/* a positive cache-update message was sent by vine_cache_add_file */
 		} else {
 			char *error_path = vine_cache_error_path(c, cachename);
 			char *error_message = NULL;
