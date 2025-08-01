@@ -137,7 +137,7 @@ void generate_contract_from_list(FILE *f, struct list *r)
 		if (a->delete)
 			strcat(perms, "D");
 
-		/// XXX: We should rewrite the enforcer wrapper functions to
+		/// TODO: We should rewrite the enforcer wrapper functions to
 		/// use 2 separate letters for RW permission and not +
 		if (a->read && a->write)
 			strcat(perms, "+");
