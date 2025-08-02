@@ -2,3 +2,5 @@
 * We need to trace failed calls (we should start with ENOENT)
 * Dependency graph of our own?
 * mprotect
+* pipes and unfinished
+* enforce()'ing needs a check up

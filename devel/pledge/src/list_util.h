@@ -6,17 +6,21 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <unistd.h>
+#include <sys/param.h>
+
 #include "list.h"
 
-#define ACCESS_COUNT 6
+#define ACCESS_COUNT 7
 
 #define UNKOWN_ACCESS 0
 #define READ_ACCESS 1
 #define WRITE_ACCESS 2
-#define STAT_ACCESS 4
+#define METADATA_ACCESS 4
 #define CREATE_ACCESS 8
 #define DELETE_ACCESS 16
 #define LIST_ACCESS 32
+#define ERROR_ACCESS 64
 
 // In a text file Read and Write as true get dumped as +
 // THOUGHT: If we were to add a metadata flag, would open be a metadata flag
@@ -27,33 +31,38 @@
 // because otherwise we might not be able to do much
 // Now the real question is, do we LABEL an open call as whatever flag it carries
 // (aside from creat obviously)
-/// Struct containing our paths with their permission
+/// Struct containing our paths with their keys
 /// TODO: Change name
 struct path_access {
 	/// How many times the file has been accessed
 	uint32_t count;
 	/// XXX: For statistics and summarization, if there was an ENOENT on a certain path
 	/// it should be saved
-	/// Pathname in absolute form, ideally it should never be relative
+	/// Pathname in absolute form (ideally) it should never be relative
 	char *pathname;
 	/// Flag for read
 	bool read;
 	/// Flag for write
 	bool write;
-	/// Flag for stat
-	bool stat;
+	/// Flag for metadata
+	bool metadata;
 	/// Flag for file creation
 	bool create;
 	/// Flag for file deletion
 	bool delete;
-	/// Flag for retrieving directory list (getdents)
+	/// Flag for retrieving directory entities
 	bool list;
+	/// Flag for an error when accessing the path
+	bool error;
 };
+
+char *rel2abspath(char *abs_p, char *rel_p, size_t size);
 
 /// Add a path_access node to our cctools list
 void new_path_access_node(struct list *c,
 		char *path,
 		uint8_t access_fl);
+
 void destroy_path_node(void *x);
 void destroy_contract_list(struct list *c);
 struct path_access *
