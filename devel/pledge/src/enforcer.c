@@ -11,7 +11,6 @@
 #include <unistd.h>
 
 #include "list_util.h"
-#include "util.h"
 
 #ifdef COLOR_ENFORCING
 #define PINK "\033[38;5;198m"
@@ -44,20 +43,20 @@ void flag2letter(struct path_access *r, char *buff, size_t buff_len)
 		return;
 	}
 	memset(buff, 0, buff_len);
-	if (r->stat)
-		strncat(buff, "S", buff_len);
+	if (r->metadata)
+		strncat(buff, "M", buff_len);
 	if (r->create)
 		strncat(buff, "C", buff_len);
 	if (r->delete)
 		strncat(buff, "D", buff_len);
-	if (r->read && r->write)
-		strncat(buff, "+", buff_len);
-	else if (r->read)
+	if (r->read)
 		strncat(buff, "R", buff_len);
-	else if (r->write)
+	if (r->write)
 		strncat(buff, "W", buff_len);
 	if (r->list)
 		strncat(buff, "L", buff_len);
+	if (r->error)
+		strncat(buff, "E", buff_len);
 }
 
 // TODO: The bit flags need to be changed to a typedef so we can
@@ -65,17 +64,14 @@ void flag2letter(struct path_access *r, char *buff, size_t buff_len)
 uint8_t letter2bitflag(char x)
 {
 	switch (x) {
-	case 'S':
-		return STAT_ACCESS;
+	case 'M':
+		return METADATA_ACCESS;
 		break;
 	case 'R':
 		return READ_ACCESS;
 		break;
 	case 'W':
 		return WRITE_ACCESS;
-		break;
-	case '+':
-		return READ_ACCESS | WRITE_ACCESS;
 		break;
 	case 'C':
 		return CREATE_ACCESS;
@@ -85,6 +81,9 @@ uint8_t letter2bitflag(char x)
 		break;
 	case 'L':
 		return LIST_ACCESS;
+		break;
+	case 'E':
+		return ERROR_ACCESS;
 		break;
 	default:
 		return UNKOWN_ACCESS;
@@ -365,11 +364,22 @@ bool enforce(const char *pathname,
 				a_perm);
 		PRINT_RESET_TERM_C();
 		return true;
-	} else if (a->stat && (keys & STAT_ACCESS)) {
+	} else if (a->metadata && (keys & METADATA_ACCESS)) {
 		flag2letter(a, a_perm, a_perm_len);
 		PRINT_GREEN();
 		fprintf(stderr,
-				"[ALLOWED STAT]: "
+				"[ALLOWED METADATA OPERATION]: "
+				"Path [%s] with permission [%s] is not in violation of the "
+				"contract.\n",
+				a->pathname,
+				a_perm);
+		PRINT_RESET_TERM_C();
+		return true;
+	} else if (a->list && (keys & LIST_ACCESS)) {
+		flag2letter(a, a_perm, a_perm_len);
+		PRINT_GREEN();
+		fprintf(stderr,
+				"[ALLOWED GETDENTS]: "
 				"Path [%s] with permission [%s] is not in violation of the "
 				"contract.\n",
 				a->pathname,
@@ -428,16 +438,9 @@ int open(const char *pathname,
 
 		path_perm |= CREATE_ACCESS;
 	}
+	path_perm |= METADATA_ACCESS;
 
 	// SECTION: Enforce
-	if ((flags & O_RDONLY) == O_RDONLY) // O_RDONLY flag is 0 under the hood
-	{
-		path_perm |= READ_ACCESS;
-	} else if (flags & O_WRONLY) {
-		path_perm |= WRITE_ACCESS;
-	} else if (flags & O_RDWR) {
-		path_perm |= READ_ACCESS | WRITE_ACCESS;
-	}
 	if (enforce(full_path, path_perm) != true) {
 		return -1;
 	}
@@ -517,33 +520,8 @@ fopen(const char *restrict pathname,
 	// SECTION: Enforcing
 	uint8_t perm_val = 0x0;
 	char mode_len = strlen(mode);
-	// We need to get the values out of the flags
-	if (strcmp(mode, "r") == 0) {
-		perm_val |= READ_ACCESS;
-	} else if (strcmp(mode, "w") == 0) {
-		perm_val |= WRITE_ACCESS;
-	} else if (strcmp(mode, "a") == 0) {
-		perm_val |= WRITE_ACCESS;
-	} else if (mode_len > 1) {
-		if (mode[1] == '+') {
-			perm_val |= READ_ACCESS | WRITE_ACCESS;
-			// b and + are not the only things we can to an fopen mode flag call
-			// theres also e, but for now we only want to treat + like its special
-			// b and e, we dont really concern ourselves
-		} else {
-			// not a fan of this
-			switch (mode[0]) {
-			case 'r':
-				perm_val |= READ_ACCESS;
-				break;
-			case 'w':
-				perm_val |= WRITE_ACCESS;
-				break;
-			}
-		}
-	} else {
-		fprintf(stderr, "FOPEN: Unkown permission [%s]\n", mode);
-	}
+
+	perm_val |= METADATA_ACCESS;
 
 	char full_path[MAXPATHLEN];
 	if (rel2abspath(full_path, pathname, MAXPATHLEN) == NULL) {
@@ -581,7 +559,7 @@ int stat(const char *restrict pathname,
 		// Couldn't convert so we fallback to pathname
 		strncpy(full_path, pathname, MAXPATHLEN);
 	}
-	enforce(full_path, STAT_ACCESS);
+	enforce(full_path, METADATA_ACCESS);
 
 	int (*real_stat)(const char *restrict pathname, struct stat *restrict statbuf);
 	real_stat = dlsym(RTLD_NEXT, "stat");
@@ -622,7 +600,7 @@ int fstatat(int dirfd,
 	// TODO: This could be made to only have 1 call to enforce instead of 2 in separate
 	// branches
 	if (dirfd == AT_FDCWD) {
-		enforce(full_path, STAT_ACCESS);
+		enforce(full_path, METADATA_ACCESS);
 	} else {
 		// Solve the dirfd and then glue it together with the absolute path
 		char fd_link[MAXPATHLEN];
@@ -638,7 +616,7 @@ int fstatat(int dirfd,
 		} else {
 			strcat(solved_path, pathname);
 		}
-		enforce(solved_path, STAT_ACCESS);
+		enforce(solved_path, METADATA_ACCESS);
 	}
 
 	int (*real_fstatat)(int dirfd, const char *restrict pathname, struct stat *restrict statbuf, int flags);
@@ -668,4 +646,25 @@ int remove(const char *pathname)
 	int (*real_remove)(const char *pathname);
 	real_remove = dlsym(RTLD_NEXT, "remove");
 	return real_remove(pathname);
+}
+
+ssize_t getdents64(int fd, void *dirp, size_t count)
+{
+	char fd_link[BUFSIZ];
+	snprintf(fd_link, BUFSIZ, "/proc/self/fd/%d", fd);
+	char solved_path[BUFSIZ];
+	size_t solved_path_len = readlink(fd_link, solved_path, BUFSIZ);
+	solved_path[solved_path_len] = '\0';
+
+	PRINT_YELLOW();
+	fprintf(stderr, "[GETDENTS64]: Caught path: [%s]\n", solved_path);
+	PRINT_RESET_TERM_C();
+
+	if (enforce(solved_path, LIST_ACCESS) != true) {
+		return -1;
+	}
+
+	ssize_t (*real_getdents64)(int fd, void *dirp, size_t count);
+	real_getdents64 = dlsym(RTLD_NEXT, "getdents64");
+	return real_getdents64(fd, dirp, count);
 }

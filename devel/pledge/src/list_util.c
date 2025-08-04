@@ -1,5 +1,58 @@
 #include "list_util.h"
 
+/// Turn a relative path into an absolute path, based on CWD
+/// @param abs_p is the buffer where we will store the absolute path
+/// @param rel_p is the user given string
+/// @param size is the size/len of abs_p
+/// Return If the path does not need to be turned into an absolute path then we just
+/// copy to the abs_p buffer and return that
+/// TODO: Perhaps we do strlcpy/strlcat?
+char *
+rel2abspath(char *abs_p,
+		char *rel_p,
+		size_t size)
+{
+	if (rel_p == NULL) {
+		fprintf(stderr, "Attempted to turn an empty string into an absolute path.\n");
+		abs_p = NULL;
+		return NULL;
+	}
+	// Strnlen??
+	size_t rel_p_len = strlen(rel_p);
+	// current directory paths need to get expanded
+	// TODO: Integrate with dttools/path functions,
+	// no reason we can't have both
+	if (rel_p_len == 1) {
+		if (rel_p[0] == '.') {
+			realpath(rel_p, abs_p);
+			return abs_p;
+		}
+	}
+	if (rel_p_len >= 1) {
+		if (rel_p[0] != '/') {
+			// Check if its relative of the form ./
+			if (rel_p[0] == '.' && rel_p[1] == '/') {
+				rel_p = rel_p + 2;
+			}
+			// get cwd
+			if (getcwd(abs_p, size) == NULL) {
+				fprintf(stderr, "Attempt to obtain cwd failed.\n");
+				return rel_p;
+			}
+			size_t abs_p_len = strlen(abs_p);
+			if (abs_p[abs_p_len - 1] != '/') {
+				strncat(abs_p, "/", MAXPATHLEN);
+			}
+			strncat(abs_p, rel_p, MAXPATHLEN);
+			return abs_p;
+		}
+		strncpy(abs_p, rel_p, MAXPATHLEN);
+		return abs_p;
+	}
+	strncpy(abs_p, rel_p, MAXPATHLEN);
+	return abs_p;
+}
+
 /// Add a path_access node to our cctools list
 /// Perhaps this should return the temprary path_access var
 void new_path_access_node(struct list *c,
@@ -9,10 +62,11 @@ void new_path_access_node(struct list *c,
 	struct path_access *t = malloc(sizeof(struct path_access));
 	t->read = (access_fl & READ_ACCESS) ? true : false;
 	t->write = (access_fl & WRITE_ACCESS) ? true : false;
-	t->stat = (access_fl & STAT_ACCESS) ? true : false;
+	t->metadata = (access_fl & METADATA_ACCESS) ? true : false;
 	t->create = (access_fl & CREATE_ACCESS) ? true : false;
 	t->delete = (access_fl & DELETE_ACCESS) ? true : false;
 	t->list = (access_fl & LIST_ACCESS) ? true : false;
+	t->error = (access_fl & ERROR_ACCESS) ? true : false;
 	t->count = 1;
 
 	/// This string gotta be manually removed
@@ -78,8 +132,8 @@ update_path_perms(struct path_access *a,
 	if (access_fl & WRITE_ACCESS) {
 		a->write = true;
 	}
-	if (access_fl & STAT_ACCESS) {
-		a->stat = true;
+	if (access_fl & METADATA_ACCESS) {
+		a->metadata = true;
 	}
 	if (access_fl & CREATE_ACCESS) {
 		a->create = true;
@@ -88,6 +142,9 @@ update_path_perms(struct path_access *a,
 		a->delete = true;
 	}
 	if (access_fl & LIST_ACCESS) {
+		a->list = true;
+	}
+	if (access_fl & ERROR_ACCESS) {
 		a->list = true;
 	}
 	a->count += 1;
@@ -130,24 +187,21 @@ void generate_contract_from_list(FILE *f, struct list *r)
 	fprintf(o, "%-12s %-14s %s\n", col1_title, col2_title, col3_title);
 	while ((a = list_next_item(r))) {
 		// THINK: This might need to become a function
-		if (a->stat)
-			strcat(perms, "S");
+		if (a->metadata)
+			strcat(perms, "M");
 		if (a->create)
 			strcat(perms, "C");
 		if (a->delete)
 			strcat(perms, "D");
-
-		/// TODO: We should rewrite the enforcer wrapper functions to
-		/// use 2 separate letters for RW permission and not +
-		if (a->read && a->write)
-			strcat(perms, "+");
-		else if (a->read)
+		if (a->read)
 			strcat(perms, "R");
-		else if (a->write)
+		if (a->write)
 			strcat(perms, "W");
-
 		if (a->list)
 			strcat(perms, "L");
+
+		if (a->error)
+			strcat(perms, "E");
 
 		fprintf(o, "%-12s <%s> %d\n", perms, a->pathname, a->count);
 
