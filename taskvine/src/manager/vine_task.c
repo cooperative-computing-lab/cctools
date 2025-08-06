@@ -585,17 +585,17 @@ int vine_task_add_output(struct vine_task *t, struct vine_file *f, const char *r
 	return 1;
 }
 
-int vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
+int vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags, vine_file_type_t original_type)
 {
-	struct vine_file *f = vine_file_local(local_name, VINE_CACHE_LEVEL_TASK, 0);
+	struct vine_file *f = vine_file_create(local_name, 0, 0, 0, original_type, 0, VINE_CACHE_LEVEL_TASK, 0);
 	int r = vine_task_add_input(t, f, remote_name, flags);
 	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
 	return r;
 }
 
-int vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
+int vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags, vine_file_type_t original_type)
 {
-	struct vine_file *f = vine_file_local(local_name, VINE_CACHE_LEVEL_TASK, 0);
+	struct vine_file *f = vine_file_create(local_name, 0, 0, 0, original_type, 0, VINE_CACHE_LEVEL_TASK, 0);
 	int r = vine_task_add_output(t, f, remote_name, flags);
 	vine_file_delete(f); /* symmetric create/delete needed for reference counting. */
 	return r;

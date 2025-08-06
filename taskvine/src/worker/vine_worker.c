@@ -849,7 +849,8 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 	char taskname_encoded[VINE_LINE_MAX];
 	char library_name[VINE_LINE_MAX];
 	char category[VINE_LINE_MAX];
-	int flags, length, groupid;
+	int flags, length, groupid, original_type;
+	;
 	int64_t n;
 
 	timestamp_t nt;
@@ -886,14 +887,14 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 				return 0;
 			}
 			task->func_exec_mode = func_exec_mode;
-		} else if (sscanf(line, "infile %s %s %d", localname, taskname_encoded, &flags)) {
+		} else if (sscanf(line, "infile %s %s %d %d", localname, taskname_encoded, &flags, &original_type)) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			vine_hack_do_not_compute_cached_name = 1;
-			vine_task_add_input_file(task, localname, taskname, flags);
-		} else if (sscanf(line, "outfile %s %s %d", localname, taskname_encoded, &flags)) {
+			vine_task_add_input_file(task, localname, taskname, flags, original_type);
+		} else if (sscanf(line, "outfile %s %s %d %d", localname, taskname_encoded, &flags, &original_type)) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			vine_hack_do_not_compute_cached_name = 1;
-			vine_task_add_output_file(task, localname, taskname, flags);
+			vine_task_add_output_file(task, localname, taskname, flags, original_type);
 		} else if (sscanf(line, "cores %" PRId64, &n)) {
 			vine_task_set_cores(task, n);
 		} else if (sscanf(line, "memory %" PRId64, &n)) {
@@ -969,7 +970,7 @@ into a temporary transfer path, and then (if successful)
 add the file to the cache manager.
 */
 
-static int do_put(struct link *manager, const char *cachename, vine_cache_level_t cache_level, int64_t expected_size)
+static int do_put(struct link *manager, const char *cachename, vine_cache_level_t cache_level, int64_t expected_size, int original_type)
 {
 	int64_t actual_size = 0;
 	int mode = 0;
@@ -986,7 +987,7 @@ static int do_put(struct link *manager, const char *cachename, vine_cache_level_
 	/* XXX actual_size should equal expected size, but only for a simple file, not a dir. */
 
 	if (r) {
-		vine_cache_add_file(cache_manager, cachename, transfer_path, cache_level, mode, actual_size, mtime, start, stop - start, manager);
+		vine_cache_add_file(cache_manager, cachename, transfer_path, cache_level, mode, actual_size, original_type, mtime, start, stop - start, manager);
 	} else {
 		trash_file(transfer_path);
 	}
@@ -1001,18 +1002,18 @@ static int do_put(struct link *manager, const char *cachename, vine_cache_level_
 Accept a url specification and queue it for later transfer.
 */
 
-static int do_put_url(const char *cache_name, vine_cache_level_t cache_level, int64_t size, int mode, const char *source)
+static int do_put_url(const char *cache_name, vine_cache_level_t cache_level, int64_t size, vine_file_type_t original_type, int mode, const char *source)
 {
-	return vine_cache_add_transfer(cache_manager, cache_name, source, cache_level, mode, size, VINE_CACHE_FLAGS_ON_TASK);
+	return vine_cache_add_transfer(cache_manager, cache_name, source, cache_level, mode, size, original_type, VINE_CACHE_FLAGS_ON_TASK);
 }
 
 /*
 Accept a url specification and transfer immediately.
 */
 
-static int do_put_url_now(const char *cache_name, vine_cache_level_t cache_level, int64_t size, int mode, const char *source)
+static int do_put_url_now(const char *cache_name, vine_cache_level_t cache_level, int64_t size, vine_file_type_t original_type, int mode, const char *source)
 {
-	return vine_cache_add_transfer(cache_manager, cache_name, source, cache_level, mode, size, VINE_CACHE_FLAGS_NOW);
+	return vine_cache_add_transfer(cache_manager, cache_name, source, cache_level, mode, size, original_type, VINE_CACHE_FLAGS_NOW);
 }
 
 /*
@@ -1277,24 +1278,25 @@ static int handle_manager(struct link *manager)
 	int mode, n;
 	int r = 0;
 	int cache_level;
+	int original_type;
 
 	if (recv_message(manager, line, sizeof(line), options->idle_stoptime)) {
 		if (sscanf(line, "task %" SCNd64, &task_id) == 1) {
 			r = do_task(manager, task_id, time(0) + options->active_timeout);
-		} else if (sscanf(line, "put %s %d %" SCNd64, filename_encoded, &cache_level, &length) == 3) {
+		} else if (sscanf(line, "put %s %d %" SCNd64 " %d", filename_encoded, &cache_level, &length, &original_type) == 4) {
 			url_decode(filename_encoded, filename, sizeof(filename));
-			r = do_put(manager, filename, cache_level, length);
+			r = do_put(manager, filename, cache_level, length, original_type);
 			reset_idle_timer();
-		} else if (sscanf(line, "puturl %s %s %d %" SCNd64 " %o %s", source_encoded, filename_encoded, &cache_level, &length, &mode, transfer_id) == 6) {
+		} else if (sscanf(line, "puturl %s %s %d %" SCNd64 " %d %o %s", source_encoded, filename_encoded, &cache_level, &length, &original_type, &mode, transfer_id) == 7) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			url_decode(source_encoded, source, sizeof(source));
-			r = do_put_url(filename, cache_level, length, mode, source);
+			r = do_put_url(filename, cache_level, length, original_type, mode, source);
 			reset_idle_timer();
 			hash_table_insert(current_transfers, filename, strdup(transfer_id));
-		} else if (sscanf(line, "puturl_now %s %s %d %" SCNd64 " %o %s", source_encoded, filename_encoded, &cache_level, &length, &mode, transfer_id) == 6) {
+		} else if (sscanf(line, "puturl_now %s %s %d %" SCNd64 " %d %o %s", source_encoded, filename_encoded, &cache_level, &length, &original_type, &mode, transfer_id) == 7) {
 			url_decode(filename_encoded, filename, sizeof(filename));
 			url_decode(source_encoded, source, sizeof(source));
-			r = do_put_url_now(filename, cache_level, length, mode, source);
+			r = do_put_url_now(filename, cache_level, length, original_type, mode, source);
 			reset_idle_timer();
 			hash_table_insert(current_transfers, filename, strdup(transfer_id));
 		} else if (sscanf(line, "mini_task %s %s %d %" SCNd64 " %o", source_encoded, filename_encoded, &cache_level, &length, &mode) == 5) {

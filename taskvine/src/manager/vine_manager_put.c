@@ -243,7 +243,7 @@ vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_
 
 	char *transfer_id = vine_current_transfers_add(q, dest_worker, source_worker, source_url);
 
-	vine_manager_send(q, dest_worker, "puturl_now %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, mode, transfer_id);
+	vine_manager_send(q, dest_worker, "puturl_now %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, f->type, mode, transfer_id);
 
 	vine_file_replica_table_get_or_create(q, dest_worker, f->cached_name, f->type, f->cache_level, f->size, f->mtime);
 
@@ -281,7 +281,7 @@ vine_result_code_t vine_manager_put_url(struct vine_manager *q, struct vine_work
 
 	char *transfer_id = vine_current_transfers_add(q, dest_worker, source_worker, f->source);
 
-	vine_manager_send(q, dest_worker, "puturl %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, mode, transfer_id);
+	vine_manager_send(q, dest_worker, "puturl %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, f->type, mode, transfer_id);
 
 	vine_file_replica_table_get_or_create(q, dest_worker, f->cached_name, f->type, f->cache_level, f->size, f->mtime);
 
@@ -327,13 +327,13 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 	switch (f->type) {
 	case VINE_FILE:
 		debug(D_VINE, "%s (%s) needs file %s as %s", w->hostname, w->addrport, f->source, m->remote_name);
-		vine_manager_send(q, w, "put %s %d %lld\n", f->cached_name, f->cache_level, (long long)f->size);
+		vine_manager_send(q, w, "put %s %d %lld %d\n", f->cached_name, f->cache_level, (long long)f->size, f->type);
 		result = vine_manager_put_file_or_dir(q, w, t, f->source, f->cached_name, f->mode, &total_bytes, 1);
 		break;
 
 	case VINE_BUFFER:
 		debug(D_VINE, "%s (%s) needs buffer as %s", w->hostname, w->addrport, m->remote_name);
-		vine_manager_send(q, w, "put %s %d %lld\n", f->cached_name, f->cache_level, (long long)f->size);
+		vine_manager_send(q, w, "put %s %d %lld %d\n", f->cached_name, f->cache_level, (long long)f->size, f->type);
 		result = vine_manager_put_buffer(q, w, t, f, &total_bytes);
 		break;
 
@@ -557,7 +557,7 @@ vine_result_code_t vine_manager_put_task(
 		{
 			char remote_name_encoded[PATH_MAX];
 			url_encode(m->remote_name, remote_name_encoded, PATH_MAX);
-			vine_manager_send(q, w, "infile %s %s %d\n", m->file->cached_name, remote_name_encoded, m->flags);
+			vine_manager_send(q, w, "infile %s %s %d %d\n", m->file->cached_name, remote_name_encoded, m->flags, m->file->type);
 		}
 	}
 
@@ -567,7 +567,7 @@ vine_result_code_t vine_manager_put_task(
 		{
 			char remote_name_encoded[PATH_MAX];
 			url_encode(m->remote_name, remote_name_encoded, PATH_MAX);
-			vine_manager_send(q, w, "outfile %s %s %d\n", m->file->cached_name, remote_name_encoded, m->flags);
+			vine_manager_send(q, w, "outfile %s %s %d %d\n", m->file->cached_name, remote_name_encoded, m->flags, m->file->type);
 		}
 	}
 
