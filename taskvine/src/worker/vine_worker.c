@@ -850,7 +850,7 @@ static struct vine_task *do_task_body(struct link *manager, int task_id, time_t 
 	char library_name[VINE_LINE_MAX];
 	char category[VINE_LINE_MAX];
 	int flags, length, groupid, original_type;
-	;
+
 	int64_t n;
 
 	timestamp_t nt;
