@@ -243,7 +243,7 @@ vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_
 
 	char *transfer_id = vine_current_transfers_add(q, dest_worker, source_worker, source_url);
 
-	vine_manager_send(q, dest_worker, "puturl_now %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, f->type, mode, transfer_id);
+	vine_manager_send(q, dest_worker, "puturl_now %s %s %d %lld %d 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, f->type, mode, transfer_id);
 
 	vine_file_replica_table_get_or_create(q, dest_worker, f->cached_name, f->type, f->cache_level, f->size, f->mtime);
 
@@ -281,7 +281,7 @@ vine_result_code_t vine_manager_put_url(struct vine_manager *q, struct vine_work
 
 	char *transfer_id = vine_current_transfers_add(q, dest_worker, source_worker, f->source);
 
-	vine_manager_send(q, dest_worker, "puturl %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, f->type, mode, transfer_id);
+	vine_manager_send(q, dest_worker, "puturl %s %s %d %lld %d 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, f->type, mode, transfer_id);
 
 	vine_file_replica_table_get_or_create(q, dest_worker, f->cached_name, f->type, f->cache_level, f->size, f->mtime);
 
