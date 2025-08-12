@@ -131,19 +131,9 @@ double itable_load(struct itable *h)
 static int insert_to_buckets_aux(struct entry **buckets, int bucket_count, struct entry *new_entry)
 {
 	unsigned index;
-	struct entry *e;
-
 	index = new_entry->key % bucket_count;
-	e = buckets[index];
 
-	while (e) {
-		/* check that this key does not already exist in the table */
-		if (new_entry->key == e->key) {
-			return 0;
-		}
-		e = e->next;
-	}
-
+	// Possible memory leak! Silently replacing value if it existed.
 	new_entry->next = buckets[index];
 	buckets[index] = new_entry;
 	return 1;

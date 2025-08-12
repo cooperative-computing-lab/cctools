@@ -103,8 +103,7 @@ double itable_load(struct itable *h);
 
 
 /** Insert a key and value.
-This call will fail if the table already contains the same key.
-You must call @ref itable_remove to remove it.
+This call will replace the value if it already contains the same key.
 Also note that you cannot insert a null value into the table.
 @param h A pointer to an integer table.
 @param key An integer key
