@@ -121,7 +121,7 @@ class DaskVine(Manager):
     #                      fn(*args) at some point during its execution to produce the dask task result.
     #                      Should return a tuple of (wrapper result, dask call result). Use for debugging.
     # @param wrapper_proc  Function to process results from wrapper on completion. (default is print)
-    # @param prune_files If True, remove files from the cluster after they are no longer needed.
+    # @param prune_depth Control pruning behavior: 0 (default) - no pruning, 1 - only check direct consumers, 2+ - check consumers up to specified depth
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
@@ -147,7 +147,6 @@ class DaskVine(Manager):
             progress_label="[green]tasks",
             wrapper=None,
             wrapper_proc=print,
-            prune_files=False,
             prune_depth=0,
             hoisting_modules=None,  # Deprecated, use lib_modules
             import_modules=None,    # Deprecated, use lib_modules
@@ -196,7 +195,6 @@ class DaskVine(Manager):
             self.wrapper = wrapper
             self.wrapper_proc = wrapper_proc
             self.prune_depth = prune_depth
-            self.prune_files = prune_files
             self.category_info = defaultdict(lambda: {"num_tasks": 0, "total_execution_time": 0})
             self.max_priority = float('inf')
             self.min_priority = float('-inf')
