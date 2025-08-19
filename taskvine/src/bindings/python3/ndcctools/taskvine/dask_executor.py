@@ -195,7 +195,6 @@ class DaskVine(Manager):
             self.wrapper = wrapper
             self.wrapper_proc = wrapper_proc
             self.prune_depth = prune_depth
-            self.prune_files = prune_files
             self.category_info = defaultdict(lambda: {"num_tasks": 0, "total_execution_time": 0})
             self.max_priority = float('inf')
             self.min_priority = float('-inf')
