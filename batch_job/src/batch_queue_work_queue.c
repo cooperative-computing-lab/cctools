@@ -256,6 +256,8 @@ static void batch_queue_wq_option_update(struct batch_queue *q, const char *what
 	}
 }
 
+batch_queue_stub_prune(wq);
+
 const struct batch_queue_module batch_queue_wq = {
 		BATCH_QUEUE_TYPE_WORK_QUEUE,
 		"wq",
@@ -268,6 +270,7 @@ const struct batch_queue_module batch_queue_wq = {
 		batch_queue_wq_submit,
 		batch_queue_wq_wait,
 		batch_queue_wq_remove,
+		batch_queue_wq_prune,
 };
 
 /* vim: set noexpandtab tabstop=8: */

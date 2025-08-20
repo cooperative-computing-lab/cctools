@@ -139,6 +139,8 @@ int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_fi
 
 	makeflow_hook_file_clean(f);
 
+	batch_queue_prune( queue, f->filename );
+
 	if(unlink_recursive(f->filename) == 0) {
 		printf("deleted %s\n",f->filename);
 		d->total_file_size -= f->actual_size;
