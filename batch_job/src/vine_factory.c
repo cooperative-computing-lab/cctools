@@ -219,7 +219,7 @@ int manager_workers_capacity(struct jx *j) {
 	return capacity;
 }
 
-char *string_escape_shell(const char *input) {
+char *string_escape_shell_vine_factory(const char *input) {
     size_t len = strlen(input);
 
     // Worst case: every char becomes 2 chars + quotes
@@ -496,7 +496,7 @@ static int submit_worker( struct batch_queue *queue )
 		cmd = string_format(
 		"./%s --parent-death -M %s -t %d -C '%s' %s %s %s %s %s %s %s %s",
 		worker_command,
-		string_escape_shell(submission_regex),
+		string_escape_shell_vine_factory(submission_regex),
 		worker_timeout,
 		catalog_host,
 		debug_workers ? debug_worker_options : "",
@@ -512,7 +512,7 @@ static int submit_worker( struct batch_queue *queue )
 		cmd = string_format(
 		"./%s --parent-death %s %d -t %d -C '%s' %s %s %s %s %s %s %s",
 		worker_command,
-		string_escape_shell(manager_host),
+		string_escape_shell_vine_factory(manager_host),
 		manager_port,
 		worker_timeout,
 		catalog_host,
@@ -1715,8 +1715,8 @@ int main(int argc, char *argv[])
 	char* cmd;
 	if(worker_command != NULL){
 		cmd = string_format("cp %s %s",
-			string_escape_shell(worker_command),
-			string_escape_shell(scratch_dir));
+			string_escape_shell_vine_factory(worker_command),
+			string_escape_shell_vine_factory(scratch_dir));
 		if(system(cmd)){
 			fprintf(stderr,"vine_factory: Could not Access specified worker binary.\n");
 			exit(EXIT_FAILURE);
@@ -1734,8 +1734,8 @@ int main(int argc, char *argv[])
 		}
 
 		cmd = string_format("cp %s %s",
-			string_escape_shell(tmp),
-			string_escape_shell(scratch_dir));
+			string_escape_shell_vine_factory(tmp),
+			string_escape_shell_vine_factory(scratch_dir));
 		if (system(cmd)) {
 			fprintf(stderr, "vine_factory: could not copy vine_worker to scratch directory.\n");
 			exit(EXIT_FAILURE);
