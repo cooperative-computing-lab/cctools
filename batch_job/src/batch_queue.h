@@ -141,6 +141,16 @@ You must still call @ref batch_queue_wait to wait for the removal to complete.
 */
 int batch_queue_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode );
 
+/** Remove in-cluster cached data associated with filename.
+This call may be used to indicate that cached data associated with the given
+filename will no longer be used in the future, and may be freed.
+@param q The queue to prune from.
+@param filename The name of the file to be pruned.
+@return Greater than zero if the file exists and was pruned, zero otherwise.
+*/
+
+int batch_queue_prune(struct batch_queue *q, const char *filename );
+
 /** Converts a string into a batch queue type.
 @param str A string listing all of the known batch queue types (which changes over time.)
 @return The batch queue type corresponding to the string, or BATCH_QUEUE_TYPE_UNKNOWN if the string is invalid.

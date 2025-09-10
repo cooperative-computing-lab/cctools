@@ -694,6 +694,7 @@ static int batch_queue_k8s_free(struct batch_queue *q)
 
 batch_queue_stub_port(k8s);
 batch_queue_stub_option_update(k8s);
+batch_queue_stub_prune(k8s);
 
 const struct batch_queue_module batch_queue_k8s = {
 		BATCH_QUEUE_TYPE_K8S,
@@ -707,6 +708,7 @@ const struct batch_queue_module batch_queue_k8s = {
 		batch_queue_k8s_submit,
 		batch_queue_k8s_wait,
 		batch_queue_k8s_remove,
+		batch_queue_k8s_prune,
 };
 
 /* vim: set noexpandtab tabstop=8: */
