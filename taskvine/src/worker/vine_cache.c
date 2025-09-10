@@ -262,7 +262,7 @@ and writing out the metadata to the proper location.
 */
 
 int vine_cache_add_file(
-		struct vine_cache *c, const char *cachename, const char *transfer_path, vine_cache_level_t level, int mode, uint64_t size, time_t mtime, timestamp_t start_time, timestamp_t transfer_time, struct link *manager)
+		struct vine_cache *c, const char *cachename, const char *transfer_path, vine_cache_level_t level, int mode, uint64_t size, vine_file_type_t original_type, time_t mtime, timestamp_t start_time, timestamp_t transfer_time, struct link *manager)
 {
 	char *data_path = vine_cache_data_path(c, cachename);
 	char *meta_path = vine_cache_meta_path(c, cachename);
@@ -283,6 +283,7 @@ int vine_cache_add_file(
 		f->cache_level = level;
 		f->mode = mode;
 		f->size = size;
+		f->original_type = original_type;
 		f->mtime = mtime;
 		f->transfer_time = transfer_time;
 		f->start_time = start_time;
@@ -320,7 +321,7 @@ Queue a remote file transfer to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */
 
-int vine_cache_add_transfer(struct vine_cache *c, const char *cachename, const char *source, vine_cache_level_t level, int mode, uint64_t size, vine_cache_flags_t flags)
+int vine_cache_add_transfer(struct vine_cache *c, const char *cachename, const char *source, vine_cache_level_t level, int mode, uint64_t size, vine_file_type_t original_type, vine_cache_flags_t flags)
 {
 	/* Has this transfer already been queued? */
 	struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
@@ -345,12 +346,14 @@ int vine_cache_add_transfer(struct vine_cache *c, const char *cachename, const c
 	f = vine_cache_file_create(VINE_CACHE_TRANSFER, source, 0);
 
 	/*
-	XXX Note that VINE_URL may not be right b/c puturl may be used to
-	perform a worker-to-worker transfer of an object that was originally
-	some other type.  We don't have that type here, and maybe we should.
+	XXX Note that original_type might be VINE_URL b/c puturl may be used to
+	perform a worker-to-worker transfer of an object that was initially of
+	another type. We don't need to consider the initial type here, as the
+	actual type will be determined by the manager once the transfer is complete
+	and the corresponding cache-update message is received.
 	*/
 
-	f->original_type = VINE_URL;
+	f->original_type = original_type;
 	f->cache_level = level;
 	f->mode = mode;
 	f->size = size;
@@ -833,7 +836,7 @@ static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_fil
 		debug(D_VINE, "cache: measuring %s", transfer_path);
 		if (vine_cache_file_measure_metadata(transfer_path, &mode, &size, &mtime)) {
 			debug(D_VINE, "cache: created %s with size %lld in %lld usec", cachename, (long long)size, (long long)transfer_time);
-			if (vine_cache_add_file(c, cachename, transfer_path, f->cache_level, mode, size, mtime, f->start_time, transfer_time, manager)) {
+			if (vine_cache_add_file(c, cachename, transfer_path, f->cache_level, mode, size, f->original_type, mtime, f->start_time, transfer_time, manager)) {
 				f->status = VINE_CACHE_STATUS_READY;
 			} else {
 				debug(D_VINE, "cache: unable to move %s to %s: %s\n", transfer_path, cache_path, strerror(errno));
