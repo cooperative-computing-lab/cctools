@@ -1,35 +1,38 @@
-CC = gcc
-CFLAGS = -Wall -Wextra -Wpedantic
-CFLAGS += -fpic
-# some posix functions werent added to standard c until c23, so we have
-# to specify
-# POSIX_C_SOURCE is saying that we want to enable functionality from 2008 posix
-CFLAGS += -std=c11 -D_POSIX_C_SOURCE=200809L
-# Alternatively, this enables extensions and all functionality
-#CFLAGS += -std=gnu11
+include ../../config.mk
+include ../../rules.mk
 
-RELFLGS = -O3
+PHONY_TARGETS ?= src
+TARGETS ?= $(PHONY_TARGETS)
 
-LDFLAGS += -ldl -shared
+all: $(TARGETS)
 
-BUILDDIR = ./build
-TARGET = $(BUILDDIR)/libenforcer.so
+$(TARGETS):
+	@$(MAKE) -C $@
 
-SRCS = src/enforcer.c
-OBJ = $(BUILDDIR)/enforcer.o
+CLEAN_TARGETS = $(TARGETS:%=clean-%)
+$(CLEAN_TARGETS):
+	@$(MAKE) -C $(@:clean-%=%) clean
+clean: $(CLEAN_TARGETS)
 
-all: $(TARGET)
+LINT_TARGETS = $(TARGETS:%=lint-%)
+$(LINT_TARGETS):
+	@$(MAKE) -C $(@:lint-%=%) lint
+lint: $(LINT_TARGETS)
 
-$(TARGET): $(OBJ)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJ) -o $(TARGET)
+FORMAT_TARGETS = $(TARGETS:%=format-%)
+$(FORMAT_TARGETS):
+	@$(MAKE) -C $(@:format-%=%) format
+format: $(FORMAT_TARGETS)
 
-# Order only build dir
-$(OBJ) : $(SRCS) | $(BUILDDIR)
-	$(CC) $(CFLAGS) -c $< -o $@
+INSTALL_TARGETS = $(TARGETS:%=install-%)
+$(INSTALL_TARGETS):
+	@$(MAKE) -C $(@:install-%=%) install
+install: $(INSTALL_TARGETS)
 
-$(BUILDDIR):
-	mkdir $@
+TEST_TARGETS = $(TARGETS:%=test-%)
+$(TEST_TARGETS):
+	@$(MAKE) -C $(@:test-%=%) test
+test: $(TEST_TARGETS)
 
-.PHONY : clean all
-clean:
-	rm -rf $(BUILDDIR)
+
+.PHONY: $(PHONY_TARGETS) $(CLEAN_TARGETS) $(INSTALL_TARGETS) $(TEST_TARGETS) all clean install test

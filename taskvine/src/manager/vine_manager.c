@@ -388,17 +388,12 @@ static vine_msg_code_t handle_cache_update(struct vine_manager *q, struct vine_w
 	char id[VINE_LINE_MAX];
 
 	if (sscanf(line, "cache-update %s %d %d %lld %lld %lld %lld %s", cachename, &type, &cache_level, &size, &mtime, &transfer_time, &start_time, id) == 8) {
-		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, cachename);
-
-		if (!replica) {
-			/*
-			If an unsolicited cache-update arrives, there are several possibilities:
-			- The worker is telling us about an item from a previous run.
-			- The file was created as an output of a task.
-			*/
-			replica = vine_file_replica_create(type, cache_level, size, mtime);
-			vine_file_replica_table_insert(q, w, cachename, replica);
-		}
+		/*
+		If an unsolicited cache-update arrives, there are several possibilities:
+		- The worker is telling us about an item from a previous run.
+		- The file was created as an output of a task.
+		*/
+		struct vine_file_replica *replica = vine_file_replica_table_get_or_create(q, w, cachename, type, cache_level, size, mtime);
 
 		replica->type = type;
 		replica->cache_level = cache_level;
@@ -1065,10 +1060,10 @@ static int consider_tempfile_replications(struct vine_manager *q)
 			continue;
 		}
 
-		/* are there any available sources? */
-		struct set *sources = hash_table_lookup(q->file_worker_table, f->cached_name);
-		if (!sources) {
-			/* If no sources found, it indicates that the file doesn't exist, either pruned or lost.
+		/* are there any available source workers? */
+		struct set *source_workers = hash_table_lookup(q->file_worker_table, f->cached_name);
+		if (!source_workers) {
+			/* If no source workers found, it indicates that the file doesn't exist, either pruned or lost.
 			Because a pruned file is removed from the recovery queue, so it definitely indicates that the file is lost. */
 			if (q->transfer_temps_recovery && file_needs_recovery(q, f)) {
 				vine_manager_consider_recovery_task(q, f, f->recovery_task);
@@ -1080,7 +1075,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		/* at least one source is able to transfer? */
 		int has_valid_source = 0;
 		struct vine_worker_info *s;
-		SET_ITERATE(sources, s)
+		SET_ITERATE(source_workers, s)
 		{
 			if (s->transfer_port_active && s->outgoing_xfer_counter < q->worker_source_max_transfers && !s->draining) {
 				has_valid_source = 1;
@@ -1092,16 +1087,16 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		}
 
 		/* has this file been fully replicated? */
-		int nsources = set_size(sources);
-		int to_find = MIN(q->temp_replica_count - nsources, q->transfer_replica_per_cycle);
+		int nsource_workers = set_size(source_workers);
+		int to_find = MIN(q->temp_replica_count - nsource_workers, q->transfer_replica_per_cycle);
 		if (to_find <= 0) {
 			list_push_tail(to_remove, xxstrdup(f->cached_name));
 			continue;
 		}
 
-		// debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsources, f->cached_name, to_find);
+		// debug(D_VINE, "Found %d workers holding %s, %d replicas needed", nsource_workers, f->cached_name, to_find);
 
-		int round_replication_request_sent = vine_file_replica_table_replicate(q, f, sources, to_find);
+		int round_replication_request_sent = vine_file_replica_table_replicate(q, f, source_workers, to_find);
 		total_replication_request_sent += round_replication_request_sent;
 
 		if (total_replication_request_sent >= q->attempt_schedule_depth) {
@@ -1113,6 +1108,8 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		hash_table_remove(q->temp_files_to_replicate, cached_name);
 		free(cached_name);
 	}
+
+	list_delete(to_remove);
 
 	return total_replication_request_sent;
 }
@@ -2402,6 +2399,7 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "tasks_total_memory", total->memory);
 	jx_insert_integer(j, "tasks_total_disk", total->disk);
 	jx_insert_integer(j, "tasks_total_gpus", total->gpus);
+	rmsummary_delete(total);
 
 	// worker information for general vine_status report
 	jx_insert_integer(j, "workers", info.workers_connected);
@@ -2664,7 +2662,10 @@ static vine_result_code_t handle_worker(struct vine_manager *q, struct link *l)
 	case VINE_MSG_PROCESSED_DISCONNECT:
 		// A status query was received and processed, so disconnect.
 		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_STATUS_WORKER);
-		return VINE_SUCCESS;
+		// It was not really a failure, but signals to the calling code that the worker
+		// is not available anymore.
+		return VINE_WORKER_FAILURE;
+		break;
 
 	case VINE_MSG_NOT_PROCESSED:
 		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
@@ -2678,6 +2679,7 @@ static vine_result_code_t handle_worker(struct vine_manager *q, struct link *l)
 		q->stats->workers_lost++;
 		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
 		return VINE_WORKER_FAILURE;
+		break;
 	}
 
 	return VINE_SUCCESS;
@@ -3393,8 +3395,10 @@ int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine
 		 * We modify the object each time we schedule a peer transfer by adding a substitute url.
 		 * We must clear the substitute pointer each task we send to ensure we aren't using
 		 * a previously scheduled url. */
-		vine_file_delete(m->substitute);
-		m->substitute = NULL;
+		if (m->substitute) {
+			vine_file_delete(m->substitute);
+			m->substitute = NULL;
+		}
 
 		/* Provide a substitute file object to describe the peer. */
 		if (!(m->file->flags & VINE_PEER_NOSHARE) && (m->file->cache_level > VINE_CACHE_LEVEL_TASK)) {
@@ -3437,7 +3441,6 @@ int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine
 		}
 	}
 
-	debug(D_VINE, "task %lld has a ready transfer source for all files", (long long)t->task_id);
 	return 1;
 }
 
@@ -3613,7 +3616,7 @@ to run, finding the best worker for that task, and then committing
 the task to the worker.
 */
 
-static int send_one_task(struct vine_manager *q)
+static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consider)
 {
 	int t_idx;
 	struct vine_task *t;
@@ -3637,6 +3640,8 @@ static int send_one_task(struct vine_manager *q)
 	// the priority queue data structure where also invokes priority_queue_rotate_reset.
 	PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
 	{
+		*tasks_ready_left_to_consider -= 1;
+
 		if (!consider_task(q, t)) {
 			continue;
 		}
@@ -4852,6 +4857,17 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	/* Issue warnings if the files are set up strangely. */
 	vine_task_check_consistency(t);
 
+	/* The goal of a recovery task is to reproduce a lost temp file, which serves as input to another task.
+	 * Recovery tasks should therefore be prioritized ahead of all other tasks.
+	 * If a recovery task is not runnable due to its own missing inputs, we submit additional recovery tasks to restore those files.
+	 * Each of these later-submitted recovery tasks is assigned a higher priority than all currently existing tasks,
+	 * so they are considered first. This ensures that the most recent recovery tasks have the best chance to run and succeed.
+	 * Additionally, we incorporate the priority of the original task, so not all recovery tasks receive the same priority,
+	 * this distinction is important when many files are lost and the workflow is effectively rerun from scratch. */
+	if (t->type == VINE_TASK_TYPE_RECOVERY) {
+		vine_task_set_priority(t, t->priority + priority_queue_get_top_priority(q->ready_tasks) + 1);
+	}
+
 	if (t->has_fixed_locations) {
 		q->fixed_location_in_queue++;
 		vine_task_set_scheduler(t, VINE_SCHEDULE_FILES);
@@ -5100,9 +5116,10 @@ static int poll_active_workers(struct vine_manager *q, int stoptime)
 
 	int n = build_poll_table(q);
 
-	// We poll in at most small time segments (of a second). This lets
-	// promptly dispatch tasks, while avoiding busy waiting.
-	int msec = q->busy_waiting_flag ? 1000 : 0;
+	// We poll in at most small time segments (of a half a second). This lets
+	// promptly dispatch tasks, while avoiding wasting cpu cycles when the
+	// state of the system cannot be advanced.
+	int msec = q->nothing_happened_last_wait_cycle ? 1000 : 0;
 	if (stoptime) {
 		msec = MIN(msec, (stoptime - time(0)) * 1000);
 	}
@@ -5257,7 +5274,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	   - send all libraries to all workers
 	   - replicate temp files
 	   - manager empty?                                           Yes: break
-	   - mark as busy-waiting and go to S
+	   - mark as nothing_happened_last_wait_cycle and go to S
 	*/
 
 	// account for time we spend outside vine_wait
@@ -5288,6 +5305,10 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 	// used for q->prefer_dispatch. If 0 and there is a task retrieved, then return task to app.
 	int sent_in_previous_cycle = 1;
+
+	// used to set nothing_happened_last_wait_cycle. nothing_happened_last_wait_cycle only set
+	// when tasks_ready_left_to_consider is less than 1.
+	int tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
 
 	// time left?
 	while ((stoptime == 0) || (time(0) < stoptime)) {
@@ -5349,7 +5370,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			continue;
 		}
 
-		q->busy_waiting_flag = 0;
+		q->nothing_happened_last_wait_cycle = 0;
 
 		// Retrieve results from workers. We do a worker at a time to be more efficient.
 		// We get a known worker with results from the first task in the waiting_retrieval_list,
@@ -5397,6 +5418,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		if (retrieved_this_cycle) {
 			// reset the rotate cursor on task retrieval
 			priority_queue_rotate_reset(q->ready_tasks);
+			tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
+
 			if (!q->prefer_dispatch) {
 				continue;
 			}
@@ -5410,7 +5433,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 			// tasks waiting to be dispatched?
 			BEGIN_ACCUM_TIME(q, time_send);
-			result = send_one_task(q);
+			result = send_one_task(q, &tasks_ready_left_to_consider);
 			END_ACCUM_TIME(q, time_send);
 			if (result) {
 				// sent at least one task
@@ -5450,6 +5473,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			// accepted at least one worker
 			// reset the rotate cursor on worker connection
 			priority_queue_rotate_reset(q->ready_tasks);
+			tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
+
 			events++;
 			continue;
 		}
@@ -5490,9 +5515,12 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		}
 
 		// if we got here, no events were triggered this time around.
-		// we set the busy_waiting flag so that link_poll waits for some time
+		// we set the nothing_happened_last_wait_cycle flag so that link_poll waits for some time
 		// the next time around, or return retrieved tasks if there some available.
-		q->busy_waiting_flag = 1;
+		if (tasks_ready_left_to_consider < 1) {
+			q->nothing_happened_last_wait_cycle = 1;
+			tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
+		}
 	}
 
 	if (events > 0) {
@@ -6418,12 +6446,15 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 	}
 
 	/* delete all of the replicas present at remote workers. */
-	struct set *sources = hash_table_lookup(m->file_worker_table, f->cached_name);
-	if (sources && set_size(sources) > 0) {
-		struct vine_worker_info *w;
-		SET_ITERATE(sources, w)
-		{
-			delete_worker_file(m, w, f->cached_name, 0, 0);
+	struct set *source_workers = hash_table_lookup(m->file_worker_table, f->cached_name);
+	if (source_workers && set_size(source_workers) > 0) {
+		void **workers_array = set_values_array(source_workers);
+		if (workers_array) {
+			for (int i = 0; workers_array[i] != NULL; i++) {
+				struct vine_worker_info *w = (struct vine_worker_info *)workers_array[i];
+				delete_worker_file(m, w, f->cached_name, 0, 0);
+			}
+			set_free_values_array(workers_array);
 		}
 	}
 
@@ -6534,7 +6565,7 @@ struct vine_file *vine_declare_temp(struct vine_manager *m)
 		struct vine_file *f = vine_file_temp();
 		return vine_manager_declare_file(m, f);
 	} else {
-		struct vine_file *f = vine_file_temp_no_peers();
+		struct vine_file *f = vine_file_temp_no_peers(vine_get_path_staging(m, NULL));
 		return vine_manager_declare_file(m, f);
 	}
 }

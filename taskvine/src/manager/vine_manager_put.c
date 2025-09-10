@@ -220,11 +220,11 @@ may be an estimate at this point and will be updated by return
 message once the object is actually loaded into the cache.
 */
 
-vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_worker_info *w, const char *source, struct vine_file *f)
+vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_worker_info *dest_worker, struct vine_worker_info *source_worker, const char *source_url, struct vine_file *f)
 {
-	if (vine_file_replica_table_lookup(w, f->cached_name)) {
+	if (vine_file_replica_table_lookup(dest_worker, f->cached_name)) {
 		/* do nothing, file already at worker */
-		debug(D_NOTICE, "cannot puturl_now %s at %s. Already at worker.", f->cached_name, w->addrport);
+		debug(D_NOTICE, "cannot puturl_now %s at %s. Already at worker.", f->cached_name, dest_worker->addrport);
 		return VINE_SUCCESS;
 	}
 
@@ -238,15 +238,14 @@ vine_result_code_t vine_manager_put_url_now(struct vine_manager *q, struct vine_
 	char source_encoded[VINE_LINE_MAX];
 	char cached_name_encoded[VINE_LINE_MAX];
 
-	url_encode(source, source_encoded, sizeof(source_encoded));
+	url_encode(source_url, source_encoded, sizeof(source_encoded));
 	url_encode(f->cached_name, cached_name_encoded, sizeof(cached_name_encoded));
 
-	char *transfer_id = vine_current_transfers_add(q, w, f->source_worker, source);
+	char *transfer_id = vine_current_transfers_add(q, dest_worker, source_worker, source_url);
 
-	vine_manager_send(q, w, "puturl_now %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, mode, transfer_id);
+	vine_manager_send(q, dest_worker, "puturl_now %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, mode, transfer_id);
 
-	struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
-	vine_file_replica_table_insert(q, w, f->cached_name, replica);
+	vine_file_replica_table_get_or_create(q, dest_worker, f->cached_name, f->type, f->cache_level, f->size, f->mtime);
 
 	free(transfer_id);
 	return VINE_SUCCESS;
@@ -259,11 +258,11 @@ may be an estimate at this point and will be updated by return
 message once the object is actually loaded into the cache.
 */
 
-vine_result_code_t vine_manager_put_url(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f)
+vine_result_code_t vine_manager_put_url(struct vine_manager *q, struct vine_worker_info *dest_worker, struct vine_worker_info *source_worker, struct vine_task *t, struct vine_file *f)
 {
-	if (vine_file_replica_table_lookup(w, f->cached_name)) {
+	if (vine_file_replica_table_lookup(dest_worker, f->cached_name)) {
 		/* do nothing, file already at worker */
-		debug(D_NOTICE, "cannot puturl %s at %s. Already at worker.", f->cached_name, w->addrport);
+		debug(D_NOTICE, "cannot puturl %s at %s. Already at worker.", f->cached_name, dest_worker->addrport);
 		return VINE_SUCCESS;
 	}
 
@@ -280,12 +279,11 @@ vine_result_code_t vine_manager_put_url(struct vine_manager *q, struct vine_work
 	url_encode(f->source, source_encoded, sizeof(source_encoded));
 	url_encode(f->cached_name, cached_name_encoded, sizeof(cached_name_encoded));
 
-	char *transfer_id = vine_current_transfers_add(q, w, f->source_worker, f->source);
+	char *transfer_id = vine_current_transfers_add(q, dest_worker, source_worker, f->source);
 
-	vine_manager_send(q, w, "puturl %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, mode, transfer_id);
+	vine_manager_send(q, dest_worker, "puturl %s %s %d %lld 0%o %s\n", source_encoded, cached_name_encoded, f->cache_level, (long long)f->size, mode, transfer_id);
 
-	struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
-	vine_file_replica_table_insert(q, w, f->cached_name, replica);
+	vine_file_replica_table_get_or_create(q, dest_worker, f->cached_name, f->type, f->cache_level, f->size, f->mtime);
 
 	free(transfer_id);
 	return VINE_SUCCESS;
@@ -346,7 +344,7 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 
 	case VINE_URL:
 		debug(D_VINE, "%s (%s) will get %s from url %s", w->hostname, w->addrport, m->remote_name, f->source);
-		result = vine_manager_put_url(q, w, t, f);
+		result = vine_manager_put_url(q, w, f->source_worker, t, f);
 		break;
 
 	case VINE_TEMP:
@@ -443,25 +441,12 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 	/* Now send the actual file. */
 	vine_result_code_t result = vine_manager_put_input_file(q, w, t, m, file_to_send);
 
-	/* If the send succeeded, then record it in the worker */
+	/* If the send succeeded, then note that we have a PENDING replica */
+	/* If will be marked as READY when a cache-update message comes back. */
+
 	if (result == VINE_SUCCESS) {
 		struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
 		vine_file_replica_table_insert(q, w, f->cached_name, replica);
-
-		switch (file_to_send->type) {
-		case VINE_URL:
-		case VINE_TEMP:
-			/* For these types, a cache-update will arrive when the replica actually exists. */
-			replica->state = VINE_FILE_REPLICA_STATE_CREATING;
-			break;
-		case VINE_FILE:
-		case VINE_MINI_TASK:
-		case VINE_BUFFER:
-			/* For these types, we sent the data, so we know it exists. */
-			replica->state = VINE_FILE_REPLICA_STATE_READY;
-			f->state = VINE_FILE_STATE_CREATED;
-			break;
-		}
 	}
 
 	return result;
@@ -597,8 +582,7 @@ vine_result_code_t vine_manager_put_task(
 	int r = vine_manager_send(q, w, "end\n");
 	if (r >= 0) {
 		if (target) {
-			struct vine_file_replica *replica = vine_file_replica_create(target->type, target->cache_level, target->size, target->mtime);
-			vine_file_replica_table_insert(q, w, target->cached_name, replica);
+			vine_file_replica_table_get_or_create(q, w, target->cached_name, target->type, target->cache_level, target->size, target->mtime);
 		}
 
 		return VINE_SUCCESS;

@@ -39,6 +39,9 @@ void vine_mount_delete(struct vine_mount *m)
 	if (!m)
 		return;
 	vine_file_delete(m->file);
+	if (m->substitute) {
+		vine_file_delete(m->substitute);
+	}
 	free(m->remote_name);
 	free(m);
 	vine_counters.mount.deleted++;

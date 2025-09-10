@@ -55,7 +55,7 @@ $(LINT_PACKAGES): config.mk
 	@$(MAKE) -C $(@:lint-%=%) lint
 lint: $(LINT_PACKAGES)
 
-PACKAGES_TO_FORMAT = taskvine resource_monitor batch_job dttools
+PACKAGES_TO_FORMAT = taskvine resource_monitor batch_job dttools devel/pledge
 FORMAT_PACKAGES = $(PACKAGES_TO_FORMAT:%=format-%)
 $(FORMAT_PACKAGES): config.mk
 	@$(MAKE) -C $(@:format-%=%) format

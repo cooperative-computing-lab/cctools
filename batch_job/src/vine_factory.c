@@ -117,6 +117,9 @@ static char *worker_command = 0;
 /* Unique number assigned to each worker instance for troubleshooting. */
 static int worker_instance = 0;
 
+/* Space-separated string listing the hostnames of workers not to be used. */
+static char *workers_blocked = 0;
+
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
 
@@ -147,6 +150,10 @@ static int single_shot = 0;
 
 // A pretend port number to unqiuely identify the factory in catalog updates.
 static int pretend_port = 0;
+
+// When killing a worker, how long to wait between sending SIGQUIT and SIGKILL
+static int worker_kill_timeout = 30;
+
 
 /*
 In a signal handler, only a limited number of functions are safe to
@@ -540,41 +547,59 @@ static int submit_worker( struct batch_queue *queue )
 	return status;
 }
 
-static void update_blocked_hosts( struct batch_queue *queue, struct list *managers_list ) {
+/*
+Generate a list of blocked workers, from two different sources:
+1 - The published info from the manager.
+2 - The workers_blocked propery of the factory.
+Put it into the form "host1 host2 host3 ..," and pass it to the batch queue as the workers-blocked property.
+*/
 
-	if(!managers_list || list_size(managers_list) < 1)
-		return;
-
+static void update_blocked_hosts( struct batch_queue *queue, struct list *managers_list )
+{
 	buffer_t b;
-	struct jx *j;
-
 	buffer_init(&b);
 
+	/* The separator is initially nothing, then converted to space after first item. */
 	const char *sep = "";
-	list_first_item(managers_list);
-	while((j=list_next_item(managers_list))) {
-		struct jx *blocked = jx_lookup(j,"workers_blocked");
 
-		if(!blocked) {
-			continue;
-		}
+	/* Iterate over all managers and extract the workers_blocked property. */
 
-		if(jx_istype(blocked, JX_STRING)) {
-			buffer_printf(&b, "%s%s", sep, blocked->u.string_value);
-			sep = " ";
-		}
+	if(managers_list) {
+		struct jx *j;
+		list_first_item(managers_list);
+		while((j=list_next_item(managers_list))) {
 
-		if(jx_istype(blocked, JX_ARRAY)) {
-			struct jx *item;
-			for (void *i = NULL; (item = jx_iterate_array(blocked, &i));) {
-				if(jx_istype(item, JX_STRING)) {
-					buffer_printf(&b, "%s%s", sep, item->u.string_value);
-					sep = " ";
+			/* Skip if no workers_blocked property */
+			struct jx *blocked = jx_lookup(j,"workers_blocked");
+			if(!blocked) {
+				continue;
+			}
+
+			/* If a single host, add that. */
+			if(jx_istype(blocked, JX_STRING)) {
+				buffer_printf(&b, "%s%s", sep, blocked->u.string_value);
+				sep = " ";
+			}
+
+			/* If an array, add each string item in the array. */
+			if(jx_istype(blocked, JX_ARRAY)) {
+				struct jx *item;
+				for (void *i = NULL; (item = jx_iterate_array(blocked, &i));) {
+					if(jx_istype(item, JX_STRING)) {
+						buffer_printf(&b, "%s%s", sep, item->u.string_value);
+						sep = " ";
+					}
 				}
 			}
 		}
 	}
 
+	/* Add on the workers_blocked property from the config file */
+	if(workers_blocked) {
+		buffer_printf(&b,"%s%s",sep,workers_blocked);
+	}
+
+	/* Now publish the list (if any contents) or null it out. */
 	if(buffer_pos(&b) > 0) {
 		batch_queue_set_option(queue, "workers-blocked", buffer_tostring(&b));
 	} else {
@@ -599,20 +624,54 @@ static int submit_workers( struct batch_queue *queue, struct itable *job_table, 
 	return i;
 }
 
-void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
+void wait_all_workers( struct batch_queue *queue, struct itable *job_table, time_t stoptime)
+{
+	debug(D_VINE,"waiting for workers to exit...");
+	while(itable_size(job_table)) {
+		struct batch_job_info info;
+		uint64_t jobid = batch_queue_wait_timeout(queue,&info,stoptime);
+		if(jobid>0) {
+			debug(D_VINE,"worker job %"PRId64" completed",jobid);
+			itable_remove(job_table,jobid);
+		} else if(jobid<=0) {
+			/* indicates no more jobs or time expired. */
+			break;
+		}
+	}
+}
+
+void remove_all_workers( struct batch_queue *queue, struct itable *job_table, batch_queue_remove_mode_t mode )
 {
 	uint64_t jobid;
 	void *value;
 
-	debug(D_VINE,"removing all remaining worker jobs...");
-	int count = itable_size(job_table);
+	debug(D_VINE,"removing all workers...");
+
 	itable_firstkey(job_table);
 	while(itable_nextkey(job_table,&jobid,&value)) {
-		debug(D_VINE,"removing job %"PRId64,jobid);
-		batch_queue_remove(queue,jobid);
+		debug(D_VINE,"removing worker job %"PRId64,jobid);
+		batch_queue_remove(queue,jobid,mode);
 	}
-	debug(D_VINE,"%d workers removed.",count);
+}
 
+void remove_and_wait_all_workers( struct batch_queue *queue, struct itable *job_table )
+{
+	remove_all_workers(queue,job_table,BATCH_QUEUE_REMOVE_MODE_FRIENDLY);
+
+	/*
+	For non-local batch queues, we skip this be because our ability to
+	wait on removed jobs is unreliable.  For local jobs, we follow up
+	the friendly remove after 30s with an unfriendly kill every 5s,
+	and we wait for children to exit to ensure cleanup is complete.
+	*/
+
+	if(batch_queue_get_type(queue)==BATCH_QUEUE_TYPE_LOCAL) {
+		wait_all_workers(queue,job_table,time(0)+worker_kill_timeout);
+		while(itable_size(job_table)) {
+			remove_all_workers(queue,job_table,BATCH_QUEUE_REMOVE_MODE_KILL);
+			wait_all_workers(queue,job_table,time(0)+5);
+		}
+	}
 }
 
 void print_stats(struct jx *j) {
@@ -830,6 +889,8 @@ int read_config_file(const char *config_file) {
 
 	assign_new_value(new_condor_requirements, condor_requirements, condor-requirements, const char *, JX_STRING, string_value)
 
+	assign_new_value(new_workers_blocked, workers_blocked, workers-blocked, const char *, JX_STRING, string_value )
+
 	if(!manager_host) {
 		if(!new_project_regex) {
 			// if manager-name not given, try with the old master-name
@@ -910,6 +971,11 @@ int read_config_file(const char *config_file) {
 		factory_name = xxstrdup(new_factory_name);
 	}
 
+	if(workers_blocked != new_workers_blocked) {
+		free(workers_blocked);
+		workers_blocked = xxstrdup(new_workers_blocked);
+	}
+
 	last_time_modified = new_time_modified;
 	fprintf(stdout, "Configuration file '%s' has been loaded.", config_file);
 
@@ -951,6 +1017,10 @@ int read_config_file(const char *config_file) {
 
 	if(extra_worker_args) {
 		fprintf(stdout, "worker-extra-options: %s", extra_worker_args);
+	}
+
+	if(workers_blocked) {
+		fprintf(stdout, "workers-blocked: %s", workers_blocked);
 	}
 
 	fprintf(stdout, "\n");
@@ -1144,7 +1214,7 @@ static void mainloop( struct batch_queue *queue )
 	}
 
 	printf("removing %d workers...\n",itable_size(job_table));
-	remove_all_workers(queue,job_table);
+	remove_and_wait_all_workers(queue,job_table);
 	printf("all workers removed.\n");
 	itable_delete(job_table);
 }

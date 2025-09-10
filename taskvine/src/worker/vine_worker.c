@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "vine_cache.h"
+#include "vine_cache_file.h"
 #include "vine_catalog.h"
 #include "vine_file.h"
 #include "vine_gpus.h"
@@ -495,8 +496,7 @@ Send an asynchronmous message to the manager indicating that an item was success
 its size in bytes and transfer time in usec.
 */
 
-void vine_worker_send_cache_update(struct link *manager, const char *cachename, vine_file_type_t type, vine_cache_level_t cache_level, int64_t size, time_t mtime,
-		timestamp_t transfer_time, timestamp_t transfer_start)
+void vine_worker_send_cache_update(struct link *manager, const char *cachename, struct vine_cache_file *f)
 {
 	char *transfer_id = hash_table_remove(current_transfers, cachename);
 	if (!transfer_id) {
@@ -506,12 +506,12 @@ void vine_worker_send_cache_update(struct link *manager, const char *cachename, 
 	send_async_message(manager,
 			"cache-update %s %d %d %lld %lld %lld %lld %s\n",
 			cachename,
-			type,
-			cache_level,
-			(long long)size,
-			(long long)mtime,
-			(long long)transfer_time,
-			(long long)transfer_start,
+			f->original_type,
+			f->cache_level,
+			(long long)f->size,
+			(long long)f->mtime,
+			(long long)f->transfer_time,
+			(long long)f->start_time,
 			transfer_id);
 
 	free(transfer_id);
@@ -986,7 +986,7 @@ static int do_put(struct link *manager, const char *cachename, vine_cache_level_
 	/* XXX actual_size should equal expected size, but only for a simple file, not a dir. */
 
 	if (r) {
-		vine_cache_add_file(cache_manager, cachename, transfer_path, cache_level, mode, actual_size, mtime, stop - start);
+		vine_cache_add_file(cache_manager, cachename, transfer_path, cache_level, mode, actual_size, mtime, start, stop - start, manager);
 	} else {
 		trash_file(transfer_path);
 	}
@@ -1713,7 +1713,7 @@ static void vine_worker_serve_manager(struct link *manager)
 		expire_procs_running();
 
 		ok &= handle_completed_tasks(manager);
-		ok &= vine_cache_wait(cache_manager, manager);
+		ok &= vine_cache_check_files(cache_manager, manager);
 
 		measure_worker_resources();
 
@@ -1737,8 +1737,8 @@ static void vine_worker_serve_manager(struct link *manager)
 			break;
 		}
 
-		/* Periodically process pending transfers. */
-		vine_cache_process_pending_transfers(cache_manager);
+		/* Periodically start some pending transfers. */
+		vine_cache_start_transfers(cache_manager);
 
 		/* Check all known libraries if they are ready to execute functions. */
 		check_libraries_ready(manager);
