@@ -13,7 +13,6 @@
 #include <getopt.h>
 
 #include "list_util.h"
-#include "util.h"
 
 #include "libenforcer.h"
 
@@ -348,7 +347,7 @@ void tracer(int argc,
 	prog[0] = "strace";
 	prog[1] = "-f";
 	prog[2] = "-y";
-	prog[3] = "--trace=file,read,write,mmap";
+	prog[3] = "--trace=file,read,write,mmap,getdents64";
 
 	// TODO: For this log name stuff we need something to catch long names
 	// and just assign a default name thats seeded by time or sumn
@@ -463,45 +462,23 @@ void tracer(int argc,
 		while (getline(&strace_line, &str_siz, strace_raw) != -1) {
 			paths_from_strace_line(paths, strace_line);
 			// SECTION: openat
-			// uhhhh what if the read command has an execve
-			// O_RDONLY O_WRONLY O_RDWR
-			// Reading the openat syscall man page andddd
-			// we need to literally ignore the first argument,
-			// because if the path given in 2nd parameter is relative
-			// then it is used but the second path we parse is the actual file
-			// if the 2nd parameter is absolute, first parameter is
-			// ignored and at the end of the day:
-			// the second path we parse is the actual file!!!!
+			// We give opencalls a metadata flag
 			if (strstr(strace_line, "openat(") != NULL) {
 				if (strstr(strace_line, "O_CREAT") != NULL)
 					temp_access_fl |= CREATE_ACCESS;
-				if (strstr(strace_line, "O_RDONLY") != NULL)
-					temp_access_fl |= READ_ACCESS;
-				if (strstr(strace_line, "O_WRONLY") != NULL)
-					temp_access_fl |= WRITE_ACCESS;
-				if (strstr(strace_line, "O_RDWR") != NULL)
-					temp_access_fl |= (READ_ACCESS | WRITE_ACCESS);
+				if (strstr(strace_line, "ENOENT") != NULL)
+					temp_access_fl |= ERROR_ACCESS;
 
-				if (temp_access_fl) {
-					insert_paths_to_contract(&root, paths, temp_access_fl, false);
-				}
+				insert_paths_to_contract(&root, paths, temp_access_fl | METADATA_ACCESS, false);
 				temp_access_fl = 0x0;
 			}
 			// SECTION: Stat
-			// We are going to treat stat as a read operation,
-			// but stat wil probably eventually become a unique operation
-			// im thinking something that can be upgraded so
-			// say a path is marked with permission S (stat)
-			// and when we are enforcing, if there tries to be an operation on
-			// that path then we can upgrade said operation from stat to the
-			// new operation but there have to be restrictions, a write
-			// operation is more aggresive than a read
+			// This is a metadata operation now
 			else if (strstr(strace_line, "newfstatat(") != NULL) {
-				insert_paths_to_contract(&root, paths, STAT_ACCESS, false);
+				insert_paths_to_contract(&root, paths, METADATA_ACCESS, false);
 			}
-			// SECTION: read
-			// The syscall itself tells u the operation lol
-			// probably going to separate them
+			// SECTION: read & write
+			// The syscall itself tells you the operation
 			else if (strstr(strace_line, "read(") != NULL) {
 				insert_paths_to_contract(&root, paths, READ_ACCESS, true);
 			} else if (strstr(strace_line, "write(") != NULL) {
@@ -511,11 +488,8 @@ void tracer(int argc,
 			// execve at the bottom because what if text containing
 			// execve is a parameter of one of the functions (like read)
 			else if (strstr(strace_line, "execve(") != NULL) {
-				// XXX: Is there any reason we should care if it's a
-				// subprocess aside from the fact that we can find out if the
-				// user is calling more programs What about subprocess of
-				// subprocesses? Should we represent that too? elif "strace:
-				// Process" in line:
+				// XXX: Subprocesses are very important, not only for DAG
+				// but also because some calls are labeled unfinished
 
 				// execve is special in that we only really care about the first path
 				// so we will go directly to the source here
@@ -526,11 +500,6 @@ void tracer(int argc,
 				}
 			}
 			// SECTION: mmap
-			// PROT_READ
-			// PROT_WRITE
-			// but heres question, if the file is MAP_PRIVATE,
-			// do we want to care about it or no?
-			// im guessing somewhere in between
 			// THINK: Should MAP_PRIVATE be handled a certain way?
 			else if (strstr(strace_line, "mmap(") != NULL) {
 				if (strstr(strace_line, "PROT_READ|PROT_WRITE") != NULL)
@@ -551,6 +520,12 @@ void tracer(int argc,
 			// does write something to the disk kinda ish
 			else if (strstr(strace_line, "unlinkat(") != NULL) {
 				insert_paths_to_contract(&root, paths, DELETE_ACCESS | WRITE_ACCESS, true);
+			}
+			// SECTION: getdents
+			// Get directory entries
+			// aka we looking at the entries in a directory
+			else if (strstr(strace_line, "getdents64(")) {
+				insert_paths_to_contract(&root, paths, LIST_ACCESS, true);
 			}
 			memset(paths, 0, sizeof(struct path_bundle));
 		}

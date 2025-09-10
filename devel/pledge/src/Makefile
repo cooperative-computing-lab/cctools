@@ -8,11 +8,11 @@ TARGETS = $(LIBRARIES) $(PROGRAMS)
 
 EXTERNAL_DEPENDENCIES = $(CCTOOLS_HOME)/dttools/src/libdttools.a
 
-SOURCES = pledge.c list_util.c util.c enforcer.c
-COMMON_SRCS = list_util.c util.c
+SOURCES = pledge.c list_util.c enforcer.c
+COMMON_SRCS = list_util.c
 
 OBJECTS = list_util.o util.o pledge.o enforcer.o
-OBJECTS_PLEDGE = list_util.o util.o pledge.o
+OBJECTS_PLEDGE = list_util.o pledge.o
 
 # If we want to color output while enforcing
 # DEFS = -DCOLOR_ENFORCING
