@@ -15,8 +15,8 @@ See the file COPYING for details.
 #include "debug.h"
 #include "process.h"
 #include "macros.h"
-#include "stringtools.h"
 #include "path.h"
+#include "stringtools.h"
 #include "xxmalloc.h"
 
 static batch_queue_id_t batch_queue_dryrun_submit(struct batch_queue *q, struct batch_job *bt)
@@ -84,7 +84,7 @@ static batch_queue_id_t batch_queue_dryrun_wait(struct batch_queue *q, struct ba
 	}
 }
 
-static int batch_queue_dryrun_remove(struct batch_queue *q, batch_queue_id_t jobid)
+static int batch_queue_dryrun_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode)
 {
 	return 0;
 }
