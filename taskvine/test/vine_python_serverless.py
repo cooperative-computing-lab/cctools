@@ -188,7 +188,7 @@ def main():
     with_context_direct_expected = (tasks * (divide(2, 2**2) + double(3) + cube(4) + base_val * 3))
     with_context_fork_expected = (tasks * (divide(2, 2**2) + double(3) + cube(4) + base_val * 3))
     special_fns_expected = (tasks * (lambda_fn(1) + dyn_fn(1)))
-    with_context_from_file_expected = (1 + 2 + 3) # 1 and 2 from the context loaded from file '/tmp/test-context-from-file.input', and 3 from the function call
+    with_context_from_file_expected = (1 + 2 + 3) # 1 and 2 from the context loaded from the library input file, and 3 from the function call
     expected = no_context_direct_expected + no_context_fork_expected + with_context_direct_expected + with_context_fork_expected + special_fns_expected + with_context_from_file_expected
 
     print(f"Total:    {total_sum}")
