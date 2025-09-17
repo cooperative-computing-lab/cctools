@@ -49,6 +49,17 @@ def func_copy_input_to_output(input_filename, output_filename):
         f.write(contents)
     return 0
 
+def func_load_partial_data_from_file(filename):
+    with open(filename, 'r') as f:
+        contents = f.read()
+    contents = contents.strip()
+    partial_value = sum([int(x) for x in contents.split(' ')])
+    return {'partial_value': partial_value}
+
+def compute_final_value(value):
+    partial_value = load_variable_from_library('partial_value')
+    return partial_value + value
+
 def main():
     parser = argparse.ArgumentParser("Test for taskvine python bindings.")
     parser.add_argument("port_file", help="File to write the port the queue is using.")
@@ -88,6 +99,14 @@ def main():
     # this is to test the input/output staging of function calls
     libtask_with_io_fn = q.create_library_from_functions('test-library-with-io-fn', func_copy_input_to_output, add_env=False, exec_mode='fork')
 
+    # define a function that loads partial data from a file in the library.
+    # this is to test the context loading of the library.
+    test_filename_for_libtask_with_context_from_file = os.path.basename(__file__) + '.context.libtask.input'
+    with open(test_filename_for_libtask_with_context_from_file, 'w') as f:
+        print('1 2', file=f)
+    libtask_with_context_from_file = q.create_library_from_functions('test-library-with-context-from-file', compute_final_value, add_env=False, exec_mode='fork', library_context_info=[func_load_partial_data_from_file, [test_filename_for_libtask_with_context_from_file], {}])
+    taskvine_file_for_libtask_with_context_from_file = q.declare_file(test_filename_for_libtask_with_context_from_file)
+    libtask_with_context_from_file.add_input(taskvine_file_for_libtask_with_context_from_file, test_filename_for_libtask_with_context_from_file)
     # Just take default resources for the library, this will cause it to fill the whole worker. 
     # And the number of functions slots will match the number of cores available.
 
@@ -97,12 +116,14 @@ def main():
     q.install_library(libtask_with_context_fork)
     q.install_library(libtask_with_special_fns)
     q.install_library(libtask_with_io_fn)
+    q.install_library(libtask_with_context_from_file)
     lib_task_names = ['test-library-no-context-direct',
                       'test-library-no-context-fork',
                       'test-library-with-context-direct',
                       'test-library-with-context-fork',
                       'test-library-with-special-fns',
-                      'test-library-with-io-fn']
+                      'test-library-with-io-fn',
+                      'test-library-with-context-from-file']
     print("Submitting function call tasks...")
     
     tasks = 100
@@ -128,6 +149,12 @@ def main():
                 output_file = q.declare_file(output_filename)
                 s_task.add_input(input_file, input_filename)
                 s_task.add_output(output_file, output_filename)
+                q.submit(s_task)
+
+                # do this test once only
+                break
+            elif lib_name == 'test-library-with-context-from-file':
+                s_task = vine.FunctionCall(lib_name, 'compute_final_value', 3)
                 q.submit(s_task)
 
                 # do this test once only
@@ -161,7 +188,8 @@ def main():
     with_context_direct_expected = (tasks * (divide(2, 2**2) + double(3) + cube(4) + base_val * 3))
     with_context_fork_expected = (tasks * (divide(2, 2**2) + double(3) + cube(4) + base_val * 3))
     special_fns_expected = (tasks * (lambda_fn(1) + dyn_fn(1)))
-    expected = no_context_direct_expected + no_context_fork_expected + with_context_direct_expected + with_context_fork_expected + special_fns_expected
+    with_context_from_file_expected = (1 + 2 + 3) # 1 and 2 from the context loaded from file '/tmp/test-context-from-file.input', and 3 from the function call
+    expected = no_context_direct_expected + no_context_fork_expected + with_context_direct_expected + with_context_fork_expected + special_fns_expected + with_context_from_file_expected
 
     print(f"Total:    {total_sum}")
     print(f"Expected: {expected}")
