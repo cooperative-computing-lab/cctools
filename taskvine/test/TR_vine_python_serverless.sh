@@ -14,6 +14,7 @@ PORT_FILE=vine.port
 PYTHON_SCRIPT=vine_python_serverless.py
 TEST_INPUT_FILE=${PYTHON_SCRIPT}.input
 TEST_OUTPUT_FILE=${PYTHON_SCRIPT}.output
+TEST_CONTEXT_INPUT_FILE=${PYTHON_SCRIPT}.context.libtask.input
 
 check_needed()
 {
@@ -36,8 +37,9 @@ prepare()
 {
 	rm -f $STATUS_FILE
 	rm -f $PORT_FILE
-        rm -f $TEST_INPUT_FILE
-        rm -f $TEST_OUTPUT_FILE
+    rm -f $TEST_INPUT_FILE
+    rm -f $TEST_OUTPUT_FILE
+    rm -f $TEST_CONTEXT_INPUT_FILE
 	return 0
 }
 
@@ -82,10 +84,11 @@ clean()
 {
 	rm -f $STATUS_FILE
 	rm -f $PORT_FILE
-        rm -f $TEST_INPUT_FILE
-        rm -f $TEST_OUTPUT_FILE
+    rm -f $TEST_INPUT_FILE
+    rm -f $TEST_OUTPUT_FILE
+	rm -f $TEST_CONTEXT_INPUT_FILE
 	rm -rf vine-run-info
-        rm worker.log
+    rm worker.log
 	exit 0
 }
 
