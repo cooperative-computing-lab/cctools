@@ -173,8 +173,8 @@ vine_task_func_exec_mode_t vine_task_func_exec_mode_from_string(const char *exec
 
 /** Attach an input or outputs to tasks without declaring files to manager.
  * Only really useful at the worker where tasks are created without a manager. */
-int vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags);
-int vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags);
+int vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags, vine_file_type_t original_type);
+int vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags, vine_file_type_t original_type);
 int vine_task_add_input_url(struct vine_task *t, const char *url, const char *remote_name, vine_mount_flags_t flags);
 int vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_mount_flags_t flags);
 int vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_mount_flags_t flags);
