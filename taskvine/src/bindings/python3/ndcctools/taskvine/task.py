@@ -15,7 +15,6 @@ from .utils import get_c_constant
 
 import copy
 import os
-import sys
 import textwrap
 import uuid
 import cloudpickle
