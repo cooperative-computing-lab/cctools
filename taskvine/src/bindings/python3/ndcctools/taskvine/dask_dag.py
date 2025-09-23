@@ -186,7 +186,7 @@ class DaskVineDag:
                 self._depth_of[task.key] = 0
                 self.set_result(task.key, task.value)
 
-        # Then initializa pwnding consumers if pruning is enabled
+        # Then initialize pending consumers if pruning is enabled
         if self.prune_depth > 0:
             self._initialize_pending_consumers()
             self._initialize_pending_producers()
