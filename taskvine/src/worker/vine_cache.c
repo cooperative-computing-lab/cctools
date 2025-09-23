@@ -950,7 +950,7 @@ int vine_cache_check_files(struct vine_cache *c, struct link *manager)
 			vine_cache_remove(c, cachename, manager);
 		}
 
-		/* Note that f may not longer be valid at this point */
+		/* Note that f may no longer be valid at this point */
 	}
 	return 1;
 }

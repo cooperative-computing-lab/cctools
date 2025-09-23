@@ -993,6 +993,7 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 			/* evict this worker */
 			debug(D_VINE | D_NOTICE, "Intentionally evicting worker %s", w->hostname);
 			release_worker(q, w);
+			break;
 		}
 	}
 	list_delete(candidates_list);

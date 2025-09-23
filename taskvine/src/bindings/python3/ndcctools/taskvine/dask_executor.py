@@ -115,7 +115,7 @@ class DaskVine(Manager):
     # @param env_per_task  if true, each task individually expands its own environment. Must use environment option as a str.
     # @param progress_disable If True, disable progress bar
     # @param progress_label Label to use in progress bar
-    # @param reconstruct   Reconstrut graph based on annotated functions.
+    # @param reconstruct   Reconstruct graph based on annotated functions.
     # @param merge_size    When reconstructing a merge function, merge this many at a time
     # @param wrapper       Function to wrap dask calls. It should take as arguments (key, fn, *args). It should execute
     #                      fn(*args) at some point during its execution to produce the dask task result.
