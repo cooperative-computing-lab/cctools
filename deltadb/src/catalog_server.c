@@ -139,6 +139,21 @@ static char data[1024*1024];
 struct datagram *update_dgram = 0;
 struct link *update_port = 0;
 
+/*
+Shutdown *without* performing cleanup, so as to avoid (surprisingly common)
+deadlocks when a SIGALRM is received while in the middle of SSL negotiation.
+*/
+
+void shutdown_fast(int sig)
+{
+	_exit(0);
+}
+
+/*
+Shutdown normally, calling destructors, atexit, and so forth when a manual
+shutdown signal is received.
+*/
+
 void shutdown_clean(int sig)
 {
 	exit(0);
@@ -417,9 +432,6 @@ static struct jx_table html_headers[] = {
 	{"name", "NAME", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 0},
 	{"port", "PORT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 0},
 	{"owner", "OWNER", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 0},
-	{"total", "TOTAL", JX_TABLE_MODE_METRIC, JX_TABLE_ALIGN_RIGHT, 0},
-	{"avail", "AVAIL", JX_TABLE_MODE_METRIC, JX_TABLE_ALIGN_RIGHT, 0},
-	{"load5", "LOAD5", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 0},
 	{"version", "VERSION", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 0},
 	{0,0,0,0,0}
 };
@@ -945,7 +957,7 @@ int main(int argc, char *argv[])
 	install_handler(SIGINT, shutdown_clean);
 	install_handler(SIGTERM, shutdown_clean);
 	install_handler(SIGQUIT, shutdown_clean);
-	install_handler(SIGALRM, shutdown_clean);
+	install_handler(SIGALRM, shutdown_fast);
 
 	if(!preferred_hostname) {
 		domain_name_cache_guess(hostname);

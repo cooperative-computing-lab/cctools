@@ -195,7 +195,7 @@ void *priority_queue_peek_top(struct priority_queue *pq)
 double priority_queue_get_priority_at(struct priority_queue *pq, int idx)
 {
 	if (!pq || pq->size < 1 || idx < 0 || idx > pq->size - 1) {
-		return NAN;
+		return 0;
 	}
 
 	return pq->elements[idx]->priority;
@@ -204,7 +204,7 @@ double priority_queue_get_priority_at(struct priority_queue *pq, int idx)
 double priority_queue_get_top_priority(struct priority_queue *pq)
 {
 	if (!pq || pq->size < 1) {
-		return NAN;
+		return 0;
 	}
 
 	return pq->elements[0]->priority;

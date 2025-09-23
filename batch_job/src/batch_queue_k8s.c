@@ -349,7 +349,7 @@ static batch_queue_id_t batch_queue_k8s_submit(struct batch_queue *q, struct bat
 	return jobid;
 }
 
-static int batch_queue_k8s_remove(struct batch_queue *q, batch_queue_id_t jobid)
+static int batch_queue_k8s_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode)
 {
 
 	pid_t pid = fork();
@@ -408,7 +408,7 @@ static void batch_queue_k8s_handle_complete_task(char *pod_id, int job_id,
 	free(info);
 
 	list_remove(running_pod_lst, pod_id);
-	batch_queue_k8s_remove(q, job_id);
+	batch_queue_k8s_remove(q, job_id, BATCH_QUEUE_REMOVE_MODE_FRIENDLY);
 
 	if (curr_k8s_job_info->is_running == 0) {
 		process_wait(timeout);
@@ -694,6 +694,7 @@ static int batch_queue_k8s_free(struct batch_queue *q)
 
 batch_queue_stub_port(k8s);
 batch_queue_stub_option_update(k8s);
+batch_queue_stub_prune(k8s);
 
 const struct batch_queue_module batch_queue_k8s = {
 		BATCH_QUEUE_TYPE_K8S,
@@ -707,6 +708,7 @@ const struct batch_queue_module batch_queue_k8s = {
 		batch_queue_k8s_submit,
 		batch_queue_k8s_wait,
 		batch_queue_k8s_remove,
+		batch_queue_k8s_prune,
 };
 
 /* vim: set noexpandtab tabstop=8: */

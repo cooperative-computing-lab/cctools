@@ -84,10 +84,16 @@ typedef enum {
 	BATCH_QUEUE_TYPE_UNKNOWN = -1         /**< An invalid batch queue type. */
 } batch_queue_type_t;
 
+/** Indicates how aggressively to remove a batch job. */
+typedef enum {
+	BATCH_QUEUE_REMOVE_MODE_FRIENDLY,     /**< Remove a batch job with a friendly signal that allows it to clean up. */
+	BATCH_QUEUE_REMOVE_MODE_KILL,	      /**< Remove a batch job by sending a kill signal that terminates quickly. */
+} batch_queue_remove_mode_t;
+
 /** Create a new batch queue.
 @param type The type of the queue.
 @param ssl_key_file The location of the queue manager's ssl key file, if it has one.
-@param ssl_key_file The location of the queue manager's ssl certiciate file, if it has one.
+@param ssl_cert_file The location of the queue manager's ssl certiciate file, if it has one.
 @return A new batch queue object on success, null on failure.
 */
 struct batch_queue *batch_queue_create(batch_queue_type_t type, const char *ssl_key_file, const char *ssl_cert_file );
@@ -95,7 +101,6 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type, const char *ssl_
 /** Submit a batch job.
 @param q The queue to submit to.
 @param task The job description to submit.
-@param resources The computational resources needed by the job.
 @return On success, returns a positive unique identifier for the batch job.  On failure, returns a negative number.
 Zero is not a valid batch job id and indicates an internal failure.
 */
@@ -134,7 +139,17 @@ You must still call @ref batch_queue_wait to wait for the removal to complete.
 @param jobid The job to be removed.
 @return Greater than zero if the job exists and was removed, zero otherwise.
 */
-int batch_queue_remove(struct batch_queue *q, batch_queue_id_t jobid);
+int batch_queue_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode );
+
+/** Remove in-cluster cached data associated with filename.
+This call may be used to indicate that cached data associated with the given
+filename will no longer be used in the future, and may be freed.
+@param q The queue to prune from.
+@param filename The name of the file to be pruned.
+@return Greater than zero if the file exists and was pruned, zero otherwise.
+*/
+
+int batch_queue_prune(struct batch_queue *q, const char *filename );
 
 /** Converts a string into a batch queue type.
 @param str A string listing all of the known batch queue types (which changes over time.)

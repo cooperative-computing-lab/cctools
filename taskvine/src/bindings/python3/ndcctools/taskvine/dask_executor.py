@@ -35,6 +35,13 @@ try:
 except ImportError:
     rich = None
 
+
+def daskvine_merge(func):
+    def flex_merge(*args, **kwargs):
+        result = func(*args, **kwargs)
+        return result
+    return flex_merge
+
 ##
 # @class ndcctools.taskvine.dask_executor.DaskVine
 #
@@ -108,11 +115,13 @@ class DaskVine(Manager):
     # @param env_per_task  if true, each task individually expands its own environment. Must use environment option as a str.
     # @param progress_disable If True, disable progress bar
     # @param progress_label Label to use in progress bar
+    # @param reconstruct   Reconstruct graph based on annotated functions.
+    # @param merge_size    When reconstructing a merge function, merge this many at a time
     # @param wrapper       Function to wrap dask calls. It should take as arguments (key, fn, *args). It should execute
     #                      fn(*args) at some point during its execution to produce the dask task result.
     #                      Should return a tuple of (wrapper result, dask call result). Use for debugging.
     # @param wrapper_proc  Function to process results from wrapper on completion. (default is print)
-    # @param prune_files If True, remove files from the cluster after they are no longer needed.
+    # @param prune_depth Control pruning behavior: 0 (default) - no pruning, 1 - only check direct consumers, 2+ - check consumers up to specified depth
     def get(self, dsk, keys, *,
             environment=None,
             extra_files=None,
@@ -133,10 +142,12 @@ class DaskVine(Manager):
             scheduling_mode='FIFO',
             env_per_task=False,
             progress_disable=False,
+            reconstruct=False,
+            merge_size=2,
             progress_label="[green]tasks",
             wrapper=None,
             wrapper_proc=print,
-            prune_files=False,
+            prune_depth=0,
             hoisting_modules=None,  # Deprecated, use lib_modules
             import_modules=None,    # Deprecated, use lib_modules
             lazy_transfers=True,    # Deprecated, use worker_tranfers
@@ -177,11 +188,13 @@ class DaskVine(Manager):
             self.task_mode = task_mode
             self.scheduling_mode = scheduling_mode
             self.env_per_task = env_per_task
+            self.reconstruct = reconstruct
+            self.merge_size = merge_size
             self.progress_disable = progress_disable
             self.progress_label = progress_label
             self.wrapper = wrapper
             self.wrapper_proc = wrapper_proc
-            self.prune_files = prune_files
+            self.prune_depth = prune_depth
             self.category_info = defaultdict(lambda: {"num_tasks": 0, "total_execution_time": 0})
             self.max_priority = float('inf')
             self.min_priority = float('-inf')
@@ -219,7 +232,8 @@ class DaskVine(Manager):
         indices = {k: inds for (k, inds) in find_dask_keys(keys)}
         keys_flatten = indices.keys()
 
-        dag = DaskVineDag(dsk)
+        dag = DaskVineDag(dsk, reconstruct=self.reconstruct, merge_size=self.merge_size, prune_depth=self.prune_depth)
+
         tag = f"dag-{id(dag)}"
 
         # create Library if using 'function-calls' task mode.
@@ -260,13 +274,15 @@ class DaskVine(Manager):
 
             self.install_library(libtask)
 
+        if self.reconstruct:
+            keys_flatten = dag.replace_targets(keys_flatten)
+
         enqueued_calls = []
         rs = dag.set_targets(keys_flatten)
         self._enqueue_dask_calls(dag, tag, rs, self.retries, enqueued_calls)
 
         timeout = 5
         pending = 0
-
         (bar_progress, bar_update) = self._make_progress_bar(dag.left_to_compute())
         with bar_progress:
             while not self.empty() or enqueued_calls:
@@ -277,7 +293,8 @@ class DaskVine(Manager):
                     and (not self.max_pending or pending < self.max_pending)
                     and self.hungry()
                 ):
-                    self.submit(enqueued_calls.pop())
+                    t = enqueued_calls.pop()
+                    self.submit(t)
                     submitted += 1
                     pending += 1
 
@@ -301,8 +318,13 @@ class DaskVine(Manager):
                         if t.key in dsk:
                             bar_update(advance=1)
 
-                        if self.prune_files:
-                            self._prune_file(dag, t.key)
+                        if self.prune_depth > 0:
+                            for p in dag.pending_producers[t.key]:
+                                dag.pending_consumers[p] -= 1
+                                if dag.pending_consumers[p] == 0:
+                                    p_result = dag.get_result(p)
+                                    self.prune_file(p_result._file)
+
                     else:
                         retries_left = t.decrement_retry()
                         print(f"task id {t.id} key {t.key} failed: {t.result}. {retries_left} attempts left.\n{t.std_output}")

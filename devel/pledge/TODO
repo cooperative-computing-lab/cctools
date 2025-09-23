@@ -1,0 +1,6 @@
+* Enforcer should allow paths that have a Stat permission lead to other calls without issues
+* We need to trace failed calls (we should start with ENOENT)
+* Dependency graph of our own?
+* mprotect
+* pipes and unfinished
+* enforce()'ing needs a check up

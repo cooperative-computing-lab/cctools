@@ -258,7 +258,7 @@ static batch_queue_id_t batch_queue_flux_wait(struct batch_queue *q, struct batc
 	return batch_queue_flux_wait_jobid(q, info_out, stoptime, 0);
 }
 
-static int batch_queue_flux_remove(struct batch_queue *q, batch_queue_id_t jobid)
+static int batch_queue_flux_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode)
 {
 	struct flux_job_info *info = itable_lookup(batch_queue_jobid_info_table, jobid);
 	if (!info) {
@@ -360,6 +360,7 @@ static int batch_queue_flux_free(struct batch_queue *q)
 
 batch_queue_stub_port(flux);
 batch_queue_stub_option_update(flux);
+batch_queue_stub_prune(flux);
 
 const struct batch_queue_module batch_queue_flux = {
 		BATCH_QUEUE_TYPE_FLUX,
@@ -373,6 +374,7 @@ const struct batch_queue_module batch_queue_flux = {
 		batch_queue_flux_submit,
 		batch_queue_flux_wait,
 		batch_queue_flux_remove,
+		batch_queue_flux_prune,
 };
 
 /* vim: set noexpandtab tabstop=8: */

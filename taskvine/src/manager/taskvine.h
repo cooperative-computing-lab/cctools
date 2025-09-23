@@ -361,7 +361,7 @@ the result VINE_RESULT_FORSAKEN.
 @param max_retries The number of retries.
 */
 
-void vine_task_set_max_forsaken(struct vine_task *t, int64_t max_forsaken);
+void vine_task_set_max_forsaken(struct vine_task *t, int64_t max_retries);
 
 /** Specify the amount of disk space required by a task.
 @param t A task object.
@@ -707,7 +707,6 @@ int vine_task_add_environment(struct vine_task *t, struct vine_file *f);
 Typically used to examine an output buffer returned from a file.
 Note that the vfile contents may not be available unless @ref vine_fetch_file
 has previously been called on this object.
-@param m A manager object
 @param f A file object created by @ref vine_declare_buffer.
 @return A constant pointer to the buffer contents, or null if not available.
 */
@@ -773,7 +772,7 @@ struct vine_file *vine_declare_url(
 @param proxy A proxy file object (e.g. from @ref vine_declare_file) of a X509 proxy to use. If NULL, the
 environment variable X509_USER_PROXY and the file "$TMPDIR/$UID" are considered
 in that order. If no proxy is present, the transfer is tried without authentication.
-@param env    If not NULL, an environment file (e.g poncho or starch, see @ref vine_task_add_environment) that contains
+@param env    If not NULL, an environment file (e.g poncho or starch, see @ref vine_task_add_execution_context) that contains
 the xrootd executables. Otherwise assume xrootd is available at the worker.
 @param cache Method for caching file at the workers: never, the default (VINE_CACHE_LEVEL_TASK), to cache only for the
 current manager (VINE_CACHE_LEVEL_WORKFLOW), to cache for the lifetime of the worker (VINE_CACHE_LEVEL_WORKER), or to
@@ -791,7 +790,7 @@ struct vine_file *vine_declare_xrootd(struct vine_manager *m, const char *source
 @param server The chirp server address of the form "hostname[:port"]"
 @param source The name of the file in the server
 @param ticket If not NULL, a file object that provides a chirp an authentication ticket
-@param env    If not NULL, an environment file (e.g poncho or starch, see @ref vine_task_add_environment) that contains
+@param env    If not NULL, an environment file (e.g poncho or starch, see @ref vine_task_add_execution_context) that contains
 the chirp executables. Otherwise assume chirp is available at the worker.
 @param cache Method for caching file at the workers: never, the default (VINE_CACHE_LEVEL_TASK), to cache only for the
 current manager (VINE_CACHE_LEVEL_WORKFLOW), to cache for the lifetime of the worker (VINE_CACHE_LEVEL_WORKER), or to
@@ -908,6 +907,8 @@ whose contents are not returned to the manager by default.
 @param m A manager object
 @param f A file object.
 @return A pointer to the contents of the file.  This will be freed with the file object.
+On error, returns NULL with errno set to: ENOENT if the file was not yet created,
+EAGAIN if the fetch failed but can be tried again, EIO if some unexpected I/O error occurred.
 */
 
 const char *vine_fetch_file(struct vine_manager *m, struct vine_file *f);
@@ -1007,9 +1008,9 @@ void vine_manager_remove_library(struct vine_manager *m, const char *name);
 
 /** Find a library template on the manager
 @param m A manager object
-@param name The name of the library of interest
+@param library_name The name of the library of interest
 */
-struct vine_task *vine_manager_find_library_template(struct vine_manager *q, const char *library_name);
+struct vine_task *vine_manager_find_library_template(struct vine_manager *m, const char *library_name);
 
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the manager is empty.
@@ -1251,7 +1252,7 @@ int vine_set_category_mode(struct vine_manager *m, const char *category, vine_ca
 
 /** Set a maximum number of tasks of this category that can execute concurrently. If less than 0, unlimited (this is the
 default).
-@param q A manager object.
+@param m A manager object.
 @param category A category name.
 @param max_concurrent Number of maximum concurrent tasks.
 */
@@ -1503,19 +1504,19 @@ void vine_set_runtime_info_path(const char *path);
 /** Sets the directory where a workflow-specific runtime logs are directly written into.
 @param dir A directory
 */
-void vine_set_runtime_info_template(const char *template);
+void vine_set_runtime_info_template(const char *dir);
 
 /** Adds a custom APPLICATION entry to the debug log.
 @param m     Reference to the current manager object.
 @param entry A custom debug message.
 */
-void vine_log_debug_app(struct vine_manager *q, const char *entry);
+void vine_log_debug_app(struct vine_manager *m, const char *entry);
 
 /** Adds a custom APPLICATION entry to the transactions log.
 @param m     Reference to the current manager object.
 @param entry A custom transaction message.
 */
-void vine_log_txn_app(struct vine_manager *q, const char *entry);
+void vine_log_txn_app(struct vine_manager *m, const char *entry);
 
 /** Display internal reference counts for troubleshooting purposes.
  */
@@ -1529,24 +1530,28 @@ char *vine_version_string();
 
 /** Returns path relative to the logs runtime directory
 @param m Reference to the current manager object.
+@param path Target filename.
 @return A string.
 */
 char *vine_get_path_log(struct vine_manager *m, const char *path);
 
 /** Returns path relative to the staging runtime directory
 @param m Reference to the current manager object.
+@param path Target filename.
 @return A string.
 */
 char *vine_get_path_staging(struct vine_manager *m, const char *path);
 
 /** Returns path relative to the library logs runtime directory
 @param m Reference to the current manager object.
+@param path Target filename.
 @return A string.
 */
 char *vine_get_path_library_log(struct vine_manager *m, const char *path);
 
 /** Returns path relative to the cache runtime directory
 @param m Reference to the current manager object.
+@param path Target filename.
 @return A string.
 */
 char *vine_get_path_cache(struct vine_manager *m, const char *path);

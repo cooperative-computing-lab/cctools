@@ -107,10 +107,16 @@ static batch_queue_id_t batch_queue_local_wait(struct batch_queue *q, struct bat
 	}
 }
 
-static int batch_queue_local_remove(struct batch_queue *q, batch_queue_id_t jobid)
+/* Note that batch_queue_remove triggers a job to exit, but it must still be returned by batch_queue_wait */
+
+static int batch_queue_local_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode)
 {
-	int max_wait = 5; // maximum seconds we wish to wait for a given process
-	process_kill_waitpid(jobid, max_wait);
+	if (mode == BATCH_QUEUE_REMOVE_MODE_FRIENDLY) {
+		kill(jobid, SIGQUIT);
+	} else {
+		kill(jobid, SIGKILL);
+	}
+
 	return 0;
 }
 
@@ -123,6 +129,7 @@ static int batch_queue_local_create(struct batch_queue *q)
 batch_queue_stub_free(local);
 batch_queue_stub_port(local);
 batch_queue_stub_option_update(local);
+batch_queue_stub_prune(local);
 
 const struct batch_queue_module batch_queue_local = {
 		BATCH_QUEUE_TYPE_LOCAL,
@@ -136,6 +143,7 @@ const struct batch_queue_module batch_queue_local = {
 		batch_queue_local_submit,
 		batch_queue_local_wait,
 		batch_queue_local_remove,
+		batch_queue_local_prune,
 };
 
 /* vim: set noexpandtab tabstop=8: */

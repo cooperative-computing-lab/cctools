@@ -389,17 +389,12 @@ static vine_msg_code_t handle_cache_update(struct vine_manager *q, struct vine_w
 	char id[VINE_LINE_MAX];
 
 	if (sscanf(line, "cache-update %s %d %d %lld %lld %lld %lld %s", cachename, &type, &cache_level, &size, &mtime, &transfer_time, &start_time, id) == 8) {
-		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, cachename);
-
-		if (!replica) {
-			/*
-			If an unsolicited cache-update arrives, there are several possibilities:
-			- The worker is telling us about an item from a previous run.
-			- The file was created as an output of a task.
-			*/
-			replica = vine_file_replica_create(type, cache_level, size, mtime);
-			vine_file_replica_table_insert(q, w, cachename, replica);
-		}
+		/*
+		If an unsolicited cache-update arrives, there are several possibilities:
+		- The worker is telling us about an item from a previous run.
+		- The file was created as an output of a task.
+		*/
+		struct vine_file_replica *replica = vine_file_replica_table_get_or_create(q, w, cachename, type, cache_level, size, mtime);
 
 		replica->type = type;
 		replica->cache_level = cache_level;
@@ -999,6 +994,7 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 			/* evict this worker */
 			debug(D_VINE | D_NOTICE, "Intentionally evicting worker %s", w->hostname);
 			release_worker(q, w);
+			break;
 		}
 	}
 	list_delete(candidates_list);
@@ -1114,6 +1110,8 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		hash_table_remove(q->temp_files_to_replicate, cached_name);
 		free(cached_name);
 	}
+
+	list_delete(to_remove);
 
 	return total_replication_request_sent;
 }
@@ -2327,6 +2325,7 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "tasks_total_memory", total->memory);
 	jx_insert_integer(j, "tasks_total_disk", total->disk);
 	jx_insert_integer(j, "tasks_total_gpus", total->gpus);
+	rmsummary_delete(total);
 
 	// worker information for general vine_status report
 	jx_insert_integer(j, "workers", info.workers_connected);
@@ -2589,7 +2588,10 @@ static vine_result_code_t handle_worker(struct vine_manager *q, struct link *l)
 	case VINE_MSG_PROCESSED_DISCONNECT:
 		// A status query was received and processed, so disconnect.
 		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_STATUS_WORKER);
-		return VINE_SUCCESS;
+		// It was not really a failure, but signals to the calling code that the worker
+		// is not available anymore.
+		return VINE_WORKER_FAILURE;
+		break;
 
 	case VINE_MSG_NOT_PROCESSED:
 		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
@@ -2603,6 +2605,7 @@ static vine_result_code_t handle_worker(struct vine_manager *q, struct link *l)
 		q->stats->workers_lost++;
 		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
 		return VINE_WORKER_FAILURE;
+		break;
 	}
 
 	return VINE_SUCCESS;
@@ -3318,8 +3321,10 @@ int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine
 		 * We modify the object each time we schedule a peer transfer by adding a substitute url.
 		 * We must clear the substitute pointer each task we send to ensure we aren't using
 		 * a previously scheduled url. */
-		vine_file_delete(m->substitute);
-		m->substitute = NULL;
+		if (m->substitute) {
+			vine_file_delete(m->substitute);
+			m->substitute = NULL;
+		}
 
 		/* Provide a substitute file object to describe the peer. */
 		if (!(m->file->flags & VINE_PEER_NOSHARE) && (m->file->cache_level > VINE_CACHE_LEVEL_TASK)) {
@@ -3362,7 +3367,6 @@ int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine
 		}
 	}
 
-	debug(D_VINE, "task %lld has a ready transfer source for all files", (long long)t->task_id);
 	return 1;
 }
 
@@ -6411,10 +6415,13 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 	/* delete all of the replicas present at remote workers. */
 	struct set *source_workers = hash_table_lookup(m->file_worker_table, f->cached_name);
 	if (source_workers && set_size(source_workers) > 0) {
-		struct vine_worker_info *w;
-		SET_ITERATE(source_workers, w)
-		{
-			delete_worker_file(m, w, f->cached_name, 0, 0);
+		void **workers_array = set_values_array(source_workers);
+		if (workers_array) {
+			for (int i = 0; workers_array[i] != NULL; i++) {
+				struct vine_worker_info *w = (struct vine_worker_info *)workers_array[i];
+				delete_worker_file(m, w, f->cached_name, 0, 0);
+			}
+			set_free_values_array(workers_array);
 		}
 	}
 
@@ -6525,7 +6532,7 @@ struct vine_file *vine_declare_temp(struct vine_manager *m)
 		struct vine_file *f = vine_file_temp();
 		return vine_manager_declare_file(m, f);
 	} else {
-		struct vine_file *f = vine_file_temp_no_peers();
+		struct vine_file *f = vine_file_temp_no_peers(vine_get_path_staging(m, NULL));
 		return vine_manager_declare_file(m, f);
 	}
 }
@@ -6573,38 +6580,67 @@ struct vine_file *vine_declare_chirp(
 	return vine_manager_declare_file(m, t);
 }
 
+/*
+Return the contents of a vine_file as a memory buffer.
+If the content is not available, set errno in one of three ways:
+ENOENT - file has not been created yet
+EAGAIN - file has been created, but not currently available, try again.
+EIO    - something more serious went wrong.
+*/
+
 const char *vine_fetch_file(struct vine_manager *m, struct vine_file *f)
 {
+	/* If the file should not exist yet, bail out quickly. */
+	if (f->state == VINE_FILE_STATE_PENDING) {
+		errno = ENOENT;
+		return 0;
+	}
+
 	/* If the data has already been loaded, just return it. */
-	if (f->data)
+	if (f->data) {
 		return f->data;
+	}
+
+	/* Now consider the various ways to get the file content. */
 
 	switch (f->type) {
 	case VINE_FILE:
-		/* If it is on the local filesystem, load it. */
+		/* It should already be on the local filesystem */
 		{
 			size_t length;
 			if (copy_file_to_buffer(f->source, &f->data, &length)) {
 				return f->data;
 			} else {
+				/* something went wrong in loading the file. */
+				errno = EIO;
 				return 0;
 			}
 		}
 		break;
 	case VINE_BUFFER:
-		/* Buffer files will already have their contents in memory, if available. */
-		return f->data;
-		break;
+		/* We shouldn't get here: f->data should be filled when file created. */
+		errno = EIO;
+		return 0;
 	case VINE_TEMP:
 	case VINE_URL:
 	case VINE_MINI_TASK:
 		/* If the file has been materialized remotely, go get it from a worker. */
 		{
 			struct vine_worker_info *w = vine_file_replica_table_find_worker(m, f->cached_name);
-			if (w)
+			if (w) {
 				vine_manager_get_single_file(m, w, f);
-			/* If that succeeded, then f->data is now set, null otherwise. */
-			return f->data;
+				if (f->data) {
+					return f->data;
+				} else {
+					/* Something went wrong in fetching a good replica. */
+					errno = EIO;
+					return 0;
+				}
+			} else {
+				/* No replicas were currently available, but you can try again later. */
+				errno = EAGAIN;
+				return 0;
+			}
 		}
 		break;
 	}

@@ -98,7 +98,11 @@ def _copy_run_in_env(env_dir):
         logger.error("could not find poncho_package_run. Please add it to the PATH.")
         sys.exit(1)
 
-    shutil.copy(candidate, f"{env_dir}/env/bin/poncho_package_run")
+    try:
+        shutil.copy(candidate, f"{env_dir}/env/bin/poncho_package_run")
+    except shutil.SameFileError:
+        # ndcctools already in env and conda using hard-links when possible
+        pass
     with open(f"{env_dir}/env/bin/run_in_env", "w") as f:
         f.write("#! /bin/sh\n")
         f.write(

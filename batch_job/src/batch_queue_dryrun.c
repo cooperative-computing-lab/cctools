@@ -15,8 +15,8 @@ See the file COPYING for details.
 #include "debug.h"
 #include "process.h"
 #include "macros.h"
-#include "stringtools.h"
 #include "path.h"
+#include "stringtools.h"
 #include "xxmalloc.h"
 
 static batch_queue_id_t batch_queue_dryrun_submit(struct batch_queue *q, struct batch_job *bt)
@@ -84,7 +84,7 @@ static batch_queue_id_t batch_queue_dryrun_wait(struct batch_queue *q, struct ba
 	}
 }
 
-static int batch_queue_dryrun_remove(struct batch_queue *q, batch_queue_id_t jobid)
+static int batch_queue_dryrun_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode)
 {
 	return 0;
 }
@@ -102,6 +102,7 @@ static int batch_queue_dryrun_create(struct batch_queue *q)
 batch_queue_stub_free(dryrun);
 batch_queue_stub_port(dryrun);
 batch_queue_stub_option_update(dryrun);
+batch_queue_stub_prune(dryrun);
 
 const struct batch_queue_module batch_queue_dryrun = {
 		BATCH_QUEUE_TYPE_DRYRUN,
@@ -115,6 +116,7 @@ const struct batch_queue_module batch_queue_dryrun = {
 		batch_queue_dryrun_submit,
 		batch_queue_dryrun_wait,
 		batch_queue_dryrun_remove,
+		batch_queue_dryrun_prune,
 };
 
 /* vim: set noexpandtab tabstop=8: */

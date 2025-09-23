@@ -393,7 +393,7 @@ static batch_queue_id_t batch_queue_cluster_wait(struct batch_queue *q, struct b
 	return -1;
 }
 
-static int batch_queue_cluster_remove(struct batch_queue *q, batch_queue_id_t jobid)
+static int batch_queue_cluster_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode)
 {
 	struct batch_job_info *info;
 
@@ -515,6 +515,7 @@ static int batch_queue_cluster_create(struct batch_queue *q)
 batch_queue_stub_free(cluster);
 batch_queue_stub_port(cluster);
 batch_queue_stub_option_update(cluster);
+batch_queue_stub_prune(cluster);
 
 const struct batch_queue_module batch_queue_cluster = {
 		BATCH_QUEUE_TYPE_CLUSTER,
@@ -528,6 +529,7 @@ const struct batch_queue_module batch_queue_cluster = {
 		batch_queue_cluster_submit,
 		batch_queue_cluster_wait,
 		batch_queue_cluster_remove,
+		batch_queue_cluster_prune,
 };
 
 const struct batch_queue_module batch_queue_moab = {
@@ -542,6 +544,7 @@ const struct batch_queue_module batch_queue_moab = {
 		batch_queue_cluster_submit,
 		batch_queue_cluster_wait,
 		batch_queue_cluster_remove,
+		batch_queue_cluster_prune,
 };
 
 const struct batch_queue_module batch_queue_uge = {
@@ -556,6 +559,7 @@ const struct batch_queue_module batch_queue_uge = {
 		batch_queue_cluster_submit,
 		batch_queue_cluster_wait,
 		batch_queue_cluster_remove,
+		batch_queue_cluster_prune,
 };
 
 /* retained sge keyword for backwards compatibility after sge->uge name change. */
@@ -571,6 +575,7 @@ const struct batch_queue_module batch_queue_sge = {
 		batch_queue_cluster_submit,
 		batch_queue_cluster_wait,
 		batch_queue_cluster_remove,
+		batch_queue_cluster_prune,
 };
 
 const struct batch_queue_module batch_queue_pbs = {
@@ -585,6 +590,7 @@ const struct batch_queue_module batch_queue_pbs = {
 		batch_queue_cluster_submit,
 		batch_queue_cluster_wait,
 		batch_queue_cluster_remove,
+		batch_queue_cluster_prune,
 };
 
 const struct batch_queue_module batch_queue_lsf = {
@@ -599,6 +605,7 @@ const struct batch_queue_module batch_queue_lsf = {
 		batch_queue_cluster_submit,
 		batch_queue_cluster_wait,
 		batch_queue_cluster_remove,
+		batch_queue_cluster_prune,
 };
 
 const struct batch_queue_module batch_queue_torque = {
@@ -613,6 +620,7 @@ const struct batch_queue_module batch_queue_torque = {
 		batch_queue_cluster_submit,
 		batch_queue_cluster_wait,
 		batch_queue_cluster_remove,
+		batch_queue_cluster_prune,
 };
 
 const struct batch_queue_module batch_queue_slurm = {
@@ -627,6 +635,7 @@ const struct batch_queue_module batch_queue_slurm = {
 		batch_queue_cluster_submit,
 		batch_queue_cluster_wait,
 		batch_queue_cluster_remove,
+		batch_queue_cluster_prune,
 };
 
 /* vim: set noexpandtab tabstop=8: */
