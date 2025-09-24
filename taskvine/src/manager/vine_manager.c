@@ -1704,7 +1704,7 @@ not line up with an expected task and file, then we discard it and keep
 going.
 */
 
-static vine_result_code_t get_update(struct vine_manager *q, struct vine_worker_info *w, const char *line)
+static vine_result_code_t get_watched_file_update(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
 	int64_t task_id;
 	char path[VINE_LINE_MAX];
@@ -1889,12 +1889,13 @@ static vine_result_code_t get_stdout(struct vine_manager *q, struct vine_worker_
 }
 
 /*
-Send to this worker a request for task results.
-The worker will respond with all completed tasks and updates
-on watched output files.  Process those results as they come back.
+Send to this worker a request for watched file updates.
+The worker will respond with zero or more "update" messages
+indicating changes to watched files.
+Process those results as they come back.
 */
 
-static vine_result_code_t get_available_results(struct vine_manager *q, struct vine_worker_info *w)
+static vine_result_code_t get_watched_file_updates(struct vine_manager *q, struct vine_worker_info *w)
 {
 	// max_count == -1, tells the worker to send all available results.
 	vine_manager_send(q, w, "send_results %d\n", -1);
@@ -1912,7 +1913,7 @@ static vine_result_code_t get_available_results(struct vine_manager *q, struct v
 			break;
 		}
 		if (string_prefix_is(line, "update")) {
-			result = get_update(q, w, line);
+			result = get_watched_file_update(q, w, line);
 			if (result != VINE_SUCCESS)
 				break;
 		} else if (!strcmp(line, "end")) {
@@ -5356,7 +5357,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			char *key;
 			HASH_TABLE_ITERATE(q->worker_table, key, w)
 			{
-				get_available_results(q, w);
+				get_watched_file_updates(q, w);
 				hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
 			}
 		}
