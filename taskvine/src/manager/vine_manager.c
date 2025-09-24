@@ -131,7 +131,7 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state);
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w);
 static vine_result_code_t get_stdout(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t output_length);
-static vine_result_code_t retrieve_output(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
+static vine_result_code_t get_stdout_long(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 
 static void find_max_worker(struct vine_manager *q);
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w);
@@ -1425,7 +1425,7 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 	default:
 		/* Otherwise get all of the output files. */
 		if (!t->output_received) {
-			result = retrieve_output(q, w, t);
+			result = get_stdout_long(q, w, t);
 			if (result == VINE_SUCCESS) {
 				t->output_received = 1;
 			}
@@ -1763,10 +1763,11 @@ static vine_result_code_t get_update(struct vine_manager *q, struct vine_worker_
 }
 
 /*
-make a synchronus connection with a worker to retrieve the stdout of a task
+Make a synchronus connection with a worker to retrieve the stdout of a task
+when it is too long to fit in a completion message.
 */
 
-static vine_result_code_t retrieve_output(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+static vine_result_code_t get_stdout_long(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	int64_t output_length;
 	uint64_t task_id;
