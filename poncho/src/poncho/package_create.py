@@ -108,6 +108,7 @@ def _copy_run_in_env(env_dir):
         f.write(
             'env_dir=$(dirname $( cd -- "$( dirname -- "$0" )" > /dev/null 2>&1 && pwd ))\n'
         )
+        f.write('export PONCHO_PREFIX="${env_dir}"\n')
         f.write('exec "${env_dir}"/bin/poncho_package_run -e ${env_dir} "$@"\n')
     os.chmod(f"{env_dir}/env/bin/run_in_env", 0o755)
 
