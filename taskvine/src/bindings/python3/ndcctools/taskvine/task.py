@@ -1004,8 +1004,7 @@ class PythonTask(Task):
 
     def _python_function_command(self):
         py_exec = "${PONCHO_PREFIX:+${PONCHO_PREFIX}/bin/}" + f"python{sys.version_info[0]}"
-
-        command = f"{py_exec} w_{self._id} f_{self._id} a_{self._id} o_{self._id}"
+        command = " ".join([py_exec, "w_{self._id} f_{self._id} a_{self._id} o_{self._id}"])
         return command
 
     def _add_inputs_outputs(self, manager, func, args, kwargs):
