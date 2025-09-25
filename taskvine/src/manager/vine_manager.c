@@ -6434,10 +6434,10 @@ int vine_set_task_id_min(struct vine_manager *q, int minid)
 
 /*
 Remove all replicas of a special file across the compute cluster.
-
-While invoking outside, it is primarily used to remove replicas
-from workers when the file is no longer needed by the manager.
+Should be invoked by the application when a file will never
+be needed again, to free up available space.
 */
+
 void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 {
 	if (!f) {
