@@ -18,6 +18,7 @@ import os
 import textwrap
 import uuid
 import cloudpickle
+import sys
 
 
 ##
@@ -1002,7 +1003,7 @@ class PythonTask(Task):
         self._serialize_output = False
 
     def _python_function_command(self):
-        py_exec = "${PONCHO_PREFIX:+${PONCHO_PREFIX}/bin/}python"
+        py_exec = "${PONCHO_PREFIX:+${PONCHO_PREFIX}/bin/}" + f"python{sys.version_info[0]}"
 
         command = f"{py_exec} w_{self._id} f_{self._id} a_{self._id} o_{self._id}"
         return command
