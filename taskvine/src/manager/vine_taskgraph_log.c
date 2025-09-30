@@ -25,7 +25,7 @@ void vine_taskgraph_log_write_task(struct vine_manager *q, struct vine_task *t)
 	if (p)
 		*p = 0;
 
-	fprintf(q->graph_logfile, "TASK T%d \"%s\" INPUTS ",id,name);
+	fprintf(q->graph_logfile, "TASK T%d \"%s\" INPUTS ", id, name);
 
 	free(name);
 
@@ -36,17 +36,17 @@ void vine_taskgraph_log_write_task(struct vine_manager *q, struct vine_task *t)
 		fprintf(q->graph_logfile, "%s ", m->file->cached_name);
 	}
 
-	fprintf(q->graph_logfile,"OUTPUTS ");
+	fprintf(q->graph_logfile, "OUTPUTS ");
 
 	LIST_ITERATE(t->output_mounts, m)
 	{
 		fprintf(q->graph_logfile, "%s ", m->file->cached_name);
 	}
 
-	fprintf(q->graph_logfile,"\n");
+	fprintf(q->graph_logfile, "\n");
 }
 
-void vine_taskgraph_log_write_mini_task(struct vine_manager *q, struct vine_task *t, const char *task_name, const char *output_name )
+void vine_taskgraph_log_write_mini_task(struct vine_manager *q, struct vine_task *t, const char *task_name, const char *output_name)
 {
 	if (!t)
 		return;
@@ -59,7 +59,7 @@ void vine_taskgraph_log_write_mini_task(struct vine_manager *q, struct vine_task
 	if (p)
 		*p = 0;
 
-	fprintf(q->graph_logfile, "TASK T-%d \"%s\" INPUTS ",id,task_name);
+	fprintf(q->graph_logfile, "TASK T-%d \"%s\" INPUTS ", id, task_name);
 
 	free(name);
 
@@ -71,9 +71,9 @@ void vine_taskgraph_log_write_mini_task(struct vine_manager *q, struct vine_task
 	}
 
 	/* A mini-task has exactly one implied output that is named by provided argument, not the data structure */
-	fprintf(q->graph_logfile, "OUTPUTS %s", output_name );
+	fprintf(q->graph_logfile, "OUTPUTS %s", output_name);
 
-	fprintf(q->graph_logfile,"\n");
+	fprintf(q->graph_logfile, "\n");
 }
 
 void vine_taskgraph_log_write_file(struct vine_manager *q, struct vine_file *f)
