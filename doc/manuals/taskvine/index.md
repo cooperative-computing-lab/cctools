@@ -2455,9 +2455,8 @@ cores, memory and disk have modifiers `~` and `>` as follows:
 
 ## Logging, Plotting, and Tuning
 
-A TaskVine manager produces several logs: `debug`, `taskgraph`, `performance`,
-and `transactions`. These logs are always enabled, and appear in the current
-working directory in the subdirectories:
+A TaskVine manager produces several logs: `performance`, `taskgraph`, `debug`, and `transactions`.
+These logs are always enabled, and appear in the current working directory in the subdirectories:
 
 ```sh
 vine-run-info/YYYY-mm-ddTHH:MM:SS/vine-logs
@@ -2487,24 +2486,84 @@ If set, the environment variable `VINE_RUNTIME_INFO_DIR` determines the logging
 directory. If `VINE_RUNTIME_INFO_DIR` is not an absolute path, then it is taken
 relative to the current logging prefix (i.e. `vine-run-info/` by default).
 
+### Performance Log
+
+The performance log contains a time series of the statistics collected by the manager,
+such as number of tasks waiting and completed, number of workers busy,
+total number of cores available, etc.
+It is located by default at:
+
+```sh
+vine-run-info/%Y-%m-%dT%H:%M:%S/vine-logs/performance
+```
+
+!!! note
+    To use `vine_graph_log`, you must first install the `gnuplot` package like this:
+    ```
+    conda install conda-forge::gnuplot
+    ```
+
+`vine_graph_log` will plot a wide variety of statistics from the performance log,
+such as total time spent transferring tasks, number of tasks running, and workers connected.
+For example, this command:
+
+```sh
+$ vine_graph_log -o myplots vine-run-info/most-recent/vine-logs/performance
+```
+
+produces the following graphs:
+
+![](images/plot-perf-montage.png)
+
+- [Performance Log File Format Details](log-file-formats.md#performance-log-format)
+
+### Taskgraph Log
+
+The `taskgraph` log file captures the graph relationship between every task and file in a workflow as it runs.
+To generate a visual graph from the log file, run `vine_plot_taskgraph`:
+It is located by default at:
+
+```sh
+vine-run-info/%Y-%m-%dT%H:%M:%S/vine-logs/taskgraph
+```
+
+!!! note
+    To use `vine_plot_taskgraph`, you must first install the `graphviz` package like this:
+    ```
+    conda install conda-forge::graphviz
+    ```
+
+```sh
+vine_plot_taskgraph vine-run-info/most-recent/vine-logs/taskgraph --output taskgraph.pdf
+```
+
+Which produces a graph like the following:
+
+![Example Task Graph](images/plot-taskgraph.png)
+
+Note that very large task graphs may take a long time to render, and make be impractical to display
+if there are a large number of edges to be rendered.
+
+- [Taskgraph Log File Format Details](log-file-formats.md#taskgraph-log-format)
 
 ### Debug Log
 
 The debug log prints unstructured messages as the manager transfers files and
 tasks, workers connect and report resources, etc. This is specially useful to
-find failures, bugs, and other errors. It is located by default at:
+find failures, bugs, and other errors when your workflow isn't running as expected.
+It is located by default at:
 
 ```sh
 vine-run-info/%Y-%m-%dT%H:%M:%S/vine-logs/debug
 ```
 
-To enable debugging at the worker, set the `-d` option:
-
+To view the debug log of the manager:
 ```sh
-$ vine_worker -d all -o worker.debug -M myproject
+less vine-run-info/most-recent/vine-logs/debug
 ```
 
-Custom APPLICATION messages can be added to the log with the calls:
+When writing an application, you may find it helpful to add your
+own application-level messages to the log with code like this:
 
 === "Python"
     ```python
@@ -2515,42 +2574,25 @@ Custom APPLICATION messages can be added to the log with the calls:
     ```
     vine_log_debug_app("your custom log message")
     ```
-
-### Performance Log
-
-The performance log contains a time series of the statistics collected by the manager,
-such as number of tasks waiting and completed, number of workers busy,
-total number of cores available, etc. The log is located by default at:
+You may also find it helpful to view the debug log of a worker,
+when running it locally. To enable debugging at the worker, add
+the `-d all` option:
 
 ```sh
-vine-run-info/%Y-%m-%dT%H:%M:%S/vine-logs/performance
+$ vine_worker -d all -o worker.debug -M myproject
 ```
 
-Install gnuplot to enable the use of `vine_graph_log`
-
+And then view the debug output of the worker process:
 ```sh
-conda install conda-forge::gnuplot
+less worker.debug
 ```
-
-The script `vine_graph_log` is a wrapper for `gnuplot`, and with it you
-can plot some of the statistics, such as total time spent transferring tasks,
-number of tasks running, and workers connected.  For example, this command:
-
-```sh
-$ vine_graph_log -o myplots my.stats.log
-```
-
-produces the following graphs:
-
-![](images/plot-perf-montage.png)
-
-- [Performance Log File Format Details](log-file-formats.md#performance-log-format)
 
 ### Transactions Log
 
 The transactions log records the lifetime of tasks and workers. It is
 specially useful for tracking the resources requested, allocated, and used by
-specific tasks. It is located by default at:
+specific tasks.
+It is located by default at:
 
 ```sh
 vine-run-info/%Y-%m-%dT%H:%M:%S/vine-logs/transactions
@@ -2569,7 +2611,6 @@ to produce a visualization of how tasks are packed into workers like this:
 ![](images/plot-txn-workers.png)
 
 - [Transactions Log File Format Details](log-file-formats.md#transactions-log-format)
-
 
 Custom APPLICATION messages can be added to the log with the calls:
 
@@ -2666,28 +2707,6 @@ For the *workers* file:
 | `memory` | Total memory in MB available at the worker.|
 | `disk` | Total disk space in MB available at the worker.|
 | `gpus` | Total number of gpus available at the worker.|
-
-### Task Graph Log
-
-The complete graph of tasks and files is recorded in `taskgraph`
-using the [Graphviz](https://graphviz.org) Dot file format.  With the `dot` tool installed, you
-can visualize the task graph as follows:
-
-```sh
-dot -Tpng vine-run-info/most-recent/vine-logs/taskgraph > taskgraph.png
-```
-
-This can produce results like this:
-
-![Example Task Graph](images/plot-taskgraph.png)
-
-Note that very large task graphs may be impractical to graph at this level of detail.
-
-!!! note
-    You may need to install Graphviz Dot separately like this:
-    ```
-    conda install -c conda-forge graphviz
-    ```
 
 ### TaskVine Report Tool
 
