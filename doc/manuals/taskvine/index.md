@@ -2486,6 +2486,47 @@ If set, the environment variable `VINE_RUNTIME_INFO_DIR` determines the logging
 directory. If `VINE_RUNTIME_INFO_DIR` is not an absolute path, then it is taken
 relative to the current logging prefix (i.e. `vine-run-info/` by default).
 
+### Debug Log
+
+The debug log prints unstructured messages as the manager transfers files and
+tasks, workers connect and report resources, etc. This is specially useful to
+find failures, bugs, and other errors when your workflow isn't running as expected.
+It is located by default at:
+
+```sh
+vine-run-info/%Y-%m-%dT%H:%M:%S/vine-logs/debug
+```
+
+To view the debug log of the manager:
+```sh
+less vine-run-info/most-recent/vine-logs/debug
+```
+
+When writing an application, you may find it helpful to add your
+own application-level messages to the log with code like this:
+
+=== "Python"
+    ```python
+    m.log_debug_app("your custom log message")
+    ```
+
+=== "C"
+    ```
+    vine_log_debug_app("your custom log message")
+    ```
+You may also find it helpful to view the debug log of a worker,
+when running it locally. To enable debugging at the worker, add
+the `-d all` option:
+
+```sh
+$ vine_worker -d all -o worker.debug -M myproject
+```
+
+And then view the debug output of the worker process:
+```sh
+less worker.debug
+```
+
 ### Performance Log
 
 The performance log contains a time series of the statistics collected by the manager,
@@ -2545,47 +2586,6 @@ Note that very large task graphs may take a long time to render, and make be imp
 if there are a large number of edges to be rendered.
 
 - [Taskgraph Log File Format Details](log-file-formats.md#taskgraph-log-format)
-
-### Debug Log
-
-The debug log prints unstructured messages as the manager transfers files and
-tasks, workers connect and report resources, etc. This is specially useful to
-find failures, bugs, and other errors when your workflow isn't running as expected.
-It is located by default at:
-
-```sh
-vine-run-info/%Y-%m-%dT%H:%M:%S/vine-logs/debug
-```
-
-To view the debug log of the manager:
-```sh
-less vine-run-info/most-recent/vine-logs/debug
-```
-
-When writing an application, you may find it helpful to add your
-own application-level messages to the log with code like this:
-
-=== "Python"
-    ```python
-    m.log_debug_app("your custom log message")
-    ```
-
-=== "C"
-    ```
-    vine_log_debug_app("your custom log message")
-    ```
-You may also find it helpful to view the debug log of a worker,
-when running it locally. To enable debugging at the worker, add
-the `-d all` option:
-
-```sh
-$ vine_worker -d all -o worker.debug -M myproject
-```
-
-And then view the debug output of the worker process:
-```sh
-less worker.debug
-```
 
 ### Transactions Log
 
