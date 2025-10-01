@@ -1,30 +1,50 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2022- The University of Notre Dame
+# Copyright (C) 2025- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
+
+# Parse a taskvine performance log, and produce ten different plots
+# that summarize different aspects of task performance, worker utilization, etc.
 
 import sys
 import re
 import os
 import getopt
-from subprocess import Popen, PIPE, check_output
+import matplotlib.pyplot as plt
 from functools import reduce
 
-gnuplot_cmd = 'gnuplot'
-format = 'svg'
-extension = format
-resolution = 30          # this many seconds to one log entry. Default is 30 seconds.
-x_range = None        # If unspecified, then plot all the valid range.
-geometry = "600,480"   # width,height in pixels
+# default output format, can choose any type supported by matplotlib
+extension = 'svg'
 
-log_entries = None
+# this many seconds to one log entry. Default is 30 seconds.
+time_resolution = 30
+
+# If unspecified, then plot all the valid range.
+x_range = None
+
+# Size of the output image in inches
+image_width=640
+image_height=480
+image_dpi=100
+
+# An array of the valid timestamps loaded from the log.
 times = None
 
+# A dictionary of records, keyed by timestamp.
+log_entries = None
+
+# Multiplication factors and for each label abbreviation type.
 unit_labels = {'s': 'seconds', 'm': 'minutes', 'h': 'hours', 'd': 'days', 'GB': 'GB', 'i': ''}
 unit_factors = {None: 1, 's': 1, 'm': 60, 'h': 3600, 'd': 86400, 'KB': 1024, 'GB': 1073741824}
-x_units = 'm'          # Default is minutes.
 
+# Default X unit is in minutes.
+x_units = 'm'
+
+# Fixed colors to use in each field in order
+colors = ["#1b9377","#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a676ad" ]
+
+# Search for the log file (comment) header which indicates each of the field names.
 
 def read_fields(file, lines_patience=10):
     for line in file:
@@ -37,14 +57,14 @@ def read_fields(file, lines_patience=10):
     sys.stderr.write("Could not find fields descriptions (a line such as # timestamp workers_....)\n")
     sys.exit(1)
 
-
 def time_to_resolution(t):
-    return (t - (t % (resolution * 1000000))) / 1000000
-
+    return (t - (t % (time_resolution * 1000000))) / 1000000
 
 def time_field_p(field):
     return re.search('^time_.*$', field)
 
+# Consume the log file, reading in all of the valid timestamps to "times"
+# and data records to log_entries for each timestamp.
 
 def read_log_entries(file, fields, reset_until_dispatch=False):
     log_entries = {}
@@ -150,13 +170,8 @@ def sort_time(log_entries):
     times.sort()
     return times
 
-
-def pout(file, str):
-    file.write("{}\n".format(str).encode('utf-8'))
-
-
 class VinePlot:
-    def __init__(self, title, ylabel, fields, labels=None, x_units=x_units, y_units=None, range=x_range, stack=False):
+    def __init__(self, title, ylabel, fields, labels=None, x_units=x_units, y_units=None, range=x_range, stack=False, logscale=False ):
         self.title = title
         self.fields = fields
         self.labels = labels or self.fields
@@ -165,91 +180,11 @@ class VinePlot:
         self.ylabel = ylabel
         self.range = range
         self.stack = stack
-
-    def preamble(self, file):
-        self.__preamble_common(file)
-
-    def __preamble_common(self, file):
-        units = ""
-        if self.y_units:
-            units = f" ({self.y_units})"
-
-        pout(file, """
-set term {fmt} size {geo} butt linewidth 1
-set title  '{title}'
-set xlabel 'manager lifetime in {x_units}'
-set ylabel '{y_label}{y_units}'
-set yrange [0:]
-set noborder
-set tics nomirror out
-""".format(fmt=format, geo=geometry, title=self.title, x_units=unit_labels[self.x_units], y_label=self.ylabel, y_units=units))
-
-        if self.stack:
-            pout(file, "set key below\n")
-        else:
-            pout(file, "set key left top\n")
-
-        intervals = [len(log_entries.keys())/x for x in [19, 17, 13, 11, 7, 5, 3]]
-
-        pout(file, """
-set style line 1 pt 5   lc rgb '#1b9e77' pointinterval {0}
-set style line 2 pt 13  lc rgb '#d95f02' pointinterval {1}
-set style line 3 pt 7   lc rgb '#7570b3' pointinterval {2}
-set style line 4 pt 9   lc rgb '#e7298a' pointinterval {3}
-set style line 5 pt 10  lc rgb '#66a61e' pointinterval {4}
-set style line 6 pt 2   lc rgb '#e6ab02' pointinterval {5}
-set style line 7 pt 1   lc rgb '#a6761d' pointinterval {6}
-""".format(*intervals))
-
-        if self.range:
-            pout(file, 'set xrange [%s]' % (self.range,))
-
-    def __data_one_time_field(self, file, field):
-        time_scale = unit_factors[self.x_units]
-        # if a time field, then scale
-        mod = time_field_p(field) and unit_factors[self.y_units] or 1
-
-        for t in times:
-            r = log_entries[t]
-            try:
-                pout(file, '%lf %lf' % (t/time_scale, r[field]/mod))
-            except KeyError:
-                sys.stderr.write("Field '%s' does not exist in the log\n" % (field,))
-                break
-        pout(file, 'EOF')
-
-    def plot_line(self, label, place):
-        return "'-' using 1:2 title '%s' with linespoints ls %d lw 3" % (label, place+1)
-
-    def plot_stack(self, label, place):
-        return "'-' using 1:2 title '%s' with fillsteps fs solid 1.0 noborder ls %d" % (label, place+1)
-
-    def write_plot(self, file):
-        self.preamble(file)
-
-        plots = []
-        for i in range(len(self.labels)):
-            if self.stack:
-                plots.append(self.plot_stack(self.labels[i], i))
-            else:
-                plots.append(self.plot_line(self.labels[i], i))
-
-        pout(file, 'plot %s;' % (',\\\n'.join(plots),))
-
-        for field in self.fields:
-            self.__data_one_time_field(file, field)
-
-    def __plot_internal(self, output, command):
-        sys.stdout.write("Generating '%s'.\n" % (output,))
-        fout = open(output, 'w')
-        gnuplot = Popen(command, stdin=PIPE, stdout=fout)
-        self.write_plot(gnuplot.stdin)
-        gnuplot.stdin.close()
-        gnuplot.wait()
+        self.logscale = logscale
 
     def plot(self, output):
         try:
-            self.__plot_internal(output, command=gnuplot_cmd)
+            self.doplot(output)
         except IOError:
             sys.stderr.write("Could not generate file %s.\n" % (output,))
             exit(1)
@@ -258,61 +193,71 @@ set style line 7 pt 1   lc rgb '#a6761d' pointinterval {6}
                 "Could not execute '%s'. Please try again specifying -c <gnuplot-path>, or -Ttext\n" % (gnuplot_cmd, ))
             exit(1)
 
+    def doplot( self, output ):
 
-class VinePlotLog(VinePlot):
-    def preamble(self, file):
-        VinePlot.preamble(self, file)
-        pout(file, 'set logscale y')
-        pout(file, 'set format y "10^{%L}"')
-        pout(file, '')
+        plt.figure(figsize=(image_width/image_dpi,image_height/image_dpi),dpi=image_dpi)
+                   
+        for i in range(len(self.fields)):
+                (x,y) = self.get_data_for_field(self.fields[i])
+                if self.stack:
+                    plt.bar(x,y,label=self.fields[i],color=colors[i])
+                else:
+                    plt.plot(x,y,label=self.fields[i],color=colors[i],marker='o')
 
+        if self.y_units:
+            plt.ylabel("{} ({})".format(self.ylabel,self.y_units))
 
-def check_gnuplot_version(gnuplot_cmd):
-    try:
-        version = check_output([gnuplot_cmd, '--version'])
-        version = version.decode("utf-8")
-        result = re.match(r'gnuplot\s+(\d+\.\d+)\D', version)
+        if self.logscale:
+            plt.yscale("log")
+            
+        plt.title(self.title)
+        plt.xlabel("manager lifetime in {}".format(unit_labels[self.x_units]))
+        plt.legend(loc="upper left")
+        plt.savefig(output)
+        plt.close()
 
-        if not result:
-            sys.stderr.write("Could not determine gnuplot version.")
-            exit(1)
+    def get_data_for_field(self,field):
 
-        version = result.group(1)
+        time_scale = unit_factors[self.x_units]
+        # if a time field, then scale
+        mod = time_field_p(field) and unit_factors[self.y_units] or 1
 
-        if float(version) < 4.6:
-            sys.stderr.write("gnuplot is version %s, at least version 4.6 is required." % (version,))
-            exit(1)
+        xvalues = list()
+        yvalues = list()
+        
+        for t in times:
+            r = log_entries[t]
+            try:
+                x = t/time_scale
+                y = r[field]/mod
+                xvalues.append(x)
+                yvalues.append(y)
+            except KeyError:
+                sys.stderr.write("Field '%s' does not exist in the log\n" % (field,))
+                break
 
-    except OSError:
-        sys.stderr.write(
-            "Could not execute '%s'. Please try again specifying -c <gnuplot-path>, or -Ttext\n" % (gnuplot_cmd, ))
-        exit(1)
-
-
+        return (xvalues,yvalues)
+                   
 def show_usage():
     usage_string = """
-{command} [options] <work-queue-log>
+{command} [options] <vine-performance-log>
         -h                  This message.
-        -c <gnuplot-path>   Specify the location of the gnuplot executable.
-                            Default is gnuplot.
         -l                  Graph y-axis with logscale.
         -D                  Start plots when the first task is dispatched.
         -o <prefix-output>  Generate prefix-output.{{workers,workers-accum,
                                                     tasks,tasks-accum,
                                                     time-manager,time-workers,
-                                                    transfer,workers-disk}}.{format}
+                                                    transfer,workers-disk}}.{extension}
                             Default is <work-queue-log>.
         -r <range>          Range of time to plot, in time units (see -u) from
                             the start of execution. Of the form: min:max,
                             min:, or :max.
-        -s <seconds>        Sample log every <seconds> (default is {format}).
+        -s <seconds>        Sample log every <seconds> (default is {time_resolution}).
         -u <time-unit>      Time scale to output. One of s,m,h or d, for seconds,
                             minutes (default), hours or days.
-        -T <output-format>  Set output format. Default is {format}.
-                            If \'text\', then the gnuplot scripts are written
-                            instead of the images.
-        -g <width,height>   Size of each plot. Default is {geometry}.
-""".format(command=os.path.basename(sys.argv[0],), format=format, resolution=resolution, geometry=geometry)
+        -T <output-format>  Set output format. Default is {extension}.
+        -g <width,height>   Size of each plot. Default is {image_width},{image_height}.
+""".format(command=os.path.basename(sys.argv[0],), extension=extension, time_resolution=time_resolution, image_width=image_width, image_height=image_height)
     print(usage_string)
 
 
@@ -335,9 +280,7 @@ if __name__ == '__main__':
     logscale = False
 
     for opt, arg in optlist:
-        if opt == '-c':
-            gnuplot_cmd = arg
-        elif opt == '-o':
+        if opt == '-o':
             prefix = arg
         elif opt == '-h':
             show_usage()
@@ -345,16 +288,12 @@ if __name__ == '__main__':
         elif opt == '-r':
             x_range = arg
         elif opt == '-s':
-            resolution = float(arg)
+            time_resolution = float(arg)
         elif opt == '-g':
-            geometry = arg
+            (image_width,image_height) = arg.split(",")
         elif opt == '-T':
-            if arg == 'text':
-                gnuplot_cmd = 'cat'
-                extension = format + '.gnuplot'
-            else:
-                format = arg
-                extension = format
+            format = arg
+            extension = format
         elif opt == '-u':
             if arg in unit_factors:
                 x_units = arg
@@ -368,67 +307,60 @@ if __name__ == '__main__':
 
     try:
 
-        if extension is not (format + '.gnuplot'):
-            check_gnuplot_version(gnuplot_cmd)
-
         with open(logname) as file:
             log_entries = read_log_entries(file, read_fields(file), reset_until_dispatch)
             times = sort_time(log_entries)
 
-        constructor = VinePlot
-        if logscale:
-            constructor = VinePlotLog
-
         plots = {}
-        plots['workers'] = constructor(x_units=x_units, ylabel='number of workers', range=x_range,
+        plots['workers'] = VinePlot(x_units=x_units, ylabel='number of workers', range=x_range, logscale=logscale,
                                     title="workers instantaneous counts",
                                     fields=['workers_connected', 'workers_idle', 'workers_busy'],
                                     labels=['connected', 'idle', 'busy'])
 
-        plots['workers-accum'] = constructor(x_units=x_units, ylabel='number of workers', range=x_range,
+        plots['workers-accum'] = VinePlot(x_units=x_units, ylabel='number of workers', range=x_range, logscale=logscale,
                                           title="workers cumulative counts",
                                           fields=['workers_joined', 'workers_removed', 'workers_released',
                                                   'workers_slow', 'workers_idled_out', 'workers_lost'],
                                           labels=['joined', 'removed', 'released', 'slow', 'idled out,', 'lost'])
 
-        plots['workers-disk'] = constructor(x_units=x_units, y_units='GB', ylabel='disk space', range=x_range,
+        plots['workers-disk'] = VinePlot(x_units=x_units, y_units='GB', ylabel='disk space', range=x_range,  logscale=logscale,
                                             title='workers disk utilization',
                                             fields=['total_disk', 'committed_disk', 'inuse_cache'],
                                             labels=['total', 'committed to tasks', 'used by cache'])
 
-        plots['tasks'] = constructor(x_units=x_units, ylabel='number of tasks', range=x_range,
+        plots['tasks'] = VinePlot(x_units=x_units, ylabel='number of tasks', range=x_range,  logscale=logscale,
                                   title="tasks instantaneous counts",
                                   fields=['tasks_waiting', 'tasks_on_workers', 'tasks_running', 'tasks_with_results'],
                                   labels=['waiting', 'on workers', 'running', 'with results'])
 
-        plots['tasks-capacities'] = constructor(x_units=x_units, ylabel='number of tasks', range=x_range,
+        plots['tasks-capacities'] = VinePlot(x_units=x_units, ylabel='number of tasks', range=x_range, logscale=logscale,
                                              title="tasks instantaneous capacities",
                                              fields=['tasks_running', 'capacity_instantaneous', 'capacity_weighted'],
                                              labels=['tasks running', 'tasks capacity raw', 'tasks capacity weighted'])
 
-        plots['tasks-accum'] = constructor(x_units=x_units, ylabel='number of tasks', range=x_range,
+        plots['tasks-accum'] = VinePlot(x_units=x_units, ylabel='number of tasks', range=x_range,  logscale=logscale,
                                         title="tasks cumulative counts",
                                         fields=['tasks_submitted', 'tasks_dispatched', 'tasks_done',
                                                 'tasks_failed', 'tasks_cancelled', 'tasks_exhausted_attempts'],
                                         labels=['submitted', 'dispatched', 'done', 'failed', 'cancelled', 'exhausted attempts'])
 
-        plots['time-manager'] = constructor(x_units=x_units, ylabel="cumulative time", y_units=x_units, range=x_range,
+        plots['time-manager'] = VinePlot(x_units=x_units, ylabel="cumulative time", y_units=x_units, range=x_range,  logscale=logscale,
                                          title="cumulative times at the manager",
                                          fields=['time_send', 'time_receive', 'time_polling',
                                                  'time_status_msgs', 'time_internal', 'time_application'],
                                          labels=['send', 'receive', 'manager polling', 'manager status msgs', 'manager internal', 'manager application'])
 
-        plots['time-workers'] = constructor(x_units=x_units, y_units='h', ylabel="cumulative time", range=x_range,
+        plots['time-workers'] = VinePlot(x_units=x_units, y_units='h', ylabel="cumulative time", range=x_range,  logscale=logscale,
                                          title="cumulative times at workers",
                                          fields=['time_execute', 'time_execute_good', 'time_execute_exhaustion'],
                                          labels=['execute', 'execute good', 'execute exhaustion'])
 
-        plots['transfer'] = constructor(x_units=x_units, y_units='GB', ylabel='size', range=x_range,
+        plots['transfer'] = VinePlot(x_units=x_units, y_units='GB', ylabel='size', range=x_range,  logscale=logscale,
                                      title="manager data transfer",
                                      fields=['bytes_sent', 'bytes_received'],
                                      labels=['sent', 'received'])
 
-        plots['times-stacked'] = VinePlot(x_units=x_units, y_units='%', ylabel='utilization per time sample', range=x_range, stack=True,
+        plots['times-stacked'] = VinePlot(x_units=x_units, y_units='%', ylabel='utilization per time sample', range=x_range, stack=True,  logscale=logscale,
                                           title='manager time proportions',
                                           fields=['stack_time_other', 'stack_time_application', 'stack_time_receive',
                                                   'stack_time_send', 'stack_time_polling', 'stack_time_internal', 'stack_time_status_msgs'],
