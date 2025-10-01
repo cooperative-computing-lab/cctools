@@ -89,7 +89,7 @@ OPTION_END
 - **--send-environment**<br />Send all local environment variables in remote execution.
 - **--wait-for-files-upto=_&lt;#&gt;_**<br />Wait for output files to be created upto this many seconds (e.g., to deal with NFS semantics).
 - **-S**,**--submission-timeout=_&lt;timeout&gt;_**<br />Time to retry failed batch job submission. (default is 3600s)
-- **-T**,**--batch-type=_&lt;type&gt;_**<br />Batch system type: local, dryrun, condor, sge, pbs, torque, blue_waters, slurm, moab, cluster, wq, amazon, mesos. (default is local)
+- **-T**,**--batch-type=_&lt;type&gt;_**<br />Batch system type: local, dryrun, condor, wq, vine, uge, pbs, torque, slurm, moab, cluster, amazon. (default is local)
 - **--safe-submit-mode**<br />Excludes resources at submission. (SLURM, TORQUE, and PBS)
 - **--ignore-memory-spec**<br />Excludes memory at submission. (SLURM)
 - **--batch-mem-type=_&lt;type&gt;_**<br />Specify memory resource type. (SGE)
