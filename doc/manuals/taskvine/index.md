@@ -2539,17 +2539,17 @@ vine-run-info/%Y-%m-%dT%H:%M:%S/vine-logs/performance
 ```
 
 !!! note
-    To use `vine_graph_log`, you must first install the `gnuplot` package like this:
+    To use `vine_plot_performance`, you must first install the `matplotlib` package like this:
     ```
-    conda install conda-forge::gnuplot
+    conda install conda-forge::matplotlib
     ```
 
-`vine_graph_log` will plot a wide variety of statistics from the performance log,
+`vine_plot_performance` will plot a wide variety of statistics from the performance log,
 such as total time spent transferring tasks, number of tasks running, and workers connected.
 For example, this command:
 
 ```sh
-$ vine_graph_log -o myplots vine-run-info/most-recent/vine-logs/performance
+$ vine_plot_performance -o myplots vine-run-info/most-recent/vine-logs/performance
 ```
 
 produces the following graphs:
