@@ -14,11 +14,14 @@ import getopt
 import matplotlib.pyplot as plt
 from functools import reduce
 
-# default output format, can choose any type supported by matplotlib
+# Default output format, can choose any type supported by matplotlib
 extension = "svg"
 
-# this many seconds to one log entry. Default is 30 seconds.
+# Sample the log file at this time period, to keep graphs readable:
 time_resolution = 30
+
+# Try these different time resolutions to get a reasonable number of points:
+time_resolution_list = [30,5,1]
 
 # If unspecified, then plot all the valid range.
 x_range = None
@@ -265,7 +268,7 @@ class VinePlot:
             if self.stack:
                 plt.bar(x, y, label=self.fields[i], color=colors[i])
             else:
-                plt.plot(x, y, label=self.fields[i], color=colors[i], marker="o")
+                plt.plot(x, y, label=self.fields[i], color=colors[i])
 
         if self.y_units:
             plt.ylabel("{} ({})".format(self.ylabel, self.y_units))
@@ -360,7 +363,8 @@ if __name__ == "__main__":
         elif opt == "-r":
             x_range = arg
         elif opt == "-s":
-            time_resolution = float(arg)
+            # If a specific resolution is given, use that one alone
+            time_resolution_list = [float(arg)]
         elif opt == "-g":
             (image_width, image_height) = arg.split(",")
         elif opt == "-T":
@@ -382,12 +386,21 @@ if __name__ == "__main__":
 
     try:
 
-        with open(logname) as file:
-            log_entries = read_log_entries(
-                file, read_fields(file), reset_until_dispatch
-            )
-            times = sort_time(log_entries)
+        for time_resolution in time_resolution_list:
+            
+            with open(logname) as file:
+                log_entries = read_log_entries(
+                    file, read_fields(file), reset_until_dispatch
+                )
 
+                times = sort_time(log_entries)
+    
+            # If this is a small log file and we didn't get many entries,
+            # then reload again with a finer time resolution.
+            
+            if(len(times)<30):
+                continue
+                
         plots = {}
         plots["workers"] = VinePlot(
             x_units=x_units,
