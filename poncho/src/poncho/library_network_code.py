@@ -93,7 +93,7 @@ def load_function_infile(in_file_path):
         with open(in_file_path, "rb") as f:
             return cloudpickle.load(f)
     elif function_infile_load_mode == "json":
-        with open(in_file_path, "r") as f:
+        with open(in_file_path, "r", encoding="utf-8") as f:
             return json.load(f)
     else:
         raise ValueError(f"invalid infile load mode: {function_infile_load_mode}")
