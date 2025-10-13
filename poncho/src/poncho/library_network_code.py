@@ -174,12 +174,7 @@ def start_function(in_pipe_fd, thread_limit=1):
 
                     stdout_timed_message(f"TASK {function_id} {function_name} arrives, starting to run in process {os.getpid()}")
 
-                    try:
-                        exit_status = 1
-                    except Exception:
-                        stdout_timed_message(f"TASK {function_id} error: can't load the arguments from infile")
-                        exit_status = 2
-                        raise
+                    exit_status = 1
 
                     try:
                         # setup stdout/err for a function call so we can capture them.
@@ -199,7 +194,7 @@ def start_function(in_pipe_fd, thread_limit=1):
                         os.dup2(library_fd, sys.stdout.fileno())
                     except Exception:
                         stdout_timed_message(f"TASK {function_id} error: can't execute this function")
-                        exit_status = 3
+                        exit_status = 2
                         raise
                     finally:
                         if function_stdout_fd in locals():
@@ -210,14 +205,14 @@ def start_function(in_pipe_fd, thread_limit=1):
                             cloudpickle.dump(result, f)
                     except Exception:
                         stdout_timed_message(f"TASK {function_id} error: can't load the result from outfile")
-                        exit_status = 4
-                        if os.path.exits("outfile"):
+                        exit_status = 3
+                        if os.path.exists("outfile"):
                             os.remove("outfile")
                         raise
 
                     try:
                         if not result["Success"]:
-                            exit_status = 5
+                            exit_status = 4
                     except Exception:
                         stdout_timed_message(f"TASK {function_id} error: the result is invalid")
                         exit_status = 5
@@ -232,13 +227,11 @@ def start_function(in_pipe_fd, thread_limit=1):
                     os._exit(exit_status)
             elif p < 0:
                 stdout_timed_message(f"TASK {function_id} error: unable to fork to execute {function_name}")
-                return -1
+                return -1, function_id
 
             # return pid and function id of child process to parent.
             else:
                 return p, function_id
-
-    return -1
 
 
 # Send result of a function execution to worker. Wake worker up to do work with SIGCHLD.
