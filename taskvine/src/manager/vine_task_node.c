@@ -433,7 +433,7 @@ int _prune_ancestors_of_persisted_node(struct vine_task_node *node)
 			timestamp_t start_time = timestamp_get();
 			unlink(ancestor_node->outfile_remote_name);
 			node->time_spent_on_unlink_local_files += timestamp_get() - start_time;
-			debug(D_VINE, "unlinked %s size: %ld bytes, time: %llu", ancestor_node->outfile_remote_name, ancestor_node->outfile_size_bytes, node->time_spent_on_unlink_local_files);
+			debug(D_VINE, "unlinked %s size: %ld bytes, time: %lu", ancestor_node->outfile_remote_name, ancestor_node->outfile_size_bytes, node->time_spent_on_unlink_local_files);
 		} else {
 			switch (ancestor_node->outfile->type) {
 			case VINE_FILE:
