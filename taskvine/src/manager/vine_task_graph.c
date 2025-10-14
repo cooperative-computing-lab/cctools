@@ -342,7 +342,7 @@ void vine_task_graph_execute(struct vine_task_graph *tg)
 
 			/* if the outfile is set to save on the sharedfs, stat to get the size of the file */
 			switch (node->outfile_type) {
-			case VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM:
+			case VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM: {
 				struct stat info;
 				int result = stat(node->outfile_remote_name, &info);
 				if (result < 0) {
@@ -353,6 +353,7 @@ void vine_task_graph_execute(struct vine_task_graph *tg)
 				}
 				node->outfile_size_bytes = info.st_size;
 				break;
+            }
 			case VINE_NODE_OUTFILE_TYPE_LOCAL:
 			case VINE_NODE_OUTFILE_TYPE_TEMP:
 				node->outfile_size_bytes = node->outfile->size;
