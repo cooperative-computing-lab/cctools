@@ -18,6 +18,8 @@
 #include "vine_temp.h"
 #include "random.h"
 
+#include <inttypes.h>
+
 double compute_lex_priority(const char *key)
 {
 	double score = 0.0;
@@ -433,7 +435,7 @@ int _prune_ancestors_of_persisted_node(struct vine_task_node *node)
 			timestamp_t start_time = timestamp_get();
 			unlink(ancestor_node->outfile_remote_name);
 			node->time_spent_on_unlink_local_files += timestamp_get() - start_time;
-			debug(D_VINE, "unlinked %s size: %ld bytes, time: %lu", ancestor_node->outfile_remote_name, ancestor_node->outfile_size_bytes, node->time_spent_on_unlink_local_files);
+			debug(D_VINE, "unlinked %s size: %ld bytes, time: %" PRIu64, ancestor_node->outfile_remote_name, ancestor_node->outfile_size_bytes, (uint64_t) node->time_spent_on_unlink_local_files);
 		} else {
 			switch (ancestor_node->outfile->type) {
 			case VINE_FILE:
