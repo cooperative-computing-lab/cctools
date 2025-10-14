@@ -27,7 +27,7 @@ int main()
 	progress_bar_delete(bar);
 
 	timestamp_t end_time = timestamp_get();
-	printf("time taken: %ld\n", end_time - start_time);
+	printf("time taken: %ld us\n", end_time - start_time);
 
 	return 0;
 }
