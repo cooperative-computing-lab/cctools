@@ -40,6 +40,7 @@ def dist_func(mode, low, high):
         return 0
 
     assert mode in ["uniform", "normal", "lognormal", "pareto", "mix"]
+
     # uniform distribution, flat spread
     def uniform_dist():
         return random.uniform(low, high)

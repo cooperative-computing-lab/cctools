@@ -3,6 +3,8 @@
 #include "vine_task.h"
 #include "vine_file.h"
 #include "vine_task_graph.h"
+#include "jx.h"
+#include "jx_print.h"
 #include "xxmalloc.h"
 #include "stringtools.h"
 #include "taskvine.h"
@@ -81,8 +83,16 @@ struct vine_task_node *vine_task_node_create(
 	vine_task_set_library_required(node->task, library_name);
 	vine_task_addref(node->task);
 
-	/* add the infile as the key of the graph to compute */
-	char *infile_content = string_format("%s", node->node_key);
+	/* build JSON infile expected by library: {"fn_args": [key], "fn_kwargs": {}} */
+	struct jx *event = jx_object(NULL);
+	struct jx *args = jx_array(NULL);
+	jx_array_append(args, jx_string(node->node_key));
+	jx_insert(event, jx_string("fn_args"), args);
+	jx_insert(event, jx_string("fn_kwargs"), jx_object(NULL));
+
+	char *infile_content = jx_print_string(event);
+	jx_delete(event);
+
 	node->infile = vine_declare_buffer(node->manager, infile_content, strlen(infile_content), VINE_CACHE_LEVEL_TASK, VINE_UNLINK_WHEN_DONE);
 	free(infile_content);
 	vine_task_add_input(node->task, node->infile, "infile", VINE_TRANSFER_ALWAYS);
@@ -137,22 +147,16 @@ static int _node_outfile_is_persisted(struct vine_task_node *node)
 		return 0;
 	}
 
-	/* if the outfile pointer is NULL, it means the node is producing a shared file system file */
-	if (!node->outfile) {
+	switch (node->outfile_type) {
+	case VINE_NODE_OUTFILE_TYPE_LOCAL:
 		return 1;
-	}
-
-	switch (node->outfile->type) {
-	case VINE_FILE:
+	case VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM:
 		return 1;
-	case VINE_TEMP:
-		/* check if this file is in the any of the checkpoint workers */
-		return file_has_been_checkpointed(node->manager, node->outfile);
-	default:
-		/* not supported at the moment */
-		debug(D_ERROR, "unsupported outfile type: %d", node->outfile->type);
+	case VINE_NODE_OUTFILE_TYPE_TEMP:
 		return 0;
 	}
+
+	return 0;
 }
 
 double vine_task_node_calculate_priority(struct vine_task_node *node)
@@ -553,15 +557,6 @@ void vine_task_node_replicate_outfile(struct vine_task_node *node)
 	}
 
 	vine_temp_replicate_file_later(node->manager, node->outfile);
-}
-
-void vine_task_node_checkpoint_outfile(struct vine_task_node *node)
-{
-	if (!node || !node->outfile) {
-		return;
-	}
-
-	vine_temp_checkpoint_file_later(node->manager, node->outfile);
 }
 
 int vine_task_node_set_outfile_size_bytes(struct vine_task_node *node, size_t outfile_size_bytes)

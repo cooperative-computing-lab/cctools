@@ -121,32 +121,6 @@ static struct vine_worker_info *get_best_dest_worker(struct vine_manager *q, str
 	return best_destination;
 }
 
-int file_has_been_checkpointed(struct vine_manager *q, struct vine_file *f)
-{
-	if (!q || !f || f->type != VINE_TEMP) {
-		return 0;
-	}
-
-	/* check if the file has been checkpointed by any checkpoint worker */
-	struct set *source_workers = hash_table_lookup(q->file_worker_table, f->cached_name);
-	if (!source_workers) {
-		return 0;
-	}
-
-	struct vine_worker_info *source_worker;
-	SET_ITERATE(source_workers, source_worker)
-	{
-		/* skip if not a checkpoint worker */
-		if (!is_checkpoint_worker(q, source_worker)) {
-			continue;
-		}
-		/* it is already checkpointed */
-		return 1;
-	}
-
-	return 0;
-}
-
 void vine_temp_start_peer_transfer(struct vine_manager *q, struct vine_file *f, struct vine_worker_info *source_worker, struct vine_worker_info *dest_worker)
 {
 	if (!q || !f || f->type != VINE_TEMP || !source_worker || !dest_worker) {

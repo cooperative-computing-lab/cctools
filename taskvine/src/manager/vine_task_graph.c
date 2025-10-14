@@ -242,20 +242,6 @@ static struct vine_task_node *get_node_by_task(struct vine_task_graph *tg, struc
 	return NULL;
 }
 
-static void handle_checkpoint_worker_stagein(struct vine_task_graph *tg, struct vine_file *f)
-{
-	if (!tg || !f) {
-		return;
-	}
-
-	struct vine_task_node *this_node = hash_table_lookup(tg->outfile_cachename_to_node, f->cached_name);
-	if (!this_node) {
-		return;
-	}
-
-	vine_task_node_prune_ancestors(this_node);
-}
-
 /*************************************************************/
 /* Public APIs */
 /*************************************************************/
@@ -390,10 +376,10 @@ void vine_task_graph_execute(struct vine_task_graph *tg)
 			if (regular_tasks_part->current == 0) {
 				progress_bar_set_start_time(pbar, task->time_when_commit_start);
 			}
-			
+
 			/* update critical time */
 			vine_task_node_update_critical_time(node, task->time_workers_execute_last);
-			
+
 			/* mark this regular task as completed */
 			progress_bar_update_part(pbar, regular_tasks_part, 1);
 
@@ -406,7 +392,7 @@ void vine_task_graph_execute(struct vine_task_graph *tg)
 				}
 			}
 
-			/* enqueue the output file for replication or checkpointing */
+			/* enqueue the output file for replication */
 			switch (node->outfile_type) {
 			case VINE_NODE_OUTFILE_TYPE_TEMP:
 				vine_task_node_replicate_outfile(node);

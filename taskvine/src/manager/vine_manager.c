@@ -4377,7 +4377,6 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->shutting_down = 0;
 	vine_set_replica_placement_policy(q, VINE_REPLICA_PLACEMENT_POLICY_RANDOM);
 
-
 	if ((envstring = getenv("VINE_BANDWIDTH"))) {
 		q->bandwidth_limit = string_metric_parse(envstring);
 		if (q->bandwidth_limit < 0) {

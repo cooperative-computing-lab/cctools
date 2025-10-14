@@ -124,7 +124,7 @@ class GraphExecutor(Manager):
             compute_single_key,
             library_context_info=[init_task_graph_context, [], {"task_graph_path": self.task_graph_pkl_file_remote_path}],
             add_env=False,
-            infile_load_mode="text",
+            function_infile_load_mode="json",
             hoisting_modules=hoisting_modules
         )
         self.libtask.add_input(self.declare_file(self.task_graph_pkl_file_local_path), self.task_graph_pkl_file_remote_path)

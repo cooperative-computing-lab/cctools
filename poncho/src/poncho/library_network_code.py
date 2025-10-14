@@ -177,7 +177,7 @@ def start_function(in_pipe_fd, thread_limit=1):
                 infile_path = os.path.join(function_sandbox, "infile")
                 event = load_function_infile(infile_path)
             except Exception:
-                stdout_timed_message(f"TASK {function_id} error: can't load the arguments from {arg_infile}")
+                stdout_timed_message(f"TASK {function_id} error: can't load the arguments from {infile_path}")
                 return -1, function_id
             p = os.fork()
             if p == 0:
