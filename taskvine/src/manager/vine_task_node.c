@@ -113,12 +113,13 @@ void vine_task_node_set_outfile(struct vine_task_node *node, vine_task_node_outf
 
 	/* create the output file */
 	switch (node->outfile_type) {
-	case VINE_NODE_OUTFILE_TYPE_LOCAL:
+	case VINE_NODE_OUTFILE_TYPE_LOCAL: {
 		char *persistent_path = string_format("%s/outputs/%s", node->staging_dir, node->outfile_remote_name);
 		node->outfile = vine_declare_file(node->manager, persistent_path, VINE_CACHE_LEVEL_WORKFLOW, 0);
 		free(persistent_path);
 		debug(D_VINE, "node %s: outfile type = VINE_NODE_OUTFILE_TYPE_LOCAL, outfile = %s", node->node_key, node->outfile->cached_name);
 		break;
+    }
 	case VINE_NODE_OUTFILE_TYPE_TEMP:
 		node->outfile = vine_declare_temp(node->manager);
 		debug(D_VINE, "node %s: outfile type = VINE_NODE_OUTFILE_TYPE_TEMP, outfile = %s", node->node_key, node->outfile->cached_name);
@@ -432,7 +433,7 @@ int _prune_ancestors_of_persisted_node(struct vine_task_node *node)
 			timestamp_t start_time = timestamp_get();
 			unlink(ancestor_node->outfile_remote_name);
 			node->time_spent_on_unlink_local_files += timestamp_get() - start_time;
-			debug(D_VINE, "unlinked %s size: %ld bytes, time: %ld", ancestor_node->outfile_remote_name, ancestor_node->outfile_size_bytes, node->time_spent_on_unlink_local_files);
+			debug(D_VINE, "unlinked %s size: %ld bytes, time: %llu", ancestor_node->outfile_remote_name, ancestor_node->outfile_size_bytes, node->time_spent_on_unlink_local_files);
 		} else {
 			switch (ancestor_node->outfile->type) {
 			case VINE_FILE:
