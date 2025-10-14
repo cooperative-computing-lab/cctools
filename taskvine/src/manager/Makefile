@@ -28,7 +28,10 @@ SOURCES = \
 	vine_file_replica_table.c \
 	vine_fair.c \
 	vine_runtime_dir.c \
-	vine_task_groups.c
+	vine_task_groups.c \
+	vine_temp.c \
+	vine_task_node.c \
+	vine_task_graph.c
 
 PUBLIC_HEADERS = taskvine.h
 

@@ -123,7 +123,7 @@ struct vine_manager {
 
 	struct hash_table *file_table;      /* Maps fileid -> struct vine_file.* */
 	struct hash_table *file_worker_table; /* Maps cachename -> struct set of workers with a replica of the file.* */
-	struct hash_table *temp_files_to_replicate; /* Maps cachename -> NULL. Used as a set of temp files to be replicated */
+	struct priority_queue *temp_files_to_replicate; /* Maps cachename -> NULL. Used as a set of temp files to be replicated */
 
 
 	/* Primary scheduling controls. */
@@ -232,6 +232,14 @@ struct vine_manager {
 	double sandbox_grow_factor;         /* When task disk sandboxes are exhausted, increase the allocation using their measured valued times this factor */
 	double disk_proportion_available_to_task;   /* intentionally reduces disk allocation for tasks to reserve some space for cache growth. */
 
+	int return_recovery_tasks; /* If true, recovery tasks are returned by vine_wait to the user. By default they are handled internally. */
+	int num_submitted_recovery_tasks;
+	vine_replica_placement_policy_t replica_placement_policy; /* Mode for selecting best worker for placing a new replica of a temp file */
+	int balance_worker_disk_load; /* If true, offload replicas from workers that are overloaded with temp files. */
+	timestamp_t when_last_offloaded;
+	int64_t peak_used_cache;
+	int shutting_down;
+
 	/* todo: confirm datatype. int or int64 */
 	int max_task_stdout_storage;	/* Maximum size of standard output from task.  (If larger, send to a separate file.) */
 	int max_new_workers;			/* Maximum number of workers to add in a single cycle before dealing with other matters. */
@@ -290,6 +298,15 @@ void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info 
 
 /* Check if the worker is able to transfer the necessary files for this task. */
 int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
+
+/* Delete a file from a worker. */
+int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
+
+/* Evict a random worker to simulate a worker failure. */
+int evict_random_worker(struct vine_manager *q);
+
+/* Get the available disk space in bytes for a worker. */
+int64_t get_worker_available_disk_bytes(struct vine_worker_info *w);
 
 /* The expected format of files created by the resource monitor.*/
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-task-%d"

@@ -15,6 +15,7 @@ See the file COPYING for details.
 struct vine_manager;
 struct vine_task;
 struct vine_file;
+struct vine_task_graph;
 
 /** @file taskvine.h The public API for the taskvine distributed application framework.
 A taskvine application consists of a manager process and a larger number of worker
@@ -149,6 +150,30 @@ typedef enum {
 	VINE_MINI_TASK,             /**< A file obtained by executing a Unix command line. */
 } vine_file_type_t;
 
+/* Select while type of workers to place the redundant file replicas */
+typedef enum {
+	VINE_REPLICA_PLACEMENT_POLICY_RANDOM = 0,        /* select a random worker */
+	VINE_REPLICA_PLACEMENT_POLICY_DISK_LOAD,         /* select a worker with the most free disk space */
+	VINE_REPLICA_PLACEMENT_POLICY_TRANSFER_LOAD      /* select a worker with the least incoming transfer load */
+} vine_replica_placement_policy_t;
+
+/** Select the type of the node-output file. */
+typedef enum {
+	VINE_NODE_OUTFILE_TYPE_LOCAL = 0,               /* Node-output file will be stored locally on the manager's staging directory */
+    VINE_NODE_OUTFILE_TYPE_TEMP,                    /* Node-output file will be stored in the temporary node-local storage */
+    VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM,      /* Node-output file will be stored in the persistent shared file system */
+} vine_task_node_outfile_type_t;
+
+/** Select priority algorithm for task graph task scheduling. */
+typedef enum {
+    VINE_TASK_PRIORITY_MODE_RANDOM = 0,          /**< Assign random priority to tasks */
+    VINE_TASK_PRIORITY_MODE_DEPTH_FIRST,         /**< Prioritize deeper tasks first */
+    VINE_TASK_PRIORITY_MODE_BREADTH_FIRST,       /**< Prioritize shallower tasks first */
+    VINE_TASK_PRIORITY_MODE_FIFO,                /**< First in, first out priority */
+    VINE_TASK_PRIORITY_MODE_LIFO,                /**< Last in, first out priority */
+    VINE_TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST, /**< Prioritize tasks with larger inputs first */
+    VINE_TASK_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST /**< Prioritize tasks with larger storage footprint first */
+} vine_task_node_priority_mode_t;
 
 /** Statistics describing a manager. */
 struct vine_stats {
@@ -1117,6 +1142,14 @@ int vine_enable_peer_transfers(struct vine_manager *m);
 /** Disable taskvine peer transfers to be scheduled by the manager **/
 int vine_disable_peer_transfers(struct vine_manager *m);
 
+/** Enable recovery tasks to be returned by vine_wait.
+By default, recovery tasks are handled internally by the manager. **/
+int vine_enable_return_recovery_tasks(struct vine_manager *m);
+
+/** Disable recovery tasks from being returned by vine_wait.
+Recovery tasks will be handled internally by the manager. **/
+int vine_disable_return_recovery_tasks(struct vine_manager *m);
+
 /** When enabled, resources to tasks in are assigned in proportion to the size
 of the worker. If a resource is specified (e.g. with @ref vine_task_set_cores),
 proportional resources never go below explicit specifications. This mode is most
@@ -1555,6 +1588,94 @@ char *vine_get_path_library_log(struct vine_manager *m, const char *path);
 @return A string.
 */
 char *vine_get_path_cache(struct vine_manager *m, const char *path);
+
+/** Create a task graph object and return it.
+@param q Reference to the current manager object.
+@return A new task graph object.
+*/
+struct vine_task_graph *vine_task_graph_create(struct vine_manager *q);
+
+/** Delete a task graph object.
+@param tg Reference to the task graph object.
+*/
+void vine_task_graph_delete(struct vine_task_graph *tg);
+
+/** Add a dependency between two nodes in the task graph.
+@param tg Reference to the task graph object.
+@param parent_key Reference to the parent node key.
+@param child_key Reference to the child node key.
+*/
+void vine_task_graph_add_dependency(struct vine_task_graph *tg, const char *parent_key, const char *child_key);
+
+/** Create a new node in the task graph.
+@param tg Reference to the task graph object.
+@param node_key Reference to the node key.
+@param staging_dir Reference to the staging directory.
+@param prune_depth Reference to the prune depth.
+@param priority_mode Reference to the priority mode.
+@return A new node object.
+*/
+struct vine_task_node *vine_task_graph_create_node(struct vine_task_graph *tg,
+	const char *node_key,
+	const char *staging_dir,
+	int prune_depth,
+	vine_task_node_priority_mode_t priority_mode);
+
+/** Set the replica placement policy (which worker do we prefer to place the redundant file replicas).
+@param q Reference to the current manager object.
+@param policy Reference to the replica placement policy.
+*/
+void vine_set_replica_placement_policy(struct vine_manager *q, vine_replica_placement_policy_t policy);
+
+/** Set the type of the node-output file.
+@param tg Reference to the task graph object.
+@param node_key Reference to the node key.
+@param outfile_type Reference to the output file type.
+@param outfile_remote_name Reference to the output file remote name.
+*/
+void vine_task_graph_set_node_outfile(struct vine_task_graph *tg, const char *node_key, vine_task_node_outfile_type_t outfile_type, const char *outfile_remote_name);
+
+/** Finalize the metrics of the task graph.
+@param tg Reference to the task graph object.
+*/
+void vine_task_graph_finalize_metrics(struct vine_task_graph *tg);
+
+/** Get the library name of the task graph.
+@param tg Reference to the task graph object.
+@return The library name.
+*/
+const char *vine_task_graph_get_library_name(const struct vine_task_graph *tg);
+
+/** Get the function name of the task graph.
+@param tg Reference to the task graph object.
+@return The function name.
+*/
+const char *vine_task_graph_get_function_name(const struct vine_task_graph *tg);
+
+/** Get the heavy score of a node in the task graph.
+@param tg Reference to the task graph object.
+@param node_key Reference to the node key.
+@return The heavy score.
+*/
+double vine_task_graph_get_node_heavy_score(const struct vine_task_graph *tg, const char *node_key);
+
+/** Execute the task graph.
+@param tg Reference to the task graph object.
+*/
+void vine_task_graph_execute(struct vine_task_graph *tg);
+
+/** Get the local outfile source of a node in the task graph.
+@param tg Reference to the task graph object.
+@param node_key Reference to the node key.
+@return The local outfile source.
+*/
+const char *vine_task_graph_get_node_local_outfile_source(const struct vine_task_graph *tg, const char *node_key);
+
+/** Set the failure injection step percent.
+@param tg Reference to the task graph object.
+@param percent Reference to the failure injection step percent.
+*/
+void vine_task_graph_set_failure_injection_step_percent(struct vine_task_graph *tg, double percent);
 
 //@}
 
