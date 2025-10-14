@@ -353,7 +353,7 @@ void vine_task_graph_execute(struct vine_task_graph *tg)
 				}
 				node->outfile_size_bytes = info.st_size;
 				break;
-            }
+			}
 			case VINE_NODE_OUTFILE_TYPE_LOCAL:
 			case VINE_NODE_OUTFILE_TYPE_TEMP:
 				node->outfile_size_bytes = node->outfile->size;
