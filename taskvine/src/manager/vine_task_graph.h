@@ -14,8 +14,8 @@ struct vine_task_graph {
 	struct itable *task_id_to_node;
 	struct hash_table *outfile_cachename_to_node;
 
-    char *library_name;
-    char *function_name;
+    char *proxy_library_name;
+    char *proxy_function_name;
 
     double failure_injection_step_percent;  // 0 - 100, the percentage of steps to inject failure
 };

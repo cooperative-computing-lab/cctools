@@ -1,6 +1,7 @@
 #include "vine_task_graph.h"
 #include "taskvine.h"
 #include "vine_manager.h"
+#include "vine_task_node.h"
 #include "vine_worker_info.h"
 #include "priority_queue.h"
 #include <stdlib.h>
@@ -9,7 +10,6 @@
 #include "debug.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
-#include "priority_queue.h"
 #include <math.h>
 #include "hash_table.h"
 #include <sys/stat.h>
@@ -46,13 +46,6 @@ static void submit_node_task(struct vine_task_graph *tg, struct vine_task_node *
 	int task_id = vine_task_node_submit(node);
 	itable_insert(tg->task_id_to_node, task_id, node);
 
-	node->retry_attempts_left--;
-	if (node->retry_attempts_left < 0) {
-		debug(D_ERROR, "Aborting, node %s has exhausted all retry attempts", node->node_key);
-		vine_task_graph_delete(tg);
-		exit(1);
-	}
-
 	return;
 }
 
@@ -68,8 +61,11 @@ static void submit_node_ready_children(struct vine_task_graph *tg, struct vine_t
 		/* Remove this parent from the child's pending set if it exists */
 		if (child_node->pending_parents) {
 			/* Assert that this parent is indeed pending for the child */
-			assert(set_lookup(child_node->pending_parents, node));
-			set_remove(child_node->pending_parents, node);
+			if (child_node->pending_parents && set_lookup(child_node->pending_parents, node)) {
+				set_remove(child_node->pending_parents, node);
+			} else {
+				debug(D_ERROR, "inconsistent pending set: child=%s missing parent=%s", child_node->node_key, node->node_key);
+			}
 		}
 
 		/* If no more parents are pending, submit the child */
@@ -141,6 +137,8 @@ static struct list *get_topological_order(struct vine_task_graph *tg)
 		}
 
 		list_delete(topo_order);
+		hash_table_delete(in_degree_map);
+		priority_queue_delete(pq);
 		exit(1);
 	}
 
@@ -251,9 +249,19 @@ void vine_task_graph_execute(struct vine_task_graph *tg)
 	if (!tg) {
 		return;
 	}
-
+	
+	debug(D_VINE, "start executing task graph");
+	
+	/* print the info of all nodes */
 	char *node_key;
 	struct vine_task_node *node;
+	HASH_TABLE_ITERATE(tg->nodes, node_key, node)
+	{
+		vine_task_node_print_info(node);
+	}
+	
+	/* enable return recovery tasks */
+	vine_enable_return_recovery_tasks(tg->manager);
 
 	/* create mapping from task_id and outfile cached_name to node */
 	HASH_TABLE_ITERATE(tg->nodes, node_key, node)
@@ -288,9 +296,6 @@ void vine_task_graph_execute(struct vine_task_graph *tg)
 			}
 		}
 	}
-
-	/* enable return recovery tasks */
-	vine_enable_return_recovery_tasks(tg->manager);
 
 	/* enqueue those without dependencies */
 	HASH_TABLE_ITERATE(tg->nodes, node_key, node)
@@ -334,7 +339,15 @@ void vine_task_graph_execute(struct vine_task_graph *tg)
 
 			/* in case of failure, resubmit this task */
 			if (node->task->result != VINE_RESULT_SUCCESS || node->task->exit_code != 0) {
-				debug(D_VINE | D_NOTICE, "Task %d failed with result %d and exit code %d, resubmitting...", task->task_id, node->task->result, node->task->exit_code);
+				if (node->retry_attempts_left <= 0) {
+					debug(D_ERROR, "Task %d failed (result=%d, exit=%d). Node %s has no retries left. Aborting.",
+						  task->task_id, node->task->result, node->task->exit_code, node->node_key);
+					vine_task_graph_delete(tg);
+					exit(1);
+				}
+				node->retry_attempts_left--;
+				debug(D_VINE | D_NOTICE, "Task %d failed (result=%d, exit=%d). Retrying node %s (remaining=%d)...",
+					  task->task_id, node->task->result, node->task->exit_code, node->node_key, node->retry_attempts_left);
 				vine_task_reset(node->task);
 				submit_node_task(tg, node);
 				continue;
@@ -346,7 +359,15 @@ void vine_task_graph_execute(struct vine_task_graph *tg)
 				struct stat info;
 				int result = stat(node->outfile_remote_name, &info);
 				if (result < 0) {
-					debug(D_VINE | D_NOTICE, "Task %d succeeded but output file %s does not exist on the shared file system", task->task_id, node->outfile_remote_name);
+					if (node->retry_attempts_left <= 0) {
+						debug(D_ERROR, "Task %d succeeded but missing sharedfs output %s; no retries left for node %s. Aborting.",
+							  task->task_id, node->outfile_remote_name, node->node_key);
+						vine_task_graph_delete(tg);
+						exit(1);
+					}
+					node->retry_attempts_left--;
+					debug(D_VINE | D_NOTICE, "Task %d succeeded but missing sharedfs output %s; retrying node %s (remaining=%d)...",
+						  task->task_id, node->outfile_remote_name, node->node_key, node->retry_attempts_left);
 					vine_task_reset(node->task);
 					submit_node_task(tg, node);
 					continue;
@@ -407,7 +428,7 @@ void vine_task_graph_execute(struct vine_task_graph *tg)
 			submit_node_ready_children(tg, node);
 		} else {
 			wait_timeout = 2;
-			progress_bar_update_part(pbar, recovery_tasks_part, 0);
+			progress_bar_update_part(pbar, recovery_tasks_part, 0);  // refresh the time and total for recovery tasks
 		}
 	}
 
@@ -434,7 +455,7 @@ void vine_task_graph_execute(struct vine_task_graph *tg)
 	return;
 }
 
-void vine_task_graph_finalize_metrics(struct vine_task_graph *tg)
+void vine_task_graph_compute_topology_metrics(struct vine_task_graph *tg)
 {
 	if (!tg) {
 		return;
@@ -531,6 +552,7 @@ void vine_task_graph_finalize_metrics(struct vine_task_graph *tg)
 	LIST_ITERATE(weakly_connected_components, component)
 	{
 		debug(D_VINE, "component %d size: %d\n", component_index, list_size(component));
+		list_delete(component);
 		component_index++;
 	}
 	list_delete(weakly_connected_components);
@@ -547,8 +569,8 @@ struct vine_task_graph *vine_task_graph_create(struct vine_manager *q)
 	tg->task_id_to_node = itable_create(0);
 	tg->outfile_cachename_to_node = hash_table_create(0, 0);
 
-	tg->library_name = xxstrdup("vine_task_graph_library");
-	tg->function_name = xxstrdup("compute_single_key");
+	tg->proxy_library_name = xxstrdup("vine_task_graph_library");
+	tg->proxy_function_name = xxstrdup("compute_single_key");
 	tg->manager = q;
 
 	tg->failure_injection_step_percent = -1.0;
@@ -593,8 +615,8 @@ struct vine_task_node *vine_task_graph_create_node(
 	if (!node) {
 		node = vine_task_node_create(tg->manager,
 				node_key,
-				tg->library_name,
-				tg->function_name,
+				tg->proxy_library_name,
+				tg->proxy_function_name,
 				staging_dir,
 				prune_depth,
 				priority_mode);
@@ -604,6 +626,13 @@ struct vine_task_node *vine_task_graph_create_node(
 	return node;
 }
 
+/**
+ * Add a dependency between two nodes in the task graph. Note that the input-output file relationship
+ * is not handled here, because their file names may have not been determined yet.
+ * @param tg Reference to the task graph object.
+ * @param parent_key Reference to the parent node key.
+ * @param child_key Reference to the child node key.
+ */
 void vine_task_graph_add_dependency(struct vine_task_graph *tg, const char *parent_key, const char *child_key)
 {
 	if (!tg || !parent_key || !child_key) {
@@ -623,25 +652,44 @@ void vine_task_graph_add_dependency(struct vine_task_graph *tg, const char *pare
 
 	list_push_tail(child_node->parents, parent_node);
 	list_push_tail(parent_node->children, child_node);
-	debug(D_VINE, "added dependency: %s -> %s", parent_key, child_key);
+
+	return;
 }
 
-const char *vine_task_graph_get_library_name(const struct vine_task_graph *tg)
+/**
+ * Get the library name of the task graph.
+ * @param tg Reference to the task graph object.
+ * @return The library name.
+ */
+const char *vine_task_graph_get_proxy_library_name(const struct vine_task_graph *tg)
 {
 	if (!tg) {
 		return NULL;
 	}
-	return tg->library_name;
+
+	return tg->proxy_library_name;
 }
 
-const char *vine_task_graph_get_function_name(const struct vine_task_graph *tg)
+/**
+ * Get the function name of the task graph.
+ * @param tg Reference to the task graph object.
+ * @return The function name.
+ */
+const char *vine_task_graph_get_proxy_function_name(const struct vine_task_graph *tg)
 {
 	if (!tg) {
 		return NULL;
 	}
-	return tg->function_name;
+
+	return tg->proxy_function_name;
 }
 
+/**
+ * Get the heavy score of a node in the task graph.
+ * @param tg Reference to the task graph object.
+ * @param node_key Reference to the node key.
+ * @return The heavy score.
+ */
 double vine_task_graph_get_node_heavy_score(const struct vine_task_graph *tg, const char *node_key)
 {
 	if (!tg) {
@@ -656,6 +704,13 @@ double vine_task_graph_get_node_heavy_score(const struct vine_task_graph *tg, co
 	return node->heavy_score;
 }
 
+/**
+ * Get the local outfile source of a node in the task graph, only valid for local output files.
+ * The source of a local output file is the path on the local filesystem.
+ * @param tg Reference to the task graph object.
+ * @param node_key Reference to the node key.
+ * @return The local outfile source.
+ */
 const char *vine_task_graph_get_node_local_outfile_source(const struct vine_task_graph *tg, const char *node_key)
 {
 	if (!tg || !node_key) {
@@ -676,6 +731,13 @@ const char *vine_task_graph_get_node_local_outfile_source(const struct vine_task
 	return node->outfile->source;
 }
 
+/**
+ * Set the outfile of a node in the task graph. This involves declaring the output file and adding it to the task.
+ * @param tg Reference to the task graph object.
+ * @param node_key Reference to the node key.
+ * @param outfile_type Reference to the outfile type.
+ * @param outfile_remote_name Reference to the outfile remote name that the task will generate remotely.
+ */
 void vine_task_graph_set_node_outfile(struct vine_task_graph *tg, const char *node_key, vine_task_node_outfile_type_t outfile_type, const char *outfile_remote_name)
 {
 	if (!tg || !node_key || !outfile_remote_name) {
@@ -692,6 +754,10 @@ void vine_task_graph_set_node_outfile(struct vine_task_graph *tg, const char *no
 	return;
 }
 
+/**
+ * Delete a task graph object.
+ * @param tg Reference to the task graph object.
+ */
 void vine_task_graph_delete(struct vine_task_graph *tg)
 {
 	if (!tg) {
@@ -716,8 +782,8 @@ void vine_task_graph_delete(struct vine_task_graph *tg)
 
 	vine_delete(tg->manager);
 
-	free(tg->library_name);
-	free(tg->function_name);
+	free(tg->proxy_library_name);
+	free(tg->proxy_function_name);
 
 	hash_table_delete(tg->nodes);
 	itable_delete(tg->task_id_to_node);

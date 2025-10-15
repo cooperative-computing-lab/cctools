@@ -54,8 +54,8 @@ struct vine_task_node {
 struct vine_task_node *vine_task_node_create(
     struct vine_manager *manager,
     const char *node_key,
-    const char *library_name,
-    const char *function_name,
+    const char *proxy_library_name,
+    const char *proxy_function_name,
     const char *staging_dir,
     int prune_depth,
     vine_task_node_priority_mode_t priority_mode

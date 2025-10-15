@@ -109,7 +109,7 @@ class GraphExecutor(Manager):
         self._create_library_task(libcores, hoisting_modules, libtask_env_files)
 
     def _create_library_task(self, libcores=1, hoisting_modules=[], libtask_env_files={}):
-        assert cvine.vine_task_graph_get_function_name(self._vine_task_graph) == compute_single_key.__name__
+        assert cvine.vine_task_graph_get_proxy_function_name(self._vine_task_graph) == compute_single_key.__name__
 
         self.task_graph_pkl_file_name = f"library-task-graph-{uuid.uuid4()}.pkl"
         self.task_graph_pkl_file_local_path = self.task_graph_pkl_file_name
@@ -120,7 +120,7 @@ class GraphExecutor(Manager):
         if dask:
             hoisting_modules += [dask]
         self.libtask = self.create_library_from_functions(
-            cvine.vine_task_graph_get_library_name(self._vine_task_graph),
+            cvine.vine_task_graph_get_proxy_library_name(self._vine_task_graph),
             compute_single_key,
             library_context_info=[init_task_graph_context, [], {"task_graph_path": self.task_graph_pkl_file_remote_path}],
             add_env=False,
@@ -194,7 +194,7 @@ class GraphExecutor(Manager):
 
         # we must finalize the graph in c side after all nodes and dependencies are added
         # this includes computing various metrics for each node, such as depth, height, heavy score, etc.
-        cvine.vine_task_graph_finalize_metrics(self._vine_task_graph)
+        cvine.vine_task_graph_compute_topology_metrics(self._vine_task_graph)
 
         # then we can use the heavy score to sort the nodes and specify their outfile remote names
         heavy_scores = {}
@@ -212,7 +212,9 @@ class GraphExecutor(Manager):
                     choice = "shared-file-system"
                 else:
                     choice = "temp"
+            # set on the Python side, will be installed on the remote workers
             self.task_graph.set_outfile_type_of(k, choice)
+            # set on the C side, so the manager knows where the data is stored
             outfile_type_str = f"NODE_OUTFILE_TYPE_{choice.upper().replace('-', '_')}"
             cvine.vine_task_graph_set_node_outfile(self._vine_task_graph,
                                                    self.task_graph.vine_key_of[k],

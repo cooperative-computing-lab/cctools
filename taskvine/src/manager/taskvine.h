@@ -1639,19 +1639,19 @@ void vine_task_graph_set_node_outfile(struct vine_task_graph *tg, const char *no
 /** Finalize the metrics of the task graph.
 @param tg Reference to the task graph object.
 */
-void vine_task_graph_finalize_metrics(struct vine_task_graph *tg);
+void vine_task_graph_compute_topology_metrics(struct vine_task_graph *tg);
 
 /** Get the library name of the task graph.
 @param tg Reference to the task graph object.
 @return The library name.
 */
-const char *vine_task_graph_get_library_name(const struct vine_task_graph *tg);
+const char *vine_task_graph_get_proxy_library_name(const struct vine_task_graph *tg);
 
 /** Get the function name of the task graph.
 @param tg Reference to the task graph object.
 @return The function name.
 */
-const char *vine_task_graph_get_function_name(const struct vine_task_graph *tg);
+const char *vine_task_graph_get_proxy_function_name(const struct vine_task_graph *tg);
 
 /** Get the heavy score of a node in the task graph.
 @param tg Reference to the task graph object.
