@@ -359,7 +359,7 @@ void vine_task_graph_execute(struct vine_task_graph *tg)
 				node->outfile_size_bytes = node->outfile->size;
 				break;
 			}
-			debug(D_VINE, "Node %s completed with outfile %s size: %ld bytes", node->node_key, node->outfile_remote_name, node->outfile_size_bytes);
+			debug(D_VINE, "Node %s completed with outfile %s size: %zu bytes", node->node_key, node->outfile_remote_name, node->outfile_size_bytes);
 
 			/* mark the node as completed */
 			node->completed = 1;
