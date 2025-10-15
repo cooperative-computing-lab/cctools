@@ -1616,7 +1616,7 @@ void vine_task_graph_add_dependency(struct vine_task_graph *tg, const char *pare
 @param priority_mode Reference to the priority mode.
 @return A new node object.
 */
-struct vine_task_node *vine_task_graph_create_node(struct vine_task_graph *tg,
+struct vine_task_node *vine_task_graph_add_node(struct vine_task_graph *tg,
 	const char *node_key,
 	const char *staging_dir,
 	int prune_depth,

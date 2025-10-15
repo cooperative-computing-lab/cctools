@@ -184,11 +184,11 @@ class GraphExecutor(Manager):
         # create task graph in the python side
         print("Initializing task graph in TaskVine")
         for k in topo_order:
-            cvine.vine_task_graph_create_node(self._vine_task_graph,
-                                              self.task_graph.vine_key_of[k],
-                                              self.staging_dir,
-                                              prune_depth,
-                                              get_c_constant(f"task_priority_mode_{priority_mode.replace('-', '_')}"))
+            cvine.vine_task_graph_add_node(self._vine_task_graph,
+                                           self.task_graph.vine_key_of[k],
+                                           self.staging_dir,
+                                           prune_depth,
+                                           get_c_constant(f"task_priority_mode_{priority_mode.replace('-', '_')}"))
             for pk in self.task_graph.parents_of.get(k, []):
                 cvine.vine_task_graph_add_dependency(self._vine_task_graph, self.task_graph.vine_key_of[pk], self.task_graph.vine_key_of[k])
 

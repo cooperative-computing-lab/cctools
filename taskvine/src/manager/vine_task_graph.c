@@ -32,11 +32,20 @@ static volatile sig_atomic_t interrupted = 0;
 /* Private Functions */
 /*************************************************************/
 
+/**
+ * Handle the SIGINT signal.
+ * @param signal Reference to the signal.
+ */
 static void handle_sigint(int signal)
 {
 	interrupted = 1;
 }
 
+/**
+ * Submit a node to the taskvine manager.
+ * @param tg Reference to the task graph object.
+ * @param node Reference to the node object.
+ */
 static void submit_node_task(struct vine_task_graph *tg, struct vine_task_node *node)
 {
 	if (!tg || !node) {
@@ -49,7 +58,12 @@ static void submit_node_task(struct vine_task_graph *tg, struct vine_task_node *
 	return;
 }
 
-static void submit_node_ready_children(struct vine_task_graph *tg, struct vine_task_node *node)
+/**
+ * Submit the children of a node if all its dependencies are resolved.
+ * @param tg Reference to the task graph object.
+ * @param node Reference to the node object.
+ */
+static void submit_unblocked_children(struct vine_task_graph *tg, struct vine_task_node *node)
 {
 	if (!tg || !node) {
 		return;
@@ -77,6 +91,12 @@ static void submit_node_ready_children(struct vine_task_graph *tg, struct vine_t
 	return;
 }
 
+/**
+ * Get the topological order of the task graph.
+ * Must be called after all nodes and dependencies are added and the topology metrics are computed.
+ * @param tg Reference to the task graph object.
+ * @return The list of nodes in topological order.
+ */
 static struct list *get_topological_order(struct vine_task_graph *tg)
 {
 	if (!tg) {
@@ -147,6 +167,12 @@ static struct list *get_topological_order(struct vine_task_graph *tg)
 	return topo_order;
 }
 
+/**
+ * Extract the weakly connected components of the task graph.
+ * This function is used only for debugging purposes at the moment.
+ * @param tg Reference to the task graph object.
+ * @return The list of weakly connected components.
+ */
 static struct list *extract_weakly_connected_components(struct vine_task_graph *tg)
 {
 	if (!tg) {
@@ -203,6 +229,11 @@ static struct list *extract_weakly_connected_components(struct vine_task_graph *
 	return components;
 }
 
+/**
+ * Compute the heavy score of a node in the task graph.
+ * @param node Reference to the node object.
+ * @return The heavy score.
+ */
 static double compute_node_heavy_score(struct vine_task_node *node)
 {
 	if (!node) {
@@ -215,6 +246,12 @@ static double compute_node_heavy_score(struct vine_task_node *node)
 	return up_score / (down_score + 1);
 }
 
+/**
+ * Map a task to a node in the task graph.
+ * @param tg Reference to the task graph object.
+ * @param task Reference to the task object.
+ * @return The node object.
+ */
 static struct vine_task_node *get_node_by_task(struct vine_task_graph *tg, struct vine_task *task)
 {
 	if (!tg || !task) {
@@ -222,6 +259,7 @@ static struct vine_task_node *get_node_by_task(struct vine_task_graph *tg, struc
 	}
 
 	if (task->type == VINE_TASK_TYPE_STANDARD) {
+		/* standard tasks are mapped directly to a node */
 		return itable_lookup(tg->task_id_to_node, task->task_id);
 	} else if (task->type == VINE_TASK_TYPE_RECOVERY) {
 		/* note that recovery tasks are not mapped to any node but we still need the original node for pruning,
@@ -244,217 +282,86 @@ static struct vine_task_node *get_node_by_task(struct vine_task_graph *tg, struc
 /* Public APIs */
 /*************************************************************/
 
-void vine_task_graph_execute(struct vine_task_graph *tg)
+/**
+ * Get the library name of the task graph.
+ * @param tg Reference to the task graph object.
+ * @return The library name.
+ */
+const char *vine_task_graph_get_proxy_library_name(const struct vine_task_graph *tg)
 {
 	if (!tg) {
-		return;
-	}
-	
-	debug(D_VINE, "start executing task graph");
-	
-	/* print the info of all nodes */
-	char *node_key;
-	struct vine_task_node *node;
-	HASH_TABLE_ITERATE(tg->nodes, node_key, node)
-	{
-		vine_task_node_print_info(node);
-	}
-	
-	/* enable return recovery tasks */
-	vine_enable_return_recovery_tasks(tg->manager);
-
-	/* create mapping from task_id and outfile cached_name to node */
-	HASH_TABLE_ITERATE(tg->nodes, node_key, node)
-	{
-		if (node->outfile) {
-			hash_table_insert(tg->outfile_cachename_to_node, node->outfile->cached_name, node);
-		}
+		return NULL;
 	}
 
-	/* add the parents' outfiles as inputs to the task */
-	struct list *topo_order = get_topological_order(tg);
-	LIST_ITERATE(topo_order, node)
-	{
-		struct vine_task_node *parent_node;
-		LIST_ITERATE(node->parents, parent_node)
-		{
-			if (parent_node->outfile) {
-				vine_task_add_input(node->task, parent_node->outfile, parent_node->outfile_remote_name, VINE_TRANSFER_ALWAYS);
-			}
-		}
-	}
-
-	/* initialize pending_parents for all nodes */
-	HASH_TABLE_ITERATE(tg->nodes, node_key, node)
-	{
-		struct vine_task_node *parent_node;
-		LIST_ITERATE(node->parents, parent_node)
-		{
-			if (node->pending_parents) {
-				/* Use parent_node->node_key to ensure pointer consistency */
-				set_insert(node->pending_parents, parent_node);
-			}
-		}
-	}
-
-	/* enqueue those without dependencies */
-	HASH_TABLE_ITERATE(tg->nodes, node_key, node)
-	{
-		if (!node->pending_parents || set_size(node->pending_parents) == 0) {
-			submit_node_task(tg, node);
-		}
-	}
-
-	/* calculate steps to inject failure */
-	double next_failure_threshold = -1.0;
-	if (tg->failure_injection_step_percent > 0) {
-		next_failure_threshold = tg->failure_injection_step_percent / 100.0;
-	}
-
-	struct ProgressBar *pbar = progress_bar_init("Executing Tasks");
-	struct ProgressBarPart *regular_tasks_part = progress_bar_create_part("Regular", hash_table_size(tg->nodes));
-	struct ProgressBarPart *recovery_tasks_part = progress_bar_create_part("Recovery", 0);
-	progress_bar_bind_part(pbar, regular_tasks_part);
-	progress_bar_bind_part(pbar, recovery_tasks_part);
-
-	int wait_timeout = 2;
-
-	while (regular_tasks_part->current < regular_tasks_part->total) {
-		if (interrupted) {
-			break;
-		}
-
-		struct vine_task *task = vine_wait(tg->manager, wait_timeout);
-		progress_bar_set_part_total(pbar, recovery_tasks_part, tg->manager->num_submitted_recovery_tasks);
-		if (task) {
-			/* retrieve all possible tasks */
-			wait_timeout = 0;
-
-			/* get the original node by task id */
-			struct vine_task_node *node = get_node_by_task(tg, task);
-			if (!node) {
-				debug(D_ERROR, "fatal: task %d could not be mapped to a task node, this indicates a serious bug.", task->task_id);
-				exit(1);
-			}
-
-			/* in case of failure, resubmit this task */
-			if (node->task->result != VINE_RESULT_SUCCESS || node->task->exit_code != 0) {
-				if (node->retry_attempts_left <= 0) {
-					debug(D_ERROR, "Task %d failed (result=%d, exit=%d). Node %s has no retries left. Aborting.",
-						  task->task_id, node->task->result, node->task->exit_code, node->node_key);
-					vine_task_graph_delete(tg);
-					exit(1);
-				}
-				node->retry_attempts_left--;
-				debug(D_VINE | D_NOTICE, "Task %d failed (result=%d, exit=%d). Retrying node %s (remaining=%d)...",
-					  task->task_id, node->task->result, node->task->exit_code, node->node_key, node->retry_attempts_left);
-				vine_task_reset(node->task);
-				submit_node_task(tg, node);
-				continue;
-			}
-
-			/* if the outfile is set to save on the sharedfs, stat to get the size of the file */
-			switch (node->outfile_type) {
-			case VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM: {
-				struct stat info;
-				int result = stat(node->outfile_remote_name, &info);
-				if (result < 0) {
-					if (node->retry_attempts_left <= 0) {
-						debug(D_ERROR, "Task %d succeeded but missing sharedfs output %s; no retries left for node %s. Aborting.",
-							  task->task_id, node->outfile_remote_name, node->node_key);
-						vine_task_graph_delete(tg);
-						exit(1);
-					}
-					node->retry_attempts_left--;
-					debug(D_VINE | D_NOTICE, "Task %d succeeded but missing sharedfs output %s; retrying node %s (remaining=%d)...",
-						  task->task_id, node->outfile_remote_name, node->node_key, node->retry_attempts_left);
-					vine_task_reset(node->task);
-					submit_node_task(tg, node);
-					continue;
-				}
-				node->outfile_size_bytes = info.st_size;
-				break;
-			}
-			case VINE_NODE_OUTFILE_TYPE_LOCAL:
-			case VINE_NODE_OUTFILE_TYPE_TEMP:
-				node->outfile_size_bytes = node->outfile->size;
-				break;
-			}
-			debug(D_VINE, "Node %s completed with outfile %s size: %zu bytes", node->node_key, node->outfile_remote_name, node->outfile_size_bytes);
-
-			/* mark the node as completed */
-			node->completed = 1;
-
-			/* prune nodes on task completion */
-			vine_task_node_prune_ancestors(node);
-
-			/* skip recovery tasks */
-			if (task->type == VINE_TASK_TYPE_RECOVERY) {
-				progress_bar_update_part(pbar, recovery_tasks_part, 1);
-				continue;
-			}
-
-			/* set the start time to the submit time of the first regular task */
-			if (regular_tasks_part->current == 0) {
-				progress_bar_set_start_time(pbar, task->time_when_commit_start);
-			}
-
-			/* update critical time */
-			vine_task_node_update_critical_time(node, task->time_workers_execute_last);
-
-			/* mark this regular task as completed */
-			progress_bar_update_part(pbar, regular_tasks_part, 1);
-
-			/* inject failure */
-			if (tg->failure_injection_step_percent > 0) {
-				double progress = (double)regular_tasks_part->current / (double)regular_tasks_part->total;
-				if (progress >= next_failure_threshold && evict_random_worker(tg->manager)) {
-					debug(D_VINE, "evicted a worker at %.2f%% (threshold %.2f%%)", progress * 100, next_failure_threshold * 100);
-					next_failure_threshold += tg->failure_injection_step_percent / 100.0;
-				}
-			}
-
-			/* enqueue the output file for replication */
-			switch (node->outfile_type) {
-			case VINE_NODE_OUTFILE_TYPE_TEMP:
-				vine_task_node_replicate_outfile(node);
-				break;
-			case VINE_NODE_OUTFILE_TYPE_LOCAL:
-			case VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM:
-				break;
-			}
-
-			/* submit children nodes with dependencies all resolved */
-			submit_node_ready_children(tg, node);
-		} else {
-			wait_timeout = 2;
-			progress_bar_update_part(pbar, recovery_tasks_part, 0);  // refresh the time and total for recovery tasks
-		}
-	}
-
-	progress_bar_finish(pbar);
-	progress_bar_delete(pbar);
-
-	double total_time_spent_on_unlink_local_files = 0;
-	double total_time_spent_on_prune_ancestors_of_temp_node = 0;
-	double total_time_spent_on_prune_ancestors_of_persisted_node = 0;
-	HASH_TABLE_ITERATE(tg->nodes, node_key, node)
-	{
-		total_time_spent_on_unlink_local_files += node->time_spent_on_unlink_local_files;
-		total_time_spent_on_prune_ancestors_of_temp_node += node->time_spent_on_prune_ancestors_of_temp_node;
-		total_time_spent_on_prune_ancestors_of_persisted_node += node->time_spent_on_prune_ancestors_of_persisted_node;
-	}
-	total_time_spent_on_unlink_local_files /= 1e6;
-	total_time_spent_on_prune_ancestors_of_temp_node /= 1e6;
-	total_time_spent_on_prune_ancestors_of_persisted_node /= 1e6;
-
-	debug(D_VINE, "total time spent on prune ancestors of temp node: %.6f seconds\n", total_time_spent_on_prune_ancestors_of_temp_node);
-	debug(D_VINE, "total time spent on prune ancestors of persisted node: %.6f seconds\n", total_time_spent_on_prune_ancestors_of_persisted_node);
-	debug(D_VINE, "total time spent on unlink local files: %.6f seconds\n", total_time_spent_on_unlink_local_files);
-
-	return;
+	return tg->proxy_library_name;
 }
 
+/**
+ * Get the function name of the task graph.
+ * @param tg Reference to the task graph object.
+ * @return The function name.
+ */
+const char *vine_task_graph_get_proxy_function_name(const struct vine_task_graph *tg)
+{
+	if (!tg) {
+		return NULL;
+	}
+
+	return tg->proxy_function_name;
+}
+
+/**
+ * Get the heavy score of a node in the task graph.
+ * @param tg Reference to the task graph object.
+ * @param node_key Reference to the node key.
+ * @return The heavy score.
+ */
+double vine_task_graph_get_node_heavy_score(const struct vine_task_graph *tg, const char *node_key)
+{
+	if (!tg) {
+		return -1;
+	}
+
+	struct vine_task_node *node = hash_table_lookup(tg->nodes, node_key);
+	if (!node) {
+		return -1;
+	}
+
+	return node->heavy_score;
+}
+
+/**
+ * Get the local outfile source of a node in the task graph, only valid for local output files.
+ * The source of a local output file is the path on the local filesystem.
+ * @param tg Reference to the task graph object.
+ * @param node_key Reference to the node key.
+ * @return The local outfile source.
+ */
+const char *vine_task_graph_get_node_local_outfile_source(const struct vine_task_graph *tg, const char *node_key)
+{
+	if (!tg || !node_key) {
+		return NULL;
+	}
+
+	struct vine_task_node *node = hash_table_lookup(tg->nodes, node_key);
+	if (!node) {
+		debug(D_ERROR, "node %s not found", node_key);
+		exit(1);
+	}
+
+	if (node->outfile_type != VINE_NODE_OUTFILE_TYPE_LOCAL) {
+		debug(D_ERROR, "node %s is not a local output file", node_key);
+		exit(1);
+	}
+
+	return node->outfile->source;
+}
+
+/**
+ * Compute the topology metrics of the task graph, including depth, height, upstream and downstream counts,
+ * heavy scores, and weakly connected components.
+ * @param tg Reference to the task graph object.
+ */
 void vine_task_graph_compute_topology_metrics(struct vine_task_graph *tg)
 {
 	if (!tg) {
@@ -538,7 +445,7 @@ void vine_task_graph_compute_topology_metrics(struct vine_task_graph *tg)
 	hash_table_delete(upstream_map);
 	hash_table_delete(downstream_map);
 
-	/* compute the heavy score  */
+	/* compute the heavy score for each node */
 	LIST_ITERATE(topo_order, node)
 	{
 		node->heavy_score = compute_node_heavy_score(node);
@@ -562,6 +469,47 @@ void vine_task_graph_compute_topology_metrics(struct vine_task_graph *tg)
 	return;
 }
 
+/**
+ * Create a new node and track it in the task graph.
+ * @param tg Reference to the task graph object.
+ * @param node_key Reference to the node key.
+ * @param staging_dir Reference to the staging directory.
+ * @param prune_depth Reference to the prune depth.
+ * @param priority_mode Reference to the priority mode.
+ * @return A new node object.
+ */
+struct vine_task_node *vine_task_graph_add_node(
+		struct vine_task_graph *tg,
+		const char *node_key,
+		const char *staging_dir,
+		int prune_depth,
+		vine_task_node_priority_mode_t priority_mode)
+{
+	if (!tg || !node_key) {
+		return NULL;
+	}
+
+	/* if the node already exists, skip creating a new one */
+	struct vine_task_node *node = hash_table_lookup(tg->nodes, node_key);
+	if (!node) {
+		node = vine_task_node_create(tg->manager,
+				node_key,
+				tg->proxy_library_name,
+				tg->proxy_function_name,
+				staging_dir,
+				prune_depth,
+				priority_mode);
+		hash_table_insert(tg->nodes, node_key, node);
+	}
+
+	return node;
+}
+
+/**
+ * Create a new task graph object and bind a manager to it.
+ * @param q Reference to the manager object.
+ * @return A new task graph object.
+ */
 struct vine_task_graph *vine_task_graph_create(struct vine_manager *q)
 {
 	struct vine_task_graph *tg = xxmalloc(sizeof(struct vine_task_graph));
@@ -586,6 +534,11 @@ struct vine_task_graph *vine_task_graph_create(struct vine_manager *q)
 	return tg;
 }
 
+/**
+ * Set the failure injection step percent, meaning we will evict a randome worker at every X% of the DAG completion.
+ * @param tg Reference to the task graph object.
+ * @param percent Reference to the failure injection step percent.
+ */
 void vine_task_graph_set_failure_injection_step_percent(struct vine_task_graph *tg, double percent)
 {
 	if (!tg) {
@@ -598,32 +551,6 @@ void vine_task_graph_set_failure_injection_step_percent(struct vine_task_graph *
 
 	debug(D_VINE, "setting failure injection step percent to %lf", percent);
 	tg->failure_injection_step_percent = percent;
-}
-
-struct vine_task_node *vine_task_graph_create_node(
-		struct vine_task_graph *tg,
-		const char *node_key,
-		const char *staging_dir,
-		int prune_depth,
-		vine_task_node_priority_mode_t priority_mode)
-{
-	if (!tg || !node_key) {
-		return NULL;
-	}
-
-	struct vine_task_node *node = hash_table_lookup(tg->nodes, node_key);
-	if (!node) {
-		node = vine_task_node_create(tg->manager,
-				node_key,
-				tg->proxy_library_name,
-				tg->proxy_function_name,
-				staging_dir,
-				prune_depth,
-				priority_mode);
-		hash_table_insert(tg->nodes, node_key, node);
-	}
-
-	return node;
 }
 
 /**
@@ -657,82 +584,8 @@ void vine_task_graph_add_dependency(struct vine_task_graph *tg, const char *pare
 }
 
 /**
- * Get the library name of the task graph.
- * @param tg Reference to the task graph object.
- * @return The library name.
- */
-const char *vine_task_graph_get_proxy_library_name(const struct vine_task_graph *tg)
-{
-	if (!tg) {
-		return NULL;
-	}
-
-	return tg->proxy_library_name;
-}
-
-/**
- * Get the function name of the task graph.
- * @param tg Reference to the task graph object.
- * @return The function name.
- */
-const char *vine_task_graph_get_proxy_function_name(const struct vine_task_graph *tg)
-{
-	if (!tg) {
-		return NULL;
-	}
-
-	return tg->proxy_function_name;
-}
-
-/**
- * Get the heavy score of a node in the task graph.
- * @param tg Reference to the task graph object.
- * @param node_key Reference to the node key.
- * @return The heavy score.
- */
-double vine_task_graph_get_node_heavy_score(const struct vine_task_graph *tg, const char *node_key)
-{
-	if (!tg) {
-		return -1;
-	}
-
-	struct vine_task_node *node = hash_table_lookup(tg->nodes, node_key);
-	if (!node) {
-		return -1;
-	}
-
-	return node->heavy_score;
-}
-
-/**
- * Get the local outfile source of a node in the task graph, only valid for local output files.
- * The source of a local output file is the path on the local filesystem.
- * @param tg Reference to the task graph object.
- * @param node_key Reference to the node key.
- * @return The local outfile source.
- */
-const char *vine_task_graph_get_node_local_outfile_source(const struct vine_task_graph *tg, const char *node_key)
-{
-	if (!tg || !node_key) {
-		return NULL;
-	}
-
-	struct vine_task_node *node = hash_table_lookup(tg->nodes, node_key);
-	if (!node) {
-		debug(D_ERROR, "node %s not found", node_key);
-		exit(1);
-	}
-
-	if (node->outfile_type != VINE_NODE_OUTFILE_TYPE_LOCAL) {
-		debug(D_ERROR, "node %s is not a local output file", node_key);
-		exit(1);
-	}
-
-	return node->outfile->source;
-}
-
-/**
- * Set the outfile of a node in the task graph. This involves declaring the output file and adding it to the task.
+ * Set the outfile of a node in the task graph.
+ * This involves declaring the output file and adding it to the task.
  * @param tg Reference to the task graph object.
  * @param node_key Reference to the node key.
  * @param outfile_type Reference to the outfile type.
@@ -750,6 +603,217 @@ void vine_task_graph_set_node_outfile(struct vine_task_graph *tg, const char *no
 	}
 
 	vine_task_node_set_outfile(node, outfile_type, outfile_remote_name);
+
+	return;
+}
+
+/**
+ * Execute the task graph. This must be called after all nodes and dependencies are added and the topology metrics are computed.
+ * @param tg Reference to the task graph object.
+ */
+void vine_task_graph_execute(struct vine_task_graph *tg)
+{
+	if (!tg) {
+		return;
+	}
+
+	debug(D_VINE, "start executing task graph");
+
+	/* print the info of all nodes */
+	char *node_key;
+	struct vine_task_node *node;
+	HASH_TABLE_ITERATE(tg->nodes, node_key, node)
+	{
+		vine_task_node_print_info(node);
+	}
+
+	/* enable return recovery tasks */
+	vine_enable_return_recovery_tasks(tg->manager);
+
+	/* create mapping from task_id and outfile cached_name to node */
+	HASH_TABLE_ITERATE(tg->nodes, node_key, node)
+	{
+		if (node->outfile) {
+			hash_table_insert(tg->outfile_cachename_to_node, node->outfile->cached_name, node);
+		}
+	}
+
+	/* add the parents' outfiles as inputs to the task */
+	struct list *topo_order = get_topological_order(tg);
+	LIST_ITERATE(topo_order, node)
+	{
+		struct vine_task_node *parent_node;
+		LIST_ITERATE(node->parents, parent_node)
+		{
+			if (parent_node->outfile) {
+				vine_task_add_input(node->task, parent_node->outfile, parent_node->outfile_remote_name, VINE_TRANSFER_ALWAYS);
+			}
+		}
+	}
+
+	/* initialize pending_parents for all nodes */
+	HASH_TABLE_ITERATE(tg->nodes, node_key, node)
+	{
+		struct vine_task_node *parent_node;
+		LIST_ITERATE(node->parents, parent_node)
+		{
+			if (node->pending_parents) {
+				/* Use parent_node->node_key to ensure pointer consistency */
+				set_insert(node->pending_parents, parent_node);
+			}
+		}
+	}
+
+	/* enqueue those without dependencies */
+	HASH_TABLE_ITERATE(tg->nodes, node_key, node)
+	{
+		if (!node->pending_parents || set_size(node->pending_parents) == 0) {
+			submit_node_task(tg, node);
+		}
+	}
+
+	/* calculate steps to inject failure */
+	double next_failure_threshold = -1.0;
+	if (tg->failure_injection_step_percent > 0) {
+		next_failure_threshold = tg->failure_injection_step_percent / 100.0;
+	}
+
+	struct ProgressBar *pbar = progress_bar_init("Executing Tasks");
+	struct ProgressBarPart *regular_tasks_part = progress_bar_create_part("Regular", hash_table_size(tg->nodes));
+	struct ProgressBarPart *recovery_tasks_part = progress_bar_create_part("Recovery", 0);
+	progress_bar_bind_part(pbar, regular_tasks_part);
+	progress_bar_bind_part(pbar, recovery_tasks_part);
+
+	int wait_timeout = 2;
+
+	while (regular_tasks_part->current < regular_tasks_part->total) {
+		if (interrupted) {
+			break;
+		}
+
+		struct vine_task *task = vine_wait(tg->manager, wait_timeout);
+		progress_bar_set_part_total(pbar, recovery_tasks_part, tg->manager->num_submitted_recovery_tasks);
+		if (task) {
+			/* retrieve all possible tasks */
+			wait_timeout = 0;
+
+			/* get the original node by task id */
+			struct vine_task_node *node = get_node_by_task(tg, task);
+			if (!node) {
+				debug(D_ERROR, "fatal: task %d could not be mapped to a task node, this indicates a serious bug.", task->task_id);
+				exit(1);
+			}
+
+			/* in case of failure, resubmit this task */
+			if (node->task->result != VINE_RESULT_SUCCESS || node->task->exit_code != 0) {
+				if (node->retry_attempts_left <= 0) {
+					debug(D_ERROR, "Task %d failed (result=%d, exit=%d). Node %s has no retries left. Aborting.", task->task_id, node->task->result, node->task->exit_code, node->node_key);
+					vine_task_graph_delete(tg);
+					exit(1);
+				}
+				node->retry_attempts_left--;
+				debug(D_VINE | D_NOTICE, "Task %d failed (result=%d, exit=%d). Retrying node %s (remaining=%d)...", task->task_id, node->task->result, node->task->exit_code, node->node_key, node->retry_attempts_left);
+				vine_task_reset(node->task);
+				submit_node_task(tg, node);
+				continue;
+			}
+
+			/* if the outfile is set to save on the sharedfs, stat to get the size of the file */
+			switch (node->outfile_type) {
+			case VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM: {
+				struct stat info;
+				int result = stat(node->outfile_remote_name, &info);
+				if (result < 0) {
+					if (node->retry_attempts_left <= 0) {
+						debug(D_ERROR, "Task %d succeeded but missing sharedfs output %s; no retries left for node %s. Aborting.", task->task_id, node->outfile_remote_name, node->node_key);
+						vine_task_graph_delete(tg);
+						exit(1);
+					}
+					node->retry_attempts_left--;
+					debug(D_VINE | D_NOTICE, "Task %d succeeded but missing sharedfs output %s; retrying node %s (remaining=%d)...", task->task_id, node->outfile_remote_name, node->node_key, node->retry_attempts_left);
+					vine_task_reset(node->task);
+					submit_node_task(tg, node);
+					continue;
+				}
+				node->outfile_size_bytes = info.st_size;
+				break;
+			}
+			case VINE_NODE_OUTFILE_TYPE_LOCAL:
+			case VINE_NODE_OUTFILE_TYPE_TEMP:
+				node->outfile_size_bytes = node->outfile->size;
+				break;
+			}
+			debug(D_VINE, "Node %s completed with outfile %s size: %zu bytes", node->node_key, node->outfile_remote_name, node->outfile_size_bytes);
+
+			/* mark the node as completed */
+			node->completed = 1;
+
+			/* prune nodes on task completion */
+			vine_task_node_prune_ancestors(node);
+
+			/* skip recovery tasks */
+			if (task->type == VINE_TASK_TYPE_RECOVERY) {
+				progress_bar_update_part(pbar, recovery_tasks_part, 1);
+				continue;
+			}
+
+			/* set the start time to the submit time of the first regular task */
+			if (regular_tasks_part->current == 0) {
+				progress_bar_set_start_time(pbar, task->time_when_commit_start);
+			}
+
+			/* update critical time */
+			vine_task_node_update_critical_time(node, task->time_workers_execute_last);
+
+			/* mark this regular task as completed */
+			progress_bar_update_part(pbar, regular_tasks_part, 1);
+
+			/* inject failure */
+			if (tg->failure_injection_step_percent > 0) {
+				double progress = (double)regular_tasks_part->current / (double)regular_tasks_part->total;
+				if (progress >= next_failure_threshold && evict_random_worker(tg->manager)) {
+					debug(D_VINE, "evicted a worker at %.2f%% (threshold %.2f%%)", progress * 100, next_failure_threshold * 100);
+					next_failure_threshold += tg->failure_injection_step_percent / 100.0;
+				}
+			}
+
+			/* enqueue the output file for replication */
+			switch (node->outfile_type) {
+			case VINE_NODE_OUTFILE_TYPE_TEMP:
+				vine_task_node_replicate_outfile(node);
+				break;
+			case VINE_NODE_OUTFILE_TYPE_LOCAL:
+			case VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM:
+				break;
+			}
+
+			/* submit children nodes with dependencies all resolved */
+			submit_unblocked_children(tg, node);
+		} else {
+			wait_timeout = 2;
+			progress_bar_update_part(pbar, recovery_tasks_part, 0); // refresh the time and total for recovery tasks
+		}
+	}
+
+	progress_bar_finish(pbar);
+	progress_bar_delete(pbar);
+
+	double total_time_spent_on_unlink_local_files = 0;
+	double total_time_spent_on_prune_ancestors_of_temp_node = 0;
+	double total_time_spent_on_prune_ancestors_of_persisted_node = 0;
+	HASH_TABLE_ITERATE(tg->nodes, node_key, node)
+	{
+		total_time_spent_on_unlink_local_files += node->time_spent_on_unlink_local_files;
+		total_time_spent_on_prune_ancestors_of_temp_node += node->time_spent_on_prune_ancestors_of_temp_node;
+		total_time_spent_on_prune_ancestors_of_persisted_node += node->time_spent_on_prune_ancestors_of_persisted_node;
+	}
+	total_time_spent_on_unlink_local_files /= 1e6;
+	total_time_spent_on_prune_ancestors_of_temp_node /= 1e6;
+	total_time_spent_on_prune_ancestors_of_persisted_node /= 1e6;
+
+	debug(D_VINE, "total time spent on prune ancestors of temp node: %.6f seconds\n", total_time_spent_on_prune_ancestors_of_temp_node);
+	debug(D_VINE, "total time spent on prune ancestors of persisted node: %.6f seconds\n", total_time_spent_on_prune_ancestors_of_persisted_node);
+	debug(D_VINE, "total time spent on unlink local files: %.6f seconds\n", total_time_spent_on_unlink_local_files);
 
 	return;
 }

@@ -25,6 +25,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+/**
+ * Compute a lexicographic priority score from the node key.
+ * Used during topological sorting to break ties deterministically.
+ * @param key Reference to the node key.
+ * @return The lexical priority.
+ */
 double compute_lex_priority(const char *key)
 {
 	double score = 0.0;
@@ -36,11 +42,17 @@ double compute_lex_priority(const char *key)
 	return -score;
 }
 
-/*
- * Create a new node in the graph.
- * The caller must construct the graph nodes in a topological order.
+/**
+ * Create a new node object.
+ * @param manager Reference to the manager object.
+ * @param node_key Reference to the node key.
+ * @param proxy_library_name Reference to the proxy library name.
+ * @param proxy_function_name Reference to the proxy function name.
+ * @param staging_dir Reference to the staging directory.
+ * @param prune_depth Reference to the prune depth.
+ * @param priority_mode Reference to the priority mode.
+ * @return A new node object.
  */
-
 struct vine_task_node *vine_task_node_create(
 		struct vine_manager *manager,
 		const char *node_key,
@@ -58,8 +70,8 @@ struct vine_task_node *vine_task_node_create(
 
 	node->manager = manager;
 	node->node_key = xxstrdup(node_key);
-    node->staging_dir = xxstrdup(staging_dir);
-	
+	node->staging_dir = xxstrdup(staging_dir);
+
 	node->priority_mode = priority_mode;
 	node->prune_status = PRUNE_STATUS_NOT_PRUNED;
 	node->parents = list_create();
@@ -68,7 +80,7 @@ struct vine_task_node *vine_task_node_create(
 	node->completed = 0;
 	node->prune_depth = prune_depth;
 	node->retry_attempts_left = 1;
-    node->outfile_size_bytes = 0;
+	node->outfile_size_bytes = 0;
 
 	node->depth = -1;
 	node->height = -1;
@@ -88,24 +100,31 @@ struct vine_task_node *vine_task_node_create(
 	node->task = vine_task_create(proxy_function_name);
 	vine_task_set_library_required(node->task, proxy_library_name);
 	vine_task_addref(node->task);
-    
+
 	/* build JSON infile expected by library: {"fn_args": [key], "fn_kwargs": {}} */
 	struct jx *event = jx_object(NULL);
 	struct jx *args = jx_array(NULL);
 	jx_array_append(args, jx_string(node->node_key));
 	jx_insert(event, jx_string("fn_args"), args);
 	jx_insert(event, jx_string("fn_kwargs"), jx_object(NULL));
-    
+
 	char *infile_content = jx_print_string(event);
 	jx_delete(event);
-    
+
 	node->infile = vine_declare_buffer(node->manager, infile_content, strlen(infile_content), VINE_CACHE_LEVEL_TASK, VINE_UNLINK_WHEN_DONE);
 	free(infile_content);
 	vine_task_add_input(node->task, node->infile, "infile", VINE_TRANSFER_ALWAYS);
-    
+
 	return node;
 }
 
+/**
+ * Set the outfile of a node in the task graph.
+ * This involves declaring the output file and adding it to the task.
+ * @param node Reference to the node object.
+ * @param outfile_type Reference to the outfile type.
+ * @param outfile_remote_name Reference to the outfile remote name.
+ */
 void vine_task_node_set_outfile(struct vine_task_node *node, vine_task_node_outfile_type_t outfile_type, const char *outfile_remote_name)
 {
 	if (!node) {
@@ -121,10 +140,10 @@ void vine_task_node_set_outfile(struct vine_task_node *node, vine_task_node_outf
 	switch (node->outfile_type) {
 	case VINE_NODE_OUTFILE_TYPE_LOCAL: {
 		char *local_output_dir = string_format("%s/outputs", node->staging_dir);
-        if (mkdir(local_output_dir, 0777) != 0 && errno != EEXIST) {
-            debug(D_ERROR, "failed to mkdir %s (errno=%d)", local_output_dir, errno);
-        }
-        char *local_output_path = string_format("%s/%s", local_output_dir, node->outfile_remote_name);
+		if (mkdir(local_output_dir, 0777) != 0 && errno != EEXIST) {
+			debug(D_ERROR, "failed to mkdir %s (errno=%d)", local_output_dir, errno);
+		}
+		char *local_output_path = string_format("%s/%s", local_output_dir, node->outfile_remote_name);
 		node->outfile = vine_declare_file(node->manager, local_output_path, VINE_CACHE_LEVEL_WORKFLOW, 0);
 		free(local_output_dir);
 		free(local_output_path);
@@ -145,6 +164,13 @@ void vine_task_node_set_outfile(struct vine_task_node *node, vine_task_node_outf
 	return;
 }
 
+/**
+ * Check if the outfile of a node is persisted.
+ * A node is considered persisted if it has completed and 1) the outfile is written to the shared file system,
+ * 2) the outfile is written to the local staging directory.
+ * @param node Reference to the node object.
+ * @return 1 if the outfile is persisted, 0 otherwise.
+ */
 static int _node_outfile_is_persisted(struct vine_task_node *node)
 {
 	if (!node) {
@@ -168,6 +194,11 @@ static int _node_outfile_is_persisted(struct vine_task_node *node)
 	return 0;
 }
 
+/**
+ * Calculate the priority of a node given the priority mode.
+ * @param node Reference to the node object.
+ * @return The priority.
+ */
 double vine_task_node_calculate_priority(struct vine_task_node *node)
 {
 	if (!node) {
@@ -219,6 +250,11 @@ double vine_task_node_calculate_priority(struct vine_task_node *node)
 	return priority;
 }
 
+/**
+ * Update the critical time of a node.
+ * @param node Reference to the node object.
+ * @param execution_time Reference to the execution time of the node.
+ */
 void vine_task_node_update_critical_time(struct vine_task_node *node, timestamp_t execution_time)
 {
 	timestamp_t max_parent_critical_time = 0;
@@ -232,7 +268,13 @@ void vine_task_node_update_critical_time(struct vine_task_node *node, timestamp_
 	node->critical_time = max_parent_critical_time + execution_time;
 }
 
-/* the dfs helper function for finding parents in a specific depth */
+/**
+ * The dfs helper function for finding parents in a specific depth.
+ * @param node Reference to the node object.
+ * @param remaining_depth Reference to the remaining depth.
+ * @param result Reference to the result list.
+ * @param visited Reference to the visited set.
+ */
 static void _find_parents_dfs(struct vine_task_node *node, int remaining_depth, struct list *result, struct set *visited)
 {
 	if (!node || set_lookup(visited, node)) {
@@ -251,7 +293,12 @@ static void _find_parents_dfs(struct vine_task_node *node, int remaining_depth, 
 	}
 }
 
-/* find all parents in a specific depth of the node */
+/**
+ * Find all parents in a specific depth of the node.
+ * @param node Reference to the node object.
+ * @param depth Reference to the depth.
+ * @return The list of parents.
+ */
 static struct list *_find_parents_in_depth(struct vine_task_node *node, int depth)
 {
 	if (!node || depth < 0) {
@@ -267,7 +314,14 @@ static struct list *_find_parents_in_depth(struct vine_task_node *node, int dept
 	return result;
 }
 
-int _prune_ancestors_of_temp_node(struct vine_task_node *node)
+/**
+ * Prune the ancestors of a temp node. This is only used for temp nodes that produce temp files.
+ * All ancestors of this node we consider here are temp nodes, we can not safely prune those stored in the shared file system
+ * because temp nodes are not considered safe enough to trigger the deletion of upstream persisted files.
+ * @param node Reference to the node object.
+ * @return The number of pruned replicas.
+ */
+static int prune_ancestors_of_temp_node(struct vine_task_node *node)
 {
 	if (!node || !node->outfile || node->prune_depth <= 0) {
 		return 0;
@@ -329,6 +383,11 @@ int _prune_ancestors_of_temp_node(struct vine_task_node *node)
 	return pruned_replica_count;
 }
 
+/**
+ * Find all safe ancestors of a node.
+ * @param start_node Reference to the start node.
+ * @return The set of safe ancestors.
+ */
 static struct set *_find_safe_ancestors(struct vine_task_node *start_node)
 {
 	if (!start_node) {
@@ -392,7 +451,14 @@ static struct set *_find_safe_ancestors(struct vine_task_node *start_node)
 	return visited_nodes;
 }
 
-int _prune_ancestors_of_persisted_node(struct vine_task_node *node)
+/**
+ * Prune the ancestors of a persisted node. This is only used for persisted nodes that produce persisted files.
+ * All ancestors we consider here include both temp nodes and persisted nodes, becasue data written to shared file system
+ * is safe and can definitely trigger upstream data redundancy to be released.
+ * @param node Reference to the node object.
+ * @return The number of pruned replicas.
+ */
+static int prune_ancestors_of_persisted_node(struct vine_task_node *node)
 {
 	if (!node) {
 		return 0;
@@ -414,15 +480,12 @@ int _prune_ancestors_of_persisted_node(struct vine_task_node *node)
 	{
 		/* unlink the shared file system file */
 		if (!ancestor_node->outfile) {
-			timestamp_t unlink_start  = timestamp_get();
-            if (ancestor_node->outfile_remote_name) {
-                unlink(ancestor_node->outfile_remote_name);   // system call
-            }
+			timestamp_t unlink_start = timestamp_get();
+			if (ancestor_node->outfile_remote_name) {
+				unlink(ancestor_node->outfile_remote_name); // system call
+			}
 			node->time_spent_on_unlink_local_files += timestamp_get() - unlink_start;
-			debug(D_VINE, "unlinked %s size: %zu bytes, time: %" PRIu64,
-                    ancestor_node->outfile_remote_name ? ancestor_node->outfile_remote_name : "(null)",
-                    ancestor_node->outfile_size_bytes,
-                    (uint64_t)node->time_spent_on_unlink_local_files);          
+			debug(D_VINE, "unlinked %s size: %zu bytes, time: %" PRIu64, ancestor_node->outfile_remote_name ? ancestor_node->outfile_remote_name : "(null)", ancestor_node->outfile_size_bytes, (uint64_t)node->time_spent_on_unlink_local_files);
 		} else {
 			switch (ancestor_node->outfile->type) {
 			case VINE_FILE:
@@ -448,6 +511,11 @@ int _prune_ancestors_of_persisted_node(struct vine_task_node *node)
 	return pruned_replica_count;
 }
 
+/**
+ * Submit a node to the taskvine manager.
+ * @param node Reference to the node object.
+ * @return The task id.
+ */
 int vine_task_node_submit(struct vine_task_node *node)
 {
 	if (!node) {
@@ -460,80 +528,99 @@ int vine_task_node_submit(struct vine_task_node *node)
 	return vine_submit(node->manager, node->task);
 }
 
-/* print the info of the node */
+/**
+ * Print the info of the node.
+ * @param node Reference to the node object.
+ */
 void vine_task_node_print_info(struct vine_task_node *node)
 {
-    if (!node) {
-        return;
-    }
+	if (!node) {
+		return;
+	}
 
-    if (!node->task) {
-        debug(D_ERROR, "node %s has no task", node->node_key);
-        return;
-    }
+	if (!node->task) {
+		debug(D_ERROR, "node %s has no task", node->node_key);
+		return;
+	}
 
-    debug(D_VINE, "---------------- Node Info ----------------");
-    debug(D_VINE, "key: %s", node->node_key);
-    debug(D_VINE, "task_id: %d", node->task->task_id);
-    debug(D_VINE, "staging_dir: %s", node->staging_dir ? node->staging_dir : "(null)");
-    debug(D_VINE, "depth: %d", node->depth);
-    debug(D_VINE, "height: %d", node->height);
-    debug(D_VINE, "prune_depth: %d", node->prune_depth);
-    debug(D_VINE, "priority_mode: %d", node->priority_mode);
+	debug(D_VINE, "---------------- Node Info ----------------");
+	debug(D_VINE, "key: %s", node->node_key);
+	debug(D_VINE, "task_id: %d", node->task->task_id);
+	debug(D_VINE, "staging_dir: %s", node->staging_dir ? node->staging_dir : "(null)");
+	debug(D_VINE, "depth: %d", node->depth);
+	debug(D_VINE, "height: %d", node->height);
+	debug(D_VINE, "prune_depth: %d", node->prune_depth);
+	debug(D_VINE, "priority_mode: %d", node->priority_mode);
 
-    if (node->outfile_remote_name) {
-        debug(D_VINE, "outfile_remote_name: %s", node->outfile_remote_name);
-    }
+	if (node->outfile_remote_name) {
+		debug(D_VINE, "outfile_remote_name: %s", node->outfile_remote_name);
+	}
 
-    if (node->outfile) {
-        const char *type_str = "UNKNOWN";
-        switch (node->outfile->type) {
-            case VINE_FILE:       type_str = "VINE_FILE"; break;
-            case VINE_TEMP:       type_str = "VINE_TEMP"; break;
-            case VINE_URL:        type_str = "VINE_URL"; break;
-            case VINE_BUFFER:     type_str = "VINE_BUFFER"; break;
-            case VINE_MINI_TASK:  type_str = "VINE_MINI_TASK"; break;
-        }
-        debug(D_VINE, "outfile_type: %s", type_str);
-        debug(D_VINE, "outfile_cached_name: %s", node->outfile->cached_name ? node->outfile->cached_name : "(null)");
-    } else {
-        debug(D_VINE, "outfile_type: SHARED_FILE_SYSTEM or none");
-    }
+	if (node->outfile) {
+		const char *type_str = "UNKNOWN";
+		switch (node->outfile->type) {
+		case VINE_FILE:
+			type_str = "VINE_FILE";
+			break;
+		case VINE_TEMP:
+			type_str = "VINE_TEMP";
+			break;
+		case VINE_URL:
+			type_str = "VINE_URL";
+			break;
+		case VINE_BUFFER:
+			type_str = "VINE_BUFFER";
+			break;
+		case VINE_MINI_TASK:
+			type_str = "VINE_MINI_TASK";
+			break;
+		}
+		debug(D_VINE, "outfile_type: %s", type_str);
+		debug(D_VINE, "outfile_cached_name: %s", node->outfile->cached_name ? node->outfile->cached_name : "(null)");
+	} else {
+		debug(D_VINE, "outfile_type: SHARED_FILE_SYSTEM or none");
+	}
 
-    /* print parent and child node keys */
-    char *parent_keys = NULL;
-    struct vine_task_node *p;
-    LIST_ITERATE(node->parents, p) {
-        if (!parent_keys) {
-            parent_keys = string_format("%s", p->node_key);
-        } else {
-            char *tmp = string_format("%s, %s", parent_keys, p->node_key);
-            free(parent_keys);
-            parent_keys = tmp;
-        }
-    }
+	/* print parent and child node keys */
+	char *parent_keys = NULL;
+	struct vine_task_node *p;
+	LIST_ITERATE(node->parents, p)
+	{
+		if (!parent_keys) {
+			parent_keys = string_format("%s", p->node_key);
+		} else {
+			char *tmp = string_format("%s, %s", parent_keys, p->node_key);
+			free(parent_keys);
+			parent_keys = tmp;
+		}
+	}
 
-    char *child_keys = NULL;
-    struct vine_task_node *c;
-    LIST_ITERATE(node->children, c) {
-        if (!child_keys) {
-            child_keys = string_format("%s", c->node_key);
-        } else {
-            char *tmp = string_format("%s, %s", child_keys, c->node_key);
-            free(child_keys);
-            child_keys = tmp;
-        }
-    }
+	char *child_keys = NULL;
+	struct vine_task_node *c;
+	LIST_ITERATE(node->children, c)
+	{
+		if (!child_keys) {
+			child_keys = string_format("%s", c->node_key);
+		} else {
+			char *tmp = string_format("%s, %s", child_keys, c->node_key);
+			free(child_keys);
+			child_keys = tmp;
+		}
+	}
 
-    debug(D_VINE, "parents: %s", parent_keys ? parent_keys : "(none)");
-    debug(D_VINE, "children: %s", child_keys ? child_keys : "(none)");
+	debug(D_VINE, "parents: %s", parent_keys ? parent_keys : "(none)");
+	debug(D_VINE, "children: %s", child_keys ? child_keys : "(none)");
 
-    free(parent_keys);
-    free(child_keys);
+	free(parent_keys);
+	free(child_keys);
 
-    debug(D_VINE, "-------------------------------------------");
+	debug(D_VINE, "-------------------------------------------");
 }
 
+/**
+ * Prune the ancestors of a node when it is completed.
+ * @param node Reference to the node object.
+ */
 void vine_task_node_prune_ancestors(struct vine_task_node *node)
 {
 	if (!node) {
@@ -545,9 +632,9 @@ void vine_task_node_prune_ancestors(struct vine_task_node *node)
 	int pruned_replica_count = 0;
 
 	if (_node_outfile_is_persisted(node)) {
-		pruned_replica_count = _prune_ancestors_of_persisted_node(node);
+		pruned_replica_count = prune_ancestors_of_persisted_node(node);
 	} else {
-		pruned_replica_count = _prune_ancestors_of_temp_node(node);
+		pruned_replica_count = prune_ancestors_of_temp_node(node);
 	}
 
 	timestamp_t elapsed_time = timestamp_get() - start_time;
@@ -555,20 +642,27 @@ void vine_task_node_prune_ancestors(struct vine_task_node *node)
 	debug(D_VINE, "pruned %d ancestors of node %s in %.6f seconds", pruned_replica_count, node->node_key, elapsed_time / 1000000.0);
 }
 
+/**
+ * Replicate the outfile of a node if it is a temp file.
+ * @param node Reference to the node object.
+ */
 void vine_task_node_replicate_outfile(struct vine_task_node *node)
 {
 	if (!node || !node->outfile) {
 		return;
 	}
 
-    if (node->outfile->type != VINE_TEMP) {
-        return;
-    }
+	if (node->outfile->type != VINE_TEMP) {
+		return;
+	}
 
 	vine_temp_replicate_file_later(node->manager, node->outfile);
 }
 
-/* delete the node and all of its associated resources. */
+/**
+ * Delete the node and all of its associated resources.
+ * @param node Reference to the node object.
+ */
 void vine_task_node_delete(struct vine_task_node *node)
 {
 	if (!node) {
@@ -581,9 +675,9 @@ void vine_task_node_delete(struct vine_task_node *node)
 	if (node->outfile_remote_name) {
 		free(node->outfile_remote_name);
 	}
-    if (node->staging_dir) {
-        free(node->staging_dir);
-    }
+	if (node->staging_dir) {
+		free(node->staging_dir);
+	}
 
 	vine_task_delete(node->task);
 	node->task = NULL;
