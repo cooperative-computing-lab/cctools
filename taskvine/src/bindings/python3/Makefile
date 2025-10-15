@@ -4,8 +4,8 @@ include ../../../../rules.mk
 # Python always uses 'so' for its modules (even on Darwin)
 CCTOOLS_DYNAMIC_SUFFIX = so
 # SWIG produces code that causes a lot of warnings, so use -w to turn those off.
-LOCAL_CCFLAGS = -w -fPIC -DNDEBUG $(CCTOOLS_PYTHON3_CCFLAGS) -I ../../manager
-LOCAL_LINKAGE = $(CCTOOLS_PYTHON3_LDFLAGS) -lz $(CCTOOLS_OPENSSL_LDFLAGS) $(CCTOOLS_HOME)/taskvine/src/manager/libtaskvine.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
+LOCAL_CCFLAGS = -w -fPIC -DNDEBUG $(CCTOOLS_PYTHON3_CCFLAGS) -I ../../manager -I ../../graph/GraphInvoker
+LOCAL_LINKAGE = $(CCTOOLS_PYTHON3_LDFLAGS) -lz $(CCTOOLS_OPENSSL_LDFLAGS) $(CCTOOLS_HOME)/taskvine/src/graph/GraphInvoker/libgraphinvoker.a $(CCTOOLS_HOME)/taskvine/src/manager/libtaskvine.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
 
 CCTOOLS_FLAKE8_IGNORE_FILES = "cvine.py"
 
@@ -18,7 +18,7 @@ all: $(TARGETS)
 
 vine_wrap.c: taskvine.i
 	@echo "SWIG taskvine.i (python)"
-	@$(CCTOOLS_SWIG) -o vine_wrap.c -outdir ndcctools/taskvine -python -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/taskvine/src/manager taskvine.i
+	@$(CCTOOLS_SWIG) -o vine_wrap.c -outdir ndcctools/taskvine -python -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/taskvine/src/manager -I$(CCTOOLS_HOME)/taskvine/src/graph/GraphInvoker taskvine.i
 
 $(DSPYTHONSO): vine_wrap.o $(EXTERNAL_DEPENDENCIES)
 
@@ -35,3 +35,6 @@ install: all
 	cp ndcctools/taskvine/*.py $(DSPYTHONSO) $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine
 	cp ndcctools/taskvine/compat/*.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/compat
 	cp taskvine.py $(CCTOOLS_PYTHON3_PATH)/
+	# install GraphInvoker python modules into package path to preserve API
+	cp $(CCTOOLS_HOME)/taskvine/src/graph/GraphInvoker/graph_definition.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/graph_definition.py
+	cp $(CCTOOLS_HOME)/taskvine/src/graph/GraphInvoker/graph_executor.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/graph_executor.py
