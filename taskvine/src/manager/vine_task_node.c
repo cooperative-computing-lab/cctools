@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -29,7 +30,7 @@ double compute_lex_priority(const char *key)
 	double score = 0.0;
 	double factor = 1.0;
 	for (int i = 0; i < 8 && key[i] != '\0'; i++) {
-		score += key[i] * factor;
+		score += (unsigned char)key[i] * factor;
 		factor *= 0.01;
 	}
 	return -score;
@@ -57,6 +58,7 @@ struct vine_task_node *vine_task_node_create(
 
 	node->manager = manager;
 	node->node_key = xxstrdup(node_key);
+    node->staging_dir = xxstrdup(staging_dir);
 	
 	node->priority_mode = priority_mode;
 	node->prune_status = PRUNE_STATUS_NOT_PRUNED;
@@ -66,8 +68,8 @@ struct vine_task_node *vine_task_node_create(
 	node->completed = 0;
 	node->prune_depth = prune_depth;
 	node->retry_attempts_left = 1;
+    node->outfile_size_bytes = 0;
 
-	node->outfile_size_bytes = 0;
 	node->depth = -1;
 	node->height = -1;
 	node->upstream_subgraph_size = -1;
@@ -121,7 +123,9 @@ void vine_task_node_set_outfile(struct vine_task_node *node, vine_task_node_outf
 	switch (node->outfile_type) {
 	case VINE_NODE_OUTFILE_TYPE_LOCAL: {
 		char *local_output_dir = string_format("%s/outputs", node->staging_dir);
-        mkdir(local_output_dir, 0777);  // ignore errors if exists
+        if (mkdir(local_output_dir, 0777) != 0 && errno != EEXIST) {
+            debug(D_ERROR, "failed to mkdir %s (errno=%d)", local_output_dir, errno);
+        }
         char *local_output_path = string_format("%s/%s", local_output_dir, node->outfile_remote_name);
 		node->outfile = vine_declare_file(node->manager, local_output_path, VINE_CACHE_LEVEL_WORKFLOW, 0);
 		free(local_output_dir);
@@ -233,33 +237,6 @@ void vine_task_node_update_critical_time(struct vine_task_node *node, timestamp_
 	node->critical_time = max_parent_critical_time + execution_time;
 }
 
-/* delete all of the replicas present at remote workers. */
-int _prune_outfile_from_regular_workers(struct vine_task_node *node)
-{
-	if (!node || !node->outfile) {
-		return 0;
-	}
-
-	struct set *source_workers = hash_table_lookup(node->manager->file_worker_table, node->outfile->cached_name);
-	if (!source_workers) {
-		return 0;
-	}
-
-	int pruned_replica_count = 0;
-
-	struct vine_worker_info *source_worker;
-	SET_ITERATE(source_workers, source_worker)
-	{
-		if (is_checkpoint_worker(node->manager, source_worker)) {
-			continue;
-		}
-		delete_worker_file(node->manager, source_worker, node->outfile->cached_name, 0, 0);
-		pruned_replica_count++;
-	}
-
-	return pruned_replica_count;
-}
-
 /* the dfs helper function for finding parents in a specific depth */
 static void _find_parents_dfs(struct vine_task_node *node, int remaining_depth, struct list *result, struct set *visited)
 {
@@ -344,7 +321,7 @@ int _prune_ancestors_of_temp_node(struct vine_task_node *node)
 			continue;
 		}
 
-		pruned_replica_count += _prune_outfile_from_regular_workers(parent_node);
+		pruned_replica_count += vine_prune_file(node->manager, parent_node->outfile);
 		/* this parent is pruned because a successor that produces a temp file is completed, it is unsafe because the
 		 * manager may submit a recovery task to bring it back in case of worker failures. */
 		parent_node->prune_status = PRUNE_STATUS_UNSAFE;
@@ -447,7 +424,10 @@ int _prune_ancestors_of_persisted_node(struct vine_task_node *node)
                 unlink(ancestor_node->outfile_remote_name);   // system call
             }
 			node->time_spent_on_unlink_local_files += timestamp_get() - unlink_start;
-			debug(D_VINE, "unlinked %s size: %zu bytes, time: %" PRIu64, ancestor_node->outfile_remote_name, ancestor_node->outfile_size_bytes, node->time_spent_on_unlink_local_files);
+			debug(D_VINE, "unlinked %s size: %zu bytes, time: %" PRIu64,
+                    ancestor_node->outfile_remote_name ? ancestor_node->outfile_remote_name : "(null)",
+                    ancestor_node->outfile_size_bytes,
+                    (uint64_t)node->time_spent_on_unlink_local_files);          
 		} else {
 			switch (ancestor_node->outfile->type) {
 			case VINE_FILE:
@@ -580,17 +560,6 @@ void vine_task_node_replicate_outfile(struct vine_task_node *node)
     }
 
 	vine_temp_replicate_file_later(node->manager, node->outfile);
-}
-
-int vine_task_node_set_outfile_size_bytes(struct vine_task_node *node, size_t outfile_size_bytes)
-{
-	if (!node || !node->outfile) {
-		return -1;
-	}
-
-	node->outfile_size_bytes = outfile_size_bytes;
-
-	return 0;
 }
 
 /* delete the node and all of its associated resources. */

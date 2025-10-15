@@ -954,8 +954,9 @@ The given file or directory object is deleted from all worker's caches,
 but is still available on the manager's site, and can be recovered by submitting a recovery task.
 @param m A manager object
 @param f Any file object.
+@return The number of replicas pruned.
 */
-void vine_prune_file(struct vine_manager *m, struct vine_file *f);
+int vine_prune_file(struct vine_manager *m, struct vine_file *f);
 
 //@}
 

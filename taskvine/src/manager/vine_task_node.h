@@ -70,7 +70,6 @@ void vine_task_node_update_critical_time(struct vine_task_node *node, timestamp_
 void vine_task_node_replicate_outfile(struct vine_task_node *node);
 int vine_task_node_submit(struct vine_task_node *node);
 void vine_task_node_set_outfile(struct vine_task_node *node, vine_task_node_outfile_type_t outfile_type, const char *outfile_remote_name);
-int vine_task_node_set_outfile_size_bytes(struct vine_task_node *node, size_t outfile_size_bytes);
 void vine_task_node_checkpoint_outfile(struct vine_task_node *node);
 
 #endif

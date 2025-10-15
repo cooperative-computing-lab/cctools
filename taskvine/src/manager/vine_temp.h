@@ -3,7 +3,6 @@
 
 #include "vine_manager.h"
 
-int is_checkpoint_worker(struct vine_manager *q, struct vine_worker_info *w);
 int vine_temp_replicate_file_now(struct vine_manager *q, struct vine_file *f);
 int vine_temp_replicate_file_later(struct vine_manager *q, struct vine_file *f);
 int vine_temp_handle_file_lost(struct vine_manager *q, char *cachename);

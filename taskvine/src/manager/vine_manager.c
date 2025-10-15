@@ -6600,15 +6600,17 @@ Should be invoked by the application when a file will never
 be needed again, to free up available space.
 */
 
-void vine_prune_file(struct vine_manager *m, struct vine_file *f)
+int vine_prune_file(struct vine_manager *m, struct vine_file *f)
 {
 	if (!f) {
-		return;
+		return 0;
 	}
 
 	if (!m) {
-		return;
+		return 0;
 	}
+
+	int pruned_replica_count = 0;
 
 	/* delete all of the replicas present at remote workers. */
 	struct set *source_workers = hash_table_lookup(m->file_worker_table, f->cached_name);
@@ -6618,10 +6620,13 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 			for (int i = 0; workers_array[i] != NULL; i++) {
 				struct vine_worker_info *w = (struct vine_worker_info *)workers_array[i];
 				delete_worker_file(m, w, f->cached_name, 0, 0);
+				pruned_replica_count++;
 			}
 			set_free_values_array(workers_array);
 		}
 	}
+
+	return pruned_replica_count;
 }
 
 /*

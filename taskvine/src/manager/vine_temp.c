@@ -15,15 +15,6 @@
 /* Private Functions */
 /*************************************************************/
 
-int is_checkpoint_worker(struct vine_manager *q, struct vine_worker_info *w)
-{
-	if (!q || !w || !w->features) {
-		return 0;
-	}
-
-	return hash_table_lookup(w->features, "checkpoint-worker") != NULL;
-}
-
 static struct vine_worker_info *get_best_source_worker(struct vine_manager *q, struct vine_file *f)
 {
 	if (!q || !f || f->type != VINE_TEMP) {
@@ -84,10 +75,6 @@ static struct vine_worker_info *get_best_dest_worker(struct vine_manager *q, str
 		}
 		/* skip if the incoming transfer counter is too high */
 		if (w->incoming_xfer_counter >= q->worker_source_max_transfers) {
-			continue;
-		}
-		/* skip if the worker is a checkpoint worker */
-		if (is_checkpoint_worker(q, w)) {
 			continue;
 		}
 		/* skip if the worker already has this file */
