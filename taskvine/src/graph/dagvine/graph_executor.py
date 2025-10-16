@@ -5,7 +5,7 @@ from ndcctools.taskvine.utils import delete_all_files, get_c_constant
 from ndcctools.taskvine.dagvine.graph_definition import GraphKeyResult, TaskGraph
 from ndcctools.taskvine.dagvine.params import ManagerTuningParams
 from ndcctools.taskvine.dagvine.params import VineConstantParams
-
+from ndcctools.taskvine.dagvine.params import RegularParams
 
 import cloudpickle
 import os
@@ -69,95 +69,81 @@ def ensure_task_dict(collection_dict):
 class GraphExecutor(Manager):
     def __init__(self,
                  *args,
-                 manager_tuning_params=None,
-                 library=None,
-                 worker_cores=16,
+                 manager_tuning_params=ManagerTuningParams(),
+                 regular_params=RegularParams(),
+                 vine_constant_params=VineConstantParams(),
                  **kwargs):
 
         signal.signal(signal.SIGINT, self._on_sigint)
 
-        # delete all files in the run info template directory, do this before super().__init__()
-        self.run_info_path = kwargs.get('run_info_path')
-        self.run_info_template = kwargs.get('run_info_template')
-        self.run_info_path_absolute = os.path.join(self.run_info_path, self.run_info_template)
-        if self.run_info_path and self.run_info_template:
+        self.manager_tuning_params = manager_tuning_params
+        self.vine_constant_params = vine_constant_params
+        self.regular_params = regular_params
+
+        # delete all files in the run info directory, do this before super().__init__()
+        run_info_path = self.regular_params.run_info_path
+        run_info_template = self.regular_params.run_info_template
+        self.run_info_path_absolute = os.path.join(run_info_path, run_info_template)
+        if run_info_path and run_info_template:
             delete_all_files(self.run_info_path_absolute)
 
-        # initialize the manager
-        super_params = set(inspect.signature(Manager.__init__).parameters)
-        super_kwargs = {k: v for k, v in kwargs.items() if k in super_params}
-
-        super().__init__(*args, **super_kwargs)
+        kwargs["run_info_path"] = run_info_path
+        kwargs["run_info_template"] = run_info_template
+        super().__init__(*args, **kwargs)
         print(f"TaskVine Manager \033[92m{self.name}\033[0m listening on port \033[92m{self.port}\033[0m")
-
-        # tune the manager
-        if manager_tuning_params:
-            assert isinstance(manager_tuning_params, ManagerTuningParams), "manager_tuning_params must be an instance of ManagerTuningParams"
-            for k, v in manager_tuning_params.to_dict().items():
-                print(f"Tuning {k} to {v}")
-                self.tune(k, v)
 
         # initialize the task graph
         self._vine_task_graph = cvine.vine_task_graph_create(self._taskvine)
 
-        # create library task
-        self.library = library
-        self.library.install(self, worker_cores, self._vine_task_graph)
+    def tune_manager(self):
+        for k, v in self.manager_tuning_params.to_dict().items():
+            print(f"Tuning {k} to {v}")
+            self.tune(k, v)
+
+    def set_policy(self):
+        # set replica placement policy
+        cvine.vine_set_replica_placement_policy(self._taskvine, self.vine_constant_params.get_c_constant_of("replica_placement_policy"))
+        # set worker scheduling algorithm
+        cvine.vine_set_scheduler(self._taskvine, self.vine_constant_params.get_c_constant_of("schedule"))
+        # set task priority mode
+        cvine.vine_task_graph_set_task_priority_mode(self._vine_task_graph, self.vine_constant_params.get_c_constant_of("task_priority_mode"))
 
     def run(self,
             collection_dict,
             target_keys=[],
-            replica_placement_policy="random",
-            priority_mode="largest-input-first",
-            # scheduling_mode="files",
-            extra_task_output_size_mb=["uniform", 0, 0],
-            extra_task_sleep_time=["uniform", 0, 0],
-            prune_depth=1,
-            shared_file_system_dir="/project01/ndcms/jzhou24/shared_file_system",
-            staging_dir="/project01/ndcms/jzhou24/staging",
-            failure_injection_step_percent=-1,
-            vine_constant_params=None,
-            outfile_type={
-                "temp": 1.0,
-                "shared-file-system": 0.0,
-            }):
+            library=None,
+            ):
+
+        # tune the manager every time we start a new run as the parameters may have changed
+        self.tune_manager()
+        # set the policy every time we start a new run as the parameters may have changed
+        self.set_policy()
+
         self.target_keys = target_keys
         self.task_dict = ensure_task_dict(collection_dict)
 
-        cvine.vine_task_graph_set_failure_injection_step_percent(self._vine_task_graph, failure_injection_step_percent)
+        # create library task
+        self.library = library
+        self.library.install(self, self.regular_params.libcores, self._vine_task_graph)
 
-        # self.set_scheduler(scheduling_mode)
+        cvine.vine_task_graph_set_failure_injection_step_percent(self._vine_task_graph, self.regular_params.failure_injection_step_percent)
 
         # create task graph in the python side
         print("Initializing TaskGraph object")
-        self.shared_file_system_dir = shared_file_system_dir
-        self.staging_dir = staging_dir
         self.task_graph = TaskGraph(self.task_dict,
-                                    staging_dir=self.staging_dir,
-                                    shared_file_system_dir=self.shared_file_system_dir,
-                                    extra_task_output_size_mb=extra_task_output_size_mb,
-                                    extra_task_sleep_time=extra_task_sleep_time)
+                                    staging_dir=self.regular_params.staging_dir,
+                                    shared_file_system_dir=self.regular_params.shared_file_system_dir,
+                                    extra_task_output_size_mb=self.regular_params.extra_task_output_size_mb,
+                                    extra_task_sleep_time=self.regular_params.extra_task_sleep_time)
         topo_order = self.task_graph.get_topological_order()
-
-        # the sum of the values in outfile_type must be 1.0
-        assert sum(list(outfile_type.values())) == 1.0
-
-        if vine_constant_params:
-            assert isinstance(vine_constant_params, VineConstantParams), "vine_constant_params must be an instance of VineConstantParams"
-            # set replica placement policy
-            cvine.vine_set_replica_placement_policy(self._taskvine, vine_constant_params.get_c_constant_of("replica_placement_policy"))
-            # set worker scheduling algorithm
-            cvine.vine_set_scheduler(self._taskvine, vine_constant_params.get_c_constant_of("schedule"))
-            # set task priority mode
-            cvine.vine_task_graph_set_task_priority_mode(self._vine_task_graph, vine_constant_params.get_c_constant_of("task_priority_mode"))
 
         # create task graph in the python side
         print("Initializing task graph in TaskVine")
         for k in topo_order:
             cvine.vine_task_graph_add_node(self._vine_task_graph,
                                            self.task_graph.vine_key_of[k],
-                                           self.staging_dir,
-                                           prune_depth)
+                                           self.regular_params.staging_dir,
+                                           self.regular_params.prune_depth)
             for pk in self.task_graph.parents_of.get(k, []):
                 cvine.vine_task_graph_add_dependency(self._vine_task_graph, self.task_graph.vine_key_of[pk], self.task_graph.vine_key_of[k])
 
@@ -172,7 +158,7 @@ class GraphExecutor(Manager):
 
         # keys with larger heavy score should be stored into the shared file system
         sorted_keys = sorted(heavy_scores, key=lambda x: heavy_scores[x], reverse=True)
-        shared_file_system_size = round(len(sorted_keys) * outfile_type["shared-file-system"])
+        shared_file_system_size = round(len(sorted_keys) * self.regular_params.outfile_type["shared-file-system"])
         for i, k in enumerate(sorted_keys):
             if k in self.target_keys:
                 choice = "local"
@@ -195,7 +181,7 @@ class GraphExecutor(Manager):
             cloudpickle.dump(self.task_graph, f)
 
         # now execute the vine graph
-        print(f"Executing task graph, logs will be written into {self.run_info_path_absolute}")
+        print(f"\033[92mExecuting task graph, logs will be written into {self.run_info_path_absolute}\033[0m")
         cvine.vine_task_graph_execute(self._vine_task_graph)
 
         # after execution, we need to load results of target keys
