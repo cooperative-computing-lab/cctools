@@ -6,6 +6,7 @@ TARGETS=manager worker tools bindings examples graph
 all: $(TARGETS)
 
 worker: manager
+graph: manager
 bindings: manager graph
 tools: manager
 examples: manager worker tools bindings

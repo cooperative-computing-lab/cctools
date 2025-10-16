@@ -225,7 +225,7 @@ int vine_temp_handle_file_lost(struct vine_manager *q, char *cachename)
 	return 1;
 }
 
-void vine_set_replica_placement_policy(struct vine_manager *q, vine_replica_placement_policy_t policy)
+void vine_temp_set_replica_placement_policy(struct vine_manager *q, vine_replica_placement_policy_t policy)
 {
 	if (!q) {
 		return;

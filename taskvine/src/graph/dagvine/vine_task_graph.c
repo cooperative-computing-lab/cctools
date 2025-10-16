@@ -27,6 +27,7 @@
 #include "vine_task.h"
 #include "vine_file.h"
 #include "vine_mount.h"
+#include "taskvine.h"
 
 
 static volatile sig_atomic_t interrupted = 0;
@@ -134,7 +135,7 @@ static void submit_unblocked_children(struct vine_task_graph *tg, struct vine_ta
 		return;
 	}
 
-	struct vine_task_node *child_node;
+	struct vine_task_node *child_node; 
 	LIST_ITERATE(node->children, child_node)
 	{
 		/* Remove this parent from the child's pending set if it exists */
@@ -348,30 +349,45 @@ static struct vine_task_node *get_node_by_task(struct vine_task_graph *tg, struc
 /*************************************************************/
 
 /**
- * Set the proxy library and function names (Python-side), shared by all tasks.
+ * Set the proxy library name (Python-side), shared by all tasks.
  * @param tg Reference to the task graph object.
  * @param proxy_library_name Reference to the proxy library name.
- * @param proxy_function_name Reference to the proxy function name.
  */
-void vine_task_graph_set_proxy_library_and_function_names(struct vine_task_graph *tg,
-	const char *proxy_library_name,
-	const char *proxy_function_name)
+void vine_task_graph_set_proxy_library_name(struct vine_task_graph *tg, const char *proxy_library_name)
 {
-	if (!tg || !proxy_library_name || !proxy_function_name) {
+	if (!tg || !proxy_library_name) {
 		return;
 	}
 
-	/* free the existing proxy library and function names if they exist */
+	/* free the existing proxy library name if it exists */
 	if (tg->proxy_library_name) {
 		free(tg->proxy_library_name);
 	}
+
+	tg->proxy_library_name = xxstrdup(proxy_library_name);
+
+	return;
+}
+
+/**
+ * Set the proxy function name (Python-side), shared by all tasks.
+ * @param tg Reference to the task graph object.
+ * @param proxy_function_name Reference to the proxy function name.
+ */
+void vine_task_graph_set_proxy_function_name(struct vine_task_graph *tg, const char *proxy_function_name)
+{
+	if (!tg || !proxy_function_name) {
+		return;
+	}
+
+	/* free the existing proxy function name if it exists */
 	if (tg->proxy_function_name) {
 		free(tg->proxy_function_name);
 	}
 
-	/* set the new proxy library and function names */
-	tg->proxy_library_name = xxstrdup(proxy_library_name);
 	tg->proxy_function_name = xxstrdup(proxy_function_name);
+
+	return;
 }
 
 /**
@@ -619,8 +635,6 @@ struct vine_task_graph *vine_task_graph_create(struct vine_manager *q)
 	vine_enable_debug_log(debug_tmp);
 	free(debug_tmp);
 
-	signal(SIGINT, handle_sigint);
-
 	return tg;
 }
 
@@ -723,6 +737,8 @@ void vine_task_graph_execute(struct vine_task_graph *tg)
 	if (!tg) {
 		return;
 	}
+
+	signal(SIGINT, handle_sigint);
 
 	debug(D_VINE, "start executing task graph");
 

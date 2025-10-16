@@ -1,4 +1,5 @@
 from ndcctools.taskvine import cvine
+from ndcctools.taskvine.dagvine import cdagvine
 from ndcctools.taskvine.manager import Manager
 from ndcctools.taskvine.utils import delete_all_files, get_c_constant
 
@@ -74,7 +75,7 @@ class GraphExecutor(Manager):
                  vine_constant_params=VineConstantParams(),
                  **kwargs):
 
-        signal.signal(signal.SIGINT, self._on_sigint)
+        # Use C-side SIGINT handler in cdagvine to handle Ctrl+C gracefully
 
         self.manager_tuning_params = manager_tuning_params
         self.vine_constant_params = vine_constant_params
@@ -93,7 +94,7 @@ class GraphExecutor(Manager):
         print(f"TaskVine Manager \033[92m{self.name}\033[0m listening on port \033[92m{self.port}\033[0m")
 
         # initialize the task graph
-        self._vine_task_graph = cvine.vine_task_graph_create(self._taskvine)
+        self._vine_task_graph = cdagvine.vine_task_graph_create(self._taskvine)
 
     def tune_manager(self):
         for k, v in self.manager_tuning_params.to_dict().items():
@@ -102,11 +103,11 @@ class GraphExecutor(Manager):
 
     def set_policy(self):
         # set replica placement policy
-        cvine.vine_set_replica_placement_policy(self._taskvine, self.vine_constant_params.get_c_constant_of("replica_placement_policy"))
+        cvine.vine_temp_set_replica_placement_policy(self._taskvine, self.vine_constant_params.get_c_constant_of("replica_placement_policy"))
         # set worker scheduling algorithm
         cvine.vine_set_scheduler(self._taskvine, self.vine_constant_params.get_c_constant_of("schedule"))
         # set task priority mode
-        cvine.vine_task_graph_set_task_priority_mode(self._vine_task_graph, self.vine_constant_params.get_c_constant_of("task_priority_mode"))
+        cdagvine.vine_task_graph_set_task_priority_mode(self._vine_task_graph, self.vine_constant_params.get_c_constant_of("task_priority_mode"))
 
     def run(self,
             collection_dict,
@@ -126,7 +127,7 @@ class GraphExecutor(Manager):
         self.library = library
         self.library.install(self, self.regular_params.libcores, self._vine_task_graph)
 
-        cvine.vine_task_graph_set_failure_injection_step_percent(self._vine_task_graph, self.regular_params.failure_injection_step_percent)
+        cdagvine.vine_task_graph_set_failure_injection_step_percent(self._vine_task_graph, self.regular_params.failure_injection_step_percent)
 
         # create task graph in the python side
         print("Initializing TaskGraph object")
@@ -140,21 +141,21 @@ class GraphExecutor(Manager):
         # create task graph in the python side
         print("Initializing task graph in TaskVine")
         for k in topo_order:
-            cvine.vine_task_graph_add_node(self._vine_task_graph,
+            cdagvine.vine_task_graph_add_node(self._vine_task_graph,
                                            self.task_graph.vine_key_of[k],
                                            self.regular_params.staging_dir,
                                            self.regular_params.prune_depth)
             for pk in self.task_graph.parents_of.get(k, []):
-                cvine.vine_task_graph_add_dependency(self._vine_task_graph, self.task_graph.vine_key_of[pk], self.task_graph.vine_key_of[k])
+                cdagvine.vine_task_graph_add_dependency(self._vine_task_graph, self.task_graph.vine_key_of[pk], self.task_graph.vine_key_of[k])
 
         # we must finalize the graph in c side after all nodes and dependencies are added
         # this includes computing various metrics for each node, such as depth, height, heavy score, etc.
-        cvine.vine_task_graph_compute_topology_metrics(self._vine_task_graph)
+        cdagvine.vine_task_graph_compute_topology_metrics(self._vine_task_graph)
 
         # then we can use the heavy score to sort the nodes and specify their outfile remote names
         heavy_scores = {}
         for k in self.task_graph.task_dict.keys():
-            heavy_scores[k] = cvine.vine_task_graph_get_node_heavy_score(self._vine_task_graph, self.task_graph.vine_key_of[k])
+            heavy_scores[k] = cdagvine.vine_task_graph_get_node_heavy_score(self._vine_task_graph, self.task_graph.vine_key_of[k])
 
         # keys with larger heavy score should be stored into the shared file system
         sorted_keys = sorted(heavy_scores, key=lambda x: heavy_scores[x], reverse=True)
@@ -171,7 +172,7 @@ class GraphExecutor(Manager):
             self.task_graph.set_outfile_type_of(k, choice)
             # set on the C side, so the manager knows where the data is stored
             outfile_type_str = f"NODE_OUTFILE_TYPE_{choice.upper().replace('-', '_')}"
-            cvine.vine_task_graph_set_node_outfile(self._vine_task_graph,
+            cdagvine.vine_task_graph_set_node_outfile(self._vine_task_graph,
                                                    self.task_graph.vine_key_of[k],
                                                    get_c_constant(outfile_type_str),
                                                    self.task_graph.outfile_remote_name[k])
@@ -182,12 +183,12 @@ class GraphExecutor(Manager):
 
         # now execute the vine graph
         print(f"\033[92mExecuting task graph, logs will be written into {self.run_info_path_absolute}\033[0m")
-        cvine.vine_task_graph_execute(self._vine_task_graph)
+        cdagvine.vine_task_graph_execute(self._vine_task_graph)
 
         # after execution, we need to load results of target keys
         results = {}
         for k in self.target_keys:
-            local_outfile_path = cvine.vine_task_graph_get_node_local_outfile_source(self._vine_task_graph, self.task_graph.vine_key_of[k])
+            local_outfile_path = cdagvine.vine_task_graph_get_node_local_outfile_source(self._vine_task_graph, self.task_graph.vine_key_of[k])
             if not os.path.exists(local_outfile_path):
                 results[k] = "NOT_FOUND"
                 continue
@@ -202,7 +203,7 @@ class GraphExecutor(Manager):
 
     def __del__(self):
         if hasattr(self, '_vine_task_graph') and self._vine_task_graph:
-            cvine.vine_task_graph_delete(self._vine_task_graph)
+            cdagvine.vine_task_graph_delete(self._vine_task_graph)
 
         if hasattr(self, 'library') and self.library.local_path and os.path.exists(self.library.local_path):
             os.remove(self.library.local_path)
