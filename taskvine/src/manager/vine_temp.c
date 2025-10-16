@@ -233,14 +233,15 @@ void vine_set_replica_placement_policy(struct vine_manager *q, vine_replica_plac
 
 	switch (policy) {
 	case VINE_REPLICA_PLACEMENT_POLICY_RANDOM:
-		debug(D_VINE, "Setting replica placement policy to RANDOM");
+		debug(D_VINE | D_NOTICE, "Setting replica placement policy to RANDOM");
 		q->replica_placement_policy = policy;
 		break;
 	case VINE_REPLICA_PLACEMENT_POLICY_DISK_LOAD:
-		debug(D_VINE, "Setting replica placement policy to DISK_LOAD");
+		debug(D_VINE | D_NOTICE, "Setting replica placement policy to DISK_LOAD");
 		q->replica_placement_policy = policy;
 		break;
 	case VINE_REPLICA_PLACEMENT_POLICY_TRANSFER_LOAD:
+		debug(D_VINE | D_NOTICE, "Setting replica placement policy to TRANSFER_LOAD");
 		q->replica_placement_policy = policy;
 		break;
 	default:

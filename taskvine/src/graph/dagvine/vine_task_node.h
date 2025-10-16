@@ -46,7 +46,6 @@ struct vine_task_node {
     timestamp_t time_spent_on_prune_ancestors_of_temp_node;
     timestamp_t time_spent_on_prune_ancestors_of_persisted_node;
 
-    vine_task_node_priority_mode_t priority_mode;
     vine_task_node_outfile_type_t outfile_type;
     prune_status_t prune_status;
 };
@@ -57,18 +56,15 @@ struct vine_task_node *vine_task_node_create(
     const char *proxy_library_name,
     const char *proxy_function_name,
     const char *staging_dir,
-    int prune_depth,
-    vine_task_node_priority_mode_t priority_mode
+    int prune_depth
 );
 
 void vine_task_node_delete(struct vine_task_node *node);
 double compute_lex_priority(const char *key);
 void vine_task_node_prune_ancestors(struct vine_task_node *node);
-double vine_task_node_calculate_priority(struct vine_task_node *node);
 void vine_task_node_print_info(struct vine_task_node *node);
 void vine_task_node_update_critical_time(struct vine_task_node *node, timestamp_t execution_time);
 void vine_task_node_replicate_outfile(struct vine_task_node *node);
-int vine_task_node_submit(struct vine_task_node *node);
 void vine_task_node_set_outfile(struct vine_task_node *node, vine_task_node_outfile_type_t outfile_type, const char *outfile_remote_name);
 void vine_task_node_checkpoint_outfile(struct vine_task_node *node);
 

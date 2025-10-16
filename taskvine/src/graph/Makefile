@@ -1,7 +1,7 @@
 include ../../../config.mk
 include ../../../rules.mk
 
-SUBDIRS = GraphInvoker
+SUBDIRS = dagvine
 
 all clean install test lint format: $(SUBDIRS)
 

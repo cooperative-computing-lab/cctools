@@ -20,10 +20,10 @@
 #include "vine_manager.h"
 #include "vine_file.h"
 #include "vine_task.h"
-#include "vine_task_graph.h"
 #include "vine_worker_info.h"
 #include "vine_temp.h"
 #include "vine_task_node.h"
+#include "taskvine.h"
 
 
 /**
@@ -51,7 +51,6 @@ double compute_lex_priority(const char *key)
  * @param proxy_function_name Reference to the proxy function name.
  * @param staging_dir Reference to the staging directory.
  * @param prune_depth Reference to the prune depth.
- * @param priority_mode Reference to the priority mode.
  * @return A new node object.
  */
 struct vine_task_node *vine_task_node_create(
@@ -60,8 +59,7 @@ struct vine_task_node *vine_task_node_create(
 		const char *proxy_library_name,
 		const char *proxy_function_name,
 		const char *staging_dir,
-		int prune_depth,
-		vine_task_node_priority_mode_t priority_mode)
+		int prune_depth)
 {
 	if (!manager || !node_key || !proxy_library_name || !proxy_function_name || !staging_dir) {
 		return NULL;
@@ -73,7 +71,6 @@ struct vine_task_node *vine_task_node_create(
 	node->node_key = xxstrdup(node_key);
 	node->staging_dir = xxstrdup(staging_dir);
 
-	node->priority_mode = priority_mode;
 	node->prune_status = PRUNE_STATUS_NOT_PRUNED;
 	node->parents = list_create();
 	node->children = list_create();
@@ -193,62 +190,6 @@ static int _node_outfile_is_persisted(struct vine_task_node *node)
 	}
 
 	return 0;
-}
-
-/**
- * Calculate the priority of a node given the priority mode.
- * @param node Reference to the node object.
- * @return The priority.
- */
-double vine_task_node_calculate_priority(struct vine_task_node *node)
-{
-	if (!node) {
-		return 0;
-	}
-
-	double priority = 0;
-	timestamp_t current_time = timestamp_get();
-
-	struct vine_task_node *parent_node;
-
-	switch (node->priority_mode) {
-	case VINE_TASK_PRIORITY_MODE_RANDOM:
-		priority = random_double();
-		break;
-	case VINE_TASK_PRIORITY_MODE_DEPTH_FIRST:
-		priority = (double)node->depth;
-		break;
-	case VINE_TASK_PRIORITY_MODE_BREADTH_FIRST:
-		priority = -(double)node->depth;
-		break;
-	case VINE_TASK_PRIORITY_MODE_FIFO:
-		priority = -(double)current_time;
-		break;
-	case VINE_TASK_PRIORITY_MODE_LIFO:
-		priority = (double)current_time;
-		break;
-	case VINE_TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST:
-		LIST_ITERATE(node->parents, parent_node)
-		{
-			if (!parent_node->outfile) {
-				continue;
-			}
-			priority += (double)vine_file_size(parent_node->outfile);
-		}
-		break;
-	case VINE_TASK_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST:
-		LIST_ITERATE(node->parents, parent_node)
-		{
-			if (!parent_node->outfile) {
-				continue;
-			}
-			timestamp_t parent_task_completion_time = parent_node->task->time_workers_execute_last;
-			priority += (double)vine_file_size(parent_node->outfile) * (double)parent_task_completion_time;
-		}
-		break;
-	}
-
-	return priority;
 }
 
 /**
@@ -513,23 +454,6 @@ static int prune_ancestors_of_persisted_node(struct vine_task_node *node)
 }
 
 /**
- * Submit a node to the taskvine manager.
- * @param node Reference to the node object.
- * @return The task id.
- */
-int vine_task_node_submit(struct vine_task_node *node)
-{
-	if (!node) {
-		return -1;
-	}
-
-	double priority = vine_task_node_calculate_priority(node);
-	vine_task_set_priority(node->task, priority);
-
-	return vine_submit(node->manager, node->task);
-}
-
-/**
  * Print the info of the node.
  * @param node Reference to the node object.
  */
@@ -551,7 +475,6 @@ void vine_task_node_print_info(struct vine_task_node *node)
 	debug(D_VINE, "depth: %d", node->depth);
 	debug(D_VINE, "height: %d", node->height);
 	debug(D_VINE, "prune_depth: %d", node->prune_depth);
-	debug(D_VINE, "priority_mode: %d", node->priority_mode);
 
 	if (node->outfile_remote_name) {
 		debug(D_VINE, "outfile_remote_name: %s", node->outfile_remote_name);

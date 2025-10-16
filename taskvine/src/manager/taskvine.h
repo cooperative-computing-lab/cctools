@@ -173,7 +173,7 @@ typedef enum {
     VINE_TASK_PRIORITY_MODE_LIFO,                /**< Last in, first out priority */
     VINE_TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST, /**< Prioritize tasks with larger inputs first */
     VINE_TASK_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST /**< Prioritize tasks with larger storage footprint first */
-} vine_task_node_priority_mode_t;
+} vine_task_priority_mode_t;
 
 /** Statistics describing a manager. */
 struct vine_stats {
@@ -1613,20 +1613,24 @@ void vine_task_graph_add_dependency(struct vine_task_graph *tg, const char *pare
 @param node_key Reference to the node key.
 @param staging_dir Reference to the staging directory.
 @param prune_depth Reference to the prune depth.
-@param priority_mode Reference to the priority mode.
 @return A new node object.
 */
 struct vine_task_node *vine_task_graph_add_node(struct vine_task_graph *tg,
 	const char *node_key,
 	const char *staging_dir,
-	int prune_depth,
-	vine_task_node_priority_mode_t priority_mode);
+	int prune_depth);
 
 /** Set the replica placement policy (which worker do we prefer to place the redundant file replicas).
 @param q Reference to the current manager object.
 @param policy Reference to the replica placement policy.
 */
 void vine_set_replica_placement_policy(struct vine_manager *q, vine_replica_placement_policy_t policy);
+
+/** Set the task priority mode for the task graph.
+@param tg Reference to the task graph object.
+@param priority_mode Reference to the priority mode.
+*/
+void vine_task_graph_set_task_priority_mode(struct vine_task_graph *tg, vine_task_priority_mode_t priority_mode);
 
 /** Set the type of the node-output file.
 @param tg Reference to the task graph object.

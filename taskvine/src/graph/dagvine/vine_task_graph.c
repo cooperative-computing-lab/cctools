@@ -13,6 +13,7 @@
 #include "itable.h"
 #include "xxmalloc.h"
 #include "stringtools.h"
+#include "random.h"
 #include "hash_table.h"
 #include "set.h"
 #include "timestamp.h"
@@ -44,6 +45,63 @@ static void handle_sigint(int signal)
 }
 
 /**
+ * Calculate the priority of a node given the priority mode.
+ * @param node Reference to the node object.
+ * @param priority_mode Reference to the priority mode.
+ * @return The priority.
+ */
+static double vine_task_node_calculate_priority(struct vine_task_node *node, vine_task_priority_mode_t priority_mode)
+{
+	if (!node) {
+		return 0;
+	}
+
+	double priority = 0;
+	timestamp_t current_time = timestamp_get();
+
+	struct vine_task_node *parent_node;
+
+	switch (priority_mode) {
+	case VINE_TASK_PRIORITY_MODE_RANDOM:
+		priority = random_double();
+		break;
+	case VINE_TASK_PRIORITY_MODE_DEPTH_FIRST:
+		priority = (double)node->depth;
+		break;
+	case VINE_TASK_PRIORITY_MODE_BREADTH_FIRST:
+		priority = -(double)node->depth;
+		break;
+	case VINE_TASK_PRIORITY_MODE_FIFO:
+		priority = -(double)current_time;
+		break;
+	case VINE_TASK_PRIORITY_MODE_LIFO:
+		priority = (double)current_time;
+		break;
+	case VINE_TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST:
+		LIST_ITERATE(node->parents, parent_node)
+		{
+			if (!parent_node->outfile) {
+				continue;
+			}
+			priority += (double)vine_file_size(parent_node->outfile);
+		}
+		break;
+	case VINE_TASK_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST:
+		LIST_ITERATE(node->parents, parent_node)
+		{
+			if (!parent_node->outfile) {
+				continue;
+			}
+			timestamp_t parent_task_completion_time = parent_node->task->time_workers_execute_last;
+			priority += (double)vine_file_size(parent_node->outfile) * (double)parent_task_completion_time;
+		}
+		break;
+	}
+
+	return priority;
+}
+
+/**
  * Submit a node to the taskvine manager.
  * @param tg Reference to the task graph object.
  * @param node Reference to the node object.
@@ -54,7 +112,12 @@ static void submit_node_task(struct vine_task_graph *tg, struct vine_task_node *
 		return;
 	}
 
-	int task_id = vine_task_node_submit(node);
+	/* calculate the priority of the node */
+	double priority = vine_task_node_calculate_priority(node, tg->task_priority_mode);
+	vine_task_set_priority(node->task, priority);
+	/* submit the task to the manager */
+	int task_id = vine_submit(node->manager, node->task);
+	/* insert the task id to the task id to node map */
 	itable_insert(tg->task_id_to_node, task_id, node);
 
 	return;
@@ -504,15 +567,13 @@ void vine_task_graph_compute_topology_metrics(struct vine_task_graph *tg)
  * @param node_key Reference to the node key.
  * @param staging_dir Reference to the staging directory.
  * @param prune_depth Reference to the prune depth.
- * @param priority_mode Reference to the priority mode.
  * @return A new node object.
  */
 struct vine_task_node *vine_task_graph_add_node(
 		struct vine_task_graph *tg,
 		const char *node_key,
 		const char *staging_dir,
-		int prune_depth,
-		vine_task_node_priority_mode_t priority_mode)
+		int prune_depth)
 {
 	if (!tg || !node_key) {
 		return NULL;
@@ -526,8 +587,7 @@ struct vine_task_node *vine_task_graph_add_node(
 				tg->proxy_library_name,
 				tg->proxy_function_name,
 				staging_dir,
-				prune_depth,
-				priority_mode);
+				prune_depth);
 		hash_table_insert(tg->nodes, node_key, node);
 	}
 
@@ -550,6 +610,7 @@ struct vine_task_graph *vine_task_graph_create(struct vine_manager *q)
 	tg->proxy_function_name = xxstrdup("compute_single_key");       // Python-side proxy function name (shared by all tasks)
 	tg->manager = q;
 
+	tg->task_priority_mode = VINE_TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST;
 	tg->failure_injection_step_percent = -1.0;
 
 	/* enable debug system for C code since it uses a separate debug system instance
@@ -580,6 +641,23 @@ void vine_task_graph_set_failure_injection_step_percent(struct vine_task_graph *
 
 	debug(D_VINE, "setting failure injection step percent to %lf", percent);
 	tg->failure_injection_step_percent = percent;
+
+	return;
+}
+
+/**
+ * Set the task priority mode for the task graph.
+ * @param tg Reference to the task graph object.
+ * @param priority_mode Reference to the priority mode.
+ */
+void vine_task_graph_set_task_priority_mode(struct vine_task_graph *tg, vine_task_priority_mode_t priority_mode)
+{
+	if (!tg) {
+		return;
+	}
+
+	tg->task_priority_mode = priority_mode;
+	return;
 }
 
 /**

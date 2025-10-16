@@ -7,22 +7,22 @@ LOCAL_CCFLAGS+=-I ${CCTOOLS_HOME}/taskvine/src/manager
 SOURCES = vine_task_node.c vine_task_graph.c
 OBJECTS = $(SOURCES:%.c=%.o)
 
-LIBRARIES = libgraphinvoker.a
+LIBRARIES = libdagvine.a
 PROGRAMS =
 SCRIPTS =
 TARGETS = $(LIBRARIES) $(PROGRAMS)
 
 all: $(TARGETS)
 
-libgraphinvoker.a: $(OBJECTS)
+libdagvine.a: $(OBJECTS)
 
 $(PROGRAMS): $(EXTERNALS)
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
 	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/graph/GraphInvoker/include
-	cp ${CCTOOLS_HOME}/taskvine/src/manager/taskvine.h $(CCTOOLS_INSTALL_DIR)/graph/GraphInvoker/include/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/graph/dagvine/include
+	cp ${CCTOOLS_HOME}/taskvine/src/manager/taskvine.h $(CCTOOLS_INSTALL_DIR)/graph/dagvine/include/
 
 clean:
 	rm -rf $(PROGRAMS) $(OBJECTS) *.o

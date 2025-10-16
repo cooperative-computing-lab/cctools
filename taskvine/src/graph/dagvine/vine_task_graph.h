@@ -7,6 +7,7 @@
 #include "vine_manager.h"
 #include "set.h"
 #include "vine_task_node.h"
+#include "taskvine.h"
 
 struct vine_task_graph {
     struct vine_manager *manager;
@@ -17,6 +18,7 @@ struct vine_task_graph {
     char *proxy_library_name;
     char *proxy_function_name;
 
+    vine_task_priority_mode_t task_priority_mode;  // priority mode for task graph task scheduling
     double failure_injection_step_percent;  // 0 - 100, the percentage of steps to inject failure
 };
 
@@ -30,8 +32,7 @@ void vine_task_graph_compute_topology_metrics(struct vine_task_graph *tg);
 struct vine_task_node *vine_task_graph_add_node(struct vine_task_graph *tg,
     const char *node_key,
     const char *staging_dir,
-    int prune_depth,
-    vine_task_node_priority_mode_t priority_mode);
+    int prune_depth);
 struct vine_task_graph *vine_task_graph_create(struct vine_manager *q);
 void vine_task_graph_set_failure_injection_step_percent(struct vine_task_graph *tg, double percent);
 void vine_task_graph_add_dependency(struct vine_task_graph *tg, const char *parent_key, const char *child_key);

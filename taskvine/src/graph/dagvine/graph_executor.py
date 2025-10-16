@@ -1,8 +1,11 @@
 from ndcctools.taskvine import cvine
 from ndcctools.taskvine.manager import Manager
-from ndcctools.taskvine.utils import load_variable_from_library, delete_all_files, get_c_constant
-from ndcctools.taskvine.graph_definition import GraphKeyResult, TaskGraph, init_task_graph_context, compute_dts_key, compute_sexpr_key, compute_single_key, hash_name, hashable
-from ndcctools.taskvine.library_task import LibraryTask
+from ndcctools.taskvine.utils import delete_all_files, get_c_constant
+
+from ndcctools.taskvine.dagvine.graph_definition import GraphKeyResult, TaskGraph
+from ndcctools.taskvine.dagvine.params import ManagerTuningParams
+from ndcctools.taskvine.dagvine.params import VineConstantParams
+
 
 import cloudpickle
 import os
@@ -66,9 +69,9 @@ def ensure_task_dict(collection_dict):
 class GraphExecutor(Manager):
     def __init__(self,
                  *args,
-                 libcores=1,
-                 hoisting_modules=[],
-                 libtask_env_files={},
+                 manager_tuning_params=None,
+                 library=None,
+                 worker_cores=16,
                  **kwargs):
 
         signal.signal(signal.SIGINT, self._on_sigint)
@@ -85,44 +88,35 @@ class GraphExecutor(Manager):
         super_kwargs = {k: v for k, v in kwargs.items() if k in super_params}
 
         super().__init__(*args, **super_kwargs)
-        print(f"TaskVine manager \033[92m{self.name}\033[0m listening on port \033[92m{self.port}\033[0m")
+        print(f"TaskVine Manager \033[92m{self.name}\033[0m listening on port \033[92m{self.port}\033[0m")
 
         # tune the manager
-        leftover_kwargs = {k: v for k, v in kwargs.items() if k not in super_params}
-        for key, value in leftover_kwargs.items():
-            try:
-                vine_param = key.replace("_", "-")
-                self.tune(vine_param, value)
-                print(f"Tuned {vine_param} to {value}")
-            except Exception as e:
-                print(f"Failed to tune {key} with value {value}: {e}")
-                exit(1)
-        self.tune("worker-source-max-transfers", 100)
-        self.tune("max-retrievals", -1)
-        self.tune("prefer-dispatch", 1)
-        self.tune("transient-error-interval", 1)
-        self.tune("attempt-schedule-depth", 1000)
+        if manager_tuning_params:
+            assert isinstance(manager_tuning_params, ManagerTuningParams), "manager_tuning_params must be an instance of ManagerTuningParams"
+            for k, v in manager_tuning_params.to_dict().items():
+                print(f"Tuning {k} to {v}")
+                self.tune(k, v)
 
         # initialize the task graph
         self._vine_task_graph = cvine.vine_task_graph_create(self._taskvine)
 
         # create library task
-        self.libtask = LibraryTask(libcores=libcores, hoisting_modules=hoisting_modules, env_files=libtask_env_files)
-        self.libtask.install(self, self._vine_task_graph)
+        self.library = library
+        self.library.install(self, worker_cores, self._vine_task_graph)
 
     def run(self,
             collection_dict,
             target_keys=[],
             replica_placement_policy="random",
             priority_mode="largest-input-first",
-            scheduling_mode="files",
+            # scheduling_mode="files",
             extra_task_output_size_mb=["uniform", 0, 0],
             extra_task_sleep_time=["uniform", 0, 0],
             prune_depth=1,
             shared_file_system_dir="/project01/ndcms/jzhou24/shared_file_system",
             staging_dir="/project01/ndcms/jzhou24/staging",
             failure_injection_step_percent=-1,
-            balance_worker_disk_load=0,
+            vine_constant_params=None,
             outfile_type={
                 "temp": 1.0,
                 "shared-file-system": 0.0,
@@ -130,15 +124,9 @@ class GraphExecutor(Manager):
         self.target_keys = target_keys
         self.task_dict = ensure_task_dict(collection_dict)
 
-        self.tune("balance-worker-disk-load", balance_worker_disk_load)
-
         cvine.vine_task_graph_set_failure_injection_step_percent(self._vine_task_graph, failure_injection_step_percent)
 
-        if balance_worker_disk_load:
-            replica_placement_policy = "disk-load"
-            scheduling_mode = "worst"
-
-        self.set_scheduler(scheduling_mode)
+        # self.set_scheduler(scheduling_mode)
 
         # create task graph in the python side
         print("Initializing TaskGraph object")
@@ -154,8 +142,14 @@ class GraphExecutor(Manager):
         # the sum of the values in outfile_type must be 1.0
         assert sum(list(outfile_type.values())) == 1.0
 
-        # set replica placement policy
-        cvine.vine_set_replica_placement_policy(self._taskvine, get_c_constant(f"replica_placement_policy_{replica_placement_policy.replace('-', '_')}"))
+        if vine_constant_params:
+            assert isinstance(vine_constant_params, VineConstantParams), "vine_constant_params must be an instance of VineConstantParams"
+            # set replica placement policy
+            cvine.vine_set_replica_placement_policy(self._taskvine, vine_constant_params.get_c_constant_of("replica_placement_policy"))
+            # set worker scheduling algorithm
+            cvine.vine_set_scheduler(self._taskvine, vine_constant_params.get_c_constant_of("schedule"))
+            # set task priority mode
+            cvine.vine_task_graph_set_task_priority_mode(self._vine_task_graph, vine_constant_params.get_c_constant_of("task_priority_mode"))
 
         # create task graph in the python side
         print("Initializing task graph in TaskVine")
@@ -163,8 +157,7 @@ class GraphExecutor(Manager):
             cvine.vine_task_graph_add_node(self._vine_task_graph,
                                            self.task_graph.vine_key_of[k],
                                            self.staging_dir,
-                                           prune_depth,
-                                           get_c_constant(f"task_priority_mode_{priority_mode.replace('-', '_')}"))
+                                           prune_depth)
             for pk in self.task_graph.parents_of.get(k, []):
                 cvine.vine_task_graph_add_dependency(self._vine_task_graph, self.task_graph.vine_key_of[pk], self.task_graph.vine_key_of[k])
 
@@ -198,7 +191,7 @@ class GraphExecutor(Manager):
                                                    self.task_graph.outfile_remote_name[k])
 
         # save the task graph to a pickle file, will be sent to the remote workers
-        with open(self.libtask.local_path, 'wb') as f:
+        with open(self.library.local_path, 'wb') as f:
             cloudpickle.dump(self.task_graph, f)
 
         # now execute the vine graph
@@ -225,5 +218,5 @@ class GraphExecutor(Manager):
         if hasattr(self, '_vine_task_graph') and self._vine_task_graph:
             cvine.vine_task_graph_delete(self._vine_task_graph)
 
-        if hasattr(self, 'libtask') and self.libtask.local_path and os.path.exists(self.libtask.local_path):
-            os.remove(self.libtask.local_path)
+        if hasattr(self, 'library') and self.library.local_path and os.path.exists(self.library.local_path):
+            os.remove(self.library.local_path)
