@@ -35,6 +35,8 @@ install: all
 	cp ndcctools/taskvine/*.py $(DSPYTHONSO) $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine
 	cp ndcctools/taskvine/compat/*.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/compat
 	cp taskvine.py $(CCTOOLS_PYTHON3_PATH)/
+
 	# install GraphInvoker python modules into package path to preserve API
 	cp $(CCTOOLS_HOME)/taskvine/src/graph/GraphInvoker/graph_definition.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/graph_definition.py
 	cp $(CCTOOLS_HOME)/taskvine/src/graph/GraphInvoker/graph_executor.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/graph_executor.py
+	cp $(CCTOOLS_HOME)/taskvine/src/graph/GraphInvoker/library_task.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/library_task.py

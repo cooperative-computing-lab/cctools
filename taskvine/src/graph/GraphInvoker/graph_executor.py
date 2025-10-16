@@ -2,6 +2,7 @@ from ndcctools.taskvine import cvine
 from ndcctools.taskvine.manager import Manager
 from ndcctools.taskvine.utils import load_variable_from_library, delete_all_files, get_c_constant
 from ndcctools.taskvine.graph_definition import GraphKeyResult, TaskGraph, init_task_graph_context, compute_dts_key, compute_sexpr_key, compute_single_key, hash_name, hashable
+from ndcctools.taskvine.library_task import LibraryTask
 
 import cloudpickle
 import os
@@ -105,34 +106,9 @@ class GraphExecutor(Manager):
         # initialize the task graph
         self._vine_task_graph = cvine.vine_task_graph_create(self._taskvine)
 
-        # create library task with specified resources
-        self._create_library_task(libcores, hoisting_modules, libtask_env_files)
-
-    def _create_library_task(self, libcores=1, hoisting_modules=[], libtask_env_files={}):
-        assert cvine.vine_task_graph_get_proxy_function_name(self._vine_task_graph) == compute_single_key.__name__
-
-        self.task_graph_pkl_file_name = f"library-task-graph-{uuid.uuid4()}.pkl"
-        self.task_graph_pkl_file_local_path = self.task_graph_pkl_file_name
-        self.task_graph_pkl_file_remote_path = self.task_graph_pkl_file_name
-
-        hoisting_modules += [os, cloudpickle, GraphKeyResult, TaskGraph, uuid, hashlib, random, types, collections, time,
-                             load_variable_from_library, compute_dts_key, compute_sexpr_key, compute_single_key, hash_name, hashable]
-        if dask:
-            hoisting_modules += [dask]
-        self.libtask = self.create_library_from_functions(
-            cvine.vine_task_graph_get_proxy_library_name(self._vine_task_graph),
-            compute_single_key,
-            library_context_info=[init_task_graph_context, [], {"task_graph_path": self.task_graph_pkl_file_remote_path}],
-            add_env=False,
-            function_infile_load_mode="json",
-            hoisting_modules=hoisting_modules
-        )
-        self.libtask.add_input(self.declare_file(self.task_graph_pkl_file_local_path), self.task_graph_pkl_file_remote_path)
-        for local_file_path, remote_file_path in libtask_env_files.items():
-            self.libtask.add_input(self.declare_file(local_file_path, cache=True, peer_transfer=True), remote_file_path)
-        self.libtask.set_cores(libcores)
-        self.libtask.set_function_slots(libcores)
-        self.install_library(self.libtask)
+        # create library task
+        self.libtask = LibraryTask(libcores=libcores, hoisting_modules=hoisting_modules, env_files=libtask_env_files)
+        self.libtask.install(self, self._vine_task_graph)
 
     def run(self,
             collection_dict,
@@ -222,7 +198,7 @@ class GraphExecutor(Manager):
                                                    self.task_graph.outfile_remote_name[k])
 
         # save the task graph to a pickle file, will be sent to the remote workers
-        with open(self.task_graph_pkl_file_local_path, 'wb') as f:
+        with open(self.libtask.local_path, 'wb') as f:
             cloudpickle.dump(self.task_graph, f)
 
         # now execute the vine graph
@@ -249,5 +225,5 @@ class GraphExecutor(Manager):
         if hasattr(self, '_vine_task_graph') and self._vine_task_graph:
             cvine.vine_task_graph_delete(self._vine_task_graph)
 
-        if hasattr(self, 'task_graph_pkl_file_local_path') and os.path.exists(self.task_graph_pkl_file_local_path):
-            os.remove(self.task_graph_pkl_file_local_path)
+        if hasattr(self, 'libtask') and self.libtask.local_path and os.path.exists(self.libtask.local_path):
+            os.remove(self.libtask.local_path)
