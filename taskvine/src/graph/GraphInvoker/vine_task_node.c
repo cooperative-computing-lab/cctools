@@ -1,22 +1,4 @@
-#include "vine_task_node.h"
-#include "vine_manager.h"
-#include "vine_task.h"
-#include "vine_file.h"
-#include "vine_task_graph.h"
-#include "jx.h"
-#include "jx_print.h"
-#include "xxmalloc.h"
-#include "stringtools.h"
-#include "taskvine.h"
-#include "timestamp.h"
-#include "set.h"
-#include "hash_table.h"
-#include "debug.h"
-#include "assert.h"
-#include "vine_worker_info.h"
-#include "vine_temp.h"
-#include "random.h"
-
+#include <assert.h>
 #include <inttypes.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -24,6 +6,25 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#include "jx.h"
+#include "jx_print.h"
+#include "xxmalloc.h"
+#include "stringtools.h"
+#include "timestamp.h"
+#include "set.h"
+#include "hash_table.h"
+#include "debug.h"
+#include "random.h"
+
+#include "vine_manager.h"
+#include "vine_file.h"
+#include "vine_task.h"
+#include "vine_task_graph.h"
+#include "vine_worker_info.h"
+#include "vine_temp.h"
+#include "vine_task_node.h"
+
 
 /**
  * Compute a lexicographic priority score from the node key.

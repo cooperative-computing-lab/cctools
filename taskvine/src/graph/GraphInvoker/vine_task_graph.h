@@ -38,6 +38,8 @@ void vine_task_graph_add_dependency(struct vine_task_graph *tg, const char *pare
 void vine_task_graph_set_node_outfile(struct vine_task_graph *tg, const char *node_key, vine_task_node_outfile_type_t outfile_type, const char *outfile_remote_name);
 void vine_task_graph_execute(struct vine_task_graph *tg);
 void vine_task_graph_delete(struct vine_task_graph *tg);
-
+void vine_task_graph_set_proxy_library_and_function_names(struct vine_task_graph *tg,
+	const char *proxy_library_name,
+	const char *proxy_function_name);
 
 #endif // VINE_TASK_GRAPH_H

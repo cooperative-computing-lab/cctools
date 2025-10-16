@@ -1,30 +1,32 @@
-#include "vine_task_graph.h"
-#include "taskvine.h"
-#include "vine_manager.h"
-#include "vine_task_node.h"
-#include "vine_worker_info.h"
-#include "priority_queue.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include "debug.h"
-#include "stringtools.h"
-#include "xxmalloc.h"
+#include <assert.h>
 #include <math.h>
-#include "hash_table.h"
-#include <sys/stat.h>
-#include "itable.h"
-#include "list.h"
-#include "vine_task.h"
-#include "timestamp.h"
-#include "vine_file.h"
-#include "set.h"
-#include "vine_mount.h"
-#include "progress_bar.h"
-#include "assert.h"
-#include "macros.h"
 #include <signal.h>
 #include <stdio.h>
+#include <sys/stat.h>
+
+#include "priority_queue.h"
+#include "list.h"
+#include "debug.h"
+#include "itable.h"
+#include "xxmalloc.h"
+#include "stringtools.h"
+#include "hash_table.h"
+#include "set.h"
+#include "timestamp.h"
+#include "progress_bar.h"
+#include "macros.h"
+
+#include "vine_task_graph.h"
+#include "vine_manager.h"
+#include "vine_task_node.h"
+#include "vine_worker_info.h"
+#include "vine_task.h"
+#include "vine_file.h"
+#include "vine_mount.h"
+
 
 static volatile sig_atomic_t interrupted = 0;
 
@@ -283,7 +285,34 @@ static struct vine_task_node *get_node_by_task(struct vine_task_graph *tg, struc
 /*************************************************************/
 
 /**
- * Get the library name of the task graph.
+ * Set the proxy library and function names (Python-side), shared by all tasks.
+ * @param tg Reference to the task graph object.
+ * @param proxy_library_name Reference to the proxy library name.
+ * @param proxy_function_name Reference to the proxy function name.
+ */
+void vine_task_graph_set_proxy_library_and_function_names(struct vine_task_graph *tg,
+	const char *proxy_library_name,
+	const char *proxy_function_name)
+{
+	if (!tg || !proxy_library_name || !proxy_function_name) {
+		return;
+	}
+
+	/* free the existing proxy library and function names if they exist */
+	if (tg->proxy_library_name) {
+		free(tg->proxy_library_name);
+	}
+	if (tg->proxy_function_name) {
+		free(tg->proxy_function_name);
+	}
+
+	/* set the new proxy library and function names */
+	tg->proxy_library_name = xxstrdup(proxy_library_name);
+	tg->proxy_function_name = xxstrdup(proxy_function_name);
+}
+
+/**
+ * Get the proxy library name (Python-side), shared by all tasks.
  * @param tg Reference to the task graph object.
  * @return The library name.
  */
@@ -297,7 +326,7 @@ const char *vine_task_graph_get_proxy_library_name(const struct vine_task_graph 
 }
 
 /**
- * Get the function name of the task graph.
+ * Get the proxy function name (Python-side), shared by all tasks.
  * @param tg Reference to the task graph object.
  * @return The function name.
  */
@@ -517,8 +546,8 @@ struct vine_task_graph *vine_task_graph_create(struct vine_manager *q)
 	tg->task_id_to_node = itable_create(0);
 	tg->outfile_cachename_to_node = hash_table_create(0, 0);
 
-	tg->proxy_library_name = xxstrdup("vine_task_graph_library");
-	tg->proxy_function_name = xxstrdup("compute_single_key");
+	tg->proxy_library_name = xxstrdup("vine_task_graph_library");   // Python-side proxy library name (shared by all tasks)
+	tg->proxy_function_name = xxstrdup("compute_single_key");       // Python-side proxy function name (shared by all tasks)
 	tg->manager = q;
 
 	tg->failure_injection_step_percent = -1.0;
