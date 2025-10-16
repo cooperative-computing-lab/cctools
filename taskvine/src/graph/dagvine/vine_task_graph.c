@@ -51,7 +51,7 @@ static void handle_sigint(int signal)
  * @param priority_mode Reference to the priority mode.
  * @return The priority.
  */
-static double vine_task_node_calculate_priority(struct vine_task_node *node, vine_task_priority_mode_t priority_mode)
+static double vine_task_node_calculate_priority(struct vine_task_node *node, vine_task_graph_priority_mode_t priority_mode)
 {
 	if (!node) {
 		return 0;
@@ -63,22 +63,22 @@ static double vine_task_node_calculate_priority(struct vine_task_node *node, vin
 	struct vine_task_node *parent_node;
 
 	switch (priority_mode) {
-	case VINE_TASK_PRIORITY_MODE_RANDOM:
+	case VINE_TASK_GRAPH_PRIORITY_MODE_RANDOM:
 		priority = random_double();
 		break;
-	case VINE_TASK_PRIORITY_MODE_DEPTH_FIRST:
+	case VINE_TASK_GRAPH_PRIORITY_MODE_DEPTH_FIRST:
 		priority = (double)node->depth;
 		break;
-	case VINE_TASK_PRIORITY_MODE_BREADTH_FIRST:
+	case VINE_TASK_GRAPH_PRIORITY_MODE_BREADTH_FIRST:
 		priority = -(double)node->depth;
 		break;
-	case VINE_TASK_PRIORITY_MODE_FIFO:
+	case VINE_TASK_GRAPH_PRIORITY_MODE_FIFO:
 		priority = -(double)current_time;
 		break;
-	case VINE_TASK_PRIORITY_MODE_LIFO:
+	case VINE_TASK_GRAPH_PRIORITY_MODE_LIFO:
 		priority = (double)current_time;
 		break;
-	case VINE_TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST:
+	case VINE_TASK_GRAPH_PRIORITY_MODE_LARGEST_INPUT_FIRST:
 		LIST_ITERATE(node->parents, parent_node)
 		{
 			if (!parent_node->outfile) {
@@ -87,7 +87,7 @@ static double vine_task_node_calculate_priority(struct vine_task_node *node, vin
 			priority += (double)vine_file_size(parent_node->outfile);
 		}
 		break;
-	case VINE_TASK_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST:
+	case VINE_TASK_GRAPH_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST:
 		LIST_ITERATE(node->parents, parent_node)
 		{
 			if (!parent_node->outfile) {
@@ -347,6 +347,46 @@ static struct vine_task_node *get_node_by_task(struct vine_task_graph *tg, struc
 /*************************************************************/
 /* Public APIs */
 /*************************************************************/
+
+/** Tune the task graph.
+ *@param tg Reference to the task graph object.
+ *@param name Reference to the name of the parameter to tune.
+ *@param value Reference to the value of the parameter to tune.
+ *@return 0 on success, -1 on failure.
+ */
+int vine_task_graph_tune(struct vine_task_graph *tg, const char *name, const char *value)
+{
+	if (!tg || !name || !value) {
+		return -1;
+	}
+
+	if (strcmp(name, "failure-injection-step-percent") == 0) {
+		tg->failure_injection_step_percent = atof(value);
+
+	} else if (strcmp(name, "task-priority-mode") == 0) {
+		if (strcmp(value, "random") == 0) {
+			tg->task_priority_mode = VINE_TASK_GRAPH_PRIORITY_MODE_RANDOM;
+		} else if (strcmp(value, "depth-first") == 0) {
+			tg->task_priority_mode = VINE_TASK_GRAPH_PRIORITY_MODE_DEPTH_FIRST;
+		} else if (strcmp(value, "breadth-first") == 0) {
+			tg->task_priority_mode = VINE_TASK_GRAPH_PRIORITY_MODE_BREADTH_FIRST;
+		} else if (strcmp(value, "fifo") == 0) {
+			tg->task_priority_mode = VINE_TASK_GRAPH_PRIORITY_MODE_FIFO;
+		} else if (strcmp(value, "lifo") == 0) {
+			tg->task_priority_mode = VINE_TASK_GRAPH_PRIORITY_MODE_LIFO;
+		} else if (strcmp(value, "largest-input-first") == 0) {
+			tg->task_priority_mode = VINE_TASK_GRAPH_PRIORITY_MODE_LARGEST_INPUT_FIRST;
+		} else if (strcmp(value, "largest-storage-footprint-first") == 0) {
+			tg->task_priority_mode = VINE_TASK_GRAPH_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST;
+		} else {
+			debug(D_ERROR, "invalid priority mode: %s", value);
+			return -1;
+		}		
+
+	}
+
+	return 0;
+}
 
 /**
  * Set the proxy library name (Python-side), shared by all tasks.
@@ -626,7 +666,7 @@ struct vine_task_graph *vine_task_graph_create(struct vine_manager *q)
 	tg->proxy_function_name = xxstrdup("compute_single_key");       // Python-side proxy function name (shared by all tasks)
 	tg->manager = q;
 
-	tg->task_priority_mode = VINE_TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST;
+	tg->task_priority_mode = VINE_TASK_GRAPH_PRIORITY_MODE_LARGEST_INPUT_FIRST;
 	tg->failure_injection_step_percent = -1.0;
 
 	/* enable debug system for C code since it uses a separate debug system instance
@@ -636,42 +676,6 @@ struct vine_task_graph *vine_task_graph_create(struct vine_manager *q)
 	free(debug_tmp);
 
 	return tg;
-}
-
-/**
- * Set the failure injection step percent, meaning we will evict a randome worker at every X% of the DAG completion.
- * @param tg Reference to the task graph object.
- * @param percent Reference to the failure injection step percent.
- */
-void vine_task_graph_set_failure_injection_step_percent(struct vine_task_graph *tg, double percent)
-{
-	if (!tg) {
-		return;
-	}
-
-	if (percent <= 0 || percent > 100) {
-		return;
-	}
-
-	debug(D_VINE, "setting failure injection step percent to %lf", percent);
-	tg->failure_injection_step_percent = percent;
-
-	return;
-}
-
-/**
- * Set the task priority mode for the task graph.
- * @param tg Reference to the task graph object.
- * @param priority_mode Reference to the priority mode.
- */
-void vine_task_graph_set_task_priority_mode(struct vine_task_graph *tg, vine_task_priority_mode_t priority_mode)
-{
-	if (!tg) {
-		return;
-	}
-
-	tg->task_priority_mode = priority_mode;
-	return;
 }
 
 /**

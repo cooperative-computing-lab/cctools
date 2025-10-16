@@ -4,7 +4,7 @@
 
 from . import cvine
 try:
-    # cdagvine contains DAG-specific enums (e.g., VINE_TASK_PRIORITY_MODE_*)
+    # cdagvine contains DAG-specific enums (e.g., VINE_TASK_GRAPH_PRIORITY_MODE_*)
     from .dagvine import cdagvine  # type: ignore
 except Exception:
     cdagvine = None

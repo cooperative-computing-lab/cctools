@@ -149,13 +149,6 @@ typedef enum {
 	VINE_MINI_TASK,             /**< A file obtained by executing a Unix command line. */
 } vine_file_type_t;
 
-/* Select while type of workers to place the redundant file replicas */
-typedef enum {
-	VINE_REPLICA_PLACEMENT_POLICY_RANDOM = 0,        /* select a random worker */
-	VINE_REPLICA_PLACEMENT_POLICY_DISK_LOAD,         /* select a worker with the most free disk space */
-	VINE_REPLICA_PLACEMENT_POLICY_TRANSFER_LOAD      /* select a worker with the least incoming transfer load */
-} vine_replica_placement_policy_t;
-
 /** Statistics describing a manager. */
 struct vine_stats {
 	/* Stats for the current state of workers: */
@@ -1131,12 +1124,6 @@ int vine_enable_return_recovery_tasks(struct vine_manager *m);
 /** Disable recovery tasks from being returned by vine_wait.
 Recovery tasks will be handled internally by the manager. **/
 int vine_disable_return_recovery_tasks(struct vine_manager *m);
-
-/** Set the replica placement policy (which worker do we prefer to place the redundant file replicas).
-@param q Reference to the current manager object.
-@param policy Reference to the replica placement policy.
-*/
-void vine_temp_set_replica_placement_policy(struct vine_manager *q, vine_replica_placement_policy_t policy);
 
 /** When enabled, resources to tasks in are assigned in proportion to the size
 of the worker. If a resource is specified (e.g. with @ref vine_task_set_cores),

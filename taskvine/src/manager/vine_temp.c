@@ -87,19 +87,8 @@ static struct vine_worker_info *get_best_dest_worker(struct vine_manager *q, str
 		if ((int64_t)f->size > available_disk_space) {
 			continue;
 		}
-		/* workers with more available disk space are preferred */
+		/* workers with more available disk space are preferred to hold the file */
 		priority_queue_push(valid_destinations, w, available_disk_space);
-		switch (q->replica_placement_policy) {
-		case VINE_REPLICA_PLACEMENT_POLICY_RANDOM:
-			priority_queue_push(valid_destinations, w, random_double());
-			break;
-		case VINE_REPLICA_PLACEMENT_POLICY_DISK_LOAD:
-			priority_queue_push(valid_destinations, w, available_disk_space);
-			break;
-		case VINE_REPLICA_PLACEMENT_POLICY_TRANSFER_LOAD:
-			priority_queue_push(valid_destinations, w, -w->incoming_xfer_counter);
-			break;
-		}
 	}
 
 	struct vine_worker_info *best_destination = priority_queue_pop(valid_destinations);
@@ -223,28 +212,4 @@ int vine_temp_handle_file_lost(struct vine_manager *q, char *cachename)
 	vine_temp_replicate_file_later(q, f);
 
 	return 1;
-}
-
-void vine_temp_set_replica_placement_policy(struct vine_manager *q, vine_replica_placement_policy_t policy)
-{
-	if (!q) {
-		return;
-	}
-
-	switch (policy) {
-	case VINE_REPLICA_PLACEMENT_POLICY_RANDOM:
-		debug(D_VINE | D_NOTICE, "Setting replica placement policy to RANDOM");
-		q->replica_placement_policy = policy;
-		break;
-	case VINE_REPLICA_PLACEMENT_POLICY_DISK_LOAD:
-		debug(D_VINE | D_NOTICE, "Setting replica placement policy to DISK_LOAD");
-		q->replica_placement_policy = policy;
-		break;
-	case VINE_REPLICA_PLACEMENT_POLICY_TRANSFER_LOAD:
-		debug(D_VINE | D_NOTICE, "Setting replica placement policy to TRANSFER_LOAD");
-		q->replica_placement_policy = policy;
-		break;
-	default:
-		debug(D_ERROR, "Invalid replica placement policy: %d", policy);
-	}
 }

@@ -3,3 +3,4 @@
 *.o
 *_wrap.c
 *_wrap.0
+build/

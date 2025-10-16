@@ -7,7 +7,7 @@ GRAPH_EXECUTOR_MODULE_NAME = dagvine
 CCTOOLS_DYNAMIC_SUFFIX = so
 # SWIG produces code that causes a lot of warnings, so use -w to turn those off.
 LOCAL_CCFLAGS = -w -fPIC -DNDEBUG $(CCTOOLS_PYTHON3_CCFLAGS) -I ../../manager -I ../../graph/${GRAPH_EXECUTOR_MODULE_NAME}
-LOCAL_LINKAGE = $(CCTOOLS_PYTHON3_LDFLAGS) -lz $(CCTOOLS_OPENSSL_LDFLAGS) $(CCTOOLS_HOME)/taskvine/src/graph/${GRAPH_EXECUTOR_MODULE_NAME}/lib${GRAPH_EXECUTOR_MODULE_NAME}.a $(CCTOOLS_HOME)/taskvine/src/manager/libtaskvine.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
+LOCAL_LINKAGE = $(CCTOOLS_PYTHON3_LDFLAGS) -lz $(CCTOOLS_OPENSSL_LDFLAGS) $(CCTOOLS_HOME)/taskvine/src/manager/libtaskvine.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
 
 CCTOOLS_FLAKE8_IGNORE_FILES = "cvine.py"
 

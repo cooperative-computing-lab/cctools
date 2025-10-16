@@ -75,39 +75,30 @@ class GraphExecutor(Manager):
                  vine_constant_params=VineConstantParams(),
                  **kwargs):
 
-        # Use C-side SIGINT handler in cdagvine to handle Ctrl+C gracefully
+        # handle SIGINT correctly
+        signal.signal(signal.SIGINT, self._on_sigint)
 
         self.manager_tuning_params = manager_tuning_params
         self.vine_constant_params = vine_constant_params
         self.regular_params = regular_params
 
         # delete all files in the run info directory, do this before super().__init__()
-        run_info_path = self.regular_params.run_info_path
-        run_info_template = self.regular_params.run_info_template
-        self.run_info_path_absolute = os.path.join(run_info_path, run_info_template)
-        if run_info_path and run_info_template:
-            delete_all_files(self.run_info_path_absolute)
+        run_info_path = kwargs.get("run_info_path", None)
+        run_info_template = kwargs.get("run_info_template", None)
+        self.run_info_template_path = os.path.join(run_info_path, run_info_template)
+        if self.run_info_template_path:
+            delete_all_files(self.run_info_template_path)
 
-        kwargs["run_info_path"] = run_info_path
-        kwargs["run_info_template"] = run_info_template
+        # initialize the manager
         super().__init__(*args, **kwargs)
-        print(f"TaskVine Manager \033[92m{self.name}\033[0m listening on port \033[92m{self.port}\033[0m")
-
-        # initialize the task graph
-        self._vine_task_graph = cdagvine.vine_task_graph_create(self._taskvine)
 
     def tune_manager(self):
         for k, v in self.manager_tuning_params.to_dict().items():
             print(f"Tuning {k} to {v}")
             self.tune(k, v)
 
-    def set_policy(self):
-        # set replica placement policy
-        cvine.vine_temp_set_replica_placement_policy(self._taskvine, self.vine_constant_params.get_c_constant_of("replica_placement_policy"))
         # set worker scheduling algorithm
         cvine.vine_set_scheduler(self._taskvine, self.vine_constant_params.get_c_constant_of("schedule"))
-        # set task priority mode
-        cdagvine.vine_task_graph_set_task_priority_mode(self._vine_task_graph, self.vine_constant_params.get_c_constant_of("task_priority_mode"))
 
     def run(self,
             collection_dict,
@@ -115,10 +106,13 @@ class GraphExecutor(Manager):
             library=None,
             ):
 
+        # initialize the task graph (note: the lifetime of this object is limited to this function)
+        self._vine_task_graph = cdagvine.vine_task_graph_create(self._taskvine)
+        cdagvine.vine_task_graph_tune(self._vine_task_graph, "failure-injection-step-percent", str(self.regular_params.failure_injection_step_percent))
+        cdagvine.vine_task_graph_tune(self._vine_task_graph, "task-priority-mode", self.vine_constant_params.task_priority_mode)
+
         # tune the manager every time we start a new run as the parameters may have changed
         self.tune_manager()
-        # set the policy every time we start a new run as the parameters may have changed
-        self.set_policy()
 
         self.target_keys = target_keys
         self.task_dict = ensure_task_dict(collection_dict)
@@ -126,8 +120,6 @@ class GraphExecutor(Manager):
         # create library task
         self.library = library
         self.library.install(self, self.regular_params.libcores, self._vine_task_graph)
-
-        cdagvine.vine_task_graph_set_failure_injection_step_percent(self._vine_task_graph, self.regular_params.failure_injection_step_percent)
 
         # create task graph in the python side
         print("Initializing TaskGraph object")
@@ -182,7 +174,7 @@ class GraphExecutor(Manager):
             cloudpickle.dump(self.task_graph, f)
 
         # now execute the vine graph
-        print(f"\033[92mExecuting task graph, logs will be written into {self.run_info_path_absolute}\033[0m")
+        print(f"\033[92mExecuting task graph, logs will be written into {self.run_info_template_path}\033[0m")
         cdagvine.vine_task_graph_execute(self._vine_task_graph)
 
         # after execution, we need to load results of target keys

@@ -81,8 +81,8 @@ _cvine_dagvine.vine_task_graph_swigregister(vine_task_graph)
 def vine_task_graph_create(q):
     return _cvine_dagvine.vine_task_graph_create(q)
 
-def vine_task_graph_set_task_priority_mode(tg, priority_mode):
-    return _cvine_dagvine.vine_task_graph_set_task_priority_mode(tg, priority_mode)
+def vine_task_graph_set_priority_mode(tg, priority_mode):
+    return _cvine_dagvine.vine_task_graph_set_priority_mode(tg, priority_mode)
 
 def vine_task_graph_set_failure_injection_step_percent(tg, percent):
     return _cvine_dagvine.vine_task_graph_set_failure_injection_step_percent(tg, percent)

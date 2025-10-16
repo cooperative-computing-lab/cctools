@@ -12,14 +12,14 @@
 
 /** Select priority algorithm for task graph task scheduling. */
 typedef enum {
-    VINE_TASK_PRIORITY_MODE_RANDOM = 0,          /**< Assign random priority to tasks */
-    VINE_TASK_PRIORITY_MODE_DEPTH_FIRST,         /**< Prioritize deeper tasks first */
-    VINE_TASK_PRIORITY_MODE_BREADTH_FIRST,       /**< Prioritize shallower tasks first */
-    VINE_TASK_PRIORITY_MODE_FIFO,                /**< First in, first out priority */
-    VINE_TASK_PRIORITY_MODE_LIFO,                /**< Last in, first out priority */
-    VINE_TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST, /**< Prioritize tasks with larger inputs first */
-    VINE_TASK_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST /**< Prioritize tasks with larger storage footprint first */
-} vine_task_priority_mode_t;
+    VINE_TASK_GRAPH_PRIORITY_MODE_RANDOM = 0,          /**< Assign random priority to tasks */
+    VINE_TASK_GRAPH_PRIORITY_MODE_DEPTH_FIRST,         /**< Prioritize deeper tasks first */
+    VINE_TASK_GRAPH_PRIORITY_MODE_BREADTH_FIRST,       /**< Prioritize shallower tasks first */
+    VINE_TASK_GRAPH_PRIORITY_MODE_FIFO,                /**< First in, first out priority */
+    VINE_TASK_GRAPH_PRIORITY_MODE_LIFO,                /**< Last in, first out priority */
+    VINE_TASK_GRAPH_PRIORITY_MODE_LARGEST_INPUT_FIRST, /**< Prioritize tasks with larger inputs first */
+    VINE_TASK_GRAPH_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST /**< Prioritize tasks with larger storage footprint first */
+} vine_task_graph_priority_mode_t;
 
 /** The task graph object. */
 struct vine_task_graph {
@@ -31,7 +31,7 @@ struct vine_task_graph {
     char *proxy_library_name;
     char *proxy_function_name;
 
-    vine_task_priority_mode_t task_priority_mode;  // priority mode for task graph task scheduling
+    vine_task_graph_priority_mode_t task_priority_mode;  // priority mode for task graph task scheduling
     double failure_injection_step_percent;  // 0 - 100, the percentage of steps to inject failure
 };
 
@@ -43,18 +43,6 @@ struct vine_task_graph {
 @return A new task graph object.
 */
 struct vine_task_graph *vine_task_graph_create(struct vine_manager *q);
-
-/** Set the task priority mode for the task graph.
-@param tg Reference to the task graph object.
-@param priority_mode Reference to the priority mode.
-*/
-void vine_task_graph_set_task_priority_mode(struct vine_task_graph *tg, vine_task_priority_mode_t priority_mode);
-
-/** Set the failure injection step percent.
-@param tg Reference to the task graph object.
-@param percent Reference to the failure injection step percent.
-*/
-void vine_task_graph_set_failure_injection_step_percent(struct vine_task_graph *tg, double percent);
 
 /** Create a new node in the task graph.
 @param tg Reference to the task graph object.
@@ -136,5 +124,12 @@ void vine_task_graph_set_proxy_library_name(struct vine_task_graph *tg, const ch
 */
 void vine_task_graph_set_proxy_function_name(struct vine_task_graph *tg, const char *proxy_function_name);
 
+/** Tune the task graph.
+@param tg Reference to the task graph object.
+@param name Reference to the name of the parameter to tune.
+@param value Reference to the value of the parameter to tune.
+@return 0 on success, -1 on failure.
+*/
+int vine_task_graph_tune(struct vine_task_graph *tg, const char *name, const char *value);
 
 #endif // VINE_TASK_GRAPH_H

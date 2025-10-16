@@ -42,14 +42,12 @@ class VineConstantParams:
     If there is a need to use these values in the C code, convert them to uppercase and call the get_c_constant_of method to get the C constant.
     """
 
-    replica_placement_policy: str = "random"
     schedule: str = "worst"
-    task_priority_mode: str = "largest_input_first"
+    task_priority_mode: str = "largest-input-first"
 
     valid_normalized_values = {
-        "replica_placement_policy": {"random", "disk_load", "transfer_load"},
         "schedule": {"files", "time", "rand", "worst", "disk"},
-        "task_priority_mode": {"random", "depth_first", "breadth_first", "fifo", "lifo", "largest_input_first", "largest_storage_footprint_first"},
+        "task_priority_mode": {"random", "depth-first", "breadth-first", "fifo", "lifo", "largest-input-first", "largest-storage-footprint-first"},
     }
 
     def normalize(self, obj):
@@ -83,8 +81,6 @@ class VineConstantParams:
 @dataclass
 class RegularParams:
     """Regular parameters that will be used directly by the graph executor."""
-    run_info_path: str = None
-    run_info_template: str = None
     libcores: int = 16
     failure_injection_step_percent: int = -1
     prune_depth: int = 1
