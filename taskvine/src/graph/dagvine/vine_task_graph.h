@@ -9,12 +9,17 @@
 #include "vine_task_node.h"
 #include "taskvine.h"
 
-/** Select the type of the node-output file. */
+
+/** Select priority algorithm for task graph task scheduling. */
 typedef enum {
-	VINE_NODE_OUTFILE_TYPE_LOCAL = 0,               /* Node-output file will be stored locally on the manager's staging directory */
-    VINE_NODE_OUTFILE_TYPE_TEMP,                    /* Node-output file will be stored in the temporary node-local storage */
-    VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM,      /* Node-output file will be stored in the persistent shared file system */
-} vine_task_node_outfile_type_t;
+    VINE_TASK_PRIORITY_MODE_RANDOM = 0,          /**< Assign random priority to tasks */
+    VINE_TASK_PRIORITY_MODE_DEPTH_FIRST,         /**< Prioritize deeper tasks first */
+    VINE_TASK_PRIORITY_MODE_BREADTH_FIRST,       /**< Prioritize shallower tasks first */
+    VINE_TASK_PRIORITY_MODE_FIFO,                /**< First in, first out priority */
+    VINE_TASK_PRIORITY_MODE_LIFO,                /**< Last in, first out priority */
+    VINE_TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST, /**< Prioritize tasks with larger inputs first */
+    VINE_TASK_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST /**< Prioritize tasks with larger storage footprint first */
+} vine_task_priority_mode_t;
 
 /** The task graph object. */
 struct vine_task_graph {

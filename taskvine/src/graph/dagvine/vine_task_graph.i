@@ -4,6 +4,7 @@
 %{
 #include "int_sizes.h"
 #include "vine_task_graph.h"
+#include "vine_task_node.h"  /* expose outfile type enum to SWIG */
 %}
 
 %include "stdint.i"
@@ -13,6 +14,7 @@
 %import "../../bindings/python3/taskvine.i"
 
 /* Expose only the dagvine task graph APIs */
+%include "vine_task_node.h"    /* export vine_task_node_outfile_type_t values */
 %include "vine_task_graph.h"
 
 

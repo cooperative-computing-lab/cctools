@@ -156,17 +156,6 @@ typedef enum {
 	VINE_REPLICA_PLACEMENT_POLICY_TRANSFER_LOAD      /* select a worker with the least incoming transfer load */
 } vine_replica_placement_policy_t;
 
-/** Select priority algorithm for task graph task scheduling. */
-typedef enum {
-    VINE_TASK_PRIORITY_MODE_RANDOM = 0,          /**< Assign random priority to tasks */
-    VINE_TASK_PRIORITY_MODE_DEPTH_FIRST,         /**< Prioritize deeper tasks first */
-    VINE_TASK_PRIORITY_MODE_BREADTH_FIRST,       /**< Prioritize shallower tasks first */
-    VINE_TASK_PRIORITY_MODE_FIFO,                /**< First in, first out priority */
-    VINE_TASK_PRIORITY_MODE_LIFO,                /**< Last in, first out priority */
-    VINE_TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST, /**< Prioritize tasks with larger inputs first */
-    VINE_TASK_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST /**< Prioritize tasks with larger storage footprint first */
-} vine_task_priority_mode_t;
-
 /** Statistics describing a manager. */
 struct vine_stats {
 	/* Stats for the current state of workers: */
@@ -1143,6 +1132,12 @@ int vine_enable_return_recovery_tasks(struct vine_manager *m);
 Recovery tasks will be handled internally by the manager. **/
 int vine_disable_return_recovery_tasks(struct vine_manager *m);
 
+/** Set the replica placement policy (which worker do we prefer to place the redundant file replicas).
+@param q Reference to the current manager object.
+@param policy Reference to the replica placement policy.
+*/
+void vine_temp_set_replica_placement_policy(struct vine_manager *q, vine_replica_placement_policy_t policy);
+
 /** When enabled, resources to tasks in are assigned in proportion to the size
 of the worker. If a resource is specified (e.g. with @ref vine_task_set_cores),
 proportional resources never go below explicit specifications. This mode is most
@@ -1581,12 +1576,6 @@ char *vine_get_path_library_log(struct vine_manager *m, const char *path);
 @return A string.
 */
 char *vine_get_path_cache(struct vine_manager *m, const char *path);
-
-/** Set the replica placement policy (which worker do we prefer to place the redundant file replicas).
-@param q Reference to the current manager object.
-@param policy Reference to the replica placement policy.
-*/
-void vine_temp_set_replica_placement_policy(struct vine_manager *q, vine_replica_placement_policy_t policy);
 
 //@}
 

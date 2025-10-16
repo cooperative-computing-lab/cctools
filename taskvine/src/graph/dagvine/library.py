@@ -1,5 +1,6 @@
 import os, uuid, cloudpickle, types, time, random, hashlib, collections
 from ndcctools.taskvine import cvine
+from ndcctools.taskvine.dagvine import cdagvine
 from ndcctools.taskvine.graph_definition import (
     GraphKeyResult, TaskGraph, compute_dts_key, compute_sexpr_key, 
     compute_single_key, hash_name, hashable, init_task_graph_context
@@ -29,7 +30,7 @@ class Library:
     def install(self, manager, libcores, vine_graph):
         self.libcores = libcores
 
-        assert cvine.vine_task_graph_get_proxy_function_name(vine_graph) == compute_single_key.__name__
+        assert cdagvine.vine_task_graph_get_proxy_function_name(vine_graph) == compute_single_key.__name__
 
         self.local_path = f"library-task-graph-{uuid.uuid4()}.pkl"
         self.remote_path = self.local_path
@@ -38,7 +39,7 @@ class Library:
             os, cloudpickle, GraphKeyResult, TaskGraph, uuid, hashlib, random, types, collections, time,
             load_variable_from_library, compute_dts_key, compute_sexpr_key, compute_single_key, hash_name, hashable
         ]
-        lib_name = cvine.vine_task_graph_get_proxy_library_name(vine_graph)
+        lib_name = cdagvine.vine_task_graph_get_proxy_library_name(vine_graph)
         self.libtask = manager.create_library_from_functions(
             lib_name,
             compute_single_key,

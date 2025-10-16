@@ -59,6 +59,80 @@ class _SwigNonDynamicMeta(type):
 
 
 import ndcctools.taskvine.cvine
+VINE_NODE_OUTFILE_TYPE_LOCAL = _cdagvine.VINE_NODE_OUTFILE_TYPE_LOCAL
+VINE_NODE_OUTFILE_TYPE_TEMP = _cdagvine.VINE_NODE_OUTFILE_TYPE_TEMP
+VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM = _cdagvine.VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM
+PRUNE_STATUS_NOT_PRUNED = _cdagvine.PRUNE_STATUS_NOT_PRUNED
+PRUNE_STATUS_SAFE = _cdagvine.PRUNE_STATUS_SAFE
+PRUNE_STATUS_UNSAFE = _cdagvine.PRUNE_STATUS_UNSAFE
+class vine_task_node(object):
+    thisown = property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc="The membership flag")
+    __repr__ = _swig_repr
+    node_key = property(_cdagvine.vine_task_node_node_key_get, _cdagvine.vine_task_node_node_key_set)
+    manager = property(_cdagvine.vine_task_node_manager_get, _cdagvine.vine_task_node_manager_set)
+    task = property(_cdagvine.vine_task_node_task_get, _cdagvine.vine_task_node_task_set)
+    infile = property(_cdagvine.vine_task_node_infile_get, _cdagvine.vine_task_node_infile_set)
+    outfile = property(_cdagvine.vine_task_node_outfile_get, _cdagvine.vine_task_node_outfile_set)
+    outfile_remote_name = property(_cdagvine.vine_task_node_outfile_remote_name_get, _cdagvine.vine_task_node_outfile_remote_name_set)
+    staging_dir = property(_cdagvine.vine_task_node_staging_dir_get, _cdagvine.vine_task_node_staging_dir_set)
+    outfile_size_bytes = property(_cdagvine.vine_task_node_outfile_size_bytes_get, _cdagvine.vine_task_node_outfile_size_bytes_set)
+    parents = property(_cdagvine.vine_task_node_parents_get, _cdagvine.vine_task_node_parents_set)
+    children = property(_cdagvine.vine_task_node_children_get, _cdagvine.vine_task_node_children_set)
+    pending_parents = property(_cdagvine.vine_task_node_pending_parents_get, _cdagvine.vine_task_node_pending_parents_set)
+    retry_attempts_left = property(_cdagvine.vine_task_node_retry_attempts_left_get, _cdagvine.vine_task_node_retry_attempts_left_set)
+    completed = property(_cdagvine.vine_task_node_completed_get, _cdagvine.vine_task_node_completed_set)
+    prune_depth = property(_cdagvine.vine_task_node_prune_depth_get, _cdagvine.vine_task_node_prune_depth_set)
+    depth = property(_cdagvine.vine_task_node_depth_get, _cdagvine.vine_task_node_depth_set)
+    height = property(_cdagvine.vine_task_node_height_get, _cdagvine.vine_task_node_height_set)
+    upstream_subgraph_size = property(_cdagvine.vine_task_node_upstream_subgraph_size_get, _cdagvine.vine_task_node_upstream_subgraph_size_set)
+    downstream_subgraph_size = property(_cdagvine.vine_task_node_downstream_subgraph_size_get, _cdagvine.vine_task_node_downstream_subgraph_size_set)
+    fan_in = property(_cdagvine.vine_task_node_fan_in_get, _cdagvine.vine_task_node_fan_in_set)
+    fan_out = property(_cdagvine.vine_task_node_fan_out_get, _cdagvine.vine_task_node_fan_out_set)
+    heavy_score = property(_cdagvine.vine_task_node_heavy_score_get, _cdagvine.vine_task_node_heavy_score_set)
+    critical_time = property(_cdagvine.vine_task_node_critical_time_get, _cdagvine.vine_task_node_critical_time_set)
+    time_spent_on_unlink_local_files = property(_cdagvine.vine_task_node_time_spent_on_unlink_local_files_get, _cdagvine.vine_task_node_time_spent_on_unlink_local_files_set)
+    time_spent_on_prune_ancestors_of_temp_node = property(_cdagvine.vine_task_node_time_spent_on_prune_ancestors_of_temp_node_get, _cdagvine.vine_task_node_time_spent_on_prune_ancestors_of_temp_node_set)
+    time_spent_on_prune_ancestors_of_persisted_node = property(_cdagvine.vine_task_node_time_spent_on_prune_ancestors_of_persisted_node_get, _cdagvine.vine_task_node_time_spent_on_prune_ancestors_of_persisted_node_set)
+    outfile_type = property(_cdagvine.vine_task_node_outfile_type_get, _cdagvine.vine_task_node_outfile_type_set)
+    prune_status = property(_cdagvine.vine_task_node_prune_status_get, _cdagvine.vine_task_node_prune_status_set)
+
+    def __init__(self):
+        _cdagvine.vine_task_node_swiginit(self, _cdagvine.new_vine_task_node())
+    __swig_destroy__ = _cdagvine.delete_vine_task_node
+
+# Register vine_task_node in _cdagvine:
+_cdagvine.vine_task_node_swigregister(vine_task_node)
+
+def vine_task_node_create(manager, node_key, proxy_library_name, proxy_function_name, staging_dir, prune_depth):
+    return _cdagvine.vine_task_node_create(manager, node_key, proxy_library_name, proxy_function_name, staging_dir, prune_depth)
+
+def vine_task_node_delete(node):
+    return _cdagvine.vine_task_node_delete(node)
+
+def compute_lex_priority(key):
+    return _cdagvine.compute_lex_priority(key)
+
+def vine_task_node_prune_ancestors(node):
+    return _cdagvine.vine_task_node_prune_ancestors(node)
+
+def vine_task_node_print_info(node):
+    return _cdagvine.vine_task_node_print_info(node)
+
+def vine_task_node_update_critical_time(node, execution_time):
+    return _cdagvine.vine_task_node_update_critical_time(node, execution_time)
+
+def vine_task_node_replicate_outfile(node):
+    return _cdagvine.vine_task_node_replicate_outfile(node)
+
+def vine_task_node_set_outfile(node, outfile_type, outfile_remote_name):
+    return _cdagvine.vine_task_node_set_outfile(node, outfile_type, outfile_remote_name)
+VINE_TASK_PRIORITY_MODE_RANDOM = _cdagvine.VINE_TASK_PRIORITY_MODE_RANDOM
+VINE_TASK_PRIORITY_MODE_DEPTH_FIRST = _cdagvine.VINE_TASK_PRIORITY_MODE_DEPTH_FIRST
+VINE_TASK_PRIORITY_MODE_BREADTH_FIRST = _cdagvine.VINE_TASK_PRIORITY_MODE_BREADTH_FIRST
+VINE_TASK_PRIORITY_MODE_FIFO = _cdagvine.VINE_TASK_PRIORITY_MODE_FIFO
+VINE_TASK_PRIORITY_MODE_LIFO = _cdagvine.VINE_TASK_PRIORITY_MODE_LIFO
+VINE_TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST = _cdagvine.VINE_TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST
+VINE_TASK_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST = _cdagvine.VINE_TASK_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST
 class vine_task_graph(object):
     thisown = property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc="The membership flag")
     __repr__ = _swig_repr
@@ -102,6 +176,24 @@ def vine_task_graph_get_node_heavy_score(tg, node_key):
 def vine_task_graph_set_node_outfile(tg, node_key, outfile_type, outfile_remote_name):
     return _cdagvine.vine_task_graph_set_node_outfile(tg, node_key, outfile_type, outfile_remote_name)
 
-def vine_task_graph_set_proxy_library_and_function_names(tg, proxy_library_name, proxy_function_name):
-    return _cdagvine.vine_task_graph_set_proxy_library_and_function_names(tg, proxy_library_name, proxy_function_name)
+def vine_task_graph_execute(tg):
+    return _cdagvine.vine_task_graph_execute(tg)
+
+def vine_task_graph_get_node_local_outfile_source(tg, node_key):
+    return _cdagvine.vine_task_graph_get_node_local_outfile_source(tg, node_key)
+
+def vine_task_graph_delete(tg):
+    return _cdagvine.vine_task_graph_delete(tg)
+
+def vine_task_graph_get_proxy_library_name(tg):
+    return _cdagvine.vine_task_graph_get_proxy_library_name(tg)
+
+def vine_task_graph_get_proxy_function_name(tg):
+    return _cdagvine.vine_task_graph_get_proxy_function_name(tg)
+
+def vine_task_graph_set_proxy_library_name(tg, proxy_library_name):
+    return _cdagvine.vine_task_graph_set_proxy_library_name(tg, proxy_library_name)
+
+def vine_task_graph_set_proxy_function_name(tg, proxy_function_name):
+    return _cdagvine.vine_task_graph_set_proxy_function_name(tg, proxy_function_name)
 

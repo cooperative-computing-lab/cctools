@@ -8,9 +8,16 @@
 #include "set.h"
 #include "taskvine.h"
 
+/** Select the type of the node-output file. */
+typedef enum {
+    VINE_NODE_OUTFILE_TYPE_LOCAL = 0,               /* Node-output file will be stored locally on the manager's staging directory */
+    VINE_NODE_OUTFILE_TYPE_TEMP,                    /* Node-output file will be stored in the temporary node-local storage */
+    VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM,      /* Node-output file will be stored in the persistent shared file system */
+} vine_task_node_outfile_type_t;
+
 typedef enum {
     PRUNE_STATUS_NOT_PRUNED = 0,
-    PRUNE_STATUS_SAFE,
+    PRUNE_STATUS_SAFE, 
     PRUNE_STATUS_UNSAFE
 } prune_status_t;
 
@@ -66,6 +73,5 @@ void vine_task_node_print_info(struct vine_task_node *node);
 void vine_task_node_update_critical_time(struct vine_task_node *node, timestamp_t execution_time);
 void vine_task_node_replicate_outfile(struct vine_task_node *node);
 void vine_task_node_set_outfile(struct vine_task_node *node, vine_task_node_outfile_type_t outfile_type, const char *outfile_remote_name);
-void vine_task_node_checkpoint_outfile(struct vine_task_node *node);
 
 #endif

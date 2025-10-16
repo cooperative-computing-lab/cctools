@@ -3,6 +3,11 @@
 # See the file COPYING for details.
 
 from . import cvine
+try:
+    # cdagvine contains DAG-specific enums (e.g., VINE_TASK_PRIORITY_MODE_*)
+    from .dagvine import cdagvine  # type: ignore
+except Exception:
+    cdagvine = None
 
 import os
 
@@ -12,7 +17,17 @@ def get_c_constant(constant):
         "result_success" -> VINE_RESULT_SUCCESS
     """
     constant = f"VINE_{constant.upper()}"
-    return getattr(cvine, constant)
+    # First try the base cvine module
+    value = getattr(cvine, constant, None)
+    if value is not None:
+        return value
+    # Fallback to cdagvine if available (for DAG-specific constants)
+    if cdagvine is not None:
+        value = getattr(cdagvine, constant, None)
+        if value is not None:
+            return value
+    # If still missing, raise a clear error
+    raise AttributeError(f"C constant {constant} not found in cvine or cdagvine")
 
 
 def set_port_range(port):
