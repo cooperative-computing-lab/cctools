@@ -629,11 +629,24 @@ void list_first_item(struct list *list)
 	list_seek(list->iter, 0);
 }
 
+void list_last_item(struct list *list)
+{
+	list_seek(list->iter, -1);
+}
+
 void *list_next_item(struct list *list)
 {
 	void *item = NULL;
 	list_get(list->iter, &item);
 	list_next(list->iter);
+	return item;
+}
+
+void *list_prev_item(struct list *list)
+{
+	void *item = NULL;
+	list_get(list->iter, &item);
+	list_prev(list->iter);
 	return item;
 }
 
