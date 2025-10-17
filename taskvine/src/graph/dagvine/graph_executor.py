@@ -1,12 +1,15 @@
+
 from ndcctools.taskvine import cvine
 from ndcctools.taskvine.dagvine import cdagvine
 from ndcctools.taskvine.manager import Manager
 from ndcctools.taskvine.utils import delete_all_files, get_c_constant
 
 from ndcctools.taskvine.dagvine.graph_definition import GraphKeyResult, TaskGraph
-from ndcctools.taskvine.dagvine.params import ManagerTuningParams
-from ndcctools.taskvine.dagvine.params import VineConstantParams
-from ndcctools.taskvine.dagvine.params import RegularParams
+from ndcctools.taskvine.dagvine.library import Library
+from ndcctools.taskvine.dagvine.graph_definition import (
+    GraphKeyResult, TaskGraph, compute_dts_key, compute_sexpr_key, 
+    compute_single_key, hash_name, hashable, task_graph_loader
+)
 
 import cloudpickle
 import os
@@ -67,20 +70,69 @@ def ensure_task_dict(collection_dict):
         return task_dict
 
 
+class GraphParams:
+    def __init__(self):
+        self.vine_manager_tuning_params = {
+            "worker-source-max-transfers": 100,
+            "max-retrievals": -1,
+            "prefer-dispatch": 1,
+            "transient-error-interval": 1,
+            "attempt-schedule-depth": 10000,
+            "temp-replica-count": 1,
+            "enforce-worker-eviction-interval": -1,
+            "balance-worker-disk-load": 0,
+        }
+        self.vine_task_graph_tuning_params = {
+            "failure-injection-step-percent": -1,
+            "task-priority-mode": "largest-input-first",
+            "proxy-library-name": "vine_task_graph_library",
+            "proxy-function-name": "compute_single_key",
+            "prune-depth": 1,
+        }
+        self.other_params = {
+            "schedule": "worst",
+            "libcores": 16,
+            "failure-injection-step-percent": -1,
+            "target-results-dir": "./target_results",
+            "shared-file-system-dir": "./shared_file_system",
+            "extra-task-output-size-mb": ["uniform", 0, 0],
+            "extra-task-sleep-time": ["uniform", 0, 0],
+            "outfile-type": {
+                "temp": 1.0,
+                "shared-file-system": 0.0,
+            },
+        }
+
+    def update_param(self, param_name, new_value):
+        if param_name in self.vine_manager_tuning_params:
+            self.vine_manager_tuning_params[param_name] = new_value
+        elif param_name in self.vine_task_graph_tuning_params:
+            self.vine_task_graph_tuning_params[param_name] = new_value
+        elif param_name in self.other_params:
+            self.other_params[param_name] = new_value
+        else:
+            self.vine_manager_tuning_params[param_name] = new_value
+
+    def get_value_of(self, param_name):
+        if param_name in self.vine_manager_tuning_params:
+            return self.vine_manager_tuning_params[param_name]
+        elif param_name in self.vine_task_graph_tuning_params:
+            return self.vine_task_graph_tuning_params[param_name]
+        elif param_name in self.other_params:
+            return self.other_params[param_name]
+        else:
+            raise ValueError(f"Invalid param name: {param_name}")
+
+
 class GraphExecutor(Manager):
     def __init__(self,
                  *args,
-                 manager_tuning_params=ManagerTuningParams(),
-                 regular_params=RegularParams(),
-                 vine_constant_params=VineConstantParams(),
                  **kwargs):
 
         # handle SIGINT correctly
         signal.signal(signal.SIGINT, self._on_sigint)
 
-        self.manager_tuning_params = manager_tuning_params
-        self.vine_constant_params = vine_constant_params
-        self.regular_params = regular_params
+        self.params = GraphParams()
 
         # delete all files in the run info directory, do this before super().__init__()
         run_info_path = kwargs.get("run_info_path", None)
@@ -92,6 +144,8 @@ class GraphExecutor(Manager):
         # initialize the manager
         super().__init__(*args, **kwargs)
 
+        self._vine_task_graph = None
+
     def tune_manager(self):
         for k, v in self.manager_tuning_params.to_dict().items():
             print(f"Tuning {k} to {v}")
@@ -100,102 +154,138 @@ class GraphExecutor(Manager):
         # set worker scheduling algorithm
         cvine.vine_set_scheduler(self._taskvine, self.vine_constant_params.get_c_constant_of("schedule"))
 
-    def run(self,
-            collection_dict,
-            target_keys=[],
-            library=None,
-            ):
+        if self._vine_task_graph:
+            cdagvine.vine_task_graph_tune(self._vine_task_graph, "failure-injection-step-percent", str(self.regular_params.failure_injection_step_percent))
+            cdagvine.vine_task_graph_tune(self._vine_task_graph, "task-priority-mode", self.vine_constant_params.task_priority_mode)
 
-        # initialize the task graph (note: the lifetime of this object is limited to this function)
-        self._vine_task_graph = cdagvine.vine_task_graph_create(self._taskvine)
-        cdagvine.vine_task_graph_tune(self._vine_task_graph, "failure-injection-step-percent", str(self.regular_params.failure_injection_step_percent))
-        cdagvine.vine_task_graph_tune(self._vine_task_graph, "task-priority-mode", self.vine_constant_params.task_priority_mode)
+    def param(self, param_name):
+        return self.params.get_value_of(param_name)
 
-        # tune the manager every time we start a new run as the parameters may have changed
-        self.tune_manager()
+    def update_params(self, new_params):
+        assert isinstance(new_params, dict), "new_params must be a dict"
+        for k, new_v in new_params.items():
+            self.params.update_param(k, new_v)
 
-        self.target_keys = target_keys
-        self.task_dict = ensure_task_dict(collection_dict)
+    def get_run_info_path(self):
+        return os.path.join(self.param("run-info-path"), self.param("run-info-template"))
 
-        # create library task
-        self.library = library
-        self.library.install(self, self.regular_params.libcores, self._vine_task_graph)
+    def tune_vine_manager(self):
+        for k, v in self.params.vine_manager_tuning_params.items():
+            print(f"Tuning {k} to {v}")
+            self.tune(k, v)
 
-        # create task graph in the python side
-        print("Initializing TaskGraph object")
-        self.task_graph = TaskGraph(self.task_dict,
-                                    staging_dir=self.regular_params.staging_dir,
-                                    shared_file_system_dir=self.regular_params.shared_file_system_dir,
-                                    extra_task_output_size_mb=self.regular_params.extra_task_output_size_mb,
-                                    extra_task_sleep_time=self.regular_params.extra_task_sleep_time)
-        topo_order = self.task_graph.get_topological_order()
+    def tune_vine_task_graph(self, c_graph):
+        for k, v in self.params.vine_task_graph_tuning_params.items():
+            print(f"Tuning {k} to {v}")
+            cdagvine.vine_task_graph_tune(c_graph, k, str(v))
 
-        # create task graph in the python side
-        print("Initializing task graph in TaskVine")
-        for k in topo_order:
-            cdagvine.vine_task_graph_add_node(self._vine_task_graph,
-                                           self.task_graph.vine_key_of[k],
-                                           self.regular_params.staging_dir,
-                                           self.regular_params.prune_depth)
-            for pk in self.task_graph.parents_of.get(k, []):
-                cdagvine.vine_task_graph_add_dependency(self._vine_task_graph, self.task_graph.vine_key_of[pk], self.task_graph.vine_key_of[k])
+    def assign_outfile_types(self, target_keys, py_graph, c_graph):
+        assert py_graph is not None, "Python graph must be built first"
+        assert c_graph is not None, "C graph must be built first"
 
-        # we must finalize the graph in c side after all nodes and dependencies are added
-        # this includes computing various metrics for each node, such as depth, height, heavy score, etc.
-        cdagvine.vine_task_graph_compute_topology_metrics(self._vine_task_graph)
-
-        # then we can use the heavy score to sort the nodes and specify their outfile remote names
+        # get heavy score from C side
         heavy_scores = {}
-        for k in self.task_graph.task_dict.keys():
-            heavy_scores[k] = cdagvine.vine_task_graph_get_node_heavy_score(self._vine_task_graph, self.task_graph.vine_key_of[k])
+        for k in py_graph.task_dict.keys():
+            heavy_scores[k] = cdagvine.vine_task_graph_get_node_heavy_score(c_graph, py_graph.vine_key_of[k])
 
-        # keys with larger heavy score should be stored into the shared file system
-        sorted_keys = sorted(heavy_scores, key=lambda x: heavy_scores[x], reverse=True)
-        shared_file_system_size = round(len(sorted_keys) * self.regular_params.outfile_type["shared-file-system"])
+        # sort keys by heavy score descending
+        sorted_keys = sorted(heavy_scores, key=lambda k: heavy_scores[k], reverse=True)
+
+        # determine how many go to shared FS
+        sharedfs_count = round(self.param("outfile-type")["shared-file-system"] * len(sorted_keys))
+
+        # assign outfile types
         for i, k in enumerate(sorted_keys):
-            if k in self.target_keys:
+            if k in target_keys:
                 choice = "local"
+            elif i < sharedfs_count:
+                choice = "shared-file-system"
             else:
-                if i < shared_file_system_size:
-                    choice = "shared-file-system"
-                else:
-                    choice = "temp"
-            # set on the Python side, will be installed on the remote workers
-            self.task_graph.set_outfile_type_of(k, choice)
-            # set on the C side, so the manager knows where the data is stored
-            outfile_type_str = f"NODE_OUTFILE_TYPE_{choice.upper().replace('-', '_')}"
-            cdagvine.vine_task_graph_set_node_outfile(self._vine_task_graph,
-                                                   self.task_graph.vine_key_of[k],
-                                                   get_c_constant(outfile_type_str),
-                                                   self.task_graph.outfile_remote_name[k])
+                choice = "temp"
 
-        # save the task graph to a pickle file, will be sent to the remote workers
-        with open(self.library.local_path, 'wb') as f:
-            cloudpickle.dump(self.task_graph, f)
+            py_graph.set_outfile_type_of(k, choice)
+            outfile_type_enum = get_c_constant(f"NODE_OUTFILE_TYPE_{choice.upper().replace('-', '_')}")
+            cdagvine.vine_task_graph_set_node_outfile(
+                c_graph,
+                py_graph.vine_key_of[k],
+                outfile_type_enum,
+                py_graph.outfile_remote_name[k]
+            )
 
-        # now execute the vine graph
-        print(f"\033[92mExecuting task graph, logs will be written into {self.run_info_template_path}\033[0m")
-        cdagvine.vine_task_graph_execute(self._vine_task_graph)
+    def build_python_graph(self):
+        py_graph = TaskGraph(
+            self.task_dict,
+            shared_file_system_dir=self.param("shared-file-system-dir"),
+            extra_task_output_size_mb=self.param("extra-task-output-size-mb"),
+            extra_task_sleep_time=self.param("extra-task-sleep-time")
+        )
 
-        # after execution, we need to load results of target keys
+        return py_graph
+
+    def build_c_graph(self, py_graph):
+        assert py_graph is not None, "Python graph must be built before building the C graph"
+
+        c_graph = cdagvine.vine_task_graph_create(self._taskvine)
+
+        # C side vine task graph must be tuned before adding nodes and dependencies
+        self.tune_vine_manager()
+        self.tune_vine_task_graph(c_graph)
+
+        topo_order = py_graph.get_topological_order()
+        for k in topo_order:
+            cdagvine.vine_task_graph_add_node(
+                c_graph,
+                py_graph.vine_key_of[k],
+            )
+            for pk in py_graph.parents_of[k]:
+                cdagvine.vine_task_graph_add_dependency(c_graph, py_graph.vine_key_of[pk], py_graph.vine_key_of[k])
+
+        cdagvine.vine_task_graph_compute_topology_metrics(c_graph)
+
+        return c_graph
+
+    def build_graphs(self, target_keys):
+        # build Python DAG (logical topology)
+        py_graph = self.build_python_graph()
+
+        # build C DAG (physical topology)
+        c_graph = self.build_c_graph(py_graph)
+
+        # assign outfile types
+        self.assign_outfile_types(target_keys, py_graph, c_graph)
+
+        return py_graph, c_graph
+
+    def new_run(self, collection_dict, target_keys=None, params={}, hoisting_modules=[], env_files={}):
+        # first update the params so that they can be used for the following construction
+        self.update_params(params)
+
+        self.task_dict = ensure_task_dict(collection_dict)
+        
+        # build graphs in both Python and C sides
+        py_graph, c_graph = self.build_graphs(target_keys)
+
+        library = Library(self, self.param("proxy-library-name"), self.param("libcores"))
+
+        library.add_hoisting_modules(hoisting_modules)
+        library.add_env_files(env_files)
+        library.set_context_loader(task_graph_loader, context_loader_args=[cloudpickle.dumps(py_graph)])
+        library.install()
+
+        cdagvine.vine_task_graph_execute(c_graph)
+
+        # delete the C graph immediately after execution, so that the lifetime of this object is limited to the execution
+        cdagvine.vine_task_graph_delete(c_graph)
+
+        # clean up the library instances and template on the manager
+        library.uninstall()
+
+        # load results of target keys
         results = {}
-        for k in self.target_keys:
-            local_outfile_path = cdagvine.vine_task_graph_get_node_local_outfile_source(self._vine_task_graph, self.task_graph.vine_key_of[k])
-            if not os.path.exists(local_outfile_path):
-                results[k] = "NOT_FOUND"
-                continue
-            with open(local_outfile_path, 'rb') as f:
-                result_obj = cloudpickle.load(f)
-                assert isinstance(result_obj, GraphKeyResult), "Loaded object is not of type GraphKeyResult"
-                results[k] = result_obj.result
+        for k in target_keys:
+            results[k] = py_graph.load_result_of_target_key(self.param("target-results-dir"), k)
         return results
 
     def _on_sigint(self, signum, frame):
         self.__del__()
 
-    def __del__(self):
-        if hasattr(self, '_vine_task_graph') and self._vine_task_graph:
-            cdagvine.vine_task_graph_delete(self._vine_task_graph)
-
-        if hasattr(self, 'library') and self.library.local_path and os.path.exists(self.library.local_path):
-            os.remove(self.library.local_path)

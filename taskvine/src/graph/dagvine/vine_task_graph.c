@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <math.h>
 #include <signal.h>
+#include <errno.h>
 #include <stdio.h>
 #include <sys/stat.h>
 
@@ -383,51 +384,38 @@ int vine_task_graph_tune(struct vine_task_graph *tg, const char *name, const cha
 			return -1;
 		}		
 
+	} else if (strcmp(name, "target-results-dir") == 0) {
+		if (tg->target_results_dir) {
+			free(tg->target_results_dir);
+		}
+		if (mkdir(value, 0777) != 0 && errno != EEXIST) {
+			debug(D_ERROR, "failed to mkdir %s (errno=%d)", value, errno);
+			return -1;
+		}
+		tg->target_results_dir = xxstrdup(value);
+
+	} else if (strcmp(name, "proxy-library-name") == 0) {
+		if (tg->proxy_library_name) {
+			free(tg->proxy_library_name);
+		}
+		tg->proxy_library_name = xxstrdup(value);
+
+	} else if (strcmp(name, "proxy-function-name") == 0) {
+		if (tg->proxy_function_name) {
+			free(tg->proxy_function_name);
+		}
+		tg->proxy_function_name = xxstrdup(value);
+
+	} else if (strcmp(name, "prune-depth") == 0) {
+		tg->prune_depth = atoi(value);
+		
+	} else {
+		debug(D_ERROR, "invalid parameter name: %s", name);
+		return -1;
+
 	}
 
 	return 0;
-}
-
-/**
- * Set the proxy library name (Python-side), shared by all tasks.
- * @param tg Reference to the task graph object.
- * @param proxy_library_name Reference to the proxy library name.
- */
-void vine_task_graph_set_proxy_library_name(struct vine_task_graph *tg, const char *proxy_library_name)
-{
-	if (!tg || !proxy_library_name) {
-		return;
-	}
-
-	/* free the existing proxy library name if it exists */
-	if (tg->proxy_library_name) {
-		free(tg->proxy_library_name);
-	}
-
-	tg->proxy_library_name = xxstrdup(proxy_library_name);
-
-	return;
-}
-
-/**
- * Set the proxy function name (Python-side), shared by all tasks.
- * @param tg Reference to the task graph object.
- * @param proxy_function_name Reference to the proxy function name.
- */
-void vine_task_graph_set_proxy_function_name(struct vine_task_graph *tg, const char *proxy_function_name)
-{
-	if (!tg || !proxy_function_name) {
-		return;
-	}
-
-	/* free the existing proxy function name if it exists */
-	if (tg->proxy_function_name) {
-		free(tg->proxy_function_name);
-	}
-
-	tg->proxy_function_name = xxstrdup(proxy_function_name);
-
-	return;
 }
 
 /**
@@ -621,15 +609,9 @@ void vine_task_graph_compute_topology_metrics(struct vine_task_graph *tg)
  * Create a new node and track it in the task graph.
  * @param tg Reference to the task graph object.
  * @param node_key Reference to the node key.
- * @param staging_dir Reference to the staging directory.
- * @param prune_depth Reference to the prune depth.
  * @return A new node object.
  */
-struct vine_task_node *vine_task_graph_add_node(
-		struct vine_task_graph *tg,
-		const char *node_key,
-		const char *staging_dir,
-		int prune_depth)
+struct vine_task_node *vine_task_graph_add_node(struct vine_task_graph *tg, const char *node_key)
 {
 	if (!tg || !node_key) {
 		return NULL;
@@ -642,8 +624,15 @@ struct vine_task_node *vine_task_graph_add_node(
 				node_key,
 				tg->proxy_library_name,
 				tg->proxy_function_name,
-				staging_dir,
-				prune_depth);
+				tg->target_results_dir,
+				tg->prune_depth);
+
+		if (!node) {
+			debug(D_ERROR, "failed to create node %s", node_key);
+			vine_task_graph_delete(tg);
+			exit(1);
+		}
+
 		hash_table_insert(tg->nodes, node_key, node);
 	}
 
@@ -658,13 +647,18 @@ struct vine_task_node *vine_task_graph_add_node(
 struct vine_task_graph *vine_task_graph_create(struct vine_manager *q)
 {
 	struct vine_task_graph *tg = xxmalloc(sizeof(struct vine_task_graph));
+
+	tg->manager = q;
+	
 	tg->nodes = hash_table_create(0, 0);
 	tg->task_id_to_node = itable_create(0);
 	tg->outfile_cachename_to_node = hash_table_create(0, 0);
 
-	tg->proxy_library_name = xxstrdup("vine_task_graph_library");   // Python-side proxy library name (shared by all tasks)
-	tg->proxy_function_name = xxstrdup("compute_single_key");       // Python-side proxy function name (shared by all tasks)
-	tg->manager = q;
+	tg->target_results_dir = xxstrdup(tg->manager->runtime_directory);  // default to current working directory
+	tg->proxy_library_name = NULL;
+	tg->proxy_function_name = NULL;
+
+	tg->prune_depth = 1;
 
 	tg->task_priority_mode = VINE_TASK_GRAPH_PRIORITY_MODE_LARGEST_INPUT_FIRST;
 	tg->failure_injection_step_percent = -1.0;
@@ -695,6 +689,13 @@ void vine_task_graph_add_dependency(struct vine_task_graph *tg, const char *pare
 	struct vine_task_node *child_node = hash_table_lookup(tg->nodes, child_key);
 	if (!parent_node) {
 		debug(D_ERROR, "parent node %s not found", parent_key);
+		char *node_key = NULL;
+		struct vine_task_node *node;
+		printf("parent_keys:\n");
+		HASH_TABLE_ITERATE(tg->nodes, node_key, node)
+		{
+			printf("  %s\n", node->node_key);
+		}
 		exit(1);
 	}
 	if (!child_node) {

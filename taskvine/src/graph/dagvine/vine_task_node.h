@@ -29,7 +29,7 @@ struct vine_task_node {
     struct vine_file *infile;
     struct vine_file *outfile;
     char *outfile_remote_name;
-    char *staging_dir;
+    char *target_results_dir;
     size_t outfile_size_bytes;
         
     struct list *parents;
@@ -62,7 +62,7 @@ struct vine_task_node *vine_task_node_create(
     const char *node_key,
     const char *proxy_library_name,
     const char *proxy_function_name,
-    const char *staging_dir,
+    const char *target_results_dir,
     int prune_depth
 );
 

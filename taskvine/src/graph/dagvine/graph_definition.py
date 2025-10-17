@@ -93,12 +93,10 @@ class GraphKeyResult:
 class TaskGraph:
     def __init__(self, task_dict,
                  shared_file_system_dir=None,
-                 staging_dir=None,
                  extra_task_output_size_mb=["uniform", 0, 0],
                  extra_task_sleep_time=["uniform", 0, 0]):
         self.task_dict = task_dict
         self.shared_file_system_dir = shared_file_system_dir
-        self.staging_dir = staging_dir
 
         if self.shared_file_system_dir:
             os.makedirs(self.shared_file_system_dir, exist_ok=True)
@@ -248,6 +246,18 @@ class TaskGraph:
 
         return topo_order
 
+    def load_result_of_target_key(self, target_results_dir, key):
+        assert self.outfile_type[key] == "local", "Only local output files are supported for target keys"
+        outfile_path = os.path.join(target_results_dir, self.outfile_remote_name[key])
+        if not os.path.exists(outfile_path):
+            result = "NOT_FOUND"
+        else:
+            with open(outfile_path, "rb") as f:
+                result_obj = cloudpickle.load(f)
+                assert isinstance(result_obj, GraphKeyResult), "Loaded object is not of type GraphKeyResult"
+                result = result_obj.result
+        return result
+
     def __del__(self):
         if hasattr(self, 'outfile_remote_name') and self.outfile_remote_name:
             for k in self.outfile_remote_name.keys():
@@ -255,18 +265,14 @@ class TaskGraph:
                     os.remove(self.outfile_remote_name[k])
 
 
-def init_task_graph_context(task_graph_path=None):
-    if task_graph_path is None:
+def task_graph_loader(task_graph_pkl):
+    task_graph = cloudpickle.loads(task_graph_pkl)
 
-        raise ValueError("task_graph_path must be provided to initialize the task graph context")
-    if not os.path.exists(task_graph_path):
-        raise FileNotFoundError(f"Task graph file not found at {task_graph_path}")
-
-    with open(task_graph_path, 'rb') as f:
-        task_graph = cloudpickle.load(f)
+    if not isinstance(task_graph, TaskGraph):
+        raise TypeError("Task graph is not of type TaskGraph")
 
     return {
-        'task_graph': task_graph,
+        "task_graph": task_graph,
     }
 
 

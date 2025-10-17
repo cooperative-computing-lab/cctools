@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -58,10 +57,27 @@ struct vine_task_node *vine_task_node_create(
 		const char *node_key,
 		const char *proxy_library_name,
 		const char *proxy_function_name,
-		const char *staging_dir,
+		const char *target_results_dir,
 		int prune_depth)
 {
-	if (!manager || !node_key || !proxy_library_name || !proxy_function_name || !staging_dir) {
+	if (!manager) {
+		debug(D_ERROR, "Cannot create node because manager is NULL");
+		return NULL;
+	}
+	if (!node_key) {
+		debug(D_ERROR, "Cannot create node because node_key is NULL");
+		return NULL;
+	}
+	if (!proxy_library_name) {
+		debug(D_ERROR, "Cannot create node because proxy_library_name is NULL");
+		return NULL;
+	}
+	if (!proxy_function_name) {
+		debug(D_ERROR, "Cannot create node because proxy_function_name is NULL");
+		return NULL;
+	}
+	if (!target_results_dir) {
+		debug(D_ERROR, "Cannot create node because target_results_dir is NULL");
 		return NULL;
 	}
 
@@ -69,7 +85,7 @@ struct vine_task_node *vine_task_node_create(
 
 	node->manager = manager;
 	node->node_key = xxstrdup(node_key);
-	node->staging_dir = xxstrdup(staging_dir);
+	node->target_results_dir = xxstrdup(target_results_dir);
 
 	node->prune_status = PRUNE_STATUS_NOT_PRUNED;
 	node->parents = list_create();
@@ -137,13 +153,12 @@ void vine_task_node_set_outfile(struct vine_task_node *node, vine_task_node_outf
 	/* create the output file */
 	switch (node->outfile_type) {
 	case VINE_NODE_OUTFILE_TYPE_LOCAL: {
-		char *local_output_dir = string_format("%s/outputs", node->staging_dir);
-		if (mkdir(local_output_dir, 0777) != 0 && errno != EEXIST) {
-			debug(D_ERROR, "failed to mkdir %s (errno=%d)", local_output_dir, errno);
+		if (!node->target_results_dir) {
+			debug(D_ERROR, "Cannot create local output file for node %s because target_results_dir is NULL", node->node_key);
+			exit(1);
 		}
-		char *local_output_path = string_format("%s/%s", local_output_dir, node->outfile_remote_name);
+		char *local_output_path = string_format("%s/%s", node->target_results_dir, node->outfile_remote_name);
 		node->outfile = vine_declare_file(node->manager, local_output_path, VINE_CACHE_LEVEL_WORKFLOW, 0);
-		free(local_output_dir);
 		free(local_output_path);
 		break;
 	}
@@ -471,7 +486,7 @@ void vine_task_node_print_info(struct vine_task_node *node)
 	debug(D_VINE, "---------------- Node Info ----------------");
 	debug(D_VINE, "key: %s", node->node_key);
 	debug(D_VINE, "task_id: %d", node->task->task_id);
-	debug(D_VINE, "staging_dir: %s", node->staging_dir ? node->staging_dir : "(null)");
+	debug(D_VINE, "target_results_dir: %s", node->target_results_dir ? node->target_results_dir : "(null)");
 	debug(D_VINE, "depth: %d", node->depth);
 	debug(D_VINE, "height: %d", node->height);
 	debug(D_VINE, "prune_depth: %d", node->prune_depth);
@@ -599,8 +614,8 @@ void vine_task_node_delete(struct vine_task_node *node)
 	if (node->outfile_remote_name) {
 		free(node->outfile_remote_name);
 	}
-	if (node->staging_dir) {
-		free(node->staging_dir);
+	if (node->target_results_dir) {
+		free(node->target_results_dir);
 	}
 
 	vine_task_delete(node->task);

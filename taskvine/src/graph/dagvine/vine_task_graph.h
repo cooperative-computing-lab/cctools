@@ -28,8 +28,16 @@ struct vine_task_graph {
 	struct itable *task_id_to_node;
 	struct hash_table *outfile_cachename_to_node;
 
-    char *proxy_library_name;
-    char *proxy_function_name;
+    /* Results of target keys will be stored in this directory. 
+     * This dir path can not necessarily be a shared file system directory,
+     * output files will be retrieved through the network instead,
+     * as long as the manager can access it. */
+    char *target_results_dir;
+
+    char *proxy_library_name;    // Python-side proxy library name (shared by all tasks)
+    char *proxy_function_name;   // Python-side proxy function name (shared by all tasks)
+
+    int prune_depth;
 
     vine_task_graph_priority_mode_t task_priority_mode;  // priority mode for task graph task scheduling
     double failure_injection_step_percent;  // 0 - 100, the percentage of steps to inject failure
@@ -47,14 +55,9 @@ struct vine_task_graph *vine_task_graph_create(struct vine_manager *q);
 /** Create a new node in the task graph.
 @param tg Reference to the task graph object.
 @param node_key Reference to the node key.
-@param staging_dir Reference to the staging directory.
-@param prune_depth Reference to the prune depth.
 @return A new node object.
 */
-struct vine_task_node *vine_task_graph_add_node(struct vine_task_graph *tg,
-	const char *node_key,
-	const char *staging_dir,
-	int prune_depth);
+struct vine_task_node *vine_task_graph_add_node(struct vine_task_graph *tg, const char *node_key);
 
 /** Add a dependency between two nodes in the task graph.
 @param tg Reference to the task graph object.
@@ -111,18 +114,6 @@ const char *vine_task_graph_get_proxy_library_name(const struct vine_task_graph 
 @return The function name.
 */
 const char *vine_task_graph_get_proxy_function_name(const struct vine_task_graph *tg);
-
-/** Set the proxy library name (Python-side), shared by all tasks.
-@param tg Reference to the task graph object.
-@param proxy_library_name Reference to the proxy library name.
-*/
-void vine_task_graph_set_proxy_library_name(struct vine_task_graph *tg, const char *proxy_library_name);
-
-/** Set the proxy function name (Python-side), shared by all tasks.
-@param tg Reference to the task graph object.
-@param proxy_function_name Reference to the proxy function name.
-*/
-void vine_task_graph_set_proxy_function_name(struct vine_task_graph *tg, const char *proxy_function_name);
 
 /** Tune the task graph.
 @param tg Reference to the task graph object.

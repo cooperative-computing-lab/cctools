@@ -3,19 +3,38 @@ from ndcctools.taskvine import cvine
 from ndcctools.taskvine.dagvine import cdagvine
 from ndcctools.taskvine.graph_definition import (
     GraphKeyResult, TaskGraph, compute_dts_key, compute_sexpr_key, 
-    compute_single_key, hash_name, hashable, init_task_graph_context
+    compute_single_key, hash_name, hashable
 )
 from ndcctools.taskvine.utils import load_variable_from_library
 
 
 class Library:
-    def __init__(self, hoisting_modules=[], env_files={}):
+    def __init__(self, py_manager, libname, libcores):
+        self.py_manager = py_manager
+        self.libname = libname
+        assert self.libname is not None, "libname must be provided"
+
+        self.libcores = libcores
+        assert self.libcores is not None, "libcores must be provided"
+
         self.libtask = None
 
-        self.hoisting_modules = hoisting_modules
-        self.env_files = env_files
+        # these modules are always included in the preamble of the library task, so that function calls can execute directly
+        # using the loaded context without importing them over and over again
+        self.hoisting_modules = [
+            os, cloudpickle, GraphKeyResult, TaskGraph, uuid, hashlib, random, types, collections, time,
+            load_variable_from_library, compute_dts_key, compute_sexpr_key, compute_single_key, hash_name, hashable
+        ]
 
-        self.libcores = -1
+        # environment files serve as additional inputs to the library task, where each key is the local path and the value is the remote path
+        # those local files will be sent remotely to the workers so tasks can access them as appropriate
+        self.env_files = {}
+
+        # context loader is a function that will be used to load the library context on remote nodes.
+        self.context_loader_func = None
+        self.context_loader_args = []
+        self.context_loader_kwargs = {}
+
         self.local_path = None
         self.remote_path = None
 
@@ -27,30 +46,29 @@ class Library:
         assert isinstance(new_env_files, dict), "new_env_files must be a dictionary"
         self.env_files.update(new_env_files)
 
-    def install(self, manager, libcores, vine_graph):
-        self.libcores = libcores
+    def set_context_loader(self, context_loader_func, context_loader_args=[], context_loader_kwargs={}):
+        self.context_loader_func = context_loader_func
+        self.context_loader_args = context_loader_args
+        self.context_loader_kwargs = context_loader_kwargs
 
-        assert cdagvine.vine_task_graph_get_proxy_function_name(vine_graph) == compute_single_key.__name__
-
-        self.local_path = f"library-task-graph-{uuid.uuid4()}.pkl"
-        self.remote_path = self.local_path
-
-        self.hoisting_modules += [
-            os, cloudpickle, GraphKeyResult, TaskGraph, uuid, hashlib, random, types, collections, time,
-            load_variable_from_library, compute_dts_key, compute_sexpr_key, compute_single_key, hash_name, hashable
-        ]
-        lib_name = cdagvine.vine_task_graph_get_proxy_library_name(vine_graph)
-        self.libtask = manager.create_library_from_functions(
-            lib_name,
+    def install(self):
+        self.libtask = self.py_manager.create_library_from_functions(
+            self.libname,
             compute_single_key,
-            library_context_info=[init_task_graph_context, [], {"task_graph_path": self.remote_path}],
+            library_context_info=[self.context_loader_func, self.context_loader_args, self.context_loader_kwargs],
             add_env=False,
             function_infile_load_mode="json",
             hoisting_modules=self.hoisting_modules,
         )
-        self.libtask.add_input(manager.declare_file(self.local_path), self.remote_path)
         for local, remote in self.env_files.items():
-            self.libtask.add_input(manager.declare_file(local, cache=True, peer_transfer=True), remote)
+            # check if the local file exists
+            if not os.path.exists(local):
+                raise FileNotFoundError(f"Local file {local} not found")
+            # attach as the input file to the library task
+            self.libtask.add_input(self.py_manager.declare_file(local, cache=True, peer_transfer=True), remote)
         self.libtask.set_cores(self.libcores)
         self.libtask.set_function_slots(self.libcores)
-        manager.install_library(self.libtask)
+        self.py_manager.install_library(self.libtask)
+
+    def uninstall(self):
+        self.py_manager.remove_library(self.libname)
