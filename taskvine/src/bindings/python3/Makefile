@@ -39,7 +39,7 @@ install: all
 	cp taskvine.py $(CCTOOLS_PYTHON3_PATH)/
 
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}
-	cp $(CCTOOLS_HOME)/taskvine/src/graph/${GRAPH_EXECUTOR_MODULE_NAME}/graph_definition.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}/graph_definition.py
+	cp $(CCTOOLS_HOME)/taskvine/src/graph/${GRAPH_EXECUTOR_MODULE_NAME}/runtime_execution_graph.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}/runtime_execution_graph.py
 	cp $(CCTOOLS_HOME)/taskvine/src/graph/${GRAPH_EXECUTOR_MODULE_NAME}/graph_executor.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}/graph_executor.py
 	cp $(CCTOOLS_HOME)/taskvine/src/graph/${GRAPH_EXECUTOR_MODULE_NAME}/library.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}/library.py
 	cp $(CCTOOLS_HOME)/taskvine/src/graph/${GRAPH_EXECUTOR_MODULE_NAME}/params.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}/params.py

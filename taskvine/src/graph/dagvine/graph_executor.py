@@ -5,7 +5,7 @@ from ndcctools.taskvine.manager import Manager
 from ndcctools.taskvine.utils import delete_all_files, get_c_constant
 
 from ndcctools.taskvine.dagvine.library import Library
-from ndcctools.taskvine.dagvine.graph_definition import TaskGraph, task_graph_loader
+from ndcctools.taskvine.dagvine.runtime_execution_graph import RuntimeExecutionGraph
 
 import cloudpickle
 import os
@@ -166,14 +166,14 @@ class GraphExecutor(Manager):
             print(f"Tuning {k} to {v}")
             cdagvine.vine_task_graph_tune(c_graph, k, str(v))
 
-    def assign_outfile_types(self, target_keys, py_graph, c_graph):
-        assert py_graph is not None, "Python graph must be built first"
+    def assign_outfile_types(self, target_keys, reg, c_graph):
+        assert reg is not None, "Python graph must be built first"
         assert c_graph is not None, "C graph must be built first"
 
         # get heavy score from C side
         heavy_scores = {}
-        for k in py_graph.task_dict.keys():
-            heavy_scores[k] = cdagvine.vine_task_graph_get_node_heavy_score(c_graph, py_graph.vine_key_of[k])
+        for k in reg.task_dict.keys():
+            heavy_scores[k] = cdagvine.vine_task_graph_get_node_heavy_score(c_graph, reg.vine_key_of[k])
 
         # sort keys by heavy score descending
         sorted_keys = sorted(heavy_scores, key=lambda k: heavy_scores[k], reverse=True)
@@ -190,27 +190,27 @@ class GraphExecutor(Manager):
             else:
                 choice = "temp"
 
-            py_graph.set_outfile_type_of(k, choice)
+            reg.set_outfile_type_of(k, choice)
             outfile_type_enum = get_c_constant(f"NODE_OUTFILE_TYPE_{choice.upper().replace('-', '_')}")
             cdagvine.vine_task_graph_set_node_outfile(
                 c_graph,
-                py_graph.vine_key_of[k],
+                reg.vine_key_of[k],
                 outfile_type_enum,
-                py_graph.outfile_remote_name[k]
+                reg.outfile_remote_name[k]
             )
 
     def build_python_graph(self):
-        py_graph = TaskGraph(
+        reg = RuntimeExecutionGraph(
             self.task_dict,
             shared_file_system_dir=self.param("shared-file-system-dir"),
             extra_task_output_size_mb=self.param("extra-task-output-size-mb"),
             extra_task_sleep_time=self.param("extra-task-sleep-time")
         )
 
-        return py_graph
+        return reg
 
-    def build_c_graph(self, py_graph):
-        assert py_graph is not None, "Python graph must be built before building the C graph"
+    def build_c_graph(self, reg):
+        assert reg is not None, "Python graph must be built before building the C graph"
 
         c_graph = cdagvine.vine_task_graph_create(self._taskvine)
 
@@ -218,14 +218,14 @@ class GraphExecutor(Manager):
         self.tune_vine_manager()
         self.tune_vine_task_graph(c_graph)
 
-        topo_order = py_graph.get_topological_order()
+        topo_order = reg.get_topological_order()
         for k in topo_order:
             cdagvine.vine_task_graph_add_node(
                 c_graph,
-                py_graph.vine_key_of[k],
+                reg.vine_key_of[k],
             )
-            for pk in py_graph.parents_of[k]:
-                cdagvine.vine_task_graph_add_dependency(c_graph, py_graph.vine_key_of[pk], py_graph.vine_key_of[k])
+            for pk in reg.parents_of[k]:
+                cdagvine.vine_task_graph_add_dependency(c_graph, reg.vine_key_of[pk], reg.vine_key_of[k])
 
         cdagvine.vine_task_graph_compute_topology_metrics(c_graph)
 
@@ -233,15 +233,15 @@ class GraphExecutor(Manager):
 
     def build_graphs(self, target_keys):
         # build Python DAG (logical topology)
-        py_graph = self.build_python_graph()
+        reg = self.build_python_graph()
 
         # build C DAG (physical topology)
-        c_graph = self.build_c_graph(py_graph)
+        c_graph = self.build_c_graph(reg)
 
         # assign outfile types
-        self.assign_outfile_types(target_keys, py_graph, c_graph)
+        self.assign_outfile_types(target_keys, reg, c_graph)
 
-        return py_graph, c_graph
+        return reg, c_graph
 
     def run(self, collection_dict, target_keys=None, params={}, hoisting_modules=[], env_files={}):
         # first update the params so that they can be used for the following construction
@@ -250,13 +250,13 @@ class GraphExecutor(Manager):
         self.task_dict = ensure_task_dict(collection_dict)
         
         # build graphs in both Python and C sides
-        py_graph, c_graph = self.build_graphs(target_keys)
+        reg, c_graph = self.build_graphs(target_keys)
 
         # create and install the library template on the manager
         library = Library(self, self.param("proxy-library-name"), self.param("libcores"))
         library.add_hoisting_modules(hoisting_modules)
         library.add_env_files(env_files)
-        library.set_context_loader(task_graph_loader, context_loader_args=[cloudpickle.dumps(py_graph)])
+        library.set_context_loader(RuntimeExecutionGraph.context_loader_func, context_loader_args=[cloudpickle.dumps(reg)])
         library.install()
 
         # execute the graph on the C side
@@ -271,7 +271,7 @@ class GraphExecutor(Manager):
         # load results of target keys
         results = {}
         for k in target_keys:
-            results[k] = py_graph.load_result_of_key(k, target_results_dir=self.param("target-results-dir"))
+            results[k] = reg.load_result_of_key(k, target_results_dir=self.param("target-results-dir"))
         return results
 
     def _on_sigint(self, signum, frame):

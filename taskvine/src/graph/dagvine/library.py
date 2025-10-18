@@ -1,8 +1,8 @@
 import os, uuid, cloudpickle, types, time, random, hashlib, collections
 from ndcctools.taskvine import cvine
 from ndcctools.taskvine.dagvine import cdagvine
-from ndcctools.taskvine.graph_definition import (
-    GraphKeyResult, TaskGraph, compute_dts_key, compute_sexpr_key, 
+from ndcctools.taskvine.dagvine.runtime_execution_graph import (
+    GraphKeyResult, RuntimeExecutionGraph, compute_dts_key, compute_sexpr_key, 
     compute_single_key, hash_name, hashable
 )
 from ndcctools.taskvine.utils import load_variable_from_library
@@ -22,7 +22,7 @@ class Library:
         # these modules are always included in the preamble of the library task, so that function calls can execute directly
         # using the loaded context without importing them over and over again
         self.hoisting_modules = [
-            os, cloudpickle, GraphKeyResult, TaskGraph, uuid, hashlib, random, types, collections, time,
+            os, cloudpickle, GraphKeyResult, RuntimeExecutionGraph, uuid, hashlib, random, types, collections, time,
             load_variable_from_library, compute_dts_key, compute_sexpr_key, compute_single_key, hash_name, hashable
         ]
 
