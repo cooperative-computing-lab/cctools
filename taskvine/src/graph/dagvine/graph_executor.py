@@ -4,23 +4,12 @@ from ndcctools.taskvine.dagvine import cdagvine
 from ndcctools.taskvine.manager import Manager
 from ndcctools.taskvine.utils import delete_all_files, get_c_constant
 
-from ndcctools.taskvine.dagvine.graph_definition import GraphKeyResult, TaskGraph
 from ndcctools.taskvine.dagvine.library import Library
-from ndcctools.taskvine.dagvine.graph_definition import (
-    GraphKeyResult, TaskGraph, compute_dts_key, compute_sexpr_key, 
-    compute_single_key, hash_name, hashable, task_graph_loader
-)
+from ndcctools.taskvine.dagvine.graph_definition import TaskGraph, task_graph_loader
 
 import cloudpickle
 import os
-import collections
-import inspect
-import types
 import signal
-import hashlib
-import time
-import random
-import uuid
 
 try:
     import dask
@@ -38,6 +27,7 @@ except ImportError:
     dts = None
 
 
+# convert Dask collection to task dictionary
 def dask_collections_to_task_dict(collection_dict):
     assert is_dask_collection is not None
     from dask.highlevelgraph import HighLevelGraph, ensure_dict
@@ -58,6 +48,7 @@ def dask_collections_to_task_dict(collection_dict):
     return ensure_dict(hlg)
 
 
+# compatibility for Dask-created collections
 def ensure_task_dict(collection_dict):
     if is_dask_collection and any(is_dask_collection(v) for v in collection_dict.values()):
         task_dict = dask_collections_to_task_dict(collection_dict)
@@ -144,7 +135,7 @@ class GraphExecutor(Manager):
         # initialize the manager
         super().__init__(*args, **kwargs)
 
-        self._vine_task_graph = None
+        self.runtime_directory = cvine.vine_get_runtime_directory(self._taskvine)
 
     def tune_manager(self):
         for k, v in self.manager_tuning_params.to_dict().items():
@@ -153,10 +144,6 @@ class GraphExecutor(Manager):
 
         # set worker scheduling algorithm
         cvine.vine_set_scheduler(self._taskvine, self.vine_constant_params.get_c_constant_of("schedule"))
-
-        if self._vine_task_graph:
-            cdagvine.vine_task_graph_tune(self._vine_task_graph, "failure-injection-step-percent", str(self.regular_params.failure_injection_step_percent))
-            cdagvine.vine_task_graph_tune(self._vine_task_graph, "task-priority-mode", self.vine_constant_params.task_priority_mode)
 
     def param(self, param_name):
         return self.params.get_value_of(param_name)
@@ -256,7 +243,7 @@ class GraphExecutor(Manager):
 
         return py_graph, c_graph
 
-    def new_run(self, collection_dict, target_keys=None, params={}, hoisting_modules=[], env_files={}):
+    def run(self, collection_dict, target_keys=None, params={}, hoisting_modules=[], env_files={}):
         # first update the params so that they can be used for the following construction
         self.update_params(params)
 
@@ -272,13 +259,14 @@ class GraphExecutor(Manager):
         library.set_context_loader(task_graph_loader, context_loader_args=[cloudpickle.dumps(py_graph)])
         library.install()
 
+        # execute the graph on the C side
+        print(f"Executing task graph, logs will be written to {self.runtime_directory}")
         cdagvine.vine_task_graph_execute(c_graph)
-
-        # delete the C graph immediately after execution, so that the lifetime of this object is limited to the execution
-        cdagvine.vine_task_graph_delete(c_graph)
 
         # clean up the library instances and template on the manager
         library.uninstall()
+        # delete the C graph immediately after execution, so that the lifetime of this object is limited to the execution
+        cdagvine.vine_task_graph_delete(c_graph)
 
         # load results of target keys
         results = {}

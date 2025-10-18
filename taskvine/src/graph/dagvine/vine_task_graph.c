@@ -972,8 +972,6 @@ void vine_task_graph_delete(struct vine_task_graph *tg)
 		vine_task_node_delete(node);
 	}
 
-	vine_delete(tg->manager);
-
 	free(tg->proxy_library_name);
 	free(tg->proxy_function_name);
 

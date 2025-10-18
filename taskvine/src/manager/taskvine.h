@@ -1536,6 +1536,12 @@ void vine_counters_print();
  */
 char *vine_version_string();
 
+/** Returns the runtime directory
+@param m Reference to the current manager object.
+@return A string.
+*/
+char *vine_get_runtime_directory(struct vine_manager *m);
+
 /** Returns path relative to the logs runtime directory
 @param m Reference to the current manager object.
 @param path Target filename.
