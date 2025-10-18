@@ -79,12 +79,12 @@ class GraphParams:
             "proxy-library-name": "vine_task_graph_library",
             "proxy-function-name": "compute_single_key",
             "prune-depth": 1,
+            "target-results-dir": "./target_results",
         }
         self.other_params = {
             "schedule": "worst",
             "libcores": 16,
             "failure-injection-step-percent": -1,
-            "target-results-dir": "./target_results",
             "shared-file-system-dir": "./shared_file_system",
             "extra-task-output-size-mb": ["uniform", 0, 0],
             "extra-task-sleep-time": ["uniform", 0, 0],
@@ -252,8 +252,8 @@ class GraphExecutor(Manager):
         # build graphs in both Python and C sides
         py_graph, c_graph = self.build_graphs(target_keys)
 
+        # create and install the library template on the manager
         library = Library(self, self.param("proxy-library-name"), self.param("libcores"))
-
         library.add_hoisting_modules(hoisting_modules)
         library.add_env_files(env_files)
         library.set_context_loader(task_graph_loader, context_loader_args=[cloudpickle.dumps(py_graph)])
@@ -271,7 +271,7 @@ class GraphExecutor(Manager):
         # load results of target keys
         results = {}
         for k in target_keys:
-            results[k] = py_graph.load_result_of_target_key(self.param("target-results-dir"), k)
+            results[k] = py_graph.load_result_of_key(k, target_results_dir=self.param("target-results-dir"))
         return results
 
     def _on_sigint(self, signum, frame):

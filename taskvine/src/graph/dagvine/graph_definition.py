@@ -216,14 +216,24 @@ class TaskGraph:
             result_obj = GraphKeyResult(result, extra_size_mb=self.extra_task_output_size_mb[key])
             cloudpickle.dump(result_obj, f)
 
-    def load_result_of_key(self, key):
+    def load_result_of_key(self, key, target_results_dir=None):
+        if self.outfile_type[key] == "local":
+            # nodes with local outfile type will have their results stored in the target results directory
+            # when the execution is done, users can call this function to load the results from the target results directory
+            # note that data is transferred through the link in sequence, not in parallel through the shared file system
+            outfile_path = os.path.join(target_results_dir, self.outfile_remote_name[key])
+        else:
+            # workers user this branch to load results from either local or shared file system
+            # if a node-local output, then data is stored in the task sandbox and the remote name is just the filename
+            # if a shared file system output, then remote name is the full path to the file
+            outfile_path = self.outfile_remote_name[key]
         try:
-            with open(self.outfile_remote_name[key], "rb") as f:
+            with open(outfile_path, "rb") as f:
                 result_obj = cloudpickle.load(f)
                 assert isinstance(result_obj, GraphKeyResult), "Loaded object is not of type GraphKeyResult"
                 return result_obj.result
         except FileNotFoundError:
-            raise FileNotFoundError(f"Output file for key {key} not found at {self.outfile_remote_name[key]}")
+            raise FileNotFoundError(f"Output file for key {key} not found at {outfile_path}")
 
     def get_topological_order(self):
         in_degree = {key: len(self.parents_of[key]) for key in self.task_dict.keys()}
@@ -245,18 +255,6 @@ class TaskGraph:
             raise ValueError("Failed to create topo order, the dependencies may be cyclic or problematic")
 
         return topo_order
-
-    def load_result_of_target_key(self, target_results_dir, key):
-        assert self.outfile_type[key] == "local", "Only local output files are supported for target keys"
-        outfile_path = os.path.join(target_results_dir, self.outfile_remote_name[key])
-        if not os.path.exists(outfile_path):
-            result = "NOT_FOUND"
-        else:
-            with open(outfile_path, "rb") as f:
-                result_obj = cloudpickle.load(f)
-                assert isinstance(result_obj, GraphKeyResult), "Loaded object is not of type GraphKeyResult"
-                result = result_obj.result
-        return result
 
     def __del__(self):
         if hasattr(self, 'outfile_remote_name') and self.outfile_remote_name:
