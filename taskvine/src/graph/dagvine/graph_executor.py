@@ -73,10 +73,9 @@ class GraphParams:
             "enforce-worker-eviction-interval": -1,
             "balance-worker-disk-load": 0,
         }
-        self.vine_task_graph_tuning_params = {
+        self.sog_tuning_params = {
             "failure-injection-step-percent": -1,
-            "task-priority-mode": "largest-input-first",
-            "proxy-library-name": "vine_task_graph_library",
+            "priority-mode": "largest-input-first",
             "proxy-function-name": "compute_single_key",
             "prune-depth": 1,
             "target-results-dir": "./target_results",
@@ -97,8 +96,8 @@ class GraphParams:
     def update_param(self, param_name, new_value):
         if param_name in self.vine_manager_tuning_params:
             self.vine_manager_tuning_params[param_name] = new_value
-        elif param_name in self.vine_task_graph_tuning_params:
-            self.vine_task_graph_tuning_params[param_name] = new_value
+        elif param_name in self.sog_tuning_params:
+            self.sog_tuning_params[param_name] = new_value
         elif param_name in self.other_params:
             self.other_params[param_name] = new_value
         else:
@@ -107,8 +106,8 @@ class GraphParams:
     def get_value_of(self, param_name):
         if param_name in self.vine_manager_tuning_params:
             return self.vine_manager_tuning_params[param_name]
-        elif param_name in self.vine_task_graph_tuning_params:
-            return self.vine_task_graph_tuning_params[param_name]
+        elif param_name in self.sog_tuning_params:
+            return self.sog_tuning_params[param_name]
         elif param_name in self.other_params:
             return self.other_params[param_name]
         else:
@@ -161,19 +160,19 @@ class GraphExecutor(Manager):
             print(f"Tuning {k} to {v}")
             self.tune(k, v)
 
-    def tune_vine_task_graph(self, c_graph):
-        for k, v in self.params.vine_task_graph_tuning_params.items():
+    def tune_sog(self, sog):
+        for k, v in self.params.sog_tuning_params.items():
             print(f"Tuning {k} to {v}")
-            cdagvine.vine_task_graph_tune(c_graph, k, str(v))
+            cdagvine.sog_tune(sog, k, str(v))
 
-    def assign_outfile_types(self, target_keys, reg, c_graph):
-        assert reg is not None, "Python graph must be built first"
-        assert c_graph is not None, "C graph must be built first"
+    def assign_outfile_types(self, target_keys, reg, sog):
+        assert reg is not None, "Runtime execution graph must be built first"
+        assert sog is not None, "Strategic orchestration graph must be built first"
 
         # get heavy score from C side
         heavy_scores = {}
         for k in reg.task_dict.keys():
-            heavy_scores[k] = cdagvine.vine_task_graph_get_node_heavy_score(c_graph, reg.vine_key_of[k])
+            heavy_scores[k] = cdagvine.sog_get_node_heavy_score(sog, reg.vine_key_of[k])
 
         # sort keys by heavy score descending
         sorted_keys = sorted(heavy_scores, key=lambda k: heavy_scores[k], reverse=True)
@@ -192,8 +191,8 @@ class GraphExecutor(Manager):
 
             reg.set_outfile_type_of(k, choice)
             outfile_type_enum = get_c_constant(f"NODE_OUTFILE_TYPE_{choice.upper().replace('-', '_')}")
-            cdagvine.vine_task_graph_set_node_outfile(
-                c_graph,
+            cdagvine.sog_set_node_outfile(
+                sog,
                 reg.vine_key_of[k],
                 outfile_type_enum,
                 reg.outfile_remote_name[k]
@@ -209,39 +208,39 @@ class GraphExecutor(Manager):
 
         return reg
 
-    def build_c_graph(self, reg):
+    def build_sog(self, reg):
         assert reg is not None, "Python graph must be built before building the C graph"
 
-        c_graph = cdagvine.vine_task_graph_create(self._taskvine)
+        sog = cdagvine.sog_create(self._taskvine)
 
         # C side vine task graph must be tuned before adding nodes and dependencies
         self.tune_vine_manager()
-        self.tune_vine_task_graph(c_graph)
+        self.tune_sog(sog)
 
         topo_order = reg.get_topological_order()
         for k in topo_order:
-            cdagvine.vine_task_graph_add_node(
-                c_graph,
+            cdagvine.sog_add_node(
+                sog,
                 reg.vine_key_of[k],
             )
             for pk in reg.parents_of[k]:
-                cdagvine.vine_task_graph_add_dependency(c_graph, reg.vine_key_of[pk], reg.vine_key_of[k])
+                cdagvine.sog_add_dependency(sog, reg.vine_key_of[pk], reg.vine_key_of[k])
 
-        cdagvine.vine_task_graph_compute_topology_metrics(c_graph)
+        cdagvine.sog_compute_topology_metrics(sog)
 
-        return c_graph
+        return sog
 
     def build_graphs(self, target_keys):
         # build Python DAG (logical topology)
         reg = self.build_python_graph()
 
         # build C DAG (physical topology)
-        c_graph = self.build_c_graph(reg)
+        sog = self.build_sog(reg)
 
         # assign outfile types
-        self.assign_outfile_types(target_keys, reg, c_graph)
+        self.assign_outfile_types(target_keys, reg, sog)
 
-        return reg, c_graph
+        return reg, sog
 
     def run(self, collection_dict, target_keys=None, params={}, hoisting_modules=[], env_files={}):
         # first update the params so that they can be used for the following construction
@@ -250,23 +249,24 @@ class GraphExecutor(Manager):
         self.task_dict = ensure_task_dict(collection_dict)
         
         # build graphs in both Python and C sides
-        reg, c_graph = self.build_graphs(target_keys)
+        reg, sog = self.build_graphs(target_keys)
 
         # create and install the library template on the manager
-        library = Library(self, self.param("proxy-library-name"), self.param("libcores"))
+        library = Library(self, self.param("libcores"))
         library.add_hoisting_modules(hoisting_modules)
         library.add_env_files(env_files)
         library.set_context_loader(RuntimeExecutionGraph.context_loader_func, context_loader_args=[cloudpickle.dumps(reg)])
         library.install()
+        cdagvine.sog_set_proxy_library_name(sog, library.get_name())
 
         # execute the graph on the C side
         print(f"Executing task graph, logs will be written to {self.runtime_directory}")
-        cdagvine.vine_task_graph_execute(c_graph)
+        cdagvine.sog_execute(sog)
 
         # clean up the library instances and template on the manager
         library.uninstall()
         # delete the C graph immediately after execution, so that the lifetime of this object is limited to the execution
-        cdagvine.vine_task_graph_delete(c_graph)
+        cdagvine.sog_delete(sog)
 
         # load results of target keys
         results = {}

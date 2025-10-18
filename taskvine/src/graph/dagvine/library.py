@@ -1,6 +1,4 @@
 import os, uuid, cloudpickle, types, time, random, hashlib, collections
-from ndcctools.taskvine import cvine
-from ndcctools.taskvine.dagvine import cdagvine
 from ndcctools.taskvine.dagvine.runtime_execution_graph import (
     GraphKeyResult, RuntimeExecutionGraph, compute_dts_key, compute_sexpr_key, 
     compute_single_key, hash_name, hashable
@@ -9,10 +7,9 @@ from ndcctools.taskvine.utils import load_variable_from_library
 
 
 class Library:
-    def __init__(self, py_manager, libname, libcores):
+    def __init__(self, py_manager, libcores):
         self.py_manager = py_manager
-        self.libname = libname
-        assert self.libname is not None, "libname must be provided"
+        self.libname = f"proxy-library-{str(uuid.uuid4())}"
 
         self.libcores = libcores
         assert self.libcores is not None, "libcores must be provided"
@@ -37,6 +34,9 @@ class Library:
 
         self.local_path = None
         self.remote_path = None
+
+    def get_name(self):
+        return self.libname
 
     def add_hoisting_modules(self, new_modules):
         assert isinstance(new_modules, list), "new_modules must be a list of modules"

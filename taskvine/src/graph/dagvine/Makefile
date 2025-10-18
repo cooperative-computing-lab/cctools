@@ -6,15 +6,15 @@ LOCAL_CCFLAGS+=-I ${CCTOOLS_HOME}/taskvine/src/manager
 
  
 
-SOURCES = vine_task_node.c vine_task_graph.c
+SOURCES = vine_task_node.c strategic_orchestration_graph.c
 OBJECTS = $(SOURCES:%.c=%.o)
 
-SWIG_I = vine_task_graph.i
+SWIG_I = strategic_orchestration_graph.i
 
 # put SWIG generated sources and Python extension artifacts into build/ directory
 BUILD_DIR := build
-SWIG_WRAP = $(BUILD_DIR)/vine_task_graph_wrap.c
-WRAP_OBJ = $(BUILD_DIR)/vine_task_graph_wrap.o
+SWIG_WRAP = $(BUILD_DIR)/strategic_orchestration_graph_wrap.c
+WRAP_OBJ = $(BUILD_DIR)/strategic_orchestration_graph_wrap.o
 PYMODULE = $(BUILD_DIR)/_cdagvine.$(CCTOOLS_DYNAMIC_SUFFIX)
 
 LIBRARIES =
@@ -33,7 +33,7 @@ $(PROGRAMS): $(EXTERNALS)
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-$(SWIG_WRAP): $(SWIG_I) vine_task_graph.h | $(BUILD_DIR)
+$(SWIG_WRAP): $(SWIG_I) strategic_orchestration_graph.h | $(BUILD_DIR)
 	$(CCTOOLS_SWIG) -python -threads -relativeimport -I$(CCTOOLS_HOME)/taskvine/src/manager -I$(CCTOOLS_HOME)/dttools/src -outdir $(BUILD_DIR) -o $@ $<
 
 # Build Python module
