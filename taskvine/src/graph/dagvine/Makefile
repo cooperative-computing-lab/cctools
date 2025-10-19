@@ -6,7 +6,7 @@ LOCAL_CCFLAGS+=-I ${CCTOOLS_HOME}/taskvine/src/manager
 
  
 
-SOURCES = vine_task_node.c strategic_orchestration_graph.c
+SOURCES = strategic_orchestration_node.c strategic_orchestration_graph.c
 OBJECTS = $(SOURCES:%.c=%.o)
 
 SWIG_I = strategic_orchestration_graph.i

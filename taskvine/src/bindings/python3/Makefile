@@ -41,7 +41,9 @@ install: all
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}
 	cp $(CCTOOLS_HOME)/taskvine/src/graph/${GRAPH_EXECUTOR_MODULE_NAME}/runtime_execution_graph.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}/runtime_execution_graph.py
 	cp $(CCTOOLS_HOME)/taskvine/src/graph/${GRAPH_EXECUTOR_MODULE_NAME}/graph_executor.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}/graph_executor.py
-	cp $(CCTOOLS_HOME)/taskvine/src/graph/${GRAPH_EXECUTOR_MODULE_NAME}/library.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}/library.py
+	cp $(CCTOOLS_HOME)/taskvine/src/graph/${GRAPH_EXECUTOR_MODULE_NAME}/proxy_library.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}/proxy_library.py
+	cp $(CCTOOLS_HOME)/taskvine/src/graph/${GRAPH_EXECUTOR_MODULE_NAME}/proxy_functions.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}/proxy_functions.py
+	cp $(CCTOOLS_HOME)/taskvine/src/graph/${GRAPH_EXECUTOR_MODULE_NAME}/strategic_orchestration_graph.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}/strategic_orchestration_graph.py
 	cp $(CCTOOLS_HOME)/taskvine/src/graph/${GRAPH_EXECUTOR_MODULE_NAME}/params.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}/params.py
 	cp $(CCTOOLS_HOME)/taskvine/src/graph/${GRAPH_EXECUTOR_MODULE_NAME}/utils.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}/utils.py
 	@echo "# ${GRAPH_EXECUTOR_MODULE_NAME} package" > $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/${GRAPH_EXECUTOR_MODULE_NAME}/__init__.py

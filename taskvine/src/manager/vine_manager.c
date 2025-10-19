@@ -3686,6 +3686,7 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 			all_available = 0;
 		}
 	}
+
 	return all_available;
 }
 

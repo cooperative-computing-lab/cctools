@@ -6,7 +6,7 @@
 #include "list.h"
 #include "vine_manager.h"
 #include "set.h"
-#include "vine_task_node.h"
+#include "strategic_orchestration_node.h"
 #include "taskvine.h"
 
 
@@ -39,6 +39,7 @@ struct strategic_orchestration_graph {
     char *proxy_function_name;   // Python-side proxy function name (shared by all tasks)
 
     int prune_depth;
+    double checkpoint_fraction;  // 0 - 1, the fraction of intermediate results to checkpoint
 
     task_priority_mode_t task_priority_mode;  // priority mode for task graph task scheduling
     double failure_injection_step_percent;  // 0 - 100, the percentage of steps to inject failure
@@ -56,8 +57,9 @@ struct strategic_orchestration_graph *sog_create(struct vine_manager *q);
 /** Create a new node in the strategic orchestration graph.
 @param sog Reference to the strategic orchestration graph object.
 @param node_key Reference to the node key.
+@param is_target_key Reference to whether the node is a target key.
 */
-void sog_add_node(struct strategic_orchestration_graph *sog, const char *node_key);
+void sog_add_node(struct strategic_orchestration_graph *sog, const char *node_key, int is_target_key);
 
 /** Add a dependency between two nodes in the strategic orchestration graph.
 @param sog Reference to the strategic orchestration graph object.
@@ -78,18 +80,17 @@ void sog_compute_topology_metrics(struct strategic_orchestration_graph *sog);
 */
 double sog_get_node_heavy_score(const struct strategic_orchestration_graph *sog, const char *node_key);
 
-/** Set the type of the node-output file.
-@param sog Reference to the strategic orchestration graph object.
-@param node_key Reference to the node key.
-@param outfile_type Reference to the output file type.
-@param outfile_remote_name Reference to the output file remote name.
-*/
-void sog_set_node_outfile(struct strategic_orchestration_graph *sog, const char *node_key, vine_task_node_outfile_type_t outfile_type, const char *outfile_remote_name);
-
 /** Execute the task graph.
 @param sog Reference to the strategic orchestration graph object.
 */
 void sog_execute(struct strategic_orchestration_graph *sog);
+
+/** Get the outfile remote name of a node in the strategic orchestration graph.
+@param sog Reference to the strategic orchestration graph object.
+@param node_key Reference to the node key.
+@return The outfile remote name.
+*/
+const char *sog_get_node_outfile_remote_name(const struct strategic_orchestration_graph *sog, const char *node_key);
 
 /** Get the local outfile source of a node in the strategic orchestration graph.
 @param sog Reference to the strategic orchestration graph object.
@@ -103,23 +104,17 @@ const char *sog_get_node_local_outfile_source(const struct strategic_orchestrati
 */
 void sog_delete(struct strategic_orchestration_graph *sog);
 
-/** Set the Python-side proxy library name of the strategic orchestration graph.
+/** Get the proxy library name of the strategic orchestration graph.
 @param sog Reference to the strategic orchestration graph object.
-@param proxy_library_name Reference to the Python-side proxy library name.
-*/
-void sog_set_proxy_library_name(struct strategic_orchestration_graph *sog, const char *proxy_library_name);
-
-/** Get the library name of the strategic orchestration graph.
-@param sog Reference to the strategic orchestration graph object.
-@return The library name.
+@return The proxy library name.
 */
 const char *sog_get_proxy_library_name(const struct strategic_orchestration_graph *sog);
 
-/** Get the function name of the strategic orchestration graph.
+/** Set the proxy function name of the strategic orchestration graph.
 @param sog Reference to the strategic orchestration graph object.
-@return The function name.
+@param proxy_function_name Reference to the proxy function name.
 */
-const char *sog_get_proxy_function_name(const struct strategic_orchestration_graph *sog);
+void sog_set_proxy_function_name(struct strategic_orchestration_graph *sog, const char *proxy_function_name);
 
 /** Tune the strategic orchestration graph.
 @param sog Reference to the strategic orchestration graph object.

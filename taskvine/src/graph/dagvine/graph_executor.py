@@ -1,11 +1,11 @@
 
 from ndcctools.taskvine import cvine
-from ndcctools.taskvine.dagvine import cdagvine
 from ndcctools.taskvine.manager import Manager
-from ndcctools.taskvine.utils import delete_all_files, get_c_constant
+from ndcctools.taskvine.utils import delete_all_files
 
-from ndcctools.taskvine.dagvine.library import Library
-from ndcctools.taskvine.dagvine.runtime_execution_graph import RuntimeExecutionGraph
+from ndcctools.taskvine.dagvine.proxy_library import ProxyLibrary
+from ndcctools.taskvine.dagvine.runtime_execution_graph import RuntimeExecutionGraph, GraphKeyResult
+from ndcctools.taskvine.dagvine.strategic_orchestration_graph import StrategicOrchestrationGraph
 
 import cloudpickle
 import os
@@ -76,9 +76,9 @@ class GraphParams:
         self.sog_tuning_params = {
             "failure-injection-step-percent": -1,
             "priority-mode": "largest-input-first",
-            "proxy-function-name": "compute_single_key",
             "prune-depth": 1,
             "target-results-dir": "./target_results",
+            "checkpoint-fraction": 0,
         }
         self.other_params = {
             "schedule": "worst",
@@ -163,42 +163,9 @@ class GraphExecutor(Manager):
     def tune_sog(self, sog):
         for k, v in self.params.sog_tuning_params.items():
             print(f"Tuning {k} to {v}")
-            cdagvine.sog_tune(sog, k, str(v))
+            sog.tune(k, str(v))
 
-    def assign_outfile_types(self, target_keys, reg, sog):
-        assert reg is not None, "Runtime execution graph must be built first"
-        assert sog is not None, "Strategic orchestration graph must be built first"
-
-        # get heavy score from C side
-        heavy_scores = {}
-        for k in reg.task_dict.keys():
-            heavy_scores[k] = cdagvine.sog_get_node_heavy_score(sog, reg.vine_key_of[k])
-
-        # sort keys by heavy score descending
-        sorted_keys = sorted(heavy_scores, key=lambda k: heavy_scores[k], reverse=True)
-
-        # determine how many go to shared FS
-        sharedfs_count = round(self.param("outfile-type")["shared-file-system"] * len(sorted_keys))
-
-        # assign outfile types
-        for i, k in enumerate(sorted_keys):
-            if k in target_keys:
-                choice = "local"
-            elif i < sharedfs_count:
-                choice = "shared-file-system"
-            else:
-                choice = "temp"
-
-            reg.set_outfile_type_of(k, choice)
-            outfile_type_enum = get_c_constant(f"NODE_OUTFILE_TYPE_{choice.upper().replace('-', '_')}")
-            cdagvine.sog_set_node_outfile(
-                sog,
-                reg.vine_key_of[k],
-                outfile_type_enum,
-                reg.outfile_remote_name[k]
-            )
-
-    def build_python_graph(self):
+    def build_reg(self):
         reg = RuntimeExecutionGraph(
             self.task_dict,
             shared_file_system_dir=self.param("shared-file-system-dir"),
@@ -208,10 +175,12 @@ class GraphExecutor(Manager):
 
         return reg
 
-    def build_sog(self, reg):
+    def build_sog(self, reg, target_keys):
         assert reg is not None, "Python graph must be built before building the C graph"
 
-        sog = cdagvine.sog_create(self._taskvine)
+        sog = StrategicOrchestrationGraph(self._taskvine)
+
+        sog.set_proxy_function_name("compute_single_key")
 
         # C side vine task graph must be tuned before adding nodes and dependencies
         self.tune_vine_manager()
@@ -219,59 +188,66 @@ class GraphExecutor(Manager):
 
         topo_order = reg.get_topological_order()
         for k in topo_order:
-            cdagvine.sog_add_node(
-                sog,
-                reg.vine_key_of[k],
-            )
-            for pk in reg.parents_of[k]:
-                cdagvine.sog_add_dependency(sog, reg.vine_key_of[pk], reg.vine_key_of[k])
+            sog.add_node(reg.sog_node_key_of[k], int(k in target_keys))
+            for pk in reg.parents_of[k]:      #!!!!!!!!!!!!!!!!!!!!!!! TODO: fix sog-reg key mapping
+                sog.add_dependency(reg.sog_node_key_of[pk], reg.sog_node_key_of[k])
 
-        cdagvine.sog_compute_topology_metrics(sog)
+        sog.compute_topology_metrics()
 
         return sog
 
     def build_graphs(self, target_keys):
         # build Python DAG (logical topology)
-        reg = self.build_python_graph()
-
+        reg = self.build_reg()
         # build C DAG (physical topology)
-        sog = self.build_sog(reg)
+        sog = self.build_sog(reg, target_keys)
 
-        # assign outfile types
-        self.assign_outfile_types(target_keys, reg, sog)
+        # set outfile remote names in reg from sog, note that these names are automatically generated
+        # with regard to the checkpointing strategy and the shared file system directory
+        for sog_node_key in reg.sog_node_key_of.values():
+            outfile_remote_name = sog.get_node_outfile_remote_name(sog_node_key)
+            reg.set_outfile_remote_name_of(reg.reg_node_key_of[sog_node_key], outfile_remote_name)
 
         return reg, sog
 
-    def run(self, collection_dict, target_keys=None, params={}, hoisting_modules=[], env_files={}):
+    def create_proxy_library(self, reg, sog, hoisting_modules, env_files):
+        proxy_library = ProxyLibrary(self)
+        proxy_library.add_hoisting_modules(hoisting_modules)
+        proxy_library.add_env_files(env_files)
+        proxy_library.set_context_loader(RuntimeExecutionGraph.context_loader_func, context_loader_args=[cloudpickle.dumps(reg)])
+        proxy_library.set_libcores(self.param("libcores"))
+        proxy_library.set_name(sog.get_proxy_library_name())
+        proxy_library.install()
+
+        return proxy_library
+
+    def run(self, collection_dict, target_keys=[], params={}, hoisting_modules=[], env_files={}):
         # first update the params so that they can be used for the following construction
         self.update_params(params)
 
         self.task_dict = ensure_task_dict(collection_dict)
-        
-        # build graphs in both Python and C sides
+
+        # build graphs from both sides
         reg, sog = self.build_graphs(target_keys)
 
-        # create and install the library template on the manager
-        library = Library(self, self.param("libcores"))
-        library.add_hoisting_modules(hoisting_modules)
-        library.add_env_files(env_files)
-        library.set_context_loader(RuntimeExecutionGraph.context_loader_func, context_loader_args=[cloudpickle.dumps(reg)])
-        library.install()
-        cdagvine.sog_set_proxy_library_name(sog, library.get_name())
+        # create and install the proxy library on the manager
+        proxy_library = self.create_proxy_library(reg, sog, hoisting_modules, env_files)
 
         # execute the graph on the C side
         print(f"Executing task graph, logs will be written to {self.runtime_directory}")
-        cdagvine.sog_execute(sog)
+        sog.execute()
 
         # clean up the library instances and template on the manager
-        library.uninstall()
+        proxy_library.uninstall()
+
         # delete the C graph immediately after execution, so that the lifetime of this object is limited to the execution
-        cdagvine.sog_delete(sog)
+        sog.delete()
 
         # load results of target keys
         results = {}
         for k in target_keys:
-            results[k] = reg.load_result_of_key(k, target_results_dir=self.param("target-results-dir"))
+            outfile_path = os.path.join(self.param("target-results-dir"), reg.outfile_remote_name[k])
+            results[k] = GraphKeyResult.load_from_path(outfile_path)
         return results
 
     def _on_sigint(self, signum, frame):

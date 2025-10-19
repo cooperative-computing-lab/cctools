@@ -2,8 +2,6 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-from ndcctools.taskvine.utils import load_variable_from_library
-
 import os
 import hashlib
 import time
@@ -90,6 +88,16 @@ class GraphKeyResult:
         self.result = result
         self.extra_obj = bytearray(int(extra_size_mb * 1024 * 1024)) if extra_size_mb and extra_size_mb > 0 else None
 
+    @staticmethod
+    def load_from_path(path):
+        try:
+            with open(path, "rb") as f:
+                result_obj = cloudpickle.load(f)
+                assert isinstance(result_obj, GraphKeyResult), "Loaded object is not of type GraphKeyResult"
+                return result_obj.result
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Output file not found at {path}")
+
 
 class RuntimeExecutionGraph:
     """
@@ -117,21 +125,15 @@ class RuntimeExecutionGraph:
         self.parents_of, self.children_of = self._build_dependencies(self.task_dict)
         self.depth_of = self._calculate_depths()
 
-        self.vine_key_of = {k: hash_name(k) for k in task_dict.keys()}
-        self.key_of_vine_key = {hash_name(k): k for k in task_dict.keys()}
+        self.sog_node_key_of = {k: hash_name(k) for k in task_dict.keys()}
+        self.reg_node_key_of = {hash_name(k): k for k in task_dict.keys()}
 
-        self.outfile_remote_name = {key: f"{uuid.uuid4()}.pkl" for key in self.task_dict.keys()}
-        self.outfile_type = {key: None for key in self.task_dict.keys()}
+        # will be set from sog
+        self.outfile_remote_name = {key: None for key in self.task_dict.keys()}
 
         # testing params
         self.extra_task_output_size_mb = self._calculate_extra_size_mb_of(extra_task_output_size_mb)
         self.extra_sleep_time_of = self._calculate_extra_sleep_time_of(extra_task_sleep_time)
-
-    def set_outfile_type_of(self, k, outfile_type_str):
-        assert outfile_type_str in ["local", "shared-file-system", "temp"]
-        self.outfile_type[k] = outfile_type_str
-        if outfile_type_str == "shared-file-system":
-            self.outfile_remote_name[k] = os.path.join(self.shared_file_system_dir, self.outfile_remote_name[k])
 
     def _calculate_extra_size_mb_of(self, extra_task_output_size_mb):
         assert isinstance(extra_task_output_size_mb, list) and len(extra_task_output_size_mb) == 3
@@ -224,24 +226,12 @@ class RuntimeExecutionGraph:
             result_obj = GraphKeyResult(result, extra_size_mb=self.extra_task_output_size_mb[key])
             cloudpickle.dump(result_obj, f)
 
-    def load_result_of_key(self, key, target_results_dir=None):
-        if self.outfile_type[key] == "local":
-            # nodes with local outfile type will have their results stored in the target results directory
-            # when the execution is done, users can call this function to load the results from the target results directory
-            # note that data is transferred through the link in sequence, not in parallel through the shared file system
-            outfile_path = os.path.join(target_results_dir, self.outfile_remote_name[key])
-        else:
-            # workers user this branch to load results from either local or shared file system
-            # if a node-local output, then data is stored in the task sandbox and the remote name is just the filename
-            # if a shared file system output, then remote name is the full path to the file
-            outfile_path = self.outfile_remote_name[key]
-        try:
-            with open(outfile_path, "rb") as f:
-                result_obj = cloudpickle.load(f)
-                assert isinstance(result_obj, GraphKeyResult), "Loaded object is not of type GraphKeyResult"
-                return result_obj.result
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Output file for key {key} not found at {outfile_path}")
+    def load_result_of_key(self, key):
+        # workers user this function to load results from either local or shared file system
+        # if a node-local output, then data is stored in the task sandbox and the remote name is just the filename
+        # if a shared file system output, then remote name is the full path to the file
+        outfile_path = self.outfile_remote_name[key]
+        return GraphKeyResult.load_from_path(outfile_path)
 
     def get_topological_order(self):
         in_degree = {key: len(self.parents_of[key]) for key in self.task_dict.keys()}
@@ -264,12 +254,6 @@ class RuntimeExecutionGraph:
 
         return topo_order
 
-    def __del__(self):
-        if hasattr(self, 'outfile_remote_name') and self.outfile_remote_name:
-            for k in self.outfile_remote_name.keys():
-                if self.outfile_type.get(k) == "shared-file-system" and os.path.exists(self.outfile_remote_name[k]):
-                    os.remove(self.outfile_remote_name[k])
-
     @staticmethod
     def context_loader_func(reg_pkl):
         reg = cloudpickle.loads(reg_pkl)
@@ -281,106 +265,3 @@ class RuntimeExecutionGraph:
             "reg": reg,
         }
 
-
-def compute_dts_key(reg, k, v):
-    """
-    Compute the result of a Dask task node from dask._task_spec.
-
-    Each value `v` may be an instance of Task, Alias, or DataNode, all of which
-    inherit from the same base class. The `dependencies` field is a frozenset
-    containing direct dependencies only (no recursive ancestry).
-
-    The function resolves each dependency from the reg, constructs an
-    input dictionary, and then executes the node according to its type.
-    """
-    try:
-        import dask._task_spec as dts
-    except ImportError:
-        raise ImportError("Dask is not installed")
-
-    input_dict = {dep: reg.load_result_of_key(dep) for dep in v.dependencies}
-
-    try:
-        if isinstance(v, dts.Alias):
-            assert len(v.dependencies) == 1, "Expected exactly one dependency"
-            return reg.load_result_of_key(next(iter(v.dependencies)))
-        elif isinstance(v, dts.Task):
-            return v(input_dict)
-        elif isinstance(v, dts.DataNode):
-            return v.value
-        else:
-            raise TypeError(f"unexpected node type: {type(v)} for key {k}")
-    except Exception as e:
-        raise Exception(f"Error while executing task {k}: {e}")
-
-
-def compute_sexpr_key(reg, k, v):
-    """
-    Evaluate a symbolic expression (S-expression) task within the task graph.
-
-    Both DAGVine and legacy Dask represent computations as symbolic
-    expression trees (S-expressions). Each task value `v` encodes a nested
-    structure where:
-      - Leaf nodes are constants or task keys referencing parent results.
-      - Lists are recursively evaluated.
-      - Tuples of the form (func, arg1, arg2, ...) represent function calls.
-
-    This function builds an input dictionary from all parent keys, then
-    recursively resolves and executes the expression until a final value
-    is produced.
-    """
-    input_dict = {parent: reg.load_result_of_key(parent) for parent in reg.parents_of[k]}
-
-    def _rec_call(expr):
-        try:
-            if expr in input_dict.keys():
-                return input_dict[expr]
-        except TypeError:
-            pass
-        if isinstance(expr, list):
-            return [_rec_call(e) for e in expr]
-        if isinstance(expr, tuple) and len(expr) > 0 and callable(expr[0]):
-            res = expr[0](*[_rec_call(a) for a in expr[1:]])
-            return res
-        return expr
-
-    try:
-        return _rec_call(v)
-    except Exception as e:
-        raise Exception(f"Failed to invoke _rec_call(): {e}")
-
-
-def compute_single_key(vine_key):
-    """
-    Compute a single task identified by a Vine key within the current RuntimeExecutionGraph.
-
-    The function retrieves the corresponding graph key and task object from the
-    global reg, determines the task type, and dispatches to the appropriate
-    execution interface — e.g., `compute_dts_key` for Dask-style task specs or
-    `compute_sexpr_key` for S-expression graphs.
-
-    This design allows extensibility: for new graph representations, additional
-    compute interfaces can be introduced and registered here to handle new key types.
-
-    After computation, the result is saved, the output file is validated, and
-    an optional delay (`extra_sleep_time_of`) is applied before returning.
-    """
-    reg = load_variable_from_library('reg')
-
-    k = reg.key_of_vine_key[vine_key]
-    v = reg.task_dict[k]
-
-    if reg.is_dts_key(k):
-        result = compute_dts_key(reg, k, v)
-    else:
-        result = compute_sexpr_key(reg, k, v)
-
-    reg.save_result_of_key(k, result)
-    if not os.path.exists(reg.outfile_remote_name[k]):
-        raise Exception(f"Output file {reg.outfile_remote_name[k]} does not exist after writing")
-    if os.stat(reg.outfile_remote_name[k]).st_size == 0:
-        raise Exception(f"Output file {reg.outfile_remote_name[k]} is empty after writing")
-
-    time.sleep(reg.extra_sleep_time_of[k])
-
-    return True

@@ -20,10 +20,11 @@
 #include "timestamp.h"
 #include "progress_bar.h"
 #include "macros.h"
+#include "uuid.h"
 
+#include "strategic_orchestration_node.h"
 #include "strategic_orchestration_graph.h"
 #include "vine_manager.h"
-#include "vine_task_node.h"
 #include "vine_worker_info.h"
 #include "vine_task.h"
 #include "vine_file.h"
@@ -52,7 +53,7 @@ static void handle_sigint(int signal)
  * @param priority_mode Reference to the priority mode.
  * @return The priority.
  */
-static double vine_task_node_calculate_priority(struct vine_task_node *node, task_priority_mode_t priority_mode)
+static double calculate_task_priority(struct strategic_orchestration_node *node, task_priority_mode_t priority_mode)
 {
 	if (!node) {
 		return 0;
@@ -61,7 +62,7 @@ static double vine_task_node_calculate_priority(struct vine_task_node *node, tas
 	double priority = 0;
 	timestamp_t current_time = timestamp_get();
 
-	struct vine_task_node *parent_node;
+	struct strategic_orchestration_node *parent_node;
 
 	switch (priority_mode) {
 	case TASK_PRIORITY_MODE_RANDOM:
@@ -108,19 +109,23 @@ static double vine_task_node_calculate_priority(struct vine_task_node *node, tas
  * @param sog Reference to the strategic orchestration graph object.
  * @param node Reference to the node object.
  */
-static void submit_node_task(struct strategic_orchestration_graph *sog, struct vine_task_node *node)
+static void submit_node_task(struct strategic_orchestration_graph *sog, struct strategic_orchestration_node *node)
 {
 	if (!sog || !node) {
 		return;
 	}
 
 	/* calculate the priority of the node */
-	double priority = vine_task_node_calculate_priority(node, sog->task_priority_mode);
+	double priority = calculate_task_priority(node, sog->task_priority_mode);
 	vine_task_set_priority(node->task, priority);
+
 	/* submit the task to the manager */
 	int task_id = vine_submit(sog->manager, node->task);
+
 	/* insert the task id to the task id to node map */
 	itable_insert(sog->task_id_to_node, task_id, node);
+
+	debug(D_VINE, "submitted node %s with task id %d", node->node_key, task_id);
 
 	return;
 }
@@ -130,13 +135,13 @@ static void submit_node_task(struct strategic_orchestration_graph *sog, struct v
  * @param sog Reference to the strategic orchestration graph object.
  * @param node Reference to the node object.
  */
-static void submit_unblocked_children(struct strategic_orchestration_graph *sog, struct vine_task_node *node)
+static void submit_unblocked_children(struct strategic_orchestration_graph *sog, struct strategic_orchestration_node *node)
 {
 	if (!sog || !node) {
 		return;
 	}
 
-	struct vine_task_node *child_node; 
+	struct strategic_orchestration_node *child_node; 
 	LIST_ITERATE(node->children, child_node)
 	{
 		/* Remove this parent from the child's pending set if it exists */
@@ -176,7 +181,7 @@ static struct list *get_topological_order(struct strategic_orchestration_graph *
 	struct priority_queue *pq = priority_queue_create(total_nodes);
 
 	char *key;
-	struct vine_task_node *node;
+	struct strategic_orchestration_node *node;
 	HASH_TABLE_ITERATE(sog->nodes, key, node)
 	{
 		int deg = list_size(node->parents);
@@ -187,10 +192,10 @@ static struct list *get_topological_order(struct strategic_orchestration_graph *
 	}
 
 	while (priority_queue_size(pq) > 0) {
-		struct vine_task_node *current = priority_queue_pop(pq);
+		struct strategic_orchestration_node *current = priority_queue_pop(pq);
 		list_push_tail(topo_order, current);
 
-		struct vine_task_node *child;
+		struct strategic_orchestration_node *child;
 		LIST_ITERATE(current->children, child)
 		{
 			intptr_t raw_deg = (intptr_t)hash_table_lookup(in_degree_map, child->node_key);
@@ -215,7 +220,7 @@ static struct list *get_topological_order(struct strategic_orchestration_graph *
 			int deg = (int)raw_deg;
 			if (deg > 0) {
 				debug(D_ERROR, "  Node %s has in-degree %d. Parents:\n", key, deg);
-				struct vine_task_node *p;
+				struct strategic_orchestration_node *p;
 				LIST_ITERATE(node->parents, p)
 				{
 					debug(D_ERROR, "    -> %s\n", p->node_key);
@@ -250,7 +255,7 @@ static struct list *extract_weakly_connected_components(struct strategic_orchest
 	struct list *components = list_create();
 
 	char *node_key;
-	struct vine_task_node *node;
+	struct strategic_orchestration_node *node;
 	HASH_TABLE_ITERATE(sog->nodes, node_key, node)
 	{
 		if (set_lookup(visited, node)) {
@@ -265,9 +270,9 @@ static struct list *extract_weakly_connected_components(struct strategic_orchest
 		list_push_tail(component, node);
 
 		while (list_size(queue) > 0) {
-			struct vine_task_node *curr = list_pop_head(queue);
+			struct strategic_orchestration_node *curr = list_pop_head(queue);
 
-			struct vine_task_node *p;
+			struct strategic_orchestration_node *p;
 			LIST_ITERATE(curr->parents, p)
 			{
 				if (!set_lookup(visited, p)) {
@@ -277,7 +282,7 @@ static struct list *extract_weakly_connected_components(struct strategic_orchest
 				}
 			}
 
-			struct vine_task_node *c;
+			struct strategic_orchestration_node *c;
 			LIST_ITERATE(curr->children, c)
 			{
 				if (!set_lookup(visited, c)) {
@@ -301,7 +306,7 @@ static struct list *extract_weakly_connected_components(struct strategic_orchest
  * @param node Reference to the node object.
  * @return The heavy score.
  */
-static double compute_node_heavy_score(struct vine_task_node *node)
+static double compute_node_heavy_score(struct strategic_orchestration_node *node)
 {
 	if (!node) {
 		return 0;
@@ -319,7 +324,7 @@ static double compute_node_heavy_score(struct vine_task_node *node)
  * @param task Reference to the task object.
  * @return The node object.
  */
-static struct vine_task_node *get_node_by_task(struct strategic_orchestration_graph *sog, struct vine_task *task)
+static struct strategic_orchestration_node *get_node_by_task(struct strategic_orchestration_graph *sog, struct vine_task *task)
 {
 	if (!sog || !task) {
 		return NULL;
@@ -394,15 +399,17 @@ int sog_tune(struct strategic_orchestration_graph *sog, const char *name, const 
 		}
 		sog->target_results_dir = xxstrdup(value);
 
-	} else if (strcmp(name, "proxy-function-name") == 0) {
-		if (sog->proxy_function_name) {
-			free(sog->proxy_function_name);
-		}
-		sog->proxy_function_name = xxstrdup(value);
-
 	} else if (strcmp(name, "prune-depth") == 0) {
 		sog->prune_depth = atoi(value);
 		
+	} else if (strcmp(name, "checkpoint-fraction") == 0) {
+		double fraction = atof(value);
+		if (fraction < 0.0 || fraction > 1.0) {
+			debug(D_ERROR, "invalid checkpoint fraction: %s (must be between 0.0 and 1.0)", value);
+			return -1;
+		}
+		sog->checkpoint_fraction = fraction;
+
 	} else {
 		debug(D_ERROR, "invalid parameter name: %s", name);
 		return -1;
@@ -412,23 +419,30 @@ int sog_tune(struct strategic_orchestration_graph *sog, const char *name, const 
 	return 0;
 }
 
-void sog_set_proxy_library_name(struct strategic_orchestration_graph *sog, const char *proxy_library_name)
+/**
+ * Get the outfile remote name of a node in the strategic orchestration graph.
+ * @param sog Reference to the strategic orchestration graph object.
+ * @param node_key Reference to the node key.
+ * @return The outfile remote name.
+ */
+const char *sog_get_node_outfile_remote_name(const struct strategic_orchestration_graph *sog, const char *node_key)
 {
-	if (!sog || !proxy_library_name) {
-		return;
+	if (!sog || !node_key) {
+		return NULL;
 	}
 
-	if (sog->proxy_library_name) {
-		free(sog->proxy_library_name);
+	struct strategic_orchestration_node *node = hash_table_lookup(sog->nodes, node_key);
+	if (!node) {
+		return NULL;
 	}
 
-	sog->proxy_library_name = xxstrdup(proxy_library_name);
+	return node->outfile_remote_name;
 }
 
 /**
- * Get the proxy library name (Python-side), shared by all tasks.
+ * Get the proxy library name of the strategic orchestration graph.
  * @param sog Reference to the strategic orchestration graph object.
- * @return The library name.
+ * @return The proxy library name.
  */
 const char *sog_get_proxy_library_name(const struct strategic_orchestration_graph *sog)
 {
@@ -440,17 +454,21 @@ const char *sog_get_proxy_library_name(const struct strategic_orchestration_grap
 }
 
 /**
- * Get the proxy function name (Python-side), shared by all tasks.
+ * Set the proxy function name of the strategic orchestration graph.
  * @param sog Reference to the strategic orchestration graph object.
- * @return The function name.
+ * @param proxy_function_name Reference to the proxy function name.
  */
-const char *sog_get_proxy_function_name(const struct strategic_orchestration_graph *sog)
+void sog_set_proxy_function_name(struct strategic_orchestration_graph *sog, const char *proxy_function_name)
 {
-	if (!sog) {
-		return NULL;
+	if (!sog || !proxy_function_name) {
+		return;
 	}
 
-	return sog->proxy_function_name;
+	if (sog->proxy_function_name) {
+		free(sog->proxy_function_name);
+	}
+
+	sog->proxy_function_name = xxstrdup(proxy_function_name);
 }
 
 /**
@@ -465,7 +483,7 @@ double sog_get_node_heavy_score(const struct strategic_orchestration_graph *sog,
 		return -1;
 	}
 
-	struct vine_task_node *node = hash_table_lookup(sog->nodes, node_key);
+	struct strategic_orchestration_node *node = hash_table_lookup(sog->nodes, node_key);
 	if (!node) {
 		return -1;
 	}
@@ -486,7 +504,7 @@ const char *sog_get_node_local_outfile_source(const struct strategic_orchestrati
 		return NULL;
 	}
 
-	struct vine_task_node *node = hash_table_lookup(sog->nodes, node_key);
+	struct strategic_orchestration_node *node = hash_table_lookup(sog->nodes, node_key);
 	if (!node) {
 		debug(D_ERROR, "node %s not found", node_key);
 		exit(1);
@@ -502,7 +520,7 @@ const char *sog_get_node_local_outfile_source(const struct strategic_orchestrati
 
 /**
  * Compute the topology metrics of the strategic orchestration graph, including depth, height, upstream and downstream counts,
- * heavy scores, and weakly connected components.
+ * heavy scores, and weakly connected components. Must be called after all nodes and dependencies are added.
  * @param sog Reference to the strategic orchestration graph object.
  */
 void sog_compute_topology_metrics(struct strategic_orchestration_graph *sog)
@@ -518,9 +536,9 @@ void sog_compute_topology_metrics(struct strategic_orchestration_graph *sog)
 	}
 
 	char *node_key;
-	struct vine_task_node *node;
-	struct vine_task_node *parent_node;
-	struct vine_task_node *child_node;
+	struct strategic_orchestration_node *node;
+	struct strategic_orchestration_node *parent_node;
+	struct strategic_orchestration_node *child_node;
 
 	/* compute the depth of the node */
 	LIST_ITERATE(topo_order, node)
@@ -594,6 +612,57 @@ void sog_compute_topology_metrics(struct strategic_orchestration_graph *sog)
 		node->heavy_score = compute_node_heavy_score(node);
 	}
 
+	/* sort nodes using priority queue */
+	int total_nodes = list_size(topo_order);
+	int total_target_nodes = 0;
+	struct priority_queue *sorted_nodes = priority_queue_create(total_nodes);
+	LIST_ITERATE(topo_order, node)
+	{
+		if (node->is_target_key) {
+			total_target_nodes++;
+		}
+		priority_queue_push(sorted_nodes, node, node->heavy_score);
+	}
+	/* calculate the number of nodes to be checkpointed */
+	int checkpoint_count = (int)((total_nodes - total_target_nodes) * sog->checkpoint_fraction);
+	if (checkpoint_count < 0) {
+		checkpoint_count = 0;
+	}
+
+	/* assign outfile types to each node */
+	int assigned_checkpoint_count = 0;
+	while ((node = priority_queue_pop(sorted_nodes))) {
+		if (node->is_target_key) {
+			/* declare the output file as a vine_file so that it can be retrieved by the manager as usual */
+			node->outfile_type = VINE_NODE_OUTFILE_TYPE_LOCAL;
+			char *local_outfile_path = string_format("%s/%s", sog->target_results_dir, node->outfile_remote_name);
+			node->outfile = vine_declare_file(node->manager, local_outfile_path, VINE_CACHE_LEVEL_WORKFLOW, 0);
+			free(local_outfile_path);
+			continue;
+		}
+		if (assigned_checkpoint_count < checkpoint_count) {
+			/* checkpointed files will be written directly to the shared file system, no need to manage them in the manager */
+			node->outfile_type = VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM;
+			char *shared_file_system_outfile_path = string_format("%s/%s", sog->target_results_dir, node->outfile_remote_name);
+			free(node->outfile_remote_name);
+			node->outfile_remote_name = shared_file_system_outfile_path;
+			node->outfile = NULL;
+			assigned_checkpoint_count++;
+		} else {
+			/* other nodes will be declared as temp files to leverage node-local storage */
+			node->outfile_type = VINE_NODE_OUTFILE_TYPE_TEMP;
+			node->outfile = vine_declare_temp(sog->manager);
+		}
+	}
+	/* track the output dependencies of regular and vine_temp nodes */
+	LIST_ITERATE(topo_order, node)
+	{
+		if (node->outfile) {
+			vine_task_add_output(node->task, node->outfile, node->outfile_remote_name, VINE_TRANSFER_ALWAYS);
+		}
+	}
+	priority_queue_delete(sorted_nodes);
+
 	/* extract weakly connected components */
 	struct list *weakly_connected_components = extract_weakly_connected_components(sog);
 	struct list *component;
@@ -616,19 +685,21 @@ void sog_compute_topology_metrics(struct strategic_orchestration_graph *sog)
  * Create a new node and track it in the strategic orchestration graph.
  * @param sog Reference to the strategic orchestration graph object.
  * @param node_key Reference to the node key.
+ * @param is_target_key Reference to whether the node is a target key.
  * @return A new node object.
  */
-void sog_add_node(struct strategic_orchestration_graph *sog, const char *node_key)
+void sog_add_node(struct strategic_orchestration_graph *sog, const char *node_key, int is_target_key)
 {
 	if (!sog || !node_key) {
 		return;
 	}
 
 	/* if the node already exists, skip creating a new one */
-	struct vine_task_node *node = hash_table_lookup(sog->nodes, node_key);
+	struct strategic_orchestration_node *node = hash_table_lookup(sog->nodes, node_key);
 	if (!node) {
-		node = vine_task_node_create(sog->manager,
+		node = son_create(sog->manager,
 				node_key,
+				is_target_key,
 				sog->proxy_library_name,
 				sog->proxy_function_name,
 				sog->target_results_dir,
@@ -651,6 +722,10 @@ void sog_add_node(struct strategic_orchestration_graph *sog, const char *node_ke
  */
 struct strategic_orchestration_graph *sog_create(struct vine_manager *q)
 {
+	if (!q) {
+		return NULL;
+	}
+
 	struct strategic_orchestration_graph *sog = xxmalloc(sizeof(struct strategic_orchestration_graph));
 
 	sog->manager = q;
@@ -660,7 +735,11 @@ struct strategic_orchestration_graph *sog_create(struct vine_manager *q)
 	sog->outfile_cachename_to_node = hash_table_create(0, 0);
 
 	sog->target_results_dir = xxstrdup(sog->manager->runtime_directory);  // default to current working directory
-	sog->proxy_library_name = NULL;
+
+	cctools_uuid_t proxy_library_name_id;
+	cctools_uuid_create(&proxy_library_name_id);
+	sog->proxy_library_name = xxstrdup(proxy_library_name_id.str);
+
 	sog->proxy_function_name = NULL;
 
 	sog->prune_depth = 1;
@@ -690,12 +769,12 @@ void sog_add_dependency(struct strategic_orchestration_graph *sog, const char *p
 		return;
 	}
 
-	struct vine_task_node *parent_node = hash_table_lookup(sog->nodes, parent_key);
-	struct vine_task_node *child_node = hash_table_lookup(sog->nodes, child_key);
+	struct strategic_orchestration_node *parent_node = hash_table_lookup(sog->nodes, parent_key);
+	struct strategic_orchestration_node *child_node = hash_table_lookup(sog->nodes, child_key);
 	if (!parent_node) {
 		debug(D_ERROR, "parent node %s not found", parent_key);
 		char *node_key = NULL;
-		struct vine_task_node *node;
+		struct strategic_orchestration_node *node;
 		printf("parent_keys:\n");
 		HASH_TABLE_ITERATE(sog->nodes, node_key, node)
 		{
@@ -710,30 +789,6 @@ void sog_add_dependency(struct strategic_orchestration_graph *sog, const char *p
 
 	list_push_tail(child_node->parents, parent_node);
 	list_push_tail(parent_node->children, child_node);
-
-	return;
-}
-
-/**
- * Set the outfile of a node in the strategic orchestration graph.
- * This involves declaring the output file and adding it to the task.
- * @param sog Reference to the strategic orchestration graph object.
- * @param node_key Reference to the node key.
- * @param outfile_type Reference to the outfile type.
- * @param outfile_remote_name Reference to the outfile remote name that the task will generate remotely.
- */
-void sog_set_node_outfile(struct strategic_orchestration_graph *sog, const char *node_key, vine_task_node_outfile_type_t outfile_type, const char *outfile_remote_name)
-{
-	if (!sog || !node_key || !outfile_remote_name) {
-		return;
-	}
-
-	struct vine_task_node *node = hash_table_lookup(sog->nodes, node_key);
-	if (!node) {
-		return;
-	}
-
-	vine_task_node_set_outfile(node, outfile_type, outfile_remote_name);
 
 	return;
 }
@@ -754,10 +809,10 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 
 	/* print the info of all nodes */
 	char *node_key;
-	struct vine_task_node *node;
+	struct strategic_orchestration_node *node;
 	HASH_TABLE_ITERATE(sog->nodes, node_key, node)
 	{
-		vine_task_node_print_info(node);
+		son_print_info(node);
 	}
 
 	/* enable return recovery tasks */
@@ -775,7 +830,7 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 	struct list *topo_order = get_topological_order(sog);
 	LIST_ITERATE(topo_order, node)
 	{
-		struct vine_task_node *parent_node;
+		struct strategic_orchestration_node *parent_node;
 		LIST_ITERATE(node->parents, parent_node)
 		{
 			if (parent_node->outfile) {
@@ -787,7 +842,7 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 	/* initialize pending_parents for all nodes */
 	HASH_TABLE_ITERATE(sog->nodes, node_key, node)
 	{
-		struct vine_task_node *parent_node;
+		struct strategic_orchestration_node *parent_node;
 		LIST_ITERATE(node->parents, parent_node)
 		{
 			if (node->pending_parents) {
@@ -831,7 +886,7 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 			wait_timeout = 0;
 
 			/* get the original node by task id */
-			struct vine_task_node *node = get_node_by_task(sog, task);
+			struct strategic_orchestration_node *node = get_node_by_task(sog, task);
 			if (!node) {
 				debug(D_ERROR, "fatal: task %d could not be mapped to a task node, this indicates a serious bug.", task->task_id);
 				exit(1);
@@ -882,7 +937,7 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 			node->completed = 1;
 
 			/* prune nodes on task completion */
-			vine_task_node_prune_ancestors(node);
+			son_prune_ancestors(node);
 
 			/* skip recovery tasks */
 			if (task->type == VINE_TASK_TYPE_RECOVERY) {
@@ -896,7 +951,7 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 			}
 
 			/* update critical time */
-			vine_task_node_update_critical_time(node, task->time_workers_execute_last);
+			son_update_critical_time(node, task->time_workers_execute_last);
 
 			/* mark this regular task as completed */
 			progress_bar_update_part(pbar, regular_tasks_part, 1);
@@ -913,7 +968,7 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 			/* enqueue the output file for replication */
 			switch (node->outfile_type) {
 			case VINE_NODE_OUTFILE_TYPE_TEMP:
-				vine_task_node_replicate_outfile(node);
+				son_replicate_outfile(node);
 				break;
 			case VINE_NODE_OUTFILE_TYPE_LOCAL:
 			case VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM:
@@ -962,7 +1017,7 @@ void sog_delete(struct strategic_orchestration_graph *sog)
 	}
 
 	char *node_key;
-	struct vine_task_node *node;
+	struct strategic_orchestration_node *node;
 	HASH_TABLE_ITERATE(sog->nodes, node_key, node)
 	{
 		if (node->infile) {
@@ -974,7 +1029,10 @@ void sog_delete(struct strategic_orchestration_graph *sog)
 			hash_table_remove(sog->outfile_cachename_to_node, node->outfile->cached_name);
 			hash_table_remove(sog->manager->file_table, node->outfile->cached_name);
 		}
-		vine_task_node_delete(node);
+		if (node->outfile_type == VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM) {
+			unlink(node->outfile_remote_name);
+		}
+		son_delete(node);
 	}
 
 	free(sog->proxy_library_name);
