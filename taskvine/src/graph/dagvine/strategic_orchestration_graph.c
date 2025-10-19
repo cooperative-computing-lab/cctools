@@ -31,7 +31,6 @@
 #include "vine_mount.h"
 #include "taskvine.h"
 
-
 static volatile sig_atomic_t interrupted = 0;
 
 /*************************************************************/
@@ -45,6 +44,23 @@ static volatile sig_atomic_t interrupted = 0;
 static void handle_sigint(int signal)
 {
 	interrupted = 1;
+}
+
+/**
+ * Compute a lexicographic priority score from the node key.
+ * Used during topological sorting to break ties deterministically.
+ * @param key Reference to the node key.
+ * @return The lexical priority.
+ */
+static double compute_lex_priority(const char *key)
+{
+	double score = 0.0;
+	double factor = 1.0;
+	for (int i = 0; i < 8 && key[i] != '\0'; i++) {
+		score += (unsigned char)key[i] * factor;
+		factor *= 0.01;
+	}
+	return -score;
 }
 
 /**
@@ -141,7 +157,7 @@ static void submit_unblocked_children(struct strategic_orchestration_graph *sog,
 		return;
 	}
 
-	struct strategic_orchestration_node *child_node; 
+	struct strategic_orchestration_node *child_node;
 	LIST_ITERATE(node->children, child_node)
 	{
 		/* Remove this parent from the child's pending set if it exists */
@@ -355,7 +371,7 @@ static struct strategic_orchestration_node *get_node_by_task(struct strategic_or
 /*************************************************************/
 
 /** Tune the strategic orchestration graph.
-*@param sog Reference to the strategic orchestration graph object.
+ *@param sog Reference to the strategic orchestration graph object.
  *@param name Reference to the name of the parameter to tune.
  *@param value Reference to the value of the parameter to tune.
  *@return 0 on success, -1 on failure.
@@ -387,7 +403,7 @@ int sog_tune(struct strategic_orchestration_graph *sog, const char *name, const 
 		} else {
 			debug(D_ERROR, "invalid priority mode: %s", value);
 			return -1;
-		}		
+		}
 
 	} else if (strcmp(name, "target-results-dir") == 0) {
 		if (sog->target_results_dir) {
@@ -401,7 +417,7 @@ int sog_tune(struct strategic_orchestration_graph *sog, const char *name, const 
 
 	} else if (strcmp(name, "prune-depth") == 0) {
 		sog->prune_depth = atoi(value);
-		
+
 	} else if (strcmp(name, "checkpoint-fraction") == 0) {
 		double fraction = atof(value);
 		if (fraction < 0.0 || fraction > 1.0) {
@@ -413,7 +429,6 @@ int sog_tune(struct strategic_orchestration_graph *sog, const char *name, const 
 	} else {
 		debug(D_ERROR, "invalid parameter name: %s", name);
 		return -1;
-
 	}
 
 	return 0;
@@ -729,12 +744,12 @@ struct strategic_orchestration_graph *sog_create(struct vine_manager *q)
 	struct strategic_orchestration_graph *sog = xxmalloc(sizeof(struct strategic_orchestration_graph));
 
 	sog->manager = q;
-	
+
 	sog->nodes = hash_table_create(0, 0);
 	sog->task_id_to_node = itable_create(0);
 	sog->outfile_cachename_to_node = hash_table_create(0, 0);
 
-	sog->target_results_dir = xxstrdup(sog->manager->runtime_directory);  // default to current working directory
+	sog->target_results_dir = xxstrdup(sog->manager->runtime_directory); // default to current working directory
 
 	cctools_uuid_t proxy_library_name_id;
 	cctools_uuid_create(&proxy_library_name_id);

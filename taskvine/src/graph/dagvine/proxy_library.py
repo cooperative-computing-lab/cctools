@@ -1,4 +1,15 @@
-import os, uuid, cloudpickle, types, time, random, hashlib, collections
+# Copyright (C) 2025- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+
+import os
+import uuid
+import cloudpickle
+import types
+import time
+import random
+import hashlib
+import collections
 from ndcctools.taskvine.dagvine.runtime_execution_graph import (
     GraphKeyResult, RuntimeExecutionGraph, hash_name, hashable
 )

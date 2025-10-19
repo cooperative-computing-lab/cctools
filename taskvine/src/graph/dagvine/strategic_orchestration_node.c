@@ -25,24 +25,6 @@
 #include "strategic_orchestration_node.h"
 #include "taskvine.h"
 
-
-/**
- * Compute a lexicographic priority score from the node key.
- * Used during topological sorting to break ties deterministically.
- * @param key Reference to the node key.
- * @return The lexical priority.
- */
-double compute_lex_priority(const char *key)
-{
-	double score = 0.0;
-	double factor = 1.0;
-	for (int i = 0; i < 8 && key[i] != '\0'; i++) {
-		score += (unsigned char)key[i] * factor;
-		factor *= 0.01;
-	}
-	return -score;
-}
-
 /**
  * Create a new node object.
  * @param manager Reference to the manager object.

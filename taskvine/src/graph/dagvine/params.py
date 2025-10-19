@@ -4,7 +4,7 @@ from ndcctools.taskvine.utils import get_c_constant
 
 @dataclass
 class ManagerTuningParams:
-    """These parameters are used to tune the manager at the C level 
+    """These parameters are used to tune the manager at the C level
     and should comply with the TaskVine manager API."""
     worker_source_max_transfers: int = 100
     max_retrievals: int = -1

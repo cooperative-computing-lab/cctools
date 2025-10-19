@@ -1,4 +1,9 @@
-import os, time
+# Copyright (C) 2025- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+
+import os
+import time
 from ndcctools.taskvine.utils import load_variable_from_library
 
 
@@ -87,7 +92,7 @@ def compute_single_key(vine_key):
     """
     reg = load_variable_from_library('reg')
 
-    k = reg.reg_node_key_of[vine_key]
+    k = reg.sog_key_to_reg_key[vine_key]
     v = reg.task_dict[k]
 
     if reg.is_dts_key(k):

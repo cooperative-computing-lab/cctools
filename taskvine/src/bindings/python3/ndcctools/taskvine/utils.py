@@ -3,10 +3,6 @@
 # See the file COPYING for details.
 
 from . import cvine
-try:
-    from .dagvine import cdagvine
-except Exception:
-    cdagvine = None
 
 import os
 
@@ -20,11 +16,6 @@ def get_c_constant(constant):
     value = getattr(cvine, constant, None)
     if value is not None:
         return value
-    # Fallback to cdagvine if available (for DAG-specific constants)
-    if cdagvine is not None:
-        value = getattr(cdagvine, constant, None)
-        if value is not None:
-            return value
     # If still missing, raise a clear error
     raise AttributeError(f"C constant {constant} not found in cvine or cdagvine")
 

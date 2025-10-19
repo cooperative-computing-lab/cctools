@@ -4,7 +4,9 @@ include ../../../../rules.mk
 LOCAL_LINKAGE+=${CCTOOLS_HOME}/taskvine/src/manager/libtaskvine.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
 LOCAL_CCFLAGS+=-I ${CCTOOLS_HOME}/taskvine/src/manager
 
- 
+
+DAGVINE_SOURCE_DIR = $(CCTOOLS_HOME)/taskvine/src/graph/dagvine
+
 
 SOURCES = strategic_orchestration_node.c strategic_orchestration_graph.c
 OBJECTS = $(SOURCES:%.c=%.o)
@@ -15,7 +17,7 @@ SWIG_I = strategic_orchestration_graph.i
 BUILD_DIR := build
 SWIG_WRAP = $(BUILD_DIR)/strategic_orchestration_graph_wrap.c
 WRAP_OBJ = $(BUILD_DIR)/strategic_orchestration_graph_wrap.o
-PYMODULE = $(BUILD_DIR)/_cdagvine.$(CCTOOLS_DYNAMIC_SUFFIX)
+PYMODULE = $(BUILD_DIR)/_capi.$(CCTOOLS_DYNAMIC_SUFFIX)
 
 LIBRARIES =
 PYDEPS = $(WRAP_OBJ) $(OBJECTS)
@@ -54,18 +56,27 @@ install: all
 	cp ${CCTOOLS_HOME}/taskvine/src/manager/taskvine.h $(CCTOOLS_INSTALL_DIR)/graph/dagvine/include/
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/dagvine
 	cp $(PYMODULE) $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/dagvine/
-	cp $(BUILD_DIR)/cdagvine.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/dagvine/
-	# remove build artifacts after installation
-	rm -rf $(BUILD_DIR)
+	cp $(BUILD_DIR)/capi.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/dagvine/
 
 clean:
-	rm -rf $(PROGRAMS) $(OBJECTS) *.o $(BUILD_DIR) $(PYMODULE) cdagvine.py
+	rm -rf $(PROGRAMS) $(OBJECTS) *.o $(BUILD_DIR) $(PYMODULE) capi.py
 
 test: all
 
 lint:
+	if ( ! clang-format -Werror --dry-run --style='file:${CCTOOLS_HOME}/.clang-format' $(DAGVINE_SOURCE_DIR)/*.c $(DAGVINE_SOURCE_DIR)/*.h);\
+	then\
+		echo  "========================================================";\
+		echo  "NOTICE: Run \`make format\` to format your latest changes.";\
+		echo  "========================================================";\
+		exit 1;\
+	fi
+	flake8 --ignore=$(CCTOOLS_FLAKE8_IGNORE_ERRORS) \
+		--exclude=$(CCTOOLS_FLAKE8_IGNORE_FILES),$(BUILD_DIR) \
+		$(DAGVINE_SOURCE_DIR)/
 
 format:
+	clang-format -i $(DAGVINE_SOURCE_DIR)/*.c $(DAGVINE_SOURCE_DIR)/*.h
 
 .PHONY: all clean install test lint format
 

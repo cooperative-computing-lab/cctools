@@ -9,42 +9,39 @@
 #include "strategic_orchestration_node.h"
 #include "taskvine.h"
 
-
 /** Select priority algorithm for strategic orchestration graph task scheduling. */
 typedef enum {
-    TASK_PRIORITY_MODE_RANDOM = 0,          /**< Assign random priority to tasks */
-    TASK_PRIORITY_MODE_DEPTH_FIRST,         /**< Prioritize deeper tasks first */
-    TASK_PRIORITY_MODE_BREADTH_FIRST,       /**< Prioritize shallower tasks first */
-    TASK_PRIORITY_MODE_FIFO,                /**< First in, first out priority */
-    TASK_PRIORITY_MODE_LIFO,                /**< Last in, first out priority */
-    TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST, /**< Prioritize tasks with larger inputs first */
-    TASK_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST /**< Prioritize tasks with larger storage footprint first */
+	TASK_PRIORITY_MODE_RANDOM = 0,			   /**< Assign random priority to tasks */
+	TASK_PRIORITY_MODE_DEPTH_FIRST,			   /**< Prioritize deeper tasks first */
+	TASK_PRIORITY_MODE_BREADTH_FIRST,		   /**< Prioritize shallower tasks first */
+	TASK_PRIORITY_MODE_FIFO,			   /**< First in, first out priority */
+	TASK_PRIORITY_MODE_LIFO,			   /**< Last in, first out priority */
+	TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST,		   /**< Prioritize tasks with larger inputs first */
+	TASK_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST /**< Prioritize tasks with larger storage footprint first */
 } task_priority_mode_t;
-
 
 /** The strategic orchestration graph object (logical scheduling layer). */
 struct strategic_orchestration_graph {
-    struct vine_manager *manager;
+	struct vine_manager *manager;
 	struct hash_table *nodes;
 	struct itable *task_id_to_node;
 	struct hash_table *outfile_cachename_to_node;
 
-    /* Results of target keys will be stored in this directory. 
-     * This dir path can not necessarily be a shared file system directory,
-     * output files will be retrieved through the network instead,
-     * as long as the manager can access it. */
-    char *target_results_dir;
+	/* Results of target keys will be stored in this directory.
+	 * This dir path can not necessarily be a shared file system directory,
+	 * output files will be retrieved through the network instead,
+	 * as long as the manager can access it. */
+	char *target_results_dir;
 
-    char *proxy_library_name;    // Python-side proxy library name (shared by all tasks)
-    char *proxy_function_name;   // Python-side proxy function name (shared by all tasks)
+	char *proxy_library_name;  // Python-side proxy library name (shared by all tasks)
+	char *proxy_function_name; // Python-side proxy function name (shared by all tasks)
 
-    int prune_depth;
-    double checkpoint_fraction;  // 0 - 1, the fraction of intermediate results to checkpoint
+	int prune_depth;
+	double checkpoint_fraction; // 0 - 1, the fraction of intermediate results to checkpoint
 
-    task_priority_mode_t task_priority_mode;  // priority mode for task graph task scheduling
-    double failure_injection_step_percent;  // 0 - 100, the percentage of steps to inject failure
+	task_priority_mode_t task_priority_mode; // priority mode for task graph task scheduling
+	double failure_injection_step_percent;	 // 0 - 100, the percentage of steps to inject failure
 };
-
 
 /* Public APIs for operating the strategic orchestration graph */
 

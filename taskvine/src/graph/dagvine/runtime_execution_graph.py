@@ -4,10 +4,8 @@
 
 import os
 import hashlib
-import time
 import cloudpickle
 import collections
-import uuid
 import random
 from collections import deque
 
@@ -125,8 +123,8 @@ class RuntimeExecutionGraph:
         self.parents_of, self.children_of = self._build_dependencies(self.task_dict)
         self.depth_of = self._calculate_depths()
 
-        self.sog_node_key_of = {k: hash_name(k) for k in task_dict.keys()}
-        self.reg_node_key_of = {hash_name(k): k for k in task_dict.keys()}
+        self.reg_key_to_sog_key = {k: hash_name(k) for k in task_dict.keys()}
+        self.sog_key_to_reg_key = {hash_name(k): k for k in task_dict.keys()}
 
         # will be set from sog
         self.outfile_remote_name = {key: None for key in self.task_dict.keys()}
@@ -264,4 +262,3 @@ class RuntimeExecutionGraph:
         return {
             "reg": reg,
         }
-
