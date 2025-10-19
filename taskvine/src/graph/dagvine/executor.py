@@ -29,13 +29,6 @@ except ImportError:
     dts = None
 
 
-def hash_name(*args):
-    out_str = ""
-    for arg in args:
-        out_str += str(arg)
-    return hashlib.sha256(out_str.encode('utf-8')).hexdigest()[:32]
-
-
 # convert Dask collection to task dictionary
 def dask_collections_to_task_dict(collection_dict):
     assert is_dask_collection is not None
@@ -165,9 +158,9 @@ class Executor(Manager):
             print(f"Tuning {k} to {v}")
             sog.tune(k, str(v))
 
-    def build_reg(self):
+    def build_reg(self, task_dict):
         reg = RuntimeExecutionGraph(
-            self.task_dict,
+            task_dict,
             extra_task_output_size_mb=self.param("extra-task-output-size-mb"),
             extra_task_sleep_time=self.param("extra-task-sleep-time")
         )
@@ -195,9 +188,9 @@ class Executor(Manager):
 
         return sog
 
-    def build_graphs(self, target_keys):
+    def build_graphs(self, task_dict, target_keys):
         # build Python DAG (logical topology)
-        reg = self.build_reg()
+        reg = self.build_reg(task_dict)
         # build C DAG (physical topology)
         sog = self.build_sog(reg, target_keys)
 
@@ -223,10 +216,10 @@ class Executor(Manager):
         # first update the params so that they can be used for the following construction
         self.update_params(params)
 
-        self.task_dict = ensure_task_dict(collection_dict)
+        task_dict = ensure_task_dict(collection_dict)
 
         # build graphs from both sides
-        reg, sog = self.build_graphs(target_keys)
+        reg, sog = self.build_graphs(task_dict, target_keys)
 
         # create and install the proxy library on the manager
         proxy_library = self.create_proxy_library(reg, sog, hoisting_modules, env_files)
