@@ -2,7 +2,6 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-import os
 import hashlib
 import cloudpickle
 import collections

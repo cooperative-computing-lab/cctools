@@ -11,7 +11,6 @@ from ndcctools.taskvine.dagvine.strategic_orchestration_graph import StrategicOr
 import cloudpickle
 import os
 import signal
-import hashlib
 
 try:
     import dask
@@ -149,7 +148,7 @@ class Executor(Manager):
         for k, v in self.params.vine_manager_tuning_params.items():
             try:
                 self.tune(k, v)
-            except:
+            except Exception:
                 raise ValueError(f"Unrecognized parameter: {k}")
 
     def tune_sog(self, sog):
