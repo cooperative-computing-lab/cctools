@@ -147,7 +147,6 @@ class Executor(Manager):
 
     def tune_manager(self):
         for k, v in self.params.vine_manager_tuning_params.items():
-            print(f"Tuning {k} to {v}")
             try:
                 self.tune(k, v)
             except:
@@ -155,7 +154,6 @@ class Executor(Manager):
 
     def tune_sog(self, sog):
         for k, v in self.params.sog_tuning_params.items():
-            print(f"Tuning {k} to {v}")
             sog.tune(k, str(v))
 
     def build_reg(self, task_dict):

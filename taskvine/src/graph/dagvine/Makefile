@@ -36,11 +36,11 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 $(SWIG_WRAP): $(SWIG_I) strategic_orchestration_graph.h | $(BUILD_DIR)
-	$(CCTOOLS_SWIG) -python -threads -relativeimport -I$(CCTOOLS_HOME)/taskvine/src/manager -I$(CCTOOLS_HOME)/dttools/src -outdir $(BUILD_DIR) -o $@ $<
+	$(CCTOOLS_SWIG) -python -threads -relativeimport -I$(CCTOOLS_HOME)/taskvine/src/manager -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/taskvine/src/graph/dagvine -outdir $(BUILD_DIR) -o $@ $<
 
-# Build Python module
+# Build Python module (mimic bindings: silence SWIG warnings and build PIC)
 $(WRAP_OBJ): $(SWIG_WRAP)
-	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(CCTOOLS_PYTHON3_CCFLAGS) $(LOCAL_CCFLAGS) -Wno-error=cast-function-type $<
+	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $(CCTOOLS_PYTHON3_CCFLAGS) -w -fPIC -DNDEBUG $<
 
 $(PYMODULE): $(PYDEPS)
 ifeq ($(CCTOOLS_STATIC),1)
