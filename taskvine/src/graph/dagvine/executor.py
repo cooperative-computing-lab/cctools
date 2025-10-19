@@ -84,22 +84,18 @@ class GraphParams:
         }
         self.sog_tuning_params = {
             "failure-injection-step-percent": -1,
-            "priority-mode": "largest-input-first",
+            "task-priority-mode": "largest-input-first",
             "prune-depth": 1,
-            "target-results-dir": "./target_results",
+            "output-dir": "./outputs",
+            "checkpoint-dir": "./checkpoints",
             "checkpoint-fraction": 0,
         }
         self.other_params = {
             "schedule": "worst",
             "libcores": 16,
             "failure-injection-step-percent": -1,
-            "shared-file-system-dir": "./shared_file_system",
             "extra-task-output-size-mb": ["uniform", 0, 0],
             "extra-task-sleep-time": ["uniform", 0, 0],
-            "outfile-type": {
-                "temp": 1.0,
-                "shared-file-system": 0.0,
-            },
         }
 
     def update_param(self, param_name, new_value):
@@ -159,7 +155,10 @@ class Executor(Manager):
     def tune_manager(self):
         for k, v in self.params.vine_manager_tuning_params.items():
             print(f"Tuning {k} to {v}")
-            self.tune(k, v)
+            try:
+                self.tune(k, v)
+            except:
+                raise ValueError(f"Unrecognized parameter: {k}")
 
     def tune_sog(self, sog):
         for k, v in self.params.sog_tuning_params.items():
@@ -169,7 +168,6 @@ class Executor(Manager):
     def build_reg(self):
         reg = RuntimeExecutionGraph(
             self.task_dict,
-            shared_file_system_dir=self.param("shared-file-system-dir"),
             extra_task_output_size_mb=self.param("extra-task-output-size-mb"),
             extra_task_sleep_time=self.param("extra-task-sleep-time")
         )
@@ -247,7 +245,7 @@ class Executor(Manager):
         # load results of target keys
         results = {}
         for k in target_keys:
-            outfile_path = os.path.join(self.param("target-results-dir"), reg.outfile_remote_name[k])
+            outfile_path = os.path.join(self.param("output-dir"), reg.outfile_remote_name[k])
             results[k] = GraphKeyResult.load_from_path(outfile_path)
         return results
 

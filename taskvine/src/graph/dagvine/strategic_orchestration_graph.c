@@ -30,6 +30,7 @@
 #include "vine_file.h"
 #include "vine_mount.h"
 #include "taskvine.h"
+#include "vine_temp.h"
 
 static volatile sig_atomic_t interrupted = 0;
 
@@ -366,6 +367,169 @@ static struct strategic_orchestration_node *get_node_by_task(struct strategic_or
 	return NULL;
 }
 
+/**
+ * Prune the ancestors of a persisted node. This is only used for persisted nodes that produce persisted files.
+ * All ancestors we consider here include both temp nodes and persisted nodes, becasue data written to shared file system
+ * is safe and can definitely trigger upstream data redundancy to be released.
+ * @param sog Reference to the strategic orchestration graph object.
+ * @param node Reference to the node object.
+ * @return The number of pruned replicas.
+ */
+static int prune_ancestors_of_persisted_node(struct strategic_orchestration_graph *sog, struct strategic_orchestration_node *node)
+{
+	if (!sog || !node) {
+		return -1;
+	}
+
+	/* find all safe ancestors */
+	struct set *safe_ancestors = son_find_safe_ancestors(node);
+	if (!safe_ancestors) {
+		return 0;
+	}
+
+	int pruned_replica_count = 0;
+
+	timestamp_t start_time = timestamp_get();
+
+	/* prune all safe ancestors */
+	struct strategic_orchestration_node *ancestor_node;
+	SET_ITERATE(safe_ancestors, ancestor_node)
+	{
+		switch (ancestor_node->outfile_type) {
+		case NODE_OUTFILE_TYPE_LOCAL:
+			/* do not prune the local file */
+			break;
+		case NODE_OUTFILE_TYPE_TEMP:
+			/* prune the temp file */
+			vine_prune_file(sog->manager, ancestor_node->outfile);
+			break;
+		case NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM:
+			/* unlink directly from the shared file system */
+			unlink(ancestor_node->outfile_remote_name);
+			break;
+		}
+		ancestor_node->prune_status = PRUNE_STATUS_SAFE;
+		pruned_replica_count++;
+	}
+
+	set_delete(safe_ancestors);
+
+	node->time_spent_on_prune_ancestors_of_persisted_node += timestamp_get() - start_time;
+
+	return pruned_replica_count;
+}
+
+/**
+ * Prune the ancestors of a temp node.
+ * This function opportunistically releases upstream temporary files
+ * that are no longer needed once this temp-producing node has completed.
+ *
+ * Only ancestors producing temporary outputs are considered here.
+ * Files stored in the shared filesystem are never pruned by this function,
+ * because temp outputs are not considered sufficiently safe to trigger
+ * deletion of persisted data upstream.
+ * @param sog Reference to the strategic orchestration graph object.
+ * @param node Reference to the node object.
+ * @return The number of pruned replicas.
+ */
+static int prune_ancestors_of_temp_node(struct strategic_orchestration_graph *sog, struct strategic_orchestration_node *node)
+{
+	if (!sog || !node || !node->outfile || node->prune_depth <= 0) {
+		return 0;
+	}
+
+	timestamp_t start_time = timestamp_get();
+
+	int pruned_replica_count = 0;
+
+	struct list *parents = son_find_parents_by_depth(node, node->prune_depth);
+
+	struct strategic_orchestration_node *parent_node;
+	LIST_ITERATE(parents, parent_node)
+	{
+		/* skip if the parent does not produce a temp file */
+		if (parent_node->outfile_type != NODE_OUTFILE_TYPE_TEMP) {
+			continue;
+		}
+
+		/* a file is prunable if its outfile is no longer needed by any child node:
+		 * 1. it has no pending dependents
+		 * 2. all completed dependents have also completed their corresponding recovery tasks, if any */
+		int all_children_completed = 1;
+		struct strategic_orchestration_node *child_node;
+		LIST_ITERATE(parent_node->children, child_node)
+		{
+			/* break early if the child node is not completed */
+			if (!child_node->completed) {
+				all_children_completed = 0;
+				break;
+			}
+			/* if the task produces a temp file and the recovery task is running, the parent is not prunable */
+			if (child_node->outfile && child_node->outfile->type == VINE_TEMP) {
+				struct vine_task *child_node_recovery_task = child_node->outfile->recovery_task;
+				if (child_node_recovery_task && (child_node_recovery_task->state != VINE_TASK_INITIAL && child_node_recovery_task->state != VINE_TASK_DONE)) {
+					all_children_completed = 0;
+					break;
+				}
+			}
+		}
+		if (!all_children_completed) {
+			continue;
+		}
+
+		pruned_replica_count += vine_prune_file(sog->manager, parent_node->outfile);
+		/* this parent is pruned because a successor that produces a temp file is completed, it is unsafe because the
+		 * manager may submit a recovery task to bring it back in case of worker failures. */
+		parent_node->prune_status = PRUNE_STATUS_UNSAFE;
+	}
+
+	list_delete(parents);
+
+	node->time_spent_on_prune_ancestors_of_temp_node += timestamp_get() - start_time;
+
+	return pruned_replica_count;
+}
+
+/**
+ * Prune the ancestors of a node when it is completed.
+ * @param node Reference to the node object.
+ */
+static void prune_ancestors_of_node(struct strategic_orchestration_graph *sog, struct strategic_orchestration_node *node)
+{
+	if (!sog || !node) {
+		return;
+	}
+
+	/* do not prune if the node is not completed */
+	if (!node->completed) {
+		return;
+	}
+
+	timestamp_t start_time = timestamp_get();
+
+	int pruned_replica_count = 0;
+
+	switch (node->outfile_type) {
+	case NODE_OUTFILE_TYPE_LOCAL:
+	case NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM:
+		/* If the outfile was declared as a VINE_FILE or was written to the shared fs, then it is guaranteed to be persisted
+		 * and there is no chance that it will be lost unexpectedly. So we can safely prune all ancestors of this node. */
+		pruned_replica_count = prune_ancestors_of_persisted_node(sog, node);
+		break;
+	case NODE_OUTFILE_TYPE_TEMP:
+		/* Otherwise, if the node outfile is a temp file, we need to be careful about pruning, because temp files are prone
+		 * to failures, while means they can be lost due to node evictions or failures. */
+		pruned_replica_count = prune_ancestors_of_temp_node(sog, node);
+		break;
+	}
+
+	timestamp_t elapsed_time = timestamp_get() - start_time;
+
+	debug(D_VINE, "pruned %d ancestors of node %s in %.6f seconds", pruned_replica_count, node->node_key, elapsed_time / 1000000.0);
+
+	return;
+}
+
 /*************************************************************/
 /* Public APIs */
 /*************************************************************/
@@ -405,15 +569,15 @@ int sog_tune(struct strategic_orchestration_graph *sog, const char *name, const 
 			return -1;
 		}
 
-	} else if (strcmp(name, "target-results-dir") == 0) {
-		if (sog->target_results_dir) {
-			free(sog->target_results_dir);
+	} else if (strcmp(name, "output-dir") == 0) {
+		if (sog->output_dir) {
+			free(sog->output_dir);
 		}
 		if (mkdir(value, 0777) != 0 && errno != EEXIST) {
 			debug(D_ERROR, "failed to mkdir %s (errno=%d)", value, errno);
 			return -1;
 		}
-		sog->target_results_dir = xxstrdup(value);
+		sog->output_dir = xxstrdup(value);
 
 	} else if (strcmp(name, "prune-depth") == 0) {
 		sog->prune_depth = atoi(value);
@@ -425,6 +589,16 @@ int sog_tune(struct strategic_orchestration_graph *sog, const char *name, const 
 			return -1;
 		}
 		sog->checkpoint_fraction = fraction;
+
+	} else if (strcmp(name, "checkpoint-dir") == 0) {
+		if (sog->checkpoint_dir) {
+			free(sog->checkpoint_dir);
+		}
+		if (mkdir(value, 0777) != 0 && errno != EEXIST) {
+			debug(D_ERROR, "failed to mkdir %s (errno=%d)", value, errno);
+			return -1;
+		}
+		sog->checkpoint_dir = xxstrdup(value);
 
 	} else {
 		debug(D_ERROR, "invalid parameter name: %s", name);
@@ -525,7 +699,7 @@ const char *sog_get_node_local_outfile_source(const struct strategic_orchestrati
 		exit(1);
 	}
 
-	if (node->outfile_type != VINE_NODE_OUTFILE_TYPE_LOCAL) {
+	if (node->outfile_type != NODE_OUTFILE_TYPE_LOCAL) {
 		debug(D_ERROR, "node %s is not a local output file", node_key);
 		exit(1);
 	}
@@ -649,23 +823,23 @@ void sog_compute_topology_metrics(struct strategic_orchestration_graph *sog)
 	while ((node = priority_queue_pop(sorted_nodes))) {
 		if (node->is_target_key) {
 			/* declare the output file as a vine_file so that it can be retrieved by the manager as usual */
-			node->outfile_type = VINE_NODE_OUTFILE_TYPE_LOCAL;
-			char *local_outfile_path = string_format("%s/%s", sog->target_results_dir, node->outfile_remote_name);
-			node->outfile = vine_declare_file(node->manager, local_outfile_path, VINE_CACHE_LEVEL_WORKFLOW, 0);
+			node->outfile_type = NODE_OUTFILE_TYPE_LOCAL;
+			char *local_outfile_path = string_format("%s/%s", sog->output_dir, node->outfile_remote_name);
+			node->outfile = vine_declare_file(sog->manager, local_outfile_path, VINE_CACHE_LEVEL_WORKFLOW, 0);
 			free(local_outfile_path);
 			continue;
 		}
 		if (assigned_checkpoint_count < checkpoint_count) {
 			/* checkpointed files will be written directly to the shared file system, no need to manage them in the manager */
-			node->outfile_type = VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM;
-			char *shared_file_system_outfile_path = string_format("%s/%s", sog->target_results_dir, node->outfile_remote_name);
+			node->outfile_type = NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM;
+			char *shared_file_system_outfile_path = string_format("%s/%s", sog->checkpoint_dir, node->outfile_remote_name);
 			free(node->outfile_remote_name);
 			node->outfile_remote_name = shared_file_system_outfile_path;
 			node->outfile = NULL;
 			assigned_checkpoint_count++;
 		} else {
 			/* other nodes will be declared as temp files to leverage node-local storage */
-			node->outfile_type = VINE_NODE_OUTFILE_TYPE_TEMP;
+			node->outfile_type = NODE_OUTFILE_TYPE_TEMP;
 			node->outfile = vine_declare_temp(sog->manager);
 		}
 	}
@@ -712,19 +886,39 @@ void sog_add_node(struct strategic_orchestration_graph *sog, const char *node_ke
 	/* if the node already exists, skip creating a new one */
 	struct strategic_orchestration_node *node = hash_table_lookup(sog->nodes, node_key);
 	if (!node) {
-		node = son_create(sog->manager,
-				node_key,
-				is_target_key,
-				sog->proxy_library_name,
-				sog->proxy_function_name,
-				sog->target_results_dir,
-				sog->prune_depth);
+		node = son_create(node_key, is_target_key);
 
 		if (!node) {
 			debug(D_ERROR, "failed to create node %s", node_key);
 			sog_delete(sog);
 			exit(1);
 		}
+
+		if (!sog->proxy_function_name) {
+			debug(D_ERROR, "proxy function name is not set");
+			sog_delete(sog);
+			exit(1);
+		}
+
+		if (!sog->proxy_library_name) {
+			debug(D_ERROR, "proxy library name is not set");
+			sog_delete(sog);
+			exit(1);
+		}
+
+		/* create node task */
+		node->task = vine_task_create(sog->proxy_function_name);
+		vine_task_set_library_required(node->task, sog->proxy_library_name);
+		vine_task_addref(node->task);
+
+		/* construct the task arguments and declare the infile */
+		char *task_arguments = son_construct_task_arguments(node);
+		node->infile = vine_declare_buffer(sog->manager, task_arguments, strlen(task_arguments), VINE_CACHE_LEVEL_TASK, VINE_UNLINK_WHEN_DONE);
+		free(task_arguments);
+		vine_task_add_input(node->task, node->infile, "infile", VINE_TRANSFER_ALWAYS);
+
+		/* initialize the pruning depth of each node, currently statically set to the global prune depth */
+		node->prune_depth = sog->prune_depth;
 
 		hash_table_insert(sog->nodes, node_key, node);
 	}
@@ -745,11 +939,12 @@ struct strategic_orchestration_graph *sog_create(struct vine_manager *q)
 
 	sog->manager = q;
 
+	sog->checkpoint_dir = xxstrdup(sog->manager->runtime_directory); // default to current working directory
+	sog->output_dir = xxstrdup(sog->manager->runtime_directory);	 // default to current working directory
+
 	sog->nodes = hash_table_create(0, 0);
 	sog->task_id_to_node = itable_create(0);
 	sog->outfile_cachename_to_node = hash_table_create(0, 0);
-
-	sog->target_results_dir = xxstrdup(sog->manager->runtime_directory); // default to current working directory
 
 	cctools_uuid_t proxy_library_name_id;
 	cctools_uuid_create(&proxy_library_name_id);
@@ -827,7 +1022,7 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 	struct strategic_orchestration_node *node;
 	HASH_TABLE_ITERATE(sog->nodes, node_key, node)
 	{
-		son_print_info(node);
+		son_debug_print(node);
 	}
 
 	/* enable return recovery tasks */
@@ -923,7 +1118,7 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 
 			/* if the outfile is set to save on the sharedfs, stat to get the size of the file */
 			switch (node->outfile_type) {
-			case VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM: {
+			case NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM: {
 				struct stat info;
 				int result = stat(node->outfile_remote_name, &info);
 				if (result < 0) {
@@ -941,8 +1136,8 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 				node->outfile_size_bytes = info.st_size;
 				break;
 			}
-			case VINE_NODE_OUTFILE_TYPE_LOCAL:
-			case VINE_NODE_OUTFILE_TYPE_TEMP:
+			case NODE_OUTFILE_TYPE_LOCAL:
+			case NODE_OUTFILE_TYPE_TEMP:
 				node->outfile_size_bytes = node->outfile->size;
 				break;
 			}
@@ -952,7 +1147,7 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 			node->completed = 1;
 
 			/* prune nodes on task completion */
-			son_prune_ancestors(node);
+			prune_ancestors_of_node(sog, node);
 
 			/* skip recovery tasks */
 			if (task->type == VINE_TASK_TYPE_RECOVERY) {
@@ -966,7 +1161,7 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 			}
 
 			/* update critical time */
-			son_update_critical_time(node, task->time_workers_execute_last);
+			son_update_critical_path_time(node, task->time_workers_execute_last);
 
 			/* mark this regular task as completed */
 			progress_bar_update_part(pbar, regular_tasks_part, 1);
@@ -982,11 +1177,12 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 
 			/* enqueue the output file for replication */
 			switch (node->outfile_type) {
-			case VINE_NODE_OUTFILE_TYPE_TEMP:
-				son_replicate_outfile(node);
+			case NODE_OUTFILE_TYPE_TEMP:
+				/* replicate the outfile of the temp node */
+				vine_temp_replicate_file_later(sog->manager, node->outfile);
 				break;
-			case VINE_NODE_OUTFILE_TYPE_LOCAL:
-			case VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM:
+			case NODE_OUTFILE_TYPE_LOCAL:
+			case NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM:
 				break;
 			}
 
@@ -1044,7 +1240,7 @@ void sog_delete(struct strategic_orchestration_graph *sog)
 			hash_table_remove(sog->outfile_cachename_to_node, node->outfile->cached_name);
 			hash_table_remove(sog->manager->file_table, node->outfile->cached_name);
 		}
-		if (node->outfile_type == VINE_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM) {
+		if (node->outfile_type == NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM) {
 			unlink(node->outfile_remote_name);
 		}
 		son_delete(node);

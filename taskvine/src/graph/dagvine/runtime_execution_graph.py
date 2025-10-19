@@ -106,14 +106,9 @@ class RuntimeExecutionGraph:
     to produce the result.
     """
     def __init__(self, task_dict,
-                 shared_file_system_dir=None,
                  extra_task_output_size_mb=["uniform", 0, 0],
                  extra_task_sleep_time=["uniform", 0, 0]):
         self.task_dict = task_dict
-        self.shared_file_system_dir = shared_file_system_dir
-
-        if self.shared_file_system_dir:
-            os.makedirs(self.shared_file_system_dir, exist_ok=True)
 
         if dts:
             for k, v in self.task_dict.items():
