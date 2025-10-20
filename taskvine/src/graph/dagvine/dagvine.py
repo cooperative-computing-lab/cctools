@@ -111,7 +111,7 @@ class GraphParams:
             raise ValueError(f"Invalid param name: {param_name}")
 
 
-class Executor(Manager):
+class DAGVine(Manager):
     def __init__(self,
                  *args,
                  **kwargs):

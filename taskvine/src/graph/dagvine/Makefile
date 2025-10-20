@@ -6,6 +6,7 @@ LOCAL_CCFLAGS+=-I ${CCTOOLS_HOME}/taskvine/src/manager
 
 
 DAGVINE_SOURCE_DIR = $(CCTOOLS_HOME)/taskvine/src/graph/dagvine
+DAGVINE_MODULE_DIR = $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/dagvine
 
 
 SOURCES = strategic_orchestration_node.c strategic_orchestration_graph.c
@@ -28,7 +29,7 @@ TARGETS = $(LIBRARIES) $(PYMODULE) $(PROGRAMS)
 
 all: $(TARGETS)
 
- 
+
 
 $(PROGRAMS): $(EXTERNALS)
 
@@ -54,14 +55,14 @@ endif
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/graph/dagvine/include
 	cp ${CCTOOLS_HOME}/taskvine/src/manager/taskvine.h $(CCTOOLS_INSTALL_DIR)/graph/dagvine/include/
-	mkdir -p $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/dagvine
-	cp $(PYMODULE) $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/dagvine/
-	cp $(BUILD_DIR)/capi.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/dagvine/
+	mkdir -p $(DAGVINE_MODULE_DIR)
+	cp $(PYMODULE) $(DAGVINE_MODULE_DIR)
+	cp $(BUILD_DIR)/capi.py $(DAGVINE_MODULE_DIR)
+	# also install pure Python sources for the dagvine package
+	cp $(DAGVINE_SOURCE_DIR)/*.py $(DAGVINE_MODULE_DIR)
 
 clean:
 	rm -rf $(PROGRAMS) $(OBJECTS) *.o $(BUILD_DIR) $(PYMODULE) capi.py
-
-test: all
 
 lint:
 	if ( ! clang-format -Werror --dry-run --style='file:${CCTOOLS_HOME}/.clang-format' $(DAGVINE_SOURCE_DIR)/*.c $(DAGVINE_SOURCE_DIR)/*.h);\
