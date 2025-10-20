@@ -116,7 +116,7 @@ class Executor(Manager):
                  *args,
                  **kwargs):
 
-        # handle SIGINT correctly
+        # handle SIGINT
         signal.signal(signal.SIGINT, self._on_sigint)
 
         self.params = GraphParams()
