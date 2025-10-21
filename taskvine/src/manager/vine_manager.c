@@ -3617,6 +3617,8 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 	struct vine_task *t;
 
 	while (tasks_considered < tasks_to_consider) {
+		timestamp_t time_when_scheduling_start = timestamp_get();
+
 		t = priority_queue_pop(q->ready_tasks);
 		if (!t) {
 			break;
@@ -3649,6 +3651,7 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 		switch (result) {
 		case VINE_SUCCESS:
 			committed_tasks++;
+			t->time_spent_on_scheduling = timestamp_get() - time_when_scheduling_start;
 			break;
 		case VINE_APP_FAILURE:
 		case VINE_WORKER_FAILURE:
