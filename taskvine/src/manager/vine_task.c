@@ -153,6 +153,8 @@ void vine_task_reset(struct vine_task *t)
 	t->time_workers_execute_exhaustion = 0;
 	t->time_workers_execute_failure = 0;
 
+	t->time_spent_on_scheduling = 0;
+
 	rmsummary_delete(t->resources_measured);
 	rmsummary_delete(t->resources_allocated);
 	t->resources_measured = rmsummary_create(-1);

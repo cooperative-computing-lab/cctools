@@ -122,6 +122,8 @@ struct vine_task {
 	timestamp_t time_workers_execute_exhaustion;           /**< Accumulated time spent in attempts that exhausted resources. */
 	timestamp_t time_workers_execute_failure;              /**< Accumulated time for runs that terminated in worker failure/disconnection. */
 
+	timestamp_t time_spent_on_scheduling;                 /**< Time spent on scheduling the task, only consider the successful scheduling. */
+
 	int64_t bytes_received;                                /**< Number of bytes received since task has last started receiving input data. */
 	int64_t bytes_sent;                                    /**< Number of bytes sent since task has last started sending input data. */
 	int64_t bytes_transferred;                             /**< Number of bytes transferred since task has last started transferring input data. */
