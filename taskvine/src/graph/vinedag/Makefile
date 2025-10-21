@@ -4,9 +4,10 @@ include ../../../../rules.mk
 LOCAL_LINKAGE+=${CCTOOLS_HOME}/taskvine/src/manager/libtaskvine.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
 LOCAL_CCFLAGS+=-I ${CCTOOLS_HOME}/taskvine/src/manager
 
+PROJECT_NAME = vinedag
 
-DAGVINE_SOURCE_DIR = $(CCTOOLS_HOME)/taskvine/src/graph/dagvine
-DAGVINE_MODULE_DIR = $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/dagvine
+SOURCE_DIR = $(CCTOOLS_HOME)/taskvine/src/graph/$(PROJECT_NAME)
+MODULE_DIR = $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/$(PROJECT_NAME)
 
 
 SOURCES = strategic_orchestration_node.c strategic_orchestration_graph.c
@@ -37,7 +38,7 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 $(SWIG_WRAP): $(SWIG_I) strategic_orchestration_graph.h | $(BUILD_DIR)
-	$(CCTOOLS_SWIG) -python -threads -relativeimport -I$(CCTOOLS_HOME)/taskvine/src/manager -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/taskvine/src/graph/dagvine -outdir $(BUILD_DIR) -o $@ $<
+	$(CCTOOLS_SWIG) -python -threads -relativeimport -I$(CCTOOLS_HOME)/taskvine/src/manager -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/taskvine/src/graph/$(PROJECT_NAME) -outdir $(BUILD_DIR) -o $@ $<
 
 # Build Python module (mimic bindings: silence SWIG warnings and build PIC)
 $(WRAP_OBJ): $(SWIG_WRAP)
@@ -53,19 +54,18 @@ endif
 
 
 install: all
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/graph/dagvine/include
-	cp ${CCTOOLS_HOME}/taskvine/src/manager/taskvine.h $(CCTOOLS_INSTALL_DIR)/graph/dagvine/include/
-	mkdir -p $(DAGVINE_MODULE_DIR)
-	cp $(PYMODULE) $(DAGVINE_MODULE_DIR)
-	cp $(BUILD_DIR)/capi.py $(DAGVINE_MODULE_DIR)
-	# also install pure Python sources for the dagvine package
-	cp $(DAGVINE_SOURCE_DIR)/*.py $(DAGVINE_MODULE_DIR)
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/graph/$(PROJECT_NAME)/include
+	cp ${CCTOOLS_HOME}/taskvine/src/manager/taskvine.h $(CCTOOLS_INSTALL_DIR)/graph/$(PROJECT_NAME)/include/
+	mkdir -p $(MODULE_DIR)
+	cp $(PYMODULE) $(MODULE_DIR)
+	cp $(BUILD_DIR)/capi.py $(MODULE_DIR)
+	cp $(SOURCE_DIR)/*.py $(MODULE_DIR)
 
 clean:
 	rm -rf $(PROGRAMS) $(OBJECTS) *.o $(BUILD_DIR) $(PYMODULE) capi.py
 
 lint:
-	if ( ! clang-format -Werror --dry-run --style='file:${CCTOOLS_HOME}/.clang-format' $(DAGVINE_SOURCE_DIR)/*.c $(DAGVINE_SOURCE_DIR)/*.h);\
+	if ( ! clang-format -Werror --dry-run --style='file:${CCTOOLS_HOME}/.clang-format' $(SOURCE_DIR)/*.c $(SOURCE_DIR)/*.h);\
 	then\
 		echo  "========================================================";\
 		echo  "NOTICE: Run \`make format\` to format your latest changes.";\
@@ -74,10 +74,10 @@ lint:
 	fi
 	flake8 --ignore=$(CCTOOLS_FLAKE8_IGNORE_ERRORS) \
 		--exclude=$(CCTOOLS_FLAKE8_IGNORE_FILES),$(BUILD_DIR) \
-		$(DAGVINE_SOURCE_DIR)/
+		$(SOURCE_DIR)/
 
 format:
-	clang-format -i $(DAGVINE_SOURCE_DIR)/*.c $(DAGVINE_SOURCE_DIR)/*.h
+	clang-format -i $(SOURCE_DIR)/*.c $(SOURCE_DIR)/*.h
 
 .PHONY: all clean install test lint format
 

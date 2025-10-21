@@ -12,12 +12,7 @@ def get_c_constant(constant):
         "result_success" -> VINE_RESULT_SUCCESS
     """
     constant = f"VINE_{constant.upper()}"
-    # First try the base cvine module
-    value = getattr(cvine, constant, None)
-    if value is not None:
-        return value
-    # If still missing, raise a clear error
-    raise AttributeError(f"C constant {constant} not found in cvine or cdagvine")
+    return getattr(cvine, constant)
 
 
 def set_port_range(port):
@@ -41,17 +36,5 @@ def set_port_range(port):
 def load_variable_from_library(var_name):
     return globals()[var_name]
 
-
-# helper function that deletes all files in a directory
-def delete_all_files(root_dir):
-    if not os.path.exists(root_dir):
-        return
-    for dirpath, dirnames, filenames in os.walk(root_dir):
-        for filename in filenames:
-            file_path = os.path.join(dirpath, filename)
-            try:
-                os.remove(file_path)
-            except FileNotFoundError:
-                print(f"Failed to delete file {file_path}")
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:

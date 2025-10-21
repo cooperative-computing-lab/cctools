@@ -10,10 +10,10 @@ import time
 import random
 import hashlib
 import collections
-from ndcctools.taskvine.dagvine.runtime_execution_graph import (
+from ndcctools.taskvine.vinedag.runtime_execution_graph import (
     GraphKeyResult, RuntimeExecutionGraph, hash_name, hashable
 )
-from ndcctools.taskvine.dagvine.proxy_functions import compute_dts_key, compute_sexpr_key, compute_single_key
+from ndcctools.taskvine.vinedag.proxy_functions import compute_dts_key, compute_sexpr_key, compute_single_key
 from ndcctools.taskvine.utils import load_variable_from_library
 
 
@@ -63,6 +63,11 @@ class ProxyLibrary:
         self.context_loader_func = context_loader_func
         self.context_loader_args = context_loader_args
         self.context_loader_kwargs = context_loader_kwargs
+
+    def get_context_size(self):
+        dumped_data = self.context_loader_args[0]
+        serialized = round(len(dumped_data) / 1024 / 1024, 2)
+        return serialized
 
     def install(self):
         assert self.name is not None, "Library name must be set before installing (use set_name method)"

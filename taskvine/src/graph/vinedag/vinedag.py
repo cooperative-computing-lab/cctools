@@ -1,16 +1,16 @@
 
 from ndcctools.taskvine import cvine
 from ndcctools.taskvine.manager import Manager
-from ndcctools.taskvine.utils import delete_all_files
 
-from ndcctools.taskvine.dagvine.proxy_library import ProxyLibrary
-from ndcctools.taskvine.dagvine.proxy_functions import compute_single_key
-from ndcctools.taskvine.dagvine.runtime_execution_graph import RuntimeExecutionGraph, GraphKeyResult
-from ndcctools.taskvine.dagvine.strategic_orchestration_graph import StrategicOrchestrationGraph
+from ndcctools.taskvine.vinedag.proxy_library import ProxyLibrary
+from ndcctools.taskvine.vinedag.proxy_functions import compute_single_key
+from ndcctools.taskvine.vinedag.runtime_execution_graph import RuntimeExecutionGraph, GraphKeyResult
+from ndcctools.taskvine.vinedag.strategic_orchestration_graph import StrategicOrchestrationGraph
 
 import cloudpickle
 import os
 import signal
+import json
 
 try:
     import dask
@@ -26,6 +26,23 @@ try:
     import dask._task_spec as dts
 except ImportError:
     dts = None
+
+
+def delete_all_files(root_dir):
+    if not os.path.exists(root_dir):
+        return
+    for dirpath, dirnames, filenames in os.walk(root_dir):
+        for filename in filenames:
+            file_path = os.path.join(dirpath, filename)
+            try:
+                os.remove(file_path)
+            except FileNotFoundError:
+                print(f"Failed to delete file {file_path}")
+
+
+# color the text with the given color code
+def color_text(text, color_code):
+    return f"\033[{color_code}m{text}\033[0m"
 
 
 # convert Dask collection to task dictionary
@@ -81,6 +98,7 @@ class GraphParams:
             "output-dir": "./outputs",
             "checkpoint-dir": "./checkpoints",
             "checkpoint-fraction": 0,
+            "progress-bar-update-interval-sec": 0.1,
         }
         self.other_params = {
             "schedule": "worst",
@@ -89,6 +107,10 @@ class GraphParams:
             "extra-task-output-size-mb": ["uniform", 0, 0],
             "extra-task-sleep-time": ["uniform", 0, 0],
         }
+
+    def print_params(self):
+        all_params = {**self.vine_manager_tuning_params, **self.sog_tuning_params, **self.other_params}
+        print(json.dumps(all_params, indent=4))
 
     def update_param(self, param_name, new_value):
         if param_name in self.vine_manager_tuning_params:
@@ -111,7 +133,7 @@ class GraphParams:
             raise ValueError(f"Invalid param name: {param_name}")
 
 
-class DAGVine(Manager):
+class VineDAG(Manager):
     def __init__(self,
                  *args,
                  **kwargs):
@@ -130,8 +152,11 @@ class DAGVine(Manager):
 
         # initialize the manager
         super().__init__(*args, **kwargs)
-
         self.runtime_directory = cvine.vine_get_runtime_directory(self._taskvine)
+
+        print(f"=== Manager name: {color_text(self.name, 92)}")
+        print(f"=== Manager port: {color_text(self.port, 92)}")
+        print(f"=== Runtime directory: {color_text(self.runtime_directory, 92)}")
 
     def param(self, param_name):
         return self.params.get_value_of(param_name)
@@ -215,6 +240,9 @@ class DAGVine(Manager):
 
         task_dict = ensure_task_dict(collection_dict)
 
+        with open("test_dv5.pkl", "wb") as f:
+            cloudpickle.dump(task_dict, f)
+
         # build graphs from both sides
         reg, sog = self.build_graphs(task_dict, target_keys)
 
@@ -222,8 +250,9 @@ class DAGVine(Manager):
         proxy_library = self.create_proxy_library(reg, sog, hoisting_modules, env_files)
         proxy_library.install()
 
+        print(f"=== Library serialized size: {color_text(proxy_library.get_context_size(), 92)} MB")
+
         # execute the graph on the C side
-        print(f"Executing task graph, logs will be written to {self.runtime_directory}")
         sog.execute()
 
         # clean up the library instances and template on the manager

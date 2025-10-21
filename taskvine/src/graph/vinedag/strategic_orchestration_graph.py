@@ -1,4 +1,4 @@
-from ndcctools.taskvine.dagvine import capi
+from ndcctools.taskvine.vinedag import capi
 
 
 class StrategicOrchestrationGraph:

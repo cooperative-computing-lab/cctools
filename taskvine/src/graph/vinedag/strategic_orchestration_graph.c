@@ -137,7 +137,12 @@ static void submit_node_task(struct strategic_orchestration_graph *sog, struct s
 	vine_task_set_priority(node->task, priority);
 
 	/* submit the task to the manager */
+	timestamp_t time_start = timestamp_get();
 	int task_id = vine_submit(sog->manager, node->task);
+	double time_taken = (double)(timestamp_get() - time_start) / 1e6;
+	FILE *fp = fopen("vinedag_submission_time.txt", "a");
+	fprintf(fp, "%.6f\n", time_taken);
+	fclose(fp);
 
 	/* insert the task id to the task id to node map */
 	itable_insert(sog->task_id_to_node, task_id, node);
@@ -600,6 +605,10 @@ int sog_tune(struct strategic_orchestration_graph *sog, const char *name, const 
 		}
 		sog->checkpoint_dir = xxstrdup(value);
 
+	} else if (strcmp(name, "progress-bar-update-interval-sec") == 0) {
+		double val = atof(value);
+		sog->progress_bar_update_interval_sec = (val > 0.0) ? val : 0.1;
+
 	} else {
 		debug(D_ERROR, "invalid parameter name: %s", name);
 		return -1;
@@ -957,6 +966,8 @@ struct strategic_orchestration_graph *sog_create(struct vine_manager *q)
 	sog->task_priority_mode = TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST;
 	sog->failure_injection_step_percent = -1.0;
 
+	sog->progress_bar_update_interval_sec = 0.1;
+
 	/* enable debug system for C code since it uses a separate debug system instance
 	 * from the Python bindings. Use the same function that the manager uses. */
 	char *debug_tmp = string_format("%s/vine-logs/debug", sog->manager->runtime_directory);
@@ -1077,6 +1088,8 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 	}
 
 	struct ProgressBar *pbar = progress_bar_init("Executing Tasks");
+	progress_bar_set_update_interval(pbar, sog->progress_bar_update_interval_sec);
+
 	struct ProgressBarPart *regular_tasks_part = progress_bar_create_part("Regular", hash_table_size(sog->nodes));
 	struct ProgressBarPart *recovery_tasks_part = progress_bar_create_part("Recovery", 0);
 	progress_bar_bind_part(pbar, regular_tasks_part);

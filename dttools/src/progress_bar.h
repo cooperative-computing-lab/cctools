@@ -25,11 +25,15 @@ struct ProgressBarPart {
 
 /** Progress bar object. */
 struct ProgressBar {
-	char *label;
-	struct list *parts;
-	timestamp_t start_time;
-    timestamp_t last_draw_time;
-	int has_drawn_once;
+    /* User-facing interval in seconds; internal comparisons use *_us. */
+    double update_interval_sec;
+    char *label;
+    struct list *parts;
+    /* Timestamps in microseconds. */
+    timestamp_t start_time_us;
+    timestamp_t last_draw_time_us;
+    timestamp_t update_interval_us;
+    int has_drawn_once;
 };
 
 /* Progress Bar Part API */
@@ -39,6 +43,12 @@ struct ProgressBar {
 @return New progress bar.
 */
 struct ProgressBar *progress_bar_init(const char *label);
+
+/** Set the update interval for the progress bar.
+@param bar Progress bar.
+@param update_interval_sec Update interval in seconds.
+*/
+void progress_bar_set_update_interval(struct ProgressBar *bar, double update_interval_sec);
 
 /** Create a new part.
 @param label Part label (internally duplicated).

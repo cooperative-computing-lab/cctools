@@ -6,12 +6,14 @@
 
 int main()
 {
-	uint64_t total = 100000;
+	uint64_t total = 1000000;
 	struct ProgressBarPart *part1 = progress_bar_create_part("step", total);
 	struct ProgressBarPart *part2 = progress_bar_create_part("fetch", total);
 	struct ProgressBarPart *part3 = progress_bar_create_part("commit", total);
 
 	struct ProgressBar *bar = progress_bar_init("Compute");
+	progress_bar_set_update_interval(bar, 0.5);
+
 	progress_bar_bind_part(bar, part1);
 	progress_bar_bind_part(bar, part2);
 	progress_bar_bind_part(bar, part3);
