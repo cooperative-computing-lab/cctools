@@ -153,6 +153,11 @@ struct strategic_orchestration_node *son_create(const char *node_key, int is_tar
 	node->time_spent_on_prune_ancestors_of_temp_node = 0;
 	node->time_spent_on_prune_ancestors_of_persisted_node = 0;
 
+	node->submission_time = 0;
+	node->scheduling_time = 0;
+	node->execution_time = 0;
+	node->retrieval_time = 0;
+
 	node->critical_path_time = -1;
 
 	return node;

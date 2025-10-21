@@ -56,6 +56,11 @@ struct strategic_orchestration_node {
 	timestamp_t time_spent_on_prune_ancestors_of_temp_node;
 	timestamp_t time_spent_on_prune_ancestors_of_persisted_node;
 
+	timestamp_t submission_time;
+	timestamp_t scheduling_time;
+	timestamp_t execution_time;
+	timestamp_t retrieval_time;
+
 	node_outfile_type_t outfile_type;
 	prune_status_t prune_status;
 };

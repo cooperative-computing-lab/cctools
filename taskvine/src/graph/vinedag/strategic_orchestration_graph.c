@@ -139,10 +139,7 @@ static void submit_node_task(struct strategic_orchestration_graph *sog, struct s
 	/* submit the task to the manager */
 	timestamp_t time_start = timestamp_get();
 	int task_id = vine_submit(sog->manager, node->task);
-	double time_taken = (double)(timestamp_get() - time_start) / 1e6;
-	FILE *fp = fopen("vinedag_submission_time.txt", "a");
-	fprintf(fp, "%.6f\n", time_taken);
-	fclose(fp);
+	node->submission_time = timestamp_get() - time_start;
 
 	/* insert the task id to the task id to node map */
 	itable_insert(sog->task_id_to_node, task_id, node);
@@ -1158,6 +1155,7 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 
 			/* mark the node as completed */
 			node->completed = 1;
+			
 
 			/* prune nodes on task completion */
 			prune_ancestors_of_node(sog, node);
