@@ -19,6 +19,35 @@ Here is an example of the first few rows and columns:
 ...
 ```
 
+## Taskgraph Log Format
+
+The `taskgraph` log contains a sequence of records describing the basic
+properties of each file and task, and the relationships between the two.
+It is suitable for determining the provenance of files and tasks, and
+can be used to display the visual structure of a workflow.
+
+Each line is ASCII text with words delimited by spaces, except where quoted.
+Lines beginning with `#` are comments.  A file record consists of the word
+`FILE` followed by the unique file id, the quoted source path of the file,
+and the size of the file, if known.
+A task record consists of the word `TASK` followed by the unique task ID,
+the quoted name of the task, the keyword `INPUTS` followed by a list of input file IDs,
+and the keyword `OUTPUTS` followed by a list of output file IDs.
+
+```text
+# taskvine taskgraph version 2
+# TASK taskid "program" INPUTS fileid1 fileid fileid3 ... OUTPUTS fileid4 fileid5 ...
+# FILE fileid "source" size
+FILE file-meta-9c24a99af02ce7f488fcc7461fba2423 "convert.sfx" 350768
+FILE url-rnd-qjmltcbhuctjrfl "A-Cat.jpg" 163047
+FILE temp-rnd-sfscsbmjstfkvob "temp" 0
+TASK T1 "convert.sfx" INPUTS file-meta-9c24a99af02ce7f488fcc7461fba2423 url-rnd-qjmltcbhuctjrfl OUTPUTS temp-rnd-sfscsbmjstfkvob 
+TASK T4 "convert.sfx" INPUTS file-meta-9c24a99af02ce7f488fcc7461fba2423 url-rnd-qjmltcbhuctjrfl OUTPUTS temp-rnd-wqtpljproftkoym 
+TASK T23 "convert.sfx" INPUTS file-meta-9c24a99af02ce7f488fcc7461fba2423 url-rnd-qjmltcbhuctjrfl OUTPUTS temp-rnd-ycbskigfhodnnuj 
+TASK T5 "convert.sfx" INPUTS file-meta-9c24a99af02ce7f488fcc7461fba2423 url-rnd-qjmltcbhuctjrfl OUTPUTS temp-rnd-evtwiteajlpgwjn 
+...
+```
+
 ## Transactions Log Format
 
 The first few lines of the log document the possible log records:
