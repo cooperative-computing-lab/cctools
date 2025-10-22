@@ -189,7 +189,8 @@ int vine_schedule_count_committable_cores(struct vine_manager *q)
 		}
 		/* count the number of free gpus */
 		if (w->resources->gpus.total > 0 && overcommitted_resource_total(q, w->resources->gpus.total) > w->resources->gpus.inuse) {
-			count += overcommitted_resource_total(q, w->resources->gpus.total) - w->resources->gpus.inuse;
+			// Don't count gpus for now, because the manager has not yet fully supported scheduling tasks to GPUs.
+			// count += overcommitted_resource_total(q, w->resources->gpus.total) - w->resources->gpus.inuse;
 		}
 	}
 
