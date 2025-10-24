@@ -209,7 +209,7 @@ def _wrap_function(results, fun, args, kwargs):
             start = time.time()
             result = fun(*args, **kwargs)
             __measure_update_to_peak(pid, rm)
-            setattr(rm, 'wall_time', int((time.time() - start) * 1e6))
+            setattr(rm, 'wall_time', int((time.time() - start)))
             results.put((result, rm))
         except Exception as e:
             results.put((e, None))
