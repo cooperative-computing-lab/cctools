@@ -1,4 +1,4 @@
-import resource_monitor
+from ndcctools import resource_monitor
 
 import sys
 import time
