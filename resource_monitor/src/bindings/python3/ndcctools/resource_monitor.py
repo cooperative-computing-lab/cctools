@@ -358,7 +358,7 @@ def __monitor_function(limits, callback, interval, return_resources, function, *
         pass
 
     if results['resource_exhaustion']:
-        raise ResourceExhaustion(results['resources'], function, args, kwargs)
+        raise ResourceExhaustion(results['resources'], function.__name__, args, kwargs)
 
     if return_resources:
         return (results['result'], results['resources'])
