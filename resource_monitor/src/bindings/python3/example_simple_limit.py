@@ -4,7 +4,8 @@ import sys
 import time
 
 
-@resource_monitor.monitored(limits={"wall_time": 1})  # wall_time in seconds
+#@resource_monitor.monitored(limits={"wall_time": 1})  # wall_time in seconds
+@resource_monitor.monitored(limits={"cores": 10})
 def my_function(n):
     sys.stdout.write("waiting for {time} seconds...".format(time=n))
     time.sleep(n)
