@@ -147,6 +147,7 @@ static vine_msg_code_t handle_manager_status(struct vine_manager *q, struct vine
 static vine_msg_code_t handle_resources(struct vine_manager *q, struct vine_worker_info *w, time_t stoptime);
 static vine_msg_code_t handle_feature(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 static void handle_library_update(struct vine_manager *q, struct vine_worker_info *w, const char *line);
+static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_info *w, int count_received_so_far);
 
 static struct jx *manager_to_jx(struct vine_manager *q);
 static struct jx *manager_lean_to_jx(struct vine_manager *q);
@@ -588,6 +589,8 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		return VINE_SUCCESS;
 	}
 
+	t->time_when_get_result_start = timestamp_get();
+
 	if (task_status != VINE_RESULT_SUCCESS) {
 		w->last_failure_time = timestamp_get();
 		t->time_when_last_failure = w->last_failure_time;
@@ -675,6 +678,8 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		}
 	}
 
+	t->time_when_get_result_end = timestamp_get();
+
 	return VINE_SUCCESS;
 }
 
@@ -687,6 +692,7 @@ static vine_msg_code_t handle_complete(struct vine_manager *q, struct vine_worke
 {
 	vine_result_code_t result = get_completion_result(q, w, line);
 	if (result == VINE_SUCCESS) {
+		receive_tasks_from_worker(q, w, 0);
 		return VINE_MSG_PROCESSED;
 	}
 	return VINE_MSG_NOT_PROCESSED;
@@ -3743,13 +3749,13 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 	struct vine_task *t;
 
 	while (tasks_considered < tasks_to_consider) {
-		timestamp_t time_when_scheduling_start = timestamp_get();
-
 		t = priority_queue_pop(q->ready_tasks);
 		if (!t) {
 			break;
 		}
 		tasks_considered++;
+
+		t->time_when_scheduling_start = timestamp_get();
 
 		/* this task is not runnable at all, put it back in the pending queue */
 		if (!consider_task(q, t)) {
@@ -3760,8 +3766,8 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 		/* select a worker for the task */
 		struct vine_worker_info *w = vine_schedule_task_to_worker(q, t);
 
-		timestamp_t time_when_scheduling_end = timestamp_get();
-		
+		t->time_when_scheduling_end = timestamp_get();
+
 		/* task is runnable but no worker is fit, silently skip it */
 		if (!w) {
 			list_push_tail(skipped_tasks, t);
@@ -3779,7 +3785,6 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 		switch (result) {
 		case VINE_SUCCESS:
 			committed_tasks++;
-			t->time_spent_on_scheduling = time_when_scheduling_end - time_when_scheduling_start;
 			break;
 		case VINE_APP_FAILURE:
 		case VINE_WORKER_FAILURE:

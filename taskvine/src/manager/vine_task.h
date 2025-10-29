@@ -106,8 +106,14 @@ struct vine_task {
 	timestamp_t time_when_submitted;    /**< The time at which this task was added to the queue. */
 	timestamp_t time_when_done;         /**< The time at which the task is mark as retrieved, after transfering output files and other final processing. */
 
+	timestamp_t time_when_scheduling_start; /**< The time when the task starts to be considered for scheduling. */
+	timestamp_t time_when_scheduling_end;   /**< The time when the task is mapped to a worker and ready to be committed. */
+
 	timestamp_t time_when_commit_start; /**< The time when the task starts to be transfered to a worker. */
 	timestamp_t time_when_commit_end;   /**< The time when the task is completely transfered to a worker. */
+
+	timestamp_t time_when_get_result_start; /**< The time when the task starts to get the result from the worker. */
+	timestamp_t time_when_get_result_end;   /**< The time when the task gets the result from the worker. */
 
 	timestamp_t time_when_retrieval;    /**< The time when output files start to be transfered back to the manager. time_done - time_when_retrieval is the time taken to transfer output files. */
 
@@ -121,8 +127,6 @@ struct vine_task {
 	timestamp_t time_workers_execute_all;                  /**< Accumulated time for executing the command on any worker, regardless of whether the task completed (i.e., this includes time running on workers that disconnected). */
 	timestamp_t time_workers_execute_exhaustion;           /**< Accumulated time spent in attempts that exhausted resources. */
 	timestamp_t time_workers_execute_failure;              /**< Accumulated time for runs that terminated in worker failure/disconnection. */
-
-	timestamp_t time_spent_on_scheduling;                 /**< Time spent on scheduling the task, only consider the successful scheduling. */
 
 	int64_t bytes_received;                                /**< Number of bytes received since task has last started receiving input data. */
 	int64_t bytes_sent;                                    /**< Number of bytes sent since task has last started sending input data. */

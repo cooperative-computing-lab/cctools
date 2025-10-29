@@ -554,13 +554,13 @@ static void print_time_metrics(struct strategic_orchestration_graph *sog, const 
 		debug(D_ERROR, "failed to open file %s", filename);
 		return;
 	}
-	fprintf(fp, "node_key,submission_time_us,scheduling_time_us,commit_time_us,execution_time_us,retrieval_time_us,pruning_time_us,postprocessing_time_us\n");
+	fprintf(fp, "node_key,submission_time_us,scheduling_time_us,commit_time_us,execution_time_us,retrieval_time_us,postprocessing_time_us\n");
 
 	char *node_key;
 	struct strategic_orchestration_node *node;
 	HASH_TABLE_ITERATE(sog->nodes, node_key, node)
 	{
-		fprintf(fp, "%s,%lu,%lu,%lu,%lu,%lu,%lu,%lu\n", node_key, node->submission_time, node->scheduling_time, node->commit_time, node->execution_time, node->retrieval_time, node->pruning_time, node->postprocessing_time);
+		fprintf(fp, "%s,%lu,%lu,%lu,%lu,%lu,%lu\n", node_key, node->submission_time, node->scheduling_time, node->commit_time, node->execution_time, node->retrieval_time, node->postprocessing_time);
 	}
 	fclose(fp);
 
@@ -649,9 +649,9 @@ int sog_tune(struct strategic_orchestration_graph *sog, const char *name, const 
 		if (sog->time_metrics_filename) {
 			free(sog->time_metrics_filename);
 		}
-	
+
 		sog->time_metrics_filename = xxstrdup(value);
-	
+
 		/** Extract parent directory inline **/
 		const char *slash = strrchr(sog->time_metrics_filename, '/');
 		if (slash) {
@@ -659,7 +659,7 @@ int sog_tune(struct strategic_orchestration_graph *sog, const char *name, const 
 			char *parent = malloc(len + 1);
 			memcpy(parent, sog->time_metrics_filename, len);
 			parent[len] = '\0';
-	
+
 			/** Ensure the parent directory exists **/
 			if (mkdir(parent, 0777) != 0 && errno != EEXIST) {
 				debug(D_ERROR, "failed to mkdir %s (errno=%d)", parent, errno);
@@ -668,7 +668,7 @@ int sog_tune(struct strategic_orchestration_graph *sog, const char *name, const 
 			}
 			free(parent);
 		}
-	
+
 		/** Truncate or create the file **/
 		FILE *fp = fopen(sog->time_metrics_filename, "w");
 		if (!fp) {
@@ -1242,10 +1242,10 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 
 			/* mark the node as completed */
 			node->completed = 1;
-			node->scheduling_time = task->time_spent_on_scheduling;
+			node->scheduling_time = task->time_when_scheduling_end - task->time_when_scheduling_start;
 			node->commit_time = task->time_when_commit_end - task->time_when_commit_start;
 			node->execution_time = task->time_workers_execute_last;
-			node->retrieval_time = task->time_when_done - task->time_when_retrieval;
+			node->retrieval_time = task->time_when_get_result_end - task->time_when_get_result_start;
 
 			/* prune nodes on task completion */
 			prune_ancestors_of_node(sog, node);
@@ -1309,7 +1309,6 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 		total_time_spent_on_unlink_local_files += node->time_spent_on_unlink_local_files;
 		total_time_spent_on_prune_ancestors_of_temp_node += node->time_spent_on_prune_ancestors_of_temp_node;
 		total_time_spent_on_prune_ancestors_of_persisted_node += node->time_spent_on_prune_ancestors_of_persisted_node;
-		node->pruning_time = node->time_spent_on_unlink_local_files + node->time_spent_on_prune_ancestors_of_temp_node + node->time_spent_on_prune_ancestors_of_persisted_node;
 	}
 	total_time_spent_on_unlink_local_files /= 1e6;
 	total_time_spent_on_prune_ancestors_of_temp_node /= 1e6;

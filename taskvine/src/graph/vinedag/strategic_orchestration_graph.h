@@ -54,7 +54,7 @@ struct strategic_orchestration_graph {
 	task_priority_mode_t task_priority_mode; /* priority mode for task graph task scheduling */
 	double failure_injection_step_percent;	 /* 0 - 100, the percentage of steps to inject failure */
 
-    double progress_bar_update_interval_sec; /* update interval for the progress bar in seconds */
+	double progress_bar_update_interval_sec; /* update interval for the progress bar in seconds */
 
 	/* The filename of the csv file to store the time metrics of the strategic orchestration graph. */
 	char *time_metrics_filename;
