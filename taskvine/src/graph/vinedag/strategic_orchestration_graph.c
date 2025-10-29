@@ -532,6 +532,41 @@ static void prune_ancestors_of_node(struct strategic_orchestration_graph *sog, s
 	return;
 }
 
+/**
+ * Print the time metrics of the strategic orchestration graph to a csv file.
+ * @param sog Reference to the strategic orchestration graph object.
+ * @param filename Reference to the filename of the csv file.
+ */
+static void print_time_metrics(struct strategic_orchestration_graph *sog, const char *filename)
+{
+	if (!sog) {
+		return;
+	}
+
+	/* first delete the file if it exists */
+	if (access(filename, F_OK) != -1) {
+		unlink(filename);
+	}
+
+	/* print the header as a csv file */
+	FILE *fp = fopen(filename, "w");
+	if (!fp) {
+		debug(D_ERROR, "failed to open file %s", filename);
+		return;
+	}
+	fprintf(fp, "node_key,submission_time_us,scheduling_time_us,commit_time_us,execution_time_us,retrieval_time_us,pruning_time_us,postprocessing_time_us\n");
+
+	char *node_key;
+	struct strategic_orchestration_node *node;
+	HASH_TABLE_ITERATE(sog->nodes, node_key, node)
+	{
+		fprintf(fp, "%s,%lu,%lu,%lu,%lu,%lu,%lu,%lu\n", node_key, node->submission_time, node->scheduling_time, node->commit_time, node->execution_time, node->retrieval_time, node->pruning_time, node->postprocessing_time);
+	}
+	fclose(fp);
+
+	return;
+}
+
 /*************************************************************/
 /* Public APIs */
 /*************************************************************/
@@ -605,6 +640,52 @@ int sog_tune(struct strategic_orchestration_graph *sog, const char *name, const 
 	} else if (strcmp(name, "progress-bar-update-interval-sec") == 0) {
 		double val = atof(value);
 		sog->progress_bar_update_interval_sec = (val > 0.0) ? val : 0.1;
+
+	} else if (strcmp(name, "time-metrics-filename") == 0) {
+		if (strcmp(value, "0") == 0) {
+			return 0;
+		}
+
+		if (sog->time_metrics_filename) {
+			free(sog->time_metrics_filename);
+		}
+	
+		sog->time_metrics_filename = xxstrdup(value);
+	
+		/** Extract parent directory inline **/
+		const char *slash = strrchr(sog->time_metrics_filename, '/');
+		if (slash) {
+			size_t len = slash - sog->time_metrics_filename;
+			char *parent = malloc(len + 1);
+			memcpy(parent, sog->time_metrics_filename, len);
+			parent[len] = '\0';
+	
+			/** Ensure the parent directory exists **/
+			if (mkdir(parent, 0777) != 0 && errno != EEXIST) {
+				debug(D_ERROR, "failed to mkdir %s (errno=%d)", parent, errno);
+				free(parent);
+				return -1;
+			}
+			free(parent);
+		}
+	
+		/** Truncate or create the file **/
+		FILE *fp = fopen(sog->time_metrics_filename, "w");
+		if (!fp) {
+			debug(D_ERROR, "failed to create file %s (errno=%d)", sog->time_metrics_filename, errno);
+			return -1;
+		}
+		fclose(fp);
+
+	} else if (strcmp(name, "enable-debug-log") == 0) {
+		if (sog->enable_debug_log == 0) {
+			return -1;
+		}
+		sog->enable_debug_log = (atoi(value) == 1) ? 1 : 0;
+		if (sog->enable_debug_log == 0) {
+			debug_flags_clear();
+			debug_close();
+		}
 
 	} else {
 		debug(D_ERROR, "invalid parameter name: %s", name);
@@ -971,6 +1052,10 @@ struct strategic_orchestration_graph *sog_create(struct vine_manager *q)
 	vine_enable_debug_log(debug_tmp);
 	free(debug_tmp);
 
+	sog->time_metrics_filename = NULL;
+
+	sog->enable_debug_log = 1;
+
 	return sog;
 }
 
@@ -1092,7 +1177,7 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 	progress_bar_bind_part(pbar, regular_tasks_part);
 	progress_bar_bind_part(pbar, recovery_tasks_part);
 
-	int wait_timeout = 2;
+	int wait_timeout = 1;
 
 	while (regular_tasks_part->current < regular_tasks_part->total) {
 		if (interrupted) {
@@ -1104,6 +1189,8 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 		if (task) {
 			/* retrieve all possible tasks */
 			wait_timeout = 0;
+
+			timestamp_t time_when_postprocessing_start = timestamp_get();
 
 			/* get the original node by task id */
 			struct strategic_orchestration_node *node = get_node_by_task(sog, task);
@@ -1155,7 +1242,10 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 
 			/* mark the node as completed */
 			node->completed = 1;
-			
+			node->scheduling_time = task->time_spent_on_scheduling;
+			node->commit_time = task->time_when_commit_end - task->time_when_commit_start;
+			node->execution_time = task->time_workers_execute_last;
+			node->retrieval_time = task->time_when_done - task->time_when_retrieval;
 
 			/* prune nodes on task completion */
 			prune_ancestors_of_node(sog, node);
@@ -1172,7 +1262,7 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 			}
 
 			/* update critical time */
-			son_update_critical_path_time(node, task->time_workers_execute_last);
+			son_update_critical_path_time(node, node->execution_time);
 
 			/* mark this regular task as completed */
 			progress_bar_update_part(pbar, regular_tasks_part, 1);
@@ -1199,8 +1289,11 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 
 			/* submit children nodes with dependencies all resolved */
 			submit_unblocked_children(sog, node);
+
+			timestamp_t time_when_postprocessing_end = timestamp_get();
+			node->postprocessing_time = time_when_postprocessing_end - time_when_postprocessing_start;
 		} else {
-			wait_timeout = 2;
+			wait_timeout = 1;
 			progress_bar_update_part(pbar, recovery_tasks_part, 0); // refresh the time and total for recovery tasks
 		}
 	}
@@ -1216,6 +1309,7 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 		total_time_spent_on_unlink_local_files += node->time_spent_on_unlink_local_files;
 		total_time_spent_on_prune_ancestors_of_temp_node += node->time_spent_on_prune_ancestors_of_temp_node;
 		total_time_spent_on_prune_ancestors_of_persisted_node += node->time_spent_on_prune_ancestors_of_persisted_node;
+		node->pruning_time = node->time_spent_on_unlink_local_files + node->time_spent_on_prune_ancestors_of_temp_node + node->time_spent_on_prune_ancestors_of_persisted_node;
 	}
 	total_time_spent_on_unlink_local_files /= 1e6;
 	total_time_spent_on_prune_ancestors_of_temp_node /= 1e6;
@@ -1224,6 +1318,10 @@ void sog_execute(struct strategic_orchestration_graph *sog)
 	debug(D_VINE, "total time spent on prune ancestors of temp node: %.6f seconds\n", total_time_spent_on_prune_ancestors_of_temp_node);
 	debug(D_VINE, "total time spent on prune ancestors of persisted node: %.6f seconds\n", total_time_spent_on_prune_ancestors_of_persisted_node);
 	debug(D_VINE, "total time spent on unlink local files: %.6f seconds\n", total_time_spent_on_unlink_local_files);
+
+	if (sog->time_metrics_filename) {
+		print_time_metrics(sog, sog->time_metrics_filename);
+	}
 
 	return;
 }

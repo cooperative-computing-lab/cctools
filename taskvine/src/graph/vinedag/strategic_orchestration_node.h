@@ -58,8 +58,11 @@ struct strategic_orchestration_node {
 
 	timestamp_t submission_time;
 	timestamp_t scheduling_time;
+	timestamp_t commit_time;
 	timestamp_t execution_time;
 	timestamp_t retrieval_time;
+	timestamp_t pruning_time;
+	timestamp_t postprocessing_time;
 
 	node_outfile_type_t outfile_type;
 	prune_status_t prune_status;

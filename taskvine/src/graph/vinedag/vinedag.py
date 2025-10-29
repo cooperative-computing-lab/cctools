@@ -11,6 +11,7 @@ import cloudpickle
 import os
 import signal
 import json
+import tqdm
 
 try:
     import dask
@@ -99,6 +100,8 @@ class GraphParams:
             "checkpoint-dir": "./checkpoints",
             "checkpoint-fraction": 0,
             "progress-bar-update-interval-sec": 0.1,
+            "time-metrics-filename": "time_metrics.csv",
+            "enable-debug-log": 1,
         }
         self.other_params = {
             "schedule": "worst",

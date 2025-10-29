@@ -155,8 +155,11 @@ struct strategic_orchestration_node *son_create(const char *node_key, int is_tar
 
 	node->submission_time = 0;
 	node->scheduling_time = 0;
+	node->commit_time = 0;
 	node->execution_time = 0;
 	node->retrieval_time = 0;
+	node->pruning_time = 0;
+	node->postprocessing_time = 0;
 
 	node->critical_path_time = -1;
 

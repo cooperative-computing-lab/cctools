@@ -3143,7 +3143,7 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 
 	/* Kill unused libraries on this worker to reclaim resources. */
 	/* Matches assumption in vine_schedule.c:check_worker_have_enough_resources() */
-	kill_empty_libraries_on_worker(q, w, t);
+	// kill_empty_libraries_on_worker(q, w, t);
 
 	/* If this is a function needing a library, dispatch the library. */
 	if (t->needs_library) {
@@ -3760,6 +3760,8 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 		/* select a worker for the task */
 		struct vine_worker_info *w = vine_schedule_task_to_worker(q, t);
 
+		timestamp_t time_when_scheduling_end = timestamp_get();
+		
 		/* task is runnable but no worker is fit, silently skip it */
 		if (!w) {
 			list_push_tail(skipped_tasks, t);
@@ -3777,7 +3779,7 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 		switch (result) {
 		case VINE_SUCCESS:
 			committed_tasks++;
-			t->time_spent_on_scheduling = timestamp_get() - time_when_scheduling_start;
+			t->time_spent_on_scheduling = time_when_scheduling_end - time_when_scheduling_start;
 			break;
 		case VINE_APP_FAILURE:
 		case VINE_WORKER_FAILURE:
