@@ -11,7 +11,6 @@ import cloudpickle
 import os
 import signal
 import json
-import tqdm
 
 try:
     import dask
