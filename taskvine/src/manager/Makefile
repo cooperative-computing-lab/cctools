@@ -28,7 +28,8 @@ SOURCES = \
 	vine_file_replica_table.c \
 	vine_fair.c \
 	vine_runtime_dir.c \
-	vine_task_groups.c
+	vine_task_groups.c \
+	vine_temp.c
 
 PUBLIC_HEADERS = taskvine.h
 
@@ -38,6 +39,7 @@ LIBRARIES = libtaskvine.a
 TARGETS = $(LIBRARIES)
 
 all: $(TARGETS)
+
 
 libtaskvine.a: $(OBJECTS)
 

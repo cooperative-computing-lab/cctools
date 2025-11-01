@@ -134,6 +134,11 @@ char *vine_runtime_directory_create()
 	return runtime_dir;
 }
 
+char *vine_get_runtime_directory(struct vine_manager *m)
+{
+	return m->runtime_directory;
+}
+
 char *vine_get_path_log(struct vine_manager *m, const char *path)
 {
 	return string_format("%s/vine-logs%s%s", m->runtime_directory, path ? "/" : "", path ? path : "");
