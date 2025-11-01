@@ -6121,6 +6121,12 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "balance-worker-disk-load")) {
 		q->balance_worker_disk_load = !!((int)value);
 
+	} else if (!strcmp(name, "enable-debug-log")) {
+		if (value == 0) {
+			debug_flags_clear();
+			debug_close();
+		}
+
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;

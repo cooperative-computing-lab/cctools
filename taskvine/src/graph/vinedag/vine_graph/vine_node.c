@@ -21,7 +21,7 @@
 #include "vine_task.h"
 #include "vine_worker_info.h"
 #include "vine_temp.h"
-#include "strategic_orchestration_node.h"
+#include "vine_node.h"
 #include "taskvine.h"
 
 /*************************************************************/
@@ -35,7 +35,7 @@
  * @param node Reference to the node object.
  * @return 1 if the outfile is persisted, 0 otherwise.
  */
-static int node_outfile_has_been_persisted(struct strategic_orchestration_node *node)
+static int node_outfile_has_been_persisted(struct vine_node *node)
 {
 	if (!node) {
 		return 0;
@@ -63,10 +63,10 @@ static int node_outfile_has_been_persisted(struct strategic_orchestration_node *
  * @param node Reference to the node object.
  * @param execution_time Reference to the execution time of the node.
  */
-void son_update_critical_path_time(struct strategic_orchestration_node *node, timestamp_t execution_time)
+void vine_node_update_critical_path_time(struct vine_node *node, timestamp_t execution_time)
 {
 	timestamp_t max_parent_critical_path_time = 0;
-	struct strategic_orchestration_node *parent_node;
+	struct vine_node *parent_node;
 	LIST_ITERATE(node->parents, parent_node)
 	{
 		if (parent_node->critical_path_time > max_parent_critical_path_time) {
@@ -83,7 +83,7 @@ void son_update_critical_path_time(struct strategic_orchestration_node *node, ti
  * @param result Reference to the result list.
  * @param visited Reference to the visited set.
  */
-static void find_parents_dfs(struct strategic_orchestration_node *node, int remaining_depth, struct list *result, struct set *visited)
+static void find_parents_dfs(struct vine_node *node, int remaining_depth, struct list *result, struct set *visited)
 {
 	if (!node || set_lookup(visited, node)) {
 		return;
@@ -94,7 +94,7 @@ static void find_parents_dfs(struct strategic_orchestration_node *node, int rema
 		list_push_tail(result, node);
 		return;
 	}
-	struct strategic_orchestration_node *parent_node;
+	struct vine_node *parent_node;
 	LIST_ITERATE(node->parents, parent_node)
 	{
 		find_parents_dfs(parent_node, remaining_depth - 1, result, visited);
@@ -106,31 +106,21 @@ static void find_parents_dfs(struct strategic_orchestration_node *node, int rema
 /*************************************************************/
 
 /**
- * Create a new node object.
- * @param node_key Reference to the node key.
- * @param is_target_key Reference to whether the node is a target key.
- * @return A new node object.
+ * Create a new vine node owned by the C-side graph.
+ * @param node_id Graph-assigned identifier that keeps C and Python in sync.
+ * @return Newly allocated vine node.
  */
-struct strategic_orchestration_node *son_create(const char *node_key, int is_target_key)
+struct vine_node *vine_node_create(uint64_t node_id)
 {
-	if (!node_key) {
-		debug(D_ERROR, "Cannot create node because node_key is NULL");
-		return NULL;
-	}
-	if (is_target_key != 0 && is_target_key != 1) {
-		debug(D_ERROR, "Cannot create node because is_target_key is not 0 or 1");
-		return NULL;
-	}
+	struct vine_node *node = xxmalloc(sizeof(struct vine_node));
 
-	struct strategic_orchestration_node *node = xxmalloc(sizeof(struct strategic_orchestration_node));
+	node->is_target = 0;
+	node->node_id = node_id;
 
-	node->is_target_key = is_target_key;
-	node->node_key = xxstrdup(node_key);
-
-	/* create a unique outfile remote name for the node */
-	cctools_uuid_t id;
-	cctools_uuid_create(&id);
-	node->outfile_remote_name = xxstrdup(id.str);
+	/* create a unique UUID-based remote outfile name for this node */
+	cctools_uuid_t uuid;
+	cctools_uuid_create(&uuid);
+	node->outfile_remote_name = xxstrdup(uuid.str);
 
 	node->prune_status = PRUNE_STATUS_NOT_PRUNED;
 	node->parents = list_create();
@@ -168,9 +158,9 @@ struct strategic_orchestration_node *son_create(const char *node_key, int is_tar
 /**
  * Construct the task arguments for the node.
  * @param node Reference to the node object.
- * @return The task arguments in JSON format: {"fn_args": [key], "fn_kwargs": {}}.
+ * @return The task arguments in JSON format: {"fn_args": [node_id], "fn_kwargs": {}}.
  */
-char *son_construct_task_arguments(struct strategic_orchestration_node *node)
+char *vine_node_construct_task_arguments(struct vine_node *node)
 {
 	if (!node) {
 		return NULL;
@@ -178,7 +168,7 @@ char *son_construct_task_arguments(struct strategic_orchestration_node *node)
 
 	struct jx *event = jx_object(NULL);
 	struct jx *args = jx_array(NULL);
-	jx_array_append(args, jx_string(node->node_key));
+	jx_array_append(args, jx_integer(node->node_id));
 	jx_insert(event, jx_string("fn_args"), args);
 	jx_insert(event, jx_string("fn_kwargs"), jx_object(NULL));
 
@@ -194,7 +184,7 @@ char *son_construct_task_arguments(struct strategic_orchestration_node *node)
  * @param depth Reference to the depth.
  * @return The list of parents.
  */
-struct list *son_find_parents_by_depth(struct strategic_orchestration_node *node, int depth)
+struct list *vine_node_find_parents_by_depth(struct vine_node *node, int depth)
 {
 	if (!node || depth < 0) {
 		return NULL;
@@ -229,7 +219,7 @@ struct list *son_find_parents_by_depth(struct strategic_orchestration_node *node
  * @param start_node  The node from which to begin the reverse search.
  * @return A set of ancestor nodes that are safe to prune (excluding start_node).
  */
-struct set *son_find_safe_ancestors(struct strategic_orchestration_node *start_node)
+struct set *vine_node_find_safe_ancestors(struct vine_node *start_node)
 {
 	if (!start_node) {
 		return NULL;
@@ -244,8 +234,8 @@ struct set *son_find_safe_ancestors(struct strategic_orchestration_node *start_n
 	set_insert(visited_nodes, start_node);
 
 	while (list_size(queue) > 0) {
-		struct strategic_orchestration_node *current_node = list_pop_head(queue);
-		struct strategic_orchestration_node *parent_node;
+		struct vine_node *current_node = list_pop_head(queue);
+		struct vine_node *parent_node;
 
 		LIST_ITERATE(current_node->parents, parent_node)
 		{
@@ -262,7 +252,7 @@ struct set *son_find_safe_ancestors(struct strategic_orchestration_node *start_n
 
 			/* check if all children of this parent are safe */
 			int all_children_safe = 1;
-			struct strategic_orchestration_node *child_node;
+			struct vine_node *child_node;
 			LIST_ITERATE(parent_node->children, child_node)
 			{
 				/* shortcut if this child is part of the recovery subgraph */
@@ -298,19 +288,19 @@ struct set *son_find_safe_ancestors(struct strategic_orchestration_node *start_n
  * Print the info of the node.
  * @param node Reference to the node object.
  */
-void son_debug_print(struct strategic_orchestration_node *node)
+void vine_node_debug_print(struct vine_node *node)
 {
 	if (!node) {
 		return;
 	}
 
 	if (!node->task) {
-		debug(D_ERROR, "node %s has no task", node->node_key);
+		debug(D_ERROR, "node %" PRIu64 " has no task", node->node_id);
 		return;
 	}
 
 	debug(D_VINE, "---------------- Node Info ----------------");
-	debug(D_VINE, "key: %s", node->node_key);
+	debug(D_VINE, "node_id: %" PRIu64, node->node_id);
 	debug(D_VINE, "task_id: %d", node->task->task_id);
 	debug(D_VINE, "depth: %d", node->depth);
 	debug(D_VINE, "height: %d", node->height);
@@ -345,38 +335,38 @@ void son_debug_print(struct strategic_orchestration_node *node)
 		debug(D_VINE, "outfile_type: SHARED_FILE_SYSTEM or none");
 	}
 
-	/* print parent and child node keys */
-	char *parent_keys = NULL;
-	struct strategic_orchestration_node *p;
+	/* print parent and child node ids */
+	char *parent_ids = NULL;
+	struct vine_node *p;
 	LIST_ITERATE(node->parents, p)
 	{
-		if (!parent_keys) {
-			parent_keys = string_format("%s", p->node_key);
+		if (!parent_ids) {
+			parent_ids = string_format("%" PRIu64, p->node_id);
 		} else {
-			char *tmp = string_format("%s, %s", parent_keys, p->node_key);
-			free(parent_keys);
-			parent_keys = tmp;
+			char *tmp = string_format("%s, %" PRIu64, parent_ids, p->node_id);
+			free(parent_ids);
+			parent_ids = tmp;
 		}
 	}
 
-	char *child_keys = NULL;
-	struct strategic_orchestration_node *c;
+	char *child_ids = NULL;
+	struct vine_node *c;
 	LIST_ITERATE(node->children, c)
 	{
-		if (!child_keys) {
-			child_keys = string_format("%s", c->node_key);
+		if (!child_ids) {
+			child_ids = string_format("%" PRIu64, c->node_id);
 		} else {
-			char *tmp = string_format("%s, %s", child_keys, c->node_key);
-			free(child_keys);
-			child_keys = tmp;
+			char *tmp = string_format("%s, %" PRIu64, child_ids, c->node_id);
+			free(child_ids);
+			child_ids = tmp;
 		}
 	}
 
-	debug(D_VINE, "parents: %s", parent_keys ? parent_keys : "(none)");
-	debug(D_VINE, "children: %s", child_keys ? child_keys : "(none)");
+	debug(D_VINE, "parents: %s", parent_ids ? parent_ids : "(none)");
+	debug(D_VINE, "children: %s", child_ids ? child_ids : "(none)");
 
-	free(parent_keys);
-	free(child_keys);
+	free(parent_ids);
+	free(child_ids);
 
 	debug(D_VINE, "-------------------------------------------");
 }
@@ -385,15 +375,12 @@ void son_debug_print(struct strategic_orchestration_node *node)
  * Delete the node and all of its associated resources.
  * @param node Reference to the node object.
  */
-void son_delete(struct strategic_orchestration_node *node)
+void vine_node_delete(struct vine_node *node)
 {
 	if (!node) {
 		return;
 	}
 
-	if (node->node_key) {
-		free(node->node_key);
-	}
 	if (node->outfile_remote_name) {
 		free(node->outfile_remote_name);
 	}

@@ -1,11 +1,14 @@
+# Copyright (C) 2025 The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
 
 from ndcctools.taskvine import cvine
 from ndcctools.taskvine.manager import Manager
 
-from ndcctools.taskvine.vinedag.proxy_library import ProxyLibrary
-from ndcctools.taskvine.vinedag.proxy_functions import compute_single_key
-from ndcctools.taskvine.vinedag.runtime_execution_graph import RuntimeExecutionGraph, GraphKeyResult
-from ndcctools.taskvine.vinedag.strategic_orchestration_graph import StrategicOrchestrationGraph
+from ndcctools.taskvine.vinedag.context_graph.proxy_library import ProxyLibrary
+from ndcctools.taskvine.vinedag.context_graph.proxy_functions import compute_single_key
+from ndcctools.taskvine.vinedag.context_graph.core import ContextGraph, GraphKeyResult
+from ndcctools.taskvine.vinedag.vine_graph.vine_graph_client import VineGraphClient
 
 import cloudpickle
 import os
@@ -29,6 +32,7 @@ except ImportError:
 
 
 def delete_all_files(root_dir):
+    """Clean the run-info template directory between runs so stale files never leak into a new DAG."""
     if not os.path.exists(root_dir):
         return
     for dirpath, dirnames, filenames in os.walk(root_dir):
@@ -40,34 +44,45 @@ def delete_all_files(root_dir):
                 print(f"Failed to delete file {file_path}")
 
 
-# color the text with the given color code
+# Nicely format terminal output when printing manager metadata.
 def color_text(text, color_code):
+    """Render a colored string for the friendly status banners Vineyard prints at start-up."""
     return f"\033[{color_code}m{text}\033[0m"
 
 
-# convert Dask collection to task dictionary
+# Flatten Dask collections into the dict-of-tasks structure the rest of the
+# pipeline expects. VineDAG clients often hand us a dict like
+# {"result": dask.delayed(...)}; we merge the underlying HighLevelGraphs so
+# `ContextGraph` sees the same dict representation C does.
 def dask_collections_to_task_dict(collection_dict):
+    """Merge user-facing Dask collections into the flattened task dict the ContextGraph expects."""
     assert is_dask_collection is not None
     from dask.highlevelgraph import HighLevelGraph, ensure_dict
 
     if not isinstance(collection_dict, dict):
-        raise TypeError("Input must be a dict or a HighLevelGraph")
+        raise TypeError("Input must be a dict")
 
     for k, v in collection_dict.items():
         if not is_dask_collection(v):
             raise TypeError(f"Input must be a dict of DaskCollection, but found {k} with type {type(v)}")
 
     if dts:
+        # the new Dask API
         sub_hlgs = [v.dask for v in collection_dict.values()]
         hlg = HighLevelGraph.merge(*sub_hlgs).to_dict()
     else:
+        # the old Dask API
         hlg = dask.base.collections_to_dsk(collection_dict.values())
 
     return ensure_dict(hlg)
 
 
-# compatibility for Dask-created collections
+# Accept both plain dicts and Dask collections from callers. Most library users
+# hand us `{key: delayed / value}` directly, while some experiments pass a
+# fully-expanded legacy Dask dict. This helper normalises both cases so the rest
+# of the pipeline only deals with `{task_key: task_expression}`.
 def ensure_task_dict(collection_dict):
+    """Normalize user input (raw dict or Dask collection) into a plain `{task_key: expr}` mapping."""
     if is_dask_collection and any(is_dask_collection(v) for v in collection_dict.values()):
         task_dict = dask_collections_to_task_dict(collection_dict)
     else:
@@ -81,6 +96,8 @@ def ensure_task_dict(collection_dict):
 
 class GraphParams:
     def __init__(self):
+        """Hold all tweakable knobs (manager-side, vine_graph-side, and misc)."""
+        # Manager-level knobs: fed into `Manager.tune(...)` before execution.
         self.vine_manager_tuning_params = {
             "worker-source-max-transfers": 100,
             "max-retrievals": -1,
@@ -91,7 +108,8 @@ class GraphParams:
             "enforce-worker-eviction-interval": -1,
             "balance-worker-disk-load": 0,
         }
-        self.sog_tuning_params = {
+        # VineGraph-level knobs: forwarded to the underlying vine graph via VineGraphClient.
+        self.vine_graph_tuning_params = {
             "failure-injection-step-percent": -1,
             "task-priority-mode": "largest-input-first",
             "prune-depth": 1,
@@ -102,33 +120,37 @@ class GraphParams:
             "time-metrics-filename": "time_metrics.csv",
             "enable-debug-log": 1,
         }
+        # Misc knobs used purely on the Python side (e.g., generate fake outputs).
         self.other_params = {
             "schedule": "worst",
             "libcores": 16,
             "failure-injection-step-percent": -1,
-            "extra-task-output-size-mb": ["uniform", 0, 0],
-            "extra-task-sleep-time": ["uniform", 0, 0],
+            "extra-task-output-size-mb": [0, 0],
+            "extra-task-sleep-time": [0, 0],
         }
 
     def print_params(self):
-        all_params = {**self.vine_manager_tuning_params, **self.sog_tuning_params, **self.other_params}
+        """Dump current knob values to stdout for debugging."""
+        all_params = {**self.vine_manager_tuning_params, **self.vine_graph_tuning_params, **self.other_params}
         print(json.dumps(all_params, indent=4))
 
     def update_param(self, param_name, new_value):
+        """Update a single knob, falling back to manager-level if unknown."""
         if param_name in self.vine_manager_tuning_params:
             self.vine_manager_tuning_params[param_name] = new_value
-        elif param_name in self.sog_tuning_params:
-            self.sog_tuning_params[param_name] = new_value
+        elif param_name in self.vine_graph_tuning_params:
+            self.vine_graph_tuning_params[param_name] = new_value
         elif param_name in self.other_params:
             self.other_params[param_name] = new_value
         else:
             self.vine_manager_tuning_params[param_name] = new_value
 
     def get_value_of(self, param_name):
+        """Helper so VineDAG can pull a knob value without caring where it lives."""
         if param_name in self.vine_manager_tuning_params:
             return self.vine_manager_tuning_params[param_name]
-        elif param_name in self.sog_tuning_params:
-            return self.sog_tuning_params[param_name]
+        elif param_name in self.vine_graph_tuning_params:
+            return self.vine_graph_tuning_params[param_name]
         elif param_name in self.other_params:
             return self.other_params[param_name]
         else:
@@ -139,20 +161,21 @@ class VineDAG(Manager):
     def __init__(self,
                  *args,
                  **kwargs):
+        """Spin up a TaskVine manager that knows how to mirror a Python DAG into the C orchestration layer."""
 
-        # handle SIGINT
+        # React to Ctrl+C so we can tear down the graphs cleanly.
         signal.signal(signal.SIGINT, self._on_sigint)
 
         self.params = GraphParams()
 
-        # delete all files in the run info directory, do this before super().__init__()
+        # Ensure run-info templates don't accumulate garbage between runs.
         run_info_path = kwargs.get("run_info_path", None)
         run_info_template = kwargs.get("run_info_template", None)
         self.run_info_template_path = os.path.join(run_info_path, run_info_template)
         if self.run_info_template_path:
             delete_all_files(self.run_info_template_path)
 
-        # initialize the manager
+        # Boot the underlying TaskVine manager. The TaskVine manager keeps alive until the vinedag object is destroyed
         super().__init__(*args, **kwargs)
         self.runtime_directory = cvine.vine_get_runtime_directory(self._taskvine)
 
@@ -161,114 +184,130 @@ class VineDAG(Manager):
         print(f"=== Runtime directory: {color_text(self.runtime_directory, 92)}")
 
     def param(self, param_name):
+        """Convenience accessor so callers can read tuned parameters at runtime."""
         return self.params.get_value_of(param_name)
 
     def update_params(self, new_params):
+        """Apply a batch of overrides before constructing graphs.
+
+        All parameter dictionaries—whether set via `update_params()` or passed
+        to `run(..., params={...})`—flow through here. We funnel each key into
+        the appropriate bucket (manager/vine_graph/misc). Subsequent runs can override
+        them by calling this again.
+        """
         assert isinstance(new_params, dict), "new_params must be a dict"
         for k, new_v in new_params.items():
             self.params.update_param(k, new_v)
 
-    def get_run_info_path(self):
-        return os.path.join(self.param("run-info-path"), self.param("run-info-template"))
-
     def tune_manager(self):
+        """Push our manager-side tuning knobs into the C layer."""
         for k, v in self.params.vine_manager_tuning_params.items():
             try:
                 self.tune(k, v)
             except Exception:
                 raise ValueError(f"Unrecognized parameter: {k}")
 
-    def tune_sog(self, sog):
-        for k, v in self.params.sog_tuning_params.items():
-            sog.tune(k, str(v))
+    def tune_vine_graph(self, vine_graph):
+        """Push VineGraph-specific tuning knobs before we build the graph."""
+        for k, v in self.params.vine_graph_tuning_params.items():
+            vine_graph.tune(k, str(v))
 
-    def build_reg(self, task_dict):
-        reg = RuntimeExecutionGraph(
+    def build_context_graph(self, task_dict):
+        """Construct the Python-side DAG wrapper (ContextGraph)."""
+        context_graph = ContextGraph(
             task_dict,
             extra_task_output_size_mb=self.param("extra-task-output-size-mb"),
             extra_task_sleep_time=self.param("extra-task-sleep-time")
         )
 
-        return reg
+        return context_graph
 
-    def build_sog(self, reg, target_keys):
-        assert reg is not None, "Python graph must be built before building the C graph"
+    def build_vine_graph(self, context_graph, target_keys):
+        """Mirror the ContextGraph into VineGraph, preserving ordering and targets."""
+        assert context_graph is not None, "ContextGraph must be built before building the VineGraph"
 
-        sog = StrategicOrchestrationGraph(self._taskvine)
+        vine_graph = VineGraphClient(self._taskvine)
 
-        sog.set_proxy_function(compute_single_key)
+        vine_graph.set_proxy_function(compute_single_key)
 
-        # C side vine task graph must be tuned before adding nodes and dependencies
+        # Tune both manager and vine_graph before we start adding nodes/edges.
         self.tune_manager()
-        self.tune_sog(sog)
+        self.tune_vine_graph(vine_graph)
 
-        topo_order = reg.get_topological_order()
+        topo_order = context_graph.get_topological_order()
+        # Build the cross-language mapping as we walk the topo order.
         for k in topo_order:
-            sog.add_node(reg.reg_key_to_sog_key[k], int(k in target_keys))
-            for pk in reg.parents_of[k]:
-                sog.add_dependency(reg.reg_key_to_sog_key[pk], reg.reg_key_to_sog_key[k])
+            node_id = vine_graph.add_node(k)
+            context_graph.ckey2vid[k] = node_id
+            context_graph.vid2ckey[node_id] = k
+            for pk in context_graph.parents_of[k]:
+                vine_graph.add_dependency(pk, k)
 
-        sog.compute_topology_metrics()
+        # Now that every node is present, mark which ones are final outputs.
+        for k in target_keys:
+            vine_graph.set_target(k)
 
-        return sog
+        vine_graph.compute_topology_metrics()
+
+        return vine_graph
 
     def build_graphs(self, task_dict, target_keys):
-        # build Python DAG (logical topology)
-        reg = self.build_reg(task_dict)
-        # build C DAG (physical topology)
-        sog = self.build_sog(reg, target_keys)
+        """Create both the ContextGraph and its C counterpart, wiring outputs for later use."""
+        # Build the logical (Python) DAG.
+        context_graph = self.build_context_graph(task_dict)
+        # Build the physical (C) DAG.
+        vine_graph = self.build_vine_graph(context_graph, target_keys)
 
-        # set outfile remote names in reg from sog, note that these names are automatically generated
-        # with regard to the checkpointing strategy and the shared file system directory
-        for sog_key in reg.reg_key_to_sog_key.values():
-            outfile_remote_name = sog.get_node_outfile_remote_name(sog_key)
-            reg.set_outfile_remote_name_of(reg.sog_key_to_reg_key[sog_key], outfile_remote_name)
+        # Cross-fill the outfile locations so the runtime graph knows where to read/write.
+        for k in context_graph.ckey2vid:
+            outfile_remote_name = vine_graph.get_node_outfile_remote_name(k)
+            context_graph.outfile_remote_name[k] = outfile_remote_name
 
-        return reg, sog
+        return context_graph, vine_graph
 
-    def create_proxy_library(self, reg, sog, hoisting_modules, env_files):
+    def create_proxy_library(self, context_graph, vine_graph, hoisting_modules, env_files):
+        """Package up the context_graph as a TaskVine library."""
         proxy_library = ProxyLibrary(self)
         proxy_library.add_hoisting_modules(hoisting_modules)
         proxy_library.add_env_files(env_files)
-        proxy_library.set_context_loader(RuntimeExecutionGraph.context_loader_func, context_loader_args=[cloudpickle.dumps(reg)])
+        proxy_library.set_context_loader(ContextGraph.context_loader_func, context_loader_args=[cloudpickle.dumps(context_graph)])
         proxy_library.set_libcores(self.param("libcores"))
-        proxy_library.set_name(sog.get_proxy_library_name())
+        proxy_library.set_name(vine_graph.get_proxy_library_name())
 
         return proxy_library
 
     def run(self, collection_dict, target_keys=[], params={}, hoisting_modules=[], env_files={}):
+        """High-level entry point: normalise input, build graphs, ship the library, execute, and return results."""
         # first update the params so that they can be used for the following construction
         self.update_params(params)
 
         task_dict = ensure_task_dict(collection_dict)
 
-        with open("test_dv5.pkl", "wb") as f:
-            cloudpickle.dump(task_dict, f)
+        # Build both the Python DAG and its C mirror.
+        context_graph, vine_graph = self.build_graphs(task_dict, target_keys)
 
-        # build graphs from both sides
-        reg, sog = self.build_graphs(task_dict, target_keys)
-
-        # create and install the proxy library on the manager
-        proxy_library = self.create_proxy_library(reg, sog, hoisting_modules, env_files)
+        # Ship the execution context to workers via a proxy library.
+        proxy_library = self.create_proxy_library(context_graph, vine_graph, hoisting_modules, env_files)
         proxy_library.install()
 
         print(f"=== Library serialized size: {color_text(proxy_library.get_context_size(), 92)} MB")
 
-        # execute the graph on the C side
-        sog.execute()
+        # Kick off execution on the C side.
+        vine_graph.execute()
 
-        # clean up the library instances and template on the manager
+        # Tear down once we're done so successive runs start clean.
         proxy_library.uninstall()
 
-        # delete the C graph immediately after execution, so that the lifetime of this object is limited to the execution
-        sog.delete()
+        # Delete the C graph immediately so its lifetime matches the run.
+        vine_graph.delete()
 
-        # load results of target keys
+        # Load any requested target outputs back into Python land.
         results = {}
         for k in target_keys:
-            outfile_path = os.path.join(self.param("output-dir"), reg.outfile_remote_name[k])
+            outfile_path = os.path.join(self.param("output-dir"), context_graph.outfile_remote_name[k])
             results[k] = GraphKeyResult.load_from_path(outfile_path)
         return results
 
     def _on_sigint(self, signum, frame):
+        """SIGINT handler that delegates to Manager cleanup so workers are released promptly."""
         self.__del__()

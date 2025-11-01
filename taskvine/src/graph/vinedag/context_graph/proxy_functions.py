@@ -7,7 +7,7 @@ import time
 from ndcctools.taskvine.utils import load_variable_from_library
 
 
-def compute_dts_key(reg, k, v):
+def compute_dts_key(context_graph, k, v):
     """
     Compute the result of a Dask task node from dask._task_spec.
 
@@ -15,7 +15,7 @@ def compute_dts_key(reg, k, v):
     inherit from the same base class. The `dependencies` field is a frozenset
     containing direct dependencies only (no recursive ancestry).
 
-    The function resolves each dependency from the reg, constructs an
+    The function resolves each dependency from the context_graph, constructs an
     input dictionary, and then executes the node according to its type.
     """
     try:
@@ -23,12 +23,12 @@ def compute_dts_key(reg, k, v):
     except ImportError:
         raise ImportError("Dask is not installed")
 
-    input_dict = {dep: reg.load_result_of_key(dep) for dep in v.dependencies}
+    input_dict = {dep: context_graph.load_result_of_key(dep) for dep in v.dependencies}
 
     try:
         if isinstance(v, dts.Alias):
             assert len(v.dependencies) == 1, "Expected exactly one dependency"
-            return reg.load_result_of_key(next(iter(v.dependencies)))
+            return context_graph.load_result_of_key(next(iter(v.dependencies)))
         elif isinstance(v, dts.Task):
             return v(input_dict)
         elif isinstance(v, dts.DataNode):
@@ -39,7 +39,7 @@ def compute_dts_key(reg, k, v):
         raise Exception(f"Error while executing task {k}: {e}")
 
 
-def compute_sexpr_key(reg, k, v):
+def compute_sexpr_key(context_graph, k, v):
     """
     Evaluate a symbolic expression (S-expression) task within the task graph.
 
@@ -54,7 +54,7 @@ def compute_sexpr_key(reg, k, v):
     recursively resolves and executes the expression until a final value
     is produced.
     """
-    input_dict = {parent: reg.load_result_of_key(parent) for parent in reg.parents_of[k]}
+    input_dict = {parent: context_graph.load_result_of_key(parent) for parent in context_graph.parents_of[k]}
 
     def _rec_call(expr):
         try:
@@ -77,10 +77,10 @@ def compute_sexpr_key(reg, k, v):
 
 def compute_single_key(vine_key):
     """
-    Compute a single task identified by a Vine key within the current RuntimeExecutionGraph.
+    Compute a single task identified by a Vine key within the current ContextGraph.
 
     The function retrieves the corresponding graph key and task object from the
-    global reg, determines the task type, and dispatches to the appropriate
+    global context_graph, determines the task type, and dispatches to the appropriate
     execution interface — e.g., `compute_dts_key` for Dask-style task specs or
     `compute_sexpr_key` for S-expression graphs.
 
@@ -90,22 +90,22 @@ def compute_single_key(vine_key):
     After computation, the result is saved, the output file is validated, and
     an optional delay (`extra_sleep_time_of`) is applied before returning.
     """
-    reg = load_variable_from_library('reg')
+    context_graph = load_variable_from_library('context_graph')
 
-    k = reg.sog_key_to_reg_key[vine_key]
-    v = reg.task_dict[k]
+    k = context_graph.vid2ckey[vine_key]
+    v = context_graph.task_dict[k]
 
-    if reg.is_dts_key(k):
-        result = compute_dts_key(reg, k, v)
+    if context_graph.is_dts_key(k):
+        result = compute_dts_key(context_graph, k, v)
     else:
-        result = compute_sexpr_key(reg, k, v)
+        result = compute_sexpr_key(context_graph, k, v)
 
-    reg.save_result_of_key(k, result)
-    if not os.path.exists(reg.outfile_remote_name[k]):
-        raise Exception(f"Output file {reg.outfile_remote_name[k]} does not exist after writing")
-    if os.stat(reg.outfile_remote_name[k]).st_size == 0:
-        raise Exception(f"Output file {reg.outfile_remote_name[k]} is empty after writing")
+    context_graph.save_result_of_key(k, result)
+    if not os.path.exists(context_graph.outfile_remote_name[k]):
+        raise Exception(f"Output file {context_graph.outfile_remote_name[k]} does not exist after writing")
+    if os.stat(context_graph.outfile_remote_name[k]).st_size == 0:
+        raise Exception(f"Output file {context_graph.outfile_remote_name[k]} is empty after writing")
 
-    time.sleep(reg.extra_sleep_time_of[k])
+    time.sleep(context_graph.extra_sleep_time_of[k])
 
     return True
