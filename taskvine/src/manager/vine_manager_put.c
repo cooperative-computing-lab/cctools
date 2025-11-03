@@ -30,6 +30,11 @@ See the file COPYING for details.
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <inttypes.h>
 
 char *vine_monitor_wrap(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *limits);
 
@@ -475,117 +480,257 @@ It does not perform any resource management.
 This allows it to be used for both regular tasks and mini tasks.
 */
 
-vine_result_code_t vine_manager_put_task(
-		struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *command_line, struct rmsummary *limits, struct vine_file *target)
+#ifndef SB_INIT_CAP
+#define SB_INIT_CAP 4096
+#endif
+
+#ifndef SB_MAX_CHUNK
+#define SB_MAX_CHUNK (1024*1024)
+#endif
+
+struct sbuf {
+	char *buf;
+	size_t len;
+	size_t cap;
+};
+
+static inline int sb_reserve(struct sbuf *B, size_t add)
 {
-	if (target) {
-		if (vine_file_replica_table_lookup(w, target->cached_name)) {
-			/* do nothing, file already at worker */
-			debug(D_NOTICE, "cannot put mini_task %s at %s. Already at worker.", target->cached_name, w->addrport);
-			return VINE_SUCCESS;
-		}
+	size_t need = B->len + add + 1;
+	if (need <= B->cap) {
+		return 0;
+	}
+	size_t cap = (B->cap > 0) ? B->cap : SB_INIT_CAP;
+	while (cap < need) {
+		cap <<= 1;
+	}
+	char *nb = (char *)realloc(B->buf, cap);
+	if (!nb) {
+		return -1;
+	}
+	B->buf = nb;
+	B->cap = cap;
+	return 0;
+}
+
+static inline int sb_append(struct sbuf *B, const void *p, size_t n)
+{
+	if (sb_reserve(B, n) < 0) {
+		return -1;
+	}
+	memcpy(B->buf + B->len, p, n);
+	B->len += n;
+	return 0;
+}
+
+static inline int sb_printf(struct sbuf *B, const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	va_list aq;
+	va_copy(aq, ap);
+	int need = vsnprintf(NULL, 0, fmt, aq);
+	va_end(aq);
+	if (need <= 0) {
+		va_end(ap);
+		return 0;
+	}
+	if (sb_reserve(B, (size_t)need) < 0) {
+		va_end(ap);
+		return -1;
+	}
+	int n = vsnprintf(B->buf + B->len, (size_t)need + 1, fmt, ap);
+	va_end(ap);
+	if (n > 0) {
+		B->len += (size_t)n;
+	}
+	return n;
+}
+
+#if defined(DEBUG_LEVEL) && (DEBUG_LEVEL >= D_VINE)
+#define DBG_TX(W,S,N) do { \
+	if ((N) > 0) { \
+		debug(D_VINE, "tx to %s (%s): %.*s", (W)->hostname, (W)->addrport, (int)(N), (const char*)(S)); \
+	} \
+} while(0)
+#else
+#define DBG_TX(W,S,N) do { (void)(W); (void)(S); (void)(N); } while(0)
+#endif
+
+#define EMITF(B,W,...) do { \
+	char _ln[VINE_LINE_MAX]; \
+	int _n = snprintf(_ln, sizeof(_ln), __VA_ARGS__); \
+	if (_n > 0) { \
+		size_t _L = (size_t)_n; \
+		if (_L >= sizeof(_ln)) { \
+			_L = sizeof(_ln) - 1; \
+		} \
+		sb_append((B), _ln, _L); \
+		DBG_TX((W), _ln, _L); \
+	} \
+} while(0)
+
+vine_result_code_t vine_manager_put_task(
+	struct vine_manager *q, struct vine_worker_info *w,
+	struct vine_task *t, const char *command_line,
+	struct rmsummary *limits, struct vine_file *target)
+{
+	if (target && vine_file_replica_table_lookup(w, target->cached_name)) {
+		debug(D_NOTICE, "mini_task %s already at %s", target->cached_name, w->addrport);
+		return VINE_SUCCESS;
 	}
 
-	vine_result_code_t result = vine_manager_put_input_files(q, w, t);
-	if (result != VINE_SUCCESS)
-		return result;
-
-	if (target) {
-		/* If the user provide mode bits manually, use them here. */
-		int mode = target->mode;
-		if (mode == 0)
-			mode = 0755;
-		/* A mini-task is identified by the file it creates. */
-		vine_manager_send(q, w, "mini_task %s %s %d %lld 0%o\n", target->source, target->cached_name, target->cache_level, (long long)target->size, mode);
-	} else {
-		/* A regular task is simply identified by a task id. */
-		vine_manager_send(q, w, "task %lld\n", (long long)t->task_id);
+	vine_result_code_t rc = vine_manager_put_input_files(q, w, t);
+	if (rc != VINE_SUCCESS) {
+		return rc;
 	}
 
 	if (!command_line) {
 		command_line = t->command_line;
 	}
+	const size_t cmd_len = strlen(command_line);
 
-	long long cmd_len = strlen(command_line);
-	vine_manager_send(q, w, "cmd %lld\n", (long long)cmd_len);
-	link_putlstring(w->link, command_line, cmd_len, time(0) + q->short_timeout);
-	debug(D_VINE, "%s\n", command_line);
+	size_t pre = 256 + cmd_len + 64;
+	{
+		char *e;
+		size_t nenv = 0, envbytes = 0;
+		LIST_ITERATE(t->env_list, e) {
+			size_t L = strlen(e);
+			envbytes += L + 16;
+			nenv++;
+		}
+		pre += envbytes + nenv * 32;
+		struct vine_mount *m;
+		if (t->input_mounts) {
+			LIST_ITERATE(t->input_mounts, m) {
+				pre += (m->remote_name ? strlen(m->remote_name) : 0) + 64;
+			}
+		}
+		if (t->output_mounts) {
+			LIST_ITERATE(t->output_mounts, m) {
+				pre += (m->remote_name ? strlen(m->remote_name) : 0) + 64;
+			}
+		}
+		if (t->needs_library) {
+			pre += strlen(t->needs_library) + 32;
+		}
+		if (t->provides_library) {
+			pre += strlen(t->provides_library) + 64;
+		}
+		if (t->category) {
+			pre += strlen(t->category) + 32;
+		}
+	}
+
+	struct sbuf sb = {0, 0, 0};
+	if (sb_reserve(&sb, pre) < 0) {
+		return VINE_WORKER_FAILURE;
+	}
+
+	if (target) {
+		int mode = target->mode ? target->mode : 0755;
+		EMITF(&sb, w, "mini_task %s %s %d %lld 0%o\n",
+			target->source, target->cached_name, target->cache_level,
+			(long long)target->size, mode);
+	} else {
+		EMITF(&sb, w, "task %lld\n", (long long)t->task_id);
+	}
+
+	EMITF(&sb, w, "cmd %zu\n", cmd_len);
+	if (sb_append(&sb, command_line, cmd_len) < 0) {
+		free(sb.buf);
+		return VINE_WORKER_FAILURE;
+	}
+	DBG_TX(w, command_line, cmd_len);
+	EMITF(&sb, w, "\n");
 
 	if (t->needs_library) {
-		vine_manager_send(q, w, "needs_library %s\n", t->needs_library);
+		EMITF(&sb, w, "needs_library %s\n", t->needs_library);
 	}
-
 	if (t->provides_library) {
-		vine_manager_send(q, w, "provides_library %s\n", t->provides_library);
-		vine_manager_send(q, w, "function_slots %d\n", t->function_slots_total);
-		vine_manager_send(q, w, "func_exec_mode %d\n", t->func_exec_mode);
+		EMITF(&sb, w, "provides_library %s\n", t->provides_library);
+		EMITF(&sb, w, "function_slots %d\n", t->function_slots_total);
+		EMITF(&sb, w, "func_exec_mode %d\n", t->func_exec_mode);
 	}
 
-	vine_manager_send(q, w, "category %s\n", t->category);
+	EMITF(&sb, w, "category %s\n", t->category ? t->category : "default");
 
 	if (limits) {
-		vine_manager_send(q, w, "cores %s\n", rmsummary_resource_to_str("cores", limits->cores, 0));
-		vine_manager_send(q, w, "gpus %s\n", rmsummary_resource_to_str("gpus", limits->gpus, 0));
-		vine_manager_send(q, w, "memory %s\n", rmsummary_resource_to_str("memory", limits->memory, 0));
-		vine_manager_send(q, w, "disk %s\n", rmsummary_resource_to_str("disk", limits->disk, 0));
-
-		/* Do not set end, wall_time if running the resource monitor. We let the monitor police these resources.
-		 */
-		if (q->monitor_mode != VINE_MON_WATCHDOG) {
+		EMITF(&sb, w, "cores %s\n",   rmsummary_resource_to_str("cores",   limits->cores,   0));
+		EMITF(&sb, w, "gpus %s\n",    rmsummary_resource_to_str("gpus",    limits->gpus,    0));
+		EMITF(&sb, w, "memory %s\n",  rmsummary_resource_to_str("memory",  limits->memory,  0));
+		EMITF(&sb, w, "disk %s\n",    rmsummary_resource_to_str("disk",    limits->disk,    0));
+		if (q->monitor_mode == VINE_MON_DISABLED) {
 			if (limits->end > 0) {
-				vine_manager_send(q, w, "end_time %s\n", rmsummary_resource_to_str("end", limits->end, 0));
+				EMITF(&sb, w, "end_time %s\n", rmsummary_resource_to_str("end", limits->end, 0));
 			}
 			if (limits->wall_time > 0) {
-				vine_manager_send(q, w, "wall_time %s\n", rmsummary_resource_to_str("wall_time", limits->wall_time, 0));
+				EMITF(&sb, w, "wall_time %s\n", rmsummary_resource_to_str("wall_time", limits->wall_time, 0));
 			}
 		}
 	}
 
-	/* Note that even when environment variables after resources, values for
-	 * CORES, MEMORY, etc. will be set at the worker to the values of
-	 * set_*, if used. */
-	char *var;
-	LIST_ITERATE(t->env_list, var)
 	{
-		vine_manager_send(q, w, "env %zu\n%s\n", strlen(var), var);
-	}
-
-	if (t->input_mounts) {
-		struct vine_mount *m;
-		LIST_ITERATE(t->input_mounts, m)
-		{
-			char remote_name_encoded[PATH_MAX];
-			url_encode(m->remote_name, remote_name_encoded, PATH_MAX);
-			vine_manager_send(q, w, "infile %s %s %d\n", m->file->cached_name, remote_name_encoded, m->flags);
+		char *var;
+		LIST_ITERATE(t->env_list, var) {
+			size_t L = strlen(var);
+			EMITF(&sb, w, "env %zu\n", L);
+			if (sb_append(&sb, var, L) < 0) {
+				free(sb.buf);
+				return VINE_WORKER_FAILURE;
+			}
+			DBG_TX(w, var, L);
+			EMITF(&sb, w, "\n");
 		}
 	}
 
-	if (t->output_mounts) {
+	{
 		struct vine_mount *m;
-		LIST_ITERATE(t->output_mounts, m)
-		{
-			char remote_name_encoded[PATH_MAX];
-			url_encode(m->remote_name, remote_name_encoded, PATH_MAX);
-			vine_manager_send(q, w, "outfile %s %s %d\n", m->file->cached_name, remote_name_encoded, m->flags);
+		if (t->input_mounts) {
+			LIST_ITERATE(t->input_mounts, m) {
+				char enc[PATH_MAX];
+				url_encode(m->remote_name, enc, PATH_MAX);
+				EMITF(&sb, w, "infile %s %s %d\n", m->file->cached_name, enc, m->flags);
+			}
+		}
+		if (t->output_mounts) {
+			LIST_ITERATE(t->output_mounts, m) {
+				char enc[PATH_MAX];
+				url_encode(m->remote_name, enc, PATH_MAX);
+				EMITF(&sb, w, "outfile %s %s %d\n", m->file->cached_name, enc, m->flags);
+			}
 		}
 	}
 
 	if (t->group_id) {
-		vine_manager_send(q, w, "groupid %d\n", t->group_id);
+		EMITF(&sb, w, "groupid %d\n", t->group_id);
+	}
+	EMITF(&sb, w, "end\n");
+
+	const char *p = sb.buf;
+	size_t left = sb.len;
+	time_t deadline = time(0) + q->short_timeout;
+	int r = 0;
+
+	while (left > 0) {
+		size_t chunk = (left > SB_MAX_CHUNK) ? SB_MAX_CHUNK : left;
+		r = link_putlstring(w->link, p, chunk, deadline);
+		if (r < 0) {
+			break;
+		}
+		p += chunk;
+		left -= chunk;
 	}
 
-	// vine_manager_send returns the number of bytes sent, or a number less than
-	// zero to indicate errors. We are lazy here, we only check the last
-	// message we sent to the worker (other messages may have failed above).
-
-	int r = vine_manager_send(q, w, "end\n");
-	if (r >= 0) {
+	if (r >= 0 && left == 0) {
 		if (target) {
-			vine_file_replica_table_get_or_create(q, w, target->cached_name, target->type, target->cache_level, target->size, target->mtime);
+			vine_file_replica_table_get_or_create(q, w, target->cached_name, target->type,
+				target->cache_level, target->size, target->mtime);
 		}
-
+		free(sb.buf);
 		return VINE_SUCCESS;
 	} else {
+		free(sb.buf);
 		return VINE_WORKER_FAILURE;
 	}
 }
