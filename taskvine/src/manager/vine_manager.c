@@ -170,6 +170,8 @@ static int release_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
+static void clean_redundant_replicas(struct vine_manager *q, struct vine_file *f);
+
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
 static int count_workers(struct vine_manager *q, vine_worker_type_t type)
@@ -650,6 +652,15 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	itable_remove(q->running_table, t->task_id);
 	vine_task_set_result(t, task_status);
 
+	/* Clean redundant replicas for the inputs of the task. */
+	struct vine_mount *input_mount;
+	LIST_ITERATE(t->input_mounts, input_mount)
+	{
+		if (input_mount->file && input_mount->file->type == VINE_TEMP) {
+			clean_redundant_replicas(q, input_mount->file);
+		}
+	}
+
 	return VINE_SUCCESS;
 }
 
@@ -999,6 +1010,75 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 	list_delete(candidates_list);
 
 	return 1;
+}
+
+/** Clean redundant replicas of a temporary file. 
+For example, a file may be transferred to another worker because a task that declares it 
+as input is scheduled there, resulting in an extra replica that consumes storage space. 
+This function evaluates whether the file has excessive replicas and removes those on 
+workers that do not execute their dependent tasks. */
+static void clean_redundant_replicas(struct vine_manager *q, struct vine_file *f)
+{
+	if (!f || f->type != VINE_TEMP) {
+		return;
+	}
+
+	struct set *source_workers = hash_table_lookup(q->file_worker_table, f->cached_name);
+	if (!source_workers) {
+		/* no surprise - a cache-update message may trigger a file deletion. */
+		return;
+	}
+	int excess_replicas = set_size(source_workers) - q->temp_replica_count;
+	if (excess_replicas <= 0) {
+		return;
+	}
+	/* Note that this replica may serve as a source for a peer transfer. If it is unlinked prematurely,
+	 * the corresponding transfer could fail and leave a task without its required data.
+	 * Therefore, we must wait until all replicas are confirmed ready before proceeding. */
+	if (vine_file_replica_table_count_replicas(q, f->cached_name, VINE_FILE_REPLICA_STATE_READY) != set_size(source_workers)) {
+		return;
+	}
+
+	struct priority_queue *clean_replicas_from_workers = priority_queue_create(0);
+
+	struct vine_worker_info *source_worker = NULL;
+	SET_ITERATE(source_workers, source_worker)
+	{
+		/* if the file is actively in use by a task (the input to that task), we don't remove the replica on this worker */
+		int file_inuse = 0;
+
+		uint64_t task_id;
+		struct vine_task *task;
+		ITABLE_ITERATE(source_worker->current_tasks, task_id, task)
+		{
+			struct vine_mount *input_mount;
+			LIST_ITERATE(task->input_mounts, input_mount)
+			{
+				if (f == input_mount->file) {
+					file_inuse = 1;
+					break;
+				}
+			}
+			if (file_inuse) {
+				break;
+			}
+		}
+		
+		if (file_inuse) {
+			continue;
+		}
+
+		priority_queue_push(clean_replicas_from_workers, source_worker, source_worker->inuse_cache);
+	}
+
+	source_worker = NULL;
+	while (excess_replicas > 0 && (source_worker = priority_queue_pop(clean_replicas_from_workers))) {
+		delete_worker_file(q, source_worker, f->cached_name, 0, 0);
+		excess_replicas--;
+	}
+	priority_queue_delete(clean_replicas_from_workers);
+
+	return;
 }
 
 /* Remove all tasks and other associated state from a given worker. */
