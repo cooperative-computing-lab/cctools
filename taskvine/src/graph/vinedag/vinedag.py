@@ -7,7 +7,7 @@ from ndcctools.taskvine.manager import Manager
 
 from ndcctools.taskvine.vinedag.context_graph.proxy_library import ProxyLibrary
 from ndcctools.taskvine.vinedag.context_graph.proxy_functions import compute_single_key
-from ndcctools.taskvine.vinedag.context_graph.core import ContextGraph, GraphKeyResult
+from ndcctools.taskvine.vinedag.context_graph.core import ContextGraph, ContextGraphTaskResult
 from ndcctools.taskvine.vinedag.vine_graph.vine_graph_client import VineGraphClient
 
 import cloudpickle
@@ -305,7 +305,7 @@ class VineDAG(Manager):
         results = {}
         for k in target_keys:
             outfile_path = os.path.join(self.param("output-dir"), context_graph.outfile_remote_name[k])
-            results[k] = GraphKeyResult.load_from_path(outfile_path)
+            results[k] = ContextGraphTaskResult.load_from_path(outfile_path)
         return results
 
     def _on_sigint(self, signum, frame):

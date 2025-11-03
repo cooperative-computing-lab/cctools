@@ -11,7 +11,7 @@ import random
 import hashlib
 import collections
 
-from ndcctools.taskvine.vinedag.context_graph.core import GraphKeyResult, ContextGraph
+from ndcctools.taskvine.vinedag.context_graph.core import ContextGraphTaskResult, ContextGraph
 from ndcctools.taskvine.vinedag.context_graph.proxy_functions import compute_dts_key, compute_sexpr_key, compute_single_key
 from ndcctools.taskvine.utils import load_variable_from_library
 
@@ -28,7 +28,7 @@ class ProxyLibrary:
         # these modules are always included in the preamble of the library task, so that function calls can execute directly
         # using the loaded context without importing them over and over again
         self.hoisting_modules = [
-            os, cloudpickle, GraphKeyResult, ContextGraph, uuid, hashlib, random, types, collections, time,
+            os, cloudpickle, ContextGraphTaskResult, ContextGraph, uuid, hashlib, random, types, collections, time,
             load_variable_from_library, compute_dts_key, compute_sexpr_key, compute_single_key
         ]
 

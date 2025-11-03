@@ -32,7 +32,7 @@ def hashable(s):
 
 # Lightweight wrapper around task results that optionally pads the payload. The
 # padding lets tests model large outputs without altering the logical result.
-class GraphKeyResult:
+class ContextGraphTaskResult:
     def __init__(self, result, extra_size_mb=None):
         """Store the real user result plus optional padding used during regression tests."""
         self.result = result
@@ -47,7 +47,7 @@ class GraphKeyResult:
         try:
             with open(path, "rb") as f:
                 result_obj = cloudpickle.load(f)
-                assert isinstance(result_obj, GraphKeyResult), "Loaded object is not of type GraphKeyResult"
+                assert isinstance(result_obj, ContextGraphTaskResult), "Loaded object is not of type ContextGraphTaskResult"
                 return result_obj.result
         except FileNotFoundError:
             raise FileNotFoundError(f"Output file not found at {path}")
@@ -149,7 +149,7 @@ class ContextGraph:
     def save_result_of_key(self, key, result):
         """Called from the proxy function to persist a result into disk after the worker finishes."""
         with open(self.outfile_remote_name[key], "wb") as f:
-            result_obj = GraphKeyResult(result, extra_size_mb=self.extra_task_output_size_mb[key])
+            result_obj = ContextGraphTaskResult(result, extra_size_mb=self.extra_task_output_size_mb[key])
             cloudpickle.dump(result_obj, f)
 
     def load_result_of_key(self, key):
@@ -158,7 +158,7 @@ class ContextGraph:
         # if a node-local output, then data is stored in the task sandbox and the remote name is just the filename
         # if a shared file system output, then remote name is the full path to the file
         outfile_path = self.outfile_remote_name[key]
-        return GraphKeyResult.load_from_path(outfile_path)
+        return ContextGraphTaskResult.load_from_path(outfile_path)
 
     def get_topological_order(self):
         """Produce the order VineDAG uses when assigning node IDs to the C graph."""

@@ -40,12 +40,12 @@ struct vine_graph {
 	 * as long as the manager can access it. */
 	char *output_dir;
 
-	/* Python-side proxy library name. ContextGraph owns this library and sends calls into the vine graph
+	/* Python-side proxy library name. The context_graph runtime owns this library and sends calls into the vine graph
 	 * so the manager can execute them through the proxy function. */
 	char *proxy_library_name;
 
 	/* The proxy function lives inside that library. It receives vine node IDs, looks up the
-	 * Python callable and arguments inside ContextGraph, and executes the work. ContextGraph generates the name
+	 * Python callable and arguments inside the context_graph runtime, and executes the work. The runtime generates the name
 	 * and shares it with the vine graph. */
 	char *proxy_function_name;
 
