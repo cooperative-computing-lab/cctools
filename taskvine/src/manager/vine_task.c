@@ -442,7 +442,7 @@ void vine_task_set_time_max(struct vine_task *t, int64_t seconds)
 	if (seconds < 1) {
 		t->resources_requested->wall_time = -1;
 	} else {
-		t->resources_requested->wall_time = DIV_INT_ROUND_UP(seconds, ONE_SECOND);
+		t->resources_requested->wall_time = seconds;
 	}
 }
 
