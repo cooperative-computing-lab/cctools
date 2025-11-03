@@ -532,7 +532,7 @@ vine_result_code_t vine_manager_put_task_old(
 
 		/* Do not set end, wall_time if running the resource monitor. We let the monitor police these resources.
 		 */
-		if (q->monitor_mode == VINE_MON_DISABLED) {
+		if (q->monitor_mode != VINE_MON_WATCHDOG) {
 			if (limits->end > 0) {
 				vine_manager_send(q, w, "end_time %s\n", rmsummary_resource_to_str("end", limits->end, 0));
 			}
