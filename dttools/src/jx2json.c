@@ -11,7 +11,7 @@ See the file COPYING for details.
 #include <string.h>
 
 #include "cctools.h"
-#include "getopt.h"
+#include <getopt.h>
 #include "jx.h"
 #include "jx_eval.h"
 #include "jx_parse.h"

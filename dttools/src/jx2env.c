@@ -13,7 +13,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include "getopt.h"
+#include <getopt.h>
 #include "int_sizes.h"
 #include "jx.h"
 #include "jx_parse.h"

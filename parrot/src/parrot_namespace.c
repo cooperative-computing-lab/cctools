@@ -6,7 +6,7 @@ See the file COPYING for details.
 
 #include "cctools.h"
 #include "debug.h"
-#include "getopt.h"
+#include <getopt.h>
 #include "parrot_client.h"
 #include "path.h"
 #include "stringtools.h"

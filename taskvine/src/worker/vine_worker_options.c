@@ -14,7 +14,7 @@
 #include "path.h"
 #include "stringtools.h"
 
-#include "getopt.h"
+#include <getopt.h>
 #include "getopt_aux.h"
 #include "xxmalloc.h"
 
