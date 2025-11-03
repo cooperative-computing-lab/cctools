@@ -177,6 +177,7 @@ class VineDAG(Manager):
 
         # Boot the underlying TaskVine manager. The TaskVine manager keeps alive until the vinedag object is destroyed
         super().__init__(*args, **kwargs)
+        print(f"cvine = {cvine}")
         self.runtime_directory = cvine.vine_get_runtime_directory(self._taskvine)
 
         print(f"=== Manager name: {color_text(self.name, 92)}")

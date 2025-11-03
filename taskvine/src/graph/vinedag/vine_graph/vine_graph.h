@@ -14,13 +14,13 @@
 
 /** The task priority algorithm used for vine graph scheduling. */
 typedef enum {
-	TASK_PRIORITY_MODE_RANDOM = 0,			   /**< Assign random priority to tasks */
-	TASK_PRIORITY_MODE_DEPTH_FIRST,			   /**< Prioritize deeper tasks first */
-	TASK_PRIORITY_MODE_BREADTH_FIRST,		   /**< Prioritize shallower tasks first */
-	TASK_PRIORITY_MODE_FIFO,			   /**< First in, first out priority */
-	TASK_PRIORITY_MODE_LIFO,			   /**< Last in, first out priority */
-	TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST,		   /**< Prioritize tasks with larger inputs first */
-	TASK_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST /**< Prioritize tasks with larger storage footprint first */
+	TASK_PRIORITY_MODE_RANDOM = 0,			              /**< Assign random priority to tasks */
+	TASK_PRIORITY_MODE_DEPTH_FIRST,			              /**< Prioritize deeper tasks first */
+	TASK_PRIORITY_MODE_BREADTH_FIRST,		              /**< Prioritize shallower tasks first */
+	TASK_PRIORITY_MODE_FIFO,			                  /**< First in, first out priority */
+	TASK_PRIORITY_MODE_LIFO,			                  /**< Last in, first out priority */
+	TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST,		          /**< Prioritize tasks with larger inputs first */
+	TASK_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST    /**< Prioritize tasks with larger storage footprint first */
 } task_priority_mode_t;
 
 /** The vine graph (logical scheduling layer). */
