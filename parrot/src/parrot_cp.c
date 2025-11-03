@@ -5,7 +5,7 @@ See the file COPYING for details.
 */
 
 #include "full_io.h"
-#include "getopt.h"
+#include <getopt.h>
 #include "parrot_client.h"
 #include "pfs_types.h"
 

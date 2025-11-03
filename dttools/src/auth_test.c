@@ -7,7 +7,7 @@ See the file COPYING for details.
 
 #include "auth.h"
 #include "link.h"
-#include "getopt.h"
+#include <getopt.h>
 #include "debug.h"
 #include "domain_name_cache.h"
 #include "auth_all.h"
