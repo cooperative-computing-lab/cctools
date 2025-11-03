@@ -10,7 +10,7 @@ See the file COPYING for details.
 #include <inttypes.h>
 #include <unistd.h>
 #include <string.h>
-#include "getopt.h"
+#include <getopt.h>
 #include "disk_alloc.h"
 #include "stringtools.h"
 #include "cctools.h"
