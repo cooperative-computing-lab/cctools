@@ -170,7 +170,7 @@ static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_
 static int release_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
-static void enqueue_ready_task(struct vine_manager *q, struct vine_task *t);
+static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t);
 
 static void clean_redundant_replicas(struct vine_manager *q, struct vine_file *f);
 
@@ -3712,7 +3712,7 @@ static int rotate_pending_tasks(struct vine_manager *q)
 		}
 
 		if (consider_task(q, t)) {
-			enqueue_ready_task(q, t);
+			push_task_to_ready_tasks(q, t);
 			runnable_tasks++;
 		} else {
 			list_push_tail(q->pending_tasks, t);
@@ -3814,7 +3814,7 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 
 	/* put back all tasks that were skipped */
 	while ((t = list_pop_head(skipped_tasks))) {
-		enqueue_ready_task(q, t);
+		push_task_to_ready_tasks(q, t);
 	}
 	list_delete(skipped_tasks);
 
@@ -4809,7 +4809,7 @@ char *vine_monitor_wrap(struct vine_manager *q, struct vine_worker_info *w, stru
 }
 
 /* Put a given task on the ready queue, taking into account the task priority and the manager schedule. */
-static void enqueue_ready_task(struct vine_manager *q, struct vine_task *t)
+static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t)
 {
 	if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
 		/* when a task is resubmitted given resource exhaustion, we
@@ -4873,7 +4873,7 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 		break;
 	case VINE_TASK_READY:
 		vine_task_set_result(t, VINE_RESULT_UNKNOWN);
-		enqueue_ready_task(q, t);
+		push_task_to_ready_tasks(q, t);
 		c->vine_stats->tasks_waiting++;
 		break;
 	case VINE_TASK_RUNNING:
