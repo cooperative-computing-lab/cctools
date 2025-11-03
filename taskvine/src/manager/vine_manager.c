@@ -3067,12 +3067,12 @@ static void find_max_worker(struct vine_manager *q)
  * are not counted towards the resources in use and will be killed if needed. */
 static void kill_empty_libraries_on_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	uint64_t task_id;
-	struct vine_task *task;
-	ITABLE_ITERATE(w->current_tasks, task_id, task)
+	uint64_t libtask_id;
+	struct vine_task *libtask;
+	ITABLE_ITERATE(w->current_libraries, libtask_id, libtask)
 	{
-		if (task->provides_library && task->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, task->provides_library))) {
-			vine_cancel_by_task_id(q, task->task_id);
+		if (libtask->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, libtask->provides_library))) {
+			vine_cancel_by_task_id(q, libtask_id);
 		}
 	}
 }
