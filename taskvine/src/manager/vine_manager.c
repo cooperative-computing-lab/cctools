@@ -4668,14 +4668,13 @@ static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t
 {
 	if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
 		/* when a task is resubmitted given resource exhaustion, we
-		 * increment its priority by 1, so it gets to run as soon
+		 * increment its priority a bit, so it gets to run as soon
 		 * as possible among those with the same priority. This avoids
 		 * the issue in which all 'big' tasks fail because the first
 		 * allocation is too small. */
-		priority_queue_push(q->ready_tasks, t, t->priority + 1);
-	} else {
-		priority_queue_push(q->ready_tasks, t, t->priority);
+		t->priority *= 1.05;
 	}
+	priority_queue_push(q->ready_tasks, t, t->priority);
 
 	/* If the task has been used before, clear out accumulated state. */
 	vine_task_clean(t);
