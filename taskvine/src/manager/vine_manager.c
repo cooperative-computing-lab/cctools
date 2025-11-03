@@ -1012,10 +1012,10 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 	return 1;
 }
 
-/** Clean redundant replicas of a temporary file. 
-For example, a file may be transferred to another worker because a task that declares it 
-as input is scheduled there, resulting in an extra replica that consumes storage space. 
-This function evaluates whether the file has excessive replicas and removes those on 
+/** Clean redundant replicas of a temporary file.
+For example, a file may be transferred to another worker because a task that declares it
+as input is scheduled there, resulting in an extra replica that consumes storage space.
+This function evaluates whether the file has excessive replicas and removes those on
 workers that do not execute their dependent tasks. */
 static void clean_redundant_replicas(struct vine_manager *q, struct vine_file *f)
 {
@@ -1063,7 +1063,7 @@ static void clean_redundant_replicas(struct vine_manager *q, struct vine_file *f
 				break;
 			}
 		}
-		
+
 		if (file_inuse) {
 			continue;
 		}
