@@ -3519,7 +3519,7 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 	case VINE_TASK_INITIAL:
 		/* The recovery task has never been run, so submit it now. */
 		vine_submit(q, rt);
-		notice(D_VINE, "Submitted recovery task %d (%s) to re-create lost temporary file %s.", rt->task_id, rt->command_line, lost_file->cached_name);
+		debug(D_VINE, "Submitted recovery task %d (%s) to re-create lost temporary file %s.", rt->task_id, rt->command_line, lost_file->cached_name);
 		break;
 	case VINE_TASK_READY:
 	case VINE_TASK_RUNNING:
@@ -3533,7 +3533,7 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 		 * here. */
 		vine_task_reset(rt);
 		vine_submit(q, rt);
-		notice(D_VINE, "Submitted recovery task %d (%s) to re-create lost temporary file %s.", rt->task_id, rt->command_line, lost_file->cached_name);
+		debug(D_VINE, "Submitted recovery task %d (%s) to re-create lost temporary file %s.", rt->task_id, rt->command_line, lost_file->cached_name);
 		break;
 	}
 }
@@ -4440,6 +4440,11 @@ int vine_set_password_file(struct vine_manager *q, const char *file)
 	return copy_file_to_buffer(file, &q->password, NULL) > 0;
 }
 
+int vine_get_num_submitted_recovery_tasks(struct vine_manager *q)
+{
+	return q->num_submitted_recovery_tasks;
+}
+
 static void delete_task_at_exit(struct vine_task *t)
 {
 	if (!t) {
@@ -4869,6 +4874,7 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	 * this distinction is important when many files are lost and the workflow is effectively rerun from scratch. */
 	if (t->type == VINE_TASK_TYPE_RECOVERY) {
 		vine_task_set_priority(t, t->priority + priority_queue_get_top_priority(q->ready_tasks) + 1);
+		q->num_submitted_recovery_tasks++;
 	}
 
 	if (t->has_fixed_locations) {
@@ -5374,6 +5380,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		}
 
 		q->nothing_happened_last_wait_cycle = 0;
+
+		q->num_submitted_recovery_tasks = 0;
 
 		// Retrieve results from workers. We do a worker at a time to be more efficient.
 		// We get a known worker with results from the first task in the waiting_retrieval_list,

@@ -1388,6 +1388,12 @@ void vine_set_password(struct vine_manager *m, const char *password);
 
 int vine_set_password_file(struct vine_manager *m, const char *file);
 
+/** Get the number of recovery tasks submitted to the manager.
+@param m A manager object
+@return The number of recovery tasks submitted to the manager.
+*/
+int vine_get_num_submitted_recovery_tasks(struct vine_manager *m);
+
 /** Change the keepalive interval for a given manager.
 @param m A manager object
 @param interval The minimum number of seconds to wait before sending new keepalive checks to workers.

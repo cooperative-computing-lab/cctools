@@ -138,6 +138,7 @@ struct vine_manager {
 	int num_tasks_left;    /* Optional: Number of tasks remaining, if given by user.  @ref vine_set_num_tasks */
 	int nothing_happened_last_wait_cycle; /* Set internally in main loop if no messages or tasks were processed during the last wait loop.
 																					 If set, poll longer to avoid wasting cpu cycles, and growing log files unnecessarily.*/
+	int num_submitted_recovery_tasks;    /* Number of recovery tasks submitted to restore lost temp files. */
 
 	/* Accumulation of statistics for reporting to the caller. */
 
