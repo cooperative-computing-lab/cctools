@@ -4153,6 +4153,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->sandbox_grow_factor = 2.0;
 	q->disk_proportion_available_to_task = 0.75;
 
+	q->return_recovery_tasks = 0;
+
 	q->stats = calloc(1, sizeof(struct vine_stats));
 	q->stats_measure = calloc(1, sizeof(struct vine_stats));
 
@@ -5232,7 +5234,11 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			return t;
 			break;
 		case VINE_TASK_TYPE_RECOVERY:
-			/* do nothing and let vine_manager_consider_recovery_task do its job */
+			/* if configured to return recovery tasks, return it to the user and let them take care of it. */
+			if (q->return_recovery_tasks) {
+				return t;
+			}
+			/* otherwise, do nothing and let vine_manager_consider_recovery_task do its job */
 			break;
 		case VINE_TASK_TYPE_LIBRARY_INSTANCE:
 			/* silently delete the task, since it was created by the manager.
@@ -5979,6 +5985,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		}
 	} else if (!strcmp(name, "enforce-worker-eviction-interval")) {
 		q->enforce_worker_eviction_interval = (timestamp_t)(MAX(0, (int)value) * ONE_SECOND);
+
+	} else if (!strcmp(name, "return-recovery-tasks")) {
+		q->return_recovery_tasks = !!((int)value);
 
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
