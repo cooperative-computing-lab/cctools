@@ -6409,6 +6409,8 @@ int vine_prune_file(struct vine_manager *m, struct vine_file *f)
 			set_free_values_array(workers_array);
 		}
 	}
+
+	return pruned_replica_count;
 }
 
 /*
