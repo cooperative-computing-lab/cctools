@@ -9,7 +9,7 @@ See the file COPYING for details.
 
 #include "copy_stream.h"
 #include "debug.h"
-#include "getopt.h"
+#include <getopt.h>
 
 #include <stdio.h>
 #include <stdlib.h>

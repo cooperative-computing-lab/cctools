@@ -25,7 +25,7 @@ See the file COPYING for details.
 #include "link_auth.h"
 #include "list.h"
 #include "get_line.h"
-#include "getopt.h"
+#include <getopt.h>
 #include "path.h"
 #include "buffer.h"
 #include "rmsummary.h"

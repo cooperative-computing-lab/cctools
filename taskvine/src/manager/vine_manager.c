@@ -131,7 +131,7 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state);
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w);
 static vine_result_code_t get_stdout(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t output_length);
-static vine_result_code_t retrieve_output(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
+static vine_result_code_t get_stdout_long(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 
 static void find_max_worker(struct vine_manager *q);
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w);
@@ -1425,7 +1425,7 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 	default:
 		/* Otherwise get all of the output files. */
 		if (!t->output_received) {
-			result = retrieve_output(q, w, t);
+			result = get_stdout_long(q, w, t);
 			if (result == VINE_SUCCESS) {
 				t->output_received = 1;
 			}
@@ -1704,7 +1704,7 @@ not line up with an expected task and file, then we discard it and keep
 going.
 */
 
-static vine_result_code_t get_update(struct vine_manager *q, struct vine_worker_info *w, const char *line)
+static vine_result_code_t get_watched_file_update(struct vine_manager *q, struct vine_worker_info *w, const char *line)
 {
 	int64_t task_id;
 	char path[VINE_LINE_MAX];
@@ -1763,10 +1763,11 @@ static vine_result_code_t get_update(struct vine_manager *q, struct vine_worker_
 }
 
 /*
-make a synchronus connection with a worker to retrieve the stdout of a task
+Make a synchronus connection with a worker to retrieve the stdout of a task
+when it is too long to fit in a completion message.
 */
 
-static vine_result_code_t retrieve_output(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+static vine_result_code_t get_stdout_long(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	int64_t output_length;
 	uint64_t task_id;
@@ -1888,12 +1889,13 @@ static vine_result_code_t get_stdout(struct vine_manager *q, struct vine_worker_
 }
 
 /*
-Send to this worker a request for task results.
-The worker will respond with all completed tasks and updates
-on watched output files.  Process those results as they come back.
+Send to this worker a request for watched file updates.
+The worker will respond with zero or more "update" messages
+indicating changes to watched files.
+Process those results as they come back.
 */
 
-static vine_result_code_t get_available_results(struct vine_manager *q, struct vine_worker_info *w)
+static vine_result_code_t get_watched_file_updates(struct vine_manager *q, struct vine_worker_info *w)
 {
 	// max_count == -1, tells the worker to send all available results.
 	vine_manager_send(q, w, "send_results %d\n", -1);
@@ -1911,7 +1913,7 @@ static vine_result_code_t get_available_results(struct vine_manager *q, struct v
 			break;
 		}
 		if (string_prefix_is(line, "update")) {
-			result = get_update(q, w, line);
+			result = get_watched_file_update(q, w, line);
 			if (result != VINE_SUCCESS)
 				break;
 		} else if (!strcmp(line, "end")) {
@@ -5355,7 +5357,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			char *key;
 			HASH_TABLE_ITERATE(q->worker_table, key, w)
 			{
-				get_available_results(q, w);
+				get_watched_file_updates(q, w);
 				hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
 			}
 		}
@@ -6432,10 +6434,10 @@ int vine_set_task_id_min(struct vine_manager *q, int minid)
 
 /*
 Remove all replicas of a special file across the compute cluster.
-
-While invoking outside, it is primarily used to remove replicas
-from workers when the file is no longer needed by the manager.
+Should be invoked by the application when a file will never
+be needed again, to free up available space.
 */
+
 void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 {
 	if (!f) {
