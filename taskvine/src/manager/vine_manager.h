@@ -217,6 +217,7 @@ struct vine_manager {
 	int transfer_temps_recovery;  /* If true, attempt to recover temp files from lost worker to reach threshold required */
 	int transfer_replica_per_cycle;  /* Maximum number of replica to request per temp file per iteration */
 	int temp_replica_count;       /* Number of replicas per temp file */
+	int clean_redundant_replicas; /* If true, remove redundant replicas of temp files to save disk space. */
 
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */

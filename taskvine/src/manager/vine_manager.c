@@ -652,12 +652,16 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	itable_remove(q->running_table, t->task_id);
 	vine_task_set_result(t, task_status);
 
-	/* Clean redundant replicas for the inputs of the task. */
-	struct vine_mount *input_mount;
-	LIST_ITERATE(t->input_mounts, input_mount)
-	{
-		if (input_mount->file && input_mount->file->type == VINE_TEMP) {
-			clean_redundant_replicas(q, input_mount->file);
+	/* A task scheduling may result in a redundant replica of its input due to peer transfers, which can be safely removed when completed.
+	 * However, the general function of taskvine is to replicate files on demand, and to only clean them up when prune is called.
+	 * So, we only clean up redundant replicas for the task-inputs when the manager is configured to do so. */
+	if (q->clean_redundant_replicas) {
+		struct vine_mount *input_mount;
+		LIST_ITERATE(t->input_mounts, input_mount)
+		{
+			if (input_mount->file && input_mount->file->type == VINE_TEMP) {
+				clean_redundant_replicas(q, input_mount->file);
+			}
 		}
 	}
 
@@ -4299,6 +4303,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->perf_log_interval = VINE_PERF_LOG_INTERVAL;
 
 	q->temp_replica_count = 1;
+	q->clean_redundant_replicas = 0;
 	q->transfer_temps_recovery = 0;
 	q->transfer_replica_per_cycle = 10;
 
@@ -6059,6 +6064,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		}
 	} else if (!strcmp(name, "enforce-worker-eviction-interval")) {
 		q->enforce_worker_eviction_interval = (timestamp_t)(MAX(0, (int)value) * ONE_SECOND);
+
+	} else if (!strcmp(name, "clean-redundant-replicas")) {
+		q->clean_redundant_replicas = !!((int)value);
 
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
