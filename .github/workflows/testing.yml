@@ -139,7 +139,7 @@ jobs:
     runs-on: ${{ matrix.os-name }}
     strategy:
       matrix:
-        os-name: ['macos-14','macos-13']
+        os-name: ['macos-14','macos-15-intel']
     timeout-minutes: 30
     env:
       CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, matrix.os-name) }}
@@ -181,7 +181,7 @@ jobs:
     runs-on: ${{ matrix.os-name }}
     strategy:
       matrix:
-        os-name: ['macos-14']
+        os-name: ['macos-14', 'macos-15']
     timeout-minutes: 30
     env:
       CCTOOLS_OUTPUT: ${{ format('cctools-{0}-arm64-{1}.tar.gz', github.event.inputs.version, matrix.os-name) }}

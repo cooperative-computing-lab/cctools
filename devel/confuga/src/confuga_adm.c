@@ -9,7 +9,7 @@ See the file COPYING for details.
 #include "catch.h"
 #include "cctools.h"
 #include "debug.h"
-#include "getopt.h"
+#include <getopt.h>
 #include "random.h"
 
 #include <errno.h>
