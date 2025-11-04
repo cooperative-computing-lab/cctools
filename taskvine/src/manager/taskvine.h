@@ -149,7 +149,6 @@ typedef enum {
 	VINE_MINI_TASK,             /**< A file obtained by executing a Unix command line. */
 } vine_file_type_t;
 
-
 /** Statistics describing a manager. */
 struct vine_stats {
 	/* Stats for the current state of workers: */
@@ -929,8 +928,9 @@ The given file or directory object is deleted from all worker's caches,
 but is still available on the manager's site, and can be recovered by submitting a recovery task.
 @param m A manager object
 @param f Any file object.
+@return The number of replicas pruned.
 */
-void vine_prune_file(struct vine_manager *m, struct vine_file *f);
+int vine_prune_file(struct vine_manager *m, struct vine_file *f);
 
 //@}
 
@@ -1116,6 +1116,14 @@ int vine_enable_peer_transfers(struct vine_manager *m);
 
 /** Disable taskvine peer transfers to be scheduled by the manager **/
 int vine_disable_peer_transfers(struct vine_manager *m);
+
+/** Enable recovery tasks to be returned by vine_wait.
+By default, recovery tasks are handled internally by the manager. **/
+int vine_enable_return_recovery_tasks(struct vine_manager *m);
+
+/** Disable recovery tasks from being returned by vine_wait.
+Recovery tasks will be handled internally by the manager. **/
+int vine_disable_return_recovery_tasks(struct vine_manager *m);
 
 /** When enabled, resources to tasks in are assigned in proportion to the size
 of the worker. If a resource is specified (e.g. with @ref vine_task_set_cores),
@@ -1527,6 +1535,12 @@ void vine_counters_print();
 @return A string.
  */
 char *vine_version_string();
+
+/** Returns the runtime directory
+@param m Reference to the current manager object.
+@return A string.
+*/
+char *vine_get_runtime_directory(struct vine_manager *m);
 
 /** Returns path relative to the logs runtime directory
 @param m Reference to the current manager object.

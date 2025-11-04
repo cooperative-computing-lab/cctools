@@ -25,7 +25,8 @@ See the file COPYING for details.
 int vine_file_replica_table_insert(struct vine_manager *m, struct vine_worker_info *w, const char *cachename, struct vine_file_replica *replica)
 {
 	if (hash_table_lookup(w->current_files, cachename)) {
-		return 0;
+		// delete the previous replcia because the replica's size might have changed
+		vine_file_replica_table_remove(m, w, cachename);
 	}
 
 	double prev_available = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);

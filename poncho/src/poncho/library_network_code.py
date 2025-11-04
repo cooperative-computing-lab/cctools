@@ -28,6 +28,9 @@ from ndcctools.taskvine.utils import load_variable_from_library
 r, w = os.pipe()
 exec_method = None
 
+# infile load mode for function tasks inside this library
+function_infile_load_mode = None
+
 
 # This class captures how results from FunctionCalls are conveyed from
 # the library to the manager.
@@ -81,7 +84,22 @@ def remote_execute(func):
 # Handler to sigchld when child exits.
 def sigchld_handler(signum, frame):
     # write any byte to signal that there's at least 1 child
-    os.writev(w, [b"a"])
+    try:
+        os.write(w, b"a")
+    except OSError:
+        pass
+
+
+# Load the infile for a function task inside this library
+def load_function_infile(in_file_path):
+    if function_infile_load_mode == "cloudpickle":
+        with open(in_file_path, "rb") as f:
+            return cloudpickle.load(f)
+    elif function_infile_load_mode == "json":
+        with open(in_file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    else:
+        raise ValueError(f"invalid infile load mode: {function_infile_load_mode}")
 
 
 # Read data from worker, start function, and dump result to `outfile`.
@@ -130,8 +148,7 @@ def start_function(in_pipe_fd, thread_limit=1):
                 os.chdir(function_sandbox)
 
                 # parameters are represented as infile.
-                with open("infile", "rb") as f:
-                    event = cloudpickle.load(f)
+                event = load_function_infile("infile")
 
                 # output of execution should be dumped to outfile.
                 result = globals()[function_name](event)
@@ -150,24 +167,22 @@ def start_function(in_pipe_fd, thread_limit=1):
                     raise
 
             except Exception as e:
-                stdout_timed_message(
-                    f"Library code: Function call failed due to {e}",
-                    file=sys.stderr,
-                )
+                stdout_timed_message(f"Library code: Function call failed due to {e}")
                 sys.exit(1)
             finally:
                 os.chdir(library_sandbox)
             return -1, function_id
         else:
             try:
-                arg_infile = os.path.join(function_sandbox, "infile")
-                with open(arg_infile, "rb") as f:
-                    event = cloudpickle.load(f)
+                infile_path = os.path.join(function_sandbox, "infile")
+                event = load_function_infile(infile_path)
             except Exception:
-                stdout_timed_message(f"TASK {function_id} error: can't load the arguments from {arg_infile}")
-                return
+                stdout_timed_message(f"TASK {function_id} error: can't load the arguments from {infile_path}")
+                return -1, function_id
             p = os.fork()
             if p == 0:
+                exit_status = 1
+
                 try:
                     # change the working directory to the function's sandbox
                     os.chdir(function_sandbox)
@@ -175,49 +190,33 @@ def start_function(in_pipe_fd, thread_limit=1):
                     stdout_timed_message(f"TASK {function_id} {function_name} arrives, starting to run in process {os.getpid()}")
 
                     try:
-                        exit_status = 1
+                        # each child process independently redirects its own stdout/stderr.
+                        with open(function_stdout_filename, "wb", buffering=0) as f:
+                            os.dup2(f.fileno(), 1)  # redirect stdout
+                            os.dup2(f.fileno(), 2)  # redirect stderr
+
+                            stdout_timed_message(f"TASK {function_id} {function_name} starts in PID {os.getpid()}")
+                            result = globals()[function_name](event)
+                            stdout_timed_message(f"TASK {function_id} {function_name} finished")
+
                     except Exception:
-                        stdout_timed_message(f"TASK {function_id} error: can't load the arguments from infile")
+                        stdout_timed_message(f"TASK {function_id} error: can't execute {function_name} due to {traceback.format_exc()}")
                         exit_status = 2
                         raise
-
-                    try:
-                        # setup stdout/err for a function call so we can capture them.
-                        function_stdout_fd = os.open(
-                            function_stdout_filename, os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-                        )
-                        # store the library's stdout fd
-                        library_fd = os.dup(sys.stdout.fileno())
-
-                        # only redirect the stdout of a specific FunctionCall task into its own stdout fd,
-                        # otherwise use the library's stdout
-                        os.dup2(function_stdout_fd, sys.stdout.fileno())
-                        os.dup2(function_stdout_fd, sys.stderr.fileno())
-                        result = globals()[function_name](event)
-
-                        # restore to the library's stdout fd on completion
-                        os.dup2(library_fd, sys.stdout.fileno())
-                    except Exception:
-                        stdout_timed_message(f"TASK {function_id} error: can't execute this function")
-                        exit_status = 3
-                        raise
-                    finally:
-                        if function_stdout_fd in locals():
-                            os.close(function_stdout_fd)
 
                     try:
                         with open("outfile", "wb") as f:
                             cloudpickle.dump(result, f)
                     except Exception:
                         stdout_timed_message(f"TASK {function_id} error: can't load the result from outfile")
-                        exit_status = 4
-                        if os.path.exits("outfile"):
+                        exit_status = 3
+                        if os.path.exists("outfile"):
                             os.remove("outfile")
                         raise
 
                     try:
                         if not result["Success"]:
-                            exit_status = 5
+                            exit_status = 4
                     except Exception:
                         stdout_timed_message(f"TASK {function_id} error: the result is invalid")
                         exit_status = 5
@@ -232,13 +231,11 @@ def start_function(in_pipe_fd, thread_limit=1):
                     os._exit(exit_status)
             elif p < 0:
                 stdout_timed_message(f"TASK {function_id} error: unable to fork to execute {function_name}")
-                return -1
+                return -1, function_id
 
             # return pid and function id of child process to parent.
             else:
                 return p, function_id
-
-    return -1
 
 
 # Send result of a function execution to worker. Wake worker up to do work with SIGCHLD.
@@ -382,11 +379,16 @@ def main():
     global exec_method
     exec_method = library_info['exec_mode']
 
+    # set infile load mode of functions in this library
+    global function_infile_load_mode
+    function_infile_load_mode = library_info['function_infile_load_mode']
+
     # send configuration of library, just its name for now
     config = {
         "name": library_info['library_name'],
         "taskid": args.task_id,
         "exec_mode": exec_method,
+        "function_infile_load_mode": function_infile_load_mode,
     }
     send_configuration(config, out_pipe_fd, args.worker_pid)
 
@@ -431,7 +433,15 @@ def main():
                     )
                 else:
                     pid, func_id = start_function(in_pipe_fd, thread_limit)
-                    pid_to_func_id[pid] = func_id
+                    if pid == -1:
+                        send_result(
+                            out_pipe_fd,
+                            args.worker_pid,
+                            func_id,
+                            1,
+                        )
+                    else:
+                        pid_to_func_id[pid] = func_id
             else:
                 # at least 1 child exits, reap all.
                 # read only once as os.read is blocking if there's nothing to read.
