@@ -1,19 +1,44 @@
 #include "vine_temp.h"
-#include "priority_queue.h"
 #include "vine_file.h"
 #include "vine_worker_info.h"
 #include "vine_file_replica_table.h"
+#include "vine_manager.h"
+#include "vine_manager_put.h"
+#include "vine_file_replica.h"
+#include "vine_file_replica_table.h"
+#include "vine_task.h"
+#include "vine_mount.h"
+
+#include "priority_queue.h"
 #include "macros.h"
 #include "stringtools.h"
-#include "vine_manager.h"
 #include "debug.h"
 #include "random.h"
-#include "vine_manager_put.h"
 #include "xxmalloc.h"
 
 /*************************************************************/
 /* Private Functions */
 /*************************************************************/
+
+static int is_worker_active(struct vine_worker_info *w)
+{
+	if (!w) {
+		return 0;
+	}
+	if (w->type != VINE_WORKER_TYPE_WORKER) {
+		return 0;
+	}
+	if (!w->transfer_port_active) {
+		return 0;
+	}
+	if (w->draining) {
+		return 0;
+	}
+	if (w->resources->tag < 0) {
+		return 0;
+	}
+	return 1;
+}
 
 static struct vine_worker_info *get_best_source_worker(struct vine_manager *q, struct vine_file *f)
 {
@@ -31,7 +56,7 @@ static struct vine_worker_info *get_best_source_worker(struct vine_manager *q, s
 	SET_ITERATE(sources, w)
 	{
 		/* skip if transfer port is not active or in draining mode */
-		if (!w->transfer_port_active || w->draining) {
+		if (!is_worker_active(w)) {
 			continue;
 		}
 		/* skip if incoming transfer counter is too high */
@@ -70,7 +95,7 @@ static struct vine_worker_info *get_best_dest_worker(struct vine_manager *q, str
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
 		/* skip if transfer port is not active or in draining mode */
-		if (!w->transfer_port_active || w->draining) {
+		if (!is_worker_active(w)) {
 			continue;
 		}
 		/* skip if the incoming transfer counter is too high */
@@ -83,7 +108,7 @@ static struct vine_worker_info *get_best_dest_worker(struct vine_manager *q, str
 			continue;
 		}
 		/* skip if the worker does not have enough disk space */
-		int64_t available_disk_space = get_worker_available_disk_bytes(w);
+		int64_t available_disk_space = (int64_t)MEGABYTES_TO_BYTES(w->resources->disk.total) - w->inuse_cache;
 		if ((int64_t)f->size > available_disk_space) {
 			continue;
 		}
@@ -95,6 +120,17 @@ static struct vine_worker_info *get_best_dest_worker(struct vine_manager *q, str
 	priority_queue_delete(valid_destinations);
 
 	return best_destination;
+}
+
+static void start_peer_transfer(struct vine_manager *q, struct vine_file *f, struct vine_worker_info *dest_worker, struct vine_worker_info *source_worker)
+{
+	if (!q || !f || f->type != VINE_TEMP || !dest_worker || !source_worker) {
+		return;
+	}
+
+	char *source_addr = string_format("%s/%s", source_worker->transfer_url, f->cached_name);
+	vine_manager_put_url_now(q, dest_worker, source_worker, source_addr, f);
+	free(source_addr);
 }
 
 static int vine_temp_replicate_file_now(struct vine_manager *q, struct vine_file *f)
@@ -113,7 +149,7 @@ static int vine_temp_replicate_file_now(struct vine_manager *q, struct vine_file
 		return 0;
 	}
 
-	vine_temp_start_peer_transfer(q, f, source_worker, dest_worker);
+	start_peer_transfer(q, f, dest_worker, source_worker);
 
 	return 1;
 }
@@ -122,20 +158,13 @@ static int vine_temp_replicate_file_now(struct vine_manager *q, struct vine_file
 /* Public Functions */
 /*************************************************************/
 
-void vine_temp_start_peer_transfer(struct vine_manager *q, struct vine_file *f, struct vine_worker_info *source_worker, struct vine_worker_info *dest_worker)
-{
-	if (!q || !f || f->type != VINE_TEMP || !source_worker || !dest_worker) {
-		return;
-	}
-
-	char *source_addr = string_format("%s/%s", source_worker->transfer_url, f->cached_name);
-	vine_manager_put_url_now(q, dest_worker, source_worker, source_addr, f);
-	free(source_addr);
-}
-
 int vine_temp_replicate_file_later(struct vine_manager *q, struct vine_file *f)
 {
 	if (!q || !f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
+		return 0;
+	}
+
+	if (q->temp_replica_count <= 1) {
 		return 0;
 	}
 
@@ -149,7 +178,7 @@ int vine_temp_replicate_file_later(struct vine_manager *q, struct vine_file *f)
 	return 1;
 }
 
-int vine_temp_handle_file_lost(struct vine_manager *q, char *cachename)
+int vine_temp_rescue_lost_replica(struct vine_manager *q, char *cachename)
 {
 	if (!q || !cachename) {
 		return 0;
@@ -219,7 +248,7 @@ Clean redundant replicas of a temporary file.
 For example, a file may be transferred to another worker because a task that declares it
 as input is scheduled there, resulting in an extra replica that consumes storage space.
 This function evaluates whether the file has excessive replicas and removes those on
-workers that do not execute their dependent tasks. 
+workers that do not execute their dependent tasks.
 */
 void vine_temp_clean_redundant_replicas(struct vine_manager *q, struct vine_file *f)
 {
@@ -296,28 +325,23 @@ void vine_temp_shift_disk_load(struct vine_manager *q, struct vine_worker_info *
 		return;
 	}
 
+	if (!q->shift_disk_load) {
+		return;
+	}
+
 	struct vine_worker_info *target_worker = NULL;
 
 	char *key;
 	struct vine_worker_info *w = NULL;
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
-		if (w->type != VINE_WORKER_TYPE_WORKER) {
-			continue;
-		}
-		if (!w->transfer_port_active) {
-			continue;
-		}
-		if (w->draining) {
-			continue;
-		}
-		if (w->resources->tag < 0) {
+		if (!is_worker_active(w)) {
 			continue;
 		}
 		if (vine_file_replica_table_lookup(w, f->cached_name)) {
 			continue;
 		}
-		if (w->inuse_cache + f->size > (source_worker->inuse_cache - f->size) * 0.8) {
+		if (w->inuse_cache + f->size > (source_worker->inuse_cache - f->size)) {
 			continue;
 		}
 		if (!target_worker || w->inuse_cache < target_worker->inuse_cache) {
@@ -325,9 +349,7 @@ void vine_temp_shift_disk_load(struct vine_manager *q, struct vine_worker_info *
 		}
 	}
 	if (target_worker) {
-		char *source_addr = string_format("%s/%s", source_worker->transfer_url, f->cached_name);
-		vine_manager_put_url_now(q, target_worker, source_worker, source_addr, f);
-		free(source_addr);
+		start_peer_transfer(q, f, target_worker, source_worker);
 	}
 
 	/* We can clean up the original one safely when the replica arrives at the destination worker. */
