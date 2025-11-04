@@ -1021,6 +1021,11 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 	return 1;
 }
 
+/**
+Shift a temp file replica away from the worker using the most cache space.
+This function looks for an alternative worker that can accept the file immediately
+so that the original replica can be cleaned up later by @clean_redundant_replicas().
+*/
 static void shift_disk_load(struct vine_manager *q, struct vine_worker_info *source_worker, struct vine_file *f)
 {
 	if (!q || !source_worker || !f) {
@@ -1031,8 +1036,6 @@ static void shift_disk_load(struct vine_manager *q, struct vine_worker_info *sou
 		return;
 	}
 
-	/* Determine if this replica is from the heaviest worker, and if so, trigger a replication immediately
-	 * to shift the storage burden to the most free and eligible worker. */
 	struct vine_worker_info *target_worker = NULL;
 
 	char *key;
@@ -1067,8 +1070,7 @@ static void shift_disk_load(struct vine_manager *q, struct vine_worker_info *sou
 		free(source_addr);
 	}
 
-	/* Shifting storage burden from heavy to light workers requires to replicate the file first,
-	 * so we can clean up the original one safely when the replica arrives at the destination worker. */
+	/* We can clean up the original one safely when the replica arrives at the destination worker. */
 	clean_redundant_replicas(q, f);
 }
 
