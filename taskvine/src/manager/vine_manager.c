@@ -29,6 +29,7 @@ See the file COPYING for details.
 #include "vine_taskgraph_log.h"
 #include "vine_txn_log.h"
 #include "vine_worker_info.h"
+#include "vine_temp.h"
 
 #include "address.h"
 #include "buffer.h"
@@ -169,9 +170,6 @@ static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w
 static int release_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
-
-static void shift_disk_load(struct vine_manager *q, struct vine_worker_info *source_worker, struct vine_file *f);
-static void clean_redundant_replicas(struct vine_manager *q, struct vine_file *f);
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
@@ -427,7 +425,7 @@ static vine_msg_code_t handle_cache_update(struct vine_manager *q, struct vine_w
 			}
 
 			if (q->shift_disk_load) {
-				shift_disk_load(q, w, f);
+				vine_temp_shift_disk_load(q, w, f);
 			}
 		}
 	}
@@ -665,7 +663,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		LIST_ITERATE(t->input_mounts, input_mount)
 		{
 			if (input_mount->file && input_mount->file->type == VINE_TEMP) {
-				clean_redundant_replicas(q, input_mount->file);
+				vine_temp_clean_redundant_replicas(q, input_mount->file);
 			}
 		}
 	}
@@ -1019,128 +1017,6 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 	list_delete(candidates_list);
 
 	return 1;
-}
-
-/**
-Shift a temp file replica away from the worker using the most cache space.
-This function looks for an alternative worker that can accept the file immediately
-so that the original replica can be cleaned up later by @clean_redundant_replicas().
-*/
-static void shift_disk_load(struct vine_manager *q, struct vine_worker_info *source_worker, struct vine_file *f)
-{
-	if (!q || !source_worker || !f) {
-		return;
-	}
-
-	if (f->type != VINE_TEMP) {
-		return;
-	}
-
-	struct vine_worker_info *target_worker = NULL;
-
-	char *key;
-	struct vine_worker_info *w = NULL;
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
-	{
-		if (w->type != VINE_WORKER_TYPE_WORKER) {
-			continue;
-		}
-		if (!w->transfer_port_active) {
-			continue;
-		}
-		if (w->draining) {
-			continue;
-		}
-		if (w->resources->tag < 0) {
-			continue;
-		}
-		if (vine_file_replica_table_lookup(w, f->cached_name)) {
-			continue;
-		}
-		if (w->inuse_cache + f->size > (source_worker->inuse_cache - f->size) * 0.8) {
-			continue;
-		}
-		if (!target_worker || w->inuse_cache < target_worker->inuse_cache) {
-			target_worker = w;
-		}
-	}
-	if (target_worker) {
-		char *source_addr = string_format("%s/%s", source_worker->transfer_url, f->cached_name);
-		vine_manager_put_url_now(q, target_worker, source_worker, source_addr, f);
-		free(source_addr);
-	}
-
-	/* We can clean up the original one safely when the replica arrives at the destination worker. */
-	clean_redundant_replicas(q, f);
-}
-
-/** Clean redundant replicas of a temporary file.
-For example, a file may be transferred to another worker because a task that declares it
-as input is scheduled there, resulting in an extra replica that consumes storage space.
-This function evaluates whether the file has excessive replicas and removes those on
-workers that do not execute their dependent tasks. */
-static void clean_redundant_replicas(struct vine_manager *q, struct vine_file *f)
-{
-	if (!f || f->type != VINE_TEMP) {
-		return;
-	}
-
-	struct set *source_workers = hash_table_lookup(q->file_worker_table, f->cached_name);
-	if (!source_workers) {
-		/* no surprise - a cache-update message may trigger a file deletion. */
-		return;
-	}
-	int excess_replicas = set_size(source_workers) - q->temp_replica_count;
-	if (excess_replicas <= 0) {
-		return;
-	}
-	/* Note that this replica may serve as a source for a peer transfer. If it is unlinked prematurely,
-	 * the corresponding transfer could fail and leave a task without its required data.
-	 * Therefore, we must wait until all replicas are confirmed ready before proceeding. */
-	if (vine_file_replica_table_count_replicas(q, f->cached_name, VINE_FILE_REPLICA_STATE_READY) != set_size(source_workers)) {
-		return;
-	}
-
-	struct priority_queue *clean_replicas_from_workers = priority_queue_create(0);
-
-	struct vine_worker_info *source_worker = NULL;
-	SET_ITERATE(source_workers, source_worker)
-	{
-		/* if the file is actively in use by a task (the input to that task), we don't remove the replica on this worker */
-		int file_inuse = 0;
-
-		uint64_t task_id;
-		struct vine_task *task;
-		ITABLE_ITERATE(source_worker->current_tasks, task_id, task)
-		{
-			struct vine_mount *input_mount;
-			LIST_ITERATE(task->input_mounts, input_mount)
-			{
-				if (f == input_mount->file) {
-					file_inuse = 1;
-					break;
-				}
-			}
-			if (file_inuse) {
-				break;
-			}
-		}
-
-		if (file_inuse) {
-			continue;
-		}
-
-		priority_queue_push(clean_replicas_from_workers, source_worker, source_worker->inuse_cache);
-	}
-
-	source_worker = NULL;
-	while (excess_replicas > 0 && (source_worker = priority_queue_pop(clean_replicas_from_workers))) {
-		delete_worker_file(q, source_worker, f->cached_name, 0, 0);
-		excess_replicas--;
-	}
-	priority_queue_delete(clean_replicas_from_workers);
-
-	return;
 }
 
 /* Remove all tasks and other associated state from a given worker. */
@@ -5983,7 +5859,6 @@ void vine_set_manager_preferred_connection(struct vine_manager *q, const char *p
 
 int vine_tune(struct vine_manager *q, const char *name, double value)
 {
-
 	if (!strcmp(name, "attempt-schedule-depth")) {
 		q->attempt_schedule_depth = MAX(1, (int)value);
 
@@ -6121,6 +5996,12 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		}
 	} else if (!strcmp(name, "enforce-worker-eviction-interval")) {
 		q->enforce_worker_eviction_interval = (timestamp_t)(MAX(0, (int)value) * ONE_SECOND);
+
+	} else if (!strcmp(name, "clean-redundant-replicas")) {
+		q->clean_redundant_replicas = !!((int)value);
+
+	} else if (!strcmp(name, "shift-disk-load")) {
+		q->shift_disk_load = !!((int)value);
 
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
