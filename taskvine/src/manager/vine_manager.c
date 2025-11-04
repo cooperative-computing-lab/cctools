@@ -170,6 +170,7 @@ static int release_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 
+static void shift_disk_load(struct vine_manager *q, struct vine_worker_info *source_worker, struct vine_file *f);
 static void clean_redundant_replicas(struct vine_manager *q, struct vine_file *f);
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
@@ -424,6 +425,10 @@ static vine_msg_code_t handle_cache_update(struct vine_manager *q, struct vine_w
 			if (f->type == VINE_TEMP && *id == 'X' && q->temp_replica_count > 1) {
 				hash_table_insert(q->temp_files_to_replicate, f->cached_name, NULL);
 			}
+
+			if (q->shift_disk_load) {
+				shift_disk_load(q, w, f);
+			}
 		}
 	}
 
@@ -652,12 +657,16 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	itable_remove(q->running_table, t->task_id);
 	vine_task_set_result(t, task_status);
 
-	/* Clean redundant replicas for the inputs of the task. */
-	struct vine_mount *input_mount;
-	LIST_ITERATE(t->input_mounts, input_mount)
-	{
-		if (input_mount->file && input_mount->file->type == VINE_TEMP) {
-			clean_redundant_replicas(q, input_mount->file);
+	/* A task scheduling may result in a redundant replica of its input due to peer transfers, which can be safely removed when completed.
+	 * However, the general function of taskvine is to replicate files on demand, and to only clean them up when prune is called.
+	 * So, we only clean up redundant replicas for the task-inputs when the manager is configured to clean redundant replicas. */
+	if (q->clean_redundant_replicas) {
+		struct vine_mount *input_mount;
+		LIST_ITERATE(t->input_mounts, input_mount)
+		{
+			if (input_mount->file && input_mount->file->type == VINE_TEMP) {
+				clean_redundant_replicas(q, input_mount->file);
+			}
 		}
 	}
 
@@ -1010,6 +1019,57 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 	list_delete(candidates_list);
 
 	return 1;
+}
+
+static void shift_disk_load(struct vine_manager *q, struct vine_worker_info *source_worker, struct vine_file *f)
+{
+	if (!q || !source_worker || !f) {
+		return;
+	}
+
+	if (f->type != VINE_TEMP) {
+		return;
+	}
+
+	/* Determine if this replica is from the heaviest worker, and if so, trigger a replication immediately 
+	* to shift the storage burden to the most free and eligible worker. */
+	struct vine_worker_info *target_worker = NULL;
+
+	char *key;
+	struct vine_worker_info *w = NULL;
+	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	{
+		if (w->type != VINE_WORKER_TYPE_WORKER) {
+			continue;
+		}
+		if (!w->transfer_port_active) {
+			continue;
+		}
+		if (w->draining) {
+			continue;
+		}
+		if (w->resources->tag < 0) {
+			continue;
+		}
+		if (vine_file_replica_table_lookup(w, f->cached_name)) {
+			continue;
+		}
+		if (w->inuse_cache + f->size > (source_worker->inuse_cache - f->size) * 0.8) {
+			continue;
+		}
+		if (!target_worker || w->inuse_cache < target_worker->inuse_cache) {
+			target_worker = w;
+		}
+	}
+	if (target_worker) {
+		char *source_addr = string_format("%s/%s", source_worker->transfer_url, f->cached_name);
+		vine_manager_put_url_now(q, target_worker, source_worker, source_addr, f);
+		free(source_addr);
+	}
+
+	/* Shifting storage burden from heavy to light workers requires to replicate the file first, 
+	* so we can clean up the original one safely when the replica arrives at the destination worker. */
+	clean_redundant_replicas(q, f);
 }
 
 /** Clean redundant replicas of a temporary file.
@@ -4299,6 +4359,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->perf_log_interval = VINE_PERF_LOG_INTERVAL;
 
 	q->temp_replica_count = 1;
+	q->clean_redundant_replicas = 0;
+	q->shift_disk_load = 0;
 	q->transfer_temps_recovery = 0;
 	q->transfer_replica_per_cycle = 10;
 
@@ -6059,6 +6121,12 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		}
 	} else if (!strcmp(name, "enforce-worker-eviction-interval")) {
 		q->enforce_worker_eviction_interval = (timestamp_t)(MAX(0, (int)value) * ONE_SECOND);
+
+	} else if (!strcmp(name, "shift-disk-load")) {
+		q->shift_disk_load = !!((int)value);
+
+	} else if (!strcmp(name, "clean-redundant-replicas")) {
+		q->clean_redundant_replicas = !!((int)value);
 
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
