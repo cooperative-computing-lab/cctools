@@ -173,7 +173,7 @@ The Cooperative Computing Tools are Copyright (C) 2022 The University of Notre D
 
 - [Cooperative Computing Tools Documentation]("../index.html")
 - [TaskVine User Manual]("../taskvine.html")
-- [vine_worker(1)](vine_worker.md) [vine_status(1)](vine_status.md) [vine_factory(1)](vine_factory.md) [vine_graph_log(1)](vine_graph_log.md) 
+- [vine_worker(1)](vine_worker.md) [vine_status(1)](vine_status.md) [vine_factory(1)](vine_factory.md) [vine_plot_performance(1)](vine_plot_performance.md) 
 
 
 CCTools
