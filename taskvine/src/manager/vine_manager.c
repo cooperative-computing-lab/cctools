@@ -2388,7 +2388,6 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	// additional task information for vine_factory
 	jx_insert_integer(j, "tasks_on_workers", info.tasks_on_workers);
 	jx_insert_integer(j, "tasks_left", q->num_tasks_left);
-	jx_insert_integer(j, "recovery_tasks_submitted", info.recovery_tasks_submitted);
 
 	// capacity information the factory needs
 	jx_insert_integer(j, "capacity_tasks", info.capacity_tasks);
