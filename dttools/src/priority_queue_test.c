@@ -10,7 +10,7 @@ See the file COPYING for details.
 
 int main()
 {
-	struct priority_queue *pq = priority_queue_create(2, 1);
+	struct priority_queue *pq = priority_queue_create(2, 3);
 	if (!pq) {
 		fprintf(stderr, "Failed to create priority queue.\n");
 		return EXIT_FAILURE;
@@ -22,7 +22,7 @@ int main()
 	// Insert elements
 	printf("Inserting elements:\n");
 	for (int i = 0; i < 6; i++) {
-		int idx = priority_queue_push_varargs(pq, data[i], priorities[i]);
+		int idx = priority_queue_push(pq, data[i], priorities[i], 0.0, 0.0);
 		if (idx >= 0) {
 			printf("Inserted '%s' with priority %.1f at index %d\n", data[i], priorities[i], idx);
 		} else {
@@ -83,7 +83,7 @@ int main()
 	}
 
 	// Insert an element
-	int ins_idx = priority_queue_push_varargs(pq, "Task G", 11.0);
+	int ins_idx = priority_queue_push(pq, "Task G", 11.0, 0.0, 0.0);
 	printf("\nInserting Task G with priority 11.0:\n");
 	if (ins_idx >= 0) {
 		printf("Inserted Task G at index %d\n", ins_idx);

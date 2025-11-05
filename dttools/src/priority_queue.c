@@ -13,17 +13,25 @@ See the file COPYING for details.
 #include <math.h>
 #include <float.h>
 #include <stdarg.h>
+#include <stddef.h>
 
 #define DEFAULT_CAPACITY 127
+
+/* This is the maximum number of priorities defined in struct element. */
+#define MAX_PRIORITY_COUNT 3
 
 struct element {
 	void *data;
 
-	// Priorities ar keps in this array, compared in order.
+	// Priorities are stored as three separate variables, compared in order.
 	// For two elements e1 and e2, e1 is considered to have higher priority than e2 if
-	// e1->priority[0] > e2->priority[0] or e1->priority[0] == e2->priority[0] and e1->priority[1] > e2->priority[1] or ...
+	// e1->priority_0 > e2->priority_0 or e1->priority_0 == e2->priority_0 and e1->priority_1 > e2->priority_1 or ...
 	// Larger numbers have higher priority.
-	double *priority;
+
+	// WARNING: This attributes should be the last defined in this struct.
+	double priority_0;
+	double priority_1;
+	double priority_2;
 };
 
 struct priority_queue {
@@ -32,7 +40,7 @@ struct priority_queue {
 	struct element **elements;
 
 	int priority_count; // Number of priorities per element. Priorities are compared
-			    // in the order priority[] -> priority[1] -> ... -> priority[priority_count-1]
+			    // in the order priority0 -> priority1 -> ...
 
 	/* The following three cursors are used to iterate over the elements in the numerical order they are stored in the array, which is
 	   different from the order of priorities.  Each of them has different concerns when traverse the queue Though the typical priority-based
@@ -43,44 +51,20 @@ struct priority_queue {
 };
 
 /****** Static Methods ******/
-
-static struct element *element_create(void *data, int priority_count, const double *priority)
-{
-	struct element *e = (struct element *)malloc(sizeof(struct element));
-
-	e->data = data;
-
-	if (priority) {
-		e->priority = (double *)malloc(priority_count * sizeof(double));
-		if (!e->priority) {
-			free(e);
-			return NULL;
-		}
-		memcpy(e->priority, priority, priority_count * sizeof(double));
-	} else {
-		e->priority = NULL;
-	}
-
-	return e;
-}
-
-static void element_delete(struct element *e)
-{
-	free(e->priority);
-	free(e);
-}
-
 static int cmp_left_right(struct priority_queue *pq, int left_idx, int right_idx)
 {
-	double *left = pq->elements[left_idx]->priority;
-	double *right = pq->elements[right_idx]->priority;
+	struct element *left = pq->elements[left_idx];
+	struct element *right = pq->elements[right_idx];
 
+	// Compare priorities in order
 	for (int i = 0; i < pq->priority_count; i++) {
-		if (left[i] < right[i]) {
+		double left_priority = *((double *)((char *)left + offsetof(struct element, priority_0) + i * sizeof(double)));
+		double right_priority = *((double *)((char *)right + offsetof(struct element, priority_0) + i * sizeof(double)));
+
+		if (left_priority < right_priority) {
 			return -1;
 		}
-
-		if (left[i] > right[i]) {
+		if (left_priority > right_priority) {
 			return 1;
 		}
 	}
@@ -173,8 +157,8 @@ struct priority_queue *priority_queue_create(int init_capacity, int priority_cou
 		init_capacity = DEFAULT_CAPACITY;
 	}
 
-	if (priority_count < 1) {
-		fatal("Priority count must be at least 1.\n");
+	if (priority_count < 1 || priority_count > MAX_PRIORITY_COUNT) {
+		fatal("Priority count must be at least 1 and at most %d.\n", MAX_PRIORITY_COUNT);
 		return NULL;
 	}
 
@@ -205,8 +189,7 @@ int priority_queue_size(struct priority_queue *pq)
 	return pq->size;
 }
 
-/** Push to the queue without duplicating priotiry array. */
-int push_internal(struct priority_queue *pq, void *data, double *priority)
+int priority_queue_push(struct priority_queue *pq, void *data, ...)
 {
 	if (!pq) {
 		return -1;
@@ -218,11 +201,20 @@ int push_internal(struct priority_queue *pq, void *data, double *priority)
 		}
 	}
 
-	struct element *e = element_create(data, pq->priority_count, NULL);
+	struct element *e = (struct element *)calloc(1, sizeof(struct element));
 	if (!e) {
 		return -1;
 	}
-	e->priority = priority;
+
+	e->data = data;
+
+	// Collect variable arguments for the three priorities
+	va_list args;
+	va_start(args, data);
+	for (int i = 0; i < pq->priority_count; i++) {
+		*((double *)((char *)e + offsetof(struct element, priority_0) + i * sizeof(double))) = va_arg(args, double);
+	}
+	va_end(args);
 
 	pq->elements[pq->size++] = e;
 
@@ -236,46 +228,6 @@ int push_internal(struct priority_queue *pq, void *data, double *priority)
 	return new_idx;
 }
 
-int priority_queue_push(struct priority_queue *pq, void *data, const double *priority)
-{
-	if (!pq) {
-		return -1;
-	}
-
-	double *priority_copy = (double *)malloc(pq->priority_count * sizeof(double));
-	if (!priority_copy) {
-		return -1;
-	}
-
-	memcpy(priority_copy, priority, pq->priority_count * sizeof(double));
-	return push_internal(pq, data, priority_copy);
-}
-
-int priority_queue_push_varargs(struct priority_queue *pq, void *data, ...)
-{
-	if (!pq) {
-		return -1;
-	}
-
-	// Allocate array for priorities
-	double *priority = (double *)malloc(pq->priority_count * sizeof(double));
-	if (!priority) {
-		return -1;
-	}
-
-	// Collect variable arguments into the priority array
-	va_list args;
-	va_start(args, data);
-	for (int i = 0; i < pq->priority_count; i++) {
-		priority[i] = va_arg(args, double);
-	}
-	va_end(args);
-
-	// Call the standard push function
-	// Note: push_internal takes ownership of the priority array, so we don't free it here
-	return push_internal(pq, data, priority);
-}
-
 void *priority_queue_pop(struct priority_queue *pq)
 {
 	if (!pq || pq->size == 0) {
@@ -287,7 +239,7 @@ void *priority_queue_pop(struct priority_queue *pq)
 	pq->elements[0] = pq->elements[--pq->size];
 	pq->elements[pq->size] = NULL;
 	sink(pq, 0);
-	element_delete(e);
+	free(e);
 
 	return data;
 }
@@ -307,7 +259,8 @@ double priority_queue_get_priority_at(struct priority_queue *pq, int priority_id
 		return 0;
 	}
 
-	return pq->elements[element_index]->priority[priority_idx];
+	struct element *e = pq->elements[element_index];
+	return *((double *)((char *)e + offsetof(struct element, priority_0) + priority_idx * sizeof(double)));
 }
 
 double priority_queue_get_top_priority(struct priority_queue *pq)
@@ -316,7 +269,8 @@ double priority_queue_get_top_priority(struct priority_queue *pq)
 		return 0;
 	}
 
-	return pq->elements[0]->priority[0];
+	struct element *e = pq->elements[0];
+	return *((double *)((char *)e + offsetof(struct element, priority_0) + 0 * sizeof(double)));
 }
 
 void *priority_queue_peek_at(struct priority_queue *pq, int idx)
@@ -346,8 +300,15 @@ int priority_queue_update_priority(struct priority_queue *pq, void *data, int pr
 		return -1;
 	}
 
-	double old_priority = pq->elements[idx]->priority[priority_idx];
-	pq->elements[idx]->priority[priority_idx] = new_priority;
+	struct element *e = pq->elements[idx];
+
+	// Get old priority and set new priority based on priority_idx
+	if (priority_idx < 0 || priority_idx >= pq->priority_count) {
+		return -1;
+	}
+
+	double old_priority = *((double *)((char *)e + offsetof(struct element, priority_0) + priority_idx * sizeof(double)));
+	*((double *)((char *)e + offsetof(struct element, priority_0) + priority_idx * sizeof(double))) = new_priority;
 
 	int new_idx = -1;
 
@@ -483,7 +444,7 @@ int priority_queue_remove(struct priority_queue *pq, int idx)
 		priority_queue_rotate_reset(pq);
 	}
 
-	element_delete(to_delete);
+	free(to_delete);
 
 	return 1;
 }
@@ -496,7 +457,7 @@ void priority_queue_delete(struct priority_queue *pq)
 
 	for (int i = 0; i < pq->size; i++) {
 		if (pq->elements[i]) {
-			element_delete(pq->elements[i]);
+			free(pq->elements[i]);
 		}
 	}
 	free(pq->elements);

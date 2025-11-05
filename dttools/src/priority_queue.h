@@ -75,7 +75,7 @@ int priority0 = 5;
 int priority1 = 3;
 void *data = someDataPointer;
 
-priority_queue_push_varargs(pq, data, priority0, priority1);
+priority_queue_push(pq, data, priority0, priority1);
 data = priority_queue_pop(pq);
 void *headData = priority_queue_peek_top(pq);
 </pre>
@@ -117,23 +117,14 @@ struct priority_queue *priority_queue_create(int init_capacity, int priority_cou
 int priority_queue_size(struct priority_queue *pq);
 
 /** Push an element into a priority queue.
-The standard push operation. New elements are placed lower than existing elements of the same priority
-The priorities are specified as a double array, with the length of the array being the number of priorities per element.
-@param pq A pointer to a priority queue.
-@param data A pointer to store in the queue.
-@param priority The specified priorities with the given object.
-@return The idex of data if the push succeeded, -1 on failure.
-*/
-int priority_queue_push(struct priority_queue *pq, void *data, const double *priority);
-
-/** Push an element into a priority queue.
 The standard push operation. New elements are placed lower than existing elements of the same priority.
+Takes three priority values as variable arguments.
 @param pq A pointer to a priority queue.
 @param data A pointer to store in the queue.
-@param ... The variable arguments list of priorities, as doubles.
+@param ... The priority values (priority_0, priority_1, ...) as doubles.
 @return The idex of data if the push succeeded, -1 on failure.
 */
-int priority_queue_push_varargs(struct priority_queue *pq, void *data, ...);
+int priority_queue_push(struct priority_queue *pq, void *data, ...);
 
 /** Pop the element with the highest priority from a priority queue.
 @param pq A pointer to a priority queue.
