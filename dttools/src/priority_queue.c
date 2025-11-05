@@ -31,8 +31,8 @@ struct priority_queue {
 	int capacity;
 	struct element **elements;
 
-	int priority_count;   // Number of priorities per element. Priorities are compared
-	                      // in the order priority[] -> priority[1] -> ... -> priority[priority_count-1]
+	int priority_count; // Number of priorities per element. Priorities are compared
+			    // in the order priority[] -> priority[1] -> ... -> priority[priority_count-1]
 
 	/* The following three cursors are used to iterate over the elements in the numerical order they are stored in the array, which is
 	   different from the order of priorities.  Each of them has different concerns when traverse the queue Though the typical priority-based
@@ -178,7 +178,6 @@ struct priority_queue *priority_queue_create(int init_capacity, int priority_cou
 		return NULL;
 	}
 
-
 	pq->elements = (struct element **)calloc(init_capacity, sizeof(struct element *));
 	if (!pq->elements) {
 		fatal("Priority queue memory allocation failed.\n");
@@ -251,8 +250,6 @@ int priority_queue_push(struct priority_queue *pq, void *data, const double *pri
 	memcpy(priority_copy, priority, pq->priority_count * sizeof(double));
 	return push_internal(pq, data, priority_copy);
 }
-
-
 
 int priority_queue_push_varargs(struct priority_queue *pq, void *data, ...)
 {
@@ -462,9 +459,9 @@ int priority_queue_remove(struct priority_queue *pq, int idx)
 		pq->elements[idx] = last_elem;
 		pq->elements[pq->size] = NULL;
 
-		if (GT(pq, idx, pq->size -1)) {
+		if (GT(pq, idx, pq->size - 1)) {
 			swim(pq, idx);
-		} else if (LT(pq, idx, pq->size -1)) {
+		} else if (LT(pq, idx, pq->size - 1)) {
 			sink(pq, idx);
 		}
 	} else {

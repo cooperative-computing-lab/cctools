@@ -3691,11 +3691,11 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 			case VINE_APP_FAILURE:
 			case VINE_WORKER_FAILURE:
 				/* failed to dispatch, commit put the task back in the right place. */
-			break;
-		case VINE_MGR_FAILURE:
-			/* special case, commit had a chained failure. */
-			priority_queue_push_varargs(q->ready_tasks, t, VINE_PRIORITY_DEFAULT,t->priority);
-			break;
+				break;
+			case VINE_MGR_FAILURE:
+				/* special case, commit had a chained failure. */
+				priority_queue_push_varargs(q->ready_tasks, t, VINE_PRIORITY_DEFAULT, t->priority);
+				break;
 			case VINE_END_OF_LIST:
 				/* shouldn't happen, keep going */
 				break;
@@ -4133,7 +4133,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->fixed_location_in_queue = 0;
 
 	/* Each tasks has two priority. First is the priority that taskvine itself assigns and
-	it is always VINE_PRIORITY_DEFAULT under normal operation. The second is the one the 
+	it is always VINE_PRIORITY_DEFAULT under normal operation. The second is the one the
 	user assigns. */
 	q->ready_tasks = priority_queue_create(0, 2);
 	q->running_table = itable_create(0);
