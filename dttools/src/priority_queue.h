@@ -54,15 +54,28 @@ The fifth time -
 [(5, "e"), (4, "d"), (2, "b"), (1, "a"), (3, "c")]
 As seen, the iteration order of elements is not the same as the priority order.
 
+Further, the priority queue can be used to store elements with multiple priorities. 
+Each element can have an array of priorities, allowing for multi-level priority ordering.
+Priorities are compared lexicographically: priority[0] is compared first; if equal, priority[1] 
+is compared; if equal, priority[2] is compared, and so on. This allows for sophisticated 
+tie-breaking schemes where higher-indexed priorities serve as secondary criteria.
+
+For example, with 3 priority levels:
+- Element A with priorities [5.0, 3.0, 7.0]
+- Element B with priorities [5.0, 4.0, 1.0]
+The comparison checks priority[0]: both are 5.0 (equal), so it moves to priority[1].
+Since 3.0 < 4.0, element B has higher overall priority. Note that priority[2] is never examined.
+
 An example to create a priority queue and manipulate its elements:
 <pre>
 struct priority_queue *pq;
-pq = priority_queue_create(10);
+pq = priority_queue_create(10, 2); // intial space for 10 elements and 2 priorities per element
 
-int priority = 5;
+int priority0 = 5;
+int priority1 = 3;
 void *data = someDataPointer;
 
-priority_queue_push(pq, data, priority);
+priority_queue_push_varargs(pq, data, priority0, priority1);
 data = priority_queue_pop(pq);
 void *headData = priority_queue_peek_top(pq);
 </pre>
