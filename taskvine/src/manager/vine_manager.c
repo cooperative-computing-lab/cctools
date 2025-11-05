@@ -426,8 +426,12 @@ static vine_msg_code_t handle_cache_update(struct vine_manager *q, struct vine_w
 
 			/* If a TEMP file, replicate or shift disk load as needed. */
 			if (f->type == VINE_TEMP) {
-				vine_temp_replicate_file_later(q, f);
-				vine_temp_shift_disk_load(q, w, f);
+				if (q->temp_replica_count > 1) {
+					vine_temp_queue_for_replication(q, f);
+				}
+				if (q->shift_disk_load) {
+					vine_temp_shift_disk_load(q, w, f);
+				}
 			}
 		}
 	}
@@ -484,7 +488,7 @@ static vine_msg_code_t handle_cache_invalid(struct vine_manager *q, struct vine_
 		}
 
 		/* If the creation failed, we may want to backup the file somewhere else. */
-		vine_temp_rescue_lost_replica(q, cachename);
+		vine_temp_handle_lost_replica(q, cachename);
 
 		/* Successfully processed this message. */
 		return VINE_MSG_PROCESSED;
@@ -1071,7 +1075,7 @@ static void recall_worker_lost_temp_files(struct vine_manager *q, struct vine_wo
 	// Iterate over files we want might want to recover
 	HASH_TABLE_ITERATE(w->current_files, cached_name, info)
 	{
-		vine_temp_rescue_lost_replica(q, cached_name);
+		vine_temp_handle_lost_replica(q, cached_name);
 	}
 }
 

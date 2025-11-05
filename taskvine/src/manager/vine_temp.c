@@ -20,6 +20,9 @@
 /* Private Functions */
 /*************************************************************/
 
+/**
+Check whether a worker is eligible to participate in peer transfers.
+*/
 static int is_worker_active(struct vine_worker_info *w)
 {
 	if (!w) {
@@ -40,6 +43,12 @@ static int is_worker_active(struct vine_worker_info *w)
 	return 1;
 }
 
+/**
+Find the most suitable worker to serve as the source of a replica transfer.
+Eligible workers already host the file, have a ready replica, and are not
+overloaded with outgoing transfers. Preference is given to workers with fewer
+outgoing transfers to balance load.
+*/
 static struct vine_worker_info *get_best_source_worker(struct vine_manager *q, struct vine_file *f)
 {
 	if (!q || !f || f->type != VINE_TEMP) {
@@ -82,6 +91,12 @@ static struct vine_worker_info *get_best_source_worker(struct vine_manager *q, s
 	return best_source;
 }
 
+/**
+Select a destination worker that can accept a new replica. Workers must be
+active, not currently hosting the file, and have sufficient free cache space.
+Those with more available disk space are prioritized to reduce pressure on
+heavily utilized workers.
+*/
 static struct vine_worker_info *get_best_dest_worker(struct vine_manager *q, struct vine_file *f)
 {
 	if (!q || !f || f->type != VINE_TEMP) {
@@ -122,6 +137,11 @@ static struct vine_worker_info *get_best_dest_worker(struct vine_manager *q, str
 	return best_destination;
 }
 
+/**
+Initiate a peer-to-peer transfer between two workers for the specified file.
+The source worker provides a direct URL so the destination worker can pull the
+replica immediately via `vine_manager_put_url_now`.
+*/
 static void start_peer_transfer(struct vine_manager *q, struct vine_file *f, struct vine_worker_info *dest_worker, struct vine_worker_info *source_worker)
 {
 	if (!q || !f || f->type != VINE_TEMP || !dest_worker || !source_worker) {
@@ -133,6 +153,11 @@ static void start_peer_transfer(struct vine_manager *q, struct vine_file *f, str
 	free(source_addr);
 }
 
+/**
+Attempt to replicate a temporary file immediately by selecting compatible
+source and destination workers. Returns 1 when a transfer is launched, or 0 if
+no suitable pair of workers is currently available.
+*/
 static int vine_temp_replicate_file_now(struct vine_manager *q, struct vine_file *f)
 {
 	if (!q || !f || f->type != VINE_TEMP) {
@@ -158,7 +183,12 @@ static int vine_temp_replicate_file_now(struct vine_manager *q, struct vine_file
 /* Public Functions */
 /*************************************************************/
 
-int vine_temp_replicate_file_later(struct vine_manager *q, struct vine_file *f)
+/**
+Queue a temporary file for replication when it still lacks the target number of
+replicas. Files without any replica and those already satisfying the quota are
+ignored. A lower priority value gives preference to scarcer replicas.
+*/
+int vine_temp_queue_for_replication(struct vine_manager *q, struct vine_file *f)
 {
 	if (!q || !f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
 		return 0;
@@ -178,7 +208,15 @@ int vine_temp_replicate_file_later(struct vine_manager *q, struct vine_file *f)
 	return 1;
 }
 
-int vine_temp_rescue_lost_replica(struct vine_manager *q, char *cachename)
+/**
+Respond to a missing replica notification by re-queuing the corresponding file
+for replication, provided the file is still valid and managed by this
+coordinator. The use cases include when a cache-invalid message is received from a worker,
+or when a worker disconnects unexpectedly, and we need to rescue the lost data.
+If the replica does not have any ready source, it will be silently discarded in the
+replication phase, so don't worry about it.
+*/
+int vine_temp_handle_lost_replica(struct vine_manager *q, char *cachename)
 {
 	if (!q || !cachename) {
 		return 0;
@@ -189,11 +227,19 @@ int vine_temp_rescue_lost_replica(struct vine_manager *q, char *cachename)
 		return 0;
 	}
 
-	vine_temp_replicate_file_later(q, f);
+	vine_temp_queue_for_replication(q, f);
 
 	return 1;
 }
 
+/**
+Iterate through temporary files that still need additional replicas and
+trigger peer-to-peer transfers when both a source and destination worker
+are available. The function honors the manager's scheduling depth so that we
+do not spend too much time evaluating the queue in a single invocation.
+Files that cannot be replicated immediately are deferred by lowering their
+priority and will be reconsidered in future calls.
+*/
 int vine_temp_start_replication(struct vine_manager *q)
 {
 	if (!q) {
@@ -202,27 +248,31 @@ int vine_temp_start_replication(struct vine_manager *q)
 
 	int processed = 0;
 	int iter_count = 0;
+	/* Only examine up to attempt_schedule_depth files to keep the event loop responsive. */
 	int iter_depth = MIN(q->attempt_schedule_depth, priority_queue_size(q->temp_files_to_replicate));
+	/* Files that cannot be replicated now are temporarily stored and re-queued at the end. */
 	struct list *skipped = list_create();
 
 	struct vine_file *f;
 	while ((f = priority_queue_pop(q->temp_files_to_replicate)) && (iter_count++ < iter_depth)) {
+		/* skip and discard the replication request if the file is not valid */
 		if (!f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
 			continue;
 		}
 
-		/* skip if the file has enough replicas or no replicas */
+		/* skip and discard the replication request if the file has enough replicas or no replicas */
 		int current_replica_count = vine_file_replica_count(q, f);
 		if (current_replica_count >= q->temp_replica_count || current_replica_count == 0) {
 			continue;
 		}
-		/* skip if the file has no ready replicas */
+		/* skip and discard the replication request if the file has no ready replicas */
 		int current_ready_replica_count = vine_file_replica_table_count_replicas(q, f->cached_name, VINE_FILE_REPLICA_STATE_READY);
 		if (current_ready_replica_count == 0) {
 			continue;
 		}
 
-		/* if reach here, it means the file needs to be replicated and there is at least one ready replica. */
+		/* If reaches here, the file still lacks replicas and has at least one ready source, so we start finding a valid source and destination worker
+		 * and trigger the replication. If fails to find a valid source or destination worker, we requeue the file and will consider later. */
 		if (!vine_temp_replicate_file_now(q, f)) {
 			list_push_tail(skipped, f);
 			continue;
@@ -230,13 +280,12 @@ int vine_temp_start_replication(struct vine_manager *q)
 
 		processed++;
 
-		/* push back and keep evaluating the same file with a lower priority, until no more source
-		 * or destination workers are available, or the file has enough replicas. */
-		vine_temp_replicate_file_later(q, f);
+		/* Requeue the file with lower priority so it can accumulate replicas gradually. */
+		vine_temp_queue_for_replication(q, f);
 	}
 
 	while ((f = list_pop_head(skipped))) {
-		vine_temp_replicate_file_later(q, f);
+		vine_temp_queue_for_replication(q, f);
 	}
 	list_delete(skipped);
 
@@ -325,25 +374,25 @@ void vine_temp_shift_disk_load(struct vine_manager *q, struct vine_worker_info *
 		return;
 	}
 
-	if (!q->shift_disk_load) {
-		return;
-	}
-
 	struct vine_worker_info *target_worker = NULL;
 
 	char *key;
 	struct vine_worker_info *w = NULL;
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
+		/* skip if the worker is not active */
 		if (!is_worker_active(w)) {
 			continue;
 		}
+		/* skip if the worker already has this file */
 		if (vine_file_replica_table_lookup(w, f->cached_name)) {
 			continue;
 		}
-		if (w->inuse_cache + f->size > (source_worker->inuse_cache - f->size)) {
+		/* skip if the worker becomes heavier after the transfer */
+		if (w->inuse_cache + f->size > source_worker->inuse_cache - f->size) {
 			continue;
 		}
+		/* workers with less inuse cache space are preferred */
 		if (!target_worker || w->inuse_cache < target_worker->inuse_cache) {
 			target_worker = w;
 		}
