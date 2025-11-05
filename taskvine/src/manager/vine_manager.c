@@ -418,6 +418,12 @@ static vine_msg_code_t handle_cache_update(struct vine_manager *q, struct vine_w
 			f->state = VINE_FILE_STATE_CREATED;
 			f->size = size;
 
+			/* If the replica's type was a URL, it means the manager expected the destination worker to download it
+			 * from elsewhere. Now that it's physically present, we can resolve its type back to the original. */
+			 if (replica->type == VINE_URL) {
+				replica->type = f->type;
+			}
+
 			/* And if the file is a newly created temporary, replicate as needed. */
 			if (f->type == VINE_TEMP && *id == 'X' && q->temp_replica_count > 1) {
 				hash_table_insert(q->temp_files_to_replicate, f->cached_name, NULL);
