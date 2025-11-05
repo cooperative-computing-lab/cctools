@@ -5009,6 +5009,7 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 		struct vine_task *library = vine_schedule_find_library(q, w, name);
 		while (library) {
 			vine_cancel_by_task_id(q, library->task_id);
+			itable_remove(w->current_libraries, library->task_id);
 			library = vine_schedule_find_library(q, w, name);
 		}
 		hash_table_remove(q->library_templates, name);
