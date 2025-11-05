@@ -121,6 +121,13 @@ See the file COPYING for details.
 /* Default timeout for slow workers to come back to the pool, can be set prior to creating a manager. */
 double vine_option_blocklist_slow_workers_timeout = 900;
 
+typedef enum {
+	VINE_PRIORITY_DEFAULT = 0,
+	VINE_PRIORITY_EXHAUSTION = 2 << 4,
+	VINE_PRIORITY_RECOVERY = 2 << 8,
+	VINE_PRIORITY_HIGHEST = 2 << 30,
+} vine_priority_type_t;
+
 /* Forward prototypes for functions that are called out of order. */
 /* Many of these should be removed if forward declaration is not needed. */
 
@@ -3684,11 +3691,11 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 			case VINE_APP_FAILURE:
 			case VINE_WORKER_FAILURE:
 				/* failed to dispatch, commit put the task back in the right place. */
-				break;
-			case VINE_MGR_FAILURE:
-				/* special case, commit had a chained failure. */
-				priority_queue_push(q->ready_tasks, t, t->priority);
-				break;
+			break;
+		case VINE_MGR_FAILURE:
+			/* special case, commit had a chained failure. */
+			priority_queue_push_varargs(q->ready_tasks, t, VINE_PRIORITY_DEFAULT,t->priority);
+			break;
 			case VINE_END_OF_LIST:
 				/* shouldn't happen, keep going */
 				break;
@@ -4125,7 +4132,10 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->next_task_id = 1;
 	q->fixed_location_in_queue = 0;
 
-	q->ready_tasks = priority_queue_create(0);
+	/* Each tasks has two priority. First is the priority that taskvine itself assigns and
+	it is always VINE_PRIORITY_DEFAULT under normal operation. The second is the one the 
+	user assigns. */
+	q->ready_tasks = priority_queue_create(0, 2);
 	q->running_table = itable_create(0);
 	q->waiting_retrieval_list = list_create();
 	q->retrieved_list = list_create();
@@ -4672,9 +4682,9 @@ static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t
 		 * as possible among those with the same priority. This avoids
 		 * the issue in which all 'big' tasks fail because the first
 		 * allocation is too small. */
-		priority_queue_push(q->ready_tasks, t, t->priority + 1);
+		priority_queue_push_varargs(q->ready_tasks, t, VINE_PRIORITY_EXHAUSTION, t->priority);
 	} else {
-		priority_queue_push(q->ready_tasks, t, t->priority);
+		priority_queue_push_varargs(q->ready_tasks, t, VINE_PRIORITY_DEFAULT, t->priority);
 	}
 
 	/* If the task has been used before, clear out accumulated state. */
