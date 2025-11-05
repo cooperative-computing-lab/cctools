@@ -11,6 +11,8 @@ Implementation of a terminal progress bar with multiple parts.
 #include "progress_bar.h"
 #include "xxmalloc.h"
 #include "macros.h"
+#include "macros.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,8 +25,9 @@ Implementation of a terminal progress bar with multiple parts.
 
 /* Max bar width (in block characters) for single-line rendering. */
 #define MAX_BAR_WIDTH 30
-/* Minimum redraw interval to avoid flicker. */
-#define PROGRESS_BAR_UPDATE_INTERVAL ((USECOND) * 0.1)
+
+/* Minimum redraw interval to avoid flicker (200ms). */
+#define PROGRESS_BAR_UPDATE_INTERVAL_US (USECOND / 5)
 
 #define COLOR_RESET "\033[0m"
 #define COLOR_GREEN "\033[32m"
@@ -75,7 +78,7 @@ static void print_progress_bar(struct ProgressBar *bar)
 		return;
 	}
 
-	bar->last_draw_time = timestamp_get();
+	bar->last_draw_time_us = timestamp_get();
 
 	char part_text[256];
 	char *ptr = part_text;
@@ -114,7 +117,7 @@ static void print_progress_bar(struct ProgressBar *bar)
 		progress = 1.0f;
 	}
 
-	timestamp_t elapsed = timestamp_get() - bar->start_time;
+	timestamp_t elapsed = timestamp_get() - bar->start_time_us;
 	int h = elapsed / (3600LL * USECOND);
 	int m = (elapsed % (3600LL * USECOND)) / (60LL * USECOND);
 	int s = (elapsed % (60LL * USECOND)) / USECOND;
@@ -167,11 +170,32 @@ struct ProgressBar *progress_bar_init(const char *label)
 
 	bar->label = xxstrdup(label);
 	bar->parts = list_create();
-	bar->start_time = timestamp_get();
-	bar->last_draw_time = timestamp_get();
+	bar->start_time_us = timestamp_get();
+	bar->last_draw_time_us = 0;
+	bar->update_interval_us = PROGRESS_BAR_UPDATE_INTERVAL_US;
+	bar->update_interval_sec = (double)bar->update_interval_us / USECOND;
 	bar->has_drawn_once = 0;
 
 	return bar;
+}
+
+/** Set the update interval for the progress bar. */
+void progress_bar_set_update_interval(struct ProgressBar *bar, double update_interval_sec)
+{
+	if (!bar) {
+		return;
+	}
+
+	if (update_interval_sec < 0) {
+		update_interval_sec = 0;
+	}
+	bar->update_interval_sec = update_interval_sec;
+	/* Convert seconds to microseconds with saturation to avoid overflow. */
+	if (update_interval_sec >= (double)UINT64_MAX / (double)USECOND) {
+		bar->update_interval_us = (timestamp_t)UINT64_MAX;
+	} else {
+		bar->update_interval_us = (timestamp_t)(update_interval_sec * (double)USECOND);
+	}
 }
 
 /** Create a new part. */
@@ -207,9 +231,8 @@ void progress_bar_set_part_total(struct ProgressBar *bar, struct ProgressBarPart
 	if (!bar || !part) {
 		return;
 	}
-	part->total = new_total;
 
-	print_progress_bar(bar);
+	part->total = new_total;
 }
 
 /** Advance a part's current value, redraw if needed. */
@@ -224,11 +247,10 @@ void progress_bar_update_part(struct ProgressBar *bar, struct ProgressBarPart *p
 		part->current = part->total;
 	}
 
-	if (timestamp_get() - bar->last_draw_time < PROGRESS_BAR_UPDATE_INTERVAL) {
-		return;
+	timestamp_t now_us = timestamp_get();
+	if (!bar->has_drawn_once || (now_us - bar->last_draw_time_us) >= bar->update_interval_us) {
+		print_progress_bar(bar);
 	}
-
-	print_progress_bar(bar);
 }
 
 /** Set the start time for the progress bar. */
@@ -238,7 +260,7 @@ void progress_bar_set_start_time(struct ProgressBar *bar, timestamp_t start_time
 		return;
 	}
 
-	bar->start_time = start_time;
+	bar->start_time_us = start_time;
 }
 
 /** Final render and newline. */
