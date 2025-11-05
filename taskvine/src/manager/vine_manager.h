@@ -291,6 +291,9 @@ void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info 
 /* Check if the worker is able to transfer the necessary files for this task. */
 int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 
+/** Evict a random worker to simulate a failure. */
+int vine_manager_evict_a_random_worker(struct vine_manager *q);
+
 /* The expected format of files created by the resource monitor.*/
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-task-%d"
 #define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
