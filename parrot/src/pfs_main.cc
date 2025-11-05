@@ -37,7 +37,7 @@ extern "C" {
 #include "unlink_recursive.h"
 #include "file_cache.h"
 #include "ftp_lite.h"
-#include "getopt.h"
+#include <getopt.h>
 #include "int_sizes.h"
 #include "itable.h"
 #include "macros.h"

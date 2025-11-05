@@ -50,7 +50,6 @@ SOURCES = \
 	full_io.c \
 	get_canonical_path.c \
 	get_line.c \
-	getopt.c \
 	getopt_aux.c \
 	gpu_info.c \
 	hash_cache.c \
@@ -149,7 +148,6 @@ HEADERS_PUBLIC = \
 	fast_popen.h \
 	file_link_recursive.h \
 	full_io.h \
-	getopt.h \
 	getopt_aux.h \
 	hash_table.h \
 	histogram.h \

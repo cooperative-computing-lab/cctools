@@ -86,8 +86,6 @@ Also configurable through environment variables **CCTOOLS_TEMP** or **TMPDIR**
 - **--tls-sni=_&lt;&gt;_**<br />SNI domain name if different from manager hostname. Implies --ssl.
 - **-v**,**--version**<br /> Show the version string.
 - **-h**,**--help**<br /> Show this screen.
-- **--debug-workers**<br /> Bring the woker logs back to the scratch directory, usually work with **--single-shot**
-- **--single-shot**<br /> Shut down workers gracefully once their connected manager is done
 
 
 Concurrent control options:
@@ -174,8 +172,6 @@ If running on condor, you may manually specify condor requirements:
 vine_factory -T condor -M barney --condor-requirements 'MachineGroup == "disc"' --condor-requirements 'has_matlab == true'
 ```
 
-If 
-
 Repeated uses of **condor-requirements** are and-ed together. The previous example will produce a statement equivalent to:
 
 **requirements = ((MachineGroup == "disc") && (has_matlab == true))**
@@ -225,7 +221,7 @@ The Cooperative Computing Tools are Copyright (C) 2022 The University of Notre D
 
 - [Cooperative Computing Tools Documentation]("../index.html")
 - [TaskVine User Manual]("../taskvine.html")
-- [vine_worker(1)](vine_worker.md) [vine_status(1)](vine_status.md) [vine_factory(1)](vine_factory.md) [vine_graph_log(1)](vine_graph_log.md) 
+- [vine_worker(1)](vine_worker.md) [vine_status(1)](vine_status.md) [vine_factory(1)](vine_factory.md) [vine_plot_performance(1)](vine_plot_performance.md) 
 
 
 CCTools

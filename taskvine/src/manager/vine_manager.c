@@ -3067,12 +3067,12 @@ static void find_max_worker(struct vine_manager *q)
  * are not counted towards the resources in use and will be killed if needed. */
 static void kill_empty_libraries_on_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	uint64_t task_id;
-	struct vine_task *task;
-	ITABLE_ITERATE(w->current_tasks, task_id, task)
+	uint64_t libtask_id;
+	struct vine_task *libtask;
+	ITABLE_ITERATE(w->current_libraries, libtask_id, libtask)
 	{
-		if (task->provides_library && task->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, task->provides_library))) {
-			vine_cancel_by_task_id(q, task->task_id);
+		if (libtask->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, libtask->provides_library))) {
+			vine_cancel_by_task_id(q, libtask_id);
 		}
 	}
 }
@@ -6438,15 +6438,17 @@ Should be invoked by the application when a file will never
 be needed again, to free up available space.
 */
 
-void vine_prune_file(struct vine_manager *m, struct vine_file *f)
+int vine_prune_file(struct vine_manager *m, struct vine_file *f)
 {
 	if (!f) {
-		return;
+		return 0;
 	}
 
 	if (!m) {
-		return;
+		return 0;
 	}
+
+	int pruned_replica_count = 0;
 
 	/* delete all of the replicas present at remote workers. */
 	struct set *source_workers = hash_table_lookup(m->file_worker_table, f->cached_name);
@@ -6456,6 +6458,7 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 			for (int i = 0; workers_array[i] != NULL; i++) {
 				struct vine_worker_info *w = (struct vine_worker_info *)workers_array[i];
 				delete_worker_file(m, w, f->cached_name, 0, 0);
+				pruned_replica_count++;
 			}
 			set_free_values_array(workers_array);
 		}
@@ -6463,6 +6466,8 @@ void vine_prune_file(struct vine_manager *m, struct vine_file *f)
 
 	/* also remove from the replication table. */
 	hash_table_remove(m->temp_files_to_replicate, f->cached_name);
+
+	return pruned_replica_count;
 }
 
 /*

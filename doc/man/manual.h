@@ -22,7 +22,7 @@ define(SEE_ALSO_TASK_VINE,
 `LIST_BEGIN
 LIST_ITEM(MANUAL(Cooperative Computing Tools Documentation,"../index.html"))
 LIST_ITEM(MANUAL(TaskVine User Manual,"../taskvine.html"))
-LIST_ITEM(MANPAGE(vine_worker,1) MANPAGE(vine_status,1) MANPAGE(vine_factory,1) MANPAGE(vine_graph_log,1) )
+LIST_ITEM(MANPAGE(vine_worker,1) MANPAGE(vine_status,1) MANPAGE(vine_factory,1) MANPAGE(vine_plot_performance,1) )
 LIST_END')dnl
 dnl
 define(SEE_ALSO_PARROT,
