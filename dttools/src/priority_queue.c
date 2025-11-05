@@ -275,12 +275,8 @@ int priority_queue_push_varargs(struct priority_queue *pq, void *data, ...)
 	va_end(args);
 
 	// Call the standard push function
-	int result = push_internal(pq, data, priority);
-
-	// Clean up
-	free(priority);
-
-	return result;
+	// Note: push_internal takes ownership of the priority array, so we don't free it here
+	return push_internal(pq, data, priority);
 }
 
 void *priority_queue_pop(struct priority_queue *pq)
@@ -294,7 +290,7 @@ void *priority_queue_pop(struct priority_queue *pq)
 	pq->elements[0] = pq->elements[--pq->size];
 	pq->elements[pq->size] = NULL;
 	sink(pq, 0);
-	free(e);
+	element_delete(e);
 
 	return data;
 }
