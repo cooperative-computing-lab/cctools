@@ -2262,6 +2262,7 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "tasks_on_workers", info.tasks_on_workers);
 	jx_insert_integer(j, "tasks_running", info.tasks_running);
 	jx_insert_integer(j, "tasks_with_results", info.tasks_with_results);
+	jx_insert_integer(j, "recovery_tasks_submitted", info.recovery_tasks_submitted);
 	jx_insert_integer(j, "tasks_left", q->num_tasks_left);
 
 	jx_insert_integer(j, "tasks_submitted", info.tasks_submitted);
@@ -2387,6 +2388,7 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	// additional task information for vine_factory
 	jx_insert_integer(j, "tasks_on_workers", info.tasks_on_workers);
 	jx_insert_integer(j, "tasks_left", q->num_tasks_left);
+	jx_insert_integer(j, "recovery_tasks_submitted", info.recovery_tasks_submitted);
 
 	// capacity information the factory needs
 	jx_insert_integer(j, "capacity_tasks", info.capacity_tasks);
@@ -4440,11 +4442,6 @@ int vine_set_password_file(struct vine_manager *q, const char *file)
 	return copy_file_to_buffer(file, &q->password, NULL) > 0;
 }
 
-int vine_get_num_submitted_recovery_tasks(struct vine_manager *q)
-{
-	return q->num_submitted_recovery_tasks;
-}
-
 static void delete_task_at_exit(struct vine_task *t)
 {
 	if (!t) {
@@ -4874,7 +4871,7 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	 * this distinction is important when many files are lost and the workflow is effectively rerun from scratch. */
 	if (t->type == VINE_TASK_TYPE_RECOVERY) {
 		vine_task_set_priority(t, t->priority + priority_queue_get_top_priority(q->ready_tasks) + 1);
-		q->num_submitted_recovery_tasks++;
+		q->stats->recovery_tasks_submitted++;
 	}
 
 	if (t->has_fixed_locations) {
@@ -5380,8 +5377,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		}
 
 		q->nothing_happened_last_wait_cycle = 0;
-
-		q->num_submitted_recovery_tasks = 0;
 
 		// Retrieve results from workers. We do a worker at a time to be more efficient.
 		// We get a known worker with results from the first task in the waiting_retrieval_list,

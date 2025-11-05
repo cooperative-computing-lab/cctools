@@ -176,6 +176,7 @@ struct vine_stats {
 	int tasks_on_workers;	/**< Number of tasks currently dispatched to some worker. */
 	int tasks_running;	/**< Number of tasks currently executing at some worker. */
 	int tasks_with_results; /**< Number of tasks with retrieved results and waiting to be returned to user. */
+	int recovery_tasks_submitted; /**< Total number of recovery tasks submitted since the manager started. */
 
 	/* Cumulative stats for tasks: */
 	int tasks_submitted;  /**< Total number of tasks submitted to the manager. */
@@ -1387,12 +1388,6 @@ void vine_set_password(struct vine_manager *m, const char *password);
 */
 
 int vine_set_password_file(struct vine_manager *m, const char *file);
-
-/** Get the number of recovery tasks submitted to the manager.
-@param m A manager object
-@return The number of recovery tasks submitted to the manager.
-*/
-int vine_get_num_submitted_recovery_tasks(struct vine_manager *m);
 
 /** Change the keepalive interval for a given manager.
 @param m A manager object
