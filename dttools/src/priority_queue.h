@@ -92,9 +92,10 @@ PRIORITY_QUEUE_BASE_ITERATE (pq, idx, data, iter_count, iter_depth) {
 /** Create a new priority queue.
 Element with a higher priority is at the top of the heap.
 @param init_capacity The initial number of elements in the queue. If zero, a default value will be used.
+@param priority_count The number of priorities per element.
 @return A pointer to a new priority queue.
 */
-struct priority_queue *priority_queue_create(int init_capacity);
+struct priority_queue *priority_queue_create(int init_capacity, int priority_count);
 
 /** Count the elements in a priority queue.
 @param pq A pointer to a priority queue.
@@ -104,12 +105,22 @@ int priority_queue_size(struct priority_queue *pq);
 
 /** Push an element into a priority queue.
 The standard push operation. New elements are placed lower than existing elements of the same priority
+The priorities are specified as a double array, with the length of the array being the number of priorities per element.
 @param pq A pointer to a priority queue.
 @param data A pointer to store in the queue.
-@param priority The specified priority with the given object.
+@param priority The specified priorities with the given object.
 @return The idex of data if the push succeeded, -1 on failure.
 */
-int priority_queue_push(struct priority_queue *pq, void *data, double priority);
+int priority_queue_push(struct priority_queue *pq, void *data, const double *priority);
+
+/** Push an element into a priority queue.
+The standard push operation. New elements are placed lower than existing elements of the same priority.
+@param pq A pointer to a priority queue.
+@param data A pointer to store in the queue.
+@param ... The variable arguments list of priorities, as doubles.
+@return The idex of data if the push succeeded, -1 on failure.
+*/
+int priority_queue_push_varargs(struct priority_queue *pq, void *data, ...);
 
 /** Pop the element with the highest priority from a priority queue.
 @param pq A pointer to a priority queue.
@@ -134,10 +145,11 @@ void *priority_queue_peek_at(struct priority_queue *pq, int index);
 
 /** Get the priority of an element at a specified index.
 @param pq A pointer to a priority queue.
-@param index The index of the element.
+@param priority_idx The index of the priority.
+@param element_index The index of the element.
 @return The priority of the element if any, NAN on failure.
 */
-double priority_queue_get_priority_at(struct priority_queue *pq, int index);
+double priority_queue_get_priority_at(struct priority_queue *pq, int priority_idx, int element_index);
 
 /** Get the priority of the top element in a priority queue.
 @param pq A pointer to a priority queue.
@@ -148,10 +160,11 @@ double priority_queue_get_top_priority(struct priority_queue *pq);
 /** Update the priority of an element in a priority queue.
 @param pq A pointer to a priority queue.
 @param data The pointer to the element to update.
+@param priority_idx The index of the priority to update.
 @param new_priority The new priority of the element.
 @return The new index if the update succeeded, -1 on failure.
 */
-int priority_queue_update_priority(struct priority_queue *pq, void *data, double new_priority);
+int priority_queue_update_priority(struct priority_queue *pq, void *data, int priority_idx, double new_priority);
 
 /** Find the index of an element in a priority queue.
 @param pq A pointer to a priority queue.

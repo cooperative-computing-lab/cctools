@@ -5,24 +5,34 @@ See the file COPYING for details.
 */
 
 #include "priority_queue.h"
+#include "debug.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <float.h>
+#include <stdarg.h>
 
 #define DEFAULT_CAPACITY 127
 
 struct element {
 	void *data;
-	double priority; // In this implementation, elements with bigger priorities are considered to be privileged.
+
+	// Priorities ar keps in this array, compared in order.
+	// For two elements e1 and e2, e1 is considered to have higher priority than e2 if
+	// e1->priority[0] > e2->priority[0] or e1->priority[0] == e2->priority[0] and e1->priority[1] > e2->priority[1] or ...
+	// Larger numbers have higher priority.
+	double *priority;
 };
 
 struct priority_queue {
 	int size;
 	int capacity;
 	struct element **elements;
+
+	int priority_count;   // Number of priorities per element. Priorities are compared
+	                      // in the order priority[] -> priority[1] -> ... -> priority[priority_count-1]
 
 	/* The following three cursors are used to iterate over the elements in the numerical order they are stored in the array, which is
 	   different from the order of priorities.  Each of them has different concerns when traverse the queue Though the typical priority-based
@@ -33,6 +43,57 @@ struct priority_queue {
 };
 
 /****** Static Methods ******/
+
+static struct element *element_create(void *data, int priority_count, const double *priority)
+{
+	struct element *e = (struct element *)malloc(sizeof(struct element));
+
+	e->data = data;
+
+	if (priority) {
+		e->priority = (double *)malloc(priority_count * sizeof(double));
+		if (!e->priority) {
+			free(e);
+			return NULL;
+		}
+		memcpy(e->priority, priority, priority_count * sizeof(double));
+	} else {
+		e->priority = NULL;
+	}
+
+	return e;
+}
+
+static void element_delete(struct element *e)
+{
+	free(e->priority);
+	free(e);
+}
+
+static int cmp_left_right(struct priority_queue *pq, int left_idx, int right_idx)
+{
+	double *left = pq->elements[left_idx]->priority;
+	double *right = pq->elements[right_idx]->priority;
+
+	for (int i = 0; i < pq->priority_count; i++) {
+		if (left[i] < right[i]) {
+			return -1;
+		}
+
+		if (left[i] > right[i]) {
+			return 1;
+		}
+	}
+
+	// If all priorities are equal, return 0
+	return 0;
+}
+
+#define LE(p, l, r) (cmp_left_right(p, l, r) <= 0)
+#define LT(p, l, r) (cmp_left_right(p, l, r) < 0)
+#define GT(p, l, r) (cmp_left_right(p, l, r) > 0)
+#define GE(p, l, r) (cmp_left_right(p, l, r) >= 0)
+#define EQ(p, l, r) (cmp_left_right(p, l, r) == 0)
 
 static void swap_elements(struct priority_queue *pq, int i, int j)
 {
@@ -47,7 +108,7 @@ static int swim(struct priority_queue *pq, int k)
 		return 1;
 	}
 
-	while (k > 0 && pq->elements[(k - 1) / 2]->priority <= pq->elements[k]->priority) {
+	while (k > 0 && LE(pq, (k - 1) / 2, k)) {
 		swap_elements(pq, k, (k - 1) / 2);
 		k = (k - 1) / 2;
 	}
@@ -63,12 +124,14 @@ static int sink(struct priority_queue *pq, int k)
 
 	while (2 * k + 1 < pq->size) {
 		int j = 2 * k + 1;
-		if (j + 1 < pq->size && pq->elements[j]->priority <= pq->elements[j + 1]->priority) {
+		if (j + 1 < pq->size && LE(pq, j, j + 1)) {
 			j++;
 		}
-		if (pq->elements[k]->priority >= pq->elements[j]->priority) {
+
+		if (GE(pq, k, j)) {
 			break;
 		}
+
 		swap_elements(pq, k, j);
 		k = j;
 	}
@@ -99,7 +162,7 @@ static int priority_queue_double_capacity(struct priority_queue *pq)
 
 /****** External Methods ******/
 
-struct priority_queue *priority_queue_create(int init_capacity)
+struct priority_queue *priority_queue_create(int init_capacity, int priority_count)
 {
 	struct priority_queue *pq = (struct priority_queue *)malloc(sizeof(struct priority_queue));
 	if (!pq) {
@@ -110,16 +173,22 @@ struct priority_queue *priority_queue_create(int init_capacity)
 		init_capacity = DEFAULT_CAPACITY;
 	}
 
+	if (priority_count < 1) {
+		fatal("Priority count must be at least 1.\n");
+		return NULL;
+	}
+
+
 	pq->elements = (struct element **)calloc(init_capacity, sizeof(struct element *));
 	if (!pq->elements) {
-		free(pq);
-		fprintf(stderr, "Fatal error: Memory allocation failed.\n");
-		exit(EXIT_FAILURE);
+		fatal("Priority queue memory allocation failed.\n");
 		return NULL;
 	}
 
 	pq->capacity = init_capacity;
 	pq->size = 0;
+
+	pq->priority_count = priority_count;
 
 	pq->static_cursor = 0;
 	pq->base_cursor = 0;
@@ -137,7 +206,8 @@ int priority_queue_size(struct priority_queue *pq)
 	return pq->size;
 }
 
-int priority_queue_push(struct priority_queue *pq, void *data, double priority)
+/** Push to the queue without duplicating priotiry array. */
+int push_internal(struct priority_queue *pq, void *data, double *priority)
 {
 	if (!pq) {
 		return -1;
@@ -148,11 +218,11 @@ int priority_queue_push(struct priority_queue *pq, void *data, double priority)
 			return -1;
 		}
 	}
-	struct element *e = (struct element *)malloc(sizeof(struct element));
+
+	struct element *e = element_create(data, pq->priority_count, NULL);
 	if (!e) {
 		return -1;
 	}
-	e->data = data;
 	e->priority = priority;
 
 	pq->elements[pq->size++] = e;
@@ -165,6 +235,52 @@ int priority_queue_push(struct priority_queue *pq, void *data, double priority)
 	}
 
 	return new_idx;
+}
+
+int priority_queue_push(struct priority_queue *pq, void *data, const double *priority)
+{
+	if (!pq) {
+		return -1;
+	}
+
+	double *priority_copy = (double *)malloc(pq->priority_count * sizeof(double));
+	if (!priority_copy) {
+		return -1;
+	}
+
+	memcpy(priority_copy, priority, pq->priority_count * sizeof(double));
+	return push_internal(pq, data, priority_copy);
+}
+
+
+
+int priority_queue_push_varargs(struct priority_queue *pq, void *data, ...)
+{
+	if (!pq) {
+		return -1;
+	}
+
+	// Allocate array for priorities
+	double *priority = (double *)malloc(pq->priority_count * sizeof(double));
+	if (!priority) {
+		return -1;
+	}
+
+	// Collect variable arguments into the priority array
+	va_list args;
+	va_start(args, data);
+	for (int i = 0; i < pq->priority_count; i++) {
+		priority[i] = va_arg(args, double);
+	}
+	va_end(args);
+
+	// Call the standard push function
+	int result = push_internal(pq, data, priority);
+
+	// Clean up
+	free(priority);
+
+	return result;
 }
 
 void *priority_queue_pop(struct priority_queue *pq)
@@ -192,13 +308,13 @@ void *priority_queue_peek_top(struct priority_queue *pq)
 	return pq->elements[0]->data;
 }
 
-double priority_queue_get_priority_at(struct priority_queue *pq, int idx)
+double priority_queue_get_priority_at(struct priority_queue *pq, int priority_idx, int element_index)
 {
-	if (!pq || pq->size < 1 || idx < 0 || idx > pq->size - 1) {
+	if (!pq || pq->size < 1 || element_index < 0 || element_index > pq->size - 1 || priority_idx < 0 || priority_idx >= pq->priority_count) {
 		return 0;
 	}
 
-	return pq->elements[idx]->priority;
+	return pq->elements[element_index]->priority[priority_idx];
 }
 
 double priority_queue_get_top_priority(struct priority_queue *pq)
@@ -207,7 +323,7 @@ double priority_queue_get_top_priority(struct priority_queue *pq)
 		return 0;
 	}
 
-	return pq->elements[0]->priority;
+	return pq->elements[0]->priority[0];
 }
 
 void *priority_queue_peek_at(struct priority_queue *pq, int idx)
@@ -219,7 +335,7 @@ void *priority_queue_peek_at(struct priority_queue *pq, int idx)
 	return pq->elements[idx]->data;
 }
 
-int priority_queue_update_priority(struct priority_queue *pq, void *data, double new_priority)
+int priority_queue_update_priority(struct priority_queue *pq, void *data, int priority_idx, double new_priority)
 {
 	if (!pq) {
 		return -1;
@@ -233,13 +349,12 @@ int priority_queue_update_priority(struct priority_queue *pq, void *data, double
 		}
 	}
 
-	/* If the data isn’t already in the queue, enqueue it. */
 	if (idx == -1) {
-		return priority_queue_push(pq, data, new_priority);
+		return -1;
 	}
 
-	double old_priority = pq->elements[idx]->priority;
-	pq->elements[idx]->priority = new_priority;
+	double old_priority = pq->elements[idx]->priority[priority_idx];
+	pq->elements[idx]->priority[priority_idx] = new_priority;
 
 	int new_idx = -1;
 
@@ -346,19 +461,14 @@ int priority_queue_remove(struct priority_queue *pq, int idx)
 	struct element *to_delete = pq->elements[idx];
 	struct element *last_elem = pq->elements[pq->size - 1];
 
-	double old_priority = to_delete->priority;
-	double new_priority = last_elem->priority;
-
-	free(to_delete);
-
 	pq->size--;
 	if (idx != pq->size) {
 		pq->elements[idx] = last_elem;
 		pq->elements[pq->size] = NULL;
 
-		if (new_priority > old_priority) {
+		if (GT(pq, idx, pq->size -1)) {
 			swim(pq, idx);
-		} else if (new_priority < old_priority) {
+		} else if (LT(pq, idx, pq->size -1)) {
 			sink(pq, idx);
 		}
 	} else {
@@ -380,6 +490,8 @@ int priority_queue_remove(struct priority_queue *pq, int idx)
 		priority_queue_rotate_reset(pq);
 	}
 
+	element_delete(to_delete);
+
 	return 1;
 }
 
@@ -391,7 +503,7 @@ void priority_queue_delete(struct priority_queue *pq)
 
 	for (int i = 0; i < pq->size; i++) {
 		if (pq->elements[i]) {
-			free(pq->elements[i]);
+			element_delete(pq->elements[i]);
 		}
 	}
 	free(pq->elements);
