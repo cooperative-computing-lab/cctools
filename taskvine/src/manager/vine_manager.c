@@ -4653,7 +4653,8 @@ char *vine_monitor_wrap(struct vine_manager *q, struct vine_worker_info *w, stru
 	return wrap_cmd;
 }
 
-/* Put a given task on the ready queue, taking into account the task priority and the manager schedule. */
+/* Put a given task on the ready list, taking into account the task priority and the manager schedule. */
+
 static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t)
 {
 	if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
