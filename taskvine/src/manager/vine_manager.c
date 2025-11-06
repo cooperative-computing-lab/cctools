@@ -1008,7 +1008,7 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 		return 0;
 	}
 
-	/* evict a random worker if any */
+	/* release a random worker if any */
 	return release_random_worker(q);
 }
 
