@@ -3544,22 +3544,22 @@ int consider_task(struct vine_manager *q, struct vine_task *t)
 	return 1;
 }
 
-/* Rotate pending tasks to the ready queue if they are runnable. */
-static int rotate_pending_tasks(struct vine_manager *q)
+/* Rotate blocked tasks to the ready queue if they are runnable. */
+static int rotate_blocked_tasks(struct vine_manager *q)
 {
-	if (list_size(q->pending_tasks) == 0) {
+	if (list_size(q->blocked_tasks) == 0) {
 		return 0;
 	}
 
 	int runnable_tasks = 0;
 	int tasks_considered = 0;
-	int tasks_to_consider = MIN(list_size(q->pending_tasks), q->attempt_schedule_depth);
+	int tasks_to_consider = MIN(list_size(q->blocked_tasks), q->attempt_schedule_depth);
 	struct vine_task *t = NULL;
 
 	double current_time = timestamp_get() / ONE_SECOND;
 
 	while (tasks_considered++ < tasks_to_consider) {
-		t = list_pop_head(q->pending_tasks);
+		t = list_pop_head(q->blocked_tasks);
 		if (!t) {
 			break;
 		}
@@ -3589,7 +3589,7 @@ static int rotate_pending_tasks(struct vine_manager *q)
 			enqueue_ready_task(q, t);
 			runnable_tasks++;
 		} else {
-			list_push_tail(q->pending_tasks, t);
+			list_push_tail(q->blocked_tasks, t);
 		}
 	}
 
@@ -3606,12 +3606,9 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 {
 	/* return early if no committable cores */
 	int committable_cores = vine_schedule_count_committable_cores(q);
-	if (committable_cores == 0) {
+	if (committable_cores <= 0) {
 		return 0;
 	}
-
-	/* rotate pending tasks before dispatching any tasks */
-	rotate_pending_tasks(q);
 
 	int committed_tasks = 0;
 	int tasks_considered = 0;
@@ -3623,24 +3620,22 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 	struct vine_task *t;
 
 	while (tasks_considered < tasks_to_consider) {
-		timestamp_t time_when_scheduling_start = timestamp_get();
-
 		t = priority_queue_pop(q->ready_tasks);
 		if (!t) {
 			break;
 		}
 		tasks_considered++;
 
-		/* this task is not runnable at all, put it back in the pending queue */
+		/* this task is not runnable at all, demote it to the blocked queue */
 		if (!consider_task(q, t)) {
-			list_push_tail(q->pending_tasks, t);
+			list_push_tail(q->blocked_tasks, t);
 			continue;
 		}
 
 		/* select a worker for the task */
 		struct vine_worker_info *w = vine_schedule_task_to_worker(q, t);
 
-		/* task is runnable but no worker is fit, silently skip it */
+		/* task is runnable but no worker is fit, hold if off and try again later */
 		if (!w) {
 			list_push_tail(skipped_tasks, t);
 			continue;
@@ -3657,7 +3652,6 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 		switch (result) {
 		case VINE_SUCCESS:
 			committed_tasks++;
-			t->time_spent_on_scheduling = timestamp_get() - time_when_scheduling_start;
 			break;
 		case VINE_APP_FAILURE:
 		case VINE_WORKER_FAILURE:
@@ -3665,8 +3659,8 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 			break;
 		case VINE_MGR_FAILURE:
 			/* special case, commit had a chained failure. */
-			debug(D_VINE, "Special case, failed to commit task %d to worker %s", t->task_id, w->hostname);
-			list_push_tail(q->pending_tasks, t);
+			debug(D_VINE, "Failed to commit task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
+			list_push_tail(q->blocked_tasks, t);
 			break;
 		case VINE_END_OF_LIST:
 			/* shouldn't happen, keep going */
@@ -3685,7 +3679,7 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 		}
 	}
 
-	/* put back all tasks that were skipped */
+	/* put back all tasks that were skipped due to no suitable worker */
 	while ((t = list_pop_head(skipped_tasks))) {
 		enqueue_ready_task(q, t);
 	}
@@ -4120,7 +4114,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->next_task_id = 1;
 	q->fixed_location_in_queue = 0;
 
-	q->pending_tasks = list_create();
+	q->blocked_tasks = list_create();
 	q->ready_tasks = priority_queue_create(0);
 	q->running_table = itable_create(0);
 	q->waiting_retrieval_list = list_create();
@@ -4511,7 +4505,7 @@ void vine_delete(struct vine_manager *q)
 	hash_table_clear(q->categories, (void *)category_free);
 	hash_table_delete(q->categories);
 
-	list_delete(q->pending_tasks);
+	list_delete(q->blocked_tasks);
 	priority_queue_delete(q->ready_tasks);
 	itable_delete(q->running_table);
 	list_delete(q->waiting_retrieval_list);
@@ -5412,6 +5406,9 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 			// tasks waiting to be dispatched?
 			BEGIN_ACCUM_TIME(q, time_send);
+			/* rotate blocked tasks before dispatching any */
+			rotate_blocked_tasks(q);
+			/* dispatch one task */
 			result = send_one_task(q, &tasks_ready_left_to_consider);
 			END_ACCUM_TIME(q, time_send);
 			if (result) {
@@ -5473,7 +5470,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// in this wait.
 		if (events > 0) {
 			BEGIN_ACCUM_TIME(q, time_internal);
-			int done = !priority_queue_size(q->ready_tasks) && !list_size(q->pending_tasks) && !list_size(q->waiting_retrieval_list) && !itable_size(q->running_table);
+			int done = !priority_queue_size(q->ready_tasks) && !list_size(q->blocked_tasks) && !list_size(q->waiting_retrieval_list) && !itable_size(q->running_table);
 			END_ACCUM_TIME(q, time_internal);
 
 			if (done) {

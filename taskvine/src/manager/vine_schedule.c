@@ -171,26 +171,21 @@ int vine_schedule_count_committable_cores(struct vine_manager *q)
 		}
 		/* count the number of free slots on running libraries */
 		if (w->current_libraries && itable_size(w->current_libraries) > 0) {
-			uint64_t library_task_id = 0;
-			struct vine_task *library_task = NULL;
-			ITABLE_ITERATE(w->current_libraries, library_task_id, library_task)
+			uint64_t libtask_id = 0;
+			struct vine_task *libtask = NULL;
+			ITABLE_ITERATE(w->current_libraries, libtask_id, libtask)
 			{
-				if (!library_task || !library_task->provides_library) {
+				if (!libtask || !libtask->provides_library) {
 					continue;
 				}
-				if (library_task->function_slots_total > library_task->function_slots_inuse) {
-					count += library_task->function_slots_total - library_task->function_slots_inuse;
+				if (libtask->function_slots_total > libtask->function_slots_inuse) {
+					count += libtask->function_slots_total - libtask->function_slots_inuse;
 				}
 			}
 		}
-		/* count the number of free cores */
+		/* count the number of free cores aside from libraries */
 		if (w->resources->cores.total > 0 && overcommitted_resource_total(q, w->resources->cores.total) > w->resources->cores.inuse) {
 			count += overcommitted_resource_total(q, w->resources->cores.total) - w->resources->cores.inuse;
-		}
-		/* count the number of free gpus */
-		if (w->resources->gpus.total > 0 && overcommitted_resource_total(q, w->resources->gpus.total) > w->resources->gpus.inuse) {
-			// Don't count gpus for now, because the manager has not yet fully supported scheduling tasks to GPUs.
-			// count += overcommitted_resource_total(q, w->resources->gpus.total) - w->resources->gpus.inuse;
 		}
 	}
 
@@ -587,7 +582,7 @@ void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 
 	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
 
-	LIST_ITERATE(q->pending_tasks, t)
+	LIST_ITERATE(q->blocked_tasks, t)
 	{
 		// check each task against the queue of connected workers
 		vine_resource_bitmask_t bit_set = is_task_larger_than_any_worker(q, t);
