@@ -2779,7 +2779,6 @@ change.
 | watch-library-logfiles | If 1, watch the output files produced by each of the library processes running on the remote workers, take
 them back the current logging directory. | 0 |
 
-
 === "Python"
     ```python
     m.tune("hungry-minumum", 20)
