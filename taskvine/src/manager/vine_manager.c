@@ -169,7 +169,7 @@ static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w
 static int release_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
-static void enqueue_ready_task(struct vine_manager *q, struct vine_task *t);
+static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t);
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
@@ -3586,7 +3586,7 @@ static int rotate_blocked_tasks(struct vine_manager *q)
 		}
 
 		if (consider_task(q, t)) {
-			enqueue_ready_task(q, t);
+			push_task_to_ready_tasks(q, t);
 			runnable_tasks++;
 		} else {
 			list_push_tail(q->blocked_tasks, t);
@@ -3681,7 +3681,7 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 
 	/* put back all tasks that were skipped due to no suitable worker */
 	while ((t = list_pop_head(skipped_tasks))) {
-		enqueue_ready_task(q, t);
+		push_task_to_ready_tasks(q, t);
 	}
 	list_delete(skipped_tasks);
 
@@ -4654,17 +4654,18 @@ char *vine_monitor_wrap(struct vine_manager *q, struct vine_worker_info *w, stru
 }
 
 /* Put a given task on the ready queue, taking into account the task priority and the manager schedule. */
-static void enqueue_ready_task(struct vine_manager *q, struct vine_task *t)
+static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t)
 {
 	if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
 		/* when a task is resubmitted given resource exhaustion, we
-		 * increment its priority a bit, so it gets to run as soon
+		 * increment its priority by 1, so it gets to run as soon
 		 * as possible among those with the same priority. This avoids
 		 * the issue in which all 'big' tasks fail because the first
 		 * allocation is too small. */
-		t->priority *= 1.05;
+		priority_queue_push(q->ready_tasks, t, t->priority + 1);
+	} else {
+		priority_queue_push(q->ready_tasks, t, t->priority);
 	}
-	priority_queue_push(q->ready_tasks, t, t->priority);
 
 	/* If the task has been used before, clear out accumulated state. */
 	vine_task_clean(t);
@@ -4718,7 +4719,7 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 		break;
 	case VINE_TASK_READY:
 		vine_task_set_result(t, VINE_RESULT_UNKNOWN);
-		enqueue_ready_task(q, t);
+		push_task_to_ready_tasks(q, t);
 		c->vine_stats->tasks_waiting++;
 		break;
 	case VINE_TASK_RUNNING:
