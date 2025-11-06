@@ -941,46 +941,32 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 	hash_table_free_keys_array(cachenames);
 }
 
-/** Evict a random worker to simulate a failure. */
-int vine_manager_evict_a_random_worker(struct vine_manager *q)
+/** Release a random worker to simulate a failure. */
+int release_random_worker(struct vine_manager *q)
 {
 	if (!q) {
 		return 0;
 	}
 
-	if (hash_table_size(q->worker_table) == 0) {
-		return 0;
-	}
-
 	int removed = 0;
 
-	/* collect removable workers */
-	struct list *candidates_list = list_create();
+	int offset_bookkeep;
 	char *key;
 	struct vine_worker_info *w;
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
+
+	HASH_TABLE_ITERATE_RANDOM_START(q->worker_table, offset_bookkeep, key, w)
 	{
-		list_push_tail(candidates_list, w);
-	}
-
-	/* release a random worker if any */
-	int random_number = random_int64();
-	if (random_number < 0) {
-		random_number = -random_number;
-	}
-	int index = (int)(random_number % list_size(candidates_list));
-	int i = 0;
-	while ((w = list_pop_head(candidates_list))) {
-		if (i++ == index) {
-			/* evict this worker */
-			debug(D_VINE | D_NOTICE, "Intentionally evicting worker %s", w->hostname);
-			release_worker(q, w);
-			removed = 1;
-			break;
+		if (!w) {
+			continue;
 		}
+
+		/* evict this worker */
+		debug(D_VINE | D_NOTICE, "Intentionally evicting worker %s", w->hostname);
+		release_worker(q, w);
+		removed = 1;
+		break;
 	}
 
-	list_delete(candidates_list);
 	return removed;
 }
 
@@ -1023,7 +1009,7 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 	}
 
 	/* evict a random worker if any */
-	return vine_manager_evict_a_random_worker(q);
+	return release_random_worker(q);
 }
 
 /* Remove all tasks and other associated state from a given worker. */
