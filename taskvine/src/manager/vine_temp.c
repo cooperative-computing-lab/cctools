@@ -5,7 +5,6 @@
 #include "vine_manager.h"
 #include "vine_manager_put.h"
 #include "vine_file_replica.h"
-#include "vine_file_replica_table.h"
 #include "vine_task.h"
 #include "vine_mount.h"
 
@@ -23,7 +22,7 @@
 /**
 Check whether a worker is eligible to participate in peer transfers.
 */
-static int is_worker_active(struct vine_worker_info *w)
+static int worker_can_peer_transfer(struct vine_worker_info *w)
 {
 	if (!w) {
 		return 0;
@@ -37,10 +36,33 @@ static int is_worker_active(struct vine_worker_info *w)
 	if (w->draining) {
 		return 0;
 	}
+	if (!w->resources) {
+		return 0;
+	}
 	if (w->resources->tag < 0) {
 		return 0;
 	}
 	return 1;
+}
+
+/**
+Return available disk space (in bytes) on a worker.
+Note that w->resources->disk.total is in megabytes.
+Use int64_t in case the actual usage is larger than the total space.
+Returns -1 if worker or resources is invalid, or if the available disk space is negative.
+*/
+static int64_t worker_get_available_disk(const struct vine_worker_info *w)
+{
+	if (!w || !w->resources) {
+		return -1;
+	}
+
+	int64_t available_disk = (int64_t)MEGABYTES_TO_BYTES(w->resources->disk.total) - w->inuse_cache;
+	if (available_disk < 0) {
+		return -1;
+	}
+
+	return available_disk;
 }
 
 /**
@@ -60,19 +82,20 @@ static struct vine_worker_info *get_best_source_worker(struct vine_manager *q, s
 		return NULL;
 	}
 
-	struct priority_queue *valid_sources_queue = priority_queue_create(0);
+	struct vine_worker_info *best_source_worker = NULL;
+
 	struct vine_worker_info *w = NULL;
 	SET_ITERATE(sources, w)
 	{
-		/* skip if transfer port is not active or in draining mode */
-		if (!is_worker_active(w)) {
+		/* skip if the worker cannot participate in peer transfers */
+		if (!worker_can_peer_transfer(w)) {
 			continue;
 		}
-		/* skip if incoming transfer counter is too high */
+		/* skip if outgoing transfer counter is too high */
 		if (w->outgoing_xfer_counter >= q->worker_source_max_transfers) {
 			continue;
 		}
-		/* skip if the worker does not have this file */
+		/* skip if the worker does not have this file (which is faulty) */
 		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, f->cached_name);
 		if (!replica) {
 			continue;
@@ -81,14 +104,13 @@ static struct vine_worker_info *get_best_source_worker(struct vine_manager *q, s
 		if (replica->state != VINE_FILE_REPLICA_STATE_READY) {
 			continue;
 		}
-		/* those with less outgoing_xfer_counter are preferred */
-		priority_queue_push(valid_sources_queue, w, -w->outgoing_xfer_counter);
+		/* workers with fewer outgoing transfers are preferred */
+		if (!best_source_worker || w->outgoing_xfer_counter < best_source_worker->outgoing_xfer_counter) {
+			best_source_worker = w;
+		}
 	}
 
-	struct vine_worker_info *best_source = priority_queue_pop(valid_sources_queue);
-	priority_queue_delete(valid_sources_queue);
-
-	return best_source;
+	return best_source_worker;
 }
 
 /**
@@ -103,14 +125,14 @@ static struct vine_worker_info *get_best_dest_worker(struct vine_manager *q, str
 		return NULL;
 	}
 
-	struct priority_queue *valid_destinations = priority_queue_create(0);
+	struct vine_worker_info *best_dest_worker = NULL;
 
 	char *key;
 	struct vine_worker_info *w;
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
-		/* skip if transfer port is not active or in draining mode */
-		if (!is_worker_active(w)) {
+		/* skip if the worker cannot participate in peer transfers */
+		if (!worker_can_peer_transfer(w)) {
 			continue;
 		}
 		/* skip if the incoming transfer counter is too high */
@@ -123,18 +145,16 @@ static struct vine_worker_info *get_best_dest_worker(struct vine_manager *q, str
 			continue;
 		}
 		/* skip if the worker does not have enough disk space */
-		int64_t available_disk_space = (int64_t)MEGABYTES_TO_BYTES(w->resources->disk.total) - w->inuse_cache;
-		if ((int64_t)f->size > available_disk_space) {
+		if (worker_get_available_disk(w) < (int64_t)f->size) {
 			continue;
 		}
 		/* workers with more available disk space are preferred to hold the file */
-		priority_queue_push(valid_destinations, w, available_disk_space);
+		if (!best_dest_worker || worker_get_available_disk(w) > worker_get_available_disk(best_dest_worker)) {
+			best_dest_worker = w;
+		}
 	}
 
-	struct vine_worker_info *best_destination = priority_queue_pop(valid_destinations);
-	priority_queue_delete(valid_destinations);
-
-	return best_destination;
+	return best_dest_worker;
 }
 
 /**
@@ -158,7 +178,7 @@ Attempt to replicate a temporary file immediately by selecting compatible
 source and destination workers. Returns 1 when a transfer is launched, or 0 if
 no suitable pair of workers is currently available.
 */
-static int vine_temp_replicate_file_now(struct vine_manager *q, struct vine_file *f)
+static int attempt_replication(struct vine_manager *q, struct vine_file *f)
 {
 	if (!q || !f || f->type != VINE_TEMP) {
 		return 0;
@@ -209,30 +229,6 @@ int vine_temp_queue_for_replication(struct vine_manager *q, struct vine_file *f)
 }
 
 /**
-Respond to a missing replica notification by re-queuing the corresponding file
-for replication, provided the file is still valid and managed by this
-coordinator. The use cases include when a cache-invalid message is received from a worker,
-or when a worker disconnects unexpectedly, and we need to rescue the lost data.
-If the replica does not have any ready source, it will be silently discarded in the
-replication phase, so don't worry about it.
-*/
-int vine_temp_handle_lost_replica(struct vine_manager *q, char *cachename)
-{
-	if (!q || !cachename) {
-		return 0;
-	}
-
-	struct vine_file *f = hash_table_lookup(q->file_table, cachename);
-	if (!f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
-		return 0;
-	}
-
-	vine_temp_queue_for_replication(q, f);
-
-	return 1;
-}
-
-/**
 Iterate through temporary files that still need additional replicas and
 trigger peer-to-peer transfers when both a source and destination worker
 are available. The function honors the manager's scheduling depth so that we
@@ -246,41 +242,47 @@ int vine_temp_start_replication(struct vine_manager *q)
 		return 0;
 	}
 
+	/* Count the number of files that have been processed. */
 	int processed = 0;
-	int iter_count = 0;
+
 	/* Only examine up to attempt_schedule_depth files to keep the event loop responsive. */
 	int iter_depth = MIN(q->attempt_schedule_depth, priority_queue_size(q->temp_files_to_replicate));
+
 	/* Files that cannot be replicated now are temporarily stored and re-queued at the end. */
 	struct list *skipped = list_create();
 
 	struct vine_file *f;
-	while ((f = priority_queue_pop(q->temp_files_to_replicate)) && (iter_count++ < iter_depth)) {
-		/* skip and discard the replication request if the file is not valid */
+	for (int i = 0; i < iter_depth; i++) {
+		f = priority_queue_pop(q->temp_files_to_replicate);
+		if (!f) {
+			break;
+		}
+		/* skip and discard the replication if the file is not valid */
 		if (!f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
 			continue;
 		}
 
-		/* skip and discard the replication request if the file has enough replicas or no replicas */
+		/* skip and discard the replication if the file has enough replicas or no sources at all */
 		int current_replica_count = vine_file_replica_count(q, f);
 		if (current_replica_count >= q->temp_replica_count || current_replica_count == 0) {
 			continue;
 		}
-		/* skip and discard the replication request if the file has no ready replicas */
+		/* skip and discard the replication if the file has no ready replicas, will be re-enqueued upon its next cache-update */
 		int current_ready_replica_count = vine_file_replica_table_count_replicas(q, f->cached_name, VINE_FILE_REPLICA_STATE_READY);
 		if (current_ready_replica_count == 0) {
 			continue;
 		}
 
-		/* If reaches here, the file still lacks replicas and has at least one ready source, so we start finding a valid source and destination worker
-		 * and trigger the replication. If fails to find a valid source or destination worker, we requeue the file and will consider later. */
-		if (!vine_temp_replicate_file_now(q, f)) {
+		/* If reaches here, the file needs more replicas and has at least one ready source, so we start finding a valid source and destination worker
+		 * to trigger the replication. If fails to find a valid source or destination worker, we requeue the file and will consider it later. */
+		if (!attempt_replication(q, f)) {
 			list_push_tail(skipped, f);
 			continue;
 		}
 
 		processed++;
 
-		/* Requeue the file with lower priority so it can accumulate replicas gradually. */
+		/* Requeue the file with lower priority (-1 because the current replica count is added up) so it can accumulate replicas gradually. */
 		vine_temp_queue_for_replication(q, f);
 	}
 
@@ -307,9 +309,9 @@ void vine_temp_clean_redundant_replicas(struct vine_manager *q, struct vine_file
 
 	struct set *source_workers = hash_table_lookup(q->file_worker_table, f->cached_name);
 	if (!source_workers) {
-		/* no surprise - a cache-update message may trigger a file deletion. */
 		return;
 	}
+
 	int excess_replicas = set_size(source_workers) - q->temp_replica_count;
 	if (excess_replicas <= 0) {
 		return;
@@ -353,11 +355,15 @@ void vine_temp_clean_redundant_replicas(struct vine_manager *q, struct vine_file
 		priority_queue_push(clean_replicas_from_workers, source_worker, source_worker->inuse_cache);
 	}
 
-	source_worker = NULL;
-	while (excess_replicas > 0 && (source_worker = priority_queue_pop(clean_replicas_from_workers))) {
+	while (excess_replicas > 0) {
+		source_worker = priority_queue_pop(clean_replicas_from_workers);
+		if (!source_worker) {
+			break;
+		}
 		delete_worker_file(q, source_worker, f->cached_name, 0, 0);
 		excess_replicas--;
 	}
+
 	priority_queue_delete(clean_replicas_from_workers);
 
 	return;
@@ -380,20 +386,24 @@ void vine_temp_shift_disk_load(struct vine_manager *q, struct vine_worker_info *
 	struct vine_worker_info *w = NULL;
 	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
-		/* skip if the worker is not active */
-		if (!is_worker_active(w)) {
+		/* skip if the worker cannot participate in peer transfers */
+		if (!worker_can_peer_transfer(w)) {
 			continue;
 		}
 		/* skip if the worker already has this file */
 		if (vine_file_replica_table_lookup(w, f->cached_name)) {
 			continue;
 		}
+		/* skip if the worker does not have enough disk space */
+		if (worker_get_available_disk(w) < (int64_t)f->size) {
+			continue;
+		}
 		/* skip if the worker becomes heavier after the transfer */
 		if (w->inuse_cache + f->size > source_worker->inuse_cache - f->size) {
 			continue;
 		}
-		/* workers with less inuse cache space are preferred */
-		if (!target_worker || w->inuse_cache < target_worker->inuse_cache) {
+		/* workers with more available disk space are preferred */
+		if (!target_worker || worker_get_available_disk(w) > worker_get_available_disk(target_worker)) {
 			target_worker = w;
 		}
 	}

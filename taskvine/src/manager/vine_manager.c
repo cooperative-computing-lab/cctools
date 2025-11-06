@@ -418,13 +418,22 @@ static vine_msg_code_t handle_cache_update(struct vine_manager *q, struct vine_w
 			f->state = VINE_FILE_STATE_CREATED;
 			f->size = size;
 
-			/* If a TEMP file, replicate or shift disk load as needed. */
+			/* If the replica's type was a URL, it means the manager expected the destination worker to download it
+			 * from elsewhere. Now that it's physically present, we can resolve its type back to the original. */
+			if (replica->type == VINE_URL) {
+				replica->type = f->type;
+			}
+
+			/* If a TEMP file, perform various actions as needed. */
 			if (f->type == VINE_TEMP) {
 				if (q->temp_replica_count > 1) {
 					vine_temp_queue_for_replication(q, f);
 				}
 				if (q->shift_disk_load) {
 					vine_temp_shift_disk_load(q, w, f);
+				}
+				if (q->clean_redundant_replicas) {
+					vine_temp_clean_redundant_replicas(q, f);
 				}
 			}
 		}
@@ -481,8 +490,11 @@ static vine_msg_code_t handle_cache_invalid(struct vine_manager *q, struct vine_
 			w->last_failure_time = timestamp_get();
 		}
 
-		/* If the creation failed, we may want to backup the file somewhere else. */
-		vine_temp_handle_lost_replica(q, cachename);
+		/* Respond to a missing replica notification by re-queuing the corresponding file
+		 * for replication. If the replica does not have any ready source, it will be silently
+		 * discarded in the replication phase. */
+		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
+		vine_temp_queue_for_replication(q, f);
 
 		/* Successfully processed this message. */
 		return VINE_MSG_PROCESSED;
@@ -1069,7 +1081,11 @@ static void recall_worker_lost_temp_files(struct vine_manager *q, struct vine_wo
 	// Iterate over files we want might want to recover
 	HASH_TABLE_ITERATE(w->current_files, cached_name, info)
 	{
-		vine_temp_handle_lost_replica(q, cached_name);
+		/* Respond to a data loss due to worker removal by re-queuing the corresponding file
+		 * for replication. If the replica does not have any ready source, it will be silently
+		 * discarded in the replication phase. */
+		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
+		vine_temp_queue_for_replication(q, f);
 	}
 }
 
@@ -4948,6 +4964,7 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 		struct vine_task *library = vine_schedule_find_library(q, w, name);
 		while (library) {
 			vine_cancel_by_task_id(q, library->task_id);
+			itable_remove(w->current_libraries, library->task_id);
 			library = vine_schedule_find_library(q, w, name);
 		}
 		hash_table_remove(q->library_templates, name);
