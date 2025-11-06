@@ -5115,7 +5115,7 @@ static int poll_active_workers(struct vine_manager *q, int stoptime)
 	// promptly dispatch tasks, while avoiding wasting cpu cycles when the
 	// state of the system cannot be advanced.
 	int msec = q->nothing_happened_last_wait_cycle ? 1000 : 0;
-	msec = 0;
+
 	if (stoptime) {
 		msec = MIN(msec, (stoptime - time(0)) * 1000);
 	}
