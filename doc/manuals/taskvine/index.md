@@ -2777,6 +2777,8 @@ change.
 | worker-retrievals | If 1, retrieve all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |
 | watch-library-logfiles | If 1, watch the output files produced by each of the library processes running on the remote workers, take
 them back the current logging directory. | 0 |
+| return-recovery-tasks | If set to 1, recovery tasks are returned to the application via `wait` instead of being handled internally. This is not expected in regular applications, the caller is aware of such behavior and should take care of it. | 0 |
+
 
 === "Python"
     ```python
