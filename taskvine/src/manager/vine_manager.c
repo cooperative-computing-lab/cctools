@@ -672,7 +672,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 
 	/* A task scheduling may result in a redundant replica of its input due to peer transfers, which can be safely removed when completed.
 	 * However, the general function of taskvine is to replicate files on demand, and to only clean them up when prune is called.
-	 * So, we only clean up redundant replicas for the task-inputs when the manager is configured to clean redundant replicas. */
+	 * So, we only clean up redundant replicas for the task-inputs when the manager is configured to do so. */
 	if (q->clean_redundant_replicas) {
 		struct vine_mount *input_mount;
 		LIST_ITERATE(t->input_mounts, input_mount)
