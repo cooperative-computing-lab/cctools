@@ -135,7 +135,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "domain_name_cache.h"
 #include "elfheader.h"
-#include "getopt.h"
+#include <getopt.h>
 #include "hash_table.h"
 #include "itable.h"
 #include "jx.h"

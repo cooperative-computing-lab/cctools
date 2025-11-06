@@ -24,4 +24,4 @@ dependencies:
  - doxygen              # optional to make doxygen api docs
  - mkdocs               # optional to make readthedocs online manual
  - pymdown-extensions   # optional to make readthedocs online manual
-...
+ - matplotlib           # optional for vine plotting tools

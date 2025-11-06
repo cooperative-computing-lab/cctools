@@ -16,7 +16,7 @@ See the file COPYING for details.
 #include "jx_print.h"
 #include "jx_parse.h"
 #include "link.h"
-#include "getopt.h"
+#include <getopt.h>
 #include "stringtools.h"
 #include "xxmalloc.h"
 
