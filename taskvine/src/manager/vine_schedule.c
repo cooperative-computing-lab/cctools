@@ -165,8 +165,8 @@ int vine_schedule_count_committable_cores(struct vine_manager *q)
 		if (!w->resources) {
 			continue;
 		}
-		/* skip if the worker has no cores or gpus */
-		if (w->resources->cores.total <= 0 && w->resources->gpus.total <= 0) {
+		/* skip if the worker has no cores */
+		if (w->resources->cores.total <= 0) {
 			continue;
 		}
 		/* count the number of free slots on running libraries */
