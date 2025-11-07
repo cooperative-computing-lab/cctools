@@ -199,14 +199,14 @@ Internal function that takes an array of priorities.
 @param priority_count Number of priorities in the array.
 @return The index of the element if found, -1 on failure.
 */
-int priority_queue_find_idx_by_priority_core(struct priority_queue *pq, const double *priorities, size_t priority_count);
+int priority_queue_find_idx_by_priority_array(struct priority_queue *pq, const double *priorities, size_t priority_count);
 
 /** Find the index of an element in a priority queue by its priorities.
 @param pq A pointer to a priority queue.
 @param ... The priority values (priority_0, priority_1, ...) as doubles.
 @return The index of the element if found, -1 on failure.
 */
-#define priority_queue_find_idx_by_priority(pq, ...) priority_queue_find_idx_by_priority_core( \
+#define priority_queue_find_idx_by_priority(pq, ...) priority_queue_find_idx_by_priority_array( \
 	pq, (const double[]){ __VA_ARGS__ }, \
 	sizeof (double[]){ __VA_ARGS__ } / sizeof (double) \
 )

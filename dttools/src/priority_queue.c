@@ -381,7 +381,7 @@ static int search_heap_recursive(struct priority_queue *pq, int idx, const doubl
 	}
 }
 
-int priority_queue_find_idx_by_priority_core(struct priority_queue *pq, const double *priorities, size_t priority_count)
+int priority_queue_find_idx_by_priority_array(struct priority_queue *pq, const double *priorities, size_t priority_count)
 {
 	if (!pq) {
 		return -1;
