@@ -3644,6 +3644,21 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 		/* commit the task to the worker */
 		vine_result_code_t result;
 		if (q->task_groups_enabled) {
+			/* do not consider if this worker is running a group task */
+			int worker_running_group_task = 0;
+			struct vine_task *it;
+			uint64_t taskid;
+			ITABLE_ITERATE(w->current_tasks, taskid, it)
+			{
+				if (it->group_id) {
+					worker_running_group_task = 1;
+					break;
+				}
+			}
+			if (worker_running_group_task) {
+				list_push_tail(q->blocked_tasks, t);
+				continue;
+			}
 			result = commit_task_group_to_worker(q, w, t);
 		} else {
 			result = commit_task_to_worker(q, w, t);
