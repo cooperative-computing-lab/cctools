@@ -17,7 +17,7 @@ See the file COPYING for details.
 #define DEFAULT_CAPACITY 127
 
 /* This is the maximum number of priorities defined in struct element. */
-#define MAX_PRIORITY_COUNT 3
+#define MAX_PRIORITY_COUNT 4
 
 struct element {
 	void *data;
@@ -31,6 +31,7 @@ struct element {
 	double priority_0;
 	double priority_1;
 	double priority_2;
+	double priority_3;
 };
 
 struct priority_queue {
@@ -332,6 +333,67 @@ int priority_queue_find_idx(struct priority_queue *pq, void *data)
 	}
 
 	return -1;
+}
+
+// Recursive helper function to search the heap tree with branch pruning
+// Returns the index if found, -1 otherwise
+static int search_heap_recursive(struct priority_queue *pq, int idx, const double *priorities)
+{
+	// Base case: index out of bounds
+	if (idx >= pq->size) {
+		return -1;
+	}
+
+	struct element *e = pq->elements[idx];
+
+	// Compare priorities lexicographically
+	int cmp = 0;
+	for (int i = 0; i < pq->priority_count; i++) {
+		double elem_priority = *((double *)((char *)e + offsetof(struct element, priority_0) + i * sizeof(double)));
+		if (elem_priority < priorities[i]) {
+			cmp = -1;
+			break;
+		}
+		if (elem_priority > priorities[i]) {
+			cmp = 1;
+			break;
+		}
+	}
+
+	if (cmp == 0) {
+		// Found exact match
+		return idx;
+	} else if (cmp < 0) {
+		// Current element is smaller than target
+		// Due to max-heap property, all descendants are also smaller, so prune this branch
+		return -1;
+	} else {
+		// Current element is larger than target, search both children
+		// In max-heap, children might still contain the target
+		int left_child = 2 * idx + 1;
+		int result = search_heap_recursive(pq, left_child, priorities);
+		if (result >= 0) {
+			return result;
+		}
+
+		int right_child = 2 * idx + 2;
+		return search_heap_recursive(pq, right_child, priorities);
+	}
+}
+
+int priority_queue_find_idx_by_priority_core(struct priority_queue *pq, const double *priorities, size_t priority_count)
+{
+	if (!pq) {
+		return -1;
+	}
+
+	if (priority_count != (size_t)pq->priority_count) {
+		return -1;
+	}
+
+	// Start recursive search from root of heap (index 0)
+	// Uses heap property to prune branches efficiently
+	return search_heap_recursive(pq, 0, priorities);
 }
 
 int priority_queue_static_next(struct priority_queue *pq)
