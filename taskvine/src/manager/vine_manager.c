@@ -3564,20 +3564,22 @@ static int rotate_blocked_tasks(struct vine_manager *q)
 			break;
 		}
 
-		/* first check if the task has exceeded its end time or does not match any submitted library */
-		/* If any of the reasons fired, then expire the task and put in the retrieved queue. */
+		/* If any of the following reasons fired, then expire the task and put in the retrieved queue. */
+		/* check if the task has exceeded its end time */
 		if (t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
 			debug(D_VINE, "task %d has exceeded its end time", t->task_id);
 			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			continue;
 		}
+		/* check if the task does not match any library */
 		if (t->needs_library && !hash_table_lookup(q->library_templates, t->needs_library)) {
 			debug(D_VINE, "task %d does not match any submitted library named \"%s\"", t->task_id, t->needs_library);
 			vine_task_set_result(t, VINE_RESULT_MISSING_LIBRARY);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			continue;
 		}
+		/* check if the task has missing fixed location dependencies */
 		if (q->fixed_location_in_queue && t->has_fixed_locations && !vine_schedule_check_fixed_location(q, t)) {
 			debug(D_VINE, "Missing fixed_location dependencies for task: %d", t->task_id);
 			vine_task_set_result(t, VINE_RESULT_FIXED_LOCATION_MISSING);
@@ -3585,7 +3587,8 @@ static int rotate_blocked_tasks(struct vine_manager *q)
 			continue;
 		}
 
-		if (consider_task(q, t)) {
+		/* check if the task is runnable and can be scheduled to a worker */
+		if (consider_task(q, t) && vine_schedule_task_to_worker(q, t)) {
 			push_task_to_ready_tasks(q, t);
 			runnable_tasks++;
 		} else {
