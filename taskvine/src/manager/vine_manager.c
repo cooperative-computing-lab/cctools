@@ -5391,8 +5391,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		END_ACCUM_TIME(q, time_receive);
 
 		if (retrieved_this_cycle) {
-			// reset the rotate cursor on task retrieval
-			priority_queue_rotate_reset(q->ready_tasks);
 			tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
 
 			if (!q->prefer_dispatch) {
@@ -5449,8 +5447,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		END_ACCUM_TIME(q, time_status_msgs);
 		if (result) {
 			// accepted at least one worker
-			// reset the rotate cursor on worker connection
-			priority_queue_rotate_reset(q->ready_tasks);
 			tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
 
 			events++;
