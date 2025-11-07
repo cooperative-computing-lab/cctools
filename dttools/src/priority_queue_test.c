@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "priority_queue.h"
 
 int main()
@@ -71,6 +72,48 @@ int main()
 		printf("Element '%s' found at index %d\n", element_to_find, found_idx);
 	} else {
 		printf("Element '%s' not found in the queue.\n", element_to_find);
+	}
+
+	// Find an element by priority
+	printf("\nFinding elements by priority:\n");
+	// Test 1: Find Task B with priority 5.0
+	int found_by_prio = priority_queue_find_idx_by_priority(pq, 5.0);
+	if (found_by_prio >= 0) {
+		char *found_data = (char *)priority_queue_peek_at(pq, found_by_prio);
+		double found_prio = priority_queue_get_priority_at(pq, 0, found_by_prio);
+		printf("Found element with priority 5.0: '%s' at index %d (priority=%.1f)\n", found_data, found_by_prio, found_prio);
+		if (strcmp(found_data, "Task B") == 0) {
+			printf("Found the correct task (Task B)\n");
+		} else {
+			printf("Expected 'Task B' but found '%s'\n", found_data);
+		}
+	} else {
+		printf("Element with priority 5.0 not found.\n");
+	}
+
+	// Test 2: Find Task C with priority 1.0
+	found_by_prio = priority_queue_find_idx_by_priority(pq, 1.0);
+	if (found_by_prio >= 0) {
+		char *found_data = (char *)priority_queue_peek_at(pq, found_by_prio);
+		double found_prio = priority_queue_get_priority_at(pq, 0, found_by_prio);
+		printf("Found element with priority 1.0: '%s' at index %d (priority=%.1f)\n", found_data, found_by_prio, found_prio);
+		if (strcmp(found_data, "Task C") == 0) {
+			printf("Found the correct task (Task C)\n");
+		} else {
+			printf("Expected 'Task C' but found '%s'\n", found_data);
+		}
+	} else {
+		printf("Element with priority 1.0 not found.\n");
+	}
+
+	// Test 3: Try to find non-existent priority
+	found_by_prio = priority_queue_find_idx_by_priority(pq, 10.5);
+	if (found_by_prio >= 0) {
+		char *found_data = (char *)priority_queue_peek_at(pq, found_by_prio);
+		double found_prio = priority_queue_get_priority_at(pq, 0, found_by_prio);
+		printf("Found element with priority 10.5: '%s' at index %d (priority=%.1f)\n", found_data, found_by_prio, found_prio);
+	} else {
+		printf("Element with priority 10.5 not found (expected).\n");
 	}
 
 	// Update the priority of an element
