@@ -7,6 +7,8 @@ See the file COPYING for details.
 #ifndef PRIORITY_QUEUE_H
 #define PRIORITY_QUEUE_H
 
+#include <stddef.h>
+
 /** 
 @file priority_queue.h
 A general purpose priority queue.
@@ -116,15 +118,28 @@ struct priority_queue *priority_queue_create(int init_capacity, int priority_cou
 */
 int priority_queue_size(struct priority_queue *pq);
 
+/** Push an element into a priority queue (core implementation).
+Internal function that takes an array of priorities.
+@param pq A pointer to a priority queue.
+@param data A pointer to store in the queue.
+@param priorities Array of priority values.
+@param priority_count Number of priorities in the array.
+@return The index of data if the push succeeded, -1 on failure.
+*/
+int priority_queue_push_array(struct priority_queue *pq, void *data, const double *priorities, size_t priority_count);
+
 /** Push an element into a priority queue.
 The standard push operation. New elements are placed lower than existing elements of the same priority.
-Takes three priority values as variable arguments.
+Takes priority values as variable arguments.
 @param pq A pointer to a priority queue.
 @param data A pointer to store in the queue.
 @param ... The priority values (priority_0, priority_1, ...) as doubles.
-@return The idex of data if the push succeeded, -1 on failure.
+@return The index of data if the push succeeded, -1 on failure.
 */
-int priority_queue_push(struct priority_queue *pq, void *data, ...);
+#define priority_queue_push(pq, data, ...) priority_queue_push_array( \
+	pq, data, (const double[]){ __VA_ARGS__ }, \
+	sizeof (double[]){ __VA_ARGS__ } / sizeof (double) \
+)
 
 /** Pop the element with the highest priority from a priority queue.
 @param pq A pointer to a priority queue.

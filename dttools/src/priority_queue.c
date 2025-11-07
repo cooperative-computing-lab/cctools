@@ -12,7 +12,6 @@ See the file COPYING for details.
 #include <string.h>
 #include <math.h>
 #include <float.h>
-#include <stdarg.h>
 #include <stddef.h>
 
 #define DEFAULT_CAPACITY 127
@@ -189,9 +188,13 @@ int priority_queue_size(struct priority_queue *pq)
 	return pq->size;
 }
 
-int priority_queue_push(struct priority_queue *pq, void *data, ...)
+int priority_queue_push_array(struct priority_queue *pq, void *data, const double *priorities, size_t priority_count)
 {
 	if (!pq) {
+		return -1;
+	}
+
+	if (priority_count != (size_t)pq->priority_count) {
 		return -1;
 	}
 
@@ -208,13 +211,8 @@ int priority_queue_push(struct priority_queue *pq, void *data, ...)
 
 	e->data = data;
 
-	// Collect variable arguments for the three priorities
-	va_list args;
-	va_start(args, data);
-	for (int i = 0; i < pq->priority_count; i++) {
-		*((double *)((char *)e + offsetof(struct element, priority_0) + i * sizeof(double))) = va_arg(args, double);
-	}
-	va_end(args);
+	// Copy priorities from the array
+	memcpy((char *)e + offsetof(struct element, priority_0), priorities, priority_count * sizeof(double));
 
 	pq->elements[pq->size++] = e;
 
