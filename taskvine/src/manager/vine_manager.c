@@ -3614,9 +3614,6 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 	int tasks_considered = 0;
 	int tasks_to_consider = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
 
-	/* temporarily skipped tasks that are runnable but cannot fit on any current worker */
-	struct list *skipped_tasks = list_create();
-
 	struct vine_task *t;
 
 	while (tasks_considered < tasks_to_consider) {
@@ -3635,9 +3632,9 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 		/* select a worker for the task */
 		struct vine_worker_info *w = vine_schedule_task_to_worker(q, t);
 
-		/* task is runnable but no worker is fit, hold if off and try again later */
+		/* task is runnable but no worker is fit, demote it and consider later */
 		if (!w) {
-			list_push_tail(skipped_tasks, t);
+			list_push_tail(q->blocked_tasks, t);
 			continue;
 		}
 
@@ -3678,12 +3675,6 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 			break;
 		}
 	}
-
-	/* put back all tasks that were skipped due to no suitable worker */
-	while ((t = list_pop_head(skipped_tasks))) {
-		push_task_to_ready_tasks(q, t);
-	}
-	list_delete(skipped_tasks);
 
 	return committed_tasks;
 }
