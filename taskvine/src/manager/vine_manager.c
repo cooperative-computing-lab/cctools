@@ -121,13 +121,6 @@ See the file COPYING for details.
 /* Default timeout for slow workers to come back to the pool, can be set prior to creating a manager. */
 double vine_option_blocklist_slow_workers_timeout = 900;
 
-typedef enum {
-	VINE_PRIORITY_DEFAULT = 0,
-	VINE_PRIORITY_EXHAUSTION = 2 << 4,
-	VINE_PRIORITY_RECOVERY = 2 << 8,
-	VINE_PRIORITY_HIGHEST = 2 << 30,
-} vine_priority_type_t;
-
 /* Forward prototypes for functions that are called out of order. */
 /* Many of these should be removed if forward declaration is not needed. */
 
@@ -3694,7 +3687,7 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 				break;
 			case VINE_MGR_FAILURE:
 				/* special case, commit had a chained failure. */
-				priority_queue_push(q->ready_tasks, t, VINE_PRIORITY_DEFAULT, t->priority);
+				priority_queue_push(q->ready_tasks, t, t->manager_priority, t->user_priority, t->task_id);
 				break;
 			case VINE_END_OF_LIST:
 				/* shouldn't happen, keep going */
@@ -4135,7 +4128,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	/* Each tasks has two priority. First is the priority that taskvine itself assigns and
 	it is always VINE_PRIORITY_DEFAULT under normal operation. The second is the one the
 	user assigns. The third priority is unused and set to 0.0. */
-	q->ready_tasks = priority_queue_create(0, 2);
+	q->ready_tasks = priority_queue_create(0, 3);
 	q->running_table = itable_create(0);
 	q->waiting_retrieval_list = list_create();
 	q->retrieved_list = list_create();
@@ -4679,14 +4672,15 @@ static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t
 	/* when a task is resubmitted given resource exhaustion, or as a recovery task,
 	its priority is increased by one level to allow them to run as soon as possible. */
 
-	double priority = VINE_PRIORITY_DEFAULT;
 	if (t->type == VINE_TASK_TYPE_RECOVERY) {
-		priority = VINE_PRIORITY_RECOVERY;
+		t->manager_priority = VINE_PRIORITY_RECOVERY;
 	} else if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
-		priority = VINE_PRIORITY_EXHAUSTION;
+		t->manager_priority = VINE_PRIORITY_EXHAUSTION;
 	}
 
-	priority_queue_push(q->ready_tasks, t, priority, t->priority);
+	/* priority of the task is determined by manager, user, and negative task id so that older tasks are run first in case of a tie. */
+	/* since task id is unique, this means that a task can be found efficiently in q->ready_tasks using priority_queue_find_idx_by_priority(). */
+	priority_queue_push(q->ready_tasks, t, t->manager_priority, t->user_priority, -1 * t->task_id);
 
 	/* If the task has been used before, clear out accumulated state. */
 	vine_task_clean(t);

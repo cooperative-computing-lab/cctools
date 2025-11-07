@@ -44,6 +44,13 @@ typedef enum {
         VINE_TASK_FUNC_EXEC_MODE_FORK,          /**< A library task will fork and execute each function call. **/
 } vine_task_func_exec_mode_t;
 
+typedef enum {
+	VINE_PRIORITY_DEFAULT = 0,
+	VINE_PRIORITY_EXHAUSTION = 2 << 4,
+	VINE_PRIORITY_RECOVERY = 2 << 8,
+	VINE_PRIORITY_HIGHEST = 2 << 30,
+} vine_priority_type_t;
+
 struct vine_task {
     /***** Fixed properties of task at submit time. ******/
 
@@ -68,7 +75,9 @@ struct vine_task {
 
 	category_allocation_t resource_request; /**< See @ref category_allocation_t */
 	vine_schedule_t worker_selection_algorithm; /**< How to choose worker to run the task. */
-	double priority;             /**< The priority of this task relative to others in the queue: higher number run earlier. */
+	double user_priority;             /**< The priority of this task relative to others in the queue: higher number run earlier. */
+	vine_priority_type_t manager_priority;  /**< The priority of this task as determined by the manager: higher number run earlier. Manager 
+												 priority takes precedence over user priority. */
 	int max_retries;             /**< Number of times the task is tried to be executed on some workers until success. If less than one, the task is retried indefinitely. See try_count below.*/
 	int max_forsaken;            /**< Number of times the task is submitted to workers without being executed. If less than one, the task is retried indefinitely. See forsaken_count below.*/
 	int64_t min_running_time;    /**< Minimum time (in seconds) the task needs to run. (see vine_worker --wall-time)*/
