@@ -3174,7 +3174,7 @@ static vine_result_code_t commit_task_group_to_worker(struct vine_manager *q, st
 	do {
 
 		if (counter && (result == VINE_SUCCESS)) {
-			int t_idx = priority_queue_find_idx(q->ready_tasks, t);
+			int t_idx = priority_queue_find_idx_by_priority(q->ready_tasks, t->manager_priority, t->user_priority, (-1 * t->task_id));
 			priority_queue_remove(q->ready_tasks, t_idx);
 			// decrement refcount
 			vine_task_delete(t);
@@ -3988,7 +3988,7 @@ static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vin
 		break;
 
 	case VINE_TASK_READY:
-		t_idx = priority_queue_find_idx(q->ready_tasks, t);
+		t_idx = priority_queue_find_idx_by_priority(q->ready_tasks, t->manager_priority, t->user_priority, (-1 * t->task_id));
 		priority_queue_remove(q->ready_tasks, t_idx);
 		change_task_state(q, t, new_state);
 		break;
