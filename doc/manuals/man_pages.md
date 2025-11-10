@@ -22,8 +22,8 @@ for a broader discussion of how each tool is used.
 
   * [vine_worker(1)](man_pages/vine_worker.md)
   * [vine_status(1)](man_pages/vine_status.md)
-  * [vine_graph_log(1)](man_pages/vine_graph_log.md)
   * [vine_factory(1)](man_pages/work_queue_factory.md)
+  * [vine_plot_performance(1)](man_pages/vine_plot_performance.md)
 
 ## Work Queue
 

@@ -374,6 +374,14 @@ Call @ref list_next_item to begin returning the items.
 
 void list_first_item(struct list *list);
 
+/** Begin traversing a list in reverse.
+This function sets the internal list iterator to the last item.
+Call @ref list_prev_item to begin returning the items in reverse order.
+@param list The list to traverse.
+*/
+
+void list_last_item(struct list *list);
+
 /** Continue traversing a list.
 This function returns the current list item,
 and advances the internal iterator to the next item.
@@ -382,6 +390,15 @@ and advances the internal iterator to the next item.
 */
 
 void *list_next_item(struct list *list);
+
+/** Continue traversing a list in reverse.
+This function returns the current list item,
+and advances the internal iterator to the previous item.
+@param list The list to traverse.
+@return The current item in the list, NULL if end of list.
+*/
+
+void *list_prev_item(struct list *list);
 
 /** Apply a function to a list.
 Invokes op on every member of the list.
@@ -420,5 +437,17 @@ LIST_ITERATE( list, s ) {
 */
 
 #define LIST_ITERATE( list, item ) list_first_item(list); while((item=list_next_item(list)))
+
+/** Macro to iterate over a list in reverse order.
+Note that a statement or code block must follow the macro, like this:
+<pre>
+char *s;
+LIST_ITERATE_REVERSE( list, s ) {
+	printf("%s\n",s);
+}
+</pre>
+*/
+
+#define LIST_ITERATE_REVERSE( list, item ) list_last_item(list); while((item=list_prev_item(list)))
 
 #endif

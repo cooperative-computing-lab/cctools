@@ -15,7 +15,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "username.h"
 #include "uptime.h"
-#include "getopt.h"
+#include <getopt.h>
 #include "cctools.h"
 
 #include <stdlib.h>

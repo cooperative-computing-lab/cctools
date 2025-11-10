@@ -37,7 +37,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "path.h"
 #include "load_average.h"
-#include "getopt.h"
+#include <getopt.h>
 #include "getopt_aux.h"
 #include "create_dir.h"
 #include "unlink_recursive.h"
