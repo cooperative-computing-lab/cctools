@@ -179,9 +179,11 @@ def start_function(in_pipe_fd, thread_limit=1):
                     try:
                         # each child process independently redirects its own stdout/stderr.
                         with open(function_stdout_filename, "wb", buffering=0) as f:
-                            os.dup2(f.fileno(), 1)  # redirect stdout
-                            os.dup2(f.fileno(), 2)  # redirect stderr
+                            os.dup2(f.fileno(), sys.stdout.fileno())  # redirect stdout
+                            os.dup2(f.fileno(), sys.stderr.fileno())  # redirect stderr
 
+                            # keep the function invocation inside the context
+                            # so the stdout/stderr file stays open during execution and closes safely afterward.
                             stdout_timed_message(f"TASK {function_id} {function_name} starts in PID {os.getpid()}")
                             result = globals()[function_name](event)
                             stdout_timed_message(f"TASK {function_id} {function_name} finished")
