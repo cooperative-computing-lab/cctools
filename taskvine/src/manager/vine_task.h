@@ -45,11 +45,11 @@ typedef enum {
 } vine_task_func_exec_mode_t;
 
 typedef enum {
-	VINE_PRIORITY_BLOCKED = -2 << 30,
+	VINE_PRIORITY_BLOCKED = -1000000,
 	VINE_PRIORITY_DEFAULT = 0,
-	VINE_PRIORITY_EXHAUSTION = 2 << 4,
-	VINE_PRIORITY_RECOVERY = 2 << 8,
-	VINE_PRIORITY_HIGHEST = 2 << 30,
+	VINE_PRIORITY_EXHAUSTION = 100,
+	VINE_PRIORITY_RECOVERY = 1000,
+	VINE_PRIORITY_HIGHEST = 1000000
 } vine_priority_type_t;
 
 struct vine_task {
