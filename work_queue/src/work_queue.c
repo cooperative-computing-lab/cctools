@@ -2016,12 +2016,12 @@ static int expire_waiting_tasks(struct work_queue *q)
 			update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
 			change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
 			expired++;
-			list_pop_tail(q->ready_list);
+			list_remove(q->ready_list, t);
 		} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
 			update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
 			change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
 			expired++;
-			list_pop_tail(q->ready_list);
+			list_remove(q->ready_list, t);
 		}
 		tasks_considered++;
 	}
@@ -4626,7 +4626,11 @@ static int send_one_task( struct work_queue *q )
 		}
 
 		// Otherwise, remove it from the ready list and start it:
-		list_pop_tail(q->ready_list);
+		if(!q->ht_dispatch){
+			list_remove(q->ready_list, t);
+		} else {
+			list_pop_tail(q->ready_list);
+		}
 		commit_task_to_worker(q,w,t);
 		return 1;
 	}
