@@ -1146,6 +1146,36 @@ static void recall_worker_lost_temp_files(struct vine_manager *q, struct vine_wo
 	}
 }
 
+static int blocked_to_ready_tasks(struct vine_manager *q)
+{
+	int tasks_to_consider = MIN(list_size(q->blocked_tasks), q->attempt_schedule_depth);
+	int tasks_unblocked = 0;
+
+	while (tasks_to_consider > 0) {
+		tasks_to_consider--;
+		struct vine_task *t = list_rotate(q->blocked_tasks);
+
+		enum vine_schedule_result result = consider_task(q, t);
+
+		switch (result) {
+		case VINE_SCHEDULE_RESULT_OK:
+			tasks_unblocked++;
+			priority_queue_insert(q->ready_tasks, t);
+			list_pop_tail(q->blocked_tasks);
+			break;
+		case VINE_SCHEDULE_RESULT_TOO_EARLY:
+		case VINE_SCHEDULE_RESULT_COOL_DOWN:
+		case VINE_SCHEDULE_RESULT_MAX_CONCURRENT:
+		case VINE_SCHEDULE_RESULT_NO_TEMPS:
+		case VINE_SCHEDULE_RESULT_NO_LIBRARY:
+			// Task remains blocked, already rotated to tail
+			continue;
+		}
+	}
+
+	return tasks_unblocked;
+}
+
 /* Remove a worker from this master by removing all remote state, all local state, and disconnecting. */
 
 void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason)
@@ -4149,6 +4179,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->fixed_location_in_queue = 0;
 
 	q->ready_tasks = priority_queue_create(0);
+	q->blocked_tasks = list_create();
 	q->running_table = itable_create(0);
 	q->waiting_retrieval_list = list_create();
 	q->retrieved_list = list_create();
@@ -4539,6 +4570,7 @@ void vine_delete(struct vine_manager *q)
 	hash_table_delete(q->categories);
 
 	priority_queue_delete(q->ready_tasks);
+	list_delete(q->blocked_tasks);
 	itable_delete(q->running_table);
 	list_delete(q->waiting_retrieval_list);
 	list_delete(q->retrieved_list);
@@ -5480,6 +5512,16 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			continue;
 		}
 
+		// move potentially unblocked tasks to ready tasks
+		result = blocked_to_ready_tasks(q);
+		BEGIN_ACCUM_TIME(q, time_internal);
+		if (result > 0) {
+			events++;
+			continue;
+		}
+		END_ACCUM_TIME(q, time_internal);
+
+
 		// send keepalives to appropriate workers
 		BEGIN_ACCUM_TIME(q, time_status_msgs);
 		ask_for_workers_updates(q);
@@ -5521,7 +5563,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// in this wait.
 		if (events > 0) {
 			BEGIN_ACCUM_TIME(q, time_internal);
-			int done = !priority_queue_size(q->ready_tasks) && !list_size(q->waiting_retrieval_list) && !itable_size(q->running_table);
+			int done = !priority_queue_size(q->ready_tasks) && !list_size(q->waiting_retrieval_list) && !itable_size(q->running_table) && !list_size(q->blocked_tasks);
 			END_ACCUM_TIME(q, time_internal);
 
 			if (done) {

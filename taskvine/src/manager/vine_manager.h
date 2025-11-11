@@ -103,6 +103,7 @@ struct vine_manager {
 
 	struct itable *tasks;           /* Maps task_id -> vine_task of all tasks in any state. */
 	struct priority_queue   *ready_tasks;       /* Priority queue of vine_task that are waiting to execute. */
+	struct list *blocked_tasks;       /* List of vine_task that missing input temp files or libraries. */
 	struct itable   *running_table;      /* Table of vine_task that are running at workers. */
 	struct list   *waiting_retrieval_list;      /* List of vine_task that are waiting to be retrieved. */
 	struct list   *retrieved_list;      /* List of vine_task that have been retrieved. */
