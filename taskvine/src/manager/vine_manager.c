@@ -3596,32 +3596,32 @@ int consider_task(struct vine_manager *q, struct vine_task *t)
 
 	// Skip task if min requested start time not met.
 	if (t->resources_requested->start > now_secs) {
-		return 0;
+		return VINE_SCHEDULE_RESULT_TOO_EARLY;
 	}
 
 	// Skip if this task failed recently
 	if (t->time_when_last_failure + q->transient_error_interval > now_usecs) {
-		return 0;
+		return VINE_SCHEDULE_RESULT_COOL_DOWN;
 	}
 
 	// Skip if category already running maximum allowed tasks
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 	if (c->max_concurrent > -1 && c->max_concurrent <= c->vine_stats->tasks_running) {
-		return 0;
+		return VINE_SCHEDULE_RESULT_MAX_CONCURRENT;
 	}
 
 	// Skip task if temp input files have not been materialized.
 	if (!vine_manager_check_inputs_available(q, t)) {
-		return 0;
+		return VINE_SCHEDULE_RESULT_NO_TEMPS;
 	}
 
 	// Skip function call task if no suitable library template was installed.
 	if (!vine_manager_check_library_for_function_call(q, t)) {
-		return 0;
+		return VINE_SCHEDULE_RESULT_NO_LIBRARY;
 	}
 
 	// All checks passed, task is eligible to run.
-	return 1;
+	return VINE_SCHEDULE_RESULT_OK;
 }
 
 /*
@@ -3655,9 +3655,21 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 	PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
 	{
 		*tasks_ready_left_to_consider -= 1;
+		vine_schedule_result_t result = consider_task(q, t);
 
-		if (!consider_task(q, t)) {
+		switch (result) {
+		case VINE_SCHEDULE_RESULT_OK:
+			break;
+		case VINE_SCHEDULE_RESULT_TOO_EARLY:
+		case VINE_SCHEDULE_RESULT_COOL_DOWN:
+		case VINE_SCHEDULE_RESULT_MAX_CONCURRENT:
 			continue;
+			break;
+		case VINE_SCHEDULE_RESULT_NO_TEMPS:
+		case VINE_SCHEDULE_RESULT_NO_LIBRARY:
+			list_push_tail(q->blocked_tasks, t);
+			continue;
+			break;
 		}
 
 		// Find the best worker for the task

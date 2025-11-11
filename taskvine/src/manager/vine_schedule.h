@@ -18,6 +18,19 @@ This module is private to the manager and should not be invoked by the end user.
 #include "vine_task.h"
 #include "vine_worker_info.h"
 
+enum vine_schedule_result {
+	VINE_SCHEDULE_RESULT_OK = 0,
+	VINE_SCHEDULE_RESULT_TOO_EARLY,
+	VINE_SCHEDULE_RESULT_COOL_DOWN,
+	VINE_SCHEDULE_RESULT_MAX_CONCURRENT,
+	VINE_SCHEDULE_RESULT_NO_RESOURCES,
+	VINE_SCHEDULE_RESULT_NO_TEMPS,
+	VINE_SCHEDULE_RESULT_NO_FIXED_LOCATIONS,
+	VINE_SCHEDULE_RESULT_NO_FEATURES,
+	VINE_SCHEDULE_RESULT_NO_TIME,
+	VINE_SCHEDULE_RESULT_NO_LIBRARY
+};
+
 struct vine_worker_info *vine_schedule_task_to_worker( struct vine_manager *q, struct vine_task *t );
 void vine_schedule_check_for_large_tasks( struct vine_manager *q );
 int vine_schedule_check_fixed_location(struct vine_manager *q, struct vine_task *t);
