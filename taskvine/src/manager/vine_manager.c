@@ -1146,36 +1146,6 @@ static void recall_worker_lost_temp_files(struct vine_manager *q, struct vine_wo
 	}
 }
 
-static int blocked_to_ready_tasks(struct vine_manager *q)
-{
-	int tasks_to_consider = MIN(list_size(q->blocked_tasks), q->attempt_schedule_depth);
-	int tasks_unblocked = 0;
-
-	while (tasks_to_consider > 0) {
-		tasks_to_consider--;
-		struct vine_task *t = list_rotate(q->blocked_tasks);
-
-		enum vine_schedule_result result = consider_task(q, t);
-
-		switch (result) {
-		case VINE_SCHEDULE_RESULT_OK:
-			tasks_unblocked++;
-			priority_queue_insert(q->ready_tasks, t);
-			list_pop_tail(q->blocked_tasks);
-			break;
-		case VINE_SCHEDULE_RESULT_TOO_EARLY:
-		case VINE_SCHEDULE_RESULT_COOL_DOWN:
-		case VINE_SCHEDULE_RESULT_MAX_CONCURRENT:
-		case VINE_SCHEDULE_RESULT_NO_TEMPS:
-		case VINE_SCHEDULE_RESULT_NO_LIBRARY:
-			// Task remains blocked, already rotated to tail
-			continue;
-		}
-	}
-
-	return tasks_unblocked;
-}
-
 /* Remove a worker from this master by removing all remote state, all local state, and disconnecting. */
 
 void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason)
@@ -3654,6 +3624,32 @@ int consider_task(struct vine_manager *q, struct vine_task *t)
 	return VINE_SCHEDULE_RESULT_OK;
 }
 
+static int blocked_to_ready_tasks(struct vine_manager *q)
+{
+	int tasks_to_consider = MIN(list_size(q->blocked_tasks), q->attempt_schedule_depth);
+	int tasks_unblocked = 0;
+
+	while (tasks_to_consider > 0) {
+		tasks_to_consider--;
+		struct vine_task *t = list_rotate(q->blocked_tasks);
+
+		enum vine_schedule_result result = consider_task(q, t);
+
+		switch (result) {
+		case VINE_SCHEDULE_RESULT_OK:
+			tasks_unblocked++;
+			priority_queue_push(q->ready_tasks, t, t->priority);
+			list_pop_tail(q->blocked_tasks);
+			break;
+		default:
+			// Task remains blocked, already rotated to tail
+			continue;
+		}
+	}
+
+	return tasks_unblocked;
+}
+
 /*
 Advance the state of the system by selecting one task available
 to run, finding the best worker for that task, and then committing
@@ -3685,19 +3681,18 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 	PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
 	{
 		*tasks_ready_left_to_consider -= 1;
-		vine_schedule_result_t result = consider_task(q, t);
+		enum vine_schedule_result result = consider_task(q, t);
 
 		switch (result) {
 		case VINE_SCHEDULE_RESULT_OK:
 			break;
-		case VINE_SCHEDULE_RESULT_TOO_EARLY:
-		case VINE_SCHEDULE_RESULT_COOL_DOWN:
-		case VINE_SCHEDULE_RESULT_MAX_CONCURRENT:
+		case VINE_SCHEDULE_RESULT_NO_FEATURES:
+		case VINE_SCHEDULE_RESULT_NO_LIBRARY:
+		case VINE_SCHEDULE_RESULT_NO_TEMPS:
+			list_push_tail(q->blocked_tasks, t);
 			continue;
 			break;
-		case VINE_SCHEDULE_RESULT_NO_TEMPS:
-		case VINE_SCHEDULE_RESULT_NO_LIBRARY:
-			list_push_tail(q->blocked_tasks, t);
+		default:
 			continue;
 			break;
 		}
