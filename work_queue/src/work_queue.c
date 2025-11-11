@@ -2001,39 +2001,26 @@ static int expire_waiting_tasks(struct work_queue *q)
 
 	int tasks_considered = 0;
 	double current_time = timestamp_get() / ONE_SECOND;
-	if(q->ht_dispatch) {
-			while( (t = list_rotate(q->ready_list)) ) {
-				if(tasks_considered > q->attempt_schedule_depth) {
-					return expired;
-				}
-				if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
-					update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
-					change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
-					expired++;
-					list_pop_tail(q->ready_list);
-				} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
-					update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
-					change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
-					expired++;
-					list_pop_tail(q->ready_list);
-				}
-				tasks_considered++;
-			}
-	} else {
-		list_first_item(q->ready_list);
-		while( (t = list_next_item(q->ready_list))) {
-				if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
-					update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
-					change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
-					expired++;
-					list_pop_tail(q->ready_list);
-				} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
-					update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
-					change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
-					expired++;
-					list_pop_tail(q->ready_list);
-				}
+	
+	void *(*list_iter_fn)(struct list*) = q->ht_dispatch ? list_rotate : list_next_item;
+
+	list_first_item(q->ready_list);
+	while( (t = list_iter_fn(q->ready_list)) ) {
+		if((tasks_considered > q->attempt_schedule_depth) && q->ht_dispatch) {
+			return expired;
 		}
+		if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
+			update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
+			change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
+			expired++;
+			list_pop_tail(q->ready_list);
+		} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
+			update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
+			change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
+			expired++;
+			list_pop_tail(q->ready_list);
+		}
+		tasks_considered++;
 	}
 	return expired;
 }
@@ -4607,59 +4594,35 @@ static int send_one_task( struct work_queue *q )
 	int tasks_considered = 0;
 	timestamp_t now = timestamp_get();
 
-	if(q->ht_dispatch){
-			while( (t = list_rotate(q->ready_list)) ) {
-				if(tasks_considered++ > q->attempt_schedule_depth) {
-					return 0;
-				}
-
-				// Skip task if min requested start time not met.
-				if(t->resources_requested->start > now) {
-					continue;
-				}
-
-				struct category *c = work_queue_category_lookup_or_create(q, t->category);
-				if (c->max_concurrent > -1 && c->max_concurrent < c->wq_stats->tasks_running) {
-					continue;
-				}
-
-				// Find the best worker for the task at the head of the list
-				w = find_best_worker(q,t);
-
-				if(!w) {
-					continue;
-				}
-
-				// Otherwise, remove it from the ready list and start it:
-				list_pop_tail(q->ready_list);
-				commit_task_to_worker(q,w,t);
-				return 1;
-			}
-	} else {
-		list_first_item(q->ready_list);
-		while( (t = list_next_item(q->ready_list))) {
-				// Skip task if min requested start time not met.
-				if(t->resources_requested->start > now) {
-					continue;
-				}
-
-				struct category *c = work_queue_category_lookup_or_create(q, t->category);
-				if (c->max_concurrent > -1 && c->max_concurrent < c->wq_stats->tasks_running) {
-					continue;
-				}
-
-				// Find the best worker for the task at the head of the list
-				w = find_best_worker(q,t);
-
-				if(!w) {
-					continue;
-				}
-
-				// Otherwise, remove it from the ready list and start it:
-				list_pop_tail(q->ready_list);
-				commit_task_to_worker(q,w,t);
-				return 1;
+	void *(*list_iter_fn)(struct list*) = q->ht_dispatch ? list_rotate : list_next_item;
+	
+	list_first_item(q->ready_list);
+	while( (t = list_iter_fn(q->ready_list)) ) {
+		if((tasks_considered++ > q->attempt_schedule_depth) && q->ht_dispatch) {
+			return 0;
 		}
+
+		// Skip task if min requested start time not met.
+		if(t->resources_requested->start > now) {
+			continue;
+		}
+
+		struct category *c = work_queue_category_lookup_or_create(q, t->category);
+		if (c->max_concurrent > -1 && c->max_concurrent < c->wq_stats->tasks_running) {
+			continue;
+		}
+
+		// Find the best worker for the task at the head of the list
+		w = find_best_worker(q,t);
+
+		if(!w) {
+			continue;
+		}
+
+		// Otherwise, remove it from the ready list and start it:
+		list_pop_tail(q->ready_list);
+		commit_task_to_worker(q,w,t);
+		return 1;
 	}
 
 	// if we made it here we reached the end of the list
