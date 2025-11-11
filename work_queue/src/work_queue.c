@@ -2004,7 +2004,10 @@ static int expire_waiting_tasks(struct work_queue *q)
 	
 	void *(*list_iter_fn)(struct list*) = q->ht_dispatch ? list_rotate : list_next_item;
 
-	list_first_item(q->ready_list);
+	if(!q->ht_dispatch){
+			list_first_item(q->ready_list);
+	}
+	
 	while( (t = list_iter_fn(q->ready_list)) ) {
 		if((tasks_considered > q->attempt_schedule_depth) && q->ht_dispatch) {
 			return expired;
@@ -4596,7 +4599,10 @@ static int send_one_task( struct work_queue *q )
 
 	void *(*list_iter_fn)(struct list*) = q->ht_dispatch ? list_rotate : list_next_item;
 	
-	list_first_item(q->ready_list);
+	if(!q->ht_dispatch){
+			list_first_item(q->ready_list);
+	}
+
 	while( (t = list_iter_fn(q->ready_list)) ) {
 		if((tasks_considered++ > q->attempt_schedule_depth) && q->ht_dispatch) {
 			return 0;
