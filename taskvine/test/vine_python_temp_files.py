@@ -24,7 +24,7 @@ def fun_b(remote_data):
 
 
 # Create a new m
-m = vine.Manager(port=[9123, 9130])
+m = vine.Manager(port=0)
 print("listening on port {}".format(m.port))
 with open(port_file, "w") as f:
     f.write(str(m.port))
