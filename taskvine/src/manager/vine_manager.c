@@ -5516,7 +5516,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		}
 		END_ACCUM_TIME(q, time_internal);
 
-
 		// send keepalives to appropriate workers
 		BEGIN_ACCUM_TIME(q, time_status_msgs);
 		ask_for_workers_updates(q);
