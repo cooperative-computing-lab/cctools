@@ -3634,9 +3634,10 @@ static int rotate_blocked_tasks(struct vine_manager *q)
 
 	int unblocked_tasks = 0;
 	int tasks_considered = 0;
-	int tasks_to_consider = MIN(list_size(q->blocked_tasks), q->attempt_schedule_depth);
+	int tasks_to_consider = list_size(q->blocked_tasks);
 
-	while (tasks_considered++ < tasks_to_consider) {
+	while (tasks_considered < tasks_to_consider) {
+		tasks_considered++;
 		struct vine_task *t = list_pop_head(q->blocked_tasks);
 		if (!t) {
 			break;
