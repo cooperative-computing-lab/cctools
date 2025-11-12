@@ -169,6 +169,7 @@ static int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w
 static int release_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
+static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t);
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
@@ -3624,6 +3625,35 @@ int consider_task(struct vine_manager *q, struct vine_task *t)
 	return 1;
 }
 
+/* Rotate blocked tasks to the ready queue if they are runnable. */
+static int rotate_blocked_tasks(struct vine_manager *q)
+{
+	if (list_size(q->blocked_tasks) == 0) {
+		return 0;
+	}
+
+	int unblocked_tasks = 0;
+	int tasks_considered = 0;
+	int tasks_to_consider = MIN(list_size(q->blocked_tasks), q->attempt_schedule_depth);
+
+	while (tasks_considered++ < tasks_to_consider) {
+		struct vine_task *t = list_pop_head(q->blocked_tasks);
+		if (!t) {
+			break;
+		}
+
+		/* check if the task is runnable and has a suitable worker */
+		if (consider_task(q, t) && vine_schedule_task_to_worker(q, t)) {
+			push_task_to_ready_tasks(q, t);
+			unblocked_tasks++;
+		} else {
+			list_push_tail(q->blocked_tasks, t);
+		}
+	}
+
+	return unblocked_tasks;
+}
+
 /*
 Advance the state of the system by selecting one task available
 to run, finding the best worker for that task, and then committing
@@ -3656,7 +3686,9 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 	{
 		*tasks_ready_left_to_consider -= 1;
 
+		/* this task is not runnable at all, demote it to the blocked queue */
 		if (!consider_task(q, t)) {
+			list_push_tail(q->blocked_tasks, t);
 			continue;
 		}
 
@@ -3665,45 +3697,55 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 		struct vine_worker_info *w = vine_schedule_task_to_worker(q, t);
 		q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
 
-		if (w) {
-			priority_queue_remove(q->ready_tasks, t_idx);
+		/* task is runnable but no worker is fit, demote it and consider later */
+		if (!w) {
+			list_push_tail(q->blocked_tasks, t);
+			continue;
+		}
 
-			// do not continue if this worker is running a group task
-			if (q->task_groups_enabled) {
-				struct vine_task *it;
-				uint64_t taskid;
-				ITABLE_ITERATE(w->current_tasks, taskid, it)
-				{
-					if (it->group_id) {
-						return 0;
-					}
+		priority_queue_remove(q->ready_tasks, t_idx);
+
+		/* do not consider if this worker is running a group task */
+		if (q->task_groups_enabled) {
+			int worker_running_group_task = 0;
+			struct vine_task *it;
+			uint64_t taskid;
+			ITABLE_ITERATE(w->current_tasks, taskid, it)
+			{
+				if (it->group_id) {
+					worker_running_group_task = 1;
+					break;
 				}
 			}
-
-			vine_result_code_t result;
-			if (q->task_groups_enabled) {
-				result = commit_task_group_to_worker(q, w, t);
-			} else {
-				result = commit_task_to_worker(q, w, t);
+			if (worker_running_group_task) {
+				list_push_tail(q->blocked_tasks, t);
+				continue;
 			}
+		}
 
-			switch (result) {
-			case VINE_SUCCESS:
-				/* return on successful commit. */
-				return 1;
-				break;
-			case VINE_APP_FAILURE:
-			case VINE_WORKER_FAILURE:
-				/* failed to dispatch, commit put the task back in the right place. */
-				break;
-			case VINE_MGR_FAILURE:
-				/* special case, commit had a chained failure. */
-				priority_queue_push(q->ready_tasks, t, t->priority);
-				break;
-			case VINE_END_OF_LIST:
-				/* shouldn't happen, keep going */
-				break;
-			}
+		vine_result_code_t result;
+		if (q->task_groups_enabled) {
+			result = commit_task_group_to_worker(q, w, t);
+		} else {
+			result = commit_task_to_worker(q, w, t);
+		}
+
+		switch (result) {
+		case VINE_SUCCESS:
+			/* return on successful commit. */
+			return 1;
+			break;
+		case VINE_APP_FAILURE:
+		case VINE_WORKER_FAILURE:
+			/* failed to dispatch, commit put the task back in the right place. */
+			break;
+		case VINE_MGR_FAILURE:
+			/* special case, commit had a chained failure. */
+			priority_queue_push(q->ready_tasks, t, t->priority);
+			break;
+		case VINE_END_OF_LIST:
+			/* shouldn't happen, keep going */
+			break;
 		}
 	}
 
@@ -4136,6 +4178,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->next_task_id = 1;
 	q->fixed_location_in_queue = 0;
 
+	q->blocked_tasks = list_create();
 	q->ready_tasks = priority_queue_create(0);
 	q->running_table = itable_create(0);
 	q->waiting_retrieval_list = list_create();
@@ -4526,6 +4569,7 @@ void vine_delete(struct vine_manager *q)
 	hash_table_clear(q->categories, (void *)category_free);
 	hash_table_delete(q->categories);
 
+	list_delete(q->blocked_tasks);
 	priority_queue_delete(q->ready_tasks);
 	itable_delete(q->running_table);
 	list_delete(q->waiting_retrieval_list);
@@ -5448,6 +5492,9 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 			// tasks waiting to be dispatched?
 			BEGIN_ACCUM_TIME(q, time_send);
+			/* rotate blocked tasks before dispatching any */
+			rotate_blocked_tasks(q);
+			/* dispatch one task */
 			result = send_one_task(q, &tasks_ready_left_to_consider);
 			END_ACCUM_TIME(q, time_send);
 			if (result) {
@@ -5509,7 +5556,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// in this wait.
 		if (events > 0) {
 			BEGIN_ACCUM_TIME(q, time_internal);
-			int done = !priority_queue_size(q->ready_tasks) && !list_size(q->waiting_retrieval_list) && !itable_size(q->running_table);
+			int done = !priority_queue_size(q->ready_tasks) && !list_size(q->blocked_tasks) && !list_size(q->waiting_retrieval_list) && !itable_size(q->running_table);
 			END_ACCUM_TIME(q, time_internal);
 
 			if (done) {
