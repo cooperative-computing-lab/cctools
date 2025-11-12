@@ -1526,7 +1526,6 @@ to avoid the cost of these checks in the critical path.
 static int expire_waiting_tasks(struct vine_manager *q)
 {
 	struct vine_task *t;
-	int t_idx;
 	int expired = 0;
 
 	/* Measure the current time once for the whole iteration. */
@@ -1536,8 +1535,15 @@ static int expire_waiting_tasks(struct vine_manager *q)
 	int iter_count = 0;
 	int iter_depth = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
 
-	PRIORITY_QUEUE_STATIC_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
+	/* expire tasks after iteration */
+	struct list *tasks_to_expire = list_create();
+
+	LIST_ITERATE(q->blocked_tasks, t)
 	{
+		if (iter_count >= iter_depth) {
+			break;
+		}
+		iter_count++;
 		/* In this loop, use VINE_RESULT_SUCCESS as an indication of "still ok to run". */
 		vine_result_t result = VINE_RESULT_SUCCESS;
 
@@ -1553,12 +1559,17 @@ static int expire_waiting_tasks(struct vine_manager *q)
 
 		/* If any of the reasons fired, then expire the task and put in the retrieved queue. */
 		if (result != VINE_RESULT_SUCCESS) {
-			vine_task_set_result(t, result);
-			priority_queue_remove(q->ready_tasks, t_idx);
-			change_task_state(q, t, VINE_TASK_RETRIEVED);
-			expired++;
+			list_push_tail(tasks_to_expire, t);
 		}
 	}
+
+	while ((t = list_pop_head(tasks_to_expire))) {
+		list_remove(q->blocked_tasks, t);
+		change_task_state(q, t, VINE_TASK_RETRIEVED);
+		expired++;
+	}
+
+	list_delete(tasks_to_expire);
 
 	/* Return the number of tasks expired. */
 	return expired;
