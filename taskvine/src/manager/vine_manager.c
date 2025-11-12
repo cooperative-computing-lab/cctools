@@ -3669,12 +3669,6 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 		return 0;
 	}
 
-	int t_idx;
-	struct vine_task *t;
-
-	int iter_count = 0;
-	int iter_depth = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
-
 	// Iterate over the ready tasks by priority.
 	// The first time we arrive here, the task with the highest priority is considered. However, there may be various reasons
 	// 	that this particular task is not eligible to run, such as: 1) the task requires more resources than the workers have;
