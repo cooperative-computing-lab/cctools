@@ -1533,7 +1533,7 @@ static int expire_waiting_tasks(struct vine_manager *q)
 
 	/* Only work through the queue up to iter_depth. */
 	int iter_count = 0;
-	int iter_depth = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
+	int iter_depth = MIN(list_size(q->blocked_tasks), q->attempt_schedule_depth);
 
 	/* expire tasks after iteration */
 	struct list *tasks_to_expire = list_create();
