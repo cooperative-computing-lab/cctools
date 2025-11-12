@@ -361,7 +361,7 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 	}
 
 	/* first sort by the strategy-specific criterion, then run @check_worker_against_task on the sorted list */
-	struct priority_queue *workers = priority_queue_create(0);
+	struct priority_queue *workers = priority_queue_create(0, 1);
 	if (!workers) {
 		return NULL;
 	}

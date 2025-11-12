@@ -6,11 +6,12 @@ See the file COPYING for details.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "priority_queue.h"
 
 int main()
 {
-	struct priority_queue *pq = priority_queue_create(2);
+	struct priority_queue *pq = priority_queue_create(0, 1);
 	if (!pq) {
 		fprintf(stderr, "Failed to create priority queue.\n");
 		return EXIT_FAILURE;
@@ -42,7 +43,7 @@ int main()
 	printf("\nIterating over the priority queue using PRIORITY_QUEUE_BASE_ITERATE:\n");
 	PRIORITY_QUEUE_BASE_ITERATE(pq, idx, item, iter_count, iter_depth)
 	{
-		double prio = priority_queue_get_priority_at(pq, idx);
+		double prio = priority_queue_get_priority_at(pq, 0, idx);
 		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
 	}
 
@@ -73,8 +74,50 @@ int main()
 		printf("Element '%s' not found in the queue.\n", element_to_find);
 	}
 
+	// Find an element by priority
+	printf("\nFinding elements by priority:\n");
+	// Test 1: Find Task B with priority 5.0
+	int found_by_prio = priority_queue_find_idx_by_priority(pq, 5.0);
+	if (found_by_prio >= 0) {
+		char *found_data = (char *)priority_queue_peek_at(pq, found_by_prio);
+		double found_prio = priority_queue_get_priority_at(pq, 0, found_by_prio);
+		printf("Found element with priority 5.0: '%s' at index %d (priority=%.1f)\n", found_data, found_by_prio, found_prio);
+		if (strcmp(found_data, "Task B") == 0) {
+			printf("Found the correct task (Task B)\n");
+		} else {
+			printf("Expected 'Task B' but found '%s'\n", found_data);
+		}
+	} else {
+		printf("Element with priority 5.0 not found.\n");
+	}
+
+	// Test 2: Find Task C with priority 1.0
+	found_by_prio = priority_queue_find_idx_by_priority(pq, 1.0);
+	if (found_by_prio >= 0) {
+		char *found_data = (char *)priority_queue_peek_at(pq, found_by_prio);
+		double found_prio = priority_queue_get_priority_at(pq, 0, found_by_prio);
+		printf("Found element with priority 1.0: '%s' at index %d (priority=%.1f)\n", found_data, found_by_prio, found_prio);
+		if (strcmp(found_data, "Task C") == 0) {
+			printf("Found the correct task (Task C)\n");
+		} else {
+			printf("Expected 'Task C' but found '%s'\n", found_data);
+		}
+	} else {
+		printf("Element with priority 1.0 not found.\n");
+	}
+
+	// Test 3: Try to find non-existent priority
+	found_by_prio = priority_queue_find_idx_by_priority(pq, 10.5);
+	if (found_by_prio >= 0) {
+		char *found_data = (char *)priority_queue_peek_at(pq, found_by_prio);
+		double found_prio = priority_queue_get_priority_at(pq, 0, found_by_prio);
+		printf("Found element with priority 10.5: '%s' at index %d (priority=%.1f)\n", found_data, found_by_prio, found_prio);
+	} else {
+		printf("Element with priority 10.5 not found (expected).\n");
+	}
+
 	// Update the priority of an element
-	int update_idx = priority_queue_update_priority(pq, "Task A", 9.0);
+	int update_idx = priority_queue_update_priority(pq, "Task A", 0, 9.0);
 	printf("\nUpdating the priority of 'Task A' to 9.0:\n");
 	if (update_idx >= 0) {
 		printf("Task A new index after priority update: %d\n", update_idx);
@@ -98,7 +141,7 @@ int main()
 	iter_depth = priority_queue_size(pq);
 	PRIORITY_QUEUE_BASE_ITERATE(pq, idx, item, iter_count, iter_depth)
 	{
-		double prio = priority_queue_get_priority_at(pq, idx);
+		double prio = priority_queue_get_priority_at(pq, 0, idx);
 		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
 	}
 
@@ -110,7 +153,7 @@ int main()
 	printf("\nIterating over the priority queue using PRIORITY_QUEUE_ROTATE_ITERATE with a depth %d:\n", iter_depth);
 	PRIORITY_QUEUE_ROTATE_ITERATE(pq, idx, item, iter_count, iter_depth)
 	{
-		double prio = priority_queue_get_priority_at(pq, idx);
+		double prio = priority_queue_get_priority_at(pq, 0, idx);
 		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
 		// The break check must go after the task is considered, as the rotate cursor is advanced in the macro and must be considered
 	}
@@ -121,7 +164,7 @@ int main()
 	printf("\nReset the rotate cursor and Iterate from beginning with a depth %d:\n", iter_depth);
 	PRIORITY_QUEUE_ROTATE_ITERATE(pq, idx, item, iter_count, iter_depth)
 	{
-		double prio = priority_queue_get_priority_at(pq, idx);
+		double prio = priority_queue_get_priority_at(pq, 0, idx);
 		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
 	}
 
@@ -133,7 +176,7 @@ int main()
 	printf("\nIterating over the priority queue using PRIORITY_QUEUE_STATIC_ITERATE with a depth %d:\n", iter_depth);
 	PRIORITY_QUEUE_STATIC_ITERATE(pq, idx, item, iter_count, iter_depth)
 	{
-		double prio = priority_queue_get_priority_at(pq, idx);
+		double prio = priority_queue_get_priority_at(pq, 0, idx);
 		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
 	}
 	iter_count = 0;
@@ -141,7 +184,7 @@ int main()
 	printf("Continue iterating from the last position with a depth %d\n", iter_depth);
 	PRIORITY_QUEUE_STATIC_ITERATE(pq, idx, item, iter_count, iter_depth)
 	{
-		double prio = priority_queue_get_priority_at(pq, idx);
+		double prio = priority_queue_get_priority_at(pq, 0, idx);
 		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
 	}
 
@@ -158,14 +201,14 @@ int main()
 	printf("\nIterating over the priority queue using PRIORITY_QUEUE_BASE_ITERATE:\n");
 	PRIORITY_QUEUE_BASE_ITERATE(pq, idx, item, iter_count, iter_depth)
 	{
-		double prio = priority_queue_get_priority_at(pq, idx);
+		double prio = priority_queue_get_priority_at(pq, 0, idx);
 		printf("Index: %d, Element: %s, Priority: %.1f\n", idx, item, prio);
 	}
 
 	// Pop elements from the priority queue using priority_queue_pop
 	printf("\nPopping elements from the priority queue:\n");
 	while ((item = (char *)priority_queue_peek_top(pq)) != NULL) {
-		printf("Popped element: %s  Priority: %d\n", item, (int)priority_queue_get_priority_at(pq, 0));
+		printf("Popped element: %s  Priority: %d\n", item, (int)priority_queue_get_priority_at(pq, 0, 0));
 		priority_queue_pop(pq);
 	}
 
