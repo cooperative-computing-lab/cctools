@@ -152,6 +152,46 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 	return ok;
 }
 
+/* Count the number of committable cores for all workers. */
+int vine_schedule_count_committable_cores(struct vine_manager *q)
+{
+	int count = 0;
+
+	char *key;
+	struct vine_worker_info *w;
+	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	{
+		/* skip if the worker hasn't reported any resources yet */
+		if (!w->resources) {
+			continue;
+		}
+		/* skip if the worker has no cores */
+		if (w->resources->cores.total <= 0) {
+			continue;
+		}
+		/* count the number of free slots on running libraries */
+		if (w->current_libraries && itable_size(w->current_libraries) > 0) {
+			uint64_t libtask_id = 0;
+			struct vine_task *libtask = NULL;
+			ITABLE_ITERATE(w->current_libraries, libtask_id, libtask)
+			{
+				if (!libtask || !libtask->provides_library) {
+					continue;
+				}
+				if (libtask->function_slots_total > libtask->function_slots_inuse) {
+					count += libtask->function_slots_total - libtask->function_slots_inuse;
+				}
+			}
+		}
+		/* count the number of free cores aside from libraries */
+		if (w->resources->cores.total > 0 && overcommitted_resource_total(q, w->resources->cores.total) > w->resources->cores.inuse) {
+			count += overcommitted_resource_total(q, w->resources->cores.total) - w->resources->cores.inuse;
+		}
+	}
+
+	return count;
+}
+
 /* Check if this worker has committable resources for any type of task.
  * If it returns false, neither a function task, library task nor a regular task can run on this worker.
  * If it returns true, the worker has either free slots for function calls or sufficient resources for regular tasks.

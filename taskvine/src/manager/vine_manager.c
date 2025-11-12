@@ -3625,30 +3625,30 @@ int consider_task(struct vine_manager *q, struct vine_task *t)
 	return 1;
 }
 
-/* Rotate blocked tasks to the ready queue if they are runnable. */
-static int rotate_blocked_tasks(struct vine_manager *q)
+/* Block a task */
+static void block_task(struct vine_manager *q, struct vine_task *t)
 {
-	if (list_size(q->blocked_tasks) == 0) {
-		return 0;
+	if (!t) {
+		return;
 	}
+	list_push_tail(q->blocked_tasks, t);
+}
 
+/* Rotate blocked tasks to the ready queue if they are runnable. */
+static int unblock_tasks(struct vine_manager *q)
+{
 	int unblocked_tasks = 0;
-	int tasks_considered = 0;
-	int tasks_to_consider = list_size(q->blocked_tasks);
 
-	while (tasks_considered < tasks_to_consider) {
-		tasks_considered++;
+	/* scan all of the blocked tasks */
+	for (int i = 0; i < list_size(q->blocked_tasks); i++) {
 		struct vine_task *t = list_pop_head(q->blocked_tasks);
-		if (!t) {
-			break;
-		}
 
 		/* check if the task is runnable and has a suitable worker */
 		if (consider_task(q, t) && vine_schedule_task_to_worker(q, t)) {
 			push_task_to_ready_tasks(q, t);
 			unblocked_tasks++;
 		} else {
-			list_push_tail(q->blocked_tasks, t);
+			block_task(q, t);
 		}
 	}
 
@@ -3663,6 +3663,12 @@ the task to the worker.
 
 static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consider)
 {
+	/* return early if no committable cores */
+	int committable_cores = vine_schedule_count_committable_cores(q);
+	if (committable_cores <= 0) {
+		return 0;
+	}
+
 	int t_idx;
 	struct vine_task *t;
 
@@ -3683,17 +3689,20 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 	//  3. Delete/Insert an element prior/equal to the rotate cursor (tasks prior to the current cursor changed)
 	// 1 and 2 are explicitly handled by the manager where calls priority_queue_rotate_reset, while 3 is implicitly handled by
 	// the priority queue data structure where also invokes priority_queue_rotate_reset.
-	PRIORITY_QUEUE_ROTATE_ITERATE(q->ready_tasks, t_idx, t, iter_count, iter_depth)
-	{
-		*tasks_ready_left_to_consider -= 1;
+	int tasks_considered = 0;
+	int tasks_to_consider = MIN(priority_queue_size(q->ready_tasks), q->attempt_schedule_depth);
+	while (tasks_considered < tasks_to_consider) {
+		struct vine_task *t = priority_queue_pop(q->ready_tasks);
+		if (!t) {
+			break;
+		}
+		tasks_considered++;
 
-		/* remove the task first, because it will either be committed or blocked, both lead to the removal */
-		/* this achieves the same result as constantly peeking at the top, a later PR will update this to use priority_queue_pop */
-		priority_queue_remove(q->ready_tasks, t_idx);
+		*tasks_ready_left_to_consider -= 1;
 
 		/* this task is not runnable at all, demote it to the blocked queue */
 		if (!consider_task(q, t)) {
-			list_push_tail(q->blocked_tasks, t);
+			block_task(q, t);
 			continue;
 		}
 
@@ -3704,7 +3713,7 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 
 		/* task is runnable but no worker is fit, demote it and consider later */
 		if (!w) {
-			list_push_tail(q->blocked_tasks, t);
+			block_task(q, t);
 			continue;
 		}
 
@@ -3721,7 +3730,7 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 				}
 			}
 			if (worker_running_group_task) {
-				list_push_tail(q->blocked_tasks, t);
+				block_task(q, t);
 				continue;
 			}
 		}
@@ -3744,7 +3753,7 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 			break;
 		case VINE_MGR_FAILURE:
 			/* special case, commit had a chained failure. */
-			priority_queue_push(q->ready_tasks, t, t->priority);
+			block_task(q, t);
 			break;
 		case VINE_END_OF_LIST:
 			/* shouldn't happen, keep going */
@@ -5496,7 +5505,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			// tasks waiting to be dispatched?
 			BEGIN_ACCUM_TIME(q, time_send);
 			/* rotate blocked tasks before dispatching any */
-			rotate_blocked_tasks(q);
+			unblock_tasks(q);
 			/* dispatch one task */
 			result = send_one_task(q, &tasks_ready_left_to_consider);
 			END_ACCUM_TIME(q, time_send);
