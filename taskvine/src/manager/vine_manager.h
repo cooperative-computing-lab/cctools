@@ -102,6 +102,7 @@ struct vine_manager {
 	/* Primary data structures for tracking task state. */
 
 	struct itable *tasks;           /* Maps task_id -> vine_task of all tasks in any state. */
+	struct list   *blocked_tasks;      /* List of vine_task that are blocked due to various reasons. */
 	struct priority_queue   *ready_tasks;       /* Priority queue of vine_task that are waiting to execute. */
 	struct itable   *running_table;      /* Table of vine_task that are running at workers. */
 	struct list   *waiting_retrieval_list;      /* List of vine_task that are waiting to be retrieved. */
@@ -136,8 +137,6 @@ struct vine_manager {
 	int next_task_id;       /* Next integer task_id to be assigned to a created task. */
 	int fixed_location_in_queue; /* Number of fixed location tasks currently being managed */
 	int num_tasks_left;    /* Optional: Number of tasks remaining, if given by user.  @ref vine_set_num_tasks */
-	int nothing_happened_last_wait_cycle; /* Set internally in main loop if no messages or tasks were processed during the last wait loop.
-																					 If set, poll longer to avoid wasting cpu cycles, and growing log files unnecessarily.*/
 
 	/* Accumulation of statistics for reporting to the caller. */
 
@@ -214,6 +213,8 @@ struct vine_manager {
 	int immediate_recovery;       /* If true, recovery tasks for tmp files are created as soon as the worker that had them
 																	 disconnects. Otherwise, create them only when a tasks needs then as inputs (this is
 																	 the default). */
+	int auto_recovery;            /* If true, automatically recover lost temp files by submitting recovery tasks.
+																	 Otherwise, expire ineligible tasks and return them to the user */
 	int transfer_temps_recovery;  /* If true, attempt to recover temp files from lost worker to reach threshold required */
 	int transfer_replica_per_cycle;  /* Maximum number of replica to request per temp file per iteration */
 	int temp_replica_count;       /* Number of replicas per temp file */
