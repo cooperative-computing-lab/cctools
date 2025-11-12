@@ -160,14 +160,6 @@ int priority_queue_update_priority(struct priority_queue *pq, void *data, double
 */
 int priority_queue_find_idx(struct priority_queue *pq, void *data);
 
-/** Advance the static_cursor to the next element and return the index.
-The static_cursor is used to globally iterate over the elements by sequential index.
-The position of the static_cursor is automatically remembered and never reset.
-@param pq A pointer to a priority queue.
-@return The index of the next element if any, -1 on failure.
-*/
-int priority_queue_static_next(struct priority_queue *pq);
-
 /** Reset the base_cursor to 0.
 The base_cursor is used in PRIORITY_QUEUE_BASE_ITERATE to iterate over the elements from the beginning.
 @param pq A pointer to a priority queue.
@@ -179,21 +171,6 @@ void priority_queue_base_reset(struct priority_queue *pq);
 @return The index of the next element if any, -1 on failure.
 */
 int priority_queue_base_next(struct priority_queue *pq);
-
-/** Reset the rotate_cursor to 0.
-The rotate_cursor is used to iterate over the elements from the beginning, and reset on demand.
-In task scheduling, we tipically iterate over a amall number of tasks at a time. If there is no task to execute,
-we remember the position of the cursor and we can start from there the next time.
-If there are interesting events happening, we reset the cursor and start from the beginning.
-@param pq A pointer to a priority queue.
-*/
-void priority_queue_rotate_reset(struct priority_queue *pq);
-
-/** Advance the rotate_cursor to the next element and return the index.
-@param pq A pointer to a priority queue.
-@return The index of the next element if any, -1 on failure.
-*/
-int priority_queue_rotate_next(struct priority_queue *pq);
 
 /** Remove the element with the specified index from a priority queue.
 @param pq A pointer to a priority queue.
@@ -221,13 +198,6 @@ PRIORITY_QUEUE_BASE_ITERATE(pq, idx, data, iter_count, iter_depth) {
 	printf("Data idx: %d\n", idx);
 }
 
-int iter_count = 0;
-int iter_depth = 4;
-PRIORITY_QUEUE_STATIC_ITERATE( pq, idx, data, iter_count, iter_depth ) {
-    printf("Has accessed %d of %d elements\n", iter_count, iter_depth);
-    printf("Data idx: %d\n", idx);
-}
-
 iter_count = 0;
 iter_depth = 7;
 PRIORITY_QUEUE_ROTATE_ITERATE( pq, idx, data, iter_count, iter_depth ) {
@@ -242,15 +212,5 @@ PRIORITY_QUEUE_ROTATE_ITERATE( pq, idx, data, iter_count, iter_depth ) {
     iter_count = 0; \
     priority_queue_base_reset(pq); \
     while ((iter_count < iter_depth) && ((idx = priority_queue_base_next(pq)) >= 0) && (data = priority_queue_peek_at(pq, idx)) && (iter_count += 1))
-
-/* Iterate from last position, never reset. */
-#define PRIORITY_QUEUE_STATIC_ITERATE( pq, idx, data, iter_count, iter_depth ) \
-    iter_count = 0; \
-    while ((iter_count < iter_depth) && ((idx = priority_queue_static_next(pq)) >= 0) && (data = priority_queue_peek_at(pq, idx)) && (iter_count += 1))
-
-/* Iterate from last position, reset to the begining when needed. */
-#define PRIORITY_QUEUE_ROTATE_ITERATE( pq, idx, data, iter_count, iter_depth ) \
-    iter_count = 0; \
-    while ((iter_count < iter_depth) && ((idx = priority_queue_rotate_next(pq)) >= 0) && (data = priority_queue_peek_at(pq, idx)) && (iter_count += 1))
 
 #endif

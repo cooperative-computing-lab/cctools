@@ -903,6 +903,11 @@ static int file_needs_recovery(struct vine_manager *q, struct vine_file *f)
 		return 0;
 	}
 
+	/* Only consider recovery tasks if auto-recovery is enabled. */
+	if (!q->auto_recovery) {
+		return 0;
+	}
+
 	return !vine_file_replica_table_exists_somewhere(q, f->cached_name);
 }
 
@@ -934,7 +939,7 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 			vine_file_replica_delete(removed_replica);
 		}
 		/* consider if this replica needs recovery because of worker removal */
-		if (q->immediate_recovery && file_needs_recovery(q, f)) {
+		if (q->immediate_recovery) {
 			vine_manager_consider_recovery_task(q, f, f->recovery_task);
 		}
 	}
@@ -1073,7 +1078,7 @@ static int consider_tempfile_replications(struct vine_manager *q)
 		if (!source_workers) {
 			/* If no source workers found, it indicates that the file doesn't exist, either pruned or lost.
 			Because a pruned file is removed from the recovery queue, so it definitely indicates that the file is lost. */
-			if (q->transfer_temps_recovery && file_needs_recovery(q, f)) {
+			if (q->transfer_temps_recovery) {
 				vine_manager_consider_recovery_task(q, f, f->recovery_task);
 			}
 			list_push_tail(to_remove, xxstrdup(f->cached_name));
@@ -3081,11 +3086,6 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 
 	count_worker_resources(q, w);
 
-	if (result != VINE_SUCCESS) {
-		debug(D_VINE, "Failed to send task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
-		handle_failure(q, w, t, result);
-	}
-
 	return result;
 }
 
@@ -3431,6 +3431,11 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 		return;
 	}
 
+	/* Return early if the file does not need recovery. */
+	if (!file_needs_recovery(q, lost_file)) {
+		return;
+	}
+
 	/* Prevent race between original task and recovery task after worker crash.
 	 * Example: Task T completes on worker W, creates file F, T moves to WAITING_RETRIEVAL.
 	 * W crashes before stdout retrieval, T gets rescheduled to READY, F is lost and triggers
@@ -3487,7 +3492,7 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 		struct vine_file *f = m->file;
 		if (f->type == VINE_FILE && f->state == VINE_FILE_STATE_PENDING) {
 			all_available = 0;
-		} else if (file_needs_recovery(q, f)) {
+		} else if (f->type == VINE_TEMP) {
 			vine_manager_consider_recovery_task(q, f, f->recovery_task);
 			all_available = 0;
 		}
@@ -3565,29 +3570,36 @@ static int rotate_blocked_tasks(struct vine_manager *q)
 		}
 
 		/* If any of the following reasons fired, then expire the task and put in the retrieved queue. */
-		/* check if the task has exceeded its end time */
+		char *expiry_message = NULL;
+		vine_result_t expiry_reason = VINE_RESULT_SUCCESS;
 		if (t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
-			debug(D_VINE, "task %d has exceeded its end time", t->task_id);
-			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
-			change_task_state(q, t, VINE_TASK_RETRIEVED);
-			continue;
+			/* check if the task has exceeded its end time */
+			expiry_message = string_format("it has exceeded its end time at %f", t->resources_requested->end);
+			expiry_reason = VINE_RESULT_MAX_END_TIME;
+		} else if (t->needs_library && !hash_table_lookup(q->library_templates, t->needs_library)) {
+			/* check if the task does not match any library */
+			expiry_message = string_format("it does not match any submitted library named \"%s\"", t->needs_library);
+			expiry_reason = VINE_RESULT_MISSING_LIBRARY;
+		} else if (q->fixed_location_in_queue && t->has_fixed_locations && !vine_schedule_check_fixed_location(q, t)) {
+			/* check if the task has missing fixed location dependencies */
+			expiry_message = string_format("it has missing fixed location dependencies");
+			expiry_reason = VINE_RESULT_FIXED_LOCATION_MISSING;
+		} else if (q->auto_recovery == 0 && !vine_manager_check_inputs_available(q, t)) {
+			/* check if the task has missing input files when q->auto_recovery is not enabled */
+			expiry_message = string_format("it has missing input files");
+			expiry_reason = VINE_RESULT_INPUT_MISSING;
 		}
-		/* check if the task does not match any library */
-		if (t->needs_library && !hash_table_lookup(q->library_templates, t->needs_library)) {
-			debug(D_VINE, "task %d does not match any submitted library named \"%s\"", t->task_id, t->needs_library);
-			vine_task_set_result(t, VINE_RESULT_MISSING_LIBRARY);
+		/* if there is an expiry reason, set the result and state of the task and continue */
+		if (expiry_reason != VINE_RESULT_SUCCESS) {
+			debug(D_VINE, "expiring task %d: %s", t->task_id, expiry_message);
+			vine_task_set_result(t, expiry_reason);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
-			continue;
-		}
-		/* check if the task has missing fixed location dependencies */
-		if (q->fixed_location_in_queue && t->has_fixed_locations && !vine_schedule_check_fixed_location(q, t)) {
-			debug(D_VINE, "Missing fixed_location dependencies for task: %d", t->task_id);
-			vine_task_set_result(t, VINE_RESULT_FIXED_LOCATION_MISSING);
-			change_task_state(q, t, VINE_TASK_RETRIEVED);
+			free(expiry_message);
+			expiry_message = NULL;
 			continue;
 		}
 
-		/* check if the task is runnable and can be scheduled to a worker */
+		/* check if the task is runnable and has a suitable worker */
 		if (consider_task(q, t) && vine_schedule_task_to_worker(q, t)) {
 			push_task_to_ready_tasks(q, t);
 			runnable_tasks++;
@@ -3664,22 +3676,14 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 			result = commit_task_to_worker(q, w, t);
 		}
 
-		switch (result) {
-		case VINE_SUCCESS:
+		/* check if the task was successfully committed */
+		if (result == VINE_SUCCESS) {
+			/* successfully committed the task, keep going.*/
 			committed_tasks++;
-			break;
-		case VINE_APP_FAILURE:
-		case VINE_WORKER_FAILURE:
-			/* failed to dispatch, commit put the task back in the right place. */
-			break;
-		case VINE_MGR_FAILURE:
-			/* special case, commit had a chained failure. */
+		} else {
+			/* failed to commit for whatever reason, demote it to the blocked queue. */
 			debug(D_VINE, "Failed to commit task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
 			list_push_tail(q->blocked_tasks, t);
-			break;
-		case VINE_END_OF_LIST:
-			/* shouldn't happen, keep going */
-			break;
 		}
 
 		/* continue dispatching tasks if q->prefer_dispatch is set */
@@ -4183,6 +4187,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->hungry_minimum = 10;
 	q->hungry_minimum_factor = 2;
+
+	q->auto_recovery = 1;
 
 	q->wait_for_workers = 0;
 	q->max_workers = -1;
@@ -5842,6 +5848,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "immediate-recovery")) {
 		q->immediate_recovery = !!((int)value);
+
+	} else if (!strcmp(name, "auto-recovery")) {
+		q->auto_recovery = !!((int)value);
 
 	} else if (!strcmp(name, "keepalive-interval")) {
 		q->keepalive_interval = MAX(0, (int)value);
