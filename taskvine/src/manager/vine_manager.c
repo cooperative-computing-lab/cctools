@@ -3552,15 +3552,14 @@ static int rotate_blocked_tasks(struct vine_manager *q)
 		return 0;
 	}
 
-	int runnable_tasks = 0;
+	int unblocked_tasks = 0;
 	int tasks_considered = 0;
 	int tasks_to_consider = MIN(list_size(q->blocked_tasks), q->attempt_schedule_depth);
-	struct vine_task *t = NULL;
 
 	double current_time = timestamp_get() / ONE_SECOND;
 
 	while (tasks_considered++ < tasks_to_consider) {
-		t = list_pop_head(q->blocked_tasks);
+		struct vine_task *t = list_pop_head(q->blocked_tasks);
 		if (!t) {
 			break;
 		}
@@ -3598,13 +3597,13 @@ static int rotate_blocked_tasks(struct vine_manager *q)
 		/* check if the task is runnable and has a suitable worker */
 		if (consider_task(q, t) && vine_schedule_task_to_worker(q, t)) {
 			push_task_to_ready_tasks(q, t);
-			runnable_tasks++;
+			unblocked_tasks++;
 		} else {
 			list_push_tail(q->blocked_tasks, t);
 		}
 	}
 
-	return runnable_tasks;
+	return unblocked_tasks;
 }
 
 /*
@@ -3641,7 +3640,9 @@ static int send_one_task(struct vine_manager *q)
 		}
 
 		/* select a worker for the task */
+		q->stats_measure->time_scheduling = timestamp_get();
 		struct vine_worker_info *w = vine_schedule_task_to_worker(q, t);
+		q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
 
 		/* task is runnable but no worker is fit, demote it and consider later */
 		if (!w) {
