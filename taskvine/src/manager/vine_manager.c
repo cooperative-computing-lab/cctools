@@ -897,20 +897,6 @@ void vine_update_catalog(struct vine_manager *m)
 	}
 }
 
-static int file_needs_recovery(struct vine_manager *q, struct vine_file *f)
-{
-	if (!f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
-		return 0;
-	}
-
-	/* Only consider recovery tasks if auto-recovery is enabled. */
-	if (!q->auto_recovery) {
-		return 0;
-	}
-
-	return !vine_file_replica_table_exists_somewhere(q, f->cached_name);
-}
-
 static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info *w)
 {
 	if (!q || !w || hash_table_size(w->current_files) < 1) {
@@ -3436,8 +3422,13 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 		return;
 	}
 
-	/* Return early if the file does not need recovery. */
-	if (!file_needs_recovery(q, lost_file)) {
+	/* Return if auto-recovery is not enabled. */
+	if (!q->auto_recovery) {
+		return;
+	}
+
+	/* Return if the file exists on any worker. */
+	if (vine_file_replica_table_exists_somewhere(q, lost_file->cached_name)) {
 		return;
 	}
 
