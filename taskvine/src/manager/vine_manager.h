@@ -214,7 +214,7 @@ struct vine_manager {
 																	 disconnects. Otherwise, create them only when a tasks needs then as inputs (this is
 																	 the default). */
 	int auto_recovery;            /* If true, automatically recover lost temp files by submitting recovery tasks.
-																	 Otherwise, expire tasks with missing inputs and return to the user */
+																	 Otherwise, expire ineligible tasks and return them to the user */
 	int transfer_temps_recovery;  /* If true, attempt to recover temp files from lost worker to reach threshold required */
 	int transfer_replica_per_cycle;  /* Maximum number of replica to request per temp file per iteration */
 	int temp_replica_count;       /* Number of replicas per temp file */
