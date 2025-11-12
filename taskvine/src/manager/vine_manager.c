@@ -3686,6 +3686,10 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 	{
 		*tasks_ready_left_to_consider -= 1;
 
+		/* remove the task first, because it will either be committed or blocked, both lead to the removal */
+		/* this achieves the same result as constantly peeking at the top, a later PR will update this to use priority_queue_pop */
+		priority_queue_remove(q->ready_tasks, t_idx);
+
 		/* this task is not runnable at all, demote it to the blocked queue */
 		if (!consider_task(q, t)) {
 			list_push_tail(q->blocked_tasks, t);
@@ -3702,8 +3706,6 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 			list_push_tail(q->blocked_tasks, t);
 			continue;
 		}
-
-		priority_queue_remove(q->ready_tasks, t_idx);
 
 		/* do not consider if this worker is running a group task */
 		if (q->task_groups_enabled) {
