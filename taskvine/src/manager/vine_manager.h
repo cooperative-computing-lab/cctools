@@ -137,8 +137,6 @@ struct vine_manager {
 	int next_task_id;       /* Next integer task_id to be assigned to a created task. */
 	int fixed_location_in_queue; /* Number of fixed location tasks currently being managed */
 	int num_tasks_left;    /* Optional: Number of tasks remaining, if given by user.  @ref vine_set_num_tasks */
-	int nothing_happened_last_wait_cycle; /* Set internally in main loop if no messages or tasks were processed during the last wait loop.
-																					 If set, poll longer to avoid wasting cpu cycles, and growing log files unnecessarily.*/
 
 	/* Accumulation of statistics for reporting to the caller. */
 

@@ -3617,7 +3617,7 @@ to run, finding the best worker for that task, and then committing
 the task to the worker.
 */
 
-static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consider)
+static int send_one_task(struct vine_manager *q)
 {
 	/* return early if no committable cores */
 	int committable_cores = vine_schedule_count_committable_cores(q);
@@ -5126,10 +5126,10 @@ static int poll_active_workers(struct vine_manager *q, int stoptime)
 
 	int n = build_poll_table(q);
 
-	// We poll in at most small time segments (of a half a second). This lets
-	// promptly dispatch tasks, while avoiding wasting cpu cycles when the
-	// state of the system cannot be advanced.
-	int msec = q->nothing_happened_last_wait_cycle ? 1000 : 0;
+	/* Make a quick, non-blocking poll to keep the manager busy within its main loop.
+	 * Be aware that some functions may be called excessively, so exercise caution when adding
+	 * debug messages to them, or the log file could be flooded. */
+	int msec = 0;
 
 	if (stoptime) {
 		msec = MIN(msec, (stoptime - time(0)) * 1000);
@@ -5285,7 +5285,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	   - send all libraries to all workers
 	   - replicate temp files
 	   - manager empty?                                           Yes: break
-	   - mark as nothing_happened_last_wait_cycle and go to S
 	*/
 
 	// account for time we spend outside vine_wait
@@ -5316,10 +5315,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 	// used for q->prefer_dispatch. If 0 and there is a task retrieved, then return task to app.
 	int sent_in_previous_cycle = 1;
-
-	// used to set nothing_happened_last_wait_cycle. nothing_happened_last_wait_cycle only set
-	// when tasks_ready_left_to_consider is less than 1.
-	int tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
 
 	// time left?
 	while ((stoptime == 0) || (time(0) < stoptime)) {
@@ -5381,8 +5376,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			continue;
 		}
 
-		q->nothing_happened_last_wait_cycle = 0;
-
 		// Retrieve results from workers. We do a worker at a time to be more efficient.
 		// We get a known worker with results from the first task in the waiting_retrieval_list,
 		// and get as many tasks as possible under the q->max_retrievals constraint.
@@ -5406,8 +5399,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		END_ACCUM_TIME(q, time_receive);
 
 		if (retrieved_this_cycle) {
-			tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
-
 			if (!q->prefer_dispatch) {
 				continue;
 			}
@@ -5424,7 +5415,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			/* rotate blocked tasks before dispatching any */
 			rotate_blocked_tasks(q);
 			/* dispatch one task */
-			result = send_one_task(q, &tasks_ready_left_to_consider);
+			result = send_one_task(q);
 			END_ACCUM_TIME(q, time_send);
 			if (result) {
 				// sent at least one task
@@ -5461,9 +5452,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		result = connect_new_workers(q, stoptime, MAX(q->wait_for_workers, q->max_new_workers));
 		END_ACCUM_TIME(q, time_status_msgs);
 		if (result) {
-			// accepted at least one worker
-			tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
-
 			events++;
 			continue;
 		}
@@ -5501,14 +5489,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			q->time_last_large_tasks_check = current_time;
 			find_max_worker(q);
 			vine_schedule_check_for_large_tasks(q);
-		}
-
-		// if we got here, no events were triggered this time around.
-		// we set the nothing_happened_last_wait_cycle flag so that link_poll waits for some time
-		// the next time around, or return retrieved tasks if there some available.
-		if (tasks_ready_left_to_consider < 1) {
-			q->nothing_happened_last_wait_cycle = 1;
-			tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
 		}
 	}
 
