@@ -3086,6 +3086,11 @@ static vine_result_code_t commit_task_to_worker(struct vine_manager *q, struct v
 
 	count_worker_resources(q, w);
 
+	if (result != VINE_SUCCESS) {
+		debug(D_VINE, "Failed to send task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
+		handle_failure(q, w, t, result);
+	}
+
 	return result;
 }
 
@@ -3676,14 +3681,21 @@ static int send_one_task(struct vine_manager *q)
 			result = commit_task_to_worker(q, w, t);
 		}
 
-		/* check if the task was successfully committed */
-		if (result == VINE_SUCCESS) {
-			/* successfully committed the task, keep going.*/
+		switch (result) {
+		case VINE_SUCCESS:
 			committed_tasks++;
-		} else {
-			/* failed to commit for whatever reason, demote it to the blocked queue. */
-			debug(D_VINE, "Failed to commit task %d to worker %s (%s).", t->task_id, w->hostname, w->addrport);
-			list_push_tail(q->blocked_tasks, t);
+			break;
+		case VINE_APP_FAILURE:
+		case VINE_WORKER_FAILURE:
+			/* failed to dispatch, commit put the task back in the right place. */
+			break;
+		case VINE_MGR_FAILURE:
+			/* special case, the required library instance is somehow missing. */
+			priority_queue_push(q->ready_tasks, t, t->priority);
+			break;
+		case VINE_END_OF_LIST:
+			/* shouldn't happen, keep going */
+			break;
 		}
 
 		/* continue dispatching tasks if q->prefer_dispatch is set */
