@@ -6,7 +6,9 @@
 /* all modes of bucketing */
 typedef enum {
     BUCKETING_MODE_GREEDY,
-    BUCKETING_MODE_EXHAUSTIVE
+    BUCKETING_MODE_EXHAUSTIVE,
+    BUCKETING_MODE_DET_GREEDY,
+    BUCKETING_MODE_DET_EXHAUSTIVE
 } bucketing_mode_t;
 
 /* Bucketing has two operations, add and predict */
