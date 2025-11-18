@@ -1,4 +1,4 @@
-#include "bucketing_greedy.h"
+#include "bucketing_det_greedy.h"
 #include "debug.h"
 #include "xxmalloc.h"
 #include <stdlib.h>
@@ -188,7 +188,7 @@ static int bucketing_compare_break_points(const void *p1, const void *p2)
  * @param break_point empty pointer to be filled
  * @return cost of current break point
  * @return -1 if failure */
-static double bucketing_greedy_policy(bucketing_bucket_range_t *range, int break_index, bucketing_cursor_w_pos_t **break_point)
+static double bucketing_det_greedy_policy(bucketing_bucket_range_t *range, int break_index, bucketing_cursor_w_pos_t **break_point)
 {
 	if (!range) {
 		fatal("No range to apply policy\n");
@@ -249,13 +249,11 @@ static double bucketing_greedy_policy(bucketing_bucket_range_t *range, int break
 		exp_cons_g_break /= total_hi_sig;
 
 	/* Compute individual costs */
-	double cost_lower_hit = p1 * (p1 * (break_val - exp_cons_lq_break));
-	double cost_lower_miss = p1 * (p2 * (max_val - exp_cons_lq_break));
-	double cost_upper_miss = p2 * (p1 * (break_val + max_val - exp_cons_g_break));
-	double cost_upper_hit = p2 * (p2 * (max_val - exp_cons_g_break));
+    double cost_low_cons = p1 * (break_val - exp_cons_lq_break);
+    double const_hi_cons = p2 * (break_val + max_val - exp_cons_g_break);
 
 	/* Compute final cost */
-	double cost = cost_lower_hit + cost_lower_miss + cost_upper_miss + cost_upper_hit;
+	double cost = cost_low_cons + const_hi_cons;
 
 	list_cursor_destroy(iter);
 
@@ -268,7 +266,7 @@ static double bucketing_greedy_policy(bucketing_bucket_range_t *range, int break
  * @return 0 if can break bucket
  * @return 1 if cannot break bucket
  * @return -1 if failure */
-static int bucketing_greedy_break_bucket(bucketing_bucket_range_t *range, bucketing_cursor_w_pos_t **break_point)
+static int bucketing_det_greedy_break_bucket(bucketing_bucket_range_t *range, bucketing_cursor_w_pos_t **break_point)
 {
 	if (!range) {
 		fatal("No range to break\n");
@@ -281,7 +279,7 @@ static int bucketing_greedy_break_bucket(bucketing_bucket_range_t *range, bucket
 
 	/* Loop through all points in range and choose 1 with the lowest cost */
 	for (int i = range->lo->pos; i <= range->hi->pos; ++i) {
-		cost = bucketing_greedy_policy(range, i, &tmp_break_point);
+		cost = bucketing_det_greedy_policy(range, i, &tmp_break_point);
 		if (cost == -1) {
 			fatal("Problem computing cost\n");
 			return -1;
@@ -345,7 +343,7 @@ static struct list *bucketing_det_greedy_find_break_points(bucketing_state_t *s)
 
 	bucketing_bucket_range_t *lo_bucket_range; // create low bucket, if possible
 	bucketing_bucket_range_t *hi_bucket_range; // create high bucket, if possible
-	bucketing_cursor_w_pos_t *break_point = 0; // store break point betweem high and low buckets
+	bucketing_cursor_w_pos_t *break_point = 0; // store break point between high and low buckets
 	bucketing_bucket_range_t *bbr_ptr = 0;	   // pointer to a bucket in bucket_range_list
 
 	struct list_cursor *lc = list_cursor_create(bucket_range_list);
@@ -363,7 +361,7 @@ static struct list *bucketing_det_greedy_find_break_points(bucketing_state_t *s)
 			return 0;
 		}
 
-		breakable = bucketing_greedy_break_bucket(bbr_ptr, &break_point);
+		breakable = bucketing_det_greedy_break_bucket(bbr_ptr, &break_point);
 
 		/* If bucket is breakable, break it. Else do nothing */
 		if (breakable == 0) {
@@ -475,59 +473,10 @@ void bucketing_det_greedy_update_buckets(bucketing_state_t *s)
 		return;
 	}
 
-	/* Find probabilities of buckets */
-	double bucket_probs[list_size(break_point_list)]; // store probabilities of buckets
-	list_first_item(s->sorted_points);
-	list_first_item(break_point_list);
-	bucketing_point_t *tmp_point;		   // pointer to item in s->sorted_points
 	bucketing_cursor_w_pos_t *tmp_break_point; // pointer pointing to item in break point list
-	int i = 0;
-	bucket_probs[0] = 0;
-	double total_sig = 0; // track total significance
-
-	if (!(tmp_point = list_next_item(s->sorted_points))) {
-		fatal("bucketing: cannot get tmp point\n");
-		return;
-	}
-
-	if (!(tmp_break_point = list_next_item(break_point_list))) {
-		fatal("bucketing: cannot get tmp break point\n");
-		return;
-	}
-	bucketing_point_t *tmp_point_of_break_point = 0;
-	if (!list_get(tmp_break_point->lc, (void **)&tmp_point_of_break_point)) {
-		fatal("Cannot get item from list\n");
-		return;
-	}
-
-	/* loop to compute buckets' probabilities */
-	while (tmp_point) {
-
-		if (tmp_point->val <= tmp_point_of_break_point->val) {
-			bucket_probs[i] += tmp_point->sig;
-			total_sig += tmp_point->sig;
-			tmp_point = list_next_item(s->sorted_points);
-		} else {
-
-			++i;
-			bucket_probs[i] = 0;
-			tmp_break_point = list_next_item(break_point_list);
-			if (!list_get(tmp_break_point->lc, (void **)&tmp_point_of_break_point)) {
-				fatal("Cannot get item from list\n");
-				return;
-			}
-		}
-	}
-
-	/* must divide by total significance to normalize to [0, 1] */
-	for (int i = 0; i < list_size(break_point_list); ++i) {
-		bucket_probs[i] /= total_sig;
-	}
-
-	bucketing_bucket_t *tmp_bucket;	      // pointer to a created bucket
 	bucketing_point_t *tmp_point_ptr = 0; // pointer to what tmp_break_point->lc points
+	bucketing_bucket_t *tmp_bucket;	      // pointer to a created bucket
 	list_first_item(break_point_list);    // reset to beginning of break point list
-	i = 0;
 
 	/* Loop through list of break points */
 	while ((tmp_break_point = list_next_item(break_point_list))) {
@@ -536,7 +485,8 @@ void bucketing_det_greedy_update_buckets(bucketing_state_t *s)
 			return;
 		}
 
-		tmp_bucket = bucketing_bucket_create(tmp_point_ptr->val, bucket_probs[i]);
+        // in deterministic greedy, buckets don't have probabilities, so -1 is used as a filler
+		tmp_bucket = bucketing_bucket_create(tmp_point_ptr->val, -1);
 		if (!tmp_bucket) {
 			fatal("Cannot create bucket\n");
 			return;
@@ -546,13 +496,11 @@ void bucketing_det_greedy_update_buckets(bucketing_state_t *s)
 			fatal("Cannot push tmp bucket to sorted buckets\n");
 			return;
 		}
-		++i;
 	}
 
 	/* Delete break point list */
 	bucketing_cursor_pos_list_clear(break_point_list, bucketing_cursor_w_pos_delete);
 
 	list_delete(break_point_list);
-
 	return;
 }
