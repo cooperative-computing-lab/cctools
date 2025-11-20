@@ -654,7 +654,9 @@ void *list_remove_item(struct list *list)
 {
 	void *item = NULL;
 	list_get(list->iter, &item);
-	if(item) list_drop(list->iter);
+	if (item) {
+		list_drop(list->iter);
+	}
 	return item;
 }
 
