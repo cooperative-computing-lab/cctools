@@ -437,3 +437,21 @@ void bucketing_sorted_points_print(struct list *l)
 }
 
 /** End: debug functions **/
+
+/** Begin: test helper functions **/
+void get_bucketing_sorted_buckets_values(struct list *l, double* vals, int limit)
+{
+	if (!l)
+		return;
+	bucketing_bucket_t *tmp;
+	list_first_item(l);
+	int i = 0;
+	while ((tmp = list_next_item(l))) {
+        *(vals+i) = tmp->val;
+		++i;
+        if (i == limit) {
+            break;
+        }
+	}
+}
+/** End: test helper functions **/

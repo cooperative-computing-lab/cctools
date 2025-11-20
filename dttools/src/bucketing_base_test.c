@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <assert.h>
 #include <string.h>
 #include "bucketing_greedy.h"
 #include "bucketing_exhaust.h"
@@ -67,9 +68,24 @@ int main(int argc, char** argv)
     printf("Adding values\n");
     for (int i = 0; i < iters; ++i)
     {
-        num = num * multiple % prime;
         bucketing_sorted_points_print(s->sorted_points);
         bucketing_sorted_buckets_print(s->sorted_buckets);
+
+        // Manually verified tests
+        // This is true for greedy, det-greedy, exhaust, and det-exhaust
+        int test_iter = 10;
+        if (i == test_iter) {
+            int max_num_buckets = 10; // 10 is the maximum number of buckets possible at this point
+            double buckets_vals[max_num_buckets];
+
+            double test_vals[2] = {2000, 4000};
+            get_bucketing_sorted_buckets_values(s->sorted_buckets, buckets_vals, max_num_buckets);
+
+            assert(buckets_vals[0] == test_vals[0]);
+            assert(buckets_vals[1] == test_vals[1]);
+        }
+        
+        num = num * multiple % prime;
         printf("iteration %d data value %d\n", i, num);
         while ((pred = bucketing_predict(s, prev_val)))
         {
@@ -92,13 +108,6 @@ int main(int argc, char** argv)
 
         bucketing_add(s, num);
         alloc = 0;
-        //printf("value added\n");
-        //if (i >= num_sampling_points - 1)
-        //{
-            //printf("Finding buckets\n");
-        //    bucketing_greedy_update_buckets(s);
-        //}
-        //printf("Sorted list length %d\n", list_length(s->sorted_points));
         printf("----------------------------------\n");
     }
     bucketing_state_delete(s);

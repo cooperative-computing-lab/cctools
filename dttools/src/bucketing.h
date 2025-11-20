@@ -164,4 +164,13 @@ void bucketing_sorted_points_print(struct list* l);
 
 /** End: debug functions **/
 
+/** Begin: test helper functions **/
+
+/* Dump the values of all buckets at the moment
+ * @param l the list of points
+ * @param vals the pointer to an array of values to be filled
+ * @param limit the size of the array above */
+void get_bucketing_sorted_buckets_values(struct list *l, double* vals, int limit);
+
+/** End: test helper functions **/
 #endif
