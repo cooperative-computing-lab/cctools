@@ -87,6 +87,9 @@ struct vine_process *vine_process_create(struct vine_task *task, vine_process_ty
 	p->task = task;
 	p->type = type;
 
+	/* Invalid pid indicating that this process has not yet started. */
+	p->pid = 0;
+	
 	const char *dirtype = vine_process_sandbox_code(p->type);
 
 	p->sandbox = string_format("%s/%s.%d", workspace->workspace_dir, dirtype, p->task->task_id);
@@ -423,6 +426,11 @@ int vine_process_is_complete(struct vine_process *p)
 		return 0;
 	}
 
+	/* Invalid pid means the process was never started. */
+	if (p->pid==0) {
+		return 0;
+	}
+	
 	/* But any other type of process is done when the Unix process completes. */
 	int status;
 	int result = wait4(p->pid, &status, WNOHANG, &p->rusage);
@@ -446,6 +454,11 @@ int vine_process_wait(struct vine_process *p)
 		return 0;
 	}
 
+	/* Invalid pid means the process was never started. */
+	if (p->pid==0) {
+		return 0;
+	}
+	
 	while (1) {
 		int status;
 		pid_t pid = waitpid(p->pid, &status, 0);
@@ -524,6 +537,12 @@ void vine_process_kill(struct vine_process *p)
 		return;
 	}
 
+	/* If vine_process_executed was never called, p->pid will be invalid. */
+	if (p->pid==0) {
+		debug(D_VINE, "task %d was never started", p->task->task_id);
+		return;
+	}
+	
 	// make sure a few seconds have passed since child process was created to avoid sending a signal
 	// before it has been fully initialized. Else, the signal sent to that process gets lost.
 	timestamp_t elapsed_time_execution_start = timestamp_get() - p->execution_start;
