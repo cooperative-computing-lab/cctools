@@ -5532,7 +5532,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// if we got here, no events were triggered this time around.
 		// we set the nothing_happened_last_wait_cycle flag so that link_poll waits for some time
 		// the next time around, or return retrieved tasks if there some available.
-		if (tasks_ready_left_to_consider < 1) {
+		if (tasks_ready_left_to_consider < 1 && retrieved_this_cycle < 1) {
 			q->nothing_happened_last_wait_cycle = 1;
 			tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
 		}
