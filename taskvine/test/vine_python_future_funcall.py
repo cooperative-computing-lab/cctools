@@ -27,9 +27,8 @@ def failure():
 
 
 def main():
-    executor = vine.FuturesExecutor(
-        port=[9123, 9129], manager_name="test-executor", factory=False
-    )
+    executor = vine.FuturesExecutor(port=0,factory=False)
+    
     print("listening on port {}".format(executor.port))
     with open(port_file, "w") as f:
         f.write(str(executor.port))
