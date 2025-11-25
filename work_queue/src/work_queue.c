@@ -4601,12 +4601,14 @@ static int send_one_task_aux( struct work_queue *q,  struct list_cursor *cur, do
 {
 	struct work_queue_task *t;
 
+	// dividing attempt_schedule_depth by 2 so that priority and starvation cursor get the same
+	// amount of tasks.
 	int tasks_to_consider = MIN(MAX(1, q->attempt_schedule_depth/2), list_size(q->ready_list));
 	int tasks_considered = 0;
 	int task_committed = 0;
 
 	for (
-			list_seek(cur, 0);
+			;
 			list_get(cur, (void **) &t) && tasks_considered <= tasks_to_consider;
 			list_next(cur), tasks_considered++) {
 		if (retrieved_expired_task(q, t, now)) {
@@ -4628,16 +4630,24 @@ static int send_one_task( struct work_queue *q )
 {
 	double now = ((double) timestamp_get()) / ONE_SECOND;
 
-	int task_committed = 0;
-
-	struct list_cursor *cur = q->ready_priority_cr;
-	task_committed = send_one_task_aux(q, cur, now);
-
-	if (task_committed) {
+	list_seek(q->ready_priority_cr, 0);
+	if(send_one_task_aux(q, q->ready_priority_cr, now)) {
+		/* we were able to schedule by priority, thus we can bring back
+		 * the starvation fallback. */
+		list_reset(q->ready_starve_cr);
 		return 1;
+	} else {
+		/* if the current ready_starve_cr position is invalid,
+		 * then we move it to the task next to the last that we check by priority.
+		 */
+		struct work_queue_task *dummy;
+		if (!list_get(q->ready_starve_cr, (void **) &dummy)) {
+			list_cursor_move(q->ready_starve_cr, q->ready_priority_cr);
+			list_next(q->ready_starve_cr);
+		}
 	}
 
-	return task_committed;
+	return send_one_task_aux(q, q->ready_starve_cr, now);
 }
 
 static void print_large_tasks_warning(struct work_queue *q)
