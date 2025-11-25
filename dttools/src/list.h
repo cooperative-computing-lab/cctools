@@ -125,6 +125,13 @@ struct list_cursor *list_cursor_create(struct list *list);
  */
 void list_cursor_destroy(struct list_cursor *cur);
 
+/** Move dest cursor to the position of src cursor.
+ * @param dest The cursor to move.
+ * @param src The cursor that indicated the target position.
+ * @returns A pointer to a new cursor.
+ */
+void list_cursor_move(struct list_cursor *dest, struct list_cursor *src);
+
 /** Get a copy of an existing cursor.
  * The returned cursor is independent from the original, but initially
  * sits at the same position.

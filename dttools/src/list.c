@@ -141,6 +141,18 @@ void list_reset(struct list_cursor *cur)
 	cur->target = NULL;
 }
 
+void list_cursor_move(struct list_cursor *dest, struct list_cursor *src)
+{
+	assert(dest);
+	assert(src);
+
+	list_reset(dest);
+	if (src->target) {
+		dest->target = src->target;
+		list_item_ref(dest->target);
+	}
+}
+
 void list_cursor_destroy(struct list_cursor *cur)
 {
 	assert(cur);
