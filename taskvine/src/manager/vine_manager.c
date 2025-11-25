@@ -3185,7 +3185,7 @@ static vine_result_code_t commit_task_group_to_worker(struct vine_manager *q, st
 	do {
 
 		if (counter && (result == VINE_SUCCESS)) {
-			int t_idx = priority_queue_find_idx(q->ready_tasks, t);
+			int t_idx = priority_queue_find_idx_by_priority(q->ready_tasks, t->manager_priority, t->user_priority, (-1 * t->task_id));
 			priority_queue_remove(q->ready_tasks, t_idx);
 			// decrement refcount
 			vine_task_delete(t);
@@ -3698,7 +3698,7 @@ static int send_one_task(struct vine_manager *q, int *tasks_ready_left_to_consid
 				break;
 			case VINE_MGR_FAILURE:
 				/* special case, commit had a chained failure. */
-				priority_queue_push(q->ready_tasks, t, t->priority);
+				priority_queue_push(q->ready_tasks, t, t->manager_priority, t->user_priority, t->task_id);
 				break;
 			case VINE_END_OF_LIST:
 				/* shouldn't happen, keep going */
@@ -3999,7 +3999,7 @@ static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vin
 		break;
 
 	case VINE_TASK_READY:
-		t_idx = priority_queue_find_idx(q->ready_tasks, t);
+		t_idx = priority_queue_find_idx_by_priority(q->ready_tasks, t->manager_priority, t->user_priority, (-1 * t->task_id));
 		priority_queue_remove(q->ready_tasks, t_idx);
 		change_task_state(q, t, new_state);
 		break;
@@ -4136,7 +4136,10 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->next_task_id = 1;
 	q->fixed_location_in_queue = 0;
 
-	q->ready_tasks = priority_queue_create(0);
+	/* Each tasks has two priority. First is the priority that taskvine itself assigns and
+	it is always VINE_PRIORITY_DEFAULT under normal operation. The second is the one the
+	user assigns. The third priority is unused and set to 0.0. */
+	q->ready_tasks = priority_queue_create(0, 3);
 	q->running_table = itable_create(0);
 	q->waiting_retrieval_list = list_create();
 	q->retrieved_list = list_create();
@@ -4677,16 +4680,18 @@ char *vine_monitor_wrap(struct vine_manager *q, struct vine_worker_info *w, stru
 
 static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t)
 {
-	if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
-		/* when a task is resubmitted given resource exhaustion, we
-		 * increment its priority by 1, so it gets to run as soon
-		 * as possible among those with the same priority. This avoids
-		 * the issue in which all 'big' tasks fail because the first
-		 * allocation is too small. */
-		priority_queue_push(q->ready_tasks, t, t->priority + 1);
-	} else {
-		priority_queue_push(q->ready_tasks, t, t->priority);
+	/* when a task is resubmitted given resource exhaustion, or as a recovery task,
+	its priority is increased by one level to allow them to run as soon as possible. */
+
+	if (t->type == VINE_TASK_TYPE_RECOVERY) {
+		t->manager_priority = VINE_PRIORITY_RECOVERY;
+	} else if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
+		t->manager_priority = VINE_PRIORITY_EXHAUSTION;
 	}
+
+	/* priority of the task is determined by manager, user, and negative task id so that older tasks are run first in case of a tie. */
+	/* since task id is unique, this means that a task can be found efficiently in q->ready_tasks using priority_queue_find_idx_by_priority(). */
+	priority_queue_push(q->ready_tasks, t, t->manager_priority, t->user_priority, -1 * t->task_id);
 
 	/* If the task has been used before, clear out accumulated state. */
 	vine_task_clean(t);
@@ -4870,17 +4875,6 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 	/* Issue warnings if the files are set up strangely. */
 	vine_task_check_consistency(t);
-
-	/* The goal of a recovery task is to reproduce a lost temp file, which serves as input to another task.
-	 * Recovery tasks should therefore be prioritized ahead of all other tasks.
-	 * If a recovery task is not runnable due to its own missing inputs, we submit additional recovery tasks to restore those files.
-	 * Each of these later-submitted recovery tasks is assigned a higher priority than all currently existing tasks,
-	 * so they are considered first. This ensures that the most recent recovery tasks have the best chance to run and succeed.
-	 * Additionally, we incorporate the priority of the original task, so not all recovery tasks receive the same priority,
-	 * this distinction is important when many files are lost and the workflow is effectively rerun from scratch. */
-	if (t->type == VINE_TASK_TYPE_RECOVERY) {
-		vine_task_set_priority(t, t->priority + priority_queue_get_top_priority(q->ready_tasks) + 1);
-	}
 
 	if (t->has_fixed_locations) {
 		q->fixed_location_in_queue++;
