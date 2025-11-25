@@ -4574,50 +4574,57 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	count_worker_resources(q, w);
 }
 
+static int send_one_task_aux( struct work_queue *q,  struct work_queue_task *t,  double now )
+{
+	// Skip task if min requested start time not met.
+	if(t->resources_requested->start > now) {
+		return 0;
+	}
+
+	// Skip this task if its category is currently full
+	struct category *c = work_queue_category_lookup_or_create(q, t->category);
+	if (c->max_concurrent > -1 && c->max_concurrent < c->wq_stats->tasks_running) {
+		return 0;
+	}
+
+	// Skip this task if we did not find a worker to run it
+	struct work_queue_worker *w = find_best_worker(q, t);
+	if(!w) {
+		return 0;
+	}
+
+	commit_task_to_worker(q, w, t);
+	return 1;
+}
+
 static int send_one_task( struct work_queue *q )
 {
 	struct work_queue_task *t;
-	struct work_queue_worker *w;
 
 	int tasks_considered = 0;
-	timestamp_t now = timestamp_get() / ONE_SECOND;
+	int tasks_to_consider = MIN(q->attempt_schedule_depth, list_size(q->ready_list));
+	double now = ((double) timestamp_get()) / ONE_SECOND;
+
+	int task_committed = 0;
 
 	while( (t = list_rotate(q->ready_list)) ) {
-		if(tasks_considered++ > q->attempt_schedule_depth) {
-			return 0;
+		if(tasks_considered++ > tasks_to_consider) {
+			break;
 		}
 
-		// Skip task if min requested start time not met.
-		if(t->resources_requested->start > now) {
-			continue;
-		}
-
-		// Skip this task if it's end time expired, or it reached the maximum retry count.
 		if (retrieved_expired_task(q, t, now)) {
-			continue;
-		}
-		
-
-		struct category *c = work_queue_category_lookup_or_create(q, t->category);
-		if (c->max_concurrent > -1 && c->max_concurrent < c->wq_stats->tasks_running) {
+			list_pop_tail(q->ready_list);
 			continue;
 		}
 
-		// Find the best worker for the task at the head of the list
-		w = find_best_worker(q,t);
-
-		if(!w) {
-			continue;
+		if(send_one_task_aux(q, t, now)) {
+			list_pop_tail(q->ready_list);
+			task_committed = 1;
+			break;
 		}
-
-		// Otherwise, remove it from the ready list and start it:
-		list_pop_tail(q->ready_list);
-		commit_task_to_worker(q,w,t);
-		return 1;
 	}
 
-	// if we made it here we reached the end of the list
-	return 0;
+	return task_committed;
 }
 
 static void print_large_tasks_warning(struct work_queue *q)
