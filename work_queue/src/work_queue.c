@@ -4597,10 +4597,11 @@ static int try_to_commit_task( struct work_queue *q,  struct work_queue_task *t,
 	return 1;
 }
 
-static int send_one_task_aux( struct work_queue *q,  struct list_cursor *cur, int tasks_to_consider, double now )
+static int send_one_task_aux( struct work_queue *q,  struct list_cursor *cur, double now )
 {
 	struct work_queue_task *t;
 
+	int tasks_to_consider = MIN(MAX(1, q->attempt_schedule_depth/2), list_size(q->ready_list));
 	int tasks_considered = 0;
 	int task_committed = 0;
 
@@ -4625,13 +4626,16 @@ static int send_one_task_aux( struct work_queue *q,  struct list_cursor *cur, in
 
 static int send_one_task( struct work_queue *q )
 {
-	int tasks_to_consider = MIN(q->attempt_schedule_depth, list_size(q->ready_list));
 	double now = ((double) timestamp_get()) / ONE_SECOND;
 
 	int task_committed = 0;
 
 	struct list_cursor *cur = q->ready_priority_cr;
-	task_committed = send_one_task_aux(q, cur, tasks_to_consider, now);
+	task_committed = send_one_task_aux(q, cur, now);
+
+	if (task_committed) {
+		return 1;
+	}
 
 	return task_committed;
 }
