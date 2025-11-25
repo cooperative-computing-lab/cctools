@@ -161,6 +161,11 @@ struct work_queue {
 	struct itable *task_state_map;  // taskid -> state
 	struct list   *ready_list;      // ready to be sent to a worker
 
+	struct list_cursor *ready_priority_cr;	// cursor that iterates ready_list from head every time.
+	struct list_cursor *ready_starve_cr;	// cursor that iterates ready_list, reseting only when a
+											// task pointed by ready_priority is scheduled.
+											// This avoid task starvation.
+
 	struct hash_table *worker_table;
 	struct hash_table *worker_blocklist;
 	struct itable  *worker_task_map;
@@ -1993,31 +1998,19 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	return;
 }
 
-static int expire_waiting_tasks(struct work_queue *q)
+static int retrieved_expired_task(struct work_queue *q, struct work_queue_task *t, double current_time)
 {
-	struct work_queue_task *t;
-	int expired = 0;
-
-	int tasks_considered = 0;
-	double current_time = timestamp_get() / ONE_SECOND;
-	while( (t = list_rotate(q->ready_list)) ) {
-		if(tasks_considered > q->attempt_schedule_depth) {
-			return expired;
-		}
-		if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
-			update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
-			change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
-			expired++;
-			list_pop_tail(q->ready_list);
-		} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
-			update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
-			change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
-			expired++;
-			list_pop_tail(q->ready_list);
-		}
-		tasks_considered++;
+	if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
+		update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
+		change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
+		return 1;
+	} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
+		update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
+		change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
+		return 1;
 	}
-	return expired;
+
+	return 0;
 }
 
 
@@ -4587,7 +4580,7 @@ static int send_one_task( struct work_queue *q )
 	struct work_queue_worker *w;
 
 	int tasks_considered = 0;
-	timestamp_t now = timestamp_get();
+	timestamp_t now = timestamp_get() / ONE_SECOND;
 
 	while( (t = list_rotate(q->ready_list)) ) {
 		if(tasks_considered++ > q->attempt_schedule_depth) {
@@ -4598,6 +4591,12 @@ static int send_one_task( struct work_queue *q )
 		if(t->resources_requested->start > now) {
 			continue;
 		}
+
+		// Skip this task if it's end time expired, or it reached the maximum retry count.
+		if (retrieved_expired_task(q, t, now)) {
+			continue;
+		}
+		
 
 		struct category *c = work_queue_category_lookup_or_create(q, t->category);
 		if (c->max_concurrent > -1 && c->max_concurrent < c->wq_stats->tasks_running) {
@@ -5878,6 +5877,8 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->next_taskid = 1;
 
 	q->ready_list = list_create();
+	q->ready_priority_cr = list_cursor_create(q->ready_list);
+	q->ready_starve_cr = list_cursor_create(q->ready_list);
 
 	q->tasks          = itable_create(0);
 	q->task_state_map = itable_create(0);
@@ -6209,6 +6210,8 @@ void work_queue_delete(struct work_queue *q)
 		hash_table_clear(q->categories, (void *)category_free);
 		hash_table_delete(q->categories);
 
+		list_cursor_destroy(q->ready_priority_cr);
+		list_cursor_destroy(q->ready_starve_cr);
 		list_delete(q->ready_list);
 
 		itable_delete(q->tasks);
@@ -6957,7 +6960,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
    - send keepalives to appropriate workers
    - fast-abort workers
    - if new workers, connect n of them
-   - expired tasks?                          Yes: mark expired tasks as retrieved and go to S.
    - queue empty?                            Yes: return null
    - go to S
 */
@@ -7039,17 +7041,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		END_ACCUM_TIME(q, time_receive);
 		if(result) {
 			// retrieved at least one task
-			events++;
-			compute_manager_load(q, 1);
-			continue;
-		}
-
-		// expired tasks
-		BEGIN_ACCUM_TIME(q, time_internal);
-		result = expire_waiting_tasks(q);
-		END_ACCUM_TIME(q, time_internal);
-		if(result) {
-			// expired at least one task
 			events++;
 			compute_manager_load(q, 1);
 			continue;
