@@ -367,7 +367,6 @@ void *list_find(struct list *list, list_op_t cmp, const void *arg);
 
 /** Remove an item from the list
 This function searches the list for the item pointed to by value and removes it.
-If you are iterating over a list, use @ref list_remove_item instead.
 @param list The list to search
 @param value The item to remove
 @return The removed item.
@@ -414,15 +413,6 @@ This function removes the item pointed to by
 the internal iterator, and returns it.
 @param list The list to traverse.
 @return The object removed from the current iterator position, NULL if at end of list.
-*/
-
-void *list_remove_item(struct list *list);
-
-/** Apply a function to a list.
-Invokes op on every member of the list.
-@param list The list to operate on.
-@param op The operator to apply.
-@param arg An optional parameter to send to op.
 */
 
 int list_iterate(struct list *list, list_op_t op, const void *arg);
