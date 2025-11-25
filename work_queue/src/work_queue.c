@@ -4597,7 +4597,13 @@ static int try_to_commit_task( struct work_queue *q,  struct work_queue_task *t,
 	return 1;
 }
 
-static int send_one_task_aux( struct work_queue *q,  struct list_cursor *cur, double now )
+/*
+Search for a task to send starting from the given cursor position.
+Checks up to attempt_schedule_depth/2 tasks for a valid assignment.
+Expired tasks are removed as we encounter them.
+Returns 1 if a task was successfully committed to a worker, 0 otherwise.
+*/
+static int search_and_send_task_from_cursor( struct work_queue *q,  struct list_cursor *cur, double now )
 {
 	struct work_queue_task *t;
 
@@ -4607,18 +4613,19 @@ static int send_one_task_aux( struct work_queue *q,  struct list_cursor *cur, do
 	int tasks_considered = 0;
 	int task_committed = 0;
 
-	for (
-			;
-			list_get(cur, (void **) &t) && tasks_considered <= tasks_to_consider;
-			list_next(cur), tasks_considered++) {
+	while (list_get(cur, (void **) &t)) {
 		if (retrieved_expired_task(q, t, now)) {
-			list_drop(cur);
-			continue;
-		}
-
-		if(try_to_commit_task(q, t, now)) {
-			list_drop(cur);
+			list_remove_here(cur);
+			list_next(cur);
+		} else if(try_to_commit_task(q, t, now)) {
+			list_remove_here(cur);
 			task_committed = 1;
+			break;
+		}
+		list_next(cur);
+
+		tasks_considered++;
+		if (tasks_considered >= tasks_to_consider) {
 			break;
 		}
 	}
@@ -4626,28 +4633,48 @@ static int send_one_task_aux( struct work_queue *q,  struct list_cursor *cur, do
 	return task_committed;
 }
 
+/*
+Send one task to an available worker using a two-cursor strategy to balance
+priority scheduling with starvation avoidance:
+
+1. ready_priority_cr: Always starts from the head of the list (highest priority).
+   This cursor searches for high-priority tasks that can be scheduled.
+
+2. ready_starve_cr: A starvation fallback cursor that persists across wait loop.
+   This cursor continues from where it left off in previous calls, ensuring
+   that lower-priority tasks eventually get scheduled even when high-priority
+   cannot be scheduled.
+
+First, try to schedule a task starting from the head (priority cursor).
+If we successfully schedule a high-priority task, reset the starvation cursor
+back to the beginning, since we're making progress on the priority queue.
+If we fail to schedule from the priority cursor (no workers available for
+those tasks), fall back to the starvation cursor to search further down the list.
+The starvation cursor "remembers" where it left off, so lower-priority tasks
+don't get starved.
+*/
 static int send_one_task( struct work_queue *q )
 {
 	double now = ((double) timestamp_get()) / ONE_SECOND;
 
 	list_seek(q->ready_priority_cr, 0);
-	if(send_one_task_aux(q, q->ready_priority_cr, now)) {
+	if(search_and_send_task_from_cursor(q, q->ready_priority_cr, now)) {
 		/* we were able to schedule by priority, thus we can bring back
 		 * the starvation fallback. */
 		list_reset(q->ready_starve_cr);
 		return 1;
-	} else {
-		/* if the current ready_starve_cr position is invalid,
-		 * then we move it to the task next to the last that we check by priority.
-		 */
-		struct work_queue_task *dummy;
-		if (!list_get(q->ready_starve_cr, (void **) &dummy)) {
-			list_cursor_move(q->ready_starve_cr, q->ready_priority_cr);
-			list_next(q->ready_starve_cr);
-		}
 	}
 
-	return send_one_task_aux(q, q->ready_starve_cr, now);
+	/* if the current ready_starve_cr position is invalid,
+		* then we move it to the task next to the last that we check by priority.
+		*/
+	struct work_queue_task *dummy;
+	if (!list_get(q->ready_starve_cr, (void **) &dummy)) {
+		list_cursor_move(q->ready_starve_cr, q->ready_priority_cr);
+		list_next(q->ready_starve_cr);
+	}
+
+	return search_and_send_task_from_cursor(q, q->ready_starve_cr, now);
 }
 
 static void print_large_tasks_warning(struct work_queue *q)

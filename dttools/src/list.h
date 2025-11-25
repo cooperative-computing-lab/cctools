@@ -54,6 +54,7 @@ transparently modify the linker namespace we are using.
 #define list_cursor_create		cctools_list_cursor_create
 #define list_cursor_destroy		cctools_list_cursor_destroy
 #define list_cursor_clone		cctools_list_cursor_clone
+#define list_cursor_move		cctools_list_cursor_move
 #define list_reset			cctools_list_reset
 #define list_seek			cctools_list_seek
 #define list_tell			cctools_list_tell
@@ -424,6 +425,15 @@ This function removes the item pointed to by
 the internal iterator, and returns it.
 @param list The list to traverse.
 @return The object removed from the current iterator position, NULL if at end of list.
+*/
+void *list_remove_item(struct list *list);
+
+/** Apply a function to a list. 
+Invokes op on every member of the list.
+@param list The list to operate on.
+@param op The operator to apply.
+@param arg An optional parameter to send to op.
+@return 1 if all items were processed successfully, 0 otherwise.
 */
 
 int list_iterate(struct list *list, list_op_t op, const void *arg);
