@@ -141,6 +141,18 @@ void list_reset(struct list_cursor *cur)
 	cur->target = NULL;
 }
 
+void list_cursor_move(struct list_cursor *dest, struct list_cursor *src)
+{
+	assert(dest);
+	assert(src);
+
+	list_reset(dest);
+	if (src->target) {
+		dest->target = src->target;
+		list_item_ref(dest->target);
+	}
+}
+
 void list_cursor_destroy(struct list_cursor *cur)
 {
 	assert(cur);
@@ -267,7 +279,7 @@ bool list_seek(struct list_cursor *cur, int index)
 	return true;
 }
 
-bool list_drop(struct list_cursor *cur)
+bool list_remove_here(struct list_cursor *cur)
 {
 	assert(cur);
 	assert(cur->list);
@@ -355,7 +367,7 @@ struct list *list_splice(struct list *top, struct list *bottom)
 
 	for (list_seek(cur_bot, 0); list_get(cur_bot, &item); list_next(cur_bot)) {
 		list_insert(cur_top, item);
-		list_drop(cur_bot);
+		list_remove_here(cur_bot);
 	}
 
 	list_cursor_destroy(cur_bot);
@@ -392,7 +404,7 @@ struct list *list_split(struct list *l, list_op_t comparator, const void *arg)
 		struct list_cursor *end = list_cursor_create(out);
 		list_insert(end, item);
 		list_cursor_destroy(end);
-		list_drop(cur);
+		list_remove_here(cur);
 		list_next(cur);
 	}
 
@@ -408,7 +420,7 @@ void list_delete(struct list *l)
 	struct list_cursor *cur = list_cursor_create(l);
 	list_seek(cur, 0);
 	do {
-		list_drop(cur);
+		list_remove_here(cur);
 	} while (list_next(cur));
 	list_cursor_destroy(cur);
 
@@ -460,7 +472,7 @@ void *list_pop_head(struct list *l)
 	struct list_cursor *cur = list_cursor_create(l);
 	list_seek(cur, 0);
 	list_get(cur, &item);
-	list_drop(cur);
+	list_remove_here(cur);
 	list_cursor_destroy(cur);
 
 	return item;
@@ -476,7 +488,7 @@ void *list_pop_tail(struct list *l)
 	struct list_cursor *cur = list_cursor_create(l);
 	list_seek(cur, -1);
 	list_get(cur, &item);
-	list_drop(cur);
+	list_remove_here(cur);
 	list_cursor_destroy(cur);
 
 	return item;
@@ -576,7 +588,7 @@ void *list_remove(struct list *l, const void *value)
 	for (list_seek(cur, 0); list_get(cur, &item); list_next(cur)) {
 		if (value == item) {
 			out = item;
-			ok = list_drop(cur);
+			ok = list_remove_here(cur);
 			assert(ok);
 			break;
 		}
@@ -668,7 +680,7 @@ void *list_remove_item(struct list *list)
 	void *item = NULL;
 	list_get(list->iter, &item);
 	if (item) {
-		list_drop(list->iter);
+		list_remove_here(list->iter);
 	}
 	return item;
 }
@@ -702,7 +714,7 @@ struct list *list_sort(struct list *list, int (*comparator)(const void *, const 
 	array = malloc(size * sizeof(*array));
 
 	while (list_get(cur, &array[i])) {
-		list_drop(cur);
+		list_remove_here(cur);
 		list_next(cur);
 		i++;
 	}

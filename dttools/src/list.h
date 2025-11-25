@@ -54,6 +54,7 @@ transparently modify the linker namespace we are using.
 #define list_cursor_create		cctools_list_cursor_create
 #define list_cursor_destroy		cctools_list_cursor_destroy
 #define list_cursor_clone		cctools_list_cursor_clone
+#define list_cursor_move		cctools_list_cursor_move
 #define list_reset			cctools_list_reset
 #define list_seek			cctools_list_seek
 #define list_tell			cctools_list_tell
@@ -61,6 +62,7 @@ transparently modify the linker namespace we are using.
 #define list_prev			cctools_list_prev
 #define list_get			cctools_list_get
 #define list_set			cctools_list_set
+#define list_remove_here		cctools_list_remove_here
 #define list_drop			cctools_list_drop
 #define list_insert			cctools_list_insert
 
@@ -124,6 +126,13 @@ struct list_cursor *list_cursor_create(struct list *list);
  * @param cur The cursor to free.
  */
 void list_cursor_destroy(struct list_cursor *cur);
+
+/** Move dest cursor to the position of src cursor.
+ * @param dest The cursor to move.
+ * @param src The cursor that indicated the target position.
+ * @returns A pointer to a new cursor.
+ */
+void list_cursor_move(struct list_cursor *dest, struct list_cursor *src);
 
 /** Get a copy of an existing cursor.
  * The returned cursor is independent from the original, but initially
@@ -204,7 +213,17 @@ bool list_set(struct list_cursor *cur, void *item);
  * This function is safe to use while iterating over a list,
  * and in the presence of other cursors. Any cursors on the same item
  * will be advanced to the next item.
+ * Note: This is an O(1) operation that removes the item at the current cursor position.
+ * Compare with list_remove() which searches the entire list and is O(n).
  * @param cur The cursor to use.
+ * @returns true if an item was successfully removed.
+ * @returns false if the cursor position is undefined.
+ */
+bool list_remove_here(struct list_cursor *cur);
+
+
+/** Deprecated function. Use list_remove_here instead. */
+/** @param cur The cursor to use.
  * @returns true if an item was successfully removed.
  * @returns false if the cursor position is undefined.
  */
@@ -360,7 +379,6 @@ void *list_find(struct list *list, list_op_t cmp, const void *arg);
 
 /** Remove an item from the list
 This function searches the list for the item pointed to by value and removes it.
-If you are iterating over a list, use @ref list_remove_item instead.
 @param list The list to search
 @param value The item to remove
 @return The removed item.
@@ -408,14 +426,14 @@ the internal iterator, and returns it.
 @param list The list to traverse.
 @return The object removed from the current iterator position, NULL if at end of list.
 */
-
 void *list_remove_item(struct list *list);
 
-/** Apply a function to a list.
+/** Apply a function to a list. 
 Invokes op on every member of the list.
 @param list The list to operate on.
 @param op The operator to apply.
 @param arg An optional parameter to send to op.
+@return 1 if all items were processed successfully, 0 otherwise.
 */
 
 int list_iterate(struct list *list, list_op_t op, const void *arg);

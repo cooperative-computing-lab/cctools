@@ -40,7 +40,7 @@ int main (int argc, char *argv[])
 	assert(!ok);
 	ok = list_set(cur, (void *) item);
 	assert(!ok);
-	ok = list_drop(cur);
+	ok = list_remove_here(cur);
 	assert(!ok);
 
 	// put in a couple of items
@@ -141,7 +141,7 @@ int main (int argc, char *argv[])
 	assert(item == 7);
 
 	// drop the middle element
-	ok = list_drop(cur);
+	ok = list_remove_here(cur);
 	assert(ok);
 	assert(list_size(list) == 2);
 
@@ -195,7 +195,7 @@ int main (int argc, char *argv[])
 	// clear the list
 	list_seek(cur, 0);
 	do {
-		ok = list_drop(cur);
+		ok = list_remove_here(cur);
 		assert(ok);
 	} while (list_next(cur));
 
