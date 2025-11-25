@@ -61,6 +61,7 @@ transparently modify the linker namespace we are using.
 #define list_prev			cctools_list_prev
 #define list_get			cctools_list_get
 #define list_set			cctools_list_set
+#define list_remove_here		cctools_list_remove_here
 #define list_drop			cctools_list_drop
 #define list_insert			cctools_list_insert
 
@@ -211,7 +212,17 @@ bool list_set(struct list_cursor *cur, void *item);
  * This function is safe to use while iterating over a list,
  * and in the presence of other cursors. Any cursors on the same item
  * will be advanced to the next item.
+ * Note: This is an O(1) operation that removes the item at the current cursor position.
+ * Compare with list_remove() which searches the entire list and is O(n).
  * @param cur The cursor to use.
+ * @returns true if an item was successfully removed.
+ * @returns false if the cursor position is undefined.
+ */
+bool list_remove_here(struct list_cursor *cur);
+
+
+/** Deprecated function. Use list_remove_here instead. */
+/** @param cur The cursor to use.
  * @returns true if an item was successfully removed.
  * @returns false if the cursor position is undefined.
  */

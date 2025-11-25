@@ -5309,7 +5309,7 @@ static void delete_feature(struct work_queue_task *t, const char *name)
 	char *feature;
 	for(list_seek(c, 0); list_get(c, (void **) &feature); list_next(c)) {
 		if(name && feature && (strcmp(name, feature) == 0)) {
-			list_drop(c);
+			list_remove_here(c);
 		}
 	}
 
