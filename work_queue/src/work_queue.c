@@ -4574,7 +4574,7 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	count_worker_resources(q, w);
 }
 
-static int send_one_task_aux( struct work_queue *q,  struct work_queue_task *t,  double now )
+static int try_to_commit_task( struct work_queue *q,  struct work_queue_task *t,  double now )
 {
 	// Skip task if min requested start time not met.
 	if(t->resources_requested->start > now) {
@@ -4597,32 +4597,41 @@ static int send_one_task_aux( struct work_queue *q,  struct work_queue_task *t, 
 	return 1;
 }
 
-static int send_one_task( struct work_queue *q )
+static int send_one_task_aux( struct work_queue *q,  struct list_cursor *cur, int tasks_to_consider, double now )
 {
 	struct work_queue_task *t;
 
 	int tasks_considered = 0;
+	int task_committed = 0;
+
+	for (
+			list_seek(cur, 0);
+			list_get(cur, (void **) &t) && tasks_considered <= tasks_to_consider;
+			list_next(cur), tasks_considered++) {
+		if (retrieved_expired_task(q, t, now)) {
+			list_drop(cur);
+			continue;
+		}
+
+		if(try_to_commit_task(q, t, now)) {
+			list_drop(cur);
+			task_committed = 1;
+			break;
+		}
+	}
+
+	return task_committed;
+}
+
+static int send_one_task( struct work_queue *q )
+{
 	int tasks_to_consider = MIN(q->attempt_schedule_depth, list_size(q->ready_list));
 	double now = ((double) timestamp_get()) / ONE_SECOND;
 
 	int task_committed = 0;
 
-	while( (t = list_rotate(q->ready_list)) ) {
-		if(tasks_considered++ > tasks_to_consider) {
-			break;
-		}
-
-		if (retrieved_expired_task(q, t, now)) {
-			list_pop_tail(q->ready_list);
-			continue;
-		}
-
-		if(send_one_task_aux(q, t, now)) {
-			list_pop_tail(q->ready_list);
-			task_committed = 1;
-			break;
-		}
-	}
+	struct list_cursor *cur = q->ready_priority_cr;
+	task_committed = send_one_task_aux(q, cur, tasks_to_consider, now);
 
 	return task_committed;
 }
@@ -4644,7 +4653,6 @@ static void print_large_tasks_warning(struct work_queue *q)
 
 	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
 
-	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))){
 		// check each task against the queue of connected workers
 		int bit_set = is_task_larger_than_connected_workers(q, t);
