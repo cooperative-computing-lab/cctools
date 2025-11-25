@@ -675,6 +675,16 @@ void *list_prev_item(struct list *list)
 	return item;
 }
 
+void *list_remove_item(struct list *list)
+{
+	void *item = NULL;
+	list_get(list->iter, &item);
+	if (item) {
+		list_remove_here(list->iter);
+	}
+	return item;
+}
+
 struct list *list_duplicate(struct list *src)
 {
 	void *item;
