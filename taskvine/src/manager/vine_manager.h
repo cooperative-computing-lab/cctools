@@ -231,6 +231,7 @@ struct vine_manager {
 
 	double sandbox_grow_factor;         /* When task disk sandboxes are exhausted, increase the allocation using their measured valued times this factor */
 	double disk_proportion_available_to_task;   /* intentionally reduces disk allocation for tasks to reserve some space for cache growth. */
+	int return_recovery_tasks;      /* If true, recovery tasks are returned by vine_wait to the user. By default 0 and they are handled internally. */
 
 	/* todo: confirm datatype. int or int64 */
 	int max_task_stdout_storage;	/* Maximum size of standard output from task.  (If larger, send to a separate file.) */
