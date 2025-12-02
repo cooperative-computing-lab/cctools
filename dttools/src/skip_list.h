@@ -11,7 +11,7 @@ See the file COPYING for details.
 
 /** @file skip_list.h Skip list structure built on top of list.h
  *
- * A skip list is a probabilistic data structure that allows O(log n) 
+ * A skip list is a probabilistic data structure that allows O(log n)
  * search, insertion, and deletion. This implementation uses multiple
  * levels of linked lists, where each level contains ceil(log(n)) elements
  * from the level below.
@@ -39,14 +39,14 @@ See the file COPYING for details.
  * <pre>
  * struct skip_list_cursor *cur = skip_list_cursor_create(sl);
  * skip_list_seek(cur, 0);
- * 
+ *
  * void *item;
  * do {
  *     if (skip_list_get(cur, &item)) {
  *         printf("%s\n", (char *)item);  // Prints: banana, cherry, apple
  *     }
  * } while (skip_list_next(cur));
- * 
+ *
  * skip_list_cursor_destroy(cur);
  * </pre>
  */
@@ -237,13 +237,13 @@ void skip_list_insert_arr(struct skip_list *lst, void *item, double *priority);
 /** Insert an item with priority into the skip list.
  * Items are automatically inserted in sorted order by priority (high to low).
  * Priority values should be passed as doubles matching the priority_size from skip_list_create.
- * 
+ *
  * Example for priority_size=2:
  *   skip_list_insert(cur, data, 10.0, 5.0);
- * 
+ *
  * Example for priority_size=3:
  *   skip_list_insert(cur, data, 10.0, 5.0, 2.5);
- * 
+ *
  * @param lst The skip list to insert into.
  * @param item The pointer to insert.
  * @param ... Priority values (doubles) matching the priority_size.
