@@ -102,13 +102,15 @@ struct vine_manager {
 	/* Primary data structures for tracking task state. */
 
 	struct itable *tasks;           /* Maps task_id -> vine_task of all tasks in any state. */
-	struct priority_queue   *ready_tasks;       /* Priority queue of vine_task that are waiting to execute. */
+	struct skip_list   *ready_tasks;       /* Skip list of vine_task that are waiting to execute. */
 	struct itable   *running_table;      /* Table of vine_task that are running at workers. */
 	struct list   *waiting_retrieval_list;      /* List of vine_task that are waiting to be retrieved. */
 	struct list   *retrieved_list;      /* List of vine_task that have been retrieved. */
 	struct list   *task_info_list;  /* List of last N vine_task_infos for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */
 	struct hash_table *library_templates; /* Maps library name -> vine_task of library with that name. */
+
+	struct skip_list_cursor *priority_ready_cr;      /* Iterates ready_list in order */
 
 	/* Primary data structures for tracking worker state. */
 
