@@ -1917,10 +1917,9 @@ static struct rmsummary *total_resources_needed(struct vine_manager *q)
 	/* for waiting tasks, we use what they would request if dispatched right now. */
 	struct skip_list_cursor *cur = skip_list_cursor_create(q->ready_tasks);
 	skip_list_seek(cur, 0);
-	while (skip_list_get(cur, (void **)&t)) {
+	SKIP_LIST_ITERATE(cur, t) {
 		const struct rmsummary *s = vine_manager_task_resources_min(q, t);
 		rmsummary_add(total, s);
-		skip_list_next(cur);
 	}
 	skip_list_cursor_destroy(cur);
 
@@ -3598,18 +3597,14 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 
 	int iter_count = 0;
 
-	struct skip_list_cursor *here = skip_list_cursor_create(q->ready_tasks);
-	while (iter_count < iter_depth && skip_list_get(cur, (void **)&t)) {
-		// keep a copy of current cursor position
-		// so that we can remove if needed and advance the original cursor
-		// before any possible loop continue.
-		skip_list_cursor_move(here, cur);
-		skip_list_next(cur);
-
+	SKIP_LIST_ITERATE(cur, t) {
+		if (iter_count >= iter_depth) {
+			break;
+		}
 		iter_count++;
 
 		if (retrieve_ready_task(q, t, now_secs)) {
-			skip_list_remove_here(here);
+			skip_list_remove_here(cur);
 
 			// task was "retrieved" because its ending time
 			// or because it does not have a needed fixed location input file
@@ -3628,7 +3623,7 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 		q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
 
 		if (w) {
-			skip_list_remove_here(here);
+			skip_list_remove_here(cur);
 			task_unready = 1;
 
 			vine_result_code_t result;
@@ -3656,8 +3651,6 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 			}
 		}
 	}
-
-	skip_list_cursor_destroy(here);
 
 	return task_unready;
 }
@@ -5566,13 +5559,15 @@ int vine_hungry_computation(struct vine_manager *q)
 
 	struct skip_list_cursor *cur = skip_list_cursor_create(q->ready_tasks);
 	skip_list_seek(cur, 0);
-	while (sampled_tasks_waiting < iter_depth && skip_list_get(cur, (void **)&t)) {
+	SKIP_LIST_ITERATE(cur, t) {
+		if (sampled_tasks_waiting >= iter_depth) {
+			break;
+		}
 		/* unset resources are marked with -1, so we added what we know about currently running tasks */
 		ready_task_cores += t->resources_requested->cores > 0 ? t->resources_requested->cores : avg_commited_tasks_cores;
 		ready_task_memory += t->resources_requested->memory > 0 ? t->resources_requested->memory : avg_commited_tasks_memory;
 		ready_task_disk += t->resources_requested->disk > 0 ? t->resources_requested->disk : avg_commited_tasks_disk;
 		ready_task_gpus += t->resources_requested->gpus > 0 ? t->resources_requested->gpus : avg_commited_tasks_gpus;
-		skip_list_next(cur);
 		sampled_tasks_waiting++;
 	}
 	skip_list_cursor_destroy(cur);
