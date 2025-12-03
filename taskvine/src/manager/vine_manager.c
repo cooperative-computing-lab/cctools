@@ -1921,7 +1921,7 @@ static struct rmsummary *total_resources_needed(struct vine_manager *q)
 		const struct rmsummary *s = vine_manager_task_resources_min(q, t);
 		rmsummary_add(total, s);
 	}
-	skip_list_cursor_destroy(cur);
+	skip_list_cursor_delete(cur);
 
 	/* for running tasks, we use what they have been allocated already. */
 	char *key;
@@ -3597,7 +3597,11 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 
 	int iter_count = 0;
 
+
+	printf("now considering tasks from ready list: %d\n", skip_list_length(q->ready_tasks));
+	skip_list_seek(cur, 0);
 	SKIP_LIST_ITERATE(cur, t) {
+		printf("task %d is being considered\n", t->task_id);
 		if (iter_count >= iter_depth) {
 			break;
 		}
@@ -3623,7 +3627,6 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 		q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
 
 		if (w) {
-			skip_list_remove_here(cur);
 			task_unready = 1;
 
 			vine_result_code_t result;
@@ -3634,19 +3637,15 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 			}
 
 			switch (result) {
-			case VINE_SUCCESS:
-				/* return on successful commit. */
-				break;
-			case VINE_APP_FAILURE:
+			case VINE_SUCCESS: /* return on successful commit. */
+			case VINE_APP_FAILURE: /* failed to dispatch, commit put the task back in the right place. */
 			case VINE_WORKER_FAILURE:
-				/* failed to dispatch, commit put the task back in the right place. */
+			case VINE_END_OF_LIST: /* shouldn't happen */
+				skip_list_remove_here(cur);
 				break;
 			case VINE_MGR_FAILURE:
-				/* special case, commit had a chained failure. */
-				skip_list_insert(q->ready_tasks, t, t->manager_priority, t->user_priority, -t->task_id);
-				break;
-			case VINE_END_OF_LIST:
-				/* shouldn't happen, keep going */
+				/* special case, commit had a chained failure,
+				keep the task in the ready list so it can be retried. */
 				break;
 			}
 		}
@@ -3659,6 +3658,13 @@ static int send_one_task(struct vine_manager *q)
 {
 	double now_secs = ((double)timestamp_get()) / ONE_SECOND;
 	int iter_depth = MIN(skip_list_length(q->ready_tasks), q->attempt_schedule_depth);
+
+	// if priority_ready_cr is not pointing at a task
+	// (e.g it is at the end of the list, or first time through)
+	// set it to the beginning of the ready list.
+	if (!skip_list_get(q->priority_ready_cr, NULL)) {
+		skip_list_seek(q->priority_ready_cr, 0);
+	}
 
 	int sent = 0;
 	sent = send_one_task_with_cr(q, q->priority_ready_cr, iter_depth, now_secs);
@@ -4483,8 +4489,8 @@ void vine_delete(struct vine_manager *q)
 	hash_table_clear(q->categories, (void *)category_free);
 	hash_table_delete(q->categories);
 
-	skip_list_cursor_destroy(q->priority_ready_cr);
-	skip_list_destroy(q->ready_tasks);
+	skip_list_cursor_delete(q->priority_ready_cr);
+	skip_list_delete(q->ready_tasks);
 
 	itable_delete(q->running_table);
 	list_delete(q->waiting_retrieval_list);
@@ -5270,12 +5276,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	// used for q->prefer_dispatch. If 0 and there is a task retrieved, then return task to app.
 	int sent_in_previous_cycle = 1;
 
-	// if priority_ready_cr is not pointing at a task (e.g it is at the end of the list, or first time through)
-	// set it to the beginning of the ready list.
-	if (!skip_list_get(q->priority_ready_cr, NULL)) {
-		skip_list_seek(q->priority_ready_cr, 0);
-	}
-
 	// time left?
 	while ((stoptime == 0) || (time(0) < stoptime)) {
 
@@ -5465,7 +5465,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// the next time around, or return retrieved tasks if there some available.
 		if (!skip_list_get(q->priority_ready_cr, NULL) && list_size(q->retrieved_list) < 1) {
 			q->nothing_happened_last_wait_cycle = 1;
-			skip_list_seek(q->priority_ready_cr, 0);
 		}
 	}
 
@@ -5570,7 +5569,7 @@ int vine_hungry_computation(struct vine_manager *q)
 		ready_task_gpus += t->resources_requested->gpus > 0 ? t->resources_requested->gpus : avg_commited_tasks_gpus;
 		sampled_tasks_waiting++;
 	}
-	skip_list_cursor_destroy(cur);
+	skip_list_cursor_delete(cur);
 
 	int64_t avg_ready_tasks_cores = DIV_INT_ROUND_UP(ready_task_cores, sampled_tasks_waiting);
 	int64_t avg_ready_tasks_memory = DIV_INT_ROUND_UP(ready_task_memory, sampled_tasks_waiting);

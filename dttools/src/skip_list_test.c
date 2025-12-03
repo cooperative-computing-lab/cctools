@@ -153,8 +153,8 @@ double measure_skip_list_operations(struct item **items, int num_elements, int o
 		clock_gettime(CLOCK_MONOTONIC, &end);
 	}
 
-	skip_list_cursor_destroy(cur);
-	skip_list_destroy(sl);
+	skip_list_cursor_delete(cur);
+	skip_list_delete(sl);
 	return (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
 }
 
@@ -345,8 +345,8 @@ int main(int argc, char *argv[])
 		order_time_test_passed = 0;
 	}
 
-	skip_list_cursor_destroy(cur);
-	skip_list_destroy(sl);
+	skip_list_cursor_delete(cur);
+	skip_list_delete(sl);
 	free_items(items, num_elements);
 
 	printf("=================================================================\n\n");

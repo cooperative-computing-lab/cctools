@@ -97,7 +97,7 @@ static void skip_list_node_ref(struct skip_list_node *node)
 	++node->refcount;
 }
 
-static void delete_node(struct skip_list_node *node, struct skip_list *sl)
+static int delete_node(struct skip_list_node *node, struct skip_list *sl)
 {
 	assert(node);
 	assert(sl);
@@ -120,7 +120,11 @@ static void delete_node(struct skip_list_node *node, struct skip_list *sl)
 		free(node->forward);
 		free(node->backward);
 		free(node);
+
+		return 1;
 	}
+
+	return 0;
 }
 
 static void skip_list_node_unref(struct skip_list_node *node, struct skip_list *sl)
@@ -237,7 +241,7 @@ int skip_list_length(struct skip_list *sl)
 	return sl->length;
 }
 
-bool skip_list_destroy(struct skip_list *sl)
+bool skip_list_delete(struct skip_list *sl)
 {
 	if (!sl)
 		return true;
@@ -288,7 +292,7 @@ struct skip_list_cursor *skip_list_cursor_create(struct skip_list *sl)
 	return cur;
 }
 
-void skip_list_cursor_destroy(struct skip_list_cursor *cur)
+void skip_list_cursor_delete(struct skip_list_cursor *cur)
 {
 	if (!cur)
 		return;
@@ -367,24 +371,32 @@ void skip_list_reset(struct skip_list_cursor *cur)
 bool seek_forward(struct skip_list_cursor *cur, int index)
 {
 	assert(index >= 0);
-
+	skip_list_reset(cur);
 	struct skip_list *sl = cur->list;
 
-	skip_list_reset(cur);
-	cur->target = sl->head->forward[0];
-	while (cur->target != sl->tail && cur->target->dead) {
-		cur->target = cur->target->forward[0];
-	}
-	if (cur->target == sl->tail) {
+	if (index >= skip_list_length(sl)) {
 		return false;
 	}
-	skip_list_node_ref(cur->target);
 
-	while (index > 0) {
+	cur->target = sl->head;
+	while (index >= 0) {
+		cur->target = cur->target->forward[0];
+
+		if (cur->target == sl->tail) {
+			return false;
+		}
+
+		// Skip dead nodes without counting them
+		// and try to delete them if their refcount is 0
+		if (cur->target->dead) {
+			delete_node(cur->target, sl);
+			continue;
+		}
+
 		index--;
-		bool ok = skip_list_next(cur);
-		assert(ok);
 	}
+
+	skip_list_node_ref(cur->target);
 
 	return true;
 }
@@ -392,24 +404,32 @@ bool seek_forward(struct skip_list_cursor *cur, int index)
 bool seek_backward(struct skip_list_cursor *cur, int index)
 {
 	assert(index < 0);
-
+	skip_list_reset(cur);
 	struct skip_list *sl = cur->list;
 
-	skip_list_reset(cur);
-	cur->target = sl->tail->backward[0];
-	while (cur->target != sl->head && cur->target->dead) {
-		cur->target = cur->target->backward[0];
-	}
-	if (cur->target == sl->head) {
+	if (-index > skip_list_length(sl)) {
 		return false;
 	}
-	skip_list_node_ref(cur->target);
 
-	while (index < -1) {
+	cur->target = sl->tail;
+	while (index < 0) {
+		cur->target = cur->target->backward[0];
+
+		if (cur->target == sl->head) {
+			return false;
+		}
+
+		// Skip dead nodes without counting them
+		// and try to delete them if their refcount is 0
+		if (cur->target->dead) {
+			delete_node(cur->target, sl);
+			continue;
+		}
+
 		index++;
-		bool ok = skip_list_prev(cur);
-		assert(ok);
 	}
+
+	skip_list_node_ref(cur->target);
 
 	return true;
 }
@@ -510,7 +530,7 @@ const double *skip_list_peek_head_priority(struct skip_list *sl)
 		priority = cur->target->priority;
 	}
 
-	skip_list_cursor_destroy(cur);
+	skip_list_cursor_delete(cur);
 	return priority;
 }
 
@@ -525,7 +545,7 @@ const void *skip_list_peek_head(struct skip_list *sl)
 		item = cur->target->data;
 	}
 
-	skip_list_cursor_destroy(cur);
+	skip_list_cursor_delete(cur);
 	return item;
 }
 
@@ -541,7 +561,7 @@ void *skip_list_pop_head(struct skip_list *sl)
 		skip_list_remove_here(cur);
 	}
 
-	skip_list_cursor_destroy(cur);
+	skip_list_cursor_delete(cur);
 	return item;
 }
 
@@ -620,7 +640,7 @@ bool skip_list_remove(struct skip_list *sl, void *data)
 
 	// Start at the beginning
 	if (!skip_list_seek(cur, 0)) {
-		skip_list_cursor_destroy(cur);
+		skip_list_cursor_delete(cur);
 		return false;
 	}
 
@@ -642,7 +662,7 @@ bool skip_list_remove(struct skip_list *sl, void *data)
 		}
 	}
 
-	skip_list_cursor_destroy(cur);
+	skip_list_cursor_delete(cur);
 	return ok;
 }
 

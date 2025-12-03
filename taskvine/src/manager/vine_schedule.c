@@ -588,7 +588,7 @@ void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 			unfit_gpu++;
 		}
 	}
-	skip_list_cursor_destroy(cur);
+	skip_list_cursor_delete(cur);
 
 	if (unfit_core || unfit_mem || unfit_disk || unfit_gpu) {
 		notice(D_VINE, "There are tasks that cannot fit any currently connected worker:\n");

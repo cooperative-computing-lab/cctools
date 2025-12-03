@@ -30,8 +30,8 @@ See the file COPYING for details.
  * skip_list_insert(cur, banana, 20.0, 3.0);  // Priority: (20.0, 3.0) - highest
  * skip_list_insert(cur, cherry, 10.0, 8.0);  // Priority: (10.0, 8.0)
 
- * skip_list_cursor_destroy(cur);
- * skip_list_destroy(sl);
+ * skip_list_cursor_delete(cur);
+ * skip_list_delete(sl);
  * </pre>
  *
  * <b>Example: Iterating through all items (in priority order)</b>
@@ -47,7 +47,7 @@ See the file COPYING for details.
  *     }
  * } while (skip_list_next(cur));
  *
- * skip_list_cursor_destroy(cur);
+ * skip_list_cursor_delete(cur);
  * </pre>
  */
 
@@ -70,7 +70,7 @@ struct skip_list *skip_list_create(unsigned priority_size, double probability);
  * @returns true if the skip list was deleted.
  * @returns false if the skip list is non-empty or there are live cursors.
  */
-bool skip_list_destroy(struct skip_list *sl);
+bool skip_list_delete(struct skip_list *sl);
 
 /** Get the number of items in a skip list.
  * @param sl The skip list to examine.
@@ -105,7 +105,7 @@ struct skip_list_cursor *skip_list_cursor_create(struct skip_list *sl);
 /** Delete a previously created cursor.
  * @param cur The cursor to free.
  */
-void skip_list_cursor_destroy(struct skip_list_cursor *cur);
+void skip_list_cursor_delete(struct skip_list_cursor *cur);
 
 /** Get a copy of an existing cursor.
  * @param cur The cursor to clone.
@@ -286,7 +286,7 @@ void skip_list_insert_arr(struct skip_list *lst, void *item, double *priority);
  *     }
  * SKIP_LIST_ITERATE_END(cur)
  *
- * skip_list_cursor_destroy(cur);
+ * skip_list_cursor_delete(cur);
  * </pre>
  *
  * @note The cursor is valid during each iteration and can be used with
