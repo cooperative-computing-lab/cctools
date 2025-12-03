@@ -1917,7 +1917,8 @@ static struct rmsummary *total_resources_needed(struct vine_manager *q)
 	/* for waiting tasks, we use what they would request if dispatched right now. */
 	struct skip_list_cursor *cur = skip_list_cursor_create(q->ready_tasks);
 	skip_list_seek(cur, 0);
-	SKIP_LIST_ITERATE(cur, t) {
+	SKIP_LIST_ITERATE(cur, t)
+	{
 		const struct rmsummary *s = vine_manager_task_resources_min(q, t);
 		rmsummary_add(total, s);
 	}
@@ -3597,10 +3598,10 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 
 	int iter_count = 0;
 
-
 	printf("now considering tasks from ready list: %d\n", skip_list_length(q->ready_tasks));
 	skip_list_seek(cur, 0);
-	SKIP_LIST_ITERATE(cur, t) {
+	SKIP_LIST_ITERATE(cur, t)
+	{
 		printf("task %d is being considered\n", t->task_id);
 		if (iter_count >= iter_depth) {
 			break;
@@ -3637,7 +3638,7 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 			}
 
 			switch (result) {
-			case VINE_SUCCESS: /* return on successful commit. */
+			case VINE_SUCCESS:     /* return on successful commit. */
 			case VINE_APP_FAILURE: /* failed to dispatch, commit put the task back in the right place. */
 			case VINE_WORKER_FAILURE:
 			case VINE_END_OF_LIST: /* shouldn't happen */
@@ -5558,7 +5559,8 @@ int vine_hungry_computation(struct vine_manager *q)
 
 	struct skip_list_cursor *cur = skip_list_cursor_create(q->ready_tasks);
 	skip_list_seek(cur, 0);
-	SKIP_LIST_ITERATE(cur, t) {
+	SKIP_LIST_ITERATE(cur, t)
+	{
 		if (sampled_tasks_waiting >= iter_depth) {
 			break;
 		}
