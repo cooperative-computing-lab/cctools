@@ -4095,6 +4095,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->waiting_retrieval_list = list_create();
 	q->retrieved_list = list_create();
 
+	q->priority_ready_cr = skip_list_cursor_create(q->ready_tasks);
+
 	q->tasks = itable_create(0);
 	q->library_templates = hash_table_create(0, 0);
 
@@ -4480,7 +4482,9 @@ void vine_delete(struct vine_manager *q)
 	hash_table_clear(q->categories, (void *)category_free);
 	hash_table_delete(q->categories);
 
+	skip_list_cursor_destroy(q->priority_ready_cr);
 	skip_list_destroy(q->ready_tasks);
+
 	itable_delete(q->running_table);
 	list_delete(q->waiting_retrieval_list);
 	list_delete(q->retrieved_list);
