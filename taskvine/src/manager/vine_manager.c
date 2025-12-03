@@ -3598,12 +3598,18 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 
 	int iter_count = 0;
 
+	struct skip_list_cursor *here = skip_list_cursor_create(q->ready_tasks);
 	while (iter_count < iter_depth && skip_list_get(cur, (void **)&t)) {
+		// keep a copy of current cursor position
+		// so that we can remove if needed and advance the original cursor
+		// before any possible loop continue.
+		skip_list_cursor_move(here, cur);
 		skip_list_next(cur);
+
 		iter_count++;
 
 		if (retrieve_ready_task(q, t, now_secs)) {
-			skip_list_remove_here(cur);
+			skip_list_remove_here(here);
 
 			// task was "retrieved" because its ending time
 			// or because it does not have a needed fixed location input file
@@ -3622,7 +3628,7 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 		q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
 
 		if (w) {
-			skip_list_remove_here(cur);
+			skip_list_remove_here(here);
 			task_unready = 1;
 
 			vine_result_code_t result;
@@ -3650,6 +3656,8 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 			}
 		}
 	}
+
+	skip_list_cursor_destroy(here);
 
 	return task_unready;
 }

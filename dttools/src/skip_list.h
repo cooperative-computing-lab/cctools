@@ -113,6 +113,13 @@ void skip_list_cursor_destroy(struct skip_list_cursor *cur);
  */
 struct skip_list_cursor *skip_list_cursor_clone(struct skip_list_cursor *cur);
 
+/** Move a cursor's position to match another cursor.
+ * After this call, to_move will point to the same item as destination.
+ * @param to_move The cursor whose position will be updated.
+ * @param destination The source cursor whose position will be copied.
+ */
+void skip_list_cursor_move(struct skip_list_cursor *to_move, struct skip_list_cursor *destination);
+
 /** Reset the position of a cursor.
  * @param cur The cursor to reset.
  */

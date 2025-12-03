@@ -308,6 +308,15 @@ struct skip_list_cursor *skip_list_cursor_clone(struct skip_list_cursor *cur)
 	return out;
 }
 
+void skip_list_cursor_move(struct skip_list_cursor *to_move, struct skip_list_cursor *destination)
+{
+	assert(to_move);
+	assert(destination);
+	skip_list_node_unref(to_move->target, to_move->list);
+	to_move->target = destination->target;
+	skip_list_node_ref(to_move->target);
+}
+
 bool skip_list_cursor_move_to_priority_arr(struct skip_list_cursor *cur, double *priority)
 {
 	assert(cur);
