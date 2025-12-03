@@ -61,7 +61,7 @@ class ContextGraph:
     def __init__(self, task_dict,
                  extra_task_output_size_mb=[0, 0],
                  extra_task_sleep_time=[0, 0]):
-        """Capture the Python DAG that VineDAG hands us before we mirror it in C."""
+        """Capture the Python DAG that DAGVine hands us before we mirror it in C."""
         self.task_dict = task_dict
 
         if dts:
@@ -161,7 +161,7 @@ class ContextGraph:
         return ContextGraphTaskResult.load_from_path(outfile_path)
 
     def get_topological_order(self):
-        """Produce the order VineDAG uses when assigning node IDs to the C graph."""
+        """Produce the order DAGVine uses when assigning node IDs to the C graph."""
         in_degree = {key: len(self.parents_of[key]) for key in self.task_dict.keys()}
         queue = deque([key for key, degree in in_degree.items() if degree == 0])
         topo_order = []

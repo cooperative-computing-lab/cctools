@@ -11,6 +11,8 @@ Implementation of a terminal progress bar with multiple parts.
 #include "progress_bar.h"
 #include "xxmalloc.h"
 #include "macros.h"
+#include "macros.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,13 +25,9 @@ Implementation of a terminal progress bar with multiple parts.
 
 /* Max bar width (in block characters) for single-line rendering. */
 #define MAX_BAR_WIDTH 30
-/* Typed time constants (microseconds). */
-static const timestamp_t SECOND_US      = 1000000ULL;
-static const timestamp_t MILLISECOND_US = 1000ULL;
-static const timestamp_t MICROSECOND_US = 1ULL;
 
 /* Minimum redraw interval to avoid flicker (200ms). */
-#define PROGRESS_BAR_UPDATE_INTERVAL_US (SECOND_US / 5)
+#define PROGRESS_BAR_UPDATE_INTERVAL_US (USECOND / 5)
 
 #define COLOR_RESET "\033[0m"
 #define COLOR_GREEN "\033[32m"
@@ -120,9 +118,9 @@ static void print_progress_bar(struct ProgressBar *bar)
 	}
 
 	timestamp_t elapsed = timestamp_get() - bar->start_time_us;
-	int h = elapsed / (3600LL * SECOND_US);
-	int m = (elapsed % (3600LL * SECOND_US)) / (60LL * SECOND_US);
-	int s = (elapsed % (60LL * SECOND_US)) / SECOND_US;
+	int h = elapsed / (3600LL * USECOND);
+	int m = (elapsed % (3600LL * USECOND)) / (60LL * USECOND);
+	int s = (elapsed % (60LL * USECOND)) / USECOND;
 
 	if (bar->has_drawn_once) {
 		printf("\r\033[2K");
@@ -175,7 +173,7 @@ struct ProgressBar *progress_bar_init(const char *label)
 	bar->start_time_us = timestamp_get();
 	bar->last_draw_time_us = 0;
 	bar->update_interval_us = PROGRESS_BAR_UPDATE_INTERVAL_US;
-	bar->update_interval_sec = (double)bar->update_interval_us / SECOND_US;
+	bar->update_interval_sec = (double)bar->update_interval_us / USECOND;
 	bar->has_drawn_once = 0;
 
 	return bar;
@@ -193,10 +191,10 @@ void progress_bar_set_update_interval(struct ProgressBar *bar, double update_int
 	}
 	bar->update_interval_sec = update_interval_sec;
 	/* Convert seconds to microseconds with saturation to avoid overflow. */
-	if (update_interval_sec >= (double)UINT64_MAX / (double)SECOND_US) {
+	if (update_interval_sec >= (double)UINT64_MAX / (double)USECOND) {
 		bar->update_interval_us = (timestamp_t)UINT64_MAX;
 	} else {
-		bar->update_interval_us = (timestamp_t)(update_interval_sec * (double)SECOND_US);
+		bar->update_interval_us = (timestamp_t)(update_interval_sec * (double)USECOND);
 	}
 }
 

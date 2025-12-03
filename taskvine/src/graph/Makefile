@@ -1,7 +1,7 @@
 include ../../../config.mk
 include ../../../rules.mk
 
-SUBDIRS = vinedag
+SUBDIRS = dagvine
 
 all clean install test lint format: $(SUBDIRS)
 

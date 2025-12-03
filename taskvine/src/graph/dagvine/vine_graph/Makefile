@@ -1,7 +1,7 @@
 include ../../../../../config.mk
 include ../../../../../rules.mk
 
-PROJECT_NAME = vinedag
+PROJECT_NAME = dagvine
 
 LOCAL_LINKAGE+=${CCTOOLS_HOME}/taskvine/src/manager/libtaskvine.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
 LOCAL_CCFLAGS+=-I ${CCTOOLS_HOME}/taskvine/src/manager

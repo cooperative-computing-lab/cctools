@@ -5,10 +5,10 @@
 from ndcctools.taskvine import cvine
 from ndcctools.taskvine.manager import Manager
 
-from ndcctools.taskvine.vinedag.context_graph.proxy_library import ProxyLibrary
-from ndcctools.taskvine.vinedag.context_graph.proxy_functions import compute_single_key
-from ndcctools.taskvine.vinedag.context_graph.core import ContextGraph, ContextGraphTaskResult
-from ndcctools.taskvine.vinedag.vine_graph.vine_graph_client import VineGraphClient
+from ndcctools.taskvine.dagvine.context_graph.proxy_library import ProxyLibrary
+from ndcctools.taskvine.dagvine.context_graph.proxy_functions import compute_single_key
+from ndcctools.taskvine.dagvine.context_graph.core import ContextGraph, ContextGraphTaskResult
+from ndcctools.taskvine.dagvine.vine_graph.vine_graph_client import VineGraphClient
 
 import cloudpickle
 import os
@@ -51,7 +51,7 @@ def color_text(text, color_code):
 
 
 # Flatten Dask collections into the dict-of-tasks structure the rest of the
-# pipeline expects. VineDAG clients often hand us a dict like
+# pipeline expects. DAGVine clients often hand us a dict like
 # {"result": dask.delayed(...)}; we merge the underlying HighLevelGraphs so
 # `ContextGraph` sees the same dict representation C does.
 def dask_collections_to_task_dict(collection_dict):
@@ -146,7 +146,7 @@ class GraphParams:
             self.vine_manager_tuning_params[param_name] = new_value
 
     def get_value_of(self, param_name):
-        """Helper so VineDAG can pull a knob value without caring where it lives."""
+        """Helper so DAGVine can pull a knob value without caring where it lives."""
         if param_name in self.vine_manager_tuning_params:
             return self.vine_manager_tuning_params[param_name]
         elif param_name in self.vine_graph_tuning_params:
@@ -157,7 +157,7 @@ class GraphParams:
             raise ValueError(f"Invalid param name: {param_name}")
 
 
-class VineDAG(Manager):
+class DAGVine(Manager):
     def __init__(self,
                  *args,
                  **kwargs):
@@ -175,7 +175,7 @@ class VineDAG(Manager):
         if self.run_info_template_path:
             delete_all_files(self.run_info_template_path)
 
-        # Boot the underlying TaskVine manager. The TaskVine manager keeps alive until the vinedag object is destroyed
+        # Boot the underlying TaskVine manager. The TaskVine manager keeps alive until the dagvine object is destroyed
         super().__init__(*args, **kwargs)
         print(f"cvine = {cvine}")
         self.runtime_directory = cvine.vine_get_runtime_directory(self._taskvine)
@@ -281,6 +281,14 @@ class VineDAG(Manager):
         """High-level entry point: normalise input, build graphs, ship the library, execute, and return results."""
         # first update the params so that they can be used for the following construction
         self.update_params(params)
+
+        # filter out target keys that are not in the collection dict
+        missing_keys = [k for k in target_keys if k not in collection_dict]
+        if missing_keys:
+            print(f"=== Warning: the following target keys are not in the collection dict:")
+            for k in missing_keys:
+                print(f"             {k}")
+        target_keys = list(set(target_keys) - set(missing_keys))
 
         task_dict = ensure_task_dict(collection_dict)
 

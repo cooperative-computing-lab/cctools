@@ -2,6 +2,6 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-from .vinedag import VineDAG
+from .dagvine import DAGVine
 
-__all__ = ["VineDAG"]
+__all__ = ["DAGVine"]

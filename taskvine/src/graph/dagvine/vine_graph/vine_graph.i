@@ -1,4 +1,4 @@
-/* SWIG interface for local vinedag graph API bindings */
+/* SWIG interface for local dagvine graph API bindings */
 %module vine_graph_capi
 
 %{

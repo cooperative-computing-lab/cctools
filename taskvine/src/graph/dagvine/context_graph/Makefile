@@ -1,7 +1,7 @@
 include ../../../../../config.mk
 include ../../../../../rules.mk
 
-PROJECT_NAME = vinedag
+PROJECT_NAME = dagvine
 
 SOURCE_DIR = $(CCTOOLS_HOME)/taskvine/src/graph/$(PROJECT_NAME)/context_graph
 MODULE_ROOT = $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/$(PROJECT_NAME)

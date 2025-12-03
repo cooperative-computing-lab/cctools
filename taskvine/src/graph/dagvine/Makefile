@@ -1,7 +1,7 @@
 include ../../../../config.mk
 include ../../../../rules.mk
 
-MODULE_DIR := $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/vinedag
+MODULE_DIR := $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/dagvine
 SUBDIRS    := context_graph vine_graph
 
 .PHONY: all install clean lint format $(SUBDIRS)
@@ -13,7 +13,7 @@ $(SUBDIRS):
 
 install: all
 	mkdir -p $(MODULE_DIR)
-	cp vinedag.py $(MODULE_DIR)
+	cp dagvine.py $(MODULE_DIR)
 	cp __init__.py $(MODULE_DIR)
 	@for dir in $(SUBDIRS); do \
 		$(MAKE) -C $$dir install; \

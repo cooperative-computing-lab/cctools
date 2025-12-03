@@ -43,7 +43,7 @@ def compute_sexpr_key(context_graph, k, v):
     """
     Evaluate a symbolic expression (S-expression) task within the task graph.
 
-    Both VineDAG and legacy Dask represent computations as symbolic
+    Both DAGVine and legacy Dask represent computations as symbolic
     expression trees (S-expressions). Each task value `v` encodes a nested
     structure where:
       - Leaf nodes are constants or task keys referencing parent results.

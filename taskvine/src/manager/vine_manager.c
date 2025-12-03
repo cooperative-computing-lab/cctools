@@ -966,29 +966,6 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 	hash_table_free_keys_array(cachenames);
 }
 
-/** Check if a file is busy by checking if it is an input file of any task. */
-static int is_file_busy(struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f)
-{
-	if (!q || !w || !f) {
-		return 0;
-	}
-
-	uint64_t task_id;
-	struct vine_task *task;
-	ITABLE_ITERATE(w->current_tasks, task_id, task)
-	{
-		struct vine_mount *input_mount;
-		LIST_ITERATE(task->input_mounts, input_mount)
-		{
-			if (f == input_mount->file) {
-				return 1;
-			}
-		}
-	}
-
-	return 0;
-}
-
 /** Evict a random worker to simulate a worker failure. */
 int evict_random_worker(struct vine_manager *q)
 {
@@ -1108,24 +1085,42 @@ static void clean_redundant_replicas(struct vine_manager *q, struct vine_file *f
 		return;
 	}
 
-	struct priority_queue *offload_from_workers = priority_queue_create(0);
+	struct priority_queue *clean_replicas_from_workers = priority_queue_create(0);
 
 	struct vine_worker_info *source_worker = NULL;
 	SET_ITERATE(source_workers, source_worker)
 	{
-		// workers with more used disk are prioritized for removing
-		if (is_file_busy(q, source_worker, f)) {
+		// if the file is actively in use by a task (the input to that task), we don't remove the replica on this worker
+		int file_inuse = 0;
+
+		uint64_t task_id;
+		struct vine_task *task;
+		ITABLE_ITERATE(source_worker->current_tasks, task_id, task)
+		{
+			struct vine_mount *input_mount;
+			LIST_ITERATE(task->input_mounts, input_mount)
+			{
+				if (f == input_mount->file) {
+					file_inuse = 1;
+					break;
+				}
+			}
+			if (file_inuse) {
+				break;
+			}
+		}
+		
+		if (file_inuse) {
 			continue;
 		}
 
-		priority_queue_push(offload_from_workers, source_worker, source_worker->inuse_cache);
+		priority_queue_push(clean_replicas_from_workers, source_worker, source_worker->inuse_cache);
 	}
 
-	struct vine_worker_info *offload_from_worker = NULL;
-	while (replicas_to_remove-- > 0 && (offload_from_worker = priority_queue_pop(offload_from_workers))) {
-		delete_worker_file(q, offload_from_worker, f->cached_name, 0, 0);
+	while (replicas_to_remove-- > 0 && (source_worker = priority_queue_pop(clean_replicas_from_workers))) {
+		delete_worker_file(q, source_worker, f->cached_name, 0, 0);
 	}
-	priority_queue_delete(offload_from_workers);
+	priority_queue_delete(clean_replicas_from_workers);
 
 	return;
 }

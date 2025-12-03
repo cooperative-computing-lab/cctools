@@ -97,18 +97,7 @@ static struct vine_worker_info *get_best_dest_worker(struct vine_manager *q, str
 	return best_destination;
 }
 
-void vine_temp_start_peer_transfer(struct vine_manager *q, struct vine_file *f, struct vine_worker_info *source_worker, struct vine_worker_info *dest_worker)
-{
-	if (!q || !f || f->type != VINE_TEMP || !source_worker || !dest_worker) {
-		return;
-	}
-
-	char *source_addr = string_format("%s/%s", source_worker->transfer_url, f->cached_name);
-	vine_manager_put_url_now(q, dest_worker, source_worker, source_addr, f);
-	free(source_addr);
-}
-
-int vine_temp_replicate_file_now(struct vine_manager *q, struct vine_file *f)
+static int vine_temp_replicate_file_now(struct vine_manager *q, struct vine_file *f)
 {
 	if (!q || !f || f->type != VINE_TEMP) {
 		return 0;
@@ -125,6 +114,53 @@ int vine_temp_replicate_file_now(struct vine_manager *q, struct vine_file *f)
 	}
 
 	vine_temp_start_peer_transfer(q, f, source_worker, dest_worker);
+
+	return 1;
+}
+
+/*************************************************************/
+/* Public Functions */
+/*************************************************************/
+
+void vine_temp_start_peer_transfer(struct vine_manager *q, struct vine_file *f, struct vine_worker_info *source_worker, struct vine_worker_info *dest_worker)
+{
+	if (!q || !f || f->type != VINE_TEMP || !source_worker || !dest_worker) {
+		return;
+	}
+
+	char *source_addr = string_format("%s/%s", source_worker->transfer_url, f->cached_name);
+	vine_manager_put_url_now(q, dest_worker, source_worker, source_addr, f);
+	free(source_addr);
+}
+
+int vine_temp_replicate_file_later(struct vine_manager *q, struct vine_file *f)
+{
+	if (!q || !f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
+		return 0;
+	}
+
+	int current_replica_count = vine_file_replica_count(q, f);
+	if (current_replica_count == 0 || current_replica_count >= q->temp_replica_count) {
+		return 0;
+	}
+
+	priority_queue_push(q->temp_files_to_replicate, f, -current_replica_count);
+
+	return 1;
+}
+
+int vine_temp_handle_file_lost(struct vine_manager *q, char *cachename)
+{
+	if (!q || !cachename) {
+		return 0;
+	}
+
+	struct vine_file *f = hash_table_lookup(q->file_table, cachename);
+	if (!f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
+		return 0;
+	}
+
+	vine_temp_replicate_file_later(q, f);
 
 	return 1;
 }
@@ -176,40 +212,4 @@ int vine_temp_start_replication(struct vine_manager *q)
 	list_delete(skipped);
 
 	return processed;
-}
-
-/*************************************************************/
-/* Public Functions */
-/*************************************************************/
-
-int vine_temp_replicate_file_later(struct vine_manager *q, struct vine_file *f)
-{
-	if (!q || !f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
-		return 0;
-	}
-
-	int current_replica_count = vine_file_replica_count(q, f);
-	if (current_replica_count == 0 || current_replica_count >= q->temp_replica_count) {
-		return 0;
-	}
-
-	priority_queue_push(q->temp_files_to_replicate, f, -current_replica_count);
-
-	return 1;
-}
-
-int vine_temp_handle_file_lost(struct vine_manager *q, char *cachename)
-{
-	if (!q || !cachename) {
-		return 0;
-	}
-
-	struct vine_file *f = hash_table_lookup(q->file_table, cachename);
-	if (!f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
-		return 0;
-	}
-
-	vine_temp_replicate_file_later(q, f);
-
-	return 1;
 }

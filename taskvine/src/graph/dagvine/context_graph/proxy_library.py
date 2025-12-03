@@ -11,8 +11,8 @@ import random
 import hashlib
 import collections
 
-from ndcctools.taskvine.vinedag.context_graph.core import ContextGraphTaskResult, ContextGraph
-from ndcctools.taskvine.vinedag.context_graph.proxy_functions import compute_dts_key, compute_sexpr_key, compute_single_key
+from ndcctools.taskvine.dagvine.context_graph.core import ContextGraphTaskResult, ContextGraph
+from ndcctools.taskvine.dagvine.context_graph.proxy_functions import compute_dts_key, compute_sexpr_key, compute_single_key
 from ndcctools.taskvine.utils import load_variable_from_library
 
 
