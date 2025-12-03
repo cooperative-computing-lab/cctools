@@ -5,6 +5,7 @@ See the file COPYING for details.
 
 #include "skip_list.h"
 #include "debug.h"
+#include "xxmalloc.h"
 
 #include <assert.h>
 #include <limits.h>
@@ -66,11 +67,6 @@ struct skip_list_cursor {
 	struct skip_list *list;
 	struct skip_list_node *target;
 };
-
-static void oom(void)
-{
-	fatal("out of memory");
-}
 
 static void skip_list_ref(struct skip_list *sl)
 {
@@ -164,23 +160,19 @@ static int random_level(struct skip_list *sl)
 /* Create a new node with the given level */
 static struct skip_list_node *create_node(int level, void *data, double *priority, unsigned priority_size)
 {
-	struct skip_list_node *node = calloc(1, sizeof(*node));
-	if (!node)
-		oom();
+	struct skip_list_node *node = xxmalloc(sizeof(*node));
+	memset(node, 0, sizeof(*node));
 
-	node->forward = calloc(level + 1, sizeof(struct skip_list_node *));
-	if (!node->forward)
-		oom();
+	node->forward = xxmalloc((level + 1) * sizeof(struct skip_list_node *));
+	node->backward = xxmalloc((level + 1) * sizeof(struct skip_list_node *));
+	node->priority = xxmalloc(priority_size * sizeof(double));
 
-	node->backward = calloc(level + 1, sizeof(struct skip_list_node *));
-	if (!node->backward)
-		oom();
+	memset(node->forward, 0, (level + 1) * sizeof(struct skip_list_node *));
+	memset(node->backward, 0, (level + 1) * sizeof(struct skip_list_node *));
+	if (priority) {
+		memcpy(node->priority, priority, priority_size * sizeof(double));
+	}
 
-	node->priority = malloc(priority_size * sizeof(double));
-	if (!node->priority)
-		oom();
-
-	memcpy(node->priority, priority, priority_size * sizeof(double));
 	node->data = data;
 	node->dead = false;
 	node->refcount = 0;
@@ -194,9 +186,8 @@ struct skip_list *skip_list_create(unsigned priority_size, double probability)
 	assert(priority_size > 0);
 	assert(probability > 0.0 && probability <= 0.5);
 
-	struct skip_list *sl = calloc(1, sizeof(*sl));
-	if (!sl)
-		oom();
+	struct skip_list *sl = xxmalloc(sizeof(*sl));
+	memset(sl, 0, sizeof(*sl));
 
 	sl->priority_size = priority_size;
 	sl->probability = probability;
@@ -204,27 +195,8 @@ struct skip_list *skip_list_create(unsigned priority_size, double probability)
 	sl->length = 0;
 	sl->refcount = 0;
 
-	/* Create head node with max level */
-	sl->head = calloc(1, sizeof(*sl->head));
-	if (!sl->head)
-		oom();
-	sl->head->forward = calloc(MAX_LEVEL, sizeof(struct skip_list_node *));
-	if (!sl->head->forward)
-		oom();
-	sl->head->backward = calloc(MAX_LEVEL, sizeof(struct skip_list_node *));
-	if (!sl->head->backward)
-		oom();
-
-	/* Create tail node with max level */
-	sl->tail = calloc(1, sizeof(*sl->tail));
-	if (!sl->tail)
-		oom();
-	sl->tail->forward = calloc(MAX_LEVEL, sizeof(struct skip_list_node *));
-	if (!sl->tail->forward)
-		oom();
-	sl->tail->backward = calloc(MAX_LEVEL, sizeof(struct skip_list_node *));
-	if (!sl->tail->backward)
-		oom();
+	sl->head = create_node(MAX_LEVEL, NULL, NULL, priority_size);
+	sl->tail = create_node(MAX_LEVEL, NULL, NULL, priority_size);
 
 	/* Link head and tail together at all levels */
 	for (int i = 0; i < MAX_LEVEL; i++) {
@@ -283,12 +255,11 @@ bool skip_list_delete(struct skip_list *sl)
 struct skip_list_cursor *skip_list_cursor_create(struct skip_list *sl)
 {
 	assert(sl);
-	struct skip_list_cursor *cur = calloc(1, sizeof(*cur));
-	if (!cur)
-		oom();
+	struct skip_list_cursor *cur = xxmalloc(sizeof(*cur));
 	cur->list = sl;
 	cur->target = NULL;
 	skip_list_ref(sl);
+
 	return cur;
 }
 
