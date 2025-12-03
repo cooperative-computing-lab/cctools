@@ -296,6 +296,9 @@ int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine
 /* Delete a file from a worker. */
 int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
 
+/** Release a random worker to simulate a failure. */
+int release_random_worker(struct vine_manager *q);
+
 /* The expected format of files created by the resource monitor.*/
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-task-%d"
 #define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"

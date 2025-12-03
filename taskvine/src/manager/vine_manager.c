@@ -968,6 +968,35 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 	hash_table_free_keys_array(cachenames);
 }
 
+/** Release a random worker to simulate a failure. */
+int release_random_worker(struct vine_manager *q)
+{
+	if (!q) {
+		return 0;
+	}
+
+	int removed = 0;
+
+	int offset_bookkeep;
+	char *key;
+	struct vine_worker_info *w;
+
+	HASH_TABLE_ITERATE_RANDOM_START(q->worker_table, offset_bookkeep, key, w)
+	{
+		if (!w) {
+			continue;
+		}
+
+		/* evict this worker */
+		debug(D_VINE | D_NOTICE, "Intentionally evicting worker %s", w->hostname);
+		release_worker(q, w);
+		removed = 1;
+		break;
+	}
+
+	return removed;
+}
+
 /*
 This function enforces a target worker eviction rate (1 every X seconds).
 If the observed eviction interval is shorter than the desired one, we randomly evict one worker
@@ -1006,32 +1035,8 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 		return 0;
 	}
 
-	/* collect removable workers */
-	struct list *candidates_list = list_create();
-	char *key;
-	struct vine_worker_info *w;
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
-	{
-		if (w->type != VINE_WORKER_TYPE_WORKER) {
-			continue;
-		}
-		list_push_tail(candidates_list, w);
-	}
-
 	/* release a random worker if any */
-	int index = (int)(random_int64() % list_size(candidates_list));
-	int i = 0;
-	while ((w = list_pop_head(candidates_list))) {
-		if (i++ == index) {
-			/* evict this worker */
-			debug(D_VINE | D_NOTICE, "Intentionally evicting worker %s", w->hostname);
-			release_worker(q, w);
-			break;
-		}
-	}
-	list_delete(candidates_list);
-
-	return 1;
+	return release_random_worker(q);
 }
 
 /* Remove all tasks and other associated state from a given worker. */
@@ -5476,7 +5481,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// if we got here, no events were triggered this time around.
 		// we set the nothing_happened_last_wait_cycle flag so that link_poll waits for some time
 		// the next time around, or return retrieved tasks if there some available.
-		if (tasks_ready_left_to_consider < 1) {
+		if (tasks_ready_left_to_consider < 1 && retrieved_this_cycle < 1) {
 			q->nothing_happened_last_wait_cycle = 1;
 			tasks_ready_left_to_consider = priority_queue_size(q->ready_tasks);
 		}

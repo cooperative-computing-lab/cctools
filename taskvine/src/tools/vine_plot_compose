@@ -22,8 +22,9 @@ def parse_debug(log):
     transfer_addresses = {}
     # FORMAT [FROM_ADDR, TO_ADDR, CACHENAME, SIZE(ADDED LATER)]
     for line in lines:
-        if 'tx to' in line and ' file ' in line:
-            date, time, manager, vine, tx, to, machine, addr, opt, cachename, size, mode = line.split(maxsplit=11)
+        if 'tx to' in line and ' put ' in line:
+            print(line)
+            date, time, manager, tx, to, machine, addr, opt, cachename, size, mode = line.split(maxsplit=11)
             size = float(size)
             addr = addr.strip('):')
             addr = addr.strip('(')
@@ -33,10 +34,10 @@ def parse_debug(log):
             file_sizes[cachename].append(size/GIGABYTES)
         if 'rx from' in line and ' file ' in line:
             try:
-                date, time, manager, vine, rx, frm, machine, addr, opt, cachename, size, mode = line.split(maxsplit=11)
+                date, time, manager, rx, frm, machine, addr, opt, cachename, size, mode = line.split(maxsplit=11)
             # WQ fallback
             except:
-                date, time, manager, vine, rx, frm, machine, addr, opt, cachename, size = line.split(maxsplit=10)
+                date, time, manager, rx, frm, machine, addr, opt, cachename, size = line.split(maxsplit=10)
             size = float(size)
             addr = addr.strip('):')
             addr = addr.strip('(')
@@ -45,7 +46,7 @@ def parse_debug(log):
                 file_sizes[cachename] = []
             file_sizes[cachename].append(size/GIGABYTES)
         if 'will get' in line:
-            date, time, manager, vine, machine, addr, will, get, filename, fr, url, path = line.split(maxsplit=12)
+            date, time, manager, machine, addr, will, get, filename, fr, url, path = line.split(maxsplit=12)
             path = path.strip('workerip://')
             from_addr, cachenmame = path.split('/') 
             addr = addr.strip('):')
@@ -53,7 +54,7 @@ def parse_debug(log):
             from_addr = transfer_addresses[from_addr]
             transfer_info.append([from_addr, addr, cachename])
         if "cache-update" in line:
-            date, time, manager, vine, rx, frm, machine, addr, op, cachename, size, x, y, z = line.split(maxsplit=13)
+            date, time, manager, rx, frm, machine, addr, op, cachename, size, x, y, z = line.split(maxsplit=13)
             size = float(size)
             if cachename not in file_sizes:
                 file_sizes[cachename] = []
@@ -64,7 +65,7 @@ def parse_debug(log):
             worker_file_info[addr]['files'][cachename] = 0
             file_sizes[cachename].append(size/GIGABYTES)
         if "transfer-port" in line:
-            date, time, manager, vine, rx, frm, machine, addr, transfer_address, tr_addr = line.split(maxsplit=9)
+            date, time, manager, rx, frm, machine, addr, transfer_address, tr_addr = line.split(maxsplit=9)
             addr = addr.strip('):')
             addr = addr.strip('(')
             tr_addr = addr.split(':')[0] + ':' + tr_addr
@@ -365,7 +366,9 @@ def plot_worker(log_info, axs, args):
     
     # trickery for y axis ticks
     tick_count = args.worker_ticks
-    steps = int(len(y_counts)/tick_count) 
+    steps = int(len(y_counts)/tick_count)
+    if steps==0:
+        steps = 1
     y_labels = []
     y_ticks = [y_counts[x] for x in range(steps - 1, len(y_counts), steps) if y_counts[steps - 1]]
     y_axis = args.worker_y
