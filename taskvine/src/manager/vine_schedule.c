@@ -66,7 +66,7 @@ int vine_schedule_in_ramp_down(struct vine_manager *q)
 		return 0;
 	}
 
-	if (hash_table_size(q->worker_table) > skip_list_length(q->ready_tasks)) {
+	if (hash_table_size(q->worker_table) > skip_list_size(q->ready_tasks)) {
 		return 1;
 	}
 

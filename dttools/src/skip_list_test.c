@@ -145,8 +145,8 @@ double measure_skip_list_operations(struct item **items, int num_elements, int o
 		for (int i = 0; i < num_elements; i++) {
 			skip_list_remove_by_priority(sl, items[i]->priority);
 		}
-		if (skip_list_length(sl) != 0) {
-			printf("FAIL: skip_list_length %d is not 0 after removal\n", skip_list_length(sl));
+		if (skip_list_size(sl) != 0) {
+			printf("FAIL: skip_list_size %d is not 0 after removal\n", skip_list_size(sl));
 			return -1;
 		}
 
@@ -293,7 +293,7 @@ int main(int argc, char *argv[])
 	int order_time_test_passed = 1;
 	int elements_checked = 0;
 
-	while (skip_list_length(sl) > 0) {
+	while (skip_list_size(sl) > 0) {
 		// Peek at head priority
 		memcpy(head_priority, skip_list_peek_head_priority(sl), 2 * sizeof(double));
 

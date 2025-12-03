@@ -3598,7 +3598,7 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 
 	int iter_count = 0;
 
-	printf("now considering tasks from ready list: %d\n", skip_list_length(q->ready_tasks));
+	printf("now considering tasks from ready list: %d\n", skip_list_size(q->ready_tasks));
 	skip_list_seek(cur, 0);
 	SKIP_LIST_ITERATE(cur, t)
 	{
@@ -3658,7 +3658,7 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 static int send_one_task(struct vine_manager *q)
 {
 	double now_secs = ((double)timestamp_get()) / ONE_SECOND;
-	int iter_depth = MIN(skip_list_length(q->ready_tasks), q->attempt_schedule_depth);
+	int iter_depth = MIN(skip_list_size(q->ready_tasks), q->attempt_schedule_depth);
 
 	// if priority_ready_cr is not pointing at a task
 	// (e.g it is at the end of the list, or first time through)
@@ -5300,7 +5300,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				END_ACCUM_TIME(q, time_internal);
 			}
 
-			if (t && (!q->prefer_dispatch || skip_list_length(q->ready_tasks) == 0 || !sent_in_previous_cycle)) {
+			if (t && (!q->prefer_dispatch || skip_list_size(q->ready_tasks) == 0 || !sent_in_previous_cycle)) {
 				break;
 			}
 		}
@@ -5358,7 +5358,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			int retrieved_from_worker = receive_tasks_from_worker(q, w, retrieved_this_cycle);
 			retrieved_this_cycle += retrieved_from_worker;
 			events += retrieved_from_worker;
-		} while (q->max_retrievals < 0 || retrieved_this_cycle < q->max_retrievals || !skip_list_length(q->ready_tasks));
+		} while (q->max_retrievals < 0 || retrieved_this_cycle < q->max_retrievals || !skip_list_size(q->ready_tasks));
 		END_ACCUM_TIME(q, time_receive);
 
 		if (retrieved_this_cycle) {
@@ -5440,7 +5440,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// in this wait.
 		if (events > 0) {
 			BEGIN_ACCUM_TIME(q, time_internal);
-			int done = !skip_list_length(q->ready_tasks) && !list_size(q->waiting_retrieval_list) && !itable_size(q->running_table);
+			int done = !skip_list_size(q->ready_tasks) && !list_size(q->waiting_retrieval_list) && !itable_size(q->running_table);
 			END_ACCUM_TIME(q, time_internal);
 
 			if (done) {
@@ -5617,11 +5617,11 @@ int vine_hungry(struct vine_manager *q)
 
 	if (current_time - q->time_last_hungry + q->hungry_check_interval > 0) {
 		q->time_last_hungry = current_time;
-		q->tasks_waiting_last_hungry = skip_list_length(q->ready_tasks);
+		q->tasks_waiting_last_hungry = skip_list_size(q->ready_tasks);
 		q->tasks_to_sate_hungry = vine_hungry_computation(q);
 	}
 
-	int change = q->tasks_waiting_last_hungry - skip_list_length(q->ready_tasks);
+	int change = q->tasks_waiting_last_hungry - skip_list_size(q->ready_tasks);
 
 	return MAX(0, q->tasks_to_sate_hungry - change);
 }
@@ -5974,7 +5974,7 @@ void vine_get_stats(struct vine_manager *q, struct vine_stats *s)
 	// s->workers_able computed below.
 
 	// info about tasks
-	s->tasks_waiting = skip_list_length(q->ready_tasks);
+	s->tasks_waiting = skip_list_size(q->ready_tasks);
 	s->tasks_with_results = list_size(q->waiting_retrieval_list);
 	s->tasks_running = itable_size(q->running_table);
 	s->tasks_on_workers = s->tasks_with_results + s->tasks_running;

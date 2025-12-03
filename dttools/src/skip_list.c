@@ -54,7 +54,7 @@ struct skip_list_node {
 /* Skip list structure */
 struct skip_list {
 	unsigned refcount;
-	unsigned length;
+	unsigned size;
 	unsigned priority_size;
 	double probability;
 	int level;		     /* Current max level (0-based) */
@@ -192,7 +192,7 @@ struct skip_list *skip_list_create(unsigned priority_size, double probability)
 	sl->priority_size = priority_size;
 	sl->probability = probability;
 	sl->level = 0;
-	sl->length = 0;
+	sl->size = 0;
 	sl->refcount = 0;
 
 	sl->head = create_node(MAX_LEVEL, NULL, NULL, priority_size);
@@ -207,17 +207,17 @@ struct skip_list *skip_list_create(unsigned priority_size, double probability)
 	return sl;
 }
 
-int skip_list_length(struct skip_list *sl)
+int skip_list_size(struct skip_list *sl)
 {
 	assert(sl);
-	return sl->length;
+	return sl->size;
 }
 
 bool skip_list_delete(struct skip_list *sl)
 {
 	if (!sl)
 		return true;
-	if (sl->length > 0)
+	if (sl->size > 0)
 		return false;
 	if (sl->refcount > 0)
 		return false;
@@ -345,7 +345,7 @@ bool seek_forward(struct skip_list_cursor *cur, int index)
 	skip_list_reset(cur);
 	struct skip_list *sl = cur->list;
 
-	if (index >= skip_list_length(sl)) {
+	if (index >= skip_list_size(sl)) {
 		return false;
 	}
 
@@ -378,7 +378,7 @@ bool seek_backward(struct skip_list_cursor *cur, int index)
 	skip_list_reset(cur);
 	struct skip_list *sl = cur->list;
 
-	if (-index > skip_list_length(sl)) {
+	if (-index > skip_list_size(sl)) {
 		return false;
 	}
 
@@ -592,8 +592,8 @@ bool skip_list_remove_here(struct skip_list_cursor *cur)
 
 	/* Mark node as dead */
 	target->dead = true;
-	assert(sl->length > 0);
-	--sl->length;
+	assert(sl->size > 0);
+	--sl->size;
 
 	/* Note: We don't unlink the node here. We just mark it as dead.
 	 * It will be skipped by iteration and search operations.
@@ -667,8 +667,8 @@ bool skip_list_remove_by_priority_arr(struct skip_list *sl, double *priority)
 	if (x != sl->tail && compare_priority(x->priority, priority, sl->priority_size) == 0) {
 		/* Mark node as dead */
 		x->dead = true;
-		assert(sl->length > 0);
-		--sl->length;
+		assert(sl->size > 0);
+		--sl->size;
 		delete_node(x, sl);
 
 		return true;
@@ -721,6 +721,6 @@ void skip_list_insert_arr(struct skip_list *sl, void *item, double *priority)
 		update[i]->forward[i] = new_node;
 	}
 
-	assert(sl->length < UINT_MAX);
-	++sl->length;
+	assert(sl->size < UINT_MAX);
+	++sl->size;
 }

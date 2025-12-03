@@ -76,7 +76,7 @@ bool skip_list_delete(struct skip_list *sl);
  * @param sl The skip list to examine.
  * @returns The number of items in the skip list.
  */
-int skip_list_length(struct skip_list *sl);
+int skip_list_size(struct skip_list *sl);
 
 /** Get the priority tuple of the first item in the skip list.
  * @param sl The skip list to examine.
