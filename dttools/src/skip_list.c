@@ -171,6 +171,8 @@ static struct skip_list_node *create_node(int level, void *data, double *priorit
 	memset(node->backward, 0, (level + 1) * sizeof(struct skip_list_node *));
 	if (priority) {
 		memcpy(node->priority, priority, priority_size * sizeof(double));
+	} else {
+		memset(node->priority, 0, priority_size * sizeof(double));
 	}
 
 	node->data = data;
@@ -223,8 +225,8 @@ bool skip_list_delete(struct skip_list *sl)
 		return false;
 
 	/* Clean up any dead nodes that are still around (with refcount 0) */
-	struct skip_list_node *node = sl->head->forward[0];
-	while (node != sl->tail) {
+	struct skip_list_node *node = sl->head;
+	while (node) {
 		struct skip_list_node *next = node->forward[0];
 		assert(node->refcount == 0);
 		free(node->priority);
@@ -232,20 +234,6 @@ bool skip_list_delete(struct skip_list *sl)
 		free(node->backward);
 		free(node);
 		node = next;
-	}
-
-	/* Free the head node */
-	if (sl->head) {
-		free(sl->head->forward);
-		free(sl->head->backward);
-		free(sl->head);
-	}
-
-	/* Free the tail node */
-	if (sl->tail) {
-		free(sl->tail->forward);
-		free(sl->tail->backward);
-		free(sl->tail);
 	}
 
 	free(sl);
