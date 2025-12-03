@@ -258,4 +258,42 @@ void skip_list_insert_arr(struct skip_list *lst, void *item, double *priority);
 #define skip_list_insert(lst, item, ...) \
 	skip_list_insert_arr(lst, item, (double[]){__VA_ARGS__})
 
+
+/** Iterate over all items in a skip list (highest to lowest priority).
+ *
+ * These macros provide a convenient way to iterate over all items while
+ * maintaining a cursor that points to the current item during each iteration.
+ *
+ * @param cursor A pre-existing cursor (struct skip_list_cursor *) that will be
+ *               positioned at each item during iteration. Can be used to modify
+ *               or remove the current item. Iteration starts at the position
+ *               of that the cursor is currently at.
+ * @param item A pointer variable that will receive each item's data.
+ *
+ * <b>Example usage:</b>
+ * <pre>
+ * struct skip_list *sl = skip_list_create(1, 0.5);
+ * struct skip_list_cursor *cur = skip_list_cursor_create(sl);
+ * struct my_data *data;
+ *
+ * // Insert some items...
+ *
+ * skip_list_seek(cur, 0);
+ * SKIP_LIST_ITERATE_START(cur, data)
+ *     printf("Processing: %s\n", data->name);
+ *     if (should_remove(data)) {
+ *         skip_list_remove_here(cur);
+ *     }
+ * SKIP_LIST_ITERATE_END(cur)
+ *
+ * skip_list_cursor_destroy(cur);
+ * </pre>
+ *
+ * @note The cursor is valid during each iteration and can be used with
+ *       skip_list_remove_here(), skip_list_get_priority(), etc.
+ * @note Safe to use break/continue within the loop body.
+ */
+#define SKIP_LIST_ITERATE(cursor, item) \
+	for(; skip_list_get(cursor, (void **)&item); skip_list_next(cursor))
+
 #endif
