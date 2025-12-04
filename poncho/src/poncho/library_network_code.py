@@ -81,10 +81,8 @@ def remote_execute(func):
 # Handler to sigchld when child exits.
 def sigchld_handler(signum, frame):
     # write any byte to signal that there's at least 1 child
-    try:
-        os.write(w, b"a")
-    except OSError:
-        pass
+    # if this fails, the notification mechanism has failed and the error will be raised normally
+    os.write(w, b"a")
 
 
 # Read data from worker, start function, and dump result to `outfile`.
@@ -417,6 +415,7 @@ def main():
                     )
                 else:
                     pid, func_id = start_function(in_pipe_fd, thread_limit)
+                    # pid == -1 indicates a failure during fork/setup of the function execution
                     if pid == -1:
                         send_result(
                             out_pipe_fd,
