@@ -348,7 +348,10 @@ bool seek_forward(struct skip_list_cursor *cur, int index)
 		// Skip dead nodes without counting them
 		// and try to delete them if their refcount is 0
 		if (cur->target->dead) {
+			// Save next pointer before delete_node potentially frees the node
+			struct skip_list_node *next = cur->target->forward[0];
 			delete_node(cur->target, sl);
+			cur->target = next;
 			continue;
 		}
 
@@ -381,7 +384,10 @@ bool seek_backward(struct skip_list_cursor *cur, int index)
 		// Skip dead nodes without counting them
 		// and try to delete them if their refcount is 0
 		if (cur->target->dead) {
+			// Save previous pointer before delete_node potentially frees the node
+			struct skip_list_node *prev = cur->target->backward[0];
 			delete_node(cur->target, sl);
+			cur->target = prev;
 			continue;
 		}
 
