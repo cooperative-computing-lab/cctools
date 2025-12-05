@@ -3598,11 +3598,9 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 
 	int iter_count = 0;
 
-	printf("now considering tasks from ready list: %d\n", skip_list_size(q->ready_tasks));
 	skip_list_seek(cur, 0);
 	SKIP_LIST_ITERATE(cur, t)
 	{
-		printf("task %d is being considered\n", t->task_id);
 		if (iter_count >= iter_depth) {
 			break;
 		}
