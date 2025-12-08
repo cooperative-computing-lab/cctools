@@ -31,37 +31,34 @@ bucketing_bucket_range_t *bucketing_bucket_range_create(int lo, int hi, struct l
 	struct list_cursor *cursor_lo = list_cursor_create(l);
 	if (!list_seek(cursor_lo, lo)) {
 		free(range);
-		list_cursor_destroy(cursor_lo);
 		return 0;
 	}
 
 	bucketing_cursor_w_pos_t *cursor_pos_lo = bucketing_cursor_w_pos_create(cursor_lo, lo);
 	if (!cursor_pos_lo) {
-                free(range);
-                list_cursor_destroy(cursor_lo);
-                bucketing_cursor_w_pos_delete(cursor_pos_lo);
+		free(range);
+		list_cursor_destroy(cursor_lo);
 		return 0;
-        }
+	}
 
 	range->lo = cursor_pos_lo;
 
 	struct list_cursor *cursor_hi = list_cursor_create(l);
 	if (!list_seek(cursor_hi, hi)) {
-                free(range);
-                list_cursor_destroy(cursor_lo);
-                bucketing_cursor_w_pos_delete(cursor_pos_lo);
-                list_cursor_destroy(cursor_hi);
+		free(range);
+		list_cursor_destroy(cursor_lo);
+		bucketing_cursor_w_pos_delete(cursor_pos_lo);
 		return 0;
-        }
+	}
 
 	bucketing_cursor_w_pos_t *cursor_pos_hi = bucketing_cursor_w_pos_create(cursor_hi, hi);
 	if (!cursor_pos_hi) {
-                free(range);
-                list_cursor_destroy(cursor_lo);
-                bucketing_cursor_w_pos_delete(cursor_pos_lo);
-                list_cursor_destroy(cursor_hi);
+		free(range);
+		list_cursor_destroy(cursor_lo);
+		bucketing_cursor_w_pos_delete(cursor_pos_lo);
+		list_cursor_destroy(cursor_hi);
 		return 0;
-        }
+	}
 
 	range->hi = cursor_pos_hi;
 

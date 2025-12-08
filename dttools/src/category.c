@@ -140,11 +140,9 @@ void category_specify_first_allocation_guess(struct category *c, const struct rm
 
 int category_in_bucketing_mode(struct category *c)
 {
-	if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING
-            || c->allocation_mode == CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING
-            || c->allocation_mode == CATEGORY_ALLOCATION_MODE_DET_GREEDY_BUCKETING
-            || c->allocation_mode == CATEGORY_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING)
+	if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING || c->allocation_mode == CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING || c->allocation_mode == CATEGORY_ALLOCATION_MODE_DET_GREEDY_BUCKETING || c->allocation_mode == CATEGORY_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING) {
 		return 1;
+	}
 	return 0;
 }
 

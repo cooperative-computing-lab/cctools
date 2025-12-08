@@ -64,18 +64,18 @@ static double bucketing_det_greedy_policy(bucketing_bucket_range_t *range, int b
 	}
 
 	/* Update general statistics */
-        if (total_sig == 0) {
-            fatal("Total significance is zero, cannot divide by zero\n");
-            list_cursor_destroy(iter);
-            return -1;
+	if (total_sig == 0) {
+		fatal("Total significance is zero, cannot divide by zero\n");
+		list_cursor_destroy(iter);
+		return -1;
 	}
 	p1 /= total_sig;
 	p2 /= total_sig;
-        if (total_lo_sig == 0) {
-            fatal("Total significance in the lower bucket is zero, cannot divide by zero\n");
-            list_cursor_destroy(iter);
-            return -1;
-        }
+	if (total_lo_sig == 0) {
+		fatal("Total significance in the lower bucket is zero, cannot divide by zero\n");
+		list_cursor_destroy(iter);
+		return -1;
+	}
 	exp_cons_lq_break /= total_lo_sig;
 	if (total_hi_sig == 0)
 		exp_cons_g_break = 0;
