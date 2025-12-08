@@ -101,19 +101,19 @@ static int bucketing_ready_to_update_buckets(bucketing_state_t *s)
 static void bucketing_update_buckets(bucketing_state_t *s)
 {
 	switch (s->mode) {
-	case BUCKETING_MODE_GREEDY:
+	    case BUCKETING_MODE_GREEDY:
 		bucketing_greedy_update_buckets(s);
 		break;
-	case BUCKETING_MODE_EXHAUSTIVE:
+	    case BUCKETING_MODE_EXHAUSTIVE:
 		bucketing_exhaust_update_buckets(s);
 		break;
-    case BUCKETING_MODE_DET_GREEDY:
-        bucketing_det_greedy_update_buckets(s);
-        break;
-    case BUCKETING_MODE_DET_EXHAUSTIVE:
-        bucketing_det_exhaust_update_buckets(s);
-        break;
-	default:
+            case BUCKETING_MODE_DET_GREEDY:
+                bucketing_det_greedy_update_buckets(s);
+                break;
+            case BUCKETING_MODE_DET_EXHAUSTIVE:
+                bucketing_det_exhaust_update_buckets(s);
+                break;
+            default:
 		fatal("Invalid mode to update buckets\n");
 	}
 }
@@ -164,8 +164,8 @@ bucketing_state_t *bucketing_state_create(double default_value, int num_sampling
 
 	if (!(mode == BUCKETING_MODE_GREEDY
 	    || mode == BUCKETING_MODE_EXHAUSTIVE
-		|| mode == BUCKETING_MODE_DET_GREEDY
-		|| mode == BUCKETING_MODE_DET_EXHAUSTIVE)) {
+	    || mode == BUCKETING_MODE_DET_GREEDY
+            || mode == BUCKETING_MODE_DET_EXHAUSTIVE)) {
 		warn(D_BUCKETING, "Invalid bucketing mode, defaulting to the probabilistic greedy mode.\n");
 		mode = BUCKETING_MODE_GREEDY;
 	}

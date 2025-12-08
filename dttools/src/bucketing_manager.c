@@ -43,7 +43,6 @@ bucketing_manager_t *bucketing_manager_create(bucketing_mode_t mode)
 {
 	bucketing_manager_t *m = xxmalloc(sizeof(*m));
 
-	/* only support two bucketing modes */
 	if (mode != BUCKETING_MODE_GREEDY
         && mode != BUCKETING_MODE_EXHAUSTIVE
         && mode != BUCKETING_MODE_DET_GREEDY
@@ -141,8 +140,10 @@ void bucketing_manager_set_mode(bucketing_manager_t *m, bucketing_mode_t mode)
 		return;
 	}
 
-	/* can only set two modes of bucketing */
-	if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE) {
+	if (mode != BUCKETING_MODE_GREEDY
+            && mode != BUCKETING_MODE_EXHAUSTIVE
+            && mode != BUCKETING_MODE_DET_GREEDY
+            && mode != BUCKETING_MODE_DET_EXHAUSTIVE) {
 		fatal("Invalid bucketing mode\n");
 		return;
 	}

@@ -126,5 +126,16 @@ with worker:
             max = {},
             min = {},
             expected = e)
+    check_task('det_exhaustive_bucketing',
+            wq.WORK_QUEUE_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING,
+            max = {},
+            min = {},
+            expected = e)
+
+    check_task('det_greedy_bucketing',
+            wq.WORK_QUEUE_ALLOCATION_MODE_DET_GREEDY_BUCKETING,
+            max = {},
+            min = {},
+            expected = e)
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:

@@ -62,7 +62,7 @@ class DaskWQ(WorkQueue):
     #                      removes some of the dask graph optimizations, thus proceed with care.
     # @param resources     A dictionary with optional keys of cores, memory and disk (MB)
     #                      to set maximum resource usage per task.
-    # @param resources_mode One of work_queue.WORK_QUEUE_ALLOCATION_MODE_{FIXED,MAX,MIN_WASTE,MAX_THROUGHPUT,GREEDY_BUCKETING,EXHAUSTIVE_BUCKETING}
+    # @param resources_mode One of work_queue.WORK_QUEUE_ALLOCATION_MODE_{FIXED,MAX,MIN_WASTE,MAX_THROUGHPUT,GREEDY_BUCKETING,EXHAUSTIVE_BUCKETING, DET_GREEDY_BUCKETING, DET_EXHAUSTIVE_BUCKETING}
     # @param retries       Number of times to attempt a task. Default is 5.
     # @param verbose       if true, emit additional debugging information.
     def get(self, dsk, keys, *,
