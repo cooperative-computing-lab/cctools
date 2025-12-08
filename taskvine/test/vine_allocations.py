@@ -98,8 +98,8 @@ with worker:
     check_task("exhaustive_bucketing", "exhaustive_bucketing", max={}, min={}, expected=e)
 
     check_task("greedy_bucketing", "greedy_bucketing", max={}, min={}, expected=e)
-    check_task("deterministic_exhaustive_bucketing", "deterministic_exhaustive_bucketing", max={}, min={}, expected=e)
+    check_task("det_exhaustive_bucketing", "det_exhaustive_bucketing", max={}, min={}, expected=e)
 
-    check_task("deterministic_greedy_bucketing", "deterministic_greedy_bucketing", max={}, min={}, expected=e)
+    check_task("det_greedy_bucketing", "det_greedy_bucketing", max={}, min={}, expected=e)
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
