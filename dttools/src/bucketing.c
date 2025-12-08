@@ -331,7 +331,6 @@ double bucketing_predict(bucketing_state_t *s, double prev_val)
 			/* return if at last bucket */
 			if (i == list_length(s->sorted_buckets) - 1) {
 				ret_val = bb_ptr->val;
-
 				if (ret_val <= prev_val) {
 					exp = floor(log(prev_val / s->default_value) / log(s->increase_rate)) + 1;
 					list_cursor_destroy(lc);
