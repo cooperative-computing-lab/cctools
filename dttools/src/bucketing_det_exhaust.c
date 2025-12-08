@@ -79,29 +79,27 @@ static double bucketing_det_exhaust_compute_cost(bucketing_state_t *s, struct li
 		return -1;
 	}
 
-    // precompute the deterministic cost of det_exhaust
-    double incre_sum_bucket_vals[N];
-    for (int i = 0; i < N; ++i) {
-        if (i == 0) {
-            incre_sum_bucket_vals[i] = bucket_array[i]->val;
-        }
-        else {
-            incre_sum_bucket_vals[i] = incre_sum_bucket_vals[i-1] + bucket_array[i]->val;
-        }
-    }
+	// precompute the deterministic cost of det_exhaust
+	double incre_sum_bucket_vals[N];
+	for (int i = 0; i < N; ++i) {
+		if (i == 0) {
+			incre_sum_bucket_vals[i] = bucket_array[i]->val;
+		} else {
+			incre_sum_bucket_vals[i] = incre_sum_bucket_vals[i - 1] + bucket_array[i]->val;
+		}
+	}
 
-
-    // compute the cost of det_exhaust
-    double expected_cost = 0;
-    double p;                   // probability of a bucket
-    double sum_bucket_vals;     // sum of all buckets' vals up to a given bucket
-    double exp_val;             // expected value of a task in a given bucket
-    for (int i = 0; i < N; ++i) {
-        p = bucket_array[i]->prob;
-        sum_bucket_vals = incre_sum_bucket_vals[i];
-        exp_val = *(task_exps+i);
-        expected_cost += p * (sum_bucket_vals - exp_val);
-    }
+	// compute the cost of det_exhaust
+	double expected_cost = 0;
+	double p;		// probability of a bucket
+	double sum_bucket_vals; // sum of all buckets' vals up to a given bucket
+	double exp_val;		// expected value of a task in a given bucket
+	for (int i = 0; i < N; ++i) {
+		p = bucket_array[i]->prob;
+		sum_bucket_vals = incre_sum_bucket_vals[i];
+		exp_val = *(task_exps + i);
+		expected_cost += p * (sum_bucket_vals - exp_val);
+	}
 
 	free(bucket_array);
 	free(task_exps);

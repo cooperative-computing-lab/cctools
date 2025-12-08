@@ -8,20 +8,20 @@
 
 bucketing_cursor_w_pos_t *bucketing_cursor_w_pos_create(struct list_cursor *lc, int pos)
 {
-    bucketing_cursor_w_pos_t *cursor_pos = xxmalloc(sizeof(*cursor_pos));
+	bucketing_cursor_w_pos_t *cursor_pos = xxmalloc(sizeof(*cursor_pos));
 
-    cursor_pos->lc = lc;
-    cursor_pos->pos = pos;
+	cursor_pos->lc = lc;
+	cursor_pos->pos = pos;
 
-    return cursor_pos;
+	return cursor_pos;
 }
 
 void bucketing_cursor_w_pos_delete(bucketing_cursor_w_pos_t *cursor_pos)
 {
-    if (cursor_pos) {
-        list_cursor_destroy(cursor_pos->lc);
-        free(cursor_pos);
-    }
+	if (cursor_pos) {
+		list_cursor_destroy(cursor_pos->lc);
+		free(cursor_pos);
+	}
 }
 
 bucketing_bucket_range_t *bucketing_bucket_range_create(int lo, int hi, struct list *l)
@@ -53,35 +53,35 @@ bucketing_bucket_range_t *bucketing_bucket_range_create(int lo, int hi, struct l
 
 void bucketing_bucket_range_delete(bucketing_bucket_range_t *range)
 {
-    if (range) {
-        bucketing_cursor_w_pos_delete(range->lo);
-        bucketing_cursor_w_pos_delete(range->hi);
-        free(range);
-    } else {
-        warn(D_BUCKETING, "ignoring command to delete a null pointer to bucket range\n");
-    }
+	if (range) {
+		bucketing_cursor_w_pos_delete(range->lo);
+		bucketing_cursor_w_pos_delete(range->hi);
+		free(range);
+	} else {
+		warn(D_BUCKETING, "ignoring command to delete a null pointer to bucket range\n");
+	}
 }
 
 void bucketing_cursor_pos_list_clear(struct list *l, void (*f)(bucketing_cursor_w_pos_t *))
 {
-    if (!l)
-        return;
+	if (!l)
+		return;
 
-    bucketing_cursor_w_pos_t *tmp;
+	bucketing_cursor_w_pos_t *tmp;
 
-    while ((tmp = list_pop_head(l)))
-        f(tmp);
+	while ((tmp = list_pop_head(l)))
+		f(tmp);
 }
 
 void bucketing_bucket_range_list_clear(struct list *l, void (*f)(bucketing_bucket_range_t *))
 {
-    if (!l)
-        return;
+	if (!l)
+		return;
 
-    bucketing_bucket_range_t *tmp;
+	bucketing_bucket_range_t *tmp;
 
-    while ((tmp = list_pop_head(l)))
-        f(tmp);
+	while ((tmp = list_pop_head(l)))
+		f(tmp);
 }
 
 struct list *bucketing_cursor_pos_list_sort(struct list *l, int (*f)(const void *, const void *))
@@ -132,9 +132,9 @@ struct list *bucketing_cursor_pos_list_sort(struct list *l, int (*f)(const void 
 
 int bucketing_compare_break_points(const void *p1, const void *p2)
 {
-    if (!p1 || !p2) {
-        fatal("Cannot compare empty break points\n");
-        return 0;
-    }
-    return (*((bucketing_cursor_w_pos_t **)p1))->pos - (*((bucketing_cursor_w_pos_t **)p2))->pos;
+	if (!p1 || !p2) {
+		fatal("Cannot compare empty break points\n");
+		return 0;
+	}
+	return (*((bucketing_cursor_w_pos_t **)p1))->pos - (*((bucketing_cursor_w_pos_t **)p2))->pos;
 }

@@ -92,8 +92,8 @@ class DaskVine(Manager):
     # @param resources_mode Automatically resize allocation per task. One of 'fixed'
     #                       (use the value of 'resources' above), 'max througput',
     #                       'max' (for maximum values seen), 'min_waste', 'greedy bucketing',
-    #                       'exhaustive bucketing', 'deterministic greedy bucketing', or 
-    #                       'deterministic exhaustive bucketing'. 
+    #                       'exhaustive bucketing', 'deterministic greedy bucketing', or
+    #                       'deterministic exhaustive bucketing'.
     #                       This is done per function type in dsk.
     # @param task_mode     Create tasks as either as 'tasks' (using PythonTasks) or 'function-calls' (using FunctionCalls)
     # @param retries       Number of times to attempt a task. Default is 5.

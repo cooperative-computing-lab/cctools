@@ -157,20 +157,17 @@ void category_specify_allocation_mode(struct category *c, int mode)
 
 	if (category_in_bucketing_mode(c)) {
 		if (!c->bucketing_manager) {
-                    bucketing_mode_t bmode;
-                    if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING) {
-                        bmode = BUCKETING_MODE_GREEDY;
-                    }
-                    else if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING) {
-                        bmode = BUCKETING_MODE_EXHAUSTIVE;
-                    }
-                    else if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_DET_GREEDY_BUCKETING) {
-                        bmode = BUCKETING_MODE_DET_GREEDY;
-                    }
-                    else {
-                        bmode = BUCKETING_MODE_DET_EXHAUSTIVE;
-                    }
-		    c->bucketing_manager = bucketing_manager_initialize(bmode);
+			bucketing_mode_t bmode;
+			if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING) {
+				bmode = BUCKETING_MODE_GREEDY;
+			} else if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING) {
+				bmode = BUCKETING_MODE_EXHAUSTIVE;
+			} else if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_DET_GREEDY_BUCKETING) {
+				bmode = BUCKETING_MODE_DET_GREEDY;
+			} else {
+				bmode = BUCKETING_MODE_DET_EXHAUSTIVE;
+			}
+			c->bucketing_manager = bucketing_manager_initialize(bmode);
 		}
 	}
 

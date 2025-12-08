@@ -73,8 +73,8 @@ static double bucketing_det_greedy_policy(bucketing_bucket_range_t *range, int b
 		exp_cons_g_break /= total_hi_sig;
 
 	/* Compute individual costs */
-    double cost_low_cons = p1 * (break_val - exp_cons_lq_break);
-    double const_hi_cons = p2 * (break_val + max_val - exp_cons_g_break);
+	double cost_low_cons = p1 * (break_val - exp_cons_lq_break);
+	double const_hi_cons = p2 * (break_val + max_val - exp_cons_g_break);
 
 	/* Compute final cost */
 	double cost = cost_low_cons + const_hi_cons;
@@ -298,9 +298,9 @@ void bucketing_det_greedy_update_buckets(bucketing_state_t *s)
 	}
 
 	bucketing_cursor_w_pos_t *tmp_break_point; // pointer pointing to item in break point list
-	bucketing_point_t *tmp_point_ptr = 0; // pointer to what tmp_break_point->lc points
-	bucketing_bucket_t *tmp_bucket;	      // pointer to a created bucket
-	list_first_item(break_point_list);    // reset to beginning of break point list
+	bucketing_point_t *tmp_point_ptr = 0;	   // pointer to what tmp_break_point->lc points
+	bucketing_bucket_t *tmp_bucket;		   // pointer to a created bucket
+	list_first_item(break_point_list);	   // reset to beginning of break point list
 
 	/* Loop through list of break points */
 	while ((tmp_break_point = list_next_item(break_point_list))) {
@@ -309,7 +309,7 @@ void bucketing_det_greedy_update_buckets(bucketing_state_t *s)
 			return;
 		}
 
-        // in deterministic greedy, buckets don't have probabilities, so -1 is used as a filler
+		// in deterministic greedy, buckets don't have probabilities, so -1 is used as a filler
 		tmp_bucket = bucketing_bucket_create(tmp_point_ptr->val, -1);
 		if (!tmp_bucket) {
 			fatal("Cannot create bucket\n");
