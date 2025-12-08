@@ -39,6 +39,10 @@ static double *bucketing_det_exhaust_compute_task_exps(bucketing_state_t *s, str
 			task_exps[i] += tmp_pnt->val * tmp_pnt->sig;
 			tmp_pnt = list_next_item(s->sorted_points);
 		} else {
+                        if (total_sig_buck == 0) {
+                            fatal("Total significance of a bucket cannot be zero.\n");
+                            return 0;
+                        }
 			task_exps[i] /= total_sig_buck;
 			++i;
 			total_sig_buck = 0;
@@ -47,6 +51,11 @@ static double *bucketing_det_exhaust_compute_task_exps(bucketing_state_t *s, str
 	}
 
 	/* Update last task expectation of last bucket */
+        if (total_sig_buck == 0) {
+                fatal("Division by zero in bucketing_det_exhaust_compute_task_exps: last bucket has no points\n");
+		free(task_exps);
+		return 0;
+        }
 	task_exps[i] /= total_sig_buck;
 
 	return task_exps;
@@ -76,6 +85,7 @@ static double bucketing_det_exhaust_compute_cost(bucketing_state_t *s, struct li
 	bucketing_bucket_t **bucket_array = bucketing_bucket_list_to_array(bucket_list);
 	if (!bucket_array) {
 		fatal("Cannot convert list of buckets to array of buckets\n");
+                free(task_exps);
 		return -1;
 	}
 

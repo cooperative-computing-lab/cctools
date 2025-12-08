@@ -6,7 +6,7 @@
 
 /** Begin: internals **/
 
-/* Apply policy to see if calculate cost of using this break point at break index
+/* Apply policy to calculate cost of using this break point at break index
  * @param range range of two break points denoting current bucket
  * @param break_index the index of break point
  * @param break_point empty pointer to be filled
@@ -64,8 +64,18 @@ static double bucketing_det_greedy_policy(bucketing_bucket_range_t *range, int b
 	}
 
 	/* Update general statistics */
+        if (total_sig == 0) {
+            fatal("Total significance is zero, cannot divide by zero\n");
+            list_cursor_destroy(iter);
+            return -1;
+	}
 	p1 /= total_sig;
 	p2 /= total_sig;
+        if (total_lo_sig == 0) {
+            fatal("Total significance in the lower bucket is zero, cannot divide by zero\n");
+            list_cursor_destroy(iter);
+            return -1;
+        }
 	exp_cons_lq_break /= total_lo_sig;
 	if (total_hi_sig == 0)
 		exp_cons_g_break = 0;
@@ -74,10 +84,10 @@ static double bucketing_det_greedy_policy(bucketing_bucket_range_t *range, int b
 
 	/* Compute individual costs */
 	double cost_low_cons = p1 * (break_val - exp_cons_lq_break);
-	double const_hi_cons = p2 * (break_val + max_val - exp_cons_g_break);
+	double cost_hi_cons = p2 * (break_val + max_val - exp_cons_g_break);
 
 	/* Compute final cost */
-	double cost = cost_low_cons + const_hi_cons;
+	double cost = cost_low_cons + cost_hi_cons;
 
 	list_cursor_destroy(iter);
 

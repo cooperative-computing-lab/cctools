@@ -603,7 +603,7 @@ void *list_find(struct list *l, list_op_t comparator, const void *arg)
 	return out;
 }
 
-int list_iterate(struct list *l, list_op_t operator, const void *arg)
+int list_iterate(struct list *l, list_op_t operator, const void * arg)
 {
 	void *item;
 	int alltheway = 1;
@@ -620,7 +620,7 @@ int list_iterate(struct list *l, list_op_t operator, const void *arg)
 	return alltheway;
 }
 
-int list_iterate_reverse(struct list *l, list_op_t operator, const void *arg)
+int list_iterate_reverse(struct list *l, list_op_t operator, const void * arg)
 {
 	void *item;
 	int alltheway = 1;

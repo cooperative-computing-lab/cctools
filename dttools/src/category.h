@@ -20,10 +20,10 @@ See the file COPYING for details.
   Valid states for the lifetime of automatic resource allocations for a single task.
 */
 typedef enum {
-	CATEGORY_ALLOCATION_FIRST = 0,       /**< No automatic allocation, or using first step value of the two-step policy. */
-	CATEGORY_ALLOCATION_AUTO  = 0,       /**< Same as FIRST, FIRST is deprecated */
-	CATEGORY_ALLOCATION_MAX,             /**< Using max of category. (2nd step of two-step policy) */
-	CATEGORY_ALLOCATION_ERROR,            /**< No valid resources could be found. (E.g., after 2nd step fails) */
+        CATEGORY_ALLOCATION_FIRST = 0,       /**< No automatic allocation, or using first step value of the two-step policy. */
+        CATEGORY_ALLOCATION_AUTO  = 0,       /**< Same as FIRST, FIRST is deprecated */
+        CATEGORY_ALLOCATION_MAX,             /**< Using max of category. (2nd step of two-step policy) */
+        CATEGORY_ALLOCATION_ERROR,            /**< No valid resources could be found. (E.g., after 2nd step fails) */
         CATEGORY_ALLOCATION_GREEDY_BUCKETING,    /**< Use the greedy bucketing algorithm to label resources */
         CATEGORY_ALLOCATION_EXHAUSTIVE_BUCKETING, /**< Use the exhaustive bucketing algorithm to label resources */
         CATEGORY_ALLOCATION_DET_GREEDY_BUCKETING,    /**< Use the deterministic greedy bucketing algorithm to label resources */

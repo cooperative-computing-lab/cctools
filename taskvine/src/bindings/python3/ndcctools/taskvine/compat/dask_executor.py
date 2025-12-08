@@ -90,7 +90,7 @@ class DaskVine(Manager):
     # @param lib_modules Hoist these module imports for the execution library (function-calls task_mode)
     # @param env_per_task execute each task
     # @param resources_mode Automatically resize allocation per task. One of 'fixed'
-    #                       (use the value of 'resources' above), 'max througput',
+    #                       (use the value of 'resources' above), 'max throughput',
     #                       'max' (for maximum values seen), 'min_waste', 'greedy bucketing',
     #                       'exhaustive bucketing', 'deterministic greedy bucketing', or
     #                       'deterministic exhaustive bucketing'.

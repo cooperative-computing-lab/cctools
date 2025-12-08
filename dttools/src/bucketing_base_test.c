@@ -75,8 +75,7 @@ int main(int argc, char** argv)
         // This is true for greedy, det-greedy, exhaust, and det-exhaust
         int test_iter = 10;
         if (i == test_iter) {
-            int max_num_buckets = 10; // 10 is the maximum number of buckets possible at this point
-            double buckets_vals[max_num_buckets];
+            double buckets_vals[max_num_buckets]; // 10 is the maximum number of buckets possible at this point
 
             double test_vals[2] = {2000, 4000};
             get_bucketing_sorted_buckets_values(s->sorted_buckets, buckets_vals, max_num_buckets);
