@@ -158,7 +158,7 @@ bucketing_state_t *bucketing_state_create(double default_value, int num_sampling
 	}
 
 	if (max_num_buckets < 1 && (mode == BUCKETING_MODE_EXHAUSTIVE || mode == BUCKETING_MODE_DET_EXHAUSTIVE)) {
-		warn(D_BUCKETING, "The maximum number of buckets for exhaustive and deterministic-exhaustive bucketing must be at least 1\n");
+		warn(D_BUCKETING, "The maximum number of buckets for exhaustive and deterministic exhaustive bucketing must be at least 1\n");
 		max_num_buckets = 1;
 	}
 

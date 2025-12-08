@@ -293,7 +293,7 @@ bool enforce(const char *pathname,
 		return true;
 	}
 	// Order matters a lot for these operations
-	if (a->delete &&(keys & DELETE_ACCESS)) {
+	if (a->delete && (keys & DELETE_ACCESS)) {
 		flag2letter(a, a_perm, a_perm_len);
 		PRINT_GREEN();
 		fprintf(stderr,
