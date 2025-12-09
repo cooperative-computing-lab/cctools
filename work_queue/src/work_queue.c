@@ -5908,6 +5908,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->next_taskid = 1;
 
 	q->ready_list = skip_list_create(2, 0.5);
+	q->ready_list_cursor = skip_list_cursor_create(q->ready_list);
 
 	q->tasks          = itable_create(0);
 	q->task_state_map = itable_create(0);
