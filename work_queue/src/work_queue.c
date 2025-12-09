@@ -359,8 +359,6 @@ const char *task_state_str(work_queue_task_state_t state);
 static int task_state_is( struct work_queue *q, uint64_t taskid, work_queue_task_state_t state);
 /* pointer to first task found with state. NULL if no such task */
 static struct work_queue_task *task_state_any(struct work_queue *q, work_queue_task_state_t state);
-/* number of tasks with state */
-static int task_state_count( struct work_queue *q, const char *category, work_queue_task_state_t state);
 /* number of tasks with the resource allocation request */
 static int task_request_count( struct work_queue *q, const char *category, category_allocation_t request);
 
@@ -6422,12 +6420,6 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 	return wrap_cmd;
 }
 
-static double work_queue_task_priority(void *item) {
-	assert(item);
-	struct work_queue_task *t = item;
-	return t->priority;
-}
-
 /* Put a given task on the ready list, taking into account the task priority and the queue schedule. */
 
 void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
@@ -6679,24 +6671,6 @@ static struct work_queue_task *task_state_any_with_tag(struct work_queue *q, wor
 	}
 
 	return NULL;
-}
-
-static int task_state_count(struct work_queue *q, const char *category, work_queue_task_state_t state) {
-	struct work_queue_task *t;
-	uint64_t taskid;
-
-	int count = 0;
-
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
-		if( task_state_is(q, taskid, state) ) {
-			if(!category || strcmp(category, t->category) == 0) {
-				count++;
-			}
-		}
-	}
-
-	return count;
 }
 
 static int task_request_count( struct work_queue *q, const char *category, category_allocation_t request) {
