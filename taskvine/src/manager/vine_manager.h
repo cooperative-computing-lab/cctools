@@ -110,7 +110,7 @@ struct vine_manager {
 	struct hash_table *categories;  /* Maps category_name -> struct category */
 	struct hash_table *library_templates; /* Maps library name -> vine_task of library with that name. */
 
-	struct skip_list_cursor *priority_ready_cr;      /* Iterates ready_list in order */
+	struct skip_list_cursor *ready_tasks_cr;      /* Iterates ready_list in order */
 
 	/* Primary data structures for tracking worker state. */
 

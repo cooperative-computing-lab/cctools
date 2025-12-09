@@ -163,6 +163,7 @@ static struct skip_list_node *create_node(int level, void *data, double *priorit
 	struct skip_list_node *node = xxmalloc(sizeof(*node));
 	memset(node, 0, sizeof(*node));
 
+	// levels are 0-based, so we need to allocate one more than the level number
 	node->forward = xxmalloc((level + 1) * sizeof(struct skip_list_node *));
 	node->backward = xxmalloc((level + 1) * sizeof(struct skip_list_node *));
 	node->priority = xxmalloc(priority_size * sizeof(double));
@@ -201,7 +202,7 @@ struct skip_list *skip_list_create(unsigned priority_size, double probability)
 	sl->tail = create_node(MAX_LEVEL, NULL, NULL, priority_size);
 
 	/* Link head and tail together at all levels */
-	for (int i = 0; i < MAX_LEVEL; i++) {
+	for (int i = 0; i <= MAX_LEVEL; i++) {
 		sl->head->forward[i] = sl->tail;
 		sl->tail->backward[i] = sl->head;
 	}

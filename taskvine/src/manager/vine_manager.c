@@ -3658,15 +3658,15 @@ static int send_one_task(struct vine_manager *q)
 	double now_secs = ((double)timestamp_get()) / ONE_SECOND;
 	int iter_depth = MIN(skip_list_size(q->ready_tasks), q->attempt_schedule_depth);
 
-	// if priority_ready_cr is not pointing at a task
+	// if ready_tasks_cr is not pointing at a task
 	// (e.g it is at the end of the list, or first time through)
 	// set it to the beginning of the ready list.
-	if (!skip_list_get(q->priority_ready_cr, NULL)) {
-		skip_list_seek(q->priority_ready_cr, 0);
+	if (!skip_list_get(q->ready_tasks_cr, NULL)) {
+		skip_list_seek(q->ready_tasks_cr, 0);
 	}
 
 	int sent = 0;
-	sent = send_one_task_with_cr(q, q->priority_ready_cr, iter_depth, now_secs);
+	sent = send_one_task_with_cr(q, q->ready_tasks_cr, iter_depth, now_secs);
 
 	return sent;
 }
@@ -4101,7 +4101,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->waiting_retrieval_list = list_create();
 	q->retrieved_list = list_create();
 
-	q->priority_ready_cr = skip_list_cursor_create(q->ready_tasks);
+	q->ready_tasks_cr = skip_list_cursor_create(q->ready_tasks);
 
 	q->tasks = itable_create(0);
 	q->library_templates = hash_table_create(0, 0);
@@ -4475,6 +4475,13 @@ void vine_delete(struct vine_manager *q)
 	vine_task_groups_clear(q);
 	itable_delete(q->task_group_table);
 
+	skip_list_cursor_delete(q->ready_tasks_cr);
+	while (skip_list_pop_head(q->ready_tasks)) {
+		/* drain the list so skip_list_delete can free the nodes.
+		The struct vine_task is deleted in delete_task_at_exit below. */
+	}
+	skip_list_delete(q->ready_tasks);
+
 	itable_clear(q->tasks, (void *)delete_task_at_exit);
 	itable_delete(q->tasks);
 
@@ -4487,9 +4494,6 @@ void vine_delete(struct vine_manager *q)
 
 	hash_table_clear(q->categories, (void *)category_free);
 	hash_table_delete(q->categories);
-
-	skip_list_cursor_delete(q->priority_ready_cr);
-	skip_list_delete(q->ready_tasks);
 
 	itable_delete(q->running_table);
 	list_delete(q->waiting_retrieval_list);
@@ -5362,7 +5366,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		if (retrieved_this_cycle) {
 			// reset priority cursor on task retrieval, as workers
 			// may be free to run high priority tasks now.
-			skip_list_seek(q->priority_ready_cr, 0);
+			skip_list_seek(q->ready_tasks_cr, 0);
 
 			if (!q->prefer_dispatch) {
 				continue;
@@ -5417,7 +5421,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			// accepted at least one worker
 			// reset priority cursor as new workers
 			// may be able to run high priority tasks now.
-			skip_list_seek(q->priority_ready_cr, 0);
+			skip_list_seek(q->ready_tasks_cr, 0);
 
 			events++;
 			continue;
@@ -5462,7 +5466,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// if we went through the entire ready list without finding a task to dispatch,
 		// we set the nothing_happened_last_wait_cycle flag so that link_poll waits for some time
 		// the next time around, or return retrieved tasks if there some available.
-		if (!skip_list_get(q->priority_ready_cr, NULL) && list_size(q->retrieved_list) < 1) {
+		if (!skip_list_get(q->ready_tasks_cr, NULL) && list_size(q->retrieved_list) < 1) {
 			q->nothing_happened_last_wait_cycle = 1;
 		}
 	}
