@@ -280,6 +280,10 @@ int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 		/* inserting cause different behaviours with nextkey (e.g., sometimes the new
 		 * key would be included or skipped in the iteration */
 		h->cant_iterate_yet = 1;
+	} else {
+		/* Key already exists, free the unused entry */
+		free(e->key);
+		free(e);
 	}
 
 	return inserted;
