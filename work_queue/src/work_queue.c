@@ -207,7 +207,6 @@ struct work_queue {
 
 	int wait_for_workers;             /* wait for these many workers before dispatching tasks at start of execution. */
 	int attempt_schedule_depth;		  /* number of submitted tasks to attempt scheduling before we continue to retrievals */
-	int ht_dispatch; 				  /* internal flag determining whether to iterate the whole ready list or rotate through attempt_schedule_depth */
 
 	work_queue_category_mode_t allocation_default_mode;
 
@@ -5953,7 +5952,6 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 
 	q->wait_for_workers = 0;
 	q->attempt_schedule_depth = 100;
-	q->ht_dispatch = 1; 
 
 	q->proportional_resources = 1;
 	q->proportional_whole_tasks = 1;
@@ -6235,8 +6233,13 @@ void work_queue_delete(struct work_queue *q)
 		hash_table_clear(q->categories, (void *)category_free);
 		hash_table_delete(q->categories);
 
-		skip_list_delete(q->ready_list);
 		skip_list_cursor_delete(q->ready_list_cursor);
+
+		while (skip_list_pop_head(q->ready_list)) {
+		/* drain the list so skip_list_delete can free the nodes.
+		The struct vine_task is deleted in delete_task_at_exit below. */
+		}
+		skip_list_delete(q->ready_list);
 
 		itable_delete(q->tasks);
 
