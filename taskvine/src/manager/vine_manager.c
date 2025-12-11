@@ -3598,7 +3598,6 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 
 	int iter_count = 0;
 
-	skip_list_seek(cur, 0);
 	SKIP_LIST_ITERATE(cur, t)
 	{
 		if (iter_count >= iter_depth) {
