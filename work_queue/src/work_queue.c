@@ -4580,7 +4580,6 @@ static int send_one_task_with_cr( struct work_queue *q , struct skip_list_cursor
 
 	int iter_count = 0;
 
-	skip_list_seek(cr, 0); // start at the beginning of the skip list
 	SKIP_LIST_ITERATE(cr, t) {
 		if(iter_count >= iter_depth) {
 			break;
@@ -4735,6 +4734,8 @@ static int receive_one_task( struct work_queue *q )
 	if ( w->factory_name ) {
 		trim_factory(q, w);
 	}
+
+	skip_list_seek(q->ready_list_cursor, 0);
 
 	return 1;
 }
@@ -6936,6 +6937,10 @@ static int connect_new_workers(struct work_queue *q, int stoptime, int max_new_w
 			add_worker(q);
 			new_workers++;
 		} while(link_usleep(q->manager_link, 0, 1, 0) && (stoptime >= time(0) && (max_new_workers > new_workers)));
+	}
+
+	if(new_workers){
+		skip_list_seek(q->ready_list_cursor, 0);
 	}
 
 	return new_workers;
