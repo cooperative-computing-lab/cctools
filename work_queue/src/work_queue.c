@@ -4735,8 +4735,6 @@ static int receive_one_task( struct work_queue *q )
 		trim_factory(q, w);
 	}
 
-	skip_list_seek(q->ready_list_cursor, 0);
-
 	return 1;
 }
 
@@ -6939,10 +6937,6 @@ static int connect_new_workers(struct work_queue *q, int stoptime, int max_new_w
 		} while(link_usleep(q->manager_link, 0, 1, 0) && (stoptime >= time(0) && (max_new_workers > new_workers)));
 	}
 
-	if(new_workers){
-		skip_list_seek(q->ready_list_cursor, 0);
-	}
-
 	return new_workers;
 }
 
@@ -7044,6 +7038,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			// retrieved at least one task
 			events++;
 			compute_manager_load(q, 1);
+			skip_list_seek(q->ready_list_cursor, 0); // reset ready list cursor on receive event
 			continue;
 		}
 
@@ -7092,6 +7087,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(result) {
 			// accepted at least one worker
 			events++;
+			skip_list_seek(q->ready_list_cursor, 0); // reset ready list cursor on new worker event
 			continue;
 		}
 
