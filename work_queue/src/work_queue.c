@@ -160,9 +160,8 @@ struct work_queue {
 
 	struct itable *tasks;           // taskid -> task
 	struct itable *task_state_map;  // taskid -> state
-	struct skip_list   *ready_list;      // ready to be sent to a worker
-	struct skip_list_cursor *ready_list_cursor; // cursor for round-robin dispatching from ready list
-
+	struct skip_list   *ready_list;     
+	struct skip_list_cursor *ready_list_cursor;
 	struct hash_table *worker_table;
 	struct hash_table *worker_blocklist;
 	struct itable  *worker_task_map;
@@ -1993,20 +1992,18 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	return;
 }
 
-static int expire_waiting_task(struct work_queue *q, struct work_queue_task *t)
-{
-	double current_time = timestamp_get() / ONE_SECOND;	
-	
+static int expire_waiting_task(struct work_queue *q, struct work_queue_task *t, double current_time)
+{	
 	int expired = 0;
 
 	if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
 		update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
 		change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
-		expired++;
+		expired = 1;
 	} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
 		update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
 		change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
-		expired++;
+		expired = 1;
 	}
 		
 	return expired;
@@ -4591,7 +4588,7 @@ static int send_one_task_with_cr( struct work_queue *q , struct skip_list_cursor
 		iter_count++;
 
 		// Expire task if its wait time has been exceeded.
-		if(expire_waiting_task(q, t)) {
+		if(expire_waiting_task(q, t, now_secs)) {
 			skip_list_remove_here(cr);
 			continue;
 		}
