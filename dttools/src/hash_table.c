@@ -7,6 +7,7 @@ See the file COPYING for details.
 
 #include "hash_table.h"
 #include "debug.h"
+#include "xxmalloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -259,17 +260,9 @@ int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 	if (((float)h->size / h->bucket_count) > DEFAULT_MAX_LOAD)
 		hash_table_double_buckets(h);
 
-	struct entry *e = (struct entry *)malloc(sizeof(struct entry));
-	if (!e) {
-		return 0;
-	}
+	struct entry *e = (struct entry *)xxmalloc(sizeof(struct entry));
 
-	e->key = strdup(key);
-	if (!e->key) {
-		free(e);
-		return 0;
-	}
-
+	e->key = xxstrdup(key);
 	e->value = (void *)value;
 	e->hash = h->hash_func(e->key);
 
@@ -282,6 +275,7 @@ int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 		h->cant_iterate_yet = 1;
 	} else {
 		/* Key already exists, free the unused entry */
+		notice(D_DEBUG, "key % already exists in hash table, ignoring new value.", key);
 		free(e->key);
 		free(e);
 	}
