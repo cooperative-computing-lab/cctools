@@ -72,7 +72,7 @@ static int work_queue_status_timeout = 30;
 
 static const char *catalog_host = 0;
 
-static int factory_period = 30; // in seconds
+static int factory_period = 10; // in seconds
 
 static int workers_min = 5;
 static int workers_max = 100;
