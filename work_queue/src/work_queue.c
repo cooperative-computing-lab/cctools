@@ -6374,7 +6374,7 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 		buffer_printf(&b, " --measure-only");
 	}
 	
-	q->monitor_interval = 15;
+	q->monitor_interval = 60;
 	if (q->monitor_interval > 0) {
 		buffer_printf(&b, " --interval %d", q->monitor_interval);
 	}
