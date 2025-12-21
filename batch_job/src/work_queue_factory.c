@@ -519,6 +519,8 @@ static int submit_worker( struct batch_queue *queue )
 	}
 
 	batch_job_add_output_file(task,"output.log",0);
+
+	batch_job_set_envlist(task, batch_env); 
 	
 	debug(D_WQ,"submitting worker: %s",cmd);
 
