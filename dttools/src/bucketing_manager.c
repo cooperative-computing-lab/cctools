@@ -250,6 +250,10 @@ struct rmsummary *bucketing_manager_predict(bucketing_manager_t *m, int task_id)
 	return pred_res;
 }
 
+static double max(double a, double b) {
+    return (a > b) ? a : b;
+}
+
 void bucketing_manager_add_resource_report(bucketing_manager_t *m, int task_id, struct rmsummary *r, int success)
 {
 	if (!m) {
@@ -261,8 +265,22 @@ void bucketing_manager_add_resource_report(bucketing_manager_t *m, int task_id, 
 	char *task_id_str = int_to_string(task_id);
 	struct rmsummary *new_r = rmsummary_copy(r, 1);
 
-	/* replace the old report with new one if possible */
+	/* merge the old report with new one if possible */
+    /* this means resources in the new report must be at least as those in the old report 
+     * as tasks' consumptions/allocations are increasingly monotonic */
 	if ((old_r = hash_table_lookup(m->task_id_to_task_rmsummary, task_id_str))) {
+        struct hash_table *ht = m->res_type_to_bucketing_state;
+        char *res_name;
+        bucketing_state_t *state;
+        double old_val, new_val;
+
+        hash_table_firstkey(ht);
+        while (hash_table_nextkey(ht, &res_name, (void **)&state)) {
+            old_val = rmsummary_get(old_r, res_name);
+            new_val = rmsummary_get(new_r, res_name);
+            rmsummary_set(new_r, res_name, max(old_val, new_val));
+        }
+
 		hash_table_remove(m->task_id_to_task_rmsummary, task_id_str);
 		rmsummary_delete(old_r);
 	}
