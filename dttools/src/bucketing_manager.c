@@ -269,16 +269,22 @@ void bucketing_manager_add_resource_report(bucketing_manager_t *m, int task_id, 
     /* this means resources in the new report must be at least as those in the old report 
      * as tasks' consumptions/allocations are increasingly monotonic */
 	if ((old_r = hash_table_lookup(m->task_id_to_task_rmsummary, task_id_str))) {
-        struct hash_table *ht = m->res_type_to_bucketing_state;
-        char *res_name;
-        bucketing_state_t *state;
-        double old_val, new_val;
+        /* However, we want to skip the merge and simply replace the report
+         * if the task run is a success, this way we don't over-report the task's
+         * consumption and we report the exact consumption. True numbers are 
+         * then added to the resource buckets. */
+        if (success == 0) {
+            struct hash_table *ht = m->res_type_to_bucketing_state;
+            char *res_name;
+            bucketing_state_t *state;
+            double old_val, new_val;
 
-        hash_table_firstkey(ht);
-        while (hash_table_nextkey(ht, &res_name, (void **)&state)) {
-            old_val = rmsummary_get(old_r, res_name);
-            new_val = rmsummary_get(new_r, res_name);
-            rmsummary_set(new_r, res_name, max(old_val, new_val));
+            hash_table_firstkey(ht);
+            while (hash_table_nextkey(ht, &res_name, (void **)&state)) {
+                old_val = rmsummary_get(old_r, res_name);
+                new_val = rmsummary_get(new_r, res_name);
+                rmsummary_set(new_r, res_name, max(old_val, new_val));
+            }
         }
 
 		hash_table_remove(m->task_id_to_task_rmsummary, task_id_str);
