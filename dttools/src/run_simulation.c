@@ -73,10 +73,16 @@ int main(int argc, char** argv)
     // skip first line
     fgets(buffer, sizeof(buffer), file);
 
+    int iter = 0;
     while (fgets(buffer, sizeof(buffer), file)) {
+        ++iter;
+        if (iter == 5000){
+            exit(1);
+        }
+
         int matched = sscanf(buffer, "%lf %lf %lf %lf %lf", &task_id, &wall_time, &cores, &mem, &disk);
 
-        printf("task id %lf\n", task_id);
+        //printf("task id %lf\n", task_id);
         
         if (total_core_allocated_workflow != 0) {
             printf("global core efficiency: %lf\n", total_core_real_consumed_workflow/total_core_allocated_workflow);
@@ -94,11 +100,11 @@ int main(int argc, char** argv)
         rmsummary_set(task_r, res_names[0], cores);
         rmsummary_set(task_r, res_names[1], mem);
         rmsummary_set(task_r, res_names[2], disk);
-        //printf(" task id %lf wall time %lf cores %lf mem %lf disk %lf\n", task_id, wall_time, cores, mem, disk);
+        printf(" task id %lf wall time %lf cores %lf mem %lf disk %lf\n", task_id, wall_time, cores, mem, disk);
 
         struct hash_table* tmp_ht = m->res_type_to_bucketing_state;
-        char* tmp_name;
-        bucketing_state_t* tmp_state;
+        //char* tmp_name;
+        //bucketing_state_t* tmp_state;
         hash_table_firstkey(tmp_ht);
         /*while(hash_table_nextkey(tmp_ht, &tmp_name, (void**) &tmp_state))
         {
