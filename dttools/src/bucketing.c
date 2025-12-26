@@ -342,7 +342,7 @@ double bucketing_predict(bucketing_state_t *s, double prev_val)
 			}
 
 			/* skip the small buckets */
-			if (bb_ptr->prob <= prev_val) {
+			if (bb_ptr->val <= prev_val) {
 				total_net_prob -= bb_ptr->prob;
 				continue;
 			}
