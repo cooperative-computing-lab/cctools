@@ -216,6 +216,13 @@ struct rmsummary *bucketing_manager_predict(bucketing_manager_t *m, int task_id)
 				if (old_val == -1)
 					pred_val = bucketing_predict(state, old_val);
 
+                /* If task doesn't exceed limits and also has a previous resource report, this means
+                 * that the task was never run, so we disregard the old value and run bucketing_predict
+                 * as if this task is a new task.*/
+                else if (!old_res->limits_exceeded) {
+                    pred_val = bucketing_predict(state, -1);
+                }
+
 				/* otherwise this resource doesn't exceed limit so return the same value */
 				else
 					pred_val = old_val;
