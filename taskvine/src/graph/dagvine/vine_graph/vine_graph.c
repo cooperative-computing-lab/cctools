@@ -1190,7 +1190,7 @@ void vine_graph_execute(struct vine_graph *vg)
 		}
 
 		struct vine_task *task = vine_wait(vg->manager, wait_timeout);
-		progress_bar_set_part_total(pbar, recovery_tasks_part, vg->manager->num_submitted_recovery_tasks);
+		progress_bar_set_part_total(pbar, recovery_tasks_part, vg->manager->stats->recovery_tasks_submitted);
 		if (task) {
 			/* retrieve all possible tasks */
 			wait_timeout = 0;

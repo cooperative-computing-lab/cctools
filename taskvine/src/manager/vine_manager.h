@@ -237,7 +237,6 @@ struct vine_manager {
 	double disk_proportion_available_to_task;   /* intentionally reduces disk allocation for tasks to reserve some space for cache growth. */
 
 	int return_recovery_tasks; /* If true, recovery tasks are returned by vine_wait to the user. By default they are handled internally. */
-	int num_submitted_recovery_tasks;
 	int balance_worker_disk_load; /* If true, offload replicas from workers that are overloaded with temp files. */
 	timestamp_t when_last_offloaded;
 	int64_t peak_used_cache;

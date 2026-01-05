@@ -4166,7 +4166,6 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->time_start_worker_eviction = 0;
 
 	q->return_recovery_tasks = 0;
-	q->num_submitted_recovery_tasks = 0;
 	q->balance_worker_disk_load = 0;
 	q->when_last_offloaded = 0;
 	q->peak_used_cache = 0;
