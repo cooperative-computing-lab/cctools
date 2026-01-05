@@ -84,10 +84,8 @@ def remote_execute(func):
 # Handler to sigchld when child exits.
 def sigchld_handler(signum, frame):
     # write any byte to signal that there's at least 1 child
-    try:
-        os.write(w, b"a")
-    except OSError:
-        pass
+    # if this fails, the notification mechanism has failed and the error will be raised normally
+    os.write(w, b"a")
 
 
 # Load the infile for a function task inside this library
@@ -172,7 +170,7 @@ def start_function(in_pipe_fd, thread_limit=1):
             finally:
                 os.chdir(library_sandbox)
             return -1, function_id
-        else:
+        elif exec_method == "fork":
             try:
                 infile_path = os.path.join(function_sandbox, "infile")
                 event = load_function_infile(infile_path)
@@ -192,12 +190,13 @@ def start_function(in_pipe_fd, thread_limit=1):
                     try:
                         # each child process independently redirects its own stdout/stderr.
                         with open(function_stdout_filename, "wb", buffering=0) as f:
-                            os.dup2(f.fileno(), 1)  # redirect stdout
-                            os.dup2(f.fileno(), 2)  # redirect stderr
+                            os.dup2(f.fileno(), sys.stdout.fileno())  # redirect stdout
+                            os.dup2(f.fileno(), sys.stderr.fileno())  # redirect stderr
 
-                            stdout_timed_message(f"TASK {function_id} {function_name} starts in PID {os.getpid()}")
-                            result = globals()[function_name](event)
-                            stdout_timed_message(f"TASK {function_id} {function_name} finished")
+                        # once the file descriptors are redirected, we can start the function execution
+                        stdout_timed_message(f"TASK {function_id} {function_name} starts in PID {os.getpid()}")
+                        result = globals()[function_name](event)
+                        stdout_timed_message(f"TASK {function_id} {function_name} finished")
 
                     except Exception:
                         stdout_timed_message(f"TASK {function_id} error: can't execute {function_name} due to {traceback.format_exc()}")
@@ -236,6 +235,9 @@ def start_function(in_pipe_fd, thread_limit=1):
             # return pid and function id of child process to parent.
             else:
                 return p, function_id
+        else:
+            stdout_timed_message(f"error: invalid execution method {exec_method}")
+            return -1, function_id
 
 
 # Send result of a function execution to worker. Wake worker up to do work with SIGCHLD.
@@ -433,6 +435,7 @@ def main():
                     )
                 else:
                     pid, func_id = start_function(in_pipe_fd, thread_limit)
+                    # pid == -1 indicates a failure during fork/setup of the function execution
                     if pid == -1:
                         send_result(
                             out_pipe_fd,
