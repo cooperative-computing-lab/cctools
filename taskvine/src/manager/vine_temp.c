@@ -42,6 +42,7 @@ static int worker_can_peer_transfer(struct vine_worker_info *w)
 	if (w->resources->tag < 0) {
 		return 0;
 	}
+
 	return 1;
 }
 
@@ -202,6 +203,42 @@ static int attempt_replication(struct vine_manager *q, struct vine_file *f)
 /*************************************************************/
 /* Public Functions */
 /*************************************************************/
+
+/**
+Check if a temporary file exists somewhere in all workers.
+Returns 1 if at least one CREATING or READY replica exists, 0 otherwise.
+
+We accept both CREATING and READY replicas as available sources, since a CREATING
+replica may already exist physically but hasn't yet received the cache-update
+message from the manager. However, we do not accept DELETING replicas, as they
+indicate the source worker has already been sent an unlink request—any subsequent
+cache-update or cache-invalid events will lead to deletion.
+
+If the file's state is not CREATED, we need to wait for the producer task to
+complete before checking for replicas.
+*/
+int vine_temp_exists_somewhere(struct vine_manager *q, struct vine_file *f)
+{
+	if (!q || !f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
+		return 0;
+	}
+
+	struct set *workers = hash_table_lookup(q->file_worker_table, f->cached_name);
+	if (!workers || set_size(workers) < 1) {
+		return 0;
+	}
+
+	struct vine_worker_info *w;
+	SET_ITERATE(workers, w)
+	{
+		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, f->cached_name);
+		if (replica && (replica->state == VINE_FILE_REPLICA_STATE_CREATING || replica->state == VINE_FILE_REPLICA_STATE_READY)) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
 
 /**
 Queue a temporary file for replication when it still lacks the target number of

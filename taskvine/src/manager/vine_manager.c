@@ -43,6 +43,7 @@ See the file COPYING for details.
 #include "envtools.h"
 #include "hash_table.h"
 #include "skip_list.h"
+#include "priority_queue.h"
 #include "int_sizes.h"
 #include "interfaces_address.h"
 #include "itable.h"
@@ -923,15 +924,6 @@ void vine_update_catalog(struct vine_manager *m)
 	}
 }
 
-static int file_needs_recovery(struct vine_manager *q, struct vine_file *f)
-{
-	if (!f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
-		return 0;
-	}
-
-	return !vine_file_replica_table_exists_somewhere(q, f->cached_name);
-}
-
 static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info *w)
 {
 	if (!q || !w || hash_table_size(w->current_files) < 1) {
@@ -960,7 +952,7 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 			vine_file_replica_delete(removed_replica);
 		}
 		/* consider if this replica needs recovery because of worker removal */
-		if (q->immediate_recovery && file_needs_recovery(q, f)) {
+		if (q->immediate_recovery && f && f->type == VINE_TEMP && !vine_temp_exists_somewhere(q, f)) {
 			vine_manager_consider_recovery_task(q, f, f->recovery_task);
 		}
 	}
@@ -3475,7 +3467,7 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 		struct vine_file *f = m->file;
 		if (f->type == VINE_FILE && f->state == VINE_FILE_STATE_PENDING) {
 			all_available = 0;
-		} else if (file_needs_recovery(q, f)) {
+		} else if (f->type == VINE_TEMP && !vine_temp_exists_somewhere(q, f)) {
 			vine_manager_consider_recovery_task(q, f, f->recovery_task);
 			all_available = 0;
 		}
