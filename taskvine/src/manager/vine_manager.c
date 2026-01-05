@@ -3492,6 +3492,7 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 		/* The recovery task has never been run, so submit it now. */
 		vine_submit(q, rt);
 		debug(D_VINE, "Submitted recovery task %d (%s) to re-create lost temporary file %s.", rt->task_id, rt->command_line, lost_file->cached_name);
+		printf("All submitted recovery tasks: %d\n", q->stats->recovery_tasks_submitted);
 		break;
 	case VINE_TASK_READY:
 	case VINE_TASK_RUNNING:
@@ -3506,6 +3507,7 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 		vine_task_reset(rt);
 		vine_submit(q, rt);
 		debug(D_VINE, "Submitted recovery task %d (%s) to re-create lost temporary file %s.", rt->task_id, rt->command_line, lost_file->cached_name);
+		printf("All submitted recovery tasks: %d\n", q->stats->recovery_tasks_submitted);
 		break;
 	}
 }
@@ -4841,6 +4843,10 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 	/* Issue warnings if the files are set up strangely. */
 	vine_task_check_consistency(t);
+	
+	if (t->type == VINE_TASK_TYPE_RECOVERY) {
+		q->stats->recovery_tasks_submitted++;
+	}
 
 	if (t->has_fixed_locations) {
 		q->fixed_location_in_queue++;
