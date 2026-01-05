@@ -15,6 +15,10 @@ static const double default_increase_rate = 2;
 static const double default_max_num_buckets = 10;
 static const int default_update_epoch = 1;
 
+static double max(double a, double b) {
+    return (a > b) ? a : b;
+}
+
 /* Convert an int to its string representation
  * @param n the integer
  * @return a malloc'ed string in decimal of n */
@@ -341,10 +345,6 @@ struct rmsummary *bucketing_manager_predict(bucketing_manager_t *m, int task_id)
 	free(task_id_str);
 
 	return pred_res;
-}
-
-static double max(double a, double b) {
-    return (a > b) ? a : b;
 }
 
 void bucketing_manager_add_resource_report(bucketing_manager_t *m, int task_id, struct rmsummary *r, int success)
