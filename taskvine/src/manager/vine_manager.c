@@ -4841,7 +4841,7 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 	/* Issue warnings if the files are set up strangely. */
 	vine_task_check_consistency(t);
-	
+
 	if (t->type == VINE_TASK_TYPE_RECOVERY) {
 		q->stats->recovery_tasks_submitted++;
 	}
