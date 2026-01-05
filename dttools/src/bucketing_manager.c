@@ -253,13 +253,26 @@ struct rmsummary *bucketing_manager_predict(bucketing_manager_t *m, int task_id)
                         pred_val = old_val;
                     }
                     else {
-                        // if it is not this resource, we use the max seen resource for this task
+                        // if it is not this resource, we either respect the default value 
+                        // while taking into account the max seen value mapped to the next interval
+                        // in the sampling phase, 
+                        // or we map the 
+                        // max seen value to our prediction model and use it as pred_val
+                        // in the stable phase.
                         if (rmsummary_get(old_res->limits_exceeded, res_name) == -1) {
                             struct rmsummary *max_seen = hash_table_lookup(m->task_id_to_task_max_seen_res, task_id_str);
                             if (!max_seen) {
                                 fatal("There must be a max seen value\n");
                             }
-                            pred_val = rmsummary_get(max_seen, res_name);
+                            
+                            double max_seen_val = rmsummary_get(max_seen, res_name);
+
+                            if (state->in_sampling_phase) {
+                                pred_val = max(bucketing_predict(state, max_seen_val), bucketing_predict(state, -1));
+                            }
+                            else {
+                                pred_val = bucketing_predict(state, max_seen_val);
+                            }
                         }
                         // if it is this resource, we predict a new one based on the old val
                         else {
