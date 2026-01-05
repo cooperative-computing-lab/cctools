@@ -6606,6 +6606,9 @@ int vine_prune_file(struct vine_manager *m, struct vine_file *f)
 		}
 	}
 
+	/* also remove from the replication table. */
+	hash_table_remove(m->temp_files_to_replicate, f->cached_name);
+
 	return pruned_replica_count;
 }
 

@@ -14,8 +14,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "ftp_lite.h"
 
-#define LINE_MAX 1024
-#define BUFFER_SIZE 32768
+#define CMD_LINE_MAX 1024
 
 static void do_open( const char *x, const char *y );
 static void do_close( const char *x, const char *y );
@@ -69,10 +68,10 @@ static struct command list[] =
 
 int main( int argc, char *argv[] )
 {
-	char line[LINE_MAX];
-	char command[LINE_MAX];
-	char arg1[LINE_MAX];
-	char arg2[LINE_MAX];
+	char line[CMD_LINE_MAX];
+	char command[CMD_LINE_MAX];
+	char arg1[CMD_LINE_MAX];
+	char arg2[CMD_LINE_MAX];
 	int fields;
 	int i;
 
@@ -87,7 +86,7 @@ int main( int argc, char *argv[] )
 		fprintf(stdout,"ftp_lite> ");
 		fflush(stdout);
 
-		if(!fgets(line,LINE_MAX,stdin)) break;
+		if(!fgets(line,CMD_LINE_MAX,stdin)) break;
 
 		command[0] = 0;
 		arg1[0] = 0;
