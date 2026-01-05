@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "list.h"
 #include "priority_queue.h"
+#include "skip_list.h"
 #include "macros.h"
 #include "random.h"
 #include "rmonitor_types.h"
@@ -65,7 +66,7 @@ int vine_schedule_in_ramp_down(struct vine_manager *q)
 		return 0;
 	}
 
-	if (hash_table_size(q->worker_table) > priority_queue_size(q->ready_tasks)) {
+	if (hash_table_size(q->worker_table) > skip_list_size(q->ready_tasks)) {
 		return 1;
 	}
 
@@ -426,6 +427,25 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 			continue;
 		}
 
+		/* if task groups are enabled, skip workers that are running a group task */
+		if (q->task_groups_enabled) {
+			if (w->current_tasks && itable_size(w->current_tasks) > 0) {
+				uint64_t tidg;
+				struct vine_task *tg;
+				int running_group_task = 0;
+				ITABLE_ITERATE(w->current_tasks, tidg, tg)
+				{
+					if (tg->group_id) {
+						running_group_task = 1;
+						break;
+					}
+				}
+				if (running_group_task) {
+					continue;
+				}
+			}
+		}
+
 		/* compute the size of cached and uncached input files on the worker */
 		int64_t uncached_input_size = 0;
 		int64_t cached_input_size = 0;
@@ -587,8 +607,18 @@ void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 
 	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
 
+<<<<<<< HEAD
 	LIST_ITERATE(q->pending_tasks, t)
 	{
+=======
+	struct skip_list_cursor *cur = skip_list_cursor_create(q->ready_tasks);
+	skip_list_seek(cur, 0);
+	while (skip_list_get(cur, (void **)&t)) {
+		// advance cursor to the next task first,
+		// in case there are continues, etc. below.
+		skip_list_next(cur);
+
+>>>>>>> origin/master
 		// check each task against the queue of connected workers
 		vine_resource_bitmask_t bit_set = is_task_larger_than_any_worker(q, t);
 		if (bit_set) {
@@ -608,6 +638,7 @@ void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 			unfit_gpu++;
 		}
 	}
+	skip_list_cursor_delete(cur);
 
 	if (unfit_core || unfit_mem || unfit_disk || unfit_gpu) {
 		notice(D_VINE, "There are tasks that cannot fit any currently connected worker:\n");

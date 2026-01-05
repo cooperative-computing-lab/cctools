@@ -102,14 +102,15 @@ struct vine_manager {
 	/* Primary data structures for tracking task state. */
 
 	struct itable *tasks;           /* Maps task_id -> vine_task of all tasks in any state. */
-	struct list   *pending_tasks;      /* List of vine_task that are waiting to be dispatched. */
-	struct priority_queue   *ready_tasks;       /* Priority queue of vine_task that are waiting to execute. */
+	struct skip_list   *ready_tasks;       /* Skip list of vine_task that are waiting to execute. */
 	struct itable   *running_table;      /* Table of vine_task that are running at workers. */
 	struct list   *waiting_retrieval_list;      /* List of vine_task that are waiting to be retrieved. */
 	struct list   *retrieved_list;      /* List of vine_task that have been retrieved. */
 	struct list   *task_info_list;  /* List of last N vine_task_infos for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */
 	struct hash_table *library_templates; /* Maps library name -> vine_task of library with that name. */
+
+	struct skip_list_cursor *ready_tasks_cr;      /* Iterates ready_list in order */
 
 	/* Primary data structures for tracking worker state. */
 
@@ -299,14 +300,8 @@ void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info 
 /* Check if the worker is able to transfer the necessary files for this task. */
 int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 
-/* Delete a file from a worker. */
-int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
-
-/* Evict a random worker to simulate a worker failure. */
-int evict_random_worker(struct vine_manager *q);
-
-/* Get the available disk space in bytes for a worker. */
-int64_t get_worker_available_disk_bytes(struct vine_worker_info *w);
+/** Release a random worker to simulate a failure. */
+int release_random_worker(struct vine_manager *q);
 
 /* The expected format of files created by the resource monitor.*/
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-task-%d"
