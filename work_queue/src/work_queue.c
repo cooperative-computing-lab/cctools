@@ -3129,7 +3129,7 @@ static work_queue_msg_code_t process_resource( struct work_queue *q, struct work
 	char resource_name[WORK_QUEUE_LINE_MAX];
 	struct work_queue_resource r;
 
-	int n = sscanf(line, "resource %s %"PRId64" %"PRId64" %"PRId64, resource_name, &r.total, &r.smallest, &r.largest);
+	int n = sscanf(line, "resource %s %lf %lf %lf", resource_name, &r.total, &r.smallest, &r.largest);
 
 	if(n == 2 && !strcmp(resource_name,"tag"))
 	{
