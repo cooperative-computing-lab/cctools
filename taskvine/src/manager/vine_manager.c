@@ -2234,6 +2234,7 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "tasks_on_workers", info.tasks_on_workers);
 	jx_insert_integer(j, "tasks_running", info.tasks_running);
 	jx_insert_integer(j, "tasks_with_results", info.tasks_with_results);
+	jx_insert_integer(j, "recovery_tasks_submitted", info.recovery_tasks_submitted);
 	jx_insert_integer(j, "tasks_left", q->num_tasks_left);
 
 	jx_insert_integer(j, "tasks_submitted", info.tasks_submitted);
@@ -3490,7 +3491,7 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 	case VINE_TASK_INITIAL:
 		/* The recovery task has never been run, so submit it now. */
 		vine_submit(q, rt);
-		notice(D_VINE, "Submitted recovery task %d (%s) to re-create lost temporary file %s.", rt->task_id, rt->command_line, lost_file->cached_name);
+		debug(D_VINE, "Submitted recovery task %d (%s) to re-create lost temporary file %s.", rt->task_id, rt->command_line, lost_file->cached_name);
 		break;
 	case VINE_TASK_READY:
 	case VINE_TASK_RUNNING:
@@ -3504,7 +3505,7 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 		 * here. */
 		vine_task_reset(rt);
 		vine_submit(q, rt);
-		notice(D_VINE, "Submitted recovery task %d (%s) to re-create lost temporary file %s.", rt->task_id, rt->command_line, lost_file->cached_name);
+		debug(D_VINE, "Submitted recovery task %d (%s) to re-create lost temporary file %s.", rt->task_id, rt->command_line, lost_file->cached_name);
 		break;
 	}
 }
@@ -4840,6 +4841,10 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 	/* Issue warnings if the files are set up strangely. */
 	vine_task_check_consistency(t);
+
+	if (t->type == VINE_TASK_TYPE_RECOVERY) {
+		q->stats->recovery_tasks_submitted++;
+	}
 
 	if (t->has_fixed_locations) {
 		q->fixed_location_in_queue++;
