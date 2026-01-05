@@ -952,7 +952,7 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 			vine_file_replica_delete(removed_replica);
 		}
 		/* consider if this replica needs recovery because of worker removal */
-		if (q->immediate_recovery && f && f->type == VINE_TEMP && !vine_temp_exists_somewhere(q, f)) {
+		if (q->immediate_recovery && f->type == VINE_TEMP && !vine_temp_exists_somewhere(q, f)) {
 			vine_manager_consider_recovery_task(q, f, f->recovery_task);
 		}
 	}
