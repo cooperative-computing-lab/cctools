@@ -544,7 +544,7 @@ static void print_time_metrics(struct vine_graph *vg, const char *filename)
 	struct vine_node *node;
 	ITABLE_ITERATE(vg->nodes, nid, node)
 	{
-		fprintf(fp, "%" PRIu64 ",%lu,%lu,%lu,%lu,%lu,%lu\n", node->node_id, node->submission_time, node->scheduling_time, node->commit_time, node->execution_time, node->retrieval_time, node->postprocessing_time);
+		fprintf(fp, "%" PRIu64 "," TIMESTAMP_FORMAT "," TIMESTAMP_FORMAT "," TIMESTAMP_FORMAT "," TIMESTAMP_FORMAT "," TIMESTAMP_FORMAT "," TIMESTAMP_FORMAT "\n", node->node_id, node->submission_time, node->scheduling_time, node->commit_time, node->execution_time, node->retrieval_time, node->postprocessing_time);
 	}
 	fclose(fp);
 
@@ -1013,6 +1013,7 @@ void vine_graph_set_target(struct vine_graph *vg, uint64_t node_id)
 		debug(D_ERROR, "node %" PRIu64 " not found", node_id);
 		exit(1);
 	}
+
 	node->is_target = 1;
 }
 

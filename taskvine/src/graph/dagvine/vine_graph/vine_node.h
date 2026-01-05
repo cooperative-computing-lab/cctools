@@ -11,9 +11,9 @@
 
 /** The storage type of the node's output file. */
 typedef enum {
-	NODE_OUTFILE_TYPE_LOCAL = 0,	       /* Node-output file will be stored locally on the local staging directory */
-	NODE_OUTFILE_TYPE_TEMP,		           /* Node-output file will be stored in the temporary node-local storage */
-	NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM,  /* Node-output file will be stored in the persistent shared file system */
+	NODE_OUTFILE_TYPE_LOCAL = 0,	      /* Node-output file will be stored locally on the local staging directory */
+	NODE_OUTFILE_TYPE_TEMP,		      /* Node-output file will be stored in the temporary node-local storage */
+	NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM, /* Node-output file will be stored in the persistent shared file system */
 } node_outfile_type_t;
 
 /** The status of an output file of a node. */
