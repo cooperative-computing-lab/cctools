@@ -173,8 +173,6 @@ static int release_worker(struct vine_manager *q, struct vine_worker_info *w);
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
 static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t);
 
-static void clean_redundant_replicas(struct vine_manager *q, struct vine_file *f);
-
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
 static int count_workers(struct vine_manager *q, vine_worker_type_t type)
@@ -3533,58 +3531,6 @@ int consider_task(struct vine_manager *q, struct vine_task *t)
 	return 1;
 }
 
-/* Rotate pending tasks to the ready queue if they are runnable. */
-static int rotate_pending_tasks(struct vine_manager *q)
-{
-	if (list_size(q->pending_tasks) == 0) {
-		return 0;
-	}
-
-	int runnable_tasks = 0;
-	int tasks_considered = 0;
-	int tasks_to_consider = MIN(list_size(q->pending_tasks), q->attempt_schedule_depth);
-	struct vine_task *t = NULL;
-
-	double current_time = timestamp_get() / ONE_SECOND;
-
-	while (tasks_considered++ < tasks_to_consider) {
-		t = list_pop_head(q->pending_tasks);
-		if (!t) {
-			break;
-		}
-
-		/* first check if the task has exceeded its end time or does not match any submitted library */
-		/* If any of the reasons fired, then expire the task and put in the retrieved queue. */
-		if (t->resources_requested->end > 0 && t->resources_requested->end <= current_time) {
-			debug(D_VINE, "task %d has exceeded its end time", t->task_id);
-			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
-			change_task_state(q, t, VINE_TASK_RETRIEVED);
-			continue;
-		}
-		if (t->needs_library && !hash_table_lookup(q->library_templates, t->needs_library)) {
-			debug(D_VINE, "task %d does not match any submitted library named \"%s\"", t->task_id, t->needs_library);
-			vine_task_set_result(t, VINE_RESULT_MISSING_LIBRARY);
-			change_task_state(q, t, VINE_TASK_RETRIEVED);
-			continue;
-		}
-		if (q->fixed_location_in_queue && t->has_fixed_locations && !vine_schedule_check_fixed_location(q, t)) {
-			debug(D_VINE, "Missing fixed_location dependencies for task: %d", t->task_id);
-			vine_task_set_result(t, VINE_RESULT_FIXED_LOCATION_MISSING);
-			change_task_state(q, t, VINE_TASK_RETRIEVED);
-			continue;
-		}
-
-		if (consider_task(q, t)) {
-			push_task_to_ready_tasks(q, t);
-			runnable_tasks++;
-		} else {
-			list_push_tail(q->pending_tasks, t);
-		}
-	}
-
-	return runnable_tasks;
-}
-
 /*
 Advance the state of the system by selecting one task available
 to run, finding the best worker for that task, and then committing
@@ -3616,25 +3562,24 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 			continue;
 		}
 
-		/* this task is not runnable at all, put it back in the pending queue */
 		if (!consider_task(q, t)) {
-			list_push_tail(q->pending_tasks, t);
 			continue;
 		}
 
-		/* select a worker for the task */
+		// Find the best worker for the task
+		q->stats_measure->time_scheduling = timestamp_get();
 		struct vine_worker_info *w = vine_schedule_task_to_worker(q, t);
+		q->stats->time_scheduling += timestamp_get() - q->stats_measure->time_scheduling;
 
 		if (w) {
 			task_unready = 1;
 
-		/* commit the task to the worker */
-		vine_result_code_t result;
-		if (q->task_groups_enabled) {
-			result = commit_task_group_to_worker(q, w, t);
-		} else {
-			result = commit_task_to_worker(q, w, t);
-		}
+			vine_result_code_t result;
+			if (q->task_groups_enabled) {
+				result = commit_task_group_to_worker(q, w, t);
+			} else {
+				result = commit_task_to_worker(q, w, t);
+			}
 
 			switch (result) {
 			case VINE_SUCCESS:     /* return on successful commit. */
@@ -4676,7 +4621,6 @@ static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t
 	} else if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
 		manager_priority = VINE_PRIORITY_EXHAUSTION;
 	}
-	priority_queue_push(q->ready_tasks, t, t->priority);
 
 	if (manager_priority > t->manager_priority) {
 		t->manager_priority = manager_priority;
@@ -5423,12 +5367,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				sent_in_previous_cycle = 1;
 				continue;
 			}
-		}
-
-		// Check if any worker is overloaded and rebalance the disk usage
-		if (q->balance_worker_disk_load && (timestamp_get() - q->when_last_offloaded > 5 * 1e6)) {
-			rebalance_worker_disk_usage(q);
-			q->when_last_offloaded = timestamp_get();
 		}
 
 		// Check if any temp files need replication and start replicating

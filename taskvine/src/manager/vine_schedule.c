@@ -607,10 +607,6 @@ void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 
 	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
 
-<<<<<<< HEAD
-	LIST_ITERATE(q->pending_tasks, t)
-	{
-=======
 	struct skip_list_cursor *cur = skip_list_cursor_create(q->ready_tasks);
 	skip_list_seek(cur, 0);
 	while (skip_list_get(cur, (void **)&t)) {
@@ -618,7 +614,6 @@ void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 		// in case there are continues, etc. below.
 		skip_list_next(cur);
 
->>>>>>> origin/master
 		// check each task against the queue of connected workers
 		vine_resource_bitmask_t bit_set = is_task_larger_than_any_worker(q, t);
 		if (bit_set) {

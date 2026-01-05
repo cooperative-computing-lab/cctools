@@ -1275,8 +1275,8 @@ void vine_graph_execute(struct vine_graph *vg)
 			/* inject failure */
 			if (vg->failure_injection_step_percent > 0) {
 				double progress = (double)regular_tasks_part->current / (double)regular_tasks_part->total;
-				if (progress >= next_failure_threshold && evict_random_worker(vg->manager)) {
-					debug(D_VINE, "evicted a worker at %.2f%% (threshold %.2f%%)", progress * 100, next_failure_threshold * 100);
+				if (progress >= next_failure_threshold && release_random_worker(vg->manager)) {
+					debug(D_VINE, "released a random worker at %.2f%% (threshold %.2f%%)", progress * 100, next_failure_threshold * 100);
 					next_failure_threshold += vg->failure_injection_step_percent / 100.0;
 				}
 			}
@@ -1285,7 +1285,7 @@ void vine_graph_execute(struct vine_graph *vg)
 			switch (node->outfile_type) {
 			case NODE_OUTFILE_TYPE_TEMP:
 				/* replicate the outfile of the temp node */
-				vine_temp_replicate_file_later(vg->manager, node->outfile);
+				vine_temp_queue_for_replication(vg->manager, node->outfile);
 				break;
 			case NODE_OUTFILE_TYPE_LOCAL:
 			case NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM:
