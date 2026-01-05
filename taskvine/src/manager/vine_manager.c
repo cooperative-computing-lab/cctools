@@ -43,6 +43,7 @@ See the file COPYING for details.
 #include "envtools.h"
 #include "hash_table.h"
 #include "skip_list.h"
+#include "priority_queue.h"
 #include "int_sizes.h"
 #include "interfaces_address.h"
 #include "itable.h"
@@ -428,9 +429,17 @@ static vine_msg_code_t handle_cache_update(struct vine_manager *q, struct vine_w
 				replica->type = f->type;
 			}
 
-			/* And if the file is a newly created temporary, replicate as needed. */
-			if (f->type == VINE_TEMP && *id == 'X' && q->temp_replica_count > 1) {
-				hash_table_insert(q->temp_files_to_replicate, f->cached_name, NULL);
+			/* If a TEMP file, perform various actions as needed. */
+			if (f->type == VINE_TEMP) {
+				if (q->temp_replica_count > 1) {
+					vine_temp_queue_for_replication(q, f);
+				}
+				if (q->shift_disk_load) {
+					vine_temp_shift_disk_load(q, w, f);
+				}
+				if (q->clean_redundant_replicas) {
+					vine_temp_clean_redundant_replicas(q, f);
+				}
 			}
 		}
 	}
@@ -486,8 +495,11 @@ static vine_msg_code_t handle_cache_invalid(struct vine_manager *q, struct vine_
 			w->last_failure_time = timestamp_get();
 		}
 
-		/* If the creation failed, we may want to backup the file somewhere else. */
-		vine_temp_handle_file_lost(q, cachename);
+		/* Respond to a missing replica notification by re-queuing the corresponding file
+		 * for replication. If the replica does not have any ready source, it will be silently
+		 * discarded in the replication phase. */
+		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
+		vine_temp_queue_for_replication(q, f);
 
 		/* Successfully processed this message. */
 		return VINE_MSG_PROCESSED;
@@ -665,16 +677,18 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	itable_remove(q->running_table, t->task_id);
 	vine_task_set_result(t, task_status);
 
-	/* Clean redundant replicas for the inputs */
-	struct vine_mount *input_mount;
-	LIST_ITERATE(t->input_mounts, input_mount)
-	{
-		if (input_mount->file && input_mount->file->type == VINE_TEMP) {
-			clean_redundant_replicas(q, input_mount->file);
+	/* A task scheduling may result in a redundant replica of its input due to peer transfers, which can be safely removed when completed.
+	 * However, the general function of taskvine is to replicate files on demand, and to only clean them up when prune is called.
+	 * So, we only clean up redundant replicas for the task-inputs when the manager is configured to do so. */
+	if (q->clean_redundant_replicas) {
+		struct vine_mount *input_mount;
+		LIST_ITERATE(t->input_mounts, input_mount)
+		{
+			if (input_mount->file && input_mount->file->type == VINE_TEMP) {
+				vine_temp_clean_redundant_replicas(q, input_mount->file);
+			}
 		}
 	}
-
-	t->time_when_get_result_end = timestamp_get();
 
 	return VINE_SUCCESS;
 }
@@ -917,15 +931,6 @@ void vine_update_catalog(struct vine_manager *m)
 	}
 }
 
-static int file_needs_recovery(struct vine_manager *q, struct vine_file *f)
-{
-	if (!f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
-		return 0;
-	}
-
-	return !vine_file_replica_table_exists_somewhere(q, f->cached_name);
-}
-
 static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info *w)
 {
 	if (!q || !w || hash_table_size(w->current_files) < 1) {
@@ -954,7 +959,7 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 			vine_file_replica_delete(removed_replica);
 		}
 		/* consider if this replica needs recovery because of worker removal */
-		if (q->immediate_recovery && file_needs_recovery(q, f)) {
+		if (q->immediate_recovery && f->type == VINE_TEMP && !vine_temp_exists_somewhere(q, f)) {
 			vine_manager_consider_recovery_task(q, f, f->recovery_task);
 		}
 	}
@@ -1080,7 +1085,11 @@ static void recall_worker_lost_temp_files(struct vine_manager *q, struct vine_wo
 	// Iterate over files we want might want to recover
 	HASH_TABLE_ITERATE(w->current_files, cached_name, info)
 	{
-		vine_temp_handle_file_lost(q, cached_name);
+		/* Respond to a data loss due to worker removal by re-queuing the corresponding file
+		 * for replication. If the replica does not have any ready source, it will be silently
+		 * discarded in the replication phase. */
+		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
+		vine_temp_queue_for_replication(q, f);
 	}
 }
 
@@ -3466,7 +3475,7 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 		struct vine_file *f = m->file;
 		if (f->type == VINE_FILE && f->state == VINE_FILE_STATE_PENDING) {
 			all_available = 0;
-		} else if (file_needs_recovery(q, f)) {
+		} else if (f->type == VINE_TEMP && !vine_temp_exists_somewhere(q, f)) {
 			vine_manager_consider_recovery_task(q, f, f->recovery_task);
 			all_available = 0;
 		}
@@ -4184,6 +4193,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->perf_log_interval = VINE_PERF_LOG_INTERVAL;
 
 	q->temp_replica_count = 1;
+	q->clean_redundant_replicas = 0;
+	q->shift_disk_load = 0;
 	q->transfer_temps_recovery = 0;
 	q->transfer_replica_per_cycle = 10;
 
@@ -5822,7 +5833,6 @@ void vine_set_manager_preferred_connection(struct vine_manager *q, const char *p
 
 int vine_tune(struct vine_manager *q, const char *name, double value)
 {
-
 	if (!strcmp(name, "attempt-schedule-depth")) {
 		q->attempt_schedule_depth = MAX(1, (int)value);
 
@@ -5963,14 +5973,11 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "enforce-worker-eviction-interval")) {
 		q->enforce_worker_eviction_interval = (timestamp_t)(MAX(0, (int)value) * ONE_SECOND);
 
-	} else if (!strcmp(name, "balance-worker-disk-load")) {
-		q->balance_worker_disk_load = !!((int)value);
+	} else if (!strcmp(name, "clean-redundant-replicas")) {
+		q->clean_redundant_replicas = !!((int)value);
 
-	} else if (!strcmp(name, "enable-debug-log")) {
-		if (value == 0) {
-			debug_flags_clear();
-			debug_close();
-		}
+	} else if (!strcmp(name, "shift-disk-load")) {
+		q->shift_disk_load = !!((int)value);
 
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
@@ -6455,9 +6462,6 @@ int vine_prune_file(struct vine_manager *m, struct vine_file *f)
 			set_free_values_array(workers_array);
 		}
 	}
-
-	/* also remove from the replication table. */
-	hash_table_remove(m->temp_files_to_replicate, f->cached_name);
 
 	return pruned_replica_count;
 }
