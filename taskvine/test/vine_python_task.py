@@ -23,7 +23,7 @@ def my_sum(x, y, negate=False):
 
 
 # Create a new queue
-queue = vine.Manager(port=[9123, 9130])
+queue = vine.Manager(port=0)
 print("listening on port {}".format(queue.port))
 with open(port_file, "w") as f:
     f.write(str(queue.port))
