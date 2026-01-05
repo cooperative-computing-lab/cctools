@@ -156,7 +156,7 @@ def start_function(in_pipe_fd, thread_limit=1):
             finally:
                 os.chdir(library_sandbox)
             return -1, function_id
-        else:
+        elif exec_method == "fork":
             try:
                 arg_infile = os.path.join(function_sandbox, "infile")
                 with open(arg_infile, "rb") as f:
@@ -180,11 +180,10 @@ def start_function(in_pipe_fd, thread_limit=1):
                             os.dup2(f.fileno(), sys.stdout.fileno())  # redirect stdout
                             os.dup2(f.fileno(), sys.stderr.fileno())  # redirect stderr
 
-                            # keep the function invocation inside the context
-                            # so the stdout/stderr file stays open during execution and closes safely afterward.
-                            stdout_timed_message(f"TASK {function_id} {function_name} starts in PID {os.getpid()}")
-                            result = globals()[function_name](event)
-                            stdout_timed_message(f"TASK {function_id} {function_name} finished")
+                        # once the file descriptors are redirected, we can start the function execution
+                        stdout_timed_message(f"TASK {function_id} {function_name} starts in PID {os.getpid()}")
+                        result = globals()[function_name](event)
+                        stdout_timed_message(f"TASK {function_id} {function_name} finished")
 
                     except Exception:
                         stdout_timed_message(f"TASK {function_id} error: can't execute {function_name} due to {traceback.format_exc()}")
@@ -223,6 +222,9 @@ def start_function(in_pipe_fd, thread_limit=1):
             # return pid and function id of child process to parent.
             else:
                 return p, function_id
+        else:
+            stdout_timed_message(f"error: invalid execution method {exec_method}")
+            return -1, function_id
 
 
 # Send result of a function execution to worker. Wake worker up to do work with SIGCHLD.
