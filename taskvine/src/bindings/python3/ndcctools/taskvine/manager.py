@@ -603,7 +603,9 @@ class Manager(object):
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
-        return cvine.vine_set_resources_max(self._taskvine, rm)
+        result = cvine.vine_set_resources_max(self._taskvine, rm)
+        rmsummary_delete(rm)
+        return result
 
     ##
     #
@@ -625,7 +627,9 @@ class Manager(object):
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
-        return cvine.vine_set_resources_min(self._taskvine, rm)
+        result = cvine.vine_set_resources_min(self._taskvine, rm)
+        rmsummary_delete(rm)
+        return result
 
     ##
     # Specifies the maximum resources allowed for the given category.
@@ -648,7 +652,9 @@ class Manager(object):
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
-        return cvine.vine_set_category_resources_max(self._taskvine, category, rm)
+        result = cvine.vine_set_category_resources_max(self._taskvine, category, rm)
+        rmsummary_delete(rm)
+        return result
 
     ##
     # Specifies the minimum resources allowed for the given category.
@@ -671,7 +677,9 @@ class Manager(object):
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
-        return cvine.vine_set_category_resources_min(self._taskvine, category, rm)
+        result = cvine.vine_set_category_resources_min(self._taskvine, category, rm)
+        rmsummary_delete(rm)
+        return result
 
     ##
     # Specifies the first-allocation guess for the given category
@@ -691,7 +699,9 @@ class Manager(object):
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
-        return cvine.vine_set_category_first_allocation_guess(self._taskvine, category, rm)
+        result = cvine.vine_set_category_first_allocation_guess(self._taskvine, category, rm)
+        rmsummary_delete(rm)
+        return result
 
     ##
     # Specifies the maximum resources allowed for the given category.
