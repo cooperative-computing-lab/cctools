@@ -254,6 +254,7 @@ int vine_temp_queue_for_replication(struct vine_manager *q, struct vine_file *f)
 	if (q->temp_replica_count <= 1) {
 		return 0;
 	}
+
 	int current_replica_count = vine_file_replica_count(q, f);
 	if (current_replica_count == 0 || current_replica_count >= q->temp_replica_count) {
 		return 0;
