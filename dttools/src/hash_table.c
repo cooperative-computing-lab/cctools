@@ -257,6 +257,15 @@ static int hash_table_reduce_buckets(struct hash_table *h)
 
 int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 {
+	/* Return 0 if the key already exists. */
+	void *old_value = hash_table_lookup(h, key);
+	if (old_value) {
+		if (old_value != value) {
+			notice(D_DEBUG, "key %s already exists in hash table with different value, ignoring new value.", key);
+		}
+		return 0;
+	}
+
 	if (((float)h->size / h->bucket_count) > DEFAULT_MAX_LOAD)
 		hash_table_double_buckets(h);
 
@@ -274,8 +283,8 @@ int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 		 * key would be included or skipped in the iteration */
 		h->cant_iterate_yet = 1;
 	} else {
-		/* Key already exists, free the unused entry */
-		notice(D_DEBUG, "key %s already exists in hash table, ignoring new value.", key);
+		/* Should be unreachable but keep for safety. */
+		notice(D_ERROR, "Failed to insert key %s into hash table.", key);
 		free(e->key);
 		free(e);
 	}
