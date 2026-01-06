@@ -148,7 +148,6 @@ static vine_msg_code_t handle_manager_status(struct vine_manager *q, struct vine
 static vine_msg_code_t handle_resources(struct vine_manager *q, struct vine_worker_info *w, time_t stoptime);
 static vine_msg_code_t handle_feature(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 static void handle_library_update(struct vine_manager *q, struct vine_worker_info *w, const char *line);
-static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_info *w, int count_received_so_far);
 
 static struct jx *manager_to_jx(struct vine_manager *q);
 static struct jx *manager_lean_to_jx(struct vine_manager *q);
@@ -700,7 +699,6 @@ static vine_msg_code_t handle_complete(struct vine_manager *q, struct vine_worke
 {
 	vine_result_code_t result = get_completion_result(q, w, line);
 	if (result == VINE_SUCCESS) {
-		receive_tasks_from_worker(q, w, 0);
 		return VINE_MSG_PROCESSED;
 	}
 	return VINE_MSG_NOT_PROCESSED;
@@ -737,7 +735,9 @@ static vine_msg_code_t vine_manager_recv_no_retry(struct vine_manager *q, struct
 			string_prefix_is(line, "wable_status") || string_prefix_is(line, "resources_status")) {
 		result = handle_manager_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "available_results")) {
-		hash_table_insert(q->workers_with_watched_file_updates, w->hashkey, w);
+		if (!hash_table_lookup(q->workers_with_watched_file_updates, w->hashkey)) {
+			hash_table_insert(q->workers_with_watched_file_updates, w->hashkey, w);
+		}
 		result = VINE_MSG_PROCESSED;
 	} else if (string_prefix_is(line, "resources")) {
 		result = handle_resources(q, w, stoptime);

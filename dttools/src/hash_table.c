@@ -275,7 +275,7 @@ int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 		h->cant_iterate_yet = 1;
 	} else {
 		/* Key already exists, free the unused entry */
-		notice(D_DEBUG, "key % already exists in hash table, ignoring new value.", key);
+		notice(D_DEBUG, "key %s already exists in hash table, ignoring new value.", key);
 		free(e->key);
 		free(e);
 	}
