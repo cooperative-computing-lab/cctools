@@ -445,8 +445,7 @@ static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_mana
 	/* If will be marked as READY when a cache-update message comes back. */
 
 	if (result == VINE_SUCCESS) {
-		struct vine_file_replica *replica = vine_file_replica_create(f->type, f->cache_level, f->size, f->mtime);
-		vine_file_replica_table_insert(q, w, f->cached_name, replica);
+		vine_file_replica_table_get_or_create(q, w, f->cached_name, f->type, f->cache_level, f->size, f->mtime);
 	}
 
 	return result;
@@ -532,7 +531,7 @@ vine_result_code_t vine_manager_put_task(
 
 		/* Do not set end, wall_time if running the resource monitor. We let the monitor police these resources.
 		 */
-		if (q->monitor_mode == VINE_MON_DISABLED) {
+		if (q->monitor_mode != VINE_MON_WATCHDOG) {
 			if (limits->end > 0) {
 				vine_manager_send(q, w, "end_time %s\n", rmsummary_resource_to_str("end", limits->end, 0));
 			}

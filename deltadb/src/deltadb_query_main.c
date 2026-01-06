@@ -9,7 +9,7 @@
 #include <stdarg.h>
 #include <ctype.h>
 
-#include "getopt.h"
+#include <getopt.h>
 #include "cctools.h"
 #include "jx_parse.h"
 #include "jx_print.h"
