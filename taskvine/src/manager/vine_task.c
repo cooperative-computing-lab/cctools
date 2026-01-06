@@ -78,7 +78,8 @@ struct vine_task *vine_task_create(const char *command_line)
 
 	t->refcount = 1;
 	t->output_received = 0;
-	t->priority = 0;
+	t->user_priority = 0;
+	t->manager_priority = VINE_PRIORITY_NORMAL;
 
 	vine_counters.task.created++;
 	t->group_id = 0;
@@ -239,7 +240,8 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 	/* Scheduling features of task are copied. */
 	new->resource_request = task->resource_request;
 	vine_task_set_scheduler(new, task->worker_selection_algorithm);
-	vine_task_set_priority(new, task->priority);
+	/* manager priority is not copied, it is assigned by the manager when the task is submitted. */
+	vine_task_set_priority(new, task->user_priority);
 	vine_task_set_retries(new, task->max_retries);
 	vine_task_set_max_forsaken(new, task->max_forsaken);
 	vine_task_set_time_min(new, task->min_running_time);
@@ -426,7 +428,7 @@ void vine_task_set_time_max(struct vine_task *t, int64_t seconds)
 	if (seconds < 1) {
 		t->resources_requested->wall_time = -1;
 	} else {
-		t->resources_requested->wall_time = DIV_INT_ROUND_UP(seconds, ONE_SECOND);
+		t->resources_requested->wall_time = seconds;
 	}
 }
 
@@ -680,7 +682,7 @@ void vine_task_set_scheduler(struct vine_task *t, vine_schedule_t algorithm)
 
 void vine_task_set_priority(struct vine_task *t, double priority)
 {
-	t->priority = priority;
+	t->user_priority = priority;
 }
 
 int vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output_directory)
@@ -957,7 +959,7 @@ struct jx *vine_task_to_jx(struct vine_manager *q, struct vine_task *t)
 	jx_insert_integer(j, "time_when_commit_end", t->time_when_commit_end);
 	jx_insert_integer(j, "current_time", timestamp_get());
 
-	priority_add_to_jx(j, t->priority);
+	priority_add_to_jx(j, t->user_priority);
 
 	return j;
 }

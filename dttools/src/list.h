@@ -83,6 +83,7 @@ transparently modify the linker namespace we are using.
 #define list_iterate_reverse		cctools_list_iterate_reverse
 #define list_first_item			cctools_list_first_item
 #define list_next_item			cctools_list_next_item
+#define list_remove_item                cctools_list_remove_item
 
 #endif
 
@@ -359,6 +360,7 @@ void *list_find(struct list *list, list_op_t cmp, const void *arg);
 
 /** Remove an item from the list
 This function searches the list for the item pointed to by value and removes it.
+If you are iterating over a list, use @ref list_remove_item instead.
 @param list The list to search
 @param value The item to remove
 @return The removed item.
@@ -374,6 +376,14 @@ Call @ref list_next_item to begin returning the items.
 
 void list_first_item(struct list *list);
 
+/** Begin traversing a list in reverse.
+This function sets the internal list iterator to the last item.
+Call @ref list_prev_item to begin returning the items in reverse order.
+@param list The list to traverse.
+*/
+
+void list_last_item(struct list *list);
+
 /** Continue traversing a list.
 This function returns the current list item,
 and advances the internal iterator to the next item.
@@ -382,6 +392,24 @@ and advances the internal iterator to the next item.
 */
 
 void *list_next_item(struct list *list);
+
+/** Continue traversing a list in reverse.
+This function returns the current list item,
+and advances the internal iterator to the previous item.
+@param list The list to traverse.
+@return The current item in the list, NULL if end of list.
+*/
+
+void *list_prev_item(struct list *list);
+
+/** Remove an item at the current position.
+This function removes the item pointed to by
+the internal iterator, and returns it.
+@param list The list to traverse.
+@return The object removed from the current iterator position, NULL if at end of list.
+*/
+
+void *list_remove_item(struct list *list);
 
 /** Apply a function to a list.
 Invokes op on every member of the list.
@@ -420,5 +448,17 @@ LIST_ITERATE( list, s ) {
 */
 
 #define LIST_ITERATE( list, item ) list_first_item(list); while((item=list_next_item(list)))
+
+/** Macro to iterate over a list in reverse order.
+Note that a statement or code block must follow the macro, like this:
+<pre>
+char *s;
+LIST_ITERATE_REVERSE( list, s ) {
+	printf("%s\n",s);
+}
+</pre>
+*/
+
+#define LIST_ITERATE_REVERSE( list, item ) list_last_item(list); while((item=list_prev_item(list)))
 
 #endif

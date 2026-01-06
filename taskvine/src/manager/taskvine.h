@@ -176,6 +176,7 @@ struct vine_stats {
 	int tasks_on_workers;	/**< Number of tasks currently dispatched to some worker. */
 	int tasks_running;	/**< Number of tasks currently executing at some worker. */
 	int tasks_with_results; /**< Number of tasks with retrieved results and waiting to be returned to user. */
+	int recovery_tasks_submitted; /**< Total number of recovery tasks submitted since the manager started. */
 
 	/* Cumulative stats for tasks: */
 	int tasks_submitted;  /**< Total number of tasks submitted to the manager. */
@@ -929,8 +930,9 @@ The given file or directory object is deleted from all worker's caches,
 but is still available on the manager's site, and can be recovered by submitting a recovery task.
 @param m A manager object
 @param f Any file object.
+@return The number of replicas pruned.
 */
-void vine_prune_file(struct vine_manager *m, struct vine_file *f);
+int vine_prune_file(struct vine_manager *m, struct vine_file *f);
 
 //@}
 

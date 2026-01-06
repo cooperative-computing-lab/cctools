@@ -1625,7 +1625,9 @@ class WorkQueue(object):
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
-        return work_queue_specify_max_resources(self._work_queue, rm)
+        result = work_queue_specify_max_resources(self._work_queue, rm)
+        rmsummary_delete(rm)
+        return result
 
     ##
     #
@@ -1644,7 +1646,9 @@ class WorkQueue(object):
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
-        return work_queue_specify_min_resources(self._work_queue, rm)
+        result = work_queue_specify_min_resources(self._work_queue, rm)
+        rmsummary_delete(rm)
+        return result
 
     ##
     # Specifies the maximum resources allowed for the given category.
@@ -1664,7 +1668,9 @@ class WorkQueue(object):
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
-        return work_queue_specify_category_max_resources(self._work_queue, category, rm)
+        result = work_queue_specify_category_max_resources(self._work_queue, category, rm)
+        rmsummary_delete(rm)
+        return result
 
     ##
     # Specifies the minimum resources allowed for the given category.
@@ -1684,7 +1690,9 @@ class WorkQueue(object):
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
-        return work_queue_specify_category_min_resources(self._work_queue, category, rm)
+        result = work_queue_specify_category_min_resources(self._work_queue, category, rm)
+        rmsummary_delete(rm)
+        return result
 
     ##
     # Specifies the first-allocation guess for the given category
@@ -1704,7 +1712,9 @@ class WorkQueue(object):
         rm = rmsummary_create(-1)
         for k in rmd:
             setattr(rm, k, rmd[k])
-        return work_queue_specify_category_first_allocation_guess(self._work_queue, category, rm)
+        result = work_queue_specify_category_first_allocation_guess(self._work_queue, category, rm)
+        rmsummary_delete(rm)
+        return result
 
     ##
     # Specifies the maximum resources allowed for the given category.

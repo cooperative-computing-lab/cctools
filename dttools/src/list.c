@@ -489,10 +489,23 @@ void *list_rotate(struct list *l)
 		return 0;
 
 	// If list has a single node, return that value.
-	if (l->head == l->tail)
-		return l->head->data;
+	if (l->head == l->tail) {
+		if (l->head->dead) {
+			list_item_unref(l->head);
+			return NULL;
+		} else {
+			return l->head->data;
+		}
+	}
 
 	struct list_item *node = l->head;
+
+	// If head is dead, we need to try again.
+	// unref 'advances' the list for us.
+	if (node->dead) {
+		list_item_unref(node);
+		return list_rotate(l);
+	}
 
 	// Change head to next item.
 	l->head = node->next;
@@ -629,11 +642,34 @@ void list_first_item(struct list *list)
 	list_seek(list->iter, 0);
 }
 
+void list_last_item(struct list *list)
+{
+	list_seek(list->iter, -1);
+}
+
 void *list_next_item(struct list *list)
 {
 	void *item = NULL;
 	list_get(list->iter, &item);
 	list_next(list->iter);
+	return item;
+}
+
+void *list_prev_item(struct list *list)
+{
+	void *item = NULL;
+	list_get(list->iter, &item);
+	list_prev(list->iter);
+	return item;
+}
+
+void *list_remove_item(struct list *list)
+{
+	void *item = NULL;
+	list_get(list->iter, &item);
+	if (item) {
+		list_drop(list->iter);
+	}
 	return item;
 }
 
