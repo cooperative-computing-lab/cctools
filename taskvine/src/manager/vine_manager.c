@@ -704,7 +704,9 @@ static vine_msg_code_t vine_manager_recv_no_retry(struct vine_manager *q, struct
 			string_prefix_is(line, "wable_status") || string_prefix_is(line, "resources_status")) {
 		result = handle_manager_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "available_results")) {
-		hash_table_insert(q->workers_with_watched_file_updates, w->hashkey, w);
+		if (!hash_table_lookup(q->workers_with_watched_file_updates, w->hashkey)) {
+			hash_table_insert(q->workers_with_watched_file_updates, w->hashkey, w);
+		}
 		result = VINE_MSG_PROCESSED;
 	} else if (string_prefix_is(line, "resources")) {
 		result = handle_resources(q, w, stoptime);
