@@ -120,6 +120,7 @@ struct vine_manager {
 	struct hash_table *workers_with_watched_file_updates;  /* Maps link -> vine_worker_info */
 	struct hash_table *current_transfer_table; 	/* Maps uuid -> struct transfer_pair */
 	struct itable     *task_group_table; 	/* Maps group id -> list vine_task */
+	struct hash_table *workers_idle_disconnecting;  /* set of workers that were granted a request to idle disconnect, and are in the process of disconnecting. */
 
 	/* Primary data structures for tracking files. */
 
