@@ -270,9 +270,7 @@ void deliver_async_messages(struct link *l)
 
 void send_async_message(struct link *l, const char *fmt, ...)
 {
-	if (!l) {
-		return;
-	}
+	assert(l);
 
 	va_list va;
 	char *message = malloc(VINE_LINE_MAX);
