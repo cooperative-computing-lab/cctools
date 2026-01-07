@@ -269,6 +269,8 @@ void deliver_async_messages(struct link *l)
 
 void send_async_message(struct link *l, const char *fmt, ...)
 {
+	assert(l);
+
 	va_list va;
 	char *message = malloc(VINE_LINE_MAX);
 	va_start(va, fmt);
@@ -498,6 +500,10 @@ its size in bytes and transfer time in usec.
 void vine_worker_send_cache_update(struct link *manager, const char *cachename, vine_file_type_t type, vine_cache_level_t cache_level, int64_t size, time_t mtime,
 		timestamp_t transfer_time, timestamp_t transfer_start)
 {
+	if (!manager) {
+		return;
+	}
+
 	char *transfer_id = hash_table_remove(current_transfers, cachename);
 	if (!transfer_id) {
 		transfer_id = xxstrdup("X");
@@ -524,6 +530,10 @@ could not be loaded.  Accompanied by a corresponding error message.
 
 void vine_worker_send_cache_invalid(struct link *manager, const char *cachename, const char *message)
 {
+	if (!manager) {
+		return;
+	}
+
 	int length = strlen(message);
 	char *transfer_id = hash_table_remove(current_transfers, cachename);
 	if (transfer_id) {
