@@ -72,8 +72,8 @@ class ContextGraph:
         self.parents_of, self.children_of = self._build_dependencies(self.task_dict)
 
         # these mappings are set after node ids are assigned in the C vine graph
-        self.ckey2vid = {}
-        self.vid2ckey = {}
+        self.pykey2cid = {}
+        self.cid2pykey = {}
 
         # will be set from vine graph
         self.outfile_remote_name = {key: None for key in self.task_dict.keys()}
@@ -181,15 +181,3 @@ class ContextGraph:
             raise ValueError("Failed to create topo order, the dependencies may be cyclic or problematic")
 
         return topo_order
-
-    @staticmethod
-    def context_loader_func(context_graph_pkl):
-        """Entry point the proxy library invokes to restore the serialized ContextGraph."""
-        context_graph = cloudpickle.loads(context_graph_pkl)
-
-        if not isinstance(context_graph, ContextGraph):
-            raise TypeError("context_graph_pkl is not of type ContextGraph")
-
-        return {
-            "context_graph": context_graph,
-        }

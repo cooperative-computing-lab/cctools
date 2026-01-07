@@ -2,7 +2,7 @@ include ../../../../config.mk
 include ../../../../rules.mk
 
 MODULE_DIR := $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/dagvine
-SUBDIRS    := context_graph vine_graph
+SUBDIRS    := context_graph vine_graph blueprint_graph
 
 .PHONY: all install clean lint format $(SUBDIRS)
 

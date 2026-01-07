@@ -90,9 +90,9 @@ def compute_single_key(vine_key):
     After computation, the result is saved, the output file is validated, and
     an optional delay (`extra_sleep_time_of`) is applied before returning.
     """
-    context_graph = load_variable_from_library('context_graph')
+    context_graph = load_variable_from_library('graph')
 
-    k = context_graph.vid2ckey[vine_key]
+    k = context_graph.cid2pykey[vine_key]
     v = context_graph.task_dict[k]
 
     if context_graph.is_dts_key(k):

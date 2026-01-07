@@ -5,9 +5,9 @@
 from ndcctools.taskvine import cvine
 from ndcctools.taskvine.manager import Manager
 
-from ndcctools.taskvine.dagvine.context_graph.proxy_library import ProxyLibrary
-from ndcctools.taskvine.dagvine.context_graph.proxy_functions import compute_single_key
-from ndcctools.taskvine.dagvine.context_graph.core import ContextGraph, ContextGraphTaskResult
+from ndcctools.taskvine.dagvine.blueprint_graph.proxy_library import ProxyLibrary
+from ndcctools.taskvine.dagvine.blueprint_graph.proxy_functions import compute_single_key
+from ndcctools.taskvine.dagvine.blueprint_graph.blueprint_graph import BlueprintGraph, TaskOutputWrapper
 from ndcctools.taskvine.dagvine.vine_graph.vine_graph_client import VineGraphClient
 
 import cloudpickle
@@ -29,6 +29,14 @@ try:
     import dask._task_spec as dts
 except ImportError:
     dts = None
+
+
+def context_loader_func(graph_pkl):
+    graph = cloudpickle.loads(graph_pkl)
+
+    return {
+        "graph": graph,
+    }
 
 
 def delete_all_files(root_dir):
@@ -81,7 +89,7 @@ def dask_collections_to_task_dict(collection_dict):
 # hand us `{key: delayed / value}` directly, while some experiments pass a
 # fully-expanded legacy Dask dict. This helper normalises both cases so the rest
 # of the pipeline only deals with `{task_key: task_expression}`.
-def ensure_task_dict(collection_dict):
+def normalize_task_dict(collection_dict):
     """Normalize user input (raw dict or Dask collection) into a plain `{task_key: expr}` mapping."""
     if is_dask_collection and any(is_dask_collection(v) for v in collection_dict.values()):
         task_dict = dask_collections_to_task_dict(collection_dict)
@@ -223,9 +231,27 @@ class DAGVine(Manager):
 
         return context_graph
 
-    def build_vine_graph(self, context_graph, target_keys):
-        """Mirror the ContextGraph into VineGraph, preserving ordering and targets."""
-        assert context_graph is not None, "ContextGraph must be built before building the VineGraph"
+    def build_blueprint_graph(self, task_dict):
+        def _unpack_sexpr(sexpr):
+            func = sexpr[0]
+            tail = sexpr[1:]
+            if tail and isinstance(tail[-1], dict):
+                return func, tail[:-1], tail[-1]
+            else:
+                return func, tail, {}
+
+        bg = BlueprintGraph()
+
+        for k, v in task_dict.items():
+            func, args, kwargs = _unpack_sexpr(v)
+            assert callable(func), f"Task {k} does not have a callable"
+            bg.add_task(k, func, *args, **kwargs)
+
+        return bg
+
+    def build_vine_graph(self, py_graph, target_keys):
+        """Mirror the Python graph into VineGraph, preserving ordering and targets."""
+        assert py_graph is not None, "Python graph must be built before building the VineGraph"
 
         vine_graph = VineGraphClient(self._taskvine)
 
@@ -235,13 +261,14 @@ class DAGVine(Manager):
         self.tune_manager()
         self.tune_vine_graph(vine_graph)
 
-        topo_order = context_graph.get_topological_order()
+        topo_order = py_graph.get_topological_order()
+
         # Build the cross-language mapping as we walk the topo order.
         for k in topo_order:
             node_id = vine_graph.add_node(k)
-            context_graph.ckey2vid[k] = node_id
-            context_graph.vid2ckey[node_id] = k
-            for pk in context_graph.parents_of[k]:
+            py_graph.pykey2cid[k] = node_id
+            py_graph.cid2pykey[node_id] = k
+            for pk in py_graph.parents_of[k]:
                 vine_graph.add_dependency(pk, k)
 
         # Now that every node is present, mark which ones are final outputs.
@@ -252,26 +279,29 @@ class DAGVine(Manager):
 
         return vine_graph
 
-    def build_graphs(self, task_dict, target_keys):
+    def build_graphs(self, task_dict, target_keys, blueprint_graph=False):
         """Create both the ContextGraph and its C counterpart, wiring outputs for later use."""
         # Build the logical (Python) DAG.
-        context_graph = self.build_context_graph(task_dict)
+        if blueprint_graph == False:
+            py_graph = self.build_context_graph(task_dict)
+        else:
+            py_graph = self.build_blueprint_graph(task_dict)
         # Build the physical (C) DAG.
-        vine_graph = self.build_vine_graph(context_graph, target_keys)
+        vine_graph = self.build_vine_graph(py_graph, target_keys)
 
         # Cross-fill the outfile locations so the runtime graph knows where to read/write.
-        for k in context_graph.ckey2vid:
+        for k in py_graph.pykey2cid:
             outfile_remote_name = vine_graph.get_node_outfile_remote_name(k)
-            context_graph.outfile_remote_name[k] = outfile_remote_name
+            py_graph.outfile_remote_name[k] = outfile_remote_name
 
-        return context_graph, vine_graph
+        return py_graph, vine_graph
 
-    def create_proxy_library(self, context_graph, vine_graph, hoisting_modules, env_files):
+    def create_proxy_library(self, py_graph, vine_graph, hoisting_modules, env_files):
         """Package up the context_graph as a TaskVine library."""
         proxy_library = ProxyLibrary(self)
         proxy_library.add_hoisting_modules(hoisting_modules)
         proxy_library.add_env_files(env_files)
-        proxy_library.set_context_loader(ContextGraph.context_loader_func, context_loader_args=[cloudpickle.dumps(context_graph)])
+        proxy_library.set_context_loader(context_loader_func, context_loader_args=[cloudpickle.dumps(py_graph)])
         proxy_library.set_libcores(self.param("libcores"))
         proxy_library.set_name(vine_graph.get_proxy_library_name())
 
@@ -290,13 +320,13 @@ class DAGVine(Manager):
                 print(f"             {k}")
         target_keys = list(set(target_keys) - set(missing_keys))
 
-        task_dict = ensure_task_dict(collection_dict)
+        task_dict = normalize_task_dict(collection_dict)
 
         # Build both the Python DAG and its C mirror.
-        context_graph, vine_graph = self.build_graphs(task_dict, target_keys)
+        py_graph, vine_graph = self.build_graphs(task_dict, target_keys, blueprint_graph=True)
 
         # Ship the execution context to workers via a proxy library.
-        proxy_library = self.create_proxy_library(context_graph, vine_graph, hoisting_modules, env_files)
+        proxy_library = self.create_proxy_library(py_graph, vine_graph, hoisting_modules, env_files)
         proxy_library.install()
 
         print(f"=== Library serialized size: {color_text(proxy_library.get_context_size(), 92)} MB")
@@ -313,8 +343,8 @@ class DAGVine(Manager):
         # Load any requested target outputs back into Python land.
         results = {}
         for k in target_keys:
-            outfile_path = os.path.join(self.param("output-dir"), context_graph.outfile_remote_name[k])
-            results[k] = ContextGraphTaskResult.load_from_path(outfile_path)
+            outfile_path = os.path.join(self.param("output-dir"), py_graph.outfile_remote_name[k])
+            results[k] = TaskOutputWrapper.load_from_path(outfile_path)
         return results
 
     def _on_sigint(self, signum, frame):
