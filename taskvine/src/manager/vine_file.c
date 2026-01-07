@@ -194,7 +194,7 @@ int vine_file_has_changed(struct vine_file *f)
 
 		struct stat info;
 
-		int result = lstat(f->source, &info);
+		int result = stat(f->source, &info);
 		if (result != 0) {
 			debug(D_NOTICE | D_VINE, "input file %s couldn't be accessed: %s", f->source, strerror(errno));
 			return 1;
