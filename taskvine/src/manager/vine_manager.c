@@ -307,6 +307,7 @@ static void handle_idle_disconnect_request(struct vine_manager *q, struct vine_w
 		debug(D_VINE, "Accepting disconnect request from worker %s (%s).", w->hostname, w->addrport);
 		q->stats->workers_idled_out++;
 		vine_manager_send(q, w, "exit\n");
+		hash_table_insert(q->workers_idle_disconnecting, w->hashkey, w);
 	}
 
 	return;
@@ -1528,7 +1529,12 @@ we remove the worker and retry the tasks dispatched to it elsewhere.
 
 static void handle_worker_failure(struct vine_manager *q, struct vine_worker_info *w)
 {
-	vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
+	vine_worker_disconnect_reason_t reason = VINE_WORKER_DISCONNECT_FAILURE;
+	if (hash_table_remove(q->workers_idle_disconnecting, w->hashkey)) {
+		reason = VINE_WORKER_DISCONNECT_IDLE_OUT;
+	}
+
+	vine_manager_remove_worker(q, w, reason);
 	return;
 }
 
@@ -4056,6 +4062,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->file_worker_table = hash_table_create(0, 0);
 	q->temp_files_to_replicate = priority_queue_create(0);
 	q->worker_blocklist = hash_table_create(0, 0);
+	q->workers_idle_disconnecting = hash_table_create(0, 0);
 
 	q->file_table = hash_table_create(0, 0);
 
@@ -4437,6 +4444,8 @@ void vine_delete(struct vine_manager *q)
 
 	hash_table_clear(q->worker_blocklist, (void *)vine_blocklist_info_delete);
 	hash_table_delete(q->worker_blocklist);
+
+	hash_table_delete(q->workers_idle_disconnecting);
 
 	vine_current_transfers_clear(q);
 	hash_table_delete(q->current_transfer_table);
