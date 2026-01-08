@@ -1704,7 +1704,7 @@ static void vine_worker_serve_manager(struct link *manager)
 		hence a maximum wait time of five seconds is enforced.
 		*/
 
-		int wait_msec = 0;
+		int wait_msec = 5000;
 
 		if (sigchld_received_flag) {
 			wait_msec = 0;
