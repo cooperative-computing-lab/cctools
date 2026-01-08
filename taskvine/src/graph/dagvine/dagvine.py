@@ -5,6 +5,7 @@
 from ndcctools.taskvine import cvine
 from ndcctools.taskvine.manager import Manager
 
+from ndcctools.taskvine.dagvine.blueprint_graph.adaptor import Adaptor
 from ndcctools.taskvine.dagvine.blueprint_graph.proxy_library import ProxyLibrary
 from ndcctools.taskvine.dagvine.blueprint_graph.proxy_functions import compute_single_key
 from ndcctools.taskvine.dagvine.blueprint_graph.blueprint_graph import BlueprintGraph, TaskOutputWrapper
@@ -14,21 +15,6 @@ import cloudpickle
 import os
 import signal
 import json
-
-try:
-    import dask
-except ImportError:
-    dask = None
-
-try:
-    from dask.base import is_dask_collection
-except ImportError:
-    is_dask_collection = None
-
-try:
-    import dask._task_spec as dts
-except ImportError:
-    dts = None
 
 
 def context_loader_func(graph_pkl):
@@ -56,50 +42,6 @@ def delete_all_files(root_dir):
 def color_text(text, color_code):
     """Render a colored string for the friendly status banners Vineyard prints at start-up."""
     return f"\033[{color_code}m{text}\033[0m"
-
-
-# Flatten Dask collections into the dict-of-tasks structure the rest of the
-# pipeline expects. DAGVine clients often hand us a dict like
-# {"result": dask.delayed(...)}; we merge the underlying HighLevelGraphs so
-# `ContextGraph` sees the same dict representation C does.
-def dask_collections_to_task_dict(collection_dict):
-    """Merge user-facing Dask collections into the flattened task dict the ContextGraph expects."""
-    assert is_dask_collection is not None
-    from dask.highlevelgraph import HighLevelGraph, ensure_dict
-
-    if not isinstance(collection_dict, dict):
-        raise TypeError("Input must be a dict")
-
-    for k, v in collection_dict.items():
-        if not is_dask_collection(v):
-            raise TypeError(f"Input must be a dict of DaskCollection, but found {k} with type {type(v)}")
-
-    if dts:
-        # the new Dask API
-        sub_hlgs = [v.dask for v in collection_dict.values()]
-        hlg = HighLevelGraph.merge(*sub_hlgs).to_dict()
-    else:
-        # the old Dask API
-        hlg = dask.base.collections_to_dsk(collection_dict.values())
-
-    return ensure_dict(hlg)
-
-
-# Accept both plain dicts and Dask collections from callers. Most library users
-# hand us `{key: delayed / value}` directly, while some experiments pass a
-# fully-expanded legacy Dask dict. This helper normalises both cases so the rest
-# of the pipeline only deals with `{task_key: task_expression}`.
-def normalize_task_dict(collection_dict):
-    """Normalize user input (raw dict or Dask collection) into a plain `{task_key: expr}` mapping."""
-    if is_dask_collection and any(is_dask_collection(v) for v in collection_dict.values()):
-        task_dict = dask_collections_to_task_dict(collection_dict)
-    else:
-        task_dict = collection_dict
-
-    if dts:
-        return dts.convert_legacy_graph(task_dict)
-    else:
-        return task_dict
 
 
 class GraphParams:
@@ -179,13 +121,13 @@ class DAGVine(Manager):
         # Ensure run-info templates don't accumulate garbage between runs.
         run_info_path = kwargs.get("run_info_path", None)
         run_info_template = kwargs.get("run_info_template", None)
+
         self.run_info_template_path = os.path.join(run_info_path, run_info_template)
         if self.run_info_template_path:
             delete_all_files(self.run_info_template_path)
 
         # Boot the underlying TaskVine manager. The TaskVine manager keeps alive until the dagvine object is destroyed
         super().__init__(*args, **kwargs)
-        print(f"cvine = {cvine}")
         self.runtime_directory = cvine.vine_get_runtime_directory(self._taskvine)
 
         print(f"=== Manager name: {color_text(self.name, 92)}")
@@ -232,18 +174,10 @@ class DAGVine(Manager):
         return context_graph
 
     def build_blueprint_graph(self, task_dict):
-        def _unpack_sexpr(sexpr):
-            func = sexpr[0]
-            tail = sexpr[1:]
-            if tail and isinstance(tail[-1], dict):
-                return func, tail[:-1], tail[-1]
-            else:
-                return func, tail, {}
-
         bg = BlueprintGraph()
 
         for k, v in task_dict.items():
-            func, args, kwargs = _unpack_sexpr(v)
+            func, args, kwargs = v
             assert callable(func), f"Task {k} does not have a callable"
             bg.add_task(k, func, *args, **kwargs)
 
@@ -320,7 +254,7 @@ class DAGVine(Manager):
                 print(f"             {k}")
         target_keys = list(set(target_keys) - set(missing_keys))
 
-        task_dict = normalize_task_dict(collection_dict)
+        task_dict = Adaptor(collection_dict).task_dict
 
         # Build both the Python DAG and its C mirror.
         py_graph, vine_graph = self.build_graphs(task_dict, target_keys, blueprint_graph=True)
