@@ -702,7 +702,7 @@ class TxnPlot:
         if self.opts.output:
             plt.savefig(self.opts.output)
 
-        if self.opts.display or not self.opts.output and not self.opts.nograph:
+        if self.opts.display:
             plt.show()
 
     def set_legend(self, fig):
@@ -1171,9 +1171,6 @@ if __name__ == "__main__":
         "--noapp", action="store_true", help="do not show custom application lines"
     )
     parser.add_argument(
-        "--nograph", action="store_true", help="do not show a matplotlib window"
-    )
-    parser.add_argument(
         "--dask-colors", action="store_true", help="color palette aligns with Dask's"
     )
     parser.add_argument(
@@ -1192,6 +1189,8 @@ if __name__ == "__main__":
         p.error("Minimum --time-ticks-n is 1")
 
     if args.mode == "csv":
+        if args.output is None:
+            args.output = "dataframes"
         p.write_tables(args.output)
     elif args.mode == "workers":
         TxnPlotWorkers(p.managers, args)
@@ -1200,5 +1199,5 @@ if __name__ == "__main__":
     elif args.mode == "manager":
         TxnPlotManager(p.managers, args)
     elif args.mode == "stats":
-        args.nograph = True
+        args.display = False
         TxnStats(p.managers, args)
