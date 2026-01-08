@@ -4,6 +4,7 @@
 
 
 from ndcctools.taskvine.utils import load_variable_from_library
+import time
 
 
 def compute_task(bg, task_expr):
@@ -33,10 +34,6 @@ def compute_task(bg, task_expr):
     r_args = bg._visit_task_output_refs(args, on_ref, rewrite=True)
     r_kwargs = bg._visit_task_output_refs(kwargs, on_ref, rewrite=True)
 
-    print(f"func: {func}")
-    print(f"r_args: {r_args}")
-    print(f"r_kwargs: {r_kwargs}")
-
     return func(*r_args, **r_kwargs)
 
 
@@ -47,5 +44,7 @@ def compute_single_key(vine_key):
     task_expr = bg.task_dict[task_key]
 
     output = compute_task(bg, task_expr)
+
+    time.sleep(bg.extra_task_sleep_time[task_key])
 
     bg.save_task_output(task_key, output)

@@ -501,7 +501,8 @@ class AdaptorTaskSpecTests(unittest.TestCase):
         fake_identity_cast.__module__ = "dask._fake"
 
         graph = {
-            "raw": _FakeDataNode(value=5),
+            "raw0": _FakeDataNode(value=5),
+            "raw1": _FakeDataNode(value=6),
             "outer": _FakeTask(
                 key="outer",
                 function=lambda x: x,
@@ -509,7 +510,11 @@ class AdaptorTaskSpecTests(unittest.TestCase):
                     _FakeTask(
                         key=None,
                         function=fake_identity_cast,
-                        args=(_FakeTaskRef("raw"),),
+                        args=(
+                            _FakeTaskRef("raw0"),
+                            _FakeTaskRef("raw1"),
+                        ),
+                        kwargs={"typ": list},
                     ),
                 ),
             ),
@@ -519,8 +524,12 @@ class AdaptorTaskSpecTests(unittest.TestCase):
         _, outer_args, outer_kwargs = adapted["outer"]
         self.assertEqual(outer_kwargs, {})
         self.assertEqual(len(outer_args), 1)
-        self.assertIsInstance(outer_args[0], TaskOutputRef)
-        self.assertEqual(outer_args[0].task_key, "raw")
+        self.assertIsInstance(outer_args[0], list)
+        self.assertEqual(len(outer_args[0]), 2)
+        self.assertIsInstance(outer_args[0][0], TaskOutputRef)
+        self.assertIsInstance(outer_args[0][1], TaskOutputRef)
+        self.assertEqual(outer_args[0][0].task_key, "raw0")
+        self.assertEqual(outer_args[0][1].task_key, "raw1")
         self.assertFalse(any(str(k).startswith("__lift__") for k in adapted.keys()))
 
 

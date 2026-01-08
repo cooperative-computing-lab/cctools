@@ -19,7 +19,7 @@ except Exception:
     # where the private module is unavailable or type-checkers can't resolve it).
     dts = None
 
-from ndcctools.taskvine.dagvine.blueprint_graph.blueprint_graph import TaskOutputRef
+from ndcctools.taskvine.dagvine.blueprint_graph.blueprint_graph import TaskOutputRef, BlueprintGraph
 
 
 def _identity(value):
@@ -32,8 +32,11 @@ class Adaptor:
 
     _LEAF_TYPES = (str, bytes, bytearray, memoryview, int, float, bool, type(None))
 
-    def __init__(self, collection_dict):
-        self.original_collection_dict = collection_dict
+    def __init__(self, task_dict):
+
+        if isinstance(task_dict, BlueprintGraph):
+            self.converted = task_dict
+            return
 
         # TaskSpec-only state used to "lift" inline Tasks that cannot be reduced to
         # a pure Python value (or would be unsafe/expensive to inline).
@@ -45,23 +48,23 @@ class Adaptor:
         # lifted keys remain visible across subsequent conversions/dedup/reference checks.
         self._task_keys = set()
 
-        normalized = self._normalize_task_dict(collection_dict)
-        self.task_dict = self._convert_to_blueprint_tasks(normalized)
+        normalized = self._normalize_task_dict(task_dict)
+        self.converted = self._convert_to_blueprint_tasks(normalized)
 
-    def _normalize_task_dict(self, collection_dict):
+    def _normalize_task_dict(self, task_dict):
         """Collapse every supported input style into a classic `{key: sexpr or TaskSpec}` mapping."""
         from_dask_collection = bool(
-            is_dask_collection and any(is_dask_collection(v) for v in collection_dict.values())
+            is_dask_collection and any(is_dask_collection(v) for v in task_dict.values())
         )
 
         if from_dask_collection:
-            task_dict = self._dask_collections_to_task_dict(collection_dict)
+            task_dict = self._dask_collections_to_task_dict(task_dict)
         else:
             # IMPORTANT: treat plain user dicts as DAGVine sexprs by default.
             # If we unconditionally run `dask._task_spec.convert_legacy_graph(...)` when
             # dts is available, Dask will interpret our "final Mapping is kwargs"
             # convention as a positional dict argument, breaking sexpr semantics.
-            task_dict = dict(collection_dict)
+            task_dict = dict(task_dict)
 
         # Only ask Dask to rewrite legacy graphs when we *know* the input came
         # from a Dask collection/HLG. This keeps classic DAGVine sexprs stable
@@ -227,10 +230,12 @@ class Adaptor:
         """Decide whether a value should become a `TaskOutputRef`."""
         if isinstance(obj, self._LEAF_TYPES):
             if isinstance(obj, str):
-                return obj in task_keys
+                hit = obj in task_keys
+                return hit
             return False
         try:
-            return obj in task_keys
+            hit = obj in task_keys
+            return hit
         except TypeError:
             return False
 
@@ -238,25 +243,25 @@ class Adaptor:
     # pipeline expects. DAGVine clients often hand us a dict like
     # {"result": dask.delayed(...)}; we merge the underlying HighLevelGraphs so
     # `ContextGraph` sees the same dict representation C does.
-    def _dask_collections_to_task_dict(self, collection_dict):
+    def _dask_collections_to_task_dict(self, task_dict):
         """Flatten Dask collections into the classic dict-of-task layout."""
         assert is_dask_collection is not None
         from dask.highlevelgraph import HighLevelGraph, ensure_dict
 
-        if not isinstance(collection_dict, dict):
+        if not isinstance(task_dict, dict):
             raise TypeError("Input must be a dict")
 
-        for k, v in collection_dict.items():
+        for k, v in task_dict.items():
             if not is_dask_collection(v):
                 raise TypeError(
                     f"Input must be a dict of DaskCollection, but found {k} with type {type(v)}"
                 )
 
         if dts:
-            sub_hlgs = [v.dask for v in collection_dict.values()]
+            sub_hlgs = [v.dask for v in task_dict.values()]
             hlg = HighLevelGraph.merge(*sub_hlgs).to_dict()
         else:
-            hlg = dask.base.collections_to_dsk(collection_dict.values())
+            hlg = dask.base.collections_to_dsk(task_dict.values())
 
         return ensure_dict(hlg)
 
@@ -299,18 +304,21 @@ class Adaptor:
 
         literal_cls = getattr(dts, "Literal", None)
         if literal_cls and isinstance(operand, literal_cls):
-            return getattr(operand, "value", None)
+            value = getattr(operand, "value", None)
+            return value
 
         datanode_cls = getattr(dts, "DataNode", None)
         if datanode_cls and isinstance(operand, datanode_cls):
-            return operand.value
+            value = operand.value
+            return value
 
         nested_cls = getattr(dts, "NestedContainer", None)
         if nested_cls and isinstance(operand, nested_cls):
             payload = getattr(operand, "value", None)
             if payload is None:
                 payload = getattr(operand, "data", None)
-            return self._unwrap_dts_operand(payload, task_keys, parent_key=parent_key)
+            value = self._unwrap_dts_operand(payload, task_keys, parent_key=parent_key)
+            return value
 
         task_cls = getattr(dts, "Task", None)
         if task_cls and isinstance(operand, task_cls):
@@ -323,15 +331,31 @@ class Adaptor:
             # Otherwise it is an inline expression. Reduce if safe, else lift.
             func = self._extract_callable_from_task(operand)
             if func is None:
-                return self._lift_inline_task(operand, task_keys, parent_key=parent_key)
+                out = self._lift_inline_task(operand, task_keys, parent_key=parent_key)
+                return out
 
             # Special-case: Dask internal identity-cast wrappers should not be called
-            # during adaptation. Reduce structurally by returning the first argument.
+            # during adaptation. Reduce structurally by unwrapping all args and
+            # rebuilding the requested container type. This preserves dependency
+            # edges (critical for WCC) without executing arbitrary code.
             if self._is_identity_cast_op(func):
                 raw_args = getattr(operand, "args", ()) or ()
-                if not raw_args:
-                    return None
-                return self._unwrap_dts_operand(raw_args[0], task_keys, parent_key=parent_key)
+                raw_kwargs = getattr(operand, "kwargs", {}) or {}
+                typ = raw_kwargs.get("typ", None)
+
+                values = [self._unwrap_dts_operand(a, task_keys, parent_key=parent_key) for a in raw_args]
+
+                # Only allow safe container constructors here; otherwise lift.
+                safe_types = (list, tuple, set, frozenset, dict)
+                if typ in safe_types:
+                    try:
+                        casted = typ(values)
+                    except Exception:
+                        return self._lift_inline_task(operand, task_keys, parent_key=parent_key)
+                    return casted
+
+                # Unknown/unsafe typ: lift so the worker executes the real op.
+                return self._lift_inline_task(operand, task_keys, parent_key=parent_key)
 
             if self._is_pure_value_op(func):
                 reduced, used_lift = self._reduce_inline_task(operand, task_keys, parent_key=parent_key)

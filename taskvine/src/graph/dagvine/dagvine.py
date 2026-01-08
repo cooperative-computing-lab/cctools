@@ -15,6 +15,7 @@ import cloudpickle
 import os
 import signal
 import json
+import random
 
 
 def context_loader_func(graph_pkl):
@@ -133,6 +134,7 @@ class DAGVine(Manager):
         print(f"=== Manager name: {color_text(self.name, 92)}")
         print(f"=== Manager port: {color_text(self.port, 92)}")
         print(f"=== Runtime directory: {color_text(self.runtime_directory, 92)}")
+        self._sigint_received = False
 
     def param(self, param_name):
         """Convenience accessor so callers can read tuned parameters at runtime."""
@@ -163,23 +165,18 @@ class DAGVine(Manager):
         for k, v in self.params.vine_graph_tuning_params.items():
             vine_graph.tune(k, str(v))
 
-    def build_context_graph(self, task_dict):
-        """Construct the Python-side DAG wrapper (ContextGraph)."""
-        context_graph = ContextGraph(
-            task_dict,
-            extra_task_output_size_mb=self.param("extra-task-output-size-mb"),
-            extra_task_sleep_time=self.param("extra-task-sleep-time")
-        )
-
-        return context_graph
-
     def build_blueprint_graph(self, task_dict):
-        bg = BlueprintGraph()
+        if isinstance(task_dict, BlueprintGraph):
+            bg = task_dict
+        else:
+            bg = BlueprintGraph()
 
-        for k, v in task_dict.items():
-            func, args, kwargs = v
-            assert callable(func), f"Task {k} does not have a callable"
-            bg.add_task(k, func, *args, **kwargs)
+            for k, v in task_dict.items():
+                func, args, kwargs = v
+                assert callable(func), f"Task {k} does not have a callable"
+                bg.add_task(k, func, *args, **kwargs)
+
+        bg.finalize()
 
         return bg
 
@@ -213,14 +210,18 @@ class DAGVine(Manager):
 
         return vine_graph
 
-    def build_graphs(self, task_dict, target_keys, blueprint_graph=False):
-        """Create both the ContextGraph and its C counterpart, wiring outputs for later use."""
-        # Build the logical (Python) DAG.
-        if blueprint_graph == False:
-            py_graph = self.build_context_graph(task_dict)
-        else:
-            py_graph = self.build_blueprint_graph(task_dict)
-        # Build the physical (C) DAG.
+    def build_graphs(self, task_dict, target_keys):
+        """Create both the python side graph and its C counterpart, wiring outputs for later use."""
+        # Build the python side graph.
+        py_graph = self.build_blueprint_graph(task_dict)
+
+        # filter out target keys that are not in the collection dict
+        missing_keys = [k for k in target_keys if k not in py_graph.task_dict]
+        if missing_keys:
+            print(f"=== Warning: the following target keys are not in the graph: {','.join(map(str, missing_keys))}")
+        target_keys = list(set(target_keys) - set(missing_keys))
+
+        # Build the c side graph.
         vine_graph = self.build_vine_graph(py_graph, target_keys)
 
         # Cross-fill the outfile locations so the runtime graph knows where to read/write.
@@ -231,7 +232,7 @@ class DAGVine(Manager):
         return py_graph, vine_graph
 
     def create_proxy_library(self, py_graph, vine_graph, hoisting_modules, env_files):
-        """Package up the context_graph as a TaskVine library."""
+        """Package up the python side graph as a TaskVine library."""
         proxy_library = ProxyLibrary(self)
         proxy_library.add_hoisting_modules(hoisting_modules)
         proxy_library.add_env_files(env_files)
@@ -241,46 +242,42 @@ class DAGVine(Manager):
 
         return proxy_library
 
-    def run(self, collection_dict, target_keys=[], params={}, hoisting_modules=[], env_files={}):
+    def run(self, task_dict, target_keys=[], params={}, hoisting_modules=[], env_files={}, adapt_dask=False):
         """High-level entry point: normalise input, build graphs, ship the library, execute, and return results."""
         # first update the params so that they can be used for the following construction
         self.update_params(params)
 
-        # filter out target keys that are not in the collection dict
-        missing_keys = [k for k in target_keys if k not in collection_dict]
-        if missing_keys:
-            print(f"=== Warning: the following target keys are not in the collection dict:")
-            for k in missing_keys:
-                print(f"             {k}")
-        target_keys = list(set(target_keys) - set(missing_keys))
-
-        task_dict = Adaptor(collection_dict).task_dict
+        if adapt_dask:
+            task_dict = Adaptor(task_dict).converted
 
         # Build both the Python DAG and its C mirror.
-        py_graph, vine_graph = self.build_graphs(task_dict, target_keys, blueprint_graph=True)
+        py_graph, vine_graph = self.build_graphs(task_dict, target_keys)
 
-        # Ship the execution context to workers via a proxy library.
+        # set extra task output size and sleep time for each task
+        for k in py_graph.task_dict:
+            py_graph.extra_task_output_size_mb[k] = random.uniform(*self.param("extra-task-output-size-mb"))
+            py_graph.extra_task_sleep_time[k] = random.uniform(*self.param("extra-task-sleep-time"))
+
+        # Ship the execution context to workers via a proxy library
         proxy_library = self.create_proxy_library(py_graph, vine_graph, hoisting_modules, env_files)
         proxy_library.install()
 
-        print(f"=== Library serialized size: {color_text(proxy_library.get_context_size(), 92)} MB")
-
-        # Kick off execution on the C side.
-        vine_graph.execute()
-
-        # Tear down once we're done so successive runs start clean.
-        proxy_library.uninstall()
-
-        # Delete the C graph immediately so its lifetime matches the run.
-        vine_graph.delete()
-
-        # Load any requested target outputs back into Python land.
-        results = {}
-        for k in target_keys:
-            outfile_path = os.path.join(self.param("output-dir"), py_graph.outfile_remote_name[k])
-            results[k] = TaskOutputWrapper.load_from_path(outfile_path)
-        return results
+        try:
+            print(f"=== Library serialized size: {color_text(proxy_library.get_context_size(), 92)} MB")
+            vine_graph.execute()
+            results = {}
+            for k in target_keys:
+                if k not in py_graph.task_dict:
+                    continue
+                outfile_path = os.path.join(self.param("output-dir"), py_graph.outfile_remote_name[k])
+                results[k] = TaskOutputWrapper.load_from_path(outfile_path)
+            return results
+        finally:
+            try:
+                proxy_library.uninstall()
+            finally:
+                vine_graph.delete()
 
     def _on_sigint(self, signum, frame):
-        """SIGINT handler that delegates to Manager cleanup so workers are released promptly."""
-        self.__del__()
+        self._sigint_received = True
+        raise KeyboardInterrupt

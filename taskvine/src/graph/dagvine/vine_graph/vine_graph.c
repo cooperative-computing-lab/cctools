@@ -1112,7 +1112,7 @@ void vine_graph_execute(struct vine_graph *vg)
 		return;
 	}
 
-	signal(SIGINT, handle_sigint);
+	void (*previous_sigint_handler)(int) = signal(SIGINT, handle_sigint);
 
 	debug(D_VINE, "start executing vine graph");
 
@@ -1326,6 +1326,11 @@ void vine_graph_execute(struct vine_graph *vg)
 
 	if (vg->time_metrics_filename) {
 		print_time_metrics(vg, vg->time_metrics_filename);
+	}
+
+	signal(SIGINT, previous_sigint_handler);
+	if (interrupted) {
+		raise(SIGINT);
 	}
 
 	return;

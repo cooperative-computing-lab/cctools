@@ -8,6 +8,8 @@ from dataclasses import is_dataclass, fields, replace
 import cloudpickle
 
 
+# Lightweight wrapper around task results that optionally pads the payload. The
+# padding lets tests model large outputs without altering the logical result.
 class TaskOutputWrapper:
     def __init__(self, result, extra_size_mb=None):
         self.result = result
@@ -24,6 +26,7 @@ class TaskOutputWrapper:
             raise FileNotFoundError(f"Task result file not found at {path}")
 
 
+# A reference to a task output. This is used to represent the output of a task as a dependency of another task.
 class TaskOutputRef:
     __slots__ = ("task_key", "path")
 
@@ -37,6 +40,8 @@ class TaskOutputRef:
         return TaskOutputRef(self.task_key, self.path + (key,))
 
 
+# The BlueprintGraph is a directed acyclic graph (DAG) that represents the logical dependencies between tasks.
+# It is used to build the C vine graph.
 class BlueprintGraph:
 
     _LEAF_TYPES = (str, bytes, bytearray, memoryview, int, float, bool, type(None))
@@ -54,6 +59,9 @@ class BlueprintGraph:
 
         self.pykey2cid = {}                  # py_key -> c_id
         self.cid2pykey = {}                  # c_id -> py_key
+
+        self.extra_task_output_size_mb = {}  # task_key -> extra size in MB
+        self.extra_task_sleep_time = {}      # task_key -> extra sleep time in seconds
 
     def _visit_task_output_refs(self, obj, on_ref, *, rewrite: bool):
         seen = set()
@@ -154,7 +162,7 @@ class BlueprintGraph:
 
     def save_task_output(self, task_key, output):
         with open(self.outfile_remote_name[task_key], "wb") as f:
-            wrapped_output = TaskOutputWrapper(output, extra_size_mb=0)
+            wrapped_output = TaskOutputWrapper(output, extra_size_mb=self.extra_task_output_size_mb[task_key])
             cloudpickle.dump(wrapped_output, f)
 
     def load_task_output(self, task_key):
@@ -191,6 +199,7 @@ class BlueprintGraph:
         print("topo verified: ok")
 
     def finalize(self):
+        # build the dependencies determined by files produced and consumed
         for file, producer in self.producer_of.items():
             for consumer in self.consumers_of.get(file, ()):
                 self.parents_of[consumer].add(producer)
