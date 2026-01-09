@@ -42,10 +42,16 @@ struct vine_node {
 	struct list *children;
 
 	/* Execution and scheduling state */
-	struct set *pending_parents;
-	int retry_attempts_left;
+	/* Number of unresolved parent dependencies. This is initialized to the in-degree
+	 * (list_size(parents)) before execution starts, and decremented exactly once per
+	 * parent->child edge when the parent first completes. */
+	int remaining_parents_count;
+	/* Edge-fired guard: tracks which parent edges have already been consumed for this child. */
+	struct set *fired_parents;
 	int completed;
 	prune_status_t prune_status;
+	int retry_attempts_left;
+	int in_resubmit_queue;
 
 	/* Structural metrics */
 	int prune_depth;
@@ -69,6 +75,8 @@ struct vine_node {
 	timestamp_t execution_time;
 	timestamp_t retrieval_time;
 	timestamp_t postprocessing_time;
+
+	timestamp_t last_failure_time;
 };
 
 /** Create a new vine node.

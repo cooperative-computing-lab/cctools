@@ -71,6 +71,9 @@ class GraphParams:
             "progress-bar-update-interval-sec": 0.1,
             "time-metrics-filename": "time_metrics.csv",
             "enable-debug-log": 1,
+            "auto-recovery": 1,
+            "max-retry-attempts": 15,
+            "retry-interval-sec": 1,
         }
         # Misc knobs used purely on the Python side (e.g., generate fake outputs).
         self.other_params = {

@@ -1487,6 +1487,10 @@ static int retrieve_ready_task(struct vine_manager *q, struct vine_task *t, doub
 			result = VINE_RESULT_FIXED_LOCATION_MISSING;
 		}
 	}
+	if (!q->auto_recovery && !vine_manager_check_inputs_available(q, t)) {
+		debug(D_VINE, "task %d has missing input files", t->task_id);
+		result = VINE_RESULT_INPUT_MISSING;
+	}
 
 	/* If any of the reasons fired, then expire the task and put in the retrieved queue. */
 	if (result != VINE_RESULT_SUCCESS) {
@@ -3423,6 +3427,10 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 		return;
 	}
 
+	if (!q->auto_recovery) {
+		return;
+	}
+
 	/* Prevent race between original task and recovery task after worker crash.
 	 * Example: Task T completes on worker W, creates file F, T moves to WAITING_RETRIEVAL.
 	 * W crashes before stdout retrieval, T gets rescheduled to READY, F is lost and triggers
@@ -3480,7 +3488,6 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 		if (f->type == VINE_FILE && f->state == VINE_FILE_STATE_PENDING) {
 			all_available = 0;
 		} else if (f->type == VINE_TEMP && !vine_temp_exists_somewhere(q, f)) {
-			printf("File %s is not available!\n", f->cached_name);
 			vine_manager_consider_recovery_task(q, f, f->recovery_task);
 			all_available = 0;
 		}
@@ -4174,6 +4181,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->time_start_worker_eviction = 0;
 
 	q->return_recovery_tasks = 0;
+	q->auto_recovery = 1;
 	q->balance_worker_disk_load = 0;
 	q->when_last_offloaded = 0;
 	q->peak_used_cache = 0;

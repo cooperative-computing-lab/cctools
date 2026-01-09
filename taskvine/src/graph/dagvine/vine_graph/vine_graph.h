@@ -32,6 +32,9 @@ struct vine_graph {
 	/* Maps a logical in/out filename (remote_name) to a stable cached_name. */
 	struct hash_table *inout_filename_to_cached_name;
 
+	/* Unsuccessful tasks are appended to this list to be resubmitted later. */
+	struct list *resubmit_queue;
+
 	/* The directory to store the checkpointed results.
 	 * Only intermediate results can be checkpointed, the fraction of intermediate results to checkpoint is controlled by the checkpoint-fraction parameter. */
 	char *checkpoint_dir;
@@ -64,6 +67,11 @@ struct vine_graph {
 	char *time_metrics_filename;
 
 	int enable_debug_log; /* whether to enable debug log */
+
+	int auto_recovery; /* whether to enable auto recovery */
+
+	int max_retry_attempts;	   /* the maximum number of times to retry a task */
+	double retry_interval_sec; /* the interval between retries in seconds, 0 means no retry interval */
 };
 
 /* Public APIs for operating the vine graph */

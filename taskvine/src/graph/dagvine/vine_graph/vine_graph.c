@@ -116,6 +116,18 @@ static void submit_node_task(struct vine_graph *vg, struct vine_node *node)
 		return;
 	}
 
+	if (!node->task) {
+		debug(D_ERROR, "submit_node_task: node %" PRIu64 " has no task", node->node_id);
+		return;
+	}
+
+	/* Avoid double-submitting the same task object. This should never be needed
+	 * for correctness and leads to task_id mapping corruption if it happens. */
+	if (node->task->state != VINE_TASK_INITIAL) {
+		debug(D_VINE, "submit_node_task: skipping node %" PRIu64 " (task already submitted, state=%d, task_id=%d)", node->node_id, node->task->state, node->task->task_id);
+		return;
+	}
+
 	/* calculate the priority of the node */
 	double priority = calculate_task_priority(node, vg->task_priority_mode);
 	vine_task_set_priority(node->task, priority);
@@ -124,6 +136,11 @@ static void submit_node_task(struct vine_graph *vg, struct vine_node *node)
 	timestamp_t time_start = timestamp_get();
 	int task_id = vine_submit(vg->manager, node->task);
 	node->submission_time = timestamp_get() - time_start;
+
+	if (task_id <= 0) {
+		debug(D_ERROR, "submit_node_task: failed to submit node %" PRIu64 " (returned task_id=%d)", node->node_id, task_id);
+		return;
+	}
 
 	/* insert the task id to the task id to node map */
 	itable_insert(vg->task_id_to_node, (uint64_t)task_id, node);
@@ -147,18 +164,26 @@ static void submit_unblocked_children(struct vine_graph *vg, struct vine_node *n
 	struct vine_node *child_node;
 	LIST_ITERATE(node->children, child_node)
 	{
-		/* Remove this parent from the child's pending set if it exists */
-		if (child_node->pending_parents) {
-			/* Assert that this parent is indeed pending for the child */
-			if (child_node->pending_parents && set_lookup(child_node->pending_parents, node)) {
-				set_remove(child_node->pending_parents, node);
-			} else {
-				debug(D_ERROR, "inconsistent pending set: child=%" PRIu64 " missing parent=%" PRIu64, child_node->node_id, node->node_id);
-			}
+		if (!child_node) {
+			continue;
 		}
 
-		/* If no more parents are pending, submit the child */
-		if (!child_node->pending_parents || set_size(child_node->pending_parents) == 0) {
+		/* Edge-fired dependency resolution: each parent->child edge is consumed at most once.
+		 * This is critical for recomputation/resubmission, where a parent may "complete" multiple times. */
+		if (child_node->fired_parents && set_lookup(child_node->fired_parents, node)) {
+			continue;
+		}
+		if (child_node->fired_parents) {
+			set_insert(child_node->fired_parents, node);
+		}
+
+		if (child_node->remaining_parents_count > 0) {
+			child_node->remaining_parents_count--;
+		}
+
+		/* If no more parents are remaining, submit the child (if it is not already done / in-flight). */
+		if (child_node->remaining_parents_count == 0 && !child_node->completed && child_node->task &&
+				child_node->task->state == VINE_TASK_INITIAL) {
 			submit_node_task(vg, child_node);
 		}
 	}
@@ -551,6 +576,85 @@ static void print_time_metrics(struct vine_graph *vg, const char *filename)
 	return;
 }
 
+/**
+ * Enqueue a node to be resubmitted later.
+ * @param vg Reference to the vine graph.
+ * @param node Reference to the node.
+ */
+static void enqueue_resubmit_node(struct vine_graph *vg, struct vine_node *node)
+{
+	if (!vg || !node) {
+		return;
+	}
+
+	if (node->in_resubmit_queue) {
+		return;
+	}
+
+	/* if the task failed due to inputs missing, we must submit the producer tasks for the lost data */
+	if (node->task->result == VINE_RESULT_INPUT_MISSING) {
+		struct vine_mount *m;
+		LIST_ITERATE(node->task->input_mounts, m)
+		{
+			struct vine_file *f = m->file;
+			/* this is a temp file, it has a producer task id and the task pointer is null */
+			if (f->type != VINE_TEMP) {
+				continue;
+			}
+			if (vine_temp_exists_somewhere(vg->manager, f)) {
+				continue;
+			}
+			if (itable_lookup(vg->manager->tasks, f->original_producer_task_id)) {
+				continue;
+			}
+			/* get the original producer node by task id */
+			struct vine_node *original_producer_node = itable_lookup(vg->task_id_to_node, f->original_producer_task_id);
+			if (!original_producer_node) {
+				continue;
+			}
+			enqueue_resubmit_node(vg, original_producer_node);
+		}
+	}
+
+	node->last_failure_time = timestamp_get();
+	list_push_tail(vg->resubmit_queue, node);
+	node->in_resubmit_queue = 1;
+}
+
+/* Try to resubmit a previously failed node.
+ * @return 1 if a node was actually resubmitted (reset + submit invoked), 0 otherwise. */
+static int try_resubmitting_node(struct vine_graph *vg)
+{
+	if (!vg) {
+		return 0;
+	}
+
+	struct vine_node *node = list_pop_head(vg->resubmit_queue);
+	if (!node) {
+		return 0;
+	}
+	node->in_resubmit_queue = 0;
+
+	timestamp_t interval = timestamp_get() - node->last_failure_time;
+
+	if (interval <= vg->retry_interval_sec * 1e6) {
+		enqueue_resubmit_node(vg, node);
+		return 0;
+	}
+
+	if (node->retry_attempts_left-- <= 0) {
+		debug(D_ERROR, "node %" PRIu64 " has no retries left. Aborting.", node->node_id);
+		vine_graph_delete(vg);
+		exit(1);
+	}
+
+	debug(D_VINE, "Resubmitting node %" PRIu64 " (remaining=%d)", node->node_id, node->retry_attempts_left);
+	vine_task_reset(node->task);
+	submit_node_task(vg, node);
+
+	return 1;
+}
+
 /*************************************************************/
 /* Public APIs */
 /*************************************************************/
@@ -670,6 +774,15 @@ int vine_graph_tune(struct vine_graph *vg, const char *name, const char *value)
 			debug_flags_clear();
 			debug_close();
 		}
+
+	} else if (strcmp(name, "auto-recovery") == 0) {
+		vg->auto_recovery = (atoi(value) == 1) ? 1 : 0;
+
+	} else if (strcmp(name, "max-retry-attempts") == 0) {
+		vg->max_retry_attempts = MAX(0, atoi(value));
+
+	} else if (strcmp(name, "retry-interval-sec") == 0) {
+		vg->retry_interval_sec = MAX(0.0, atof(value));
 
 	} else {
 		debug(D_ERROR, "invalid parameter name: %s", name);
@@ -1055,6 +1168,8 @@ uint64_t vine_graph_add_node(struct vine_graph *vg)
 	/* initialize the pruning depth of each node, currently statically set to the global prune depth */
 	node->prune_depth = vg->prune_depth;
 
+	node->retry_attempts_left = vg->max_retry_attempts;
+
 	itable_insert(vg->nodes, node_id, node);
 
 	return node_id;
@@ -1099,6 +1214,7 @@ struct vine_graph *vine_graph_create(struct vine_manager *q)
 	vg->task_id_to_node = itable_create(0);
 	vg->outfile_cachename_to_node = hash_table_create(0, 0);
 	vg->inout_filename_to_cached_name = hash_table_create(0, 0);
+	vg->resubmit_queue = list_create();
 
 	cctools_uuid_t proxy_library_name_id;
 	cctools_uuid_create(&proxy_library_name_id);
@@ -1122,6 +1238,14 @@ struct vine_graph *vine_graph_create(struct vine_manager *q)
 	vg->time_metrics_filename = NULL;
 
 	vg->enable_debug_log = 1;
+
+	vg->max_retry_attempts = 15;
+	vg->retry_interval_sec = 1.0;
+
+	/* disable auto recovery so that the graph executor can handle all tasks with missing inputs
+	 * this ensures that no recovery tasks are created automatically by the taskvine manager and that
+	 * we can be in control of when to recreate what lost data. */
+	vg->auto_recovery = 0;
 
 	return vg;
 }
@@ -1188,6 +1312,8 @@ void vine_graph_execute(struct vine_graph *vg)
 	/* enable return recovery tasks */
 	vine_enable_return_recovery_tasks(vg->manager);
 
+	vg->manager->auto_recovery = vg->auto_recovery;
+
 	/* create mappings from task IDs and outfile cache names to nodes */
 	ITABLE_ITERATE(vg->nodes, nid_iter, node)
 	{
@@ -1209,23 +1335,16 @@ void vine_graph_execute(struct vine_graph *vg)
 		}
 	}
 
-	/* initialize pending_parents for all nodes */
+	/* initialize remaining_parents_count for all nodes */
 	ITABLE_ITERATE(vg->nodes, nid_iter, node)
 	{
-		struct vine_node *parent_node;
-		LIST_ITERATE(node->parents, parent_node)
-		{
-			if (node->pending_parents) {
-				/* Use parent pointer to ensure pointer consistency */
-				set_insert(node->pending_parents, parent_node);
-			}
-		}
+		node->remaining_parents_count = list_size(node->parents);
 	}
 
 	/* enqueue those without dependencies */
 	ITABLE_ITERATE(vg->nodes, nid_iter, node)
 	{
-		if (!node->pending_parents || set_size(node->pending_parents) == 0) {
+		if (node->remaining_parents_count == 0) {
 			submit_node_task(vg, node);
 		}
 	}
@@ -1251,13 +1370,38 @@ void vine_graph_execute(struct vine_graph *vg)
 			break;
 		}
 
+		/* Always process graph-level resubmissions (this affects correctness),
+		 * but the Recovery progress bar source depends on auto_recovery:
+		 * - auto_recovery==1: Recovery tracks manager-created recovery tasks only
+		 * - auto_recovery==0: Recovery tracks graph resubmit queue only */
+		int did_resubmit = try_resubmitting_node(vg);
+
+		if (vg->manager->auto_recovery) {
+			/* Recovery progress reflects manager recovery tasks. */
+			(void)did_resubmit;
+			progress_bar_set_part_total(pbar, recovery_tasks_part, (uint64_t)vg->manager->stats->recovery_tasks_submitted);
+			progress_bar_update_part(pbar, recovery_tasks_part, 0);
+		} else {
+			/* Recovery progress reflects graph-level resubmissions:
+			 * total = (already attempted resubmits) + (currently queued resubmits). */
+			if (did_resubmit) {
+				progress_bar_update_part(pbar, recovery_tasks_part, 1);
+			}
+			uint64_t queued_resubmits = (uint64_t)list_size(vg->resubmit_queue);
+			progress_bar_set_part_total(pbar, recovery_tasks_part, recovery_tasks_part->current + queued_resubmits);
+			progress_bar_update_part(pbar, recovery_tasks_part, 0);
+		}
+
 		struct vine_task *task = vine_wait(vg->manager, wait_timeout);
-		progress_bar_set_part_total(pbar, recovery_tasks_part, vg->manager->stats->recovery_tasks_submitted);
 		if (task) {
 			/* retrieve all possible tasks */
 			wait_timeout = 0;
-
 			timestamp_t time_when_postprocessing_start = timestamp_get();
+
+			/* If auto_recovery is enabled, recovery tasks should be reflected in the Recovery progress bar. */
+			if (vg->manager->auto_recovery && task->type == VINE_TASK_TYPE_RECOVERY) {
+				progress_bar_update_part(pbar, recovery_tasks_part, 1);
+			}
 
 			/* get the original node by task id */
 			struct vine_node *node = get_node_by_task(vg, task);
@@ -1268,15 +1412,8 @@ void vine_graph_execute(struct vine_graph *vg)
 
 			/* in case of failure, resubmit this task */
 			if (node->task->result != VINE_RESULT_SUCCESS || node->task->exit_code != 0) {
-				if (node->retry_attempts_left <= 0) {
-					debug(D_ERROR, "Task %d failed (result=%d, exit=%d). Node %" PRIu64 " has no retries left. Aborting.", task->task_id, node->task->result, node->task->exit_code, node->node_id);
-					vine_graph_delete(vg);
-					exit(1);
-				}
-				node->retry_attempts_left--;
-				debug(D_VINE | D_NOTICE, "Task %d failed (result=%d, exit=%d). Retrying node %" PRIu64 " (remaining=%d)...", task->task_id, node->task->result, node->task->exit_code, node->node_id, node->retry_attempts_left);
-				vine_task_reset(node->task);
-				submit_node_task(vg, node);
+				enqueue_resubmit_node(vg, node);
+				debug(D_VINE, "Task %d failed (result=%d, exit=%d)", task->task_id, node->task->result, node->task->exit_code);
 				continue;
 			}
 
@@ -1286,15 +1423,8 @@ void vine_graph_execute(struct vine_graph *vg)
 				struct stat info;
 				int result = stat(node->outfile_remote_name, &info);
 				if (result < 0) {
-					if (node->retry_attempts_left <= 0) {
-						debug(D_ERROR, "Task %d succeeded but missing sharedfs output %s; no retries left for node %" PRIu64 ". Aborting.", task->task_id, node->outfile_remote_name, node->node_id);
-						vine_graph_delete(vg);
-						exit(1);
-					}
-					node->retry_attempts_left--;
-					debug(D_VINE | D_NOTICE, "Task %d succeeded but missing sharedfs output %s; retrying node %" PRIu64 " (remaining=%d)...", task->task_id, node->outfile_remote_name, node->node_id, node->retry_attempts_left);
-					vine_task_reset(node->task);
-					submit_node_task(vg, node);
+					debug(D_VINE, "Task %d succeeded but missing sharedfs output %s", task->task_id, node->outfile_remote_name);
+					enqueue_resubmit_node(vg, node);
 					continue;
 				}
 				node->outfile_size_bytes = info.st_size;
@@ -1307,7 +1437,10 @@ void vine_graph_execute(struct vine_graph *vg)
 			}
 			debug(D_VINE, "Node %" PRIu64 " completed with outfile %s size: %zu bytes", node->node_id, node->outfile_remote_name, node->outfile_size_bytes);
 
-			/* mark the node as completed */
+			/* mark the node as completed
+			 * Note: a node may complete multiple times due to resubmission/recomputation.
+			 * Only the first completion should advance the "Regular" progress. */
+			int first_completion = !node->completed;
 			node->completed = 1;
 			node->scheduling_time = task->time_when_scheduling_end - task->time_when_scheduling_start;
 			node->commit_time = task->time_when_commit_end - task->time_when_commit_start;
@@ -1317,22 +1450,25 @@ void vine_graph_execute(struct vine_graph *vg)
 			/* prune nodes on task completion */
 			prune_ancestors_of_node(vg, node);
 
-			/* skip recovery tasks */
+			/* skip manager-created recovery tasks.
+			 * - If auto_recovery==1, we already accounted for them in the Recovery bar above.
+			 * - If auto_recovery==0, Recovery bar tracks graph resubmits only. */
 			if (task->type == VINE_TASK_TYPE_RECOVERY) {
-				progress_bar_update_part(pbar, recovery_tasks_part, 1);
 				continue;
 			}
 
-			/* set the start time to the submit time of the first regular task */
-			if (regular_tasks_part->current == 0) {
-				progress_bar_set_start_time(pbar, task->time_when_commit_start);
+			if (first_completion) {
+				/* set the start time to the submit time of the first regular task */
+				if (regular_tasks_part->current == 0) {
+					progress_bar_set_start_time(pbar, task->time_when_commit_start);
+				}
+
+				/* update critical time */
+				vine_node_update_critical_path_time(node, node->execution_time);
+
+				/* mark this regular task as completed */
+				progress_bar_update_part(pbar, regular_tasks_part, 1);
 			}
-
-			/* update critical time */
-			vine_node_update_critical_path_time(node, node->execution_time);
-
-			/* mark this regular task as completed */
-			progress_bar_update_part(pbar, regular_tasks_part, 1);
 
 			/* inject failure */
 			if (vg->failure_injection_step_percent > 0) {
@@ -1361,7 +1497,6 @@ void vine_graph_execute(struct vine_graph *vg)
 			node->postprocessing_time = time_when_postprocessing_end - time_when_postprocessing_start;
 		} else {
 			wait_timeout = 1;
-			progress_bar_update_part(pbar, recovery_tasks_part, 0); // refresh the time and total for recovery tasks
 		}
 	}
 
@@ -1425,6 +1560,8 @@ void vine_graph_delete(struct vine_graph *vg)
 		}
 		vine_node_delete(node);
 	}
+
+	list_delete(vg->resubmit_queue);
 
 	free(vg->proxy_library_name);
 	free(vg->proxy_function_name);

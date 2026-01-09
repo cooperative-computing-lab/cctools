@@ -125,11 +125,13 @@ struct vine_node *vine_node_create(uint64_t node_id)
 	node->prune_status = PRUNE_STATUS_NOT_PRUNED;
 	node->parents = list_create();
 	node->children = list_create();
-	node->pending_parents = set_create(0);
+	node->remaining_parents_count = 0;
+	node->fired_parents = set_create(0);
 	node->completed = 0;
 	node->prune_depth = 0;
-	node->retry_attempts_left = 1;
 	node->outfile_size_bytes = 0;
+	node->retry_attempts_left = 0;
+	node->in_resubmit_queue = 0;
 
 	node->depth = -1;
 	node->height = -1;
@@ -151,6 +153,7 @@ struct vine_node *vine_node_create(uint64_t node_id)
 	node->postprocessing_time = 0;
 
 	node->critical_path_time = -1;
+	node->last_failure_time = 0;
 
 	return node;
 }
@@ -400,8 +403,8 @@ void vine_node_delete(struct vine_node *node)
 	list_delete(node->parents);
 	list_delete(node->children);
 
-	if (node->pending_parents) {
-		set_delete(node->pending_parents);
+	if (node->fired_parents) {
+		set_delete(node->fired_parents);
 	}
 	free(node);
 }
