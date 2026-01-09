@@ -27,6 +27,47 @@ def _identity(value):
     return value
 
 
+def _apply_with_kwargs_kvlist(func, args_list, kwargs_kvlist):
+    """Execute `func(*args_list, **kwargs)` where kwargs is encoded as a list of [k, v] pairs.
+
+    This encoding is intentional: `dask_executor.execute_graph_vertex.rec_call` only recurses
+    into lists and task tuples, not dicts/tuples. By representing kwargs as lists, upstream
+    task-key references can be resolved before we rebuild the dict here.
+    """
+    kwargs = {k: v for (k, v) in kwargs_kvlist}
+    return func(*args_list, **kwargs)
+
+
+def collections_from_blueprint_graph(bg):
+    assert isinstance(bg, BlueprintGraph), "bg must be a BlueprintGraph"
+
+    def _ref_to_key(ref: TaskOutputRef):
+        # Replace TaskOutputRef occurrences with the referenced task_key only.
+        # NOTE: This intentionally drops any `path` component on the ref, per request.
+        return ref.task_key
+
+    out = {}
+    for task_key, (func, args, kwargs) in bg.task_dict.items():
+        # Only rewrite references inside args/kwargs; keep everything else unchanged.
+        new_args = bg._visit_task_output_refs(args, _ref_to_key, rewrite=True)
+        new_kwargs = bg._visit_task_output_refs(kwargs, _ref_to_key, rewrite=True)
+
+        # IMPORTANT: `dask_executor.execute_graph_vertex` expects classic Dask sexprs:
+        #   (func, arg1, arg2, ...)
+        # It does not understand the BlueprintGraph triple (func, args_tuple, kwargs_dict),
+        # and it also does not recurse into dicts. So:
+        # - No-kwargs tasks become (func, *args)
+        # - Kwargs tasks become (_apply_with_kwargs_kvlist, func, [*args], [[k, v], ...])
+        if new_kwargs:
+            args_list = list(new_args)
+            kwargs_kvlist = [[k, v] for k, v in new_kwargs.items()]
+            out[task_key] = (_apply_with_kwargs_kvlist, func, args_list, kwargs_kvlist)
+        else:
+            out[task_key] = (func, *new_args)
+
+    return out
+
+
 class Adaptor:
     """Normalize user task inputs so `BlueprintGraph` can consume them without extra massaging."""
 
