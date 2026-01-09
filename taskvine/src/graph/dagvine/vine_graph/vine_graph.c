@@ -591,7 +591,27 @@ static void enqueue_resubmit_node(struct vine_graph *vg, struct vine_node *node)
 		return;
 	}
 
+	node->last_failure_time = timestamp_get();
+	list_push_tail(vg->resubmit_queue, node);
+	node->in_resubmit_queue = 1;
+}
+
+/* Try to resubmit a previously failed node.
+ * @return 1 if a node was actually resubmitted (reset + submit invoked), 0 otherwise. */
+static int try_resubmitting_node(struct vine_graph *vg)
+{
+	if (!vg) {
+		return 0;
+	}
+
+	struct vine_node *node = list_pop_head(vg->resubmit_queue);
+	if (!node) {
+		return 0;
+	}
+	node->in_resubmit_queue = 0;
+
 	/* if the task failed due to inputs missing, we must submit the producer tasks for the lost data */
+	int all_inputs_ready = 1;
 	if (node->task->result == VINE_RESULT_INPUT_MISSING) {
 		struct vine_mount *m;
 		LIST_ITERATE(node->task->input_mounts, m)
@@ -613,27 +633,15 @@ static void enqueue_resubmit_node(struct vine_graph *vg, struct vine_node *node)
 				continue;
 			}
 			enqueue_resubmit_node(vg, original_producer_node);
+			all_inputs_ready = 0;
 		}
 	}
 
-	node->last_failure_time = timestamp_get();
-	list_push_tail(vg->resubmit_queue, node);
-	node->in_resubmit_queue = 1;
-}
-
-/* Try to resubmit a previously failed node.
- * @return 1 if a node was actually resubmitted (reset + submit invoked), 0 otherwise. */
-static int try_resubmitting_node(struct vine_graph *vg)
-{
-	if (!vg) {
+	/* if not all inputs are ready, enqueue the node and consider later */
+	if (!all_inputs_ready) {
+		enqueue_resubmit_node(vg, node);
 		return 0;
 	}
-
-	struct vine_node *node = list_pop_head(vg->resubmit_queue);
-	if (!node) {
-		return 0;
-	}
-	node->in_resubmit_queue = 0;
 
 	timestamp_t interval = timestamp_get() - node->last_failure_time;
 
