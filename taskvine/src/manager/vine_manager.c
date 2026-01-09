@@ -1043,8 +1043,16 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 
 	vine_current_transfers_wipe_worker(q, w);
 
-	ITABLE_ITERATE(w->current_tasks, task_id, t)
-	{
+	/* Collect all task IDs first to avoid modifying itable during iteration */
+	UINT64_T *task_ids = itable_keys_array(w->current_tasks);
+	int num_tasks = itable_size(w->current_tasks);
+
+	for (int i = 0; i < num_tasks; i++) {
+		task_id = task_ids[i];
+		t = itable_lookup(w->current_tasks, task_id);
+		if (!t)
+			continue;
+
 		if (t->time_when_commit_end >= t->time_when_commit_start) {
 			timestamp_t delta_time = timestamp_get() - t->time_when_commit_end;
 			t->time_workers_execute_failure += delta_time;
@@ -1055,9 +1063,9 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 		reap_task_from_worker(q, w, t, VINE_TASK_READY);
 
 		vine_task_clean(t);
-
-		itable_firstkey(w->current_tasks);
 	}
+
+	itable_free_keys_array(task_ids);
 
 	itable_clear(w->current_tasks, 0);
 	itable_clear(w->current_libraries, 0);
@@ -2988,12 +2996,23 @@ static void kill_empty_libraries_on_worker(struct vine_manager *q, struct vine_w
 {
 	uint64_t libtask_id;
 	struct vine_task *libtask;
-	ITABLE_ITERATE(w->current_libraries, libtask_id, libtask)
-	{
+
+	/* Collect all library task IDs first to avoid modifying itable during iteration */
+	UINT64_T *libtask_ids = itable_keys_array(w->current_libraries);
+	int num_libraries = itable_size(w->current_libraries);
+
+	for (int i = 0; i < num_libraries; i++) {
+		libtask_id = libtask_ids[i];
+		libtask = itable_lookup(w->current_libraries, libtask_id);
+		if (!libtask)
+			continue;
+
 		if (libtask->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, libtask->provides_library))) {
 			vine_cancel_by_task_id(q, libtask_id);
 		}
 	}
+
+	itable_free_keys_array(libtask_ids);
 }
 
 /*
@@ -3636,9 +3655,17 @@ static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_
 		max_to_receive = itable_size(w->current_tasks);
 	}
 
+	/* Collect all task IDs first to avoid modifying itable during iteration */
+	UINT64_T *task_ids = itable_keys_array(w->current_tasks);
+	int num_tasks = itable_size(w->current_tasks);
+
 	/* Now consider all tasks assigned to that worker .*/
-	ITABLE_ITERATE(w->current_tasks, task_id, t)
-	{
+	for (int i = 0; i < num_tasks; i++) {
+		task_id = task_ids[i];
+		t = itable_lookup(w->current_tasks, task_id);
+		if (!t)
+			continue;
+
 		/* If the task is waiting to be retrieved... */
 		if (t->state == VINE_TASK_WAITING_RETRIEVAL) {
 			/* Attempt to fetch it. */
@@ -3651,10 +3678,13 @@ static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_
 				}
 			} else {
 				/* But if the fetch failed, the worker is no longer vaild, bail out. */
+				itable_free_keys_array(task_ids);
 				return tasks_received;
 			}
 		}
 	}
+
+	itable_free_keys_array(task_ids);
 
 	/* Consider removing the worker if it is empty. */
 	vine_manager_factory_worker_prune(q, w);
