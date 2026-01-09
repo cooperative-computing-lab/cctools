@@ -7,6 +7,7 @@ See the file COPYING for details.
 
 #include "hash_table.h"
 #include "debug.h"
+#include "xxmalloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -256,20 +257,21 @@ static int hash_table_reduce_buckets(struct hash_table *h)
 
 int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 {
+	/* Return 0 if the key already exists. */
+	void *old_value = hash_table_lookup(h, key);
+	if (old_value) {
+		if (old_value != value) {
+			notice(D_DEBUG, "key %s already exists in hash table with different value, ignoring new value.", key);
+		}
+		return 0;
+	}
+
 	if (((float)h->size / h->bucket_count) > DEFAULT_MAX_LOAD)
 		hash_table_double_buckets(h);
 
-	struct entry *e = (struct entry *)malloc(sizeof(struct entry));
-	if (!e) {
-		return 0;
-	}
+	struct entry *e = (struct entry *)xxmalloc(sizeof(struct entry));
 
-	e->key = strdup(key);
-	if (!e->key) {
-		free(e);
-		return 0;
-	}
-
+	e->key = xxstrdup(key);
 	e->value = (void *)value;
 	e->hash = h->hash_func(e->key);
 
@@ -280,6 +282,11 @@ int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 		/* inserting cause different behaviours with nextkey (e.g., sometimes the new
 		 * key would be included or skipped in the iteration */
 		h->cant_iterate_yet = 1;
+	} else {
+		/* Should be unreachable but keep for safety. */
+		notice(D_ERROR, "Failed to insert key %s into hash table.", key);
+		free(e->key);
+		free(e);
 	}
 
 	return inserted;

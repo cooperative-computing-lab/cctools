@@ -825,21 +825,6 @@ fi
 report_detection curl "${curl_avail}" "${config_curl_path}" "${curl_path}"
 
 
-if [ $BUILD_SYS = DARWIN ]
-then
-        if [ -d "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include" ]
-        then
-			ccflags_append_define CCTOOLS_OSX_GETOPT_FROM_SDK
-        else
-                # The version of getopt.h packaged in cctools appears to cause a SIGBUS on Darwin.
-                # Mac OS X Command Line Tools need to be installed to obtain a getopt.h that works.
-                echo "*** Sorry, I can't proceed without Mac OS X Command Line Tools."
-                echo "*** Please refer to the installation instructions."
-                exit 1
-        fi
-fi
-
-
 ### version requirements for swig:
 # at least version 1.3.29 for python 2.4--2.7
 # at least version 2.0.4  for python 3.0--

@@ -102,13 +102,15 @@ struct vine_manager {
 	/* Primary data structures for tracking task state. */
 
 	struct itable *tasks;           /* Maps task_id -> vine_task of all tasks in any state. */
-	struct priority_queue   *ready_tasks;       /* Priority queue of vine_task that are waiting to execute. */
+	struct skip_list   *ready_tasks;       /* Skip list of vine_task that are waiting to execute. */
 	struct itable   *running_table;      /* Table of vine_task that are running at workers. */
 	struct list   *waiting_retrieval_list;      /* List of vine_task that are waiting to be retrieved. */
 	struct list   *retrieved_list;      /* List of vine_task that have been retrieved. */
 	struct list   *task_info_list;  /* List of last N vine_task_infos for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */
 	struct hash_table *library_templates; /* Maps library name -> vine_task of library with that name. */
+
+	struct skip_list_cursor *ready_tasks_cr;      /* Iterates ready_list in order */
 
 	/* Primary data structures for tracking worker state. */
 
@@ -118,12 +120,13 @@ struct vine_manager {
 	struct hash_table *workers_with_watched_file_updates;  /* Maps link -> vine_worker_info */
 	struct hash_table *current_transfer_table; 	/* Maps uuid -> struct transfer_pair */
 	struct itable     *task_group_table; 	/* Maps group id -> list vine_task */
+	struct hash_table *workers_idle_disconnecting;  /* set of workers that were granted a request to idle disconnect, and are in the process of disconnecting. */
 
 	/* Primary data structures for tracking files. */
 
 	struct hash_table *file_table;      /* Maps fileid -> struct vine_file.* */
 	struct hash_table *file_worker_table; /* Maps cachename -> struct set of workers with a replica of the file.* */
-	struct hash_table *temp_files_to_replicate; /* Maps cachename -> NULL. Used as a set of temp files to be replicated */
+	struct priority_queue *temp_files_to_replicate; /* Priority queue of temp files to be replicated, those with less replicas are at the top. */
 
 
 	/* Primary scheduling controls. */
@@ -217,6 +220,8 @@ struct vine_manager {
 	int transfer_temps_recovery;  /* If true, attempt to recover temp files from lost worker to reach threshold required */
 	int transfer_replica_per_cycle;  /* Maximum number of replica to request per temp file per iteration */
 	int temp_replica_count;       /* Number of replicas per temp file */
+	int clean_redundant_replicas; /* If true, remove redundant replicas of temp files to save disk space. */
+	int shift_disk_load;          /* If true, shift storage burden to more available workers to minimize disk usage peaks. */
 
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
@@ -290,6 +295,12 @@ void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info 
 
 /* Check if the worker is able to transfer the necessary files for this task. */
 int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
+
+/* Delete a file from a worker. */
+int delete_worker_file(struct vine_manager *q, struct vine_worker_info *w, const char *filename, vine_cache_level_t cache_level, vine_cache_level_t delete_upto_level);
+
+/** Release a random worker to simulate a failure. */
+int release_random_worker(struct vine_manager *q);
 
 /* The expected format of files created by the resource monitor.*/
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-task-%d"

@@ -11,7 +11,7 @@ See the file COPYING for details.
 #include "datagram.h"
 #include "link.h"
 #include "debug.h"
-#include "getopt.h"
+#include <getopt.h>
 #include "nvpair.h"
 #include "nvpair_jx.h"
 #include "deltadb.h"

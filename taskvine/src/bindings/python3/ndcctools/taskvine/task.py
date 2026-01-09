@@ -543,8 +543,8 @@ class Task(object):
     # Indicate the maximum running time (in seconds) for a task in a
     # worker (relative to when the task starts to run).  If less than 1, or not
     # specified, no limit is imposed.
-    def set_time_max(self, useconds):
-        return cvine.vine_task_set_time_max(self._task, int(useconds))
+    def set_time_max(self, seconds):
+        return cvine.vine_task_set_time_max(self._task, int(seconds))
 
     # Indicate the minimum running time (in seconds) for a task in a worker
     # (relative to when the task starts to run).  If less than 1, or not
