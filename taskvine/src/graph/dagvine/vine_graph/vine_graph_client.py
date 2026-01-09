@@ -66,6 +66,20 @@ class VineGraphClient:
             self._c_graph, proxy_function.__name__
         )
 
+    def add_task_input(self, task_key, filename):
+        """Add an input file to a task."""
+        task_id = self._key_to_id.get(task_key)
+        if task_id is None:
+            raise KeyError(f"Task key not found: {task_key}")
+        vine_graph_capi.vine_graph_add_task_input(self._c_graph, task_id, filename)
+
+    def add_task_output(self, task_key, filename):
+        """Add an output file to a task."""
+        task_id = self._key_to_id.get(task_key)
+        if task_id is None:
+            raise KeyError(f"Task key not found: {task_key}")
+        vine_graph_capi.vine_graph_add_task_output(self._c_graph, task_id, filename)
+
     def execute(self):
         """Kick off execution; runs through SWIG down into the C orchestration loop."""
         vine_graph_capi.vine_graph_execute(self._c_graph)

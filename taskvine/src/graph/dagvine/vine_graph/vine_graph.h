@@ -29,6 +29,8 @@ struct vine_graph {
 	struct itable *nodes;
 	struct itable *task_id_to_node;
 	struct hash_table *outfile_cachename_to_node;
+	/* Maps a logical in/out filename (remote_name) to a stable cached_name. */
+	struct hash_table *inout_filename_to_cached_name;
 
 	/* The directory to store the checkpointed results.
 	 * Only intermediate results can be checkpointed, the fraction of intermediate results to checkpoint is controlled by the checkpoint-fraction parameter. */
@@ -132,6 +134,20 @@ void vine_graph_delete(struct vine_graph *vg);
 @return The proxy library name.
 */
 const char *vine_graph_get_proxy_library_name(const struct vine_graph *vg);
+
+/** Add an input file to a task. The input file will be declared as a temp file.
+@param vg Reference to the vine graph.
+@param task_id Identifier of the task.
+@param filename Reference to the filename.
+*/
+void vine_graph_add_task_input(struct vine_graph *vg, uint64_t task_id, const char *filename);
+
+/** Add an output file to a task. The output file will be declared as a temp file.
+@param vg Reference to the vine graph.
+@param task_id Identifier of the task.
+@param filename Reference to the filename.
+*/
+void vine_graph_add_task_output(struct vine_graph *vg, uint64_t task_id, const char *filename);
 
 /** Set the proxy function name of the vine graph.
 @param vg Reference to the vine graph.

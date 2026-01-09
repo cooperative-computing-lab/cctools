@@ -714,6 +714,66 @@ const char *vine_graph_get_proxy_library_name(const struct vine_graph *vg)
 }
 
 /**
+ * Add an input file to a task. The input file will be declared as a temp file.
+ * @param vg Reference to the vine graph.
+ * @param task_id Reference to the task id.
+ * @param filename Reference to the filename.
+ */
+void vine_graph_add_task_input(struct vine_graph *vg, uint64_t task_id, const char *filename)
+{
+	if (!vg || !task_id || !filename) {
+		return;
+	}
+
+	struct vine_node *node = itable_lookup(vg->nodes, task_id);
+	if (!node) {
+		return;
+	}
+
+	struct vine_file *f = NULL;
+	const char *cached_name = hash_table_lookup(vg->inout_filename_to_cached_name, filename);
+
+	if (cached_name) {
+		f = vine_manager_lookup_file(vg->manager, cached_name);
+	} else {
+		f = vine_declare_temp(vg->manager);
+		hash_table_insert(vg->inout_filename_to_cached_name, filename, xxstrdup(f->cached_name));
+	}
+
+	vine_task_add_input(node->task, f, filename, VINE_TRANSFER_ALWAYS);
+}
+
+/**
+ * Add an output file to a task. The output file will be declared as a temp file.
+ * @param vg Reference to the vine graph.
+ * @param task_id Reference to the task id.
+ * @param filename Reference to the filename.
+ */
+void vine_graph_add_task_output(struct vine_graph *vg, uint64_t task_id, const char *filename)
+{
+	if (!vg || !task_id || !filename) {
+		return;
+	}
+
+	struct vine_node *node = itable_lookup(vg->nodes, task_id);
+	if (!node) {
+		return;
+	}
+
+	struct vine_file *f = NULL;
+	const char *cached_name = hash_table_lookup(vg->inout_filename_to_cached_name, filename);
+
+	if (cached_name) {
+		f = vine_manager_lookup_file(vg->manager, cached_name);
+	} else {
+		f = vine_declare_temp(vg->manager);
+		hash_table_insert(vg->inout_filename_to_cached_name, filename, xxstrdup(f->cached_name));
+	}
+
+	vine_task_add_output(node->task, f, filename, VINE_TRANSFER_ALWAYS);
+}
+
+/**
  * Set the proxy function name of the vine graph.
  * @param vg Reference to the vine graph.
  * @param proxy_function_name Reference to the proxy function name.
@@ -1038,6 +1098,7 @@ struct vine_graph *vine_graph_create(struct vine_manager *q)
 	vg->nodes = itable_create(0);
 	vg->task_id_to_node = itable_create(0);
 	vg->outfile_cachename_to_node = hash_table_create(0, 0);
+	vg->inout_filename_to_cached_name = hash_table_create(0, 0);
 
 	cctools_uuid_t proxy_library_name_id;
 	cctools_uuid_create(&proxy_library_name_id);
@@ -1371,5 +1432,9 @@ void vine_graph_delete(struct vine_graph *vg)
 	itable_delete(vg->nodes);
 	itable_delete(vg->task_id_to_node);
 	hash_table_delete(vg->outfile_cachename_to_node);
+
+	hash_table_clear(vg->inout_filename_to_cached_name, (void *)free);
+	hash_table_delete(vg->inout_filename_to_cached_name);
+
 	free(vg);
 }

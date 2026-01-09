@@ -3480,6 +3480,7 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 		if (f->type == VINE_FILE && f->state == VINE_FILE_STATE_PENDING) {
 			all_available = 0;
 		} else if (f->type == VINE_TEMP && !vine_temp_exists_somewhere(q, f)) {
+			printf("File %s is not available!\n", f->cached_name);
 			vine_manager_consider_recovery_task(q, f, f->recovery_task);
 			all_available = 0;
 		}

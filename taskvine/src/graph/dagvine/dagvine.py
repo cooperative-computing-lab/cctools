@@ -57,7 +57,8 @@ class GraphParams:
             "attempt-schedule-depth": 10000,
             "temp-replica-count": 1,
             "enforce-worker-eviction-interval": -1,
-            "balance-worker-disk-load": 0,
+            "shift-disk-load": 0,
+            "clean-redundant-replicas": 0,
         }
         # VineGraph-level knobs: forwarded to the underlying vine graph via VineGraphClient.
         self.vine_graph_tuning_params = {
@@ -228,6 +229,16 @@ class DAGVine(Manager):
         for k in py_graph.pykey2cid:
             outfile_remote_name = vine_graph.get_node_outfile_remote_name(k)
             py_graph.outfile_remote_name[k] = outfile_remote_name
+
+        # For each task, declare the input and output files in the vine graph
+        for filename in py_graph.producer_of:
+            task_key = py_graph.producer_of[filename]
+            print(f"adding output file {filename} to task {task_key}")
+            vine_graph.add_task_output(task_key, filename)
+        for filename in py_graph.consumers_of:
+            for task_key in py_graph.consumers_of[filename]:
+                print(f"adding input file {filename} to task {task_key}")
+                vine_graph.add_task_input(task_key, filename)
 
         return py_graph, vine_graph
 
