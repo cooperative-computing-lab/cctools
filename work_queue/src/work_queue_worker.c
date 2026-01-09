@@ -1323,6 +1323,8 @@ static void kill_all_tasks()
 	itable_firstkey(procs_table);
 	while(itable_nextkey(procs_table,&taskid,(void**)&p)) {
 		do_kill(taskid);
+		/* do_kill removes the task from the table, so we need to reset the iterator. */
+		itable_firstkey(procs_table);
 	}
 
 	assert(itable_size(procs_table)==0);
