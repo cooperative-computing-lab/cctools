@@ -7,6 +7,7 @@ See the file COPYING for details.
 
 #include "itable.h"
 #include "debug.h"
+#include "xxmalloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -192,22 +193,7 @@ int itable_insert(struct itable *h, UINT64_T key, const void *value)
 	if (((float)h->size / h->bucket_count) > DEFAULT_MAX_LOAD)
 		itable_double_buckets(h);
 
-	struct entry *new_entry = (struct entry *)malloc(sizeof(struct entry));
-	if (!new_entry)
-		return 0;
-
-	new_entry->key = key;
-	new_entry->value = (void *)value;
-
-	int inserted = insert_to_buckets_aux(h->buckets, h->bucket_count, new_entry);
-	if (inserted) {
-		h->size++;
-		itable_double_buckets(h);
-
-	struct entry *new_entry = (struct entry *)malloc(sizeof(struct entry));
-	if (!new_entry)
-		return 0;
-
+	struct entry *new_entry = (struct entry *)xxmalloc(sizeof(struct entry));
 	new_entry->key = key;
 	new_entry->value = (void *)value;
 
@@ -351,5 +337,4 @@ int itable_nextkey(struct itable *h, UINT64_T *key, void **value)
 		return 0;
 	}
 }
-
 /* vim: set noexpandtab tabstop=8: */
