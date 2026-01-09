@@ -1087,7 +1087,7 @@ void vine_graph_compute_topology_metrics(struct vine_graph *vg)
 			node->outfile = vine_declare_temp(vg->manager);
 		}
 	}
-	/* track the output dependencies of regular and vine_temp nodes */
+	/* track the output dependencies of user and vine_temp nodes */
 	LIST_ITERATE(topo_order, node)
 	{
 		if (node->outfile) {
@@ -1358,14 +1358,14 @@ void vine_graph_execute(struct vine_graph *vg)
 	struct ProgressBar *pbar = progress_bar_init("Executing Tasks");
 	progress_bar_set_update_interval(pbar, vg->progress_bar_update_interval_sec);
 
-	struct ProgressBarPart *regular_tasks_part = progress_bar_create_part("Regular", itable_size(vg->nodes));
+	struct ProgressBarPart *user_tasks_part = progress_bar_create_part("User", itable_size(vg->nodes));
 	struct ProgressBarPart *recovery_tasks_part = progress_bar_create_part("Recovery", 0);
-	progress_bar_bind_part(pbar, regular_tasks_part);
+	progress_bar_bind_part(pbar, user_tasks_part);
 	progress_bar_bind_part(pbar, recovery_tasks_part);
 
 	int wait_timeout = 1;
 
-	while (regular_tasks_part->current < regular_tasks_part->total) {
+	while (user_tasks_part->current < user_tasks_part->total) {
 		if (interrupted) {
 			break;
 		}
@@ -1439,7 +1439,7 @@ void vine_graph_execute(struct vine_graph *vg)
 
 			/* mark the node as completed
 			 * Note: a node may complete multiple times due to resubmission/recomputation.
-			 * Only the first completion should advance the "Regular" progress. */
+			 * Only the first completion should advance the "User" progress. */
 			int first_completion = !node->completed;
 			node->completed = 1;
 			node->scheduling_time = task->time_when_scheduling_end - task->time_when_scheduling_start;
@@ -1458,21 +1458,21 @@ void vine_graph_execute(struct vine_graph *vg)
 			}
 
 			if (first_completion) {
-				/* set the start time to the submit time of the first regular task */
-				if (regular_tasks_part->current == 0) {
+				/* set the start time to the submit time of the first user task */
+				if (user_tasks_part->current == 0) {
 					progress_bar_set_start_time(pbar, task->time_when_commit_start);
 				}
 
 				/* update critical time */
 				vine_node_update_critical_path_time(node, node->execution_time);
 
-				/* mark this regular task as completed */
-				progress_bar_update_part(pbar, regular_tasks_part, 1);
+				/* mark this user task as completed */
+				progress_bar_update_part(pbar, user_tasks_part, 1);
 			}
 
 			/* inject failure */
 			if (vg->failure_injection_step_percent > 0) {
-				double progress = (double)regular_tasks_part->current / (double)regular_tasks_part->total;
+				double progress = (double)user_tasks_part->current / (double)user_tasks_part->total;
 				if (progress >= next_failure_threshold && release_random_worker(vg->manager)) {
 					debug(D_VINE, "released a random worker at %.2f%% (threshold %.2f%%)", progress * 100, next_failure_threshold * 100);
 					next_failure_threshold += vg->failure_injection_step_percent / 100.0;
