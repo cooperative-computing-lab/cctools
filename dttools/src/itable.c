@@ -202,6 +202,18 @@ int itable_insert(struct itable *h, UINT64_T key, const void *value)
 	int inserted = insert_to_buckets_aux(h->buckets, h->bucket_count, new_entry);
 	if (inserted) {
 		h->size++;
+		itable_double_buckets(h);
+
+	struct entry *new_entry = (struct entry *)malloc(sizeof(struct entry));
+	if (!new_entry)
+		return 0;
+
+	new_entry->key = key;
+	new_entry->value = (void *)value;
+
+	int inserted = insert_to_buckets_aux(h->buckets, h->bucket_count, new_entry);
+	if (inserted) {
+		h->size++;
 		/* inserting cause different behaviours with nextkey (e.g., sometimes the new
 		 * key would be included or skipped in the iteration */
 		h->cant_iterate_yet = 1;
