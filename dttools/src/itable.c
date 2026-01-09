@@ -95,7 +95,7 @@ void itable_delete(struct itable *h)
 
 UINT64_T *itable_keys_array(struct itable *h)
 {
-	UINT64_T *keys = (UINT64_T *)malloc(sizeof(int) * h->size);
+	UINT64_T *keys = (UINT64_T *)malloc(sizeof(UINT64_T) * h->size);
 	int ikey = 0;
 
 	struct entry *e, *f;
