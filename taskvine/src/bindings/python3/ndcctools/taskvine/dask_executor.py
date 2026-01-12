@@ -105,7 +105,7 @@ class DaskVine(Manager):
     #                       (use the value of 'resources' above), 'max throughput',
     #                       'max' (for maximum values seen), 'min_waste', 'greedy bucketing',
     #                       'exhaustive bucketing', 'deterministic greedy bucketing', or
-    #                       'deterministic exhaustive bucketing'.
+    #                       'deterministic exhaustive bucketing' or 'quantized bucketing'.
     #                       This is done per function type in dsk.
     # @param task_mode     Create tasks as either as 'tasks' (using PythonTasks) or 'function-calls' (using FunctionCalls)
     # @param retries       Number of times to attempt a task. Default is 5.

@@ -25,7 +25,9 @@ run()
     val7=$?
     ../src/bucketing_manager_test -det-exhaust > /dev/null
     val8=$?
-    (test $val1 = 0) && (test $val2 = 0) && (test $val3 = 0) && (test $val4 = 0) && (test $val5 = 0) && (test $val6 = 0) && (test $val7 = 0) && (test $val8 = 0)
+    ../src/bucketing_manager_test -quantized > /dev/null
+    val9=$?
+    (test $val1 = 0) && (test $val2 = 0) && (test $val3 = 0) && (test $val4 = 0) && (test $val5 = 0) && (test $val6 = 0) && (test $val7 = 0) && (test $val8 = 0) && (test $val9 = 0)
     return $?
 }
 

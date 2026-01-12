@@ -8,6 +8,7 @@ typedef enum {
     BUCKETING_MODE_GREEDY,
     BUCKETING_MODE_EXHAUSTIVE,
     BUCKETING_MODE_DET_GREEDY,
+    BUCKETING_MODE_QUANTIZED,
     BUCKETING_MODE_DET_EXHAUSTIVE
 } bucketing_mode_t;
 
@@ -88,7 +89,9 @@ typedef struct
      * predicting phase */
     double increase_rate;
 
-    /* the maximum number of buckets to break (only exhaustive bucketing) */
+    /* the maximum number of buckets to break (only exhaustive, det-exhaustive,
+     * and quantized bucketing) 
+     * For quantized bucketing, the number of buckets to quantize */
     int max_num_buckets;
 
     /* the update mode to use */

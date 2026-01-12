@@ -34,10 +34,16 @@ static char *int_to_string(int n)
  * @param m the bucketing manager */
 static void bucketing_manager_add_default_resource_types(bucketing_manager_t *m)
 {
-	bucketing_manager_add_resource_type(m, "cores", 0, default_cores, default_num_sampling_points, default_increase_rate, default_max_num_buckets, default_update_epoch);
-	bucketing_manager_add_resource_type(m, "memory", 0, default_mem, default_num_sampling_points, default_increase_rate, default_max_num_buckets, default_update_epoch);
-	bucketing_manager_add_resource_type(m, "disk", 0, default_disk, default_num_sampling_points, default_increase_rate, default_max_num_buckets, default_update_epoch);
-	bucketing_manager_add_resource_type(m, "gpus", 0, default_gpus, default_num_sampling_points, default_increase_rate, default_max_num_buckets, default_update_epoch);
+    int max_num_buckets_quantized = 2;
+    int max_num_buckets = default_max_num_buckets; 
+
+    if (m->mode == BUCKETING_MODE_QUANTIZED) {
+        max_num_buckets = max_num_buckets_quantized;
+    }
+	bucketing_manager_add_resource_type(m, "cores", 0, default_cores, default_num_sampling_points, default_increase_rate, max_num_buckets, default_update_epoch);
+	bucketing_manager_add_resource_type(m, "memory", 0, default_mem, default_num_sampling_points, default_increase_rate, max_num_buckets, default_update_epoch);
+	bucketing_manager_add_resource_type(m, "disk", 0, default_disk, default_num_sampling_points, default_increase_rate, max_num_buckets, default_update_epoch);
+	bucketing_manager_add_resource_type(m, "gpus", 0, default_gpus, default_num_sampling_points, default_increase_rate, max_num_buckets, default_update_epoch);
 }
 /* End: internals */
 
@@ -47,7 +53,7 @@ bucketing_manager_t *bucketing_manager_create(bucketing_mode_t mode)
 {
 	bucketing_manager_t *m = xxmalloc(sizeof(*m));
 
-	if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE && mode != BUCKETING_MODE_DET_GREEDY && mode != BUCKETING_MODE_DET_EXHAUSTIVE) {
+	if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE && mode != BUCKETING_MODE_DET_GREEDY && mode != BUCKETING_MODE_DET_EXHAUSTIVE && mode != BUCKETING_MODE_QUANTIZED) {
 		fatal("Invalid bucketing mode\n");
 		return 0;
 	}
@@ -153,7 +159,7 @@ void bucketing_manager_set_mode(bucketing_manager_t *m, bucketing_mode_t mode)
 		return;
 	}
 
-	if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE && mode != BUCKETING_MODE_DET_GREEDY && mode != BUCKETING_MODE_DET_EXHAUSTIVE) {
+	if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE && mode != BUCKETING_MODE_DET_GREEDY && mode != BUCKETING_MODE_DET_EXHAUSTIVE && mode != BUCKETING_MODE_QUANTIZED) {
 		fatal("Invalid bucketing mode\n");
 		return;
 	}

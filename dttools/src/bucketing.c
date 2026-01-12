@@ -3,6 +3,7 @@
 #include "bucketing_det_greedy.h"
 #include "bucketing_exhaust.h"
 #include "bucketing_det_exhaust.h"
+#include "bucketing_quantized.h"
 #include "debug.h"
 #include "random.h"
 #include "xxmalloc.h"
@@ -113,6 +114,9 @@ static void bucketing_update_buckets(bucketing_state_t *s)
 	case BUCKETING_MODE_DET_EXHAUSTIVE:
 		bucketing_det_exhaust_update_buckets(s);
 		break;
+	case BUCKETING_MODE_QUANTIZED:
+		bucketing_quantized_update_buckets(s);
+		break;
 	default:
 		fatal("Invalid mode to update buckets\n");
 	}
@@ -162,7 +166,7 @@ bucketing_state_t *bucketing_state_create(double default_value, int num_sampling
 		max_num_buckets = 1;
 	}
 
-	if (!(mode == BUCKETING_MODE_GREEDY || mode == BUCKETING_MODE_EXHAUSTIVE || mode == BUCKETING_MODE_DET_GREEDY || mode == BUCKETING_MODE_DET_EXHAUSTIVE)) {
+	if (!(mode == BUCKETING_MODE_GREEDY || mode == BUCKETING_MODE_EXHAUSTIVE || mode == BUCKETING_MODE_DET_GREEDY || mode == BUCKETING_MODE_DET_EXHAUSTIVE || mode == BUCKETING_MODE_QUANTIZED)) {
 		warn(D_BUCKETING, "Invalid bucketing mode, defaulting to the probabilistic greedy mode.\n");
 		mode = BUCKETING_MODE_GREEDY;
 	}
@@ -312,8 +316,8 @@ double bucketing_predict(bucketing_state_t *s, double prev_val)
 		return -1;
 	}
 
-	// this branch is how predictions using probabilistic greedy and exhaustive bucketing work.
-	if (s->mode == BUCKETING_MODE_GREEDY || s->mode == BUCKETING_MODE_EXHAUSTIVE) {
+	// this branch is how predictions using probabilistic greedy and exhaustive and quantized bucketing work.
+	if (s->mode == BUCKETING_MODE_GREEDY || s->mode == BUCKETING_MODE_EXHAUSTIVE || s->mode == BUCKETING_MODE_QUANTIZED) {
 		bucketing_bucket_t *bb_ptr = 0; // pointer to hold item from list
 		double sum = 0;			// sum of probability
 		double ret_val;			// predicted value to be returned

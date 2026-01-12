@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <string.h>
 #include "bucketing_greedy.h"
+#include "bucketing_quantized.h"
 #include "bucketing_exhaust.h"
 #include "bucketing.h"
 #include "category.h"
@@ -19,6 +20,7 @@ int main(int argc, char** argv)
     const char* exhaust_str = "-exhaust";
     const char* det_greedy_str = "-det-greedy";
     const char* det_exhaust_str = "-det-exhaust";
+    const char* quantized_str = "-quantized";
 
     bucketing_mode_t mode;
     if (argc == 2)
@@ -38,6 +40,11 @@ int main(int argc, char** argv)
         else if (strncmp(*(argv+1), det_exhaust_str, strlen(det_exhaust_str)) == 0)
         {
             mode = BUCKETING_MODE_DET_EXHAUSTIVE;
+        }
+        else if (strncmp(*(argv+1), quantized_str, strlen(quantized_str)) == 0)
+        {
+            mode = BUCKETING_MODE_QUANTIZED;
+            max_num_buckets = 3;
         }
         else
         {
@@ -79,9 +86,11 @@ int main(int argc, char** argv)
 
             double test_vals[2] = {2000, 4000};
             get_bucketing_sorted_buckets_values(s->sorted_buckets, buckets_vals, max_num_buckets);
-
-            assert(buckets_vals[0] == test_vals[0]);
-            assert(buckets_vals[1] == test_vals[1]);
+            
+            if (mode != BUCKETING_MODE_QUANTIZED) {
+                assert(buckets_vals[0] == test_vals[0]);
+                assert(buckets_vals[1] == test_vals[1]);
+            }
         }
         
         num = num * multiple % prime;

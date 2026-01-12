@@ -28,6 +28,7 @@ typedef enum {
         CATEGORY_ALLOCATION_EXHAUSTIVE_BUCKETING, /**< Use the exhaustive bucketing algorithm to label resources */
         CATEGORY_ALLOCATION_DET_GREEDY_BUCKETING,    /**< Use the deterministic greedy bucketing algorithm to label resources */
         CATEGORY_ALLOCATION_DET_EXHAUSTIVE_BUCKETING, /**< Use the deterministic exhaustive bucketing algorithm to label resources */
+        CATEGORY_ALLOCATION_QUANTIZED_BUCKETING,
 
 } category_allocation_t;
 
@@ -71,6 +72,7 @@ typedef enum {
     
     CATEGORY_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING,   /**< Use the deterministic exhaustive 
                                                       bucketing algorithm to label resources */
+    CATEGORY_ALLOCATION_MODE_QUANTIZED_BUCKETING,
 
 } category_mode_t;
 

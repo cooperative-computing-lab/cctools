@@ -16,6 +16,7 @@ SOURCES = \
 	bucketing.c \
 	bucketing_exhaust.c \
 	bucketing_greedy.c \
+	bucketing_quantized.c \
 	bucketing_det_exhaust.c \
 	bucketing_det_greedy.c \
 	bucketing_exhaust_common.c \
@@ -141,6 +142,7 @@ HEADERS_PUBLIC = \
 	bucketing.h \
 	bucketing_exhaust.h \
 	bucketing_greedy.h \
+	bucketing_quantized.h \
 	bucketing_det_exhaust.h \
 	bucketing_det_greedy.h \
 	bucketing_exhaust_common.h \

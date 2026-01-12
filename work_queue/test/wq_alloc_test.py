@@ -138,4 +138,10 @@ with worker:
             min = {},
             expected = e)
 
+    check_task('quantized_bucketing',
+            wq.WORK_QUEUE_ALLOCATION_MODE_QUANTIZED_BUCKETING,
+            max = {},
+            min = {},
+            expected = e)
+
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:

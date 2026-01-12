@@ -140,7 +140,7 @@ void category_specify_first_allocation_guess(struct category *c, const struct rm
 
 int category_in_bucketing_mode(struct category *c)
 {
-	if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING || c->allocation_mode == CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING || c->allocation_mode == CATEGORY_ALLOCATION_MODE_DET_GREEDY_BUCKETING || c->allocation_mode == CATEGORY_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING) {
+	if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING || c->allocation_mode == CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING || c->allocation_mode == CATEGORY_ALLOCATION_MODE_DET_GREEDY_BUCKETING || c->allocation_mode == CATEGORY_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING || c->allocation_mode == CATEGORY_ALLOCATION_MODE_QUANTIZED_BUCKETING) {
 		return 1;
 	}
 	return 0;
@@ -165,9 +165,13 @@ void category_specify_allocation_mode(struct category *c, int mode)
 				bmode = BUCKETING_MODE_EXHAUSTIVE;
 			} else if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_DET_GREEDY_BUCKETING) {
 				bmode = BUCKETING_MODE_DET_GREEDY;
-			} else {
+			} else if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING) {
 				bmode = BUCKETING_MODE_DET_EXHAUSTIVE;
-			}
+			} else if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_QUANTIZED_BUCKETING) {
+                bmode = BUCKETING_MODE_QUANTIZED;
+            } else {
+                fatal("Unknown bucketing mode for category \n");
+            }
 			c->bucketing_manager = bucketing_manager_initialize(bmode);
 		}
 	}
@@ -696,7 +700,7 @@ int category_bucketing_accumulate_summary(struct category *c, const struct rmsum
 	// if category is in bucketing modes
 	if (category_in_bucketing_mode(c)) {
 		// only add resource report when resources are exhausted (success = 0) or task succeeds (success = 1)
-		if (success != -1)
+		if (success == 0 || success == 1)
 			bucketing_manager_add_resource_report(c->bucketing_manager, taskid, (struct rmsummary *)rs, success);
 	}
 

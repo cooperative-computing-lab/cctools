@@ -71,6 +71,7 @@ class DaskWQ(WorkQueue):
     #                      - work_queue.WORK_QUEUE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING
     #                      - work_queue.WORK_QUEUE_ALLOCATION_MODE_DET_GREEDY_BUCKETING
     #                      - work_queue.WORK_QUEUE_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING
+    #                      - work_queue.WORK_QUEUE_ALLOCATION_MODE_QUANTIZED_BUCKETING
     # @param retries       Number of times to attempt a task. Default is 5.
     # @param verbose       if true, emit additional debugging information.
     def get(self, dsk, keys, *,

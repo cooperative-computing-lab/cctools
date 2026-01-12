@@ -101,5 +101,6 @@ with worker:
     check_task("det_exhaustive_bucketing", "det_exhaustive_bucketing", max={}, min={}, expected=e)
 
     check_task("det_greedy_bucketing", "det_greedy_bucketing", max={}, min={}, expected=e)
+    check_task("quantized_bucketing", "quantized_bucketing", max={}, min={}, expected=e)
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:

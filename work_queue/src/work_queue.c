@@ -7928,6 +7928,9 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 		case CATEGORY_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING:
 			mode = "DET_EXHAUSTIVE_BUCKETING";
 			break;
+		case CATEGORY_ALLOCATION_MODE_QUANTIZED_BUCKETING:
+			mode = "QUANTIZED_BUCKETING";
+			break;
 
 	}
 
@@ -8160,6 +8163,7 @@ int work_queue_specify_category_mode(struct work_queue *q, const char *category,
 		case WORK_QUEUE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
 		case WORK_QUEUE_ALLOCATION_MODE_DET_GREEDY_BUCKETING:
 		case WORK_QUEUE_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING:
+		case WORK_QUEUE_ALLOCATION_MODE_QUANTIZED_BUCKETING:
 			break;
 		default:
 			notice(D_WQ, "Unknown category mode specified.");

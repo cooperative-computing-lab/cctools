@@ -14,6 +14,14 @@ int main(int argc, char** argv)
     const char* exhaust_str = "-exhaust";
     const char* det_greedy_str = "-det-greedy";
     const char* det_exhaust_str = "-det-exhaust";
+    const char* quantized_str = "-quantized";
+
+    double default_value;
+    int num_sampling_points = 10;
+    double increase_rate = 2;
+    int max_num_buckets = 10;
+    int update_epoch = 1;
+    int set_default = 0;
 
     if (argc == 2)
     {
@@ -33,6 +41,11 @@ int main(int argc, char** argv)
         {
             mode = BUCKETING_MODE_DET_EXHAUSTIVE;
         }
+        else if (strncmp(*(argv+1), quantized_str, strlen(quantized_str)) == 0)
+        {
+            mode = BUCKETING_MODE_QUANTIZED;
+            max_num_buckets = 3;
+        }
         else
         {
             fatal("Invalid bucketing mode\n");
@@ -44,12 +57,7 @@ int main(int argc, char** argv)
         fatal("Must provide type of bucketing mode\n");
         return 1;
     }
-    double default_value;
-    int num_sampling_points = 10;
-    double increase_rate = 2;
-    int max_num_buckets = 10;
-    int update_epoch = 1;
-    int set_default = 0;
+
 
     twister_init_genrand64(15112022);
 

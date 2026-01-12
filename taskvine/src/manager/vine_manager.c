@@ -6355,6 +6355,7 @@ int vine_set_category_mode(struct vine_manager *q, const char *category, vine_ca
 	case CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
 	case CATEGORY_ALLOCATION_MODE_DET_GREEDY_BUCKETING:
 	case CATEGORY_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING:
+	case CATEGORY_ALLOCATION_MODE_QUANTIZED_BUCKETING:
 		break;
 	default:
 		notice(D_VINE, "Unknown category mode specified.");

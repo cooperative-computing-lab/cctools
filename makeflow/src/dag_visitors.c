@@ -1181,6 +1181,8 @@ struct jx *category_allocation_to_json(category_allocation_t c) {
 		case CATEGORY_ALLOCATION_DET_EXHAUSTIVE_BUCKETING:
 			return jx_string("deterministic exhaustive bucketing");
 			break;
+		case CATEGORY_ALLOCATION_QUANTIZED_BUCKETING:
+			return jx_string("quantized bucketing");
 
 	}
 	return jx_null();
