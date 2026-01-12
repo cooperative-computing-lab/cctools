@@ -2964,7 +2964,7 @@ The `compute` call above may receive the following keyword arguments:
 | merge\_size | When reconstructing a merge function, merge this many at a time. |
 | wrapper | Function to wrap dask calls for debugging; should return `(wrapper result, dask call result)`. |
 | wrapper\_proc | Function to process results from wrapper on completion (default is print). |
-| prune\_depth | Control pruning behavior: 0 (default) no pruning; 1 checks direct consumers; 2+ checks consumers up to specified depth. |
+| prune\_depth | Control pruning behavior: 0 (default) no pruning; 1 checks direct consumers (most aggressive); 2+ checks consumers up to specified depth (the higher means more conservative). |
 | env\_per\_task | If true, each task individually expands its own environment (requires `environment` be a string). |
 | lib\_extra\_functions | Additional functions to include in execution library (only for `task_mode="function-calls"`). |
 | lib\_resources | Resources for the execution library (only for `task_mode="function-calls"`), e.g. `{"cores": 4, "memory": 2000, "disk": 1000, "slots": 4}`. |
