@@ -2935,7 +2935,7 @@ scheduler. The class `DaskVine` implements a TaskVine manager that has a
         f.min_workers = 1
         with f:
             with dask.config.set(scheduler=m.get):
-                result = distance.compute(resources={"cores": 1}, resources_mode="max", lazy_transfers=True)
+                result = distance.compute(resources={"cores": 1}, resources_mode="max", worker_transfers=True)
                 print(f"distance = {result}")
             print("Terminating workers...", end="")
         print("done!")
@@ -2945,13 +2945,35 @@ The `compute` call above may receive the following keyword arguments:
 
 | Keyword | Description |
 |------------ |---------|
-| environment | A TaskVine file that provides an [environment](#execution-contexts) to execute each task. |
+| environment | A TaskVine file (or a string path to a poncho env tarball) that provides an [environment](#execution-contexts) to execute each task. |
 | env\_vars   | A dictionary of VAR=VALUE environment variables to set per task. A value should be either a string, or a function that accepts as arguments the manager and task, and that returns a string. |
 | extra\_files | A dictionary of {taskvine.File: "remote_name"} of input files to attach to each task.|
-| lazy\_transfer | Whether to bring each result back from the workers (False, default), or keep transient results at workers (True) |
+| worker\_transfers | Whether to keep intermediate results only at workers for higher throughput (True, default), or to bring back each result to the manager for better fault tolerance (False). |
 | resources   | A dictionary to specify [maximum resources](#task-resources), e.g. `{"cores": 1, "memory": 2000"}` |
 | resources\_mode | [Automatic resource management](#automatic-resource-management) to use, e.g., "fixed", "max", or "max throughput"|
 | task\_mode | Mode to execute individual tasks, such as [function calls](#serverless-computing). to use, e.g., "tasks", or "function-calls"|
+| checkpoint\_fn | Only used with `worker_transfers=True`: a predicate `(dag, key) -> bool` called before submit; if it returns True, that key is brought back to the manager. |
+| task\_priority\_mode | How tasks are prioritized for submission; higher priority is considered first (default "largest-input-first" for faster data pruning). |
+| scheduling\_mode | Strategy to dispatch tasks to workers (default "files": prefer workers that already have more of the required input files). |
+| retries | Number of times to attempt a task (default 5). |
+| submit\_per\_cycle | Maximum number of tasks to submit to the scheduler per loop; None means no limit. |
+| max\_pending | Maximum number of tasks without a result before new ones are submitted; None means no limit. |
+| verbose | If true, emit additional debugging information. |
+| progress\_disable | If True, disable progress bar. |
+| progress\_label | Label to use in progress bar. |
+| reconstruct | Reconstruct graph based on annotated functions. |
+| merge\_size | When reconstructing a merge function, merge this many at a time. |
+| wrapper | Function to wrap dask calls for debugging; should return `(wrapper result, dask call result)`. |
+| wrapper\_proc | Function to process results from wrapper on completion (default is print). |
+| prune\_depth | Control pruning behavior: 0 (default) no pruning; 1 checks direct consumers; 2+ checks consumers up to specified depth. |
+| env\_per\_task | If true, each task individually expands its own environment (requires `environment` be a string). |
+| lib\_extra\_functions | Additional functions to include in execution library (only for `task_mode="function-calls"`). |
+| lib\_resources | Resources for the execution library (only for `task_mode="function-calls"`), e.g. `{"cores": 4, "memory": 2000, "disk": 1000, "slots": 4}`. |
+| lib\_command | Command to be prefixed to the execution of a Library task (only for `task_mode="function-calls"`). |
+| lib\_modules | Hoist these execution-library imports to avoid redundant module imports across individual function invocations (only for `task_mode="function-calls"`). |
+| lazy\_transfers | Deprecated alias for `worker_transfers`. |
+| hoisting\_modules | Deprecated alias for `lib_modules`. |
+| import\_modules | Deprecated alias for `lib_modules`. |
 
 ## Appendix for Developers
 
