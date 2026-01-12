@@ -87,7 +87,7 @@ conda activate cctools-dev
 ```
 
 !!! note
-    To use the installed software you will need to set the environment variables `PATH`, `PYTHONPATH`, and `PERL5LIB` as explained [here.](#setting-your-environment)
+    To use the installed software you will need to set the environment variables `PATH`, and `PYTHONPATH` as explained [here.](#setting-your-environment)
 
 ## Install From Source Tarball
 
@@ -104,7 +104,7 @@ $ make install
 ```
 
 !!! note
-    To use the installed software you will need to set the environment variables `PATH`, `PYTHONPATH`, and `PERL5LIB` as explained [here.](#setting-your-environment)
+    To use the installed software you will need to set the environment variables `PATH`, and `PYTHONPATH` as explained [here.](#setting-your-environment)
 
 ## Install From Binary Tarball
 
@@ -122,22 +122,18 @@ $ make install
 ```
 
 !!! note
-    To use the installed software you will need to set the environment variables `PATH`, `PYTHONPATH`, and `PERL5LIB` as explained [here.](#setting-your-environment)
+    To use the installed software you will need to set the environment variables `PATH` and `PYTHONPATH` as explained [here.](#setting-your-environment)
 
 ## Setting Your Environment
 
 If you installed **CCTools** from github, source tarball, or from a binary tarball, you will need to set some environment variables.
 
-First determine the `python` and `perl` versions you are using:
+First determine the `python` versions you are using:
 
 ```sh
 # Note: your output may vary according to your python version.
 $ python -c 'from sys import version_info; print("{}.{}".format(version_info.major, version_info.minor))'
 3.7
-
-# Note: your output may vary according to your perl version.
-$ perl -e 'print("$^V\n")'
-5.16.3
 ```
 
 Now update your environment variables with those versions:
@@ -147,9 +143,6 @@ $ export PATH=$HOME/cctools/bin:$PATH
 
 # Change 3.7 to the python version you found above.
 $ export PYTHONPATH=$HOME/cctools/lib/python3.7/site-packages:${PYTHONPATH}
-
-# Change 5.16.3 to the perl version you found above.
-$ export PERL5LIB=$HOME/cctools/lib/perl5/site_perl/5.16.3:${PERL5LIB}
 ```
 
 ## Testing Your Installation
@@ -165,13 +158,10 @@ makeflow version 7.4.3 FINAL (released 2022-02-03 16:26:52 +0000)
 ...
 ```
 
-You can test that the python and perl modules are available with:
+You can test that the python modules are available with:
 
 ```sh
 $ python -c 'import work_queue; print(work_queue.WORK_QUEUE_DEFAULT_PORT)'
-9123
-
-$ perl -MWork_Queue -e 'print("$Work_Queue::WORK_QUEUE_DEFAULT_PORT\n")'
 9123
 ```
 
@@ -182,7 +172,7 @@ make sure that your PYTHONPATH is unset.
 
 !!! warning
     Remember that for installations from source you need [swig](http://www.swig.org) at compile time, and to set
-    the environment variables `PATH`, `PYTHONPATH` and `PERL5LIB` appropriately, as explained [here.](#setting-your-environment)
+    the environment variables `PATH` and `PYTHONPATH` appropriately, as explained [here.](#setting-your-environment)
 
     For **conda** installation you should not need to manually
     set any of these variables, and in fact setting them may produce errors.
@@ -197,7 +187,6 @@ To use these, you must download and
 install them separately:
 
 * [Python](https://www.python.org)
-* [Perl](https://www.perl.org)
 * [CVMFS](https://cvmfs.readthedocs.io/en/stable/cpt-quickstart.html)
 * [FUSE](http://fuse.sourceforge.net)
 * [iRODS](http://irods.org) (version 4.0.3) 
