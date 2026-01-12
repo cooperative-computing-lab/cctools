@@ -34,7 +34,7 @@ static char *int_to_string(int n)
  * @param m the bucketing manager */
 static void bucketing_manager_add_default_resource_types(bucketing_manager_t *m)
 {
-    int max_num_buckets_quantized = 2;
+    int max_num_buckets_quantized = 1;  // blind info for quantized bucketing
     int max_num_buckets = default_max_num_buckets; 
 
     if (m->mode == BUCKETING_MODE_QUANTIZED) {
