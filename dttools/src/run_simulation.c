@@ -68,6 +68,10 @@ int main(int argc, char** argv)
     struct rmsummary* task_r;
     struct rmsummary* pred_task_r;
 
+    double average_core_efficiency_workflow = 0;
+    double average_mem_efficiency_workflow = 0;
+    double average_disk_efficiency_workflow = 0;
+
     double total_core_allocated_workflow = 0;
     double total_mem_allocated_workflow = 0;
     double total_disk_allocated_workflow = 0;
@@ -86,18 +90,21 @@ int main(int argc, char** argv)
     int iter = 0;
     while (fgets(buffer, sizeof(buffer), file)) {
         ++iter;
-        if (iter == 5000){
+        if (iter == 10000){
             exit(1);
         }
+        double task_core_allocated = 0;
+        double task_mem_allocated = 0;
+        double task_disk_allocated = 0;
 
         int matched = sscanf(buffer, "%lf %lf %lf %lf %lf", &task_id, &wall_time, &cores, &mem, &disk);
 
         //printf("task id %lf\n", task_id);
         
         if (total_core_allocated_workflow != 0) {
-            printf("global core efficiency: %lf\n", total_core_real_consumed_workflow/total_core_allocated_workflow);
-            printf("global mem efficiency: %lf\n", total_mem_real_consumed_workflow/total_mem_allocated_workflow);
-            printf("global disk efficiency: %lf\n", total_disk_real_consumed_workflow/total_disk_allocated_workflow);
+            //printf("global core efficiency: %lf\n", total_core_real_consumed_workflow/total_core_allocated_workflow);
+            //printf("global mem efficiency: %lf\n", total_mem_real_consumed_workflow/total_mem_allocated_workflow);
+            //printf("global disk efficiency: %lf\n", total_disk_real_consumed_workflow/total_disk_allocated_workflow);
         }
 
 
@@ -110,7 +117,7 @@ int main(int argc, char** argv)
         rmsummary_set(task_r, res_names[0], cores);
         rmsummary_set(task_r, res_names[1], mem);
         rmsummary_set(task_r, res_names[2], disk);
-        printf(" task id %lf wall time %lf cores %lf mem %lf disk %lf\n", task_id, wall_time, cores, mem, disk);
+        //printf(" task id %lf wall time %lf cores %lf mem %lf disk %lf\n", task_id, wall_time, cores, mem, disk);
 
         struct hash_table* tmp_ht = m->res_type_to_bucketing_state;
         char* tmp_name;
@@ -118,17 +125,21 @@ int main(int argc, char** argv)
         hash_table_firstkey(tmp_ht);
         while(hash_table_nextkey(tmp_ht, &tmp_name, (void**) &tmp_state))
         {
-            printf("buckets for %s\n", tmp_name);
-            bucketing_sorted_buckets_print(tmp_state->sorted_buckets);
+            //printf("buckets for %s\n", tmp_name);
+            //bucketing_sorted_buckets_print(tmp_state->sorted_buckets);
         }
         int predict_times = 0;
         while((pred_task_r = bucketing_manager_predict(m, task_id)))
         {
             ++predict_times;
-            printf("prediction: cores %lf mem %lf disk %lf\n", pred_task_r->cores, pred_task_r->memory, pred_task_r->disk);
+            //printf("prediction: cores %lf mem %lf disk %lf\n", pred_task_r->cores, pred_task_r->memory, pred_task_r->disk);
             total_core_allocated_workflow += pred_task_r->cores * wall_time;
             total_mem_allocated_workflow += pred_task_r->memory * wall_time;
             total_disk_allocated_workflow += pred_task_r->disk * wall_time;
+
+            task_core_allocated += pred_task_r->cores * wall_time;
+            task_mem_allocated += pred_task_r->memory * wall_time;
+            task_disk_allocated += pred_task_r->disk * wall_time;
 
             // avoid double precision calculation stuff
             // 1 is to avoid equality
@@ -145,6 +156,11 @@ int main(int argc, char** argv)
                 total_core_internal_fragment_workflow += (pred_task_r->cores-task_r->cores) * wall_time;
                 total_mem_internal_fragment_workflow += (pred_task_r->memory-task_r->memory) * wall_time;
                 total_disk_internal_fragment_workflow += (pred_task_r->disk-task_r->disk) * wall_time;
+                if (task_core_allocated > 0) {
+                    average_core_efficiency_workflow += (task_r->cores * wall_time) / task_core_allocated;
+                }
+                average_mem_efficiency_workflow += (task_r->memory * wall_time) / task_mem_allocated;
+                average_disk_efficiency_workflow += (task_r->disk * wall_time) / task_disk_allocated;
                 rmsummary_delete(pred_task_r);
                 break;
             }
@@ -170,7 +186,7 @@ int main(int argc, char** argv)
                 rmsummary_delete(pred_task_r);
             }
         }
-        printf("Predict times is %d\n", predict_times);
+        //printf("Predict times is %d\n", predict_times);
         predict_times = 0;
         rmsummary_delete(task_r);
         //printf("----------------------------------\n");
@@ -178,9 +194,27 @@ int main(int argc, char** argv)
     bucketing_manager_delete(m);
     hash_table_delete(info_of_resource_table);
 
-    printf("global core efficiency: %lf\n", total_core_real_consumed_workflow/total_core_allocated_workflow);
-    printf("global mem efficiency: %lf\n", total_mem_real_consumed_workflow/total_mem_allocated_workflow);
-    printf("global disk efficiency: %lf\n", total_disk_real_consumed_workflow/total_disk_allocated_workflow);
+    average_core_efficiency_workflow /= iter;
+    average_mem_efficiency_workflow /= iter;
+    average_disk_efficiency_workflow /= iter;
+
+    printf("average workload efficiency (cores, mem, disk)\n");
+    printf("%lf %lf %lf\n", average_core_efficiency_workflow, average_mem_efficiency_workflow, average_disk_efficiency_workflow);
+    printf("global workload efficiency\n");
+    printf("%lf %lf %lf\n", total_core_real_consumed_workflow/total_core_allocated_workflow, total_mem_real_consumed_workflow/total_mem_allocated_workflow, total_disk_real_consumed_workflow/total_disk_allocated_workflow);
+    printf("absolute waste\n");
+    printf("%lf %lf %lf\n", total_core_allocated_workflow-total_core_real_consumed_workflow, total_mem_allocated_workflow-total_mem_real_consumed_workflow, total_disk_allocated_workflow-total_disk_real_consumed_workflow);
+    printf("internal waste percentage\n");
+    printf("%lf %lf %lf\n",
+            total_core_internal_fragment_workflow/(total_core_allocated_workflow-total_core_real_consumed_workflow),
+            total_mem_internal_fragment_workflow/(total_mem_allocated_workflow-total_mem_real_consumed_workflow),
+            total_disk_internal_fragment_workflow/(total_disk_allocated_workflow-total_disk_real_consumed_workflow));
+
+    //double total_core_internal_fragment_workflow = 0;
+
+    //printf("global core efficiency: %lf\n", total_core_real_consumed_workflow/total_core_allocated_workflow);
+    //printf("global mem efficiency: %lf\n", total_mem_real_consumed_workflow/total_mem_allocated_workflow);
+    //printf("global disk efficiency: %lf\n", total_disk_real_consumed_workflow/total_disk_allocated_workflow);
 
     return 0;
 }
