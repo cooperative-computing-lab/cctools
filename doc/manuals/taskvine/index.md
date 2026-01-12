@@ -2952,7 +2952,6 @@ The `compute` call above may receive the following keyword arguments:
 | resources   | A dictionary to specify [maximum resources](#task-resources), e.g. `{"cores": 1, "memory": 2000"}` |
 | resources\_mode | [Automatic resource management](#automatic-resource-management) to use, e.g., "fixed", "max", or "max throughput"|
 | task\_mode | Mode to execute individual tasks, such as [function calls](#serverless-computing). to use, e.g., "tasks", or "function-calls"|
-| checkpoint\_fn | Only used with `worker_transfers=True`: a predicate `(dag, key) -> bool` called before submit; if it returns True, that key is brought back to the manager. |
 | task\_priority\_mode | How tasks are prioritized for submission; higher priority is considered first (default "largest-input-first" for faster data pruning). |
 | scheduling\_mode | Strategy to dispatch tasks to workers (default "files": prefer workers that already have more of the required input files). |
 | retries | Number of times to attempt a task (default 5). |
