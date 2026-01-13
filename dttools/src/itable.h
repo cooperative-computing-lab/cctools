@@ -69,6 +69,24 @@ Note that this function will not delete all of the objects contained within the 
 
 void itable_delete(struct itable *h);
 
+
+/** Return an array with all the current keys.
+It is the responsibility of the caller to free this array with
+itable_free_keys_array.
+@param h A pointer to a hash table.
+@return An array of all the current keys.
+*/
+
+UINT64_T *itable_keys_array(struct itable *h);
+
+
+/** Free an array generated from itable_free_keys_array.
+@param keys An array of all the keys.
+*/
+
+void itable_free_keys_array(UINT64_T *keys);
+
+
 /** Count the entries in an integer table.
 @return The number of entries in the table.
 @param h A pointer to an integer table.
@@ -76,9 +94,16 @@ void itable_delete(struct itable *h);
 
 int itable_size(struct itable *h);
 
+/** Get the proportion of elements vs buckets in the table.
+@return The load of the table.
+@param h A pointer to an integer table.
+*/
+
+double itable_load(struct itable *h);
+
+
 /** Insert a key and value.
-This call will fail if the table already contains the same key.
-You must call @ref itable_remove to remove it.
+This call will replace the value if it already contains the same key.
 Also note that you cannot insert a null value into the table.
 @param h A pointer to an integer table.
 @param key An integer key
