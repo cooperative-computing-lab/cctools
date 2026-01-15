@@ -16,6 +16,7 @@ import os
 import signal
 import json
 import random
+import time
 
 
 def context_loader_func(graph_pkl):
@@ -69,7 +70,7 @@ class GraphParams:
             "checkpoint-dir": "./checkpoints",
             "checkpoint-fraction": 0,
             "progress-bar-update-interval-sec": 0.1,
-            "time-metrics-filename": "time_metrics.csv",
+            "time-metrics-filename": 0,
             "enable-debug-log": 1,
             "auto-recovery": 1,
             "max-retry-attempts": 15,
@@ -258,6 +259,8 @@ class DAGVine(Manager):
 
     def run(self, task_dict, target_keys=[], params={}, hoisting_modules=[], env_files={}, adapt_dask=False):
         """High-level entry point: normalise input, build graphs, ship the library, execute, and return results."""
+        time_start = time.time()
+
         # first update the params so that they can be used for the following construction
         self.update_params(params)
 
@@ -278,6 +281,7 @@ class DAGVine(Manager):
 
         try:
             print(f"=== Library serialized size: {color_text(proxy_library.get_context_size(), 92)} MB")
+            print(f"Time taken to initialize the graph in Python: {time.time() - time_start:.6f} seconds")
             vine_graph.execute()
             results = {}
             for k in target_keys:
@@ -285,6 +289,10 @@ class DAGVine(Manager):
                     continue
                 outfile_path = os.path.join(self.param("output-dir"), py_graph.outfile_remote_name[k])
                 results[k] = TaskOutputWrapper.load_from_path(outfile_path)
+            makespan_s = round(vine_graph.get_makespan_us() / 1e6, 6)
+            throughput_tps = round(len(py_graph.task_dict) / makespan_s, 6)
+            print(f"Makespan: {color_text(makespan_s, 92)} seconds")
+            print(f"Throughput: {color_text(throughput_tps, 92)} tasks/second")
             return results
         finally:
             try:

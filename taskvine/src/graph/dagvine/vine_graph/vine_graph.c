@@ -563,13 +563,13 @@ static void print_time_metrics(struct vine_graph *vg, const char *filename)
 		debug(D_ERROR, "failed to open file %s", filename);
 		return;
 	}
-	fprintf(fp, "node_id,submission_time_us,scheduling_time_us,commit_time_us,execution_time_us,retrieval_time_us,postprocessing_time_us\n");
+	fprintf(fp, "node_id,submission_time_us,commit_time_us,execution_time_us,retrieval_time_us,postprocessing_time_us\n");
 
 	uint64_t nid;
 	struct vine_node *node;
 	ITABLE_ITERATE(vg->nodes, nid, node)
 	{
-		fprintf(fp, "%" PRIu64 "," TIMESTAMP_FORMAT "," TIMESTAMP_FORMAT "," TIMESTAMP_FORMAT "," TIMESTAMP_FORMAT "," TIMESTAMP_FORMAT "," TIMESTAMP_FORMAT "\n", node->node_id, node->submission_time, node->scheduling_time, node->commit_time, node->execution_time, node->retrieval_time, node->postprocessing_time);
+		fprintf(fp, "%" PRIu64 "," TIMESTAMP_FORMAT "," TIMESTAMP_FORMAT "," TIMESTAMP_FORMAT "," TIMESTAMP_FORMAT "," TIMESTAMP_FORMAT "\n", node->node_id, node->submission_time, node->commit_time, node->execution_time, node->retrieval_time, node->postprocessing_time);
 	}
 	fclose(fp);
 
@@ -738,7 +738,7 @@ int vine_graph_tune(struct vine_graph *vg, const char *name, const char *value)
 		vg->progress_bar_update_interval_sec = (val > 0.0) ? val : 0.1;
 
 	} else if (strcmp(name, "time-metrics-filename") == 0) {
-		if (strcmp(value, "0") == 0) {
+		if (value == NULL || strcmp(value, "0") == 0) {
 			return 0;
 		}
 
@@ -1255,6 +1255,10 @@ struct vine_graph *vine_graph_create(struct vine_manager *q)
 	 * we can be in control of when to recreate what lost data. */
 	vg->auto_recovery = 0;
 
+	vg->time_first_task_dispatched = UINT64_MAX;
+	vg->time_last_task_retrieved = 0;
+	vg->makespan_us = 0;
+
 	return vg;
 }
 
@@ -1295,6 +1299,15 @@ void vine_graph_add_dependency(struct vine_graph *vg, uint64_t parent_id, uint64
 	return;
 }
 
+uint64_t vine_graph_get_makespan_us(const struct vine_graph *vg)
+{
+	if (!vg) {
+		return 0;
+	}
+
+	return (uint64_t)vg->makespan_us;
+}
+
 /**
  * Execute the vine graph. This must be called after all nodes and dependencies are added and the topology metrics are computed.
  * @param vg Reference to the vine graph.
@@ -1304,6 +1317,8 @@ void vine_graph_execute(struct vine_graph *vg)
 	if (!vg) {
 		return;
 	}
+
+	timestamp_t time_start = timestamp_get();
 
 	void (*previous_sigint_handler)(int) = signal(SIGINT, handle_sigint);
 
@@ -1362,6 +1377,9 @@ void vine_graph_execute(struct vine_graph *vg)
 	if (vg->failure_injection_step_percent > 0) {
 		next_failure_threshold = vg->failure_injection_step_percent / 100.0;
 	}
+
+	timestamp_t time_end = timestamp_get();
+	printf("Time taken to initialize the graph in C: %.6f seconds\n", (double)(time_end - time_start) / 1e6);
 
 	struct ProgressBar *pbar = progress_bar_init("Executing Tasks");
 	progress_bar_set_update_interval(pbar, vg->progress_bar_update_interval_sec);
@@ -1425,6 +1443,15 @@ void vine_graph_execute(struct vine_graph *vg)
 				continue;
 			}
 
+			/* update time metrics */
+			vg->time_first_task_dispatched = MIN(vg->time_first_task_dispatched, task->time_when_commit_end);
+			vg->time_last_task_retrieved = MAX(vg->time_last_task_retrieved, task->time_when_retrieval);
+			if (vg->time_last_task_retrieved < vg->time_first_task_dispatched) {
+				debug(D_ERROR, "task %d time_last_task_retrieved < time_first_task_dispatched: %" PRIu64 " < %" PRIu64, task->task_id, vg->time_last_task_retrieved, vg->time_first_task_dispatched);
+				vg->time_last_task_retrieved = vg->time_first_task_dispatched;
+			}
+			vg->makespan_us = vg->time_last_task_retrieved - vg->time_first_task_dispatched;
+
 			/* if the outfile is set to save on the sharedfs, stat to get the size of the file */
 			switch (node->outfile_type) {
 			case NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM: {
@@ -1450,10 +1477,9 @@ void vine_graph_execute(struct vine_graph *vg)
 			 * Only the first completion should advance the "User" progress. */
 			int first_completion = !node->completed;
 			node->completed = 1;
-			node->scheduling_time = task->time_when_scheduling_end - task->time_when_scheduling_start;
 			node->commit_time = task->time_when_commit_end - task->time_when_commit_start;
 			node->execution_time = task->time_workers_execute_last;
-			node->retrieval_time = task->time_when_get_result_end - task->time_when_get_result_start;
+			node->retrieval_time = task->time_when_done - task->time_when_retrieval;
 
 			/* prune nodes on task completion */
 			prune_ancestors_of_node(vg, node);

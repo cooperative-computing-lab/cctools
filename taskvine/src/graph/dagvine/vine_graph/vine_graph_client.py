@@ -84,6 +84,10 @@ class VineGraphClient:
         """Kick off execution; runs through SWIG down into the C orchestration loop."""
         vine_graph_capi.vine_graph_execute(self._c_graph)
 
+    def get_makespan_us(self):
+        """Get the makespan of the vine graph in microseconds."""
+        return vine_graph_capi.vine_graph_get_makespan_us(self._c_graph)
+
     def delete(self):
         """Release the C resources and clear the client."""
         vine_graph_capi.vine_graph_delete(self._c_graph)

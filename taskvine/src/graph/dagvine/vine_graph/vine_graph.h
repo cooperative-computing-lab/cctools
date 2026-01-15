@@ -11,6 +11,7 @@
 #include "set.h"
 #include "vine_node.h"
 #include "taskvine.h"
+#include "timestamp.h"
 
 /** The task priority algorithm used for vine graph scheduling. */
 typedef enum {
@@ -72,6 +73,10 @@ struct vine_graph {
 
 	int max_retry_attempts;	   /* the maximum number of times to retry a task */
 	double retry_interval_sec; /* the interval between retries in seconds, 0 means no retry interval */
+
+	timestamp_t time_first_task_dispatched; /* the time when the first task is dispatched */
+	timestamp_t time_last_task_retrieved;	/* the time when the last task is retrieved */
+	timestamp_t makespan_us;		/* the makespan of the vine graph in microseconds */
 };
 
 /* Public APIs for operating the vine graph */
@@ -170,5 +175,11 @@ void vine_graph_set_proxy_function_name(struct vine_graph *vg, const char *proxy
 @return 0 on success, -1 on failure.
 */
 int vine_graph_tune(struct vine_graph *vg, const char *name, const char *value);
+
+/** Get the makespan of the vine graph in microseconds.
+@param vg Reference to the vine graph.
+@return The makespan in microseconds.
+*/
+uint64_t vine_graph_get_makespan_us(const struct vine_graph *vg);
 
 #endif // VINE_GRAPH_H
