@@ -170,6 +170,7 @@ static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_
 static int release_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
+static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t);
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
@@ -733,7 +734,9 @@ static vine_msg_code_t vine_manager_recv_no_retry(struct vine_manager *q, struct
 			string_prefix_is(line, "wable_status") || string_prefix_is(line, "resources_status")) {
 		result = handle_manager_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "available_results")) {
-		hash_table_insert(q->workers_with_watched_file_updates, w->hashkey, w);
+		if (!hash_table_lookup(q->workers_with_watched_file_updates, w->hashkey)) {
+			hash_table_insert(q->workers_with_watched_file_updates, w->hashkey, w);
+		}
 		result = VINE_MSG_PROCESSED;
 	} else if (string_prefix_is(line, "resources")) {
 		result = handle_resources(q, w, stoptime);
@@ -1481,6 +1484,10 @@ static int retrieve_ready_task(struct vine_manager *q, struct vine_task *t, doub
 			debug(D_VINE, "task %d does not have a needed fixed location input file", t->task_id);
 			result = VINE_RESULT_FIXED_LOCATION_MISSING;
 		}
+	}
+	if (!q->auto_recovery && !vine_manager_check_inputs_available(q, t)) {
+		debug(D_VINE, "task %d has missing input files", t->task_id);
+		result = VINE_RESULT_INPUT_MISSING;
 	}
 
 	/* If any of the reasons fired, then expire the task and put in the retrieved queue. */
@@ -3418,6 +3425,10 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 		return;
 	}
 
+	if (!q->auto_recovery) {
+		return;
+	}
+
 	/* Prevent race between original task and recovery task after worker crash.
 	 * Example: Task T completes on worker W, creates file F, T moves to WAITING_RETRIEVAL.
 	 * W crashes before stdout retrieval, T gets rescheduled to READY, F is lost and triggers
@@ -3479,6 +3490,7 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 			all_available = 0;
 		}
 	}
+
 	return all_available;
 }
 
@@ -4166,6 +4178,13 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->enforce_worker_eviction_interval = 0;
 	q->time_start_worker_eviction = 0;
 
+	q->return_recovery_tasks = 0;
+	q->auto_recovery = 1;
+	q->balance_worker_disk_load = 0;
+	q->when_last_offloaded = 0;
+	q->peak_used_cache = 0;
+	q->shutting_down = 0;
+
 	if ((envstring = getenv("VINE_BANDWIDTH"))) {
 		q->bandwidth_limit = string_metric_parse(envstring);
 		if (q->bandwidth_limit < 0) {
@@ -4239,6 +4258,20 @@ int vine_disable_peer_transfers(struct vine_manager *q)
 	debug(D_VINE, "Peer Transfers disabled");
 	fprintf(stderr, "warning: Peer Transfers disabled. Temporary files will be returned to the manager upon creation.");
 	q->peer_transfers_enabled = 0;
+	return 1;
+}
+
+int vine_enable_return_recovery_tasks(struct vine_manager *q)
+{
+	debug(D_VINE, "Return recovery tasks enabled");
+	q->return_recovery_tasks = 1;
+	return 1;
+}
+
+int vine_disable_return_recovery_tasks(struct vine_manager *q)
+{
+	debug(D_VINE, "Return recovery tasks disabled");
+	q->return_recovery_tasks = 0;
 	return 1;
 }
 
@@ -4385,6 +4418,8 @@ void vine_delete(struct vine_manager *q)
 	/* now that the manager is shutting down, worker removals are not an invalid event, so we
 	 * disable the immediate recovery to avoid submitting recovery tasks for lost files */
 	q->immediate_recovery = 0;
+
+	q->shutting_down = 1;
 
 	vine_fair_write_workflow_info(q);
 
@@ -4591,8 +4626,7 @@ char *vine_monitor_wrap(struct vine_manager *q, struct vine_worker_info *w, stru
 	return wrap_cmd;
 }
 
-/* Put a given task on the ready list, taking into account the task priority and the manager schedule. */
-
+/* Put a given task on the ready queue, taking into account the task priority and the manager schedule. */
 static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t)
 {
 	vine_priority_t manager_priority = VINE_PRIORITY_NORMAL;
@@ -5049,6 +5083,7 @@ static int poll_active_workers(struct vine_manager *q, int stoptime)
 	// promptly dispatch tasks, while avoiding wasting cpu cycles when the
 	// state of the system cannot be advanced.
 	int msec = q->nothing_happened_last_wait_cycle ? 1000 : 0;
+	msec = 0;
 	if (stoptime) {
 		msec = MIN(msec, (stoptime - time(0)) * 1000);
 	}
@@ -5158,7 +5193,11 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			return t;
 			break;
 		case VINE_TASK_TYPE_RECOVERY:
-			/* do nothing and let vine_manager_consider_recovery_task do its job */
+			/* if configured to return recovery tasks, return them to the user */
+			if (q->return_recovery_tasks) {
+				return t;
+			}
+			/* otherwise, do nothing and let vine_manager_consider_recovery_task do its job */
 			break;
 		case VINE_TASK_TYPE_LIBRARY_INSTANCE:
 			/* silently delete the task, since it was created by the manager.
@@ -5878,10 +5917,12 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "max-library-retries")) {
 		q->max_library_retries = MIN(1, value);
+
 	} else if (!strcmp(name, "disk-proportion-available-to-task")) {
 		if (value < 1 && value > 0) {
 			q->disk_proportion_available_to_task = value;
 		}
+
 	} else if (!strcmp(name, "enforce-worker-eviction-interval")) {
 		q->enforce_worker_eviction_interval = (timestamp_t)(MAX(0, (int)value) * ONE_SECOND);
 
