@@ -14,6 +14,8 @@ int main(int argc, char** argv)
     const char* greedy_str = "-greedy";
     const char* exhaust_str = "-exhaust";
     const char* det_exhaust_str = "-det-exhaust";
+    const char* quantized_str = "-quantized";
+
 
     if (argc == 2)
     {
@@ -32,6 +34,10 @@ int main(int argc, char** argv)
         else if (strncmp(*(argv+1), exhaust_str, strlen(exhaust_str)) == 0)
         {
             mode = BUCKETING_MODE_EXHAUSTIVE;
+        }
+        else if (strncmp(*(argv+1), quantized_str, strlen(quantized_str)) == 0)
+        {
+            mode = BUCKETING_MODE_QUANTIZED;
         }
         else
         {
