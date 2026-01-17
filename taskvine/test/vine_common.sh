@@ -1,4 +1,4 @@
-#!/bin/hh
+#!/bin/sh
 
 . ../../dttools/test/test_runner_common.sh
 
