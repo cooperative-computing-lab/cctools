@@ -932,6 +932,14 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 		if (removed_replica) {
 			vine_file_replica_delete(removed_replica);
 		}
+		/* If a VINE_TEMP file now has 0 replicas because the worker with the last replica was lost,
+		 * remove it from temp_files_to_replicate since there's nothing to replicate. */
+		if (f && f->type == VINE_TEMP) {
+			int replica_count = vine_file_replica_count(q, f);
+			if (replica_count == 0) {
+				hash_table_remove(q->temp_files_to_replicate, cachename);
+			}
+		}
 		/* consider if this replica needs recovery because of worker removal */
 		if (q->immediate_recovery && file_needs_recovery(q, f)) {
 			vine_manager_consider_recovery_task(q, f, f->recovery_task);
