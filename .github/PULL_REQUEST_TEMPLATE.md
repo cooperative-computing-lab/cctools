@@ -8,10 +8,11 @@ Mention relevant issues and pull requests as needed.
 The following items must be completed before PRs can be merged.
 Check these off to verify you have completed all steps.
 
-- [ ] `make test`       Run local tests prior to pushing.
-- [ ] `make format`     Format source code to comply with lint policies. Note that some lint errors can only be resolved manually (e.g., Python)
-- [ ] `make lint`       Run lint on source code prior to pushing.
-- [ ] Manual Update:     Update the manual to reflect user-visible changes.
-- [ ] Type Labels:       Select a github label for the type: bugfix, enhancement, etc.
-- [ ] Product Labels:    Select a github label for the product: TaskVine, Makeflow, etc.
-- [ ] PR RTM:            Mark your PR as ready to merge.
+- [ ] `make test`                           Run local tests prior to pushing.
+- [ ] `make format`                         Format source code to comply with lint policies. Note that some lint errors can only be resolved manually (e.g., Python)
+- [ ] `make lint`                           Run lint on source code prior to pushing.
+- [ ] Manual Update:                        Update the manual to reflect user-visible changes.
+- [ ] Type Labels:                          Select a github label for the type: bugfix, enhancement, etc.
+- [ ] Product Labels:                       Select a github label for the product: TaskVine, Makeflow, etc.
+- [ ] [Optional] Request Copilot's review:  Request a code review from Copilot (or ask @tphung to request one for you).
+- [ ] PR RTM:                               Mark your PR as ready to merge.
