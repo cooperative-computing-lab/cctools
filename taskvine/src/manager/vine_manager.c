@@ -4686,7 +4686,6 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 		}
 		vine_taskgraph_log_write_task(q, t);
 		itable_remove(q->tasks, t->task_id);
-		vine_task_delete(t);
 		break;
 	}
 
@@ -5430,6 +5429,11 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	}
 
 	q->time_last_wait = timestamp_get();
+
+	if (t) {
+		// delete our reference of the task
+		vine_task_delete(t);
+	}
 
 	return t;
 }
