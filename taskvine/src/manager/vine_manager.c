@@ -4655,6 +4655,9 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 	c->vine_stats->tasks_on_workers = c->vine_stats->tasks_running + c->vine_stats->tasks_with_results;
 	c->vine_stats->tasks_submitted = c->total_tasks + c->vine_stats->tasks_waiting + c->vine_stats->tasks_on_workers;
 
+	/* update log before switch before as task may get deleted in some cases */
+	vine_txn_log_write_task(q, t);
+
 	switch (new_state) {
 	case VINE_TASK_INITIAL:
 		/* should not happen, do nothing */
@@ -4691,7 +4694,6 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 	}
 
 	vine_perf_log_write_update(q, 0);
-	vine_txn_log_write_task(q, t);
 
 	return old_state;
 }
