@@ -1043,20 +1043,39 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 
 	vine_current_transfers_wipe_worker(q, w);
 
-	ITABLE_ITERATE(w->current_tasks, task_id, t)
-	{
-		if (t->time_when_commit_end >= t->time_when_commit_start) {
-			timestamp_t delta_time = timestamp_get() - t->time_when_commit_end;
-			t->time_workers_execute_failure += delta_time;
-			t->time_workers_execute_all += delta_time;
+	/* Collect all task IDs first to avoid iterator invalidation during removal. */
+	int task_count = itable_size(w->current_tasks);
+	uint64_t *task_ids = NULL;
+	if (task_count > 0) {
+		task_ids = xxmalloc(task_count * sizeof(uint64_t));
+		int i = 0;
+		ITABLE_ITERATE(w->current_tasks, task_id, t)
+		{
+			task_ids[i] = task_id;
+			i++;
 		}
 
-		/* Remove the unfinished task and update data structures. */
-		reap_task_from_worker(q, w, t, VINE_TASK_READY);
+		/* Process each task by ID, then remove it. */
+		for (i = 0; i < task_count; i++) {
+			task_id = task_ids[i];
+			t = itable_lookup(w->current_tasks, task_id);
+			if (!t) {
+				continue; /* Task may have been removed already? */
+			}
 
-		vine_task_clean(t);
+			if (t->time_when_commit_end >= t->time_when_commit_start) {
+				timestamp_t delta_time = timestamp_get() - t->time_when_commit_end;
+				t->time_workers_execute_failure += delta_time;
+				t->time_workers_execute_all += delta_time;
+			}
 
-		itable_firstkey(w->current_tasks);
+			/* Remove the unfinished task and update data structures. */
+			reap_task_from_worker(q, w, t, VINE_TASK_READY);
+
+			vine_task_clean(t);
+		}
+
+		free(task_ids);
 	}
 
 	itable_clear(w->current_tasks, 0);
