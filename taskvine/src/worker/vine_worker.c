@@ -675,7 +675,10 @@ static void reap_process(struct vine_process *p, struct link *manager)
 	gpus_allocated -= p->task->resources_requested->gpus;
 
 	vine_gpus_free(p->task->task_id);
-	vine_sandbox_stageout(p, cache_manager, manager);
+
+	if (manager) {
+		vine_sandbox_stageout(p, cache_manager, manager);
+	}
 
 	if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
 		p->library_process->functions_running--;
@@ -765,7 +768,7 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 		if (p_running->library_process == p) {
 			debug(D_VINE, "killing function task %d running on library task %d", (int)task_id, p->task->task_id);
 			finish_running_task(p_running, VINE_RESULT_FORSAKEN);
-			reap_process(p_running, manager);
+			reap_process(p_running, /* do not stage out */ NULL);
 		}
 	}
 }
@@ -1086,12 +1089,7 @@ static int do_kill(int task_id)
 
 	if (itable_remove(procs_running, task_id)) {
 		vine_process_kill_and_wait(p);
-
-		cores_allocated -= p->task->resources_requested->cores;
-		memory_allocated -= p->task->resources_requested->memory;
-		disk_allocated -= p->task->resources_requested->disk;
-		gpus_allocated -= p->task->resources_requested->gpus;
-		vine_gpus_free(task_id);
+		reap_process(p, /* do not stage out */ NULL);
 	}
 
 	itable_remove(procs_complete, p->task->task_id);
