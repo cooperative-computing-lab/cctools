@@ -574,8 +574,11 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	if (!t) {
 		debug(D_VINE, "Unknown task completion from worker %s (%s): no task %" PRId64 " assigned to worker. Ignoring result.", w->hostname, w->addrport, task_id);
 
-		time_t stoptime = time(0) + vine_manager_transfer_time(q, w, output_length);
-		link_soak(w->link, output_length, stoptime);
+		if (bytes_sent > 0) {
+			time_t stoptime = time(0) + vine_manager_transfer_time(q, w, bytes_sent);
+			link_soak(w->link, bytes_sent, stoptime);
+		}
+
 		return VINE_SUCCESS;
 	}
 
