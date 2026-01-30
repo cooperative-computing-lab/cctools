@@ -100,6 +100,7 @@ static struct jx_table workers_able_headers[] = {
 {"category",      "CATEGORY",     JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,  -12},
 {"tasks_on_workers", "DISPATCHED",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
 {"tasks_waiting", "WAITING",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
+{"tasks_done",     "COMPLETE",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
 {"workers_able",  "FIT-WORKERS",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 12},
 {"max_cores",     "MAX-CORES",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
 {"max_memory",    "MAX-MEMORY",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
