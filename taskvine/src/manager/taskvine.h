@@ -1332,6 +1332,14 @@ The cancelled task will be returned in the normal way via @ref vine_wait with a 
 */
 int vine_cancel_by_task_tag(struct vine_manager *m, const char *tag);
 
+/** Cancel all submitted tasks with the given tag and remove them from the manager.
+Each cancelled task will be returned in the normal way via @ref vine_wait with a result of VINE_RESULT_CANCELLED.
+@param m A manager object
+@param tag The tag name assigned to tasks using @ref vine_task_set_tag.
+@return The number of tasks cancelled.
+*/
+int vine_cancel_all_by_tag(struct vine_manager *m, const char *tag);
+
 /** Cancel all submitted tasks and remove them from the manager.
 Each cancelled task will be returned in the normal way via @ref vine_wait with a result of VINE_RESULT_CANCELLED.
 @param m A manager object
