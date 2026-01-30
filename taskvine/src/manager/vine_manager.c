@@ -5760,14 +5760,13 @@ int vine_cancel_all_by_tag(struct vine_manager *q, const char *tag)
 		default:
 			switch (t->type) {
 			case VINE_TASK_TYPE_STANDARD:
-			case VINE_TASK_TYPE_LIBRARY_INSTANCE:
+			case VINE_TASK_TYPE_LIBRARY:
 				if (task_tag_comparator(t, tag)) {
 					vine_cancel_by_task_id(q, task_id);
 					count++;
 				}
 				break;
 			case VINE_TASK_TYPE_RECOVERY:
-			case VINE_TASK_TYPE_LIBRARY_TEMPLATE:
 				/* recovery tasks should not be canceled (unless explicitely by task id)
 				 * as there are temporary files that the workflow already considers done. */
 				continue;
