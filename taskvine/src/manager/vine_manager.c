@@ -3996,6 +3996,10 @@ static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vin
 		change_task_state(q, t, new_state);
 		break;
 
+	case VINE_TASK_WAITING_RETRIEVAL:
+		/* do the same for run vs waiting retrieval, only difference is waiting_retrieval_list */
+		list_remove(q->waiting_retrieval_list, t);
+		/* fall through */
 	case VINE_TASK_RUNNING:
 		/* t->worker must be set if in RUNNING state */
 		assert(w);
@@ -4009,11 +4013,6 @@ static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vin
 
 		/* change_task_state() happened inside reap_task_from_worker */
 
-		break;
-
-	case VINE_TASK_WAITING_RETRIEVAL:
-		list_remove(q->waiting_retrieval_list, t);
-		change_task_state(q, t, new_state);
 		break;
 
 	case VINE_TASK_RETRIEVED:
