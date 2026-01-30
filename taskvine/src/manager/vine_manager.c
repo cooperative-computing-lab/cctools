@@ -3105,8 +3105,9 @@ static vine_result_code_t commit_task_group_to_worker(struct vine_manager *q, st
 	return result;
 }
 
-/* 1 if task resubmitted, 0 otherwise */
-static int resubmit_task_on_exhaustion(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+/* Returns true if task should be resubmitted due to resource exhaustion. */
+
+static int should_resubmit_task_on_exhaustion(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	if (t->result != VINE_RESULT_RESOURCE_EXHAUSTION) {
 		return 0;
@@ -3136,15 +3137,15 @@ static int resubmit_task_on_exhaustion(struct vine_manager *q, struct vine_worke
 	} else {
 		debug(D_VINE, "Task %d resubmitted using new resource allocation.\n", t->task_id);
 		t->resource_request = next;
-		change_task_state(q, t, VINE_TASK_READY);
 		return 1;
 	}
 
 	return 0;
 }
 
-/* 1 if task resubmitted, 0 otherwise */
-static int resubmit_task_on_sandbox_exhaustion(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+/* Returns true if task should be resubmitted due to sandbox disk exhaustion. */
+
+static int should_resubmit_task_on_sandbox_exhaustion(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	if (t->result != VINE_RESULT_SANDBOX_EXHAUSTION) {
 		return 0;
@@ -3169,12 +3170,12 @@ static int resubmit_task_on_sandbox_exhaustion(struct vine_manager *q, struct vi
 		return 0;
 	}
 
-	change_task_state(q, t, VINE_TASK_READY);
-
 	return 1;
 }
 
-static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+/* Returns true if this completed task should be resubmitted into the READY state. */
+
+static int should_resubmit_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	/* in this function, any change_task_state should only be to VINE_TASK_READY */
 	if (t->result == VINE_RESULT_FORSAKEN) {
@@ -3184,7 +3185,6 @@ static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w
 
 		/* forsaken tasks get a retry back as they are victims of circumstance */
 		t->try_count -= 1;
-		change_task_state(q, t, VINE_TASK_READY);
 		return 1;
 	}
 
@@ -3197,10 +3197,10 @@ static int resubmit_if_needed(struct vine_manager *q, struct vine_worker_info *w
 	 * have not reached max_retries. */
 	switch (t->result) {
 	case VINE_RESULT_RESOURCE_EXHAUSTION:
-		return resubmit_task_on_exhaustion(q, w, t);
+		return should_resubmit_task_on_exhaustion(q, w, t);
 		break;
 	case VINE_RESULT_SANDBOX_EXHAUSTION:
-		return resubmit_task_on_sandbox_exhaustion(q, w, t);
+		return should_resubmit_task_on_sandbox_exhaustion(q, w, t);
 		break;
 	default:
 		/* by default tasks are not resumitted */
@@ -3270,7 +3270,9 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 	switch (t->type) {
 	case VINE_TASK_TYPE_STANDARD:
 	case VINE_TASK_TYPE_RECOVERY:
-		if (new_state != VINE_TASK_RETRIEVED || !resubmit_if_needed(q, w, t)) {
+		if(new_state == VINE_TASK_RETRIEVED && should_resubmit_task(q, w, t)) {
+			change_task_state(q, t, VINE_TASK_READY);
+		} else {
 			change_task_state(q, t, new_state);
 		}
 		break;
