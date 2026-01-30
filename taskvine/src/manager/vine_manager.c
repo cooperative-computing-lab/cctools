@@ -5105,6 +5105,14 @@ static int connect_new_workers(struct vine_manager *q, int stoptime, int max_new
 	return new_workers;
 }
 
+/*
+Find a task to return to the user based on the caller's criteria.
+If we find a completed task of a type that should not be returned to the user
+(such as a recovery task or a library task) then delete that task
+quietly and keep going.  Any task returned by this function
+remains valid for use.
+*/
+
 struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, int task_id)
 {
 	while (1) {
@@ -5116,8 +5124,8 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			while (tasks_to_consider > 0) {
 				tasks_to_consider--;
 				temp = list_peek_head(q->retrieved_list);
-				// a small hack, if task is not standard we accepted it so it can be deleted below.
-				if (temp->type != VINE_TASK_TYPE_STANDARD || task_tag_comparator(temp, tag)) {
+				/* If the tag matches OR it is non standard, consume the task below. */
+				if (task_tag_comparator(temp, tag) || temp->type != VINE_TASK_TYPE_STANDARD) {
 					// temp points to head of list
 					t = list_pop_head(q->retrieved_list);
 					break;
@@ -5126,14 +5134,18 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 				}
 			}
 		} else if (task_id >= 0) {
-			// XXX: library tasks are never removed!
-			struct vine_task *temp = itable_lookup(q->tasks, task_id);
-			if (!temp || temp->state != VINE_TASK_RETRIEVED) {
-				break;
+			/* First check that the request task exists and is retrieved. */
+			struct vine_task *temp = itable_lookup(q->tasks, task_id);	
+			if(temp && temp->state == VINE_TASK_RETRIEVED) {
+				t = temp;
+				list_remove(q->retrieved_list, t);
+				/* If so, process the task below, regardless of type. */
+			} else {
+				/* If not, return zero to indicate no such task ready. */		
+				return 0;
 			}
-			t = temp;
-			list_remove(q->retrieved_list, t);
 		} else if (list_size(q->retrieved_list) > 0) {
+			/* Process the first available retrieved task, regardless of type. */
 			t = list_pop_head(q->retrieved_list);
 		}
 
@@ -5142,30 +5154,55 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			return NULL;
 		}
 
+		/* Only at the moment of return does the task transition to the final DONE state. */
 		change_task_state(q, t, VINE_TASK_DONE);
+
 		if (t->result != VINE_RESULT_SUCCESS) {
 			q->stats->tasks_failed++;
 		}
 
-		switch (t->type) {
+		/* Grab the type *before* deleting the task object. */
+		vine_task_type_t type = t->type;
+		
+		/* The task was given a reference when added to the table, so delete a reference on removal. */
+		itable_remove(q->tasks, t->task_id);
+		vine_task_delete(t);
+
+		/* CAREFUL: a non-standard task *may* no longer exist following vine_delete! */
+		
+		switch (type) {
 		case VINE_TASK_TYPE_STANDARD:
-			/* if this is a standard task type, then break and return it to the user. */
+
+			/* If this is a standard task type, give it back the user. */
 			return t;
 			break;
+
 		case VINE_TASK_TYPE_RECOVERY:
-			/* do nothing and let vine_manager_consider_recovery_task do its job */
+
+			/* If this is a recovery task, it is owned by the manager,
+			 * and should not be given back to the user.  If the vine_file
+			 * objects that it produces still exist, then the task still
+			 * exists in the DONE state by virtue of those references,
+			 * and may by resubmitted again by vine_manager_consider_recovery task.
+			 * If there are no such files, the task no longer exists!
+			 * Either way, the user should not get it back.
+			 */
+
+			t = 0;
 			break;
+			
 		case VINE_TASK_TYPE_LIBRARY:
-			/* silently delete the task, since it was created by the manager.
-			 * note: other functions may still hold references to this library task.
-			 * those references will be released once the functions complete.
-			 *
-			 * change_task_state above internally removes the reference from q->tasks,
-			 * and this following call drops the manager's own reference.
-			 * remaining references will be released gradually upon the completion of relavant
-			 * function tasks, and the task will be automatically freed once no
-			 * references remain, regardless of whether the functions complete successfully. */
+
+			 /*
+			 * If this is a library instance task, then it was created by the manager
+			 * as needed to deploy a function call task on a particular node.
+			 * Such a task should not exit, but if it did and reached the DONE
+			 * state, then the manager should delete it, because the manager created it.
+			 * We also do not return this task type to the user.
+			 */
+			
 			vine_task_delete(t);
+			t = 0;
 			break;
 		}
 	}
