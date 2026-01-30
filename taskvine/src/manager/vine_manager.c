@@ -3276,13 +3276,7 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 			change_task_state(q, t, new_state);
 		}
 		break;
-	case VINE_TASK_TYPE_LIBRARY_INSTANCE:
-		change_task_state(q, t, VINE_TASK_RETRIEVED);
-		break;
-		return;
-
-	case VINE_TASK_TYPE_LIBRARY_TEMPLATE:
-		/* A library template should not be scheduled... */
+	case VINE_TASK_TYPE_LIBRARY:
 		change_task_state(q, t, VINE_TASK_RETRIEVED);
 		break;
 		return;
@@ -4372,7 +4366,7 @@ static void delete_task_at_exit(struct vine_task *t)
 
 	vine_task_delete(t);
 
-	if (t->type == VINE_TASK_TYPE_LIBRARY_INSTANCE) {
+	if (t->type == VINE_TASK_TYPE_LIBRARY) {
 		/* manager created this task, so it is not the API caller's reponsibility. */
 		vine_task_delete(t);
 	}
@@ -4676,7 +4670,7 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 		break;
 	case VINE_TASK_RETRIEVED:
 		/* Library task can be set to RETRIEVED when it failed or was removed intentionally */
-		if (t->type == VINE_TASK_TYPE_LIBRARY_INSTANCE) {
+		if (t->type == VINE_TASK_TYPE_LIBRARY) {
 			vine_task_set_result(t, VINE_RESULT_LIBRARY_EXIT);
 		}
 		list_push_head(q->retrieved_list, t);
@@ -4880,7 +4874,6 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 
 	/* Duplicate the original task */
 	struct vine_task *t = vine_task_copy(original);
-	t->type = VINE_TASK_TYPE_LIBRARY_INSTANCE;
 
 	/* Give it a unique taskid if library fits the worker. */
 	t->task_id = q->next_task_id++;
@@ -4917,7 +4910,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 
 void vine_manager_install_library(struct vine_manager *q, struct vine_task *t, const char *name)
 {
-	t->type = VINE_TASK_TYPE_LIBRARY_TEMPLATE;
+	t->type = VINE_TASK_TYPE_LIBRARY;
 	t->library_failed_count = 0;
 	t->task_id = -1;
 	vine_task_set_library_provided(t, name);
@@ -5162,7 +5155,7 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 		case VINE_TASK_TYPE_RECOVERY:
 			/* do nothing and let vine_manager_consider_recovery_task do its job */
 			break;
-		case VINE_TASK_TYPE_LIBRARY_INSTANCE:
+		case VINE_TASK_TYPE_LIBRARY:
 			/* silently delete the task, since it was created by the manager.
 			 * note: other functions may still hold references to this library task.
 			 * those references will be released once the functions complete.
@@ -5173,9 +5166,6 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			 * function tasks, and the task will be automatically freed once no
 			 * references remain, regardless of whether the functions complete successfully. */
 			vine_task_delete(t);
-			break;
-		case VINE_TASK_TYPE_LIBRARY_TEMPLATE:
-			/* A template shouldn't be scheduled. It's deleted when template table is deleted.*/
 			break;
 		}
 	}
