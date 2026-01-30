@@ -750,6 +750,16 @@ class Manager(object):
         return cvine.vine_cancel_by_task_tag(self._taskvine, tag)
 
     ##
+    # Cancel all tasks with the given tag.
+    # The cancelled tasks will be returned in the normal way via @ref wait with a result of VINE_RESULT_CANCELLED.
+    #
+    # @param self   Reference to the current manager object.
+    # @param tag    The tag assigned to tasks using @ref ndcctools.taskvine.task.Task.set_tag.
+    # @return The total number of tasks cancelled.
+    def cancel_all_by_tag(self, tag):
+        return cvine.vine_cancel_all_by_tag(self._taskvine, tag)
+
+    ##
     # Cancel all tasks of the given category.
     # The cancelled tasks will be returned in the normal way via @ref wait with a result of VINE_RESULT_CANCELLED.
     #

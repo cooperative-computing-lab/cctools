@@ -5738,6 +5738,41 @@ int vine_cancel_by_task_tag(struct vine_manager *q, const char *task_tag)
 	}
 }
 
+int vine_cancel_all_by_tag(struct vine_manager *q, const char *tag)
+{
+	int count = 0;
+	struct vine_task *t;
+	uint64_t task_id;
+
+	ITABLE_ITERATE(q->tasks, task_id, t)
+	{
+		switch (t->state) {
+		case VINE_TASK_RETRIEVED:
+		case VINE_TASK_DONE:
+			/* these tasks are already in a final state, so we can skip them */
+			continue;
+		default:
+			switch (t->type) {
+			case VINE_TASK_TYPE_STANDARD:
+			case VINE_TASK_TYPE_LIBRARY_INSTANCE:
+				if (task_tag_comparator(t, tag)) {
+					vine_cancel_by_task_id(q, task_id);
+					count++;
+				}
+				break;
+			case VINE_TASK_TYPE_RECOVERY:
+			case VINE_TASK_TYPE_LIBRARY_TEMPLATE:
+				/* recovery tasks should not be canceled (unless explicitely by task id)
+				 * as there are temporary files that the workflow already considers done. */
+				continue;
+				break;
+			}
+		}
+	}
+
+	return count;
+}
+
 int vine_cancel_all(struct vine_manager *q)
 {
 	int count = 0;
