@@ -3270,7 +3270,7 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 	switch (t->type) {
 	case VINE_TASK_TYPE_STANDARD:
 	case VINE_TASK_TYPE_RECOVERY:
-		if(new_state == VINE_TASK_RETRIEVED && should_resubmit_task(q, w, t)) {
+		if (new_state == VINE_TASK_RETRIEVED && should_resubmit_task(q, w, t)) {
 			change_task_state(q, t, VINE_TASK_READY);
 		} else {
 			change_task_state(q, t, new_state);
@@ -5106,53 +5106,67 @@ static int connect_new_workers(struct vine_manager *q, int stoptime, int max_new
 }
 
 /*
+Select a completed (or nonstandard) task in the retrieved
+list that should either be returned to the user, or consumed
+silently by the sytem.  If either the tag or task_id parameters
+are given, then select a task that matches those criteria.
+*/
+
+static struct vine_task *find_complete_or_nonstandard_task(struct vine_manager *q, const char *tag, int task_id)
+{
+	struct vine_task *t = NULL;
+
+	if (tag) {
+		int tasks_to_consider = list_size(q->retrieved_list);
+		while (tasks_to_consider > 0) {
+			tasks_to_consider--;
+			t = list_peek_head(q->retrieved_list);
+			/* If the tag matches OR it is non standard, return it. */
+			if (task_tag_comparator(t, tag) || t->type != VINE_TASK_TYPE_STANDARD) {
+				/* task is at the top of the list */
+				return list_pop_head(q->retrieved_list);
+			} else {
+				list_rotate(q->retrieved_list);
+			}
+		}
+		return 0;
+	} else if (task_id >= 0) {
+		/* First check that the request task exists and is retrieved. */
+		struct vine_task *t = itable_lookup(q->tasks, task_id);
+		if (t && t->state == VINE_TASK_RETRIEVED) {
+			/* Return it regardless of type, to be consumed below. */
+			list_remove(q->retrieved_list, t);
+			return t;
+		} else {
+			/* If not, return zero to indicate no such task is complete. */
+			return 0;
+		}
+	} else if (list_size(q->retrieved_list) > 0) {
+		/* Process the first available retrieved task, regardless of type. */
+		return list_pop_head(q->retrieved_list);
+	} else {
+		return 0;
+	}
+}
+
+/*
 Find a task to return to the user based on the caller's criteria.
-If we find a completed task of a type that should not be returned to the user
-(such as a recovery task or a library task) then delete that task
-quietly and keep going.  Any task returned by this function
-remains valid for use.
+If we find a regular task, that is given back to the user.
+If we find a non-standard task, that is consumed quietly,
+This allows us to treat non-standard tasks as normally as
+possible through their lifetime, until the moment
+at which they would (otherwise) be returned to the user.
 */
 
 struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, int task_id)
 {
 	while (1) {
-		struct vine_task *t = NULL;
+		/* Find one task that matches the criteria *or* is nonstandard. */
+		struct vine_task *t = find_complete_or_nonstandard_task(q, tag, task_id);
 
-		if (tag) {
-			struct vine_task *temp = NULL;
-			int tasks_to_consider = list_size(q->retrieved_list);
-			while (tasks_to_consider > 0) {
-				tasks_to_consider--;
-				temp = list_peek_head(q->retrieved_list);
-				/* If the tag matches OR it is non standard, consume the task below. */
-				if (task_tag_comparator(temp, tag) || temp->type != VINE_TASK_TYPE_STANDARD) {
-					// temp points to head of list
-					t = list_pop_head(q->retrieved_list);
-					break;
-				} else {
-					list_rotate(q->retrieved_list);
-				}
-			}
-		} else if (task_id >= 0) {
-			/* First check that the request task exists and is retrieved. */
-			struct vine_task *temp = itable_lookup(q->tasks, task_id);	
-			if(temp && temp->state == VINE_TASK_RETRIEVED) {
-				t = temp;
-				list_remove(q->retrieved_list, t);
-				/* If so, process the task below, regardless of type. */
-			} else {
-				/* If not, return zero to indicate no such task ready. */		
-				return 0;
-			}
-		} else if (list_size(q->retrieved_list) > 0) {
-			/* Process the first available retrieved task, regardless of type. */
-			t = list_pop_head(q->retrieved_list);
-		}
-
-		if (!t) {
-			/* didn't find a retrieved task to return */
-			return NULL;
-		}
+		/* If null, then there are no completed tasks available to return. */
+		if (!t)
+			return 0;
 
 		/* Only at the moment of return does the task transition to the final DONE state. */
 		change_task_state(q, t, VINE_TASK_DONE);
@@ -5163,13 +5177,13 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 
 		/* Grab the type *before* deleting the task object. */
 		vine_task_type_t type = t->type;
-		
+
 		/* The task was given a reference when added to the table, so delete a reference on removal. */
 		itable_remove(q->tasks, t->task_id);
 		vine_task_delete(t);
 
 		/* CAREFUL: a non-standard task *may* no longer exist following vine_delete! */
-		
+
 		switch (type) {
 		case VINE_TASK_TYPE_STANDARD:
 
@@ -5179,28 +5193,33 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 
 		case VINE_TASK_TYPE_RECOVERY:
 
-			/* If this is a recovery task, it is owned by the manager,
-			 * and should not be given back to the user.  If the vine_file
-			 * objects that it produces still exist, then the task still
-			 * exists in the DONE state by virtue of those references,
-			 * and may by resubmitted again by vine_manager_consider_recovery task.
-			 * If there are no such files, the task no longer exists!
-			 * Either way, the user should not get it back.
-			 */
+			/*
+			If this is a recovery task, it is owned by the manager,
+			and should not be given back to the user.  If the vine_file
+			objects that it produces still exist, then the task still
+			exists in the DONE state by virtue of those references,
+			and may by resubmitted later by vine_manager_consider_recovery task.
+			If there are no such output files, then the task no longer exists!
+			Either way, the user should not get it back.
+
+			Go around again and find another task to return or consume.
+			*/
 
 			t = 0;
 			break;
-			
+
 		case VINE_TASK_TYPE_LIBRARY:
 
-			 /*
+			/*
 			 * If this is a library instance task, then it was created by the manager
 			 * as needed to deploy a function call task on a particular node.
-			 * Such a task should not exit, but if it did and reached the DONE
+			 * Such a task should not normally exit, but if it did and reached the DONE
 			 * state, then the manager should delete it, because the manager created it.
 			 * We also do not return this task type to the user.
+			 *
+			 * Go around again and find another task to return or consume.
 			 */
-			
+
 			vine_task_delete(t);
 			t = 0;
 			break;
