@@ -589,8 +589,11 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	if (!t) {
 		debug(D_VINE, "Unknown task completion from worker %s (%s): no task %" PRId64 " assigned to worker. Ignoring result.", w->hostname, w->addrport, task_id);
 
-		time_t stoptime = time(0) + vine_manager_transfer_time(q, w, output_length);
-		link_soak(w->link, output_length, stoptime);
+		if (bytes_sent > 0) {
+			time_t stoptime = time(0) + vine_manager_transfer_time(q, w, bytes_sent);
+			link_soak(w->link, bytes_sent, stoptime);
+		}
+
 		return VINE_SUCCESS;
 	}
 
@@ -1043,20 +1046,39 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 
 	vine_current_transfers_wipe_worker(q, w);
 
-	ITABLE_ITERATE(w->current_tasks, task_id, t)
-	{
-		if (t->time_when_commit_end >= t->time_when_commit_start) {
-			timestamp_t delta_time = timestamp_get() - t->time_when_commit_end;
-			t->time_workers_execute_failure += delta_time;
-			t->time_workers_execute_all += delta_time;
+	/* Collect all task IDs first to avoid iterator invalidation during removal. */
+	int task_count = itable_size(w->current_tasks);
+	uint64_t *task_ids = NULL;
+	if (task_count > 0) {
+		task_ids = xxmalloc(task_count * sizeof(uint64_t));
+		int i = 0;
+		ITABLE_ITERATE(w->current_tasks, task_id, t)
+		{
+			task_ids[i] = task_id;
+			i++;
 		}
 
-		/* Remove the unfinished task and update data structures. */
-		reap_task_from_worker(q, w, t, VINE_TASK_READY);
+		/* Process each task by ID, then remove it. */
+		for (i = 0; i < task_count; i++) {
+			task_id = task_ids[i];
+			t = itable_lookup(w->current_tasks, task_id);
+			if (!t) {
+				continue; /* Task may have been removed already? */
+			}
 
-		vine_task_clean(t);
+			if (t->time_when_commit_end >= t->time_when_commit_start) {
+				timestamp_t delta_time = timestamp_get() - t->time_when_commit_end;
+				t->time_workers_execute_failure += delta_time;
+				t->time_workers_execute_all += delta_time;
+			}
 
-		itable_firstkey(w->current_tasks);
+			/* Remove the unfinished task and update data structures. */
+			reap_task_from_worker(q, w, t, VINE_TASK_READY);
+
+			vine_task_clean(t);
+		}
+
+		free(task_ids);
 	}
 
 	itable_clear(w->current_tasks, 0);
@@ -3905,6 +3927,10 @@ static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vin
 		change_task_state(q, t, new_state);
 		break;
 
+	case VINE_TASK_WAITING_RETRIEVAL:
+		/* do the same for run vs waiting retrieval, only difference is waiting_retrieval_list */
+		list_remove(q->waiting_retrieval_list, t);
+		/* fall through */
 	case VINE_TASK_RUNNING:
 		/* t->worker must be set if in RUNNING state */
 		assert(w);
@@ -3918,11 +3944,6 @@ static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vin
 
 		/* change_task_state() happened inside reap_task_from_worker */
 
-		break;
-
-	case VINE_TASK_WAITING_RETRIEVAL:
-		list_remove(q->waiting_retrieval_list, t);
-		change_task_state(q, t, new_state);
 		break;
 
 	case VINE_TASK_RETRIEVED:
@@ -5688,6 +5709,10 @@ int vine_cancel_by_task_id(struct vine_manager *q, int task_id)
 		return 0;
 	}
 
+	if (task->state == VINE_TASK_RETRIEVED) {
+		return 0;
+	}
+
 	if (task->group_id) {
 		struct list *l = itable_lookup(q->task_group_table, task->group_id);
 		if (l) {
@@ -5717,6 +5742,41 @@ int vine_cancel_by_task_tag(struct vine_manager *q, const char *task_tag)
 		debug(D_VINE, "Task with tag %s is not found in manager.", task_tag);
 		return 0;
 	}
+}
+
+int vine_cancel_all_by_tag(struct vine_manager *q, const char *tag)
+{
+	int count = 0;
+	struct vine_task *t;
+	uint64_t task_id;
+
+	ITABLE_ITERATE(q->tasks, task_id, t)
+	{
+		switch (t->state) {
+		case VINE_TASK_RETRIEVED:
+		case VINE_TASK_DONE:
+			/* these tasks are already in a final state, so we can skip them */
+			continue;
+		default:
+			switch (t->type) {
+			case VINE_TASK_TYPE_STANDARD:
+			case VINE_TASK_TYPE_LIBRARY_INSTANCE:
+				if (task_tag_comparator(t, tag)) {
+					vine_cancel_by_task_id(q, task_id);
+					count++;
+				}
+				break;
+			case VINE_TASK_TYPE_RECOVERY:
+			case VINE_TASK_TYPE_LIBRARY_TEMPLATE:
+				/* recovery tasks should not be canceled (unless explicitely by task id)
+				 * as there are temporary files that the workflow already considers done. */
+				continue;
+				break;
+			}
+		}
+	}
+
+	return count;
 }
 
 int vine_cancel_all(struct vine_manager *q)
