@@ -5199,9 +5199,6 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 		if (!t)
 			return 0;
 
-		// Save task type as task may be freed in change_task_state
-		vine_task_type_t task_type = t->type;
-
 		change_task_state(q, t, VINE_TASK_DONE);
 
 		if (t->result != VINE_RESULT_SUCCESS) {
@@ -5217,7 +5214,7 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 
 		/* CAREFUL: a non-standard task *may* no longer exist following vine_delete! */
 
-		switch (task_type) {
+		switch (type) {
 		case VINE_TASK_TYPE_STANDARD:
 
 			/* If this is a standard task type, give it back the user. */
