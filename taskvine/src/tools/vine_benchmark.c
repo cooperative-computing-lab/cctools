@@ -174,8 +174,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-    vine_set_runtime_info_path("vine_benchmark_info");
-
 	struct vine_manager *q = vine_create(port);
 	if(!q) fatal("couldn't listen on any port!");
 
