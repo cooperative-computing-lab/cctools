@@ -4682,6 +4682,9 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 	c->vine_stats->tasks_on_workers = c->vine_stats->tasks_running + c->vine_stats->tasks_with_results;
 	c->vine_stats->tasks_submitted = c->total_tasks + c->vine_stats->tasks_waiting + c->vine_stats->tasks_on_workers;
 
+	/* update log before switch before as task may get deleted in some cases */
+	vine_txn_log_write_task(q, t);
+
 	switch (new_state) {
 	case VINE_TASK_INITIAL:
 		/* should not happen, do nothing */
@@ -4716,7 +4719,6 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 	}
 
 	vine_perf_log_write_update(q, 0);
-	vine_txn_log_write_task(q, t);
 
 	return old_state;
 }
@@ -5197,7 +5199,9 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 		if (!t)
 			return 0;
 
-		/* Only at the moment of return does the task transition to the final DONE state. */
+		// Save task type as task may be freed in change_task_state
+		vine_task_type_t task_type = t->type;
+
 		change_task_state(q, t, VINE_TASK_DONE);
 
 		if (t->result != VINE_RESULT_SUCCESS) {
@@ -5213,7 +5217,7 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 
 		/* CAREFUL: a non-standard task *may* no longer exist following vine_delete! */
 
-		switch (type) {
+		switch (task_type) {
 		case VINE_TASK_TYPE_STANDARD:
 
 			/* If this is a standard task type, give it back the user. */

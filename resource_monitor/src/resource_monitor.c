@@ -1279,8 +1279,15 @@ int rmonitor_final_summary()
 	write_summary(1);
 
 	int status;
+
 	if (summary->limits_exceeded && enforce_limits) {
-		status = RM_OVERFLOW;
+		if (summary->limits_exceeded->wall_time > -1) {
+			/* wall time is treated differently so that result of tasks in taskvine match
+			 * when ran without the resource monitor. */
+			status = RM_TIME_EXPIRE;
+		} else {
+			status = RM_OVERFLOW;
+		}
 	} else if (summary->exit_status != 0) {
 		status = RM_TASK_ERROR;
 	} else {
