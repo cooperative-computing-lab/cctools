@@ -4385,11 +4385,21 @@ static void delete_task_at_exit(struct vine_task *t)
 		return;
 	}
 
+	/* Each task in q->tasks has one reference that was added by the vine_manager. */
 	vine_task_delete(t);
 
-	if (t->type == VINE_TASK_TYPE_LIBRARY) {
-		/* manager created this task, so it is not the API caller's reponsibility. */
-		vine_task_delete(t);
+	switch(t->type) {
+		case VINE_TASK_TYPE_STANDARD:
+			/* The user created, and the user must delete. */
+			break;
+		case VINE_TASK_TYPE_RECOVERY:
+			/* The manager dropped the primary reference at create time. */
+			/* This task will go away when all referring files are deleted. */
+			break;
+		case VINE_TASK_TYPE_LIBRARY:
+			/* The manager created the task, and so the manager must delete it. */
+			vine_task_delete(t);
+			break;
 	}
 }
 
