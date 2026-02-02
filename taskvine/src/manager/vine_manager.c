@@ -139,6 +139,7 @@ static void find_max_worker(struct vine_manager *q);
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state);
+static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t);
 
 static int task_request_count(struct vine_manager *q, const char *category, category_allocation_t request);
 
@@ -3596,6 +3597,15 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 		if (w) {
 			task_unready = 1;
 
+			/*
+			 * Remove task from ready_tasks BEFORE committing to worker.
+			 * This is critical because commit_task_to_worker may fail and
+			 * call handle_failure, which moves the task to retrieved_list.
+			 * If we don't remove first, the task would be in both lists,
+			 * leading to use-after-free when the task is later deleted.
+			 */
+			skip_list_remove_here(cur);
+
 			vine_result_code_t result;
 			if (q->task_groups_enabled) {
 				result = commit_task_group_to_worker(q, w, t);
@@ -3608,11 +3618,12 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 			case VINE_APP_FAILURE: /* failed to dispatch, commit put the task back in the right place. */
 			case VINE_WORKER_FAILURE:
 			case VINE_END_OF_LIST: /* shouldn't happen */
-				skip_list_remove_here(cur);
+				/* Task already removed above */
 				break;
 			case VINE_MGR_FAILURE:
 				/* special case, commit had a chained failure,
-				keep the task in the ready list so it can be retried. */
+				re-add task to the ready list so it can be retried. */
+				push_task_to_ready_tasks(q, t);
 				break;
 			}
 		}
@@ -5170,11 +5181,12 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			return NULL;
 		}
 
-		// Save task type as task may be freed in change_task_state
+		// Save task type and result as task may be freed in change_task_state
 		vine_task_type_t task_type = t->type;
+		vine_result_t task_result = t->result;
 
 		change_task_state(q, t, VINE_TASK_DONE);
-		if (t->result != VINE_RESULT_SUCCESS) {
+		if (task_result != VINE_RESULT_SUCCESS) {
 			q->stats->tasks_failed++;
 		}
 
