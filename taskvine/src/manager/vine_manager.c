@@ -3596,6 +3596,15 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 		if (w) {
 			task_unready = 1;
 
+			/*
+			 * Remove task from ready_tasks BEFORE committing to worker.
+			 * This is critical because commit_task_to_worker may fail and
+			 * call handle_failure, which moves the task to retrieved_list.
+			 * If we don't remove first, the task would be in both lists,
+			 * leading to use-after-free when the task is later deleted.
+			 */
+			skip_list_remove_here(cur);
+
 			vine_result_code_t result;
 			if (q->task_groups_enabled) {
 				result = commit_task_group_to_worker(q, w, t);
@@ -3608,11 +3617,12 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 			case VINE_APP_FAILURE: /* failed to dispatch, commit put the task back in the right place. */
 			case VINE_WORKER_FAILURE:
 			case VINE_END_OF_LIST: /* shouldn't happen */
-				skip_list_remove_here(cur);
+				/* Task already removed above */
 				break;
 			case VINE_MGR_FAILURE:
 				/* special case, commit had a chained failure,
-				keep the task in the ready list so it can be retried. */
+				re-add task to the ready list so it can be retried. */
+				push_task_to_ready_tasks(q, t);
 				break;
 			}
 		}
