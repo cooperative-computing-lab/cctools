@@ -182,6 +182,12 @@ void vine_txn_log_write_category(struct vine_manager *q, struct category *c)
 	case CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
 		mode = "EXHAUSTIVE_BUCKETING";
 		break;
+	case CATEGORY_ALLOCATION_MODE_DET_GREEDY_BUCKETING:
+		mode = "DET_GREEDY_BUCKETING";
+		break;
+	case CATEGORY_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING:
+		mode = "DET_EXHAUSTIVE_BUCKETING";
+		break;
 	case CATEGORY_ALLOCATION_MODE_FIXED:
 	default:
 		mode = "FIXED";

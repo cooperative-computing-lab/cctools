@@ -1,6 +1,8 @@
 #include "bucketing.h"
-#include "bucketing_exhaust.h"
 #include "bucketing_greedy.h"
+#include "bucketing_det_greedy.h"
+#include "bucketing_exhaust.h"
+#include "bucketing_det_exhaust.h"
 #include "debug.h"
 #include "random.h"
 #include "xxmalloc.h"
@@ -105,6 +107,12 @@ static void bucketing_update_buckets(bucketing_state_t *s)
 	case BUCKETING_MODE_EXHAUSTIVE:
 		bucketing_exhaust_update_buckets(s);
 		break;
+	case BUCKETING_MODE_DET_GREEDY:
+		bucketing_det_greedy_update_buckets(s);
+		break;
+	case BUCKETING_MODE_DET_EXHAUSTIVE:
+		bucketing_det_exhaust_update_buckets(s);
+		break;
 	default:
 		fatal("Invalid mode to update buckets\n");
 	}
@@ -149,18 +157,18 @@ bucketing_state_t *bucketing_state_create(double default_value, int num_sampling
 		increase_rate = 2;
 	}
 
-	if (max_num_buckets < 1 && mode == BUCKETING_MODE_EXHAUSTIVE) {
-		warn(D_BUCKETING, "The maximum number of buckets for exhaustive bucketing must be at least 1\n");
+	if (max_num_buckets < 1 && (mode == BUCKETING_MODE_EXHAUSTIVE || mode == BUCKETING_MODE_DET_EXHAUSTIVE)) {
+		warn(D_BUCKETING, "The maximum number of buckets for exhaustive and deterministic exhaustive bucketing must be at least 1\n");
 		max_num_buckets = 1;
 	}
 
-	if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE) {
-		warn(D_BUCKETING, "Invalid bucketing mode\n");
+	if (!(mode == BUCKETING_MODE_GREEDY || mode == BUCKETING_MODE_EXHAUSTIVE || mode == BUCKETING_MODE_DET_GREEDY || mode == BUCKETING_MODE_DET_EXHAUSTIVE)) {
+		warn(D_BUCKETING, "Invalid bucketing mode, defaulting to the probabilistic greedy mode.\n");
 		mode = BUCKETING_MODE_GREEDY;
 	}
 
 	if (update_epoch < 1) {
-		warn(D_BUCKETING, "Update epoch for bucketing cannot be less than 1\n");
+		warn(D_BUCKETING, "Update epoch for bucketing cannot be less than 1, defaulting to 1.\n");
 		update_epoch = 1;
 	}
 
@@ -304,48 +312,87 @@ double bucketing_predict(bucketing_state_t *s, double prev_val)
 		return -1;
 	}
 
-	bucketing_bucket_t *bb_ptr = 0; // pointer to hold item from list
-	double sum = 0;			// sum of probability
-	double ret_val;			// predicted value to be returned
-	int exp;			// exponent to raise if prev_val > max_val
-	double rand = random_double();	// random double to choose a bucket
-	double total_net_prob = 1;	// total considered probability
+	// this branch is how predictions using probabilistic greedy and exhaustive bucketing work.
+	if (s->mode == BUCKETING_MODE_GREEDY || s->mode == BUCKETING_MODE_EXHAUSTIVE) {
+		bucketing_bucket_t *bb_ptr = 0; // pointer to hold item from list
+		double sum = 0;			// sum of probability
+		double ret_val;			// predicted value to be returned
+		int exp;			// exponent to raise if prev_val >= max_val
+		double rand = random_double();	// random double to choose a bucket
+		double total_net_prob = 1;	// total considered probability
 
-	/* Loop through list of buckets to choose 1 */
-	for (unsigned int i = 0; i < list_length(s->sorted_buckets); ++i, list_next(lc)) {
-		if (!list_get(lc, (void **)&bb_ptr)) {
-			fatal("Cannot get item from list\n");
-			return -1;
-		}
-
-		/* return if at last bucket */
-		if (i == list_length(s->sorted_buckets) - 1) {
-			ret_val = bb_ptr->val;
-
-			if (ret_val <= prev_val) {
-				exp = floor(log(prev_val / s->default_value) / log(s->increase_rate)) + 1;
-				list_cursor_destroy(lc);
-				return s->default_value * pow(s->increase_rate, exp);
+		/* Loop through list of buckets to choose 1 */
+		for (unsigned int i = 0; i < list_length(s->sorted_buckets); ++i, list_next(lc)) {
+			if (!list_get(lc, (void **)&bb_ptr)) {
+				fatal("Cannot get item from list\n");
+				return -1;
 			}
 
-			list_cursor_destroy(lc);
-			return ret_val;
+			/* return if at last bucket */
+			if (i == list_length(s->sorted_buckets) - 1) {
+				ret_val = bb_ptr->val;
+				if (ret_val <= prev_val) {
+					exp = floor(log(prev_val / s->default_value) / log(s->increase_rate)) + 1;
+					list_cursor_destroy(lc);
+					return s->default_value * pow(s->increase_rate, exp);
+				}
+
+				list_cursor_destroy(lc);
+				return ret_val;
+			}
+
+			/* skip the small buckets */
+			if (bb_ptr->prob <= prev_val) {
+				total_net_prob -= bb_ptr->prob;
+				continue;
+			}
+
+			sum += bb_ptr->prob;
+
+			if (sum / total_net_prob > rand) // rescale sum to [0, 1] as we skip small buckets
+			{
+				ret_val = bb_ptr->val;
+
+				list_cursor_destroy(lc);
+				return ret_val;
+			}
 		}
+	}
+	// this branch is for deterministic greedy and exhaustive bucketing predictions
+	// .i.e, BUCKETING_MODE_DET_GREEDY and BUCKETING_MODE_DET_EXHAUSTIVE
+	else {
+		bucketing_bucket_t *bb_ptr = 0; // pointer to hold item from list
+		double ret_val;			// predicted value to be returned
+		int exp;			// exponent to raise if prev_val >= max_val
 
-		/* skip the small buckets */
-		if (bb_ptr->prob <= prev_val) {
-			total_net_prob -= bb_ptr->prob;
-			continue;
-		}
+		/* Loop through list of buckets to find the next one with a value larger than prev_val,
+		 * or the first one if prev_val doesn't exist. */
+		for (unsigned int i = 0; i < list_length(s->sorted_buckets); ++i, list_next(lc)) {
+			if (!list_get(lc, (void **)&bb_ptr)) {
+				fatal("Cannot get item from list\n");
+				return -1;
+			}
 
-		sum += bb_ptr->prob;
+			/* return if at last bucket */
+			if (i == list_length(s->sorted_buckets) - 1) {
+				ret_val = bb_ptr->val;
 
-		if (sum / total_net_prob > rand) // rescale sum to [0, 1] as we skip small buckets
-		{
-			ret_val = bb_ptr->val;
+				if (ret_val <= prev_val) {
+					exp = floor(log(prev_val / s->default_value) / log(s->increase_rate)) + 1;
+					list_cursor_destroy(lc);
+					return s->default_value * pow(s->increase_rate, exp);
+				}
 
-			list_cursor_destroy(lc);
-			return ret_val;
+				list_cursor_destroy(lc);
+				return ret_val;
+			}
+
+			// return upon the first value larger than this one
+			if (bb_ptr->val > prev_val) {
+				ret_val = bb_ptr->val;
+				list_cursor_destroy(lc);
+				return ret_val;
+			}
 		}
 	}
 
@@ -386,3 +433,21 @@ void bucketing_sorted_points_print(struct list *l)
 }
 
 /** End: debug functions **/
+
+/** Begin: test helper functions **/
+void get_bucketing_sorted_buckets_values(struct list *l, double *vals, int limit)
+{
+	if (!l)
+		return;
+	bucketing_bucket_t *tmp;
+	list_first_item(l);
+	int i = 0;
+	while ((tmp = list_next_item(l))) {
+		*(vals + i) = tmp->val;
+		++i;
+		if (i == limit) {
+			break;
+		}
+	}
+}
+/** End: test helper functions **/
