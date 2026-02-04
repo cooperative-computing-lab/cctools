@@ -40,6 +40,7 @@ TARGETS = $(LIBRARIES)
 
 all: $(TARGETS)
 
+
 libtaskvine.a: $(OBJECTS)
 
 install: all
