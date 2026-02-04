@@ -20,8 +20,6 @@ then
     # Now install using modified environment
     conda env create --name cctools-build --quiet --solver=libmamba --file environment.macos.yml
 else
-    # Install mamba for faster solves.
-    conda install -n base -c conda-forge conda-libmamba-solver
-    conda env create --name cctools-build --quiet --solver=libmamba --file environment.yml
+    conda env create --name cctools-build --quiet --file environment.yml
 fi
 
