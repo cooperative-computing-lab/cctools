@@ -547,7 +547,11 @@ int terminal_columns( int fd )
 	int columns = 80;
 
 	char *columns_str = getenv("COLUMNS");
-	if(columns_str) {
+
+	if (!isatty(STDOUT_FILENO)) {
+	    /* if in a pipe, columns count has not a limit */
+	    columns = -1;
+	} else if(columns_str) {
 		int c = atoi(columns_str);
 		if(c>=10) columns = c;
 	} else if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &window) >= 0) {
