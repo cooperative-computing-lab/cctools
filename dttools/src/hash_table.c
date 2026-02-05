@@ -173,7 +173,7 @@ static int insert_to_buckets_aux(struct entry **buckets, int bucket_count, struc
 	while (e) {
 		/* check that this key does not already exist in the table */
 		if (new_entry->hash == e->hash && !strcmp(new_entry->key, e->key)) {
-			//notice(D_DEBUG, "key %s already exists in hash table with different value, ignoring new value.", new_entry->key);
+			// notice(D_DEBUG, "key %s already exists in hash table with different value, ignoring new value.", new_entry->key);
 			return 0;
 		}
 		e = e->next;
