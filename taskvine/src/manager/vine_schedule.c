@@ -98,7 +98,7 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 	struct vine_task *ti;
 	ITABLE_ITERATE(w->current_tasks, task_id, ti)
 	{
-		if (ti->provides_library && ti->function_slots_inuse == 0) {
+		if (ti->state==VINE_TASK_RUNNING && ti->provides_library && ti->function_slots_inuse == 0) {
 			worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
 			worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
 			worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
@@ -384,7 +384,7 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 
 		/* if task groups are enabled, skip workers that are running a group task */
 		if (q->task_groups_enabled) {
-			if (w->current_tasks && itable_size(w->current_tasks) > 0) {
+			if (w->tasks_committed > 0) {
 				uint64_t tidg;
 				struct vine_task *tg;
 				int running_group_task = 0;
