@@ -2953,11 +2953,11 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 
 		w->tasks_committed++;
 
-		switch(task->state) {
+		switch (task->state) {
 		case VINE_TASK_RUNNING:
 			/* Running tasks consume all resource types. */
 			w->tasks_running++;
-			if(box) {
+			if (box) {
 				w->resources->cores.inuse += box->cores;
 				w->resources->memory.inuse += box->memory;
 				w->resources->gpus.inuse += box->gpus;
@@ -2967,12 +2967,12 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 		case VINE_TASK_WAITING_RETRIEVAL:
 			/* Waiting tasks consume only disk. */
 			w->tasks_waiting_retrieval++;
-			if(box) {
+			if (box) {
 				w->resources->disk.inuse += box->disk;
 			}
 			break;
 		default:
-			fatal("task %lld at worker %s found in illegal state %d!",task_id,w->addrport,task->state);
+			fatal("task %lld at worker %s found in illegal state %d!", task_id, w->addrport, task->state);
 			break;
 		}
 	}
