@@ -98,7 +98,7 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 	struct vine_task *ti;
 	ITABLE_ITERATE(w->current_tasks, task_id, ti)
 	{
-		if (ti->state==VINE_TASK_RUNNING && ti->provides_library && ti->function_slots_inuse == 0) {
+		if (ti->state == VINE_TASK_RUNNING && ti->provides_library && ti->function_slots_inuse == 0) {
 			worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
 			worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
 			worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
