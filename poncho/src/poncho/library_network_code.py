@@ -28,6 +28,9 @@ from ndcctools.taskvine.utils import load_variable_from_library
 r, w = os.pipe()
 exec_method = None
 
+# infile load mode for function tasks inside this library
+function_infile_load_mode = None
+
 
 # This class captures how results from FunctionCalls are conveyed from
 # the library to the manager.
@@ -85,6 +88,18 @@ def sigchld_handler(signum, frame):
     os.write(w, b"a")
 
 
+# Load the infile for a function task inside this library
+def load_function_infile(in_file_path):
+    if function_infile_load_mode == "cloudpickle":
+        with open(in_file_path, "rb") as f:
+            return cloudpickle.load(f)
+    elif function_infile_load_mode == "json":
+        with open(in_file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    else:
+        raise ValueError(f"invalid infile load mode: {function_infile_load_mode}")
+
+
 # Read data from worker, start function, and dump result to `outfile`.
 def start_function(in_pipe_fd, thread_limit=1):
     # read length of buffer to read
@@ -131,8 +146,7 @@ def start_function(in_pipe_fd, thread_limit=1):
                 os.chdir(function_sandbox)
 
                 # parameters are represented as infile.
-                with open("infile", "rb") as f:
-                    event = cloudpickle.load(f)
+                event = load_function_infile("infile")
 
                 # output of execution should be dumped to outfile.
                 result = globals()[function_name](event)
@@ -158,11 +172,10 @@ def start_function(in_pipe_fd, thread_limit=1):
             return -1, function_id
         elif exec_method == "fork":
             try:
-                arg_infile = os.path.join(function_sandbox, "infile")
-                with open(arg_infile, "rb") as f:
-                    event = cloudpickle.load(f)
+                infile_path = os.path.join(function_sandbox, "infile")
+                event = load_function_infile(infile_path)
             except Exception:
-                stdout_timed_message(f"TASK {function_id} error: can't load the arguments from {arg_infile}")
+                stdout_timed_message(f"TASK {function_id} error: can't load the arguments from {infile_path}")
                 return -1, function_id
             p = os.fork()
             if p == 0:
@@ -368,11 +381,16 @@ def main():
     global exec_method
     exec_method = library_info['exec_mode']
 
+    # set infile load mode of functions in this library
+    global function_infile_load_mode
+    function_infile_load_mode = library_info['function_infile_load_mode']
+
     # send configuration of library, just its name for now
     config = {
         "name": library_info['library_name'],
         "taskid": args.task_id,
         "exec_mode": exec_method,
+        "function_infile_load_mode": function_infile_load_mode,
     }
     send_configuration(config, out_pipe_fd, args.worker_pid)
 
