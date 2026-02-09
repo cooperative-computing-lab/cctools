@@ -280,6 +280,8 @@ void fatal(const char *fmt, ...)
 	struct fatal_callback *f;
 	va_list args;
 
+	debug_backtrace;
+
 	va_start(args, fmt);
 	do_debug(D_FATAL, fmt, args);
 	va_end(args);
