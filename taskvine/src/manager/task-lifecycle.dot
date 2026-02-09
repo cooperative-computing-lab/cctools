@@ -74,12 +74,4 @@ collected by the user.
 
 READY->RETRIEVED [label="unable"];
 
-/*
-An ordinary task is only deleted by the end user once it is
-returned from vine_wait.  However, a library task is deleted
-by the manager instead of being returned to the user.
-*/
-
-RETRIEVED -> DELETED [label="vine_delete(library task)"];
-DONE -> DELETED [label="vine_delete(standard task)"];
 }
