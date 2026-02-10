@@ -6449,6 +6449,13 @@ int vine_prune_file(struct vine_manager *m, struct vine_file *f)
 			for (int i = 0; workers_array[i] != NULL; i++) {
 				struct vine_worker_info *w = (struct vine_worker_info *)workers_array[i];
 				delete_worker_file(m, w, f->cached_name, 0, 0);
+
+				/* update replica table for the worker */
+				struct vine_file_replica *removed_replica = vine_file_replica_table_remove(q, w, f->cached_name);
+				if (removed_replica) {
+					vine_file_replica_delete(removed_replica);
+				}
+
 				pruned_replica_count++;
 			}
 			set_free_values_array(workers_array);
