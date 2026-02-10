@@ -6451,7 +6451,7 @@ int vine_prune_file(struct vine_manager *m, struct vine_file *f)
 				delete_worker_file(m, w, f->cached_name, 0, 0);
 
 				/* update replica table for the worker */
-				struct vine_file_replica *removed_replica = vine_file_replica_table_remove(q, w, f->cached_name);
+				struct vine_file_replica *removed_replica = vine_file_replica_table_remove(m, w, f->cached_name);
 				if (removed_replica) {
 					vine_file_replica_delete(removed_replica);
 				}
