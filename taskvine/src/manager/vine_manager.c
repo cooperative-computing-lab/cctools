@@ -956,9 +956,12 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 		if (removed_replica) {
 			vine_file_replica_delete(removed_replica);
 		}
+
 		/* consider if this replica needs recovery because of worker removal */
-		if (q->immediate_recovery && f->type == VINE_TEMP && !vine_temp_exists_somewhere(q, f)) {
-			vine_manager_consider_recovery_task(q, f, f->recovery_task);
+		if (f) {
+			if (q->immediate_recovery && f->type == VINE_TEMP && !vine_temp_exists_somewhere(q, f)) {
+				vine_manager_consider_recovery_task(q, f, f->recovery_task);
+			}
 		}
 	}
 
@@ -6446,6 +6449,13 @@ int vine_prune_file(struct vine_manager *m, struct vine_file *f)
 			for (int i = 0; workers_array[i] != NULL; i++) {
 				struct vine_worker_info *w = (struct vine_worker_info *)workers_array[i];
 				delete_worker_file(m, w, f->cached_name, 0, 0);
+
+				/* update replica table for the worker */
+				struct vine_file_replica *removed_replica = vine_file_replica_table_remove(m, w, f->cached_name);
+				if (removed_replica) {
+					vine_file_replica_delete(removed_replica);
+				}
+
 				pruned_replica_count++;
 			}
 			set_free_values_array(workers_array);
