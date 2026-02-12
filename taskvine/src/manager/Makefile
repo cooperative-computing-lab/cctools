@@ -65,4 +65,9 @@ lint:
 format:
 	clang-format -i $(SOURCES)
 
+# Note that this rule is not invoked by default, since this is
+# developer documentation and dot is not required for production build.
+task-lifecycle.png: task-lifecycle.dot
+	dot -Tpng task-lifecycle.dot > task-lifecycle.png
+
 .PHONY: all clean install test lint format
