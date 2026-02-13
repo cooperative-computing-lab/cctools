@@ -462,6 +462,9 @@ class ParseTxn:
             ca["exit_code"] = int(exit_code)
             self.arg_to_task_report(ca, m)
             self.arg_to_resources(ca, "measured_", m)
+            # for tasks that are retrieved but were cancelled
+            if self.cm.tasks_attempts[task_id][la]["time_worker_end"] is pd.NA:
+                self.cm.tasks_attempts[task_id][la]["time_worker_end"] = time
             try:
                 del self.cm.tasks_on_worker[ca["worker_id"]][task_id]
             except KeyError:
