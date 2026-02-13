@@ -469,10 +469,13 @@ static int submit_worker( struct batch_queue *queue )
 	char *features_string = make_features_string(features_table);
 
 	if(using_catalog) {
+		static char *submission_regex_escaped = NULL;
+		submission_regex_escaped = submission_regex ? string_escape_shell(submission_regex) : NULL;
+
 		cmd = string_format(
 		"./%s --parent-death -M %s -t %d -C '%s' %s %s %s %s %s %s %s %s",
 		worker_command,
-		submission_regex,
+		submission_regex_escaped,
 		worker_timeout,
 		catalog_host,
 		debug_workers ? debug_worker_options : "",
@@ -484,6 +487,8 @@ static int submit_worker( struct batch_queue *queue )
 		single_shot ? "--single-shot" : "",
 		extra_worker_args ? extra_worker_args : ""
 		);
+
+		free(submission_regex_escaped);
 	} else {
 		cmd = string_format(
 		"./%s --parent-death %s %d -t %d -C '%s' %s %s %s %s %s %s %s",
