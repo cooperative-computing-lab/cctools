@@ -5694,9 +5694,12 @@ int vine_cancel_by_task_id(struct vine_manager *q, int task_id)
 		vine_task_delete(task);
 	}
 
+	// set result before next call so that task appears with
+	// correct info in the transaction's log
+	task->result = VINE_RESULT_CANCELLED;
+
 	reset_task_to_state(q, task, VINE_TASK_RETRIEVED);
 
-	task->result = VINE_RESULT_CANCELLED;
 	q->stats->tasks_cancelled++;
 
 	return 1;
