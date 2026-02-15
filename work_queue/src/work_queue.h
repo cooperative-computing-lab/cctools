@@ -124,7 +124,10 @@ typedef enum {
     
     WORK_QUEUE_ALLOCATION_MODE_GREEDY_BUCKETING = CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING, /**< Use the greedy bucketing algorithm to label resources */
 
-    WORK_QUEUE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING /**< Use the exhaustive bucketing algorithm to label resources */
+    WORK_QUEUE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING, /**< Use the exhaustive bucketing algorithm to label resources */
+    WORK_QUEUE_ALLOCATION_MODE_DET_GREEDY_BUCKETING = CATEGORY_ALLOCATION_MODE_DET_GREEDY_BUCKETING, /**< Use the deterministic greedy bucketing algorithm to label resources */
+
+    WORK_QUEUE_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING = CATEGORY_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING /**< Use the deterministic exhaustive bucketing algorithm to label resources */
 } work_queue_category_mode_t;
 
 

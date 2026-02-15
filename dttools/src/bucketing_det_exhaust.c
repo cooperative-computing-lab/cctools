@@ -1,4 +1,4 @@
-#include "bucketing_exhaust.h"
+#include "bucketing_det_exhaust.h"
 #include "bucketing_exhaust_common.h"
 #include "debug.h"
 #include "list.h"
@@ -8,41 +8,12 @@
 
 /** Begin: internals **/
 
-/* Reweight the probabilities of a range of buckets to 1
- * @param bucket_array the array of bucketing_bucket_t*
- * @param lo index of low bucket
- * @param hi index of high bucket
- * @return array of reweighted probabilities
- * @return 0 if failure */
-static double *bucketing_reweight_bucket_probs(bucketing_bucket_t **bucket_array, int lo, int hi)
-{
-	if (!bucket_array) {
-		fatal("No array of buckets\n");
-		return 0;
-	}
-
-	double *bucket_probs = xxmalloc((hi - lo + 1) * sizeof(*bucket_probs));
-
-	/* get all probabilities of buckets in range */
-	double total_prob = 0;
-	for (int i = lo; i <= hi; ++i) {
-		total_prob += bucket_array[i]->prob;
-	}
-
-	/* reweight to [0, 1] */
-	for (int i = lo; i <= hi; ++i) {
-		bucket_probs[i - lo] = bucket_array[i]->prob / total_prob;
-	}
-
-	return bucket_probs;
-}
-
 /* Compute the expectations of tasks' values in all buckets
  * @param s the relevant bucketing state
  * @param bucket_list the list of buckets
  * @return pointer to a malloc'ed array of values
  * @return 0 if failure */
-static double *bucketing_exhaust_compute_task_exps(bucketing_state_t *s, struct list *bucket_list)
+static double *bucketing_det_exhaust_compute_task_exps(bucketing_state_t *s, struct list *bucket_list)
 {
 	if (!s || !bucket_list) {
 		fatal("At least one parameter is empty\n");
@@ -68,6 +39,10 @@ static double *bucketing_exhaust_compute_task_exps(bucketing_state_t *s, struct 
 			task_exps[i] += tmp_pnt->val * tmp_pnt->sig;
 			tmp_pnt = list_next_item(s->sorted_points);
 		} else {
+			if (total_sig_buck == 0) {
+				fatal("Total significance of a bucket cannot be zero.\n");
+				return 0;
+			}
 			task_exps[i] /= total_sig_buck;
 			++i;
 			total_sig_buck = 0;
@@ -76,6 +51,11 @@ static double *bucketing_exhaust_compute_task_exps(bucketing_state_t *s, struct 
 	}
 
 	/* Update last task expectation of last bucket */
+	if (total_sig_buck == 0) {
+		fatal("Division by zero in bucketing_det_exhaust_compute_task_exps: last bucket has no points\n");
+		free(task_exps);
+		return 0;
+	}
 	task_exps[i] /= total_sig_buck;
 
 	return task_exps;
@@ -86,7 +66,7 @@ static double *bucketing_exhaust_compute_task_exps(bucketing_state_t *s, struct 
  * @param bucket_list the list of buckets to be computed
  * @return expected cost of the list of buckets
  * @return -1 if failure */
-static double bucketing_exhaust_compute_cost(bucketing_state_t *s, struct list *bucket_list)
+static double bucketing_det_exhaust_compute_cost(bucketing_state_t *s, struct list *bucket_list)
 {
 	if (!s || !bucket_list) {
 		fatal("At least one parameter is empty\n");
@@ -94,10 +74,9 @@ static double bucketing_exhaust_compute_cost(bucketing_state_t *s, struct list *
 	}
 
 	int N = list_size(bucket_list);
-	double cost_table[N][N];
 
 	/* Compute task expectation in each bucket */
-	double *task_exps = bucketing_exhaust_compute_task_exps(s, bucket_list);
+	double *task_exps = bucketing_det_exhaust_compute_task_exps(s, bucket_list);
 	if (!task_exps) {
 		fatal("Cannot compute task expectations\n");
 		return -1;
@@ -106,41 +85,30 @@ static double bucketing_exhaust_compute_cost(bucketing_state_t *s, struct list *
 	bucketing_bucket_t **bucket_array = bucketing_bucket_list_to_array(bucket_list);
 	if (!bucket_array) {
 		fatal("Cannot convert list of buckets to array of buckets\n");
+		free(task_exps);
 		return -1;
 	}
 
-	/* i is task in which bucket, j is which bucket is chosen */
-	/* fill easy entries */
-	for (int j = 0; j < N; ++j) {
-		for (int i = 0; i <= j; ++i) {
-			cost_table[i][j] = bucket_array[j]->val - task_exps[i];
-		}
-	}
-
-	double *upper_bucket_probs;
-	/* fill entries that depend on other entries */
-	for (int i = N - 1; i > -1; --i) {
-		for (int j = i - 1; j > -1; --j) {
-			cost_table[i][j] = bucket_array[j]->val;
-			upper_bucket_probs = bucketing_reweight_bucket_probs(bucket_array, j + 1, N - 1);
-			if (!upper_bucket_probs) {
-				fatal("Cannot reweight buckets\n");
-				return -1;
-			}
-
-			for (int k = j + 1; k < N; ++k) {
-				cost_table[i][j] += upper_bucket_probs[k - (j + 1)] * cost_table[i][k];
-			}
-			free(upper_bucket_probs);
-		}
-	}
-
-	/* Compute final cost */
-	double expected_cost = 0;
+	// precompute the deterministic cost of det_exhaust
+	double incre_sum_bucket_vals[N];
 	for (int i = 0; i < N; ++i) {
-		for (int j = 0; j < N; ++j) {
-			expected_cost += bucket_array[i]->prob * bucket_array[j]->prob * cost_table[i][j];
+		if (i == 0) {
+			incre_sum_bucket_vals[i] = bucket_array[i]->val;
+		} else {
+			incre_sum_bucket_vals[i] = incre_sum_bucket_vals[i - 1] + bucket_array[i]->val;
 		}
+	}
+
+	// compute the cost of det_exhaust
+	double expected_cost = 0;
+	double p;		// probability of a bucket
+	double sum_bucket_vals; // sum of all buckets' vals up to a given bucket
+	double exp_val;		// expected value of a task in a given bucket
+	for (int i = 0; i < N; ++i) {
+		p = bucket_array[i]->prob;
+		sum_bucket_vals = incre_sum_bucket_vals[i];
+		exp_val = *(task_exps + i);
+		expected_cost += p * (sum_bucket_vals - exp_val);
 	}
 
 	free(bucket_array);
@@ -152,9 +120,9 @@ static double bucketing_exhaust_compute_cost(bucketing_state_t *s, struct list *
 /* Get the list of buckets from a list of points and the number of buckets
  * @param s the relevant bucketing state
  * @param n the number of buckets to get
- * @return a list of bucketing_bucket_t
+ * @return a list of bucketing_bucket_t candidate buckets
  * @return 0 if failure */
-static struct list *bucketing_exhaust_get_buckets(bucketing_state_t *s, int n)
+static struct list *bucketing_det_exhaust_get_buckets(bucketing_state_t *s, int n)
 {
 	if (!s) {
 		fatal("No state of compute buckets\n");
@@ -211,7 +179,7 @@ static struct list *bucketing_exhaust_get_buckets(bucketing_state_t *s, int n)
 	list_first_item(s->sorted_points);
 	bucketing_point_t *tmp = list_next_item(s->sorted_points);
 
-	/* loop through points to fill values for buckets */
+	/* loop through all points in the sorted list to fill values for buckets */
 	while ((tmp) && (i < steps + n)) {
 		if (candidate_vals[i] < tmp->val) {
 			total_sig += buck_sig;
@@ -251,11 +219,11 @@ static struct list *bucketing_exhaust_get_buckets(bucketing_state_t *s, int n)
 	return ret;
 }
 
-/* Return list of buckets that have the lowest expected cost
+/* Return a list of buckets that have the lowest expected cost
  * @param s the relevant bucketing state
  * @return a list of bucketing_bucket_t
  * @return 0 if failure */
-static struct list *bucketing_exhaust_get_min_cost_bucket_list(bucketing_state_t *s)
+static struct list *bucketing_det_exhaust_get_min_cost_bucket_list(bucketing_state_t *s)
 {
 	if (!s) {
 		fatal("No bucket state to get min cost bucket list\n");
@@ -270,14 +238,14 @@ static struct list *bucketing_exhaust_get_min_cost_bucket_list(bucketing_state_t
 	/* try to see which number of buckets yields the lowest cost */
 	for (int i = 0; i < s->max_num_buckets; ++i) {
 		/* get list of buckets */
-		bucket_list = bucketing_exhaust_get_buckets(s, i + 1);
+		bucket_list = bucketing_det_exhaust_get_buckets(s, i + 1);
 		if (!bucket_list) {
 			fatal("Cannot compute buckets\n");
 			return 0;
 		}
 
 		/* compute cost associated with bucket_list */
-		cost = bucketing_exhaust_compute_cost(s, bucket_list);
+		cost = bucketing_det_exhaust_compute_cost(s, bucket_list);
 		if (cost == -1) {
 			fatal("Cannot compute cost of bucket list\n");
 			return 0;
@@ -306,7 +274,7 @@ static struct list *bucketing_exhaust_get_min_cost_bucket_list(bucketing_state_t
 
 /** Begin: APIs **/
 
-void bucketing_exhaust_update_buckets(bucketing_state_t *s)
+void bucketing_det_exhaust_update_buckets(bucketing_state_t *s)
 {
 	if (!s) {
 		fatal("No bucket state to update buckets\n");
@@ -318,7 +286,7 @@ void bucketing_exhaust_update_buckets(bucketing_state_t *s)
 	list_delete(s->sorted_buckets);
 
 	/* Update with new list */
-	s->sorted_buckets = bucketing_exhaust_get_min_cost_bucket_list(s);
+	s->sorted_buckets = bucketing_det_exhaust_get_min_cost_bucket_list(s);
 	if (!(s->sorted_buckets)) {
 		fatal("Problem updating new sorted list of buckets\n");
 		return;
