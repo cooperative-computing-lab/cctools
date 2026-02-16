@@ -170,12 +170,13 @@ static void submit_unblocked_children(struct vine_graph *vg, struct vine_node *n
 
 		/* Edge-fired dependency resolution: each parent->child edge is consumed at most once.
 		 * This is critical for recomputation/resubmission, where a parent may "complete" multiple times. */
-		if (child_node->fired_parents && set_lookup(child_node->fired_parents, node)) {
+		if (!child_node->fired_parents) {
+			child_node->fired_parents = set_create(0);
+		}
+		if (set_lookup(child_node->fired_parents, node)) {
 			continue;
 		}
-		if (child_node->fired_parents) {
-			set_insert(child_node->fired_parents, node);
-		}
+		set_insert(child_node->fired_parents, node);
 
 		if (child_node->remaining_parents_count > 0) {
 			child_node->remaining_parents_count--;
@@ -345,6 +346,91 @@ static double compute_node_heavy_score(struct vine_node *node)
 	return up_score / (down_score + 1);
 }
 
+static void assign_node_outfile_local(struct vine_graph *vg, struct vine_node *node)
+{
+	node->outfile_type = NODE_OUTFILE_TYPE_LOCAL;
+	char *local_outfile_path = string_format("%s/%s", vg->output_dir, node->outfile_remote_name);
+	node->outfile = vine_declare_file(vg->manager, local_outfile_path, VINE_CACHE_LEVEL_WORKFLOW, 0);
+	free(local_outfile_path);
+}
+
+static void assign_node_outfile_temp(struct vine_graph *vg, struct vine_node *node)
+{
+	node->outfile_type = NODE_OUTFILE_TYPE_TEMP;
+	node->outfile = vine_declare_temp(vg->manager);
+}
+
+/**
+ * Compute upstream/downstream subgraph sizes and heavy scores for each node.
+ * This is expensive (can approach transitive-closure cost) and should only be
+ * invoked when heavy-score-based checkpoint selection is enabled.
+ */
+static void compute_upstream_downstream_and_heavy_scores(struct vine_graph *vg, struct list *topo_order)
+{
+	if (!vg || !topo_order) {
+		return;
+	}
+
+	struct vine_node *node;
+	struct vine_node *parent_node;
+	struct vine_node *child_node;
+
+	/* compute the upstream and downstream counts for each node */
+	struct itable *upstream_map = itable_create(0);
+	struct itable *downstream_map = itable_create(0);
+	uint64_t nid_tmp;
+	ITABLE_ITERATE(vg->nodes, nid_tmp, node)
+	{
+		struct set *upstream = set_create(0);
+		struct set *downstream = set_create(0);
+		itable_insert(upstream_map, node->node_id, upstream);
+		itable_insert(downstream_map, node->node_id, downstream);
+	}
+
+	LIST_ITERATE(topo_order, node)
+	{
+		struct set *upstream = itable_lookup(upstream_map, node->node_id);
+		LIST_ITERATE(node->parents, parent_node)
+		{
+			struct set *parent_upstream = itable_lookup(upstream_map, parent_node->node_id);
+			/* set_union() returns a NEW set (allocates); we want an in-place union. */
+			set_insert_set(upstream, parent_upstream);
+			set_insert(upstream, parent_node);
+		}
+	}
+
+	LIST_ITERATE_REVERSE(topo_order, node)
+	{
+		struct set *downstream = itable_lookup(downstream_map, node->node_id);
+		LIST_ITERATE(node->children, child_node)
+		{
+			struct set *child_downstream = itable_lookup(downstream_map, child_node->node_id);
+			/* set_union() returns a NEW set (allocates); we want an in-place union. */
+			set_insert_set(downstream, child_downstream);
+			set_insert(downstream, child_node);
+		}
+	}
+
+	LIST_ITERATE(topo_order, node)
+	{
+		node->upstream_subgraph_size = set_size(itable_lookup(upstream_map, node->node_id));
+		node->downstream_subgraph_size = set_size(itable_lookup(downstream_map, node->node_id));
+		node->fan_in = list_size(node->parents);
+		node->fan_out = list_size(node->children);
+		set_delete(itable_lookup(upstream_map, node->node_id));
+		set_delete(itable_lookup(downstream_map, node->node_id));
+	}
+
+	itable_delete(upstream_map);
+	itable_delete(downstream_map);
+
+	/* compute the heavy score for each node */
+	LIST_ITERATE(topo_order, node)
+	{
+		node->heavy_score = compute_node_heavy_score(node);
+	}
+}
+
 /**
  * Map a TaskVine task back to its vine node.
  * @param vg Reference to the vine graph.
@@ -392,6 +478,8 @@ static int prune_ancestors_of_persisted_node(struct vine_graph *vg, struct vine_
 		return -1;
 	}
 
+	timestamp_t time_start = timestamp_get();
+
 	/* find all safe ancestors */
 	struct set *safe_ancestors = vine_node_find_safe_ancestors(node);
 	if (!safe_ancestors) {
@@ -399,8 +487,6 @@ static int prune_ancestors_of_persisted_node(struct vine_graph *vg, struct vine_
 	}
 
 	int pruned_replica_count = 0;
-
-	timestamp_t start_time = timestamp_get();
 
 	/* prune all safe ancestors */
 	struct vine_node *ancestor_node;
@@ -425,7 +511,7 @@ static int prune_ancestors_of_persisted_node(struct vine_graph *vg, struct vine_
 
 	set_delete(safe_ancestors);
 
-	node->time_spent_on_prune_ancestors_of_persisted_node += timestamp_get() - start_time;
+	node->time_spent_on_prune_ancestors_of_persisted_node += timestamp_get() - time_start;
 
 	return pruned_replica_count;
 }
@@ -614,6 +700,7 @@ static int try_resubmitting_node(struct vine_graph *vg)
 	int all_inputs_ready = 1;
 	if (node->task->result == VINE_RESULT_INPUT_MISSING) {
 		struct vine_mount *m;
+		struct list *missing_input_files = list_create();
 		LIST_ITERATE(node->task->input_mounts, m)
 		{
 			struct vine_file *f = m->file;
@@ -634,7 +721,18 @@ static int try_resubmitting_node(struct vine_graph *vg)
 			}
 			enqueue_resubmit_node(vg, original_producer_node);
 			all_inputs_ready = 0;
+			list_push_tail(missing_input_files, f);
 		}
+		if (list_size(missing_input_files) > 0) {
+			char *missing_input_files_str = xxstrdup("");
+			struct vine_file *f;
+			while ((f = list_pop_head(missing_input_files))) {
+				missing_input_files_str = string_format("%s%s%s", missing_input_files_str, f->cached_name, " ");
+			}
+			debug(D_DEBUG, "node %" PRIu64 " has missing input files: %s", node->node_id, missing_input_files_str);
+			free(missing_input_files_str);
+		}
+		list_delete(missing_input_files);
 	}
 
 	/* if not all inputs are ready, enqueue the node and consider later */
@@ -792,6 +890,8 @@ int vine_graph_tune(struct vine_graph *vg, const char *name, const char *value)
 	} else if (strcmp(name, "retry-interval-sec") == 0) {
 		vg->retry_interval_sec = MAX(0.0, atof(value));
 
+	} else if (strcmp(name, "print-graph-details") == 0) {
+		vg->print_graph_details = (atoi(value) == 1) ? 1 : 0;
 	} else {
 		debug(D_ERROR, "invalid parameter name: %s", name);
 		return -1;
@@ -964,7 +1064,7 @@ const char *vine_graph_get_node_local_outfile_source(const struct vine_graph *vg
  * heavy scores, and weakly connected components. Must be called after all nodes and dependencies are added.
  * @param vg Reference to the vine graph.
  */
-void vine_graph_compute_topology_metrics(struct vine_graph *vg)
+void vine_graph_finalize(struct vine_graph *vg)
 {
 	if (!vg) {
 		return;
@@ -1004,97 +1104,67 @@ void vine_graph_compute_topology_metrics(struct vine_graph *vg)
 		}
 	}
 
-	/* compute the upstream and downstream counts for each node */
-	struct itable *upstream_map = itable_create(0);
-	struct itable *downstream_map = itable_create(0);
-	uint64_t nid_tmp;
-	ITABLE_ITERATE(vg->nodes, nid_tmp, node)
-	{
-		struct set *upstream = set_create(0);
-		struct set *downstream = set_create(0);
-		itable_insert(upstream_map, node->node_id, upstream);
-		itable_insert(downstream_map, node->node_id, downstream);
-	}
-	LIST_ITERATE(topo_order, node)
-	{
-		struct set *upstream = itable_lookup(upstream_map, node->node_id);
-		LIST_ITERATE(node->parents, parent_node)
-		{
-			struct set *parent_upstream = itable_lookup(upstream_map, parent_node->node_id);
-			set_union(upstream, parent_upstream);
-			set_insert(upstream, parent_node);
-		}
-	}
-	LIST_ITERATE_REVERSE(topo_order, node)
-	{
-		struct set *downstream = itable_lookup(downstream_map, node->node_id);
-		LIST_ITERATE(node->children, child_node)
-		{
-			struct set *child_downstream = itable_lookup(downstream_map, child_node->node_id);
-			set_union(downstream, child_downstream);
-			set_insert(downstream, child_node);
-		}
-	}
-	LIST_ITERATE(topo_order, node)
-	{
-		node->upstream_subgraph_size = set_size(itable_lookup(upstream_map, node->node_id));
-		node->downstream_subgraph_size = set_size(itable_lookup(downstream_map, node->node_id));
-		node->fan_in = list_size(node->parents);
-		node->fan_out = list_size(node->children);
-		set_delete(itable_lookup(upstream_map, node->node_id));
-		set_delete(itable_lookup(downstream_map, node->node_id));
-	}
-	itable_delete(upstream_map);
-	itable_delete(downstream_map);
-
-	/* compute the heavy score for each node */
-	LIST_ITERATE(topo_order, node)
-	{
-		node->heavy_score = compute_node_heavy_score(node);
-	}
-
-	/* sort nodes using priority queue */
 	int total_nodes = list_size(topo_order);
 	int total_target_nodes = 0;
-	struct priority_queue *sorted_nodes = priority_queue_create(total_nodes);
 	LIST_ITERATE(topo_order, node)
 	{
 		if (node->is_target) {
 			total_target_nodes++;
 		}
-		priority_queue_push(sorted_nodes, node, node->heavy_score);
 	}
-	/* calculate the number of nodes to be checkpointed */
+
+	/* Calculate the number of intermediate nodes to checkpoint.
+	 * If this is zero, skip heavy-score computation and sorting entirely. */
 	int checkpoint_count = (int)((total_nodes - total_target_nodes) * vg->checkpoint_fraction);
 	if (checkpoint_count < 0) {
 		checkpoint_count = 0;
 	}
 
-	/* assign outfile types to each node */
-	int assigned_checkpoint_count = 0;
-	while ((node = priority_queue_pop(sorted_nodes))) {
-		if (node->is_target) {
-			/* declare the output file as a vine_file so that it can be retrieved by the manager as usual */
-			node->outfile_type = NODE_OUTFILE_TYPE_LOCAL;
-			char *local_outfile_path = string_format("%s/%s", vg->output_dir, node->outfile_remote_name);
-			node->outfile = vine_declare_file(vg->manager, local_outfile_path, VINE_CACHE_LEVEL_WORKFLOW, 0);
-			free(local_outfile_path);
-			continue;
+	if (checkpoint_count > 0) {
+		/* Only pay the (large) transitive-closure-like cost when we will use it. */
+		compute_upstream_downstream_and_heavy_scores(vg, topo_order);
+
+		/* sort nodes using priority queue */
+		struct priority_queue *sorted_nodes = priority_queue_create(total_nodes);
+		LIST_ITERATE(topo_order, node)
+		{
+			priority_queue_push(sorted_nodes, node, node->heavy_score);
 		}
-		if (assigned_checkpoint_count < checkpoint_count) {
-			/* checkpointed files will be written directly to the shared file system, no need to manage them in the manager */
-			node->outfile_type = NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM;
-			char *shared_file_system_outfile_path = string_format("%s/%s", vg->checkpoint_dir, node->outfile_remote_name);
-			free(node->outfile_remote_name);
-			node->outfile_remote_name = shared_file_system_outfile_path;
-			node->outfile = NULL;
-			assigned_checkpoint_count++;
-		} else {
-			/* other nodes will be declared as temp files to leverage node-local storage */
-			node->outfile_type = NODE_OUTFILE_TYPE_TEMP;
-			node->outfile = vine_declare_temp(vg->manager);
+
+		/* assign outfile types to each node */
+		int assigned_checkpoint_count = 0;
+		while ((node = priority_queue_pop(sorted_nodes))) {
+			if (node->is_target) {
+				/* declare the output file as a vine_file so that it can be retrieved by the manager as usual */
+				assign_node_outfile_local(vg, node);
+				continue;
+			}
+			if (assigned_checkpoint_count < checkpoint_count) {
+				/* checkpointed files will be written directly to the shared file system, no need to manage them in the manager */
+				node->outfile_type = NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM;
+				char *shared_file_system_outfile_path = string_format("%s/%s", vg->checkpoint_dir, node->outfile_remote_name);
+				free(node->outfile_remote_name);
+				node->outfile_remote_name = shared_file_system_outfile_path;
+				node->outfile = NULL;
+				assigned_checkpoint_count++;
+			} else {
+				/* other nodes will be declared as temp files to leverage node-local storage */
+				assign_node_outfile_temp(vg, node);
+			}
+		}
+		priority_queue_delete(sorted_nodes);
+	} else {
+		/* Fast path: no checkpointing means no heavy-score computation/sorting. */
+		LIST_ITERATE(topo_order, node)
+		{
+			if (node->is_target) {
+				assign_node_outfile_local(vg, node);
+			} else {
+				assign_node_outfile_temp(vg, node);
+			}
 		}
 	}
+
 	/* track the output dependencies of user and vine_temp nodes */
 	LIST_ITERATE(topo_order, node)
 	{
@@ -1102,20 +1172,67 @@ void vine_graph_compute_topology_metrics(struct vine_graph *vg)
 			vine_task_add_output(node->task, node->outfile, node->outfile_remote_name, VINE_TRANSFER_ALWAYS);
 		}
 	}
-	priority_queue_delete(sorted_nodes);
 
-	/* extract weakly connected components */
-	struct list *weakly_connected_components = extract_weakly_connected_components(vg);
-	struct list *component;
-	int component_index = 0;
-	debug(D_VINE, "graph has %d weakly connected components\n", list_size(weakly_connected_components));
-	LIST_ITERATE(weakly_connected_components, component)
-	{
-		debug(D_VINE, "component %d size: %d\n", component_index, list_size(component));
-		list_delete(component);
-		component_index++;
+	/* extract weakly connected components (could be expensive) */
+	if (vg->print_graph_details) {
+		struct list *weakly_connected_components = extract_weakly_connected_components(vg);
+		struct list *component;
+		int component_index = 0;
+		debug(D_VINE, "graph has %d weakly connected components\n", list_size(weakly_connected_components));
+		LIST_ITERATE(weakly_connected_components, component)
+		{
+			debug(D_VINE, "component %d size: %d\n", component_index, list_size(component));
+			list_delete(component);
+			component_index++;
+		}
+		list_delete(weakly_connected_components);
 	}
-	list_delete(weakly_connected_components);
+
+	/* print the node details if enabled */
+	if (vg->print_graph_details) {
+		LIST_ITERATE(topo_order, node)
+		{
+			vine_node_debug_print(node);
+		}
+	}
+
+	/* create mappings from task IDs and outfile cache names to nodes */
+	LIST_ITERATE(topo_order, node)
+	{
+		if (node->outfile) {
+			hash_table_insert(vg->outfile_cachename_to_node, node->outfile->cached_name, node);
+		}
+	}
+
+	/* add the parents' outfiles as inputs to the task */
+	LIST_ITERATE(topo_order, node)
+	{
+		struct vine_node *parent_node;
+		LIST_ITERATE(node->parents, parent_node)
+		{
+			if (parent_node->outfile) {
+				vine_task_add_input(node->task, parent_node->outfile, parent_node->outfile_remote_name, VINE_TRANSFER_ALWAYS);
+			}
+		}
+	}
+
+	/* initialize remaining_parents_count for all nodes */
+	LIST_ITERATE(topo_order, node)
+	{
+		node->remaining_parents_count = list_size(node->parents);
+	}
+
+	/* enqueue those without unresolved dependencies */
+	LIST_ITERATE(topo_order, node)
+	{
+		if (node->remaining_parents_count == 0) {
+			submit_node_task(vg, node);
+		}
+	}
+
+	/* enable return recovery tasks */
+	vine_enable_return_recovery_tasks(vg->manager);
+	vg->manager->auto_recovery = vg->auto_recovery;
 
 	list_delete(topo_order);
 
@@ -1231,6 +1348,7 @@ struct vine_graph *vine_graph_create(struct vine_manager *q)
 	vg->proxy_function_name = NULL;
 
 	vg->prune_depth = 1;
+	vg->print_graph_details = 0;
 
 	vg->task_priority_mode = TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST;
 	vg->failure_injection_step_percent = -1.0;
@@ -1318,68 +1436,9 @@ void vine_graph_execute(struct vine_graph *vg)
 		return;
 	}
 
-	timestamp_t time_start = timestamp_get();
-
 	void (*previous_sigint_handler)(int) = signal(SIGINT, handle_sigint);
 
 	debug(D_VINE, "start executing vine graph");
-
-	/* print the info of all nodes */
-	uint64_t nid_iter;
-	struct vine_node *node;
-	ITABLE_ITERATE(vg->nodes, nid_iter, node)
-	{
-		vine_node_debug_print(node);
-	}
-
-	/* enable return recovery tasks */
-	vine_enable_return_recovery_tasks(vg->manager);
-
-	vg->manager->auto_recovery = vg->auto_recovery;
-
-	/* create mappings from task IDs and outfile cache names to nodes */
-	ITABLE_ITERATE(vg->nodes, nid_iter, node)
-	{
-		if (node->outfile) {
-			hash_table_insert(vg->outfile_cachename_to_node, node->outfile->cached_name, node);
-		}
-	}
-
-	/* add the parents' outfiles as inputs to the task */
-	struct list *topo_order = get_topological_order(vg);
-	LIST_ITERATE(topo_order, node)
-	{
-		struct vine_node *parent_node;
-		LIST_ITERATE(node->parents, parent_node)
-		{
-			if (parent_node->outfile) {
-				vine_task_add_input(node->task, parent_node->outfile, parent_node->outfile_remote_name, VINE_TRANSFER_ALWAYS);
-			}
-		}
-	}
-
-	/* initialize remaining_parents_count for all nodes */
-	ITABLE_ITERATE(vg->nodes, nid_iter, node)
-	{
-		node->remaining_parents_count = list_size(node->parents);
-	}
-
-	/* enqueue those without dependencies */
-	ITABLE_ITERATE(vg->nodes, nid_iter, node)
-	{
-		if (node->remaining_parents_count == 0) {
-			submit_node_task(vg, node);
-		}
-	}
-
-	/* calculate steps to inject failure */
-	double next_failure_threshold = -1.0;
-	if (vg->failure_injection_step_percent > 0) {
-		next_failure_threshold = vg->failure_injection_step_percent / 100.0;
-	}
-
-	timestamp_t time_end = timestamp_get();
-	printf("Time taken to initialize the graph in C: %.6f seconds\n", (double)(time_end - time_start) / 1e6);
 
 	struct ProgressBar *pbar = progress_bar_init("Executing Tasks");
 	progress_bar_set_update_interval(pbar, vg->progress_bar_update_interval_sec);
@@ -1389,8 +1448,14 @@ void vine_graph_execute(struct vine_graph *vg)
 	progress_bar_bind_part(pbar, user_tasks_part);
 	progress_bar_bind_part(pbar, recovery_tasks_part);
 
-	int wait_timeout = 1;
+	/* calculate steps to inject failure */
+	double next_failure_threshold = -1.0;
+	if (vg->failure_injection_step_percent > 0) {
+		next_failure_threshold = vg->failure_injection_step_percent / 100.0;
+	}
 
+	int wait_timeout = 1;
+	struct vine_node *node;
 	while (user_tasks_part->current < user_tasks_part->total) {
 		if (interrupted) {
 			break;
@@ -1540,6 +1605,8 @@ void vine_graph_execute(struct vine_graph *vg)
 	double total_time_spent_on_unlink_local_files = 0;
 	double total_time_spent_on_prune_ancestors_of_temp_node = 0;
 	double total_time_spent_on_prune_ancestors_of_persisted_node = 0;
+
+	uint64_t nid_iter;
 	ITABLE_ITERATE(vg->nodes, nid_iter, node)
 	{
 		total_time_spent_on_unlink_local_files += node->time_spent_on_unlink_local_files;

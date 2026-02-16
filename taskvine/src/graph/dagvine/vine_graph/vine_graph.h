@@ -67,7 +67,8 @@ struct vine_graph {
 	/* The filename of the csv file to store the time metrics of the vine graph. */
 	char *time_metrics_filename;
 
-	int enable_debug_log; /* whether to enable debug log */
+	int enable_debug_log;	 /* whether to enable debug log */
+	int print_graph_details; /* whether to print the graph details */
 
 	int auto_recovery; /* whether to enable auto recovery */
 
@@ -109,7 +110,7 @@ void vine_graph_add_dependency(struct vine_graph *vg, uint64_t parent_id, uint64
 /** Finalize the metrics of the vine graph.
 @param vg Reference to the vine graph.
 */
-void vine_graph_compute_topology_metrics(struct vine_graph *vg);
+void vine_graph_finalize(struct vine_graph *vg);
 
 /** Get the heavy score of a node in the vine graph.
 @param vg Reference to the vine graph.

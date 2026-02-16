@@ -47,7 +47,10 @@ class BlueprintGraph:
     _LEAF_TYPES = (str, bytes, bytearray, memoryview, int, float, bool, type(None))
 
     def __init__(self):
-        self.task_dict = {}                    # task_key -> (func, frozen_args, frozen_kwargs)
+        self.callables = []
+        self._callable_index = {}
+
+        self.task_dict = {}
 
         self.parents_of = defaultdict(set)     # task_key -> set of task_keys
         self.children_of = defaultdict(set)    # task_key -> set of task_keys
@@ -62,6 +65,14 @@ class BlueprintGraph:
 
         self.extra_task_output_size_mb = {}  # task_key -> extra size in MB
         self.extra_task_sleep_time = {}      # task_key -> extra sleep time in seconds
+
+    def _intern_callable(self, func):
+        idx = self._callable_index.get(func)
+        if idx is None:
+            idx = len(self.callables)
+            self.callables.append(func)
+            self._callable_index[func] = idx
+        return idx
 
     def _visit_task_output_refs(self, obj, on_ref, *, rewrite: bool):
         seen = set()
@@ -140,7 +151,8 @@ class BlueprintGraph:
         if task_key in self.task_dict:
             raise ValueError(f"Task {task_key} already exists")
 
-        self.task_dict[task_key] = (func, args, kwargs)
+        func_id = self._intern_callable(func)
+        self.task_dict[task_key] = (func_id, args, kwargs)
 
         parents = self._find_parents(args) | self._find_parents(kwargs)
 

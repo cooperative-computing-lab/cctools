@@ -1579,6 +1579,8 @@ char *vine_get_path_library_log(struct vine_manager *m, const char *path);
 */
 char *vine_get_path_cache(struct vine_manager *m, const char *path);
 
+uint64_t vine_manager_get_makespan_us(struct vine_manager *q);
+
 //@}
 
 #endif

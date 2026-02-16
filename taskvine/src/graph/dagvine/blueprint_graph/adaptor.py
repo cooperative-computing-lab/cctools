@@ -47,7 +47,8 @@ def collections_from_blueprint_graph(bg):
         return ref.task_key
 
     out = {}
-    for task_key, (func, args, kwargs) in bg.task_dict.items():
+    for task_key, (func_id, args, kwargs) in bg.task_dict.items():
+        func = bg.callables[func_id]
         # Only rewrite references inside args/kwargs; keep everything else unchanged.
         new_args = bg._visit_task_output_refs(args, _ref_to_key, rewrite=True)
         new_kwargs = bg._visit_task_output_refs(kwargs, _ref_to_key, rewrite=True)

@@ -8,7 +8,7 @@ from ndcctools.taskvine.manager import Manager
 from ndcctools.taskvine.dagvine.blueprint_graph.adaptor import Adaptor
 from ndcctools.taskvine.dagvine.blueprint_graph.proxy_library import ProxyLibrary
 from ndcctools.taskvine.dagvine.blueprint_graph.proxy_functions import compute_single_key
-from ndcctools.taskvine.dagvine.blueprint_graph.blueprint_graph import BlueprintGraph, TaskOutputWrapper
+from ndcctools.taskvine.dagvine.blueprint_graph.blueprint_graph import BlueprintGraph, TaskOutputRef, TaskOutputWrapper
 from ndcctools.taskvine.dagvine.vine_graph.vine_graph_client import VineGraphClient
 
 import cloudpickle
@@ -17,6 +17,7 @@ import signal
 import json
 import random
 import time
+from pympler import asizeof
 
 
 def context_loader_func(graph_pkl):
@@ -60,6 +61,7 @@ class GraphParams:
             "enforce-worker-eviction-interval": -1,
             "shift-disk-load": 0,
             "clean-redundant-replicas": 0,
+            "max-cores": 1000000,
         }
         # VineGraph-level knobs: forwarded to the underlying vine graph via VineGraphClient.
         self.vine_graph_tuning_params = {
@@ -75,6 +77,7 @@ class GraphParams:
             "auto-recovery": 1,
             "max-retry-attempts": 15,
             "retry-interval-sec": 1,
+            "print-graph-details": 0,
         }
         # Misc knobs used purely on the Python side (e.g., generate fake outputs).
         self.other_params = {
@@ -170,6 +173,49 @@ class DAGVine(Manager):
         for k, v in self.params.vine_graph_tuning_params.items():
             vine_graph.tune(k, str(v))
 
+    def _rep_key(self, k, r):
+        return k if r == 0 else ("__rep", r, k)
+
+    def _replicate_graph(self, task_dict, target_keys, repeats):
+        if repeats <= 1:
+            return task_dict, target_keys
+        if isinstance(task_dict, BlueprintGraph):
+            old_bg = task_dict
+            new_bg = BlueprintGraph()
+            new_bg.callables = list(old_bg.callables)
+            new_bg._callable_index = dict(old_bg._callable_index)
+            for r in range(repeats):
+                def rewriter(ref):
+                    return TaskOutputRef(self._rep_key(ref.task_key, r), ref.path)
+
+                def _rewrite(obj):
+                    return old_bg._visit_task_output_refs(obj, rewriter, rewrite=True)
+
+                for k, (func_id, args, kwargs) in old_bg.task_dict.items():
+                    new_bg.add_task(self._rep_key(k, r), old_bg.callables[func_id], *_rewrite(args), **_rewrite(kwargs))
+            new_bg.finalize()
+            vine_targets = list(target_keys)
+            for r in range(1, repeats):
+                vine_targets.extend(self._rep_key(k, r) for k in target_keys if k in old_bg.task_dict)
+            return new_bg, vine_targets
+        else:
+            temp_bg = BlueprintGraph()
+            expanded = {}
+            for r in range(repeats):
+                def rewriter(ref):
+                    return TaskOutputRef(self._rep_key(ref.task_key, r), ref.path)
+
+                def _rewrite(obj):
+                    return temp_bg._visit_task_output_refs(obj, rewriter, rewrite=True)
+
+                for k, v in task_dict.items():
+                    func, args, kwargs = v
+                    expanded[self._rep_key(k, r)] = (func, _rewrite(args), _rewrite(kwargs))
+            vine_targets = list(target_keys)
+            for r in range(1, repeats):
+                vine_targets.extend(self._rep_key(k, r) for k in target_keys if k in task_dict)
+            return expanded, vine_targets
+
     def build_blueprint_graph(self, task_dict):
         if isinstance(task_dict, BlueprintGraph):
             bg = task_dict
@@ -237,11 +283,9 @@ class DAGVine(Manager):
         # For each task, declare the input and output files in the vine graph
         for filename in py_graph.producer_of:
             task_key = py_graph.producer_of[filename]
-            print(f"adding output file {filename} to task {task_key}")
             vine_graph.add_task_output(task_key, filename)
         for filename in py_graph.consumers_of:
             for task_key in py_graph.consumers_of[filename]:
-                print(f"adding input file {filename} to task {task_key}")
                 vine_graph.add_task_input(task_key, filename)
 
         return py_graph, vine_graph
@@ -257,7 +301,7 @@ class DAGVine(Manager):
 
         return proxy_library
 
-    def run(self, task_dict, target_keys=[], params={}, hoisting_modules=[], env_files={}, adapt_dask=False):
+    def run(self, task_dict, target_keys=[], params={}, hoisting_modules=[], env_files={}, adapt_dask=False, repeats=1):
         """High-level entry point: normalise input, build graphs, ship the library, execute, and return results."""
         time_start = time.time()
 
@@ -266,6 +310,9 @@ class DAGVine(Manager):
 
         if adapt_dask:
             task_dict = Adaptor(task_dict).converted
+
+        result_keys = list(target_keys)
+        task_dict, target_keys = self._replicate_graph(task_dict, target_keys, repeats)
 
         # Build both the Python DAG and its C mirror.
         py_graph, vine_graph = self.build_graphs(task_dict, target_keys)
@@ -280,19 +327,20 @@ class DAGVine(Manager):
         proxy_library.install()
 
         try:
-            print(f"=== Library serialized size: {color_text(proxy_library.get_context_size(), 92)} MB")
-            print(f"Time taken to initialize the graph in Python: {time.time() - time_start:.6f} seconds")
+            print(f"=== Library size: {asizeof.asizeof(proxy_library) / 1024 / 1024} MB")
+            print(f"=== Frontend Overhead: {time.time() - time_start:.6f} seconds")
+
             vine_graph.execute()
             results = {}
-            for k in target_keys:
+            for k in result_keys:
                 if k not in py_graph.task_dict:
                     continue
                 outfile_path = os.path.join(self.param("output-dir"), py_graph.outfile_remote_name[k])
                 results[k] = TaskOutputWrapper.load_from_path(outfile_path)
             makespan_s = round(vine_graph.get_makespan_us() / 1e6, 6)
             throughput_tps = round(len(py_graph.task_dict) / makespan_s, 6)
-            print(f"Makespan: {color_text(makespan_s, 92)} seconds")
-            print(f"Throughput: {color_text(throughput_tps, 92)} tasks/second")
+            results["Makespan"] = makespan_s
+            results["Throughput"] = throughput_tps
             return results
         finally:
             try:

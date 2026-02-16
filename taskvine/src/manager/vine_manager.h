@@ -254,6 +254,10 @@ struct vine_manager {
 	/* Testing mode parameters */
 	timestamp_t enforce_worker_eviction_interval;   /* Enforce worker eviction interval in seconds */
 	timestamp_t time_start_worker_eviction;         /* Track the time when we start evicting workers */
+
+	timestamp_t time_start_execution;  // TMEP HACK
+	timestamp_t time_end_execution;    // TMEP HACK
+	int max_cores;                     // TMEP HACK
 };
 
 /*

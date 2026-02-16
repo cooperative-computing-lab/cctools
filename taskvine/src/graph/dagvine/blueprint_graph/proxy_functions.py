@@ -8,7 +8,8 @@ import time
 
 
 def compute_task(bg, task_expr):
-    func, args, kwargs = task_expr
+    func_id, args, kwargs = task_expr
+    func = bg.callables[func_id]
     cache = {}
 
     def _follow_path(value, path):

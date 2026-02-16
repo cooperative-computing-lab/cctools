@@ -485,7 +485,7 @@ This allows it to be used for both regular tasks and mini tasks.
 #endif
 
 #ifndef SB_MAX_CHUNK
-#define SB_MAX_CHUNK (1024*1024)
+#define SB_MAX_CHUNK (1024 * 1024)
 #endif
 
 struct sbuf {
@@ -548,32 +548,39 @@ static inline int sb_printf(struct sbuf *B, const char *fmt, ...)
 }
 
 #if defined(DEBUG_LEVEL) && (DEBUG_LEVEL >= D_VINE)
-#define DBG_TX(W,S,N) do { \
-	if ((N) > 0) { \
-		debug(D_VINE, "tx to %s (%s): %.*s", (W)->hostname, (W)->addrport, (int)(N), (const char*)(S)); \
-	} \
-} while(0)
+#define DBG_TX(W, S, N) \
+	do { \
+		if ((N) > 0) { \
+			debug(D_VINE, "tx to %s (%s): %.*s", (W)->hostname, (W)->addrport, (int)(N), (const char *)(S)); \
+		} \
+	} while (0)
 #else
-#define DBG_TX(W,S,N) do { (void)(W); (void)(S); (void)(N); } while(0)
+#define DBG_TX(W, S, N) \
+	do { \
+		(void)(W); \
+		(void)(S); \
+		(void)(N); \
+	} while (0)
 #endif
 
-#define EMITF(B,W,...) do { \
-	char _ln[VINE_LINE_MAX]; \
-	int _n = snprintf(_ln, sizeof(_ln), __VA_ARGS__); \
-	if (_n > 0) { \
-		size_t _L = (size_t)_n; \
-		if (_L >= sizeof(_ln)) { \
-			_L = sizeof(_ln) - 1; \
+#define EMITF(B, W, ...) \
+	do { \
+		char _ln[VINE_LINE_MAX]; \
+		int _n = snprintf(_ln, sizeof(_ln), __VA_ARGS__); \
+		if (_n > 0) { \
+			size_t _L = (size_t)_n; \
+			if (_L >= sizeof(_ln)) { \
+				_L = sizeof(_ln) - 1; \
+			} \
+			sb_append((B), _ln, _L); \
+			DBG_TX((W), _ln, _L); \
 		} \
-		sb_append((B), _ln, _L); \
-		DBG_TX((W), _ln, _L); \
-	} \
-} while(0)
+	} while (0)
 
 vine_result_code_t vine_manager_put_task(
-	struct vine_manager *q, struct vine_worker_info *w,
-	struct vine_task *t, const char *command_line,
-	struct rmsummary *limits, struct vine_file *target)
+		struct vine_manager *q, struct vine_worker_info *w,
+		struct vine_task *t, const char *command_line,
+		struct rmsummary *limits, struct vine_file *target)
 {
 	if (target && vine_file_replica_table_lookup(w, target->cached_name)) {
 		debug(D_NOTICE, "mini_task %s already at %s", target->cached_name, w->addrport);
@@ -594,7 +601,8 @@ vine_result_code_t vine_manager_put_task(
 	{
 		char *e;
 		size_t nenv = 0, envbytes = 0;
-		LIST_ITERATE(t->env_list, e) {
+		LIST_ITERATE(t->env_list, e)
+		{
 			size_t L = strlen(e);
 			envbytes += L + 16;
 			nenv++;
@@ -602,12 +610,14 @@ vine_result_code_t vine_manager_put_task(
 		pre += envbytes + nenv * 32;
 		struct vine_mount *m;
 		if (t->input_mounts) {
-			LIST_ITERATE(t->input_mounts, m) {
+			LIST_ITERATE(t->input_mounts, m)
+			{
 				pre += (m->remote_name ? strlen(m->remote_name) : 0) + 64;
 			}
 		}
 		if (t->output_mounts) {
-			LIST_ITERATE(t->output_mounts, m) {
+			LIST_ITERATE(t->output_mounts, m)
+			{
 				pre += (m->remote_name ? strlen(m->remote_name) : 0) + 64;
 			}
 		}
@@ -629,9 +639,7 @@ vine_result_code_t vine_manager_put_task(
 
 	if (target) {
 		int mode = target->mode ? target->mode : 0755;
-		EMITF(&sb, w, "mini_task %s %s %d %lld 0%o\n",
-			target->source, target->cached_name, target->cache_level,
-			(long long)target->size, mode);
+		EMITF(&sb, w, "mini_task %s %s %d %lld 0%o\n", target->source, target->cached_name, target->cache_level, (long long)target->size, mode);
 	} else {
 		EMITF(&sb, w, "task %lld\n", (long long)t->task_id);
 	}
@@ -656,10 +664,10 @@ vine_result_code_t vine_manager_put_task(
 	EMITF(&sb, w, "category %s\n", t->category ? t->category : "default");
 
 	if (limits) {
-		EMITF(&sb, w, "cores %s\n",   rmsummary_resource_to_str("cores",   limits->cores,   0));
-		EMITF(&sb, w, "gpus %s\n",    rmsummary_resource_to_str("gpus",    limits->gpus,    0));
-		EMITF(&sb, w, "memory %s\n",  rmsummary_resource_to_str("memory",  limits->memory,  0));
-		EMITF(&sb, w, "disk %s\n",    rmsummary_resource_to_str("disk",    limits->disk,    0));
+		EMITF(&sb, w, "cores %s\n", rmsummary_resource_to_str("cores", limits->cores, 0));
+		EMITF(&sb, w, "gpus %s\n", rmsummary_resource_to_str("gpus", limits->gpus, 0));
+		EMITF(&sb, w, "memory %s\n", rmsummary_resource_to_str("memory", limits->memory, 0));
+		EMITF(&sb, w, "disk %s\n", rmsummary_resource_to_str("disk", limits->disk, 0));
 		if (q->monitor_mode == VINE_MON_DISABLED) {
 			if (limits->end > 0) {
 				EMITF(&sb, w, "end_time %s\n", rmsummary_resource_to_str("end", limits->end, 0));
@@ -672,7 +680,8 @@ vine_result_code_t vine_manager_put_task(
 
 	{
 		char *var;
-		LIST_ITERATE(t->env_list, var) {
+		LIST_ITERATE(t->env_list, var)
+		{
 			size_t L = strlen(var);
 			EMITF(&sb, w, "env %zu\n", L);
 			if (sb_append(&sb, var, L) < 0) {
@@ -687,14 +696,16 @@ vine_result_code_t vine_manager_put_task(
 	{
 		struct vine_mount *m;
 		if (t->input_mounts) {
-			LIST_ITERATE(t->input_mounts, m) {
+			LIST_ITERATE(t->input_mounts, m)
+			{
 				char enc[PATH_MAX];
 				url_encode(m->remote_name, enc, PATH_MAX);
 				EMITF(&sb, w, "infile %s %s %d\n", m->file->cached_name, enc, m->flags);
 			}
 		}
 		if (t->output_mounts) {
-			LIST_ITERATE(t->output_mounts, m) {
+			LIST_ITERATE(t->output_mounts, m)
+			{
 				char enc[PATH_MAX];
 				url_encode(m->remote_name, enc, PATH_MAX);
 				EMITF(&sb, w, "outfile %s %s %d\n", m->file->cached_name, enc, m->flags);
@@ -724,8 +735,7 @@ vine_result_code_t vine_manager_put_task(
 
 	if (r >= 0 && left == 0) {
 		if (target) {
-			vine_file_replica_table_get_or_create(q, w, target->cached_name, target->type,
-				target->cache_level, target->size, target->mtime);
+			vine_file_replica_table_get_or_create(q, w, target->cached_name, target->type, target->cache_level, target->size, target->mtime);
 		}
 		free(sb.buf);
 		return VINE_SUCCESS;

@@ -6,8 +6,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "jx.h"
-#include "jx_print.h"
 #include "xxmalloc.h"
 #include "stringtools.h"
 #include "timestamp.h"
@@ -117,16 +115,13 @@ struct vine_node *vine_node_create(uint64_t node_id)
 	node->is_target = 0;
 	node->node_id = node_id;
 
-	/* create a unique UUID-based remote outfile name for this node */
-	cctools_uuid_t uuid;
-	cctools_uuid_create(&uuid);
-	node->outfile_remote_name = xxstrdup(uuid.str);
+	node->outfile_remote_name = string_format("outfile_node_%" PRIu64, node->node_id);
 
 	node->prune_status = PRUNE_STATUS_NOT_PRUNED;
 	node->parents = list_create();
 	node->children = list_create();
 	node->remaining_parents_count = 0;
-	node->fired_parents = set_create(0);
+	node->fired_parents = NULL;
 	node->completed = 0;
 	node->prune_depth = 0;
 	node->outfile_size_bytes = 0;
@@ -168,17 +163,7 @@ char *vine_node_construct_task_arguments(struct vine_node *node)
 	if (!node) {
 		return NULL;
 	}
-
-	struct jx *event = jx_object(NULL);
-	struct jx *args = jx_array(NULL);
-	jx_array_append(args, jx_integer(node->node_id));
-	jx_insert(event, jx_string("fn_args"), args);
-	jx_insert(event, jx_string("fn_kwargs"), jx_object(NULL));
-
-	char *infile_content = jx_print_string(event);
-	jx_delete(event);
-
-	return infile_content;
+	return string_format("{\"fn_args\":[%" PRIu64 "],\"fn_kwargs\":{}}", node->node_id);
 }
 
 /**

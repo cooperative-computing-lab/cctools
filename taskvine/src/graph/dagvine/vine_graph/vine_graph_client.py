@@ -46,7 +46,7 @@ class VineGraphClient:
 
     def compute_topology_metrics(self):
         """Trigger the C graph to compute depth/height, heavy-score, etc."""
-        vine_graph_capi.vine_graph_compute_topology_metrics(self._c_graph)
+        vine_graph_capi.vine_graph_finalize(self._c_graph)
 
     def get_node_outfile_remote_name(self, key):
         """Ask the C layer where a node's output will be stored."""

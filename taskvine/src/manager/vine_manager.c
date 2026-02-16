@@ -627,6 +627,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 		t->time_workers_execute_last = observed_execution_time > execution_time ? execution_time : observed_execution_time;
 		t->time_workers_execute_last_start = start_time;
 		t->time_workers_execute_last_end = end_time;
+		q->time_start_execution = MIN(q->time_start_execution, t->time_workers_execute_last_end); // TEMP HACK
 		t->time_workers_execute_all += t->time_workers_execute_last;
 		t->output_length = output_length;
 		t->result = task_status;
@@ -1378,6 +1379,11 @@ void exit_debug_message(struct vine_manager *q, struct vine_worker_info *w, stru
 	return;
 }
 
+uint64_t vine_manager_get_makespan_us(struct vine_manager *q)
+{
+	return (uint64_t)(q->time_end_execution - q->time_start_execution); // TEMP HACK
+}
+
 static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_info *w, int task_id)
 {
 	struct vine_task *t;
@@ -1390,6 +1396,8 @@ static int fetch_outputs_from_worker(struct vine_manager *q, struct vine_worker_
 		return 0;
 	}
 	t->time_when_retrieval = timestamp_get();
+
+	q->time_end_execution = MAX(q->time_end_execution, t->time_when_retrieval); // TEMP HACK
 
 	/* Determine what subset of outputs to retrieve based on status. */
 
@@ -1761,6 +1769,7 @@ This seems awfully complicated and could be simplified.
 
 static vine_result_code_t get_stdout(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t output_length)
 {
+
 	int64_t retrieved_output_length;
 	timestamp_t effective_stoptime = 0;
 	time_t stoptime;
@@ -2920,7 +2929,12 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 		command_line = xxstrdup(t->command_line);
 	}
 
+	// timestamp_t start_time = timestamp_get();
 	vine_result_code_t result = vine_manager_put_task(q, w, t, command_line, limits, 0);
+	// timestamp_t end_time = timestamp_get();
+	// printf("time to send task %d to worker: %.6f seconds\n",
+	// 		t->task_id,
+	// 		((double) (end_time - start_time)) / 1000000.0);
 
 	free(command_line);
 
@@ -3577,11 +3591,33 @@ the task to the worker.
 
 static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor *cur, int iter_depth, double now_secs)
 {
+	int committable_cores = vine_schedule_count_committable_cores(q);
+	if (committable_cores <= 0) {
+		return 0;
+	}
+
 	struct vine_task *t;
 
 	int task_unready = 0; // set to 1 if at least one task was moved from ready_list
 
 	int iter_count = 0;
+
+	/* skip if we have reached the maximum number of concurrent cores  TEMP HACK */
+	int total_inuse_cores = 0;
+	char *t_k;
+	struct vine_worker_info *t_w;
+	HASH_TABLE_ITERATE(q->worker_table, t_k, t_w)
+	{
+		uint64_t libtask_id;
+		struct vine_task *libtask;
+		ITABLE_ITERATE(t_w->current_libraries, libtask_id, libtask)
+		{
+			total_inuse_cores += libtask->function_slots_inuse;
+			if (total_inuse_cores >= q->max_cores) {
+				return 0;
+			}
+		}
+	}
 
 	SKIP_LIST_ITERATE(cur, t)
 	{
@@ -3629,7 +3665,12 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 			}
 
 			switch (result) {
-			case VINE_SUCCESS:     /* return on successful commit. */
+			case VINE_SUCCESS: /* return on successful commit. */ {
+				committable_cores--;
+				total_inuse_cores++;
+				skip_list_remove_here(cur);
+				break;
+			}
 			case VINE_APP_FAILURE: /* failed to dispatch, commit put the task back in the right place. */
 			case VINE_WORKER_FAILURE:
 			case VINE_END_OF_LIST: /* shouldn't happen */
@@ -3641,6 +3682,10 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 				push_task_to_ready_tasks(q, t);
 				break;
 			}
+		}
+
+		if (committable_cores <= 0 || total_inuse_cores >= q->max_cores) {
+			break;
 		}
 	}
 
@@ -4235,6 +4280,10 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	vine_perf_log_write_update(q, 1);
 
 	q->time_last_wait = timestamp_get();
+
+	q->time_start_execution = UINT64_MAX; // TMEP HACK
+	q->time_end_execution = 0;	      // TMEP HACK
+	q->max_cores = INT_MAX;		      // TMEP HACK
 
 	debug(D_VINE, "Manager is listening on port %d.", q->port);
 
@@ -4917,6 +4966,11 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	/* Find the original prototype library task by name, if it exists. */
 	struct vine_task *original = hash_table_lookup(q->library_templates, name);
 	if (!original) {
+		return 0;
+	}
+
+	/* HACK: if the worker already has a library instance, do not send another one */
+	if (itable_size(w->current_libraries) > 1) {
 		return 0;
 	}
 
@@ -6015,6 +6069,15 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "shift-disk-load")) {
 		q->shift_disk_load = !!((int)value);
+
+	} else if (!strcmp(name, "max-cores")) {
+		q->max_cores = MAX(1, (int)value);
+
+	} else if (strcmp(name, "enable-debug-log") == 0) {
+		if ((int)value == 0) {
+			debug_flags_clear();
+			debug_close();
+		}
 
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);

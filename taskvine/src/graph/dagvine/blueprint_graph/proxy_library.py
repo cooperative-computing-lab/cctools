@@ -63,11 +63,6 @@ class ProxyLibrary:
         self.context_loader_args = context_loader_args
         self.context_loader_kwargs = context_loader_kwargs
 
-    def get_context_size(self):
-        dumped_data = self.context_loader_args[0]
-        serialized = round(len(dumped_data) / 1024 / 1024, 2)
-        return serialized
-
     def install(self):
         assert self.name is not None, "Library name must be set before installing (use set_name method)"
         assert self.libcores is not None, "Library cores must be set before installing (use set_libcores method)"
