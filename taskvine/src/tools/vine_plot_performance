@@ -478,6 +478,7 @@ if __name__ == "__main__":
                 "tasks_failed",
                 "tasks_cancelled",
                 "tasks_exhausted_attempts",
+                "tasks_recovery",
             ],
             labels=[
                 "submitted",
@@ -486,6 +487,7 @@ if __name__ == "__main__":
                 "failed",
                 "cancelled",
                 "exhausted attempts",
+                "recovery",
             ],
         )
 
