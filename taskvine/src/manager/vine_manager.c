@@ -139,6 +139,7 @@ static void find_max_worker(struct vine_manager *q);
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state);
+static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t);
 
 static int task_request_count(struct vine_manager *q, const char *category, category_allocation_t request);
 
@@ -590,8 +591,11 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 	if (!t) {
 		debug(D_VINE, "Unknown task completion from worker %s (%s): no task %" PRId64 " assigned to worker. Ignoring result.", w->hostname, w->addrport, task_id);
 
-		time_t stoptime = time(0) + vine_manager_transfer_time(q, w, output_length);
-		link_soak(w->link, output_length, stoptime);
+		if (bytes_sent > 0) {
+			time_t stoptime = time(0) + vine_manager_transfer_time(q, w, bytes_sent);
+			link_soak(w->link, bytes_sent, stoptime);
+		}
+
 		return VINE_SUCCESS;
 	}
 
@@ -955,9 +959,12 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 		if (removed_replica) {
 			vine_file_replica_delete(removed_replica);
 		}
+
 		/* consider if this replica needs recovery because of worker removal */
-		if (q->immediate_recovery && f->type == VINE_TEMP && !vine_temp_exists_somewhere(q, f)) {
-			vine_manager_consider_recovery_task(q, f, f->recovery_task);
+		if (f) {
+			if (q->immediate_recovery && f->type == VINE_TEMP && !vine_temp_exists_somewhere(q, f)) {
+				vine_manager_consider_recovery_task(q, f, f->recovery_task);
+			}
 		}
 	}
 
@@ -1046,20 +1053,39 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 
 	vine_current_transfers_wipe_worker(q, w);
 
-	ITABLE_ITERATE(w->current_tasks, task_id, t)
-	{
-		if (t->time_when_commit_end >= t->time_when_commit_start) {
-			timestamp_t delta_time = timestamp_get() - t->time_when_commit_end;
-			t->time_workers_execute_failure += delta_time;
-			t->time_workers_execute_all += delta_time;
+	/* Collect all task IDs first to avoid iterator invalidation during removal. */
+	int task_count = itable_size(w->current_tasks);
+	uint64_t *task_ids = NULL;
+	if (task_count > 0) {
+		task_ids = xxmalloc(task_count * sizeof(uint64_t));
+		int i = 0;
+		ITABLE_ITERATE(w->current_tasks, task_id, t)
+		{
+			task_ids[i] = task_id;
+			i++;
 		}
 
-		/* Remove the unfinished task and update data structures. */
-		reap_task_from_worker(q, w, t, VINE_TASK_READY);
+		/* Process each task by ID, then remove it. */
+		for (i = 0; i < task_count; i++) {
+			task_id = task_ids[i];
+			t = itable_lookup(w->current_tasks, task_id);
+			if (!t) {
+				continue; /* Task may have been removed already? */
+			}
 
-		vine_task_clean(t);
+			if (t->time_when_commit_end >= t->time_when_commit_start) {
+				timestamp_t delta_time = timestamp_get() - t->time_when_commit_end;
+				t->time_workers_execute_failure += delta_time;
+				t->time_workers_execute_all += delta_time;
+			}
 
-		itable_firstkey(w->current_tasks);
+			/* Remove the unfinished task and update data structures. */
+			reap_task_from_worker(q, w, t, VINE_TASK_READY);
+
+			vine_task_clean(t);
+		}
+
+		free(task_ids);
 	}
 
 	itable_clear(w->current_tasks, 0);
@@ -2187,7 +2213,7 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "tasks_on_workers", info.tasks_on_workers);
 	jx_insert_integer(j, "tasks_running", info.tasks_running);
 	jx_insert_integer(j, "tasks_with_results", info.tasks_with_results);
-	jx_insert_integer(j, "recovery_tasks_submitted", info.recovery_tasks_submitted);
+	jx_insert_integer(j, "tasks_recovery", info.tasks_recovery);
 	jx_insert_integer(j, "tasks_left", q->num_tasks_left);
 
 	jx_insert_integer(j, "tasks_submitted", info.tasks_submitted);
@@ -3586,6 +3612,15 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 		if (w) {
 			task_unready = 1;
 
+			/*
+			 * Remove task from ready_tasks BEFORE committing to worker.
+			 * This is critical because commit_task_to_worker may fail and
+			 * call handle_failure, which moves the task to retrieved_list.
+			 * If we don't remove first, the task would be in both lists,
+			 * leading to use-after-free when the task is later deleted.
+			 */
+			skip_list_remove_here(cur);
+
 			vine_result_code_t result;
 			if (q->task_groups_enabled) {
 				result = commit_task_group_to_worker(q, w, t);
@@ -3598,11 +3633,12 @@ static int send_one_task_with_cr(struct vine_manager *q, struct skip_list_cursor
 			case VINE_APP_FAILURE: /* failed to dispatch, commit put the task back in the right place. */
 			case VINE_WORKER_FAILURE:
 			case VINE_END_OF_LIST: /* shouldn't happen */
-				skip_list_remove_here(cur);
+				/* Task already removed above */
 				break;
 			case VINE_MGR_FAILURE:
 				/* special case, commit had a chained failure,
-				keep the task in the ready list so it can be retried. */
+				re-add task to the ready list so it can be retried. */
+				push_task_to_ready_tasks(q, t);
 				break;
 			}
 		}
@@ -3921,6 +3957,10 @@ static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vin
 		change_task_state(q, t, new_state);
 		break;
 
+	case VINE_TASK_WAITING_RETRIEVAL:
+		/* do the same for run vs waiting retrieval, only difference is waiting_retrieval_list */
+		list_remove(q->waiting_retrieval_list, t);
+		/* fall through */
 	case VINE_TASK_RUNNING:
 		/* t->worker must be set if in RUNNING state */
 		assert(w);
@@ -3934,11 +3974,6 @@ static void reset_task_to_state(struct vine_manager *q, struct vine_task *t, vin
 
 		/* change_task_state() happened inside reap_task_from_worker */
 
-		break;
-
-	case VINE_TASK_WAITING_RETRIEVAL:
-		list_remove(q->waiting_retrieval_list, t);
-		change_task_state(q, t, new_state);
 		break;
 
 	case VINE_TASK_RETRIEVED:
@@ -4015,6 +4050,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	// information of its creation.
 	char *debug_tmp = string_format("%s/vine-logs/debug", runtime_dir);
 	vine_enable_debug_log(debug_tmp);
+	cctools_version_debug(D_VINE, "TaskVine");
 	free(debug_tmp);
 
 	q->manager_link = link_serve(port);
@@ -4689,6 +4725,9 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 	c->vine_stats->tasks_on_workers = c->vine_stats->tasks_running + c->vine_stats->tasks_with_results;
 	c->vine_stats->tasks_submitted = c->total_tasks + c->vine_stats->tasks_waiting + c->vine_stats->tasks_on_workers;
 
+	/* update log before switch before as task may get deleted in some cases */
+	vine_txn_log_write_task(q, t);
+
 	switch (new_state) {
 	case VINE_TASK_INITIAL:
 		/* should not happen, do nothing */
@@ -4725,7 +4764,6 @@ static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_t
 	}
 
 	vine_perf_log_write_update(q, 0);
-	vine_txn_log_write_task(q, t);
 
 	return old_state;
 }
@@ -4827,7 +4865,7 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	vine_task_check_consistency(t);
 
 	if (t->type == VINE_TASK_TYPE_RECOVERY) {
-		q->stats->recovery_tasks_submitted++;
+		q->stats->tasks_recovery++;
 	}
 
 	if (t->has_fixed_locations) {
@@ -5182,12 +5220,16 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			return NULL;
 		}
 
+		// Save task type and result as task may be freed in change_task_state
+		vine_task_type_t task_type = t->type;
+		vine_result_t task_result = t->result;
+
 		change_task_state(q, t, VINE_TASK_DONE);
-		if (t->result != VINE_RESULT_SUCCESS) {
+		if (task_result != VINE_RESULT_SUCCESS) {
 			q->stats->tasks_failed++;
 		}
 
-		switch (t->type) {
+		switch (task_type) {
 		case VINE_TASK_TYPE_STANDARD:
 			/* if this is a standard task type, then break and return it to the user. */
 			return t;
@@ -5679,6 +5721,10 @@ int vine_cancel_by_task_id(struct vine_manager *q, int task_id)
 		return 0;
 	}
 
+	if (task->state == VINE_TASK_RETRIEVED) {
+		return 0;
+	}
+
 	if (task->group_id) {
 		struct list *l = itable_lookup(q->task_group_table, task->group_id);
 		if (l) {
@@ -5688,9 +5734,12 @@ int vine_cancel_by_task_id(struct vine_manager *q, int task_id)
 		vine_task_delete(task);
 	}
 
+	// set result before next call so that task appears with
+	// correct info in the transaction's log
+	task->result = VINE_RESULT_CANCELLED;
+
 	reset_task_to_state(q, task, VINE_TASK_RETRIEVED);
 
-	task->result = VINE_RESULT_CANCELLED;
 	q->stats->tasks_cancelled++;
 
 	return 1;
@@ -5708,6 +5757,41 @@ int vine_cancel_by_task_tag(struct vine_manager *q, const char *task_tag)
 		debug(D_VINE, "Task with tag %s is not found in manager.", task_tag);
 		return 0;
 	}
+}
+
+int vine_cancel_all_by_tag(struct vine_manager *q, const char *tag)
+{
+	int count = 0;
+	struct vine_task *t;
+	uint64_t task_id;
+
+	ITABLE_ITERATE(q->tasks, task_id, t)
+	{
+		switch (t->state) {
+		case VINE_TASK_RETRIEVED:
+		case VINE_TASK_DONE:
+			/* these tasks are already in a final state, so we can skip them */
+			continue;
+		default:
+			switch (t->type) {
+			case VINE_TASK_TYPE_STANDARD:
+			case VINE_TASK_TYPE_LIBRARY_INSTANCE:
+				if (task_tag_comparator(t, tag)) {
+					vine_cancel_by_task_id(q, task_id);
+					count++;
+				}
+				break;
+			case VINE_TASK_TYPE_RECOVERY:
+			case VINE_TASK_TYPE_LIBRARY_TEMPLATE:
+				/* recovery tasks should not be canceled (unless explicitely by task id)
+				 * as there are temporary files that the workflow already considers done. */
+				continue;
+				break;
+			}
+		}
+	}
+
+	return count;
 }
 
 int vine_cancel_all(struct vine_manager *q)
@@ -6410,6 +6494,13 @@ int vine_prune_file(struct vine_manager *m, struct vine_file *f)
 			for (int i = 0; workers_array[i] != NULL; i++) {
 				struct vine_worker_info *w = (struct vine_worker_info *)workers_array[i];
 				delete_worker_file(m, w, f->cached_name, 0, 0);
+
+				/* update replica table for the worker */
+				struct vine_file_replica *removed_replica = vine_file_replica_table_remove(m, w, f->cached_name);
+				if (removed_replica) {
+					vine_file_replica_delete(removed_replica);
+				}
+
 				pruned_replica_count++;
 			}
 			set_free_values_array(workers_array);

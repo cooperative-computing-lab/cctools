@@ -100,6 +100,7 @@ static struct jx_table workers_able_headers[] = {
 {"category",      "CATEGORY",     JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,  -12},
 {"tasks_on_workers", "DISPATCHED",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
 {"tasks_waiting", "WAITING",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
+{"tasks_done",     "COMPLETE",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
 {"workers_able",  "FIT-WORKERS",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 12},
 {"max_cores",     "MAX-CORES",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
 {"max_memory",    "MAX-MEMORY",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
@@ -546,7 +547,11 @@ int terminal_columns( int fd )
 	int columns = 80;
 
 	char *columns_str = getenv("COLUMNS");
-	if(columns_str) {
+
+	if (!isatty(STDOUT_FILENO)) {
+	    /* if in a pipe, columns count has not a limit */
+	    columns = -1;
+	} else if(columns_str) {
 		int c = atoi(columns_str);
 		if(c>=10) columns = c;
 	} else if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &window) >= 0) {

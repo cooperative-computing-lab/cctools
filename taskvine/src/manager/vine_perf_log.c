@@ -30,7 +30,7 @@ void vine_perf_log_write_header(struct vine_manager *q)
 			// tasks current:
 			" tasks_waiting tasks_on_workers tasks_running tasks_with_results"
 			// tasks cumulative
-			" tasks_submitted tasks_dispatched tasks_done tasks_failed tasks_cancelled tasks_exhausted_attempts"
+			" tasks_submitted tasks_dispatched tasks_done tasks_failed tasks_cancelled tasks_exhausted_attempts tasks_recovery"
 			// manager time statistics:
 			" time_send time_receive time_send_good time_receive_good time_status_msgs time_internal time_polling time_application time_scheduling"
 			// workers time statistics:
@@ -100,6 +100,7 @@ void vine_perf_log_write_update(struct vine_manager *q, int force)
 	buffer_printf(&B, " %d", s.tasks_failed);
 	buffer_printf(&B, " %d", s.tasks_cancelled);
 	buffer_printf(&B, " %d", s.tasks_exhausted_attempts);
+	buffer_printf(&B, " %d", s.tasks_recovery);
 
 	/* Master time statistics: */
 	buffer_printf(&B, " %" PRId64, s.time_send);

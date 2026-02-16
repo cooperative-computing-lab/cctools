@@ -175,7 +175,7 @@ struct vine_stats {
 	int tasks_on_workers;	/**< Number of tasks currently dispatched to some worker. */
 	int tasks_running;	/**< Number of tasks currently executing at some worker. */
 	int tasks_with_results; /**< Number of tasks with retrieved results and waiting to be returned to user. */
-	int recovery_tasks_submitted; /**< Total number of recovery tasks submitted since the manager started. */
+	int tasks_recovery;     /**< Total number of recovery tasks submitted. */
 
 	/* Cumulative stats for tasks: */
 	int tasks_submitted;  /**< Total number of tasks submitted to the manager. */
@@ -1338,6 +1338,14 @@ The cancelled task will be returned in the normal way via @ref vine_wait with a 
 @return True if the task was found in the manager and cancelled, false otherwise.
 */
 int vine_cancel_by_task_tag(struct vine_manager *m, const char *tag);
+
+/** Cancel all submitted tasks with the given tag and remove them from the manager.
+Each cancelled task will be returned in the normal way via @ref vine_wait with a result of VINE_RESULT_CANCELLED.
+@param m A manager object
+@param tag The tag name assigned to tasks using @ref vine_task_set_tag.
+@return The number of tasks cancelled.
+*/
+int vine_cancel_all_by_tag(struct vine_manager *m, const char *tag);
 
 /** Cancel all submitted tasks and remove them from the manager.
 Each cancelled task will be returned in the normal way via @ref vine_wait with a result of VINE_RESULT_CANCELLED.

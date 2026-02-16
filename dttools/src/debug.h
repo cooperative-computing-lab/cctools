@@ -35,6 +35,7 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #include "int_sizes.h"
 
 #include <unistd.h>
+#include <execinfo.h>
 
 #include <sys/types.h>
 
@@ -263,5 +264,31 @@ void debug_close(void);
  * NOTE: the caller of this macro must supply at least one argument after the format string.
  */
 #define LDEBUG(fmt, ...) debug(D_DEBUG, "%s:%s:%d[%s]: " fmt, __func__, __FILE__, __LINE__, CCTOOLS_SOURCE, __VA_ARGS__)
+
+
+#define DEBUG_BT_SIZE 100
+
+/* Use offset info (+0x...) with addr2line -f -e [exe or .so] */
+#define debug_backtrace \
+	{ debug(D_ERROR, "%s:%s:%d[%s]", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE); \
+		void *buffer[DEBUG_BT_SIZE]; \
+		size_t nptrs = backtrace(buffer, DEBUG_BT_SIZE); \
+		char **strings = backtrace_symbols(buffer, nptrs); \
+		if (!strings) { \
+			debug(D_ERROR, "%s", "No backtrace available."); \
+		} else { \
+			for (size_t bt_ct = 0; bt_ct < nptrs; bt_ct++) { \
+				debug(D_ERROR, "%s", strings[bt_ct]); \
+			} \
+		} \
+		free(strings); \
+	} // generate a core if possible
+
+
+#define debug_assert(cond)\
+  if (!(cond)) {\
+    debug(D_ERROR, "Assertion failed: %s", #cond);\
+    debug_backtrace;\
+    abort(); }
 
 #endif
