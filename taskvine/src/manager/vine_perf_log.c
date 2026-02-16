@@ -100,6 +100,7 @@ void vine_perf_log_write_update(struct vine_manager *q, int force)
 	buffer_printf(&B, " %d", s.tasks_failed);
 	buffer_printf(&B, " %d", s.tasks_cancelled);
 	buffer_printf(&B, " %d", s.tasks_exhausted_attempts);
+	buffer_printf(&B, " %d", s.tasks_recovery);
 
 	/* Master time statistics: */
 	buffer_printf(&B, " %" PRId64, s.time_send);
