@@ -1470,7 +1470,7 @@ void vine_graph_execute(struct vine_graph *vg)
 		if (vg->manager->auto_recovery) {
 			/* Recovery progress reflects manager recovery tasks. */
 			(void)did_resubmit;
-			progress_bar_set_part_total(pbar, recovery_tasks_part, (uint64_t)vg->manager->stats->recovery_tasks_submitted);
+			progress_bar_set_part_total(pbar, recovery_tasks_part, (uint64_t)vg->manager->stats->tasks_recovery);
 			progress_bar_update_part(pbar, recovery_tasks_part, 0);
 		} else {
 			/* Recovery progress reflects graph-level resubmissions:
