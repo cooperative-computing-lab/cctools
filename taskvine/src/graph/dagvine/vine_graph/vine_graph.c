@@ -837,6 +837,7 @@ int vine_graph_tune(struct vine_graph *vg, const char *name, const char *value)
 
 	} else if (strcmp(name, "time-metrics-filename") == 0) {
 		if (value == NULL || strcmp(value, "0") == 0) {
+			vg->time_metrics_filename = NULL;
 			return 0;
 		}
 
@@ -1622,7 +1623,7 @@ void vine_graph_execute(struct vine_graph *vg)
 	debug(D_VINE, "total time spent on unlink local files: %.6f seconds\n", total_time_spent_on_unlink_local_files);
 
 	if (vg->time_metrics_filename) {
-		print_time_metrics(vg, vg->time_metrics_filename);
+		// print_time_metrics(vg, vg->time_metrics_filename);
 	}
 
 	signal(SIGINT, previous_sigint_handler);
