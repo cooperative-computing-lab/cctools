@@ -20,6 +20,7 @@ struct batch_job_info {
 	int exit_signal;     /**< The signal by which the job was killed, if it exited abnormally. */
 	int disk_allocation_exhausted; /**< Non-zero if the job filled its loop device allocation to capacity, zero otherwise */
 	long log_pos;        /**< Last read position in the log file, for ftell and fseek. (only for batch_queue_cluster) */
+	char *schedd;        /**< Condor schedd host from job log alias (e.g. from "Job submitted from host: <...&alias=...>"), if known. */
 };
 
 /** Create a new batch_job_info struct.
