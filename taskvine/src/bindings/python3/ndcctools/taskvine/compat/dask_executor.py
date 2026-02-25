@@ -180,8 +180,6 @@ class DaskVine(Manager):
             self.wrapper_proc = wrapper_proc
             self.prune_depth = prune_depth
             self.category_info = defaultdict(lambda: {"num_tasks": 0, "total_execution_time": 0})
-            self.max_priority = float('inf')
-            self.min_priority = float('-inf')
 
             if submit_per_cycle is not None and submit_per_cycle < 1:
                 submit_per_cycle = None
@@ -358,7 +356,7 @@ class DaskVine(Manager):
 
             task_depth = dag.depth_of(k)
             if self.task_priority_mode == 'random':
-                priority = random.randint(self.min_priority, self.max_priority)
+                priority = random.getrandbits(32)
             elif self.task_priority_mode == 'depth-first':
                 # dig more information about different kinds of tasks
                 priority = task_depth
@@ -370,13 +368,13 @@ class DaskVine(Manager):
                 if self.category_info[cat]["num_tasks"]:
                     priority = self.category_info[cat]["total_execution_time"] / self.category_info[cat]["num_tasks"]
                 else:
-                    priority = self.max_priority
+                    priority = 1 << 53
             elif self.task_priority_mode == 'shortest-category-first':
                 # if no tasks have been executed in this category, set a high priority so that we know more information about each category
                 if self.category_info[cat]["num_tasks"]:
                     priority = -self.category_info[cat]["total_execution_time"] / self.category_info[cat]["num_tasks"]
                 else:
-                    priority = self.max_priority
+                    priority = 1 << 53
             elif self.task_priority_mode == 'FIFO':
                 # first in first out, the default behavior
                 priority = -round(time.time(), 6)
