@@ -237,6 +237,13 @@ struct vine_manager {
 	double sandbox_grow_factor;         /* When task disk sandboxes are exhausted, increase the allocation using their measured valued times this factor */
 	double disk_proportion_available_to_task;   /* intentionally reduces disk allocation for tasks to reserve some space for cache growth. */
 
+	int return_recovery_tasks; /* If true, recovery tasks are returned by vine_wait to the user. By default they are handled internally. */
+	int auto_recovery;         /* If true, recovery tasks are created automatically internally. */
+	int balance_worker_disk_load; /* If true, offload replicas from workers that are overloaded with temp files. */
+	timestamp_t when_last_offloaded;
+	int64_t peak_used_cache;
+	int shutting_down;
+
 	/* todo: confirm datatype. int or int64 */
 	int max_task_stdout_storage;	/* Maximum size of standard output from task.  (If larger, send to a separate file.) */
 	int max_new_workers;			/* Maximum number of workers to add in a single cycle before dealing with other matters. */
@@ -247,6 +254,10 @@ struct vine_manager {
 	/* Testing mode parameters */
 	timestamp_t enforce_worker_eviction_interval;   /* Enforce worker eviction interval in seconds */
 	timestamp_t time_start_worker_eviction;         /* Track the time when we start evicting workers */
+
+	timestamp_t time_start_execution;  // TMEP HACK
+	timestamp_t time_end_execution;    // TMEP HACK
+	int max_cores;                     // TMEP HACK
 };
 
 /*

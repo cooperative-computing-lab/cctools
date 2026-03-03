@@ -91,6 +91,7 @@ void vine_task_clean(struct vine_task *t)
 {
 	t->time_when_commit_start = 0;
 	t->time_when_commit_end = 0;
+
 	t->time_when_retrieval = 0;
 	t->time_when_done = 0;
 
@@ -153,6 +154,9 @@ void vine_task_reset(struct vine_task *t)
 	t->time_workers_execute_all = 0;
 	t->time_workers_execute_exhaustion = 0;
 	t->time_workers_execute_failure = 0;
+
+	t->time_when_commit_start = 0;
+	t->time_when_commit_end = 0;
 
 	rmsummary_delete(t->resources_measured);
 	rmsummary_delete(t->resources_allocated);

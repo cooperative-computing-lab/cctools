@@ -178,6 +178,7 @@ def pack_library_code(path, envpath):
 # @param exec_mode      The execution mode of functions in this library.
 # @param hoisting_modules  A list of modules imported at the preamble of library, including packages, functions and classes.
 # @param library_context_info   A list containing [library_context_func, library_context_args, library_context_kwargs]. Used to create the library context on remote nodes.
+# @param function_infile_load_mode   The mode to load infile for function tasks inside this library.
 # @return               A hash value.
 def generate_library_hash(library_name,
                           function_list,
@@ -186,7 +187,8 @@ def generate_library_hash(library_name,
                           add_env,
                           exec_mode,
                           hoisting_modules,
-                          library_context_info):
+                          library_context_info,
+                          function_infile_load_mode):
     library_info = [library_name]
     function_list = list(function_list)
     function_names = set()
@@ -234,6 +236,8 @@ def generate_library_hash(library_name,
             for kwarg in library_context_info[2]:
                 library_info.append(str(kwarg))
                 library_info.append(str(library_context_info[2][kwarg]))
+
+    library_info.append(str(function_infile_load_mode))
     
     library_info = ''.join(library_info)    # linear time complexity
     msg = hashlib.sha1()
@@ -293,6 +297,7 @@ def generate_taskvine_library_code(library_path, hoisting_modules=None):
 # @param    exec_mode               execution mode of functions in this library
 # @param    hoisting_modules        a list of modules to be imported at the preamble of library
 # @param    library_context_info    a list containing a library's context to be created remotely
+# @param    function_infile_load_mode   The mode to load infile for function tasks inside this library.
 # @return   name of the file containing serialized information about the library
 def generate_library(library_cache_path,
                      library_code_path,
@@ -303,7 +308,8 @@ def generate_library(library_cache_path,
                      need_pack=True,
                      exec_mode='fork',
                      hoisting_modules=None,
-                     library_context_info=None
+                     library_context_info=None,
+                     function_infile_load_mode='cloudpickle'
 ):
     # create library_info.clpk
     library_info = {}
@@ -313,6 +319,7 @@ def generate_library(library_cache_path,
     library_info['library_name'] = library_name
     library_info['exec_mode'] = exec_mode
     library_info['context_info'] = cloudpickle.dumps(library_context_info)
+    library_info['function_infile_load_mode'] = function_infile_load_mode
     with open(library_info_path, 'wb') as f:
         cloudpickle.dump(library_info, f) 
 

@@ -138,8 +138,10 @@ class DaskVine(Manager):
             hoisting_modules=None,  # Deprecated, use lib_modules
             import_modules=None,    # Deprecated, use lib_modules
             lazy_transfers=True,    # Deprecated, use worker_tranfers
+            extra_serialize_time_sec=0,
             ):
         try:
+            self.extra_serialize_time_sec = extra_serialize_time_sec
             self.set_property("framework", "dask")
             if retries and retries < 1:
                 raise ValueError("retries should be larger than 0")
@@ -213,10 +215,13 @@ class DaskVine(Manager):
         return self.get(*args, **kwargs)
 
     def _dask_execute(self, dsk, keys):
+
         indices = {k: inds for (k, inds) in find_dask_keys(keys)}
         keys_flatten = indices.keys()
 
+        time_start = time.time()
         dag = DaskVineDag(dsk, low_memory_mode=self.low_memory_mode, prune_depth=self.prune_depth)
+        print(f"Time taken to enqueue tasks: {time.time() - time_start:.6f} seconds")
         tag = f"dag-{id(dag)}"
 
         # create Library if using 'function-calls' task mode.
@@ -437,7 +442,8 @@ class DaskVine(Manager):
                                      extra_files=self.extra_files,
                                      retries=retries,
                                      worker_transfers=lazy,
-                                     wrapper=self.wrapper)
+                                     wrapper=self.wrapper,
+                                     extra_serialize_time_sec=self.extra_serialize_time_sec)
 
                 t.set_priority(priority)
                 t.set_tag(tag)  # tag that identifies this dag
@@ -557,7 +563,9 @@ class PythonTaskDask(PythonTask):
                  env_vars=None,
                  retries=5,
                  worker_transfers=False,
-                 wrapper=None):
+                 wrapper=None,
+                 extra_serialize_time_sec=0):
+        time.sleep(extra_serialize_time_sec)
         self._key = key
         self._sexpr = sexpr
 
@@ -658,7 +666,9 @@ class FunctionCallDask(FunctionCall):
                  extra_files=None,
                  retries=5,
                  worker_transfers=False,
-                 wrapper=None):
+                 wrapper=None,
+                 extra_serialize_time_sec=0):
+        time.sleep(extra_serialize_time_sec)
 
         self._key = key
         self.resources = resources
