@@ -42,6 +42,10 @@ from .manager import (
     Manager,
     Factory,
 )
+from .vine_cache import (
+    TaskCache,
+    CachedTaskResult,
+)
 from .futures import (
     FuturesExecutor,
     FuturePythonTask,
