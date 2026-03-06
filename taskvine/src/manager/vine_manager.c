@@ -183,7 +183,7 @@ static void log_manager_start_timezone(void)
 	struct tm tm_local;
 
 	if (!localtime_r(&now, &tm_local)) {
-		debug(D_VINE, "Manager timezone at startup: unavailable (localtime_r failed).");
+		debug(D_VINE, "manager timezone at startup unavailable (localtime_r failed).");
 		return;
 	}
 
@@ -197,7 +197,7 @@ static void log_manager_start_timezone(void)
 
 	const char *tz_env = getenv("TZ");
 	debug(D_VINE,
-			"Manager timezone at startup: local_time=%s, tz_abbr=%s, tz_offset=%s, TZ_env=%s",
+			"manager timezone at startup: local_time=%s tz_abbr=%s tz_offset=%s TZ_env=%s.",
 			local_time[0] ? local_time : "unknown",
 			tz_abbr[0] ? tz_abbr : "unknown",
 			tz_offset[0] ? tz_offset : "unknown",
