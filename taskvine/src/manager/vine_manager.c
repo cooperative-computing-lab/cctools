@@ -149,6 +149,7 @@ static vine_msg_code_t handle_manager_status(struct vine_manager *q, struct vine
 static vine_msg_code_t handle_resources(struct vine_manager *q, struct vine_worker_info *w, time_t stoptime);
 static vine_msg_code_t handle_feature(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 static void handle_library_update(struct vine_manager *q, struct vine_worker_info *w, const char *line);
+static void log_manager_start_timezone(void);
 
 static struct jx *manager_to_jx(struct vine_manager *q);
 static struct jx *manager_lean_to_jx(struct vine_manager *q);
@@ -171,6 +172,37 @@ static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_
 static int release_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
+
+/*
+Log timezone context at manager startup so timestamp-based logs can be
+interpreted correctly across deployment locations.
+*/
+static void log_manager_start_timezone(void)
+{
+	time_t now = time(NULL);
+	struct tm tm_local;
+
+	if (!localtime_r(&now, &tm_local)) {
+		debug(D_VINE, "Manager timezone at startup: unavailable (localtime_r failed).");
+		return;
+	}
+
+	char local_time[64] = {0};
+	char tz_abbr[32] = {0};
+	char tz_offset[16] = {0};
+
+	strftime(local_time, sizeof(local_time), "%Y-%m-%d %H:%M:%S", &tm_local);
+	strftime(tz_abbr, sizeof(tz_abbr), "%Z", &tm_local);
+	strftime(tz_offset, sizeof(tz_offset), "%z", &tm_local);
+
+	const char *tz_env = getenv("TZ");
+	debug(D_VINE,
+			"Manager timezone at startup: local_time=%s, tz_abbr=%s, tz_offset=%s, TZ_env=%s",
+			local_time[0] ? local_time : "unknown",
+			tz_abbr[0] ? tz_abbr : "unknown",
+			tz_offset[0] ? tz_offset : "unknown",
+			tz_env ? tz_env : "(system default)");
+}
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
@@ -4039,6 +4071,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	char *debug_tmp = string_format("%s/vine-logs/debug", runtime_dir);
 	vine_enable_debug_log(debug_tmp);
 	cctools_version_debug(D_VINE, "TaskVine");
+	log_manager_start_timezone();
 	free(debug_tmp);
 
 	q->manager_link = link_serve(port);
