@@ -16,8 +16,10 @@ See the file COPYING for details.
  * normal conditions. If a worker reaches this limit, it indicates a bug on the manager's side. */
 #define VINE_TRANSFER_PROC_MAX_CHILD 128
 
-void vine_transfer_server_start( struct vine_cache *cache, int port_min, int port_max );
+/* Returns 1 on success, 0 on failure (e.g. cannot bind port). */
+int vine_transfer_server_start( struct vine_cache *cache, int port_min, int port_max );
 void vine_transfer_server_stop();
+int vine_transfer_server_running();
 void vine_transfer_server_address( char *addr, int *port );
 
 #endif
