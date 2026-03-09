@@ -50,6 +50,11 @@ class Task(object):
         if not self._task:
             raise Exception("Unable to create internal Task structure")
 
+        # Cache support: track inputs/outputs for fingerprinting and deferred registration
+        self._tracked_inputs = []    # list of (file_obj, remote_name)
+        self._tracked_outputs = []   # list of (file_obj, remote_name, flags)
+        self._outputs_finalized = False
+
         attributes = [
             "library_required",
             "library_provided",
@@ -93,7 +98,6 @@ class Task(object):
                     parameters = {"remote_name": value}
                 else:
                     raise TypeError(f"{value} is not a str or dict")
-                print(f"self.add_output({key}, {parameters})")
                 self.add_output(key, **parameters)
 
         if "env" in task_info:
@@ -355,6 +359,8 @@ class Task(object):
         if not isinstance(remote_name, str):
             raise TypeError(f"remote_name {remote_name} is not a str")
 
+        self._tracked_inputs.append((file, remote_name))  # track for cache fingerprinting
+
         flags = Task._determine_mount_flags(strict_input=strict_input, mount_symlink=mount_symlink)
 
         if cvine.vine_task_add_input(self._task, file._file, remote_name, flags) == 0:
@@ -381,8 +387,23 @@ class Task(object):
             raise TypeError(f"remote_name {remote_name} is not a str")
 
         flags = Task._determine_mount_flags(watch, failure_only, success_only)
-        if cvine.vine_task_add_output(self._task, file._file, remote_name, flags) == 0:
-            raise ValueError("invalid file description")
+        # Defer C registration to _finalize_outputs(), called by Manager.submit().
+        # This prevents PENDING state from being set for tasks that end up as cache hits.
+        self._tracked_outputs.append((file, remote_name, flags))
+
+    ##
+    # Register all deferred outputs with the C task structure.
+    #
+    # Called by Manager.submit() immediately before cvine.vine_submit() for every
+    # task that will actually execute (i.e. not a cache hit). This is a no-op if
+    # called more than once.
+    def _finalize_outputs(self):
+        if self._outputs_finalized:
+            return
+        for (file, remote_name, flags) in self._tracked_outputs:
+            if cvine.vine_task_add_output(self._task, file._file, remote_name, flags) == 0:
+                raise ValueError(f"invalid output file description for {remote_name}")
+        self._outputs_finalized = True
 
     ##
     # When monitoring, indicates a json-encoded file that instructs the monitor
@@ -881,6 +902,10 @@ class PythonTask(Task):
 
         self._tmp_output_enabled = False
         self._cache_output = False
+
+        # Cache support: stable core hash computed by TaskCache.prepare() before
+        # submit_finalize() clears _fn_def. None until prepare() is called.
+        self._core_hash = None
 
         # vine File object that will contain the output of this function
         self._output_file = None
