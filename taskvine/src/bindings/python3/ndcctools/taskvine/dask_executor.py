@@ -198,8 +198,8 @@ class DaskVine(Manager):
             self.wrapper_proc = wrapper_proc
             self.prune_depth = prune_depth
             self.category_info = defaultdict(lambda: {"num_tasks": 0, "total_execution_time": 0})
-            self.max_priority = float(1 << 53)
-            self.min_priority = -float(1 << 53)
+            self.max_priority = float('inf')
+            self.min_priority = float('-inf')
 
             if submit_per_cycle is not None and submit_per_cycle < 1:
                 submit_per_cycle = None
