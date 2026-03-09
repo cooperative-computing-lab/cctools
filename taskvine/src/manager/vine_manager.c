@@ -177,7 +177,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 Log timezone context at manager startup so timestamp-based logs can be
 interpreted correctly across deployment locations.
 */
-static void log_manager_start_timezone(void)
+static void log_manager_start_timezone()
 {
 	time_t now = time(NULL);
 	struct tm tm_local;
