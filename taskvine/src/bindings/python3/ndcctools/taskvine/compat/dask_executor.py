@@ -358,7 +358,7 @@ class DaskVine(Manager):
 
             task_depth = dag.depth_of(k)
             if self.task_priority_mode == 'random':
-                priority = int(random.uniform(self.min_priority, self.max_priority))
+                priority = random.uniform(self.min_priority, self.max_priority)
             elif self.task_priority_mode == 'depth-first':
                 # dig more information about different kinds of tasks
                 priority = task_depth
