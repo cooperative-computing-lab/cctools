@@ -195,13 +195,11 @@ static void log_manager_start_timezone(void)
 	strftime(tz_abbr, sizeof(tz_abbr), "%Z", &tm_local);
 	strftime(tz_offset, sizeof(tz_offset), "%z", &tm_local);
 
-	const char *tz_env = getenv("TZ");
 	debug(D_VINE,
-			"manager timezone at startup: local_time=%s tz_abbr=%s tz_offset=%s TZ_env=%s",
+			"manager timezone at startup: local_time=%s tz_abbr=%s tz_offset=%s",
 			local_time[0] ? local_time : "unknown",
 			tz_abbr[0] ? tz_abbr : "unknown",
-			tz_offset[0] ? tz_offset : "unknown",
-			tz_env ? tz_env : "(system default)");
+			tz_offset[0] ? tz_offset : "unknown");
 }
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
