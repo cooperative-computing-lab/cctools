@@ -120,6 +120,7 @@ Worker environment options:
  Environment variable to add to worker.
 - **-E**,**--extra-options=_&lt;options&gt;_**<br />
  Extra options to give to worker.
+- **--transfer-port=_&lt;port&gt;_**<br /> Port range for worker-worker transfers (e.g. 10000:11000).
 - **--worker-binary=_&lt;file&gt;_**<br />
  Alternate binary instead of vine_worker.
 - **--wrapper=_&lt;cmd&gt;_**<br />
@@ -202,6 +203,7 @@ workers-per-cycle
 task-per-worker
 timeout
 worker-extra-options
+transfer-port
 condor-requirements
 cores
 memory

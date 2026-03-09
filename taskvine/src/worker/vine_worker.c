@@ -552,6 +552,10 @@ Send an asynchronous message to the manager indicating where the worker is liste
 
 static void send_transfer_address(struct link *manager)
 {
+	if (!vine_transfer_server_running()) {
+		send_async_message(manager, "info transfer_port_bind_failed\n");
+		return;
+	}
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 
@@ -1887,7 +1891,9 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 	vine_cache_load(cache_manager);
 
 	/* Start the transfer server, which serves up the cache directory. */
-	vine_transfer_server_start(cache_manager, options->transfer_port_min, options->transfer_port_max);
+	if (!vine_transfer_server_start(cache_manager, options->transfer_port_min, options->transfer_port_max)) {
+		fprintf(stderr, "vine_worker: unable to bind transfer port (check --transfer-port or cluster permissions)\n");
+	}
 
 	measure_worker_resources();
 
