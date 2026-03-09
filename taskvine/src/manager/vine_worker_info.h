@@ -64,8 +64,11 @@ struct vine_worker_info {
 	struct itable       *current_tasks;
 	struct itable		*current_libraries;
 
-	/* The number of tasks running last reported by the worker */
-	int         dynamic_tasks_running;
+	/* Dynamic information summed by count_worker_resources. */
+	int	    tasks_committed;         /* # tasks at worker in any state. */
+	int	    tasks_running;           /* # tasks at worker in RUNNING state */
+	int	    tasks_waiting_retrieval; /* # tasks at worker in the WAITING_RETRIEVAL state */
+	int         dynamic_tasks_running;   /* # tasks last reported by worker actually executing. */
 	
 	/* Accumulated stats about tasks about this worker. */
 	int         finished_tasks;
