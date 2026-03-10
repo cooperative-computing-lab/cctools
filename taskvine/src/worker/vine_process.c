@@ -391,13 +391,13 @@ int vine_process_execute(struct vine_process *p)
 		/* Finally, add things that were explicitly given in the task description. */
 		export_environment(p);
 
-		char *final_command=0;
-		
-		if(p->type==VINE_PROCESS_TYPE_STANDARD) {
+		char *final_command = 0;
+
+		if (p->type == VINE_PROCESS_TYPE_STANDARD) {
 			/* A standard task is just the given command line. */
 			final_command = strdup(p->task->command_line);
 
-		} else if(p->type==VINE_PROCESS_TYPE_LIBRARY) {
+		} else if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
 			/* A library task passes the file descriptors to talk to the manager via
 			 * the command line plus the worker pid to wake the worker up
 			 * so it requires a more complex command. */
@@ -412,13 +412,12 @@ int vine_process_execute(struct vine_process *p)
 					getppid());
 		} else {
 			/* Should not happen. */
-			fatal("Unexpected process type %d!",p->type);
+			fatal("Unexpected process type %d!", p->type);
 		}
 
-		
 		/* Finally, any process type can be modified by a task wrapper. */
-		if(options->task_wrapper) {
-			final_command = string_wrap_command(final_command,options->task_wrapper);
+		if (options->task_wrapper) {
+			final_command = string_wrap_command(final_command, options->task_wrapper);
 		}
 
 		execl("/bin/sh", "sh", "-c", final_command, (char *)0);
