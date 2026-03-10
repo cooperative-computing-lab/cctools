@@ -396,7 +396,7 @@ int vine_process_execute(struct vine_process *p)
 		if(p->type==VINE_PROCESS_TYPE_STANDARD) {
 			/* A standard task may be optionally modified by a task wrapper. */
 			if(options->task_wrapper) {
-				final_command = string_wrap_command(options->task_wrapper,p->task->command_line);
+				final_command = string_wrap_command(p->task->command_line,options->task_wrapper);
 			} else {
 				final_command = p->task->command_line;
 			}
