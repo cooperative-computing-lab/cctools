@@ -418,7 +418,7 @@ int vine_process_execute(struct vine_process *p)
 		
 		/* Finally, any process type can be modified by a task wrapper. */
 		if(options->task_wrapper) {
-			final_command = string_wrap_command(p->task->command_line,options->task_wrapper);
+			final_command = string_wrap_command(final_command,options->task_wrapper);
 		}
 
 		execl("/bin/sh", "sh", "-c", final_command, (char *)0);
