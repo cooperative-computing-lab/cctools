@@ -391,13 +391,22 @@ int vine_process_execute(struct vine_process *p)
 		/* Finally, add things that were explicitly given in the task description. */
 		export_environment(p);
 
-		/* Library task passes the file descriptors to talk to the manager via
-		 * the command line plus the worker pid to wake the worker up
-		 * so it requires a special execl. */
-		if (p->type != VINE_PROCESS_TYPE_LIBRARY) {
-			execl("/bin/sh", "sh", "-c", p->task->command_line, (char *)0);
-		} else {
-			char *final_command = string_format("%s --in-pipe-fd %d --out-pipe-fd %d --task-id %d --library-cores %d --function-slots %d --worker-pid %d",
+		char *final_command=0;
+		
+		if(p->type==VINE_PROCESS_TYPE_STANDARD) {
+			/* A standard task may be optionally modified by a task wrapper. */
+			if(options->task_wrapper) {
+				final_command = string_wrap_command(options->task_wrapper,p->task->command_line);
+			} else {
+				final_command = p->task->command_line;
+			}
+			
+		} else if(p->type==VINE_PROCESS_TYPE_LIBRARY) {
+			/* Library task passes the file descriptors to talk to the manager via
+			 * the command line plus the worker pid to wake the worker up
+			 * so it requires a more complex command. */
+
+			final_command = string_format("%s --in-pipe-fd %d --out-pipe-fd %d --task-id %d --library-cores %d --function-slots %d --worker-pid %d",
 					p->task->command_line,
 					in_pipe_fd,
 					out_pipe_fd,
@@ -405,8 +414,12 @@ int vine_process_execute(struct vine_process *p)
 					(int)p->task->resources_requested->cores,
 					p->task->function_slots_total,
 					getppid());
-			execl("/bin/sh", "sh", "-c", final_command, (char *)0);
+		} else {
+			fatal("Unexpected process type %d!",p->type);
 		}
+
+		
+		execl("/bin/sh", "sh", "-c", final_command, (char *)0);
 		_exit(127); // Failed to execute the cmd.
 
 		/* NOTREACHED */
