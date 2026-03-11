@@ -149,6 +149,7 @@ static vine_msg_code_t handle_manager_status(struct vine_manager *q, struct vine
 static vine_msg_code_t handle_resources(struct vine_manager *q, struct vine_worker_info *w, time_t stoptime);
 static vine_msg_code_t handle_feature(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 static void handle_library_update(struct vine_manager *q, struct vine_worker_info *w, const char *line);
+static void log_manager_start_timezone();
 
 static struct jx *manager_to_jx(struct vine_manager *q);
 static struct jx *manager_lean_to_jx(struct vine_manager *q);
@@ -171,6 +172,35 @@ static void delete_uncacheable_files(struct vine_manager *q, struct vine_worker_
 static int release_worker(struct vine_manager *q, struct vine_worker_info *w);
 
 struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name);
+
+/*
+Log timezone context at manager startup so timestamp-based logs can be
+interpreted correctly across deployment locations.
+*/
+static void log_manager_start_timezone()
+{
+	time_t now = time(NULL);
+	struct tm tm_local;
+
+	if (!localtime_r(&now, &tm_local)) {
+		debug(D_VINE, "manager timezone at startup unavailable (localtime_r failed).");
+		return;
+	}
+
+	char local_time[64] = {0};
+	char tz_abbr[32] = {0};
+	char tz_offset[16] = {0};
+
+	strftime(local_time, sizeof(local_time), "%Y-%m-%d %H:%M:%S", &tm_local);
+	strftime(tz_abbr, sizeof(tz_abbr), "%Z", &tm_local);
+	strftime(tz_offset, sizeof(tz_offset), "%z", &tm_local);
+
+	debug(D_VINE,
+			"manager timezone at startup: local_time=%s tz_abbr=%s tz_offset=%s",
+			local_time[0] ? local_time : "unknown",
+			tz_abbr[0] ? tz_abbr : "unknown",
+			tz_offset[0] ? tz_offset : "unknown");
+}
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
@@ -339,6 +369,8 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 		vine_manager_factory_worker_arrive(q, w, value);
 	} else if (string_prefix_is(field, "library-update")) {
 		handle_library_update(q, w, value);
+	} else if (string_prefix_is(field, "transfer_port_bind_failed")) {
+		notice(D_VINE, "Worker %s (%s) could not bind transfer port; peer transfers disabled.", w->hostname, w->addrport);
 	}
 
 	// Note we always mark info messages as processed, as they are optional.
@@ -956,9 +988,12 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 		if (removed_replica) {
 			vine_file_replica_delete(removed_replica);
 		}
+
 		/* consider if this replica needs recovery because of worker removal */
-		if (q->immediate_recovery && f->type == VINE_TEMP && !vine_temp_exists_somewhere(q, f)) {
-			vine_manager_consider_recovery_task(q, f, f->recovery_task);
+		if (f) {
+			if (q->immediate_recovery && f->type == VINE_TEMP && !vine_temp_exists_somewhere(q, f)) {
+				vine_manager_consider_recovery_task(q, f, f->recovery_task);
+			}
 		}
 	}
 
@@ -2203,7 +2238,7 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "tasks_on_workers", info.tasks_on_workers);
 	jx_insert_integer(j, "tasks_running", info.tasks_running);
 	jx_insert_integer(j, "tasks_with_results", info.tasks_with_results);
-	jx_insert_integer(j, "recovery_tasks_submitted", info.recovery_tasks_submitted);
+	jx_insert_integer(j, "tasks_recovery", info.tasks_recovery);
 	jx_insert_integer(j, "tasks_left", q->num_tasks_left);
 
 	jx_insert_integer(j, "tasks_submitted", info.tasks_submitted);
@@ -4035,6 +4070,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	// information of its creation.
 	char *debug_tmp = string_format("%s/vine-logs/debug", runtime_dir);
 	vine_enable_debug_log(debug_tmp);
+	cctools_version_debug(D_VINE, "TaskVine");
+	log_manager_start_timezone();
 	free(debug_tmp);
 
 	q->manager_link = link_serve(port);
@@ -4827,7 +4864,7 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	vine_task_check_consistency(t);
 
 	if (t->type == VINE_TASK_TYPE_RECOVERY) {
-		q->stats->recovery_tasks_submitted++;
+		q->stats->tasks_recovery++;
 	}
 
 	if (t->has_fixed_locations) {
@@ -5691,9 +5728,12 @@ int vine_cancel_by_task_id(struct vine_manager *q, int task_id)
 		vine_task_delete(task);
 	}
 
+	// set result before next call so that task appears with
+	// correct info in the transaction's log
+	task->result = VINE_RESULT_CANCELLED;
+
 	reset_task_to_state(q, task, VINE_TASK_RETRIEVED);
 
-	task->result = VINE_RESULT_CANCELLED;
 	q->stats->tasks_cancelled++;
 
 	return 1;
@@ -6446,6 +6486,13 @@ int vine_prune_file(struct vine_manager *m, struct vine_file *f)
 			for (int i = 0; workers_array[i] != NULL; i++) {
 				struct vine_worker_info *w = (struct vine_worker_info *)workers_array[i];
 				delete_worker_file(m, w, f->cached_name, 0, 0);
+
+				/* update replica table for the worker */
+				struct vine_file_replica *removed_replica = vine_file_replica_table_remove(m, w, f->cached_name);
+				if (removed_replica) {
+					vine_file_replica_delete(removed_replica);
+				}
+
 				pruned_replica_count++;
 			}
 			set_free_values_array(workers_array);

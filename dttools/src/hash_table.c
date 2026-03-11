@@ -283,8 +283,10 @@ int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 		 * key would be included or skipped in the iteration */
 		h->cant_iterate_yet = 1;
 	} else {
-		/* Should be unreachable but keep for safety. */
-		notice(D_ERROR, "Failed to insert key %s into hash table.", key);
+		if (value != NULL) {
+			/* signal possible memory leak. Only if hash table is being used as set we do not print the message. */
+			notice(D_ERROR, "Failed to insert key %s into hash table.", key);
+		}
 		free(e->key);
 		free(e);
 	}

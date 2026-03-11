@@ -133,6 +133,65 @@ static int64_t factory_timeout = 0;
 
 static char *factory_name = NULL;
 
+/* Port range for worker-worker transfers (e.g. "10000:11000"). Passed as --transfer-port to workers. */
+static char *transfer_port_range = NULL;
+
+/* Returns 1 if valid, 0 if invalid (prints error to stderr). */
+static int validate_transfer_port_range(const char *range, const char *context)
+{
+	int min_port, max_port;
+	char *r, *ptr, *end;
+
+	if (!range || !*range) {
+		fprintf(stderr, "vine_factory: %stransfer-port must be non-empty (e.g. 10000 or 10000:11000)\n", context ? context : "");
+		return 0;
+	}
+
+	r = xxstrdup(range);
+	ptr = strtok(r, ":");
+	if (!ptr) {
+		fprintf(stderr, "vine_factory: %sinvalid transfer-port range \"%s\" (expected PORT or PORT_MIN:PORT_MAX)\n", context ? context : "", range);
+		free(r);
+		return 0;
+	}
+
+	errno = 0;
+	min_port = (int)strtol(ptr, &end, 10);
+	if (*end != '\0' || errno != 0 || min_port < 1 || min_port > 65535) {
+		fprintf(stderr, "vine_factory: %stransfer-port min must be 1-65535, got \"%s\"\n", context ? context : "", ptr);
+		free(r);
+		return 0;
+	}
+	max_port = min_port;
+
+	ptr = strtok(NULL, ":");
+	if (ptr) {
+		errno = 0;
+		max_port = (int)strtol(ptr, &end, 10);
+		if (*end != '\0' || errno != 0 || max_port < 1 || max_port > 65535) {
+			fprintf(stderr, "vine_factory: %stransfer-port max must be 1-65535, got \"%s\"\n", context ? context : "", ptr);
+			free(r);
+			return 0;
+		}
+	}
+
+	ptr = strtok(NULL, ":");
+	if (ptr) {
+		fprintf(stderr, "vine_factory: %sinvalid transfer-port range \"%s\" (expected PORT or PORT_MIN:PORT_MAX)\n", context ? context : "", range);
+		free(r);
+		return 0;
+	}
+
+	if (min_port > max_port) {
+		fprintf(stderr, "vine_factory: %stransfer-port min (%d) must not exceed max (%d)\n", context ? context : "", min_port, max_port);
+		free(r);
+		return 0;
+	}
+
+	free(r);
+	return 1;
+}
+
 struct batch_queue *queue = 0;
 
 // Whether workers should use ssl. If using the catalog server and the manager
@@ -498,6 +557,7 @@ static int submit_worker( struct batch_queue *queue )
 	if(manual_ssl_option)	ADD_ARG1(cmd," --ssl");
 	if(single_shot)		ADD_ARG1(cmd," --single-shot");
 	if(task_wrapper)        ADD_ARG2(cmd," --task-wrapper \"%s\"",task_wrapper);
+	if(transfer_port_range) ADD_ARG2(cmd," --transfer-port %s",transfer_port_range);
 	if(extra_worker_args)	ADD_ARG2(cmd," %s",extra_worker_args);
 
 	char *features_string = make_features_string(features_table);
@@ -886,6 +946,7 @@ int read_config_file(const char *config_file) {
 
 	assign_new_value(new_foremen_regex, foremen_regex, foremen-name, const char *, JX_STRING, string_value)
 	assign_new_value(new_extra_worker_args, extra_worker_args, worker-extra-options, const char *, JX_STRING, string_value)
+	assign_new_value(new_transfer_port_range, transfer_port_range, transfer-port, const char *, JX_STRING, string_value)
 
 	assign_new_value(new_condor_requirements, condor_requirements, condor-requirements, const char *, JX_STRING, string_value)
 
@@ -924,6 +985,14 @@ int read_config_file(const char *config_file) {
 		error_found = 1;
 	}
 
+	if(new_transfer_port_range) {
+		char ctx[PATH_MAX + 4];
+		snprintf(ctx, sizeof(ctx), "%s: ", config_file);
+		if (!validate_transfer_port_range(new_transfer_port_range, ctx)) {
+			error_found = 1;
+		}
+	}
+
 	if(error_found) {
 		goto end;
 	}
@@ -959,6 +1028,11 @@ int read_config_file(const char *config_file) {
 	if(extra_worker_args != new_extra_worker_args) {
 		free(extra_worker_args);
 		extra_worker_args = xxstrdup(new_extra_worker_args);
+	}
+
+	if(new_transfer_port_range != transfer_port_range) {
+		free(transfer_port_range);
+		transfer_port_range = new_transfer_port_range ? xxstrdup(new_transfer_port_range) : NULL;
 	}
 
 	if(new_condor_requirements != condor_requirements) {
@@ -1019,6 +1093,10 @@ int read_config_file(const char *config_file) {
 		fprintf(stdout, "worker-extra-options: %s", extra_worker_args);
 	}
 
+	if(transfer_port_range) {
+		fprintf(stdout, "transfer-port: %s\n", transfer_port_range);
+	}
+
 	if(workers_blocked) {
 		fprintf(stdout, "workers-blocked: %s", workers_blocked);
 	}
@@ -1073,7 +1151,7 @@ static void mainloop( struct batch_queue *queue )
 		{
 			factory_timeout_start = time(0);
 		} else {
-			// check to see if factory timeout is triggered, factory timeout will be 0 if flag isn't set
+			/* check to see if factory timeout is triggered, factory timeout will be 0 if flag isn't set */
 			if(factory_timeout > 0)
 			{
 				if(time(0) - factory_timeout_start > factory_timeout) {
@@ -1289,6 +1367,7 @@ static void show_help(const char *cmd)
 	printf("\nWorker environment options:\n");
 	printf(" %-30s Environment variable to add to worker.\n", "--env=<variable=value>");
 	printf(" %-30s Extra options to give to worker.\n", "-E,--extra-options=<options>");
+	printf(" %-30s Port range for worker-worker transfers (e.g. 10000:11000). Passed as --transfer-port.\n", "--transfer-port=<port|min:max>");
 	printf(" %-30s Alternate binary instead of vine_worker.\n", "--worker-binary=<file>");
 	printf(" %-30s Wrap worker with this command prefix.\n","--wrapper");
 	printf(" %-30s Wrap tasks with this command-prefix,\n","--task-wrapper");
@@ -1336,6 +1415,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_DEBUG_WORKERS,
 		LONG_OPT_DISABLE_AFS_CHECK,
 		LONG_OPT_SINGLE_SHOT,
+		LONG_OPT_TRANSFER_PORT,
 };
 
 static const struct option long_options[] = {
@@ -1388,6 +1468,7 @@ static const struct option long_options[] = {
 	{"tls-sni", required_argument, 0, LONG_OPT_TLS_SNI},
 	{"factory-name",required_argument, 0, LONG_OPT_FACTORY_NAME},
 	{"single-shot", no_argument, 0, LONG_OPT_SINGLE_SHOT},
+	{"transfer-port", required_argument, 0, LONG_OPT_TRANSFER_PORT},
 	{0,0,0,0}
 };
 
@@ -1592,6 +1673,13 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_SINGLE_SHOT:
 				single_shot = 1;
+				break;
+			case LONG_OPT_TRANSFER_PORT:
+				if (!validate_transfer_port_range(optarg, "")) {
+					return EXIT_FAILURE;
+				}
+				free(transfer_port_range);
+				transfer_port_range = xxstrdup(optarg);
 				break;
 			default:
 				show_help(argv[0]);

@@ -98,6 +98,7 @@ OPTION_ARG_LONG(env,variable=value)
  Environment variable to add to worker.
 OPTION_ARG(E,extra-options,options)
  Extra options to give to worker.
+OPTION_ARG_LONG(transfer-port,port) Port range for worker-worker transfers (e.g. 10000:11000).
 OPTION_ARG_LONG(worker-binary,file)
  Alternate binary instead of vine_worker.
 OPTION_ARG_LONG(wrapper,cmd)
@@ -180,6 +181,7 @@ workers-per-cycle
 task-per-worker
 timeout
 worker-extra-options
+transfer-port
 condor-requirements
 cores
 memory

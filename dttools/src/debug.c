@@ -115,6 +115,14 @@ struct fatal_callback {
 
 struct fatal_callback *fatal_callback_list = 0;
 
+static void debug_signal_handler(int sig)
+{
+	signal(sig, SIG_DFL);
+	debug(D_ERROR, "Fatal error: signal %d received", sig);
+	debug_backtrace;
+	_exit(1);
+}
+
 int debug_flags_set(const char *flagname)
 {
 	struct flag_info *i;
@@ -280,6 +288,8 @@ void fatal(const char *fmt, ...)
 	struct fatal_callback *f;
 	va_list args;
 
+	debug_backtrace;
+
 	va_start(args, fmt);
 	do_debug(D_FATAL, fmt, args);
 	va_end(args);
@@ -322,6 +332,15 @@ void debug_config_file(const char *path)
 	if (debug_config_file_e(path) == -1) {
 		fprintf(stderr, "could not set debug file '%s': %s", path, strerror(errno));
 		exit(EXIT_FAILURE);
+	}
+
+	char *var = getenv("CCTOOLS_DEBUG_CAPTURE_SIGNALS");
+	if (var) {
+		signal(SIGSEGV, debug_signal_handler);
+		signal(SIGILL, debug_signal_handler);
+		signal(SIGTERM, debug_signal_handler);
+		signal(SIGINT, debug_signal_handler);
+		signal(SIGQUIT, debug_signal_handler);
 	}
 }
 

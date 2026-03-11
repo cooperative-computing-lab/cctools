@@ -266,9 +266,9 @@ class VinePlot:
         for i in range(len(self.fields)):
             (x, y) = self.get_data_for_field(self.fields[i])
             if self.stack:
-                plt.bar(x, y, label=self.fields[i], color=colors[i])
+                plt.bar(x, y, label=self.labels[i], color=colors[i])
             else:
-                plt.plot(x, y, label=self.fields[i], color=colors[i])
+                plt.plot(x, y, label=self.labels[i], color=colors[i])
 
         if self.y_units:
             plt.ylabel("{} ({})".format(self.ylabel, self.y_units))
@@ -478,6 +478,7 @@ if __name__ == "__main__":
                 "tasks_failed",
                 "tasks_cancelled",
                 "tasks_exhausted_attempts",
+                "tasks_recovery",
             ],
             labels=[
                 "submitted",
@@ -486,6 +487,7 @@ if __name__ == "__main__":
                 "failed",
                 "cancelled",
                 "exhausted attempts",
+                "recovery",
             ],
         )
 

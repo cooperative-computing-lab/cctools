@@ -301,6 +301,19 @@ static batch_queue_id_t batch_queue_condor_wait(struct batch_queue *q, struct ba
 
 				if (type == 0) {
 					info->submitted = current;
+					/* Parse schedd from "Job submitted from host: <...&alias=condorfe.crc.nd.edu&...>" */
+					const char *alias = strstr(line, "alias=");
+					if (alias) {
+						alias += 6; /* skip "alias=" */
+						const char *end = strpbrk(alias, "&>");
+						if (end && end > alias) {
+							size_t len = (size_t)(end - alias);
+							free(info->schedd);
+							info->schedd = xxmalloc(len + 1);
+							memcpy(info->schedd, alias, len);
+							info->schedd[len] = '\0';
+						}
+					}
 				} else if (type == 1) {
 					info->started = current;
 					debug(D_BATCH, "job %" PRIbjid " running now", jobid);
@@ -360,7 +373,18 @@ static batch_queue_id_t batch_queue_condor_wait(struct batch_queue *q, struct ba
 
 static int batch_queue_condor_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode)
 {
-	char *command = string_format("condor_rm %" PRIbjid, jobid);
+	struct batch_job_info *info = itable_lookup(q->job_table, jobid);
+	char *schedd = NULL;
+	if (info) {
+		schedd = info->schedd;
+	}
+
+	char *command = NULL;
+	if (schedd) {
+		command = string_format("condor_rm -name %s %" PRIbjid, schedd, jobid);
+	} else {
+		command = string_format("condor_rm %" PRIbjid, jobid);
+	}
 
 	debug(D_BATCH, "%s", command);
 	FILE *file = popen(command, "r");

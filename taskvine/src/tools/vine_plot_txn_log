@@ -204,13 +204,15 @@ class Manager:
         all_workers = []
         for worker in self.worker_lifetime.values():
             all_workers.append(worker)
-        keys = "worker_id hostport CONNECTION DISCONNECTION cores memory disk gpus".split()
+        keys = (
+            "worker_id hostport CONNECTION DISCONNECTION cores memory disk gpus".split()
+        )
         workers_df = pd.DataFrame.from_records(all_workers, columns=keys)
 
         # fill up disconnect times for workers that survive the manager
-        workers_df.loc[
-            workers_df["DISCONNECTION"].isna(), ("DISCONNECTION",)
-        ] = self.termination
+        workers_df.loc[workers_df["DISCONNECTION"].isna(), ("DISCONNECTION",)] = (
+            self.termination
+        )
         return workers_df
 
     def make_table_transfers(self):
@@ -238,16 +240,16 @@ class ParseTxn:
 
         if tasks_range_spec:
             rest = tasks_range_spec.split(",")
-            (start, *rest) = rest
+            start, *rest = rest
             start = max(1, int(start)) if start else 1
             if rest:
-                (end, *step) = rest
+                end, *step = rest
                 end = max(start + 1, int(end)) if end else None
                 step = max(1, int(step[0])) if step else 1
         return (start, end, step)
 
     def check_task_range(self, task_id):
-        (start, end, step) = self.tasks_range
+        start, end, step = self.tasks_range
         if start and task_id < start:
             return False
         if end and task_id >= end:
@@ -264,7 +266,7 @@ class ParseTxn:
                 try:
                     if line.startswith("#"):
                         continue
-                    (time, manager_pid, subject, target, event, *arg) = line.split(
+                    time, manager_pid, subject, target, event, *arg = line.split(
                         maxsplit=5
                     )
                     try:
@@ -293,7 +295,7 @@ class ParseTxn:
             start_time -= self.cm.origin
 
         try:
-            (filetype, rest) = filename.split("-", maxsplit=1)
+            filetype, rest = filename.split("-", maxsplit=1)
         except Exception:
             filetype = "file"
 
@@ -380,7 +382,7 @@ class ParseTxn:
             self.cm.worker_transfers[(worker_id, hostport)].append(xfer)
         elif event == "TRANSFER":
             hostport = self.cm.last_host_port[worker_id]
-            (direction, arg) = arg.split(maxsplit=1)
+            direction, arg = arg.split(maxsplit=1)
             xfer = self.arg_to_xfer(worker_id, hostport, time, direction, arg)
             self.cm.worker_transfers[(worker_id, hostport)].append(xfer)
 
@@ -390,7 +392,7 @@ class ParseTxn:
         elif event == "MIN":
             pass
         elif event == "FIRST":
-            (mode, arg) = arg.split(maxsplit=1)
+            mode, arg = arg.split(maxsplit=1)
             pass
 
     def _parse_library(self, time, manager_pid, task_id, event, arg):
@@ -422,7 +424,7 @@ class ParseTxn:
             return
 
         if event == "READY":
-            (category, allocation, attempt_number, arg) = arg.split()
+            category, allocation, attempt_number, arg = arg.split()
             self.cm.task_last_attempt[task_id] = attempt_number
 
         try:
@@ -444,22 +446,25 @@ class ParseTxn:
             self.arg_to_resources(ca, "requested_", arg)
             ca["library"] = pd.NA  # we do not know if it a library
         elif event == "RUNNING":
-            (worker_id, allocation, arg) = arg.split()
+            worker_id, allocation, arg = arg.split()
             self.cm.tasks_on_worker[worker_id][task_id] = la
             ca["worker_id"] = worker_id
             self.arg_to_resources(ca, "allocated_", arg)
             self.arg_to_task_report(ca, arg)
-            ca[
-                "DISCONNECTION"
-            ] = pd.NA  # add field to keep time in case of worker disconnection
+            ca["DISCONNECTION"] = (
+                pd.NA
+            )  # add field to keep time in case of worker disconnection
         elif event == "WAITING_RETRIEVAL":
             pass
         elif event == "RETRIEVED":
-            (reason, exit_code, l, m) = arg.split()
+            reason, exit_code, l, m = arg.split()
             ca["reason"] = reason
             ca["exit_code"] = int(exit_code)
             self.arg_to_task_report(ca, m)
             self.arg_to_resources(ca, "measured_", m)
+            # for tasks that are retrieved but were cancelled
+            if self.cm.tasks_attempts[task_id][la]["time_worker_end"] is pd.NA:
+                self.cm.tasks_attempts[task_id][la]["time_worker_end"] = time
             try:
                 del self.cm.tasks_on_worker[ca["worker_id"]][task_id]
             except KeyError:
@@ -708,7 +713,8 @@ class TxnPlot:
     def set_legend(self, fig):
         if self.opts.legend != "none":
             handles = [
-                mpl.patches.Patch(color=color, label=label) for label, color in self.legend.items()
+                mpl.patches.Patch(color=color, label=label)
+                for label, color in self.legend.items()
             ]
             fig.legend(loc=self.opts.legend, handles=handles, fontsize=args.fontsize)
 

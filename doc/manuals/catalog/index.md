@@ -5,8 +5,8 @@
 Catalog servers function as connection points for tools that need to share
 information and interact remotely. Various services and tools send periodic
 updates to a catalog server to advertise their presence and vital details such
-as addresses, resources, and performance. Tools like `chirp_status` and
-`work_queue_status` query the server to displays servers that are currently
+as addresses, resources, and performance. Tools like `vine_status`, `work_queue_status`, and `chirp_status` and
+query the catalog to displays service that are currently
 running. Catalog updates are sent via TCP or UDP, and the catalog server exposes a
 JSON interface to view status and make queries.
 
@@ -19,11 +19,13 @@ automatic backup) at Notre Dame:
 
 The default view for a catalog server is a human-readable HTML summary.
 Machine-readable data is also available as JSON, text, XML, or ClassAds. Many
-parts of cctools make use of a catalog server internally. Chirp servers send
+parts of cctools make use of a catalog server internally. [Chirp](../chirp) servers send
 regular catalog updates indicating the host system's load, available disk
-space, cctools version, etc. Work Queue managers also advertise their projects
-through the catalog. When a worker starts, it can query the catalog to
-automatically discover a manager to contact.
+space, cctools version, etc.
+[TaskVine](../taskvine) and [Work Queue](../workqueue) managers advertise
+currently running applications, indicating number of tasks, workers, performance, etc.
+When workers start, they can query the catalog to
+automatically discover which manager to contact.
 
 ## Specifying Catalog Servers
 
@@ -33,15 +35,14 @@ delimited list of servers to use. Each may optionally include a port number.
 If no port is specified, the value of the environment variable `CATALOG_PORT`
 is used, or the default of port 9097. If no catalog server is given on the
 command line, the `CATALOG_HOST` environment variable is used. If that is
-unset, the default of `catalog.cse.nd.edu,backup-catalog.cse.nd.edu` This
-could be written more verbosely as `catalog.cse.nd.edu:9097,backup-catalog.cse.nd.edu:9097` assuming the catalog port was not set in the
-environment.
+unset, the default of `catalog.cse.nd.edu,backup-catalog.cse.nd.edu` is used,
+assuming a default port of 9097.
 
 ## Querying Catalog Servers
 
 There are several ways to query a catalog server. If you are querying
-specifically for Chirp servers or Work Queue applications, then use the
-`chirp_status` or `work_queue_status` tools, which query the server and
+specifically for Chirp servers or TaskVine applications, then use the
+`chirp_status` or `vine_status` tools, which query the server and
 display fields specific for those uses.
 
 To view all kinds of records in raw JSON format, use the `catalog_query` tool.
@@ -204,5 +205,5 @@ For more information, please see [Getting Help](../help.md) or visit the [Cooper
 
 ## Copyright
 
-CCTools is Copyright (C) 2022 The University of Notre Dame. This software is distributed under the GNU General Public License Version 2. See the file COPYING for
+CCTools is Copyright (C) 2026 The University of Notre Dame. This software is distributed under the GNU General Public License Version 2. See the file COPYING for
 details.

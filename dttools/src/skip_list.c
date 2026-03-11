@@ -7,7 +7,6 @@ See the file COPYING for details.
 #include "debug.h"
 #include "xxmalloc.h"
 
-#include <assert.h>
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
@@ -81,7 +80,7 @@ static void skip_list_unref(struct skip_list *sl)
 	if (!sl)
 		return;
 
-	assert(sl->refcount > 0);
+	debug_assert(sl->refcount > 0);
 	--sl->refcount;
 }
 
@@ -95,8 +94,8 @@ static void skip_list_node_ref(struct skip_list_node *node)
 
 static int delete_node(struct skip_list_node *node, struct skip_list *sl)
 {
-	assert(node);
-	assert(sl);
+	debug_assert(node);
+	debug_assert(sl);
 
 	if (node->dead && node->refcount == 0) {
 		/* Unlink the node from the skip list structure at all levels using backward pointers */
@@ -129,7 +128,7 @@ static void skip_list_node_unref(struct skip_list_node *node, struct skip_list *
 		return;
 	}
 
-	assert(node->refcount > 0);
+	debug_assert(node->refcount > 0);
 	--node->refcount;
 
 	delete_node(node, sl);
@@ -186,8 +185,8 @@ static struct skip_list_node *create_node(int level, void *data, double *priorit
 
 struct skip_list *skip_list_create(unsigned priority_size, double probability)
 {
-	assert(priority_size > 0);
-	assert(probability > 0.0 && probability <= 0.5);
+	debug_assert(priority_size > 0);
+	debug_assert(probability > 0.0 && probability <= 0.5);
 
 	struct skip_list *sl = xxmalloc(sizeof(*sl));
 	memset(sl, 0, sizeof(*sl));
@@ -212,7 +211,7 @@ struct skip_list *skip_list_create(unsigned priority_size, double probability)
 
 int skip_list_size(struct skip_list *sl)
 {
-	assert(sl);
+	debug_assert(sl);
 	return sl->size;
 }
 
@@ -229,7 +228,7 @@ bool skip_list_delete(struct skip_list *sl)
 	struct skip_list_node *node = sl->head;
 	while (node) {
 		struct skip_list_node *next = node->forward[0];
-		assert(node->refcount == 0);
+		debug_assert(node->refcount == 0);
 		free(node->priority);
 		free(node->forward);
 		free(node->backward);
@@ -243,7 +242,7 @@ bool skip_list_delete(struct skip_list *sl)
 
 struct skip_list_cursor *skip_list_cursor_create(struct skip_list *sl)
 {
-	assert(sl);
+	debug_assert(sl);
 	struct skip_list_cursor *cur = xxmalloc(sizeof(*cur));
 	cur->list = sl;
 	cur->target = NULL;
@@ -256,7 +255,7 @@ void skip_list_cursor_delete(struct skip_list_cursor *cur)
 {
 	if (!cur)
 		return;
-	assert(cur->list);
+	debug_assert(cur->list);
 	skip_list_node_unref(cur->target, cur->list);
 	skip_list_unref(cur->list);
 	free(cur);
@@ -264,8 +263,8 @@ void skip_list_cursor_delete(struct skip_list_cursor *cur)
 
 struct skip_list_cursor *skip_list_cursor_clone(struct skip_list_cursor *cur)
 {
-	assert(cur);
-	assert(cur->list);
+	debug_assert(cur);
+	debug_assert(cur->list);
 	struct skip_list_cursor *out = skip_list_cursor_create(cur->list);
 	out->target = cur->target;
 	skip_list_node_ref(out->target);
@@ -274,8 +273,8 @@ struct skip_list_cursor *skip_list_cursor_clone(struct skip_list_cursor *cur)
 
 void skip_list_cursor_move(struct skip_list_cursor *to_move, struct skip_list_cursor *destination)
 {
-	assert(to_move);
-	assert(destination);
+	debug_assert(to_move);
+	debug_assert(destination);
 	skip_list_node_unref(to_move->target, to_move->list);
 	to_move->target = destination->target;
 	skip_list_node_ref(to_move->target);
@@ -283,9 +282,9 @@ void skip_list_cursor_move(struct skip_list_cursor *to_move, struct skip_list_cu
 
 bool skip_list_cursor_move_to_priority_arr(struct skip_list_cursor *cur, double *priority)
 {
-	assert(cur);
-	assert(cur->list);
-	assert(priority);
+	debug_assert(cur);
+	debug_assert(cur->list);
+	debug_assert(priority);
 
 	struct skip_list *sl = cur->list;
 	struct skip_list_node *x = sl->head;
@@ -323,14 +322,14 @@ bool skip_list_cursor_move_to_priority_arr(struct skip_list_cursor *cur, double 
 
 void skip_list_reset(struct skip_list_cursor *cur)
 {
-	assert(cur);
+	debug_assert(cur);
 	skip_list_node_unref(cur->target, cur->list);
 	cur->target = NULL;
 }
 
 bool seek_forward(struct skip_list_cursor *cur, int index)
 {
-	assert(index >= 0);
+	debug_assert(index >= 0);
 	skip_list_reset(cur);
 	struct skip_list *sl = cur->list;
 
@@ -366,7 +365,7 @@ bool seek_forward(struct skip_list_cursor *cur, int index)
 
 bool seek_backward(struct skip_list_cursor *cur, int index)
 {
-	assert(index < 0);
+	debug_assert(index < 0);
 	skip_list_reset(cur);
 	struct skip_list *sl = cur->list;
 
@@ -402,8 +401,8 @@ bool seek_backward(struct skip_list_cursor *cur, int index)
 
 bool skip_list_seek(struct skip_list_cursor *cur, int index)
 {
-	assert(cur);
-	assert(cur->list);
+	debug_assert(cur);
+	debug_assert(cur->list);
 
 	if (index >= 0) {
 		return seek_forward(cur, index);
@@ -414,9 +413,9 @@ bool skip_list_seek(struct skip_list_cursor *cur, int index)
 
 bool skip_list_tell(struct skip_list_cursor *cur, unsigned *index)
 {
-	assert(cur);
-	assert(cur->list);
-	assert(index);
+	debug_assert(cur);
+	debug_assert(cur->list);
+	debug_assert(index);
 
 	if (!cur->target || cur->target->dead)
 		return false;
@@ -439,7 +438,7 @@ bool skip_list_tell(struct skip_list_cursor *cur, unsigned *index)
 
 bool skip_list_next(struct skip_list_cursor *cur)
 {
-	assert(cur);
+	debug_assert(cur);
 	if (!cur->target) {
 		return false;
 	}
@@ -463,7 +462,7 @@ bool skip_list_next(struct skip_list_cursor *cur)
 
 bool skip_list_prev(struct skip_list_cursor *cur)
 {
-	assert(cur);
+	debug_assert(cur);
 	if (!cur->target) {
 		return false;
 	}
@@ -487,7 +486,7 @@ bool skip_list_prev(struct skip_list_cursor *cur)
 
 const double *skip_list_peek_head_priority(struct skip_list *sl)
 {
-	assert(sl);
+	debug_assert(sl);
 
 	struct skip_list_cursor *cur = skip_list_cursor_create(sl);
 	const double *priority = NULL;
@@ -502,7 +501,7 @@ const double *skip_list_peek_head_priority(struct skip_list *sl)
 
 const void *skip_list_peek_head(struct skip_list *sl)
 {
-	assert(sl);
+	debug_assert(sl);
 
 	struct skip_list_cursor *cur = skip_list_cursor_create(sl);
 	const void *item = NULL;
@@ -517,7 +516,7 @@ const void *skip_list_peek_head(struct skip_list *sl)
 
 void *skip_list_pop_head(struct skip_list *sl)
 {
-	assert(sl);
+	debug_assert(sl);
 
 	struct skip_list_cursor *cur = skip_list_cursor_create(sl);
 	void *item = NULL;
@@ -533,7 +532,7 @@ void *skip_list_pop_head(struct skip_list *sl)
 
 bool skip_list_get(struct skip_list_cursor *cur, void **item)
 {
-	assert(cur);
+	debug_assert(cur);
 	if (!cur->target)
 		return false;
 	if (cur->target->dead)
@@ -548,7 +547,7 @@ bool skip_list_get(struct skip_list_cursor *cur, void **item)
 
 const double *skip_list_get_priority(struct skip_list_cursor *cur)
 {
-	assert(cur);
+	debug_assert(cur);
 	if (!cur->target) {
 		return NULL;
 	}
@@ -562,7 +561,7 @@ const double *skip_list_get_priority(struct skip_list_cursor *cur)
 
 bool skip_list_set(struct skip_list_cursor *cur, void *item)
 {
-	assert(cur);
+	debug_assert(cur);
 	if (!cur->target)
 		return false;
 	if (cur->target->dead)
@@ -574,8 +573,8 @@ bool skip_list_set(struct skip_list_cursor *cur, void *item)
 /* Remove the node under the cursor. */
 bool skip_list_remove_here(struct skip_list_cursor *cur)
 {
-	assert(cur);
-	assert(cur->list);
+	debug_assert(cur);
+	debug_assert(cur->list);
 
 	if (!cur->target)
 		return false;
@@ -587,7 +586,7 @@ bool skip_list_remove_here(struct skip_list_cursor *cur)
 
 	/* Mark node as dead */
 	target->dead = true;
-	assert(sl->size > 0);
+	debug_assert(sl->size > 0);
 	--sl->size;
 
 	/* Note: We don't unlink the node here. We just mark it as dead.
@@ -600,7 +599,7 @@ bool skip_list_remove_here(struct skip_list_cursor *cur)
 /* Remove the first node found with the given data. */
 bool skip_list_remove(struct skip_list *sl, void *data)
 {
-	assert(sl);
+	debug_assert(sl);
 
 	struct skip_list_cursor *cur = skip_list_cursor_create(sl);
 
@@ -634,8 +633,8 @@ bool skip_list_remove(struct skip_list *sl, void *data)
 
 bool skip_list_remove_by_priority_arr(struct skip_list *sl, double *priority)
 {
-	assert(sl);
-	assert(priority);
+	debug_assert(sl);
+	debug_assert(priority);
 
 	struct skip_list_node *x = sl->head;
 
@@ -662,7 +661,7 @@ bool skip_list_remove_by_priority_arr(struct skip_list *sl, double *priority)
 	if (x != sl->tail && compare_priority(x->priority, priority, sl->priority_size) == 0) {
 		/* Mark node as dead */
 		x->dead = true;
-		assert(sl->size > 0);
+		debug_assert(sl->size > 0);
 		--sl->size;
 		delete_node(x, sl);
 
@@ -674,9 +673,9 @@ bool skip_list_remove_by_priority_arr(struct skip_list *sl, double *priority)
 
 void skip_list_insert_arr(struct skip_list *sl, void *item, double *priority)
 {
-	assert(sl);
-	assert(item);
-	assert(priority);
+	debug_assert(sl);
+	debug_assert(item);
+	debug_assert(priority);
 
 	/* Find insertion position */
 	struct skip_list_node *update[MAX_LEVEL];
@@ -716,6 +715,6 @@ void skip_list_insert_arr(struct skip_list *sl, void *item, double *priority)
 		update[i]->forward[i] = new_node;
 	}
 
-	assert(sl->size < UINT_MAX);
+	debug_assert(sl->size < UINT_MAX);
 	++sl->size;
 }
