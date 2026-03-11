@@ -132,6 +132,7 @@ void vine_worker_options_show_help(const char *cmd, struct vine_worker_options *
 	printf(" %-30s Defaults to %d.\n", "", options->disk_percent);
 
 	printf(" %-30s Use loop devices for task sandboxes (default=disabled, requires root access).\n", "--disk-allocation");
+	printf(" %-30s Apply a wrapper command to each task executed.\n", "--task-wrapper");
 	printf(" %-30s Specifies a user-defined feature the worker provides. May be specified several times.\n", "--feature");
 	printf(" %-30s Set the maximum number of seconds the worker may be active. (in s).\n", "--wall-time=<s>");
 
@@ -174,6 +175,7 @@ enum {
 	LONG_OPT_WORKSPACE,
 	LONG_OPT_KEEP_WORKSPACE,
 	LONG_OPT_MAX_TRANSFER_PROCS,
+	LONG_OPT_TASK_WRAPPER,
 };
 
 static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
@@ -216,6 +218,7 @@ static const struct option long_options[] = {{"advertise", no_argument, 0, 'a'},
 		{"transfer-port", required_argument, 0, LONG_OPT_TRANSFER_PORT},
 		{"max-transfer-procs", required_argument, 0, LONG_OPT_MAX_TRANSFER_PROCS},
 		{"contact-hostport", required_argument, 0, LONG_OPT_CONTACT_HOSTPORT},
+		{"task-wrapper", required_argument, 0, LONG_OPT_TASK_WRAPPER},
 		{0, 0, 0, 0}};
 
 static void vine_worker_options_get_env(const char *name, int64_t *manual_option)
@@ -465,6 +468,9 @@ void vine_worker_options_get(struct vine_worker_options *options, int argc, char
 			break;
 		case LONG_OPT_MAX_TRANSFER_PROCS:
 			options->max_transfer_procs = atoi(optarg);
+			break;
+		case LONG_OPT_TASK_WRAPPER:
+			options->task_wrapper = optarg;
 			break;
 		default:
 			vine_worker_options_show_help(argv[0], options);
