@@ -8,7 +8,7 @@ See the file COPYING for details.
 #include "vine_cache_file.h"
 #include "vine_catalog.h"
 #include "vine_file.h"
-#include "vine_gpus.h"
+#include "vine_xpus.h"
 #include "vine_manager.h"
 #include "vine_mount.h"
 #include "vine_process.h"
@@ -125,6 +125,10 @@ static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
+
+/* Trackers for specific cores and gpus units in use. */
+struct vine_xpus *gpus_assigned = 0;
+struct vine_xpus *cores_assigned = 0;
 
 /***************************************************************/
 /*     State of Interactions Between Manager and Worker        */
@@ -434,7 +438,11 @@ static void measure_worker_resources()
 	r->disk.inuse = measure_worker_disk();
 	r->tag = last_task_received;
 
-	vine_gpus_init(r->gpus.total);
+	/* Create a tracker for specific gpus and cores, if not already created. */
+	if (!gpus_assigned)
+		gpus_assigned = vine_xpus_create("gpus", r->gpus.total);
+	if (!cores_assigned)
+		cores_assigned = vine_xpus_create("cores", r->cores.total);
 
 	last_resources_measurement = time(0);
 }
@@ -635,8 +643,14 @@ static int start_process(struct vine_process *p, struct link *manager)
 	memory_allocated += t->resources_requested->memory;
 	disk_allocated += t->resources_requested->disk;
 	gpus_allocated += t->resources_requested->gpus;
+
+	/* Mark which specific cores and gpus are assigned. */
+	if (t->resources_requested->cores > 0) {
+		vine_xpus_alloc(cores_assigned, t->resources_requested->cores, t->task_id);
+	}
+
 	if (t->resources_requested->gpus > 0) {
-		vine_gpus_allocate(t->resources_requested->gpus, t->task_id);
+		vine_xpus_alloc(gpus_assigned, t->resources_requested->gpus, t->task_id);
 	}
 
 	/* Now start the process (or function) running. */
@@ -678,7 +692,8 @@ static void reap_process(struct vine_process *p, struct link *manager)
 	disk_allocated -= p->task->resources_requested->disk;
 	gpus_allocated -= p->task->resources_requested->gpus;
 
-	vine_gpus_free(p->task->task_id);
+	vine_xpus_free(gpus_assigned, p->task->task_id);
+	vine_xpus_free(cores_assigned, p->task->task_id);
 
 	if (manager) {
 		vine_sandbox_stageout(p, cache_manager, manager);

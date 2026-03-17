@@ -5,7 +5,7 @@ See the file COPYING for details.
 */
 
 #include "vine_process.h"
-#include "vine_gpus.h"
+#include "vine_xpus.h"
 #include "vine_manager.h"
 #include "vine_protocol.h"
 #include "vine_sandbox.h"
@@ -50,6 +50,8 @@ See the file COPYING for details.
 #include <sys/wait.h>
 
 extern struct vine_cache *cache_manager;
+extern struct vine_xpus *cores_assigned;
+extern struct vine_xpus *gpus_assigned;
 
 /*
 Give the letter code used for the process sandbox dir.
@@ -182,6 +184,9 @@ static void set_integer_env_var(struct vine_process *p, const char *name, int64_
 static void set_resources_vars(struct vine_process *p)
 {
 	if (p->task->resources_requested->cores > 0) {
+		char *str = vine_xpus_to_string(cores_assigned, p->task->task_id);
+		vine_task_set_env_var(p->task, "CORES_LIST", str);
+		free(str);
 		set_integer_env_var(p, "CORES", p->task->resources_requested->cores);
 		set_integer_env_var(p, "OMP_NUM_THREADS", p->task->resources_requested->cores);
 		set_integer_env_var(p, "OPENBLAS_NUM_THREADS", p->task->resources_requested->cores);
@@ -200,7 +205,7 @@ static void set_resources_vars(struct vine_process *p)
 
 	if (p->task->resources_requested->gpus > 0) {
 		set_integer_env_var(p, "GPUS", p->task->resources_requested->gpus);
-		char *str = vine_gpus_to_string(p->task->task_id);
+		char *str = vine_xpus_to_string(gpus_assigned, p->task->task_id);
 		vine_task_set_env_var(p->task, "CUDA_VISIBLE_DEVICES", str);
 		free(str);
 	}
