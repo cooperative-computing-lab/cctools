@@ -1370,8 +1370,8 @@ static void show_help(const char *cmd)
 	printf(" %-30s Port range for worker-worker transfers (e.g. 10000:11000). Passed as --transfer-port.\n", "--transfer-port=<port|min:max>");
 	printf(" %-30s Alternate binary instead of vine_worker.\n", "--worker-binary=<file>");
 	printf(" %-30s Wrap worker with this command prefix.\n","--wrapper");
-	printf(" %-30s Wrap tasks with this command-prefix,\n","--task-wrapper");
-	printf(" %-30s Add this input file needed by a wrapper.\n","--wrapper-input");
+	printf(" %-30s Wrap tasks with this command prefix.\n","--task-wrapper");
+	printf(" %-30s Add this input file needed by a task or worker wrapper.\n","--wrapper-input");
 	printf(" %-30s Run each worker inside this poncho environment.\n","--poncho-env=<file.tar.gz>");
 
 	printf("\nOptions specific to batch systems:\n");

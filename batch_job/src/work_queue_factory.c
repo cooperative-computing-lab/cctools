@@ -1236,8 +1236,9 @@ static void show_help(const char *cmd)
 	printf(" %-30s Environment variable to add to worker.\n", "--env=<variable=value>");
 	printf(" %-30s Extra options to give to worker.\n", "-E,--extra-options=<options>");
 	printf(" %-30s Alternate binary instead of work_queue_worker.\n", "--worker-binary=<file>");
-	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
-	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
+	printf(" %-30s Wrap worker with this command prefix.\n","--wrapper");
+	printf(" %-30s Wrap tasks with this command prefix.\n","--task-wrapper");
+	printf(" %-30s Add this input file needed by a task or worker wrapper.\n","--wrapper-input");
 	printf(" %-30s Use runos tool to create environment (ND only).\n","--runos=<img>");
 	printf(" %-30s Run each worker inside this poncho environment.\n","--poncho-env=<file.tar.gz>");
 
