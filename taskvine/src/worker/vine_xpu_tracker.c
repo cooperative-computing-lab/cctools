@@ -4,11 +4,11 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "vine_xpus.h"
+#include "vine_xpu_tracker.h"
 #include "buffer.h"
 #include "debug.h"
 
-struct vine_xpus {
+struct vine_xpu_tracker {
 	const char *name;	// name of units: cpus, gpus, etc.
 	int count;		// number of available units
 	int *unit_to_task;	// array indicating task assigned to each unit.
@@ -18,9 +18,9 @@ struct vine_xpus {
 Create a new tracker for units of type "name".
 */
 
-struct vine_xpus *vine_xpus_create(const char *name, int count)
+struct vine_xpu_tracker *vine_xpu_tracker_create(const char *name, int count)
 {
-	struct vine_xpus *x = malloc(sizeof(*x));
+	struct vine_xpu_tracker *x = malloc(sizeof(*x));
 	x->name = strdup(name);
 	x->count = count;
 	x->unit_to_task = calloc(count, sizeof(int));
@@ -31,7 +31,7 @@ struct vine_xpus *vine_xpus_create(const char *name, int count)
 Display the units associated with each task to the debug log
 */
 
-void vine_xpus_debug(struct vine_xpus *x)
+void vine_xpu_tracker_debug(struct vine_xpu_tracker *x)
 {
 	buffer_t b;
 	buffer_init(&b);
@@ -49,7 +49,7 @@ void vine_xpus_debug(struct vine_xpus *x)
 Free all of the units associated with this taskid.
 */
 
-void vine_xpus_free(struct vine_xpus *x, int taskid)
+void vine_xpu_tracker_free(struct vine_xpu_tracker *x, int taskid)
 {
 	int i;
 	for (i = 0; i < x->count; i++) {
@@ -66,7 +66,7 @@ accurately tracked: this function will fatal()
 if not enough are available.
 */
 
-void vine_xpus_alloc(struct vine_xpus *x, int n, int taskid)
+void vine_xpu_tracker_alloc(struct vine_xpu_tracker *x, int n, int taskid)
 {
 	int i;
 	for (i = 0; i < x->count && n > 0; i++) {
@@ -77,9 +77,9 @@ void vine_xpus_alloc(struct vine_xpus *x, int n, int taskid)
 	}
 
 	if (n > 0)
-		fatal("vine_xpus_allocate: accounting error: ran out of %ss to assign!",x->name);
+		fatal("vine_xpu_tracker_alloc: accounting error: ran out of %ss to assign!",x->name);
 
-	vine_xpus_debug(x);
+	vine_xpu_tracker_debug(x);
 }
 
 /*
@@ -88,7 +88,7 @@ For example, if units 1 and 3 are allocated, return "1,3"
 This string must be freed after use.
 */
 
-char *vine_xpus_to_string(struct vine_xpus *x, int taskid)
+char *vine_xpu_tracker_to_string(struct vine_xpu_tracker *x, int taskid)
 {
 	int i;
 	int first = 1;
