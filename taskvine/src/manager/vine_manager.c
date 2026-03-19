@@ -690,7 +690,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 			if (t->exit_code == RM_OVERFLOW) {
 				task_status = VINE_RESULT_RESOURCE_EXHAUSTION;
 			} else if (t->exit_code == RM_TIME_EXPIRE) {
-				task_status = VINE_RESULT_MAX_END_TIME;
+				task_status = VINE_RESULT_MAX_WALL_TIME;
 			}
 		}
 
