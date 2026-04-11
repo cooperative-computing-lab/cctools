@@ -39,9 +39,9 @@ struct library_search_result find_library_by_name(enum gpu_vendor vendor)
 		strncpy(lib_result.path, result, sizeof(lib_result.path) - 1);
 		lib_result.path[sizeof(lib_result.path) - 1] = '\0';
 		lib_result.found = true;
-		debug(D_DEBUG, "GPU Library found at path %s\n", lib_result.path);
+		debug(D_DEBUG, "GPU Library found at path %s", lib_result.path);
 	} else {
-		debug(D_DEBUG, "GPU Library %s not found in system search paths.\n", lib_name);
+		debug(D_DEBUG, "GPU Library not found in system search paths.");
 	}
 
 	pclose(fp);
