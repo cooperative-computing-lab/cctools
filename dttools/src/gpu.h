@@ -12,12 +12,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <dlfcn.h>
 #include <stdlib.h>
-
-// enum for the GPU vendor
-enum gpu_vendor {
-    NVIDIA = 0,
-    AMD = 1,
-};
+#include "gpu_commons.h"
 
 // generic gpu options which can be used everywhere
 struct gpu_library {

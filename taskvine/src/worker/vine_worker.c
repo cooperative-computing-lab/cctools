@@ -2312,7 +2312,7 @@ int main(int argc, char *argv[])
 	signal(SIGCHLD, handle_sigchld);
 
 	// initialize the GPU library
-	struct gpu_library * gpu_lib = gpu_lib_init();
+	struct gpu_library *gpu_lib = gpu_lib_init();
 
 	/* Create the workspace directory and move there. */
 	workspace = vine_workspace_create(options->workspace_dir);
@@ -2346,7 +2346,7 @@ int main(int argc, char *argv[])
 
 	/* If a GPU is installed, then display and describe as a feature. */
 	char *gpu_name;
-	if(gpu_lib == NULL) {
+	if (gpu_lib == NULL) {
 		gpu_name = gpu_name_get();
 	} else {
 		gpu_name = gpu_name_get_new(gpu_lib);
@@ -2361,7 +2361,7 @@ int main(int argc, char *argv[])
 	vine_worker_serve_managers();
 
 	// shutdown the GPU lib
-	if(gpu_lib != NULL) {
+	if (gpu_lib != NULL) {
 		gpu_lib_close(gpu_lib);
 	}
 

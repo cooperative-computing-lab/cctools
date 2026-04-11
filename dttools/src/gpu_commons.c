@@ -6,33 +6,44 @@ See the file COPYING for details.
 
 #include "gpu_commons.h"
 #include "debug.h"
+#include <string.h>
 
+// nvidia libray name as macro
+const char *NVIDIA_LIBRARY_SEARCH_COMMAND = "ldconfig -p | grep libnvidia-ml.so | awk '{print $NF}'";
+// AMD library need to check for now we are only intrested in Nvidia
+// the below library is not verified but referenced for future use case
+const char *AMD_LIBRARY_SEARCH_COMMAND = "ldconfig -p | grep libhsa-runtime64.so | awk '{print $NF}'";
 
-const char * LIBRARY_SEARCH_COMMAND = "ldconfig -p | grep %s | awk '{print $NF}'";
+struct library_search_result find_library_by_name(enum gpu_vendor vendor)
+{
+	char command[256];
+	char result[512];
+	struct library_search_result lib_result = {{0}, false};
+	if (vendor == NVIDIA) {
+		strcpy(command, NVIDIA_LIBRARY_SEARCH_COMMAND);
+	} else if (vendor == AMD) {
+		strcpy(command, AMD_LIBRARY_SEARCH_COMMAND);
+	} else {
+		debug(D_ERROR, "we are not supporting any other GPU's apart from Nvidia or AMD");
+		return lib_result;
+	}
 
-struct library_search_result find_library_by_name(const char *lib_name) {
-    char command[256];
-    char result[512];
-    struct library_search_result lib_result = {{0}, false};
+	FILE *fp = popen(command, "r");
+	if (fp == NULL) {
+		debug(D_ERROR, "popen failed to run ldconfig command");
+		return lib_result;
+	}
 
-    snprintf(command, sizeof(command), LIBRARY_SEARCH_COMMAND, lib_name);
+	if (fgets(result, sizeof(result), fp) != NULL) {
+		result[strcspn(result, "\n")] = 0;
+		strncpy(lib_result.path, result, sizeof(lib_result.path) - 1);
+		lib_result.path[sizeof(lib_result.path) - 1] = '\0';
+		lib_result.found = true;
+		debug(D_DEBUG, "GPU Library found at path %s\n", lib_result.path);
+	} else {
+		debug(D_DEBUG, "GPU Library %s not found in system search paths.\n", lib_name);
+	}
 
-    FILE *fp = popen(command, "r");
-    if (fp == NULL) {
-        debug(D_ERROR,"popen failed to run ldconfig command");
-        return lib_result;
-    }
-
-    if (fgets(result, sizeof(result), fp) != NULL) {
-        result[strcspn(result, "\n")] = 0;
-        strncpy(lib_result.path, result, sizeof(lib_result.path) - 1);
-        lib_result.path[sizeof(lib_result.path) - 1] = '\0';
-        lib_result.found = true;
-        debug(D_DEBUG, "GPU Library found at path %s\n", lib_result.path);
-    } else {
-        debug(D_DEBUG,"GPU Library %s not found in system search paths.\n", lib_name);
-    }
-
-    pclose(fp);
-    return lib_result;
+	pclose(fp);
+	return lib_result;
 }
