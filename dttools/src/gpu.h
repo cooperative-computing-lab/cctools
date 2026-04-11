@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef GPU
-#define GPU
+#ifndef GPU_H
+#define GPU_H
 
 #include <stdio.h>
 #include <stdbool.h>
