@@ -53,9 +53,9 @@ struct nvml_library *nvml_library_open(struct library_search_result res)
 	debug(D_DEBUG, "library nvml load completed!");
 
 	nvmlReturn_t init_result = nvml->nvmlInit();
-	debug(D_DEBUG, "initializtion result %d", init_result);
+	debug(D_DEBUG, "initialization result %d", init_result);
 	if (init_result != NVML_SUCCESS) {
-		debug(D_ERROR, "GPU initializtion failed with error code %i", init_result);
+		debug(D_ERROR, "GPU initialization failed with error code %i", init_result);
 		goto fail;
 	}
 	return nvml;
