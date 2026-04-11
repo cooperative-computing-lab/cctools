@@ -78,10 +78,12 @@ void nvml_library_close(struct nvml_library *lib) {
         return;
     }
     // now call the shutdown function to properly close the nvml lib
-    nvmlReturn_t shutdown_result = lib->nvmlShutdown();
-    if (shutdown_result != NVML_SUCCESS) {
-        debug(D_ERROR, "GPU shutdown failed with error code %i", shutdown_result);
-        //doesnt matter now close the lib anyways
+    if (lib->nvmlShutdown) {
+        nvmlReturn_t shutdown_result = lib->nvmlShutdown();
+        if (shutdown_result != NVML_SUCCESS) {
+            debug(D_ERROR, "GPU shutdown failed with error code %i", shutdown_result);
+            //doesnt matter now close the lib anyways
+        }
     }
     if (lib->lib_handle) {
         dlclose(lib->lib_handle);
