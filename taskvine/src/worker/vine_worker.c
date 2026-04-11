@@ -2361,7 +2361,9 @@ int main(int argc, char *argv[])
 	vine_worker_serve_managers();
 
 	// shutdown the GPU lib
-	gpu_lib_close(gpu_lib);
+	if(gpu_lib != NULL) {
+		gpu_lib_close(gpu_lib);
+	}
 
 	/* Clean up data structures to satisfy valgrind at process exit. */
 	vine_workspace_delete(workspace);
