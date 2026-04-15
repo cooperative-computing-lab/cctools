@@ -26,7 +26,7 @@ def square(x):
 
 
 m = vine.Manager(port=0)
-m.enable_task_cache(cache_dir=CACHE_DIR)
+m.enable_tasks_cache(cache_dir=CACHE_DIR)
 
 with open(port_file, "w") as f:
     f.write(str(m.port))

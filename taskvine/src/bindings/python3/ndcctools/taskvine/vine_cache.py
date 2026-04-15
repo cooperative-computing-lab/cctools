@@ -11,7 +11,7 @@
 # minimal infrastructure this module reads (_tracked_inputs, _tracked_outputs,
 # _fn_def, _core_hash, _event).
 #
-# Copyright (C) 2022- The University of Notre Dame
+# Copyright (C) 2026- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
@@ -350,18 +350,18 @@ class CachedTaskResult:
 
 
 # ---------------------------------------------------------------------------
-# TaskCache
+# TasksCache
 # ---------------------------------------------------------------------------
 
 ##
-# @class ndcctools.taskvine.vine_cache.TaskCache
+# @class ndcctools.taskvine.vine_cache.TasksCache
 #
 # Core caching module. Manages in-memory cache dict, persists via TransactionLog,
 # and contains all fingerprinting logic for Task, PythonTask, and FunctionCall.
 #
-# Attach to a Manager with Manager.enable_task_cache().
+# Attach to a Manager with Manager.enable_tasks_cache().
 #
-class TaskCache:
+class TasksCache:
     ##
     # @param cache_dir  Directory where cached output files are stored.
     # @param log_file   Path to the JSON transaction log.

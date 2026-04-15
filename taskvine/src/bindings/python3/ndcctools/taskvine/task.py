@@ -903,7 +903,7 @@ class PythonTask(Task):
         self._tmp_output_enabled = False
         self._cache_output = False
 
-        # Cache support: stable core hash computed by TaskCache.prepare() before
+        # Cache support: stable core hash computed by TasksCache.prepare() before
         # submit_finalize() clears _fn_def. None until prepare() is called.
         self._core_hash = None
 
