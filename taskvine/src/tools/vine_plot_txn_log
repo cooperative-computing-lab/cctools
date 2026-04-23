@@ -1067,12 +1067,15 @@ class TxnStats(TxnPlot):
         print(f"Number of mini-tasks: {num_minitasks}")
         print(f"Bytes created by mini-tasks: {minitasks_size}")
         print(f"Number of temps: {num_temps}")
-        print(f"Bytes created: {temps_size}")
-        times = []
-        for lifetime in manager.worker_lifetime.values():
-            times.append(lifetime["DISCONNECTION"] - lifetime["CONNECTION"])
-        cpu_time = sum(times)
-        print(f"Worker CPU Time (h): {round(cpu_time/60/60, 2)}")
+        print(f"Bytes created by temp files: {temps_size}")
+        try:
+            times = []
+            for lifetime in manager.worker_lifetime.values():
+                times.append(lifetime["DISCONNECTION"] - lifetime["CONNECTION"])
+            cpu_time = sum(times)
+            print(f"Worker CPU Time (h): {round(cpu_time/60/60, 2)}")
+        except Exception:
+            print("Worker CPU Time (h): unavailable")
         print("-----------------------------------------")
         print()
 
