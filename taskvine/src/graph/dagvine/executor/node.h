@@ -6,8 +6,18 @@
 #include "set.h"
 #include "timestamp.h"
 
+#include "list.h"
 #include "vine_file.h"
 #include "vine_task.h"
+
+/**
+ * One element of @c extra_outputs or @c extra_inputs: a logical filename plus its @c vine_file
+ * (declared during graph build; attached to @c vine_task in @c executor_materialize_node).
+ */
+struct extra_io_mount {
+	struct vine_file *file;
+	char *remote_name;
+};
 
 /** The storage type of the node's output file. */
 typedef enum {
@@ -31,6 +41,19 @@ struct node {
 
 	struct list *parents;
 	struct list *children;
+	/**
+	 * @c Workflow.task_produces / @c executor_add_task_output: extra outputs beyond this node’s primary
+	 * @c outfile (the runner’s standard @c outfile_node_* result). Each list item is a declared
+	 * @c vine_file keyed by the same logical path string used by consumers. Filled before
+	 * @c node->task exists; consumed when building the task at submit / materialize time.
+	 */
+	struct list *extra_outputs;
+	/**
+	 * @c Workflow.task_consumes / @c executor_add_task_input: extra inputs beyond those implied by
+	 * the DAG via parent @c outfile edges (paired logical files shared with producers). Same lifecycle
+	 * as @c extra_outputs: queued at graph build, wired on @c vine_task at materialize.
+	 */
+	struct list *extra_inputs;
 
 	int remaining_parents_count; // parents not yet satisfied for scheduling
 	struct set *fired_parents;   // parents already counted toward that count

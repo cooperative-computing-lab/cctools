@@ -21,6 +21,26 @@
 static volatile sig_atomic_t interrupted = 0;
 
 static void submit_node_task(struct executor *e, struct node *node);
+static struct vine_task *executor_make_vine_task(struct executor *e);
+static void executor_materialize_node(struct executor *e, struct node *node);
+
+static void extra_io_mount_push(struct list *lst, struct vine_file *f, const char *remote_name)
+{
+	struct extra_io_mount *m = xxmalloc(sizeof(*m));
+	m->file = f;
+	m->remote_name = xxstrdup(remote_name);
+	list_push_tail(lst, m);
+}
+
+/* Undeclare runner infile buffer (before discarding the vine_task). */
+static void executor_clear_node_runner_arg(struct executor *e, struct node *node)
+{
+	if (!e || !node || !node->task_runner_arg_file) {
+		return;
+	}
+	vine_undeclare_file(e->manager, node->task_runner_arg_file);
+	node->task_runner_arg_file = NULL;
+}
 
 /* Initialize runtime fields and default tuning values for a new executor. */
 static void executor_init_runtime(struct executor *e)
@@ -129,25 +149,15 @@ void executor_delete(struct executor *e)
 	free(e);
 }
 
-/* Attach buffer input "infile" carrying JSON arguments for the task runner on the worker. */
-static void executor_prepare_task_runner_arg(struct executor *e, struct node *node)
-{
-	if (!e || !node || node->task_runner_arg_file) {
-		return;
-	}
-
-	char *task_arguments = node_construct_task_arguments(node);
-	node->task_runner_arg_file = vine_declare_buffer(e->manager, task_arguments, strlen(task_arguments), VINE_CACHE_LEVEL_TASK, VINE_UNLINK_WHEN_DONE);
-	free(task_arguments);
-	vine_task_add_input(node->task, node->task_runner_arg_file, "infile", VINE_TRANSFER_ALWAYS);
-}
-
-/* Create the vine_task for a node and retain a reference for the submit and wait cycle. */
-static void executor_create_node_task(struct executor *e, struct node *node)
+/*
+ * Create a new library task (not yet published on the node). The caller attaches IO, then sets
+ * node->task only when the task is fully configured (atomic materialize).
+ */
+static struct vine_task *executor_make_vine_task(struct executor *e)
 {
 	struct graph *g = e ? e->graph : NULL;
-	if (!g || !node || node->task) {
-		return;
+	if (!g) {
+		return NULL;
 	}
 
 	if (!g->task_runner_function_name) {
@@ -155,16 +165,89 @@ static void executor_create_node_task(struct executor *e, struct node *node)
 		graph_delete(g);
 		exit(1);
 	}
-
 	if (!g->task_runner_library_name) {
 		debug(D_ERROR, "task runner library name is not set");
 		graph_delete(g);
 		exit(1);
 	}
 
-	node->task = vine_task_create(g->task_runner_function_name);
-	vine_task_set_library_required(node->task, g->task_runner_library_name);
-	vine_task_addref(node->task); // keep alive across vine_submit and vine_wait
+	struct vine_task *t = vine_task_create(g->task_runner_function_name);
+	vine_task_set_library_required(t, g->task_runner_library_name);
+	vine_task_addref(t); // keep alive across vine_submit and vine_wait
+	return t;
+}
+
+/*
+ * Runtime materialization (submit path): logical graph and vine_file handles are fixed in
+ * executor_finalize. Here we build vine_task + mounts + runner infile as one atomic step:
+ * node->task is non-NULL only after all IO and the infile are attached. On failure the ephemeral
+ * task is discarded and node->task stays NULL.
+ */
+static void executor_materialize_node(struct executor *e, struct node *node)
+{
+	struct graph *g = e ? e->graph : NULL;
+	if (!g || !node) {
+		return;
+	}
+
+	if (node->task && node->task->state != VINE_TASK_INITIAL) {
+		return;
+	}
+	/* INITIAL task implies mounts + runner infile are already complete. */
+	if (node->task) {
+		return;
+	}
+
+	executor_clear_node_runner_arg(e, node);
+
+	struct vine_task *t = executor_make_vine_task(e);
+	if (!t) {
+		return;
+	}
+
+	if (node->outfile) {
+		vine_task_add_output(t, node->outfile, node->outfile_remote_name, VINE_TRANSFER_ALWAYS);
+	}
+
+	void *item;
+	LIST_ITERATE(node->extra_outputs, item)
+	{
+		struct extra_io_mount *m = (struct extra_io_mount *)item;
+		vine_task_add_output(t, m->file, m->remote_name, VINE_TRANSFER_ALWAYS);
+	}
+
+	struct node *parent_node;
+	LIST_ITERATE(node->parents, parent_node)
+	{
+		if (parent_node->outfile) {
+			vine_task_add_input(t, parent_node->outfile, parent_node->outfile_remote_name, VINE_TRANSFER_ALWAYS);
+		}
+	}
+
+	LIST_ITERATE(node->extra_inputs, item)
+	{
+		struct extra_io_mount *m = (struct extra_io_mount *)item;
+		vine_task_add_input(t, m->file, m->remote_name, VINE_TRANSFER_ALWAYS);
+	}
+
+	char *task_arguments = node_construct_task_arguments(node);
+	if (!task_arguments) {
+		goto fail_task;
+	}
+	struct vine_file *arg_file =
+			vine_declare_buffer(e->manager, task_arguments, strlen(task_arguments), VINE_CACHE_LEVEL_TASK, VINE_UNLINK_WHEN_DONE);
+	free(task_arguments);
+	if (!arg_file) {
+		goto fail_task;
+	}
+	vine_task_add_input(t, arg_file, "infile", VINE_TRANSFER_ALWAYS);
+
+	node->task = t;
+	node->task_runner_arg_file = arg_file;
+	return;
+
+fail_task:
+	vine_task_delete(t);
 }
 
 /*
@@ -193,7 +276,7 @@ static void executor_declare_node_outfile(struct executor *e, struct node *node)
 	}
 }
 
-/* Add a graph node and attach a prepared vine_task and runner argument file. */
+/* Add a graph node; vine_task and IO mounts are created at submit (materialize). */
 uint64_t executor_add_node(struct executor *e)
 {
 	if (!e || !e->graph) {
@@ -201,9 +284,6 @@ uint64_t executor_add_node(struct executor *e)
 	}
 
 	uint64_t node_id = graph_add_node(e->graph);
-	struct node *node = itable_lookup(e->graph->nodes, node_id);
-	executor_create_node_task(e, node);
-	executor_prepare_task_runner_arg(e, node);
 	return node_id;
 }
 
@@ -222,8 +302,8 @@ void executor_finalize(struct executor *e)
 
 	/*
 	 * Two passes. Declare outputs and cached_name map first so parent
-	 * vine_file objects exist. Then attach inputs and parent counts for
-	 * ready-queue logic.
+	 * vine_file objects exist. Task-level input/output mounts are applied
+	 * in executor_materialize_node at submit time.
 	 */
 	uint64_t nid;
 	struct node *node;
@@ -231,20 +311,12 @@ void executor_finalize(struct executor *e)
 	{
 		executor_declare_node_outfile(e, node);
 		if (node->outfile) {
-			vine_task_add_output(node->task, node->outfile, node->outfile_remote_name, VINE_TRANSFER_ALWAYS);
 			hash_table_insert(g->outfile_cachename_to_node, node->outfile->cached_name, node);
 		}
 	}
 
 	ITABLE_ITERATE(g->nodes, nid, node)
 	{
-		struct node *parent_node;
-		LIST_ITERATE(node->parents, parent_node)
-		{
-			if (parent_node->outfile) {
-				vine_task_add_input(node->task, parent_node->outfile, parent_node->outfile_remote_name, VINE_TRANSFER_ALWAYS);
-			}
-		}
 		node->remaining_parents_count = list_size(node->parents);
 	}
 }
@@ -272,7 +344,7 @@ void executor_add_task_input(struct executor *e, uint64_t task_id, const char *f
 		hash_table_insert(g->inout_filename_to_cached_name, filename, xxstrdup(f->cached_name));
 	}
 
-	vine_task_add_input(node->task, f, filename, VINE_TRANSFER_ALWAYS);
+	extra_io_mount_push(node->extra_inputs, f, filename);
 }
 
 /* Add a named output, linking logical filename to a cache name for paired producer and consumer tasks. */
@@ -298,7 +370,7 @@ void executor_add_task_output(struct executor *e, uint64_t task_id, const char *
 		hash_table_insert(g->inout_filename_to_cached_name, filename, xxstrdup(f->cached_name));
 	}
 
-	vine_task_add_output(node->task, f, filename, VINE_TRANSFER_ALWAYS); // same vine_file as downstream input with this name
+	extra_io_mount_push(node->extra_outputs, f, filename);
 }
 
 /* Apply executor-level tuning. Unknown keys are forwarded to graph_tune. */
@@ -400,6 +472,9 @@ static double calculate_task_priority(struct node *node, task_priority_mode_t pr
 			if (!parent_node->outfile) {
 				continue;
 			}
+			if (!parent_node->task) {
+				continue;
+			}
 			timestamp_t parent_task_completion_time = parent_node->task->time_workers_execute_last;
 			// weight by parent input size and last observed worker runtime
 			priority += (double)vine_file_size(parent_node->outfile) * (double)parent_task_completion_time;
@@ -418,8 +493,10 @@ static void submit_node_task(struct executor *e, struct node *node)
 		return;
 	}
 
+	executor_materialize_node(e, node);
+
 	if (!node->task) {
-		debug(D_ERROR, "submit_node_task: node %" PRIu64 " has no task", node->node_id);
+		debug(D_ERROR, "submit_node_task: node %" PRIu64 " has no task after materialize", node->node_id);
 		return;
 	}
 
@@ -444,13 +521,16 @@ static void submit_node_task(struct executor *e, struct node *node)
 
 static int node_ready_for_submission(struct executor *e, struct node *node)
 {
-	if (!e || !node || node->remaining_parents_count != 0 || node->completed || !node->task) {
+	if (!e || !node || node->remaining_parents_count != 0 || node->completed) {
 		return 0;
 	}
-	if (node->task->state != VINE_TASK_INITIAL) {
+	if (node->in_resubmit_queue) {
 		return 0;
 	}
-	return !node->in_resubmit_queue;
+	if (node->task && node->task->state != VINE_TASK_INITIAL) {
+		return 0;
+	}
+	return 1;
 }
 
 /* Submit ready source nodes and enable delivery of recovery tasks to the application. */
@@ -842,7 +922,7 @@ static void queue_node_for_retry(struct executor *e, struct node *node)
 	node->in_resubmit_queue = 1;
 }
 
-/* Dequeue nodes whose cooldown has expired, reset tasks, and resubmit them within a bounded scan budget. */
+/* Dequeue nodes whose cooldown has expired; discard the failed task atomically and resubmit. */
 static void drain_resubmit_queue(struct executor *e)
 {
 	struct graph *g = e ? e->graph : NULL;
@@ -868,7 +948,11 @@ static void drain_resubmit_queue(struct executor *e)
 		node->in_resubmit_queue = 0;
 
 		debug(D_VINE, "Resubmitting node %" PRIu64, node->node_id);
-		vine_task_reset(node->task);
+		executor_clear_node_runner_arg(e, node);
+		if (node->task) {
+			vine_task_delete(node->task);
+			node->task = NULL;
+		}
 		submit_node_task(e, node);
 	}
 }

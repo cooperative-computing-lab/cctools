@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "debug.h"
+#include "list.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 
@@ -49,6 +50,8 @@ struct node *node_create(uint64_t node_id)
 
 	node->parents = list_create();
 	node->children = list_create();
+	node->extra_outputs = list_create();
+	node->extra_inputs = list_create();
 	node->remaining_parents_count = 0;
 	node->fired_parents = NULL;
 	node->completed = 0;
@@ -198,6 +201,19 @@ void node_delete(struct node *node)
 
 	list_delete(node->parents);
 	list_delete(node->children);
+
+	while (list_size(node->extra_inputs) > 0) {
+		struct extra_io_mount *m = list_pop_head(node->extra_inputs);
+		free(m->remote_name);
+		free(m);
+	}
+	list_delete(node->extra_inputs);
+	while (list_size(node->extra_outputs) > 0) {
+		struct extra_io_mount *m = list_pop_head(node->extra_outputs);
+		free(m->remote_name);
+		free(m);
+	}
+	list_delete(node->extra_outputs);
 
 	if (node->fired_parents) {
 		set_delete(node->fired_parents);
