@@ -4,7 +4,25 @@
 
 """Python wrapper for the C executor graph API."""
 
+import json
+
 from . import graph_capi
+
+
+def format_scheduler_keys_runner_payload(scheduler_keys):
+    """
+    JSON string for the task-runner ``infile`` buffer: comma-separated scheduler keys in ``fn_args[0]``.
+    Compatible with worker ``task_runner.task.run_scheduler_keys`` (parses string / list / int).
+    Workflow keys ↔ scheduler keys mapping stays on the executor graph (``ExecutorGraph.add_node``).
+
+    Typical single-node payloads are still built by the C layer via ``node_construct_task_arguments``;
+    use this helper when assembling a multi-key call from Python.
+    """
+    keys_list = scheduler_keys if isinstance(scheduler_keys, (list, tuple)) else [scheduler_keys]
+    if not keys_list:
+        raise ValueError("scheduler_keys must be non-empty")
+    joined = ",".join(str(int(k)) for k in keys_list)
+    return json.dumps({"fn_args": [joined], "fn_kwargs": {}})
 
 
 class ExecutorGraph:
@@ -14,47 +32,48 @@ class ExecutorGraph:
         """Create the backing C executor graph."""
         self._c_graph = graph_capi.executor_graph_create(c_taskvine)
         self._c_executor = graph_capi.executor_create(c_taskvine, self._c_graph)
-        self._key_to_id = {}
-        self._id_to_key = {}
+        self._workflow_key_to_scheduler_key = {}
+        self._scheduler_key_to_workflow_key = {}
 
     def tune(self, name, value):
         """Forward a tuning parameter to the C executor."""
         graph_capi.executor_tune(self._c_executor, name, value)
 
-    def add_node(self, key, is_target=None):
-        """Create a C node and record its Python key."""
+    def add_node(self, workflow_key, is_target=None):
+        """Create a C node and record its workflow key."""
         node_id = graph_capi.executor_add_node(self._c_executor)
-        self._key_to_id[key] = node_id
-        self._id_to_key[node_id] = key
+        self._workflow_key_to_scheduler_key[workflow_key] = node_id
+        self._scheduler_key_to_workflow_key[node_id] = workflow_key
         if is_target is not None and bool(is_target):
             graph_capi.graph_set_target(self._c_graph, node_id)
         return node_id
 
-    def set_target(self, key):
+    def set_target(self, workflow_key):
         """Mark a node as a target."""
-        node_id = self._key_to_id.get(key)
+        node_id = self._workflow_key_to_scheduler_key.get(workflow_key)
         if node_id is None:
-            raise KeyError(f"Key not found: {key}")
+            raise KeyError(f"Workflow key not found: {workflow_key}")
         graph_capi.graph_set_target(self._c_graph, node_id)
 
-    def add_dependency(self, parent_key, child_key):
+    def add_dependency(self, parent_workflow_key, child_workflow_key):
         """Add an edge between two existing nodes."""
-        if parent_key not in self._key_to_id or child_key not in self._key_to_id:
-            raise KeyError("parent_key or child_key missing in mapping; call add_node() first")
+        wk2sk = self._workflow_key_to_scheduler_key
+        if parent_workflow_key not in wk2sk or child_workflow_key not in wk2sk:
+            raise KeyError("parent or child workflow_key missing in mapping; call add_node() first")
         graph_capi.graph_add_dependency(
-            self._c_graph, self._key_to_id[parent_key], self._key_to_id[child_key]
+            self._c_graph, wk2sk[parent_workflow_key], wk2sk[child_workflow_key]
         )
 
     def compute_topology_metrics(self):
         """Finalize the C graph and compute topology metrics."""
         graph_capi.executor_finalize(self._c_executor)
 
-    def get_node_outfile_remote_name(self, key):
+    def get_node_outfile_remote_name(self, workflow_key):
         """Return the output path assigned by the C graph."""
-        if key not in self._key_to_id:
-            raise KeyError(f"Key not found: {key}")
+        if workflow_key not in self._workflow_key_to_scheduler_key:
+            raise KeyError(f"Workflow key not found: {workflow_key}")
         return graph_capi.graph_get_node_outfile_remote_name(
-            self._c_graph, self._key_to_id[key]
+            self._c_graph, self._workflow_key_to_scheduler_key[workflow_key]
         )
 
     def get_task_runner_library_name(self):
@@ -67,18 +86,18 @@ class ExecutorGraph:
             self._c_graph, task_runner_function.__name__
         )
 
-    def add_task_input(self, task_key, filename):
+    def add_task_input(self, workflow_key, filename):
         """Add an input file to a task."""
-        task_id = self._key_to_id.get(task_key)
+        task_id = self._workflow_key_to_scheduler_key.get(workflow_key)
         if task_id is None:
-            raise KeyError(f"Task key not found: {task_key}")
+            raise KeyError(f"Workflow key not found: {workflow_key}")
         graph_capi.executor_add_task_input(self._c_executor, task_id, filename)
 
-    def add_task_output(self, task_key, filename):
+    def add_task_output(self, workflow_key, filename):
         """Add an output file to a task."""
-        task_id = self._key_to_id.get(task_key)
+        task_id = self._workflow_key_to_scheduler_key.get(workflow_key)
         if task_id is None:
-            raise KeyError(f"Task key not found: {task_key}")
+            raise KeyError(f"Workflow key not found: {workflow_key}")
         graph_capi.executor_add_task_output(self._c_executor, task_id, filename)
 
     def execute(self):

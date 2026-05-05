@@ -39,18 +39,18 @@ def collections_from_workflow(workflow):
     assert isinstance(workflow, Workflow), "workflow must be a Workflow"
 
     def ref_to_key(ref):
-        return ref.task_key
+        return ref.workflow_key
 
     dsk = {}
-    for task_key, (func_id, args, kwargs) in workflow.task_dict.items():
+    for workflow_key, (func_id, args, kwargs) in workflow.task_dict.items():
         func = workflow.callables[func_id]
         new_args = workflow._visit_task_output_refs(args, ref_to_key, rewrite=True)
         new_kwargs = workflow._visit_task_output_refs(kwargs, ref_to_key, rewrite=True)
 
         if new_kwargs:
-            dsk[task_key] = (_apply_with_kwargs_kvlist, func, list(new_args), [[k, v] for k, v in new_kwargs.items()])
+            dsk[workflow_key] = (_apply_with_kwargs_kvlist, func, list(new_args), [[k, v] for k, v in new_kwargs.items()])
         else:
-            dsk[task_key] = (func, *new_args)
+            dsk[workflow_key] = (func, *new_args)
 
     return dsk
 
@@ -106,14 +106,14 @@ class DaskAdaptor:
             return {}
 
         converted = {}
-        task_keys = set(task_dict.keys())
+        workflow_keys = set(task_dict.keys())
         task_spec = DaskTaskSpecConverter(dts) if dts else None
 
         for key, value in task_dict.items():
             if task_spec and task_spec.is_node(value):
-                converted[key] = task_spec.convert_node(key, value, task_keys)
+                converted[key] = task_spec.convert_node(key, value, workflow_keys)
             else:
-                converted[key] = self._convert_legacy_task(value, task_keys)
+                converted[key] = self._convert_legacy_task(value, workflow_keys)
 
         if task_spec:
             while True:
@@ -121,13 +121,13 @@ class DaskAdaptor:
                 if not pending:
                     break
                 for key, node in pending:
-                    converted[key] = task_spec.convert_node(key, node, task_keys)
+                    converted[key] = task_spec.convert_node(key, node, workflow_keys)
 
         return converted
 
-    def _convert_legacy_task(self, sexpr, task_keys):
+    def _convert_legacy_task(self, sexpr, workflow_keys):
         try:
-            if not isinstance(sexpr, (list, tuple)) and sexpr in task_keys:
+            if not isinstance(sexpr, (list, tuple)) and sexpr in workflow_keys:
                 return build_expr(identity, [TaskOutputRef(sexpr)], {})
         except TypeError:
             pass
@@ -142,26 +142,26 @@ class DaskAdaptor:
         else:
             raw_args, raw_kwargs = tail, {}
 
-        args = tuple(self._wrap_dependency(arg, task_keys) for arg in raw_args)
-        kwargs = {key: self._wrap_dependency(value, task_keys) for key, value in raw_kwargs.items()}
+        args = tuple(self._wrap_dependency(arg, workflow_keys) for arg in raw_args)
+        kwargs = {key: self._wrap_dependency(value, workflow_keys) for key, value in raw_kwargs.items()}
         return func, args, kwargs
 
-    def _wrap_dependency(self, obj, task_keys):
+    def _wrap_dependency(self, obj, workflow_keys):
         if isinstance(obj, TaskOutputRef):
             return obj
 
-        key = resolve_graph_key_if_task(obj, task_keys)
+        key = resolve_graph_key_if_task(obj, workflow_keys)
         if key is not None:
             return TaskOutputRef(key)
 
         if isinstance(obj, list):
-            return [self._wrap_dependency(value, task_keys) for value in obj]
+            return [self._wrap_dependency(value, workflow_keys) for value in obj]
         if isinstance(obj, tuple):
-            return tuple(self._wrap_dependency(value, task_keys) for value in obj)
+            return tuple(self._wrap_dependency(value, workflow_keys) for value in obj)
         if isinstance(obj, Mapping):
-            return {key: self._wrap_dependency(value, task_keys) for key, value in obj.items()}
+            return {key: self._wrap_dependency(value, workflow_keys) for key, value in obj.items()}
         if isinstance(obj, set):
-            return {self._wrap_dependency(value, task_keys) for value in obj}
+            return {self._wrap_dependency(value, workflow_keys) for value in obj}
         if isinstance(obj, frozenset):
-            return frozenset(self._wrap_dependency(value, task_keys) for value in obj)
+            return frozenset(self._wrap_dependency(value, workflow_keys) for value in obj)
         return obj

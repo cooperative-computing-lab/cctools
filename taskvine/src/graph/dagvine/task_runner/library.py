@@ -12,7 +12,7 @@ import hashlib
 import collections
 
 from ndcctools.taskvine.dagvine.workflow import Workflow, TaskOutputRef, TaskOutputWrapper
-from ndcctools.taskvine.dagvine.task_runner.task import run_task_key
+from ndcctools.taskvine.dagvine.task_runner.task import run_scheduler_keys
 from ndcctools.taskvine.utils import load_variable_from_library
 
 
@@ -29,7 +29,7 @@ class TaskRunnerLibrary:
         # using the loaded context without importing them over and over again
         self.hoisting_modules = [
             os, cloudpickle, Workflow, TaskOutputRef, TaskOutputWrapper, uuid, hashlib, random, types, collections, time,
-            load_variable_from_library, run_task_key
+            load_variable_from_library, run_scheduler_keys
         ]
 
         # environment files serve as additional inputs to the library task, where each key is the local path and the value is the remote path
@@ -69,7 +69,7 @@ class TaskRunnerLibrary:
 
         self.libtask = self.py_manager.create_library_from_functions(
             self.name,
-            run_task_key,
+            run_scheduler_keys,
             library_context_info=[self.context_loader_func, self.context_loader_args, self.context_loader_kwargs],
             add_env=False,
             function_infile_load_mode="json",

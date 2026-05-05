@@ -9,7 +9,7 @@ import sys
 sys.modules.setdefault("cvine", importlib.import_module("ndcctools.taskvine.cvine"))
 
 from . import graph_capi
-from .graph import ExecutorGraph
+from .graph import ExecutorGraph, format_scheduler_keys_runner_payload
 
 
-__all__ = ["graph_capi", "ExecutorGraph"]
+__all__ = ["graph_capi", "ExecutorGraph", "format_scheduler_keys_runner_payload"]

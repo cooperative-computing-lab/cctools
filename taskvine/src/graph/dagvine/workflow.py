@@ -28,16 +28,16 @@ class TaskOutputWrapper:
 
 # A reference to a task output. This is used to represent the output of a task as a dependency of another task.
 class TaskOutputRef:
-    __slots__ = ("task_key", "path")
+    __slots__ = ("workflow_key", "path")
 
-    def __init__(self, task_key, path=()):
-        self.task_key = task_key
+    def __init__(self, workflow_key, path=()):
+        self.workflow_key = workflow_key
         self.path = tuple(path)
 
     def __getitem__(self, key):
         if isinstance(key, tuple):
-            return TaskOutputRef(self.task_key, self.path + key)
-        return TaskOutputRef(self.task_key, self.path + (key,))
+            return TaskOutputRef(self.workflow_key, self.path + key)
+        return TaskOutputRef(self.workflow_key, self.path + (key,))
 
 
 # The Workflow is a directed acyclic graph (DAG) that represents the logical dependencies between tasks.
@@ -52,19 +52,19 @@ class Workflow:
 
         self.task_dict = {}
 
-        self.parents_of = defaultdict(set)     # task_key -> set of task_keys
-        self.children_of = defaultdict(set)    # task_key -> set of task_keys
+        self.parents_of = defaultdict(set)     # workflow_key -> set of workflow_keys
+        self.children_of = defaultdict(set)    # workflow_key -> set of workflow_keys
 
-        self.producer_of = {}                  # filename -> task_key
-        self.consumers_of = defaultdict(set)   # filename -> set of task_keys
+        self.producer_of = {}                  # filename -> workflow_key
+        self.consumers_of = defaultdict(set)   # filename -> set of workflow_keys
 
-        self.outfile_remote_name = defaultdict(lambda: None)   # task_key -> remote outfile name, will be set by the executor graph
+        self.outfile_remote_name = defaultdict(lambda: None)   # workflow_key -> remote outfile name, will be set by the executor graph
 
-        self.pykey2cid = {}                  # py_key -> c_id
-        self.cid2pykey = {}                  # c_id -> py_key
+        self.workflow_key_to_scheduler_key = {}                  # workflow_key -> scheduler key (C node id)
+        self.scheduler_key_to_workflow_key = {}                  # scheduler key -> workflow_key
 
-        self.extra_task_output_size_mb = {}  # task_key -> extra size in MB
-        self.extra_task_sleep_time = {}      # task_key -> extra sleep time in seconds
+        self.extra_task_output_size_mb = {}  # workflow_key -> extra size in MB
+        self.extra_task_sleep_time = {}      # workflow_key -> extra sleep time in seconds
 
     def _intern_callable(self, func):
         idx = self._callable_index.get(func)
@@ -141,49 +141,49 @@ class Workflow:
         parents = set()
 
         def on_ref(r):
-            parents.add(r.task_key)
+            parents.add(r.workflow_key)
             return None
 
         self._visit_task_output_refs(obj, on_ref, rewrite=False)
         return parents
 
-    def add_task(self, task_key, func, *args, **kwargs):
-        if task_key in self.task_dict:
-            raise ValueError(f"Task {task_key} already exists")
+    def add_task(self, workflow_key, func, *args, **kwargs):
+        if workflow_key in self.task_dict:
+            raise ValueError(f"Task {workflow_key} already exists")
 
         func_id = self._intern_callable(func)
-        self.task_dict[task_key] = (func_id, args, kwargs)
+        self.task_dict[workflow_key] = (func_id, args, kwargs)
 
         parents = self._find_parents(args) | self._find_parents(kwargs)
 
         for parent in parents:
-            self.parents_of[task_key].add(parent)
-            self.children_of[parent].add(task_key)
+            self.parents_of[workflow_key].add(parent)
+            self.children_of[parent].add(workflow_key)
 
-    def task_produces(self, task_key, *filenames):
+    def task_produces(self, workflow_key, *filenames):
         for filename in filenames:
             # a file can only be produced by one task
             if filename in self.producer_of:
                 raise ValueError(f"File {filename} already produced by task {self.producer_of[filename]}")
-            self.producer_of[filename] = task_key
+            self.producer_of[filename] = workflow_key
 
-    def task_consumes(self, task_key, *filenames):
+    def task_consumes(self, workflow_key, *filenames):
         for filename in filenames:
             # a file can be consumed by multiple tasks
-            self.consumers_of[filename].add(task_key)
+            self.consumers_of[filename].add(workflow_key)
 
-    def save_task_output(self, task_key, output):
-        with open(self.outfile_remote_name[task_key], "wb") as f:
-            wrapped_output = TaskOutputWrapper(output, extra_size_mb=self.extra_task_output_size_mb[task_key])
+    def save_task_output(self, workflow_key, output):
+        with open(self.outfile_remote_name[workflow_key], "wb") as f:
+            wrapped_output = TaskOutputWrapper(output, extra_size_mb=self.extra_task_output_size_mb[workflow_key])
             cloudpickle.dump(wrapped_output, f)
 
-    def load_task_output(self, task_key):
-        return TaskOutputWrapper.load_from_path(self.outfile_remote_name[task_key])
+    def load_task_output(self, workflow_key):
+        return TaskOutputWrapper.load_from_path(self.outfile_remote_name[workflow_key])
 
     def get_topological_order(self):
         indegree = {}
-        for task_key in self.task_dict:
-            indegree[task_key] = len(self.parents_of.get(task_key, ()))
+        for workflow_key in self.task_dict:
+            indegree[workflow_key] = len(self.parents_of.get(workflow_key, ()))
 
         q = deque(t for t, d in indegree.items() if d == 0)
         order = []

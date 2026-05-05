@@ -5,7 +5,7 @@
 from ndcctools.taskvine.manager import Manager
 
 from ndcctools.taskvine.dagvine.dask_adaptor import DaskAdaptor
-from ndcctools.taskvine.dagvine.task_runner import TaskRunnerLibrary, compute_task, run_task_key
+from ndcctools.taskvine.dagvine.task_runner import TaskRunnerLibrary, compute_task, run_scheduler_keys
 from ndcctools.taskvine.dagvine.workflow import Workflow, TaskOutputRef, TaskOutputWrapper
 from ndcctools.taskvine.dagvine.executor.graph import ExecutorGraph
 from ndcctools.taskvine.dagvine.utils import color_text, context_loader_func, delete_all_files
@@ -141,7 +141,7 @@ class DAGVine(Manager):
             new_workflow._callable_index = dict(old_workflow._callable_index)
             for r in range(repeats):
                 def rewriter(ref):
-                    return TaskOutputRef(self._rep_key(ref.task_key, r), ref.path)
+                    return TaskOutputRef(self._rep_key(ref.workflow_key, r), ref.path)
 
                 def _rewrite(obj):
                     return old_workflow._visit_task_output_refs(obj, rewriter, rewrite=True)
@@ -158,7 +158,7 @@ class DAGVine(Manager):
             expanded = {}
             for r in range(repeats):
                 def rewriter(ref):
-                    return TaskOutputRef(self._rep_key(ref.task_key, r), ref.path)
+                    return TaskOutputRef(self._rep_key(ref.workflow_key, r), ref.path)
 
                 def _rewrite(obj):
                     return temp_workflow._visit_task_output_refs(obj, rewriter, rewrite=True)
@@ -192,7 +192,7 @@ class DAGVine(Manager):
 
         executor = ExecutorGraph(self._taskvine)
 
-        executor.set_task_runner_function(run_task_key)
+        executor.set_task_runner_function(run_scheduler_keys)
 
         self.tune_manager()
         self.tune_executor(executor)
@@ -201,8 +201,8 @@ class DAGVine(Manager):
 
         for k in topo_order:
             node_id = executor.add_node(k)
-            py_graph.pykey2cid[k] = node_id
-            py_graph.cid2pykey[node_id] = k
+            py_graph.workflow_key_to_scheduler_key[k] = node_id
+            py_graph.scheduler_key_to_workflow_key[node_id] = k
             for pk in py_graph.parents_of[k]:
                 executor.add_dependency(pk, k)
 
@@ -225,16 +225,16 @@ class DAGVine(Manager):
 
         # Declare graph-level file dependencies in the C graph.
         for filename in py_graph.producer_of:
-            task_key = py_graph.producer_of[filename]
-            executor.add_task_output(task_key, filename)
+            workflow_key = py_graph.producer_of[filename]
+            executor.add_task_output(workflow_key, filename)
         for filename in py_graph.consumers_of:
-            for task_key in py_graph.consumers_of[filename]:
-                executor.add_task_input(task_key, filename)
+            for workflow_key in py_graph.consumers_of[filename]:
+                executor.add_task_input(workflow_key, filename)
 
         executor.compute_topology_metrics()
 
         # Save output locations back into the Python graph after finalize may adjust checkpoint paths.
-        for k in py_graph.pykey2cid:
+        for k in py_graph.workflow_key_to_scheduler_key:
             outfile_remote_name = executor.get_node_outfile_remote_name(k)
             py_graph.outfile_remote_name[k] = outfile_remote_name
 

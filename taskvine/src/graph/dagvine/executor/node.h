@@ -59,7 +59,7 @@ struct node *node_create(uint64_t node_id);
 
 /** Create the task arguments for a node.
 @param node Reference to the node.
-@return The task arguments in JSON format: {"fn_args": [node_id], "fn_kwargs": {}}.
+@return The task arguments in JSON format: {"fn_args": ["node_id"], "fn_kwargs": {}} (string id for run_scheduler_keys).
 */
 char *node_construct_task_arguments(struct node *node);
 

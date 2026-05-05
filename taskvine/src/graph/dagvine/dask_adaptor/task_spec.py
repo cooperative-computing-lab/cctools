@@ -24,19 +24,19 @@ def safe_repr(value, limit=800):
     return text
 
 
-def resolve_graph_key_if_task(obj, task_keys):
+def resolve_graph_key_if_task(obj, workflow_keys):
     """Return the matching graph key when ``obj`` denotes an existing Dask task."""
     if isinstance(obj, TaskOutputRef):
         return None
     try:
-        if obj in task_keys:
+        if obj in workflow_keys:
             return obj
     except TypeError:
         pass
     if hasattr(obj, "item") and callable(obj.item):
         try:
             item = obj.item()
-            if item in task_keys:
+            if item in workflow_keys:
                 return item
         except Exception:
             pass
@@ -92,7 +92,7 @@ class DaskTaskSpecConverter:
     def pending_nodes(self, converted):
         return [(key, node) for key, node in self.lifted_nodes.items() if key not in converted]
 
-    def convert_node(self, key, node, task_keys):
+    def convert_node(self, key, node, workflow_keys):
         if not self.dts:
             raise RuntimeError("Dask TaskSpec support unavailable: dask._task_spec is not installed")
 
@@ -104,9 +104,9 @@ class DaskTaskSpecConverter:
         taskref_cls = getattr(self.dts, "TaskRef", None)
 
         if task_cls and isinstance(node, task_cls):
-            return self._convert_task_node(key, node, task_keys)
+            return self._convert_task_node(key, node, workflow_keys)
         if alias_cls and isinstance(node, alias_cls):
-            alias_ref = self._extract_alias_target(node, task_keys)
+            alias_ref = self._extract_alias_target(node, workflow_keys)
             if alias_ref is None:
                 raise ValueError(f"Alias {key} is missing a resolvable upstream task")
             return build_expr(identity, [alias_ref], {})
@@ -120,10 +120,10 @@ class DaskTaskSpecConverter:
             payload = getattr(node, "value", None)
             if payload is None:
                 payload = getattr(node, "data", None)
-            return build_expr(identity, [self.unwrap_operand(payload, task_keys, parent_key=key)], {})
+            return build_expr(identity, [self.unwrap_operand(payload, workflow_keys, parent_key=key)], {})
         return build_expr(identity, [node], {})
 
-    def _convert_task_node(self, key, node, task_keys):
+    def _convert_task_node(self, key, node, workflow_keys):
         func = extract_callable_from_task(node)
         if func is None:
             raise TypeError(f"Task {key} is missing a callable function/op attribute")
@@ -134,11 +134,11 @@ class DaskTaskSpecConverter:
         args = []
         try:
             for index, arg in enumerate(raw_args):
-                args.append(self.unwrap_operand(arg, task_keys, parent_key=key))
+                args.append(self.unwrap_operand(arg, workflow_keys, parent_key=key))
         except Exception as exc:
             raise TypeError(
                 "Failed to adapt TaskSpec node argument while converting to Workflow.\n"
-                f"- parent_task_key: {key!r}\n"
+                f"- parent_workflow_key: {key!r}\n"
                 f"- func: {safe_repr(func)}\n"
                 f"- arg_index: {index}\n"
                 f"- arg_value: {safe_repr(arg)}\n"
@@ -149,11 +149,11 @@ class DaskTaskSpecConverter:
         kwargs = {}
         try:
             for kwarg_key, value in raw_kwargs.items():
-                kwargs[kwarg_key] = self.unwrap_operand(value, task_keys, parent_key=key)
+                kwargs[kwarg_key] = self.unwrap_operand(value, workflow_keys, parent_key=key)
         except Exception as exc:
             raise TypeError(
                 "Failed to adapt TaskSpec node kwarg while converting to Workflow.\n"
-                f"- parent_task_key: {key!r}\n"
+                f"- parent_workflow_key: {key!r}\n"
                 f"- func: {safe_repr(func)}\n"
                 f"- kwarg_key: {kwarg_key!r}\n"
                 f"- kwarg_value: {safe_repr(value)}\n"
@@ -163,14 +163,14 @@ class DaskTaskSpecConverter:
 
         return build_expr(func, args, kwargs)
 
-    def unwrap_operand(self, operand, task_keys, *, parent_key=None):
+    def unwrap_operand(self, operand, workflow_keys, *, parent_key=None):
         taskref_cls = getattr(self.dts, "TaskRef", None)
         if taskref_cls and isinstance(operand, taskref_cls):
             return TaskOutputRef(getattr(operand, "key", None), getattr(operand, "path", ()) or ())
 
         alias_cls = getattr(self.dts, "Alias", None)
         if alias_cls and isinstance(operand, alias_cls):
-            alias_ref = self._extract_alias_target(operand, task_keys)
+            alias_ref = self._extract_alias_target(operand, workflow_keys)
             if alias_ref is None:
                 raise ValueError("Alias node is missing a valid upstream source")
             return alias_ref
@@ -188,62 +188,62 @@ class DaskTaskSpecConverter:
             payload = getattr(operand, "value", None)
             if payload is None:
                 payload = getattr(operand, "data", None)
-            return self.unwrap_operand(payload, task_keys, parent_key=parent_key)
+            return self.unwrap_operand(payload, workflow_keys, parent_key=parent_key)
 
         task_cls = getattr(self.dts, "Task", None)
         if task_cls and isinstance(operand, task_cls):
-            return self._unwrap_task_operand(operand, task_keys, parent_key=parent_key)
+            return self._unwrap_task_operand(operand, workflow_keys, parent_key=parent_key)
 
         if isinstance(operand, list):
-            return [self.unwrap_operand(value, task_keys, parent_key=parent_key) for value in operand]
+            return [self.unwrap_operand(value, workflow_keys, parent_key=parent_key) for value in operand]
         if isinstance(operand, tuple):
-            return tuple(self.unwrap_operand(value, task_keys, parent_key=parent_key) for value in operand)
+            return tuple(self.unwrap_operand(value, workflow_keys, parent_key=parent_key) for value in operand)
         if isinstance(operand, Mapping):
-            return {key: self.unwrap_operand(value, task_keys, parent_key=parent_key) for key, value in operand.items()}
+            return {key: self.unwrap_operand(value, workflow_keys, parent_key=parent_key) for key, value in operand.items()}
         if isinstance(operand, set):
-            return {self.unwrap_operand(value, task_keys, parent_key=parent_key) for value in operand}
+            return {self.unwrap_operand(value, workflow_keys, parent_key=parent_key) for value in operand}
         if isinstance(operand, frozenset):
-            return frozenset(self.unwrap_operand(value, task_keys, parent_key=parent_key) for value in operand)
+            return frozenset(self.unwrap_operand(value, workflow_keys, parent_key=parent_key) for value in operand)
         return operand
 
-    def _unwrap_task_operand(self, operand, task_keys, *, parent_key=None):
+    def _unwrap_task_operand(self, operand, workflow_keys, *, parent_key=None):
         inline_key = getattr(operand, "key", None)
-        if inline_key is not None and inline_key in task_keys:
+        if inline_key is not None and inline_key in workflow_keys:
             return TaskOutputRef(inline_key, ())
 
         func = extract_callable_from_task(operand)
         if func is None:
-            return self._lift_inline_task(operand, task_keys, parent_key=parent_key)
+            return self._lift_inline_task(operand, workflow_keys, parent_key=parent_key)
         if _is_identity_cast_op(func):
-            return self._unwrap_identity_cast(operand, task_keys, parent_key=parent_key)
+            return self._unwrap_identity_cast(operand, workflow_keys, parent_key=parent_key)
         if _is_pure_value_op(func):
-            reduced, used_lift = self._reduce_inline_task(operand, task_keys, parent_key=parent_key)
+            reduced, used_lift = self._reduce_inline_task(operand, workflow_keys, parent_key=parent_key)
             if used_lift or _is_too_large_inline_value(reduced):
-                return self._lift_inline_task(operand, task_keys, parent_key=parent_key)
+                return self._lift_inline_task(operand, workflow_keys, parent_key=parent_key)
             return reduced
-        return self._lift_inline_task(operand, task_keys, parent_key=parent_key)
+        return self._lift_inline_task(operand, workflow_keys, parent_key=parent_key)
 
-    def _unwrap_identity_cast(self, operand, task_keys, *, parent_key=None):
+    def _unwrap_identity_cast(self, operand, workflow_keys, *, parent_key=None):
         raw_args = getattr(operand, "args", ()) or ()
         raw_kwargs = getattr(operand, "kwargs", {}) or {}
         typ = raw_kwargs.get("typ", None)
-        values = [self.unwrap_operand(arg, task_keys, parent_key=parent_key) for arg in raw_args]
+        values = [self.unwrap_operand(arg, workflow_keys, parent_key=parent_key) for arg in raw_args]
 
         if typ in (list, tuple, set, frozenset, dict):
             try:
                 return typ(values)
             except Exception:
                 pass
-        return self._lift_inline_task(operand, task_keys, parent_key=parent_key)
+        return self._lift_inline_task(operand, workflow_keys, parent_key=parent_key)
 
-    def _extract_alias_target(self, alias_node, task_keys):
+    def _extract_alias_target(self, alias_node, workflow_keys):
         fields = getattr(alias_node.__class__, "__dataclass_fields__", {}) if self.dts else {}
         path = tuple(getattr(alias_node, "path", ()) or ())
 
         for candidate in ("alias_of", "target", "source", "ref"):
             if candidate not in fields:
                 continue
-            key = resolve_graph_key_if_task(getattr(alias_node, candidate, None), task_keys)
+            key = resolve_graph_key_if_task(getattr(alias_node, candidate, None), workflow_keys)
             if key is not None:
                 return TaskOutputRef(key, path)
 
@@ -251,11 +251,11 @@ class DaskTaskSpecConverter:
         if deps:
             deps = list(deps)
             if len(deps) == 1:
-                key = resolve_graph_key_if_task(deps[0], task_keys)
+                key = resolve_graph_key_if_task(deps[0], workflow_keys)
                 return TaskOutputRef(key if key is not None else deps[0], path)
         return None
 
-    def _reduce_inline_task(self, task_node, task_keys, *, parent_key=None):
+    def _reduce_inline_task(self, task_node, workflow_keys, *, parent_key=None):
         func = extract_callable_from_task(task_node)
         raw_args = getattr(task_node, "args", ()) or ()
         raw_kwargs = getattr(task_node, "kwargs", {}) or {}
@@ -264,26 +264,26 @@ class DaskTaskSpecConverter:
         args = []
         for arg in raw_args:
             before = len(self.lifted_nodes)
-            args.append(self.unwrap_operand(arg, task_keys, parent_key=parent_key))
+            args.append(self.unwrap_operand(arg, workflow_keys, parent_key=parent_key))
             used_lift = used_lift or (len(self.lifted_nodes) != before)
 
         kwargs = {}
         for key, value in raw_kwargs.items():
             before = len(self.lifted_nodes)
-            kwargs[key] = self.unwrap_operand(value, task_keys, parent_key=parent_key)
+            kwargs[key] = self.unwrap_operand(value, workflow_keys, parent_key=parent_key)
             used_lift = used_lift or (len(self.lifted_nodes) != before)
 
         try:
             return func(*args, **kwargs), used_lift
         except Exception:
-            return self._lift_inline_task(task_node, task_keys, parent_key=parent_key), True
+            return self._lift_inline_task(task_node, workflow_keys, parent_key=parent_key), True
 
-    def _lift_inline_task(self, task_node, task_keys, *, parent_key=None):
+    def _lift_inline_task(self, task_node, workflow_keys, *, parent_key=None):
         inline_key = getattr(task_node, "key", None)
         if parent_key is not None and inline_key == parent_key:
             raise ValueError(f"Refusing to lift Task that would self-reference parent key {parent_key!r}")
 
-        signature = self._structural_signature(task_node, task_keys)
+        signature = self._structural_signature(task_node, workflow_keys)
         cached = self._lift_cache.get(signature)
         if cached is not None:
             return TaskOutputRef(cached, ())
@@ -291,22 +291,22 @@ class DaskTaskSpecConverter:
         digest = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:16]
         base = f"__lift__{digest}"
         new_key = base
-        while new_key in task_keys or new_key in self.lifted_nodes:
+        while new_key in workflow_keys or new_key in self.lifted_nodes:
             self._lift_counter += 1
             new_key = f"{base}_{self._lift_counter}"
 
         self._lift_cache[signature] = new_key
         self.lifted_nodes[new_key] = task_node
-        task_keys.add(new_key)
+        workflow_keys.add(new_key)
         return TaskOutputRef(new_key, ())
 
-    def _structural_signature(self, obj, task_keys):
+    def _structural_signature(self, obj, workflow_keys):
         try:
-            return self._structural_signature_impl(obj, task_keys)
+            return self._structural_signature_impl(obj, workflow_keys)
         except Exception:
             return f"fallback({safe_repr(obj)})"
 
-    def _structural_signature_impl(self, obj, task_keys):
+    def _structural_signature_impl(self, obj, workflow_keys):
         taskref_cls = getattr(self.dts, "TaskRef", None)
         alias_cls = getattr(self.dts, "Alias", None)
         literal_cls = getattr(self.dts, "Literal", None)
@@ -317,8 +317,8 @@ class DaskTaskSpecConverter:
         if taskref_cls and isinstance(obj, taskref_cls):
             return f"TaskRef({getattr(obj, 'key', None)!r},{tuple(getattr(obj, 'path', ()) or ())!r})"
         if alias_cls and isinstance(obj, alias_cls):
-            ref = self._extract_alias_target(obj, task_keys)
-            return f"Alias({getattr(ref, 'task_key', None)!r},{getattr(ref, 'path', ())!r})"
+            ref = self._extract_alias_target(obj, workflow_keys)
+            return f"Alias({getattr(ref, 'workflow_key', None)!r},{getattr(ref, 'path', ())!r})"
         if literal_cls and isinstance(obj, literal_cls):
             return f"Literal({safe_repr(getattr(obj, 'value', None))})"
         if datanode_cls and isinstance(obj, datanode_cls):
@@ -327,29 +327,29 @@ class DaskTaskSpecConverter:
             payload = getattr(obj, "value", None)
             if payload is None:
                 payload = getattr(obj, "data", None)
-            return f"Nested({self._structural_signature(payload, task_keys)})"
+            return f"Nested({self._structural_signature(payload, workflow_keys)})"
         if task_cls and isinstance(obj, task_cls):
             key = getattr(obj, "key", None)
-            if key is not None and key in task_keys:
+            if key is not None and key in workflow_keys:
                 return f"TaskKey({key!r})"
             func = extract_callable_from_task(obj)
             func_id = (getattr(func, "__module__", None), getattr(func, "__qualname__", None), getattr(func, "__name__", None))
             args = getattr(obj, "args", ()) or ()
             kwargs = getattr(obj, "kwargs", {}) or {}
-            arg_sigs = ",".join(self._structural_signature(arg, task_keys) for arg in args)
-            kw_sigs = ",".join(f"{key}={self._structural_signature(value, task_keys)}" for key, value in sorted(kwargs.items()))
+            arg_sigs = ",".join(self._structural_signature(arg, workflow_keys) for arg in args)
+            kw_sigs = ",".join(f"{key}={self._structural_signature(value, workflow_keys)}" for key, value in sorted(kwargs.items()))
             return f"TaskInline(func={func_id!r},args=[{arg_sigs}],kwargs=[{kw_sigs}])"
         if isinstance(obj, list):
-            return "list(" + ",".join(self._structural_signature(value, task_keys) for value in obj) + ")"
+            return "list(" + ",".join(self._structural_signature(value, workflow_keys) for value in obj) + ")"
         if isinstance(obj, tuple):
-            return "tuple(" + ",".join(self._structural_signature(value, task_keys) for value in obj) + ")"
+            return "tuple(" + ",".join(self._structural_signature(value, workflow_keys) for value in obj) + ")"
         if isinstance(obj, dict):
             items = ",".join(
-                f"{safe_repr(key)}:{self._structural_signature(value, task_keys)}"
+                f"{safe_repr(key)}:{self._structural_signature(value, workflow_keys)}"
                 for key, value in sorted(obj.items(), key=lambda item: repr(item[0]))
             )
             return "dict(" + items + ")"
         if isinstance(obj, (set, frozenset)):
-            items = ",".join(sorted(self._structural_signature(value, task_keys) for value in obj))
+            items = ",".join(sorted(self._structural_signature(value, workflow_keys) for value in obj))
             return f"{type(obj).__name__}(" + items + ")"
         return f"py({safe_repr(obj)})"

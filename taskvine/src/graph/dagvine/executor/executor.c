@@ -20,6 +20,8 @@
 
 static volatile sig_atomic_t interrupted = 0;
 
+static void submit_node_task(struct executor *e, struct node *node);
+
 /* Initialize runtime fields and default tuning values for a new executor. */
 static void executor_init_runtime(struct executor *e)
 {
@@ -47,7 +49,6 @@ static void executor_clear_runtime(struct executor *e)
 	if (!e) {
 		return;
 	}
-
 	if (e->task_id_to_node) {
 		itable_delete(e->task_id_to_node);
 		e->task_id_to_node = NULL;
@@ -345,7 +346,7 @@ int executor_tune(struct executor *e, const char *name, const char *value)
 		}
 
 	} else {
-		return graph_tune(e->graph, name, value); // graph owns structural tuning
+		return graph_tune(e->graph, name, value);
 	}
 
 	return 0;
@@ -441,6 +442,17 @@ static void submit_node_task(struct executor *e, struct node *node)
 	debug(D_VINE, "submitted node %" PRIu64 " with task id %d", node->node_id, task_id);
 }
 
+static int node_ready_for_submission(struct executor *e, struct node *node)
+{
+	if (!e || !node || node->remaining_parents_count != 0 || node->completed || !node->task) {
+		return 0;
+	}
+	if (node->task->state != VINE_TASK_INITIAL) {
+		return 0;
+	}
+	return !node->in_resubmit_queue;
+}
+
 /* Submit ready source nodes and enable delivery of recovery tasks to the application. */
 static void submit_initial_ready_nodes(struct executor *e)
 {
@@ -461,7 +473,7 @@ static void submit_initial_ready_nodes(struct executor *e)
 	vine_enable_return_recovery_tasks(e->manager); // driver must observe recovery completions for cut and prune
 }
 
-/* After a parent completes, decrement remaining parents and submit children that become ready. */
+/* After one parent completes, decrement remaining parents and submit children that become ready. */
 static void submit_unblocked_children(struct executor *e, struct node *node)
 {
 	struct graph *g = e ? e->graph : NULL;
@@ -480,7 +492,7 @@ static void submit_unblocked_children(struct executor *e, struct node *node)
 			child_node->fired_parents = set_create(0);
 		}
 		if (set_lookup(child_node->fired_parents, node)) {
-			continue; // each parent completes at most once for this child
+			continue;
 		}
 		set_insert(child_node->fired_parents, node);
 
@@ -488,8 +500,7 @@ static void submit_unblocked_children(struct executor *e, struct node *node)
 			child_node->remaining_parents_count--;
 		}
 
-		if (child_node->remaining_parents_count == 0 && !child_node->completed && child_node->task &&
-				child_node->task->state == VINE_TASK_INITIAL) {
+		if (node_ready_for_submission(e, child_node)) {
 			submit_node_task(e, child_node);
 		}
 	}
@@ -513,6 +524,15 @@ static struct node *get_node_by_task(struct executor *e, struct vine_task *task)
 		struct vine_mount *mount;
 		LIST_ITERATE(task->output_mounts, mount)
 		{
+			if (mount->file && mount->file->cached_name) {
+				struct node *producer = hash_table_lookup(g->outfile_cachename_to_node, mount->file->cached_name);
+				if (producer) {
+					return producer;
+				}
+			}
+			if (!mount->file) {
+				continue;
+			}
 			uint64_t original_producer_task_id = mount->file->original_producer_task_id;
 			if (original_producer_task_id > 0) {
 				return itable_lookup(e->task_id_to_node, original_producer_task_id);
@@ -857,6 +877,32 @@ static void drain_resubmit_queue(struct executor *e)
  * Verify status and on-disk outputs.
  * On failure enqueue a retry for the node.
  */
+static int validate_node_outputs_or_enqueue(struct executor *e, struct node *retry_node, struct node *output_node, struct vine_task *task)
+{
+	switch (output_node->outfile_type) {
+	case NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM: {
+		struct stat info;
+		// shared path may lag behind a successful task result code
+		if (stat(output_node->outfile_remote_name, &info) < 0) {
+			debug(D_VINE, "Task %d succeeded but missing sharedfs output %s", task->task_id, output_node->outfile_remote_name);
+			queue_node_for_retry(e, retry_node);
+			return 0;
+		}
+		output_node->outfile_size_bytes = info.st_size;
+		pfs_account_write(e, output_node, (size_t)info.st_size);
+		break;
+	}
+	case NODE_OUTFILE_TYPE_LOCAL:
+	case NODE_OUTFILE_TYPE_TEMP:
+		if (output_node->outfile) {
+			output_node->outfile_size_bytes = output_node->outfile->size;
+		}
+		break;
+	}
+
+	return 1;
+}
+
 static int validate_task_or_enqueue(struct executor *e, struct node *node, struct vine_task *task)
 {
 	if (task->result != VINE_RESULT_SUCCESS || task->exit_code != 0) {
@@ -865,26 +911,7 @@ static int validate_task_or_enqueue(struct executor *e, struct node *node, struc
 		return 0;
 	}
 
-	switch (node->outfile_type) {
-	case NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM: {
-		struct stat info;
-		// shared path may lag behind a successful task result code
-		if (stat(node->outfile_remote_name, &info) < 0) {
-			debug(D_VINE, "Task %d succeeded but missing sharedfs output %s", task->task_id, node->outfile_remote_name);
-			queue_node_for_retry(e, node);
-			return 0;
-		}
-		node->outfile_size_bytes = info.st_size;
-		pfs_account_write(e, node, (size_t)info.st_size);
-		break;
-	}
-	case NODE_OUTFILE_TYPE_LOCAL:
-	case NODE_OUTFILE_TYPE_TEMP:
-		node->outfile_size_bytes = node->outfile->size;
-		break;
-	}
-
-	return 1;
+	return validate_node_outputs_or_enqueue(e, node, node, task);
 }
 
 /* Return the recorded user-task makespan in microseconds. */
