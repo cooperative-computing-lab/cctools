@@ -263,6 +263,9 @@ class VinePlot:
             figsize=(image_width / image_dpi, image_height / image_dpi), dpi=image_dpi
         )
 
+        if self.range:
+            plt.xlim(*self.range)
+
         for i in range(len(self.fields)):
             (x, y) = self.get_data_for_field(self.fields[i])
             if self.stack:
@@ -361,7 +364,7 @@ if __name__ == "__main__":
             show_usage()
             sys.exit(0)
         elif opt == "-r":
-            x_range = arg
+            x_range = tuple(map(int, arg.split(":")))
         elif opt == "-s":
             # If a specific resolution is given, use that one alone
             time_resolution_list = [float(arg)]
