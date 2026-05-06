@@ -29,7 +29,12 @@ typedef enum {
 /** The node object. */
 struct node {
 	uint64_t node_id; // graph assigned id
-	int is_target;	  // if set, output is retrieved when the task completes
+	/**
+	 * Supernode leader id for scheduling: equals @c node_id for a single-node group.
+	 * After @c graph_supernode_register, every member shares the same leader id.
+	 */
+	uint64_t super_leader_id;
+	int is_target; // if set, output is retrieved when the task completes
 
 	struct vine_task *task;
 	struct vine_file *task_runner_arg_file; // JSON args buffer for the runner
@@ -84,6 +89,22 @@ struct node {
 @return Newly allocated node instance.
 */
 struct node *node_create(uint64_t node_id);
+
+/**
+ * Remove parent->child from both endpoints' parents/children lists (no-op if NULL).
+ * Used when rewiring supernodes so stale edges do not corrupt fan-in/out.
+ */
+void node_remove_dependency(struct node *parent, struct node *child);
+
+/**
+ * Add parent->child if that edge is not already present (idempotent).
+ */
+void node_ensure_dependency(struct node *parent, struct node *child);
+
+/**
+ * Drop fired_parents so executor scheduling can recount parents (e.g. after supernode merge rewires edges).
+ */
+void node_clear_fired_parents(struct node *n);
 
 /** Create the task arguments for a node.
 @param node Reference to the node.

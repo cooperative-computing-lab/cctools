@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "buffer.h"
 #include "debug.h"
 #include "executor.h"
 #include "macros.h"
@@ -24,6 +25,91 @@ static void submit_node_task(struct executor *e, struct node *node);
 static struct vine_task *executor_make_vine_task(struct executor *e);
 static void executor_materialize_node(struct executor *e, struct node *node);
 static void executor_run_completion_postprocess(struct executor *e, struct node *node);
+
+static uint64_t executor_count_completed_user_nodes(const struct graph *g)
+{
+	uint64_t n = 0;
+	uint64_t nid;
+	struct node *nd;
+
+	if (!g) {
+		return 0;
+	}
+	ITABLE_ITERATE(g->nodes, nid, nd)
+	{
+		if (nd->completed) {
+			n++;
+		}
+	}
+	return n;
+}
+
+/*
+ * The leader's task has passed validation. Mark that node completed and, when chain grouping
+ * applies, mark every non-leader in the same group. Those members did not receive their own
+ * vine tasks because they ran inside the leader's single submission.
+ */
+static void executor_mark_user_node_completed_after_success(struct graph *g, struct node *leader)
+{
+	if (!g || !leader) {
+		return;
+	}
+
+	leader->completed = 1;
+
+	if (!g->chain_grouping_enabled) {
+		return;
+	}
+
+	struct list *smems = graph_supernode_nonleader_members(g, leader->node_id);
+	if (!smems) {
+		return;
+	}
+
+	struct node *m;
+	LIST_ITERATE(smems, m)
+	{
+		if (!m->completed) {
+			m->completed = 1;
+		}
+	}
+}
+
+/*
+ * Build the JSON payload for the runner infile argument. Field fn_args[0] names the scheduler
+ * keys that run_scheduler_keys should execute. A merged chain passes one comma-separated string
+ * such as "1,2,3". A singleton passes a single id. The payload must be one JSON string in that
+ * slot instead of an array that mixes strings and bare numbers.
+ */
+static char *executor_format_runner_infile_json(struct graph *g, struct node *node)
+{
+	if (!g || !node) {
+		return NULL;
+	}
+
+	if (!g->chain_grouping_enabled) {
+		return string_format("{\"fn_args\":[\"%" PRIu64 "\"],\"fn_kwargs\":{}}", node->node_id);
+	}
+
+	struct list *mems = graph_supernode_nonleader_members(g, node->node_id);
+	if (!mems || list_size(mems) == 0) {
+		return string_format("{\"fn_args\":[\"%" PRIu64 "\"],\"fn_kwargs\":{}}", node->node_id);
+	}
+
+	buffer_t buf;
+	buffer_init(&buf);
+	buffer_printf(&buf, "{\"fn_args\":[\"%" PRIu64 "", node->node_id);
+	struct node *m;
+	LIST_ITERATE(mems, m)
+	{
+		buffer_printf(&buf, ",%" PRIu64 "", m->node_id);
+	}
+	buffer_printf(&buf, "\"],\"fn_kwargs\":{}}");
+
+	char *s = xxstrdup(buffer_tostring(&buf));
+	buffer_free(&buf);
+	return s;
+}
 
 static void extra_io_mount_push(struct list *lst, struct vine_file *f, const char *remote_name)
 {
@@ -181,10 +267,8 @@ static struct vine_task *executor_make_vine_task(struct executor *e)
 }
 
 /*
- * Runtime materialization (submit path): logical graph and vine_file handles are fixed in
- * executor_finalize. Here we build vine_task + mounts + runner infile as one atomic step:
- * node->task is non-NULL only after all IO and the infile are attached. On failure the ephemeral
- * task is discarded and node->task stays NULL.
+ * Attach inputs, outputs, and the infile buffer to a new vine_task at submit time. The node's
+ * task pointer stays NULL until that bundle is complete and ready for vine_submit.
  */
 static void executor_materialize_node(struct executor *e, struct node *node)
 {
@@ -219,11 +303,34 @@ static void executor_materialize_node(struct executor *e, struct node *node)
 		vine_task_add_output(t, m->file, m->remote_name, VINE_TRANSFER_ALWAYS);
 	}
 
+	/*
+	 * When chains are merged, only the leader submits a task, but that task must list every
+	 * member's declared outputs so the manager can track each outfile by node id.
+	 */
+	if (g->chain_grouping_enabled && graph_node_is_supernode_leader(node)) {
+		struct list *mems = graph_supernode_nonleader_members(g, node->node_id);
+		if (mems) {
+			struct node *m;
+			LIST_ITERATE(mems, m)
+			{
+				if (m->outfile) {
+					vine_task_add_output(t, m->outfile, m->outfile_remote_name, VINE_TRANSFER_ALWAYS);
+				}
+				LIST_ITERATE(m->extra_outputs, item)
+				{
+					struct extra_io_mount *em = (struct extra_io_mount *)item;
+					vine_task_add_output(t, em->file, em->remote_name, VINE_TRANSFER_ALWAYS);
+				}
+			}
+		}
+	}
+
 	struct node *parent_node;
 	LIST_ITERATE(node->parents, parent_node)
 	{
-		if (parent_node->outfile) {
-			vine_task_add_input(t, parent_node->outfile, parent_node->outfile_remote_name, VINE_TRANSFER_ALWAYS);
+		struct node *src = graph_input_producer_node(g, parent_node, node);
+		if (src && src->outfile) {
+			vine_task_add_input(t, src->outfile, src->outfile_remote_name, VINE_TRANSFER_ALWAYS);
 		}
 	}
 
@@ -233,7 +340,7 @@ static void executor_materialize_node(struct executor *e, struct node *node)
 		vine_task_add_input(t, m->file, m->remote_name, VINE_TRANSFER_ALWAYS);
 	}
 
-	char *task_arguments = node_construct_task_arguments(node);
+	char *task_arguments = executor_format_runner_infile_json(g, node);
 	if (!task_arguments) {
 		goto fail_task;
 	}
@@ -279,7 +386,10 @@ static void executor_declare_node_outfile(struct executor *e, struct node *node)
 	}
 }
 
-/* Add a graph node; vine_task and IO mounts are created at submit (materialize). */
+/*
+ * Allocate the next graph node. Per-node vine_task and I/O mounts appear later during
+ * executor_materialize_node at submit time.
+ */
 uint64_t executor_add_node(struct executor *e)
 {
 	if (!e || !e->graph) {
@@ -434,9 +544,10 @@ static void handle_sigint(int signal)
 }
 
 /* Compute submission priority for a node using the configured scheduling policy. */
-static double calculate_task_priority(struct node *node, task_priority_mode_t priority_mode)
+static double calculate_task_priority(struct executor *e, struct node *node)
 {
-	if (!node) {
+	struct graph *g = e ? e->graph : NULL;
+	if (!node || !g) {
 		return 0;
 	}
 
@@ -444,7 +555,7 @@ static double calculate_task_priority(struct node *node, task_priority_mode_t pr
 	timestamp_t current_time = timestamp_get();
 	struct node *parent_node;
 
-	switch (priority_mode) {
+	switch (e->task_priority_mode) {
 	case TASK_PRIORITY_MODE_RANDOM:
 		priority = random_double();
 		break;
@@ -463,16 +574,18 @@ static double calculate_task_priority(struct node *node, task_priority_mode_t pr
 	case TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST:
 		LIST_ITERATE(node->parents, parent_node)
 		{
-			if (!parent_node->outfile) {
+			struct node *src = graph_input_producer_node(g, parent_node, node);
+			if (!src || !src->outfile) {
 				continue;
 			}
-			priority += (double)vine_file_size(parent_node->outfile);
+			priority += (double)vine_file_size(src->outfile);
 		}
 		break;
 	case TASK_PRIORITY_MODE_LARGEST_STORAGE_FOOTPRINT_FIRST:
 		LIST_ITERATE(node->parents, parent_node)
 		{
-			if (!parent_node->outfile) {
+			struct node *src = graph_input_producer_node(g, parent_node, node);
+			if (!src || !src->outfile) {
 				continue;
 			}
 			if (!parent_node->task) {
@@ -480,7 +593,7 @@ static double calculate_task_priority(struct node *node, task_priority_mode_t pr
 			}
 			timestamp_t parent_task_completion_time = parent_node->task->time_workers_execute_last;
 			// weight by parent input size and last observed worker runtime
-			priority += (double)vine_file_size(parent_node->outfile) * (double)parent_task_completion_time;
+			priority += (double)vine_file_size(src->outfile) * (double)parent_task_completion_time;
 		}
 		break;
 	}
@@ -510,7 +623,7 @@ static void submit_node_task(struct executor *e, struct node *node)
 		goto record_preprocessing;
 	}
 
-	double priority = calculate_task_priority(node, e->task_priority_mode);
+	double priority = calculate_task_priority(e, node);
 	vine_task_set_priority(node->task, priority);
 
 	int task_id = vine_submit(e->manager, node->task);
@@ -535,9 +648,17 @@ record_preprocessing: {
 }
 }
 
+/*
+ * Return true when this node is allowed to submit. If chain grouping is active, only the
+ * supernode leader may submit because other members are executed inside the leader's task.
+ */
 static int node_ready_for_submission(struct executor *e, struct node *node)
 {
+	struct graph *g = e ? e->graph : NULL;
 	if (!e || !node || node->remaining_parents_count != 0 || node->completed) {
+		return 0;
+	}
+	if (g && g->chain_grouping_enabled && !graph_node_is_supernode_leader(node)) {
 		return 0;
 	}
 	if (node->in_resubmit_queue) {
@@ -561,7 +682,7 @@ static void submit_initial_ready_nodes(struct executor *e)
 	struct node *node;
 	ITABLE_ITERATE(g->nodes, nid, node)
 	{
-		if (node->remaining_parents_count == 0) {
+		if (node_ready_for_submission(e, node)) {
 			submit_node_task(e, node);
 		}
 	}
@@ -918,7 +1039,10 @@ static void apply_prune_depth_from(struct executor *e, struct node *node)
 	set_delete(visited);
 }
 
-/* Run completion-time driver work; wall time is attributed to the completing node (cumulative). */
+/*
+ * Completion hook after a node finishes: cut propagation, prune-depth handling, and timing.
+ * Postprocessing wall time is charged to the node that triggered this call.
+ */
 static void executor_run_completion_postprocess(struct executor *e, struct node *node)
 {
 	if (!e || !node) {
@@ -941,7 +1065,10 @@ static void executor_run_completion_postprocess(struct executor *e, struct node 
 #define RESUBMIT_SCAN_LIMIT 100
 #define RESUBMIT_COOLDOWN_USECS ((timestamp_t)1000000)
 
-/* Append a failed node to the resubmit queue after recording the failure time. */
+/*
+ * Queue a retry after failure. With chain grouping the queue stores the leader so one retry
+ * resubmits the whole merged task. Without grouping the failing node itself is the leader.
+ */
 static void queue_node_for_retry(struct executor *e, struct node *node)
 {
 	struct graph *g = e ? e->graph : NULL;
@@ -949,16 +1076,31 @@ static void queue_node_for_retry(struct executor *e, struct node *node)
 		return;
 	}
 
-	if (node->in_resubmit_queue) {
+	struct node *leader = node;
+	if (g->chain_grouping_enabled) {
+		struct node *mapped = graph_supernode_leader_node(g, node);
+		if (mapped) {
+			leader = mapped;
+		}
+	}
+	if (!leader) {
 		return;
 	}
 
-	node->last_failure_time = timestamp_get();
-	list_push_tail(e->resubmit_queue, node);
-	node->in_resubmit_queue = 1;
+	if (leader->in_resubmit_queue) {
+		return;
+	}
+
+	leader->last_failure_time = timestamp_get();
+	list_push_tail(e->resubmit_queue, leader);
+	leader->in_resubmit_queue = 1;
 }
 
-/* Dequeue nodes whose cooldown has expired; discard the failed task atomically and resubmit. */
+/*
+ * Process the resubmit queue after cooldown. A ready head is popped, its failed task is torn down,
+ * and submit_node_task runs again. If the head is still cooling off, rotate it to the tail so
+ * other leaders behind it are not stuck forever while the driver waits.
+ */
 static void drain_resubmit_queue(struct executor *e)
 {
 	struct graph *g = e ? e->graph : NULL;
@@ -968,33 +1110,45 @@ static void drain_resubmit_queue(struct executor *e)
 
 	timestamp_t now = timestamp_get();
 	int queued = list_size(e->resubmit_queue);
-	int budget = queued < RESUBMIT_SCAN_LIMIT ? queued : RESUBMIT_SCAN_LIMIT;
+	if (queued == 0) {
+		return;
+	}
 
-	// drain at most budget entries, stop early if head remains in cooldown
-	for (int i = 0; i < budget; i++) {
+	int budget = queued < RESUBMIT_SCAN_LIMIT ? queued : RESUBMIT_SCAN_LIMIT;
+	int resubmits = 0;
+	int rotations_without_resubmit = 0;
+
+	while (resubmits < budget && list_size(e->resubmit_queue) > 0) {
 		struct node *node = list_peek_head(e->resubmit_queue);
 		if (!node) {
 			break;
 		}
-		if (now - node->last_failure_time < RESUBMIT_COOLDOWN_USECS) {
-			break;
-		}
+		if (now - node->last_failure_time >= RESUBMIT_COOLDOWN_USECS) {
+			list_pop_head(e->resubmit_queue);
+			node->in_resubmit_queue = 0;
 
-		list_pop_head(e->resubmit_queue);
-		node->in_resubmit_queue = 0;
-
-		debug(D_VINE, "Resubmitting node %" PRIu64, node->node_id);
-		executor_clear_node_runner_arg(e, node);
-		if (node->task) {
-			vine_task_delete(node->task);
-			node->task = NULL;
+			debug(D_VINE, "Resubmitting node %" PRIu64, node->node_id);
+			executor_clear_node_runner_arg(e, node);
+			if (node->task) {
+				vine_task_delete(node->task);
+				node->task = NULL;
+			}
+			submit_node_task(e, node);
+			resubmits++;
+			rotations_without_resubmit = 0;
+		} else {
+			list_pop_head(e->resubmit_queue);
+			list_push_tail(e->resubmit_queue, node);
+			rotations_without_resubmit++;
+			if (rotations_without_resubmit >= list_size(e->resubmit_queue)) {
+				break;
+			}
 		}
-		submit_node_task(e, node);
 	}
 }
 
 /*
- * Verify status and on-disk outputs.
+ * Verify status and on-disk outputs (primary outfile only).
  * On failure enqueue a retry for the node.
  */
 static int validate_node_outputs_or_enqueue(struct executor *e, struct node *retry_node, struct node *output_node, struct vine_task *task)
@@ -1015,6 +1169,17 @@ static int validate_node_outputs_or_enqueue(struct executor *e, struct node *ret
 	case NODE_OUTFILE_TYPE_LOCAL:
 	case NODE_OUTFILE_TYPE_TEMP:
 		if (output_node->outfile) {
+			if (output_node->outfile->type == VINE_TEMP || output_node->outfile->type == VINE_BUFFER) {
+				if (output_node->outfile->state != VINE_FILE_STATE_CREATED) {
+					debug(D_VINE,
+							"Task %d succeeded but primary output for node %" PRIu64 " is not available (state=%d)",
+							task->task_id,
+							output_node->node_id,
+							(int)output_node->outfile->state);
+					queue_node_for_retry(e, retry_node);
+					return 0;
+				}
+			}
 			output_node->outfile_size_bytes = output_node->outfile->size;
 		}
 		break;
@@ -1023,16 +1188,104 @@ static int validate_node_outputs_or_enqueue(struct executor *e, struct node *ret
 	return 1;
 }
 
+/*
+ * Verify one extra output mount after a successful task (temp/buffer must be CREATED; VINE_FILE paths must exist).
+ */
+static int validate_extra_io_mount_or_enqueue(
+		struct executor *e, struct node *retry_node, struct extra_io_mount *mount, struct vine_task *task)
+{
+	if (!mount || !mount->file) {
+		return 1;
+	}
+	struct vine_file *f = mount->file;
+
+	switch (f->type) {
+	case VINE_TEMP:
+	case VINE_BUFFER:
+		if (f->state != VINE_FILE_STATE_CREATED) {
+			debug(D_VINE,
+					"Task %d succeeded but extra output \"%s\" is not available (state=%d)",
+					task->task_id,
+					mount->remote_name ? mount->remote_name : "?",
+					(int)f->state);
+			queue_node_for_retry(e, retry_node);
+			return 0;
+		}
+		break;
+	case VINE_FILE:
+		if (f->source) {
+			struct stat info;
+			if (stat(f->source, &info) < 0) {
+				debug(D_VINE,
+						"Task %d succeeded but missing extra output file %s (%s)",
+						task->task_id,
+						mount->remote_name ? mount->remote_name : "?",
+						f->source);
+				queue_node_for_retry(e, retry_node);
+				return 0;
+			}
+		}
+		break;
+	default:
+		break;
+	}
+	return 1;
+}
+
+/*
+ * Primary outfile (per node outfile_type) plus every extra_outputs mount declared for that graph node.
+ */
+static int validate_node_all_declared_outputs_or_enqueue(
+		struct executor *e, struct node *retry_node, struct node *output_node, struct vine_task *task)
+{
+	if (!validate_node_outputs_or_enqueue(e, retry_node, output_node, task)) {
+		return 0;
+	}
+	void *item;
+	LIST_ITERATE(output_node->extra_outputs, item)
+	{
+		if (!validate_extra_io_mount_or_enqueue(e, retry_node, (struct extra_io_mount *)item, task)) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
 static int validate_task_or_enqueue(struct executor *e, struct node *node, struct vine_task *task)
 {
-	/* Return 0 => task treated as failed (retry enqueued); executor must not advance progress bars. */
+	struct graph *g = e ? e->graph : NULL;
+	/*
+	 * Returning zero means the completion is rejected, a retry is enqueued, and the progress
+	 * bar must not advance because the batch did not truly succeed yet.
+	 */
 	if (task->result != VINE_RESULT_SUCCESS || task->exit_code != 0) {
 		debug(D_VINE, "Task %d failed (result=%d, exit=%d)", task->task_id, task->result, task->exit_code);
 		queue_node_for_retry(e, node);
 		return 0;
 	}
 
-	return validate_node_outputs_or_enqueue(e, node, node, task);
+	if (!validate_node_all_declared_outputs_or_enqueue(e, node, node, task)) {
+		return 0;
+	}
+
+	/*
+	 * One vine task may carry outputs for the whole supernode. Validate every grouped member's
+	 * declared files against that same task, not only the leader's primary outfile.
+	 */
+	if (g && g->chain_grouping_enabled) {
+		struct list *mems = graph_supernode_nonleader_members(g, node->node_id);
+		if (mems) {
+			struct node *m;
+			LIST_ITERATE(mems, m)
+			{
+				if (!validate_node_all_declared_outputs_or_enqueue(e, node, m, task)) {
+					return 0;
+				}
+			}
+		}
+	}
+
+	return 1;
 }
 
 /* Return the recorded user-task makespan in microseconds. */
@@ -1088,6 +1341,8 @@ void executor_execute(struct executor *e)
 	progress_bar_bind_part(pbar, user_tasks_part);
 	progress_bar_bind_part(pbar, recovery_tasks_part);
 
+	const uint64_t user_node_total = itable_size(g->nodes);
+
 	double next_failure_threshold = -1.0;
 	if (e->failure_injection_step_percent > 0) {
 		next_failure_threshold = e->failure_injection_step_percent / 100.0;
@@ -1096,10 +1351,11 @@ void executor_execute(struct executor *e)
 	int wait_timeout = 1; // short timeout after a result, longer when idle
 
 	/*
-	 * Finish when every user node has succeeded at least once.
-	 * Recovery tasks do not advance user_tasks_part.
+	 * Stop the main loop once every graph node reports completed. Count completed nodes directly
+	 * instead of relying on progress bar ticks because grouped members can flip to completed in
+	 * a single completion event and the bar would miss intermediate steps.
 	 */
-	while (user_tasks_part->current < user_tasks_part->total) {
+	while (executor_count_completed_user_nodes(g) < user_node_total) {
 		if (interrupted) {
 			break;
 		}
@@ -1121,7 +1377,10 @@ void executor_execute(struct executor *e)
 				e->time_first_task_dispatched = MIN(e->time_first_task_dispatched, task->time_when_commit_end); // makespan start
 			}
 
-			/* Progress (User + Recovery) only advances after full validation; failed tasks retry without touching the bar. */
+			/*
+			 * User and recovery progress advances only after outputs validate. Failed tasks enter
+			 * the retry path and leave the bar unchanged until a later successful completion.
+			 */
 			if (!validate_task_or_enqueue(e, node, task)) {
 				continue;
 			}
@@ -1145,8 +1404,8 @@ void executor_execute(struct executor *e)
 				e->time_last_task_retrieved = MAX(e->time_last_task_retrieved, task->time_when_retrieval);
 				e->makespan_us = e->time_last_task_retrieved - e->time_first_task_dispatched;
 
-				first_completion = !node->completed; // count user progress once per graph node
-				node->completed = 1;
+				first_completion = !node->completed;
+				executor_mark_user_node_completed_after_success(g, node);
 
 				if (first_completion) {
 					if (user_tasks_part->current == 0) {
@@ -1154,8 +1413,9 @@ void executor_execute(struct executor *e)
 					}
 
 					node_update_critical_path_time(node, task->time_workers_execute_last);
-					progress_bar_update_part(pbar, user_tasks_part, 1);
 				}
+
+				progress_bar_set_part_current(pbar, user_tasks_part, executor_count_completed_user_nodes(g));
 
 				if (e->failure_injection_step_percent > 0) {
 					// test hook, drop workers at stepped progress thresholds

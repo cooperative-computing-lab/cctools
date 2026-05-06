@@ -64,6 +64,10 @@ class ExecutorGraph:
             self._c_graph, wk2sk[parent_workflow_key], wk2sk[child_workflow_key]
         )
 
+    def group_chain_like_tasks(self):
+        """Merge maximal singleton linear chains into supernodes (C graph_group_chain_like_tasks)."""
+        return graph_capi.graph_group_chain_like_tasks(self._c_graph)
+
     def compute_topology_metrics(self):
         """Finalize the C graph and compute topology metrics."""
         graph_capi.executor_finalize(self._c_executor)

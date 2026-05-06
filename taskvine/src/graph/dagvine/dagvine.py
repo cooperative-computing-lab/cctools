@@ -53,6 +53,8 @@ class DAGVineConfig:
             "extra-task-sleep-time": [0, 0],
             # 1 = run Workflow in-process (topological order), no workers / no task runner library; stdout stays on frontend.
             "local-execute": 0,
+            # 1 = merge maximal linear chains into supernodes before finalize (graph_group_chain_like_tasks).
+            "task-group": 0,
         }
 
     def _sections(self):
@@ -230,6 +232,15 @@ class DAGVine(Manager):
         for filename in py_graph.consumers_of:
             for workflow_key in py_graph.consumers_of[filename]:
                 executor.add_task_input(workflow_key, filename)
+
+        # Matches --task-group on the Python side so the C executor knows whether merging is allowed.
+        executor.tune(
+            "chain-grouping-enabled",
+            "1" if int(self.param("task-group")) else "0",
+        )
+
+        if int(self.param("task-group")):
+            executor.group_chain_like_tasks()
 
         executor.compute_topology_metrics()
 

@@ -70,15 +70,22 @@ def compute_task(workflow, task_expr):
 
 
 def topo_sort_group_scheduler_keys(workflow, member_scheduler_keys):
-    """
-    Topological order of scheduler keys within one batch, using Workflow dependencies **between
-    members only** (edges parent→child when both are in the batch).
+    """Return a topological order of scheduler keys for one batched library call.
 
-    The batch itself is chosen elsewhere (application grouping). This is not “expand the subgraph
-    under a lead node”—only the induced relation on the member set. Raises ValueError if that
-    relation has a cycle.
+    Edges count only when both endpoints lie in the batch. Ties are broken by the order keys
+    appear in the argument list which usually matches the CSV written by C with the leader first.
     """
-    nodes = {int(k) for k in member_scheduler_keys}
+    # Kahn tie-break uses the order keys were listed because plain sets forget that order.
+    ordered = []
+    seen = set()
+    for k in member_scheduler_keys:
+        kk = int(k)
+        if kk not in seen:
+            seen.add(kk)
+            ordered.append(kk)
+
+    nodes = set(ordered)
+    order_index = {k: i for i, k in enumerate(ordered)}
     adj = defaultdict(set)
     indeg = {k: 0 for k in nodes}
 
@@ -93,15 +100,19 @@ def topo_sort_group_scheduler_keys(workflow, member_scheduler_keys):
                 indeg[child_sk] += 1
 
     # Kahn: serial execution order on the worker (intra-batch deps before dependents).
-    q = deque([k for k in nodes if indeg[k] == 0])
+    q = deque(k for k in ordered if indeg[k] == 0)
     out = []
     while q:
         u = q.popleft()
         out.append(u)
+        ready_next = []
         for v in adj[u]:
             indeg[v] -= 1
             if indeg[v] == 0:
-                q.append(v)
+                ready_next.append(v)
+        ready_next.sort(key=lambda x: order_index[x])
+        for v in ready_next:
+            q.append(v)
     if len(out) != len(nodes):
         raise ValueError("task_group: cycle among members per Workflow graph")
     return out
@@ -157,13 +168,24 @@ def _workflow_from_task_runner_library():
 
 
 def run_scheduler_keys(scheduler_keys_spec):
-    """
-    Task runner library entry. ``scheduler_keys_spec`` is comma-separated scheduler keys
-    (string), or a single int, or a list. Keys are resolved to a batch, then ordered by
-    ``topo_sort_group_scheduler_keys`` (Workflow dependencies **between batch members only**),
-    and each node runs in that order.
-    """
+    """TaskVine library entry that parses keys, orders them, runs each node, and writes outfiles."""
     workflow = _workflow_from_task_runner_library()
     keys = _scheduler_keys_spec_to_list(scheduler_keys_spec)
-    for sk in topo_sort_group_scheduler_keys(workflow, keys):
+    ordered = topo_sort_group_scheduler_keys(workflow, keys)
+    leader_sk = keys[0]
+    # The infile from C lists the leader first. Kahn might pick another indeg-zero key first which
+    # would reorder writes and confuse the manager's validation, so move the leader to the front
+    # when it has no parent that is also inside this batch.
+    if ordered[0] != leader_sk:
+        batch = set(ordered)
+        wk_leader = workflow.scheduler_key_to_workflow_key[leader_sk]
+        for wkp in workflow.parents_of.get(wk_leader, ()):
+            psk = workflow.workflow_key_to_scheduler_key[wkp]
+            if psk in batch:
+                raise ValueError(
+                    f"run_scheduler_keys: leader {leader_sk} must run first but has intra-batch parent {psk}"
+                )
+        ordered = [leader_sk] + [sk for sk in ordered if sk != leader_sk]
+
+    for sk in ordered:
         run_single_workflow_node(workflow, sk)

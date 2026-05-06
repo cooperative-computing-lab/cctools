@@ -253,6 +253,24 @@ void progress_bar_update_part(struct ProgressBar *bar, struct ProgressBarPart *p
 	}
 }
 
+/** Set the current value for a part (clamped to total). */
+void progress_bar_set_part_current(struct ProgressBar *bar, struct ProgressBarPart *part, uint64_t current)
+{
+	if (!bar || !part) {
+		return;
+	}
+
+	if (current > part->total) {
+		current = part->total;
+	}
+	part->current = current;
+
+	timestamp_t now_us = timestamp_get();
+	if (!bar->has_drawn_once || (now_us - bar->last_draw_time_us) >= bar->update_interval_us) {
+		print_progress_bar(bar);
+	}
+}
+
 /** Set the start time for the progress bar. */
 void progress_bar_set_start_time(struct ProgressBar *bar, timestamp_t start_time)
 {

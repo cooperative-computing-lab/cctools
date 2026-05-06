@@ -41,6 +41,7 @@ struct node *node_create(uint64_t node_id)
 
 	node->is_target = 0;
 	node->node_id = node_id;
+	node->super_leader_id = node_id;
 
 	node->task = NULL;
 	node->task_runner_arg_file = NULL;
@@ -75,6 +76,52 @@ struct node *node_create(uint64_t node_id)
 	node->postprocessing_time_us = 0;
 
 	return node;
+}
+
+/** Non-zero if parent->child is already in the adjacency lists (checked via parent's children). */
+static int node_dependency_exists(struct node *parent, struct node *child)
+{
+	struct node *x;
+	if (!parent || !child) {
+		return 0;
+	}
+	LIST_ITERATE(parent->children, x)
+	{
+		if (x == child) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+void node_remove_dependency(struct node *parent, struct node *child)
+{
+	if (!parent || !child) {
+		return;
+	}
+	list_remove(child->parents, parent);
+	list_remove(parent->children, child);
+}
+
+void node_ensure_dependency(struct node *parent, struct node *child)
+{
+	if (!parent || !child || node_dependency_exists(parent, child)) {
+		return;
+	}
+	list_push_tail(child->parents, parent);
+	list_push_tail(parent->children, child);
+}
+
+/**
+ * Drop fired_parents so executor scheduling can recount parents (e.g. after supernode merge rewires edges).
+ */
+void node_clear_fired_parents(struct node *n)
+{
+	if (!n || !n->fired_parents) {
+		return;
+	}
+	set_delete(n->fired_parents);
+	n->fired_parents = NULL;
 }
 
 /**

@@ -8,6 +8,7 @@
 #include "debug.h"
 #include "graph.h"
 #include "priority_queue.h"
+#include "set.h"
 #include "stringtools.h"
 #include "uuid.h"
 #include "xxmalloc.h"
@@ -301,6 +302,9 @@ int graph_tune(struct graph *g, const char *name, const char *value)
 
 	} else if (strcmp(name, "print-graph-details") == 0) {
 		g->print_graph_details = (atoi(value) == 1) ? 1 : 0;
+	} else if (strcmp(name, "chain-grouping-enabled") == 0) {
+		/* Stays aligned with Python's --task-group. When zero the executor never merges chain members. */
+		g->chain_grouping_enabled = (atoi(value) != 0) ? 1 : 0;
 	} else {
 		debug(D_ERROR, "invalid parameter name: %s", name);
 		return -1;
@@ -574,8 +578,10 @@ struct graph *graph_create(const char *runtime_dir)
 	g->output_dir = xxstrdup(runtime_dir);	   // default to current working directory
 
 	g->nodes = itable_create(0);
+	g->super_leader_to_members = itable_create(0);
 	g->outfile_cachename_to_node = hash_table_create(0, 0);
 	g->inout_filename_to_cached_name = hash_table_create(0, 0);
+	g->supernode_leader_child_to_input_source = hash_table_create(0, 0);
 
 	cctools_uuid_t task_runner_library_name_id;
 	cctools_uuid_create(&task_runner_library_name_id);
@@ -589,6 +595,7 @@ struct graph *graph_create(const char *runtime_dir)
 	g->prune_depth = 1;
 
 	g->print_graph_details = 0;
+	g->chain_grouping_enabled = 0;
 
 	return g;
 }
@@ -631,6 +638,355 @@ void graph_add_dependency(struct graph *g, uint64_t parent_id, uint64_t child_id
 }
 
 /**
+ * Copy a list of struct node * into a new list in the same order (pointer values only, not deep copy).
+ * Snapshots parents/children before mutating edges during supernode rewire. Caller frees the new list.
+ */
+static struct list *graph_copy_node_ptr_list(struct list *src)
+{
+	struct list *dst = list_create();
+	if (!src) {
+		return dst;
+	}
+	struct node *x;
+	LIST_ITERATE(src, x)
+	{
+		list_push_tail(dst, x);
+	}
+	return dst;
+}
+
+/**
+ * After supernode registration: for each node in mset, remove internal edges (both ends in mset).
+ * Rewire edges that cross the group boundary through leader. mset contains leader plus all non-leader members.
+ */
+static void graph_supernode_rewire(struct graph *g, struct node *leader, struct set *mset)
+{
+	struct node *m;
+	uint64_t nid;
+	ITABLE_ITERATE(g->nodes, nid, m)
+	{
+		if (!set_lookup(mset, m)) {
+			continue;
+		}
+
+		struct list *psnap = graph_copy_node_ptr_list(m->parents);
+		struct node *p;
+		while ((p = list_pop_head(psnap))) {
+			if (set_lookup(mset, p)) {
+				node_remove_dependency(p, m);
+			} else {
+				node_remove_dependency(p, m);
+				node_ensure_dependency(p, leader);
+			}
+		}
+		list_delete(psnap);
+
+		struct list *csnap = graph_copy_node_ptr_list(m->children);
+		struct node *c;
+		while ((c = list_pop_head(csnap))) {
+			if (set_lookup(mset, c)) {
+				node_remove_dependency(m, c);
+			} else {
+				node_remove_dependency(m, c);
+				node_ensure_dependency(leader, c);
+				/*
+				 * Scheduling sees leader->c; data still flows from member m (e.g. chain tail).
+				 * Record so materialize mounts m->outfile, not the leader's primary outfile.
+				 */
+				if (m != leader) {
+					char *lckey = string_format("%" PRIu64 ",%" PRIu64, leader->node_id, c->node_id);
+					/*
+					 * The table keeps the first insert if the same key is stored twice. Drop the
+					 * old mapping explicitly so the node that truly produces the file for c wins.
+					 */
+					hash_table_remove(g->supernode_leader_child_to_input_source, lckey);
+					hash_table_insert(g->supernode_leader_child_to_input_source, lckey, m);
+					free(lckey);
+				}
+			}
+		}
+		list_delete(csnap);
+	}
+}
+
+/**
+ * Resolve the leader struct node * for any node in a supernode (singleton maps to itself).
+ * Returns NULL if g or n is NULL or the leader id is missing from g.
+ */
+struct node *graph_supernode_leader_node(struct graph *g, struct node *n)
+{
+	if (!g || !n) {
+		return NULL;
+	}
+	return itable_lookup(g->nodes, n->super_leader_id);
+}
+
+/**
+ * List of non-leader member nodes for leader_id. Owned by the graph; do not free.
+ * Items are struct node *. NULL if g is NULL or there is no entry.
+ */
+struct list *graph_supernode_nonleader_members(struct graph *g, uint64_t leader_id)
+{
+	if (!g) {
+		return NULL;
+	}
+	return itable_lookup(g->super_leader_to_members, leader_id);
+}
+
+/**
+ * Register a supernode: validate members, rewire externals to leader_id, set super_leader_id on all members,
+ * clear fired_parents, and store non-leaders in super_leader_to_members. Nodes and plain deps must exist first.
+ * Returns 0 on success, -1 on error (see debug log).
+ */
+int graph_supernode_register(struct graph *g, uint64_t leader_id, const uint64_t *member_ids, int n_member_ids)
+{
+	if (!g || member_ids == NULL || n_member_ids < 1) {
+		debug(D_ERROR, "graph_supernode_register: invalid arguments");
+		return -1;
+	}
+
+	struct node *leader = itable_lookup(g->nodes, leader_id);
+	if (!leader) {
+		debug(D_ERROR, "graph_supernode_register: leader %" PRIu64 " not found", leader_id);
+		return -1;
+	}
+
+	struct set *seen = set_create(0);
+	struct set *mset = set_create(0);
+	set_insert(mset, leader);
+
+	for (int i = 0; i < n_member_ids; i++) {
+		uint64_t mid = member_ids[i];
+		if (mid == leader_id) {
+			debug(D_ERROR, "graph_supernode_register: member list must not contain leader %" PRIu64, leader_id);
+			set_delete(seen);
+			set_delete(mset);
+			return -1;
+		}
+		if (set_lookup(seen, (void *)(uintptr_t)mid)) {
+			debug(D_ERROR, "graph_supernode_register: duplicate member %" PRIu64, mid);
+			set_delete(seen);
+			set_delete(mset);
+			return -1;
+		}
+
+		struct node *mn = itable_lookup(g->nodes, mid);
+		if (!mn) {
+			debug(D_ERROR, "graph_supernode_register: member node %" PRIu64 " not found", mid);
+			set_delete(seen);
+			set_delete(mset);
+			return -1;
+		}
+		if (mn->super_leader_id != mn->node_id) {
+			debug(D_ERROR,
+					"graph_supernode_register: node %" PRIu64 " already belongs to leader %" PRIu64,
+					mid,
+					mn->super_leader_id);
+			set_delete(seen);
+			set_delete(mset);
+			return -1;
+		}
+		set_insert(seen, (void *)(uintptr_t)mid);
+		set_insert(mset, mn);
+	}
+	set_delete(seen);
+
+	if (leader->super_leader_id != leader->node_id) {
+		debug(D_ERROR,
+				"graph_supernode_register: leader %" PRIu64 " already belongs to group %" PRIu64,
+				leader_id,
+				leader->super_leader_id);
+		set_delete(mset);
+		return -1;
+	}
+
+	if (itable_lookup(g->super_leader_to_members, leader_id)) {
+		debug(D_ERROR, "graph_supernode_register: leader %" PRIu64 " already registered", leader_id);
+		set_delete(mset);
+		return -1;
+	}
+
+	graph_supernode_rewire(g, leader, mset);
+
+	struct node *x;
+	uint64_t xid;
+	ITABLE_ITERATE(g->nodes, xid, x)
+	{
+		if (set_lookup(mset, x)) {
+			x->super_leader_id = leader_id;
+			node_clear_fired_parents(x);
+		}
+	}
+
+	struct list *nonleaders = list_create();
+	for (int i = 0; i < n_member_ids; i++) {
+		struct node *mn = itable_lookup(g->nodes, member_ids[i]);
+		list_push_tail(nonleaders, mn);
+	}
+	itable_insert(g->super_leader_to_members, leader_id, nonleaders);
+
+	set_delete(mset);
+	return 0;
+}
+
+/** Exactly one child pointer, or NULL if not exactly one. */
+static struct node *graph_node_only_child(struct node *n)
+{
+	if (!n || list_size(n->children) != 1) {
+		return NULL;
+	}
+	struct node *c;
+	LIST_ITERATE(n->children, c)
+	{
+		return c;
+	}
+	return NULL;
+}
+
+/** Exactly one parent pointer, or NULL if not exactly one. */
+static struct node *graph_node_only_parent(struct node *n)
+{
+	if (!n || list_size(n->parents) != 1) {
+		return NULL;
+	}
+	struct node *p;
+	LIST_ITERATE(n->parents, p)
+	{
+		return p;
+	}
+	return NULL;
+}
+
+/**
+ * Head of a maximal linear chain: singleton, and not strictly inside such a chain from the left
+ * (no parent, fan-in > 1, or unique parent has fan-out > 1).
+ */
+static int graph_node_is_chain_head(struct node *n)
+{
+	if (!graph_node_is_supernode_leader(n)) {
+		return 0;
+	}
+	if (list_size(n->parents) == 0) {
+		return 1;
+	}
+	if (list_size(n->parents) > 1) {
+		return 1;
+	}
+	struct node *p = graph_node_only_parent(n);
+	return p && list_size(p->children) > 1;
+}
+
+struct pending_chain_group {
+	uint64_t leader_id;
+	uint64_t *member_ids;
+	int n_members;
+};
+
+int graph_group_chain_like_tasks(struct graph *g)
+{
+	if (!g) {
+		return -1;
+	}
+	if (!g->chain_grouping_enabled) {
+		return 0;
+	}
+
+	/*
+	 * Registering a supernode rewires the graph. Find every chain on the original adjacency
+	 * first, then register them, so a half-updated graph does not confuse later chain walks.
+	 */
+	struct list *pending = list_create();
+
+	uint64_t nid;
+	struct node *n;
+	ITABLE_ITERATE(g->nodes, nid, n)
+	{
+		if (!graph_node_is_chain_head(n)) {
+			continue;
+		}
+		if (list_size(n->children) != 1) {
+			continue;
+		}
+
+		struct list *chain = list_create();
+		struct node *cur = n;
+		for (;;) {
+			list_push_tail(chain, cur);
+			if (list_size(cur->children) != 1) {
+				break;
+			}
+			struct node *c = graph_node_only_child(cur);
+			if (!c || !graph_node_is_supernode_leader(c)) {
+				break;
+			}
+			if (c->is_target) {
+				/* Leave the retrieval or output consumer as its own task outside the merged chain. */
+				break;
+			}
+			if (list_size(c->parents) != 1) {
+				break;
+			}
+			if (graph_node_only_parent(c) != cur) {
+				break;
+			}
+			cur = c;
+		}
+
+		int L = list_size(chain);
+		if (L < 2) {
+			list_delete(chain);
+			continue;
+		}
+
+		struct pending_chain_group *pc = xxmalloc(sizeof(*pc));
+		pc->leader_id = n->node_id;
+		pc->n_members = L - 1;
+		pc->member_ids = xxmalloc((size_t)(L - 1) * sizeof(uint64_t));
+		int mi = 0;
+		int first = 1;
+		struct node *x;
+		LIST_ITERATE(chain, x)
+		{
+			if (first) {
+				first = 0;
+				continue;
+			}
+			pc->member_ids[mi++] = x->node_id;
+		}
+		list_push_tail(pending, pc);
+		list_delete(chain);
+	}
+
+	int groups = 0;
+	struct pending_chain_group *pc;
+	while ((pc = (struct pending_chain_group *)list_pop_head(pending))) {
+		if (graph_supernode_register(g, pc->leader_id, pc->member_ids, pc->n_members) == 0) {
+			groups++;
+		}
+		free(pc->member_ids);
+		free(pc);
+	}
+	list_delete(pending);
+
+	return groups;
+}
+
+struct node *graph_input_producer_node(struct graph *g, struct node *parent, struct node *child)
+{
+	if (!g || !parent || !child) {
+		return parent;
+	}
+	if (!g->chain_grouping_enabled || !g->supernode_leader_child_to_input_source) {
+		return parent;
+	}
+
+	char *k = string_format("%" PRIu64 ",%" PRIu64, parent->node_id, child->node_id);
+	struct node *src = (struct node *)hash_table_lookup(g->supernode_leader_child_to_input_source, k);
+	free(k);
+	return src ? src : parent;
+}
+
+/**
  * Delete an executor graph instance.
  * @param g Reference to the executor graph.
  */
@@ -638,6 +994,20 @@ void graph_delete(struct graph *g)
 {
 	if (!g) {
 		return;
+	}
+
+	uint64_t lid;
+	struct list *mems;
+	if (g->super_leader_to_members) {
+		ITABLE_ITERATE(g->super_leader_to_members, lid, mems)
+		{
+			(void)lid;
+			if (mems) {
+				list_delete(mems);
+			}
+		}
+		itable_delete(g->super_leader_to_members);
+		g->super_leader_to_members = NULL;
 	}
 
 	uint64_t nid;
@@ -654,6 +1024,8 @@ void graph_delete(struct graph *g)
 
 	itable_delete(g->nodes);
 	hash_table_delete(g->outfile_cachename_to_node);
+
+	hash_table_delete(g->supernode_leader_child_to_input_source);
 
 	hash_table_clear(g->inout_filename_to_cached_name, (void *)free);
 	hash_table_delete(g->inout_filename_to_cached_name);
