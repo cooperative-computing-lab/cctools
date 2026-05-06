@@ -1143,17 +1143,7 @@ void executor_execute(struct executor *e)
 				executor_run_completion_postprocess(e, node);
 			} else {
 				e->time_last_task_retrieved = MAX(e->time_last_task_retrieved, task->time_when_retrieval);
-				if (e->time_last_task_retrieved < e->time_first_task_dispatched) {
-					debug(D_ERROR,
-							"task %d time_last_task_retrieved < time_first_task_dispatched: %" PRIu64 " < %" PRIu64,
-							task->task_id,
-							e->time_last_task_retrieved,
-							e->time_first_task_dispatched);
-					e->time_last_task_retrieved = e->time_first_task_dispatched; // clamp non-monotonic timestamps
-				}
 				e->makespan_us = e->time_last_task_retrieved - e->time_first_task_dispatched;
-
-				debug(D_VINE, "Node %" PRIu64 " completed with outfile %s size: %zu bytes", node->node_id, node->outfile_remote_name, node->outfile_size_bytes);
 
 				first_completion = !node->completed; // count user progress once per graph node
 				node->completed = 1;
