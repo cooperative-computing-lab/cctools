@@ -852,7 +852,7 @@ static void try_prune_depth_release(struct executor *e, struct node *a)
 	if (!g || !a) {
 		return;
 	}
-	if (a->prune_depth_pruned) {
+	if (a->released_by_prune_depth) {
 		return;
 	}
 	if (a->outfile_type != NODE_OUTFILE_TYPE_TEMP) {
@@ -869,7 +869,7 @@ static void try_prune_depth_release(struct executor *e, struct node *a)
 	}
 
 	delete_node_return_file(e, a);
-	a->prune_depth_pruned = 1;
+	a->released_by_prune_depth = 1;
 
 	debug(D_VINE, "prune-depth release: node %" PRIu64 " depth=%d", a->node_id, g->prune_depth);
 }
@@ -1025,6 +1025,7 @@ static int validate_node_outputs_or_enqueue(struct executor *e, struct node *ret
 
 static int validate_task_or_enqueue(struct executor *e, struct node *node, struct vine_task *task)
 {
+	/* Return 0 => task treated as failed (retry enqueued); executor must not advance progress bars. */
 	if (task->result != VINE_RESULT_SUCCESS || task->exit_code != 0) {
 		debug(D_VINE, "Task %d failed (result=%d, exit=%d)", task->task_id, task->result, task->exit_code);
 		queue_node_for_retry(e, node);
@@ -1120,6 +1121,13 @@ void executor_execute(struct executor *e)
 				e->time_first_task_dispatched = MIN(e->time_first_task_dispatched, task->time_when_commit_end); // makespan start
 			}
 
+			/* Progress (User + Recovery) only advances after full validation; failed tasks retry without touching the bar. */
+			if (!validate_task_or_enqueue(e, node, task)) {
+				continue;
+			}
+
+			int first_completion = 0;
+
 			if (task->type == VINE_TASK_TYPE_RECOVERY) {
 				e->completed_recovery_tasks++;
 				progress_bar_update_part(
@@ -1127,67 +1135,51 @@ void executor_execute(struct executor *e)
 						recovery_tasks_part,
 						e->completed_recovery_tasks - recovery_tasks_part->current);
 
-				if (!validate_task_or_enqueue(e, node, task)) {
-					continue;
-				}
-
+				/* Reset cut and prune-depth flags for recovery tasks. */
 				node->cut = 0;
-				node->prune_depth_pruned = 0;
-				// recovery restored output, re-run release logic for this subgraph
+				node->released_by_prune_depth = 0;
+
+				/* Only postprocess recovery tasks. */
 				executor_run_completion_postprocess(e, node);
-				continue;
-			}
+			} else {
+				e->time_last_task_retrieved = MAX(e->time_last_task_retrieved, task->time_when_retrieval);
+				if (e->time_last_task_retrieved < e->time_first_task_dispatched) {
+					debug(D_ERROR,
+							"task %d time_last_task_retrieved < time_first_task_dispatched: %" PRIu64 " < %" PRIu64,
+							task->task_id,
+							e->time_last_task_retrieved,
+							e->time_first_task_dispatched);
+					e->time_last_task_retrieved = e->time_first_task_dispatched; // clamp non-monotonic timestamps
+				}
+				e->makespan_us = e->time_last_task_retrieved - e->time_first_task_dispatched;
 
-			if (!validate_task_or_enqueue(e, node, task)) {
-				continue;
-			}
+				debug(D_VINE, "Node %" PRIu64 " completed with outfile %s size: %zu bytes", node->node_id, node->outfile_remote_name, node->outfile_size_bytes);
 
-			e->time_last_task_retrieved = MAX(e->time_last_task_retrieved, task->time_when_retrieval);
-			if (e->time_last_task_retrieved < e->time_first_task_dispatched) {
-				debug(D_ERROR,
-						"task %d time_last_task_retrieved < time_first_task_dispatched: %" PRIu64 " < %" PRIu64,
-						task->task_id,
-						e->time_last_task_retrieved,
-						e->time_first_task_dispatched);
-				e->time_last_task_retrieved = e->time_first_task_dispatched; // clamp non-monotonic timestamps
-			}
-			e->makespan_us = e->time_last_task_retrieved - e->time_first_task_dispatched;
+				first_completion = !node->completed; // count user progress once per graph node
+				node->completed = 1;
 
-			debug(D_VINE, "Node %" PRIu64 " completed with outfile %s size: %zu bytes", node->node_id, node->outfile_remote_name, node->outfile_size_bytes);
+				if (first_completion) {
+					if (user_tasks_part->current == 0) {
+						progress_bar_set_start_time(pbar, task->time_when_commit_start);
+					}
 
-			int first_completion = !node->completed; // count user progress once per graph node
-			node->completed = 1;
-
-			executor_run_completion_postprocess(e, node);
-
-			if (first_completion) {
-				if (user_tasks_part->current == 0) {
-					progress_bar_set_start_time(pbar, task->time_when_commit_start);
+					node_update_critical_path_time(node, task->time_workers_execute_last);
+					progress_bar_update_part(pbar, user_tasks_part, 1);
 				}
 
-				node_update_critical_path_time(node, task->time_workers_execute_last);
-				progress_bar_update_part(pbar, user_tasks_part, 1);
-			}
-
-			if (e->failure_injection_step_percent > 0) {
-				// test hook, drop workers at stepped progress thresholds
-				double progress = (double)user_tasks_part->current / (double)user_tasks_part->total;
-				if (progress >= next_failure_threshold && release_random_worker(e->manager)) {
-					debug(D_VINE, "released a random worker at %.2f%% (threshold %.2f%%)", progress * 100, next_failure_threshold * 100);
-					next_failure_threshold += e->failure_injection_step_percent / 100.0;
+				if (e->failure_injection_step_percent > 0) {
+					// test hook, drop workers at stepped progress thresholds
+					double progress = (double)user_tasks_part->current / (double)user_tasks_part->total;
+					if (progress >= next_failure_threshold && release_random_worker(e->manager)) {
+						debug(D_VINE, "released a random worker at %.2f%% (threshold %.2f%%)", progress * 100, next_failure_threshold * 100);
+						next_failure_threshold += e->failure_injection_step_percent / 100.0;
+					}
 				}
-			}
 
-			switch (node->outfile_type) {
-			case NODE_OUTFILE_TYPE_TEMP:
-				vine_temp_queue_for_replication(e->manager, node->outfile); // optional replication policy
-				break;
-			case NODE_OUTFILE_TYPE_LOCAL:
-			case NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM:
-				break;
+				/* Postprocess the node and submit its children. */
+				executor_run_completion_postprocess(e, node);
+				submit_unblocked_children(e, node);
 			}
-
-			submit_unblocked_children(e, node);
 		} else {
 			wait_timeout = 1; // no task ready, wait with default blocking timeout
 		}

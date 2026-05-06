@@ -56,7 +56,7 @@ struct node *node_create(uint64_t node_id)
 	node->fired_parents = NULL;
 	node->completed = 0;
 	node->cut = 0;
-	node->prune_depth_pruned = 0;
+	node->released_by_prune_depth = 0;
 	node->outfile_size_bytes = 0;
 	node->pfs_credited_bytes = 0;
 	node->in_resubmit_queue = 0;

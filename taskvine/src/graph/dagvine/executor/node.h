@@ -58,8 +58,9 @@ struct node {
 	int remaining_parents_count; // parents not yet satisfied for scheduling
 	struct set *fired_parents;   // parents already counted toward that count
 	int completed;
-	int cut;		// return released by cut, cleared if recovery restores file
-	int prune_depth_pruned; // temp released by prune-depth
+	int cut; // return released by cut, cleared if recovery restores file
+	/** Non-zero after this node's temp output was released under @c graph->prune_depth; cleared on recovery. */
+	int released_by_prune_depth;
 	int in_resubmit_queue;
 	timestamp_t last_failure_time; // last enqueue to resubmit queue
 
