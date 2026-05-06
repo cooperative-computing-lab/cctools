@@ -71,6 +71,8 @@ struct node *node_create(uint64_t node_id)
 	node->heavy_score = -1;
 
 	node->critical_path_time = -1;
+	node->preprocessing_time_us = 0;
+	node->postprocessing_time_us = 0;
 
 	return node;
 }
@@ -98,13 +100,17 @@ void node_debug_print(struct node *node)
 		return;
 	}
 
+	debug(D_VINE, "---------------- Node Info ----------------");
+	debug(D_VINE, "node_id: %" PRIu64, node->node_id);
+	debug(D_VINE, "preprocessing_time_us (last): %" PRIu64, node->preprocessing_time_us);
+	debug(D_VINE, "postprocessing_time_us (last): %" PRIu64, node->postprocessing_time_us);
+
 	if (!node->task) {
-		debug(D_ERROR, "node %" PRIu64 " has no task", node->node_id);
+		debug(D_VINE, "task: (none yet)");
+		debug(D_VINE, "-------------------------------------------");
 		return;
 	}
 
-	debug(D_VINE, "---------------- Node Info ----------------");
-	debug(D_VINE, "node_id: %" PRIu64, node->node_id);
 	debug(D_VINE, "task_id: %d", node->task->task_id);
 	debug(D_VINE, "depth: %d", node->depth);
 	debug(D_VINE, "height: %d", node->height);

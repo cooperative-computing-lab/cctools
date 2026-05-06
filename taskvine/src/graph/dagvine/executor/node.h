@@ -72,6 +72,10 @@ struct node {
 	double heavy_score;
 
 	timestamp_t critical_path_time;
+	/** Latest @c submit_node_task interval for this node (microseconds); graph total is on @c struct executor. */
+	uint64_t preprocessing_time_us;
+	/** Latest @c executor_run_completion_postprocess interval for this node (microseconds); graph total on executor. */
+	uint64_t postprocessing_time_us;
 };
 
 /** Create a new node.

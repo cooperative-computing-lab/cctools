@@ -28,6 +28,10 @@ struct executor {
 	timestamp_t time_spent_on_cut_propagation; // time spent in cut propagation
 	uint64_t completed_recovery_tasks;	   // recovery completions seen this run
 	uint64_t pfs_usage_bytes;		   // bytes credited for shared filesystem outputs
+	/** Sum of @c submit_node_task preprocessing intervals across all nodes (microseconds). */
+	uint64_t total_preprocessing_time_us;
+	/** Sum of @c executor_run_completion_postprocess intervals across all completions (microseconds). */
+	uint64_t total_postprocessing_time_us;
 
 	task_priority_mode_t task_priority_mode; // schedule order before submit
 	double failure_injection_step_percent;	 // optional worker release steps for tests

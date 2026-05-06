@@ -23,6 +23,7 @@ static volatile sig_atomic_t interrupted = 0;
 static void submit_node_task(struct executor *e, struct node *node);
 static struct vine_task *executor_make_vine_task(struct executor *e);
 static void executor_materialize_node(struct executor *e, struct node *node);
+static void executor_run_completion_postprocess(struct executor *e, struct node *node);
 
 static void extra_io_mount_push(struct list *lst, struct vine_file *f, const char *remote_name)
 {
@@ -57,6 +58,8 @@ static void executor_init_runtime(struct executor *e)
 	e->completed_recovery_tasks = 0;
 	e->time_spent_on_cut_propagation = 0;
 	e->pfs_usage_bytes = 0;
+	e->total_preprocessing_time_us = 0;
+	e->total_postprocessing_time_us = 0;
 	e->task_priority_mode = TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST;
 	e->failure_injection_step_percent = -1.0;
 	e->progress_bar_update_interval_sec = 0.1;
@@ -493,16 +496,18 @@ static void submit_node_task(struct executor *e, struct node *node)
 		return;
 	}
 
+	timestamp_t t_pre = timestamp_get();
+
 	executor_materialize_node(e, node);
 
 	if (!node->task) {
 		debug(D_ERROR, "submit_node_task: node %" PRIu64 " has no task after materialize", node->node_id);
-		return;
+		goto record_preprocessing;
 	}
 
 	if (node->task->state != VINE_TASK_INITIAL) {
 		debug(D_VINE, "submit_node_task: skipping node %" PRIu64 " (task already submitted, state=%d, task_id=%d)", node->node_id, node->task->state, node->task->task_id);
-		return; // not INITIAL, manager already owns this submission
+		goto record_preprocessing;
 	}
 
 	double priority = calculate_task_priority(node, e->task_priority_mode);
@@ -512,11 +517,22 @@ static void submit_node_task(struct executor *e, struct node *node)
 
 	if (task_id <= 0) {
 		debug(D_ERROR, "submit_node_task: failed to submit node %" PRIu64 " (returned task_id=%d)", node->node_id, task_id);
-		return;
+		goto record_preprocessing;
 	}
 
 	itable_insert(e->task_id_to_node, (uint64_t)task_id, node); // reverse lookup from vine_wait
 	debug(D_VINE, "submitted node %" PRIu64 " with task id %d", node->node_id, task_id);
+
+record_preprocessing: {
+	uint64_t dt = (uint64_t)(timestamp_get() - t_pre);
+	node->preprocessing_time_us = dt;
+	e->total_preprocessing_time_us += dt;
+	debug(D_VINE,
+			"node %" PRIu64 " preprocessing %" PRIu64 " us, graph cumulative %" PRIu64 " us",
+			node->node_id,
+			dt,
+			e->total_preprocessing_time_us);
+}
 }
 
 static int node_ready_for_submission(struct executor *e, struct node *node)
@@ -902,6 +918,26 @@ static void apply_prune_depth_from(struct executor *e, struct node *node)
 	set_delete(visited);
 }
 
+/* Run completion-time driver work; wall time is attributed to the completing node (cumulative). */
+static void executor_run_completion_postprocess(struct executor *e, struct node *node)
+{
+	if (!e || !node) {
+		return;
+	}
+
+	timestamp_t t0 = timestamp_get();
+	propagate_cut_from(e, node);
+	apply_prune_depth_from(e, node);
+	uint64_t dt = (uint64_t)(timestamp_get() - t0);
+	node->postprocessing_time_us = dt;
+	e->total_postprocessing_time_us += dt;
+	debug(D_VINE,
+			"node %" PRIu64 " postprocessing %" PRIu64 " us, graph cumulative %" PRIu64 " us",
+			node->node_id,
+			dt,
+			e->total_postprocessing_time_us);
+}
+
 #define RESUBMIT_SCAN_LIMIT 100
 #define RESUBMIT_COOLDOWN_USECS ((timestamp_t)1000000)
 
@@ -1098,8 +1134,7 @@ void executor_execute(struct executor *e)
 				node->cut = 0;
 				node->prune_depth_pruned = 0;
 				// recovery restored output, re-run release logic for this subgraph
-				propagate_cut_from(e, node);
-				apply_prune_depth_from(e, node);
+				executor_run_completion_postprocess(e, node);
 				continue;
 			}
 
@@ -1123,8 +1158,7 @@ void executor_execute(struct executor *e)
 			int first_completion = !node->completed; // count user progress once per graph node
 			node->completed = 1;
 
-			propagate_cut_from(e, node);
-			apply_prune_depth_from(e, node);
+			executor_run_completion_postprocess(e, node);
 
 			if (first_completion) {
 				if (user_tasks_part->current == 0) {
