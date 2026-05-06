@@ -369,7 +369,7 @@ if __name__ == "__main__":
             # If a specific resolution is given, use that one alone
             time_resolution_list = [float(arg)]
         elif opt == "-g":
-            (image_width, image_height) = arg.split(",")
+            image_width, image_height = map(int, arg.split(","))
         elif opt == "-T":
             format = arg
             extension = format
