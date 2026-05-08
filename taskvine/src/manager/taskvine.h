@@ -181,9 +181,9 @@ struct vine_stats {
 	/* Cumulative stats for tasks: */
 	int tasks_submitted;  /**< Total number of tasks submitted to the manager. */
 	int tasks_dispatched; /**< Total number of tasks dispatch to workers. */
-	int tasks_done;	      /**< Total number of tasks completed and returned to user. (includes tasks_failed) */
-	int tasks_failed;     /**< Total number of tasks completed and returned to user with result other than
-				 VINE_RESULT_SUCCESS. */
+	int tasks_done;	      /**< Total number of tasks completed (includes tasks_failed and tasks_successful) */
+	int tasks_failed;     /**< Total number of tasks completed with result other than VINE_RESULT_SUCCESS. (includes retries) */
+	int tasks_successful; /**< Total number of task completed and returned to the user with a successful exit status. */
 	int tasks_cancelled;  /**< Total number of tasks cancelled. */
 	int tasks_exhausted_attempts; /**< Total number of task executions that failed given resource exhaustion. */
 
