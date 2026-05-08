@@ -5222,7 +5222,6 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 
 		// Save task type and result as task may be freed in change_task_state
 		vine_task_type_t task_type = t->type;
-		vine_result_t task_result = t->result;
 
 		change_task_state(q, t, VINE_TASK_DONE);
 
