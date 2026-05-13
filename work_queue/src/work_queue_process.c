@@ -43,6 +43,7 @@ Create temporary directories inside as well.
 */
 
 extern char * workspace;
+extern char * task_wrapper;
 
 static int create_sandbox_dir( struct work_queue_process *p, int disk_allocation )
 {
@@ -309,7 +310,16 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 
 		export_environment(p);
 
-		execl("/bin/sh", "sh", "-c", p->task->command_line, (char *) 0);
+		char * final_command = 0;
+		
+		if(task_wrapper) {
+			final_command = string_wrap_command(p->task->command_line,task_wrapper);
+		} else {
+			final_command = strdup(p->task->command_line);
+		}
+
+		
+		execl("/bin/sh", "sh", "-c", final_command, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 
 	}

@@ -239,6 +239,9 @@ static int coprocess_memory = -1;
 static int coprocess_disk = -1;
 static int coprocess_gpus = -1;
 
+/* A wrapper command to be applied to every executed task. */
+char *task_wrapper = 0;
+
 static char *factory_name = NULL;
 
 struct work_queue_cache *global_cache = 0;
@@ -2413,6 +2416,7 @@ static void show_help(const char *cmd)
 	printf( " %-30s Set the port used to lookup the worker's TLQ URL (-d and -o options also required).\n", "--tlq=<port>");
 	printf( " %-30s Start an arbitrary process when the worker starts up and kill the process when the worker shuts down.\n", "--coprocess <executable>");
 	printf( " %-30s Specify the number of coprocesses for serverless functions that the worker should maintain. Default is consuming all worker resources to allocate 1 coprocess per core.\n", "--coprocesses-total=<number>");
+	printf(" %-30s Apply a wrapper command to each task executed.\n","--task-wrapper");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
@@ -2423,7 +2427,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
 	  LONG_OPT_USE_SSL, LONG_OPT_PYTHON_FUNCTION, LONG_OPT_FROM_FACTORY, LONG_OPT_COPROCESS,
 	  LONG_OPT_NUM_COPROCESS, LONG_OPT_COPROCESS_CORES,
-	  LONG_OPT_COPROCESS_MEMORY, LONG_OPT_COPROCESS_DISK, LONG_OPT_COPROCESS_GPUS};
+      LONG_OPT_COPROCESS_MEMORY, LONG_OPT_COPROCESS_DISK, LONG_OPT_COPROCESS_GPUS, LONG_OPT_TASK_WRAPPER};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2476,6 +2480,7 @@ static const struct option long_options[] = {
 	{"coprocess-disk",      required_argument,  0,  LONG_OPT_COPROCESS_DISK},
 	{"coprocess-gpus",      required_argument,  0,  LONG_OPT_COPROCESS_GPUS},
 	{"from-factory",        required_argument,  0,  LONG_OPT_FROM_FACTORY},
+	{"task-wrapper",        required_argument,  0,  LONG_OPT_TASK_WRAPPER},
 	{0,0,0,0}
 };
 
@@ -2756,6 +2761,9 @@ int main(int argc, char *argv[])
 		case LONG_OPT_FROM_FACTORY:
 			if (factory_name) free(factory_name);
 			factory_name = xxstrdup(optarg);
+			break;
+		case LONG_OPT_TASK_WRAPPER:
+			task_wrapper = xxstrdup(optarg);
 			break;
 		default:
 			show_help(argv[0]);
