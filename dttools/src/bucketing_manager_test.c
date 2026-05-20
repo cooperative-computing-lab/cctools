@@ -10,21 +10,38 @@ extern struct hash_table* info_of_resource_table;
 int main(int argc, char** argv)
 {
     bucketing_mode_t mode;
+    const char* greedy_str = "-greedy";
+    const char* exhaust_str = "-exhaust";
+    const char* det_greedy_str = "-det-greedy";
+    const char* det_exhaust_str = "-det-exhaust";
+
     if (argc == 2)
     {
-        if (strncmp(*(argv+1), "-greedy", 7) == 0)
+        if (strncmp(*(argv+1), greedy_str, strlen(greedy_str)) == 0)
+        {
             mode = BUCKETING_MODE_GREEDY;
-        else if (strncmp(*(argv+1), "-exhaust", 8) == 0)
+        }
+        else if (strncmp(*(argv+1), exhaust_str, strlen(exhaust_str)) == 0)
+        {
             mode = BUCKETING_MODE_EXHAUSTIVE;
+        }
+        else if (strncmp(*(argv+1), det_greedy_str, strlen(det_greedy_str)) == 0)
+        {
+            mode = BUCKETING_MODE_DET_GREEDY;
+        }
+        else if (strncmp(*(argv+1), det_exhaust_str, strlen(det_exhaust_str)) == 0)
+        {
+            mode = BUCKETING_MODE_DET_EXHAUSTIVE;
+        }
         else
         {
-            fatal("invalid bucketing mode\n");
+            fatal("Invalid bucketing mode\n");
             return 1;
-        }
+        }    
     }
     else
     {
-        fatal("must specify bucketing mode\n");
+        fatal("Must provide type of bucketing mode\n");
         return 1;
     }
     double default_value;
@@ -67,7 +84,6 @@ int main(int argc, char** argv)
 
     int task_id = 1;
 
-    //printf("Adding values\n");
     for (int i = 0; i < iters; ++i)
     {
         task_r = rmsummary_create(-1);
