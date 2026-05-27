@@ -35,17 +35,6 @@ while(itable_nextkey(h,&key,&value)) {
 	printf("table contains: %d\n",key);
 }
 </pre>
-
-Alternatively:
-
-<pre>
-UINT64_T  key;
-void *value;
-
-ITABLE_ITERATE(h,key,value) {
-	printf("table contains: %d\n",key);
-}
-</pre>
 */
 
 /** Create a new integer table.
@@ -122,6 +111,9 @@ void itable_firstkey(struct itable *h);
 
 /** Continue iteration over all keys.
 This function returns the next key and value in the iteration.
+Warning: It cannot be called after either itable_insert or itable_remove
+during the same iteration. If this is needed, consider
+iterating using manual itable_lookup with keys from itable_keys_array.
 @param h A pointer to an integer table.
 @param key A pointer to a key integer.
 @param value A pointer to a value pointer. (can be NULL)
@@ -129,6 +121,52 @@ This function returns the next key and value in the iteration.
 */
 
 int itable_nextkey(struct itable *h, UINT64_T * key, void **value);
+
+/** Begin iteration over all keys from a random offset.
+This function begins a new iteration over an integer table,
+allowing you to visit every key and value in the table.
+Next, invoke @ref itable_nextkey_with_offset to retrieve each value in order.
+@param h A pointer to an integer table.
+@param offset_bookkeep An integer to pointer where the origin to the iteration is recorded.
+*/
+
+void itable_randomkey(struct itable *h, int *offset_bookkeep);
+
+/** Continue iteration over all keys from an arbitray offset.
+This function returns the next key and value in the iteration.
+@param h A pointer to an integer table.
+@param offset_bookkeep The origin for this iteration. See @ref itable_randomkey
+@param key A pointer to a key integer.
+@param value A pointer to a value pointer.
+@return Zero if there are no more elements to visit, one otherwise.
+*/
+
+int itable_nextkey_with_offset(struct itable *h, int offset_bookkeep, UINT64_T *key, void **value);
+
+/** Begin iteration at the given key.
+Invoke @ref itable_nextkey to retrieve each value in order.
+Note that subsequent calls to this functions may result in different iteration orders as the itable may have been
+resized.
+@param h A pointer to an integer table.
+@param key An integer key to search for.
+@return Zero if key not in itable, one otherwise.
+*/
+
+int itable_fromkey(struct itable *h, UINT64_T key);
+
+/** Return an array with a copy of all the current keys.
+It is the responsibility of the caller to free this array with
+itable_free_keys_array. The array has @ref itable_size entries.
+@param h A pointer to an integer table.
+@return Array of size with a copy of all the current keys.
+*/
+
+UINT64_T *itable_keys_array(struct itable *h);
+
+/** Free an array generated from itable_keys_array.
+@param keys Array of keys.
+*/
+void itable_free_keys_array(UINT64_T *keys);
 
 /** Utility macro to simplify common case of iterating over an itable.
 Use as follows:
@@ -145,5 +183,13 @@ ITABLE_ITERATE(table,key,value) {
 */
 
 #define ITABLE_ITERATE(table,key,value) itable_firstkey(table); while(itable_nextkey(table,&key,(void**)&value))
+
+#define ITABLE_ITERATE_RANDOM_START( table, offset_bookkeep, key, value ) itable_randomkey(table, &offset_bookkeep); while(itable_nextkey_with_offset(table, offset_bookkeep, &key, (void **)&value))
+
+#define ITABLE_ITERATE_FROM_KEY( table, iter_control, iter_count_var, key_start, key, value ) \
+	iter_control = 0; \
+	iter_count_var = 0; \
+  itable_fromkey(table, key_start); \
+	while(iter_count_var < itable_size(table) && (iter_count_var+=1 && (itable_nextkey(table, &key, (void **)&value) || (!iter_control && (iter_control+=1) && (itable_firstkey(table), itable_nextkey(table, &key, (void **)&value))))))
 
 #endif
