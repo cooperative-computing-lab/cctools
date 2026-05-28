@@ -1280,7 +1280,7 @@ int rmonitor_final_summary()
 
 	int status;
 
-	if (summary->limits_exceeded && enforce_limits) {
+	if (summary->limits_exceeded) {
 		if (summary->limits_exceeded->wall_time > -1) {
 			/* wall time is treated differently so that result of tasks in taskvine match
 			 * when ran without the resource monitor. */

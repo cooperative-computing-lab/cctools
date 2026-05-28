@@ -140,9 +140,6 @@ void jx_escape_string(const char *s, buffer_t *b)
 		case '\"':
 			buffer_putstring(b, "\\\"");
 			break;
-		case '\'':
-			buffer_putstring(b, "\\\'");
-			break;
 		case '\\':
 			buffer_putstring(b, "\\\\");
 			break;

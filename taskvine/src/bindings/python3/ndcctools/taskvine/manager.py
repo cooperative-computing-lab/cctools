@@ -31,6 +31,7 @@ from .utils import (
     set_port_range,
     get_c_constant,
 )
+from . import vine_cache as vc
 
 import atexit
 import errno
@@ -44,6 +45,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 
 
 ##
@@ -90,6 +92,9 @@ class Manager(object):
         self._stats_hierarchy = None
         self._task_table = {}
         self._library_table = {}    # A table of all libraries known to the manager
+        # Task result cache (opt-in via enable_tasks_cache())
+        self._tasks_cache = None         # TasksCache instance, or None if disabled
+        self._cached_queue = []         # CachedTaskResult objects pending return from wait()
         self._info_widget = None
         self._using_ssl = False
         if staging_path:
@@ -466,7 +471,7 @@ class Manager(object):
     #
     # @param self       Reference to the current manager object.
     def empty(self):
-        return cvine.vine_empty(self._taskvine)
+        return cvine.vine_empty(self._taskvine) and len(self._cached_queue) < 1
 
     ##
     # Determine whether the manager can support more tasks.
@@ -893,6 +898,70 @@ class Manager(object):
         return cvine.vine_tune(self._taskvine, name, value)
 
     ##
+    # Enable task result caching.
+    #
+    # Tasks whose fingerprint matches a previously completed task are returned
+    # from cache without re-execution.  Cache state persists across manager
+    # restarts via a JSON transaction log.
+    #
+    # @param cache_dir  Directory to store cached output files (created if absent).
+    # @param log_file   Path to the JSON transaction log.
+    def enable_tasks_cache(self, cache_dir="vine-cache-outputs", log_file="vine-cache.txlog"):
+        self._tasks_cache = vc.TasksCache(cache_dir=cache_dir, log_file=log_file)
+
+    # If caching is enabled, prepare the task hash, check for a cache hit, and queue a
+    # CachedTaskResult if one is found. Returns a cached_id string on a hit, else None.
+    def _submit_cache_check(self, task):
+        if not self._tasks_cache:
+            return None
+        # Pre-compute stable hash data that requires _fn_def (PythonTask only).
+        # Must run BEFORE submit_finalize() because submit_finalize() clears _fn_def.
+        self._tasks_cache.prepare(task)
+        # Check if any input is an output of a currently pending task (like vine_rewind).
+        # Uses _task_table directly — no separate inflight dict needed.
+        has_upstream = any(
+            input_file is output_file
+            for pending in self._task_table.values()
+            for (output_file, _oname, _flags) in getattr(pending, '_tracked_outputs', [])
+            for (input_file, _iname) in getattr(task, '_tracked_inputs', [])
+        )
+        if has_upstream:
+            return None
+        task_hash = self._tasks_cache.fingerprint(task)
+        cached_metadata = self._tasks_cache.lookup(task_hash)
+        if not cached_metadata:
+            return None
+        python_output_file = cached_metadata.get('python_output_file')
+        output_file_obj = None
+        if python_output_file and os.path.exists(python_output_file):
+            output_file_obj = self.declare_file(python_output_file, cache=False)
+        cached_id = str(uuid.uuid4())
+        self._cached_queue.append(
+            vc.CachedTaskResult(cached_id, task, cached_metadata, output_file_obj)
+        )
+        return cached_id
+
+    # Return and remove a matching CachedTaskResult from the cached queue, or None.
+    def _pop_cached_result(self, tag):
+        if not self._tasks_cache or not self._cached_queue:
+            return None
+        if tag is None:
+            return self._cached_queue.pop(0)
+        for i, cached in enumerate(self._cached_queue):
+            if cached.tag == tag:
+                return self._cached_queue.pop(i)
+        return None
+
+    # Cache the output of a successfully completed task, if caching is enabled.
+    def _store_task_in_cache(self, task):
+        if not self._tasks_cache:
+            return
+        if task.successful() and not self._tasks_cache.has_pending_inputs(task):
+            final_hash = self._tasks_cache.fingerprint(task)
+            python_output_path = self._tasks_cache.copy_output_to_cache(task, final_hash)
+            self._tasks_cache.record(final_hash, task, python_output_path)
+
+    ##
     # Submit a task to the manager.
     #
     # It is safe to re-submit a task returned by @ref ndcctools.taskvine.manager.Manager.wait.
@@ -901,13 +970,19 @@ class Manager(object):
     # @param task   A task description created from @ref ndcctools.taskvine.task.Task.
     def submit(self, task):
         task.manager = self
+
+        cached_id = self._submit_cache_check(task)
+        if cached_id:
+            return cached_id
+
         task.submit_finalize()
+        task._finalize_outputs()
         task_id = cvine.vine_submit(self._taskvine, task._task)
         if task_id == 0:
             raise ValueError("invalid task description")
-        else:
-            self._task_table[task_id] = task
-            return task_id
+
+        self._task_table[task_id] = task
+        return task_id
 
     ##
     # Submit a library to install on all connected workers
@@ -1130,13 +1205,25 @@ class Manager(object):
 
         self._update_status_display()
 
+        # Drain cached queue before blocking on C runtime.
+        cached = self._pop_cached_result(tag)
+        if cached:
+            return cached
+
         task_pointer = cvine.vine_wait_for_tag(self._taskvine, tag, timeout)
         if task_pointer:
+            task_id = cvine.vine_task_get_id(task_pointer)
             if self.empty():
                 # if last task in queue, update display
                 self._update_status_display(force=True)
-            task = self._task_table[cvine.vine_task_get_id(task_pointer)]
-            del self._task_table[cvine.vine_task_get_id(task_pointer)]
+            task = self._task_table[task_id]
+            del self._task_table[task_id]
+
+            # Recompute fingerprint now that all input files exist (like vine_rewind).
+            # _core_hash is stored on the task object so fingerprint() works even though
+            # submit_finalize() already cleared _fn_def.
+            self._store_task_in_cache(task)
+
             return task
         return None
 
@@ -1565,6 +1652,14 @@ class Manager(object):
         except KeyError:
             pass
 
+    # When caching is enabled, declare a real file in the cache dir instead of a
+    # VINE_TEMP, so the output can be copied to the cache on task completion.
+    def _declare_temp_for_cache(self):
+        if not self._tasks_cache:
+            return None
+        filepath = os.path.join(self._tasks_cache._cache_dir, f"{uuid.uuid4()}.output")
+        return self.declare_file(filepath, cache=False, unlink_when_done=True)
+
     ##
     # Declare an anonymous file has no initial content, but is created as the
     # output of a task, and may be consumed by other tasks.
@@ -1572,6 +1667,9 @@ class Manager(object):
     # @param self    The manager to register this file
     # @return A file object to use in @ref ndcctools.taskvine.task.Task.add_input or @ref ndcctools.taskvine.task.Task.add_output
     def declare_temp(self):
+        cached_file = self._declare_temp_for_cache()
+        if cached_file:
+            return cached_file
         f = cvine.vine_declare_temp(self._taskvine)
         return File(f)
 
