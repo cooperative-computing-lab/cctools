@@ -776,7 +776,7 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 		}
 	}
 
-	while(list_size(to_delete) > 0) {
+	while (list_size(to_delete) > 0) {
 		p_running = list_pop_head(to_delete);
 		debug(D_VINE, "killing function task %d running on library task %d", p_running->task->task_id, p->task->task_id);
 		finish_running_task(p_running, VINE_RESULT_FORSAKEN);
@@ -1131,7 +1131,7 @@ static void kill_all_tasks()
 	ITABLE_ITERATE(procs_table, task_id, p)
 	{
 		do_kill(task_id);
-		
+
 		/* calling first key here is ok as do_kill removes the task,
 		 * thus no infinite loop or quadratic runtime */
 		itable_firstkey(procs_table);
