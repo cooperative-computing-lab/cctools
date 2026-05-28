@@ -1131,6 +1131,10 @@ static void kill_all_tasks()
 	ITABLE_ITERATE(procs_table, task_id, p)
 	{
 		do_kill(task_id);
+		
+		/* calling first key here is ok as do_kill removes the task,
+		 * thus no infinite loop or quadratic runtime */
+		itable_firstkey(procs_table);
 	}
 
 	assert(itable_size(procs_table) == 0);
