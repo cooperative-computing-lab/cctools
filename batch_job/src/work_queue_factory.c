@@ -50,7 +50,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <signal.h>
 
-#define CCTOOLS_RUNOS_PATH "/afs/crc.nd.edu/group/ccl/software/runos/runos"
+#define CCTOOLS_RUNOS_PATH "/groups/dthain/software/runos/runos"
 
 typedef enum {
 	FORMAT_TABLE,
