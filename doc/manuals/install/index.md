@@ -92,7 +92,7 @@ conda activate cctools-dev
 ## Install From Source Tarball
 
 In a similar way, you can download a source package from the 
-[download page](http://ccl.cse.nd.edu/software/download).
+[download page](https://github.com/cooperative-computing-lab/cctools/releases/tag/stable)
 Then unpack the tarball and compile:
 
 ```sh
@@ -110,7 +110,7 @@ $ make install
 
 The **CCTools** software is pre-built for a small number of platforms.
 Download a source package from the [download
-page](http://ccl.cse.nd.edu/software/download). And follow this recipe while
+page](https://github.com/cooperative-computing-lab/cctools/releases). And follow this recipe while
 logged in as any ordinary user:
 
 ```sh
