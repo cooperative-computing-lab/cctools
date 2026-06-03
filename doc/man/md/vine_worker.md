@@ -47,11 +47,13 @@ computed tasks and maintains it on disk to accelerate future applications.
 
 
 The **managerhost** and **port** arguments specify the hostname and port
-number of the manager application for vine_worker to connect. Several
-managerhosts and ports may be specified, separated with a semicolon (;), with the
-worker connecting to any of the managers specified (When specifying multiple
-managers, remember to escape the ; from shell interpretation, for example, using
-quotes.)
+number of the manager application for vine_worker to connect. The manager may
+be given as separate **managerhost** and **port** arguments, or as a single
+**managerhost:port** argument; the two forms are equivalent. For IPv6 addresses,
+use the bracket form **[addr]:port**. Several managerhosts and ports may be
+specified, separated with a semicolon (;), with the worker connecting to any of
+the managers specified (When specifying multiple managers, remember to escape the
+; from shell interpretation, for example, using quotes.)
 
 Alternatevely, the manager may be specified by name, using the **-M** option.
 
@@ -104,6 +106,11 @@ On success, returns zero.  On failure, returns non-zero.
 To run **vine_worker** to join a specific manager process running on host **manager.somewhere.edu** port 9123:
 ```
 % vine_worker manager.somewhere.edu 9123
+```
+
+The same manager may be specified with a single **host:port** argument:
+```
+% vine_worker manager.somewhere.edu:9123
 ```
 
 To run **vine_worker** in auto mode with debugging turned on for all subsystems and
