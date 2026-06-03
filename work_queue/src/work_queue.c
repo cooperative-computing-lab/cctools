@@ -6472,6 +6472,7 @@ static void fill_deprecated_tasks_stats(struct work_queue_task *t) {
 static work_queue_task_state_t change_task_state( struct work_queue *q, struct work_queue_task *t, work_queue_task_state_t new_state ) {
 
 	work_queue_task_state_t old_state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
+	itable_remove(q->task_state_map, t->taskid);
 	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
 
 	struct category *c = work_queue_category_lookup_or_create(q, t->category);

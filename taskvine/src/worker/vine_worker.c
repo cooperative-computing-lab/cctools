@@ -768,14 +768,23 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 	struct vine_process *p_running;
 	uint64_t task_id;
 
+	struct list *to_delete = list_create();
+
 	ITABLE_ITERATE(procs_running, task_id, p_running)
 	{
 		if (p_running->library_process == p) {
-			debug(D_VINE, "killing function task %d running on library task %d", (int)task_id, p->task->task_id);
-			finish_running_task(p_running, VINE_RESULT_FORSAKEN);
-			reap_process(p_running, /* do not stage out */ NULL);
+			list_push_head(to_delete, p_running);
 		}
 	}
+
+	while (list_size(to_delete) > 0) {
+		p_running = list_pop_head(to_delete);
+		debug(D_VINE, "killing function task %d running on library task %d", p_running->task->task_id, p->task->task_id);
+		finish_running_task(p_running, VINE_RESULT_FORSAKEN);
+		reap_process(p_running, /* do not stage out */ NULL);
+	}
+
+	list_delete(to_delete);
 }
 
 /*
@@ -1123,6 +1132,10 @@ static void kill_all_tasks()
 	ITABLE_ITERATE(procs_table, task_id, p)
 	{
 		do_kill(task_id);
+
+		/* calling first key here is ok as do_kill removes the task,
+		 * thus no infinite loop or quadratic runtime */
+		itable_firstkey(procs_table);
 	}
 
 	assert(itable_size(procs_table) == 0);

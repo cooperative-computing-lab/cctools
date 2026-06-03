@@ -3048,11 +3048,26 @@ static void kill_empty_libraries_on_worker(struct vine_manager *q, struct vine_w
 {
 	uint64_t libtask_id;
 	struct vine_task *libtask;
+
+	struct list *to_delete = NULL;
 	ITABLE_ITERATE(w->current_libraries, libtask_id, libtask)
 	{
 		if (libtask->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, libtask->provides_library))) {
+			if (to_delete == NULL) {
+				to_delete = list_create();
+			}
+
+			list_push_head(to_delete, libtask);
+		}
+	}
+
+	if (to_delete) {
+		while (list_size(to_delete) > 0) {
+			libtask = list_pop_head(to_delete);
 			vine_cancel_by_task_id(q, libtask_id);
 		}
+
+		list_delete(to_delete);
 	}
 }
 
