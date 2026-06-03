@@ -29,6 +29,10 @@
 ## SYNOPSIS
 **vine_factory -M _&lt;project-name&gt;_ -T _&lt;batch-type&gt;_ [options]**
 
+**vine_factory -T _&lt;batch-type&gt;_ _&lt;managerhost&gt;_ _&lt;port&gt;_ [options]**
+
+**vine_factory -T _&lt;batch-type&gt;_ _&lt;managerhost:port&gt;_ [options]**
+
 ## DESCRIPTION
 **vine_factory** submits and maintains a number
 of [vine_worker(1)](vine_worker.md) processes on various batch systems, such as
@@ -38,6 +42,11 @@ a given project name.  **vine_factory** will automatically determine
 the correct number of workers to have running, based on criteria set on
 the command line.  The decision on how many workers to run is reconsidered
 once per minute.
+
+The manager may be specified directly by host and port, as separate
+**managerhost** and **port** arguments or as a single **managerhost:port**
+argument.  Alternatively, use the **-M** option to discover managers by
+project name through the catalog server.
 
 By default, **vine_factory** will run as many workers as the
 indicated managers have tasks ready to run.  If there are multiple
@@ -140,6 +149,18 @@ Options  specific to batch systems:
 On success, returns zero. On failure, returns non-zero.
 
 ## EXAMPLES
+
+To maintain workers for a specific manager running on the local machine at port 9123:
+
+```
+vine_factory -T local localhost 9123
+```
+
+The same manager may be specified with a single **host:port** argument:
+
+```
+vine_factory -T local localhost:9123
+```
 
 Suppose you have a TaskVine manager with a project name of "barney".
 To maintain workers for barney, do this:

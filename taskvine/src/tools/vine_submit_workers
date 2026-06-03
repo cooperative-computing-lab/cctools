@@ -73,6 +73,8 @@ show_help()
 
 	echo "Use: $script_name [batch selection] [worker options] [batch specific options] <servername> <port> <num-workers>"
 	echo "         or"
+	echo "     $script_name [batch selection] [worker options] [batch specific options] <servername:port> <num-workers>"
+	echo "         or"
 	echo "     $script_name [batch selection] [worker options] --manager-name <name> [batch specific options] <num-workers>"
 
     echo " "
@@ -670,6 +672,31 @@ parse_arguments_worker()
 }
 
 
+parse_host_port()
+{
+    spec=$1
+    case "$spec" in
+        \[*\]:*)
+            host="${spec%%\]:*}"
+            host="${host}]"
+            port="${spec##*:}"
+            ;;
+        *:*)
+            host="${spec%:*}"
+            port="${spec##*:}"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+    case "$port" in
+        ''|*[!0-9]*)
+            return 1
+            ;;
+    esac
+    return 0
+}
+
 set_up_manager_address()
 {
     host=
@@ -677,15 +704,17 @@ set_up_manager_address()
     count=
 
 	if [ $use_manager_name = 0 ]; then
-		if [ $# -ne 3 ] ; then
-			echo "expected 3 arguments: <servername> <port> <num-workers>, but found $#: $*" 1>&2
+		if [ $# -eq 2 ] && parse_host_port "$1"; then
+			count=$2
+		elif [ $# -eq 3 ]; then
+			host=$1
+			port=$2
+			count=$3
+		else
+			echo "expected 2 arguments (<servername:port> <num-workers>) or 3 arguments (<servername> <port> <num-workers>), but found $#: $*" 1>&2
 			echo "To view the help message, type: $script_name -h" 1>&2
 			exit 1
 		fi
-
-		host=$1
-		port=$2
-		count=$3
 	else
 		if [ $# = 0 ]
 		then
@@ -694,13 +723,16 @@ set_up_manager_address()
         elif [ $# = 1 ]
         then
             count=$1
+        elif [ $# = 2 ] && parse_host_port "$1"
+        then
+            count=$2
         elif [ $# = 3 ]
         then
             host=$1
             port=$2
             count=$3
         else
-			echo "expected 1 argument for <num-workers>, but found $#: $*" 1>&2
+			echo "expected 1 argument (<num-workers>), 2 arguments (<servername:port> <num-workers>), or 3 arguments (<servername> <port> <num-workers>), but found $#: $*" 1>&2
 			echo "To view the help message, type: $script_name -h" 1>&2
 			exit 1
 		fi
