@@ -48,8 +48,8 @@ int main(int argc, char **argv) {
 			return 1;
 		}
 
-		hash_table_fromkey(h, key_start);
-		if(!hash_table_nextkey(h, (char **)&name, (void **)&box)) {
+		int iteration = hash_table_fromkey(h, key_start);
+		if(!hash_table_nextkey(h, iteration, (char **)&name, (void **)&box)) {
 			return 1;
 		}
 

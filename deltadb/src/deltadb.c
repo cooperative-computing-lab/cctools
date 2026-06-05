@@ -35,6 +35,7 @@ struct deltadb {
 
 static int checkpoint_write( struct deltadb *db, const char *filename )
 {
+	int iteration;
 	char *key;
 	struct jx *jobject;
 	int first = 1;
@@ -44,8 +45,7 @@ static int checkpoint_write( struct deltadb *db, const char *filename )
 
 	fprintf(file,"{\n");
 
-	hash_table_firstkey(db->table);
-	while((hash_table_nextkey(db->table,&key,(void**)&jobject))) {
+	HASH_TABLE_ITERATE(db->table, iteration, key, jobject) {
 		if(!first) {
 			fprintf(file,",\n");
 		} else {

@@ -286,6 +286,7 @@ Measure the disk used by the worker. We only manually measure the cache director
 
 static int64_t measure_worker_disk()
 {
+	int iteration;
 	static struct path_disk_size_info *state = NULL;
 
 	path_disk_size_info_get_r("./cache", max_time_on_measurement, &state, NULL);
@@ -379,12 +380,11 @@ Send a message to the manager with user defined features.
 
 static void send_features(struct link *manager)
 {
+	int iteration;
 	char *f;
 	void *dummy;
-	hash_table_firstkey(features);
-
 	char fenc[WORK_QUEUE_LINE_MAX];
-	while(hash_table_nextkey(features, &f, &dummy)) {
+	HASH_TABLE_ITERATE(features, iteration, f, dummy) {
 		url_encode(f, fenc, WORK_QUEUE_LINE_MAX);
 		send_manager_message(manager, "feature %s\n", fenc);
 	}

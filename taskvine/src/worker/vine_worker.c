@@ -447,10 +447,11 @@ Send a message to the manager with user defined features.
 
 static void send_features(struct link *manager)
 {
+	int iteration;
 	char *f;
 	void *dummy;
 
-	HASH_TABLE_ITERATE(options->features, f, dummy)
+	HASH_TABLE_ITERATE(options->features, iteration, f, dummy)
 	{
 		char feature_encoded[VINE_LINE_MAX];
 		url_encode(f, feature_encoded, VINE_LINE_MAX);
@@ -770,7 +771,7 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 
 	struct vine_process *p_running;
 	uint64_t task_id;
- 	int iteration;
+	int iteration;
 
 	ITABLE_ITERATE(procs_running, iteration, task_id, p_running)
 	{

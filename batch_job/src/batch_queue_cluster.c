@@ -321,6 +321,7 @@ static batch_queue_id_t batch_queue_cluster_submit(struct batch_queue *q, struct
 
 static batch_queue_id_t batch_queue_cluster_wait(struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime)
 {
+	int iteration;
 	struct batch_job_info *info;
 	batch_queue_id_t jobid;
 	int t, c;
@@ -328,7 +329,8 @@ static batch_queue_id_t batch_queue_cluster_wait(struct batch_queue *q, struct b
 	while (1) {
 		int iteration;
 		UINT64_T ujobid;
-		ITABLE_ITERATE(q->job_table, iteration, ujobid, info) {
+		ITABLE_ITERATE(q->job_table, iteration, ujobid, info)
+		{
 			jobid = ujobid;
 			char *statusfile = string_format("%s.status.%" PRIbjid, cluster_name, jobid);
 			FILE *file = fopen(statusfile, "r");
