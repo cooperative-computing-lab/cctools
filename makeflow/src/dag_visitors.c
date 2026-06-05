@@ -307,12 +307,13 @@ void dag_to_dax_individual_node(const struct dag_node *n, UINT64_T node_id, FILE
 /* Iterates over each node to output as DAX */
 void dag_to_dax_nodes(const struct dag *d, FILE *output)
 {
+	int iteration;
 	struct dag_node *n;
 	UINT64_T node_id;
 
-	itable_firstkey(d->node_table);
-	while(itable_nextkey(d->node_table, &node_id, (void *) &n))
+	ITABLE_ITERATE(d->node_table, iteration, node_id, n) {
 		dag_to_dax_individual_node(n, node_id, output);
+	}
 }
 
 /* Writes the DAX for a node's parent relationships */
@@ -332,12 +333,13 @@ void dag_to_dax_parents(const struct dag_node *n, FILE *output)
 /* Writes the DAX version of each relationship in the dag */
 void dag_to_dax_relationships(const struct dag *d, FILE *output)
 {
+	int iteration;
 	struct dag_node *n;
 	UINT64_T node_id;
 
-	itable_firstkey(d->node_table);
-	while(itable_nextkey(d->node_table, &node_id, (void *) &n))
+	ITABLE_ITERATE(d->node_table, iteration, node_id, n) {
 		dag_to_dax_parents(n, output);
+	}
 }
 
 /* Writes the xml footer for DAX */
@@ -372,9 +374,7 @@ void dag_to_dax_transform_catalog(const struct dag *d, FILE *output)
 	uname(name);
 	struct list *transforms = list_create();
 
-	itable_firstkey(d->node_table);
-	while(itable_nextkey(d->node_table, &id, (void *) &n))
-	{
+	ITABLE_ITERATE(d->node_table, iteration, id, n) {
 		fn = xxstrdup(node_executable(n));
 		if(!list_find(transforms, (int (*)(void *, const void*)) string_equal, fn))
 			list_push_tail(transforms, fn);
@@ -1024,8 +1024,7 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 
 	h = hash_table_create(0, 0);
 
-	itable_firstkey(d->node_table);
-	while(itable_nextkey(d->node_table, &key, (void **) &n)) {
+	ITABLE_ITERATE(d->node_table, iteration, key, n) {
 
 		name = xxstrdup(n->command);
 		label = strtok(name, " \t\n");

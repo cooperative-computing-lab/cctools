@@ -1184,6 +1184,7 @@ static void clean_task_state(struct work_queue_task *t, int full_clean) {
 
 static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 {
+	int iteration;
 	char *key, *value;
 	struct work_queue_task *t;
 	uint64_t taskid;
@@ -1197,8 +1198,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		hash_table_firstkey(w->current_files);
 	}
 
-	itable_firstkey(w->current_tasks);
-	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
+	ITABLE_ITERATE(w->current_tasks, iteration, taskid, t) {
 		if (t->time_when_commit_end >= t->time_when_commit_start) {
 			timestamp_t delta_time = timestamp_get() - t->time_when_commit_end;
 			t->time_workers_execute_failure += delta_time;
@@ -1208,7 +1208,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		clean_task_state(t, 0);
 		reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_READY);
 
-		itable_firstkey(w->current_tasks);
+		iteration = itable_firstkey(w->current_tasks);
 	}
 
 	itable_clear(w->current_tasks,0);
@@ -2869,12 +2869,12 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 
 void current_tasks_to_jx( struct jx *j, struct work_queue_worker *w )
 {
+	int iteration;
 	struct work_queue_task *t;
 	uint64_t taskid;
 	int n = 0;
 
-	itable_firstkey(w->current_tasks);
-	while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
+	ITABLE_ITERATE(w->current_tasks, iteration, taskid, t) {
 		char task_string[WORK_QUEUE_LINE_MAX];
 
 		sprintf(task_string, "current_task_%03d_id", n);
@@ -3029,21 +3029,23 @@ static work_queue_msg_code_t process_http_request( struct work_queue *q, struct 
 }
 
 static struct jx *construct_status_message( struct work_queue *q, const char *request ) {
+	int iteration;
 	struct jx *a = jx_array(NULL);
 
 	if(!strcmp(request, "queue_status") || !strcmp(request, "queue") || !strcmp(request, "resources_status")) {
+		int iteration;
 		struct jx *j = queue_to_jx( q, 0 );
 		if(j) {
 			jx_array_insert(a, j);
 		}
 	} else if(!strcmp(request, "task_status") || !strcmp(request, "tasks")) {
+		int iteration;
 		struct work_queue_task *t;
 		struct work_queue_worker *w;
 		struct jx *j;
 		uint64_t taskid;
 
-		itable_firstkey(q->tasks);
-		while(itable_nextkey(q->tasks,&taskid,(void**)&t)) {
+		ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 			w = itable_lookup(q->worker_task_map, taskid);
 			work_queue_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, taskid);
 			if(w) {
@@ -4462,8 +4464,7 @@ static void count_worker_resources(struct work_queue *q, struct work_queue_worke
 		return;
 	}
 
-	itable_firstkey(w->current_tasks_boxes);
-	while(itable_nextkey(w->current_tasks_boxes, &taskid, (void **)& box)) {
+	ITABLE_ITERATE(w->current_tasks_boxes, iteration, taskid, box) {
 		struct work_queue_task *t = itable_lookup(w->current_tasks, taskid);
 		if (t->coprocess) {
 			w->coprocess_resources->cores.inuse     += box->cores;
@@ -4715,12 +4716,13 @@ static void trim_factory( struct work_queue *q, struct work_queue_worker *w )
 
 static int receive_one_task( struct work_queue *q )
 {
+	int iteration;
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 	uint64_t taskid;
 
 	int found = 0;
-	ITABLE_ITERATE(q->tasks, taskid, t) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		if( task_state_is(q, taskid, WORK_QUEUE_TASK_WAITING_RETRIEVAL) ) {
 			found = 1;
 			break;
@@ -4826,8 +4828,7 @@ static int abort_slow_workers(struct work_queue *q)
 
 	timestamp_t current = timestamp_get();
 
-	itable_firstkey(q->tasks);
-	while(itable_nextkey(q->tasks, &taskid, (void **) &t)) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		c = work_queue_category_lookup_or_create(q, t->category);
 		/* Fast abort deactivated for this category */
 		if(c->fast_abort == 0)
@@ -4960,11 +4961,11 @@ static int cancel_task_on_worker(struct work_queue *q, struct work_queue_task *t
 }
 
 static struct work_queue_task *find_task_by_tag(struct work_queue *q, const char *tasktag) {
+	int iteration;
 	struct work_queue_task *t;
 	uint64_t taskid;
 
-	itable_firstkey(q->tasks);
-	while(itable_nextkey(q->tasks, &taskid, (void**)&t)) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		if( tasktag_comparator(t, tasktag) ) {
 			return t;
 		}
@@ -5737,9 +5738,9 @@ void work_queue_invalidate_cached_file_internal(struct work_queue *q, const char
 
 		struct work_queue_task *t;
 		uint64_t taskid;
+ 		int iteration_tasks;
 
-		itable_firstkey(w->current_tasks);
-		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
+		ITABLE_ITERATE(w->current_tasks, iteration_tasks, taskid, t) {
 			struct work_queue_file *tf;
 			list_first_item(t->input_files);
 
@@ -6641,11 +6642,11 @@ static int task_state_is( struct work_queue *q, uint64_t taskid, work_queue_task
 }
 
 static struct work_queue_task *task_state_any(struct work_queue *q, work_queue_task_state_t state) {
+	int iteration;
 	struct work_queue_task *t;
 	uint64_t taskid;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		if( task_state_is(q, taskid, state) ) {
 			return t;
 		}
@@ -6655,11 +6656,11 @@ static struct work_queue_task *task_state_any(struct work_queue *q, work_queue_t
 }
 
 static struct work_queue_task *task_state_any_with_tag(struct work_queue *q, work_queue_task_state_t state, const char *tag) {
+	int iteration;
 	struct work_queue_task *t;
 	uint64_t taskid;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		if( task_state_is(q, taskid, state) && tasktag_comparator((void *) t, (void *) tag)) {
 			return t;
 		}
@@ -6669,13 +6670,13 @@ static struct work_queue_task *task_state_any_with_tag(struct work_queue *q, wor
 }
 
 static int task_request_count( struct work_queue *q, const char *category, category_allocation_t request) {
+	int iteration;
 	struct work_queue_task *t;
 	uint64_t taskid;
 
 	int count = 0;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		if(t->resource_request == request) {
 			if(!category || strcmp(category, t->category) == 0) {
 				count++;
@@ -7297,14 +7298,14 @@ struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const
 }
 
 struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
+	int iteration;
 	struct list *l = list_create();
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 	uint64_t taskid;
 	char *key;
 
-	itable_firstkey(q->tasks);
-	while(itable_nextkey(q->tasks, &taskid, (void**)&t)) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		list_push_tail(l, t);
 		work_queue_cancel_by_taskid(q, taskid);
 	}
@@ -7320,8 +7321,9 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 
 		send_worker_msg(q,w,"kill -1\n");
 
-		itable_firstkey(w->current_tasks);
-		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
+		int iteration_tasks;
+		ITABLE_ITERATE(w->current_tasks, iteration_tasks, taskid, t) {
+			int iteration;
 			//Delete any input files that are not to be cached.
 			delete_worker_files(q, w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 
@@ -7331,32 +7333,33 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 
 			list_push_tail(l, t);
 			q->stats->tasks_cancelled++;
-			itable_firstkey(w->current_tasks);
+			iteration = itable_firstkey(w->current_tasks);
 		}
 	}
 	return l;
 }
 
 void release_all_workers(struct work_queue *q) {
+	int iteration;
 	struct work_queue_worker *w;
 	char *key;
 
 	if(!q) return;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
+		int iteration;
 		release_worker(q, w);
-		hash_table_firstkey(q->worker_table);
+		iteration = hash_table_firstkey(q->worker_table);
 	}
 }
 
 int work_queue_empty(struct work_queue *q)
 {
+	int iteration;
 	struct work_queue_task *t;
 	uint64_t taskid;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		int state = work_queue_task_state(q, taskid);
 
 		if( state == WORK_QUEUE_TASK_READY   )           return 0;
@@ -7548,8 +7551,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	int waiting_tasks = 0;
 	int running_tasks = 0;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		int state = (long)itable_lookup(q->task_state_map, taskid);
 		switch (state)
 		{

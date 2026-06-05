@@ -365,12 +365,13 @@ void vine_temp_clean_redundant_replicas(struct vine_manager *q, struct vine_file
 	struct vine_worker_info *source_worker = NULL;
 	SET_ITERATE(source_workers, source_worker)
 	{
+		int iteration;
 		/* if the file is actively in use by a task (the input to that task), we don't remove the replica on this worker */
 		int file_inuse = 0;
 
 		uint64_t task_id;
 		struct vine_task *task;
-		ITABLE_ITERATE(source_worker->current_tasks, task_id, task)
+		ITABLE_ITERATE(source_worker->current_tasks, iteration, task_id, task)
 		{
 			struct vine_mount *input_mount;
 			LIST_ITERATE(task->input_mounts, input_mount)

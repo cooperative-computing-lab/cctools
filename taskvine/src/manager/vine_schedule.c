@@ -96,7 +96,8 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 	 * This matches the assumption in @vine_manager.c:commit_task_to_worker(), where empty libraries are being killed right before a task is committed. */
 	uint64_t task_id;
 	struct vine_task *ti;
-	ITABLE_ITERATE(w->current_tasks, task_id, ti)
+ 	int iteration;
+	ITABLE_ITERATE(w->current_tasks, iteration, task_id, ti)
 	{
 		if (ti->provides_library && ti->function_slots_inuse == 0) {
 			worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
@@ -161,11 +162,13 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
  */
 static int check_worker_have_committable_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
+	int iteration;
 	/* Check if there are free slots on any of the running libraries */
 	if (w->current_libraries && itable_size(w->current_libraries) > 0) {
+		int iteration;
 		uint64_t task_id;
 		struct vine_task *t;
-		ITABLE_ITERATE(w->current_libraries, task_id, t)
+		ITABLE_ITERATE(w->current_libraries, iteration, task_id, t)
 		{
 			if (t->function_slots_inuse < t->function_slots_total) {
 				return 1;
@@ -321,9 +324,10 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 
 struct vine_task *vine_schedule_find_library(struct vine_manager *q, struct vine_worker_info *w, const char *library_name)
 {
+	int iteration;
 	uint64_t task_id;
 	struct vine_task *library_task;
-	ITABLE_ITERATE(w->current_libraries, task_id, library_task)
+	ITABLE_ITERATE(w->current_libraries, iteration, task_id, library_task)
 	{
 		if (!strcmp(library_task->provides_library, library_name) && (library_task->function_slots_inuse < library_task->function_slots_total)) {
 			return library_task;
@@ -337,12 +341,13 @@ struct vine_task *vine_schedule_find_library(struct vine_manager *q, struct vine
 
 static int count_worker_free_cores(struct vine_manager *q, struct vine_worker_info *w)
 {
+	int iteration;
 	int free_cores = 0;
 
 	/* library tasks may themselves consume many cores but can have free slots */
 	uint64_t task_id;
 	struct vine_task *t;
-	ITABLE_ITERATE(w->current_libraries, task_id, t)
+	ITABLE_ITERATE(w->current_libraries, iteration, task_id, t)
 	{
 		free_cores += t->function_slots_total - t->function_slots_inuse;
 	}
@@ -357,6 +362,7 @@ static int count_worker_free_cores(struct vine_manager *q, struct vine_worker_in
 
 struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, struct vine_task *t)
 {
+	int iteration;
 	if (!q || !t) {
 		return NULL;
 	}
@@ -385,10 +391,11 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 		/* if task groups are enabled, skip workers that are running a group task */
 		if (q->task_groups_enabled) {
 			if (w->current_tasks && itable_size(w->current_tasks) > 0) {
+				int iteration_group;
 				uint64_t tidg;
 				struct vine_task *tg;
 				int running_group_task = 0;
-				ITABLE_ITERATE(w->current_tasks, tidg, tg)
+				ITABLE_ITERATE(w->current_tasks, iteration_group, tidg, tg)
 				{
 					if (tg->group_id) {
 						running_group_task = 1;

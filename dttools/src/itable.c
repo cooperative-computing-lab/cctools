@@ -115,8 +115,8 @@ static int itable_double_buckets(struct itable *h)
 	/* Move pairs to new hash */
 	uint64_t key;
 	void *value;
-	itable_firstkey(h);
-	while (itable_nextkey(h, &key, &value))
+	int iteration;
+	ITABLE_ITERATE(h, iteration, key, value)
 		if (!itable_insert(hn, key, value)) {
 			itable_delete(hn);
 			return 0;

@@ -714,13 +714,13 @@ void wait_all_workers( struct batch_queue *queue, struct itable *job_table, time
 
 void remove_all_workers( struct batch_queue *queue, struct itable *job_table, batch_queue_remove_mode_t mode )
 {
+	int iteration;
 	uint64_t jobid;
 	void *value;
 
 	debug(D_VINE,"removing all workers...");
 
-	itable_firstkey(job_table);
-	while(itable_nextkey(job_table,&jobid,&value)) {
+		ITABLE_ITERATE(job_table, iteration, jobid, value) {
 		debug(D_VINE,"removing worker job %"PRId64,jobid);
 		batch_queue_remove(queue,jobid,mode);
 	}
