@@ -326,8 +326,8 @@ static void show_help( const char *cmd )
 	{
 		char *key;
 		void *value;
-		hash_table_firstkey(available_services);
-		while(hash_table_nextkey(available_services, &key, &value)) {
+		int iteration;
+		HASH_TABLE_ITERATE(available_services, iteration, key, value) {
 			printf(" %s", key);
 		}
 	}
@@ -1461,8 +1461,8 @@ int main( int argc, char *argv[] )
 	if(namelist_table && namelist_file) {
 		char *key;
 		void *value;
-		hash_table_firstkey(namelist_table);
-		while(hash_table_nextkey(namelist_table, &key, &value)) {
+		int iteration;
+		HASH_TABLE_ITERATE(namelist_table, iteration, key, value) {
 			fprintf(namelist_file, "%s|%s\n", key, (char *)value);
 		}
 		hash_table_delete(namelist_table);
