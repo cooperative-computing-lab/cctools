@@ -211,14 +211,14 @@ HASH_TABLE_ITERATE(table, iteration, key, value) {
 	iteration = hash_table_randomkey(table, &offset_bookkeep); \
 	while (hash_table_nextkey_with_offset(table, iteration, offset_bookkeep, &key, (void **)&value))
 
-#define HASH_TABLE_ITERATE_FROM_KEY(table, iteration, iter_control, iter_count_var, key_start, key, value) \
-	iter_control = 0; \
+#define HASH_TABLE_ITERATE_FROM_KEY(table, iteration, iter_count_limit, iter_count_var, key_start, key, value) \
+	iter_count_limit = 0; \
 	iter_count_var = 0; \
 	iteration = hash_table_fromkey(table, key_start); \
 	while (iter_count_var < hash_table_size(table) && \
 		(iter_count_var += 1 && \
 		 (hash_table_nextkey(table, iteration, &key, (void **)&value) || \
-		  (!iter_control && (iter_control += 1) && \
+		  (!iter_count_limit && (iter_count_limit += 1) && \
 		   (iteration = hash_table_fromkey(table, NULL)) && \
 		   hash_table_nextkey(table, iteration, &key, (void **)&value)))))
 
