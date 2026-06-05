@@ -71,7 +71,8 @@ static batch_queue_id_t batch_queue_dryrun_wait(struct batch_queue *q, struct ba
 	UINT64_T jobid;
 	int iteration;
 
-	ITABLE_ITERATE(q->job_table, iteration, jobid, info) {
+	ITABLE_ITERATE(q->job_table, iteration, jobid, info)
+	{
 		itable_remove(q->job_table, jobid);
 		info->finished = time(0);
 		info->exited_normally = 1;
