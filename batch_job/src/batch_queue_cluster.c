@@ -321,7 +321,6 @@ static batch_queue_id_t batch_queue_cluster_submit(struct batch_queue *q, struct
 
 static batch_queue_id_t batch_queue_cluster_wait(struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime)
 {
-	int iteration;
 	struct batch_job_info *info;
 	batch_queue_id_t jobid;
 	int t, c;
