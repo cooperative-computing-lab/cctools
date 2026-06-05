@@ -286,7 +286,6 @@ Measure the disk used by the worker. We only manually measure the cache director
 
 static int64_t measure_worker_disk()
 {
-	int iteration;
 	static struct path_disk_size_info *state = NULL;
 
 	path_disk_size_info_get_r("./cache", max_time_on_measurement, &state, NULL);
@@ -299,12 +298,12 @@ static int64_t measure_worker_disk()
 	files_counted = state->last_file_count_complete;
 
 	if(state->complete_measurement) {
-		int iteration;
 		/* if a complete measurement has been done, then update
 		 * for the found value, and add the known values of the processes. */
 
 		struct work_queue_process *p;
 		uint64_t taskid;
+		int iteration;
 
 		ITABLE_ITERATE(procs_table, iteration, taskid, p) {
 			if(p->sandbox_size > 0) {
@@ -755,24 +754,24 @@ for later processing.
 
 static int handle_completed_tasks(struct link *manager)
 {
-	int iteration;
 	struct work_queue_process *p;
 	uint64_t pid;
 	int status;
+	int iteration;
 
 	ITABLE_ITERATE(procs_running, iteration, pid, p) {
 		int result = wait4((pid_t)pid, &status, WNOHANG, &p->rusage);
 		if(result==0) {
 			// pid is still going
 		} else if(result<0) {
-			debug(D_WQ, "wait4 on pid %d returned an error: %s",pid,strerror(errno));
+			debug(D_WQ, "wait4 on pid %d returned an error: %s",(pid_t) pid,strerror(errno));
 		} else if(result>0) {
 			if (!WIFEXITED(status)){
 				p->exit_status = WTERMSIG(status);
-				debug(D_WQ, "task %d (pid %d) exited abnormally with signal %d",p->task->taskid,p->pid,p->exit_status);
+				debug(D_WQ, "task %d (pid %d) exited abnormally with signal %d",p->task->taskid,(pid_t) p->pid,p->exit_status);
 			} else {
 				p->exit_status = WEXITSTATUS(status);
-				debug(D_WQ, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_status);
+				debug(D_WQ, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,(pid_t) p->pid,p->exit_status);
 
 				if(is_disk_allocation_exhausted(p)) {
 					p->task_status = WORK_QUEUE_RESULT_DISK_ALLOC_FULL;
