@@ -403,18 +403,17 @@ Abort the dag by removing all batch jobs from all queues.
 
 static void makeflow_abort_all(struct dag *d)
 {
+	int iteration;
 	uint64_t jobid;
 	struct dag_node *n;
 
 	printf("got abort signal...\n");
 
-	itable_firstkey(d->local_job_table);
-	while(itable_nextkey(d->local_job_table, &jobid, (void **) &n)) {
+	ITABLE_ITERATE(d->local_job_table, iteration, jobid, n) {
 		makeflow_abort_job(d,n,local_queue,jobid,"local");
 	}
 
-	itable_firstkey(d->remote_job_table);
-	while(itable_nextkey(d->remote_job_table, &jobid, (void **) &n)) {
+	ITABLE_ITERATE(d->remote_job_table, iteration, jobid, n) {
 		makeflow_abort_job(d,n,remote_queue,jobid,"remote");
 	}
 }
@@ -2539,10 +2538,10 @@ EXIT_WITH_FAILURE:
 
 	/* delete all files. We do this here are some of these files may be created in clean mode. */
 	{
+		int iteration;
 		struct dag_node *n;
 		uint64_t key;
-		itable_firstkey(d->node_table);
-		while(itable_nextkey(d->node_table, &key, (void **) &n)) {
+		ITABLE_ITERATE(d->node_table, iteration, key, n) {
 			if(n->workflow_args) {
 				debug(D_MAKEFLOW_RUN, "deleting tmp file: %s\n", dag_node_nested_workflow_filename(n, "args"));
 				unlink(dag_node_nested_workflow_filename(n, "args"));

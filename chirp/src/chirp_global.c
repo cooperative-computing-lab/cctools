@@ -354,6 +354,7 @@ INT64_T chirp_global_getlongdir(const char *host, const char *path, chirp_longdi
 		return chirp_reli_getlongdir(host, "/", callback, arg, stoptime);
 	} else {
 		if(server_table_load(stoptime)) {
+			int iteration;
 			char *key;
 			void *item;
 			struct chirp_stat info;

@@ -1360,13 +1360,13 @@ void rmonitor_untrack_process(uint64_t pid)
 
 void rmonitor_add_children_by_polling()
 {
+	int iteration;
 
 	uint64_t pid;
 	struct rmonitor_process_info *p;
 	uint64_t *children = NULL;
 
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p)) {
+	ITABLE_ITERATE(processes, iteration, pid, p) {
 		if (!p->running) {
 			continue;
 		}
@@ -1401,13 +1401,14 @@ void cleanup_zombie(struct rmonitor_process_info *p)
 
 void cleanup_zombies(void)
 {
+	int iteration;
 	uint64_t pid;
 	struct rmonitor_process_info *p;
 
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p))
+	ITABLE_ITERATE(processes, iteration, pid, p) {
 		if (!p->running)
 			cleanup_zombie(p);
+	}
 }
 
 void release_waiting_process(uint64_t pid)
@@ -1474,11 +1475,11 @@ void set_snapshot_watch_events()
 
 void terminate_snapshot_watch_events()
 {
+	int iteration;
 	uint64_t pid;
 	void *dummy;
 
-	itable_firstkey(snapshot_watch_pids);
-	while (itable_nextkey(snapshot_watch_pids, &pid, &dummy)) {
+		ITABLE_ITERATE(snapshot_watch_pids, iteration, pid, dummy) {
 		kill(pid, SIGKILL);
 	}
 }
@@ -1584,9 +1585,9 @@ void rmonitor_check_child(const int signal)
 
 	struct rmonitor_process_info *p;
 	debug(D_RMON, "adding all processes to cleanup list.\n");
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p))
+	ITABLE_ITERATE(processes, iteration, pid, p) {
 		rmonitor_untrack_process(pid);
+	}
 
 	/* get the peak values from getrusage, and others. */
 	struct rmsummary *tr_usg = rmonitor_final_usage_tree();
@@ -1610,8 +1611,8 @@ void rmonitor_final_cleanup()
 	sigprocmask(SIG_BLOCK, &block, NULL);
 
 	if (!first_pid_manually_set) {
-		itable_firstkey(processes);
-		while (itable_nextkey(processes, &pid, (void **)&p)) {
+		int iteration;
+		ITABLE_ITERATE(processes, iteration, pid, p) {
 			notice(D_RMON, "sending kill signal to process %" PRId64 ".%d\n", pid);
 			kill(pid, SIGKILL);
 		}

@@ -53,13 +53,13 @@ uint64_t usecs_since_epoch()
 
 void rmonitor_poll_all_processes_once(struct itable *processes, struct rmonitor_process_info *acc)
 {
+	int iteration;
 	uint64_t pid;
 	struct rmonitor_process_info *p;
 
 	bzero(acc, sizeof(struct rmonitor_process_info));
 
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p)) {
+	ITABLE_ITERATE(processes, iteration, pid, p) {
 		int status = rmonitor_poll_process_once(p);
 
 		/* do not consider process if some error is found. */
@@ -104,13 +104,13 @@ void rmonitor_poll_all_wds_once(struct hash_table *wdirs, struct rmonitor_wdir_i
 
 void rmonitor_poll_all_fss_once(struct itable *filesysms, struct rmonitor_filesys_info *acc)
 {
+	int iteration;
 	struct rmonitor_filesys_info *f;
 	uint64_t dev_id;
 
 	bzero(acc, sizeof(struct rmonitor_filesys_info));
 
-	itable_firstkey(filesysms);
-	while (itable_nextkey(filesysms, &dev_id, (void **)&f)) {
+	ITABLE_ITERATE(filesysms, iteration, dev_id, f) {
 		int status = rmonitor_poll_fs_once(f);
 		/* do not consider fs if some error is found. */
 		if (status != 0)
@@ -570,8 +570,8 @@ int rmonitor_poll_maps_once(struct itable *processes, struct rmonitor_mem_info *
 
 	uint64_t pid;
 	struct rmonitor_process_info *pinfo;
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void *)&pinfo)) {
+ 	int iteration;
+	ITABLE_ITERATE(processes, iteration, pid, pinfo) {
 		rmonitor_get_mmaps_usage(pid, maps_per_file);
 	}
 
@@ -1038,8 +1038,8 @@ struct rmsummary *rmonitor_minimonitor(minimonitor_op op, uint64_t pid)
 	switch (op) {
 	case MINIMONITOR_RESET:
 		if (processes) {
-			itable_firstkey(processes);
-			while (itable_nextkey(processes, &pid, (void **)&p)) {
+			int iteration;
+			ITABLE_ITERATE(processes, iteration, pid, p) {
 				itable_remove(processes, pid);
 				free(p);
 			}
