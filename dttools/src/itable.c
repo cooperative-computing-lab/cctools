@@ -117,10 +117,10 @@ static int itable_double_buckets(struct itable *h)
 	void *value;
 	int iteration;
 	ITABLE_ITERATE(h, iteration, key, value)
-		if (!itable_insert(hn, key, value)) {
-			itable_delete(hn);
-			return 0;
-		}
+	if (!itable_insert(hn, key, value)) {
+		itable_delete(hn);
+		return 0;
+	}
 
 	/* Delete all old pairs */
 	struct entry *e, *f;

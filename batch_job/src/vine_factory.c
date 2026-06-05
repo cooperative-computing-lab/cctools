@@ -501,11 +501,12 @@ to pass to the worker.  The returned string must be freed.
 
 static char * make_features_string( struct hash_table *features_table )
 {
+	int iteration;
 	char *str = strdup("");
 
 	char *key;
 	void *value;
-	HASH_TABLE_ITERATE(features_table,key,value) {
+	HASH_TABLE_ITERATE(features_table, iteration, key, value) {
 		char * newstr = string_format("%s --feature \"%s\"",str,key);
 		free(str);
 		str = newstr;

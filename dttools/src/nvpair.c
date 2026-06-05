@@ -31,14 +31,15 @@ struct nvpair *nvpair_create()
 
 void nvpair_delete(struct nvpair *n)
 {
+	int iteration;
 	char *key;
 	void *value;
 
 	if (!n)
 		return;
 
-	hash_table_firstkey(n->table);
-	while (hash_table_nextkey(n->table, &key, &value)) {
+	HASH_TABLE_ITERATE(n->table, iteration, key, value)
+	{
 		hash_table_remove(n->table, key);
 		free(value);
 	}
@@ -104,14 +105,15 @@ int nvpair_parse_stream(struct nvpair *n, FILE *stream)
 
 int nvpair_print(struct nvpair *n, char *text, int length)
 {
+	int iteration;
 	char *key;
 	void *value;
 
 	int actual;
 	int total = 0;
 
-	hash_table_firstkey(n->table);
-	while (hash_table_nextkey(n->table, &key, &value) && length > 0) {
+	iteration = hash_table_firstkey(n->table);
+	while (hash_table_nextkey(n->table, iteration, &key, &value) && length > 0) {
 		actual = snprintf(text, length, "%s %s\n", key, (char *)value);
 		total += actual;
 		text += actual;
@@ -122,6 +124,7 @@ int nvpair_print(struct nvpair *n, char *text, int length)
 
 int nvpair_print_alloc(struct nvpair *n, char **text)
 {
+	int iteration;
 	size_t needed;
 	char *key;
 	void *value;
@@ -130,8 +133,8 @@ int nvpair_print_alloc(struct nvpair *n, char **text)
 	buffer_init(&B);
 	buffer_abortonfailure(&B, 1);
 
-	hash_table_firstkey(n->table);
-	while (hash_table_nextkey(n->table, &key, &value)) {
+	HASH_TABLE_ITERATE(n->table, iteration, key, value)
+	{
 		buffer_putfstring(&B, "%s %s\n", key, (char *)value);
 	}
 
@@ -209,21 +212,22 @@ void nvpair_export(struct nvpair *nv)
 
 void nvpair_first_item(struct nvpair *nv)
 {
-	hash_table_firstkey(nv->table);
+	nv->iteration = hash_table_firstkey(nv->table);
 }
 
 int nvpair_next_item(struct nvpair *nv, char **name, char **value)
 {
-	return hash_table_nextkey(nv->table, name, (void **)value);
+	return hash_table_nextkey(nv->table, nv->iteration, name, (void **)value);
 }
 
 void nvpair_print_text(struct nvpair *n, FILE *s)
 {
+	int iteration;
 	char *key;
 	void *value;
 
-	hash_table_firstkey(n->table);
-	while (hash_table_nextkey(n->table, &key, &value)) {
+	HASH_TABLE_ITERATE(n->table, iteration, key, value)
+	{
 		fprintf(s, "%s %s\n", key, (char *)value);
 	}
 	fprintf(s, "\n");

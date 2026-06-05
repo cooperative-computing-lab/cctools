@@ -1137,12 +1137,13 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 
 void rmonitor_find_files_final_sizes()
 {
+	int iteration;
 	char *fname;
 	struct stat buf;
 	struct rmonitor_file_info *finfo;
 
-	hash_table_firstkey(files);
-	while (hash_table_nextkey(files, &fname, (void **)&finfo)) {
+	HASH_TABLE_ITERATE(files, iteration, fname, finfo)
+	{
 		/* If size_on_close is unknwon, perform a stat on the file. */
 
 		if (finfo->size_on_close < 0 && stat(fname, &buf) == 0) {
@@ -1153,6 +1154,7 @@ void rmonitor_find_files_final_sizes()
 
 void rmonitor_add_files_to_summary(char *field, int outputs)
 {
+	int iteration;
 	char *fname;
 	struct rmonitor_file_info *finfo;
 
@@ -1163,8 +1165,8 @@ void rmonitor_add_files_to_summary(char *field, int outputs)
 
 	char *delimeter = "";
 
-	hash_table_firstkey(files);
-	while (hash_table_nextkey(files, &fname, (void **)&finfo)) {
+	HASH_TABLE_ITERATE(files, iteration, fname, finfo)
+	{
 		if (finfo->is_output != outputs)
 			continue;
 
@@ -1190,6 +1192,7 @@ int rmonitor_file_io_summaries()
 {
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
 	if (rmonitor_inotify_fd >= 0) {
+		int iteration;
 		char *fname;
 		struct rmonitor_file_info *finfo;
 
@@ -1205,8 +1208,8 @@ int rmonitor_file_io_summaries()
 				"reads",
 				"writes");
 
-		hash_table_firstkey(files);
-		while (hash_table_nextkey(files, &fname, (void **)&finfo)) {
+		HASH_TABLE_ITERATE(files, iteration, fname, finfo)
+		{
 			fprintf(log_inotify, "%-15s\n%-15s ", fname, "");
 			fprintf(log_inotify, "%6" PRId64 " %20lld %20lld", finfo->device, (long long int)finfo->size_on_open, (long long int)finfo->size_on_close);
 			fprintf(log_inotify, " %6" PRId64 " %6" PRId64, finfo->n_opens, finfo->n_closes);
@@ -1366,7 +1369,8 @@ void rmonitor_add_children_by_polling()
 	struct rmonitor_process_info *p;
 	uint64_t *children = NULL;
 
-	ITABLE_ITERATE(processes, iteration, pid, p) {
+	ITABLE_ITERATE(processes, iteration, pid, p)
+	{
 		if (!p->running) {
 			continue;
 		}
@@ -1405,7 +1409,8 @@ void cleanup_zombies(void)
 	uint64_t pid;
 	struct rmonitor_process_info *p;
 
-	ITABLE_ITERATE(processes, iteration, pid, p) {
+	ITABLE_ITERATE(processes, iteration, pid, p)
+	{
 		if (!p->running)
 			cleanup_zombie(p);
 	}
@@ -1419,30 +1424,35 @@ void release_waiting_process(uint64_t pid)
 
 void release_waiting_processes(void)
 {
+	int iteration;
 	uint64_t pid;
 	struct rmonitor_process_info *p;
 
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p))
+	ITABLE_ITERATE(processes, iteration, pid, p)
+	{
 		if (p->waiting)
 			release_waiting_process(pid);
+	}
 }
 
 void ping_processes(void)
 {
+	int iteration;
 	uint64_t pid;
 	struct rmonitor_process_info *p;
 
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p))
+	ITABLE_ITERATE(processes, iteration, pid, p)
+	{
 		if (!ping_process(pid)) {
 			debug(D_RMON, "cannot find %" PRId64 " process.\n", pid);
 			rmonitor_untrack_process(pid);
 		}
+	}
 }
 
-void set_snapshot_watch_events()
+void set_snapshot_watch_events(void)
 {
+	int iteration;
 
 	if (!snapshot_watch_events_file) {
 		return;
@@ -1479,7 +1489,8 @@ void terminate_snapshot_watch_events()
 	uint64_t pid;
 	void *dummy;
 
-		ITABLE_ITERATE(snapshot_watch_pids, iteration, pid, dummy) {
+	ITABLE_ITERATE(snapshot_watch_pids, iteration, pid, dummy)
+	{
 		kill(pid, SIGKILL);
 	}
 }
@@ -1551,6 +1562,7 @@ void rmonitor_forward_signal(const int signal, siginfo_t *info, void *data)
 /* sigchild signal handler */
 void rmonitor_check_child(const int signal)
 {
+	int iteration;
 	uint64_t pid = waitpid(first_process_pid, &first_process_sigchild_status, WNOHANG | WCONTINUED | WUNTRACED);
 
 	if (pid != (uint64_t)first_process_pid)
@@ -1585,7 +1597,8 @@ void rmonitor_check_child(const int signal)
 
 	struct rmonitor_process_info *p;
 	debug(D_RMON, "adding all processes to cleanup list.\n");
-	ITABLE_ITERATE(processes, iteration, pid, p) {
+	ITABLE_ITERATE(processes, iteration, pid, p)
+	{
 		rmonitor_untrack_process(pid);
 	}
 
@@ -1612,7 +1625,8 @@ void rmonitor_final_cleanup()
 
 	if (!first_pid_manually_set) {
 		int iteration;
-		ITABLE_ITERATE(processes, iteration, pid, p) {
+		ITABLE_ITERATE(processes, iteration, pid, p)
+		{
 			notice(D_RMON, "sending kill signal to process %" PRId64 ".%d\n", pid);
 			kill(pid, SIGKILL);
 		}

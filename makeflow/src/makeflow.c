@@ -940,6 +940,7 @@ a prior run that was logged.
 
 static int makeflow_check_files(struct dag *d)
 {
+	int iteration;
 	struct stat buf;
 	struct dag_file *f;
 	char *name;
@@ -948,8 +949,7 @@ static int makeflow_check_files(struct dag *d)
 
 	printf("checking files for unexpected changes...  (use --skip-file-check to skip this step)\n");
 
-	hash_table_firstkey(d->files);
-	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
+	HASH_TABLE_ITERATE(d->files, iteration, name, f) {
 
 		/* Skip special files that are not connected to the DAG nodes. */
 		if(!f->created_by && !list_size(f->needed_by)) continue;
