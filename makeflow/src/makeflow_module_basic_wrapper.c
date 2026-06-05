@@ -122,7 +122,6 @@ static int create( void ** instance_struct, struct jx *hook_args ){
 
 void wrapper_instance_delete(struct wrapper_instance *w)
 {
-	int iteration;
 	if(w->command)
 		free(w->command);
 
