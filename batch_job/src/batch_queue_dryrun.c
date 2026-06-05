@@ -69,19 +69,19 @@ static batch_queue_id_t batch_queue_dryrun_wait(struct batch_queue *q, struct ba
 {
 	struct batch_job_info *info;
 	UINT64_T jobid;
+	int iteration;
 
-	itable_firstkey(q->job_table);
-	if (itable_nextkey(q->job_table, &jobid, NULL)) {
-		info = itable_remove(q->job_table, jobid);
+	ITABLE_ITERATE(q->job_table, iteration, jobid, info) {
+		itable_remove(q->job_table, jobid);
 		info->finished = time(0);
 		info->exited_normally = 1;
 		info->exit_code = 0;
 		memcpy(info_out, info, sizeof(*info));
 		free(info);
 		return jobid;
-	} else {
-		return 0;
 	}
+
+	return 0;
 }
 
 static int batch_queue_dryrun_remove(struct batch_queue *q, batch_queue_id_t jobid, batch_queue_remove_mode_t mode)

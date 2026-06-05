@@ -339,7 +339,6 @@ static int batch_queue_flux_create(struct batch_queue *q)
 
 static int batch_queue_flux_free(struct batch_queue *q)
 {
-	int iteration;
 	if (flux_job_info_table) {
 		int iteration;
 		struct flux_job_info *info;
