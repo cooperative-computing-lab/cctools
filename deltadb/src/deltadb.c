@@ -563,14 +563,14 @@ struct jx * deltadb_remove( struct deltadb *db, const char *key )
 	return j;
 }
 
-void deltadb_firstkey( struct deltadb *db )
+int deltadb_firstkey( struct deltadb *db )
 {
-	hash_table_firstkey(db->table);
+	return hash_table_firstkey(db->table);
 }
 
-int  deltadb_nextkey( struct deltadb *db, char **key, struct jx **j )
+int  deltadb_nextkey( struct deltadb *db, int iteration, char **key, struct jx **j )
 {
-	return hash_table_nextkey(db->table,key,(void**)j);
+	return hash_table_nextkey(db->table,iteration,key,(void**)j);
 }
 
 /* vim: set noexpandtab tabstop=4: */
