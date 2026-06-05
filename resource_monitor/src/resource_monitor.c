@@ -1452,8 +1452,6 @@ void ping_processes(void)
 
 void set_snapshot_watch_events(void)
 {
-	int iteration;
-
 	if (!snapshot_watch_events_file) {
 		return;
 	}
@@ -1562,7 +1560,6 @@ void rmonitor_forward_signal(const int signal, siginfo_t *info, void *data)
 /* sigchild signal handler */
 void rmonitor_check_child(const int signal)
 {
-	int iteration;
 	uint64_t pid = waitpid(first_process_pid, &first_process_sigchild_status, WNOHANG | WCONTINUED | WUNTRACED);
 
 	if (pid != (uint64_t)first_process_pid)
@@ -1596,6 +1593,8 @@ void rmonitor_check_child(const int signal)
 	first_process_already_waited = 1;
 
 	struct rmonitor_process_info *p;
+	int iteration;
+
 	debug(D_RMON, "adding all processes to cleanup list.\n");
 	ITABLE_ITERATE(processes, iteration, pid, p)
 	{
