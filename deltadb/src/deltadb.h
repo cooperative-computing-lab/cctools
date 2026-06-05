@@ -109,18 +109,20 @@ This function begins a new iteration over the database.
 allowing you to visit every primary key in the database.
 Next, invoke @ref deltadb_nextkey to retrieve each value in order.
 @param db The database to access.
+@return Iteration index
 */
 
-void deltadb_firstkey( struct deltadb *db );
+int deltadb_firstkey( struct deltadb *db );
 
 /** Continue iteration over the database.
 This function returns the next primary key and object in the iteration.
 @param db The database to access.
+@param Iteration index
 @param key A pointer to an unset char pointer, which will be made to point to the primary key.
 @param j A pointer to an unset jx pointer, which will be made to point to the next object.
 @return Zero if there are no more elements to visit, non-zero otherwise.
 */
 
-int deltadb_nextkey( struct deltadb *db, char **key, struct jx **j );
+int deltadb_nextkey( struct deltadb *db, int iteration, char **key, struct jx **j );
 
 #endif
