@@ -1173,6 +1173,7 @@ static int enforce_processes_sandbox_limits()
 
 	struct vine_process *p;
 	uint64_t task_id;
+	int iteration;
 
 	int ok = 1;
 
@@ -1632,6 +1633,7 @@ static void check_libraries_ready(struct link *manager)
 {
 	uint64_t library_task_id;
 	struct vine_process *library_process;
+	int iteration;
 
 	struct link_info library_link_info;
 	library_link_info.events = LINK_READ;
