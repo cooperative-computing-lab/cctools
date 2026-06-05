@@ -212,7 +212,8 @@ static int count_workers(struct vine_manager *q, vine_worker_type_t type)
 
 	int count = 0;
 
-	HASH_TABLE_ITERATE(q->worker_table, iteration, id, w) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, id, w)
+	{
 		if (w->type & type) {
 			count++;
 		}
@@ -1016,7 +1017,8 @@ int release_random_worker(struct vine_manager *q)
 	int iteration;
 	struct vine_worker_info *w;
 
-	HASH_TABLE_ITERATE_RANDOM_START(q->worker_table, iteration, offset_bookkeep, key, w) {
+	HASH_TABLE_ITERATE_RANDOM_START(q->worker_table, iteration, offset_bookkeep, key, w)
+	{
 		if (!w) {
 			continue;
 		}
@@ -2992,7 +2994,8 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 	struct vine_task *task;
 	int iteration;
 
-	ITABLE_ITERATE(w->current_tasks, iteration, task_id, task) {
+	ITABLE_ITERATE(w->current_tasks, iteration, task_id, task)
+	{
 		struct rmsummary *box = task->current_resource_box;
 		if (!box)
 			continue;
