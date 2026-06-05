@@ -31,14 +31,7 @@ struct hash_table {
 	struct entry **buckets;
 	int ibucket;
 	struct entry *ientry;
-
-	/* for memory safety, hash_table_nextkey cannot be called in the same
-	 * iteration if hash_table_insert or hash_table_remove has been called.
-	 * In such case, the executable will be terminated with a fatal message.
-	 * If the table should be modified during iterations, consider
-	 * using the array keys from hash_table_keys_array. (If so, remember
-	 * to free it afterwards with hash_table_free_keys_array.) */
-	int cant_iterate_yet;
+	int iteration_index;
 };
 
 struct hash_table *hash_table_create(int bucket_count, hash_func_t func)
@@ -55,7 +48,7 @@ struct hash_table *hash_table_create(int bucket_count, hash_func_t func)
 		func = DEFAULT_FUNC;
 
 	h->size = 0;
-	h->cant_iterate_yet = 0;
+	h->iteration_index = 0;
 	h->hash_func = func;
 	h->bucket_count = bucket_count;
 	h->buckets = (struct entry **)calloc(bucket_count, sizeof(struct entry *));
@@ -88,8 +81,7 @@ void hash_table_clear(struct hash_table *h, void (*delete_func)(void *))
 		h->buckets[i] = 0;
 	}
 
-	/* buckets went away, thus a nextkey would be invalid */
-	h->cant_iterate_yet = 1;
+	h->iteration_index++;
 }
 
 void hash_table_delete(struct hash_table *h)
@@ -208,8 +200,7 @@ static int hash_table_double_buckets(struct hash_table *h)
 	h->buckets = new_buckets;
 	h->bucket_count = new_count;
 
-	/* structure of hash table changed completely, thus a nextkey would be incorrect. */
-	h->cant_iterate_yet = 1;
+	h->iteration_index++;
 
 	return 1;
 }
@@ -249,8 +240,7 @@ static int hash_table_reduce_buckets(struct hash_table *h)
 	h->buckets = new_buckets;
 	h->bucket_count = new_count;
 
-	/* structure of hash table changed completely, thus a nextkey would be incorrect. */
-	h->cant_iterate_yet = 1;
+	h->iteration_index++;
 
 	return 1;
 }
@@ -278,10 +268,7 @@ int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 	int inserted = insert_to_buckets_aux(h->buckets, h->bucket_count, e);
 	if (inserted) {
 		h->size++;
-
-		/* inserting cause different behaviours with nextkey (e.g., sometimes the new
-		 * key would be included or skipped in the iteration */
-		h->cant_iterate_yet = 1;
+		h->iteration_index++;
 	} else {
 		if (value != NULL) {
 			/* signal possible memory leak. Only if hash table is being used as set we do not print the message. */
@@ -330,35 +317,8 @@ void *hash_table_remove(struct hash_table *h, const char *key)
 	return 0;
 }
 
-int hash_table_fromkey(struct hash_table *h, const char *key)
+static void hash_table_reset_to_first(struct hash_table *h)
 {
-	h->cant_iterate_yet = 0;
-
-	if (!key) {
-		/* treat NULL as a special case equivalent to firstkey */
-		hash_table_firstkey(h);
-		return 1;
-	}
-
-	unsigned hash = h->hash_func(key);
-	h->ibucket = hash % h->bucket_count;
-	h->ientry = h->buckets[h->ibucket];
-
-	while (h->ientry) {
-		if (hash == h->ientry->hash && !strcmp(key, h->ientry->key)) {
-			return 1;
-		}
-		h->ientry = h->ientry->next;
-	}
-
-	hash_table_firstkey(h);
-	return 0;
-}
-
-void hash_table_firstkey(struct hash_table *h)
-{
-	h->cant_iterate_yet = 0;
-
 	h->ientry = 0;
 	for (h->ibucket = 0; h->ibucket < h->bucket_count; h->ibucket++) {
 		h->ientry = h->buckets[h->ibucket];
@@ -367,9 +327,37 @@ void hash_table_firstkey(struct hash_table *h)
 	}
 }
 
-int hash_table_nextkey(struct hash_table *h, char **key, void **value)
+int hash_table_fromkey(struct hash_table *h, const char *key)
 {
-	if (h->cant_iterate_yet) {
+	if (key) {
+		h->iteration_index++;
+
+		unsigned hash = h->hash_func(key);
+		h->ibucket = hash % h->bucket_count;
+		h->ientry = h->buckets[h->ibucket];
+
+		while (h->ientry) {
+			if (hash == h->ientry->hash && !strcmp(key, h->ientry->key)) {
+				return h->iteration_index;
+			}
+			h->ientry = h->ientry->next;
+		}
+	}
+
+	hash_table_reset_to_first(h);
+	return h->iteration_index;
+}
+
+int hash_table_firstkey(struct hash_table *h)
+{
+	h->iteration_index++;
+	hash_table_reset_to_first(h);
+	return h->iteration_index;
+}
+
+int hash_table_nextkey(struct hash_table *h, int iteration, char **key, void **value)
+{
+	if (iteration != h->iteration_index) {
 		fatal("cctools bug: the hash table iteration has not been reset since last modification");
 	}
 
@@ -392,13 +380,13 @@ int hash_table_nextkey(struct hash_table *h, char **key, void **value)
 	}
 }
 
-void hash_table_randomkey(struct hash_table *h, int *offset_bookkeep)
+int hash_table_randomkey(struct hash_table *h, int *offset_bookkeep)
 {
-	h->cant_iterate_yet = 0;
+	h->iteration_index++;
 
 	h->ientry = 0;
 	if (h->bucket_count < 1) {
-		return;
+		return h->iteration_index;
 	}
 
 	int ibucket_start = random() % h->bucket_count;
@@ -407,7 +395,7 @@ void hash_table_randomkey(struct hash_table *h, int *offset_bookkeep)
 		h->ientry = h->buckets[h->ibucket];
 		if (h->ientry) {
 			*offset_bookkeep = h->ibucket;
-			return;
+			return h->iteration_index;
 		}
 	}
 
@@ -415,14 +403,16 @@ void hash_table_randomkey(struct hash_table *h, int *offset_bookkeep)
 		h->ientry = h->buckets[h->ibucket];
 		if (h->ientry) {
 			*offset_bookkeep = h->ibucket;
-			return;
+			return h->iteration_index;
 		}
 	}
+
+	return h->iteration_index;
 }
 
-int hash_table_nextkey_with_offset(struct hash_table *h, int offset_bookkeep, char **key, void **value)
+int hash_table_nextkey_with_offset(struct hash_table *h, int iteration, int offset_bookkeep, char **key, void **value)
 {
-	if (h->cant_iterate_yet) {
+	if (iteration != h->iteration_index) {
 		fatal("cctools bug: the hash table iteration has not been reset since last modification");
 	}
 
