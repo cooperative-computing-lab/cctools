@@ -29,9 +29,9 @@ To list all of the items in an itable, use @ref itable_firstkey and @ref itable_
 <pre>
 UINT64_T  key;
 void *value;
+int iteration;
 
-itable_firstkey(h);
-while(itable_nextkey(h,&key,&value)) {
+ITABLE_ITERATE(h, iteration, &key, &value)) {
 	printf("table contains: %d\n",key);
 }
 </pre>
@@ -41,8 +41,9 @@ Alternatively:
 <pre>
 UINT64_T  key;
 void *value;
+int iteration;
 
-ITABLE_ITERATE(h,key,value) {
+ITABLE_ITERATE(h, iteration, key, value) {
 	printf("table contains: %d\n",key);
 }
 </pre>
@@ -115,20 +116,27 @@ void * itable_pop( struct itable *h );
 This function begins a new iteration over an integer table,
 allowing you to visit every key and value in the table.
 Next, invoke @ref itable_nextkey to retrieve each value in order.
+Use ITABLE_ITERATE unless you know what you are doing.
 @param h A pointer to an integer table.
+@return The iteration index.
 */
 
-void itable_firstkey(struct itable *h);
+int itable_firstkey(struct itable *h);
 
 /** Continue iteration over all keys.
 This function returns the next key and value in the iteration.
+This function should only be called after a call to itable_firstkey.
+Use ITABLE_ITERATE unless you know what you are doing.
+Warning: It cannot be called after itable_insert, itable_clear, or a
+table resize during the same iteration.
 @param h A pointer to an integer table.
+@param iteration The iteration index since the last call to itable_firstkey.
 @param key A pointer to a key integer.
 @param value A pointer to a value pointer. (can be NULL)
 @return Zero if there are no more elements to visit, one otherwise.
 */
 
-int itable_nextkey(struct itable *h, UINT64_T * key, void **value);
+int itable_nextkey(struct itable *h, int iteration, UINT64_T * key, void **value);
 
 /** Utility macro to simplify common case of iterating over an itable.
 Use as follows:
@@ -136,14 +144,15 @@ Use as follows:
 <pre>
 UINT64_T key;
 void *value;
+int iteration;
 
-ITABLE_ITERATE(table,key,value) {
+ITABLE_ITERATE(table,iteration,key,value) {
 	printf("table contains: %lld\n",key);
 }
 
 </pre>
 */
 
-#define ITABLE_ITERATE(table,key,value) itable_firstkey(table); while(itable_nextkey(table,&key,(void**)&value))
+#define ITABLE_ITERATE(table,iteration,key,value) iteration = itable_firstkey(table); while(itable_nextkey(table, iteration, &key, (void **)&value))
 
 #endif

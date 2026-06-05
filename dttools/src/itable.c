@@ -5,6 +5,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "debug.h"
 #include "itable.h"
 
 #include <stdlib.h>
@@ -25,6 +26,7 @@ struct itable {
 	struct entry **buckets;
 	int ibucket;
 	struct entry *ientry;
+	int iteration_index;
 };
 
 struct itable *itable_create(int bucket_count)
@@ -46,7 +48,7 @@ struct itable *itable_create(int bucket_count)
 	}
 
 	h->size = 0;
-
+	h->iteration_index = 0;
 	return h;
 }
 
@@ -69,6 +71,8 @@ void itable_clear(struct itable *h, void (*delete_func)(void *))
 	for (i = 0; i < h->bucket_count; i++) {
 		h->buckets[i] = 0;
 	}
+
+	h->iteration_index++;
 }
 
 void itable_delete(struct itable *h)
@@ -139,6 +143,8 @@ static int itable_double_buckets(struct itable *h)
 	/* Delete reference to new, so old is safe */
 	free(hn);
 
+	h->iteration_index++;
+
 	return 1;
 }
 
@@ -170,6 +176,7 @@ int itable_insert(struct itable *h, UINT64_T key, const void *value)
 	e->next = h->buckets[index];
 	h->buckets[index] = e;
 	h->size++;
+	h->iteration_index++;
 
 	return 1;
 }
@@ -209,25 +216,33 @@ void *itable_pop(struct itable *t)
 	void *value;
 
 	itable_firstkey(t);
-	if (itable_nextkey(t, &key, (void **)&value)) {
+	if (itable_nextkey(t, t->iteration_index, &key, (void **)&value)) {
 		return itable_remove(t, key);
 	} else {
 		return 0;
 	}
 }
 
-void itable_firstkey(struct itable *h)
+int itable_firstkey(struct itable *h)
 {
+	h->iteration_index++;
+
 	h->ientry = 0;
 	for (h->ibucket = 0; h->ibucket < h->bucket_count; h->ibucket++) {
 		h->ientry = h->buckets[h->ibucket];
 		if (h->ientry)
 			break;
 	}
+
+	return h->iteration_index;
 }
 
-int itable_nextkey(struct itable *h, UINT64_T *key, void **value)
+int itable_nextkey(struct itable *h, int iteration, UINT64_T *key, void **value)
 {
+	if (iteration != h->iteration_index) {
+		fatal("cctools bug: the itable iteration has not been reset since last modification");
+	}
+
 	if (h->ientry) {
 		*key = h->ientry->key;
 		if (value)
