@@ -162,7 +162,6 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
  */
 static int check_worker_have_committable_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
-	int iteration;
 	/* Check if there are free slots on any of the running libraries */
 	if (w->current_libraries && itable_size(w->current_libraries) > 0) {
 		int iteration;
