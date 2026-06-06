@@ -123,6 +123,7 @@ SOURCES = \
 	url_encode.c \
 	username.c \
 	uuid.c \
+	xpu_tracker.c \
 	xxmalloc.c \
 
 HEADERS_PUBLIC = \
@@ -174,6 +175,7 @@ HEADERS_PUBLIC = \
 	text_list.h \
 	timestamp.h \
 	unlink_recursive.h \
+	xpu_tracker.h \
 	xxmalloc.h \
 
 LIBRARIES = libdttools.a
