@@ -1,0 +1,482 @@
+#!/usr/bin/env python3
+"""Run vine_plot_* into plot-files/; one HTML with base64 images."""
+
+import argparse
+import base64
+import html
+import shlex
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+# Run control
+INCLUDE_TASKGRAPH = False
+
+# vine_plot_txn_log
+TXN_DPI = 400
+TXN_WIDTH = 12.0
+TXN_HEIGHT = 7.0
+TXN_OMIT_HEIGHT = False
+TXN_TITLE = None
+# origin/end/legend: vine_plot_txn_log --help
+TXN_ORIGIN = "connected-first-worker"
+TXN_END = "done-last-task"
+TXN_TASKS_RANGE = "1,,1"
+TXN_EXPAND_WAITING = False
+TXN_LEGEND = "upper left"
+TXN_TIME_TICKS_N = 5
+TXN_TIME_TICK = []
+TXN_TEX = False
+TXN_NOAPP = False
+TXN_DASK_COLORS = False
+TXN_FONTSIZE = "large"
+
+# vine_plot_performance
+PERF_LOGSCALE = False
+PERF_DISPATCH_START = False
+PERF_RANGE = None
+PERF_SAMPLE = None
+PERF_TIME_UNIT = "m"
+PERF_FORMAT = "png"
+PERF_SIZE = None
+
+# vine_plot_compose
+COMPOSE_WIDTH = "12"
+COMPOSE_HEIGHT = "7"
+
+
+def progress(cur, total, name, elapsed):
+    t = max(total, 1)
+    pct = cur * 100 // t
+    filled = pct * 20 // 100
+    bar = "#" * filled + "-" * (20 - filled)
+    print(f"[{bar}] step {cur}/{total} {name} (elapsed {elapsed}s)")
+
+
+def run_job(job):
+    try:
+        subprocess.run(job["cmd"], check=True, capture_output=True, text=True)
+        return job["name"], True, ""
+    except subprocess.CalledProcessError as e:
+        err = (e.stderr or e.stdout or "").strip()
+        return job["name"], False, err
+
+
+def _img_to_data_uri(path):
+    path = Path(path)
+    if not path.exists():
+        return None
+    suffix = path.suffix.lower()
+    mime = {
+        ".png": "image/png",
+        ".svg": "image/svg+xml",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+    }.get(suffix, "image/png")
+    data = base64.b64encode(path.read_bytes()).decode()
+    return f"data:{mime};base64,{data}"
+
+
+def build_html(entries, out_path, run_dir=""):
+    items = []
+    for e in entries:
+        data_uri = _img_to_data_uri(e["path"])
+        if data_uri:
+            items.append({**e, "data_uri": data_uri})
+
+    if not items:
+        print("no plot files to embed")
+        return False
+
+    group_order = []
+    groups = {}
+    for e in items:
+        t = e["tool"]
+        if t not in groups:
+            groups[t] = []
+            group_order.append(t)
+        groups[t].append(e)
+
+    log_dir_display = html.escape(run_dir) if run_dir else ""
+    generated_time = time.strftime("%Y-%m-%d %H:%M")
+
+    out_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>taskvine plots</title>
+  <style>
+    :root {{ --sidebar-width: 15%; --content-width: 70%; }}
+    * {{ box-sizing: border-box; }}
+    body {{ margin: 0; background: #fff; font-family: system-ui, -apple-system, sans-serif; }}
+    .layout {{ display: flex; min-height: 100vh; }}
+    .sidebar {{ width: var(--sidebar-width); flex-shrink: 0; padding: 1rem 0.75rem; background: #f8f9fa; position: sticky; top: 0; align-self: flex-start; height: 100vh; overflow-y: auto; border-right: 1px solid #e9ecef; }}
+    .sidebar-title {{ font-size: 0.7rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; padding: 0 0.5rem; }}
+    .nav-links {{ display: flex; flex-direction: column; gap: 0; }}
+    .nav-links a {{ font-size: 0.8rem; color: #495057; text-decoration: none; padding: 0.5rem 0.5rem; border-radius: 4px; transition: background 0.15s, color 0.15s; display: block; line-height: 1.4; border-bottom: 1px solid #f1f3f5; }}
+    .nav-links a:last-child {{ border-bottom: none; }}
+    .nav-links a:hover {{ background: #e9ecef; color: #212529; }}
+    .nav-group {{ font-size: 0.65rem; font-weight: 600; color: #adb5bd; text-transform: uppercase; letter-spacing: 0.04em; margin: 0.9rem 0 0.25rem 0.5rem; padding: 0; }}
+    .nav-group:first-child {{ margin-top: 0; }}
+    .main {{ flex: 1; min-width: 0; padding: 1.5rem 2rem; overflow-x: hidden; display: flex; flex-direction: column; align-items: center; }}
+    .main-inner {{ width: var(--content-width); max-width: 100%; display: flex; flex-direction: column; align-items: stretch; }}
+    .header {{ color: #6c757d; font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.6; }}
+    .header .log-dir {{ margin-bottom: 0.25rem; }}
+    .header .generated {{ color: #adb5bd; font-size: 0.85rem; }}
+    .section-bar {{ background: #e9ecef; color: #495057; font-size: 0.85rem; font-weight: 600; padding: 0.5rem 1rem; margin: 1.5rem 0 0 0; text-transform: uppercase; letter-spacing: 0.03em; }}
+    .section-bar:first-of-type {{ margin-top: 0; }}
+    .tool-block {{ margin: 0 0 2.5rem 0; display: flex; flex-direction: column; align-items: stretch; }}
+    .plot {{ width: 100%; margin: 0 auto 1.2rem; }}
+    h3 {{ font-size: 1rem; font-weight: normal; margin: 0 0 0.3rem; }}
+    .cmd {{ font-family: monospace; font-size: 0.8rem; color: #444; margin: 0 0 0.4rem; white-space: pre-wrap; word-break: break-all; }}
+    img {{ width: 100%; height: auto; display: block; }}
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-title">toc</div>
+      <nav class="nav-links">
+"""
+
+    for tool in group_order:
+        out_html += f'        <div class="nav-group">{html.escape(tool)}</div>\n'
+        for i, e in enumerate(groups[tool]):
+            plot_id = f"{html.escape(tool)}-{i}"
+            out_html += f'        <a href="#{plot_id}">{html.escape(e["title"])}</a>\n'
+
+    out_html += f"""      </nav>
+    </aside>
+    <main class="main">
+      <div class="main-inner">
+        <div class="header">
+          <div class="log-dir">log: {log_dir_display}</div>
+          <div class="generated">{generated_time}</div>
+        </div>
+"""
+
+    for tool in group_order:
+        out_html += f'    <div class="section-bar">{html.escape(tool)}</div>\n'
+        out_html += f'    <section class="tool-block" id="section-{html.escape(tool)}">\n'
+        for i, e in enumerate(groups[tool]):
+            out_html += f"""
+  <div class="plot" id="{html.escape(tool)}-{i}">
+    <h3>{html.escape(e['title'])}</h3>
+    <div class="cmd">{html.escape(e['cmd'])}</div>
+    <img src="{e['data_uri']}" alt="{html.escape(e['title'])}" loading="lazy">
+  </div>
+"""
+        out_html += "    </section>\n"
+
+    out_html += """
+      </div>
+    </main>
+  </div>
+</body>
+</html>
+"""
+
+    Path(out_path).write_text(out_html, encoding="utf-8")
+    return True
+
+
+def _txn_log_extra():
+    dpi = max(50, TXN_DPI)
+    extra = [
+        "--width",
+        str(TXN_WIDTH),
+        "--dpi",
+        str(dpi),
+        "--origin",
+        TXN_ORIGIN,
+        "--end",
+        TXN_END,
+        "--tasks-range",
+        TXN_TASKS_RANGE,
+        "--legend",
+        TXN_LEGEND,
+        "--time-ticks-n",
+        str(TXN_TIME_TICKS_N),
+        "--fontsize",
+        TXN_FONTSIZE,
+    ]
+    if not TXN_OMIT_HEIGHT:
+        extra.extend(["--height", str(TXN_HEIGHT)])
+    if TXN_TITLE is not None:
+        extra.extend(["--title", TXN_TITLE])
+    if TXN_EXPAND_WAITING:
+        extra.append("--expand-waiting")
+    if TXN_TEX:
+        extra.append("--tex")
+    if TXN_NOAPP:
+        extra.append("--noapp")
+    if TXN_DASK_COLORS:
+        extra.append("--dask-colors")
+    for t in TXN_TIME_TICK:
+        extra.extend(["--time-tick", str(t)])
+    return extra
+
+
+def _perf_cmd(out_dir, perf_log):
+    cmd = ["vine_plot_performance"]
+    if PERF_LOGSCALE:
+        cmd.append("-l")
+    if PERF_DISPATCH_START:
+        cmd.append("-D")
+    if PERF_RANGE is not None:
+        cmd.extend(["-r", PERF_RANGE])
+    if PERF_SAMPLE is not None:
+        cmd.extend(["-s", str(PERF_SAMPLE)])
+    if PERF_SIZE is not None:
+        cmd.extend(["-g", PERF_SIZE])
+    cmd.extend(["-o", str(out_dir / "perf"), "-T", PERF_FORMAT, "-u", PERF_TIME_UNIT, str(perf_log)])
+    return cmd
+
+
+def main():
+    parser = argparse.ArgumentParser(description="taskvine plot batch")
+    parser.add_argument(
+        "--log",
+        required=True,
+        metavar="PATH",
+        help="run dir; looks for transactions (also vine-logs/, logs/, log/)",
+    )
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="redo plots that already exist",
+    )
+    args = parser.parse_args()
+
+    base = Path(args.log).expanduser().resolve()
+    if not base.exists():
+        print(f"no such path: {base}")
+        sys.exit(1)
+
+    log = base
+    if not (base / "transactions").exists():
+        for sub in ("vine-logs", "logs", "log"):
+            candidate = base / sub
+            if (candidate / "transactions").exists():
+                log = candidate
+                break
+
+    if not (log / "transactions").exists():
+        print(f"no transactions under {base}")
+        sys.exit(1)
+
+    out_dir = base / "plot-files"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    txn_extra = _txn_log_extra()
+    perf_ext = PERF_FORMAT.lstrip(".")
+    perf_workers = out_dir / f"perf.workers.{perf_ext}"
+    perf_names = [
+        (f"perf.workers.{perf_ext}", "Workers Instantaneous"),
+        (f"perf.workers-accum.{perf_ext}", "Workers Cumulative"),
+        (f"perf.workers-disk.{perf_ext}", "Workers Disk"),
+        (f"perf.tasks.{perf_ext}", "Tasks Instantaneous"),
+        (f"perf.tasks-capacities.{perf_ext}", "Tasks Capacities"),
+        (f"perf.tasks-accum.{perf_ext}", "Tasks Cumulative"),
+        (f"perf.time-manager.{perf_ext}", "Manager Time"),
+        (f"perf.time-workers.{perf_ext}", "Workers Time"),
+        (f"perf.transfer.{perf_ext}", "Data Transfer"),
+        (f"perf.times-stacked.{perf_ext}", "Manager Time Proportions"),
+    ]
+
+    txn_specs = [
+        ("txn_workers.png", []),
+        ("txn_tasks.png", ["--mode", "tasks"]),
+        ("txn_manager.png", ["--mode", "manager"]),
+    ]
+    txn_jobs = []
+    for fn, mode_extra in txn_specs:
+        cmd = (
+            ["vine_plot_txn_log", str(log / "transactions"), str(out_dir / fn)]
+            + mode_extra
+            + txn_extra
+        )
+        txn_jobs.append({"name": f"vine_plot_txn_log {fn}", "cmd": cmd, "out": out_dir / fn})
+
+    taskgraph_job = None
+    if INCLUDE_TASKGRAPH:
+        taskgraph_job = {
+            "name": "vine_plot_taskgraph",
+            "cmd": ["vine_plot_taskgraph", str(log / "taskgraph"), "--output", str(out_dir / "taskgraph.svg")],
+            "out": out_dir / "taskgraph.svg",
+        }
+
+    perf_cmd = _perf_cmd(out_dir, log / "performance")
+    perf_job = {"name": "vine_plot_performance", "cmd": perf_cmd, "out": perf_workers}
+
+    compose_modes = [
+        ("worker-view", "compose_worker_view.png"),
+        ("worker-cache", "compose_worker_cache.png"),
+        ("task-view", "compose_task_view.png"),
+        ("file-accum", "compose_file_accum.png"),
+        ("file-hist", "compose_file_hist.png"),
+    ]
+    runtime_modes = [
+        ("task-runtime", "compose_task_runtime.png"),
+        ("task-completion", "compose_task_completion.png"),
+        ("task-state", "compose_task_state.png"),
+    ]
+    compose_modes.extend(runtime_modes)
+
+    compose_jobs = []
+    for mode, fn in compose_modes:
+        cmd = [
+            "vine_plot_compose", f"--{mode}", "--sublabels",
+            "--width", COMPOSE_WIDTH, "--height", COMPOSE_HEIGHT,
+            "--out", str(out_dir / fn), str(log / "transactions")
+        ]
+        compose_jobs.append({"name": f"vine_plot_compose --{mode}", "cmd": cmd, "out": out_dir / fn})
+
+    animate_src = None
+    animate_dst = out_dir / "transfer_animate.gif"
+    animate_cmd = []
+    animate_enabled = False
+
+    if not args.refresh:
+        print(f"[INFO] reuse {out_dir} if file exists; --refresh to redo", file=sys.stderr)
+
+    run_animate = animate_enabled and animate_src.exists() and (args.refresh or not animate_dst.exists())
+    total = (
+        len(txn_jobs)
+        + (1 if taskgraph_job else 0)
+        + len(perf_names)
+        + len(compose_jobs)
+        + (1 if run_animate else 0)
+    )
+    start = time.time()
+    done = 0
+    failures = []
+    elapsed = lambda: int(time.time() - start)
+
+    for job in txn_jobs:
+        if args.refresh or not job["out"].exists():
+            name, ok, err = run_job(job)
+            if not ok:
+                failures.append((name, err))
+            done += 1
+            progress(done, total, f"{name}" + ("" if ok else " (failed)"), elapsed())
+        else:
+            done += 1
+            progress(done, total, f"{job['name']} (reused)", elapsed())
+
+    if taskgraph_job:
+        job = taskgraph_job
+        if args.refresh or not job["out"].exists():
+            name, ok, err = run_job(job)
+            if not ok:
+                failures.append((name, err))
+            done += 1
+            progress(done, total, f"{name}" + ("" if ok else " (failed)"), elapsed())
+        else:
+            done += 1
+            progress(done, total, f"{job['name']} (reused)", elapsed())
+
+    perf_need_run = args.refresh or not perf_workers.exists()
+    if perf_need_run:
+        name, ok, err = run_job(perf_job)
+        if not ok:
+            failures.append((name, err))
+        for fn, _title in perf_names:
+            done += 1
+            suffix = "" if ok else " (failed)"
+            progress(done, total, f"vine_plot_performance -> {fn}{suffix}", elapsed())
+    else:
+        for fn, _title in perf_names:
+            done += 1
+            progress(done, total, f"vine_plot_performance -> {fn} (reused)", elapsed())
+
+    for job in compose_jobs:
+        if args.refresh or not job["out"].exists():
+            name, ok, err = run_job(job)
+            if not ok:
+                failures.append((name, err))
+            done += 1
+            progress(done, total, f"{name}" + ("" if ok else " (failed)"), elapsed())
+        else:
+            done += 1
+            progress(done, total, f"{job['name']} (reused)", elapsed())
+
+    if run_animate:
+        try:
+            subprocess.run(animate_cmd, check=True, capture_output=True, text=True, cwd=str(out_dir))
+            generated = out_dir / "anim.gif"
+            if generated.exists():
+                generated.replace(animate_dst)
+        except subprocess.CalledProcessError as e:
+            err = (e.stderr or e.stdout or "").strip()
+            failures.append(("vine_transfer_plot_animate", err))
+        done += 1
+        progress(done, total, "vine_transfer_plot_animate", elapsed())
+
+    if failures:
+        print("\n[WARN] failures:")
+        for name, err in failures:
+            brief = err.splitlines()[-1] if err else "?"
+            print(f"  {name}: {brief}")
+
+    entries = []
+
+    def add_entry(path, title, tool, cmd):
+        if Path(path).exists():
+            entries.append({"path": Path(path), "title": title, "tool": tool, "cmd": shlex.join(cmd)})
+
+    add_entry(
+        out_dir / "txn_workers.png",
+        "Transaction Log - Workers",
+        "txn",
+        ["vine_plot_txn_log", str(log / "transactions"), str(out_dir / "txn_workers.png")] + txn_extra,
+    )
+    add_entry(
+        out_dir / "txn_tasks.png",
+        "Transaction Log - Tasks",
+        "txn",
+        ["vine_plot_txn_log", str(log / "transactions"), str(out_dir / "txn_tasks.png"), "--mode", "tasks"]
+        + txn_extra,
+    )
+    add_entry(
+        out_dir / "txn_manager.png",
+        "Transaction Log - Manager",
+        "txn",
+        ["vine_plot_txn_log", str(log / "transactions"), str(out_dir / "txn_manager.png"), "--mode", "manager"]
+        + txn_extra,
+    )
+
+    if INCLUDE_TASKGRAPH:
+        add_entry(
+            out_dir / "taskgraph.svg",
+            "Task Graph",
+            "taskgraph",
+            ["vine_plot_taskgraph", str(log / "taskgraph"), "--output", str(out_dir / "taskgraph.svg")],
+        )
+
+    for fn, title in perf_names:
+        add_entry(out_dir / fn, f"Performance - {title}", "performance", perf_cmd)
+
+    for mode, fn in compose_modes:
+        cmd = [
+            "vine_plot_compose", f"--{mode}", "--sublabels",
+            "--width", COMPOSE_WIDTH, "--height", COMPOSE_HEIGHT,
+            "--out", str(out_dir / fn), str(log / "transactions")
+        ]
+        add_entry(out_dir / fn, f"Compose - {mode}", "compose", cmd)
+
+    if animate_enabled:
+        add_entry(animate_dst, "Transfer Animation", "animate", animate_cmd + ["&&", "mv", "anim.gif", str(animate_dst)])
+
+    html_path = out_dir / f"{base.name}.html"
+    print(f"out: {out_dir}/")
+    if build_html(entries, str(html_path), run_dir=str(base)):
+        print(f"html: {html_path}")
+
+
+if __name__ == "__main__":
+    main()
