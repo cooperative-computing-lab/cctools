@@ -34,7 +34,6 @@ void vine_blocklist_unblock(struct vine_manager *q, const char *host)
 
 struct jx *vine_blocklist_to_jx(struct vine_manager *q)
 {
-	int iteration;
 	if (hash_table_size(q->worker_blocklist) < 1) {
 		return NULL;
 	}
@@ -43,6 +42,7 @@ struct jx *vine_blocklist_to_jx(struct vine_manager *q)
 
 	char *hostname;
 	struct vine_blocklist_info *info;
+	int iteration;
 
 	HASH_TABLE_ITERATE(q->worker_blocklist, iteration, hostname, info)
 	{
@@ -57,9 +57,9 @@ struct jx *vine_blocklist_to_jx(struct vine_manager *q)
 /* deadline < 1 means release all, regardless of release_at time. */
 void vine_blocklist_unblock_all_by_time(struct vine_manager *q, time_t deadline)
 {
-	int iteration;
 	char *hostname;
 	struct vine_blocklist_info *info;
+	int iteration;
 
 	HASH_TABLE_ITERATE(q->worker_blocklist, iteration, hostname, info)
 	{
@@ -76,6 +76,7 @@ void vine_blocklist_unblock_all_by_time(struct vine_manager *q, time_t deadline)
 
 		debug(D_VINE, "Clearing hostname %s from blocklist.\n", hostname);
 		vine_blocklist_unblock(q, hostname);
+		iteration = hash_table_firstkey(q->worker_blocklist); // BUG: Inefficient
 	}
 }
 

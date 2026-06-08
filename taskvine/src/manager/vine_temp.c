@@ -122,7 +122,6 @@ heavily utilized workers.
 */
 static struct vine_worker_info *get_best_dest_worker(struct vine_manager *q, struct vine_file *f)
 {
-	int iteration;
 	if (!q || !f || f->type != VINE_TEMP) {
 		return NULL;
 	}
@@ -131,6 +130,7 @@ static struct vine_worker_info *get_best_dest_worker(struct vine_manager *q, str
 
 	char *key;
 	struct vine_worker_info *w;
+	int iteration;
 	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
 	{
 		/* skip if the worker cannot participate in peer transfers */
@@ -366,12 +366,12 @@ void vine_temp_clean_redundant_replicas(struct vine_manager *q, struct vine_file
 	struct vine_worker_info *source_worker = NULL;
 	SET_ITERATE(source_workers, source_worker)
 	{
-		int iteration;
 		/* if the file is actively in use by a task (the input to that task), we don't remove the replica on this worker */
 		int file_inuse = 0;
 
 		uint64_t task_id;
 		struct vine_task *task;
+		int iteration;
 		ITABLE_ITERATE(source_worker->current_tasks, iteration, task_id, task)
 		{
 			struct vine_mount *input_mount;
@@ -415,7 +415,6 @@ so that the original replica can be cleaned up later by @vine_temp_clean_redunda
 */
 void vine_temp_shift_disk_load(struct vine_manager *q, struct vine_worker_info *source_worker, struct vine_file *f)
 {
-	int iteration;
 	if (!q || !source_worker || !f || f->type != VINE_TEMP) {
 		return;
 	}
@@ -424,6 +423,7 @@ void vine_temp_shift_disk_load(struct vine_manager *q, struct vine_worker_info *
 
 	char *key;
 	struct vine_worker_info *w = NULL;
+	int iteration;
 	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
 	{
 		/* skip if the worker cannot participate in peer transfers */

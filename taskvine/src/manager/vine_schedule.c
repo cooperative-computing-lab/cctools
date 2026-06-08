@@ -164,9 +164,9 @@ static int check_worker_have_committable_resources(struct vine_manager *q, struc
 {
 	/* Check if there are free slots on any of the running libraries */
 	if (w->current_libraries && itable_size(w->current_libraries) > 0) {
-		int iteration;
 		uint64_t task_id;
 		struct vine_task *t;
+		int iteration;
 		ITABLE_ITERATE(w->current_libraries, iteration, task_id, t)
 		{
 			if (t->function_slots_inuse < t->function_slots_total) {
@@ -323,9 +323,9 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 
 struct vine_task *vine_schedule_find_library(struct vine_manager *q, struct vine_worker_info *w, const char *library_name)
 {
-	int iteration;
 	uint64_t task_id;
 	struct vine_task *library_task;
+	int iteration;
 	ITABLE_ITERATE(w->current_libraries, iteration, task_id, library_task)
 	{
 		if (!strcmp(library_task->provides_library, library_name) && (library_task->function_slots_inuse < library_task->function_slots_total)) {
@@ -340,12 +340,12 @@ struct vine_task *vine_schedule_find_library(struct vine_manager *q, struct vine
 
 static int count_worker_free_cores(struct vine_manager *q, struct vine_worker_info *w)
 {
-	int iteration;
 	int free_cores = 0;
 
 	/* library tasks may themselves consume many cores but can have free slots */
 	uint64_t task_id;
 	struct vine_task *t;
+	int iteration;
 	ITABLE_ITERATE(w->current_libraries, iteration, task_id, t)
 	{
 		free_cores += t->function_slots_total - t->function_slots_inuse;
@@ -361,7 +361,6 @@ static int count_worker_free_cores(struct vine_manager *q, struct vine_worker_in
 
 struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, struct vine_task *t)
 {
-	int iteration;
 	if (!q || !t) {
 		return NULL;
 	}
@@ -380,6 +379,7 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 
 	char *key;
 	struct vine_worker_info *w;
+	int iteration;
 	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
 	{
 		/* briefly skip uninitialized workers, more detailed checks are performed in @check_worker_against_task */
@@ -531,9 +531,9 @@ that indicates that there was at least one worker that could not fit that task r
 
 static vine_resource_bitmask_t is_task_larger_than_any_worker(struct vine_manager *q, struct vine_task *t)
 {
-	int iteration;
 	char *key;
 	struct vine_worker_info *w;
+	int iteration;
 
 	int bit_set = 0;
 	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
