@@ -138,6 +138,19 @@ table resize during the same iteration.
 
 int itable_nextkey(struct itable *h, int iteration, UINT64_T * key, void **value);
 
+/** Iterate over all entries in an integer table.
+This function invokes a callback on every key and value in the table.
+Unlike @ref ITABLE_ITERATE, this function does not use the table's
+iteration state, so it may be called while another iteration is in
+progress.  The table must not be modified during the call; if an
+insert, compact, clear, or resize occurs, the program will abort.
+@param h A pointer to an integer table.
+@param func A callback invoked once for each entry.
+@param arg An arbitrary pointer passed to each invocation of @a func.
+*/
+
+void itable_foreach_ro(struct itable *h, void (*func)(UINT64_T key, void *value, void *arg), void *arg);
+
 /** Utility macro to simplify common case of iterating over an itable.
 Use as follows:
 

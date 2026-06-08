@@ -7296,14 +7296,12 @@ struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const
 
 struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 	int iteration;
-	struct list *l = list_create();
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 	uint64_t taskid;
 	char *key;
 
 	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
-		list_push_tail(l, t);
 		work_queue_cancel_by_taskid(q, taskid);
 	}
 
@@ -7327,7 +7325,6 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 
 			list_push_tail(l, t);
 			q->stats->tasks_cancelled++;
-			iteration = itable_firstkey(w->current_tasks);
 		}
 	}
 	return l;
