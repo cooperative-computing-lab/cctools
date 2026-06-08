@@ -15,8 +15,7 @@ def format_scheduler_keys_runner_payload(scheduler_keys):
     Compatible with worker ``task_runner.task.run_scheduler_keys`` (parses string / list / int).
     Workflow keys ↔ scheduler keys mapping stays on the executor graph (``ExecutorGraph.add_node``).
 
-    Typical single-node payloads are still built by the C layer via ``node_construct_task_arguments``;
-    use this helper when assembling a multi-key call from Python.
+    Use this helper when assembling a multi-key call from Python.
     """
     keys_list = scheduler_keys if isinstance(scheduler_keys, (list, tuple)) else [scheduler_keys]
     if not keys_list:
@@ -37,7 +36,8 @@ class ExecutorGraph:
 
     def tune(self, name, value):
         """Forward a tuning parameter to the C executor."""
-        graph_capi.executor_tune(self._c_executor, name, value)
+        if graph_capi.executor_tune(self._c_executor, name, value) != 0:
+            raise RuntimeError(f"Failed to tune executor parameter {name!r}={value!r}")
 
     def add_node(self, workflow_key, is_target=None):
         """Create a C node and record its workflow key."""

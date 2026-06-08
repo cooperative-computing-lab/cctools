@@ -1,7 +1,7 @@
 include ../../../../config.mk
 
 MODULE_DIR  := $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/dagvine
-SUBDIRS     := executor
+SUBDIRS     := executor test
 PY_SOURCES  := __init__.py dagvine.py utils.py workflow.py
 PY_PACKAGES := dask_adaptor task_runner
 PY_PACKAGE_SOURCES := $(foreach pkg,$(PY_PACKAGES),$(wildcard $(pkg)/*.py))
@@ -32,6 +32,7 @@ clean:
 	@for pkg in $(PY_PACKAGES); do \
 		rm -rf $$pkg/__pycache__; \
 	done
+	$(MAKE) -C test clean
 
 lint:
 	@for dir in $(SUBDIRS); do \

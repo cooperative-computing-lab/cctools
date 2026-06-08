@@ -11,6 +11,7 @@
 #include "macros.h"
 #include "progress_bar.h"
 #include "random.h"
+#include "set.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 
@@ -129,6 +130,26 @@ static void executor_clear_node_runner_arg(struct executor *e, struct node *node
 	node->task_runner_arg_file = NULL;
 }
 
+static void executor_undeclare_extra_io_mounts(struct executor *e, struct list *mounts, struct set *seen_files)
+{
+	if (!e || !mounts || !seen_files) {
+		return;
+	}
+
+	struct extra_io_mount *m;
+	LIST_ITERATE(mounts, m)
+	{
+		if (!m || !m->file) {
+			continue;
+		}
+		if (!set_lookup(seen_files, m->file)) {
+			set_insert(seen_files, m->file);
+			vine_undeclare_file(e->manager, m->file);
+		}
+		m->file = NULL;
+	}
+}
+
 /* Initialize runtime fields and default tuning values for a new executor. */
 static void executor_init_runtime(struct executor *e)
 {
@@ -205,6 +226,7 @@ void executor_delete(struct executor *e)
 {
 	struct graph *g = e ? e->graph : NULL;
 	if (g && e->manager) {
+		struct set *extra_files = set_create(0);
 		uint64_t nid;
 		struct node *node;
 		ITABLE_ITERATE(g->nodes, nid, node)
@@ -232,7 +254,10 @@ void executor_delete(struct executor *e)
 				vine_undeclare_file(e->manager, node->outfile);
 				node->outfile = NULL;
 			}
+			executor_undeclare_extra_io_mounts(e, node->extra_inputs, extra_files);
+			executor_undeclare_extra_io_mounts(e, node->extra_outputs, extra_files);
 		}
+		set_delete(extra_files);
 	}
 	executor_clear_runtime(e);
 	free(e);
@@ -1326,6 +1351,7 @@ void executor_execute(struct executor *e)
 		return;
 	}
 
+	interrupted = 0;
 	void (*previous_sigint_handler)(int) = signal(SIGINT, handle_sigint);
 
 	debug(D_VINE, "start executing executor graph");

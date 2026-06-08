@@ -265,13 +265,11 @@ int graph_tune(struct graph *g, const char *name, const char *value)
 	}
 
 	if (strcmp(name, "output-dir") == 0) {
-		if (g->output_dir) {
-			free(g->output_dir);
-		}
 		if (mkdir(value, 0777) != 0 && errno != EEXIST) {
 			debug(D_ERROR, "failed to mkdir %s (errno=%d)", value, errno);
 			return -1;
 		}
+		free(g->output_dir);
 		g->output_dir = xxstrdup(value);
 
 	} else if (strcmp(name, "prune-depth") == 0) {
@@ -291,13 +289,11 @@ int graph_tune(struct graph *g, const char *name, const char *value)
 		g->checkpoint_fraction = fraction;
 
 	} else if (strcmp(name, "checkpoint-dir") == 0) {
-		if (g->checkpoint_dir) {
-			free(g->checkpoint_dir);
-		}
 		if (mkdir(value, 0777) != 0 && errno != EEXIST) {
 			debug(D_ERROR, "failed to mkdir %s (errno=%d)", value, errno);
 			return -1;
 		}
+		free(g->checkpoint_dir);
 		g->checkpoint_dir = xxstrdup(value);
 
 	} else if (strcmp(name, "print-graph-details") == 0) {
@@ -588,6 +584,7 @@ struct graph *graph_create(const char *runtime_dir)
 	g->task_runner_library_name = xxstrdup(task_runner_library_name_id.str);
 
 	g->task_runner_function_name = NULL;
+	g->checkpoint_fraction = 0.0;
 
 	/* Default prune-depth: release a TEMP node as soon as all of its
 	 * direct children have completed. Set to 0 via tune("prune-depth") to
@@ -617,13 +614,6 @@ void graph_add_dependency(struct graph *g, uint64_t parent_id, uint64_t child_id
 	struct node *child_node = itable_lookup(g->nodes, child_id);
 	if (!parent_node) {
 		debug(D_ERROR, "parent node %" PRIu64 " not found", parent_id);
-		uint64_t nid;
-		struct node *node;
-		printf("parent_ids:\n");
-		ITABLE_ITERATE(g->nodes, nid, node)
-		{
-			printf("  %" PRIu64 "\n", node->node_id);
-		}
 		exit(1);
 	}
 	if (!child_node) {
@@ -631,8 +621,7 @@ void graph_add_dependency(struct graph *g, uint64_t parent_id, uint64_t child_id
 		exit(1);
 	}
 
-	list_push_tail(child_node->parents, parent_node);
-	list_push_tail(parent_node->children, child_node);
+	node_ensure_dependency(parent_node, child_node);
 
 	return;
 }
