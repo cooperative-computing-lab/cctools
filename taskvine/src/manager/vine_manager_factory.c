@@ -86,7 +86,6 @@ cleanly by not cancelling active work.
 
 static int vine_manager_factory_trim_workers(struct vine_manager *q, struct vine_factory_info *f)
 {
-	int iteration;
 	if (!f)
 		return 0;
 	assert(f->name);
@@ -94,6 +93,7 @@ static int vine_manager_factory_trim_workers(struct vine_manager *q, struct vine
 	// Iterate through all workers and shut idle ones down
 	struct vine_worker_info *w;
 	char *key;
+	int iteration;
 	int trimmed_workers = 0;
 
 	struct hash_table *idle_workers = hash_table_create(0, 0);
@@ -110,7 +110,7 @@ static int vine_manager_factory_trim_workers(struct vine_manager *q, struct vine
 	HASH_TABLE_ITERATE(idle_workers, iteration, key, w)
 	{
 		hash_table_remove(idle_workers, key);
-		iteration = hash_table_firstkey(idle_workers);
+		iteration = hash_table_firstkey(idle_workers); // BUG: Inefficient
 		vine_manager_shut_down_worker(q, w);
 	}
 	hash_table_delete(idle_workers);
@@ -154,10 +154,10 @@ and update all of the factory info to correspond.
 
 void vine_manager_factory_update_all(struct vine_manager *q, time_t stoptime)
 {
-	int iteration;
 	struct catalog_query *cq;
 	struct jx *jexpr = NULL;
 	struct jx *j;
+	int iteration;
 
 	// Iterate through factory_table to create a query filter.
 	int first_name = 1;

@@ -82,9 +82,9 @@ void vine_worker_delete(struct vine_worker_info *w)
 
 static void current_tasks_to_jx(struct jx *j, struct vine_worker_info *w)
 {
-	int iteration;
 	struct vine_task *t;
 	uint64_t task_id;
+	int iteration;
 	int n = 0;
 
 	ITABLE_ITERATE(w->current_tasks, iteration, task_id, t)

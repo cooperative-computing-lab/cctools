@@ -73,11 +73,11 @@ static double round_to_nice_power_of_2(double value, int n)
 
 struct rmsummary **vine_manager_summarize_workers(struct vine_manager *q)
 {
-	int iteration;
 	struct vine_worker_info *w;
 	struct rmsummary *s;
 	char *id;
 	char *resources_key;
+	int iteration;
 
 	struct hash_table *workers_count = hash_table_create(0, 0);
 
