@@ -4313,6 +4313,20 @@ int vine_disable_peer_transfers(struct vine_manager *q)
 	return 1;
 }
 
+int vine_enable_return_recovery_tasks(struct vine_manager *q)
+{
+	debug(D_VINE, "Return recovery tasks enabled");
+	q->return_recovery_tasks = 1;
+	return 1;
+}
+
+int vine_disable_return_recovery_tasks(struct vine_manager *q)
+{
+	debug(D_VINE, "Return recovery tasks disabled");
+	q->return_recovery_tasks = 0;
+	return 1;
+}
+
 int vine_enable_proportional_resources(struct vine_manager *q)
 {
 	debug(D_VINE, "Proportional resources enabled");
@@ -5231,7 +5245,11 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			return t;
 			break;
 		case VINE_TASK_TYPE_RECOVERY:
-			/* do nothing and let vine_manager_consider_recovery_task do its job */
+			/* if configured to return recovery tasks, return them to the user */
+			if (q->return_recovery_tasks) {
+				return t;
+			}
+			/* otherwise, do nothing and let vine_manager_consider_recovery_task do its job */
 			break;
 		case VINE_TASK_TYPE_LIBRARY_INSTANCE:
 			/* silently delete the task, since it was created by the manager.
@@ -5993,10 +6011,12 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "max-library-retries")) {
 		q->max_library_retries = MIN(1, value);
+
 	} else if (!strcmp(name, "disk-proportion-available-to-task")) {
 		if (value < 1 && value > 0) {
 			q->disk_proportion_available_to_task = value;
 		}
+
 	} else if (!strcmp(name, "enforce-worker-eviction-interval")) {
 		q->enforce_worker_eviction_interval = (timestamp_t)(MAX(0, (int)value) * ONE_SECOND);
 
@@ -6005,6 +6025,12 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "shift-disk-load")) {
 		q->shift_disk_load = !!((int)value);
+
+	} else if (strcmp(name, "enable-debug-log") == 0) {
+		if ((int)value == 0) {
+			debug_flags_clear();
+			debug_close();
+		}
 
 	} else {
 		debug(D_NOTICE | D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);

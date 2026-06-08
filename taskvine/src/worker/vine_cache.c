@@ -941,13 +941,22 @@ If any have definitively failed, they are removed from the cache.
 
 int vine_cache_check_files(struct vine_cache *c, struct link *manager)
 {
-	struct vine_cache_file *f;
-	char *cachename;
-	HASH_TABLE_ITERATE(c->table, cachename, f)
-	{
-		vine_cache_check_file(c, f, cachename, manager);
+	if (hash_table_size(c->processing_transfers) < 1) {
+		return 1;
+	}
 
-		if (f->status == VINE_CACHE_STATUS_FAILED) {
+	char **cachenames = hash_table_keys_array(c->processing_transfers);
+	int i = 0;
+	char *cachename;
+	while ((cachename = cachenames[i])) {
+		i++;
+		struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
+		if (f) {
+			vine_cache_check_file(c, f, cachename, manager);
+		}
+
+		f = hash_table_lookup(c->table, cachename);
+		if (f && f->status == VINE_CACHE_STATUS_FAILED) {
 			/* if transfer failed, then we delete all of our records of the file. The manager
 			 * assumes that the file is not at the worker after the manager receives
 			 * the cache invalid message sent from vine_cache_check_outputs. */
@@ -956,5 +965,7 @@ int vine_cache_check_files(struct vine_cache *c, struct link *manager)
 
 		/* Note that f may no longer be valid at this point */
 	}
+
+	hash_table_free_keys_array(cachenames);
 	return 1;
 }
