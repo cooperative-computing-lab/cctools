@@ -800,8 +800,6 @@ static int handle_completed_tasks(struct link *manager)
 
 	ITABLE_ITERATE(procs_running, iteration, task_id, p)
 	{
-		int result_retrieved = 0;
-
 		/* Check to see if this process itself is completed. */
 
 		if (vine_process_is_complete(p)) {
@@ -812,7 +810,6 @@ static int handle_completed_tasks(struct link *manager)
 			}
 			/* simply reap this process */
 			reap_process(p, manager);
-			result_retrieved++;
 		}
 
 		/* If p is a library, check to see if any results waiting. */
@@ -822,14 +819,7 @@ static int handle_completed_tasks(struct link *manager)
 			if (fp) {
 				fp->exit_code = done_exit_code;
 				reap_process(fp, manager);
-				result_retrieved++;
 			}
-		}
-
-		/* If any items were removed, reset the iterator to get back to a known position */
-
-		if (result_retrieved) {
-			itable_firstkey(procs_running);
 		}
 	}
 
@@ -1415,6 +1405,7 @@ static struct vine_process *find_running_library_for_function(const char *librar
 			}
 		}
 	}
+
 	return 0;
 }
 
