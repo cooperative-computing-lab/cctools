@@ -78,6 +78,7 @@ void itable_clear(struct itable *h, void (*delete_func)(void *))
 		h->buckets[i] = 0;
 	}
 
+	h->size = 0;
 	h->need_compact = 0;
 	h->iteration_index = (h->iteration_index + 1) % ITERATION_MAX;
 }
