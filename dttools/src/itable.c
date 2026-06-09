@@ -257,6 +257,7 @@ int itable_insert(struct itable *h, UINT64_T key, const void *value)
 		if (key == e->key) {
 			e->value = (void *)value;
 			e->deleted = 0;
+			h->size++;
 			h->iteration_index = (h->iteration_index + 1) % ITERATION_MAX;
 			return 1;
 		}
