@@ -150,6 +150,7 @@ static int itable_reduce_buckets(struct itable *h)
 	return 1;
 }
 
+/* Compact the table by removing deleted entries. This does not change the size of the table, or the number of buckets. */
 void itable_compact(struct itable *h)
 {
 	struct entry *e, *f;
@@ -161,11 +162,22 @@ void itable_compact(struct itable *h)
 
 	for (i = 0; i < h->bucket_count; i++) {
 		e = h->buckets[i];
+
+		/* find the head of the bucket and remove deleted entries*/
+		while (e && e->deleted) {
+			f = e->next;
+			free(e);
+			e = f;
+		}
+		h->buckets[i] = e;
+
+		/* remove deleted entries from the rest of the bucket */
 		while (e) {
 			f = e->next;
-			if (e->deleted) {
-				free(e);
-				h->buckets[i] = f;
+			while (f && f->deleted) {
+				e->next = f->next;
+				free(f);
+				f = e->next;
 			}
 			e = f;
 		}
