@@ -779,6 +779,8 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 			reap_process(p_running, /* do not stage out */ NULL);
 		}
 	}
+
+	reap_process(p, manager);
 }
 
 /*
@@ -796,6 +798,8 @@ static int handle_completed_tasks(struct link *manager)
 	uint64_t done_task_id;
 	int done_exit_code;
 
+	struct list *failed_libraries = NULL;
+
 	ITABLE_ITERATE(procs_running, iteration, task_id, p)
 	{
 		/* Check to see if this process itself is completed. */
@@ -804,14 +808,18 @@ static int handle_completed_tasks(struct link *manager)
 			if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
 				/* Kill the library process if it completes. */
 				debug(D_VINE, "Library %s task id %d is detected to be failed. Killing it.", p->task->provides_library, p->task->task_id);
-				handle_failed_library_process(p, manager);
+
+				if (!failed_libraries) {
+					failed_libraries = list_create();
+				}
+				/* collect the library process here as we need to iterate procs_running */
+				list_push_tail(failed_libraries, p);
+			} else {
+				reap_process(p, manager);
 			}
-			/* simply reap this process */
-			reap_process(p, manager);
 		}
 
 		/* If p is a library, check to see if any results waiting. */
-
 		while (vine_process_library_get_result(p, &done_task_id, &done_exit_code)) {
 			fp = itable_lookup(procs_table, done_task_id);
 			if (fp) {
@@ -819,6 +827,10 @@ static int handle_completed_tasks(struct link *manager)
 				reap_process(fp, manager);
 			}
 		}
+	}
+
+	while ((p = list_pop_head(failed_libraries))) {
+		handle_failed_library_process(p, manager);
 	}
 
 	return 1;
