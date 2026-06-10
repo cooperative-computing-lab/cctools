@@ -118,9 +118,9 @@ send cache updates to manager from existing cache_directory
 
 void vine_cache_scan(struct vine_cache *c, struct link *manager)
 {
-	int iteration;
 	struct vine_cache_file *f;
 	char *cachename;
+	int iteration;
 	HASH_TABLE_ITERATE(c->table, iteration, cachename, f)
 	{
 		vine_worker_send_cache_update(manager, cachename, f);
@@ -175,12 +175,12 @@ Process pending transfers until we reach the maximum number of processing transf
 
 int vine_cache_start_transfers(struct vine_cache *c)
 {
-	int iteration;
 	int processed = 0;
 
 	struct list *to_process = list_create();
 	char *cachename;
 	void *dummy;
+	int iteration;
 	HASH_TABLE_ITERATE(c->pending_transfers, iteration, cachename, dummy)
 	{
 		list_push_tail(to_process, xxstrdup(cachename));
@@ -210,10 +210,10 @@ Delete the cache manager structure, though not the underlying files.
 */
 void vine_cache_delete(struct vine_cache *c)
 {
-	int iteration;
 	/* Ensure that all child processes are killed off. */
 	char *cachename;
 	struct vine_cache_file *file;
+	int iteration;
 	HASH_TABLE_ITERATE(c->table, iteration, cachename, file)
 	{
 		vine_cache_kill(c, file, cachename, 0);
@@ -944,9 +944,9 @@ If any have definitively failed, they are removed from the cache.
 
 int vine_cache_check_files(struct vine_cache *c, struct link *manager)
 {
-	int iteration;
 	struct vine_cache_file *f;
 	char *cachename;
+	int iteration;
 	HASH_TABLE_ITERATE(c->table, iteration, cachename, f)
 	{
 		vine_cache_check_file(c, f, cachename, manager);

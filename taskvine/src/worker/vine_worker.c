@@ -378,12 +378,12 @@ static int64_t measure_worker_disk()
 	files_counted = state->last_file_count_complete;
 
 	if (state->complete_measurement) {
-		int iteration;
 		/* if a complete measurement has been done, then update
 		 * for the found value, and add the known values of the processes. */
 
 		struct vine_process *p;
 		uint64_t task_id;
+		int iteration;
 
 		ITABLE_ITERATE(procs_table, iteration, task_id, p)
 		{
@@ -447,9 +447,9 @@ Send a message to the manager with user defined features.
 
 static void send_features(struct link *manager)
 {
-	int iteration;
 	char *f;
 	void *dummy;
+	int iteration;
 
 	HASH_TABLE_ITERATE(options->features, iteration, f, dummy)
 	{
@@ -712,9 +712,9 @@ and send a kill signal.  The actual exit of the process will be detected at a la
 
 static void expire_procs_running()
 {
-	int iteration;
 	struct vine_process *p;
 	uint64_t task_id;
+	int iteration;
 
 	double current_time = timestamp_get() / USECOND;
 
@@ -739,9 +739,9 @@ static void finish_running_task(struct vine_process *p, vine_result_t result)
 
 static void finish_running_tasks(vine_result_t result)
 {
-	int iteration;
 	struct vine_process *p;
 	uint64_t task_id;
+	int iteration;
 
 	ITABLE_ITERATE(procs_running, iteration, task_id, p)
 	{
@@ -791,10 +791,10 @@ for later processing.
 
 static int handle_completed_tasks(struct link *manager)
 {
-	int iteration;
 	struct vine_process *p;
 	struct vine_process *fp;
 	uint64_t task_id;
+	int iteration;
 	uint64_t done_task_id;
 	int done_exit_code;
 
@@ -1113,9 +1113,9 @@ then we need to abort to clean things up.
 
 static void kill_all_tasks()
 {
-	int iteration;
 	struct vine_process *p;
 	uint64_t task_id;
+	int iteration;
 
 	ITABLE_ITERATE(procs_table, iteration, task_id, p)
 	{
@@ -1193,9 +1193,9 @@ as other running tasks should not be affected by a task timeout.
 
 static void enforce_processes_max_running_time()
 {
-	int iteration;
 	struct vine_process *p;
 	uint64_t task_id;
+	int iteration;
 
 	timestamp_t now = timestamp_get();
 
@@ -1393,9 +1393,9 @@ Find a suitable library process that can provide a slot to run this library righ
 
 static struct vine_process *find_running_library_for_function(const char *library_name)
 {
-	int iteration;
 	uint64_t task_id;
 	struct vine_process *p;
+	int iteration;
 
 	ITABLE_ITERATE(procs_running, iteration, task_id, p)
 	{
@@ -1438,9 +1438,9 @@ Find a suitable library process that could serve this function in the future.
 
 static struct vine_process *find_future_library_for_function(const char *library_name)
 {
-	int iteration;
 	uint64_t task_id;
 	struct vine_process *p;
+	int iteration;
 
 	ITABLE_ITERATE(procs_table, iteration, task_id, p)
 	{

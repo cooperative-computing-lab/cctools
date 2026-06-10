@@ -1087,8 +1087,9 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 
 	vine_current_transfers_wipe_worker(q, w);
 
-	ITABLE_ITERATE(w->current_tasks, iteration, task_id, t) {
-		t = itable_lookup(w->current_tasks, task_id);         // BUG? this lookup looks unecessary and weird
+	ITABLE_ITERATE(w->current_tasks, iteration, task_id, t)
+	{
+		t = itable_lookup(w->current_tasks, task_id); // BUG? this lookup looks unecessary and weird
 		if (!t) {
 			continue; /* Task may have been removed already? */
 		}
@@ -1949,7 +1950,8 @@ static const struct rmsummary *largest_seen_resources(struct vine_manager *q, co
 		c = vine_category_lookup_or_create(q, category);
 		return c->max_allocation;
 	} else {
-		HASH_TABLE_ITERATE(q->categories, iteration, key, c) {
+		HASH_TABLE_ITERATE(q->categories, iteration, key, c)
+		{
 			rmsummary_merge_max(q->max_task_resources_requested, c->max_allocation);
 		}
 		return q->max_task_resources_requested;
@@ -5356,7 +5358,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			struct vine_worker_info *w;
 			char *key;
 			int iteration;
-			HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)  // should this be workers_with_watched_file_updates?
+			HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) // should this be workers_with_watched_file_updates?
 			{
 				get_watched_file_updates(q, w);
 				hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);

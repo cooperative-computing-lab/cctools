@@ -15,7 +15,7 @@ See the file COPYING for details.
 #define DEFAULT_MAX_LOAD 0.75
 #define DEFAULT_MIN_LOAD 0.125
 
-#define ITERATION_MAX 1000000   /* very conservative overflow protection */
+#define ITERATION_MAX 1000000 /* very conservative overflow protection */
 
 struct entry {
 	UINT64_T key;
@@ -298,7 +298,8 @@ int itable_insert(struct itable *h, UINT64_T key, const void *value)
 }
 
 /* keys are not really removed, just marked as deleted. A call to itable_compact will remove them. */
-void *itable_remove(struct itable *h, UINT64_T key) {
+void *itable_remove(struct itable *h, UINT64_T key)
+{
 	struct entry *e;
 	void *value;
 	UINT64_T index;
@@ -322,18 +323,18 @@ void *itable_remove(struct itable *h, UINT64_T key) {
 	return 0;
 }
 
-
 void *itable_pop(struct itable *t)
 {
 	UINT64_T key;
 	void *value;
+	int iteration;
 
-	itable_firstkey(t);
-	if (itable_nextkey(t, t->iteration_index, &key, (void **)&value)) {
+	ITABLE_ITERATE(t, iteration, key, value)
+	{
 		return itable_remove(t, key);
-	} else {
-		return 0;
 	}
+
+	return 0;
 }
 
 int itable_firstkey(struct itable *h)

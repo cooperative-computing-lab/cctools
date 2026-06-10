@@ -53,8 +53,8 @@ vine_cache_status_t vine_sandbox_ensure(struct vine_process *p, struct vine_cach
 		case VINE_CACHE_STATUS_READY:
 			break;
 		case VINE_CACHE_STATUS_UNKNOWN: {
-			int iteration;
 			struct vine_process *lp;
+			int iteration;
 			uint64_t task_id;
 			int found_file = 0;
 			ITABLE_ITERATE(procs_table, iteration, task_id, lp)
