@@ -71,8 +71,6 @@ See the file COPYING for details.
 #include <time.h>
 #include <unistd.h>
 
-#include <signal.h>
-
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
