@@ -66,7 +66,7 @@ void itable_clear(struct itable *h, void (*delete_func)(void *))
 	for (i = 0; i < h->bucket_count; i++) {
 		e = h->buckets[i];
 		while (e) {
-			if (delete_func)
+			if (delete_func && !e->deleted)
 				delete_func(e->value);
 			f = e->next;
 			free(e);
@@ -268,9 +268,12 @@ int itable_insert(struct itable *h, UINT64_T key, const void *value)
 
 	while (e) {
 		if (key == e->key) {
+			int was_deleted = e->deleted;
 			e->value = (void *)value;
 			e->deleted = 0;
-			h->size++;
+			if (was_deleted) {
+				h->size++;
+			}
 			h->iteration_index = (h->iteration_index + 1) % ITERATION_MAX;
 			return 1;
 		}
@@ -309,6 +312,9 @@ void *itable_remove(struct itable *h, UINT64_T key)
 
 	while (e) {
 		if (key == e->key) {
+			if (e->deleted) {
+				return 0;
+			}
 			e->deleted = 1;
 			h->need_compact = 1;
 			value = e->value;
