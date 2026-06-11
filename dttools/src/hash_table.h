@@ -131,6 +131,19 @@ iterating using manual hash_table_lookup with keys from hash_table_keys_array.
 
 int hash_table_nextkey(struct hash_table *h, int iteration, char **key, void **value);
 
+/** Iterate over all entries in a hash table.
+This function invokes a callback on every key and value in the table.
+Unlike @ref HASH_TABLE_ITERATE, this function does not use the table's
+iteration state, so it may be called while another iteration is in
+progress.  The table must not be modified during the call; if an
+insert, compact, clear, or resize occurs, the program will abort.
+@param h A pointer to a hash table.
+@param func A callback invoked once for each entry.
+@param arg An arbitrary pointer passed to each invocation of @a func.
+*/
+
+void hash_table_foreach_ro(struct hash_table *h, void (*func)(const char *key, void *value, void *arg), void *arg);
+
 /** Begin iteration over all keys from a random offset.
 This function begins a new iteration over a hash table,
 allowing you to visit every key and value in the table.

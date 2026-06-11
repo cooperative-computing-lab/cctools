@@ -5815,9 +5815,9 @@ int vine_cancel_all(struct vine_manager *q)
 
 static void release_all_workers(struct vine_manager *q)
 {
-	int iteration;
 	struct vine_worker_info *w;
 	char *key;
+	int iteration;
 
 	if (!q)
 		return;

@@ -516,6 +516,28 @@ int hash_table_nextkey_with_offset(struct hash_table *h, int iteration, int offs
 	return 0;
 }
 
+void hash_table_foreach_ro(struct hash_table *h, void (*func)(const char *key, void *value, void *arg), void *arg)
+{
+	struct entry *e;
+	int i;
+
+	int prev_iteration = h->iteration_index;
+
+	for (i = 0; i < h->bucket_count; i++) {
+		e = h->buckets[i];
+		while (e) {
+			if (!e->deleted) {
+				func(e->key, e->value, arg);
+			}
+			e = e->next;
+
+			if (h->iteration_index != prev_iteration) {
+				fatal("cctools bug: the hash table iteration has been modified since last call to hash_table_foreach_ro");
+			}
+		}
+	}
+}
+
 typedef unsigned long int ub4; /* unsigned 4-byte quantities */
 typedef unsigned char ub1;     /* unsigned 1-byte quantities */
 
