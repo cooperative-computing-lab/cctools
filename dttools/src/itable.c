@@ -399,8 +399,10 @@ void itable_foreach_ro(struct itable *h, void (*func)(UINT64_T key, void *value,
 
 	for (i = 0; i < h->bucket_count; i++) {
 		e = h->buckets[i];
-		while (e && !e->deleted) {
-			func(e->key, e->value, arg);
+		while (e) {
+			if (!e->deleted) {
+				func(e->key, e->value, arg);
+			}
 			e = e->next;
 
 			if (h->iteration_index != prev_iteration) {
