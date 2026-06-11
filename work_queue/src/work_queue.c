@@ -5822,6 +5822,7 @@ int work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, 
 int work_queue_task_specify_input_buf(struct work_queue_task *t, const char *buf, int length, const char *rname)
 {
 	return work_queue_task_specify_buffer(t, buf, length, rname, WORK_QUEUE_NOCACHE);
+
 }
 
 int work_queue_task_specify_input_file(struct work_queue_task *t, const char *fname, const char *rname)
@@ -6187,15 +6188,11 @@ int work_queue_specify_password_file( struct work_queue *q, const char *file )
 void work_queue_delete(struct work_queue *q)
 {
 	if(q) {
-		int iteration;
-		struct work_queue_worker *w;
+		release_all_workers(q);
+
 		char *key;
-
-		HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
-			release_worker(q, w);
-		}
-
 		struct work_queue_factory_info *f;
+		int iteration;
 		HASH_TABLE_ITERATE(q->factory_table, iteration, key, f) {
 			remove_factory_info(q, key);
 		}
@@ -7324,13 +7321,22 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 void release_all_workers(struct work_queue *q) {
 	struct work_queue_worker *w;
 	char *key;
-	int iteration;
 
 	if(!q) return;
 
-	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
-		release_worker(q, w);
+	char **keys = hash_table_keys_array(q->worker_table);
+	if(!keys) {
+		return;
 	}
+
+	for (int i = 0; (key = keys[i]); i++) {
+		w = hash_table_lookup(q->worker_table, key);
+		if(w) {
+			release_worker(q, w);
+		}
+	}
+
+	hash_table_free_keys_array(keys);
 }
 
 int work_queue_empty(struct work_queue *q)
