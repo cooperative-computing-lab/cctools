@@ -33,6 +33,12 @@ taskinfo = {}
 # Dictionary of files, key is fileid.
 fileinfo = {}
 
+# Dict of tasks, key is category name.
+categories = {}
+
+# List of tasks in the order of "RUNNING" evennts in the txn log.
+start_ordering = []
+
 # Determine if taskgraph is in old format by looking for "digraph g {"
 # which is the preamble for the graphviz dot format.
 
@@ -44,13 +50,35 @@ def taskgraph_is_old_format( filename ):
         else:
             return False
             
-# Parse the taskgraph file and load all nodes/edges into the taskinfo and fileinfo dictionaries.
 
+def parse_txn_file( filename ):
+    txn = filename
+    global taskinfo
+    global categories
+    global start_ordering
+
+    with open(txn) as transactions:
+        for line in transactions:
+            fields = shlex.split(line)
+            # if a task fails and retries on multiple workers we will end up with the one who succeeded.
+            if len(fields) >= 3 and fields[4] == "RUNNING":
+                workerid = fields[5]
+                taskid = fields[3]
+                taskinfo['T' + taskid]["worker"] = workerid
+                start_ordering.append('T' + taskid)
+            elif len(fields) >= 3 and fields[4] == "READY":
+                taskid = fields[3]
+                taskinfo['T' + taskid]["category"] = fields[5]
+                categories[fields[5]] = categories.get(fields[5], []) + ['T' + taskid]
+
+# Parse the taskgraph file and load all nodes/edges into the taskinfo and fileinfo dictionaries.
 def parse_taskgraph_file( args, filename ):
 
     global taskinfo
     global fileinfo
     global max_error_count
+    error_count = 0
+        
     
     linenum = 0
     with open(filename) as file:
@@ -86,6 +114,7 @@ def parse_taskgraph_file( args, filename ):
                 # record the complete task
                 taskinfo[taskid] = { "name" : name, "inputs" : inputs, "outputs" : outputs }
 
+
             elif line.startswith("FILE"):
                 # use shlex.split to respect quoted fields in the input
                 (x,fileid,name,size) = shlex.split(line)
@@ -93,10 +122,11 @@ def parse_taskgraph_file( args, filename ):
 
             else:
                 print("WARNING: invalid data at {}:{}: {}\n".format(filename,linenum,line))
-                error_count=error_count+1
-                if(error_count>max_error_count):
+                error_count = error_count + 1
+                if(error_count > max_error_count):
                     print("aborting after {} errors".format(max_error_count))
                     sys.exit(1)
+                
 
 
 # Write the contents of the taskgraph back out as a graphviz dot file.
@@ -111,14 +141,41 @@ def print_taskgraph_as_dot( args, filename ):
 
         print("digraph g {",file=fp)
 
-        # Emit all of the tasks with a constant green style
-        print("node [style=filled,font=Helvetica,fontsize={},shape=oval,color=green];".format(args.fontsize), file=fp)
-        for t in taskinfo:
-            if args.labels:
-                label = taskinfo[t]["name"]
-            else:
-                label = ""
-            print("\"{}\" [label=\"{}\"];".format(t,label),file=fp)
+
+        if args.heatmap_ordering:
+            num_tasks = len(start_ordering)
+            color_sep = int(255/num_tasks)
+            for i, taskid in enumerate(start_ordering):
+                color_val = 255 - i*color_sep
+                print("node [style=filled,font=Helvetica,fontsize={},shape=oval,color={}];".format(args.fontsize, f"\"#{color_val:02x}0000\""), file=fp)
+                if args.labels:
+                    label = taskinfo[taskid]["name"]
+                else:
+                    label = ""
+                print("\"{}\" [label=\"{}\"];".format(taskid,label),file=fp)
+
+        elif args.show_workers:
+            # Give each worker its own color
+             for taskid, t in taskinfo.items():
+                worker_hexval = t["worker"].split('-')[-1]
+                worker_hexval = bytes.fromhex(worker_hexval)
+                # take the last 3 bytes of the workerid and use that as a hex color value for the node
+                print("node [style=filled,font=Helvetica,fontsize={},shape=oval,color={}];".format(args.fontsize, f"\"#{worker_hexval.hex()[-6:]}\""), file=fp)
+                if args.labels:
+                    label = t["name"]
+                else:
+                    label = ""
+                print("\"{}\" [label=\"{}\"];".format(taskid,label),file=fp)
+        
+        else:
+            # Emit all of the tasks with a constant green style
+            print("node [style=filled,font=Helvetica,fontsize={},shape=oval,color=green];".format(args.fontsize), file=fp)
+            for t in taskinfo:
+                if args.labels:
+                    label = taskinfo[t]["name"]
+                else:
+                    label = ""
+                print("\"{}\" [label=\"{}\"];".format(t,label),file=fp)
 
         # Emit all of the files with a constant style
         print("node [style=filled,font=Helvetica,fontsize={},shape=rect,color=blue];".format(args.fontsize), file=fp)
@@ -130,11 +187,24 @@ def print_taskgraph_as_dot( args, filename ):
             print("\"{}\" [label=\"{}\"];".format(f,label),file=fp)
 
         # Finally emit all of the edges.
-        for t in taskinfo:
-            for f in taskinfo[t]["inputs"]:
-                print("\"{}\" -> \"{}\";".format(f,t),file=fp);
-            for f in taskinfo[t]["outputs"]:
-                print("\"{}\" -> \"{}\";".format(t,f),file=fp);
+
+        if args.cluster_categories:
+            # express edges per category in a cluster
+                for category, tasks in categories.items():
+                    print("subgraph cluster_{} {{".format(category), file=fp)
+                    for t in tasks:
+                        for f in taskinfo[t]["inputs"]:
+                            print("\"{}\" -> \"{}\";".format(f,t),file=fp);
+                        for f in taskinfo[t]["outputs"]:
+                            print("\"{}\" -> \"{}\";".format(t,f),file=fp);
+                    print("}", file=fp)
+
+        else:
+            for t in taskinfo:
+                for f in taskinfo[t]["inputs"]:
+                    print("\"{}\" -> \"{}\";".format(f,t),file=fp);
+                for f in taskinfo[t]["outputs"]:
+                    print("\"{}\" -> \"{}\";".format(t,f),file=fp);
 
         print("}\n",file=fp)
 
@@ -150,6 +220,10 @@ if __name__ == "__main__":
     parser.add_argument("--output", nargs="?", required=True, help="output PDF file to create")
     parser.add_argument("--labels", action="store_true", help="display task/file labels")
     parser.add_argument("--fontsize",nargs="?", default=10 ,help="fontsize of task/file labels, in points")
+    parser.add_argument("--add-txn", nargs="?", default=None, help="parse specified transactions log to enable additional options")
+    parser.add_argument("--show-workers", action="store_true", help="task nodes are assigned a unique color based on the worker they were sent to. requires --add-txn.")
+    parser.add_argument("--heatmap-ordering", action="store_true", help="task nodes are colored on a heatmap scale based on their observed scheduling order. requires --add-txn.")
+    parser.add_argument("--cluster-categories", action="store_true", help="tasks are grouped into clusters based on their category. requires --add-txn.")
 
     args = parser.parse_args()
 
@@ -161,6 +235,9 @@ if __name__ == "__main__":
     else:
         print("taskgraph is in version 2 format")
         parse_taskgraph_file( args, args.taskgraph )
+
+        if args.add_txn:
+            parse_txn_file(args.add_txn)
 
         dotfile = "{}.dot".format(args.taskgraph)
         
