@@ -160,15 +160,14 @@ struct dag_file *dag_file_from_name(struct dag *d, const char *filename)
  * node */
 struct list *dag_input_files(struct dag *d)
 {
-	int iteration;
 	struct dag_file *f;
 	char *filename;
 	struct list *il;
+	int iteration;
 
 	il = list_create();
 
-	iteration = hash_table_firstkey(d->files);
-	while((hash_table_nextkey(d->files, iteration, &filename, (void **) &f)))
+	HASH_TABLE_ITERATE(d->files, iteration, filename, f)
 		if(!f->created_by) {
 			debug(D_MAKEFLOW_RUN, "Found independent input file: %s", f->filename);
 			list_push_tail(il, f);
@@ -448,8 +447,7 @@ uint64_t dag_absolute_filesize( struct dag *d )
 	uint64_t size = 0;
 	struct dag_file *f;
 	char *filename;
-	iteration = hash_table_firstkey(d->files);
-	while((hash_table_nextkey(d->files, iteration, &filename, (void **) &f))){
+	HASH_TABLE_ITERATE(d->files, iteration, filename, f) {
 		if(f->created_by) {
 			size += dag_file_size(f);
 		}

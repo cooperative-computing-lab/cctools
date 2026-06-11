@@ -539,8 +539,10 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 	fprintf(cytograph, "\t<att name = \"layoutAlgorithm\" value = \"Grid Layout\" type = \"string\" cy:hidden = \"1\"/>\n");
 
 	if(change_size) {
-		iteration = hash_table_firstkey(d->files);
-		while(hash_table_nextkey(d->files, iteration, &name, (void **) &f) && dag_file_should_exist(f)) {
+		HASH_TABLE_ITERATE(d->files, iteration, name, f) {
+			if (!dag_file_should_exist(f)) {
+				break;
+			}
 			if(stat(name,&st)==0) {
 				average += ((double) st.st_size) / ((double) d->completed_files);
 			}
@@ -1008,14 +1010,13 @@ void ppm_color_parser(struct dag_node *n, char *color_array, int ppm_mode, char 
 
 void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 {
-	int iteration;
-
 	int count, count_row, max_ancestor = 0, max_size = 0;
 	UINT64_T key;
 	struct dag_node *n;
 
 	char *name;
 	char *label;
+	int iteration;
 
 	struct hash_table *h;
 

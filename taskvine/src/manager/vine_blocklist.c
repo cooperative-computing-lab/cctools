@@ -76,7 +76,6 @@ void vine_blocklist_unblock_all_by_time(struct vine_manager *q, time_t deadline)
 
 		debug(D_VINE, "Clearing hostname %s from blocklist.\n", hostname);
 		vine_blocklist_unblock(q, hostname);
-		iteration = hash_table_firstkey(q->worker_blocklist); // BUG: Inefficient
 	}
 }
 

@@ -110,7 +110,6 @@ static int vine_manager_factory_trim_workers(struct vine_manager *q, struct vine
 	HASH_TABLE_ITERATE(idle_workers, iteration, key, w)
 	{
 		hash_table_remove(idle_workers, key);
-		iteration = hash_table_firstkey(idle_workers); // BUG: Inefficient
 		vine_manager_shut_down_worker(q, w);
 	}
 	hash_table_delete(idle_workers);

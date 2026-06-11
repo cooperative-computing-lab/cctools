@@ -961,9 +961,9 @@ static int factory_trim_workers(struct work_queue *q, struct work_queue_factory_
 	int iteration;
 
 	struct hash_table *idle_workers = hash_table_create(0, 0);
-	iteration = hash_table_firstkey(q->worker_table);
-	while ( f->connected_workers - trimmed_workers > f->max_workers &&
-			hash_table_nextkey(q->worker_table, iteration, &key, (void **) &w) ) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
+		if (f->connected_workers - trimmed_workers <= f->max_workers)
+			break;
 		if ( w->factory_name &&
 				!strcmp(f->name, w->factory_name) &&
 				itable_size(w->current_tasks) < 1 ) {
@@ -974,7 +974,6 @@ static int factory_trim_workers(struct work_queue *q, struct work_queue_factory_
 
 	HASH_TABLE_ITERATE(idle_workers, iteration, key, w) {
 		hash_table_remove(idle_workers, key);
-		iteration = hash_table_firstkey(idle_workers);
 		shut_down_worker(q, w);
 	}
 	hash_table_delete(idle_workers);
@@ -1194,7 +1193,6 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 	HASH_TABLE_ITERATE(w->current_files, iteration, key, value) {
 		hash_table_remove(w->current_files, key);
 		free(value);
-		iteration = hash_table_firstkey(w->current_files);
 	}
 
 	ITABLE_ITERATE(w->current_tasks, iteration, taskid, t) {
@@ -1206,8 +1204,6 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 
 		clean_task_state(t, 0);
 		reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_READY);
-
-		iteration = itable_firstkey(w->current_tasks);
 	}
 
 	itable_clear(w->current_tasks,0);
@@ -4398,7 +4394,6 @@ static int is_task_larger_than_connected_workers(struct work_queue *q, struct wo
 	int iteration;
 	int bit_set = 0;
 
-	iteration = hash_table_firstkey(q->worker_table);
 	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		int new_set = is_task_larger_than_worker(q, t, w);
 		if (new_set == 0){
@@ -6198,13 +6193,11 @@ void work_queue_delete(struct work_queue *q)
 
 		HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 			release_worker(q, w);
-			iteration = hash_table_firstkey(q->worker_table);
 		}
 
 		struct work_queue_factory_info *f;
 		HASH_TABLE_ITERATE(q->factory_table, iteration, key, f) {
 			remove_factory_info(q, key);
-			iteration = hash_table_firstkey(q->factory_table);
 		}
 
 		log_queue_stats(q, 1);
@@ -6910,7 +6903,6 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 		HASH_TABLE_ITERATE(q->workers_with_available_results, iteration, key, w) {
 			get_available_results(q, w);
 			hash_table_remove(q->workers_with_available_results, key);
-			iteration = hash_table_firstkey(q->workers_with_available_results);
 		}
 	}
 
@@ -7217,13 +7209,11 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 		return -1;
 
 	// send worker the "exit" msg
-	iteration = hash_table_firstkey(q->worker_table);
-	while(i < n && hash_table_nextkey(q->worker_table, iteration, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
+		if(i >= n)
+			break;
 		if(itable_size(w->current_tasks) == 0) {
 			shut_down_worker(q, w);
-
-			/* shut_down_worker alters the table, so we reset it here. */
-			iteration = hash_table_firstkey(q->worker_table);
 			i++;
 		}
 	}
@@ -7309,7 +7299,6 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 
 	HASH_TABLE_ITERATE(q->workers_with_available_results, iteration, key, w) {
 		hash_table_remove(q->workers_with_available_results, key);
-		iteration = hash_table_firstkey(q->workers_with_available_results);
 	}
 
 	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
@@ -7341,7 +7330,6 @@ void release_all_workers(struct work_queue *q) {
 
 	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		release_worker(q, w);
-		iteration = hash_table_firstkey(q->worker_table);
 	}
 }
 

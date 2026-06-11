@@ -73,7 +73,7 @@ void makeflow_parse_input_outputs( struct dag *d )
 	struct dag_file *f;
 	char *filename;
 
-	int i, argc;
+	int i, argc, iteration;
 	char **argv;
 
 	char *input_list  = dag_variable_lookup_global_string("MAKEFLOW_INPUTS" , d);
@@ -97,13 +97,13 @@ void makeflow_parse_input_outputs( struct dag *d )
 		debug(D_MAKEFLOW_RUN, "MAKEFLOW_INPUTS is not specified");
 	}
 	/* add all source files */
-	int iteration = hash_table_firstkey(d->files);
-	while((hash_table_nextkey(d->files, iteration, &filename, (void **) &f)))
+	HASH_TABLE_ITERATE(d->files, iteration, filename, f) {
 		if(dag_file_is_source(f)) {
 			set_insert(d->inputs, f);
 			f->type = DAG_FILE_TYPE_INPUT;
 			debug(D_MAKEFLOW_RUN, "Added %s to input list", f->filename);
 		}
+	}
 
 	if(output_list) {
 		/* remove files from preserve_list */
@@ -118,16 +118,15 @@ void makeflow_parse_input_outputs( struct dag *d )
 		free(output_list);
 		free(argv);
 	} else {
-		int iteration;
 		debug(D_MAKEFLOW_RUN, "MAKEFLOW_OUTPUTS is not specified");
 		/* add all sink if OUTPUTS not specified */
-		iteration = hash_table_firstkey(d->files);
-		while((hash_table_nextkey(d->files, iteration, &filename, (void **) &f)))
+		HASH_TABLE_ITERATE(d->files, iteration, filename, f) {
 			if(dag_file_is_sink(f)) {
 				set_insert(d->outputs, f);
 				f->type = DAG_FILE_TYPE_OUTPUT;
 				debug(D_MAKEFLOW_RUN, "Added %s to output list", f->filename);
 			}
+		}
 	}
 }
 
@@ -286,8 +285,9 @@ static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfi
 	/* This will walk the table of files to collect and will remove any
 	 * that are below or equal to the threshold. */
 	start_time = timestamp_get();
-	iteration = hash_table_firstkey(d->files);
-	while(hash_table_nextkey(d->files, iteration, &name, (void **) &f) && collected < maxfiles) {
+	HASH_TABLE_ITERATE(d->files, iteration, name, f) {
+		if(collected >= maxfiles)
+			break;
 		if(f->state == DAG_FILE_STATE_COMPLETE
 			&& !dag_file_is_source(f)
 			&& !set_lookup(d->outputs, f)
