@@ -76,14 +76,14 @@ struct dag *dag_create()
 
 void dag_compile_ancestors(struct dag *d)
 {
+	int iteration;
 	struct dag_node *n, *m;
 	struct dag_file *f;
 	char *name;
 
 	if (!d) return;
 
-	hash_table_firstkey(d->files);
-	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
+	HASH_TABLE_ITERATE(d->files, iteration, name, f) {
 		m = f->created_by;
 
 		if(!m)
@@ -125,11 +125,11 @@ static int get_ancestor_depth(struct dag_node *n)
 
 void dag_find_ancestor_depth(struct dag *d)
 {
+	int iteration;
 	UINT64_T key;
 	struct dag_node *n;
 
-	itable_firstkey(d->node_table);
-	while(itable_nextkey(d->node_table, &key, (void **) &n)) {
+	ITABLE_ITERATE(d->node_table, iteration, key, n) {
 		get_ancestor_depth(n);
 	}
 }
@@ -163,11 +163,11 @@ struct list *dag_input_files(struct dag *d)
 	struct dag_file *f;
 	char *filename;
 	struct list *il;
+	int iteration;
 
 	il = list_create();
 
-	hash_table_firstkey(d->files);
-	while((hash_table_nextkey(d->files, &filename, (void **) &f)))
+	HASH_TABLE_ITERATE(d->files, iteration, filename, f)
 		if(!f->created_by) {
 			debug(D_MAKEFLOW_RUN, "Found independent input file: %s", f->filename);
 			list_push_tail(il, f);
@@ -443,11 +443,11 @@ int dag_mount_clean( struct dag *d ) {
 
 uint64_t dag_absolute_filesize( struct dag *d )
 {
+	int iteration;
 	uint64_t size = 0;
 	struct dag_file *f;
 	char *filename;
-	hash_table_firstkey(d->files);
-	while((hash_table_nextkey(d->files, &filename, (void **) &f))){
+	HASH_TABLE_ITERATE(d->files, iteration, filename, f) {
 		if(f->created_by) {
 			size += dag_file_size(f);
 		}

@@ -35,6 +35,7 @@ struct deltadb {
 
 static int checkpoint_write( struct deltadb *db, const char *filename )
 {
+	int iteration;
 	char *key;
 	struct jx *jobject;
 	int first = 1;
@@ -44,8 +45,7 @@ static int checkpoint_write( struct deltadb *db, const char *filename )
 
 	fprintf(file,"{\n");
 
-	hash_table_firstkey(db->table);
-	while((hash_table_nextkey(db->table,&key,(void**)&jobject))) {
+	HASH_TABLE_ITERATE(db->table, iteration, key, jobject) {
 		if(!first) {
 			fprintf(file,",\n");
 		} else {
@@ -563,14 +563,14 @@ struct jx * deltadb_remove( struct deltadb *db, const char *key )
 	return j;
 }
 
-void deltadb_firstkey( struct deltadb *db )
+int deltadb_firstkey( struct deltadb *db )
 {
-	hash_table_firstkey(db->table);
+	return hash_table_firstkey(db->table);
 }
 
-int  deltadb_nextkey( struct deltadb *db, char **key, struct jx **j )
+int  deltadb_nextkey( struct deltadb *db, int iteration, char **key, struct jx **j )
 {
-	return hash_table_nextkey(db->table,key,(void**)j);
+	return hash_table_nextkey(db->table,iteration,key,(void**)j);
 }
 
 /* vim: set noexpandtab tabstop=4: */
