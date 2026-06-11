@@ -22,6 +22,7 @@ struct entry {
 	void *value;
 	unsigned hash;
 	struct entry *next;
+	int deleted;
 };
 
 struct hash_table {
@@ -32,6 +33,7 @@ struct hash_table {
 	int ibucket;
 	struct entry *ientry;
 	int iteration_index;
+	int need_compact;
 };
 
 struct hash_table *hash_table_create(int bucket_count, hash_func_t func)
@@ -49,6 +51,7 @@ struct hash_table *hash_table_create(int bucket_count, hash_func_t func)
 
 	h->size = 0;
 	h->iteration_index = 0;
+	h->need_compact = 0;
 	h->hash_func = func;
 	h->bucket_count = bucket_count;
 	h->buckets = (struct entry **)calloc(bucket_count, sizeof(struct entry *));
@@ -68,9 +71,9 @@ void hash_table_clear(struct hash_table *h, void (*delete_func)(void *))
 	for (i = 0; i < h->bucket_count; i++) {
 		e = h->buckets[i];
 		while (e) {
-			f = e->next;
-			if (delete_func)
+			if (delete_func && !e->deleted)
 				delete_func(e->value);
+			f = e->next;
 			free(e->key);
 			free(e);
 			e = f;
@@ -81,6 +84,8 @@ void hash_table_clear(struct hash_table *h, void (*delete_func)(void *))
 		h->buckets[i] = 0;
 	}
 
+	h->size = 0;
+	h->need_compact = 0;
 	h->iteration_index++;
 }
 
@@ -102,8 +107,10 @@ char **hash_table_keys_array(struct hash_table *h)
 	for (i = 0; i < h->bucket_count; i++) {
 		e = h->buckets[i];
 		while (e) {
-			keys[ikey] = strdup(e->key);
-			ikey++;
+			if (!e->deleted) {
+				keys[ikey] = strdup(e->key);
+				ikey++;
+			}
 			f = e->next;
 			e = f;
 		}
@@ -136,7 +143,10 @@ void *hash_table_lookup(struct hash_table *h, const char *key)
 
 	while (e) {
 		if (hash == e->hash && !strcmp(key, e->key)) {
-			return e->value;
+			if (!e->deleted) {
+				return e->value;
+			}
+			return 0;
 		}
 		e = e->next;
 	}
@@ -189,8 +199,10 @@ static int hash_table_double_buckets(struct hash_table *h)
 		e = h->buckets[i];
 		while (e) {
 			f = e->next;
-			e->next = NULL;
-			insert_to_buckets_aux(new_buckets, new_count, e);
+			if (!e->deleted) {
+				e->next = NULL;
+				insert_to_buckets_aux(new_buckets, new_count, e);
+			}
 			e = f;
 		}
 	}
@@ -199,6 +211,7 @@ static int hash_table_double_buckets(struct hash_table *h)
 	free(h->buckets);
 	h->buckets = new_buckets;
 	h->bucket_count = new_count;
+	h->need_compact = 0;
 
 	h->iteration_index++;
 
@@ -229,8 +242,10 @@ static int hash_table_reduce_buckets(struct hash_table *h)
 		e = h->buckets[i];
 		while (e) {
 			f = e->next;
-			e->next = NULL;
-			insert_to_buckets_aux(new_buckets, new_count, e);
+			if (!e->deleted) {
+				e->next = NULL;
+				insert_to_buckets_aux(new_buckets, new_count, e);
+			}
 			e = f;
 		}
 	}
@@ -239,31 +254,89 @@ static int hash_table_reduce_buckets(struct hash_table *h)
 	free(h->buckets);
 	h->buckets = new_buckets;
 	h->bucket_count = new_count;
+	h->need_compact = 0;
 
 	h->iteration_index++;
 
 	return 1;
 }
 
+/* Compact the table by removing deleted entries. This does not change the size of the table, or the number of buckets. */
+void hash_table_compact(struct hash_table *h)
+{
+	struct entry *e, *f;
+	int i;
+
+	if (!h->need_compact) {
+		return;
+	}
+
+	for (i = 0; i < h->bucket_count; i++) {
+		e = h->buckets[i];
+
+		/* find the head of the bucket and remove deleted entries */
+		while (e && e->deleted) {
+			f = e->next;
+			free(e->key);
+			free(e);
+			e = f;
+		}
+		h->buckets[i] = e;
+
+		/* remove deleted entries from the rest of the bucket */
+		while (e) {
+			f = e->next;
+			while (f && f->deleted) {
+				e->next = f->next;
+				free(f->key);
+				free(f);
+				f = e->next;
+			}
+			e = f;
+		}
+	}
+
+	h->need_compact = 0;
+	if (((float)h->size / h->bucket_count) < DEFAULT_MIN_LOAD) {
+		hash_table_reduce_buckets(h);
+	}
+}
+
 int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 {
-	/* Return 0 if the key already exists. */
-	void *old_value = hash_table_lookup(h, key);
-	if (old_value) {
-		if (old_value != value) {
-			notice(D_DEBUG, "key %s already exists in hash table with different value, ignoring new value.", key);
-		}
-		return 0;
-	}
+	struct entry *e;
+	unsigned hash, index;
 
 	if (((float)h->size / h->bucket_count) > DEFAULT_MAX_LOAD)
 		hash_table_double_buckets(h);
 
-	struct entry *e = (struct entry *)xxmalloc(sizeof(struct entry));
+	hash = h->hash_func(key);
+	index = hash % h->bucket_count;
+	e = h->buckets[index];
+
+	while (e) {
+		if (hash == e->hash && !strcmp(key, e->key)) {
+			if (!e->deleted) {
+				if (e->value != value) {
+					notice(D_DEBUG, "key %s already exists in hash table with different value, ignoring new value.", key);
+				}
+				return 0;
+			}
+			e->value = (void *)value;
+			e->deleted = 0;
+			h->size++;
+			h->iteration_index++;
+			return 1;
+		}
+		e = e->next;
+	}
+
+	e = (struct entry *)xxmalloc(sizeof(struct entry));
 
 	e->key = xxstrdup(key);
 	e->value = (void *)value;
-	e->hash = h->hash_func(e->key);
+	e->hash = hash;
+	e->deleted = 0;
 
 	int inserted = insert_to_buckets_aux(h->buckets, h->bucket_count, e);
 	if (inserted) {
@@ -281,36 +354,30 @@ int hash_table_insert(struct hash_table *h, const char *key, const void *value)
 	return inserted;
 }
 
+/* keys are not really removed, just marked as deleted. A call to hash_table_compact will remove them. */
 void *hash_table_remove(struct hash_table *h, const char *key)
 {
-	struct entry *e, *f;
+	struct entry *e;
 	void *value;
 	unsigned hash, index;
 
 	hash = h->hash_func(key);
 	index = hash % h->bucket_count;
 	e = h->buckets[index];
-	f = 0;
 
 	while (e) {
 		if (hash == e->hash && !strcmp(key, e->key)) {
-			if (f) {
-				f->next = e->next;
-			} else {
-				h->buckets[index] = e->next;
+			if (e->deleted) {
+				return 0;
 			}
+			e->deleted = 1;
+			h->need_compact = 1;
 			value = e->value;
-			free(e->key);
-			free(e);
+
 			h->size--;
-
-			if (((float)h->size / h->bucket_count) < DEFAULT_MIN_LOAD) {
-				hash_table_reduce_buckets(h);
-			}
-
 			return value;
 		}
-		f = e;
+
 		e = e->next;
 	}
 
@@ -322,7 +389,7 @@ static void hash_table_reset_to_first(struct hash_table *h)
 	h->ientry = 0;
 	for (h->ibucket = 0; h->ibucket < h->bucket_count; h->ibucket++) {
 		h->ientry = h->buckets[h->ibucket];
-		if (h->ientry)
+		if (h->ientry && !h->ientry->deleted)
 			break;
 	}
 }
@@ -337,7 +404,7 @@ int hash_table_fromkey(struct hash_table *h, const char *key)
 		h->ientry = h->buckets[h->ibucket];
 
 		while (h->ientry) {
-			if (hash == h->ientry->hash && !strcmp(key, h->ientry->key)) {
+			if (hash == h->ientry->hash && !strcmp(key, h->ientry->key) && !h->ientry->deleted) {
 				return h->iteration_index;
 			}
 			h->ientry = h->ientry->next;
@@ -350,6 +417,7 @@ int hash_table_fromkey(struct hash_table *h, const char *key)
 
 int hash_table_firstkey(struct hash_table *h)
 {
+	hash_table_compact(h);
 	h->iteration_index++;
 	hash_table_reset_to_first(h);
 	return h->iteration_index;
@@ -366,11 +434,14 @@ int hash_table_nextkey(struct hash_table *h, int iteration, char **key, void **v
 		*value = h->ientry->value;
 
 		h->ientry = h->ientry->next;
+		while (h->ientry && h->ientry->deleted) {
+			h->ientry = h->ientry->next;
+		}
 		if (!h->ientry) {
 			h->ibucket++;
 			for (; h->ibucket < h->bucket_count; h->ibucket++) {
 				h->ientry = h->buckets[h->ibucket];
-				if (h->ientry)
+				if (h->ientry && !h->ientry->deleted)
 					break;
 			}
 		}
@@ -393,7 +464,7 @@ int hash_table_randomkey(struct hash_table *h, int *offset_bookkeep)
 
 	for (h->ibucket = ibucket_start; h->ibucket < h->bucket_count; h->ibucket++) {
 		h->ientry = h->buckets[h->ibucket];
-		if (h->ientry) {
+		if (h->ientry && !h->ientry->deleted) {
 			*offset_bookkeep = h->ibucket;
 			return h->iteration_index;
 		}
@@ -401,7 +472,7 @@ int hash_table_randomkey(struct hash_table *h, int *offset_bookkeep)
 
 	for (h->ibucket = 0; h->ibucket < ibucket_start; h->ibucket++) {
 		h->ientry = h->buckets[h->ibucket];
-		if (h->ientry) {
+		if (h->ientry && !h->ientry->deleted) {
 			*offset_bookkeep = h->ibucket;
 			return h->iteration_index;
 		}
@@ -427,11 +498,14 @@ int hash_table_nextkey_with_offset(struct hash_table *h, int iteration, int offs
 		*value = h->ientry->value;
 
 		h->ientry = h->ientry->next;
+		while (h->ientry && h->ientry->deleted) {
+			h->ientry = h->ientry->next;
+		}
 		if (!h->ientry) {
 			h->ibucket = (h->ibucket + 1) % h->bucket_count;
 			for (; h->ibucket != offset_bookkeep; h->ibucket = (h->ibucket + 1) % h->bucket_count) {
 				h->ientry = h->buckets[h->ibucket];
-				if (h->ientry) {
+				if (h->ientry && !h->ientry->deleted) {
 					break;
 				}
 			}
