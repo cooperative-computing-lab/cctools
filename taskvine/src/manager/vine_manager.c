@@ -5686,9 +5686,6 @@ int vine_workers_shutdown(struct vine_manager *q, int n)
 			break;
 		if (itable_size(w->current_tasks) == 0) {
 			vine_manager_shut_down_worker(q, w);
-
-			/* vine_manager_shut_down_worker alters the table, so we reset it here. */
-			iteration = hash_table_firstkey(q->worker_table); // BUG: Inefficient
 			i++;
 		}
 	}
@@ -5828,7 +5825,6 @@ static void release_all_workers(struct vine_manager *q)
 	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
 	{
 		release_worker(q, w);
-		iteration = hash_table_firstkey(q->worker_table);
 	}
 }
 

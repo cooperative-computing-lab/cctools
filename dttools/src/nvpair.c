@@ -112,8 +112,10 @@ int nvpair_print(struct nvpair *n, char *text, int length)
 	int actual;
 	int total = 0;
 
-	iteration = hash_table_firstkey(n->table);
-	while (hash_table_nextkey(n->table, iteration, &key, &value) && length > 0) {
+	HASH_TABLE_ITERATE(n->table, iteration, key, value)
+	{
+		if (length <= 0)
+			break;
 		actual = snprintf(text, length, "%s %s\n", key, (char *)value);
 		total += actual;
 		text += actual;
