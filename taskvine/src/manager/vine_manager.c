@@ -136,7 +136,9 @@ static vine_result_code_t get_stdout(struct vine_manager *q, struct vine_worker_
 static vine_result_code_t get_stdout_long(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 
 static void find_max_worker(struct vine_manager *q);
-static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w);
+
+// char *hashkey, struct vine_worker_info *w, struct rmsummary *max
+static void update_max_worker(const char *hashkey, void *w, void *max);
 
 static vine_task_state_t change_task_state(struct vine_manager *q, struct vine_task *t, vine_task_state_t new_state);
 static void push_task_to_ready_tasks(struct vine_manager *q, struct vine_task *t);
@@ -2981,7 +2983,7 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 	w->resources->disk.inuse = 0;
 	w->resources->gpus.inuse = 0;
 
-	update_max_worker(q, w);
+	update_max_worker(w->hashkey, (void *)w, (void *)q->current_max_worker);
 
 	if (w->resources->workers.total < 1) {
 		return;
@@ -2992,8 +2994,11 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 	w->resources->disk.inuse += BYTES_TO_MEGABYTES(w->inuse_cache);
 }
 
-static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w)
+static void update_max_worker(const char *hashkey, void *w_ptr, void *max_ptr)
 {
+	struct vine_worker_info *w = (struct vine_worker_info *)w_ptr;
+	struct rmsummary *max = (struct rmsummary *)max_ptr;
+
 	if (!w) {
 		return;
 	}
@@ -3002,20 +3007,20 @@ static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w
 		return;
 	}
 
-	if (q->current_max_worker->cores < w->resources->cores.total) {
-		q->current_max_worker->cores = w->resources->cores.total;
+	if (max->cores < w->resources->cores.total) {
+		max->cores = w->resources->cores.total;
 	}
 
-	if (q->current_max_worker->memory < w->resources->memory.total) {
-		q->current_max_worker->memory = w->resources->memory.total;
+	if (max->memory < w->resources->memory.total) {
+		max->memory = w->resources->memory.total;
 	}
 
-	if (q->current_max_worker->disk < (w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache))) {
-		q->current_max_worker->disk = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
+	if (max->disk < (w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache))) {
+		max->disk = w->resources->disk.total - BYTES_TO_MEGABYTES(w->inuse_cache);
 	}
 
-	if (q->current_max_worker->gpus < w->resources->gpus.total) {
-		q->current_max_worker->gpus = w->resources->gpus.total;
+	if (max->gpus < w->resources->gpus.total) {
+		max->gpus = w->resources->gpus.total;
 	}
 }
 
@@ -3028,16 +3033,7 @@ static void find_max_worker(struct vine_manager *q)
 	q->current_max_worker->disk = 0;
 	q->current_max_worker->gpus = 0;
 
-	char *key;
-	struct vine_worker_info *w;
-	int iteration;
-
-	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
-	{
-		if (w->resources->workers.total > 0) {
-			update_max_worker(q, w);
-		}
-	}
+	hash_table_foreach_ro(q->worker_table, update_max_worker, (void *)q->current_max_worker);
 }
 
 /* Tell worker to kill all empty libraries except the case where
