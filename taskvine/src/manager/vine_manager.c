@@ -1163,7 +1163,6 @@ void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info 
 
 	vine_worker_delete(w);
 
-	/* update the largest worker seen */
 	find_max_worker(q);
 
 	debug(D_VINE, "%d workers connected in total now", count_workers(q, VINE_WORKER_TYPE_WORKER));
@@ -5813,15 +5812,23 @@ static void release_all_workers(struct vine_manager *q)
 {
 	struct vine_worker_info *w;
 	char *key;
-	int iteration;
 
 	if (!q)
 		return;
 
-	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
-	{
-		release_worker(q, w);
+	char **keys = hash_table_keys_array(q->worker_table);
+	if (!keys) {
+		return;
 	}
+
+	for (int i = 0; (key = keys[i]); i++) {
+		w = hash_table_lookup(q->worker_table, key);
+		if (w) {
+			release_worker(q, w);
+		}
+	}
+
+	hash_table_free_keys_array(keys);
 }
 
 /*
