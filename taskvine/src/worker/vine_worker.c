@@ -833,6 +833,11 @@ static int handle_completed_tasks(struct link *manager)
 		handle_failed_library_process(p, manager);
 	}
 
+
+	if (failed_libraries) {
+		list_delete(failed_libraries);
+	}
+
 	return 1;
 }
 
