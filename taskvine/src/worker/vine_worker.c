@@ -57,6 +57,7 @@ See the file COPYING for details.
 #include "unlink_recursive.h"
 #include "url_encode.h"
 #include "xxmalloc.h"
+#include "gpu.h"
 
 #include <assert.h>
 #include <dirent.h>
@@ -2303,6 +2304,9 @@ int main(int argc, char *argv[])
 	signal(SIGUSR2, handle_abort);
 	signal(SIGCHLD, handle_sigchld);
 
+	// initialize the GPU library
+	struct gpu_library *gpu_lib = gpu_lib_init();
+
 	/* Create the workspace directory and move there. */
 	workspace = vine_workspace_create(options->workspace_dir);
 	if (!workspace) {
@@ -2334,7 +2338,12 @@ int main(int argc, char *argv[])
 			total_resources->gpus.total);
 
 	/* If a GPU is installed, then display and describe as a feature. */
-	char *gpu_name = gpu_name_get();
+	char *gpu_name;
+	if (gpu_lib == NULL) {
+		gpu_name = gpu_name_get();
+	} else {
+		gpu_name = gpu_name_get_new(gpu_lib);
+	}
 	if (gpu_name) {
 		printf("vine_worker: gpu is called feature \"%s\"\n", gpu_name);
 		hash_table_insert(options->features, gpu_name, "feature");
@@ -2344,8 +2353,12 @@ int main(int argc, char *argv[])
 	/* MAIN LOOP: get to work */
 	vine_worker_serve_managers();
 
-	/* Clean up data structures to satisfy valgrind at process exit. */
+	// shutdown the GPU lib
+	if (gpu_lib != NULL) {
+		gpu_lib_close(gpu_lib);
+	}
 
+	/* Clean up data structures to satisfy valgrind at process exit. */
 	vine_workspace_delete(workspace);
 	workspace = 0;
 	vine_worker_delete_structures();
