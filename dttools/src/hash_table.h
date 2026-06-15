@@ -106,6 +106,13 @@ void *hash_table_lookup(struct hash_table *h, const char *key);
 
 void *hash_table_remove(struct hash_table *h, const char *key);
 
+/** Remove any one value.
+@param h A pointer to a hash table.
+@return One object removed from the table.
+*/
+
+void *hash_table_pop( struct hash_table *h );
+
 /** Begin iteration over all keys.
 This function begins a new iteration over a hash table,
 allowing you to visit every key and value in the table.

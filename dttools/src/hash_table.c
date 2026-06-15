@@ -415,6 +415,25 @@ int hash_table_fromkey(struct hash_table *h, const char *key)
 	return h->iteration_index;
 }
 
+void *hash_table_pop(struct hash_table *t)
+{
+	char *key;
+	void *value;
+
+	if (hash_table_nextkey(t, t->iteration_index, &key, (void **)&value)) {
+		t->iteration_index++;
+		return hash_table_remove(t, key);
+	}
+
+	hash_table_firstkey(t);
+
+	if (hash_table_nextkey(t, t->iteration_index, &key, (void **)&value)) {
+		return hash_table_remove(t, key);
+	}
+
+	return NULL;
+}
+
 int hash_table_firstkey(struct hash_table *h)
 {
 	hash_table_compact(h);
