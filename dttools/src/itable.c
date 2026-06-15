@@ -333,14 +333,19 @@ void *itable_pop(struct itable *t)
 {
 	UINT64_T key;
 	void *value;
-	int iteration;
 
-	ITABLE_ITERATE(t, iteration, key, value)
-	{
+	if (itable_nextkey(t, t->iteration_index, &key, (void **)&value)) {
+		t->iteration_index++;
 		return itable_remove(t, key);
 	}
 
-	return 0;
+	itable_firstkey(t);
+
+	if (itable_nextkey(t, t->iteration_index, &key, (void **)&value)) {
+		return itable_remove(t, key);
+	}
+
+	return NULL;
 }
 
 int itable_firstkey(struct itable *h)
