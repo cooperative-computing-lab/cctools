@@ -7320,23 +7320,10 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 
 void release_all_workers(struct work_queue *q) {
 	struct work_queue_worker *w;
-	char *key;
 
-	if(!q) return;
-
-	char **keys = hash_table_keys_array(q->worker_table);
-	if(!keys) {
-		return;
+	while ((w = hash_table_pop(q->worker_table))) {
+	    release_worker(q, w);
 	}
-
-	for (int i = 0; (key = keys[i]); i++) {
-		w = hash_table_lookup(q->worker_table, key);
-		if(w) {
-			release_worker(q, w);
-		}
-	}
-
-	hash_table_free_keys_array(keys);
 }
 
 int work_queue_empty(struct work_queue *q)
