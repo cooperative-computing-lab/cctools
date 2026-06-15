@@ -444,6 +444,10 @@ int hash_table_firstkey(struct hash_table *h)
 
 int hash_table_nextkey(struct hash_table *h, int iteration, char **key, void **value)
 {
+	if (!h) {
+		return 0;
+	}
+
 	if (iteration != h->iteration_index) {
 		fatal("cctools bug: the hash table iteration has not been reset since last modification");
 	}

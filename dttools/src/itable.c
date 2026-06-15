@@ -334,6 +334,10 @@ void *itable_pop(struct itable *t)
 	UINT64_T key;
 	void *value;
 
+	if (!t) {
+		return NULL;
+	}
+
 	if (itable_nextkey(t, t->iteration_index, &key, (void **)&value)) {
 		t->iteration_index++;
 		return itable_remove(t, key);
@@ -367,6 +371,10 @@ int itable_firstkey(struct itable *h)
 
 int itable_nextkey(struct itable *h, int iteration, UINT64_T *key, void **value)
 {
+	if (!h) {
+		return 0;
+	}
+
 	if (iteration != h->iteration_index) {
 		fatal("cctools bug: the itable iteration has not been reset since last modification");
 	}
