@@ -4,6 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "debug.h"
 #include "set.h"
 
 #include <stdlib.h>
@@ -13,6 +14,8 @@ See the file COPYING for details.
 #define DEFAULT_SIZE 127
 #define DEFAULT_LOAD 0.75
 #define DEFAULT_MIN_LOAD 0.125
+
+#define ITERATION_MAX 1000000 /* very conservative overflow protection */
 
 struct entry {
 	uintptr_t element;
@@ -26,6 +29,7 @@ struct set {
 	struct entry **buckets;
 	int ibucket;
 	struct entry *ientry;
+	int iteration_index;
 	int need_compact;
 };
 
@@ -50,6 +54,7 @@ struct set *set_create(int bucket_count)
 	s->size = 0;
 	s->need_compact = 0;
 	s->ientry = 0;
+	s->iteration_index = 0;
 	return s;
 }
 
@@ -62,9 +67,9 @@ struct set *set_duplicate(struct set *s)
 	}
 
 	s2 = set_create(0);
-	set_first_element(s);
+	int iteration = set_first_element(s);
 	const void *element;
-	while ((element = set_next_element(s)))
+	while ((element = set_next_element(s, iteration)))
 		set_insert(s2, element);
 
 	return s2;
@@ -75,9 +80,9 @@ struct set *set_union(struct set *s1, struct set *s2)
 
 	struct set *s = set_duplicate(s1);
 
-	set_first_element(s2);
+	int iteration = set_first_element(s2);
 	const void *element;
-	while ((element = set_next_element(s2)))
+	while ((element = set_next_element(s2, iteration)))
 		set_insert(s, element);
 
 	return s;
@@ -141,6 +146,8 @@ static int set_reduce_buckets(struct set *s)
 	s->bucket_count = new_count;
 	s->need_compact = 0;
 
+	s->iteration_index = (s->iteration_index + 1) % ITERATION_MAX;
+
 	return 1;
 }
 
@@ -200,6 +207,7 @@ void set_clear(struct set *s)
 
 	s->size = 0;
 	s->need_compact = 0;
+	s->iteration_index = (s->iteration_index + 1) % ITERATION_MAX;
 }
 
 void set_delete(struct set *s)
@@ -263,6 +271,8 @@ static int set_double_buckets(struct set *s)
 	s->bucket_count = new_count;
 	s->need_compact = 0;
 
+	s->iteration_index = (s->iteration_index + 1) % ITERATION_MAX;
+
 	return 1;
 }
 
@@ -284,6 +294,7 @@ int set_insert(struct set *s, const void *element)
 			if (e->deleted) {
 				e->deleted = 0;
 				s->size++;
+				s->iteration_index = (s->iteration_index + 1) % ITERATION_MAX;
 			}
 			return 1;
 		}
@@ -299,16 +310,17 @@ int set_insert(struct set *s, const void *element)
 	e->next = s->buckets[index];
 	s->buckets[index] = e;
 	s->size++;
+	s->iteration_index = (s->iteration_index + 1) % ITERATION_MAX;
 
 	return 1;
 }
 
 int set_insert_set(struct set *s, struct set *s2)
 {
-	set_first_element(s2);
+	int iteration = set_first_element(s2);
 	int additions = 0;
 	const void *element;
-	while ((element = set_next_element(s2))) {
+	while ((element = set_next_element(s2, iteration))) {
 		additions += set_insert(s, element);
 	}
 
@@ -360,33 +372,57 @@ int set_remove(struct set *s, const void *element)
 
 void *set_pop(struct set *s)
 {
-	if (set_size(s) < 1)
-		return 0;
-
 	void *element;
-	set_first_element(s);
-	element = set_next_element(s);
 
-	if (!set_remove(s, element))
-		return 0;
-	else
-		return element;
+	if (!s) {
+		return NULL;
+	}
+
+	element = set_next_element(s, s->iteration_index);
+	if (element) {
+		s->iteration_index++;
+		if (set_remove(s, element))
+			return element;
+		return NULL;
+	}
+
+	set_first_element(s);
+
+	element = set_next_element(s, s->iteration_index);
+	if (element) {
+		if (set_remove(s, element))
+			return element;
+	}
+
+	return NULL;
 }
 
-void set_first_element(struct set *s)
+int set_first_element(struct set *s)
 {
 	set_compact(s);
+	s->iteration_index = (s->iteration_index + 1) % ITERATION_MAX;
+
 	s->ientry = 0;
 	for (s->ibucket = 0; s->ibucket < s->bucket_count; s->ibucket++) {
 		s->ientry = s->buckets[s->ibucket];
 		if (s->ientry)
 			break;
 	}
+
+	return s->iteration_index;
 }
 
-void *set_next_element(struct set *s)
+void *set_next_element(struct set *s, int iteration)
 {
 	void *element;
+
+	if (!s) {
+		return 0;
+	}
+
+	if (iteration != s->iteration_index) {
+		fatal("cctools bug: the set iteration has not been reset since last modification");
+	}
 
 	if (s->ientry) {
 		element = (void *)s->ientry->element;
@@ -410,11 +446,35 @@ void *set_next_element(struct set *s)
 	}
 }
 
-void set_random_element(struct set *s, int *offset_bookkeep)
+void set_foreach_ro(struct set *s, void (*func)(void *element, void *arg), void *arg)
 {
+	struct entry *e;
+	int i;
+
+	int prev_iteration = s->iteration_index;
+
+	for (i = 0; i < s->bucket_count; i++) {
+		e = s->buckets[i];
+		while (e) {
+			if (!e->deleted) {
+				func((void *)e->element, arg);
+			}
+			e = e->next;
+
+			if (s->iteration_index != prev_iteration) {
+				fatal("cctools bug: the set iteration has been modified since last call to set_foreach_ro");
+			}
+		}
+	}
+}
+
+int set_random_element(struct set *s, int *offset_bookkeep)
+{
+	s->iteration_index = (s->iteration_index + 1) % ITERATION_MAX;
+
 	s->ientry = 0;
 	if (s->bucket_count < 1) {
-		return;
+		return s->iteration_index;
 	}
 
 	int ibucket_start = random() % s->bucket_count;
@@ -426,7 +486,7 @@ void set_random_element(struct set *s, int *offset_bookkeep)
 		}
 		if (s->ientry) {
 			*offset_bookkeep = s->ibucket;
-			return;
+			return s->iteration_index;
 		}
 	}
 
@@ -437,13 +497,23 @@ void set_random_element(struct set *s, int *offset_bookkeep)
 		}
 		if (s->ientry) {
 			*offset_bookkeep = s->ibucket;
-			return;
+			return s->iteration_index;
 		}
 	}
+
+	return s->iteration_index;
 }
 
-void *set_next_element_with_offset(struct set *s, int offset_bookkeep)
+void *set_next_element_with_offset(struct set *s, int offset_bookkeep, int iteration)
 {
+	if (!s) {
+		return 0;
+	}
+
+	if (iteration != s->iteration_index) {
+		fatal("cctools bug: the set iteration has not been reset since last modification");
+	}
+
 	if (s->bucket_count < 1) {
 		return 0;
 	}
@@ -487,9 +557,10 @@ void **set_values(struct set *s)
 	void **elements = malloc(sizeof(void *) * s->size);
 
 	int offset_bookkeep;
+	int iteration;
 	void *element;
 	int i = 0;
-	SET_ITERATE_RANDOM_START(s, offset_bookkeep, element)
+	SET_ITERATE_RANDOM_START(s, offset_bookkeep, iteration, element)
 	{
 		elements[i] = element;
 		i++;
@@ -505,9 +576,10 @@ void **set_values_array(struct set *s)
 	}
 
 	void **elements = malloc(sizeof(void *) * (s->size + 1));
+	int iteration;
 	void *element;
 	int i = 0;
-	SET_ITERATE(s, element)
+	SET_ITERATE(s, iteration, element)
 	{
 		elements[i] = element;
 		i++;
