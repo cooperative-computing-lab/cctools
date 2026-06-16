@@ -798,7 +798,7 @@ static int handle_completed_tasks(struct link *manager)
 	uint64_t done_task_id;
 	int done_exit_code;
 
-	struct list *failed_libraries = NULL;
+	struct list *failed_libraries = list_create();
 
 	ITABLE_ITERATE(procs_running, iteration, task_id, p)
 	{
@@ -809,9 +809,6 @@ static int handle_completed_tasks(struct link *manager)
 				/* Kill the library process if it completes. */
 				debug(D_VINE, "Library %s task id %d is detected to be failed. Killing it.", p->task->provides_library, p->task->task_id);
 
-				if (!failed_libraries) {
-					failed_libraries = list_create();
-				}
 				/* collect the library process here as we need to iterate procs_running */
 				list_push_tail(failed_libraries, p);
 			} else {
@@ -833,9 +830,7 @@ static int handle_completed_tasks(struct link *manager)
 		handle_failed_library_process(p, manager);
 	}
 
-	if (failed_libraries) {
-		list_delete(failed_libraries);
-	}
+	list_delete(failed_libraries);
 
 	return 1;
 }
