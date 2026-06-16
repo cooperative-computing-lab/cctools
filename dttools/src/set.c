@@ -67,10 +67,11 @@ struct set *set_duplicate(struct set *s)
 	}
 
 	s2 = set_create(0);
-	int iteration = set_first_element(s);
 	const void *element;
-	while ((element = set_next_element(s, iteration)))
+	int iteration;
+	SET_ITERATE(s, iteration, element) {
 		set_insert(s2, element);
+	}
 
 	return s2;
 }
@@ -80,10 +81,11 @@ struct set *set_union(struct set *s1, struct set *s2)
 
 	struct set *s = set_duplicate(s1);
 
-	int iteration = set_first_element(s2);
-	const void *element;
-	while ((element = set_next_element(s2, iteration)))
+	void *element;
+	int iteration;
+	SET_ITERATE(s2, iteration, element) {
 		set_insert(s, element);
+	}
 
 	return s;
 }
@@ -317,10 +319,11 @@ int set_insert(struct set *s, const void *element)
 
 int set_insert_set(struct set *s, struct set *s2)
 {
-	int iteration = set_first_element(s2);
+	int iteration;
 	int additions = 0;
 	const void *element;
-	while ((element = set_next_element(s2, iteration))) {
+
+	SET_ITERATE(s2, iteration, element) {
 		additions += set_insert(s, element);
 	}
 

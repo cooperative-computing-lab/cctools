@@ -109,8 +109,8 @@ static int get_ancestor_depth(struct dag_node *n)
 		return n->ancestor_depth;
 	}
 
-	set_first_element(n->ancestors);
-	while((ancestor = set_next_element(n->ancestors))) {
+	int iteration = set_first_element(n->ancestors);
+	while((ancestor = set_next_element(n->ancestors, iteration))) {
 
 		group_number = get_ancestor_depth(ancestor);
 		debug(D_MAKEFLOW_RUN, "group: %d, n->ancestor_depth: %d", group_number, n->ancestor_depth);

@@ -320,12 +320,13 @@ void dag_to_dax_nodes(const struct dag *d, FILE *output)
 void dag_to_dax_parents(const struct dag_node *n, FILE *output)
 {
 	struct dag_node *p;
+	int iteration;
 
 	if(set_size(n->ancestors) > 0){
 		fprintf(output, "\t<child ref=\"ID%07d\">\n", n->nodeid);
-		set_first_element(n->ancestors);
-		while((p = set_next_element(n->ancestors)))
+		SET_ITERATE(n->ancestors, iteration, p) {
 			fprintf(output, "\t\t<parent ref=\"ID%07d\" />\n", p->nodeid);
+		}
 		fprintf(output, "\t</child>\n");
 	}
 }
