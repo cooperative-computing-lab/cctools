@@ -265,8 +265,6 @@ class VinePlot:
 
         if self.range:
             plt.xlim(*self.range)
-            plt.ylim((0,210))
-            plt.yticks(range(0,210,50))
 
         for i in range(len(self.fields)):
             (x, y) = self.get_data_for_field(self.fields[i])
