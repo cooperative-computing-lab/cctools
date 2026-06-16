@@ -553,11 +553,9 @@ struct jx * deltadb_remove( struct deltadb *db, const char *key )
 		return 0;
 	}
 
-	const char *nkey = strdup(key);
-
 	struct jx *j = hash_table_remove(db->table,key);
 	if(db->logdir && j) {
-		log_delete(db,nkey);
+		log_delete(db,key);
 		log_flush(db);
 	}
 	return j;

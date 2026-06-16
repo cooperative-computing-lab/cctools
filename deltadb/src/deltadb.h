@@ -125,4 +125,7 @@ This function returns the next primary key and object in the iteration.
 
 int deltadb_nextkey( struct deltadb *db, int iteration, char **key, struct jx **j );
 
+
+#define DELTA_DB_ITERATE(db, iteration, key, j) iteration = deltadb_firstkey(db); while(deltadb_nextkey(db, iteration, &key, &j))
+
 #endif
