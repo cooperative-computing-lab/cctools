@@ -12,10 +12,12 @@ See the file COPYING for details.
 
 #define DEFAULT_SIZE 127
 #define DEFAULT_LOAD 0.75
+#define DEFAULT_MIN_LOAD 0.125
 
 struct entry {
 	uintptr_t element;
 	struct entry *next;
+	int deleted;
 };
 
 struct set {
@@ -24,6 +26,7 @@ struct set {
 	struct entry **buckets;
 	int ibucket;
 	struct entry *ientry;
+	int need_compact;
 };
 
 struct set *set_create(int bucket_count)
@@ -45,13 +48,18 @@ struct set *set_create(int bucket_count)
 	}
 
 	s->size = 0;
-
+	s->need_compact = 0;
+	s->ientry = 0;
 	return s;
 }
 
 struct set *set_duplicate(struct set *s)
 {
 	struct set *s2;
+
+	if (!s) {
+		return NULL;
+	}
 
 	s2 = set_create(0);
 	set_first_element(s);
@@ -75,6 +83,103 @@ struct set *set_union(struct set *s1, struct set *s2)
 	return s;
 }
 
+static int set_insert_to_buckets_aux(struct entry **buckets, int bucket_count, struct entry *new_entry)
+{
+	uint64_t index;
+	struct entry *e;
+
+	index = new_entry->element % bucket_count;
+	e = buckets[index];
+
+	while (e) {
+		if (new_entry->element == e->element) {
+			e->deleted = 0;
+			free(new_entry);
+			return 1;
+		}
+		e = e->next;
+	}
+
+	new_entry->next = buckets[index];
+	buckets[index] = new_entry;
+
+	return 1;
+}
+
+static int set_reduce_buckets(struct set *s)
+{
+	int new_count = ((s->bucket_count + 1) / 2) - 1;
+
+	if (new_count < DEFAULT_SIZE) {
+		return 0;
+	}
+
+	if (((float)s->size / new_count) > DEFAULT_LOAD) {
+		return 1;
+	}
+
+	struct entry **new_buckets = (struct entry **)calloc(new_count, sizeof(struct entry *));
+	if (!new_buckets) {
+		return 0;
+	}
+
+	struct entry *e, *f;
+	for (int i = 0; i < s->bucket_count; i++) {
+		e = s->buckets[i];
+		while (e) {
+			f = e->next;
+			if (!e->deleted) {
+				e->next = NULL;
+				set_insert_to_buckets_aux(new_buckets, new_count, e);
+			}
+			e = f;
+		}
+	}
+
+	free(s->buckets);
+	s->buckets = new_buckets;
+	s->bucket_count = new_count;
+	s->need_compact = 0;
+
+	return 1;
+}
+
+void set_compact(struct set *s)
+{
+	struct entry *e, *f;
+	int i;
+
+	if (!s->need_compact) {
+		return;
+	}
+
+	for (i = 0; i < s->bucket_count; i++) {
+		e = s->buckets[i];
+
+		while (e && e->deleted) {
+			f = e->next;
+			free(e);
+			e = f;
+		}
+		s->buckets[i] = e;
+
+		while (e) {
+			f = e->next;
+			while (f && f->deleted) {
+				e->next = f->next;
+				free(f);
+				f = e->next;
+			}
+			e = f;
+		}
+	}
+
+	s->need_compact = 0;
+	if (((float)s->size / s->bucket_count) < DEFAULT_MIN_LOAD) {
+		set_reduce_buckets(s);
+	}
+}
+
 void set_clear(struct set *s)
 {
 	struct entry *e, *f;
@@ -92,6 +197,9 @@ void set_clear(struct set *s)
 	for (i = 0; i < s->bucket_count; i++) {
 		s->buckets[i] = 0;
 	}
+
+	s->size = 0;
+	s->need_compact = 0;
 }
 
 void set_delete(struct set *s)
@@ -118,7 +226,10 @@ int set_lookup(struct set *s, void *element)
 
 	while (e) {
 		if (key == e->element) {
-			return 1;
+			if (!e->deleted) {
+				return 1;
+			}
+			return 0;
 		}
 		e = e->next;
 	}
@@ -128,40 +239,29 @@ int set_lookup(struct set *s, void *element)
 
 static int set_double_buckets(struct set *s)
 {
-	struct set *sn = set_create(2 * s->bucket_count);
-
-	if (!sn)
+	int new_count = 2 * s->bucket_count;
+	struct entry **new_buckets = (struct entry **)calloc(new_count, sizeof(struct entry *));
+	if (!new_buckets) {
 		return 0;
+	}
 
-	/* Move elements to new set */
-	void *element;
-	set_first_element(s);
-	while ((element = set_next_element(s)))
-		if (!set_insert(sn, element)) {
-			set_delete(sn);
-			return 0;
-		}
-
-	/* Delete all elements */
 	struct entry *e, *f;
-	int i;
-	for (i = 0; i < s->bucket_count; i++) {
+	for (int i = 0; i < s->bucket_count; i++) {
 		e = s->buckets[i];
 		while (e) {
 			f = e->next;
-			free(e);
+			if (!e->deleted) {
+				e->next = NULL;
+				set_insert_to_buckets_aux(new_buckets, new_count, e);
+			}
 			e = f;
 		}
 	}
 
-	/* Make the old point to the new */
 	free(s->buckets);
-	s->buckets = sn->buckets;
-	s->bucket_count = sn->bucket_count;
-	s->size = sn->size;
-
-	/* Delete reference to new, so old is safe */
-	free(sn);
+	s->buckets = new_buckets;
+	s->bucket_count = new_count;
+	s->need_compact = 0;
 
 	return 1;
 }
@@ -181,6 +281,10 @@ int set_insert(struct set *s, const void *element)
 
 	while (e) {
 		if (key == e->element) {
+			if (e->deleted) {
+				e->deleted = 0;
+				s->size++;
+			}
 			return 1;
 		}
 		e = e->next;
@@ -191,6 +295,7 @@ int set_insert(struct set *s, const void *element)
 		return 0;
 
 	e->element = key;
+	e->deleted = 0;
 	e->next = s->buckets[index];
 	s->buckets[index] = e;
 	s->size++;
@@ -229,27 +334,24 @@ int set_push(struct set *s, const void *element)
 
 int set_remove(struct set *s, const void *element)
 {
-	struct entry *e, *f;
+	struct entry *e;
 	uint64_t index;
 
 	uintptr_t key = (uintptr_t)element;
 
 	index = key % s->bucket_count;
 	e = s->buckets[index];
-	f = 0;
 
 	while (e) {
 		if (key == e->element) {
-			if (f) {
-				f->next = e->next;
-			} else {
-				s->buckets[index] = e->next;
+			if (e->deleted) {
+				return 0;
 			}
-			free(e);
+			e->deleted = 1;
+			s->need_compact = 1;
 			s->size--;
 			return 1;
 		}
-		f = e;
 		e = e->next;
 	}
 
@@ -273,6 +375,7 @@ void *set_pop(struct set *s)
 
 void set_first_element(struct set *s)
 {
+	set_compact(s);
 	s->ientry = 0;
 	for (s->ibucket = 0; s->ibucket < s->bucket_count; s->ibucket++) {
 		s->ientry = s->buckets[s->ibucket];
@@ -289,11 +392,14 @@ void *set_next_element(struct set *s)
 		element = (void *)s->ientry->element;
 
 		s->ientry = s->ientry->next;
+		while (s->ientry && s->ientry->deleted) {
+			s->ientry = s->ientry->next;
+		}
 		if (!s->ientry) {
 			s->ibucket++;
 			for (; s->ibucket < s->bucket_count; s->ibucket++) {
 				s->ientry = s->buckets[s->ibucket];
-				if (s->ientry)
+				if (s->ientry && !s->ientry->deleted)
 					break;
 			}
 		}
@@ -315,6 +421,9 @@ void set_random_element(struct set *s, int *offset_bookkeep)
 
 	for (s->ibucket = ibucket_start; s->ibucket < s->bucket_count; s->ibucket++) {
 		s->ientry = s->buckets[s->ibucket];
+		while (s->ientry && s->ientry->deleted) {
+			s->ientry = s->ientry->next;
+		}
 		if (s->ientry) {
 			*offset_bookkeep = s->ibucket;
 			return;
@@ -323,6 +432,9 @@ void set_random_element(struct set *s, int *offset_bookkeep)
 
 	for (s->ibucket = 0; s->ibucket < ibucket_start; s->ibucket++) {
 		s->ientry = s->buckets[s->ibucket];
+		while (s->ientry && s->ientry->deleted) {
+			s->ientry = s->ientry->next;
+		}
 		if (s->ientry) {
 			*offset_bookkeep = s->ibucket;
 			return;
@@ -344,10 +456,16 @@ void *set_next_element_with_offset(struct set *s, int offset_bookkeep)
 		element = (void *)s->ientry->element;
 
 		s->ientry = s->ientry->next;
+		while (s->ientry && s->ientry->deleted) {
+			s->ientry = s->ientry->next;
+		}
 		if (!s->ientry) {
 			s->ibucket = (s->ibucket + 1) % s->bucket_count;
 			for (; s->ibucket != offset_bookkeep; s->ibucket = (s->ibucket + 1) % s->bucket_count) {
 				s->ientry = s->buckets[s->ibucket];
+				while (s->ientry && s->ientry->deleted) {
+					s->ientry = s->ientry->next;
+				}
 				if (s->ientry) {
 					break;
 				}
