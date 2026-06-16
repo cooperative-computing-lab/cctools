@@ -53,6 +53,7 @@ struct itable *itable_create(int bucket_count)
 	}
 
 	h->size = 0;
+	h->ientry = 0;
 	h->iteration_index = 0;
 	h->need_compact = 0;
 	return h;

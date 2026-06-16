@@ -50,6 +50,7 @@ struct hash_table *hash_table_create(int bucket_count, hash_func_t func)
 		func = DEFAULT_FUNC;
 
 	h->size = 0;
+	h->ientry = 0;
 	h->iteration_index = 0;
 	h->need_compact = 0;
 	h->hash_func = func;
