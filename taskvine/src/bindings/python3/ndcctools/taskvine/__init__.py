@@ -77,6 +77,11 @@ except (ImportError, ModuleNotFoundError):
     from .compat import DaskVine
     from .compat import DaskVineDag
 
+try:
+    from .dagvine import VineGraph
+except (ImportError, ModuleNotFoundError):
+    pass
+
 
 __all__ = [
     "Manager",
@@ -94,6 +99,9 @@ __all__ = [
     "DaskVine",
     "DaskVineDag",
 ]
+
+if "VineGraph" in globals():
+    __all__.append("VineGraph")
 
 __version__ = cvine.vine_version_string()
 

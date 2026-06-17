@@ -1,13 +1,13 @@
 include ../../config.mk
 include ../../rules.mk
 
-TARGETS=manager worker tools bindings examples graph
+TARGETS=manager worker tools bindings examples dagvine
 
 all: $(TARGETS)
 
 worker: manager
-graph: manager
-bindings: manager graph
+dagvine: manager
+bindings: manager dagvine
 tools: manager
 examples: manager worker tools bindings
 
