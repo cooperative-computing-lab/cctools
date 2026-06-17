@@ -12,6 +12,6 @@ See the file COPYING for details.
 
 char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize );
 char *vine_meta_name( const struct vine_file *f, ssize_t *totalsize );
-char *vine_random_name( const struct vine_file *f, ssize_t *totalsize );
+char *vine_random_name( const struct vine_file *f );
 
 #endif

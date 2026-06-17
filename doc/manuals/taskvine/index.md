@@ -1246,6 +1246,17 @@ warranted:
     }
     ```
 
+### Task Result Caching
+
+For workflows where the same task is submitted multiple times with identical arguments (such as during iterative development or notebook re-execution), TaskVine can cache task outputs and return them without dispatching to a worker. Enable caching by calling `enable_tasks_cache` on the manager:
+
+```python
+m = vine.Manager(port=9123)
+m.enable_tasks_cache(cache_dir="vine-cache-outputs", log_file="vine-cache.txlog")
+```
+
+When a task completes, its output is stored in `cache_dir` and indexed by a fingerprint of the function and its arguments. On subsequent submissions of an identical task, the result is returned directly from cache. The cache persists across manager restarts via the transaction log, so results from a previous run are available immediately in a new session. Tasks that do not match any cached result are executed normally on a worker.
+
 ### Automatic Garbage Collection on Disk
 
 For workflows that generate partial results that are not needed once a final

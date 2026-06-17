@@ -126,7 +126,6 @@ static batch_queue_id_t batch_queue_condor_submit(struct batch_queue *q, struct 
 	fprintf(file, "should_transfer_files = yes\n");
 	fprintf(file, "when_to_transfer_output = on_exit\n");
 	fprintf(file, "notification = never\n");
-	fprintf(file, "copy_to_spool = true\n");
 	fprintf(file, "transfer_executable = true\n");
 	fprintf(file, "keep_claim_idle = 30\n");
 	fprintf(file, "log = %s\n", q->logfile);

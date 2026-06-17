@@ -690,7 +690,7 @@ static vine_result_code_t get_completion_result(struct vine_manager *q, struct v
 			if (t->exit_code == RM_OVERFLOW) {
 				task_status = VINE_RESULT_RESOURCE_EXHAUSTION;
 			} else if (t->exit_code == RM_TIME_EXPIRE) {
-				task_status = VINE_RESULT_MAX_END_TIME;
+				task_status = VINE_RESULT_MAX_WALL_TIME;
 			}
 		}
 
@@ -2109,6 +2109,7 @@ static struct jx *category_to_jx(struct vine_manager *q, const char *category)
 	jx_insert_integer(j, "tasks_dispatched", s.tasks_dispatched);
 	jx_insert_integer(j, "tasks_done", s.tasks_done);
 	jx_insert_integer(j, "tasks_failed", s.tasks_failed);
+	jx_insert_integer(j, "tasks_successful", s.tasks_successful);
 	jx_insert_integer(j, "tasks_cancelled", s.tasks_cancelled);
 	jx_insert_integer(j, "workers_able", s.workers_able);
 
@@ -2245,6 +2246,7 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "tasks_dispatched", info.tasks_dispatched);
 	jx_insert_integer(j, "tasks_done", info.tasks_done);
 	jx_insert_integer(j, "tasks_failed", info.tasks_failed);
+	jx_insert_integer(j, "tasks_successful", info.tasks_successful);
 	jx_insert_integer(j, "tasks_cancelled", info.tasks_cancelled);
 	jx_insert_integer(j, "tasks_exhausted_attempts", info.tasks_exhausted_attempts);
 
@@ -5220,12 +5222,8 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 
 		// Save task type and result as task may be freed in change_task_state
 		vine_task_type_t task_type = t->type;
-		vine_result_t task_result = t->result;
 
 		change_task_state(q, t, VINE_TASK_DONE);
-		if (task_result != VINE_RESULT_SUCCESS) {
-			q->stats->tasks_failed++;
-		}
 
 		switch (task_type) {
 		case VINE_TASK_TYPE_STANDARD:
@@ -6260,17 +6258,20 @@ void vine_accumulate_task(struct vine_manager *q, struct vine_task *t)
 	s->bandwidth = (1.0 * MEGABYTE * (s->bytes_sent + s->bytes_received)) / (s->time_send + s->time_receive + 1);
 
 	q->stats->tasks_done++;
+	s->tasks_done++;
 
 	if (t->result == VINE_RESULT_SUCCESS) {
 		q->stats->time_workers_execute_good += t->time_workers_execute_last;
 		q->stats->time_send_good += t->time_when_commit_end - t->time_when_commit_end;
 		q->stats->time_receive_good += t->time_when_done - t->time_when_retrieval;
+		q->stats->tasks_successful++;
 
-		s->tasks_done++;
+		s->tasks_successful++;
 		s->time_workers_execute_good += t->time_workers_execute_last;
 		s->time_send_good += t->time_when_commit_end - t->time_when_commit_end;
 		s->time_receive_good += t->time_when_done - t->time_when_retrieval;
 	} else {
+		q->stats->tasks_failed++;
 		s->tasks_failed++;
 
 		if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {

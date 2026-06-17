@@ -1054,25 +1054,28 @@ class TxnStats(TxnPlot):
         print("-----------------------------------------")
         print(f"Number of workers: {num_workers}")
         print(f"Number of tasks: {num_tasks}")
-        print(f"Files created at worker: {num_files}")
-        print(f"Bytes created: {files_size}")
+        print(f"Files created at workers: {num_files}")
+        print(f"Bytes created at workers: {files_size}")
         print(f"Number of inputs transferred by manager: {num_inputs}")
         print(f"Bytes transferred: {inputs_size}")
         print(f"Number of outputs returned: {num_outputs}")
         print(f"Size of outputs returned: {outputs_size}")
         print(f"Number of URL/Worker transfers: {num_urls}")
-        print(f"Bytes transferred: {urls_size}")
+        print(f"Bytes transferred URL/Worker: {urls_size}")
         if num_urls > 0:
             print("Average transfer time: {:.2f}s".format(float(xfr_avg)))
-        print(f"Number of mini tasks: {num_minitasks}")
-        print(f"Bytes created: {minitasks_size}")
+        print(f"Number of mini-tasks: {num_minitasks}")
+        print(f"Bytes created by mini-tasks: {minitasks_size}")
         print(f"Number of temps: {num_temps}")
-        print(f"Bytes created: {temps_size}")
-        times = []
-        for lifetime in manager.worker_lifetime.values():
-            times.append(lifetime["DISCONNECTION"] - lifetime["CONNECTION"])
-        cpu_time = sum(times)
-        print(f"Worker CPU Time (h): {round(cpu_time/60/60, 2)}")
+        print(f"Bytes created by temp files: {temps_size}")
+        try:
+            times = []
+            for lifetime in manager.worker_lifetime.values():
+                times.append(lifetime["DISCONNECTION"] - lifetime["CONNECTION"])
+            cpu_time = sum(times)
+            print(f"Worker CPU Time (h): {round(cpu_time/60/60, 2)}")
+        except Exception:
+            print("Worker CPU Time (h): unavailable")
         print("-----------------------------------------")
         print()
 

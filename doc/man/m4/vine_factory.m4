@@ -7,6 +7,10 @@ BOLD(vine_factory) - maintain a pool of TaskVine workers on a batch system.
 SECTION(SYNOPSIS)
 CODE(vine_factory -M PARAM(project-name) -T PARAM(batch-type) [options])
 
+CODE(vine_factory -T PARAM(batch-type) PARAM(managerhost) PARAM(port) [options])
+
+CODE(vine_factory -T PARAM(batch-type) PARAM(managerhost:port) [options])
+
 SECTION(DESCRIPTION)
 BOLD(vine_factory) submits and maintains a number
 of MANPAGE(vine_worker,1) processes on various batch systems, such as
@@ -16,6 +20,11 @@ a given project name.  BOLD(vine_factory) will automatically determine
 the correct number of workers to have running, based on criteria set on
 the command line.  The decision on how many workers to run is reconsidered
 once per minute.
+PARA
+The manager may be specified directly by host and port, as separate
+BOLD(managerhost) and BOLD(port) arguments or as a single BOLD(managerhost:port)
+argument.  Alternatively, use the BOLD(-M) option to discover managers by
+project name through the catalog server.
 PARA
 By default, BOLD(vine_factory) will run as many workers as the
 indicated managers have tasks ready to run.  If there are multiple
@@ -118,6 +127,18 @@ SECTION(EXIT STATUS)
 On success, returns zero. On failure, returns non-zero.
 
 SECTION(EXAMPLES)
+
+To maintain workers for a specific manager running on the local machine at port 9123:
+
+LONGCODE_BEGIN
+vine_factory -T local localhost 9123
+LONGCODE_END
+
+The same manager may be specified with a single BOLD(host:port) argument:
+
+LONGCODE_BEGIN
+vine_factory -T local localhost:9123
+LONGCODE_END
 
 Suppose you have a TaskVine manager with a project name of "barney".
 To maintain workers for barney, do this:
