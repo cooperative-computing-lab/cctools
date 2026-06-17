@@ -345,14 +345,14 @@ bool seek_forward(struct skip_list_cursor *cur, int index)
 			return false;
 		}
 
-		// Skip dead nodes without counting them
-		// and try to delete them if their refcount is 0
-		if (cur->target->dead) {
-			// Save next pointer before delete_node potentially frees the node
+		/* Skip dead nodes without counting them */
+		while (cur->target->dead) {
 			struct skip_list_node *next = cur->target->forward[0];
 			delete_node(cur->target, sl);
 			cur->target = next;
-			continue;
+			if (cur->target == sl->tail) {
+				return false;
+			}
 		}
 
 		index--;
@@ -381,14 +381,14 @@ bool seek_backward(struct skip_list_cursor *cur, int index)
 			return false;
 		}
 
-		// Skip dead nodes without counting them
-		// and try to delete them if their refcount is 0
-		if (cur->target->dead) {
-			// Save previous pointer before delete_node potentially frees the node
+		/* Skip dead nodes without counting them */
+		while (cur->target->dead) {
 			struct skip_list_node *prev = cur->target->backward[0];
 			delete_node(cur->target, sl);
 			cur->target = prev;
-			continue;
+			if (cur->target == sl->head) {
+				return false;
+			}
 		}
 
 		index++;
@@ -538,10 +538,11 @@ bool skip_list_get(struct skip_list_cursor *cur, void **item)
 	if (cur->target->dead)
 		return false;
 	if (item) {
-		// if item is not given, then we are simply checking if the cursor is
-		// at a valid position
 		*item = cur->target->data;
 	}
+
+	// if item is not given, then we are simply checking if the cursor is
+	// at a valid position
 	return true;
 }
 
