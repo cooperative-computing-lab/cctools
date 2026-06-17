@@ -16,7 +16,7 @@ typedef enum {
 } task_priority_mode_t;
 
 struct vine_graph_executor {
-	struct vine_graph *graph;	      // DAG executed by this executor
+	struct vine_graph *graph;     // DAG executed by this executor
 	struct vine_manager *manager; // TaskVine runtime
 
 	struct itable *task_id_to_node; // maps vine task id to graph node after submit

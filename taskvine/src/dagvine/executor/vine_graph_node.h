@@ -21,8 +21,8 @@ struct vine_graph_io_mount {
 
 /** The storage type of the node's output file. */
 typedef enum {
-	VINE_GRAPH_NODE_OUTFILE_TYPE_LOCAL = 0,	      // staged file under graph output_dir
-	VINE_GRAPH_NODE_OUTFILE_TYPE_TEMP,		      // TaskVine temp blob
+	VINE_GRAPH_NODE_OUTFILE_TYPE_LOCAL = 0,		 // staged file under graph output_dir
+	VINE_GRAPH_NODE_OUTFILE_TYPE_TEMP,		 // TaskVine temp blob
 	VINE_GRAPH_NODE_OUTFILE_TYPE_SHARED_FILE_SYSTEM, // path on shared storage, no vine_file
 } vine_graph_node_outfile_type_t;
 
