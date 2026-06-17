@@ -8,7 +8,6 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 
 #include <limits.h>
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>

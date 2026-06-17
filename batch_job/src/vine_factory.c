@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include "vine_catalog.h"
 #include "vine_protocol.h"
 
+#include "address.h"
 #include "cctools.h"
 #include "batch_queue.h"
 #include "hash_table.h"
@@ -93,6 +94,7 @@ static char *foremen_regex = 0;
 
 char *manager_host = 0;
 int manager_port = 0;
+static char manager_host_storage[DOMAIN_NAME_MAX];
 int using_catalog = 0;
 
 static char *extra_worker_args=0;
@@ -1331,6 +1333,7 @@ void add_wrapper_input( const char *filename )
 static void show_help(const char *cmd)
 {
 	printf("Use: vine_factory [options] <managerhost> <port>\n");
+	printf("Or:  vine_factory [options] <managerhost:port>\n");
 	printf("Or:  vine_factory [options] -M projectname\n");
 	printf("\n");
 	/*------------------------------------------------------------*/
@@ -1710,9 +1713,15 @@ int main(int argc, char *argv[])
 		config_file = xxstrdup(abs_path_name);
 	}
 
-	if((argc - optind) == 2) {
+	if ((argc - optind) == 1) {
+		if (!address_parse_hostport(argv[optind], manager_host_storage, &manager_port, 0) || manager_port < 1) {
+			fprintf(stderr, "vine_factory: invalid manager address '%s'\n", argv[optind]);
+			exit(1);
+		}
+		manager_host = manager_host_storage;
+	} else if ((argc - optind) == 2) {
 		manager_host = argv[optind];
-		manager_port = atoi(argv[optind+1]);
+		manager_port = atoi(argv[optind + 1]);
 	}
 
 	if(config_file) {
@@ -1723,7 +1732,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(!(manager_host || config_file || project_regex)) {
-		fprintf(stderr,"vine_factory: You must either give a project name with the -M option or manager-name option with a configuration file, or give the manager's host and port.\n");
+		fprintf(stderr,"vine_factory: You must either give a project name with the -M option or manager-name option with a configuration file, or give the manager's host and port (as <host> <port> or <host:port>).\n");
 		exit(1);
 	}
 
