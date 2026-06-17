@@ -16,7 +16,6 @@ See the file COPYING for details.
 #include "debug.h"
 #include "domain_name.h"
 #include "domain_name_cache.h"
-#include "fd.h"
 #include "http_query.h"
 #include "jx.h"
 #include "jx_eval.h"
