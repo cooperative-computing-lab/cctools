@@ -685,7 +685,8 @@ void skip_list_insert_arr(struct skip_list *sl, void *item, double *priority)
 	/* For each level, find the insertion point */
 	for (int i = sl->level; i >= 0; i--) {
 		while (x->forward[i] != sl->tail &&
-				compare_priority(x->forward[i]->priority, priority, sl->priority_size) > 0) {
+				(x->forward[i]->dead ||
+						compare_priority(x->forward[i]->priority, priority, sl->priority_size) > 0)) {
 			x = x->forward[i];
 		}
 		update[i] = x;
