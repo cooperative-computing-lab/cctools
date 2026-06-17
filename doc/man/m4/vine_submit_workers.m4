@@ -9,6 +9,10 @@ CODE(vine_submit_workers [batch options] [worker options] [batch specific option
 
 or
 
+CODE(vine_submit_workers [batch options] [worker options] [batch specific options] PARAM(servername:port) PARAM(num-workers))
+
+or
+
 CODE(vine_submit_workers [batch options] [worker options] --manager-name PARAM(name) [batch specific options] PARAM(num-workers))
 
 
@@ -19,8 +23,10 @@ The number of BOLD(vine_worker) scheduled and run is given by the BOLD(num-worke
 argument.
 
 The BOLD(servername) and BOLD(port) arguments specify the hostname and port number of the
-manager for the vine_worker to connect. Alternatively, this information can be obtained from
-the catalog server by specifying the name of the TaskVine manager using the --manager-name parameter.
+manager for the vine_worker to connect. The manager may be given as separate
+BOLD(servername) and BOLD(port) arguments, or as a single BOLD(servername:port)
+argument. Alternatively, this information can be obtained from the catalog server
+by specifying the name of the TaskVine manager using the --manager-name parameter.
 
 SECTION(BATCH OPTIONS)
 OPTIONS_BEGIN
@@ -76,6 +82,12 @@ Submit 10 worker instances to run on Condor and connect to a specific manager:
 
 LONGCODE_BEGIN
 vine_submit_workers -T condor manager.somewhere.edu 9123 10
+LONGCODE_END
+
+The same manager may be specified with a single BOLD(host:port) argument:
+
+LONGCODE_BEGIN
+vine_submit_workers -T condor manager.somewhere.edu:9123 10
 LONGCODE_END
 
 Submit 10 vine_worker instances to run on Condor in auto mode with their

@@ -49,8 +49,11 @@ int unlinkat_recursive(int dirfd, const char *path)
 					}
 				}
 				closedir(dir);
+				close(subdirfd);
+			} else {
+				close(subdirfd);
+				return -1;
 			}
-			close(subdirfd);
 
 			/* If there was an interior failure, then this will also fail. */
 			rc = unlinkat(dirfd, path, AT_REMOVEDIR);
@@ -87,11 +90,12 @@ int unlink_dir_contents(const char *path)
 				}
 			}
 			closedir(dir);
+			close(dirfd);
 		} else {
 			rcs = -1;
+			close(dirfd);
 		}
 
-		close(dirfd);
 		return rcs != 0 ? -1 : 0;
 	}
 
