@@ -1,17 +1,17 @@
-include ../../../../config.mk
-include ../../../../rules.mk
+include ../../../config.mk
+include ../../../rules.mk
 
 PROJECT_NAME := vine_graph
-SOURCE_DIR   := $(CCTOOLS_HOME)/taskvine/src/dagvine/executor
-BUILD_DIR    := ../build
+SOURCE_DIR   := $(CCTOOLS_HOME)/taskvine/src/graph
+PY_EXECUTOR_DIR := $(CCTOOLS_HOME)/taskvine/src/bindings/python3/ndcctools/taskvine/dagvine/executor
 MODULE_DIR   := $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/dagvine/executor
 MODULE_NAME  := vine_graph_capi
 
 SOURCES   := vine_graph_node.c vine_graph.c vine_graph_executor.c
-OBJECTS   := $(SOURCES:%.c=$(BUILD_DIR)/%.o)
-SWIG_WRAP := $(BUILD_DIR)/vine_graph_wrap.c
-WRAP_OBJ  := $(BUILD_DIR)/vine_graph_wrap.o
-PYMODULE  := $(BUILD_DIR)/_$(MODULE_NAME).$(CCTOOLS_DYNAMIC_SUFFIX)
+OBJECTS   := $(SOURCES:%.c=%.o)
+SWIG_WRAP := vine_graph_wrap.c
+WRAP_OBJ  := vine_graph_wrap.o
+PYMODULE  := _$(MODULE_NAME).$(CCTOOLS_DYNAMIC_SUFFIX)
 
 LOCAL_LINKAGE += $(CCTOOLS_HOME)/taskvine/src/manager/libtaskvine.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
 LOCAL_CCFLAGS += -I $(CCTOOLS_HOME)/taskvine/src/manager -I $(SOURCE_DIR)
@@ -20,21 +20,17 @@ LOCAL_CCFLAGS += -I $(CCTOOLS_HOME)/taskvine/src/manager -I $(SOURCE_DIR)
 
 all: $(PYMODULE)
 
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
-
-$(SWIG_WRAP): vine_graph.i vine_graph.h vine_graph_executor.h | $(BUILD_DIR)
+$(SWIG_WRAP): vine_graph.i vine_graph.h vine_graph_executor.h
 	$(CCTOOLS_SWIG) -python -threads -relativeimport \
 		-I$(CCTOOLS_HOME)/taskvine/src/manager \
 		-I$(CCTOOLS_HOME)/dttools/src \
-		-I$(CCTOOLS_HOME)/taskvine/src/dagvine \
 		-I$(SOURCE_DIR) \
-		-outdir $(BUILD_DIR) -o $@ $<
+		-outdir $(SOURCE_DIR) -o $@ $<
 
 $(WRAP_OBJ): $(SWIG_WRAP)
 	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $(CCTOOLS_PYTHON3_CCFLAGS) -w -fPIC -DNDEBUG $<
 
-$(BUILD_DIR)/%.o: %.c vine_graph.h vine_graph_executor.h vine_graph_node.h | $(BUILD_DIR)
+%.o: %.c vine_graph.h vine_graph_executor.h vine_graph_node.h
 	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) -fPIC -DNDEBUG $<
 
 $(PYMODULE): $(WRAP_OBJ) $(OBJECTS)
@@ -48,14 +44,14 @@ install: all
 	mkdir -p $(MODULE_DIR)
 	rm -f $(MODULE_DIR)/graph.py $(MODULE_DIR)/graph_capi.py $(MODULE_DIR)/_graph_capi.$(CCTOOLS_DYNAMIC_SUFFIX)
 	cp $(PYMODULE) $(MODULE_DIR)
-	cp $(BUILD_DIR)/$(MODULE_NAME).py $(MODULE_DIR)
-	cp $(SOURCE_DIR)/__init__.py $(MODULE_DIR)
-	cp $(SOURCE_DIR)/vine_graph.py $(MODULE_DIR)
+	cp $(MODULE_NAME).py $(MODULE_DIR)
+	cp $(PY_EXECUTOR_DIR)/__init__.py $(MODULE_DIR)
+	cp $(PY_EXECUTOR_DIR)/vine_graph.py $(MODULE_DIR)
 
 clean:
 	rm -f *.o
 	rm -rf __pycache__
-	rm -rf $(BUILD_DIR)
+	rm -f $(SWIG_WRAP) $(WRAP_OBJ) $(PYMODULE) $(MODULE_NAME).py
 
 lint:
 	clang-format -Werror --dry-run --style='file:$(CCTOOLS_HOME)/.clang-format' $(SOURCE_DIR)/*.[ch]

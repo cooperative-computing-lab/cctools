@@ -17,7 +17,7 @@ def _merge(bg, keys, prefix="M"):
     while len(cur) > 1:
         nxt = []
         for i in range(0, len(cur), MERGE_FANIN):
-            grp = cur[i : i + MERGE_FANIN]
+            grp = cur[i:i + MERGE_FANIN]
             if len(grp) == 1:
                 nxt.append(grp[0])
             else:

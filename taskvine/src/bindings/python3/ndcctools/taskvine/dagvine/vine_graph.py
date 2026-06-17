@@ -4,7 +4,7 @@
 
 from ndcctools.taskvine.manager import Manager
 
-from .dask_adaptor import DaskAdapter
+from .dask_adaptor import VineGraphDaskAdaptor
 from .task_runner import TaskRunnerLibrary, execute_workflow_task, run_scheduler_keys
 from .workflow import Workflow, TaskOutputRef, TaskOutputWrapper
 from .executor.vine_graph import VineGraphExecutor
@@ -304,7 +304,7 @@ class VineGraph(Manager):
         self.set_params(params)
 
         if from_dask:
-            task_dict = DaskAdapter(task_dict, expand_subgraphs=expand_subgraphs).converted
+            task_dict = VineGraphDaskAdaptor(task_dict, expand_subgraphs=expand_subgraphs).converted
 
         result_keys = list(target_keys)
         task_dict, target_keys = self._replicate_graph(task_dict, target_keys, repeats)

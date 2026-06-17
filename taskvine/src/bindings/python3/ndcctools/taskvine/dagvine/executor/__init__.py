@@ -4,10 +4,6 @@
 
 import importlib
 import sys
-
-# SWIG-generated vine_graph_capi.py does "import cvine"; wire the top-level name to the real module.
-sys.modules.setdefault("cvine", importlib.import_module("ndcctools.taskvine.cvine"))
-
 from . import vine_graph_capi
 from . import vine_graph
 from .vine_graph import (
@@ -16,6 +12,9 @@ from .vine_graph import (
     _format_scheduler_keys_runner_payload,
     format_scheduler_keys_runner_payload,
 )
+
+# SWIG-generated vine_graph_capi.py does "import cvine"; wire the top-level name to the real module.
+sys.modules.setdefault("cvine", importlib.import_module("ndcctools.taskvine.cvine"))
 
 sys.modules.setdefault(__name__ + ".graph", vine_graph)
 

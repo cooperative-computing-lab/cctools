@@ -10,6 +10,7 @@ LOCAL_LINKAGE = $(CCTOOLS_PYTHON3_LDFLAGS) -lz $(CCTOOLS_OPENSSL_LDFLAGS) $(CCTO
 CCTOOLS_FLAKE8_IGNORE_FILES = "cvine.py"
 
 DSPYTHONSO = ndcctools/taskvine/_cvine.$(CCTOOLS_DYNAMIC_SUFFIX)
+DAGVINE_MODULE_DIR = $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/dagvine
 LIBRARIES = $(DSPYTHONSO)
 OBJECTS = vine_wrap.o
 TARGETS = $(LIBRARIES)
@@ -29,9 +30,15 @@ lint:
 
 clean:
 	rm -rf $(OBJECTS) $(TARGETS) ndcctools/taskvine/cvine.py vine_wrap.c vine_wrap.o *.pyc __pycache__
+	rm -rf ndcctools/taskvine/dagvine/__pycache__
+	find ndcctools/taskvine/dagvine -name __pycache__ -type d -prune -exec rm -rf {} +
 
 install: all
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/compat
 	cp ndcctools/taskvine/*.py $(DSPYTHONSO) $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine
 	cp ndcctools/taskvine/compat/*.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/compat
+	rm -rf $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/vine_graph
+	rm -rf $(DAGVINE_MODULE_DIR)
+	cd ndcctools/taskvine/dagvine && find . -path ./test -prune -o -type d -print | while read dir; do mkdir -p "$(DAGVINE_MODULE_DIR)/$$dir"; done
+	cd ndcctools/taskvine/dagvine && find . -path ./test -prune -o -name '*.py' -print | while read file; do cp "$$file" "$(DAGVINE_MODULE_DIR)/$$file"; done
 	cp taskvine.py $(CCTOOLS_PYTHON3_PATH)/

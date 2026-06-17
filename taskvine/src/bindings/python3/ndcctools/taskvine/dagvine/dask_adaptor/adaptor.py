@@ -55,7 +55,7 @@ def workflow_to_dask_graph(workflow):
     return dsk
 
 
-class DaskAdapter:
+class VineGraphDaskAdaptor:
     """Convert Dask graph forms into VineGraph ``Workflow`` task expressions."""
 
     def __init__(self, task_dict, expand_subgraphs=False):
