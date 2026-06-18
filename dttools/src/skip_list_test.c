@@ -8,11 +8,20 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 #include <math.h>
-#include <assert.h>
 #include "list.h"
 #include "skip_list.h"
 
 #define MAX_KEY_LEN 32
+
+#define CHECK(msg, cond) \
+	do { \
+		if (!(cond)) { \
+			printf("FAIL: %s\n", msg); \
+			passed = 0; \
+		} else { \
+			printf("PASS: %s\n", msg); \
+		} \
+	} while (0)
 
 struct item {
 	char key[MAX_KEY_LEN];
@@ -60,6 +69,143 @@ void free_items(struct item **items, int num_elements)
 		free(items[i]);
 	}
 	free(items);
+}
+
+static int run_api_tests(void)
+{
+	int passed = 1;
+	unsigned index = 0;
+	void *item = NULL;
+	const double *priority = NULL;
+
+	printf("=================================================================\n");
+	printf("API Test: Exercising all skip_list.h functionality\n");
+	printf("=================================================================\n");
+
+	struct skip_list *sl = skip_list_create(2, 0.5);
+	char *apple = "apple";
+	char *banana = "banana";
+	char *cherry = "cherry";
+	char *grape = "grape";
+
+	CHECK("skip_list_size on empty list", skip_list_size(sl) == 0);
+	CHECK("skip_list_peek_head on empty list", skip_list_peek_head(sl) == NULL);
+	CHECK("skip_list_peek_head_priority on empty list", skip_list_peek_head_priority(sl) == NULL);
+	CHECK("skip_list_pop_head on empty list", skip_list_pop_head(sl) == NULL);
+	CHECK("skip_list_delete on NULL", skip_list_delete(NULL));
+
+	skip_list_insert(sl, apple, 10.0, 5.0);
+	skip_list_insert(sl, banana, 20.0, 3.0);
+	skip_list_insert(sl, cherry, 10.0, 8.0);
+
+	CHECK("skip_list_size after inserts", skip_list_size(sl) == 3);
+	CHECK("skip_list_peek_head returns highest priority item", skip_list_peek_head(sl) == banana);
+	priority = skip_list_peek_head_priority(sl);
+	CHECK("skip_list_peek_head_priority returns highest priority tuple",
+			priority && priority[0] == 20.0 && priority[1] == 3.0);
+
+	struct skip_list_cursor *cur = skip_list_cursor_create(sl);
+	CHECK("skip_list_get on undefined cursor", !skip_list_get(cur, &item));
+	CHECK("skip_list_get_priority on undefined cursor", skip_list_get_priority(cur) == NULL);
+	CHECK("skip_list_tell on undefined cursor", !skip_list_tell(cur, &index));
+	CHECK("skip_list_next on undefined cursor", !skip_list_next(cur));
+	CHECK("skip_list_prev on undefined cursor", !skip_list_prev(cur));
+	CHECK("skip_list_set on undefined cursor", !skip_list_set(cur, grape));
+	CHECK("skip_list_remove_here on undefined cursor", !skip_list_remove_here(cur));
+
+	CHECK("skip_list_seek to index 0", skip_list_seek(cur, 0));
+	CHECK("skip_list_tell at index 0", skip_list_tell(cur, &index) && index == 0);
+	CHECK("skip_list_get at index 0", skip_list_get(cur, &item) && item == banana);
+	priority = skip_list_get_priority(cur);
+	CHECK("skip_list_get_priority at index 0", priority && priority[0] == 20.0 && priority[1] == 3.0);
+
+	CHECK("skip_list_seek to index 1", skip_list_seek(cur, 1));
+	CHECK("skip_list_tell at index 1", skip_list_tell(cur, &index) && index == 1);
+	CHECK("skip_list_get at index 1", skip_list_get(cur, &item) && item == cherry);
+
+	CHECK("skip_list_seek to index -1", skip_list_seek(cur, -1));
+	CHECK("skip_list_tell at index -1", skip_list_tell(cur, &index) && index == 2);
+	CHECK("skip_list_get at index -1", skip_list_get(cur, &item) && item == apple);
+
+	CHECK("skip_list_seek forward out of bounds", !skip_list_seek(cur, 10));
+	CHECK("skip_list_seek backward out of bounds", !skip_list_seek(cur, -10));
+
+	CHECK("skip_list_seek for next/prev test", skip_list_seek(cur, 0));
+	CHECK("skip_list_next to index 1", skip_list_next(cur) && skip_list_get(cur, &item) && item == cherry);
+	CHECK("skip_list_next to index 2", skip_list_next(cur) && skip_list_get(cur, &item) && item == apple);
+	CHECK("skip_list_prev back to index 1", skip_list_prev(cur) && skip_list_get(cur, &item) && item == cherry);
+	CHECK("skip_list_prev off beginning", skip_list_seek(cur, 0) && !skip_list_prev(cur));
+	CHECK("skip_list_next off end", skip_list_seek(cur, 2) && !skip_list_next(cur));
+	CHECK("skip_list_get after next off end", !skip_list_get(cur, &item));
+
+	skip_list_reset(cur);
+	CHECK("skip_list_get after reset", !skip_list_get(cur, &item));
+
+	CHECK("skip_list_seek before clone", skip_list_seek(cur, 1));
+	struct skip_list_cursor *clone = skip_list_cursor_clone(cur);
+	void *clone_item = NULL;
+	CHECK("skip_list_cursor_clone copies position", skip_list_get(clone, &clone_item) && clone_item == cherry);
+
+	struct skip_list_cursor *other = skip_list_cursor_create(sl);
+	CHECK("skip_list_seek on other cursor", skip_list_seek(other, 0));
+	skip_list_cursor_move(cur, other);
+	CHECK("skip_list_cursor_move copies position", skip_list_get(cur, &item) && item == banana);
+	skip_list_cursor_delete(other);
+	skip_list_cursor_delete(clone);
+
+	CHECK("skip_list_cursor_move_to_priority finds item",
+			skip_list_cursor_move_to_priority(cur, 20.0, 3.0) && skip_list_get(cur, &item) && item == banana);
+	CHECK("skip_list_cursor_move_to_priority misses missing item",
+			!skip_list_cursor_move_to_priority(cur, 99.0, 99.0));
+
+	CHECK("skip_list_seek before set", skip_list_seek(cur, 2));
+	CHECK("skip_list_set updates item", skip_list_set(cur, grape));
+	CHECK("skip_list_get after set", skip_list_get(cur, &item) && item == grape);
+
+	CHECK("skip_list_seek before iteration", skip_list_seek(cur, 0));
+	const char *expected_order[] = {banana, cherry, grape};
+	int iter_count = 0;
+	char *iter_item = NULL;
+	SKIP_LIST_ITERATE(cur, iter_item)
+	{
+		if (iter_count >= 3 || iter_item != expected_order[iter_count]) {
+			printf("FAIL: SKIP_LIST_ITERATE order at index %d\n", iter_count);
+			passed = 0;
+			break;
+		}
+		iter_count++;
+	}
+	CHECK("SKIP_LIST_ITERATE visits all items", iter_count == 3);
+
+	CHECK("skip_list_seek before remove_here", skip_list_seek(cur, 1));
+	CHECK("skip_list_remove_here removes current item", skip_list_remove_here(cur) && skip_list_size(sl) == 2);
+	CHECK("skip_list_get on removed node", !skip_list_get(cur, &item));
+	CHECK("skip_list_next skips removed node", skip_list_next(cur) && skip_list_get(cur, &item) && item == grape);
+
+	CHECK("skip_list_remove by data pointer", skip_list_remove(sl, banana) && skip_list_size(sl) == 1);
+	CHECK("skip_list_remove misses missing data", !skip_list_remove(sl, banana));
+	CHECK("skip_list_remove_by_priority removes remaining item",
+			skip_list_remove_by_priority(sl, 10.0, 5.0) && skip_list_size(sl) == 0);
+	CHECK("skip_list_remove_by_priority misses missing priority", !skip_list_remove_by_priority(sl, 1.0, 1.0));
+
+	skip_list_cursor_delete(cur);
+
+	skip_list_insert(sl, apple, 1.0, 1.0);
+	CHECK("skip_list_delete fails on non-empty list", !skip_list_delete(sl));
+	CHECK("skip_list_pop_head on non-empty list", skip_list_pop_head(sl) == apple && skip_list_size(sl) == 0);
+
+	struct skip_list_cursor *live = skip_list_cursor_create(sl);
+	skip_list_insert(sl, banana, 2.0, 2.0);
+	CHECK("skip_list_pop_head empties list again", skip_list_pop_head(sl) == banana && skip_list_size(sl) == 0);
+	CHECK("skip_list_delete fails with live cursor", !skip_list_delete(sl));
+	skip_list_cursor_delete(live);
+	CHECK("skip_list_delete succeeds when empty with no cursors", skip_list_delete(sl));
+
+	printf("=================================================================\n\n");
+
+#undef CHECK
+
+	return passed;
 }
 
 /* Measure time for list operations with priority-based insertion */
@@ -187,6 +333,8 @@ int main(int argc, char *argv[])
 	// Allocate arrays for results
 	struct test_result *results = malloc(total_count * sizeof(struct test_result));
 	int result_idx = 0;
+
+	int api_test_passed = run_api_tests();
 
 	printf("=================================================================\n");
 	printf("Performance Comparison: list.c vs skip_list.c\n");
@@ -384,5 +532,5 @@ int main(int argc, char *argv[])
 
 	free(results);
 
-	return (time_test_passed && order_time_test_passed) ? 0 : 1;
+	return (time_test_passed && order_time_test_passed && api_test_passed) ? 0 : 1;
 }
