@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "vine_worker_options.h"
 #include "vine_workspace.h"
 
+#include "address.h"
 #include "catalog_query.h"
 #include "cctools.h"
 #include "change_process_title.h"
@@ -2177,15 +2178,11 @@ struct list *parse_manager_addresses(const char *specs, int default_port)
 
 	char *next_manager = strtok(managers_args, ";");
 	while (next_manager) {
+		char host[DOMAIN_NAME_MAX];
 		int port = default_port;
 
-		char *port_str = strchr(next_manager, ':');
-		if (port_str) {
-			char *no_ipv4 = strchr(port_str + 1, ':'); /* if another ':', then this is not ipv4. */
-			if (!no_ipv4) {
-				*port_str = '\0';
-				port = atoi(port_str + 1);
-			}
+		if (!address_parse_hostport(next_manager, host, &port, default_port)) {
+			fatal("Invalid manager address '%s'", next_manager);
 		}
 
 		if (port < 1) {
@@ -2193,12 +2190,8 @@ struct list *parse_manager_addresses(const char *specs, int default_port)
 		}
 
 		struct manager_address *m = calloc(1, sizeof(*m));
-		strncpy(m->host, next_manager, DOMAIN_NAME_MAX - 1);
+		snprintf(m->host, sizeof(m->host), "%s", host);
 		m->port = port;
-
-		if (port_str) {
-			*port_str = ':';
-		}
 
 		list_push_tail(managers, m);
 		next_manager = strtok(NULL, ";");
