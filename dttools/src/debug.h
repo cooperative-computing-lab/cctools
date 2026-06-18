@@ -270,7 +270,8 @@ void debug_close(void);
 
 /* Use offset info (+0x...) with addr2line -f -e [exe or .so] */
 #define debug_backtrace \
-	{ debug(D_ERROR, "%s:%s:%d[%s]", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE); \
+	{ \
+		debug(D_ERROR, "%s:%s:%d", __func__, __FILE__, __LINE__); \
 		void *buffer[DEBUG_BT_SIZE]; \
 		size_t nptrs = backtrace(buffer, DEBUG_BT_SIZE); \
 		char **strings = backtrace_symbols(buffer, nptrs); \
@@ -284,11 +285,11 @@ void debug_close(void);
 		free(strings); \
 	} // generate a core if possible
 
-
-#define debug_assert(cond)\
-  if (!(cond)) {\
-    debug(D_ERROR, "Assertion failed: %s", #cond);\
-    debug_backtrace;\
-    abort(); }
+#define debug_assert(cond) \
+	if (!(cond)) { \
+		debug(D_ERROR, "Assertion failed: %s:%s:%d", __func__, __FILE__, __LINE__); \
+		debug_backtrace; \
+		abort(); \
+	}
 
 #endif
