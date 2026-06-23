@@ -78,9 +78,7 @@ except (ImportError, ModuleNotFoundError):
     from .compat import DaskVineDag
 
 try:
-    from . import dagvine as _dagvine
-    VineGraph = _dagvine.VineGraph
-    VineGraphDaskAdaptor = _dagvine.VineGraphDaskAdaptor
+    from .vine_graph import VineGraph, VineGraphConfig, VineGraphDaskAdaptor
 except (ImportError, ModuleNotFoundError):
     pass
 
@@ -104,6 +102,8 @@ __all__ = [
 
 if "VineGraph" in globals():
     __all__.append("VineGraph")
+if "VineGraphConfig" in globals():
+    __all__.append("VineGraphConfig")
 if "VineGraphDaskAdaptor" in globals():
     __all__.append("VineGraphDaskAdaptor")
 

@@ -1029,6 +1029,11 @@ int release_random_worker(struct vine_manager *q)
 	return removed;
 }
 
+int vine_manager_release_random_worker(struct vine_manager *q)
+{
+	return release_random_worker(q);
+}
+
 /*
 This function enforces a target worker eviction rate (1 every X seconds).
 If the observed eviction interval is shorter than the desired one, we randomly evict one worker

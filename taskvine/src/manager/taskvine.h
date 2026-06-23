@@ -278,6 +278,12 @@ This may be called on tasks after they are returned from @ref vine_wait.
 */
 void vine_task_delete(struct vine_task *t);
 
+/** Add a reference to an existing task object, return the same object.
+@param t A task object.
+@return The same task object, or null.
+*/
+struct vine_task *vine_task_addref(struct vine_task *t);
+
 /** Indicate the command to be executed.
 @param t A task object.
 @param cmd The command to be executed.  This string will be duplicated by this call, so the argument may be freed or
@@ -486,6 +492,12 @@ int vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output
 */
 
 const char *vine_task_get_state(struct vine_task *t);
+
+/** Return the original task id that a recovery task is restoring.
+@param t A task object.
+@return The source task id for a recovery task, or zero for non-recovery tasks.
+*/
+int vine_task_get_recovery_source_task_id(struct vine_task *t);
 
 /** Get the command line of the task.
 @param t A task object.
@@ -713,6 +725,14 @@ has previously been called on this object.
 */
 const char *vine_file_contents(struct vine_file *f);
 
+/** Release a reference to a file object.
+Most declared files should be released with @ref vine_undeclare_file; this function is for file references owned outside
+the manager declaration table.
+@param f A file object.
+@return The remaining reference count, or zero.
+*/
+int vine_file_delete(struct vine_file *f);
+
 /** Get the length of a vine file.
 @param f A file object.
 @return The length of the file, or zero if unknown.
@@ -731,6 +751,18 @@ const char *vine_file_source(struct vine_file *f);
 @return A file type.
 */
 vine_file_type_t vine_file_type(struct vine_file *f);
+
+/** Get the manager-side cached name of a file.
+@param f A file object.
+@return The cached name, or null.
+*/
+const char *vine_file_cached_name(struct vine_file *f);
+
+/** Return non-zero if a file is currently being recovered.
+@param f A file object.
+@return Non-zero if the file is currently being recovered.
+*/
+int vine_file_is_recovering(struct vine_file *f);
 
 /** Get the number of replicas of a file.
 @param m A manager object
@@ -934,6 +966,13 @@ but is still available on the manager's site, and can be recovered by submitting
 */
 int vine_prune_file(struct vine_manager *m, struct vine_file *f);
 
+/** Return a declared file by its cached name, or NULL if it is unknown to the manager.
+@param m A manager object.
+@param cached_name The file cache name.
+@return The declared file object, or null.
+*/
+struct vine_file *vine_manager_lookup_file(struct vine_manager *m, const char *cached_name);
+
 //@}
 
 /** @name Functions - Managers */
@@ -1126,6 +1165,13 @@ int vine_enable_return_recovery_tasks(struct vine_manager *m);
 /** Disable recovery tasks from being returned by vine_wait.
 Recovery tasks will be handled internally by the manager. **/
 int vine_disable_return_recovery_tasks(struct vine_manager *m);
+
+/** Release a random worker for failure-injection tests.
+This is a testing support hook, not a normal manager control operation.
+@param m A manager object.
+@return Non-zero if a worker was released.
+*/
+int vine_manager_release_random_worker(struct vine_manager *m);
 
 /** When enabled, resources to tasks in are assigned in proportion to the size
 of the worker. If a resource is specified (e.g. with @ref vine_task_set_cores),

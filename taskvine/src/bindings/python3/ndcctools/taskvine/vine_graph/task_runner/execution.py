@@ -70,7 +70,7 @@ def compute_task(workflow, task_expr):
 
 
 def topo_sort_group_scheduler_keys(workflow, member_scheduler_keys):
-    """Return a topological order of scheduler keys for one batched library call.
+    """Return a topological order of scheduler keys for one batched task-runner call.
 
     Edges count only when both endpoints lie in the batch. Ties are broken by the order keys
     appear in the argument list which usually matches the CSV written by C with the leader first.
@@ -99,7 +99,7 @@ def topo_sort_group_scheduler_keys(workflow, member_scheduler_keys):
                 adj[parent_sk].add(child_sk)
                 indeg[child_sk] += 1
 
-    # Kahn: serial execution order on the worker (intra-batch deps before dependents).
+    # Kahn: serial execution order within this task-runner call.
     q = deque(k for k in ordered if indeg[k] == 0)
     out = []
     while q:
@@ -132,7 +132,7 @@ def run_single_workflow_node(workflow, scheduler_key):
 
 def _scheduler_keys_spec_to_list(scheduler_keys_spec):
     """
-    Normalize library infile payload to a list of integer scheduler keys.
+    Normalize task-runner input payload to a list of integer scheduler keys.
     Primary wire form is one comma-separated string (e.g. ``\"1,2,3\"``).
     Also accepts a bare int (legacy JSON) or a list of ints/strings from json.
     """
@@ -152,12 +152,12 @@ def _scheduler_keys_spec_to_list(scheduler_keys_spec):
     )
 
 
-def _workflow_from_task_runner_library():
+def _workflow_from_task_runner_context():
     """
-    Resolve the Workflow from the TaskVine library context.
+    Resolve the Workflow from the TaskVine function context.
 
     The normal path is ``ndcctools.taskvine.utils.load_variable_from_library``.
-    Keep a ``__main__`` lookup first so generated library scripts that inject
+    Keep a ``__main__`` lookup first so generated function scripts that inject
     context directly into their own module namespace also work.
     """
     main = sys.modules.get("__main__")
@@ -168,13 +168,13 @@ def _workflow_from_task_runner_library():
 
 
 def run_scheduler_keys(scheduler_keys_spec):
-    """TaskVine library entry that parses keys, orders them, runs each node, and writes outfiles."""
-    workflow = _workflow_from_task_runner_library()
+    """Task runner entry that parses keys, orders them, runs each node, and writes outfiles."""
+    workflow = _workflow_from_task_runner_context()
     keys = _scheduler_keys_spec_to_list(scheduler_keys_spec)
     ordered = topo_sort_group_scheduler_keys(workflow, keys)
     leader_sk = keys[0]
     # The infile from C lists the leader first. Kahn might pick another indeg-zero key first which
-    # would reorder writes and confuse the manager's validation, so move the leader to the front
+    # would reorder writes and confuse executor validation, so move the leader to the front
     # when it has no parent that is also inside this batch.
     if ordered[0] != leader_sk:
         batch = set(ordered)
@@ -189,11 +189,3 @@ def run_scheduler_keys(scheduler_keys_spec):
 
     for sk in ordered:
         run_single_workflow_node(workflow, sk)
-
-
-execute_workflow_task = compute_task
-topologically_sort_scheduler_keys = topo_sort_group_scheduler_keys
-execute_workflow_node = run_single_workflow_node
-_parse_scheduler_keys = _scheduler_keys_spec_to_list
-_load_workflow_from_task_runner_library = _workflow_from_task_runner_library
-execute_scheduler_keys = run_scheduler_keys

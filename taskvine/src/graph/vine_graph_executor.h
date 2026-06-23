@@ -3,7 +3,7 @@
 
 #include "vine_graph.h"
 
-#include "vine_manager.h"
+#include "taskvine.h"
 
 typedef enum {
 	TASK_PRIORITY_MODE_RANDOM = 0,

@@ -427,6 +427,7 @@ vine_result_code_t vine_manager_get_output_files(struct vine_manager *q, struct 
 				// if temp, check that we got a cache update message.
 				struct vine_file *f = hash_table_lookup(q->file_table, m->file->cached_name);
 				if (!f || f->state != VINE_FILE_STATE_CREATED) {
+					vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
 					result_single_file = VINE_APP_FAILURE;
 				}
 			} else {

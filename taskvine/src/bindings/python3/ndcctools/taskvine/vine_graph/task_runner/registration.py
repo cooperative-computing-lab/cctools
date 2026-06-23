@@ -12,31 +12,29 @@ import hashlib
 import collections
 
 from ..workflow import Workflow, TaskOutputRef, TaskOutputWrapper
-from .task import run_scheduler_keys
+from .execution import run_scheduler_keys
 from ndcctools.taskvine.utils import load_variable_from_library
 
 
-class TaskRunnerLibrary:
-    def __init__(self, py_manager):
-        self.py_manager = py_manager
+class TaskRunnerRegistration:
+    def __init__(self, vine_graph):
+        self.vine_graph = vine_graph
 
         self.name = None
-        self.libcores = None
+        self.cores = None
 
-        self.libtask = None
+        self.task = None
 
-        # these modules are always included in the preamble of the library task, so that function calls can execute directly
-        # using the loaded context without importing them over and over again
+        # These modules are included in the generated function context so task calls can execute directly.
         self.hoisting_modules = [
             os, cloudpickle, Workflow, TaskOutputRef, TaskOutputWrapper, uuid, hashlib, random, types, collections, time,
             load_variable_from_library, run_scheduler_keys
         ]
 
-        # environment files serve as additional inputs to the library task, where each key is the local path and the value is the remote path
-        # those local files will be sent remotely to the workers so tasks can access them as appropriate
+        # Environment files are sent with the task runner context and exposed under their remote paths.
         self.env_files = {}
 
-        # context loader is a function that will be used to load the library context on remote nodes.
+        # The context loader rebuilds the Workflow object in the remote function context.
         self.context_loader_func = None
         self.context_loader_args = []
         self.context_loader_kwargs = {}
@@ -44,8 +42,8 @@ class TaskRunnerLibrary:
         self.local_path = None
         self.remote_path = None
 
-    def set_libcores(self, libcores):
-        self.libcores = libcores
+    def set_cores(self, cores):
+        self.cores = cores
 
     def set_name(self, name):
         self.name = name
@@ -64,10 +62,10 @@ class TaskRunnerLibrary:
         self.context_loader_kwargs = context_loader_kwargs
 
     def install(self):
-        assert self.name is not None, "Library name must be set before installing (use set_name method)"
-        assert self.libcores is not None, "Library cores must be set before installing (use set_libcores method)"
+        assert self.name is not None, "Task runner name must be set before installing (use set_name method)"
+        assert self.cores is not None, "Task runner cores must be set before installing (use set_cores method)"
 
-        self.libtask = self.py_manager.create_library_from_functions(
+        self.task = self.vine_graph.create_library_from_functions(
             self.name,
             run_scheduler_keys,
             library_context_info=[self.context_loader_func, self.context_loader_args, self.context_loader_kwargs],
@@ -76,14 +74,12 @@ class TaskRunnerLibrary:
             hoisting_modules=self.hoisting_modules,
         )
         for local, remote in self.env_files.items():
-            # check if the local file exists
             if not os.path.exists(local):
                 raise FileNotFoundError(f"Local file {local} not found")
-            # attach as the input file to the library task
-            self.libtask.add_input(self.py_manager.declare_file(local, cache=True, peer_transfer=True), remote)
-        self.libtask.set_cores(self.libcores)
-        self.libtask.set_function_slots(self.libcores)
-        self.py_manager.install_library(self.libtask)
+            self.task.add_input(self.vine_graph.declare_file(local, cache=True, peer_transfer=True), remote)
+        self.task.set_cores(self.cores)
+        self.task.set_function_slots(self.cores)
+        self.vine_graph.install_library(self.task)
 
     def uninstall(self):
-        self.py_manager.remove_library(self.name)
+        self.vine_graph.remove_library(self.name)

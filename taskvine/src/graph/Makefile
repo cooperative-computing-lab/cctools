@@ -3,8 +3,9 @@ include ../../../rules.mk
 
 PROJECT_NAME := vine_graph
 SOURCE_DIR   := $(CCTOOLS_HOME)/taskvine/src/graph
-PY_EXECUTOR_DIR := $(CCTOOLS_HOME)/taskvine/src/bindings/python3/ndcctools/taskvine/dagvine/executor
-MODULE_DIR   := $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/dagvine/executor
+PY_MODULE_DIR := $(CCTOOLS_HOME)/taskvine/src/bindings/python3/ndcctools/taskvine/vine_graph
+MODULE_DIR   := $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/vine_graph
+TEST_MODULE_DIR := $(CCTOOLS_HOME)/test_support/python_modules/$(CCTOOLS_PYTHON_TEST_DIR)/ndcctools/taskvine/vine_graph
 MODULE_NAME  := vine_graph_capi
 
 SOURCES   := vine_graph_node.c vine_graph.c vine_graph_executor.c
@@ -39,14 +40,19 @@ $(PYMODULE): $(WRAP_OBJ) $(OBJECTS)
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/$(PROJECT_NAME)/include
 	cp $(CCTOOLS_HOME)/taskvine/src/manager/taskvine.h $(CCTOOLS_INSTALL_DIR)/$(PROJECT_NAME)/include/
-	rm -rf $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/vine_graph/executor
-	rm -rf $(MODULE_DIR)
 	mkdir -p $(MODULE_DIR)
 	rm -f $(MODULE_DIR)/graph.py $(MODULE_DIR)/graph_capi.py $(MODULE_DIR)/_graph_capi.$(CCTOOLS_DYNAMIC_SUFFIX)
+	rm -f $(MODULE_DIR)/vine_graph_capi.py $(MODULE_DIR)/_vine_graph_capi.$(CCTOOLS_DYNAMIC_SUFFIX)
+	rm -f $(MODULE_DIR)/capi_bridge.py
 	cp $(PYMODULE) $(MODULE_DIR)
 	cp $(MODULE_NAME).py $(MODULE_DIR)
-	cp $(PY_EXECUTOR_DIR)/__init__.py $(MODULE_DIR)
-	cp $(PY_EXECUTOR_DIR)/vine_graph.py $(MODULE_DIR)
+	cp $(PY_MODULE_DIR)/capi_bridge.py $(MODULE_DIR)
+	mkdir -p $(TEST_MODULE_DIR)
+	rm -f $(TEST_MODULE_DIR)/vine_graph_capi.py $(TEST_MODULE_DIR)/_vine_graph_capi.$(CCTOOLS_DYNAMIC_SUFFIX)
+	rm -f $(TEST_MODULE_DIR)/capi_bridge.py
+	cp $(PYMODULE) $(TEST_MODULE_DIR)
+	cp $(MODULE_NAME).py $(TEST_MODULE_DIR)
+	cp $(MODULE_DIR)/capi_bridge.py $(TEST_MODULE_DIR)
 
 clean:
 	rm -f *.o

@@ -4,10 +4,10 @@
 
 from ndcctools.taskvine.manager import Manager
 
-from .dask_adaptor import VineGraphDaskAdaptor
-from .task_runner import TaskRunnerLibrary, execute_workflow_task, run_scheduler_keys
+from .adaptors import VineGraphDaskAdaptor
+from .task_runner import TaskRunnerRegistration, compute_task, run_scheduler_keys
 from .workflow import Workflow, TaskOutputRef, TaskOutputWrapper
-from .executor.vine_graph import VineGraphExecutor
+from .capi_bridge import VineGraphCapiBridge
 from .utils import color_text, context_loader_func, remove_tree_contents
 
 from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, TimeRemainingColumn
@@ -95,7 +95,9 @@ class VineGraph(Manager):
         run_info_path = kwargs.get("run_info_path", None)
         run_info_template = kwargs.get("run_info_template", None)
 
-        self.run_info_template_path = os.path.join(run_info_path, run_info_template)
+        self.run_info_template_path = None
+        if run_info_path and run_info_template:
+            self.run_info_template_path = os.path.join(run_info_path, run_info_template)
         if self.run_info_template_path:
             remove_tree_contents(self.run_info_template_path)
 
@@ -125,10 +127,10 @@ class VineGraph(Manager):
             except Exception:
                 raise ValueError(f"Unrecognized parameter: {k}")
 
-    def tune_executor(self, executor):
-        """Apply executor-graph tuning."""
+    def tune_capi_bridge(self, bridge):
+        """Apply C API bridge tuning."""
         for k, v in self.params.executor_tuning.items():
-            executor.tune(k, str(v))
+            bridge.tune(k, str(v))
 
     def _rep_key(self, k, r):
         return k if r == 0 else ("__rep", r, k)
@@ -188,32 +190,32 @@ class VineGraph(Manager):
 
         return workflow
 
-    def build_executor(self, py_graph, target_keys):
-        """Build the C executor graph from the Python graph."""
-        assert py_graph is not None, "Python graph must be built before building the VineGraphExecutor"
+    def build_capi_bridge(self, py_graph, target_keys):
+        """Build the C vine_graph mirror from the Python graph."""
+        assert py_graph is not None, "Python graph must be built before building the VineGraphCapiBridge"
 
-        executor = VineGraphExecutor(self._taskvine)
+        bridge = VineGraphCapiBridge(self._taskvine)
 
-        executor.set_task_runner_function(run_scheduler_keys)
+        bridge.set_task_runner_function(run_scheduler_keys)
 
         self.tune_manager()
-        self.tune_executor(executor)
+        self.tune_capi_bridge(bridge)
 
         topo_order = py_graph.get_topological_order()
 
         for k in topo_order:
-            node_id = executor.add_node(k)
+            node_id = bridge.add_node(k)
             py_graph.workflow_key_to_scheduler_key[k] = node_id
             py_graph.scheduler_key_to_workflow_key[node_id] = k
             for pk in py_graph.parents_of[k]:
-                executor.add_dependency(pk, k)
+                bridge.add_dependency(pk, k)
 
         for k in target_keys:
-            executor.set_target(k)
+            bridge.set_target(k)
 
-        return executor
+        return bridge
 
-    def build_workflow_and_executor(self, task_dict, target_keys):
+    def build_workflow_and_capi_bridge(self, task_dict, target_keys):
         """Build the Python graph and its C mirror."""
         py_graph = self.build_workflow(task_dict)
 
@@ -223,44 +225,44 @@ class VineGraph(Manager):
             print(f"=== Warning: the following target keys are not in the graph: {','.join(map(str, missing_keys))}")
         target_keys = list(set(target_keys) - set(missing_keys))
 
-        executor = self.build_executor(py_graph, target_keys)
+        bridge = self.build_capi_bridge(py_graph, target_keys)
 
         # Declare graph-level file dependencies in the C graph.
         for filename in py_graph.producer_of:
             workflow_key = py_graph.producer_of[filename]
-            executor.add_task_output(workflow_key, filename)
+            bridge.add_task_output(workflow_key, filename)
         for filename in py_graph.consumers_of:
             for workflow_key in py_graph.consumers_of[filename]:
-                executor.add_task_input(workflow_key, filename)
+                bridge.add_task_input(workflow_key, filename)
 
-        # Matches --task-group on the Python side so the C executor knows whether merging is allowed.
-        executor.tune(
+        # Matches --task-group on the Python side so the C layer knows whether merging is allowed.
+        bridge.tune(
             "chain-grouping-enabled",
             "1" if int(self.get_param("task-group")) else "0",
         )
 
         if int(self.get_param("task-group")):
-            executor.group_chain_like_tasks()
+            bridge.group_chain_like_tasks()
 
-        executor.compute_topology_metrics()
+        bridge.compute_topology_metrics()
 
         # Save output locations back into the Python graph after finalize may adjust checkpoint paths.
         for k in py_graph.workflow_key_to_scheduler_key:
-            outfile_remote_name = executor.get_node_outfile_remote_name(k)
+            outfile_remote_name = bridge.get_node_outfile_remote_name(k)
             py_graph.outfile_remote_name[k] = outfile_remote_name
 
-        return py_graph, executor
+        return py_graph, bridge
 
-    def build_task_runner_library(self, py_graph, executor, hoisting_modules, env_files):
-        """Build the TaskVine task runner library."""
-        task_runner_library = TaskRunnerLibrary(self)
-        task_runner_library.add_hoisting_modules(hoisting_modules)
-        task_runner_library.add_env_files(env_files)
-        task_runner_library.set_context_loader(context_loader_func, context_loader_args=[cloudpickle.dumps(py_graph)])
-        task_runner_library.set_libcores(self.get_param("libcores"))
-        task_runner_library.set_name(executor.get_task_runner_library_name())
+    def build_task_runner_registration(self, py_graph, bridge, hoisting_modules, env_files):
+        """Build the TaskVine task runner registration."""
+        task_runner_registration = TaskRunnerRegistration(self)
+        task_runner_registration.add_hoisting_modules(hoisting_modules)
+        task_runner_registration.add_env_files(env_files)
+        task_runner_registration.set_context_loader(context_loader_func, context_loader_args=[cloudpickle.dumps(py_graph)])
+        task_runner_registration.set_cores(self.get_param("libcores"))
+        task_runner_registration.set_name(bridge.get_task_runner_library_name())
 
-        return task_runner_library
+        return task_runner_registration
 
     def _execute_workflow_local(self, py_graph):
         """Run the workflow locally in topological order."""
@@ -292,7 +294,7 @@ class VineGraph(Manager):
             ) as progress:
                 bar_id = progress.add_task("User", total=n)
                 for k in order:
-                    out = execute_workflow_task(py_graph, py_graph.task_dict[k])
+                    out = compute_task(py_graph, py_graph.task_dict[k])
                     py_graph.save_task_output(k, out)
                     progress.advance(bar_id)
         finally:
@@ -309,14 +311,14 @@ class VineGraph(Manager):
         result_keys = list(target_keys)
         task_dict, target_keys = self._replicate_graph(task_dict, target_keys, repeats)
 
-        py_graph, executor = self.build_workflow_and_executor(task_dict, target_keys)
+        py_graph, bridge = self.build_workflow_and_capi_bridge(task_dict, target_keys)
         # Optional synthetic output size / sleep for testing.
         for k in py_graph.task_dict:
             py_graph.extra_task_output_size_mb[k] = random.uniform(*self.get_param("extra-task-output-size-mb"))
             py_graph.extra_task_sleep_time[k] = random.uniform(*self.get_param("extra-task-sleep-time"))
 
         local_execute = bool(self.get_param("local-execute"))
-        task_runner_library = None
+        task_runner_registration = None
 
         try:
             if local_execute:
@@ -324,11 +326,11 @@ class VineGraph(Manager):
                 makespan_s = self._execute_workflow_local(py_graph)
                 completed_recovery_tasks = 0
             else:
-                task_runner_library = self.build_task_runner_library(py_graph, executor, hoisting_modules, env_files)
-                task_runner_library.install()
-                executor.execute()
-                makespan_s = round(executor.get_makespan_us() / 1e6, 6)
-                completed_recovery_tasks = executor.get_completed_recovery_tasks()
+                task_runner_registration = self.build_task_runner_registration(py_graph, bridge, hoisting_modules, env_files)
+                task_runner_registration.install()
+                bridge.execute()
+                makespan_s = round(bridge.get_makespan_us() / 1e6, 6)
+                completed_recovery_tasks = bridge.get_completed_recovery_tasks()
 
             total_tasks_completed = len(py_graph.task_dict) + completed_recovery_tasks
             throughput_tps = round(total_tasks_completed / makespan_s, 6) if makespan_s > 0 else 0.0
@@ -345,15 +347,10 @@ class VineGraph(Manager):
             return results
         finally:
             try:
-                if task_runner_library is not None:
-                    task_runner_library.uninstall()
+                if task_runner_registration is not None:
+                    task_runner_registration.uninstall()
             finally:
-                executor.delete()
-
-    param = get_param
-    update_params = set_params
-    build_graphs = build_workflow_and_executor
-    create_task_runner_library = build_task_runner_library
+                bridge.delete()
 
     def _on_sigint(self, signum, frame):
         self._sigint_received = True

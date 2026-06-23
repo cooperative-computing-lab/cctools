@@ -1,16 +1,8 @@
 import hashlib
 from collections.abc import Mapping
 
+from .dask_common import build_task_expr, identity, resolve_graph_key_if_task
 from ..workflow import TaskOutputRef
-
-
-def identity(value):
-    """Return ``value`` unchanged."""
-    return value
-
-
-def _build_expr(func, args, kwargs):
-    return func, tuple(args), dict(kwargs)
 
 
 def _safe_repr(value, limit=800):
@@ -22,26 +14,6 @@ def _safe_repr(value, limit=800):
     if limit and len(text) > limit:
         return text[:limit] + "...<truncated>"
     return text
-
-
-def _resolve_graph_key_if_task(obj, workflow_keys):
-    """Return the matching graph key when ``obj`` denotes an existing Dask task."""
-    if isinstance(obj, TaskOutputRef):
-        return None
-    try:
-        if obj in workflow_keys:
-            return obj
-    except TypeError:
-        pass
-    if hasattr(obj, "item") and callable(obj.item):
-        try:
-            item = obj.item()
-            if item in workflow_keys:
-                return item
-        except Exception:
-            pass
-    return None
-
 
 def _extract_callable_from_task(node):
     for attr in ("function", "op", "callable", "func", "operation", "callable_obj"):
@@ -109,19 +81,19 @@ class DaskTaskSpecConverter:
             alias_ref = self._extract_alias_target(node, workflow_keys)
             if alias_ref is None:
                 raise ValueError(f"Alias {key} is missing a resolvable upstream task")
-            return _build_expr(identity, [alias_ref], {})
+            return build_task_expr(identity, [alias_ref], {})
         if datanode_cls and isinstance(node, datanode_cls):
-            return _build_expr(identity, [node.value], {})
+            return build_task_expr(identity, [node.value], {})
         if literal_cls and isinstance(node, literal_cls):
-            return _build_expr(identity, [node.value], {})
+            return build_task_expr(identity, [node.value], {})
         if taskref_cls and isinstance(node, taskref_cls):
-            return _build_expr(identity, [TaskOutputRef(node.key, getattr(node, "path", ()) or ())], {})
+            return build_task_expr(identity, [TaskOutputRef(node.key, getattr(node, "path", ()) or ())], {})
         if nested_cls and isinstance(node, nested_cls):
             payload = getattr(node, "value", None)
             if payload is None:
                 payload = getattr(node, "data", None)
-            return _build_expr(identity, [self.unwrap_operand(payload, workflow_keys, parent_key=key)], {})
-        return _build_expr(identity, [node], {})
+            return build_task_expr(identity, [self.unwrap_operand(payload, workflow_keys, parent_key=key)], {})
+        return build_task_expr(identity, [node], {})
 
     def _convert_task_node(self, key, node, workflow_keys):
         func = _extract_callable_from_task(node)
@@ -161,7 +133,7 @@ class DaskTaskSpecConverter:
                 f"- raw_kwargs: {_safe_repr(raw_kwargs)}"
             ) from exc
 
-        return _build_expr(func, args, kwargs)
+        return build_task_expr(func, args, kwargs)
 
     def unwrap_operand(self, operand, workflow_keys, *, parent_key=None):
         taskref_cls = getattr(self.dts, "TaskRef", None)
@@ -243,7 +215,7 @@ class DaskTaskSpecConverter:
         for candidate in ("alias_of", "target", "source", "ref"):
             if candidate not in fields:
                 continue
-            key = _resolve_graph_key_if_task(getattr(alias_node, candidate, None), workflow_keys)
+            key = resolve_graph_key_if_task(getattr(alias_node, candidate, None), workflow_keys)
             if key is not None:
                 return TaskOutputRef(key, path)
 
@@ -251,7 +223,7 @@ class DaskTaskSpecConverter:
         if deps:
             deps = list(deps)
             if len(deps) == 1:
-                key = _resolve_graph_key_if_task(deps[0], workflow_keys)
+                key = resolve_graph_key_if_task(deps[0], workflow_keys)
                 return TaskOutputRef(key if key is not None else deps[0], path)
         return None
 
@@ -353,9 +325,3 @@ class DaskTaskSpecConverter:
             items = ",".join(sorted(self._structural_signature(value, workflow_keys) for value in obj))
             return f"{type(obj).__name__}(" + items + ")"
         return f"py({_safe_repr(obj)})"
-
-
-build_expr = _build_expr
-safe_repr = _safe_repr
-resolve_graph_key_if_task = _resolve_graph_key_if_task
-extract_callable_from_task = _extract_callable_from_task

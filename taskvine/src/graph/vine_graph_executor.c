@@ -15,10 +15,7 @@
 #include "stringtools.h"
 #include "xxmalloc.h"
 
-#include "vine_file.h"
-#include "vine_mount.h"
-#include "vine_task.h"
-#include "vine_temp.h"
+#include "taskvine.h"
 
 static volatile sig_atomic_t interrupted = 0;
 
@@ -173,6 +170,11 @@ static void vine_graph_executor_init_runtime(struct vine_graph_executor *e)
 	e->enable_debug_log = 1;
 }
 
+static int vine_graph_task_not_submitted(struct vine_task *task)
+{
+	return !task || vine_task_get_id(task) <= 0;
+}
+
 /* Release the task-id lookup table and the resubmit queue. */
 static void vine_graph_executor_clear_runtime(struct vine_graph_executor *e)
 {
@@ -214,11 +216,12 @@ struct vine_graph *vine_graph_executor_create_graph(struct vine_manager *manager
 		return NULL;
 	}
 
-	char *debug_tmp = string_format("%s/vine-logs/debug", manager->runtime_directory);
+	const char *runtime_dir = vine_get_runtime_directory(manager);
+	char *debug_tmp = string_format("%s/vine-logs/debug", runtime_dir);
 	vine_enable_debug_log(debug_tmp);
 	free(debug_tmp);
 
-	return vine_graph_create(manager->runtime_directory);
+	return vine_graph_create(runtime_dir);
 }
 
 /* Undeclare managed files, remove local outputs, and free the executor. */
@@ -244,13 +247,13 @@ void vine_graph_executor_delete(struct vine_graph_executor *e)
 				}
 				break;
 			case VINE_GRAPH_NODE_OUTFILE_TYPE_LOCAL:
-				if (node->outfile && node->outfile->source) {
-					unlink(node->outfile->source);
+				if (node->outfile && vine_file_source(node->outfile)) {
+					unlink(vine_file_source(node->outfile));
 				}
 				break;
 			}
 			if (node->outfile) {
-				hash_table_remove(g->outfile_cachename_to_node, node->outfile->cached_name);
+				hash_table_remove(g->outfile_cachename_to_node, vine_file_cached_name(node->outfile));
 				vine_undeclare_file(e->manager, node->outfile);
 				node->outfile = NULL;
 			}
@@ -302,7 +305,7 @@ static void vine_graph_executor_materialize_node(struct vine_graph_executor *e, 
 		return;
 	}
 
-	if (node->task && node->task->state != VINE_TASK_INITIAL) {
+	if (node->task && !vine_graph_task_not_submitted(node->task)) {
 		return;
 	}
 	/* INITIAL task implies mounts + runner infile are already complete. */
@@ -449,7 +452,7 @@ void vine_graph_executor_finalize(struct vine_graph_executor *e)
 	{
 		vine_graph_executor_declare_node_outfile(e, node);
 		if (node->outfile) {
-			hash_table_insert(g->outfile_cachename_to_node, node->outfile->cached_name, node);
+			hash_table_insert(g->outfile_cachename_to_node, vine_file_cached_name(node->outfile), node);
 		}
 	}
 
@@ -479,7 +482,7 @@ void vine_graph_executor_add_task_input(struct vine_graph_executor *e, uint64_t 
 		f = vine_manager_lookup_file(e->manager, cached_name);
 	} else {
 		f = vine_declare_temp(e->manager); // first use of logical name, record cache key for paired mounts
-		hash_table_insert(g->inout_filename_to_cached_name, filename, xxstrdup(f->cached_name));
+		hash_table_insert(g->inout_filename_to_cached_name, filename, xxstrdup(vine_file_cached_name(f)));
 	}
 
 	vine_graph_io_mount_add(node->extra_inputs, f, filename);
@@ -505,7 +508,7 @@ void vine_graph_executor_add_task_output(struct vine_graph_executor *e, uint64_t
 		f = vine_manager_lookup_file(e->manager, cached_name);
 	} else {
 		f = vine_declare_temp(e->manager); // pair with matching input on consumer tasks
-		hash_table_insert(g->inout_filename_to_cached_name, filename, xxstrdup(f->cached_name));
+		hash_table_insert(g->inout_filename_to_cached_name, filename, xxstrdup(vine_file_cached_name(f)));
 	}
 
 	vine_graph_io_mount_add(node->extra_outputs, f, filename);
@@ -616,8 +619,7 @@ static double vine_graph_executor_calculate_task_priority(struct vine_graph_exec
 			if (!parent_node->task) {
 				continue;
 			}
-			timestamp_t parent_task_completion_time = parent_node->task->time_workers_execute_last;
-			// weight by parent input size and last observed worker runtime
+			timestamp_t parent_task_completion_time = vine_task_get_metric(parent_node->task, "time_workers_execute_last");
 			priority += (double)vine_file_size(src->outfile) * (double)parent_task_completion_time;
 		}
 		break;
@@ -643,8 +645,12 @@ static void vine_graph_executor_submit_node(struct vine_graph_executor *e, struc
 		goto record_preprocessing;
 	}
 
-	if (node->task->state != VINE_TASK_INITIAL) {
-		debug(D_VINE, "vine_graph_executor_submit_node: skipping node %" PRIu64 " (task already submitted, state=%d, task_id=%d)", node->node_id, node->task->state, node->task->task_id);
+	if (!vine_graph_task_not_submitted(node->task)) {
+		debug(D_VINE,
+				"vine_graph_executor_submit_node: skipping node %" PRIu64 " (task already submitted, state=%s, task_id=%d)",
+				node->node_id,
+				vine_task_get_state(node->task),
+				vine_task_get_id(node->task));
 		goto record_preprocessing;
 	}
 
@@ -689,7 +695,7 @@ static int vine_graph_node_ready_for_submission(struct vine_graph_executor *e, s
 	if (node->in_resubmit_queue) {
 		return 0;
 	}
-	if (node->task && node->task->state != VINE_TASK_INITIAL) {
+	if (node->task && !vine_graph_task_not_submitted(node->task)) {
 		return 0;
 	}
 	return 1;
@@ -756,33 +762,16 @@ static struct vine_graph_node *vine_graph_executor_node_from_task(struct vine_gr
 		return NULL;
 	}
 
-	if (task->type == VINE_TASK_TYPE_STANDARD) {
-		return itable_lookup(e->task_id_to_node, (uint64_t)task->task_id);
-	} else if (task->type == VINE_TASK_TYPE_RECOVERY) {
-		/*
-		 * Recovery tasks are not stored in task_id_to_node.
-		 * Resolve the logical node via the original producer id on output mounts.
-		 */
-		struct vine_mount *mount;
-		LIST_ITERATE(task->output_mounts, mount)
-		{
-			if (mount->file && mount->file->cached_name) {
-				struct vine_graph_node *producer = hash_table_lookup(g->outfile_cachename_to_node, mount->file->cached_name);
-				if (producer) {
-					return producer;
-				}
-			}
-			if (!mount->file) {
-				continue;
-			}
-			uint64_t original_producer_task_id = mount->file->original_producer_task_id;
-			if (original_producer_task_id > 0) {
-				return itable_lookup(e->task_id_to_node, original_producer_task_id);
-			}
-		}
+	/* Recovery completions map to the original producer; regular completions map to themselves. */
+	int lookup_task_id = vine_task_get_recovery_source_task_id(task);
+	if (lookup_task_id <= 0) {
+		lookup_task_id = vine_task_get_id(task);
+	}
+	if (lookup_task_id > 0) {
+		return itable_lookup(e->task_id_to_node, (uint64_t)lookup_task_id);
 	}
 
-	debug(D_ERROR, "task %d has no original producer task id", task->task_id);
+	debug(D_ERROR, "task %d has no graph node mapping", vine_task_get_id(task));
 	return NULL;
 }
 
@@ -849,14 +838,10 @@ static int vine_graph_node_is_anchored(const struct vine_graph_node *n)
 /* Return non-zero when a temporary output file has a recovery task that is neither initial nor finished. */
 static int vine_graph_node_is_mid_recovery(const struct vine_graph_node *n)
 {
-	if (!n || !n->outfile || n->outfile->type != VINE_TEMP) {
+	if (!n || !n->outfile || vine_file_type(n->outfile) != VINE_TEMP) {
 		return 0;
 	}
-	struct vine_task *rt = n->outfile->recovery_task;
-	if (!rt) {
-		return 0;
-	}
-	return rt->state != VINE_TASK_INITIAL && rt->state != VINE_TASK_DONE; // recovery in flight
+	return vine_file_is_recovering(n->outfile);
 }
 
 /* Remove or prune the node's result file according to its output storage mode. */
@@ -880,8 +865,8 @@ static void vine_graph_executor_delete_node_output(struct vine_graph_executor *e
 		}
 		break;
 	case VINE_GRAPH_NODE_OUTFILE_TYPE_LOCAL:
-		if (n->outfile && n->outfile->source) {
-			unlink(n->outfile->source);
+		if (n->outfile && vine_file_source(n->outfile)) {
+			unlink(vine_file_source(n->outfile));
 		}
 		break;
 	}
@@ -1183,7 +1168,7 @@ static int vine_graph_executor_validate_node_outputs_or_retry(struct vine_graph_
 		struct stat info;
 		// shared path may lag behind a successful task result code
 		if (stat(output_node->outfile_remote_name, &info) < 0) {
-			debug(D_VINE, "Task %d succeeded but missing sharedfs output %s", task->task_id, output_node->outfile_remote_name);
+			debug(D_VINE, "Task %d succeeded but missing sharedfs output %s", vine_task_get_id(task), output_node->outfile_remote_name);
 			vine_graph_executor_queue_node_retry(e, retry_node);
 			return 0;
 		}
@@ -1194,18 +1179,7 @@ static int vine_graph_executor_validate_node_outputs_or_retry(struct vine_graph_
 	case VINE_GRAPH_NODE_OUTFILE_TYPE_LOCAL:
 	case VINE_GRAPH_NODE_OUTFILE_TYPE_TEMP:
 		if (output_node->outfile) {
-			if (output_node->outfile->type == VINE_TEMP || output_node->outfile->type == VINE_BUFFER) {
-				if (output_node->outfile->state != VINE_FILE_STATE_CREATED) {
-					debug(D_VINE,
-							"Task %d succeeded but primary output for node %" PRIu64 " is not available (state=%d)",
-							task->task_id,
-							output_node->node_id,
-							(int)output_node->outfile->state);
-					vine_graph_executor_queue_node_retry(e, retry_node);
-					return 0;
-				}
-			}
-			output_node->outfile_size_bytes = output_node->outfile->size;
+			output_node->outfile_size_bytes = vine_file_size(output_node->outfile);
 		}
 		break;
 	}
@@ -1214,7 +1188,7 @@ static int vine_graph_executor_validate_node_outputs_or_retry(struct vine_graph_
 }
 
 /*
- * Verify one extra output mount after a successful task (temp/buffer must be CREATED; VINE_FILE paths must exist).
+ * Verify one extra output mount after a successful task (VINE_FILE paths must exist).
  */
 static int vine_graph_executor_validate_io_mount_or_retry(
 		struct vine_graph_executor *e, struct vine_graph_node *retry_node, struct vine_graph_io_mount *mount, struct vine_task *task)
@@ -1224,28 +1198,19 @@ static int vine_graph_executor_validate_io_mount_or_retry(
 	}
 	struct vine_file *f = mount->file;
 
-	switch (f->type) {
+	switch (vine_file_type(f)) {
 	case VINE_TEMP:
 	case VINE_BUFFER:
-		if (f->state != VINE_FILE_STATE_CREATED) {
-			debug(D_VINE,
-					"Task %d succeeded but extra output \"%s\" is not available (state=%d)",
-					task->task_id,
-					mount->remote_name ? mount->remote_name : "?",
-					(int)f->state);
-			vine_graph_executor_queue_node_retry(e, retry_node);
-			return 0;
-		}
 		break;
 	case VINE_FILE:
-		if (f->source) {
+		if (vine_file_source(f)) {
 			struct stat info;
-			if (stat(f->source, &info) < 0) {
+			if (stat(vine_file_source(f), &info) < 0) {
 				debug(D_VINE,
 						"Task %d succeeded but missing extra output file %s (%s)",
-						task->task_id,
+						vine_task_get_id(task),
 						mount->remote_name ? mount->remote_name : "?",
-						f->source);
+						vine_file_source(f));
 				vine_graph_executor_queue_node_retry(e, retry_node);
 				return 0;
 			}
@@ -1283,8 +1248,12 @@ static int vine_graph_executor_validate_task_or_retry(struct vine_graph_executor
 	 * Returning zero means the completion is rejected, a retry is enqueued, and the progress
 	 * bar must not advance because the batch did not truly succeed yet.
 	 */
-	if (task->result != VINE_RESULT_SUCCESS || task->exit_code != 0) {
-		debug(D_VINE, "Task %d failed (result=%d, exit=%d)", task->task_id, task->result, task->exit_code);
+	if (vine_task_get_result(task) != VINE_RESULT_SUCCESS || vine_task_get_exit_code(task) != 0) {
+		debug(D_VINE,
+				"Task %d failed (result=%d, exit=%d)",
+				vine_task_get_id(task),
+				vine_task_get_result(task),
+				vine_task_get_exit_code(task));
 		vine_graph_executor_queue_node_retry(e, node);
 		return 0;
 	}
@@ -1326,11 +1295,13 @@ uint64_t vine_graph_executor_get_makespan_us(const struct vine_graph_executor *e
 /* Return the manager's cumulative count of recovery tasks submitted. */
 uint64_t vine_graph_executor_get_total_recovery_tasks(const struct vine_graph_executor *e)
 {
-	if (!e || !e->manager || !e->manager->stats) {
+	if (!e || !e->manager) {
 		return 0;
 	}
 
-	return (uint64_t)e->manager->stats->tasks_recovery;
+	struct vine_stats stats;
+	vine_get_stats(e->manager, &stats);
+	return (uint64_t)stats.tasks_recovery;
 }
 
 /* Return how many recovery tasks have completed in the current executor run. */
@@ -1395,12 +1366,13 @@ void vine_graph_executor_execute(struct vine_graph_executor *e)
 
 			struct vine_graph_node *node = vine_graph_executor_node_from_task(e, task);
 			if (!node) {
-				debug(D_ERROR, "fatal: task %d could not be mapped to a task node, this indicates a serious bug.", task->task_id);
+				debug(D_ERROR, "fatal: task %d could not be mapped to a task node, this indicates a serious bug.", vine_task_get_id(task));
 				exit(1);
 			}
 
-			if (task->time_when_commit_end > 0) {
-				e->time_first_task_dispatched = MIN(e->time_first_task_dispatched, task->time_when_commit_end); // makespan start
+			timestamp_t commit_end = vine_task_get_metric(task, "time_when_commit_end");
+			if (commit_end > 0) {
+				e->time_first_task_dispatched = MIN(e->time_first_task_dispatched, commit_end); // makespan start
 			}
 
 			/*
@@ -1413,7 +1385,7 @@ void vine_graph_executor_execute(struct vine_graph_executor *e)
 
 			int first_completion = 0;
 
-			if (task->type == VINE_TASK_TYPE_RECOVERY) {
+			if (vine_task_get_recovery_source_task_id(task) > 0) {
 				e->completed_recovery_tasks++;
 				progress_bar_update_part(
 						pbar,
@@ -1427,7 +1399,8 @@ void vine_graph_executor_execute(struct vine_graph_executor *e)
 				/* Only postprocess recovery tasks. */
 				vine_graph_executor_run_completion_postprocess(e, node);
 			} else {
-				e->time_last_task_retrieved = MAX(e->time_last_task_retrieved, task->time_when_retrieval);
+				timestamp_t retrieval_time = (timestamp_t)vine_task_get_metric(task, "time_when_retrieval");
+				e->time_last_task_retrieved = MAX(e->time_last_task_retrieved, retrieval_time);
 				e->makespan_us = e->time_last_task_retrieved - e->time_first_task_dispatched;
 
 				first_completion = !node->completed;
@@ -1435,10 +1408,10 @@ void vine_graph_executor_execute(struct vine_graph_executor *e)
 
 				if (first_completion) {
 					if (user_tasks_part->current == 0) {
-						progress_bar_set_start_time(pbar, task->time_when_commit_start);
+						progress_bar_set_start_time(pbar, vine_task_get_metric(task, "time_when_commit_start"));
 					}
 
-					vine_graph_node_update_critical_path_time(node, task->time_workers_execute_last);
+					vine_graph_node_update_critical_path_time(node, vine_task_get_metric(task, "time_workers_execute_last"));
 				}
 
 				progress_bar_set_part_current(pbar, user_tasks_part, vine_graph_executor_count_completed_user_nodes(g));
@@ -1446,7 +1419,7 @@ void vine_graph_executor_execute(struct vine_graph_executor *e)
 				if (e->failure_injection_step_percent > 0) {
 					// test hook, drop workers at stepped progress thresholds
 					double progress = (double)user_tasks_part->current / (double)user_tasks_part->total;
-					if (progress >= next_failure_threshold && release_random_worker(e->manager)) {
+					if (progress >= next_failure_threshold && vine_manager_release_random_worker(e->manager)) {
 						debug(D_VINE, "released a random worker at %.2f%% (threshold %.2f%%)", progress * 100, next_failure_threshold * 100);
 						next_failure_threshold += e->failure_injection_step_percent / 100.0;
 					}

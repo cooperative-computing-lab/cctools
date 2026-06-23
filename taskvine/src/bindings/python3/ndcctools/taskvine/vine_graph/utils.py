@@ -23,7 +23,3 @@ def remove_tree_contents(root_dir):
 def color_text(text, color_code):
     """Return text wrapped in an ANSI color code."""
     return f"\033[{color_code}m{text}\033[0m"
-
-
-load_vine_graph_context = context_loader_func
-delete_all_files = remove_tree_contents

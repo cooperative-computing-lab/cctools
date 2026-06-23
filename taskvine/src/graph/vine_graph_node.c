@@ -158,7 +158,7 @@ void vine_graph_node_debug_print(struct vine_graph_node *node)
 		return;
 	}
 
-	debug(D_VINE, "task_id: %d", node->task->task_id);
+	debug(D_VINE, "task_id: %d", vine_task_get_id(node->task));
 	debug(D_VINE, "depth: %d", node->depth);
 	debug(D_VINE, "height: %d", node->height);
 
@@ -168,7 +168,7 @@ void vine_graph_node_debug_print(struct vine_graph_node *node)
 
 	if (node->outfile) {
 		const char *type_str = "UNKNOWN";
-		switch (node->outfile->type) {
+		switch (vine_file_type(node->outfile)) {
 		case VINE_FILE:
 			type_str = "VINE_FILE";
 			break;
@@ -185,8 +185,9 @@ void vine_graph_node_debug_print(struct vine_graph_node *node)
 			type_str = "VINE_MINI_TASK";
 			break;
 		}
+		const char *cached_name = vine_file_cached_name(node->outfile);
 		debug(D_VINE, "outfile_type: %s", type_str);
-		debug(D_VINE, "outfile_cached_name: %s", node->outfile->cached_name ? node->outfile->cached_name : "(null)");
+		debug(D_VINE, "outfile_cached_name: %s", cached_name ? cached_name : "(null)");
 	} else {
 		debug(D_VINE, "outfile_type: SHARED_FILE_SYSTEM or none");
 	}

@@ -2,40 +2,30 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-"""Python wrapper for the C executor graph API."""
+"""Bridge from Python VineGraph objects to the C vine_graph API."""
 
-import json
+import importlib
+import sys
+
+# SWIG-generated vine_graph_capi.py imports "cvine"; wire that top-level name
+# to the real TaskVine Python module before importing the generated bindings.
+sys.modules.setdefault("cvine", importlib.import_module("ndcctools.taskvine.cvine"))
 
 from . import vine_graph_capi
 
 
-def _format_scheduler_keys_runner_payload(scheduler_keys):
-    """
-    JSON string for the task-runner ``infile`` buffer: comma-separated scheduler keys in ``fn_args[0]``.
-    Compatible with worker ``task_runner.task.run_scheduler_keys`` (parses string / list / int).
-    Workflow keys ↔ scheduler keys mapping stays on the executor graph (``VineGraphExecutor.add_node``).
-
-    Use this helper when assembling a multi-key call from Python.
-    """
-    keys_list = scheduler_keys if isinstance(scheduler_keys, (list, tuple)) else [scheduler_keys]
-    if not keys_list:
-        raise ValueError("scheduler_keys must be non-empty")
-    joined = ",".join(str(int(k)) for k in keys_list)
-    return json.dumps({"fn_args": [joined], "fn_kwargs": {}})
-
-
-class VineGraphExecutor:
-    """Thin wrapper around the SWIG bindings."""
+class VineGraphCapiBridge:
+    """Thin bridge around the SWIG bindings."""
 
     def __init__(self, c_taskvine):
-        """Create the backing C executor graph."""
+        """Create the backing C vine_graph objects."""
         self._c_graph = vine_graph_capi.vine_graph_executor_create_graph(c_taskvine)
         self._c_executor = vine_graph_capi.vine_graph_executor_create(c_taskvine, self._c_graph)
         self._workflow_key_to_scheduler_key = {}
         self._scheduler_key_to_workflow_key = {}
 
     def tune(self, name, value):
-        """Forward a tuning parameter to the C executor."""
+        """Forward a tuning parameter to the C vine_graph executor."""
         if vine_graph_capi.vine_graph_executor_tune(self._c_executor, name, value) != 0:
             raise RuntimeError(f"Failed to tune executor parameter {name!r}={value!r}")
 
@@ -126,7 +116,3 @@ class VineGraphExecutor:
         self._c_executor = None
         vine_graph_capi.vine_graph_delete(self._c_graph)
         self._c_graph = None
-
-
-ExecutorGraph = VineGraphExecutor
-format_scheduler_keys_runner_payload = _format_scheduler_keys_runner_payload

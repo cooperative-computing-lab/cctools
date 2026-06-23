@@ -7,8 +7,7 @@
 #include "timestamp.h"
 
 #include "list.h"
-#include "vine_file.h"
-#include "vine_task.h"
+#include "taskvine.h"
 
 /**
  * One element of @c extra_outputs or @c extra_inputs: a logical filename plus its @c vine_file

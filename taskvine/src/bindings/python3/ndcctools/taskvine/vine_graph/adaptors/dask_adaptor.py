@@ -17,17 +17,14 @@ try:
 except Exception:
     dts = None
 
-from .legacy import expand_legacy_subgraph_dsk
-from .task_spec import (
-    DaskTaskSpecConverter,
-    _build_expr,
+from .legacy_dask_adaptor import expand_legacy_subgraph_dsk
+from .dask_common import (
+    build_task_expr,
     identity,
-    _resolve_graph_key_if_task,
+    resolve_graph_key_if_task,
 )
+from .dask_task_spec import DaskTaskSpecConverter
 from ..workflow import TaskOutputRef, Workflow
-
-
-_identity = identity
 
 
 def _apply_with_kwargs_kvlist(func, args_list, kwargs_kvlist):
@@ -98,7 +95,8 @@ class VineGraphDaskAdaptor:
         if dts:
             hlg = HighLevelGraph.merge(*(value.dask for value in task_dict.values())).to_dict()
         else:
-            hlg = dask.base.collections_to_dsk(task_dict.values()).to_dict()
+            hlg = dask.base.collections_to_dsk(task_dict.values())
+            hlg = hlg.to_dict() if hasattr(hlg, "to_dict") else dict(hlg)
         return ensure_dict(hlg)
 
     def _convert_to_workflow_tasks(self, task_dict):
@@ -128,12 +126,14 @@ class VineGraphDaskAdaptor:
     def _convert_legacy_task(self, sexpr, workflow_keys):
         try:
             if not isinstance(sexpr, (list, tuple)) and sexpr in workflow_keys:
-                return _build_expr(identity, [TaskOutputRef(sexpr)], {})
+                return build_task_expr(identity, [TaskOutputRef(sexpr)], {})
         except TypeError:
             pass
 
-        if not isinstance(sexpr, (list, tuple)) or not sexpr:
-            raise TypeError(f"Task definition must be a non-empty tuple/list, got {type(sexpr)}")
+        if not isinstance(sexpr, (list, tuple)):
+            return build_task_expr(identity, [sexpr], {})
+        if not sexpr:
+            raise TypeError("Task definition must be a non-empty tuple/list")
 
         func = sexpr[0]
         tail = sexpr[1:]
@@ -150,7 +150,7 @@ class VineGraphDaskAdaptor:
         if isinstance(obj, TaskOutputRef):
             return obj
 
-        key = _resolve_graph_key_if_task(obj, workflow_keys)
+        key = resolve_graph_key_if_task(obj, workflow_keys)
         if key is not None:
             return TaskOutputRef(key)
 
