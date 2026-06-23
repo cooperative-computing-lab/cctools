@@ -41,7 +41,6 @@ class VineGraphConfig:
             "checkpoint-dir": "./checkpoints",
             "checkpoint-fraction": 0,
             "progress-bar-update-interval-sec": 0.1,
-            "enable-debug-log": 1,
             "print-graph-details": 0,
         }
         self.task_runner = {

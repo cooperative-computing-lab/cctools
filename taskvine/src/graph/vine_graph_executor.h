@@ -36,7 +36,6 @@ struct vine_graph_executor {
 	task_priority_mode_t task_priority_mode; // schedule order before submit
 	double failure_injection_step_percent;	 // optional worker release steps for tests
 	double progress_bar_update_interval_sec;
-	int enable_debug_log;
 };
 
 struct vine_graph_executor *vine_graph_executor_create(struct vine_manager *manager, struct vine_graph *graph);

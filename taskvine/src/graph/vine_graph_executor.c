@@ -168,7 +168,6 @@ static void vine_graph_executor_init_runtime(struct vine_graph_executor *e)
 	e->task_priority_mode = TASK_PRIORITY_MODE_LARGEST_INPUT_FIRST;
 	e->failure_injection_step_percent = -1.0;
 	e->progress_bar_update_interval_sec = 0.1;
-	e->enable_debug_log = 1;
 }
 
 static int vine_graph_task_not_submitted(struct vine_task *task)
@@ -210,7 +209,7 @@ struct vine_graph_executor *vine_graph_executor_create(struct vine_manager *mana
 	return e;
 }
 
-/* Create a new graph for the manager and enable debug logging under the runtime directory. */
+/* Create a new graph for the manager's runtime directory. */
 struct vine_graph *vine_graph_executor_create_graph(struct vine_manager *manager)
 {
 	if (!manager) {
@@ -218,10 +217,6 @@ struct vine_graph *vine_graph_executor_create_graph(struct vine_manager *manager
 	}
 
 	const char *runtime_dir = vine_get_runtime_directory(manager);
-	char *debug_tmp = string_format("%s/vine-logs/debug", runtime_dir);
-	vine_enable_debug_log(debug_tmp);
-	free(debug_tmp);
-
 	return vine_graph_create(runtime_dir);
 }
 
@@ -550,16 +545,6 @@ int vine_graph_executor_tune(struct vine_graph_executor *e, const char *name, co
 	} else if (strcmp(name, "progress-bar-update-interval-sec") == 0) {
 		double val = atof(value);
 		e->progress_bar_update_interval_sec = (val > 0.0) ? val : 0.1;
-
-	} else if (strcmp(name, "enable-debug-log") == 0) {
-		if (e->enable_debug_log == 0) {
-			return -1;
-		}
-		e->enable_debug_log = (atoi(value) == 1) ? 1 : 0;
-		if (e->enable_debug_log == 0) {
-			debug_flags_clear();
-			debug_close();
-		}
 
 	} else {
 		return vine_graph_tune(e->graph, name, value);
@@ -1418,7 +1403,11 @@ void vine_graph_executor_execute(struct vine_graph_executor *e)
 					vine_graph_node_update_critical_path_time(node, vine_task_get_metric(task, "time_workers_execute_last"));
 				}
 
-				progress_bar_set_part_current(pbar, user_tasks_part, vine_graph_executor_count_completed_user_nodes(g));
+				uint64_t completed_user_nodes = vine_graph_executor_count_completed_user_nodes(g);
+				if (completed_user_nodes > user_tasks_part->current) {
+					/* Count graph nodes, then advance by the delta to avoid double-counting retries. */
+					progress_bar_update_part(pbar, user_tasks_part, completed_user_nodes - user_tasks_part->current);
+				}
 
 				if (e->failure_injection_step_percent > 0) {
 					// test hook, drop workers at stepped progress thresholds

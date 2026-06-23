@@ -77,13 +77,6 @@ void progress_bar_set_part_total(struct ProgressBar *bar, struct ProgressBarPart
 */
 void progress_bar_update_part(struct ProgressBar *bar, struct ProgressBarPart *part, uint64_t increment);
 
-/** Set the current value for a part (clamped to [0, total]) and redraw if the update interval allows.
-@param bar Progress bar.
-@param part Part to update.
-@param current New absolute current value.
-*/
-void progress_bar_set_part_current(struct ProgressBar *bar, struct ProgressBarPart *part, uint64_t current);
-
 /** Set the start time for the progress bar.
 @param bar Progress bar.
 @param start_time Start timestamp.

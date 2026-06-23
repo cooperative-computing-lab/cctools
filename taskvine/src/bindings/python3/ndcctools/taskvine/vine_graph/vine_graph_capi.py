@@ -152,7 +152,6 @@ class vine_graph_executor(object):
     task_priority_mode = property(_vine_graph_capi.vine_graph_executor_task_priority_mode_get, _vine_graph_capi.vine_graph_executor_task_priority_mode_set)
     failure_injection_step_percent = property(_vine_graph_capi.vine_graph_executor_failure_injection_step_percent_get, _vine_graph_capi.vine_graph_executor_failure_injection_step_percent_set)
     progress_bar_update_interval_sec = property(_vine_graph_capi.vine_graph_executor_progress_bar_update_interval_sec_get, _vine_graph_capi.vine_graph_executor_progress_bar_update_interval_sec_set)
-    enable_debug_log = property(_vine_graph_capi.vine_graph_executor_enable_debug_log_get, _vine_graph_capi.vine_graph_executor_enable_debug_log_set)
 
     def __init__(self):
         _vine_graph_capi.vine_graph_executor_swiginit(self, _vine_graph_capi.new_vine_graph_executor())
