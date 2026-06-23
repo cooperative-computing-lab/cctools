@@ -241,6 +241,12 @@ class Manager(object):
         return self._using_ssl
 
     ##
+    # Absolute path to this workflow run's runtime directory (parent of vine-logs, staging, etc.).
+    @property
+    def runtime_directory(self):
+        return cvine.vine_get_runtime_directory(self._taskvine)
+
+    ##
     # Get the logs directory of the manager
     @property
     def logging_directory(self):
