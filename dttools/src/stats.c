@@ -98,6 +98,7 @@ void stats_bin(const char *name, uint64_t value)
 
 struct jx *stats_get(void)
 {
+	int iteration;
 	if (!stats_enabled)
 		return jx_null();
 	char *k;
@@ -105,8 +106,8 @@ struct jx *stats_get(void)
 	struct jx *out = jx_object(NULL);
 	struct jx *log;
 	stats_init();
-	hash_table_firstkey(stats);
-	while (hash_table_nextkey(stats, &k, (void **)&s)) {
+	HASH_TABLE_ITERATE(stats, iteration, k, s)
+	{
 		switch (s->type) {
 		case STATS_INT:
 			jx_insert_integer(out, k, s->v.value);

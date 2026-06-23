@@ -120,7 +120,8 @@ void vine_cache_scan(struct vine_cache *c, struct link *manager)
 {
 	struct vine_cache_file *f;
 	char *cachename;
-	HASH_TABLE_ITERATE(c->table, cachename, f)
+	int iteration;
+	HASH_TABLE_ITERATE(c->table, iteration, cachename, f)
 	{
 		vine_worker_send_cache_update(manager, cachename, f);
 	}
@@ -179,7 +180,8 @@ int vine_cache_start_transfers(struct vine_cache *c)
 	struct list *to_process = list_create();
 	char *cachename;
 	void *dummy;
-	HASH_TABLE_ITERATE(c->pending_transfers, cachename, dummy)
+	int iteration;
+	HASH_TABLE_ITERATE(c->pending_transfers, iteration, cachename, dummy)
 	{
 		list_push_tail(to_process, xxstrdup(cachename));
 		if (list_size(to_process) >= c->max_transfer_procs - hash_table_size(c->processing_transfers)) {
@@ -211,7 +213,8 @@ void vine_cache_delete(struct vine_cache *c)
 	/* Ensure that all child processes are killed off. */
 	char *cachename;
 	struct vine_cache_file *file;
-	HASH_TABLE_ITERATE(c->table, cachename, file)
+	int iteration;
+	HASH_TABLE_ITERATE(c->table, iteration, cachename, file)
 	{
 		vine_cache_kill(c, file, cachename, 0);
 	}

@@ -121,7 +121,8 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 	struct vine_file_replica *replica = NULL;
 
 	int offset_bookkeep;
-	SET_ITERATE_RANDOM_START(workers, offset_bookkeep, peer)
+	int iteration;
+	SET_ITERATE_RANDOM_START(workers, offset_bookkeep, iteration, peer)
 	{
 		random_index--;
 		if (!peer->transfer_port_active)
@@ -158,7 +159,8 @@ int vine_file_replica_table_count_replicas(struct vine_manager *q, const char *c
 
 	struct set *workers = hash_table_lookup(q->file_worker_table, cachename);
 	if (workers) {
-		SET_ITERATE(workers, w)
+		int iteration;
+		SET_ITERATE(workers, iteration, w)
 		{
 			r = hash_table_lookup(w->current_files, cachename);
 			if (r && r->state == state) {
