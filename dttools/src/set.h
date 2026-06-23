@@ -32,18 +32,19 @@ To list all of the elements in a set, use @ref set_first_element and @ref set_ne
 
 <pre>
 void *element;
+int iteration;
 
-set_first_element(s);
-while(element = set_next_element(s)) {
+iteration = set_first_element(s);
+while((element = set_next_element(s, iteration))) {
 	printf("set contains: %x\n", element);
 }
 </pre>
 
 */
 
-#define SET_ITERATE( set, element ) set_first_element(set); while((element = set_next_element(set)))
+#define SET_ITERATE( set, iteration, element ) iteration = set_first_element(set); while((element = set_next_element(set, iteration)))
 
-#define SET_ITERATE_RANDOM_START( set, offset_bookkeep, element ) set_random_element(set, &offset_bookkeep); while((element = set_next_element_with_offset(set, offset_bookkeep)))
+#define SET_ITERATE_RANDOM_START( set, offset_bookkeep, iteration, element ) iteration = set_random_element(set, &offset_bookkeep); while((element = set_next_element_with_offset(set, offset_bookkeep, iteration)))
 
 /** Create a new set.
 @param buckets The number of elements in the set.  If zero, a default element will be used. Increases dynamically as needed.
@@ -155,36 +156,63 @@ void *set_pop(struct set *s);
 This function begins a new iteration over a set,
 allowing you to visit every element in the set.
 Next, invoke @ref set_next_element to retrieve each element in order.
+Use SET_ITERATE unless you know what you are doing.
 @param s A pointer to a set.
+@return The iteration index.
 */
 
-void set_first_element(struct set *s);
+int set_first_element(struct set *s);
 
 /** Continue iteration over all elements.
 This function returns the next element in the iteration.
+This function should only be called after a call to set_first_element.
+Use SET_ITERATE unless you know what you are doing.
+Warning: It cannot be called after set_insert, set_clear, or a
+table resize during the same iteration.
 @param s A pointer to a set.
+@param iteration The iteration index since the last call to set_first_element.
 @return zero if there are no more elements to visit, the next element otherwise.
 */
 
-void *set_next_element(struct set *s);
+void *set_next_element(struct set *s, int iteration);
+
+/** Iterate over all elements in a set.
+This function invokes a callback on every element in the set.
+Unlike @ref SET_ITERATE, this function does not use the set's
+iteration state, so it may be called while another iteration is in
+progress.  The set must not be modified during the call; if an
+insert, compact, clear, or resize occurs, the program will abort.
+@param s A pointer to a set.
+@param func A callback invoked once for each element.
+@param arg An arbitrary pointer passed to each invocation of @a func.
+*/
+
+void set_foreach_ro(struct set *s, void (*func)(void *element, void *arg), void *arg);
 
 /** Begin iteration over all elements from a random offset.
 This function begins a new iteration over a set,
 allowing you to visit every element in the set.
 Next, invoke @ref set_next_element_with_offset to retrieve each value in order.
+Use SET_ITERATE_RANDOM_START unless you know what you are doing.
 @param s A pointer to a set.
 @param offset_bookkeep An integer to pointer where the origin to the iteration is recorded.
+@return The iteration index.
 */
 
-void set_random_element(struct set *s, int *offset_bookkeep);
+int set_random_element(struct set *s, int *offset_bookkeep);
 
 /** Continue iteration over all elements from an arbitray offset.
 This function returns the next element in the iteration.
+This function should only be called after a call to set_random_element.
+Use SET_ITERATE_RANDOM_START unless you know what you are doing.
+Warning: It cannot be called after set_insert, set_clear, or a
+table resize during the same iteration.
 @param s A pointer to a set.
 @param offset_bookkeep The origin for this iteration. See @ref set_random_element
+@param iteration The iteration index since the last call to set_random_element.
 */
 
-void *set_next_element_with_offset(struct set *s, int offset_bookkeep);
+void *set_next_element_with_offset(struct set *s, int offset_bookkeep, int iteration);
 
 /** A set_size(s) array of the current elements in the set in a random order.
 Caller should free the array.

@@ -82,9 +82,8 @@ int main(int argc, char** argv)
         struct hash_table* tmp_ht = m->res_type_to_bucketing_state;
         char* tmp_name;
         bucketing_state_t* tmp_state;
-        hash_table_firstkey(tmp_ht);
-        while(hash_table_nextkey(tmp_ht, &tmp_name, (void**) &tmp_state))
-        {
+        int iteration;
+        HASH_TABLE_ITERATE(tmp_ht, iteration, tmp_name, tmp_state) {
             printf("buckets for %s\n", tmp_name);
             bucketing_sorted_buckets_print(tmp_state->sorted_buckets);
         }
