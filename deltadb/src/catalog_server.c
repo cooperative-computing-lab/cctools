@@ -190,9 +190,6 @@ int compare_jx(const void *a, const void *b)
 
 static void remove_expired_records()
 {
-	struct jx *j;
-	char *key;
-
 	time_t current = time(0);
 
 	// Only clean every clean_interval seconds.
@@ -202,8 +199,10 @@ static void remove_expired_records()
 	// Run for a minimum of lifetime seconds before cleaning anything up.
 	if((current-starttime)<lifetime ) return;
 
-	deltadb_firstkey(table);
-	while(deltadb_nextkey(table, &key, &j)) {
+	struct jx *j;
+	char *key;
+	int iteration;
+	DELTA_DB_ITERATE(table, iteration, key, j) {
 		time_t lastheardfrom = jx_lookup_integer(j,"lastheardfrom");
 
 		int this_lifetime = jx_lookup_integer(j,"lifetime");
@@ -215,7 +214,9 @@ static void remove_expired_records()
 
 		if( (current-lastheardfrom) > this_lifetime ) {
 				j = deltadb_remove(table,key);
-			if(j) jx_delete(j);
+				if(j){
+					jx_delete(j);
+				}
 		}
 	}
 
@@ -581,8 +582,8 @@ static void handle_query( struct link *ql, time_t st )
 
 	/* Now transform the hashtable into one big array for sorting. */
 	n = 0;
-	deltadb_firstkey(table);
-	while(deltadb_nextkey(table, &hkey, &j)) {
+	int iteration;
+	DELTA_DB_ITERATE(table, iteration, hkey, j) {
 		array[n] = j;
 		n++;
 	}

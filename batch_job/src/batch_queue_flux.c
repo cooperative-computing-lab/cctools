@@ -340,9 +340,10 @@ static int batch_queue_flux_create(struct batch_queue *q)
 static int batch_queue_flux_free(struct batch_queue *q)
 {
 	if (flux_job_info_table) {
+		int iteration;
 		struct flux_job_info *info;
 		uint64_t flux_job_id;
-		ITABLE_ITERATE(flux_job_info_table, flux_job_id, info)
+		ITABLE_ITERATE(flux_job_info_table, iteration, flux_job_id, info)
 		{
 			delete_flux_job_info(info);
 		}
