@@ -1172,6 +1172,13 @@ void vine_unblock_host(struct vine_manager *m, const char *hostname);
 */
 void vine_unblock_all(struct vine_manager *m);
 
+/** Release a random worker for failure-injection tests.
+This is a testing support hook, not a normal manager control operation.
+@param m A manager object.
+@return Non-zero if a worker was released.
+*/
+int vine_manager_release_random_worker(struct vine_manager *m);
+
 /** Get manager statistics (only from manager)
 @param m A manager object
 @param s A pointer to a buffer that will be filed with statistics
