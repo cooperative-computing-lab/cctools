@@ -222,6 +222,7 @@ struct vine_manager {
 	int temp_replica_count;       /* Number of replicas per temp file */
 	int clean_redundant_replicas; /* If true, remove redundant replicas of temp files to save disk space. */
 	int shift_disk_load;          /* If true, shift storage burden to more available workers to minimize disk usage peaks. */
+	int return_recovery_tasks;    /* If true, recovery tasks are returned by vine_wait to the user. */
 
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */

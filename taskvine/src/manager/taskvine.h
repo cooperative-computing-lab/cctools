@@ -487,6 +487,12 @@ int vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output
 
 const char *vine_task_get_state(struct vine_task *t);
 
+/** Return the original task id that a recovery task is restoring.
+@param t A task object.
+@return The source task id for a recovery task, or zero for non-recovery tasks.
+*/
+int vine_task_get_recovery_source_task_id(struct vine_task *t);
+
 /** Get the command line of the task.
 @param t A task object.
 @return The command line set by @ref vine_task_create.
@@ -1118,6 +1124,14 @@ int vine_enable_peer_transfers(struct vine_manager *m);
 
 /** Disable taskvine peer transfers to be scheduled by the manager **/
 int vine_disable_peer_transfers(struct vine_manager *m);
+
+/** Enable recovery tasks to be returned by vine_wait.
+By default, recovery tasks are handled internally by the manager. **/
+int vine_enable_return_recovery_tasks(struct vine_manager *m);
+
+/** Disable recovery tasks from being returned by vine_wait.
+Recovery tasks will be handled internally by the manager. **/
+int vine_disable_return_recovery_tasks(struct vine_manager *m);
 
 /** When enabled, resources to tasks in are assigned in proportion to the size
 of the worker. If a resource is specified (e.g. with @ref vine_task_set_cores),

@@ -4315,6 +4315,20 @@ int vine_disable_peer_transfers(struct vine_manager *q)
 	return 1;
 }
 
+int vine_enable_return_recovery_tasks(struct vine_manager *q)
+{
+	debug(D_VINE, "Return recovery tasks enabled");
+	q->return_recovery_tasks = 1;
+	return 1;
+}
+
+int vine_disable_return_recovery_tasks(struct vine_manager *q)
+{
+	debug(D_VINE, "Return recovery tasks disabled");
+	q->return_recovery_tasks = 0;
+	return 1;
+}
+
 int vine_enable_proportional_resources(struct vine_manager *q)
 {
 	debug(D_VINE, "Proportional resources enabled");
@@ -5235,7 +5249,10 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			return t;
 			break;
 		case VINE_TASK_TYPE_RECOVERY:
-			/* do nothing and let vine_manager_consider_recovery_task do its job */
+			if (q->return_recovery_tasks) {
+				return t;
+			}
+			/* Otherwise, do nothing and let vine_manager_consider_recovery_task do its job. */
 			break;
 		case VINE_TASK_TYPE_LIBRARY_INSTANCE:
 			/* silently delete the task, since it was created by the manager.
