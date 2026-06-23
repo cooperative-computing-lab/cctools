@@ -36,7 +36,8 @@ static struct list *vine_graph_compute_topological_order(struct vine_graph *g)
 
 	uint64_t nid;
 	struct vine_graph_node *node;
-	ITABLE_ITERATE(g->nodes, nid, node)
+	int iteration;
+	ITABLE_ITERATE(g->nodes, iteration, nid, node)
 	{
 		int deg = list_size(node->parents);
 		itable_insert(in_degree_map, nid, (void *)(intptr_t)deg);
@@ -67,7 +68,7 @@ static struct list *vine_graph_compute_topological_order(struct vine_graph *g)
 		debug(D_ERROR, "Expected %d nodes, but only sorted %d.", total_nodes, list_size(topo_order));
 
 		uint64_t id;
-		ITABLE_ITERATE(g->nodes, id, node)
+		ITABLE_ITERATE(g->nodes, iteration, id, node)
 		{
 			intptr_t raw_deg = (intptr_t)itable_lookup(in_degree_map, id);
 			int deg = (int)raw_deg;
@@ -109,7 +110,8 @@ static struct list *vine_graph_extract_weak_components(struct vine_graph *g)
 
 	uint64_t nid;
 	struct vine_graph_node *node;
-	ITABLE_ITERATE(g->nodes, nid, node)
+	int iteration;
+	ITABLE_ITERATE(g->nodes, iteration, nid, node)
 	{
 		if (set_lookup(visited, node)) {
 			continue;
@@ -199,7 +201,8 @@ static void vine_graph_compute_topology_scores(struct vine_graph *g, struct list
 	struct itable *upstream_map = itable_create(0);	  // reachable ancestors per node
 	struct itable *downstream_map = itable_create(0); // reachable descendants per node
 	uint64_t nid_tmp;
-	ITABLE_ITERATE(g->nodes, nid_tmp, node)
+	int iteration;
+	ITABLE_ITERATE(g->nodes, iteration, nid_tmp, node)
 	{
 		struct set *upstream = set_create(0);
 		struct set *downstream = set_create(0);
@@ -652,7 +655,8 @@ static void vine_graph_supernode_rewire(struct vine_graph *g, struct vine_graph_
 {
 	struct vine_graph_node *m;
 	uint64_t nid;
-	ITABLE_ITERATE(g->nodes, nid, m)
+	int iteration;
+	ITABLE_ITERATE(g->nodes, iteration, nid, m)
 	{
 		if (!set_lookup(mset, m)) {
 			continue;
@@ -799,7 +803,8 @@ int vine_graph_supernode_register(struct vine_graph *g, uint64_t leader_id, cons
 
 	struct vine_graph_node *x;
 	uint64_t xid;
-	ITABLE_ITERATE(g->nodes, xid, x)
+	int iteration;
+	ITABLE_ITERATE(g->nodes, iteration, xid, x)
 	{
 		if (set_lookup(mset, x)) {
 			x->super_leader_id = leader_id;
@@ -888,7 +893,8 @@ int vine_graph_group_chain_like_tasks(struct vine_graph *g)
 
 	uint64_t nid;
 	struct vine_graph_node *n;
-	ITABLE_ITERATE(g->nodes, nid, n)
+	int iteration;
+	ITABLE_ITERATE(g->nodes, iteration, nid, n)
 	{
 		if (!vine_graph_node_is_chain_head(n)) {
 			continue;
@@ -987,8 +993,9 @@ void vine_graph_delete(struct vine_graph *g)
 
 	uint64_t lid;
 	struct list *mems;
+	int iteration;
 	if (g->super_leader_to_members) {
-		ITABLE_ITERATE(g->super_leader_to_members, lid, mems)
+		ITABLE_ITERATE(g->super_leader_to_members, iteration, lid, mems)
 		{
 			(void)lid;
 			if (mems) {
@@ -1001,7 +1008,7 @@ void vine_graph_delete(struct vine_graph *g)
 
 	uint64_t nid;
 	struct vine_graph_node *node;
-	ITABLE_ITERATE(g->nodes, nid, node)
+	ITABLE_ITERATE(g->nodes, iteration, nid, node)
 	{
 		vine_graph_node_delete(node);
 	}

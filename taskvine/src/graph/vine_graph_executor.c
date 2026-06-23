@@ -29,11 +29,12 @@ static uint64_t vine_graph_executor_count_completed_user_nodes(const struct vine
 	uint64_t n = 0;
 	uint64_t nid;
 	struct vine_graph_node *nd;
+	int iteration;
 
 	if (!g) {
 		return 0;
 	}
-	ITABLE_ITERATE(g->nodes, nid, nd)
+	ITABLE_ITERATE(g->nodes, iteration, nid, nd)
 	{
 		if (nd->completed) {
 			n++;
@@ -232,7 +233,8 @@ void vine_graph_executor_delete(struct vine_graph_executor *e)
 		struct set *extra_files = set_create(0);
 		uint64_t nid;
 		struct vine_graph_node *node;
-		ITABLE_ITERATE(g->nodes, nid, node)
+		int iteration;
+		ITABLE_ITERATE(g->nodes, iteration, nid, node)
 		{
 			if (node->task_runner_arg_file) {
 				vine_undeclare_file(e->manager, node->task_runner_arg_file); // before graph free to avoid double free
@@ -448,7 +450,8 @@ void vine_graph_executor_finalize(struct vine_graph_executor *e)
 	 */
 	uint64_t nid;
 	struct vine_graph_node *node;
-	ITABLE_ITERATE(g->nodes, nid, node)
+	int iteration;
+	ITABLE_ITERATE(g->nodes, iteration, nid, node)
 	{
 		vine_graph_executor_declare_node_outfile(e, node);
 		if (node->outfile) {
@@ -456,7 +459,7 @@ void vine_graph_executor_finalize(struct vine_graph_executor *e)
 		}
 	}
 
-	ITABLE_ITERATE(g->nodes, nid, node)
+	ITABLE_ITERATE(g->nodes, iteration, nid, node)
 	{
 		node->remaining_parents_count = list_size(node->parents);
 	}
@@ -711,7 +714,8 @@ static void vine_graph_executor_submit_initial_ready_nodes(struct vine_graph_exe
 
 	uint64_t nid;
 	struct vine_graph_node *node;
-	ITABLE_ITERATE(g->nodes, nid, node)
+	int iteration;
+	ITABLE_ITERATE(g->nodes, iteration, nid, node)
 	{
 		if (vine_graph_node_ready_for_submission(e, node)) {
 			vine_graph_executor_submit_node(e, node);

@@ -164,27 +164,27 @@ def _run_vine_graph(graph, n, task_group, port, port_file, logs, tag, out_dir, c
     except Exception:
         pass
 
-    m = VineGraph(port=port, run_info_path=str(logs), run_info_template=tag)
-    if port_file:
-        Path(port_file).write_text(str(m.port))
+    with VineGraph(port=port, run_info_path=str(logs), run_info_template=tag) as m:
+        if port_file:
+            Path(port_file).write_text(str(m.port))
 
-    m.set_params(
-        {
-            "checkpoint-dir": str(ckpt_dir),
-            "extra-task-output-size-mb": [0.0, 0.0],
-            "extra-task-sleep-time": [0.0, 0.0],
-            "output-dir": str(out_dir),
-            "task-group": task_group,
-            "task-priority-mode": priority,
-            "wait-for-workers": 1,
-        }
-    )
-    return m.run(
-        wf,
-        target_keys=targets,
-        hoisting_modules=[sys.modules[__name__]],
-        env_files={"./vine_graph_workflow_examples.py": "vine_graph_workflow_examples.py"},
-    ) or {}
+        m.set_params(
+            {
+                "checkpoint-dir": str(ckpt_dir),
+                "extra-task-output-size-mb": [0.0, 0.0],
+                "extra-task-sleep-time": [0.0, 0.0],
+                "output-dir": str(out_dir),
+                "task-group": task_group,
+                "task-priority-mode": priority,
+                "wait-for-workers": 1,
+            }
+        )
+        return m.run(
+            wf,
+            target_keys=targets,
+            hoisting_modules=[sys.modules[__name__]],
+            env_files={"./vine_graph_workflow_examples.py": "vine_graph_workflow_examples.py"},
+        ) or {}
 
 
 def run_graph(
