@@ -11,7 +11,7 @@ import sys
 # to the real TaskVine Python module before importing the generated bindings.
 sys.modules.setdefault("cvine", importlib.import_module("ndcctools.taskvine.cvine"))
 
-from . import vine_graph_capi
+from . import vine_graph_capi  # noqa: E402
 
 
 class VineGraphCapiBridge:

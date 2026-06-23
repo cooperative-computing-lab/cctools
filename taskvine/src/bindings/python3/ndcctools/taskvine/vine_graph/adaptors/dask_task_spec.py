@@ -15,6 +15,7 @@ def _safe_repr(value, limit=800):
         return text[:limit] + "...<truncated>"
     return text
 
+
 def _extract_callable_from_task(node):
     for attr in ("function", "op", "callable", "func", "operation", "callable_obj"):
         if not hasattr(node, attr):

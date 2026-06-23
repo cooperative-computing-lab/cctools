@@ -10,12 +10,11 @@ from .workflow import Workflow, TaskOutputRef, TaskOutputWrapper
 from .capi_bridge import VineGraphCapiBridge
 from .utils import color_text, context_loader_func, remove_tree_contents
 
-from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, TimeRemainingColumn
-
 import cloudpickle
 import os
 import random
 import signal
+import sys
 import time
 
 
@@ -263,6 +262,18 @@ class VineGraph(Manager):
 
         return task_runner_registration
 
+    def _print_local_progress(self, done, total, started_at):
+        """Print a simple local-execute progress line without external dependencies."""
+        bar_width = 24
+        filled = int(bar_width * done / total) if total else bar_width
+        bar = "#" * filled + "-" * (bar_width - filled)
+        percent = 100.0 * done / total if total else 100.0
+        elapsed = time.time() - started_at
+        sys.stdout.write(f"\rExecuting Tasks [{bar}] {done}/{total} {percent:5.1f}% elapsed {elapsed:.1f}s")
+        if done == total:
+            sys.stdout.write("\n")
+        sys.stdout.flush()
+
     def _execute_workflow_local(self, py_graph):
         """Run the workflow locally in topological order."""
         out_dir = os.path.abspath(self.get_param("output-dir"))
@@ -275,27 +286,20 @@ class VineGraph(Manager):
             interval = float(self.get_param("progress-bar-update-interval-sec"))
             if interval <= 0:
                 interval = 0.1
-            refresh_per_second = min(30.0, max(1.0, 1.0 / interval))
 
             n = len(order)
             if n == 0:
                 return time.time() - t0
 
-            with Progress(
-                TextColumn("[bold]Executing Tasks"),
-                TextColumn("•"),
-                TextColumn("[cyan]User"),
-                BarColumn(),
-                MofNCompleteColumn(),
-                TimeRemainingColumn(),
-                refresh_per_second=refresh_per_second,
-                transient=False,
-            ) as progress:
-                bar_id = progress.add_task("User", total=n)
-                for k in order:
-                    out = compute_task(py_graph, py_graph.task_dict[k])
-                    py_graph.save_task_output(k, out)
-                    progress.advance(bar_id)
+            self._print_local_progress(0, n, t0)
+            last_update = time.time()
+            for i, k in enumerate(order, 1):
+                out = compute_task(py_graph, py_graph.task_dict[k])
+                py_graph.save_task_output(k, out)
+                now = time.time()
+                if now - last_update >= interval or i == n:
+                    self._print_local_progress(i, n, t0)
+                    last_update = now
         finally:
             os.chdir(prev_cwd)
         return time.time() - t0

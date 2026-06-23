@@ -78,7 +78,7 @@ except (ImportError, ModuleNotFoundError):
     from .compat import DaskVineDag
 
 try:
-    from .vine_graph import VineGraph, VineGraphConfig, VineGraphDaskAdaptor
+    from .vine_graph import VineGraph, VineGraphConfig, VineGraphDaskAdaptor  # noqa: F401
 except (ImportError, ModuleNotFoundError):
     pass
 

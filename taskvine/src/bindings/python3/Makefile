@@ -7,7 +7,7 @@ CCTOOLS_DYNAMIC_SUFFIX = so
 LOCAL_CCFLAGS = -w -fPIC -DNDEBUG $(CCTOOLS_PYTHON3_CCFLAGS) -I ../../manager
 LOCAL_LINKAGE = $(CCTOOLS_PYTHON3_LDFLAGS) -lz $(CCTOOLS_OPENSSL_LDFLAGS) $(CCTOOLS_HOME)/taskvine/src/manager/libtaskvine.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
 
-CCTOOLS_FLAKE8_IGNORE_FILES = "cvine.py"
+CCTOOLS_FLAKE8_IGNORE_FILES = "cvine.py,vine_graph_capi.py"
 
 DSPYTHONSO = ndcctools/taskvine/_cvine.$(CCTOOLS_DYNAMIC_SUFFIX)
 VINE_GRAPH_MODULE_DIR = $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/vine_graph
