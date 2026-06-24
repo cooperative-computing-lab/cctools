@@ -4,7 +4,6 @@
 
 from collections import defaultdict, deque
 from collections.abc import Mapping
-from dataclasses import is_dataclass, fields, replace
 import cloudpickle
 
 
@@ -98,17 +97,6 @@ class Workflow:
                         rec(v)
                     return None
                 return {k: rec(v) for k, v in x.items()}
-
-            if is_dataclass(x) and not isinstance(x, type):
-                if not rewrite:
-                    for f in fields(x):
-                        rec(getattr(x, f.name))
-                    return None
-                updates = {f.name: rec(getattr(x, f.name)) for f in fields(x)}
-                try:
-                    return replace(x, **updates)
-                except Exception:
-                    return x.__class__(**updates)
 
             if isinstance(x, tuple) and hasattr(x, "_fields"):  # namedtuple
                 if not rewrite:
