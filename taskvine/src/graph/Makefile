@@ -1,6 +1,8 @@
 include ../../../config.mk
 include ../../../rules.mk
 
+CCTOOLS_DYNAMIC_SUFFIX = so
+
 PROJECT_NAME := vine_graph
 SOURCE_DIR   := $(CCTOOLS_HOME)/taskvine/src/graph
 PY_MODULE_DIR := $(CCTOOLS_HOME)/taskvine/src/bindings/python3/ndcctools/taskvine/vine_graph
