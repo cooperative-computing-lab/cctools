@@ -100,10 +100,17 @@ class Manager(object):
         self._cached_queue = []         # CachedTaskResult objects pending return from wait()
         self._info_widget = None
         self._using_ssl = False
+
+        # Prometheus integration fields:
+        # The port number that the Prometheus metrics server is listening on, or None if disabled
         self._prometheus_port = None
+        # The HTTP server object for Prometheus metrics, or None if not running
         self._prometheus_httpd = None
+        # The Prometheus CollectorRegistry instance, or None if metrics are not enabled
         self._prometheus_registry = None
+        # The custom StatusCollector registered with Prometheus, or None if not initialized
         self._prometheus_collector = None
+
         if staging_path:
             self._staging_explicit = os.path.join(staging_path, "vine-staging")
         else:
