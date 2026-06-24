@@ -1464,6 +1464,9 @@ to make a progress bar or other user-visible information:
     printf("%d\n", stats->workers_connected);
     ```
 
+In Python, you can also expose these statistics to a Prometheus server for
+external monitoring. See [Prometheus Metrics](#prometheus-metrics).
+
 ## Python Programming Models
 
 When writing a manager in Python, you have access to several types of tasks
@@ -2568,6 +2571,48 @@ produces the following graphs:
 ![](images/plot-perf-montage.png)
 
 - [Performance Log File Format Details](log-file-formats.md#performance-log-format)
+
+### Prometheus Metrics
+
+When writing a manager in Python, you can expose live manager statistics as
+[Prometheus](https://prometheus.io/) metrics. Pass `prometheus=True` to serve
+metrics on port 9090, or pass an integer to choose a different port:
+
+```python
+import ndcctools.taskvine as vine
+
+with vine.Manager(port=0, prometheus=True) as m:
+    print(f"metrics at http://127.0.0.1:{m.prometheus_port}/metrics")
+    ...
+```
+
+This feature requires the optional `prometheus_client` package:
+
+```sh
+pip install prometheus_client
+```
+
+If `prometheus_client` is not installed, manager creation fails with an
+`ImportError` when metrics are enabled.
+
+Each scrape returns gauge metrics derived from the manager status API. Manager
+statistics are exported as `vine_<field>` (for example, `vine_tasks_waiting`
+and `vine_workers_connected`). Per-category statistics are exported as
+`vine_category_<field>` with a `category` label. Nested category fields such as
+`first_allocation`, `max_allocation`, and `max_seen` appear as
+`vine_category_<nested>_<field>`.
+
+The metrics server starts when the manager is created and stops automatically
+when the manager is destroyed.
+
+To scrape these metrics with a Prometheus server, add a job like this:
+
+```yaml
+scrape_configs:
+  - job_name: taskvine
+    static_configs:
+      - targets: ["MACHINENAME:9090"]
+```
 
 ### Taskgraph Log
 
