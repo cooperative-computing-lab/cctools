@@ -124,5 +124,8 @@ def start(port, status_fn):
     registry = pc.CollectorRegistry()
     collector = StatusCollector(status_fn)
     registry.register(collector)
+
+    # rely on GIL to ensure thread safety as SWIG bindings do
+    # not release the GIL during vine_wait calls.
     httpd, thread = pc.start_http_server(port, registry=registry)
     return httpd, registry, collector
