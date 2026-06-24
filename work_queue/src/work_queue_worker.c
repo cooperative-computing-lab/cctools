@@ -11,7 +11,6 @@ See the file COPYING for details.
 #include "work_queue_process.h"
 #include "work_queue_catalog.h"
 #include "work_queue_watcher.h"
-#include "work_queue_gpus.h"
 #include "work_queue_coprocess.h"
 #include "work_queue_sandbox.h"
 
@@ -53,6 +52,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "trash.h"
 #include "process.h"
+#include "xpu_tracker.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -185,6 +185,10 @@ static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
+
+/* Trackers noting which tasks are assigned to specific cores/gpus. */
+struct xpu_tracker *core_tracker = 0;
+struct xpu_tracker *gpu_tracker = 0;
 
 // Allow worker to use disk_alloc loop devices for task sandbox. Disabled by default.
 static int disk_allocation = 0;
@@ -364,8 +368,9 @@ static void measure_worker_resources()
 		memcpy(total_resources, r, sizeof(struct work_queue_resources));
 	}
 
-	work_queue_gpus_init(r->gpus.total);
-
+	if(!core_tracker) core_tracker = xpu_tracker_create("cores",r->cores.total);
+	if(!gpu_tracker) gpu_tracker = xpu_tracker_create("gpus",r->gpus.total);
+	
 	if (coprocess_command != NULL && coprocess_info != NULL) {
 		work_queue_coprocess_measure_resources(coprocess_info, number_of_coprocess_instances);
 	}
@@ -601,8 +606,12 @@ static int start_process( struct work_queue_process *p, struct link *manager )
 	disk_allocated += t->resources_requested->disk;
 	gpus_allocated += t->resources_requested->gpus;
 
+	if(t->resources_requested->cores>0) {
+		xpu_tracker_alloc(core_tracker,t->resources_requested->cores,t->taskid);
+	}
+
 	if(t->resources_requested->gpus>0) {
-		work_queue_gpus_allocate(t->resources_requested->gpus,t->taskid);
+		xpu_tracker_alloc(gpu_tracker,t->resources_requested->gpus,t->taskid);
 	}
 
 	pid = work_queue_process_execute(p);
@@ -628,8 +637,9 @@ static void reap_process( struct work_queue_process *p )
 	disk_allocated   -= p->task->resources_requested->disk;
 	gpus_allocated   -= p->task->resources_requested->gpus;
 
-	work_queue_gpus_free(p->task->taskid);
-
+	xpu_tracker_free(core_tracker,p->task->taskid);
+	xpu_tracker_free(gpu_tracker,p->task->taskid);
+	
 	if(!work_queue_sandbox_stageout(p,global_cache)) {
 		p->task_status = WORK_QUEUE_RESULT_OUTPUT_MISSING;
 		p->exit_status = 1;
@@ -1287,7 +1297,9 @@ static int do_kill(int taskid)
 			memory_allocated -= p->task->resources_requested->memory;
 			disk_allocated -= p->task->resources_requested->disk;
 			gpus_allocated -= p->task->resources_requested->gpus;
-			work_queue_gpus_free(taskid);
+
+			xpu_tracker_free(core_tracker,taskid);
+			xpu_tracker_free(gpu_tracker,taskid);
 		}
 	}
 

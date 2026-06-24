@@ -2,7 +2,6 @@
 #include "work_queue_process.h"
 #include "work_queue.h"
 #include "work_queue_internal.h"
-#include "work_queue_gpus.h"
 #include "work_queue_protocol.h"
 #include "work_queue_coprocess.h"
 
@@ -20,6 +19,7 @@
 #include "timestamp.h"
 #include "domain_name.h"
 #include "full_io.h"
+#include "xpu_tracker.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -36,6 +36,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+extern struct xpu_tracker *gpu_tracker;
+extern struct xpu_tracker *core_tracker;
 /*
 Create the task sandbox directory.  If disk allocation is enabled,
 make an allocation, otherwise just make a directory.
@@ -179,10 +181,21 @@ static void specify_integer_env_var( struct work_queue_process *p, const char *n
 	free(value_str);
 }
 
+static void specify_tracker_env_var( struct work_queue_process *p, const char *name, struct xpu_tracker *tracker ) {
+	char *str = xpu_tracker_to_string(tracker,p->task->taskid);
+	work_queue_task_specify_environment_variable(p->task,name,str);
+	free(str);
+}
+
 static void specify_resources_vars(struct work_queue_process *p) {
 	if(p->task->resources_requested->cores > 0) {
 		specify_integer_env_var(p, "CORES", p->task->resources_requested->cores);
+		specify_tracker_env_var(p, "CORES_LIST", core_tracker);
 		specify_integer_env_var(p, "OMP_NUM_THREADS", p->task->resources_requested->cores);
+                specify_integer_env_var(p, "OPENBLAS_NUM_THREADS", p->task->resources_requested->cores);
+                specify_integer_env_var(p, "VECLIB_NUM_THREADS", p->task->resources_requested->cores);
+                specify_integer_env_var(p, "MKL_NUM_THREADS", p->task->resources_requested->cores);
+                specify_integer_env_var(p, "NUMEXPR_NUM_THREADS", p->task->resources_requested->cores);
 	}
 
 	if(p->task->resources_requested->memory > 0) {
@@ -195,9 +208,8 @@ static void specify_resources_vars(struct work_queue_process *p) {
 
 	if(p->task->resources_requested->gpus > 0) {
 		specify_integer_env_var(p, "GPUS", p->task->resources_requested->gpus);
-		char *str = work_queue_gpus_to_string(p->task->taskid);
-		work_queue_task_specify_environment_variable(p->task,"CUDA_VISIBLE_DEVICES",str);
-		free(str);
+		specify_tracker_env_var(p, "GPUS_LIST", gpu_tracker);
+		specify_tracker_env_var(p, "CUDA_VISIBLE_DEVICES", gpu_tracker);
 	}
 }
 
