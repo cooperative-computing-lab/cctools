@@ -74,6 +74,8 @@ class Manager(object):
     #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
     # @param init_fn    Function applied to the newly created manager at initialization.
     # @param status_display_interval Number of seconds between updates to the jupyter status display. None, or less than 1 disables it.
+    # @param prometheus If True, serve Prometheus metrics on port 9090.
+    #                   If an integer, serve on that port. Requires prometheus_client when enabled.
     #
     # @see vine_create    - For more information about environmental variables that affect the behavior this method.
     def __init__(self,
@@ -85,7 +87,8 @@ class Manager(object):
                  staging_path=None,
                  ssl=None,
                  init_fn=None,
-                 status_display_interval=None):
+                 status_display_interval=None,
+                 prometheus=None):
         self._shutdown = shutdown
         self._taskvine = None
         self._stats = None
@@ -97,6 +100,17 @@ class Manager(object):
         self._cached_queue = []         # CachedTaskResult objects pending return from wait()
         self._info_widget = None
         self._using_ssl = False
+
+        # Prometheus integration fields:
+        # The port number that the Prometheus metrics server is listening on, or None if disabled
+        self._prometheus_port = None
+        # The HTTP server object for Prometheus metrics, or None if not running
+        self._prometheus_httpd = None
+        # The Prometheus CollectorRegistry instance, or None if metrics are not enabled
+        self._prometheus_registry = None
+        # The custom StatusCollector registered with Prometheus, or None if not initialized
+        self._prometheus_collector = None
+
         if staging_path:
             self._staging_explicit = os.path.join(staging_path, "vine-staging")
         else:
@@ -152,12 +166,20 @@ class Manager(object):
                 sys.stderr.write("Something went wrong with the custom initialization function.")
                 raise
             self._update_status_display()
+
+            if prometheus is not None:
+                self._start_prometheus(prometheus)
+        except ImportError:
+            self._stop_prometheus()
+            raise
         except Exception:
+            self._stop_prometheus()
             sys.stderr.write("Unable to create internal taskvine structure.")
             raise
 
     def _free(self):
         try:
+            self._stop_prometheus()
             if self._taskvine:
                 if self._shutdown:
                     self.workers_shutdown(0)
@@ -166,6 +188,60 @@ class Manager(object):
                 self._taskvine = None
         except TypeError:
             pass
+
+    @property
+    def prometheus_port(self):
+        return self._prometheus_port
+
+    def _resolve_prometheus_port(self, prometheus):
+        from .prometheus import PROMETHEUS_DEFAULT_PORT
+
+        if prometheus is True:
+            return PROMETHEUS_DEFAULT_PORT
+        if isinstance(prometheus, bool):
+            raise ValueError("prometheus must be True, an integer port, or None")
+        if not isinstance(prometheus, int):
+            raise ValueError("prometheus must be True, an integer port, or None")
+        if prometheus < 1 or prometheus > 65535:
+            raise ValueError(f"prometheus port must be between 1 and 65535, not {prometheus}")
+        return prometheus
+
+    def _start_prometheus(self, prometheus):
+        from . import prometheus as vine_prometheus
+
+        vine_prometheus.require_prometheus_client()
+
+        port = self._resolve_prometheus_port(prometheus)
+        try:
+            self._prometheus_httpd, self._prometheus_registry, self._prometheus_collector = (
+                vine_prometheus.start(port, self.status)
+            )
+        except Exception as e:
+            self._stop_prometheus()
+            raise RuntimeError(
+                f"Could not start Prometheus metrics server on port {port}: {e}"
+            ) from e
+
+        self._prometheus_port = port
+
+    def _stop_prometheus(self):
+        if self._prometheus_httpd is not None:
+            try:
+                self._prometheus_httpd.shutdown()
+            except Exception:
+                pass
+            self._prometheus_httpd = None
+
+        if self._prometheus_registry is not None and self._prometheus_collector is not None:
+            try:
+                self._prometheus_registry.unregister(
+                    self._prometheus_collector)
+            except Exception:
+                pass
+            self._prometheus_collector = None
+            self._prometheus_registry = None
+
+        self._prometheus_port = None
 
     def __del__(self):
         self._free()
