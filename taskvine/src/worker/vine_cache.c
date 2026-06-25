@@ -938,21 +938,17 @@ static void vine_cache_check_file(struct vine_cache *c, struct vine_cache_file *
 }
 
 /*
-Search the cache table to determine if any transfer processes have completed.
+Search the processing transfer table to determine if any transfer processes have completed.
 If any have definitively failed, they are removed from the cache.
 */
 
-int vine_cache_check_files(struct vine_cache *c, struct link *manager)
+int vine_cache_check_xfer_files(struct vine_cache *c, struct link *manager)
 {
-	if (hash_table_size(c->processing_transfers) < 1) {
-		return 1;
-	}
-
-	char **cachenames = hash_table_keys_array(c->processing_transfers);
-	int i = 0;
 	char *cachename;
-	while ((cachename = cachenames[i])) {
-		i++;
+	void *dummy;
+	int iteration;
+	HASH_TABLE_ITERATE(c->processing_transfers, iteration, cachename, dummy)
+	{
 		struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
 		if (f) {
 			vine_cache_check_file(c, f, cachename, manager);
@@ -969,6 +965,5 @@ int vine_cache_check_files(struct vine_cache *c, struct link *manager)
 		/* Note that f may no longer be valid at this point */
 	}
 
-	hash_table_free_keys_array(cachenames);
 	return 1;
 }
