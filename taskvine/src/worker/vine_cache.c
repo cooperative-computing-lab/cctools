@@ -954,6 +954,7 @@ int vine_cache_check_xfer_files(struct vine_cache *c, struct link *manager)
 			vine_cache_check_file(c, f, cachename, manager);
 		}
 
+		/* The check above may change or remove cache state, so look up the entry again. */
 		f = hash_table_lookup(c->table, cachename);
 		if (f && f->status == VINE_CACHE_STATUS_FAILED) {
 			/* if transfer failed, then we delete all of our records of the file. The manager
