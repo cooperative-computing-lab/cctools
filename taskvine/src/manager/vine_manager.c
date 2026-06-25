@@ -4315,17 +4315,17 @@ int vine_disable_peer_transfers(struct vine_manager *q)
 	return 1;
 }
 
-int vine_enable_recovery_tasks(struct vine_manager *q)
+int vine_enable_external_recovery_handling(struct vine_manager *q)
 {
-	debug(D_VINE, "Recovery tasks enabled");
-	q->use_recovery_tasks = 1;
+	debug(D_VINE, "External recovery handling enabled");
+	q->external_recovery_handling = 1;
 	return 1;
 }
 
-int vine_disable_recovery_tasks(struct vine_manager *q)
+int vine_disable_external_recovery_handling(struct vine_manager *q)
 {
-	debug(D_VINE, "Recovery tasks disabled");
-	q->use_recovery_tasks = 0;
+	debug(D_VINE, "External recovery handling disabled");
+	q->external_recovery_handling = 0;
 	return 1;
 }
 
@@ -5249,8 +5249,8 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			return t;
 			break;
 		case VINE_TASK_TYPE_RECOVERY:
-			/* if configured to use recovery tasks, return them to the user */
-			if (q->use_recovery_tasks) {
+			/* if configured for external recovery handling, return them to the user */
+			if (q->external_recovery_handling) {
 				return t;
 			}
 			/* otherwise, do nothing and let vine_manager_consider_recovery_task do its job */

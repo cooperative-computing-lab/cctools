@@ -1165,13 +1165,13 @@ int vine_enable_peer_transfers(struct vine_manager *m);
 /** Disable taskvine peer transfers to be scheduled by the manager **/
 int vine_disable_peer_transfers(struct vine_manager *m);
 
-/** Enable recovery tasks to be returned by vine_wait.
+/** Enable external recovery handling by returning recovery tasks from vine_wait.
 By default, recovery tasks are handled internally by the manager. **/
-int vine_enable_recovery_tasks(struct vine_manager *m);
+int vine_enable_external_recovery_handling(struct vine_manager *m);
 
-/** Disable recovery tasks from being returned by vine_wait.
+/** Disable external recovery handling.
 Recovery tasks will be handled internally by the manager. **/
-int vine_disable_recovery_tasks(struct vine_manager *m);
+int vine_disable_external_recovery_handling(struct vine_manager *m);
 
 /** When enabled, resources to tasks in are assigned in proportion to the size
 of the worker. If a resource is specified (e.g. with @ref vine_task_set_cores),
