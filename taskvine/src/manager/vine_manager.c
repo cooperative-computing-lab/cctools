@@ -1006,7 +1006,7 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 }
 
 /** Release a random worker to simulate a failure. */
-int release_random_worker(struct vine_manager *q)
+int vine_manager_release_random_worker(struct vine_manager *q)
 {
 	if (!q) {
 		return 0;
@@ -1079,7 +1079,7 @@ static int enforce_worker_eviction_interval(struct vine_manager *q)
 	}
 
 	/* release a random worker if any */
-	return release_random_worker(q);
+	return vine_manager_release_random_worker(q);
 }
 
 /* Remove all tasks and other associated state from a given worker. */

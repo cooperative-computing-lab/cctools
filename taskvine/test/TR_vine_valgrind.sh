@@ -8,6 +8,16 @@ export CORES=4
 export TASKS=20
 export VALGRIND="valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=definite,indirect,possible --track-origins=yes --track-fds=yes"
 
+# valgrind creates a named fifo in $PWD/temp.
+# This is not permitted when using AFS file system.
+# Change the location to /tmp in that case.
+
+location=$(echo "pwd" | cut -d/ -f2)
+if $location eq afs
+then
+	export VALGRIND="${VALGRIND} --vgdb-prefix=/tmp/valgrind-taskvine-fifo-$$"
+fi
+
 check_needed()
 {
 	if ! ${VALGRIND} --version > /dev/null 2>&1

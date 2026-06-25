@@ -108,9 +108,13 @@ struct vine_worker_options {
 	/* Maximum number of concurrent worker transfer requests made by worker */
 	int max_transfer_procs;
 
-  /* Explicit contact host (address or hostname) for transfers bewteen workers. */
-  char *reported_transfer_host;
-  int reported_transfer_port;
+	/* Explicit contact host (address or hostname) for transfers bewteen workers. */
+	char *reported_transfer_host;
+	int reported_transfer_port;
+
+	/* Wrapper command to be applied to beginning of each task command. */
+	const char *task_wrapper;
+
 };
 
 struct vine_worker_options * vine_worker_options_create();

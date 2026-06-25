@@ -1053,6 +1053,13 @@ void vine_manager_remove_library(struct vine_manager *m, const char *name);
 */
 struct vine_task *vine_manager_find_library_template(struct vine_manager *m, const char *library_name);
 
+/** Release a random worker for failure-injection tests.
+This is a testing support hook, not a normal manager control operation.
+@param m A manager object.
+@return Non-zero if a worker was released.
+*/
+int vine_manager_release_random_worker(struct vine_manager *m);
+
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the manager is empty.
 If a task has completed, the corresponding task object will be returned by this function.
