@@ -1,5 +1,10 @@
 """Adaptors that lower external workflow formats into VineGraph."""
 
-from .adaptor import VineGraphDaskAdaptor, workflow_to_dask_graph
+from .adaptor import VineGraphDaskAdaptor, VineGraphGraphedAdaptor, graphed_plan_to_workflow, workflow_to_dask_graph
 
-__all__ = ["VineGraphDaskAdaptor", "workflow_to_dask_graph"]
+__all__ = [
+    "VineGraphDaskAdaptor",
+    "VineGraphGraphedAdaptor",
+    "graphed_plan_to_workflow",
+    "workflow_to_dask_graph",
+]

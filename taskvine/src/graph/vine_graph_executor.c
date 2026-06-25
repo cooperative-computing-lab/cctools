@@ -707,7 +707,7 @@ static void vine_graph_executor_submit_initial_ready_nodes(struct vine_graph_exe
 		}
 	}
 
-	vine_enable_return_recovery_tasks(e->manager); // driver must observe recovery completions for cut and prune
+	vine_enable_recovery_tasks(e->manager); // driver must observe recovery completions for cut and prune
 }
 
 /* After one parent completes, decrement remaining parents and submit children that become ready. */

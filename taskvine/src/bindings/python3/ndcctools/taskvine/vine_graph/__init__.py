@@ -3,6 +3,6 @@
 # See the file COPYING for details.
 
 from .vine_graph import VineGraph, VineGraphConfig
-from .adaptors import VineGraphDaskAdaptor
+from .adaptors import VineGraphDaskAdaptor, VineGraphGraphedAdaptor
 
-__all__ = ["VineGraph", "VineGraphConfig", "VineGraphDaskAdaptor"]
+__all__ = ["VineGraph", "VineGraphConfig", "VineGraphDaskAdaptor", "VineGraphGraphedAdaptor"]

@@ -1160,11 +1160,11 @@ int vine_disable_peer_transfers(struct vine_manager *m);
 
 /** Enable recovery tasks to be returned by vine_wait.
 By default, recovery tasks are handled internally by the manager. **/
-int vine_enable_return_recovery_tasks(struct vine_manager *m);
+int vine_enable_recovery_tasks(struct vine_manager *m);
 
 /** Disable recovery tasks from being returned by vine_wait.
 Recovery tasks will be handled internally by the manager. **/
-int vine_disable_return_recovery_tasks(struct vine_manager *m);
+int vine_disable_recovery_tasks(struct vine_manager *m);
 
 /** Release a random worker for failure-injection tests.
 This is a testing support hook, not a normal manager control operation.
