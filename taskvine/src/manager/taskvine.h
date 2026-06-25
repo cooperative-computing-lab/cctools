@@ -1173,13 +1173,6 @@ int vine_enable_recovery_tasks(struct vine_manager *m);
 Recovery tasks will be handled internally by the manager. **/
 int vine_disable_recovery_tasks(struct vine_manager *m);
 
-/** Release a random worker for failure-injection tests.
-This is a testing support hook, not a normal manager control operation.
-@param m A manager object.
-@return Non-zero if a worker was released.
-*/
-int vine_manager_release_random_worker(struct vine_manager *m);
-
 /** When enabled, resources to tasks in are assigned in proportion to the size
 of the worker. If a resource is specified (e.g. with @ref vine_task_set_cores),
 proportional resources never go below explicit specifications. This mode is most
