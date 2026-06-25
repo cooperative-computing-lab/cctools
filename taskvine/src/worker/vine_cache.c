@@ -945,7 +945,7 @@ If any have definitively failed, they are removed from the cache.
 int vine_cache_check_xfer_files(struct vine_cache *c, struct link *manager)
 {
 	char *cachename;
-	void *dummy;
+	void *dummy; // processing_transfers is used as a key set; values are unused.
 	int iteration;
 	HASH_TABLE_ITERATE(c->processing_transfers, iteration, cachename, dummy)
 	{
