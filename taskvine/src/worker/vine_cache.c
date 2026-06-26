@@ -938,20 +938,25 @@ static void vine_cache_check_file(struct vine_cache *c, struct vine_cache_file *
 }
 
 /*
-Search the cache table to determine if any transfer processes have completed.
+Search the processing transfer table to determine if any transfer processes have completed.
 If any have definitively failed, they are removed from the cache.
 */
 
-int vine_cache_check_files(struct vine_cache *c, struct link *manager)
+int vine_cache_check_xfer_files(struct vine_cache *c, struct link *manager)
 {
-	struct vine_cache_file *f;
 	char *cachename;
+	void *dummy; // processing_transfers is used as a key set; values are unused.
 	int iteration;
-	HASH_TABLE_ITERATE(c->table, iteration, cachename, f)
+	HASH_TABLE_ITERATE(c->processing_transfers, iteration, cachename, dummy)
 	{
-		vine_cache_check_file(c, f, cachename, manager);
+		struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
+		if (f) {
+			vine_cache_check_file(c, f, cachename, manager);
+		}
 
-		if (f->status == VINE_CACHE_STATUS_FAILED) {
+		/* The check above may change or remove cache state, so look up the entry again. */
+		f = hash_table_lookup(c->table, cachename);
+		if (f && f->status == VINE_CACHE_STATUS_FAILED) {
 			/* if transfer failed, then we delete all of our records of the file. The manager
 			 * assumes that the file is not at the worker after the manager receives
 			 * the cache invalid message sent from vine_cache_check_outputs. */
@@ -960,5 +965,6 @@ int vine_cache_check_files(struct vine_cache *c, struct link *manager)
 
 		/* Note that f may no longer be valid at this point */
 	}
+
 	return 1;
 }

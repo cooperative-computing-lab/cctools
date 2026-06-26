@@ -1738,7 +1738,7 @@ static void vine_worker_serve_manager(struct link *manager)
 		expire_procs_running();
 
 		ok &= handle_completed_tasks(manager);
-		ok &= vine_cache_check_files(cache_manager, manager);
+		ok &= vine_cache_check_xfer_files(cache_manager, manager);
 
 		measure_worker_resources();
 
