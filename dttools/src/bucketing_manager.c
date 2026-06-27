@@ -291,45 +291,7 @@ struct rmsummary *bucketing_manager_predict(bucketing_manager_t *m, int task_id)
                     }
                 }
             }
-            /* if task doesn't exceed limits then we always use the same value */
-            //else if (!old_res->limits_exceeded) {
-                //pred_val = old_val;
-            //}
-            //else {
-                /* if task doesn't exceed limits of this resource then we use the same value. */
-                //if (rmsummary_get(old_res->limits_exceeded, res_name) == -1) {
-                    //pred_val = old_val;
-                //}
-                /* if this resource exceeds limits, we predict from the previous limit. */
-                //else {
-                    //pred_val = bucketing_predict(state, old_val);
-                //}
-            //}
-
-			/* if task doesn't exceed limits or it does but not this resource */
-			//if (!old_res->limits_exceeded || (old_res->limits_exceeded && rmsummary_get(old_res->limits_exceeded, res_name) == -1)) {
-				/* if this resource is a newly added resource, predict a new value */
-				//if (old_val == -1)
-					//pred_val = bucketing_predict(state, old_val);
-
-                /* If task doesn't exceed limits and also has a previous resource report, this means
-                 * that the task was never run, so we disregard the old value and run bucketing_predict
-                 * as if this task is a new task.*/
-                //else if (!old_res->limits_exceeded) {
-                    //pred_val = bucketing_predict(state, -1);
-                //}
-
-				/* otherwise this resource doesn't exceed limit so return the same value */
-				//else
-					//pred_val = old_val;
-			//}
-
-			/* if it does exceed then predict */
-			//else {
-				//pred_val = bucketing_predict(state, old_val);
-			//}
 		}
-
 		if (pred_val == -1) {
 			fatal("Problem predicting value in bucketing\n");
 			return 0;
