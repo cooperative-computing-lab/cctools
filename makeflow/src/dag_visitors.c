@@ -159,6 +159,7 @@ int dag_to_file_category(struct category *c, struct list *nodes, FILE * dag_stre
 
 int dag_to_file_categories(const struct dag *d, FILE * dag_stream, char *(*rename) (struct dag_node * n, const char *filename))
 {
+	int iteration;
 
 	//separate nodes per category
 	struct hash_table *nodes_of_category = hash_table_create(2*hash_table_size(d->categories), 0);
@@ -179,8 +180,7 @@ int dag_to_file_categories(const struct dag *d, FILE * dag_stream, char *(*renam
 		n = n->next;
 	}
 
-	hash_table_firstkey(nodes_of_category);
-	while(hash_table_nextkey(nodes_of_category, &name, (void **) &ns)) {
+	HASH_TABLE_ITERATE(nodes_of_category, iteration, name, ns) {
 		c = makeflow_category_lookup_or_create(d, name);
 		dag_to_file_category(c, ns, dag_stream, rename);
 	}
@@ -307,24 +307,26 @@ void dag_to_dax_individual_node(const struct dag_node *n, UINT64_T node_id, FILE
 /* Iterates over each node to output as DAX */
 void dag_to_dax_nodes(const struct dag *d, FILE *output)
 {
+	int iteration;
 	struct dag_node *n;
 	UINT64_T node_id;
 
-	itable_firstkey(d->node_table);
-	while(itable_nextkey(d->node_table, &node_id, (void *) &n))
+	ITABLE_ITERATE(d->node_table, iteration, node_id, n) {
 		dag_to_dax_individual_node(n, node_id, output);
+	}
 }
 
 /* Writes the DAX for a node's parent relationships */
 void dag_to_dax_parents(const struct dag_node *n, FILE *output)
 {
 	struct dag_node *p;
+	int iteration;
 
 	if(set_size(n->ancestors) > 0){
 		fprintf(output, "\t<child ref=\"ID%07d\">\n", n->nodeid);
-		set_first_element(n->ancestors);
-		while((p = set_next_element(n->ancestors)))
+		SET_ITERATE(n->ancestors, iteration, p) {
 			fprintf(output, "\t\t<parent ref=\"ID%07d\" />\n", p->nodeid);
+		}
 		fprintf(output, "\t</child>\n");
 	}
 }
@@ -332,12 +334,13 @@ void dag_to_dax_parents(const struct dag_node *n, FILE *output)
 /* Writes the DAX version of each relationship in the dag */
 void dag_to_dax_relationships(const struct dag *d, FILE *output)
 {
+	int iteration;
 	struct dag_node *n;
 	UINT64_T node_id;
 
-	itable_firstkey(d->node_table);
-	while(itable_nextkey(d->node_table, &node_id, (void *) &n))
+	ITABLE_ITERATE(d->node_table, iteration, node_id, n) {
 		dag_to_dax_parents(n, output);
+	}
 }
 
 /* Writes the xml footer for DAX */
@@ -363,6 +366,7 @@ void dag_to_dax_replica_catalog(const struct dag *d, FILE *output)
 /* Write transform catalog to file */
 void dag_to_dax_transform_catalog(const struct dag *d, FILE *output)
 {
+	int iteration;
 	struct dag_node *n;
 	uint64_t id;
 	char *fn, *pfn;
@@ -372,9 +376,7 @@ void dag_to_dax_transform_catalog(const struct dag *d, FILE *output)
 	uname(name);
 	struct list *transforms = list_create();
 
-	itable_firstkey(d->node_table);
-	while(itable_nextkey(d->node_table, &id, (void *) &n))
-	{
+	ITABLE_ITERATE(d->node_table, iteration, id, n) {
 		fn = xxstrdup(node_executable(n));
 		if(!list_find(transforms, (int (*)(void *, const void*)) string_equal, fn))
 			list_push_tail(transforms, fn);
@@ -486,6 +488,7 @@ void write_edge_to_xgmml(FILE *f, char sourceheader, int sourceid, char targethe
 
 void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 {
+	int iteration;
 	struct dag_node *n;
 	struct dag_file *f;
 	struct hash_table *h, *g;
@@ -537,8 +540,10 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 	fprintf(cytograph, "\t<att name = \"layoutAlgorithm\" value = \"Grid Layout\" type = \"string\" cy:hidden = \"1\"/>\n");
 
 	if(change_size) {
-		hash_table_firstkey(d->files);
-		while(hash_table_nextkey(d->files, &name, (void **) &f) && dag_file_should_exist(f)) {
+		HASH_TABLE_ITERATE(d->files, iteration, name, f) {
+			if (!dag_file_should_exist(f)) {
+				break;
+			}
 			if(stat(name,&st)==0) {
 				average += ((double) st.st_size) / ((double) d->completed_files);
 			}
@@ -612,8 +617,7 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 		}
 	}
 
-	hash_table_firstkey(g);
-	while(hash_table_nextkey(g, &label, (void **) &e)) {
+	HASH_TABLE_ITERATE(g, iteration, label, e) {
 		fn = e->name;
 		write_node_to_xgmml(cytograph, 'F', e->id, (char *)fn, 0);
 
@@ -657,14 +661,12 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 		fprintf(stderr, "Unable to create ./style.xml: %s\n", strerror(errno));
 	}
 
-	hash_table_firstkey(h);
-	while(hash_table_nextkey(h, &label, (void **) &t)) {
+	HASH_TABLE_ITERATE(h, iteration, label, t) {
 		free(t);
 		hash_table_remove(h, label);
 	}
 
-	hash_table_firstkey(g);
-	while(hash_table_nextkey(g, &label, (void **) &e)) {
+	HASH_TABLE_ITERATE(g, iteration, label, e) {
 		free(e);
 		hash_table_remove(g, label);
 	}
@@ -678,6 +680,7 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 
 void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_labels, int task_id, int with_details, char *graph_attr, char *node_attr, char *edge_attr, char *task_attr, char *file_attr )
 {
+	int iteration;
 	struct dag_node *n;
 	struct dag_file *f;
 	struct hash_table *h, *g;
@@ -701,8 +704,7 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 	printf( "digraph {\n");
 
 	if(change_size) {
-		hash_table_firstkey(d->files);
-		while(hash_table_nextkey(d->files, &name, (void**)&f )) {
+		HASH_TABLE_ITERATE(d->files, iteration, name, f) {
 			if(stat(name,&st)==0) {
 				average += ((double) st.st_size) / ((double) d->completed_files);
 			}
@@ -848,8 +850,7 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 		printf( "\nnode [shape=box,color=blue,style=%s,fixedsize=false];\n", with_labels ? "unfilled" : "filled" );
 	}
 
-	hash_table_firstkey(g);
-	while(hash_table_nextkey(g, &label, (void **) &e)) {
+	HASH_TABLE_ITERATE(g, iteration, label, e) {
 		fn = e->name;
 		printf( "F%d [label = \"%s", e->id, with_labels ? fn : "" );
 		char cytoid[6];
@@ -1010,13 +1011,13 @@ void ppm_color_parser(struct dag_node *n, char *color_array, int ppm_mode, char 
 
 void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 {
-
 	int count, count_row, max_ancestor = 0, max_size = 0;
 	UINT64_T key;
 	struct dag_node *n;
 
 	char *name;
 	char *label;
+	int iteration;
 
 	struct hash_table *h;
 
@@ -1024,8 +1025,7 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 
 	h = hash_table_create(0, 0);
 
-	itable_firstkey(d->node_table);
-	while(itable_nextkey(d->node_table, &key, (void **) &n)) {
+	ITABLE_ITERATE(d->node_table, iteration, key, n) {
 
 		name = xxstrdup(n->command);
 		label = strtok(name, " \t\n");
@@ -1047,8 +1047,7 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 		ancestor_count_list[count] = list_create();
 	}
 
-	hash_table_firstkey(h);
-	while(hash_table_nextkey(h, &label, (void **) &n)) {
+	HASH_TABLE_ITERATE(h, iteration, label, n) {
 		list_push_tail(ancestor_count_list[n->ancestor_depth], n);
 		if(list_size(ancestor_count_list[n->ancestor_depth]) > max_size)
 			max_size = list_size(ancestor_count_list[n->ancestor_depth]);
@@ -1146,12 +1145,12 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 }
 
 struct jx *variables_to_json(struct hash_table *h) {
+	int iteration;
 	char *key;
 	struct dag_variable *value;
 	struct jx *result = jx_object(NULL);
 
-	hash_table_firstkey(h);
-	while(hash_table_nextkey(h, &key, (void **) &value)) {
+	HASH_TABLE_ITERATE(h, iteration, key, value) {
 		jx_insert(result, jx_string(key), jx_string(value->values[value->count - 1]->value));
 	}
 
@@ -1268,13 +1267,13 @@ struct jx *dag_nodes_to_json(struct dag_node *node) {
 }
 
 struct jx *dag_to_json(struct dag *d) {
+	int iteration;
 	char *key;
 	void *value;
 	struct jx *result = jx_object(NULL);
 	struct jx *categories = jx_object(NULL);
 	jx_insert(result, jx_string("rules"), dag_nodes_to_json(d->nodes));
-	hash_table_firstkey(d->categories);
-	while(hash_table_nextkey(d->categories, &key,& value)) {
+		HASH_TABLE_ITERATE(d->categories, iteration, key, value) {
 		jx_insert(categories, jx_string(key), category_to_json((struct category *) value));
 	}
 	jx_insert(result, jx_string("categories"), categories);

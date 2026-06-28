@@ -50,7 +50,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <signal.h>
 
-#define CCTOOLS_RUNOS_PATH "/afs/crc.nd.edu/group/ccl/software/runos/runos"
+#define CCTOOLS_RUNOS_PATH "/groups/dthain/software/runos/runos"
 
 typedef enum {
 	FORMAT_TABLE,
@@ -103,11 +103,17 @@ static char *batch_submit_options = NULL;
 static const char *password_file = 0;
 char *password;
 
+/* A wrapper command applied to the worker itself. */
 static char *wrapper_command = 0;
 
+/* Additional files required by the worker wrapper. */
 struct list *wrapper_inputs = 0;
 
+/* The executable name of the worker itself. */
 static char *worker_command = 0;
+
+/* A wrapper command to be applied to every task executed. */
+static char *task_wrapper = 0;
 
 static char *runos_os = 0;
 
@@ -422,11 +428,12 @@ to pass to the worker.  The returned string must be freed.
 
 static char * make_features_string( struct hash_table *features_table )
 {
+	int iteration;
 	char *str = strdup("");
 
 	char *key;
 	void *value;
-	HASH_TABLE_ITERATE(features_table,key,value) {
+	HASH_TABLE_ITERATE(features_table, iteration, key, value) {
 		char * newstr = string_format("%s --feature \"%s\"",str,key);
 		free(str);
 		str = newstr;
@@ -446,39 +453,33 @@ static int submit_worker( struct batch_queue *queue )
 		worker = string_format("./%s", worker_command);
 	}
 
-	char *features_string = make_features_string(features_table);
+	/* The basic command differs whether using a project name or simple host:port. */
 	
 	if(using_catalog) {
-		cmd = string_format(
-		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s %s %s %s",
-		worker,
-		submission_regex,
-		worker_timeout,
-		catalog_host,
-		factory_name ? string_format("--from-factory \"%s\"", factory_name) : "",
-		password_file ? "-P pwfile" : "",
-		resource_args ? resource_args : "",
-		manual_ssl_option ? "--ssl" : "",
-		features_string,
-		extra_worker_args ? extra_worker_args : ""
-		);
-	}
-	else {
-		cmd = string_format(
-		"%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s %s %s",
-		worker,
-		manager_host,
-		manager_port,
-		worker_timeout,
-		catalog_host,
-		password_file ? "-P pwfile" : "",
-		resource_args ? resource_args : "",
-		manual_ssl_option ? "--ssl" : "",
-		features_string,
-		extra_worker_args ? extra_worker_args : ""
-		);
+		cmd = string_format("./%s -M %s", worker, submission_regex);
+	} else {
+		cmd = string_format("./%s %s %d", worker, manager_host, manager_port);
 	}
 
+	/* Add a formatted argument to a string s, reallocating and returning s. */
+#define ADD_ARG2(s,format,value) s = string_combine(s,string_format(format,value))
+#define ADD_ARG1(s,format)       s = string_combine(s,string_format(format))
+
+	/* Add each of the fixed options. */
+	/* Be careful that each format string begins with a space. */
+	ADD_ARG2(cmd," -t %d",worker_timeout);
+	ADD_ARG2(cmd," -C '%s'",catalog_host);
+
+	/* Add each of the optional features. */
+	if(factory_name)	ADD_ARG2(cmd," --from-factory \"%s\"",factory_name);
+	if(password_file)	ADD_ARG1(cmd," -P pwfile");
+	if(resource_args)	ADD_ARG2(cmd," %s",resource_args);
+	if(manual_ssl_option)	ADD_ARG1(cmd," --ssl");
+	if(task_wrapper)        ADD_ARG2(cmd," --task-wrapper \"%s\"",task_wrapper);
+	if(extra_worker_args)	ADD_ARG2(cmd," %s",extra_worker_args);
+
+	char *features_string = make_features_string(features_table);
+	ADD_ARG2(cmd," %s",features_string);
 	free(features_string);
 	
 	if(wrapper_command) {
@@ -611,13 +612,13 @@ void wait_all_workers( struct batch_queue *queue, struct itable *job_table, time
 
 void remove_all_workers( struct batch_queue *queue, struct itable *job_table, batch_queue_remove_mode_t mode )
 {
+	int iteration;
 	uint64_t jobid;
 	void *value;
 
 	debug(D_WQ,"removing all workers...");
 
-	itable_firstkey(job_table);
-	while(itable_nextkey(job_table,&jobid,&value)) {
+		ITABLE_ITERATE(job_table, iteration, jobid, value) {
 		debug(D_WQ,"removing worker job %"PRId64,jobid);
 		batch_queue_remove(queue,jobid,mode);
 	}
@@ -1238,8 +1239,9 @@ static void show_help(const char *cmd)
 	printf(" %-30s Environment variable to add to worker.\n", "--env=<variable=value>");
 	printf(" %-30s Extra options to give to worker.\n", "-E,--extra-options=<options>");
 	printf(" %-30s Alternate binary instead of work_queue_worker.\n", "--worker-binary=<file>");
-	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
-	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
+	printf(" %-30s Wrap worker with this command prefix.\n","--wrapper");
+	printf(" %-30s Wrap tasks with this command prefix.\n","--task-wrapper");
+	printf(" %-30s Add this input file needed by a task or worker wrapper.\n","--wrapper-input");
 	printf(" %-30s Use runos tool to create environment (ND only).\n","--runos=<img>");
 	printf(" %-30s Run each worker inside this poncho environment.\n","--poncho-env=<file.tar.gz>");
 
@@ -1268,6 +1270,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_WRAPPER, 
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WORKER_BINARY,
+		LONG_OPT_TASK_WRAPPER,
 		LONG_OPT_K8S_IMAGE,
 		LONG_OPT_K8S_WORKER_IMAGE,
 		LONG_OPT_CATALOG,
@@ -1319,6 +1322,7 @@ static const struct option long_options[] = {
 	{"runos", required_argument, 0, LONG_OPT_RUN_OS},
 	{"scratch-dir", required_argument, 0, 'S' },
 	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
+	{"task-wrapper", required_argument, 0, LONG_OPT_TASK_WRAPPER},
 	{"timeout", required_argument, 0, 't'},
 	{"version", no_argument, 0, 'v'},
 	{"worker-binary", required_argument, 0, LONG_OPT_WORKER_BINARY},
@@ -1470,6 +1474,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_WORKER_BINARY:
 				worker_command = xxstrdup(optarg);
+				break;
+			case LONG_OPT_TASK_WRAPPER:
+				task_wrapper = xxstrdup(optarg);
 				break;
 			case 'P':
 				password_file = optarg;

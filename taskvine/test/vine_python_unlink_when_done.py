@@ -11,7 +11,7 @@ def create_file():
         f.write("hello")
 
 
-m = vine.DaskVine(port=[9123, 9129])
+m = vine.DaskVine(port=0)
 
 print("testing without submitting task")
 create_file()

@@ -9,9 +9,9 @@ mkdocs:
     configuration: doc/mkdocs.yml
 
 build:
-    os: "ubuntu-20.04"
+    os: "ubuntu-24.04"
     tools:
-      python: "3.9"
+      python: "3.11"
     jobs:
       pre_build:
         - cd doc && git clone https://github.com/jothepro/doxygen-awesome-css.git --branch v2.1.0

@@ -1137,12 +1137,13 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 
 void rmonitor_find_files_final_sizes()
 {
+	int iteration;
 	char *fname;
 	struct stat buf;
 	struct rmonitor_file_info *finfo;
 
-	hash_table_firstkey(files);
-	while (hash_table_nextkey(files, &fname, (void **)&finfo)) {
+	HASH_TABLE_ITERATE(files, iteration, fname, finfo)
+	{
 		/* If size_on_close is unknwon, perform a stat on the file. */
 
 		if (finfo->size_on_close < 0 && stat(fname, &buf) == 0) {
@@ -1153,6 +1154,7 @@ void rmonitor_find_files_final_sizes()
 
 void rmonitor_add_files_to_summary(char *field, int outputs)
 {
+	int iteration;
 	char *fname;
 	struct rmonitor_file_info *finfo;
 
@@ -1163,8 +1165,8 @@ void rmonitor_add_files_to_summary(char *field, int outputs)
 
 	char *delimeter = "";
 
-	hash_table_firstkey(files);
-	while (hash_table_nextkey(files, &fname, (void **)&finfo)) {
+	HASH_TABLE_ITERATE(files, iteration, fname, finfo)
+	{
 		if (finfo->is_output != outputs)
 			continue;
 
@@ -1190,6 +1192,7 @@ int rmonitor_file_io_summaries()
 {
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
 	if (rmonitor_inotify_fd >= 0) {
+		int iteration;
 		char *fname;
 		struct rmonitor_file_info *finfo;
 
@@ -1205,8 +1208,8 @@ int rmonitor_file_io_summaries()
 				"reads",
 				"writes");
 
-		hash_table_firstkey(files);
-		while (hash_table_nextkey(files, &fname, (void **)&finfo)) {
+		HASH_TABLE_ITERATE(files, iteration, fname, finfo)
+		{
 			fprintf(log_inotify, "%-15s\n%-15s ", fname, "");
 			fprintf(log_inotify, "%6" PRId64 " %20lld %20lld", finfo->device, (long long int)finfo->size_on_open, (long long int)finfo->size_on_close);
 			fprintf(log_inotify, " %6" PRId64 " %6" PRId64, finfo->n_opens, finfo->n_closes);
@@ -1279,8 +1282,15 @@ int rmonitor_final_summary()
 	write_summary(1);
 
 	int status;
-	if (summary->limits_exceeded && enforce_limits) {
-		status = RM_OVERFLOW;
+
+	if (summary->limits_exceeded) {
+		if (summary->limits_exceeded->wall_time > -1) {
+			/* wall time is treated differently so that result of tasks in taskvine match
+			 * when ran without the resource monitor. */
+			status = RM_TIME_EXPIRE;
+		} else {
+			status = RM_OVERFLOW;
+		}
 	} else if (summary->exit_status != 0) {
 		status = RM_TASK_ERROR;
 	} else {
@@ -1353,13 +1363,14 @@ void rmonitor_untrack_process(uint64_t pid)
 
 void rmonitor_add_children_by_polling()
 {
+	int iteration;
 
 	uint64_t pid;
 	struct rmonitor_process_info *p;
 	uint64_t *children = NULL;
 
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p)) {
+	ITABLE_ITERATE(processes, iteration, pid, p)
+	{
 		if (!p->running) {
 			continue;
 		}
@@ -1394,13 +1405,15 @@ void cleanup_zombie(struct rmonitor_process_info *p)
 
 void cleanup_zombies(void)
 {
+	int iteration;
 	uint64_t pid;
 	struct rmonitor_process_info *p;
 
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p))
+	ITABLE_ITERATE(processes, iteration, pid, p)
+	{
 		if (!p->running)
 			cleanup_zombie(p);
+	}
 }
 
 void release_waiting_process(uint64_t pid)
@@ -1411,31 +1424,34 @@ void release_waiting_process(uint64_t pid)
 
 void release_waiting_processes(void)
 {
+	int iteration;
 	uint64_t pid;
 	struct rmonitor_process_info *p;
 
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p))
+	ITABLE_ITERATE(processes, iteration, pid, p)
+	{
 		if (p->waiting)
 			release_waiting_process(pid);
+	}
 }
 
 void ping_processes(void)
 {
+	int iteration;
 	uint64_t pid;
 	struct rmonitor_process_info *p;
 
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p))
+	ITABLE_ITERATE(processes, iteration, pid, p)
+	{
 		if (!ping_process(pid)) {
 			debug(D_RMON, "cannot find %" PRId64 " process.\n", pid);
 			rmonitor_untrack_process(pid);
 		}
+	}
 }
 
-void set_snapshot_watch_events()
+void set_snapshot_watch_events(void)
 {
-
 	if (!snapshot_watch_events_file) {
 		return;
 	}
@@ -1467,11 +1483,12 @@ void set_snapshot_watch_events()
 
 void terminate_snapshot_watch_events()
 {
+	int iteration;
 	uint64_t pid;
 	void *dummy;
 
-	itable_firstkey(snapshot_watch_pids);
-	while (itable_nextkey(snapshot_watch_pids, &pid, &dummy)) {
+	ITABLE_ITERATE(snapshot_watch_pids, iteration, pid, dummy)
+	{
 		kill(pid, SIGKILL);
 	}
 }
@@ -1576,10 +1593,13 @@ void rmonitor_check_child(const int signal)
 	first_process_already_waited = 1;
 
 	struct rmonitor_process_info *p;
+	int iteration;
+
 	debug(D_RMON, "adding all processes to cleanup list.\n");
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p))
+	ITABLE_ITERATE(processes, iteration, pid, p)
+	{
 		rmonitor_untrack_process(pid);
+	}
 
 	/* get the peak values from getrusage, and others. */
 	struct rmsummary *tr_usg = rmonitor_final_usage_tree();
@@ -1603,8 +1623,9 @@ void rmonitor_final_cleanup()
 	sigprocmask(SIG_BLOCK, &block, NULL);
 
 	if (!first_pid_manually_set) {
-		itable_firstkey(processes);
-		while (itable_nextkey(processes, &pid, (void **)&p)) {
+		int iteration;
+		ITABLE_ITERATE(processes, iteration, pid, p)
+		{
 			notice(D_RMON, "sending kill signal to process %" PRId64 ".%d\n", pid);
 			kill(pid, SIGKILL);
 		}

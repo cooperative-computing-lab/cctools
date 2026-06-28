@@ -30,10 +30,6 @@ struct vine_file_replica *vine_file_replica_table_get_or_create(struct vine_mana
 
 struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager *q, const char *cachename);
 
-int vine_file_replica_table_replicate(struct vine_manager *q, struct vine_file *f, struct set *source_workers, int to_find);
-
-int vine_file_replica_table_exists_somewhere( struct vine_manager *q, const char *cachename );
-
 int vine_file_replica_table_count_replicas( struct vine_manager *q, const char *cachename, vine_file_replica_state_t state );
 
 #endif

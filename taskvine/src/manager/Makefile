@@ -28,7 +28,8 @@ SOURCES = \
 	vine_file_replica_table.c \
 	vine_fair.c \
 	vine_runtime_dir.c \
-	vine_task_groups.c
+	vine_task_groups.c \
+	vine_temp.c
 
 PUBLIC_HEADERS = taskvine.h
 
@@ -63,5 +64,10 @@ lint:
 
 format:
 	clang-format -i $(SOURCES)
+
+# Note that this rule is not invoked by default, since this is
+# developer documentation and dot is not required for production build.
+task-lifecycle.png: task-lifecycle.dot
+	dot -Tpng task-lifecycle.dot > task-lifecycle.png
 
 .PHONY: all clean install test lint format

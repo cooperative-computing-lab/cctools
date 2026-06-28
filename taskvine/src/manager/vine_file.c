@@ -119,10 +119,10 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 				f->cached_name = vine_meta_name(f, &totalsize);
 				/* if this is a pending file give it a random name */
 				if (!f->cached_name) {
-					f->cached_name = vine_random_name(f, &totalsize);
+					f->cached_name = vine_random_name(f);
 				}
 			} else {
-				f->cached_name = vine_random_name(f, &totalsize);
+				f->cached_name = vine_random_name(f);
 			}
 		}
 		if (size == 0) {
@@ -194,7 +194,7 @@ int vine_file_has_changed(struct vine_file *f)
 
 		struct stat info;
 
-		int result = lstat(f->source, &info);
+		int result = stat(f->source, &info);
 		if (result != 0) {
 			debug(D_NOTICE | D_VINE, "input file %s couldn't be accessed: %s", f->source, strerror(errno));
 			return 1;

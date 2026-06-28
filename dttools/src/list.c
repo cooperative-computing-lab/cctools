@@ -4,13 +4,13 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include <assert.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
 #include "list.h"
+#include "debug.h"
 
 struct list {
 	// We keep a refcount on the list itself so we know how many cursors
@@ -51,7 +51,7 @@ static void list_ref(struct list *list)
 {
 	if (!list)
 		return;
-	assert(list->refcount < UINT_MAX);
+	debug_assert(list->refcount < UINT_MAX);
 	++list->refcount;
 }
 
@@ -59,7 +59,7 @@ static void list_unref(struct list *list)
 {
 	if (!list)
 		return;
-	assert(list->refcount > 0);
+	debug_assert(list->refcount > 0);
 	--list->refcount;
 }
 
@@ -67,7 +67,7 @@ static void list_item_ref(struct list_item *item)
 {
 	if (!item)
 		return;
-	assert(item->refcount < UINT_MAX);
+	debug_assert(item->refcount < UINT_MAX);
 	++item->refcount;
 }
 
@@ -75,7 +75,7 @@ static void list_item_unref(struct list_item *item)
 {
 	if (!item)
 		return;
-	assert(item->refcount > 0);
+	debug_assert(item->refcount > 0);
 	--item->refcount;
 	if (item->dead && item->refcount == 0) {
 		struct list_item *left = item->prev;
@@ -105,7 +105,7 @@ struct list *list_create(void)
 
 unsigned list_length(struct list *list)
 {
-	assert(list);
+	debug_assert(list);
 	return list->length;
 }
 
@@ -118,14 +118,14 @@ bool list_destroy(struct list *list)
 	if (list->refcount > 1)
 		return false;
 	list_cursor_destroy(list->iter);
-	assert(list->refcount == 0);
+	debug_assert(list->refcount == 0);
 	free(list);
 	return true;
 }
 
 struct list_cursor *list_cursor_create(struct list *list)
 {
-	assert(list);
+	debug_assert(list);
 	struct list_cursor *cur = calloc(1, sizeof(*cur));
 	if (!cur)
 		oom();
@@ -136,15 +136,15 @@ struct list_cursor *list_cursor_create(struct list *list)
 
 void list_reset(struct list_cursor *cur)
 {
-	assert(cur);
+	debug_assert(cur);
 	list_item_unref(cur->target);
 	cur->target = NULL;
 }
 
 void list_cursor_destroy(struct list_cursor *cur)
 {
-	assert(cur);
-	assert(cur->list);
+	debug_assert(cur);
+	debug_assert(cur->list);
 	list_reset(cur);
 	list_unref(cur->list);
 	free(cur);
@@ -152,7 +152,7 @@ void list_cursor_destroy(struct list_cursor *cur)
 
 bool list_get(struct list_cursor *cur, void **item)
 {
-	assert(cur);
+	debug_assert(cur);
 	if (!cur->target)
 		return false;
 	if (cur->target->dead)
@@ -163,7 +163,7 @@ bool list_get(struct list_cursor *cur, void **item)
 
 bool list_set(struct list_cursor *cur, void *item)
 {
-	assert(cur);
+	debug_assert(cur);
 	if (!cur->target)
 		return false;
 	if (cur->target->dead)
@@ -174,8 +174,8 @@ bool list_set(struct list_cursor *cur, void *item)
 
 struct list_cursor *list_cursor_clone(struct list_cursor *cur)
 {
-	assert(cur);
-	assert(cur->list);
+	debug_assert(cur);
+	debug_assert(cur->list);
 	struct list_cursor *out = list_cursor_create(cur->list);
 	out->target = cur->target;
 	list_item_ref(out->target);
@@ -184,7 +184,7 @@ struct list_cursor *list_cursor_clone(struct list_cursor *cur)
 
 bool list_next(struct list_cursor *cur)
 {
-	assert(cur);
+	debug_assert(cur);
 	struct list_item *old = cur->target;
 	if (!cur->target)
 		return false;
@@ -198,7 +198,7 @@ bool list_next(struct list_cursor *cur)
 
 bool list_prev(struct list_cursor *cur)
 {
-	assert(cur);
+	debug_assert(cur);
 	struct list_item *old = cur->target;
 	if (!cur->target)
 		return false;
@@ -212,18 +212,18 @@ bool list_prev(struct list_cursor *cur)
 
 bool list_tell(struct list_cursor *cur, unsigned *index)
 {
-	assert(cur);
-	assert(cur->list);
-	assert(index);
+	debug_assert(cur);
+	debug_assert(cur->list);
+	debug_assert(index);
 	if (!cur->target)
 		return false;
 
 	unsigned pos = 0;
 	for (struct list_item *i = cur->list->head; i != cur->target; i = i->next) {
-		assert(i);
+		debug_assert(i);
 		if (i->dead)
 			continue;
-		assert(pos < INT_MAX);
+		debug_assert(pos < INT_MAX);
 		++pos;
 	}
 	if (cur->target->dead)
@@ -234,8 +234,8 @@ bool list_tell(struct list_cursor *cur, unsigned *index)
 
 bool list_seek(struct list_cursor *cur, int index)
 {
-	assert(cur);
-	assert(cur->list);
+	debug_assert(cur);
+	debug_assert(cur->list);
 
 	if (index < 0) {
 		if ((unsigned)abs(index) > cur->list->length)
@@ -248,7 +248,7 @@ bool list_seek(struct list_cursor *cur, int index)
 		list_item_ref(cur->target);
 		while (++index) {
 			bool ok = list_prev(cur);
-			assert(ok);
+			debug_assert(ok);
 		}
 	} else {
 		if ((unsigned)index >= cur->list->length)
@@ -261,7 +261,7 @@ bool list_seek(struct list_cursor *cur, int index)
 		list_item_ref(cur->target);
 		while (index--) {
 			bool ok = list_next(cur);
-			assert(ok);
+			debug_assert(ok);
 		}
 	}
 	return true;
@@ -269,29 +269,29 @@ bool list_seek(struct list_cursor *cur, int index)
 
 bool list_drop(struct list_cursor *cur)
 {
-	assert(cur);
-	assert(cur->list);
+	debug_assert(cur);
+	debug_assert(cur->list);
 	if (!cur->target)
 		return false;
 	if (cur->target->dead)
 		return true;
 	cur->target->dead = true;
-	assert(cur->list->length > 0);
+	debug_assert(cur->list->length > 0);
 	--cur->list->length;
 	return true;
 }
 
 void list_insert(struct list_cursor *cur, void *item)
 {
-	assert(cur);
-	assert(cur->list);
+	debug_assert(cur);
+	debug_assert(cur->list);
 
 	struct list_item *node = calloc(1, sizeof(*node));
 	if (!node)
 		oom();
 	node->list = cur->list;
 	node->data = item;
-	assert(cur->list->length < UINT_MAX);
+	debug_assert(cur->list->length < UINT_MAX);
 	++cur->list->length;
 
 	if (cur->target) {
@@ -310,10 +310,10 @@ void list_insert(struct list_cursor *cur, void *item)
 		node->prev = tail;
 		cur->list->tail = node;
 		if (tail) {
-			assert(tail->next == NULL);
+			debug_assert(tail->next == NULL);
 			tail->next = node;
 		} else {
-			assert(!cur->list->head);
+			debug_assert(!cur->list->head);
 			cur->list->head = node;
 		}
 	}
@@ -332,21 +332,21 @@ int list_size(struct list *list)
 
 struct list *list_splice(struct list *top, struct list *bottom)
 {
-	assert(top);
-	assert(bottom);
+	debug_assert(top);
+	debug_assert(bottom);
 
 	void *item;
 	bool ok;
 
 	if (top->length == 0) {
 		ok = list_destroy(top);
-		assert(ok);
+		debug_assert(ok);
 		return bottom;
 	}
 
 	if (bottom->length == 0) {
 		ok = list_destroy(bottom);
-		assert(ok);
+		debug_assert(ok);
 		return top;
 	}
 
@@ -362,7 +362,7 @@ struct list *list_splice(struct list *top, struct list *bottom)
 	list_cursor_destroy(cur_top);
 
 	ok = list_destroy(bottom);
-	assert(ok);
+	debug_assert(ok);
 
 	list_reset(top->iter);
 	return top;
@@ -370,7 +370,7 @@ struct list *list_splice(struct list *top, struct list *bottom)
 
 struct list *list_split(struct list *l, list_op_t comparator, const void *arg)
 {
-	assert(l);
+	debug_assert(l);
 
 	void *item;
 	struct list *out = NULL;
@@ -413,7 +413,7 @@ void list_delete(struct list *l)
 	list_cursor_destroy(cur);
 
 	bool ok = list_destroy(l);
-	assert(ok);
+	debug_assert(ok);
 }
 
 void list_free(struct list *l)
@@ -577,7 +577,7 @@ void *list_remove(struct list *l, const void *value)
 		if (value == item) {
 			out = item;
 			ok = list_drop(cur);
-			assert(ok);
+			debug_assert(ok);
 			break;
 		}
 	}
@@ -718,8 +718,8 @@ DONE:
 
 void list_push_priority(struct list *list, list_priority_t p, void *item)
 {
-	assert(list);
-	assert(p);
+	debug_assert(list);
+	debug_assert(p);
 
 	void *i = NULL;
 	struct list_cursor *cur = list_cursor_create(list);

@@ -16,7 +16,6 @@ See the file COPYING for details.
 #include "debug.h"
 #include "domain_name.h"
 #include "domain_name_cache.h"
-#include "fd.h"
 #include "http_query.h"
 #include "jx.h"
 #include "jx_eval.h"
@@ -157,8 +156,9 @@ struct list *catalog_query_sort_hostlist(const char *hosts)
 		h->port = port;
 		h->down = 0;
 
-		set_first_element(down_hosts);
-		while ((n = set_next_element(down_hosts))) {
+		int iteration;
+		SET_ITERATE(down_hosts, iteration, n)
+		{
 			if (!strcmp(n, host)) {
 				h->down = 1;
 			}
@@ -203,8 +203,9 @@ struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_
 
 			if (h->down) {
 				debug(D_DEBUG, "catalog server at %s is back up", h->host);
-				set_first_element(down_hosts);
-				while ((n = set_next_element(down_hosts))) {
+				int iteration;
+				SET_ITERATE(down_hosts, iteration, n)
+				{
 					if (!strcmp(n, h->host)) {
 						set_remove(down_hosts, n);
 						free(n);
@@ -402,23 +403,21 @@ int catalog_query_send_update(const char *hosts, const char *text, catalog_updat
 	// Ask which protocol should be used.
 	int use_udp = catalog_update_protocol();
 
-	// Decide whether to compress the data.
-	if (strlen(text) < compress_limit) {
-		// Don't bother compressing small updates
-		update_data = strdup(text);
-	} else {
-		// Compress updates above a certain limit.
+	/* Compress the packet if large and using udp. */
+	if (use_udp && strlen(text) >= compress_limit) {
 		update_data = catalog_query_compress_update(text, &data_length);
 		if (!update_data)
 			return 0;
 
 		debug(D_DEBUG, "compressed update message from %d to %d bytes", (int)strlen(text), (int)data_length);
 
-		if (data_length > compress_limit && (flags & CATALOG_UPDATE_CONDITIONAL) && !use_udp) {
+		if (data_length > compress_limit && (flags & CATALOG_UPDATE_CONDITIONAL)) {
 			debug(D_DEBUG, "compressed update message exceeds limit of %d bytes (CATALOG_UPDATE_LIMIT)", (int)compress_limit);
 			free(update_data);
 			return 0;
 		}
+	} else {
+		update_data = strdup(text);
 	}
 
 	int sent = 0;

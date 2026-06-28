@@ -1,0 +1,74 @@
+# Suppression for Arrow library's pthread_atfork handler.
+# Arrow allocates memory in its AfterFork handler, which runs in child
+# processes after fork(). When the child immediately calls _exit(),
+# this memory is not freed via normal destructors, but the OS still
+# reclaims all memory when the process exits. This is a false positive.
+
+# Match by object file (most reliable)
+{
+   arrow_afterfork_by_obj
+   Memcheck:Leak
+   match-leak-kinds: definite,indirect
+   fun:_Znwm
+   obj:*libarrow.so*
+   fun:__run_postfork_handlers
+   fun:fork
+}
+
+# Alternative using operator new name
+{
+   arrow_afterfork_operator_new
+   Memcheck:Leak
+   match-leak-kinds: definite,indirect
+   fun:operator new*
+   obj:*libarrow*
+   fun:__run_postfork_handlers
+   fun:fork
+}
+
+# Match any leak from libarrow during fork
+{
+   arrow_afterfork_any
+   Memcheck:Leak
+   match-leak-kinds: definite,indirect
+   ...
+   obj:*libarrow*
+   ...
+   fun:fork
+   fun:catalog_update_tcp_background
+}
+
+# Broad match for AfterFork in any arrow library
+{
+   arrow_afterfork_broad
+   Memcheck:Leak
+   match-leak-kinds: definite,indirect
+   ...
+   obj:*pyarrow*libarrow*
+   fun:__run_postfork_handlers
+   ...
+}
+
+# Match allocation in postfork handlers leading to catalog update
+{
+   postfork_catalog_update
+   Memcheck:Leak
+   match-leak-kinds: definite,indirect
+   fun:_Znwm
+   ...
+   fun:__run_postfork_handlers
+   fun:fork
+   fun:catalog_update_tcp_background
+}
+
+# Very broad: any leak from postfork handlers during catalog update
+{
+   postfork_handlers_catalog
+   Memcheck:Leak
+   match-leak-kinds: all
+   ...
+   fun:__run_postfork_handlers
+   fun:fork
+   fun:catalog_update_tcp_background
+   fun:catalog_query_send_update
+}

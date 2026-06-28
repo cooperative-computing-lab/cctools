@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "vine_worker_options.h"
 #include "vine_workspace.h"
 
+#include "address.h"
 #include "catalog_query.h"
 #include "cctools.h"
 #include "change_process_title.h"
@@ -69,8 +70,6 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-
-#include <signal.h>
 
 #include <sys/mman.h>
 #include <sys/resource.h>
@@ -270,6 +269,8 @@ void deliver_async_messages(struct link *l)
 
 void send_async_message(struct link *l, const char *fmt, ...)
 {
+	assert(l);
+
 	va_list va;
 	char *message = malloc(VINE_LINE_MAX);
 	va_start(va, fmt);
@@ -380,8 +381,9 @@ static int64_t measure_worker_disk()
 
 		struct vine_process *p;
 		uint64_t task_id;
+		int iteration;
 
-		ITABLE_ITERATE(procs_table, task_id, p)
+		ITABLE_ITERATE(procs_table, iteration, task_id, p)
 		{
 			if (p->sandbox_size > 0) {
 				disk_measured += p->sandbox_size;
@@ -445,8 +447,9 @@ static void send_features(struct link *manager)
 {
 	char *f;
 	void *dummy;
+	int iteration;
 
-	HASH_TABLE_ITERATE(options->features, f, dummy)
+	HASH_TABLE_ITERATE(options->features, iteration, f, dummy)
 	{
 		char feature_encoded[VINE_LINE_MAX];
 		url_encode(f, feature_encoded, VINE_LINE_MAX);
@@ -498,6 +501,10 @@ its size in bytes and transfer time in usec.
 
 void vine_worker_send_cache_update(struct link *manager, const char *cachename, struct vine_cache_file *f)
 {
+	if (!manager) {
+		return;
+	}
+
 	char *transfer_id = hash_table_remove(current_transfers, cachename);
 	if (!transfer_id) {
 		transfer_id = xxstrdup("X");
@@ -524,6 +531,10 @@ could not be loaded.  Accompanied by a corresponding error message.
 
 void vine_worker_send_cache_invalid(struct link *manager, const char *cachename, const char *message)
 {
+	if (!manager) {
+		return;
+	}
+
 	int length = strlen(message);
 	char *transfer_id = hash_table_remove(current_transfers, cachename);
 	if (transfer_id) {
@@ -542,6 +553,10 @@ Send an asynchronous message to the manager indicating where the worker is liste
 
 static void send_transfer_address(struct link *manager)
 {
+	if (!vine_transfer_server_running()) {
+		send_async_message(manager, "info transfer_port_bind_failed\n");
+		return;
+	}
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 
@@ -665,7 +680,10 @@ static void reap_process(struct vine_process *p, struct link *manager)
 	gpus_allocated -= p->task->resources_requested->gpus;
 
 	vine_gpus_free(p->task->task_id);
-	vine_sandbox_stageout(p, cache_manager, manager);
+
+	if (manager) {
+		vine_sandbox_stageout(p, cache_manager, manager);
+	}
 
 	if (p->type == VINE_PROCESS_TYPE_FUNCTION) {
 		p->library_process->functions_running--;
@@ -694,10 +712,11 @@ static void expire_procs_running()
 {
 	struct vine_process *p;
 	uint64_t task_id;
+	int iteration;
 
 	double current_time = timestamp_get() / USECOND;
 
-	ITABLE_ITERATE(procs_running, task_id, p)
+	ITABLE_ITERATE(procs_running, iteration, task_id, p)
 	{
 		if (p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end) {
 			p->result = VINE_RESULT_MAX_END_TIME;
@@ -720,8 +739,9 @@ static void finish_running_tasks(vine_result_t result)
 {
 	struct vine_process *p;
 	uint64_t task_id;
+	int iteration;
 
-	ITABLE_ITERATE(procs_running, task_id, p)
+	ITABLE_ITERATE(procs_running, iteration, task_id, p)
 	{
 		finish_running_task(p, result);
 	}
@@ -749,15 +769,18 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 
 	struct vine_process *p_running;
 	uint64_t task_id;
+	int iteration;
 
-	ITABLE_ITERATE(procs_running, task_id, p_running)
+	ITABLE_ITERATE(procs_running, iteration, task_id, p_running)
 	{
 		if (p_running->library_process == p) {
 			debug(D_VINE, "killing function task %d running on library task %d", (int)task_id, p->task->task_id);
 			finish_running_task(p_running, VINE_RESULT_FORSAKEN);
-			reap_process(p_running, manager);
+			reap_process(p_running, /* do not stage out */ NULL);
 		}
 	}
+
+	reap_process(p, manager);
 }
 
 /*
@@ -771,43 +794,43 @@ static int handle_completed_tasks(struct link *manager)
 	struct vine_process *p;
 	struct vine_process *fp;
 	uint64_t task_id;
+	int iteration;
 	uint64_t done_task_id;
 	int done_exit_code;
 
-	ITABLE_ITERATE(procs_running, task_id, p)
-	{
-		int result_retrieved = 0;
+	struct list *failed_libraries = list_create();
 
+	ITABLE_ITERATE(procs_running, iteration, task_id, p)
+	{
 		/* Check to see if this process itself is completed. */
 
 		if (vine_process_is_complete(p)) {
 			if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
 				/* Kill the library process if it completes. */
 				debug(D_VINE, "Library %s task id %d is detected to be failed. Killing it.", p->task->provides_library, p->task->task_id);
-				handle_failed_library_process(p, manager);
+
+				/* collect the library process here as we need to iterate procs_running */
+				list_push_tail(failed_libraries, p);
+			} else {
+				reap_process(p, manager);
 			}
-			/* simply reap this process */
-			reap_process(p, manager);
-			result_retrieved++;
 		}
 
 		/* If p is a library, check to see if any results waiting. */
-
 		while (vine_process_library_get_result(p, &done_task_id, &done_exit_code)) {
 			fp = itable_lookup(procs_table, done_task_id);
 			if (fp) {
 				fp->exit_code = done_exit_code;
 				reap_process(fp, manager);
-				result_retrieved++;
 			}
 		}
-
-		/* If any items were removed, reset the iterator to get back to a known position */
-
-		if (result_retrieved) {
-			itable_firstkey(procs_running);
-		}
 	}
+
+	while ((p = list_pop_head(failed_libraries))) {
+		handle_failed_library_process(p, manager);
+	}
+
+	list_delete(failed_libraries);
 
 	return 1;
 }
@@ -1076,12 +1099,7 @@ static int do_kill(int task_id)
 
 	if (itable_remove(procs_running, task_id)) {
 		vine_process_kill_and_wait(p);
-
-		cores_allocated -= p->task->resources_requested->cores;
-		memory_allocated -= p->task->resources_requested->memory;
-		disk_allocated -= p->task->resources_requested->disk;
-		gpus_allocated -= p->task->resources_requested->gpus;
-		vine_gpus_free(task_id);
+		reap_process(p, /* do not stage out */ NULL);
 	}
 
 	itable_remove(procs_complete, p->task->task_id);
@@ -1106,8 +1124,9 @@ static void kill_all_tasks()
 {
 	struct vine_process *p;
 	uint64_t task_id;
+	int iteration;
 
-	ITABLE_ITERATE(procs_table, task_id, p)
+	ITABLE_ITERATE(procs_table, iteration, task_id, p)
 	{
 		do_kill(task_id);
 	}
@@ -1153,6 +1172,7 @@ static int enforce_processes_sandbox_limits()
 
 	struct vine_process *p;
 	uint64_t task_id;
+	int iteration;
 
 	int ok = 1;
 
@@ -1160,7 +1180,7 @@ static int enforce_processes_sandbox_limits()
 	if ((time(0) - last_check_time) < options->check_resources_interval)
 		return 1;
 
-	ITABLE_ITERATE(procs_running, task_id, p)
+	ITABLE_ITERATE(procs_running, iteration, task_id, p)
 	{
 		if (!enforce_process_sanbox_limits(p)) {
 			finish_running_task(p, VINE_RESULT_SANDBOX_EXHAUSTION);
@@ -1184,10 +1204,11 @@ static void enforce_processes_max_running_time()
 {
 	struct vine_process *p;
 	uint64_t task_id;
+	int iteration;
 
 	timestamp_t now = timestamp_get();
 
-	ITABLE_ITERATE(procs_running, task_id, p)
+	ITABLE_ITERATE(procs_running, iteration, task_id, p)
 	{
 
 		/* If the task did not set wall_time, return right away. */
@@ -1383,8 +1404,9 @@ static struct vine_process *find_running_library_for_function(const char *librar
 {
 	uint64_t task_id;
 	struct vine_process *p;
+	int iteration;
 
-	ITABLE_ITERATE(procs_running, task_id, p)
+	ITABLE_ITERATE(procs_running, iteration, task_id, p)
 	{
 		if (p->task->provides_library && !strcmp(p->task->provides_library, library_name)) {
 			if (p->library_ready && p->functions_running < p->task->function_slots_total) {
@@ -1392,6 +1414,7 @@ static struct vine_process *find_running_library_for_function(const char *librar
 			}
 		}
 	}
+
 	return 0;
 }
 
@@ -1426,8 +1449,9 @@ static struct vine_process *find_future_library_for_function(const char *library
 {
 	uint64_t task_id;
 	struct vine_process *p;
+	int iteration;
 
-	ITABLE_ITERATE(procs_table, task_id, p)
+	ITABLE_ITERATE(procs_table, iteration, task_id, p)
 	{
 		if (p->task->provides_library && !strcmp(p->task->provides_library, library_name)) {
 			return p;
@@ -1609,13 +1633,14 @@ static void check_libraries_ready(struct link *manager)
 {
 	uint64_t library_task_id;
 	struct vine_process *library_process;
+	int iteration;
 
 	struct link_info library_link_info;
 	library_link_info.events = LINK_READ;
 	library_link_info.revents = 0;
 
 	/* Loop through all processes to find libraries and check if they are alive. */
-	ITABLE_ITERATE(procs_running, library_task_id, library_process)
+	ITABLE_ITERATE(procs_running, iteration, library_task_id, library_process)
 	{
 		/* Skip non-library processes or libraries that are already ready */
 		if (library_process->type != VINE_PROCESS_TYPE_LIBRARY || library_process->library_ready)
@@ -1713,7 +1738,7 @@ static void vine_worker_serve_manager(struct link *manager)
 		expire_procs_running();
 
 		ok &= handle_completed_tasks(manager);
-		ok &= vine_cache_check_files(cache_manager, manager);
+		ok &= vine_cache_check_xfer_files(cache_manager, manager);
 
 		measure_worker_resources();
 
@@ -1879,7 +1904,9 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 	vine_cache_load(cache_manager);
 
 	/* Start the transfer server, which serves up the cache directory. */
-	vine_transfer_server_start(cache_manager, options->transfer_port_min, options->transfer_port_max);
+	if (!vine_transfer_server_start(cache_manager, options->transfer_port_min, options->transfer_port_max)) {
+		fprintf(stderr, "vine_worker: unable to bind transfer port (check --transfer-port or cluster permissions)\n");
+	}
 
 	measure_worker_resources();
 
@@ -2163,15 +2190,11 @@ struct list *parse_manager_addresses(const char *specs, int default_port)
 
 	char *next_manager = strtok(managers_args, ";");
 	while (next_manager) {
+		char host[DOMAIN_NAME_MAX];
 		int port = default_port;
 
-		char *port_str = strchr(next_manager, ':');
-		if (port_str) {
-			char *no_ipv4 = strchr(port_str + 1, ':'); /* if another ':', then this is not ipv4. */
-			if (!no_ipv4) {
-				*port_str = '\0';
-				port = atoi(port_str + 1);
-			}
+		if (!address_parse_hostport(next_manager, host, &port, default_port)) {
+			fatal("Invalid manager address '%s'", next_manager);
 		}
 
 		if (port < 1) {
@@ -2179,12 +2202,8 @@ struct list *parse_manager_addresses(const char *specs, int default_port)
 		}
 
 		struct manager_address *m = calloc(1, sizeof(*m));
-		strncpy(m->host, next_manager, DOMAIN_NAME_MAX - 1);
+		snprintf(m->host, sizeof(m->host), "%s", host);
 		m->port = port;
-
-		if (port_str) {
-			*port_str = ':';
-		}
 
 		list_push_tail(managers, m);
 		next_manager = strtok(NULL, ";");

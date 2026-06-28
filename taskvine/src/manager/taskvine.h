@@ -180,13 +180,14 @@ struct vine_stats {
 	int tasks_on_workers;	/**< Number of tasks currently dispatched to some worker. */
 	int tasks_running;	/**< Number of tasks currently executing at some worker. */
 	int tasks_with_results; /**< Number of tasks with retrieved results and waiting to be returned to user. */
+	int tasks_recovery;     /**< Total number of recovery tasks submitted. */
 
 	/* Cumulative stats for tasks: */
 	int tasks_submitted;  /**< Total number of tasks submitted to the manager. */
 	int tasks_dispatched; /**< Total number of tasks dispatch to workers. */
-	int tasks_done;	      /**< Total number of tasks completed and returned to user. (includes tasks_failed) */
-	int tasks_failed;     /**< Total number of tasks completed and returned to user with result other than
-				 VINE_RESULT_SUCCESS. */
+	int tasks_done;	      /**< Total number of tasks completed (includes tasks_failed and tasks_successful) */
+	int tasks_failed;     /**< Total number of tasks completed with result other than VINE_RESULT_SUCCESS. (includes retries) */
+	int tasks_successful; /**< Total number of task completed and returned to the user with a successful exit status. */
 	int tasks_cancelled;  /**< Total number of tasks cancelled. */
 	int tasks_exhausted_attempts; /**< Total number of task executions that failed given resource exhaustion. */
 
@@ -1017,6 +1018,13 @@ void vine_manager_remove_library(struct vine_manager *m, const char *name);
 */
 struct vine_task *vine_manager_find_library_template(struct vine_manager *m, const char *library_name);
 
+/** Release a random worker for failure-injection tests.
+This is a testing support hook, not a normal manager control operation.
+@param m A manager object.
+@return Non-zero if a worker was released.
+*/
+int vine_manager_release_random_worker(struct vine_manager *m);
+
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the manager is empty.
 If a task has completed, the corresponding task object will be returned by this function.
@@ -1335,6 +1343,14 @@ The cancelled task will be returned in the normal way via @ref vine_wait with a 
 */
 int vine_cancel_by_task_tag(struct vine_manager *m, const char *tag);
 
+/** Cancel all submitted tasks with the given tag and remove them from the manager.
+Each cancelled task will be returned in the normal way via @ref vine_wait with a result of VINE_RESULT_CANCELLED.
+@param m A manager object
+@param tag The tag name assigned to tasks using @ref vine_task_set_tag.
+@return The number of tasks cancelled.
+*/
+int vine_cancel_all_by_tag(struct vine_manager *m, const char *tag);
+
 /** Cancel all submitted tasks and remove them from the manager.
 Each cancelled task will be returned in the normal way via @ref vine_wait with a result of VINE_RESULT_CANCELLED.
 @param m A manager object
@@ -1532,6 +1548,12 @@ void vine_counters_print();
 @return A string.
  */
 char *vine_version_string();
+
+/** Absolute path of this run's workflow runtime directory.
+@param m The manager.
+@return Owned by the manager until @ref vine_delete.
+ */
+const char *vine_get_runtime_directory(struct vine_manager *m);
 
 /** Returns path relative to the logs runtime directory
 @param m Reference to the current manager object.

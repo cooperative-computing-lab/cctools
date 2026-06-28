@@ -1246,6 +1246,17 @@ warranted:
     }
     ```
 
+### Task Result Caching
+
+For workflows where the same task is submitted multiple times with identical arguments (such as during iterative development or notebook re-execution), TaskVine can cache task outputs and return them without dispatching to a worker. Enable caching by calling `enable_tasks_cache` on the manager:
+
+```python
+m = vine.Manager(port=9123)
+m.enable_tasks_cache(cache_dir="vine-cache-outputs", log_file="vine-cache.txlog")
+```
+
+When a task completes, its output is stored in `cache_dir` and indexed by a fingerprint of the function and its arguments. On subsequent submissions of an identical task, the result is returned directly from cache. The cache persists across manager restarts via the transaction log, so results from a previous run are available immediately in a new session. Tasks that do not match any cached result are executed normally on a worker.
+
 ### Automatic Garbage Collection on Disk
 
 For workflows that generate partial results that are not needed once a final
@@ -2750,6 +2761,7 @@ change.
 |-----------|-------------|---------------|
 | attempt-schedule-depth | The amount of tasks to attempt scheduling on each pass of send_one_task in the main loop. | 100 |
 | category-steady-n-tasks | Minimum number of successful tasks to use a sample for automatic resource allocation modes after encountering a new resource maximum. | 25 |
+| clean-redundant-replicas | Remove redundant temporary file replicas to save worker's local disk space. | 0 |
 | default-transfer-rate | The assumed network bandwidth used until sufficient data has been collected.  (1MB/s)
 | disconnect-slow-workers-factor | Set the multiplier of the average task time at which point to disconnect a worker; disabled if less than 1. (default=0)
 | hungry-minimum          | Smallest number of waiting tasks in the manager before declaring it hungry | 10 |
@@ -2767,6 +2779,7 @@ change.
 | ramp-down-heuristic     | If set to 1 and there are more workers than tasks waiting, then tasks are allocated all the free resources of a worker large enough to run them. If monitoring watchdog is not enabled, then this heuristic has no effect. | 0 |
 | resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
 | sandbox-grow-factor    | When task disk sandboxes are exhausted, increase the allocation using their measured valued times this factor. Minimum is 1.1. | 2 |
+| shift-disk-load | Proactively shift temporary files away from the most disk-heavy worker to those with more available disk. | 0 |
 | short-timeout | Set the minimum timeout in seconds when sending a brief message to a single worker. | 5 |
 | temp-replica-count    | Number of temp file replicas created across workers | 0 |
 | transfer-outlier-factor | Transfer that are this many times slower than the average will be terminated. | 10 |
@@ -2933,7 +2946,7 @@ scheduler. The class `DaskVine` implements a TaskVine manager that has a
         f.min_workers = 1
         with f:
             with dask.config.set(scheduler=m.get):
-                result = distance.compute(resources={"cores": 1}, resources_mode="max", lazy_transfers=True)
+                result = distance.compute(resources={"cores": 1}, resources_mode="max", worker_transfers=True)
                 print(f"distance = {result}")
             print("Terminating workers...", end="")
         print("done!")
@@ -2943,13 +2956,34 @@ The `compute` call above may receive the following keyword arguments:
 
 | Keyword | Description |
 |------------ |---------|
-| environment | A TaskVine file that provides an [environment](#execution-contexts) to execute each task. |
+| environment | A TaskVine file (or a string path to a poncho env tarball) that provides an [environment](#execution-contexts) to execute each task. |
 | env\_vars   | A dictionary of VAR=VALUE environment variables to set per task. A value should be either a string, or a function that accepts as arguments the manager and task, and that returns a string. |
 | extra\_files | A dictionary of {taskvine.File: "remote_name"} of input files to attach to each task.|
-| lazy\_transfer | Whether to bring each result back from the workers (False, default), or keep transient results at workers (True) |
+| worker\_transfers | Whether to keep intermediate results only at workers for higher throughput (True, default), or to bring back each result to the manager for better fault tolerance (False). |
 | resources   | A dictionary to specify [maximum resources](#task-resources), e.g. `{"cores": 1, "memory": 2000"}` |
 | resources\_mode | [Automatic resource management](#automatic-resource-management) to use, e.g., "fixed", "max", or "max throughput"|
 | task\_mode | Mode to execute individual tasks, such as [function calls](#serverless-computing). to use, e.g., "tasks", or "function-calls"|
+| task\_priority\_mode | How tasks are prioritized for submission; higher priority is considered first (default "largest-input-first" for faster data pruning). |
+| scheduling\_mode | Strategy to dispatch tasks to workers (default "files": prefer workers that already have more of the required input files). |
+| retries | Number of times to attempt a task (default 5). |
+| submit\_per\_cycle | Maximum number of tasks to submit to the scheduler per loop; None means no limit. |
+| max\_pending | Maximum number of tasks without a result before new ones are submitted; None means no limit. |
+| verbose | If true, emit additional debugging information. |
+| progress\_disable | If True, disable progress bar. |
+| progress\_label | Label to use in progress bar. |
+| reconstruct | Reconstruct graph based on annotated functions. |
+| merge\_size | When reconstructing a merge function, merge this many at a time. |
+| wrapper | Function to wrap dask calls for debugging; should return `(wrapper result, dask call result)`. |
+| wrapper\_proc | Function to process results from wrapper on completion (default is print). |
+| prune\_depth | Control pruning behavior: 0 (default) no pruning; 1 checks direct consumers (most aggressive); 2+ checks consumers up to specified depth (the higher means more conservative). |
+| env\_per\_task | If true, each task individually expands its own environment (requires `environment` be a string). |
+| lib\_extra\_functions | Additional functions to include in execution library (only for `task_mode="function-calls"`). |
+| lib\_resources | Resources for the execution library (only for `task_mode="function-calls"`), e.g. `{"cores": 4, "memory": 2000, "disk": 1000, "slots": 4}`. |
+| lib\_command | Command to be prefixed to the execution of a Library task (only for `task_mode="function-calls"`). |
+| lib\_modules | Hoist these execution-library imports to avoid redundant module imports across individual function invocations (only for `task_mode="function-calls"`). |
+| lazy\_transfers | Deprecated alias for `worker_transfers`. |
+| hoisting\_modules | Deprecated alias for `lib_modules`. |
+| import\_modules | Deprecated alias for `lib_modules`. |
 
 ## Appendix for Developers
 

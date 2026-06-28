@@ -11,9 +11,7 @@ except IndexError:
     raise
 
 def main():
-    executor = vine.FuturesExecutor(
-        port=[9123, 9129], manager_name="vine_hof_test", factory=False
-    )
+    executor = vine.FuturesExecutor(port=0,factory=False)
 
     print("listening on port {}".format(executor.manager.port))
     with open(port_file, "w") as f:

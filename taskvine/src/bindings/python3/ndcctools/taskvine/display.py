@@ -110,6 +110,7 @@ class StatusDisplay:
             "tasks_done",
             "tasks_waiting",
             "tasks_running",
+            "recovery_tasks_submitted",
             "tasks_exhausted_attempts",
             "workers_connected",
             "workers_busy",

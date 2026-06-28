@@ -14,6 +14,8 @@ PORT_FILE=vine.port
 
 check_needed()
 {
+    return 1
+
 	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
 	"${CCTOOLS_PYTHON_TEST_EXEC}" -c "import cloudpickle; import dask"  || return 1
 

@@ -20,6 +20,8 @@ End user may only use the API described in taskvine.h
 #include "category.h"
 #include "uuid.h"
 
+
+
 #include <stdint.h>
 
 typedef enum {
@@ -43,6 +45,14 @@ typedef enum {
         VINE_TASK_FUNC_EXEC_MODE_DIRECT = 1,    /**< A library task will execute function calls directly in its process **/
         VINE_TASK_FUNC_EXEC_MODE_FORK,          /**< A library task will fork and execute each function call. **/
 } vine_task_func_exec_mode_t;
+
+/* Manager priority for tasks. Recovery tasks have higher priority than resource exhausted normal tasks,
+and so on. Ties are broken by user priority and task id. */
+typedef enum {
+	VINE_PRIORITY_NORMAL = 0,
+	VINE_PRIORITY_EXHAUSTION,
+	VINE_PRIORITY_RECOVERY_TASK,
+} vine_priority_t;
 
 struct vine_task {
     /***** Fixed properties of task at submit time. ******/
@@ -68,7 +78,8 @@ struct vine_task {
 
 	category_allocation_t resource_request; /**< See @ref category_allocation_t */
 	vine_schedule_t worker_selection_algorithm; /**< How to choose worker to run the task. */
-	double priority;             /**< The priority of this task relative to others in the queue: higher number run earlier. */
+	double user_priority;             /**< The priority of this task relative to others as specified by the user: higher number run earlier. */
+	vine_priority_t manager_priority; /**< The manager-assigned priority of this task, normal, exhaustion, or recovery task. */
 	int max_retries;             /**< Number of times the task is tried to be executed on some workers until success. If less than one, the task is retried indefinitely. See try_count below.*/
 	int max_forsaken;            /**< Number of times the task is submitted to workers without being executed. If less than one, the task is retried indefinitely. See forsaken_count below.*/
 	int64_t min_running_time;    /**< Minimum time (in seconds) the task needs to run. (see vine_worker --wall-time)*/
