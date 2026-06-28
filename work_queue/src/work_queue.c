@@ -3774,7 +3774,6 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 	rmsummary_merge_override_basic(limits, max);
 
 	int use_whole_worker = 1;
-	q->proportional_resources = 0;
 	if(q->proportional_resources) {
 		double max_proportion = -1;
 		if(w->resources->cores.largest > 0) {
@@ -5930,10 +5929,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->wait_for_workers = 0;
 	q->attempt_schedule_depth = 100;
 
-	//q->proportional_resources = 1;
-	////disable propotional resoureces
-	q->proportional_resources = 0;
-	q->proportional_whole_tasks = 1;
+	q->proportional_resources = 1;
 
 	q->allocation_default_mode = WORK_QUEUE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);

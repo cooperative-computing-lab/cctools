@@ -2934,7 +2934,6 @@ struct rmsummary *vine_manager_choose_resources_for_task(struct vine_manager *q,
 	/* For disk, scale the estimated disk allocation by a [0, 1] factor (by default 0.75) to intentionally
 	 * reserve some space for data movement between the sandbox and cache, and allow extra room for potential cache growth.
 	 * This applies to tasks except function calls. */
-	/* THIS IS VERY LIKELY A BUG IN TERMS OF RESOURCE PREDICTION */
 	limits->disk *= q->disk_proportion_available_to_task;
 
 	/* never go below specified min resources. */
