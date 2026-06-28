@@ -5944,6 +5944,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->attempt_schedule_depth = 100;
 
 	q->proportional_resources = 1;
+        q->proportional_whole_tasks = 1;
 
 	q->allocation_default_mode = WORK_QUEUE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
