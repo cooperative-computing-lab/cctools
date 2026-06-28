@@ -168,10 +168,10 @@ void category_specify_allocation_mode(struct category *c, int mode)
 			} else if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING) {
 				bmode = BUCKETING_MODE_DET_EXHAUSTIVE;
 			} else if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_QUANTIZED_BUCKETING) {
-                bmode = BUCKETING_MODE_QUANTIZED;
-            } else {
-                fatal("Unknown bucketing mode for category \n");
-            }
+				bmode = BUCKETING_MODE_QUANTIZED;
+			} else {
+				fatal("Unknown bucketing mode for category \n");
+			}
 			c->bucketing_manager = bucketing_manager_initialize(bmode);
 		}
 	}

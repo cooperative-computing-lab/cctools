@@ -307,58 +307,58 @@ void bucketing_det_greedy_update_buckets(bucketing_state_t *s)
 		return;
 	}
 
-    /* Find probabilities of buckets */
-    double bucket_probs[list_size(break_point_list)]; // store probabilities of buckets
-    list_first_item(s->sorted_points);
-    list_first_item(break_point_list);
+	/* Find probabilities of buckets */
+	double bucket_probs[list_size(break_point_list)]; // store probabilities of buckets
+	list_first_item(s->sorted_points);
+	list_first_item(break_point_list);
 	bucketing_cursor_w_pos_t *tmp_break_point; // pointer pointing to item in break point list
-    bucketing_point_t *tmp_point;          // pointer to item in s->sorted_points
-    int i = 0;
-    bucket_probs[0] = 0;
-    double total_sig = 0; // track total significance
+	bucketing_point_t *tmp_point;		   // pointer to item in s->sorted_points
+	int i = 0;
+	bucket_probs[0] = 0;
+	double total_sig = 0; // track total significance
 
-    if (!(tmp_point = list_next_item(s->sorted_points))) {
-        fatal("bucketing: cannot get tmp point\n");
-        return;
-    }
+	if (!(tmp_point = list_next_item(s->sorted_points))) {
+		fatal("bucketing: cannot get tmp point\n");
+		return;
+	}
 
-    if (!(tmp_break_point = list_next_item(break_point_list))) {
-        fatal("bucketing: cannot get tmp break point\n");
-        return;
-    }
-    bucketing_point_t *tmp_point_of_break_point = 0;
-    if (!list_get(tmp_break_point->lc, (void **)&tmp_point_of_break_point)) {
-        fatal("Cannot get item from list\n");
-        return;
-    }
+	if (!(tmp_break_point = list_next_item(break_point_list))) {
+		fatal("bucketing: cannot get tmp break point\n");
+		return;
+	}
+	bucketing_point_t *tmp_point_of_break_point = 0;
+	if (!list_get(tmp_break_point->lc, (void **)&tmp_point_of_break_point)) {
+		fatal("Cannot get item from list\n");
+		return;
+	}
 
-    /* loop to compute buckets' probabilities */
-    while (tmp_point) {
+	/* loop to compute buckets' probabilities */
+	while (tmp_point) {
 
-        if (tmp_point->val <= tmp_point_of_break_point->val) {
-            bucket_probs[i] += tmp_point->sig;
-            total_sig += tmp_point->sig;
-            tmp_point = list_next_item(s->sorted_points);
-        } else {
-            ++i;
-            bucket_probs[i] = 0;
-            tmp_break_point = list_next_item(break_point_list);
-            if (!list_get(tmp_break_point->lc, (void **)&tmp_point_of_break_point)) {
-                fatal("Cannot get item from list\n");
-                return;
-            }
-        }
-    }
+		if (tmp_point->val <= tmp_point_of_break_point->val) {
+			bucket_probs[i] += tmp_point->sig;
+			total_sig += tmp_point->sig;
+			tmp_point = list_next_item(s->sorted_points);
+		} else {
+			++i;
+			bucket_probs[i] = 0;
+			tmp_break_point = list_next_item(break_point_list);
+			if (!list_get(tmp_break_point->lc, (void **)&tmp_point_of_break_point)) {
+				fatal("Cannot get item from list\n");
+				return;
+			}
+		}
+	}
 
-    /* must divide by total significance to normalize to [0, 1] */
-    for (int i = 0; i < list_size(break_point_list); ++i) {
-        bucket_probs[i] /= total_sig;
-    }
+	/* must divide by total significance to normalize to [0, 1] */
+	for (int i = 0; i < list_size(break_point_list); ++i) {
+		bucket_probs[i] /= total_sig;
+	}
 
-	bucketing_point_t *tmp_point_ptr = 0;	   // pointer to what tmp_break_point->lc points
-	bucketing_bucket_t *tmp_bucket;		   // pointer to a created bucket
-	list_first_item(break_point_list);	   // reset to beginning of break point list
-    i = 0;
+	bucketing_point_t *tmp_point_ptr = 0; // pointer to what tmp_break_point->lc points
+	bucketing_bucket_t *tmp_bucket;	      // pointer to a created bucket
+	list_first_item(break_point_list);    // reset to beginning of break point list
+	i = 0;
 
 	/* Loop through list of break points */
 	while ((tmp_break_point = list_next_item(break_point_list))) {
@@ -368,7 +368,7 @@ void bucketing_det_greedy_update_buckets(bucketing_state_t *s)
 		}
 
 		// in deterministic greedy, buckets don't need to have probabilities,
-        // but we still count the bucket's probabilities for debuggability
+		// but we still count the bucket's probabilities for debuggability
 
 		tmp_bucket = bucketing_bucket_create(tmp_point_ptr->val, bucket_probs[i]);
 		if (!tmp_bucket) {
@@ -380,7 +380,7 @@ void bucketing_det_greedy_update_buckets(bucketing_state_t *s)
 			fatal("Cannot push tmp bucket to sorted buckets\n");
 			return;
 		}
-        ++i;
+		++i;
 	}
 
 	/* Delete break point list */
