@@ -124,6 +124,10 @@ SOURCES = \
 	username.c \
 	uuid.c \
 	xxmalloc.c \
+	gpu_commons.c \
+	nvidia_nvml_library.c \
+	gpu.c \
+
 
 HEADERS_PUBLIC = \
 	auth.h \
@@ -175,6 +179,9 @@ HEADERS_PUBLIC = \
 	timestamp.h \
 	unlink_recursive.h \
 	xxmalloc.h \
+	gpu_commons.h \
+	nvidia_nvml_library.h \
+	gpu.h \
 
 LIBRARIES = libdttools.a
 
