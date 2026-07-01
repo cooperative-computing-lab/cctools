@@ -13,7 +13,9 @@ typedef struct
 {
     bucketing_mode_t mode;   //bucketing mode
     struct hash_table* res_type_to_bucketing_state; //mapping of resource type to bucketing state
-    struct hash_table* task_id_to_task_rmsummary;   //mapping of task id to its previous resource summary from either actual run or prediction
+    struct hash_table* task_id_to_is_task_already_run; // mapping of task id to whether the task has been run or not
+    struct hash_table* task_id_to_task_max_seen_res; // mapping of task id to its maximum seen resource consumption over all runs
+    struct hash_table* task_id_to_task_res_report;   //mapping of task id to the most recent resource report, it will carry the limits exceeded signal from add_resource_report to predict, save the new prediction, and remove the limits exceeded signal
 } 
 bucketing_manager_t;
 

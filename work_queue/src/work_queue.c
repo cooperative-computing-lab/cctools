@@ -3115,7 +3115,7 @@ static work_queue_msg_code_t process_resource( struct work_queue *q, struct work
 	char resource_name[WORK_QUEUE_LINE_MAX];
 	struct work_queue_resource r;
 
-	int n = sscanf(line, "resource %s %"PRId64" %"PRId64" %"PRId64, resource_name, &r.total, &r.smallest, &r.largest);
+	int n = sscanf(line, "resource %s %lf %lf %lf", resource_name, &r.total, &r.smallest, &r.largest);
 
 	if(n == 2 && !strcmp(resource_name,"tag"))
 	{
@@ -5944,7 +5944,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->attempt_schedule_depth = 100;
 
 	q->proportional_resources = 1;
-	q->proportional_whole_tasks = 1;
+        q->proportional_whole_tasks = 1;
 
 	q->allocation_default_mode = WORK_QUEUE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
@@ -6386,7 +6386,7 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 	if(!(q->monitor_mode & MON_WATCHDOG)) {
 		buffer_printf(&b, " --measure-only");
 	}
-
+	
 	if (q->monitor_interval > 0) {
 		buffer_printf(&b, " --interval %d", q->monitor_interval);
 	}
@@ -7878,6 +7878,16 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 		case CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
 			mode = "EXHAUSTIVE_BUCKETING";
 			break;
+		case CATEGORY_ALLOCATION_MODE_DET_GREEDY_BUCKETING:
+			mode = "DET_GREEDY_BUCKETING";
+			break;
+		case CATEGORY_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING:
+			mode = "DET_EXHAUSTIVE_BUCKETING";
+			break;
+		case CATEGORY_ALLOCATION_MODE_QUANTIZED_BUCKETING:
+			mode = "QUANTIZED_BUCKETING";
+			break;
+
 	}
 
 	buffer_printf(&B, "CATEGORY %s FIRST %s ", c->name, mode);
@@ -8107,6 +8117,9 @@ int work_queue_specify_category_mode(struct work_queue *q, const char *category,
 		case WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT:
 		case WORK_QUEUE_ALLOCATION_MODE_GREEDY_BUCKETING:
 		case WORK_QUEUE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
+		case WORK_QUEUE_ALLOCATION_MODE_DET_GREEDY_BUCKETING:
+		case WORK_QUEUE_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING:
+		case WORK_QUEUE_ALLOCATION_MODE_QUANTIZED_BUCKETING:
 			break;
 		default:
 			notice(D_WQ, "Unknown category mode specified.");

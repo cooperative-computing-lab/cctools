@@ -1513,13 +1513,13 @@ static int enforce_worker_limits(struct link *manager)
 {
 	if (options->disk_total > 0 && total_resources->disk.inuse > options->disk_total) {
 		fprintf(stderr,
-				"vine_worker: %s used more than declared disk space (--disk - < disk used) %" PRIu64 " < %" PRIu64 " MB\n",
+				"vine_worker: %s used more than declared disk space (--disk - < disk used) %" PRIu64 " < %lf MB\n",
 				workspace->workspace_dir,
 				options->disk_total,
 				total_resources->disk.inuse);
 
 		if (manager) {
-			send_message(manager, "info disk_exhausted %lld\n", (long long)total_resources->disk.inuse);
+			send_message(manager, "info disk_exhausted %lf\n", total_resources->disk.inuse);
 		}
 
 		return 0;
@@ -1527,12 +1527,12 @@ static int enforce_worker_limits(struct link *manager)
 
 	if (options->memory_total > 0 && total_resources->memory.inuse > options->memory_total) {
 		fprintf(stderr,
-				"vine_worker: used more than declared memory (--memory < memory used) %" PRIu64 " < %" PRIu64 " MB\n",
+				"vine_worker: used more than declared memory (--memory < memory used) %" PRIu64 " < %lf MB\n",
 				options->memory_total,
 				total_resources->memory.inuse);
 
 		if (manager) {
-			send_message(manager, "info memory_exhausted %lld\n", (long long)total_resources->memory.inuse);
+			send_message(manager, "info memory_exhausted %lf\n", total_resources->memory.inuse);
 		}
 
 		return 0;
@@ -1557,12 +1557,12 @@ static int enforce_worker_promises(struct link *manager)
 
 	if (options->disk_total > 0 && total_resources->disk.total < options->disk_total) {
 		fprintf(stderr,
-				"vine_worker: has less than the promised disk space (--disk > disk total) %" PRIu64 " < %" PRIu64 " MB\n",
+				"vine_worker: has less than the promised disk space (--disk > disk total) %" PRIu64 " < %lf MB\n",
 				options->disk_total,
 				total_resources->disk.total);
 
 		if (manager) {
-			send_message(manager, "info disk_error %lld\n", (long long)total_resources->disk.total);
+			send_message(manager, "info disk_error %lf\n", total_resources->disk.total);
 		}
 
 		return 0;
@@ -2339,7 +2339,7 @@ int main(int argc, char *argv[])
 
 	/* Display the available resources once at startup. */
 	measure_worker_resources();
-	printf("vine_worker: using %" PRId64 " cores, %" PRId64 " MB memory, %" PRId64 " MB disk, %" PRId64 " gpus\n",
+	printf("vine_worker: using %lf cores, %lf MB memory, %lf MB disk, %lf gpus\n",
 			total_resources->cores.total,
 			total_resources->memory.total,
 			total_resources->disk.total,
