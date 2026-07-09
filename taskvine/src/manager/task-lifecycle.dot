@@ -1,0 +1,77 @@
+digraph g {
+
+overlap=scale;
+
+/*
+A task is created by vine_task_create() in the INITIAL
+state, and then moves to the READY state via vine_submit().
+*/
+
+INITIAL -> READY [label="submit"];
+
+/*
+A task goes to the RUNNING state when it is dispatched
+from the manager to a worker.  Note that the manager
+does not know exactly when the worker does a fork/exec
+to invoke the task on its end.
+*/
+
+READY -> RUNNING [label="dispatch"];
+
+/*
+When the worker observes that a task has exited
+(or fails to start correctly) it sends a "complete"
+message to the manager with the essential task status.
+The task is now waiting for the manager to retrieve
+any large outputs and then delete the task.
+*/
+
+RUNNING -> WAITING_RETRIEVAL [label="complete"];
+
+/*
+If a task is dispatched to a worker, and then the
+worker fails prior to completion, the task goes
+back into the ready state.  Likewise if the task
+is complete but not retrieved, it goes back to ready.
+*/
+
+RUNNING -> READY [label="failure"];
+WAITING_RETRIEVAL -> READY [label="failure"];
+
+/*
+Once the manager fetches the full outputs of a task
+it sends a "kill" to the worker to delete the remote
+state, and the task is now in the retrieved state,
+until the user waits for its output.
+*/
+
+WAITING_RETRIEVAL -> RETRIEVED [label="fetch"];
+
+/*
+When the user calls vine_wait(), the manager picks
+a task out of the retrieved list, and returns it
+to the user, at which point it is DONE and the
+manager has no further responsibility for it.
+*/
+
+RETRIEVED -> DONE [label="vine_wait"];
+
+/*
+Cancellation moves a task in any state to the retrieved state,
+where it is handled like a completed task and returned to the user.
+*/
+
+READY->RETRIEVED [label="cancel"];
+RUNNING->RETRIEVED [label="cancel"];
+WAITING_RETRIEVAL->RETRIEVED [label="cancel"];
+
+/*
+A task that is permanently unable to run
+(for example, its expiration time has been exceeded)
+will go directly to RETRIEVED so that it can be
+collected by the user.
+*/
+
+READY->RETRIEVED [label="unable"];
+
+}

@@ -239,6 +239,9 @@ static int coprocess_memory = -1;
 static int coprocess_disk = -1;
 static int coprocess_gpus = -1;
 
+/* A wrapper command to be applied to every executed task. */
+char *task_wrapper = 0;
+
 static char *factory_name = NULL;
 
 struct work_queue_cache *global_cache = 0;
@@ -303,9 +306,9 @@ static int64_t measure_worker_disk()
 
 		struct work_queue_process *p;
 		uint64_t taskid;
+		int iteration;
 
-		itable_firstkey(procs_table);
-		while(itable_nextkey(procs_table,&taskid,(void**)&p)) {
+		ITABLE_ITERATE(procs_table, iteration, taskid, p) {
 			if(p->sandbox_size > 0) {
 				disk_measured += p->sandbox_size;
 				files_counted += p->sandbox_file_count;
@@ -379,12 +382,11 @@ Send a message to the manager with user defined features.
 
 static void send_features(struct link *manager)
 {
+	int iteration;
 	char *f;
 	void *dummy;
-	hash_table_firstkey(features);
-
 	char fenc[WORK_QUEUE_LINE_MAX];
-	while(hash_table_nextkey(features, &f, &dummy)) {
+	HASH_TABLE_ITERATE(features, iteration, f, dummy) {
 		url_encode(f, fenc, WORK_QUEUE_LINE_MAX);
 		send_manager_message(manager, "feature %s\n", fenc);
 	}
@@ -707,17 +709,17 @@ and send a kill signal.  The actual exit of the process will be detected at a la
 
 static void expire_procs_running()
 {
+	int iteration;
 	struct work_queue_process *p;
 	uint64_t pid;
 
 	double current_time = timestamp_get() / USECOND;
 
-	itable_firstkey(procs_running);
-	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
+	ITABLE_ITERATE(procs_running, iteration, pid, p) {
 		if(p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end)
 		{
 			p->task_status = WORK_QUEUE_RESULT_TASK_TIMEOUT;
-			kill(pid, SIGKILL);
+			kill((pid_t)pid, SIGKILL);
 		}
 	}
 }
@@ -756,23 +758,23 @@ for later processing.
 static int handle_completed_tasks(struct link *manager)
 {
 	struct work_queue_process *p;
-	pid_t pid;
+	uint64_t pid;
 	int status;
+	int iteration;
 
-	itable_firstkey(procs_running);
-	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
-		int result = wait4(pid, &status, WNOHANG, &p->rusage);
+	ITABLE_ITERATE(procs_running, iteration, pid, p) {
+		int result = wait4((pid_t)pid, &status, WNOHANG, &p->rusage);
 		if(result==0) {
 			// pid is still going
 		} else if(result<0) {
-			debug(D_WQ, "wait4 on pid %d returned an error: %s",pid,strerror(errno));
+			debug(D_WQ, "wait4 on pid %d returned an error: %s",(pid_t) pid,strerror(errno));
 		} else if(result>0) {
 			if (!WIFEXITED(status)){
 				p->exit_status = WTERMSIG(status);
-				debug(D_WQ, "task %d (pid %d) exited abnormally with signal %d",p->task->taskid,p->pid,p->exit_status);
+				debug(D_WQ, "task %d (pid %d) exited abnormally with signal %d",p->task->taskid,(pid_t) p->pid,p->exit_status);
 			} else {
 				p->exit_status = WEXITSTATUS(status);
-				debug(D_WQ, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_status);
+				debug(D_WQ, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,(pid_t) p->pid,p->exit_status);
 
 				if(is_disk_allocation_exhausted(p)) {
 					p->task_status = WORK_QUEUE_RESULT_DISK_ALLOC_FULL;
@@ -787,11 +789,6 @@ static int handle_completed_tasks(struct link *manager)
 			
 			/* collect the resources associated with the process */
 			reap_process(p);
-			
-			/* must reset the table iterator because an item was removed. */
-			itable_firstkey(procs_running);
-
-
 		}
 
 	}
@@ -1317,11 +1314,11 @@ then we need to abort to clean things up.
 
 static void kill_all_tasks()
 {
+	int iteration;
 	struct work_queue_process *p;
 	uint64_t taskid;
 
-	itable_firstkey(procs_table);
-	while(itable_nextkey(procs_table,&taskid,(void**)&p)) {
+	ITABLE_ITERATE(procs_table, iteration, taskid, p) {
 		do_kill(taskid);
 	}
 
@@ -1359,11 +1356,11 @@ static void finish_running_task(struct work_queue_process *p, work_queue_result_
 
 static void finish_running_tasks(work_queue_result_t result)
 {
+	int iteration;
 	struct work_queue_process *p;
-	pid_t pid;
+	uint64_t pid;
 
-	itable_firstkey(procs_running);
-	while(itable_nextkey(procs_running, (uint64_t*) &pid, (void**)&p)) {
+	ITABLE_ITERATE(procs_running, iteration, pid, p) {
 		finish_running_task(p, result);
 	}
 }
@@ -1388,18 +1385,18 @@ static int enforce_process_limits(struct work_queue_process *p)
 
 static int enforce_processes_limits()
 {
+	int iteration;
 	static time_t last_check_time = 0;
 
 	struct work_queue_process *p;
-	pid_t pid;
+	uint64_t pid;
 
 	int ok = 1;
 
 	/* Do not check too often, as it is expensive (particularly disk) */
 	if((time(0) - last_check_time) < check_resources_interval ) return 1;
 
-	itable_firstkey(procs_table);
-	while(itable_nextkey(procs_table,(uint64_t*)&pid,(void**)&p)) {
+	ITABLE_ITERATE(procs_table, iteration, pid, p) {
 		if(!enforce_process_limits(p) || !work_queue_coprocess_enforce_limit(p->coprocess)) {
 			finish_running_task(p, WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 
@@ -1426,13 +1423,13 @@ as other running tasks should not be affected by a task timeout.
 
 static void enforce_processes_max_running_time()
 {
+	int iteration;
 	struct work_queue_process *p;
-	pid_t pid;
+	uint64_t pid;
 
 	timestamp_t now = timestamp_get();
 
-	itable_firstkey(procs_running);
-	while(itable_nextkey(procs_running, (uint64_t*) &pid, (void**) &p)) {
+	ITABLE_ITERATE(procs_running, iteration, pid, p) {
 		/* If the task did not specify wall_time, return right away. */
 		if(p->task->resources_requested->wall_time < 1)
 			continue;
@@ -1443,7 +1440,7 @@ static void enforce_processes_max_running_time()
 					rmsummary_resource_to_str("wall_time", (now - p->execution_start)/1e6, 1),
 					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
 			p->task_status = WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME;
-			kill(pid, SIGKILL);
+			kill((pid_t)pid, SIGKILL);
 		}
 	}
 
@@ -1621,20 +1618,20 @@ If 0, the worker is using more resources than promised. 1 if resource usage hold
 static int enforce_worker_limits(struct link *manager)
 {
 	if( manual_disk_option > 0 && local_resources->disk.inuse > manual_disk_option ) {
-		fprintf(stderr,"work_queue_worker: %s used more than declared disk space (--disk - < disk used) %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, local_resources->disk.inuse);
+		fprintf(stderr,"work_queue_worker: %s used more than declared disk space (--disk - < disk used) %"PRIu64" < %lf MB\n", workspace, manual_disk_option, local_resources->disk.inuse);
 
 		if(manager) {
-			send_manager_message(manager, "info disk_exhausted %lld\n", (long long) local_resources->disk.inuse);
+			send_manager_message(manager, "info disk_exhausted %lf\n", local_resources->disk.inuse);
 		}
 
 		return 0;
 	}
 
 	if(manual_memory_option > 0 && local_resources->memory.inuse > manual_memory_option) {
-		fprintf(stderr,"work_queue_worker: used more than declared memory (--memory < memory used) %"PRIu64" < %"PRIu64" MB\n", manual_memory_option, local_resources->memory.inuse);
+		fprintf(stderr,"work_queue_worker: used more than declared memory (--memory < memory used) %"PRIu64" < %lf MB\n", manual_memory_option, local_resources->memory.inuse);
 
 		if(manager) {
-			send_manager_message(manager, "info memory_exhausted %lld\n", (long long) local_resources->memory.inuse);
+			send_manager_message(manager, "info memory_exhausted %lf\n", local_resources->memory.inuse);
 		}
 
 		return 0;
@@ -1658,10 +1655,10 @@ static int enforce_worker_promises(struct link *manager)
 	}
 
 	if( manual_disk_option > 0 && local_resources->disk.total < manual_disk_option) {
-		fprintf(stderr,"work_queue_worker: has less than the promised disk space (--disk > disk total) %"PRIu64" < %"PRIu64" MB\n", manual_disk_option, local_resources->disk.total);
+		fprintf(stderr,"work_queue_worker: has less than the promised disk space (--disk > disk total) %"PRIu64" < %lf MB\n", manual_disk_option, local_resources->disk.total);
 
 		if(manager) {
-			send_manager_message(manager, "info disk_error %lld\n", (long long) local_resources->disk.total);
+			send_manager_message(manager, "info disk_error %lf\n", local_resources->disk.total);
 		}
 
 		return 0;
@@ -2413,6 +2410,7 @@ static void show_help(const char *cmd)
 	printf( " %-30s Set the port used to lookup the worker's TLQ URL (-d and -o options also required).\n", "--tlq=<port>");
 	printf( " %-30s Start an arbitrary process when the worker starts up and kill the process when the worker shuts down.\n", "--coprocess <executable>");
 	printf( " %-30s Specify the number of coprocesses for serverless functions that the worker should maintain. Default is consuming all worker resources to allocate 1 coprocess per core.\n", "--coprocesses-total=<number>");
+	printf(" %-30s Apply a wrapper command to each task executed.\n","--task-wrapper");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
@@ -2423,7 +2421,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
 	  LONG_OPT_USE_SSL, LONG_OPT_PYTHON_FUNCTION, LONG_OPT_FROM_FACTORY, LONG_OPT_COPROCESS,
 	  LONG_OPT_NUM_COPROCESS, LONG_OPT_COPROCESS_CORES,
-	  LONG_OPT_COPROCESS_MEMORY, LONG_OPT_COPROCESS_DISK, LONG_OPT_COPROCESS_GPUS};
+      LONG_OPT_COPROCESS_MEMORY, LONG_OPT_COPROCESS_DISK, LONG_OPT_COPROCESS_GPUS, LONG_OPT_TASK_WRAPPER};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2476,6 +2474,7 @@ static const struct option long_options[] = {
 	{"coprocess-disk",      required_argument,  0,  LONG_OPT_COPROCESS_DISK},
 	{"coprocess-gpus",      required_argument,  0,  LONG_OPT_COPROCESS_GPUS},
 	{"from-factory",        required_argument,  0,  LONG_OPT_FROM_FACTORY},
+	{"task-wrapper",        required_argument,  0,  LONG_OPT_TASK_WRAPPER},
 	{0,0,0,0}
 };
 
@@ -2757,6 +2756,9 @@ int main(int argc, char *argv[])
 			if (factory_name) free(factory_name);
 			factory_name = xxstrdup(optarg);
 			break;
+		case LONG_OPT_TASK_WRAPPER:
+			task_wrapper = xxstrdup(optarg);
+			break;
 		default:
 			show_help(argv[0]);
 			return 1;
@@ -2898,7 +2900,7 @@ int main(int argc, char *argv[])
 	connect_stoptime = time(0) + connect_timeout;
 
 	measure_worker_resources();
-	printf("work_queue_worker: using %"PRId64 " cores, %"PRId64 " MB memory, %"PRId64 " MB disk, %"PRId64 " gpus\n",
+	printf("work_queue_worker: using %lf cores, %lf MB memory, %lf MB disk, %lf gpus\n",
 		total_resources->cores.total,
 		total_resources->memory.total,
 		total_resources->disk.total,

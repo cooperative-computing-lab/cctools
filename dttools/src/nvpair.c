@@ -31,14 +31,15 @@ struct nvpair *nvpair_create()
 
 void nvpair_delete(struct nvpair *n)
 {
+	int iteration;
 	char *key;
 	void *value;
 
 	if (!n)
 		return;
 
-	hash_table_firstkey(n->table);
-	while (hash_table_nextkey(n->table, &key, &value)) {
+	HASH_TABLE_ITERATE(n->table, iteration, key, value)
+	{
 		hash_table_remove(n->table, key);
 		free(value);
 	}
@@ -104,14 +105,17 @@ int nvpair_parse_stream(struct nvpair *n, FILE *stream)
 
 int nvpair_print(struct nvpair *n, char *text, int length)
 {
+	int iteration;
 	char *key;
 	void *value;
 
 	int actual;
 	int total = 0;
 
-	hash_table_firstkey(n->table);
-	while (hash_table_nextkey(n->table, &key, &value) && length > 0) {
+	HASH_TABLE_ITERATE(n->table, iteration, key, value)
+	{
+		if (length <= 0)
+			break;
 		actual = snprintf(text, length, "%s %s\n", key, (char *)value);
 		total += actual;
 		text += actual;
@@ -122,6 +126,7 @@ int nvpair_print(struct nvpair *n, char *text, int length)
 
 int nvpair_print_alloc(struct nvpair *n, char **text)
 {
+	int iteration;
 	size_t needed;
 	char *key;
 	void *value;
@@ -130,8 +135,8 @@ int nvpair_print_alloc(struct nvpair *n, char **text)
 	buffer_init(&B);
 	buffer_abortonfailure(&B, 1);
 
-	hash_table_firstkey(n->table);
-	while (hash_table_nextkey(n->table, &key, &value)) {
+	HASH_TABLE_ITERATE(n->table, iteration, key, value)
+	{
 		buffer_putfstring(&B, "%s %s\n", key, (char *)value);
 	}
 
@@ -201,29 +206,30 @@ double nvpair_lookup_float(struct nvpair *n, const char *name)
 void nvpair_export(struct nvpair *nv)
 {
 	char *name, *value;
-	nvpair_first_item(nv);
-	while (nvpair_next_item(nv, &name, &value)) {
+	int iteration = nvpair_first_item(nv);
+	while (nvpair_next_item(nv, iteration, &name, &value)) {
 		setenv(name, value, 1);
 	}
 }
 
-void nvpair_first_item(struct nvpair *nv)
+int nvpair_first_item(struct nvpair *nv)
 {
-	hash_table_firstkey(nv->table);
+	return hash_table_firstkey(nv->table);
 }
 
-int nvpair_next_item(struct nvpair *nv, char **name, char **value)
+int nvpair_next_item(struct nvpair *nv, int iteration, char **name, char **value)
 {
-	return hash_table_nextkey(nv->table, name, (void **)value);
+	return hash_table_nextkey(nv->table, iteration, name, (void **)value);
 }
 
 void nvpair_print_text(struct nvpair *n, FILE *s)
 {
+	int iteration;
 	char *key;
 	void *value;
 
-	hash_table_firstkey(n->table);
-	while (hash_table_nextkey(n->table, &key, &value)) {
+	HASH_TABLE_ITERATE(n->table, iteration, key, value)
+	{
 		fprintf(s, "%s %s\n", key, (char *)value);
 	}
 	fprintf(s, "\n");

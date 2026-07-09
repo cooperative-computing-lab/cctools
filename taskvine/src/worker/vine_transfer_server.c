@@ -114,12 +114,12 @@ static void vine_transfer_process(struct vine_cache *cache)
 	}
 }
 
-void vine_transfer_server_start(struct vine_cache *cache, int port_min, int port_max)
+int vine_transfer_server_start(struct vine_cache *cache, int port_min, int port_max)
 {
 	transfer_link = link_serve_range(port_min, port_max);
 
 	if (!transfer_link) {
-		fatal("unable to find a port to start a transfer server.");
+		return 0;
 	}
 
 	transfer_server_pid = fork();
@@ -135,22 +135,34 @@ void vine_transfer_server_start(struct vine_cache *cache, int port_min, int port
 		debug(D_VINE, "started transfer server pid %d listening on %s:%d", transfer_server_pid, addr, port);
 		// in parent, keep going
 	} else {
-		fatal("unable to fork transfer server: %s", strerror(errno));
+		link_close(transfer_link);
+		transfer_link = NULL;
+		return 0;
 	}
+	return 1;
+}
+
+int vine_transfer_server_running()
+{
+	return transfer_link != NULL;
 }
 
 void vine_transfer_server_stop()
 {
+	if (!transfer_link) {
+		return;
+	}
 	int status;
 
 	debug(D_VINE, "stopping transfer server pid %d", transfer_server_pid);
 
 	link_close(transfer_link);
-	kill(transfer_server_pid, SIGKILL);
-	waitpid(transfer_server_pid, &status, 0);
-
-	transfer_server_pid = 0;
-	transfer_link = 0;
+	transfer_link = NULL;
+	if (transfer_server_pid > 0) {
+		kill(transfer_server_pid, SIGKILL);
+		waitpid(transfer_server_pid, &status, 0);
+		transfer_server_pid = 0;
+	}
 }
 
 void vine_transfer_server_address(char *addr, int *port)

@@ -141,8 +141,8 @@ uint64_t dag_file_set_size(struct set *s)
 {
 	struct dag_file *f;
 	uint64_t size = 0;
-	set_first_element(s);
-	while((f = set_next_element(s)))
+	int iteration = set_first_element(s);
+	while((f = set_next_element(s, iteration)))
 		size += dag_file_size(f);
 
 	return size;

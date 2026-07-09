@@ -93,10 +93,11 @@ static int vine_manager_factory_trim_workers(struct vine_manager *q, struct vine
 	// Iterate through all workers and shut idle ones down
 	struct vine_worker_info *w;
 	char *key;
+	int iteration;
 	int trimmed_workers = 0;
 
 	struct hash_table *idle_workers = hash_table_create(0, 0);
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
 	{
 		if (f->connected_workers - trimmed_workers <= f->max_workers)
 			break;
@@ -106,10 +107,9 @@ static int vine_manager_factory_trim_workers(struct vine_manager *q, struct vine
 		}
 	}
 
-	HASH_TABLE_ITERATE(idle_workers, key, w)
+	HASH_TABLE_ITERATE(idle_workers, iteration, key, w)
 	{
 		hash_table_remove(idle_workers, key);
-		hash_table_firstkey(idle_workers);
 		vine_manager_shut_down_worker(q, w);
 	}
 	hash_table_delete(idle_workers);
@@ -156,6 +156,7 @@ void vine_manager_factory_update_all(struct vine_manager *q, time_t stoptime)
 	struct catalog_query *cq;
 	struct jx *jexpr = NULL;
 	struct jx *j;
+	int iteration;
 
 	// Iterate through factory_table to create a query filter.
 	int first_name = 1;
@@ -165,7 +166,7 @@ void vine_manager_factory_update_all(struct vine_manager *q, time_t stoptime)
 	struct vine_factory_info *f = NULL;
 	buffer_putfstring(&filter, "type == \"vine_factory\" && (");
 
-	HASH_TABLE_ITERATE(q->factory_table, factory_name, f)
+	HASH_TABLE_ITERATE(q->factory_table, iteration, factory_name, f)
 	{
 		buffer_putfstring(&filter, "%sfactory_name == \"%s\"", first_name ? "" : " || ", factory_name);
 		first_name = 0;
@@ -190,7 +191,7 @@ void vine_manager_factory_update_all(struct vine_manager *q, time_t stoptime)
 
 	// Remove outdated factories
 	struct list *outdated_factories = list_create();
-	HASH_TABLE_ITERATE(q->factory_table, factory_name, f)
+	HASH_TABLE_ITERATE(q->factory_table, iteration, factory_name, f)
 	{
 		if (!f->seen_at_catalog && f->connected_workers < 1) {
 			list_push_tail(outdated_factories, f);

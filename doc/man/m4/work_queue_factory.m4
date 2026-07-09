@@ -99,8 +99,11 @@ OPTION_ARG(E,extra-options,options)
 OPTION_ARG_LONG(worker-binary,file)
  Alternate binary instead of work_queue_worker.
 OPTION_ARG_LONG(wrapper,cmd)
- Wrap factory with this command prefix.
-OPTION_ARG_LONG(wrapper-input,file) Add this input file needed by the wrapper.
+ Wrap worker with this command prefix.
+OPTION_ARG_LONG(task-wrapper,cmd)
+ Wrap tasks with this command prefix.
+OPTION_ARG_LONG(wrapper-input,file)
+Add this input file needed by a task or worker wrapper.
 OPTION_ARG_LONG(python-env,file.tar.gz) Run each worker inside this python environment.
 OPTIONS_END
 
