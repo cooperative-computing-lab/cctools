@@ -205,6 +205,10 @@ class Manager(object):
             raise ValueError(
                 f"prometheus port must be between 1 and 65535, not {port}")
 
+    def _prometheus_stats(self):
+        self._update_stats_if_due()
+        return self.stats
+
     def _start_prometheus(self, port):
         from . import prometheus as vine_prometheus
 
@@ -213,7 +217,7 @@ class Manager(object):
         self._check_prometheus_port(port)
         try:
             self._prometheus_httpd, self._prometheus_registry, self._prometheus_collector = (
-                vine_prometheus.start(port, self.status)
+                vine_prometheus.start(port, self._prometheus_stats)
             )
         except Exception as e:
             self._stop_prometheus()
