@@ -248,7 +248,7 @@ static int workers_with_tasks(struct vine_manager *q)
 	HASH_TABLE_ITERATE(q->worker_table, iteration, id, w)
 	{
 		if (strcmp(w->hostname, "unknown")) {
-			if (itable_size(w->current_tasks)) {
+			if (w->tasks_running) {
 				workers_with_tasks++;
 			}
 		}
@@ -338,7 +338,7 @@ static void handle_idle_disconnect_request(struct vine_manager *q, struct vine_w
 	Also, we don't want to invalidate the worker object w in an unexpected location.
 	*/
 
-	if (itable_size(w->current_tasks) == 0) {
+	if (w->tasks_committed == 0) {
 		debug(D_VINE, "Accepting disconnect request from worker %s (%s).", w->hostname, w->addrport);
 		q->stats->workers_idled_out++;
 		vine_manager_send(q, w, "exit\n");
@@ -2960,21 +2960,47 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	return result;
 }
 
+/* Used by count_worker_resources below */
 static void add_worker_resources_cb(UINT64_T key, void *value, void *arg)
 {
 	struct vine_worker_info *w = (struct vine_worker_info *)arg;
 
 	struct vine_task *task = value;
-	struct rmsummary *box = task->current_resource_box;
-	if (!box)
-		return;
 
-	w->resources->cores.inuse += box->cores;
-	w->resources->memory.inuse += box->memory;
-	w->resources->disk.inuse += box->disk;
-	w->resources->gpus.inuse += box->gpus;
+	/* Note: in rare cases, the resource box could be null. */
+	struct rmsummary *box = task->current_resource_box;
+
+	w->tasks_committed++;
+	switch (task->state) {
+	case VINE_TASK_RUNNING:
+		/* Running tasks consume all resource types. */
+		w->tasks_running++;
+		if (box) {
+			w->resources->cores.inuse += box->cores;
+			w->resources->memory.inuse += box->memory;
+			w->resources->gpus.inuse += box->gpus;
+			w->resources->disk.inuse += box->disk;
+		}
+		break;
+	case VINE_TASK_WAITING_RETRIEVAL:
+		/* Waiting tasks consume only disk. */
+		w->tasks_waiting_retrieval++;
+		if (box) {
+			w->resources->disk.inuse += box->disk;
+		}
+		break;
+	default:
+		fatal("task %lld at worker %s found in illegal state %d!", task->task_id, w->addrport, task->state);
+		break;
+	}
 }
 
+/*
+Count up all the resources consumed at a worker based on the tasks assigned.
+Note that some tasks may be actively RUNNING while others are WAITING_RETRIEVAL,
+and these have resource consumption accounted for differently.
+Then, update the maximum worker record in the manager.
+*/
 static void count_worker_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
 	w->resources->cores.inuse = 0;
@@ -2982,14 +3008,16 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 	w->resources->disk.inuse = 0;
 	w->resources->gpus.inuse = 0;
 
-	update_max_worker(w->hashkey, (void *)w, (void *)q->current_max_worker);
-
-	if (w->resources->workers.total < 1) {
-		return;
-	}
+	w->tasks_committed = 0;
+	w->tasks_running = 0;
+	w->tasks_waiting_retrieval = 0;
 
 	itable_foreach_ro(w->current_tasks, add_worker_resources_cb, w);
 
+	/* This could be the largest worker, so update the max size. */
+	update_max_worker(w->hashkey, (void *)w, (void *)q->current_max_worker);
+
+	/* The disk usage includes the sandboxes of each task + the shared cache in use. */
 	w->resources->disk.inuse += BYTES_TO_MEGABYTES(w->inuse_cache);
 }
 
@@ -3697,7 +3725,7 @@ static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_
 
 	/* if appropriate, receive all the tasks from the worker */
 	if (q->worker_retrievals) {
-		max_to_receive = itable_size(w->current_tasks);
+		max_to_receive = w->tasks_waiting_retrieval;
 	}
 
 	/* Now consider all tasks assigned to that worker .*/
@@ -3921,7 +3949,7 @@ static int shutdown_drained_workers(struct vine_manager *q)
 	int iteration;
 	HASH_TABLE_ITERATE(q->worker_table, iteration, worker_hashkey, w)
 	{
-		if (w->draining && itable_size(w->current_tasks) == 0) {
+		if (w->draining && w->tasks_committed == 0) {
 			list_push_tail(workers_to_remove, w);
 		}
 	}
@@ -5734,7 +5762,7 @@ int vine_workers_shutdown(struct vine_manager *q, int n)
 	{
 		if (i >= n)
 			break;
-		if (itable_size(w->current_tasks) == 0) {
+		if (w->tasks_committed == 0) {
 			vine_manager_shut_down_worker(q, w);
 			i++;
 		}
