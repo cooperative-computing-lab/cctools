@@ -76,8 +76,7 @@ class Manager(object):
     #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
     # @param init_fn    Function applied to the newly created manager at initialization.
     # @param status_display_interval Number of seconds between updates to the jupyter status display. None, or less than 1 disables it.
-    # @param prometheus If True, serve Prometheus metrics on port 9090.
-    #                   If an integer, serve on that port. Requires prometheus_client when enabled.
+    # @param prometheus_port If given, serve Prometheus metrics on that port.
     #
     # @see vine_create    - For more information about environmental variables that affect the behavior this method.
     def __init__(self,
@@ -90,7 +89,7 @@ class Manager(object):
                  ssl=None,
                  init_fn=None,
                  status_display_interval=None,
-                 prometheus=None):
+                 prometheus_port=None):
         self._shutdown = shutdown
         self._taskvine = None
         self._stats = None
@@ -106,8 +105,8 @@ class Manager(object):
         self._using_ssl = False
 
         # Prometheus integration fields:
-        # The port number that the Prometheus metrics server is listening on, or None if disabled
-        self._prometheus_port = None
+        # The port number that the Prometheus metrics server is listening on, None if disabled.
+        self._prometheus_port = prometheus_port
         # The HTTP server object for Prometheus metrics, or None if not running
         self._prometheus_httpd = None
         # The Prometheus CollectorRegistry instance, or None if metrics are not enabled
@@ -173,8 +172,8 @@ class Manager(object):
             self._stats_updated_at = time.monotonic()
             self._update_status_display()
 
-            if prometheus is not None:
-                self._start_prometheus(prometheus)
+            if self.prometheus_port is not None:
+                self._start_prometheus(self.prometheus_port)
         except ImportError:
             self._stop_prometheus()
             raise
@@ -199,25 +198,19 @@ class Manager(object):
     def prometheus_port(self):
         return self._prometheus_port
 
-    def _resolve_prometheus_port(self, prometheus):
-        from .prometheus import PROMETHEUS_DEFAULT_PORT
+    def _check_prometheus_port(self, port):
+        if not isinstance(port, int):
+            raise ValueError("prometheus must be an integer port, or None")
+        if port < 1 or port > 65535:
+            raise ValueError(
+                f"prometheus port must be between 1 and 65535, not {port}")
 
-        if prometheus is True:
-            return PROMETHEUS_DEFAULT_PORT
-        if isinstance(prometheus, bool):
-            raise ValueError("prometheus must be True, an integer port, or None")
-        if not isinstance(prometheus, int):
-            raise ValueError("prometheus must be True, an integer port, or None")
-        if prometheus < 1 or prometheus > 65535:
-            raise ValueError(f"prometheus port must be between 1 and 65535, not {prometheus}")
-        return prometheus
-
-    def _start_prometheus(self, prometheus):
+    def _start_prometheus(self, port):
         from . import prometheus as vine_prometheus
 
         vine_prometheus.require_prometheus_client()
 
-        port = self._resolve_prometheus_port(prometheus)
+        self._check_prometheus_port(port)
         try:
             self._prometheus_httpd, self._prometheus_registry, self._prometheus_collector = (
                 vine_prometheus.start(port, self.status)
@@ -227,8 +220,6 @@ class Manager(object):
             raise RuntimeError(
                 f"Could not start Prometheus metrics server on port {port}: {e}"
             ) from e
-
-        self._prometheus_port = port
 
     def _stop_prometheus(self):
         if self._prometheus_httpd is not None:
@@ -381,7 +372,6 @@ class Manager(object):
     # @endcode
     @property
     def stats(self):
-        self._update_stats_if_due()
         return self._stats
 
     ##
