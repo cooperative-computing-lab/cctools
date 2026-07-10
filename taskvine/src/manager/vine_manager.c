@@ -205,23 +205,31 @@ static void log_manager_start_timezone()
 }
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
+struct count_workers_arg {
+	vine_worker_type_t type;
+	int count;
+};
+
+void count_workers_cb(const char *worker_id, void *worker, void *data)
+{
+	struct count_workers_arg *arg = (struct count_workers_arg *)data;
+	struct vine_worker_info *w = (struct vine_worker_info *)worker;
+
+	if (w->type & arg->type) {
+		arg->count++;
+	}
+}
 
 static int count_workers(struct vine_manager *q, vine_worker_type_t type)
 {
-	struct vine_worker_info *w;
-	char *id;
-	int iteration;
+	struct count_workers_arg arg = {
+			.type = type,
+			.count = 0,
+	};
 
-	int count = 0;
+	hash_table_foreach_ro(q->worker_table, count_workers_cb, &arg);
 
-	HASH_TABLE_ITERATE(q->worker_table, iteration, id, w)
-	{
-		if (w->type & type) {
-			count++;
-		}
-	}
-
-	return count;
+	return arg.count;
 }
 
 /* Round up a resource value based on the overcommit multiplier currently in effect. */
@@ -238,23 +246,22 @@ int64_t overcommitted_resource_total(struct vine_manager *q, int64_t total)
 
 /* Returns count of workers that are running at least 1 task. */
 
-static int workers_with_tasks(struct vine_manager *q)
+void workers_with_tasks_cb(const char *worker_id, void *worker, void *workers_with_tasks)
 {
-	struct vine_worker_info *w;
-	char *id;
-	int workers_with_tasks = 0;
-	int iteration;
-
-	HASH_TABLE_ITERATE(q->worker_table, iteration, id, w)
-	{
-		if (strcmp(w->hostname, "unknown")) {
-			if (w->tasks_running) {
-				workers_with_tasks++;
-			}
+	int *count = (int *)workers_with_tasks;
+	struct vine_worker_info *w = (struct vine_worker_info *)worker;
+	if (strcmp(w->hostname, "unknown")) {
+		if (w->tasks_running > 0) {
+			(*count)++;
 		}
 	}
+}
 
-	return workers_with_tasks;
+static int workers_with_tasks(struct vine_manager *q)
+{
+	int count = 0;
+	hash_table_foreach_ro(q->worker_table, workers_with_tasks_cb, &count);
+	return count;
 }
 
 /* Convert a link pointer into a string that can be used as a key into a hash table. */
