@@ -41,7 +41,7 @@ def test_prometheus_missing_dependency():
     metrics_port = find_free_port()
     with unittest.mock.patch("builtins.__import__", side_effect=fake_import):
         try:
-            vine.Manager(port=0, prometheus=metrics_port)
+            vine.Manager(port=0, prometheus_port=metrics_port)
         except ImportError as e:
             if "prometheus_client" not in str(e):
                 raise
@@ -57,7 +57,7 @@ def test_prometheus_metrics():
         return
 
     metrics_port = find_free_port()
-    with vine.Manager(port=0, prometheus=metrics_port) as m:
+    with vine.Manager(port=0, prometheus_port=metrics_port) as m:
         if m.prometheus_port != metrics_port:
             raise Exception(f"Expected prometheus_port {metrics_port}, got {m.prometheus_port}")
 

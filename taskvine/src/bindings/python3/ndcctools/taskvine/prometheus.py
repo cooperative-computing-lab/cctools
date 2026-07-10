@@ -12,7 +12,7 @@ def require_prometheus_client():
         return prometheus_client
     except ImportError as e:
         raise ImportError(
-            "prometheus_client is required when prometheus=True. "
+            "prometheus_client is required when prometheus_port is set. "
             "Install with: pip install prometheus_client"
         ) from e
 

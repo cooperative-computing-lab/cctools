@@ -199,11 +199,11 @@ class Manager(object):
         return self._prometheus_port
 
     def _check_prometheus_port(self, port):
-        if not isinstance(port, int):
-            raise ValueError("prometheus must be an integer port, or None")
+        if not isinstance(port, int) or isinstance(port, bool):
+            raise ValueError("prometheus_port must be an integer port, or None")
         if port < 1 or port > 65535:
             raise ValueError(
-                f"prometheus port must be between 1 and 65535, not {port}")
+                f"prometheus_port must be between 1 and 65535, not {port}")
 
     def _prometheus_stats(self):
         self._update_stats_if_due()
@@ -393,9 +393,12 @@ class Manager(object):
     # >>> print(s.tasks_waiting)
     # @endcode
     def stats_category(self, category):
-        # Fix: Ugly, first time call gives 0 for all values.
         if category not in self._stats_category:
             self._stats_category[category] = cvine.vine_stats()
+            cvine.vine_get_stats_category(
+                self._taskvine, category, self._stats_category[category])
+        else:
+            self._update_stats_if_due()
         return self._stats_category[category]
 
     ##

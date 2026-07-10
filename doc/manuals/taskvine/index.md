@@ -2575,13 +2575,13 @@ produces the following graphs:
 ### Prometheus Metrics
 
 When writing a manager in Python, you can expose live manager statistics as
-[Prometheus](https://prometheus.io/) metrics. Pass `prometheus=True` to serve
-metrics on port 9090, or pass an integer to choose a different port:
+[Prometheus](https://prometheus.io/) metrics. Pass `prometheus_port` to serve
+metrics on that port:
 
 ```python
 import ndcctools.taskvine as vine
 
-with vine.Manager(port=0, prometheus=True) as m:
+with vine.Manager(port=0, prometheus_port=9090) as m:
     print(f"metrics at http://127.0.0.1:{m.prometheus_port}/metrics")
     ...
 ```
@@ -2595,12 +2595,9 @@ pip install prometheus_client
 If `prometheus_client` is not installed, manager creation fails with an
 `ImportError` when metrics are enabled.
 
-Each scrape returns gauge metrics derived from the manager status API. Manager
-statistics are exported as `vine_<field>` (for example, `vine_tasks_waiting`
-and `vine_workers_connected`). Per-category statistics are exported as
-`vine_category_<field>` with a `category` label. Nested category fields such as
-`first_allocation`, `max_allocation`, and `max_seen` appear as
-`vine_category_<nested>_<field>`.
+Each scrape returns gauge metrics derived from manager statistics. Statistics
+are exported as `vine_<field>` (for example, `vine_tasks_waiting` and
+`vine_workers_connected`).
 
 The metrics server starts when the manager is created and stops automatically
 when the manager is destroyed.
