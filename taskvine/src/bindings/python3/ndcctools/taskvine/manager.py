@@ -60,6 +60,8 @@ import uuid
 # Call @ref ndcctools.taskvine.manager.Manager.wait to wait for tasks to complete.
 # Run one or more vine_workers to perform work on behalf of the manager object.
 class Manager(object):
+    _STATS_REFRESH_INTERVAL = 5.0
+
     ##
     # Create a new manager.
     #
@@ -93,6 +95,8 @@ class Manager(object):
         self._taskvine = None
         self._stats = None
         self._stats_hierarchy = None
+        self._stats_category = {}
+        self._stats_updated_at = None
         self._task_table = {}
         self._library_table = {}    # A table of all libraries known to the manager
         # Task result cache (opt-in via enable_tasks_cache())
@@ -165,6 +169,8 @@ class Manager(object):
             except Exception:
                 sys.stderr.write("Something went wrong with the custom initialization function.")
                 raise
+            self._refresh_stats()
+            self._stats_updated_at = time.monotonic()
             self._update_status_display()
 
             if prometheus is not None:
@@ -283,6 +289,18 @@ class Manager(object):
             # no exception should cause the queue to fail
             print(f"status display error: {e}", file=sys.stderr)
 
+    def _refresh_stats(self):
+        cvine.vine_get_stats(self._taskvine, self._stats)
+        for category, stats in self._stats_category.items():
+            cvine.vine_get_stats_category(self._taskvine, category, stats)
+
+    def _update_stats_if_due(self):
+        now = time.monotonic()
+        if (self._stats_updated_at is None
+                or now - self._stats_updated_at >= self._STATS_REFRESH_INTERVAL):
+            self._refresh_stats()
+            self._stats_updated_at = now
+
     def __enter__(self):
         return self
 
@@ -363,7 +381,7 @@ class Manager(object):
     # @endcode
     @property
     def stats(self):
-        cvine.vine_get_stats(self._taskvine, self._stats)
+        self._update_stats_if_due()
         return self._stats
 
     ##
@@ -381,9 +399,10 @@ class Manager(object):
     # >>> print(s.tasks_waiting)
     # @endcode
     def stats_category(self, category):
-        stats = cvine.vine_stats()
-        cvine.vine_get_stats_category(self._taskvine, category, stats)
-        return stats
+        # Fix: Ugly, first time call gives 0 for all values.
+        if category not in self._stats_category:
+            self._stats_category[category] = cvine.vine_stats()
+        return self._stats_category[category]
 
     ##
     # Get manager information as list of dictionaries
@@ -1306,7 +1325,10 @@ class Manager(object):
             # submit_finalize() already cleared _fn_def.
             self._store_task_in_cache(task)
 
+            self._update_stats_if_due()
             return task
+
+        self._update_stats_if_due()
         return None
 
     ##
