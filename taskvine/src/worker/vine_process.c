@@ -391,22 +391,29 @@ int vine_process_execute(struct vine_process *p)
 		/* Finally, add things that were explicitly given in the task description. */
 		export_environment(p);
 
-		/* Library task passes the file descriptors to talk to the manager via
-		 * the command line plus the worker pid to wake the worker up
-		 * so it requires a special execl. */
-		if (p->type != VINE_PROCESS_TYPE_LIBRARY) {
-			execl("/bin/sh", "sh", "-c", p->task->command_line, (char *)0);
-		} else {
-			char *final_command = string_format("%s --in-pipe-fd %d --out-pipe-fd %d --task-id %d --library-cores %d --function-slots %d --worker-pid %d",
-					p->task->command_line,
+		/* All process types begin with the provided command line */
+		char *final_command = strdup(p->task->command_line);
+
+		/* Library tasks get additional arguments to configure communication and convey resources. */
+		if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
+			final_command = string_format("%s --in-pipe-fd %d --out-pipe-fd %d --task-id %d --library-cores %d --function-slots %d --worker-pid %d",
+					final_command,
 					in_pipe_fd,
 					out_pipe_fd,
 					p->task->task_id,
 					(int)p->task->resources_requested->cores,
 					p->task->function_slots_total,
 					getppid());
-			execl("/bin/sh", "sh", "-c", final_command, (char *)0);
 		}
+
+		/* Only standard and library processes are affected by task wrappers. */
+		if (p->type == VINE_PROCESS_TYPE_STANDARD || p->type == VINE_PROCESS_TYPE_LIBRARY) {
+			if (options->task_wrapper) {
+				final_command = string_wrap_command(final_command, options->task_wrapper);
+			}
+		}
+
+		execl("/bin/sh", "sh", "-c", final_command, (char *)0);
 		_exit(127); // Failed to execute the cmd.
 
 		/* NOTREACHED */

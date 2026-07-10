@@ -16,5 +16,6 @@ struct batch_job_info *batch_job_info_create()
 
 void batch_job_info_delete(struct batch_job_info *info)
 {
+	free(info->schedd);
 	free(info);
 }

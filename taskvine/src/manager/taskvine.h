@@ -137,7 +137,11 @@ typedef enum {
 
 	VINE_ALLOCATION_MODE_GREEDY_BUCKETING = CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING,
 
-	VINE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING
+	VINE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING,
+	VINE_ALLOCATION_MODE_DET_GREEDY_BUCKETING = CATEGORY_ALLOCATION_MODE_DET_GREEDY_BUCKETING,
+
+	VINE_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING = CATEGORY_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING,
+	VINE_ALLOCATION_MODE_QUANTIZED_BUCKETING = CATEGORY_ALLOCATION_MODE_QUANTIZED_BUCKETING,
 } vine_category_mode_t;
 
 /** The type of an input or output file to attach to a task. */
@@ -176,14 +180,14 @@ struct vine_stats {
 	int tasks_on_workers;	/**< Number of tasks currently dispatched to some worker. */
 	int tasks_running;	/**< Number of tasks currently executing at some worker. */
 	int tasks_with_results; /**< Number of tasks with retrieved results and waiting to be returned to user. */
-	int recovery_tasks_submitted; /**< Total number of recovery tasks submitted since the manager started. */
+	int tasks_recovery;     /**< Total number of recovery tasks submitted. */
 
 	/* Cumulative stats for tasks: */
 	int tasks_submitted;  /**< Total number of tasks submitted to the manager. */
 	int tasks_dispatched; /**< Total number of tasks dispatch to workers. */
-	int tasks_done;	      /**< Total number of tasks completed and returned to user. (includes tasks_failed) */
-	int tasks_failed;     /**< Total number of tasks completed and returned to user with result other than
-				 VINE_RESULT_SUCCESS. */
+	int tasks_done;	      /**< Total number of tasks completed (includes tasks_failed and tasks_successful) */
+	int tasks_failed;     /**< Total number of tasks completed with result other than VINE_RESULT_SUCCESS. (includes retries) */
+	int tasks_successful; /**< Total number of task completed and returned to the user with a successful exit status. */
 	int tasks_cancelled;  /**< Total number of tasks cancelled. */
 	int tasks_exhausted_attempts; /**< Total number of task executions that failed given resource exhaustion. */
 
@@ -1014,6 +1018,13 @@ void vine_manager_remove_library(struct vine_manager *m, const char *name);
 */
 struct vine_task *vine_manager_find_library_template(struct vine_manager *m, const char *library_name);
 
+/** Release a random worker for failure-injection tests.
+This is a testing support hook, not a normal manager control operation.
+@param m A manager object.
+@return Non-zero if a worker was released.
+*/
+int vine_manager_release_random_worker(struct vine_manager *m);
+
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the manager is empty.
 If a task has completed, the corresponding task object will be returned by this function.
@@ -1537,6 +1548,12 @@ void vine_counters_print();
 @return A string.
  */
 char *vine_version_string();
+
+/** Absolute path of this run's workflow runtime directory.
+@param m The manager.
+@return Owned by the manager until @ref vine_delete.
+ */
+const char *vine_get_runtime_directory(struct vine_manager *m);
 
 /** Returns path relative to the logs runtime directory
 @param m Reference to the current manager object.

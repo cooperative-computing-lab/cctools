@@ -767,8 +767,8 @@ void mq_poll_delete(struct mq_poll *p)
 		return;
 
 	struct mq *mq = NULL;
-	set_first_element(p->members);
-	while ((mq = set_next_element(p->members))) {
+	int iteration = set_first_element(p->members);
+	while ((mq = set_next_element(p->members, iteration))) {
 		mq->poll_group = NULL;
 	}
 	set_delete(p->members);
@@ -820,24 +820,24 @@ struct mq *mq_poll_acceptable(struct mq_poll *p)
 {
 	assert(p);
 
-	set_first_element(p->acceptable);
-	return set_next_element(p->acceptable);
+	int iteration = set_first_element(p->acceptable);
+	return set_next_element(p->acceptable, iteration);
 }
 
 struct mq *mq_poll_readable(struct mq_poll *p)
 {
 	assert(p);
 
-	set_first_element(p->readable);
-	return set_next_element(p->readable);
+	int iteration = set_first_element(p->readable);
+	return set_next_element(p->readable, iteration);
 }
 
 struct mq *mq_poll_error(struct mq_poll *p)
 {
 	assert(p);
 
-	set_first_element(p->error);
-	return set_next_element(p->error);
+	int iteration = set_first_element(p->error);
+	return set_next_element(p->error, iteration);
 }
 
 int mq_poll_wait(struct mq_poll *p, time_t stoptime)
@@ -853,9 +853,9 @@ int mq_poll_wait(struct mq_poll *p, time_t stoptime)
 		// This assumes that iterating over a set does not
 		// change the order of the elements.
 		i = 0;
-		set_first_element(p->members);
+		int iteration = set_first_element(p->members);
 		struct mq *mq = NULL;
-		while ((mq = set_next_element(p->members))) {
+		while ((mq = set_next_element(p->members, iteration))) {
 			// NB: we're using revents from the *previous* iteration
 			rc = handle_revents(mq, &pfds[i]);
 			if (rc == -1) {
