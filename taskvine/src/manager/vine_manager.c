@@ -2993,7 +2993,6 @@ static void add_worker_resources_cb(UINT64_T key, void *value, void *arg)
 		fatal("task %lld at worker %s found in illegal state %d!", task->task_id, w->addrport, task->state);
 		break;
 	}
-
 }
 
 /*
