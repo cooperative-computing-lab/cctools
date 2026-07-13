@@ -2586,10 +2586,13 @@ with vine.Manager(port=0, prometheus_port=9090) as m:
     ...
 ```
 
-This feature requires the optional `prometheus_client` package:
+This feature requires the optional `prometheus_client` package. This package
+is installed by default if cctools is installed from conda. If it is missing,
+it can be installled with
+
 
 ```sh
-pip install prometheus_client
+conda install -c conda-forge prometheus_client
 ```
 
 If `prometheus_client` is not installed, manager creation fails with an
