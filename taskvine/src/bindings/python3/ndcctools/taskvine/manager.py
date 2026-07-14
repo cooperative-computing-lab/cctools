@@ -60,6 +60,8 @@ import uuid
 # Call @ref ndcctools.taskvine.manager.Manager.wait to wait for tasks to complete.
 # Run one or more vine_workers to perform work on behalf of the manager object.
 class Manager(object):
+    _STATS_REFRESH_INTERVAL = 5.0
+
     ##
     # Create a new manager.
     #
@@ -74,6 +76,7 @@ class Manager(object):
     #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
     # @param init_fn    Function applied to the newly created manager at initialization.
     # @param status_display_interval Number of seconds between updates to the jupyter status display. None, or less than 1 disables it.
+    # @param prometheus_port If given, serve Prometheus metrics on that port.
     #
     # @see vine_create    - For more information about environmental variables that affect the behavior this method.
     def __init__(self,
@@ -85,11 +88,14 @@ class Manager(object):
                  staging_path=None,
                  ssl=None,
                  init_fn=None,
-                 status_display_interval=None):
+                 status_display_interval=None,
+                 prometheus_port=None):
         self._shutdown = shutdown
         self._taskvine = None
         self._stats = None
         self._stats_hierarchy = None
+        self._stats_category = {}
+        self._stats_updated_at = None
         self._task_table = {}
         self._library_table = {}    # A table of all libraries known to the manager
         # Task result cache (opt-in via enable_tasks_cache())
@@ -97,6 +103,17 @@ class Manager(object):
         self._cached_queue = []         # CachedTaskResult objects pending return from wait()
         self._info_widget = None
         self._using_ssl = False
+
+        # Prometheus integration fields:
+        # The port number that the Prometheus metrics server is listening on, None if disabled.
+        self._prometheus_port = prometheus_port
+        # The HTTP server object for Prometheus metrics, or None if not running
+        self._prometheus_httpd = None
+        # The Prometheus CollectorRegistry instance, or None if metrics are not enabled
+        self._prometheus_registry = None
+        # The custom StatusCollector registered with Prometheus, or None if not initialized
+        self._prometheus_collector = None
+
         if staging_path:
             self._staging_explicit = os.path.join(staging_path, "vine-staging")
         else:
@@ -151,13 +168,23 @@ class Manager(object):
             except Exception:
                 sys.stderr.write("Something went wrong with the custom initialization function.")
                 raise
+            self._refresh_stats()
+            self._stats_updated_at = time.monotonic()
             self._update_status_display()
+
+            if self.prometheus_port is not None:
+                self._start_prometheus(self.prometheus_port)
+        except ImportError:
+            self._stop_prometheus()
+            raise
         except Exception:
+            self._stop_prometheus()
             sys.stderr.write("Unable to create internal taskvine structure.")
             raise
 
     def _free(self):
         try:
+            self._stop_prometheus()
             if self._taskvine:
                 if self._shutdown:
                     self.workers_shutdown(0)
@@ -166,6 +193,56 @@ class Manager(object):
                 self._taskvine = None
         except TypeError:
             pass
+
+    @property
+    def prometheus_port(self):
+        return self._prometheus_port
+
+    def _check_prometheus_port(self, port):
+        if not isinstance(port, int) or isinstance(port, bool):
+            raise ValueError("prometheus_port must be an integer port, or None")
+        if port < 1 or port > 65535:
+            raise ValueError(
+                f"prometheus_port must be between 1 and 65535, not {port}")
+
+    def _prometheus_stats(self):
+        self._update_stats_if_due()
+        return self.stats
+
+    def _start_prometheus(self, port):
+        from . import prometheus as vine_prometheus
+
+        vine_prometheus.require_prometheus_client()
+
+        self._check_prometheus_port(port)
+        try:
+            self._prometheus_httpd, self._prometheus_registry, self._prometheus_collector = (
+                vine_prometheus.start(port, self._prometheus_stats)
+            )
+        except Exception as e:
+            self._stop_prometheus()
+            raise RuntimeError(
+                f"Could not start Prometheus metrics server on port {port}: {e}"
+            ) from e
+
+    def _stop_prometheus(self):
+        if self._prometheus_httpd is not None:
+            try:
+                self._prometheus_httpd.shutdown()
+            except Exception:
+                pass
+            self._prometheus_httpd = None
+
+        if self._prometheus_registry is not None and self._prometheus_collector is not None:
+            try:
+                self._prometheus_registry.unregister(
+                    self._prometheus_collector)
+            except Exception:
+                pass
+            self._prometheus_collector = None
+            self._prometheus_registry = None
+
+        self._prometheus_port = None
 
     def __del__(self):
         self._free()
@@ -206,6 +283,18 @@ class Manager(object):
         except Exception as e:
             # no exception should cause the queue to fail
             print(f"status display error: {e}", file=sys.stderr)
+
+    def _refresh_stats(self):
+        cvine.vine_get_stats(self._taskvine, self._stats)
+        for category, stats in self._stats_category.items():
+            cvine.vine_get_stats_category(self._taskvine, category, stats)
+
+    def _update_stats_if_due(self):
+        now = time.monotonic()
+        if (self._stats_updated_at is None
+                or now - self._stats_updated_at >= self._STATS_REFRESH_INTERVAL):
+            self._refresh_stats()
+            self._stats_updated_at = now
 
     def __enter__(self):
         return self
@@ -287,7 +376,6 @@ class Manager(object):
     # @endcode
     @property
     def stats(self):
-        cvine.vine_get_stats(self._taskvine, self._stats)
         return self._stats
 
     ##
@@ -305,9 +393,13 @@ class Manager(object):
     # >>> print(s.tasks_waiting)
     # @endcode
     def stats_category(self, category):
-        stats = cvine.vine_stats()
-        cvine.vine_get_stats_category(self._taskvine, category, stats)
-        return stats
+        if category not in self._stats_category:
+            self._stats_category[category] = cvine.vine_stats()
+            cvine.vine_get_stats_category(
+                self._taskvine, category, self._stats_category[category])
+        else:
+            self._update_stats_if_due()
+        return self._stats_category[category]
 
     ##
     # Get manager information as list of dictionaries
@@ -1230,7 +1322,10 @@ class Manager(object):
             # submit_finalize() already cleared _fn_def.
             self._store_task_in_cache(task)
 
+            self._update_stats_if_due()
             return task
+
+        self._update_stats_if_due()
         return None
 
     ##
