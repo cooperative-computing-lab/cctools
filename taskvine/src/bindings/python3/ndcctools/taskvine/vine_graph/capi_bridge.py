@@ -4,12 +4,20 @@
 
 """Bridge from Python VineGraph objects to the C vine_graph API."""
 
+import ctypes
 import importlib
+import os
 import sys
 
 # SWIG-generated vine_graph_capi.py imports "cvine"; wire that top-level name
 # to the real TaskVine Python module before importing the generated bindings.
-sys.modules.setdefault("cvine", importlib.import_module("ndcctools.taskvine.cvine"))
+# Also expose _cvine's C symbols globally so _vine_graph_capi reuses the same
+# TaskVine/dttools runtime instead of loading a second copy of those globals.
+cvine = importlib.import_module("ndcctools.taskvine.cvine")
+_rtld_now = getattr(os, "RTLD_NOW", 0)
+_rtld_global = getattr(os, "RTLD_GLOBAL", ctypes.RTLD_GLOBAL)
+ctypes.CDLL(cvine._cvine.__file__, mode=_rtld_now | _rtld_global)
+sys.modules.setdefault("cvine", cvine)
 
 from . import vine_graph_capi  # noqa: E402
 

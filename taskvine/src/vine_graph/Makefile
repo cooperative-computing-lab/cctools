@@ -4,7 +4,7 @@ include ../../../rules.mk
 CCTOOLS_DYNAMIC_SUFFIX = so
 
 PROJECT_NAME := vine_graph
-SOURCE_DIR   := $(CCTOOLS_HOME)/taskvine/src/graph
+SOURCE_DIR   := $(CCTOOLS_HOME)/taskvine/src/vine_graph
 PY_MODULE_DIR := $(CCTOOLS_HOME)/taskvine/src/bindings/python3/ndcctools/taskvine/vine_graph
 MODULE_DIR   := $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/vine_graph
 TEST_MODULE_DIR := $(CCTOOLS_HOME)/test_support/python_modules/$(CCTOOLS_PYTHON_TEST_DIR)/ndcctools/taskvine/vine_graph
@@ -16,7 +16,7 @@ SWIG_WRAP := vine_graph_wrap.c
 WRAP_OBJ  := vine_graph_wrap.o
 PYMODULE  := _$(MODULE_NAME).$(CCTOOLS_DYNAMIC_SUFFIX)
 
-LOCAL_LINKAGE += $(CCTOOLS_HOME)/taskvine/src/manager/libtaskvine.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
+LOCAL_LINKAGE += $(CCTOOLS_HOME)/dttools/src/progress_bar.o
 LOCAL_CCFLAGS += -I $(CCTOOLS_HOME)/taskvine/src/manager -I $(SOURCE_DIR)
 
 .PHONY: all install clean lint format test
