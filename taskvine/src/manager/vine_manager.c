@@ -3719,6 +3719,12 @@ static int send_one_task(struct vine_manager *q)
 		skip_list_seek(q->ready_tasks_cr, 0);
 	}
 
+	if (q->hungry_internal) {
+		skip_list_seek(q->ready_tasks_cr, 0);
+		q->attempt_schedule_depth = vine_hungry(q);
+
+	}
+
 	int sent = 0;
 	sent = send_one_task_with_cr(q, q->ready_tasks_cr, iter_depth, now_secs);
 
@@ -4218,6 +4224,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->hungry_minimum = 10;
 	q->hungry_minimum_factor = 2;
+	q->hungry_internal = 0;
 
 	q->wait_for_workers = 0;
 	q->max_workers = -1;
@@ -6006,6 +6013,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "hungry-minimum-factor")) {
 		q->hungry_minimum_factor = MAX(1, (int)value);
+
+	} else if (!strcmp(name, "hungry-internal")) {
+		q->hungry_internal = !!((int)value);
 
 	} else if (!strcmp(name, "immediate-recovery")) {
 		q->immediate_recovery = !!((int)value);
