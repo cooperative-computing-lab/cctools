@@ -58,7 +58,7 @@ class Task(object):
         attributes = [
             "library_required",
             "library_provided",
-            "scheduler", "tag", "category",
+            "scheduler", "tag", "category", "semantic_category",
             "snapshot_file", "retries", "cores", "memory",
             "disk", "gpus", "priority", "time_end",
             "time_start", "time_max", "time_min", "monitor_output"

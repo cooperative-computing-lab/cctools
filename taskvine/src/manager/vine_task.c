@@ -48,6 +48,7 @@ struct vine_task *vine_task_create(const char *command_line)
 	if (command_line)
 		t->command_line = xxstrdup(command_line);
 	t->category = xxstrdup("default");
+	t->semantic_category = xxstrdup("default");
 
 	t->input_mounts = list_create();
 	t->output_mounts = list_create();
@@ -469,6 +470,26 @@ void vine_task_set_category(struct vine_task *t, const char *category)
 
 	t->category = xxstrdup(category ? category : "default");
 }
+
+void vine_task_set_semantic_category(struct vine_task *t, const char *category)
+{
+	if (t->category)
+		free(t->category);
+
+	t->semantic_category = xxstrdup(category ? category : "default");
+
+	unsigned int hash_prio = 12345U;
+	char *category_string = xxstrdup(t->semantic_category);
+	while(*category_string)
+	{
+		hash_prio ^= (unsigned char)*category_string;
+		hash_prio *= 16777619U;
+		category_string++;
+	}
+
+	t->user_priority = hash_prio;
+}
+
 
 void vine_task_add_feature(struct vine_task *t, const char *name)
 {

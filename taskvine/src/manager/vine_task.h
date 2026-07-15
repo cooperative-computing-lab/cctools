@@ -60,6 +60,7 @@ struct vine_task {
 	vine_task_type_t type;       /**< The type of the task. */
 	char *command_line;          /**< The program(s) to execute, as a shell command line. */
 	char *tag;                   /**< An optional user-defined logical name for the task. */
+	char *semantic_category;     /**< User-provided label for a particular subgraph or semantic boundary. Does not compute resource usage */
 	char *category;              /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref vine_task_set_category. If no explicit category is given, the label "default" is used. **/
 
 	char *monitor_output_directory;	     /**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref vine_enable_monitoring */
