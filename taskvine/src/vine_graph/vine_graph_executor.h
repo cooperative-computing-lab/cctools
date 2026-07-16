@@ -43,8 +43,10 @@ struct vine_graph *vine_graph_executor_create_graph(struct vine_manager *manager
 void vine_graph_executor_delete(struct vine_graph_executor *e);
 uint64_t vine_graph_executor_add_node(struct vine_graph_executor *e);
 void vine_graph_executor_finalize(struct vine_graph_executor *e);
-void vine_graph_executor_add_task_input(struct vine_graph_executor *e, uint64_t task_id, const char *filename);
-void vine_graph_executor_add_task_output(struct vine_graph_executor *e, uint64_t task_id, const char *filename);
+int vine_graph_executor_declare_input_file(struct vine_graph_executor *e, uint64_t file_id, const char *source_path);
+int vine_graph_executor_add_task_output_file(struct vine_graph_executor *e, uint64_t task_id, uint64_t file_id, const char *task_path, int is_target);
+int vine_graph_executor_add_task_input_file(struct vine_graph_executor *e, uint64_t task_id, uint64_t file_id, const char *task_path);
+const char *vine_graph_executor_get_file_target_path(struct vine_graph_executor *e, uint64_t file_id);
 
 int vine_graph_executor_tune(struct vine_graph_executor *e, const char *name, const char *value);
 void vine_graph_executor_execute(struct vine_graph_executor *e);

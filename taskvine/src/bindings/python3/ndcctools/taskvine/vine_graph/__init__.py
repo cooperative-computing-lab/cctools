@@ -4,5 +4,15 @@
 
 from .vine_graph import VineGraph, VineGraphConfig
 from .adaptors import VineGraphDaskAdaptor, VineGraphGraphedAdaptor
+from .workflow import FileHandle, TaskHandle, TaskOutputHandle, Workflow
 
-__all__ = ["VineGraph", "VineGraphConfig", "VineGraphDaskAdaptor", "VineGraphGraphedAdaptor"]
+__all__ = [
+    "VineGraph",
+    "VineGraphConfig",
+    "Workflow",
+    "TaskHandle",
+    "TaskOutputHandle",
+    "FileHandle",
+    "VineGraphDaskAdaptor",
+    "VineGraphGraphedAdaptor",
+]

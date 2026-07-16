@@ -6,7 +6,7 @@ from ndcctools.taskvine.manager import Manager
 
 from .adaptors import VineGraphDaskAdaptor
 from .task_runner import TaskRunnerRegistration, compute_task, run_scheduler_keys
-from .workflow import Workflow, TaskOutputRef, TaskOutputWrapper
+from .workflow import FileHandle, Workflow, TaskHandle, TaskOutputHandle, TaskOutputWrapper
 from .capi_bridge import VineGraphCapiBridge
 from .utils import color_text, context_loader_func, remove_tree_contents
 
@@ -138,18 +138,30 @@ class VineGraph(Manager):
             return task_dict, target_keys
         if isinstance(task_dict, Workflow):
             old_workflow = task_dict
+            if old_workflow.input_files or old_workflow.output_files:
+                raise ValueError("repeats cannot be combined with FileHandle dependencies")
             new_workflow = Workflow()
             new_workflow.callables = list(old_workflow.callables)
             new_workflow._callable_index = dict(old_workflow._callable_index)
             for r in range(repeats):
                 def rewriter(ref):
-                    return TaskOutputRef(self._rep_key(ref.workflow_key, r), ref.path)
+                    return TaskOutputHandle(
+                        self._rep_key(ref.task_id, r),
+                        ref.path,
+                        workflow_id=new_workflow._workflow_id,
+                    )
 
                 def _rewrite(obj):
                     return old_workflow._visit_task_output_refs(obj, rewriter, rewrite=True)
 
                 for k, (func_id, args, kwargs) in old_workflow.task_dict.items():
-                    new_workflow.add_task(self._rep_key(k, r), old_workflow.callables[func_id], *_rewrite(args), **_rewrite(kwargs))
+                    new_args, new_kwargs = _rewrite((args, kwargs))
+                    new_workflow._add_task_with_key(
+                        self._rep_key(k, r),
+                        old_workflow.callables[func_id],
+                        *new_args,
+                        **new_kwargs,
+                    )
             new_workflow.finalize()
             executor_targets = list(target_keys)
             for r in range(1, repeats):
@@ -160,14 +172,15 @@ class VineGraph(Manager):
             expanded = {}
             for r in range(repeats):
                 def rewriter(ref):
-                    return TaskOutputRef(self._rep_key(ref.workflow_key, r), ref.path)
+                    return TaskOutputHandle(self._rep_key(ref.task_id, r), ref.path)
 
                 def _rewrite(obj):
                     return temp_workflow._visit_task_output_refs(obj, rewriter, rewrite=True)
 
                 for k, v in task_dict.items():
                     func, args, kwargs = v
-                    expanded[self._rep_key(k, r)] = (func, _rewrite(args), _rewrite(kwargs))
+                    new_args, new_kwargs = _rewrite((args, kwargs))
+                    expanded[self._rep_key(k, r)] = (func, new_args, new_kwargs)
             executor_targets = list(target_keys)
             for r in range(1, repeats):
                 executor_targets.extend(self._rep_key(k, r) for k in target_keys if k in task_dict)
@@ -182,7 +195,7 @@ class VineGraph(Manager):
             for k, v in task_dict.items():
                 func, args, kwargs = v
                 assert callable(func), f"Task {k} does not have a callable"
-                workflow.add_task(k, func, *args, **kwargs)
+                workflow._add_task_with_key(k, func, *args, **kwargs)
 
         workflow.finalize()
 
@@ -203,8 +216,8 @@ class VineGraph(Manager):
 
         for k in topo_order:
             node_id = bridge.add_node(k)
-            py_graph.workflow_key_to_scheduler_key[k] = node_id
-            py_graph.scheduler_key_to_workflow_key[node_id] = k
+            py_graph.task_id_to_scheduler_key[k] = node_id
+            py_graph.scheduler_key_to_task_id[node_id] = k
             for pk in py_graph.parents_of[k]:
                 bridge.add_dependency(pk, k)
 
@@ -213,7 +226,7 @@ class VineGraph(Manager):
 
         return bridge
 
-    def build_workflow_and_capi_bridge(self, task_dict, target_keys):
+    def build_workflow_and_capi_bridge(self, task_dict, target_keys, file_target_ids=()):
         """Build the Python graph and its C mirror."""
         py_graph = self.build_workflow(task_dict)
 
@@ -225,13 +238,18 @@ class VineGraph(Manager):
 
         bridge = self.build_capi_bridge(py_graph, target_keys)
 
-        # Declare graph-level file dependencies in the C graph.
-        for filename in py_graph.producer_of:
-            workflow_key = py_graph.producer_of[filename]
-            bridge.add_task_output(workflow_key, filename)
-        for filename in py_graph.consumers_of:
-            for workflow_key in py_graph.consumers_of[filename]:
-                bridge.add_task_input(workflow_key, filename)
+        # Declare each FileHandle once, then mount it on its producer/consumers.
+        for file_id, source_path in py_graph.input_files.items():
+            bridge.declare_input_file(file_id, source_path)
+        file_target_ids = set(file_target_ids)
+        for file_id, (workflow_key, task_path) in py_graph.output_files.items():
+            bridge.add_task_output_file(
+                workflow_key, file_id, task_path, is_target=file_id in file_target_ids
+            )
+        for file_id, consumers in py_graph.file_consumers.items():
+            task_path = py_graph.file_input_path(file_id)
+            for workflow_key in consumers:
+                bridge.add_task_input_file(workflow_key, file_id, task_path)
 
         # Matches --task-group on the Python side so the C layer knows whether merging is allowed.
         bridge.tune(
@@ -245,7 +263,7 @@ class VineGraph(Manager):
         bridge.compute_topology_metrics()
 
         # Save output locations back into the Python graph after finalize may adjust checkpoint paths.
-        for k in py_graph.workflow_key_to_scheduler_key:
+        for k in py_graph.task_id_to_scheduler_key:
             outfile_remote_name = bridge.get_node_outfile_remote_name(k)
             py_graph.outfile_remote_name[k] = outfile_remote_name
 
@@ -279,7 +297,10 @@ class VineGraph(Manager):
         out_dir = os.path.abspath(self.get_param("output-dir"))
         os.makedirs(out_dir, exist_ok=True)
         prev_cwd = os.getcwd()
-        os.chdir(out_dir)
+        py_graph._local_execute = True
+        for k, remote_name in list(py_graph.outfile_remote_name.items()):
+            if not os.path.isabs(remote_name):
+                py_graph.outfile_remote_name[k] = os.path.join(out_dir, remote_name)
         t0 = time.time()
         try:
             order = py_graph.get_topological_order()
@@ -294,7 +315,24 @@ class VineGraph(Manager):
             self._print_local_progress(0, n, t0)
             last_update = time.time()
             for i, k in enumerate(order, 1):
-                out = compute_task(py_graph, py_graph.task_dict[k])
+                task_dir = os.path.join(out_dir, ".vine_graph_tasks", f"task-{py_graph.task_id_to_scheduler_key[k]}")
+                os.makedirs(task_dir, exist_ok=True)
+                remove_tree_contents(task_dir)
+                for task_path in py_graph.output_files_by_task.get(k, {}):
+                    parent = os.path.dirname(os.path.join(task_dir, task_path))
+                    os.makedirs(parent, exist_ok=True)
+                os.chdir(task_dir)
+                try:
+                    out = compute_task(py_graph, py_graph.task_dict[k])
+                finally:
+                    os.chdir(prev_cwd)
+                for task_path, file_id in py_graph.output_files_by_task.get(k, {}).items():
+                    local_path = os.path.abspath(os.path.join(task_dir, task_path))
+                    if not os.path.isfile(local_path):
+                        raise FileNotFoundError(
+                            f"task {k} did not produce declared output file {task_path!r}"
+                        )
+                    py_graph._local_file_paths[file_id] = local_path
                 py_graph.save_task_output(k, out)
                 now = time.time()
                 if now - last_update >= interval or i == n:
@@ -304,17 +342,54 @@ class VineGraph(Manager):
             os.chdir(prev_cwd)
         return time.time() - t0
 
-    def run(self, task_dict, target_keys=[], params={}, hoisting_modules=[], env_files={}, from_dask=False, expand_subgraphs=False, repeats=1):
+    def run(
+        self,
+        task_dict,
+        targets=None,
+        params=None,
+        hoisting_modules=None,
+        env_files=None,
+        from_dask=False,
+        expand_subgraphs=False,
+        repeats=1,
+    ):
         """Build the graph, run it, and return the requested results."""
+        requested_targets = list(targets or [])
+        params = {} if params is None else params
+        hoisting_modules = [] if hoisting_modules is None else hoisting_modules
+        env_files = {} if env_files is None else env_files
         self.set_params(params)
 
         if from_dask:
             task_dict = VineGraphDaskAdaptor(task_dict, expand_subgraphs=expand_subgraphs).converted
 
-        result_keys = list(target_keys)
-        task_dict, target_keys = self._replicate_graph(task_dict, target_keys, repeats)
+        file_target_ids = set()
+        if isinstance(task_dict, Workflow):
+            result_items = []
+            for target in requested_targets:
+                if isinstance(target, TaskHandle):
+                    result_items.append(("task", target, task_dict._task_key(target)))
+                elif isinstance(target, FileHandle):
+                    if target.workflow_id != task_dict._workflow_id:
+                        raise ValueError("file target belongs to a different Workflow")
+                    if target.file_id not in task_dict.input_files and target.file_id not in task_dict.output_files:
+                        raise ValueError("file target does not belong to this Workflow")
+                    result_items.append(("file", target, target.file_id))
+                    if target.file_id in task_dict.output_files:
+                        file_target_ids.add(target.file_id)
+                else:
+                    raise TypeError("Workflow targets must be TaskHandle or FileHandle objects")
+        else:
+            if any(isinstance(target, (TaskHandle, FileHandle)) for target in requested_targets):
+                raise TypeError("TaskHandle and FileHandle targets require a Workflow")
+            result_items = [("task", target, target) for target in requested_targets]
 
-        py_graph, bridge = self.build_workflow_and_capi_bridge(task_dict, target_keys)
+        scheduler_targets = [key for kind, _, key in result_items if kind == "task"]
+        task_dict, scheduler_targets = self._replicate_graph(task_dict, scheduler_targets, repeats)
+
+        py_graph, bridge = self.build_workflow_and_capi_bridge(
+            task_dict, scheduler_targets, file_target_ids
+        )
         # Optional synthetic output size / sleep for testing.
         for k in py_graph.task_dict:
             py_graph.extra_task_output_size_mb[k] = random.uniform(*self.get_param("extra-task-output-size-mb"))
@@ -342,11 +417,18 @@ class VineGraph(Manager):
             print(f"=== Throughput: {throughput_tps:.6f} tasks/s")
 
             results = {}
-            for k in result_keys:
-                if k not in py_graph.task_dict:
-                    continue
-                outfile_path = os.path.join(self.get_param("output-dir"), py_graph.outfile_remote_name[k])
-                results[k] = TaskOutputWrapper.load_from_path(outfile_path)
+            for kind, public_target, key in result_items:
+                if kind == "task":
+                    if key not in py_graph.task_dict:
+                        continue
+                    outfile_path = os.path.join(self.get_param("output-dir"), py_graph.outfile_remote_name[key])
+                    results[public_target] = TaskOutputWrapper.load_from_path(outfile_path)
+                elif key in py_graph.input_files:
+                    results[public_target] = py_graph.input_files[key]
+                elif local_execute:
+                    results[public_target] = py_graph._local_file_paths[key]
+                else:
+                    results[public_target] = os.path.abspath(bridge.get_file_target_path(key))
             return results
         finally:
             try:

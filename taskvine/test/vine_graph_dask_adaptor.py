@@ -1,7 +1,7 @@
 import warnings
 
+from ndcctools.taskvine.vine_graph import TaskOutputHandle
 from ndcctools.taskvine.vine_graph.adaptors import VineGraphDaskAdaptor
-from ndcctools.taskvine.vine_graph.workflow import TaskOutputRef
 
 
 MIN_TASKS = 10
@@ -38,14 +38,14 @@ def add_many(*values):
     return sum(values)
 
 
-def assert_has_task_output_ref(value):
+def assert_has_task_output_handle(value):
     """Return true if a converted argument tree contains a VineGraph dependency."""
-    if isinstance(value, TaskOutputRef):
+    if isinstance(value, TaskOutputHandle):
         return True
     if isinstance(value, (list, tuple, set, frozenset)):
-        return any(assert_has_task_output_ref(item) for item in value)
+        return any(assert_has_task_output_handle(item) for item in value)
     if isinstance(value, dict):
-        return any(assert_has_task_output_ref(item) for item in value.values())
+        return any(assert_has_task_output_handle(item) for item in value.values())
     return False
 
 
@@ -56,11 +56,11 @@ def assert_converts(name, graph, min_tasks=1, expect_dependency=True):
 
     has_dependency = False
     for _func, args, kwargs in converted.values():
-        has_dependency = has_dependency or any(assert_has_task_output_ref(arg) for arg in args)
-        has_dependency = has_dependency or any(assert_has_task_output_ref(value) for value in kwargs.values())
+        has_dependency = has_dependency or any(assert_has_task_output_handle(arg) for arg in args)
+        has_dependency = has_dependency or any(assert_has_task_output_handle(value) for value in kwargs.values())
 
     if expect_dependency:
-        assert has_dependency, f"{name}: expected at least one TaskOutputRef dependency"
+        assert has_dependency, f"{name}: expected at least one TaskOutputHandle dependency"
 
     return converted
 
@@ -96,7 +96,7 @@ def check_delayed():
     _func, args, kwargs = add_many_tasks[0]
     assert kwargs == {}
     assert len(args) == MIN_TASKS
-    assert all(isinstance(arg, TaskOutputRef) for arg in args)
+    assert all(isinstance(arg, TaskOutputHandle) for arg in args)
 
 
 def check_array_collection():

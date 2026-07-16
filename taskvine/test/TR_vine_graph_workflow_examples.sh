@@ -28,7 +28,7 @@ prepare()
 
 run()
 {
-	( ${CCTOOLS_PYTHON_TEST_EXEC} vine_graph_workflow_examples.py $PORT_FILE --case chain-branches:6 --task-group 1 --result-file $RESULT_FILE --no-print-results --timeout 90; echo $? > $STATUS_FILE ) &
+	( ${CCTOOLS_PYTHON_TEST_EXEC} vine_graph_workflow_examples.py $PORT_FILE --case corner-cases --result-file $RESULT_FILE --no-print-results --timeout 90; echo $? > $STATUS_FILE ) &
 
 	wait_for_file_creation $PORT_FILE 15
 

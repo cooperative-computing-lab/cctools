@@ -5,32 +5,83 @@
 
 import sys
 import time
+import copy
+import dataclasses
 from collections import defaultdict, deque
 
 from ndcctools.taskvine.utils import load_variable_from_library
+from ..workflow import _TaskOutputAttribute
 
 
-def _resolve_nested_legacy_tasks(obj):
+def _resolve_nested_legacy_tasks(obj, memo=None):
     """Evaluate nested legacy Dask tasks encoded as plain ``(func, *args)`` tuples."""
+    if memo is None:
+        memo = {}
+
+    if obj is None or isinstance(obj, (str, bytes, bytearray, memoryview, int, float, bool)):
+        return obj
+
+    oid = id(obj)
+    if oid in memo:
+        return memo[oid]
+
     if type(obj) is tuple and obj and callable(obj[0]):
         func = obj[0]
-        args = tuple(_resolve_nested_legacy_tasks(v) for v in obj[1:])
-        return func(*args)
+        args = tuple(_resolve_nested_legacy_tasks(v, memo) for v in obj[1:])
+        result = func(*args)
+        memo[oid] = result
+        return result
 
     if isinstance(obj, list):
-        return [_resolve_nested_legacy_tasks(v) for v in obj]
+        out = []
+        memo[oid] = out
+        out.extend(_resolve_nested_legacy_tasks(v, memo) for v in obj)
+        return out
+
+    if isinstance(obj, deque):
+        out = deque(maxlen=obj.maxlen)
+        memo[oid] = out
+        out.extend(_resolve_nested_legacy_tasks(v, memo) for v in obj)
+        return out
 
     if type(obj) is tuple:
-        return tuple(_resolve_nested_legacy_tasks(v) for v in obj)
+        out = tuple(_resolve_nested_legacy_tasks(v, memo) for v in obj)
+        memo[oid] = out
+        return out
+
+    if isinstance(obj, tuple) and hasattr(obj, "_fields"):
+        out = obj.__class__(*(_resolve_nested_legacy_tasks(v, memo) for v in obj))
+        memo[oid] = out
+        return out
 
     if isinstance(obj, dict):
-        return {k: _resolve_nested_legacy_tasks(v) for k, v in obj.items()}
+        try:
+            out = copy.copy(obj)
+            out.clear()
+        except Exception:
+            out = {}
+        memo[oid] = out
+        for key, value in obj.items():
+            out[key] = _resolve_nested_legacy_tasks(value, memo)
+        return out
 
     if isinstance(obj, set):
-        return {_resolve_nested_legacy_tasks(v) for v in obj}
+        out = set()
+        memo[oid] = out
+        out.update(_resolve_nested_legacy_tasks(v, memo) for v in obj)
+        return out
 
     if isinstance(obj, frozenset):
-        return frozenset(_resolve_nested_legacy_tasks(v) for v in obj)
+        out = frozenset(_resolve_nested_legacy_tasks(v, memo) for v in obj)
+        memo[oid] = out
+        return out
+
+    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        out = copy.copy(obj)
+        memo[oid] = out
+        for field in dataclasses.fields(obj):
+            object.__setattr__(out, field.name, _resolve_nested_legacy_tasks(getattr(obj, field.name), memo))
+        return out
 
     return obj
 
@@ -43,7 +94,9 @@ def compute_task(workflow, task_expr):
     def _follow_path(value, path):
         current = value
         for token in path:
-            if isinstance(current, (list, tuple)):
+            if isinstance(token, _TaskOutputAttribute):
+                current = getattr(current, token.name)
+            elif isinstance(current, (list, tuple)):
                 current = current[token]
             elif isinstance(current, dict):
                 current = current[token]
@@ -52,19 +105,25 @@ def compute_task(workflow, task_expr):
         return current
 
     def on_ref(r):
-        x = cache.get(r.workflow_key)
-        if x is None:
-            x = workflow.load_task_output(r.workflow_key)
-            cache[r.workflow_key] = x
+        if r.task_id not in cache:
+            x = workflow.load_task_output(r.task_id)
+            cache[r.task_id] = x
+        else:
+            x = cache[r.task_id]
         if r.path:
             return _follow_path(x, r.path)
         return x
 
-    r_args = workflow._visit_task_output_refs(args, on_ref, rewrite=True)
-    r_kwargs = workflow._visit_task_output_refs(kwargs, on_ref, rewrite=True)
+    def on_file(f):
+        if f.workflow_id != workflow._workflow_id:
+            raise ValueError("file belongs to a different Workflow")
+        return workflow.file_input_path(f.file_id)
 
-    r_args = _resolve_nested_legacy_tasks(r_args)
-    r_kwargs = _resolve_nested_legacy_tasks(r_kwargs)
+    r_args, r_kwargs = workflow._visit_task_output_refs(
+        (args, kwargs), on_ref, rewrite=True, on_file=on_file
+    )
+
+    r_args, r_kwargs = _resolve_nested_legacy_tasks((r_args, r_kwargs))
 
     return func(*r_args, **r_kwargs)
 
@@ -92,9 +151,9 @@ def topo_sort_group_scheduler_keys(workflow, member_scheduler_keys):
     # Restrict Workflow to this batch: edge parent_sk -> child_sk only when both endpoints are members.
     # Aligns with the C executor DAG via the same parents_of as Python Workflow.
     for child_sk in nodes:
-        wk_child = workflow.scheduler_key_to_workflow_key[child_sk]
+        wk_child = workflow.scheduler_key_to_task_id[child_sk]
         for wk_parent in workflow.parents_of.get(wk_child, ()):
-            parent_sk = workflow.workflow_key_to_scheduler_key[wk_parent]
+            parent_sk = workflow.task_id_to_scheduler_key[wk_parent]
             if parent_sk in nodes and child_sk not in adj[parent_sk]:
                 adj[parent_sk].add(child_sk)
                 indeg[child_sk] += 1
@@ -120,7 +179,7 @@ def topo_sort_group_scheduler_keys(workflow, member_scheduler_keys):
 
 def run_single_workflow_node(workflow, scheduler_key):
     """Run one node: scheduler_key -> workflow_key, execute, write outfile for downstream refs."""
-    workflow_key = workflow.scheduler_key_to_workflow_key[scheduler_key]
+    workflow_key = workflow.scheduler_key_to_task_id[scheduler_key]
     task_expr = workflow.task_dict[workflow_key]
 
     output = compute_task(workflow, task_expr)
@@ -178,9 +237,9 @@ def run_scheduler_keys(scheduler_keys_spec):
     # when it has no parent that is also inside this batch.
     if ordered[0] != leader_sk:
         batch = set(ordered)
-        wk_leader = workflow.scheduler_key_to_workflow_key[leader_sk]
+        wk_leader = workflow.scheduler_key_to_task_id[leader_sk]
         for wkp in workflow.parents_of.get(wk_leader, ()):
-            psk = workflow.workflow_key_to_scheduler_key[wkp]
+            psk = workflow.task_id_to_scheduler_key[wkp]
             if psk in batch:
                 raise ValueError(
                     f"run_scheduler_keys: leader {leader_sk} must run first but has intra-batch parent {psk}"

@@ -2,7 +2,7 @@ import hashlib
 from collections.abc import Mapping
 
 from .dask_common import build_task_expr, identity, resolve_graph_key_if_task
-from ..workflow import TaskOutputRef
+from ..workflow import TaskOutputHandle
 
 
 def _safe_repr(value, limit=800):
@@ -88,7 +88,7 @@ class DaskTaskSpecConverter:
         if literal_cls and isinstance(node, literal_cls):
             return build_task_expr(identity, [node.value], {})
         if taskref_cls and isinstance(node, taskref_cls):
-            return build_task_expr(identity, [TaskOutputRef(node.key, getattr(node, "path", ()) or ())], {})
+            return build_task_expr(identity, [TaskOutputHandle(node.key, getattr(node, "path", ()) or ())], {})
         if nested_cls and isinstance(node, nested_cls):
             payload = getattr(node, "value", None)
             if payload is None:
@@ -139,7 +139,7 @@ class DaskTaskSpecConverter:
     def unwrap_operand(self, operand, workflow_keys, *, parent_key=None):
         taskref_cls = getattr(self.dts, "TaskRef", None)
         if taskref_cls and isinstance(operand, taskref_cls):
-            return TaskOutputRef(getattr(operand, "key", None), getattr(operand, "path", ()) or ())
+            return TaskOutputHandle(getattr(operand, "key", None), getattr(operand, "path", ()) or ())
 
         alias_cls = getattr(self.dts, "Alias", None)
         if alias_cls and isinstance(operand, alias_cls):
@@ -182,7 +182,7 @@ class DaskTaskSpecConverter:
     def _unwrap_task_operand(self, operand, workflow_keys, *, parent_key=None):
         inline_key = getattr(operand, "key", None)
         if inline_key is not None and inline_key in workflow_keys:
-            return TaskOutputRef(inline_key, ())
+            return TaskOutputHandle(inline_key, ())
 
         func = _extract_callable_from_task(operand)
         if func is None:
@@ -218,14 +218,14 @@ class DaskTaskSpecConverter:
                 continue
             key = resolve_graph_key_if_task(getattr(alias_node, candidate, None), workflow_keys)
             if key is not None:
-                return TaskOutputRef(key, path)
+                return TaskOutputHandle(key, path)
 
         deps = getattr(alias_node, "dependencies", None)
         if deps:
             deps = list(deps)
             if len(deps) == 1:
                 key = resolve_graph_key_if_task(deps[0], workflow_keys)
-                return TaskOutputRef(key if key is not None else deps[0], path)
+                return TaskOutputHandle(key if key is not None else deps[0], path)
         return None
 
     def _reduce_inline_task(self, task_node, workflow_keys, *, parent_key=None):
@@ -259,7 +259,7 @@ class DaskTaskSpecConverter:
         signature = self._structural_signature(task_node, workflow_keys)
         cached = self._lift_cache.get(signature)
         if cached is not None:
-            return TaskOutputRef(cached, ())
+            return TaskOutputHandle(cached, ())
 
         digest = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:16]
         base = f"__lift__{digest}"
@@ -271,7 +271,7 @@ class DaskTaskSpecConverter:
         self._lift_cache[signature] = new_key
         self.lifted_nodes[new_key] = task_node
         workflow_keys.add(new_key)
-        return TaskOutputRef(new_key, ())
+        return TaskOutputHandle(new_key, ())
 
     def _structural_signature(self, obj, workflow_keys):
         try:
@@ -291,7 +291,7 @@ class DaskTaskSpecConverter:
             return f"TaskRef({getattr(obj, 'key', None)!r},{tuple(getattr(obj, 'path', ()) or ())!r})"
         if alias_cls and isinstance(obj, alias_cls):
             ref = self._extract_alias_target(obj, workflow_keys)
-            return f"Alias({getattr(ref, 'workflow_key', None)!r},{getattr(ref, 'path', ())!r})"
+            return f"Alias({getattr(ref, 'task_id', None)!r},{getattr(ref, 'path', ())!r})"
         if literal_cls and isinstance(obj, literal_cls):
             return f"Literal({_safe_repr(getattr(obj, 'value', None))})"
         if datanode_cls and isinstance(obj, datanode_cls):

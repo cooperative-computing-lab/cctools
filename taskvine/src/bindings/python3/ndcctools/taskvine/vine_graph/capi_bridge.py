@@ -88,19 +88,39 @@ class VineGraphCapiBridge:
             self._c_graph, task_runner_function.__name__
         )
 
-    def add_task_input(self, workflow_key, filename):
-        """Add an input file to a task."""
-        task_id = self._workflow_key_to_scheduler_key.get(workflow_key)
-        if task_id is None:
-            raise KeyError(f"Workflow key not found: {workflow_key}")
-        vine_graph_capi.vine_graph_executor_add_task_input(self._c_executor, task_id, filename)
+    def declare_input_file(self, file_id, source_path):
+        """Declare one frontend file."""
+        if vine_graph_capi.vine_graph_executor_declare_input_file(
+            self._c_executor, file_id, source_path
+        ) != 0:
+            raise RuntimeError(f"failed to declare input file {file_id}: {source_path}")
 
-    def add_task_output(self, workflow_key, filename):
-        """Add an output file to a task."""
+    def add_task_input_file(self, workflow_key, file_id, task_path):
+        """Mount a declared FileHandle into a task."""
         task_id = self._workflow_key_to_scheduler_key.get(workflow_key)
         if task_id is None:
             raise KeyError(f"Workflow key not found: {workflow_key}")
-        vine_graph_capi.vine_graph_executor_add_task_output(self._c_executor, task_id, filename)
+        if vine_graph_capi.vine_graph_executor_add_task_input_file(
+            self._c_executor, task_id, file_id, task_path
+        ) != 0:
+            raise RuntimeError(f"failed to mount input file {file_id} on task {workflow_key}")
+
+    def add_task_output_file(self, workflow_key, file_id, task_path, is_target=False):
+        """Declare and mount a task-produced FileHandle."""
+        task_id = self._workflow_key_to_scheduler_key.get(workflow_key)
+        if task_id is None:
+            raise KeyError(f"Workflow key not found: {workflow_key}")
+        if vine_graph_capi.vine_graph_executor_add_task_output_file(
+            self._c_executor, task_id, file_id, task_path, int(bool(is_target))
+        ) != 0:
+            raise RuntimeError(f"failed to declare output file {file_id} on task {workflow_key}")
+
+    def get_file_target_path(self, file_id):
+        """Return the manager-side path of a retrieved output file."""
+        path = vine_graph_capi.vine_graph_executor_get_file_target_path(self._c_executor, file_id)
+        if not path:
+            raise RuntimeError(f"file {file_id} has no manager-side target path")
+        return path
 
     def execute(self):
         """Execute the graph."""

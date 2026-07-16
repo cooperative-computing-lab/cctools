@@ -1,7 +1,7 @@
 import contextlib
 from collections import OrderedDict
 
-from ..workflow import TaskOutputRef, Workflow
+from ..workflow import Workflow
 
 
 class _VineGraphGraphedResources:
@@ -74,26 +74,20 @@ def graphed_plan_to_workflow(plan, key_prefix="graphed"):
     workflow = Workflow()
     tasks = sorted(tuple(plan.tasks), key=lambda task: task.key)
 
-    empty_key = (key_prefix, "empty")
-    workflow.add_task(empty_key, _graphed_empty, [plan.empty])
+    empty_task = workflow.add_task(_graphed_empty, [plan.empty])
 
-    previous_key = empty_key
+    previous_task = empty_task
     for task in tasks:
-        task_key = (key_prefix, "task", task.key)
-        combine_key = (key_prefix, "combine", task.key)
-
-        workflow.add_task(task_key, _graphed_process, [plan.process], task.partition)
-        workflow.add_task(
-            combine_key,
+        process_task = workflow.add_task(_graphed_process, [plan.process], task.partition)
+        previous_task = workflow.add_task(
             _graphed_combine,
             [plan.combine],
-            TaskOutputRef(previous_key),
-            TaskOutputRef(task_key),
+            previous_task.output(),
+            process_task.output(),
         )
-        previous_key = combine_key
 
     workflow.finalize()
-    return workflow, previous_key
+    return workflow, previous_task
 
 
 class VineGraphGraphedAdaptor:
@@ -101,8 +95,8 @@ class VineGraphGraphedAdaptor:
 
     def __init__(self, plan, key_prefix="graphed"):
         self.plan = plan
-        self.converted, self.target_key = graphed_plan_to_workflow(plan, key_prefix=key_prefix)
-        self.target_keys = [self.target_key]
+        self.converted, self.target = graphed_plan_to_workflow(plan, key_prefix=key_prefix)
+        self.targets = [self.target]
 
     @property
     def task_dict(self):

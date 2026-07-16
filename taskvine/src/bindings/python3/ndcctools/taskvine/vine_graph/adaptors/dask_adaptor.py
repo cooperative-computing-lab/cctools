@@ -24,7 +24,7 @@ from .dask_common import (
     resolve_graph_key_if_task,
 )
 from .dask_task_spec import DaskTaskSpecConverter
-from ..workflow import TaskOutputRef, Workflow
+from ..workflow import TaskOutputHandle, Workflow
 
 
 def _apply_with_kwargs_kvlist(func, args_list, kwargs_kvlist):
@@ -36,7 +36,7 @@ def workflow_to_dask_graph(workflow):
     assert isinstance(workflow, Workflow), "workflow must be a Workflow"
 
     def ref_to_key(ref):
-        return ref.workflow_key
+        return ref.task_id
 
     dsk = {}
     for workflow_key, (func_id, args, kwargs) in workflow.task_dict.items():
@@ -126,7 +126,7 @@ class VineGraphDaskAdaptor:
     def _convert_legacy_task(self, sexpr, workflow_keys):
         try:
             if not isinstance(sexpr, (list, tuple)) and sexpr in workflow_keys:
-                return build_task_expr(identity, [TaskOutputRef(sexpr)], {})
+                return build_task_expr(identity, [TaskOutputHandle(sexpr)], {})
         except TypeError:
             pass
 
@@ -147,12 +147,12 @@ class VineGraphDaskAdaptor:
         return func, args, kwargs
 
     def _wrap_dependency(self, obj, workflow_keys):
-        if isinstance(obj, TaskOutputRef):
+        if isinstance(obj, TaskOutputHandle):
             return obj
 
         key = resolve_graph_key_if_task(obj, workflow_keys)
         if key is not None:
-            return TaskOutputRef(key)
+            return TaskOutputHandle(key)
 
         if isinstance(obj, list):
             return [self._wrap_dependency(value, workflow_keys) for value in obj]

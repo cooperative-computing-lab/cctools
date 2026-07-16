@@ -65,7 +65,7 @@ class vine_graph(object):
     nodes = property(_vine_graph_capi.vine_graph_nodes_get, _vine_graph_capi.vine_graph_nodes_set)
     super_leader_to_members = property(_vine_graph_capi.vine_graph_super_leader_to_members_get, _vine_graph_capi.vine_graph_super_leader_to_members_set)
     outfile_cachename_to_node = property(_vine_graph_capi.vine_graph_outfile_cachename_to_node_get, _vine_graph_capi.vine_graph_outfile_cachename_to_node_set)
-    inout_filename_to_cached_name = property(_vine_graph_capi.vine_graph_inout_filename_to_cached_name_get, _vine_graph_capi.vine_graph_inout_filename_to_cached_name_set)
+    file_id_to_file = property(_vine_graph_capi.vine_graph_file_id_to_file_get, _vine_graph_capi.vine_graph_file_id_to_file_set)
     supernode_leader_child_to_input_source = property(_vine_graph_capi.vine_graph_supernode_leader_child_to_input_source_get, _vine_graph_capi.vine_graph_supernode_leader_child_to_input_source_set)
     checkpoint_dir = property(_vine_graph_capi.vine_graph_checkpoint_dir_get, _vine_graph_capi.vine_graph_checkpoint_dir_set)
     output_dir = property(_vine_graph_capi.vine_graph_output_dir_get, _vine_graph_capi.vine_graph_output_dir_set)
@@ -175,11 +175,17 @@ def vine_graph_executor_add_node(e):
 def vine_graph_executor_finalize(e):
     return _vine_graph_capi.vine_graph_executor_finalize(e)
 
-def vine_graph_executor_add_task_input(e, task_id, filename):
-    return _vine_graph_capi.vine_graph_executor_add_task_input(e, task_id, filename)
+def vine_graph_executor_declare_input_file(e, file_id, source_path):
+    return _vine_graph_capi.vine_graph_executor_declare_input_file(e, file_id, source_path)
 
-def vine_graph_executor_add_task_output(e, task_id, filename):
-    return _vine_graph_capi.vine_graph_executor_add_task_output(e, task_id, filename)
+def vine_graph_executor_add_task_output_file(e, task_id, file_id, task_path, is_target):
+    return _vine_graph_capi.vine_graph_executor_add_task_output_file(e, task_id, file_id, task_path, is_target)
+
+def vine_graph_executor_add_task_input_file(e, task_id, file_id, task_path):
+    return _vine_graph_capi.vine_graph_executor_add_task_input_file(e, task_id, file_id, task_path)
+
+def vine_graph_executor_get_file_target_path(e, file_id):
+    return _vine_graph_capi.vine_graph_executor_get_file_target_path(e, file_id)
 
 def vine_graph_executor_tune(e, name, value):
     return _vine_graph_capi.vine_graph_executor_tune(e, name, value)

@@ -37,7 +37,9 @@ install: all
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/compat
 	cp ndcctools/taskvine/*.py $(DSPYTHONSO) $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine
 	cp ndcctools/taskvine/compat/*.py $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/compat
-	rm -rf $(CCTOOLS_PYTHON3_PATH)/ndcctools/taskvine/vine_graph
+	mkdir -p $(VINE_GRAPH_MODULE_DIR)
+	rm -rf $(VINE_GRAPH_MODULE_DIR)/adaptors $(VINE_GRAPH_MODULE_DIR)/task_runner $(VINE_GRAPH_MODULE_DIR)/test $(VINE_GRAPH_MODULE_DIR)/__pycache__
+	rm -f $(VINE_GRAPH_MODULE_DIR)/*.py
 	cd ndcctools/taskvine/vine_graph && find . -path ./test -prune -o -type d -print | while read dir; do mkdir -p "$(VINE_GRAPH_MODULE_DIR)/$$dir"; done
 	cd ndcctools/taskvine/vine_graph && find . -path ./test -prune -o -name '*.py' -print | while read file; do cp "$$file" "$(VINE_GRAPH_MODULE_DIR)/$$file"; done
 	cp taskvine.py $(CCTOOLS_PYTHON3_PATH)/

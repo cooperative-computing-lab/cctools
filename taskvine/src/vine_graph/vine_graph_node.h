@@ -46,15 +46,13 @@ struct vine_graph_node {
 	struct list *parents;
 	struct list *children;
 	/**
-	 * @c Workflow.task_produces / @c vine_graph_executor_add_task_output: extra outputs beyond this node’s primary
-	 * @c outfile (the runner’s standard @c outfile_node_* result). Each list item is a declared
-	 * @c vine_file keyed by the same logical path string used by consumers. Filled before
+	 * Files tracked by TaskHandle.file(), beyond this node's primary
+	 * Python-result outfile. Filled before
 	 * @c node->task exists; consumed when building the task at submit / materialize time.
 	 */
 	struct list *extra_outputs;
 	/**
-	 * @c Workflow.task_consumes / @c vine_graph_executor_add_task_input: extra inputs beyond those implied by
-	 * the DAG via parent @c outfile edges (paired logical files shared with producers). Same lifecycle
+	 * FileHandle inputs beyond those implied by Python-result dependencies. Same lifecycle
 	 * as @c extra_outputs: queued at graph build, wired on @c vine_task at materialize.
 	 */
 	struct list *extra_inputs;

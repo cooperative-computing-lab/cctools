@@ -1,6 +1,6 @@
 """Shared helpers for Dask-to-VineGraph adaptor modules."""
 
-from ..workflow import TaskOutputRef
+from ..workflow import TaskOutputHandle
 
 
 def identity(value):
@@ -15,7 +15,7 @@ def build_task_expr(func, args, kwargs):
 
 def resolve_graph_key_if_task(obj, workflow_keys):
     """Return the matching graph key when ``obj`` denotes an existing Dask task."""
-    if isinstance(obj, TaskOutputRef):
+    if isinstance(obj, TaskOutputHandle):
         return None
     try:
         if obj in workflow_keys:

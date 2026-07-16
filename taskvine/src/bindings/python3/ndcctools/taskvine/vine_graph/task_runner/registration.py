@@ -11,7 +11,7 @@ import random
 import hashlib
 import collections
 
-from ..workflow import Workflow, TaskOutputRef, TaskOutputWrapper
+from ..workflow import FileHandle, TaskHandle, TaskOutputHandle, TaskOutputWrapper, Workflow, _TaskOutputAttribute
 from .execution import run_scheduler_keys
 from ndcctools.taskvine.utils import load_variable_from_library
 
@@ -27,7 +27,8 @@ class TaskRunnerRegistration:
 
         # These modules are included in the generated function context so task calls can execute directly.
         self.hoisting_modules = [
-            os, cloudpickle, Workflow, TaskOutputRef, TaskOutputWrapper, uuid, hashlib, random, types, collections, time,
+            os, cloudpickle, Workflow, FileHandle, TaskHandle, TaskOutputHandle, TaskOutputWrapper, _TaskOutputAttribute,
+            uuid, hashlib, random, types, collections, time,
             load_variable_from_library, run_scheduler_keys
         ]
 

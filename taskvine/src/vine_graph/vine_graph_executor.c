@@ -128,26 +128,6 @@ static void vine_graph_executor_clear_node_runner_arg(struct vine_graph_executor
 	node->task_runner_arg_file = NULL;
 }
 
-static void vine_graph_executor_undeclare_extra_io_mounts(struct vine_graph_executor *e, struct list *mounts, struct set *seen_files)
-{
-	if (!e || !mounts || !seen_files) {
-		return;
-	}
-
-	struct vine_graph_io_mount *m;
-	LIST_ITERATE(mounts, m)
-	{
-		if (!m || !m->file) {
-			continue;
-		}
-		if (!set_lookup(seen_files, m->file)) {
-			set_insert(seen_files, m->file);
-			vine_undeclare_file(e->manager, m->file);
-		}
-		m->file = NULL;
-	}
-}
-
 /* Initialize runtime fields and default tuning values for a new executor. */
 static void vine_graph_executor_init_runtime(struct vine_graph_executor *e)
 {
@@ -225,7 +205,6 @@ void vine_graph_executor_delete(struct vine_graph_executor *e)
 {
 	struct vine_graph *g = e ? e->graph : NULL;
 	if (g && e->manager) {
-		struct set *extra_files = set_create(0);
 		uint64_t nid;
 		struct vine_graph_node *node;
 		int iteration;
@@ -254,10 +233,15 @@ void vine_graph_executor_delete(struct vine_graph_executor *e)
 				vine_undeclare_file(e->manager, node->outfile);
 				node->outfile = NULL;
 			}
-			vine_graph_executor_undeclare_extra_io_mounts(e, node->extra_inputs, extra_files);
-			vine_graph_executor_undeclare_extra_io_mounts(e, node->extra_outputs, extra_files);
 		}
-		set_delete(extra_files);
+
+		uint64_t file_id;
+		struct vine_file *file;
+		ITABLE_ITERATE(g->file_id_to_file, iteration, file_id, file)
+		{
+			vine_undeclare_file(e->manager, file);
+		}
+		itable_clear(g->file_id_to_file, NULL);
 	}
 	vine_graph_executor_clear_runtime(e);
 	free(e);
@@ -460,56 +444,74 @@ void vine_graph_executor_finalize(struct vine_graph_executor *e)
 	}
 }
 
-/* Add a named input, reusing a declared file when the logical filename was already mapped. */
-void vine_graph_executor_add_task_input(struct vine_graph_executor *e, uint64_t task_id, const char *filename)
+int vine_graph_executor_declare_input_file(struct vine_graph_executor *e, uint64_t file_id, const char *source_path)
 {
 	struct vine_graph *g = e ? e->graph : NULL;
-	if (!g || !task_id || !filename) {
-		return;
+	if (!g || !file_id || !source_path || itable_lookup(g->file_id_to_file, file_id)) {
+		return -1;
 	}
 
-	struct vine_graph_node *node = itable_lookup(g->nodes, task_id);
-	if (!node) {
-		return;
+	struct vine_file *file = vine_declare_file(e->manager, source_path, VINE_CACHE_LEVEL_WORKFLOW, 0);
+	if (!file) {
+		return -1;
 	}
-
-	struct vine_file *f = NULL;
-	const char *cached_name = hash_table_lookup(g->inout_filename_to_cached_name, filename);
-
-	if (cached_name) {
-		f = vine_manager_lookup_file(e->manager, cached_name);
-	} else {
-		f = vine_declare_temp(e->manager); // first use of logical name, record cache key for paired mounts
-		hash_table_insert(g->inout_filename_to_cached_name, filename, xxstrdup(vine_file_cached_name(f)));
-	}
-
-	vine_graph_io_mount_add(node->extra_inputs, f, filename);
+	itable_insert(g->file_id_to_file, file_id, file);
+	return 0;
 }
 
-/* Add a named output, linking logical filename to a cache name for paired producer and consumer tasks. */
-void vine_graph_executor_add_task_output(struct vine_graph_executor *e, uint64_t task_id, const char *filename)
+int vine_graph_executor_add_task_output_file(struct vine_graph_executor *e, uint64_t task_id, uint64_t file_id, const char *task_path, int is_target)
 {
 	struct vine_graph *g = e ? e->graph : NULL;
-	if (!g || !task_id || !filename) {
-		return;
+	if (!g || !task_id || !file_id || !task_path || itable_lookup(g->file_id_to_file, file_id)) {
+		return -1;
 	}
 
 	struct vine_graph_node *node = itable_lookup(g->nodes, task_id);
 	if (!node) {
-		return;
+		return -1;
 	}
 
-	struct vine_file *f = NULL;
-	const char *cached_name = hash_table_lookup(g->inout_filename_to_cached_name, filename);
-
-	if (cached_name) {
-		f = vine_manager_lookup_file(e->manager, cached_name);
+	struct vine_file *file = NULL;
+	if (is_target) {
+		const char *base = strrchr(task_path, '/');
+		base = base ? base + 1 : task_path;
+		char *target_path = string_format("%s/file-%" PRIu64 "-%s", g->output_dir, file_id, base);
+		file = vine_declare_file(e->manager, target_path, VINE_CACHE_LEVEL_WORKFLOW, 0);
+		free(target_path);
 	} else {
-		f = vine_declare_temp(e->manager); // pair with matching input on consumer tasks
-		hash_table_insert(g->inout_filename_to_cached_name, filename, xxstrdup(vine_file_cached_name(f)));
+		file = vine_declare_temp(e->manager);
+	}
+	if (!file) {
+		return -1;
 	}
 
-	vine_graph_io_mount_add(node->extra_outputs, f, filename);
+	itable_insert(g->file_id_to_file, file_id, file);
+	vine_graph_io_mount_add(node->extra_outputs, file, task_path);
+	return 0;
+}
+
+int vine_graph_executor_add_task_input_file(struct vine_graph_executor *e, uint64_t task_id, uint64_t file_id, const char *task_path)
+{
+	struct vine_graph *g = e ? e->graph : NULL;
+	if (!g || !task_id || !file_id || !task_path) {
+		return -1;
+	}
+
+	struct vine_graph_node *node = itable_lookup(g->nodes, task_id);
+	struct vine_file *file = itable_lookup(g->file_id_to_file, file_id);
+	if (!node || !file) {
+		return -1;
+	}
+
+	vine_graph_io_mount_add(node->extra_inputs, file, task_path);
+	return 0;
+}
+
+const char *vine_graph_executor_get_file_target_path(struct vine_graph_executor *e, uint64_t file_id)
+{
+	struct vine_graph *g = e ? e->graph : NULL;
+	struct vine_file *file = g ? itable_lookup(g->file_id_to_file, file_id) : NULL;
+	return file ? vine_file_source(file) : NULL;
 }
 
 /* Apply executor-level tuning. Unknown keys are forwarded to vine_graph_tune. */

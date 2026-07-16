@@ -579,7 +579,7 @@ struct vine_graph *vine_graph_create(const char *runtime_dir)
 	g->nodes = itable_create(0);
 	g->super_leader_to_members = itable_create(0);
 	g->outfile_cachename_to_node = hash_table_create(0, 0);
-	g->inout_filename_to_cached_name = hash_table_create(0, 0);
+	g->file_id_to_file = itable_create(0);
 	g->supernode_leader_child_to_input_source = hash_table_create(0, 0);
 
 	cctools_uuid_t task_runner_library_name_id;
@@ -851,13 +851,19 @@ static struct vine_graph_node *vine_graph_node_only_parent(struct vine_graph_nod
 	return NULL;
 }
 
+/* File mounts need separate TaskVine sandboxes, so they form chain-group boundaries. */
+static int vine_graph_node_allows_chain_grouping(struct vine_graph_node *n)
+{
+	return n && list_size(n->extra_inputs) == 0 && list_size(n->extra_outputs) == 0;
+}
+
 /**
  * Head of a maximal linear chain: singleton, and not strictly inside such a chain from the left
  * (no parent, fan-in > 1, or unique parent has fan-out > 1).
  */
 static int vine_graph_node_is_chain_head(struct vine_graph_node *n)
 {
-	if (!vine_graph_node_is_supernode_leader(n)) {
+	if (!vine_graph_node_is_supernode_leader(n) || !vine_graph_node_allows_chain_grouping(n)) {
 		return 0;
 	}
 	if (list_size(n->parents) == 0) {
@@ -867,7 +873,7 @@ static int vine_graph_node_is_chain_head(struct vine_graph_node *n)
 		return 1;
 	}
 	struct vine_graph_node *p = vine_graph_node_only_parent(n);
-	return p && list_size(p->children) > 1;
+	return p && (!vine_graph_node_allows_chain_grouping(p) || list_size(p->children) > 1);
 }
 
 struct pending_chain_group {
@@ -911,7 +917,7 @@ int vine_graph_group_chain_like_tasks(struct vine_graph *g)
 				break;
 			}
 			struct vine_graph_node *c = vine_graph_node_only_child(cur);
-			if (!c || !vine_graph_node_is_supernode_leader(c)) {
+			if (!c || !vine_graph_node_is_supernode_leader(c) || !vine_graph_node_allows_chain_grouping(c)) {
 				break;
 			}
 			if (c->is_target) {
@@ -1023,8 +1029,7 @@ void vine_graph_delete(struct vine_graph *g)
 
 	hash_table_delete(g->supernode_leader_child_to_input_source);
 
-	hash_table_clear(g->inout_filename_to_cached_name, (void *)free);
-	hash_table_delete(g->inout_filename_to_cached_name);
+	itable_delete(g->file_id_to_file);
 
 	free(g);
 }

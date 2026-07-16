@@ -11,7 +11,8 @@ struct vine_graph {
 	/** Maps each supernode leader id to the list of non-leader member nodes. Empty when no groups exist. */
 	struct itable *super_leader_to_members;
 	struct hash_table *outfile_cachename_to_node;
-	struct hash_table *inout_filename_to_cached_name;
+	/** Maps public FileHandle ids to their single declared vine_file. */
+	struct itable *file_id_to_file;
 	/**
 	 * Maps leader id and downstream child id to the member that actually wrote the outfile the
 	 * child should read. After a rewire the DAG edge may show the leader while the tail member
