@@ -11,7 +11,6 @@ See the file COPYING for details.
 #include "work_queue_process.h"
 #include "work_queue_catalog.h"
 #include "work_queue_watcher.h"
-#include "work_queue_gpus.h"
 #include "work_queue_coprocess.h"
 #include "work_queue_sandbox.h"
 
@@ -53,6 +52,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "trash.h"
 #include "process.h"
+#include "xpu_tracker.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -185,6 +185,10 @@ static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
+
+/* Trackers noting which tasks are assigned to specific cores/gpus. */
+struct xpu_tracker *core_tracker = 0;
+struct xpu_tracker *gpu_tracker = 0;
 
 // Allow worker to use disk_alloc loop devices for task sandbox. Disabled by default.
 static int disk_allocation = 0;
@@ -367,8 +371,9 @@ static void measure_worker_resources()
 		memcpy(total_resources, r, sizeof(struct work_queue_resources));
 	}
 
-	work_queue_gpus_init(r->gpus.total);
-
+	if(!core_tracker) core_tracker = xpu_tracker_create("cores",r->cores.total);
+	if(!gpu_tracker) gpu_tracker = xpu_tracker_create("gpus",r->gpus.total);
+	
 	if (coprocess_command != NULL && coprocess_info != NULL) {
 		work_queue_coprocess_measure_resources(coprocess_info, number_of_coprocess_instances);
 	}
@@ -604,8 +609,12 @@ static int start_process( struct work_queue_process *p, struct link *manager )
 	disk_allocated += t->resources_requested->disk;
 	gpus_allocated += t->resources_requested->gpus;
 
+	if(t->resources_requested->cores>0) {
+		xpu_tracker_alloc(core_tracker,t->resources_requested->cores,t->taskid);
+	}
+
 	if(t->resources_requested->gpus>0) {
-		work_queue_gpus_allocate(t->resources_requested->gpus,t->taskid);
+		xpu_tracker_alloc(gpu_tracker,t->resources_requested->gpus,t->taskid);
 	}
 
 	pid = work_queue_process_execute(p);
@@ -631,8 +640,9 @@ static void reap_process( struct work_queue_process *p )
 	disk_allocated   -= p->task->resources_requested->disk;
 	gpus_allocated   -= p->task->resources_requested->gpus;
 
-	work_queue_gpus_free(p->task->taskid);
-
+	xpu_tracker_free(core_tracker,p->task->taskid);
+	xpu_tracker_free(gpu_tracker,p->task->taskid);
+	
 	if(!work_queue_sandbox_stageout(p,global_cache)) {
 		p->task_status = WORK_QUEUE_RESULT_OUTPUT_MISSING;
 		p->exit_status = 1;
@@ -1290,7 +1300,9 @@ static int do_kill(int taskid)
 			memory_allocated -= p->task->resources_requested->memory;
 			disk_allocated -= p->task->resources_requested->disk;
 			gpus_allocated -= p->task->resources_requested->gpus;
-			work_queue_gpus_free(taskid);
+
+			xpu_tracker_free(core_tracker,taskid);
+			xpu_tracker_free(gpu_tracker,taskid);
 		}
 	}
 
@@ -1618,20 +1630,20 @@ If 0, the worker is using more resources than promised. 1 if resource usage hold
 static int enforce_worker_limits(struct link *manager)
 {
 	if( manual_disk_option > 0 && local_resources->disk.inuse > manual_disk_option ) {
-		fprintf(stderr,"work_queue_worker: %s used more than declared disk space (--disk - < disk used) %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, local_resources->disk.inuse);
+		fprintf(stderr,"work_queue_worker: %s used more than declared disk space (--disk - < disk used) %"PRIu64" < %lf MB\n", workspace, manual_disk_option, local_resources->disk.inuse);
 
 		if(manager) {
-			send_manager_message(manager, "info disk_exhausted %lld\n", (long long) local_resources->disk.inuse);
+			send_manager_message(manager, "info disk_exhausted %lf\n", local_resources->disk.inuse);
 		}
 
 		return 0;
 	}
 
 	if(manual_memory_option > 0 && local_resources->memory.inuse > manual_memory_option) {
-		fprintf(stderr,"work_queue_worker: used more than declared memory (--memory < memory used) %"PRIu64" < %"PRIu64" MB\n", manual_memory_option, local_resources->memory.inuse);
+		fprintf(stderr,"work_queue_worker: used more than declared memory (--memory < memory used) %"PRIu64" < %lf MB\n", manual_memory_option, local_resources->memory.inuse);
 
 		if(manager) {
-			send_manager_message(manager, "info memory_exhausted %lld\n", (long long) local_resources->memory.inuse);
+			send_manager_message(manager, "info memory_exhausted %lf\n", local_resources->memory.inuse);
 		}
 
 		return 0;
@@ -1655,10 +1667,10 @@ static int enforce_worker_promises(struct link *manager)
 	}
 
 	if( manual_disk_option > 0 && local_resources->disk.total < manual_disk_option) {
-		fprintf(stderr,"work_queue_worker: has less than the promised disk space (--disk > disk total) %"PRIu64" < %"PRIu64" MB\n", manual_disk_option, local_resources->disk.total);
+		fprintf(stderr,"work_queue_worker: has less than the promised disk space (--disk > disk total) %"PRIu64" < %lf MB\n", manual_disk_option, local_resources->disk.total);
 
 		if(manager) {
-			send_manager_message(manager, "info disk_error %lld\n", (long long) local_resources->disk.total);
+			send_manager_message(manager, "info disk_error %lf\n", local_resources->disk.total);
 		}
 
 		return 0;
@@ -2900,7 +2912,7 @@ int main(int argc, char *argv[])
 	connect_stoptime = time(0) + connect_timeout;
 
 	measure_worker_resources();
-	printf("work_queue_worker: using %"PRId64 " cores, %"PRId64 " MB memory, %"PRId64 " MB disk, %"PRId64 " gpus\n",
+	printf("work_queue_worker: using %lf cores, %lf MB memory, %lf MB disk, %lf gpus\n",
 		total_resources->cores.total,
 		total_resources->memory.total,
 		total_resources->disk.total,

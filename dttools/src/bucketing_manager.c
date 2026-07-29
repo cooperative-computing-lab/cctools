@@ -15,6 +15,11 @@ static const double default_increase_rate = 2;
 static const double default_max_num_buckets = 10;
 static const int default_update_epoch = 1;
 
+static double max(double a, double b)
+{
+	return (a > b) ? a : b;
+}
+
 /* Convert an int to its string representation
  * @param n the integer
  * @return a malloc'ed string in decimal of n */
@@ -30,10 +35,16 @@ static char *int_to_string(int n)
  * @param m the bucketing manager */
 static void bucketing_manager_add_default_resource_types(bucketing_manager_t *m)
 {
-	bucketing_manager_add_resource_type(m, "cores", 0, default_cores, default_num_sampling_points, default_increase_rate, default_max_num_buckets, default_update_epoch);
-	bucketing_manager_add_resource_type(m, "memory", 0, default_mem, default_num_sampling_points, default_increase_rate, default_max_num_buckets, default_update_epoch);
-	bucketing_manager_add_resource_type(m, "disk", 0, default_disk, default_num_sampling_points, default_increase_rate, default_max_num_buckets, default_update_epoch);
-	bucketing_manager_add_resource_type(m, "gpus", 0, default_gpus, default_num_sampling_points, default_increase_rate, default_max_num_buckets, default_update_epoch);
+	int max_num_buckets_quantized = 1; // blind info for quantized bucketing
+	int max_num_buckets = default_max_num_buckets;
+
+	if (m->mode == BUCKETING_MODE_QUANTIZED) {
+		max_num_buckets = max_num_buckets_quantized;
+	}
+	bucketing_manager_add_resource_type(m, "cores", 0, default_cores, default_num_sampling_points, default_increase_rate, max_num_buckets, default_update_epoch);
+	bucketing_manager_add_resource_type(m, "memory", 0, default_mem, default_num_sampling_points, default_increase_rate, max_num_buckets, default_update_epoch);
+	bucketing_manager_add_resource_type(m, "disk", 0, default_disk, default_num_sampling_points, default_increase_rate, max_num_buckets, default_update_epoch);
+	bucketing_manager_add_resource_type(m, "gpus", 0, default_gpus, default_num_sampling_points, default_increase_rate, max_num_buckets, default_update_epoch);
 }
 /* End: internals */
 
@@ -43,15 +54,16 @@ bucketing_manager_t *bucketing_manager_create(bucketing_mode_t mode)
 {
 	bucketing_manager_t *m = xxmalloc(sizeof(*m));
 
-	/* only support two bucketing modes */
-	if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE) {
+	if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE && mode != BUCKETING_MODE_DET_GREEDY && mode != BUCKETING_MODE_DET_EXHAUSTIVE && mode != BUCKETING_MODE_QUANTIZED) {
 		fatal("Invalid bucketing mode\n");
 		return 0;
 	}
 
 	m->mode = mode;
 	m->res_type_to_bucketing_state = hash_table_create(0, 0);
-	m->task_id_to_task_rmsummary = hash_table_create(0, 0);
+	m->task_id_to_is_task_already_run = hash_table_create(0, 0);
+	m->task_id_to_task_max_seen_res = hash_table_create(0, 0);
+	m->task_id_to_task_res_report = hash_table_create(0, 0);
 
 	return m;
 }
@@ -63,6 +75,11 @@ bucketing_manager_t *bucketing_manager_initialize(bucketing_mode_t mode)
 	return m;
 }
 
+static void safe_free(void *p)
+{
+	free(p);
+}
+
 void bucketing_manager_delete(bucketing_manager_t *m)
 {
 	if (!m)
@@ -72,8 +89,14 @@ void bucketing_manager_delete(bucketing_manager_t *m)
 	hash_table_clear(m->res_type_to_bucketing_state, (void (*)(void *))bucketing_state_delete);
 	hash_table_delete(m->res_type_to_bucketing_state);
 
-	hash_table_clear(m->task_id_to_task_rmsummary, (void (*)(void *))rmsummary_delete);
-	hash_table_delete(m->task_id_to_task_rmsummary);
+	hash_table_clear(m->task_id_to_is_task_already_run, safe_free);
+	hash_table_delete(m->task_id_to_is_task_already_run);
+
+	hash_table_clear(m->task_id_to_task_max_seen_res, (void (*)(void *))rmsummary_delete);
+	hash_table_delete(m->task_id_to_task_max_seen_res);
+
+	hash_table_clear(m->task_id_to_task_res_report, (void (*)(void *))rmsummary_delete);
+	hash_table_delete(m->task_id_to_task_res_report);
 
 	free(m);
 }
@@ -138,8 +161,7 @@ void bucketing_manager_set_mode(bucketing_manager_t *m, bucketing_mode_t mode)
 		return;
 	}
 
-	/* can only set two modes of bucketing */
-	if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE) {
+	if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE && mode != BUCKETING_MODE_DET_GREEDY && mode != BUCKETING_MODE_DET_EXHAUSTIVE && mode != BUCKETING_MODE_QUANTIZED) {
 		fatal("Invalid bucketing mode\n");
 		return;
 	}
@@ -186,11 +208,21 @@ struct rmsummary *bucketing_manager_predict(bucketing_manager_t *m, int task_id)
 	}
 
 	char *task_id_str = int_to_string(task_id);
+
+	// create an entry to track whether this task has been run before
+	int *is_task_already_run = hash_table_lookup(m->task_id_to_is_task_already_run, task_id_str);
+	if (!is_task_already_run) {
+		char *task_id_str_cpy = strdup(task_id_str);
+		is_task_already_run = malloc(sizeof(int));
+		*is_task_already_run = 0;
+		hash_table_insert(m->task_id_to_is_task_already_run, task_id_str_cpy, is_task_already_run);
+	}
+
 	char *res_name;
 	bucketing_state_t *state;
 
 	/* get old resource report */
-	struct rmsummary *old_res = hash_table_lookup(m->task_id_to_task_rmsummary, task_id_str);
+	struct rmsummary *old_res = hash_table_lookup(m->task_id_to_task_res_report, task_id_str);
 	double old_val;
 
 	/* prepare predicted resource report/consumption */
@@ -211,23 +243,52 @@ struct rmsummary *bucketing_manager_predict(bucketing_manager_t *m, int task_id)
 			/*get old value */
 			old_val = rmsummary_get(old_res, res_name);
 
-			/* if task doesn't exceed limits or it does but not this resource */
-			if (!old_res->limits_exceeded || (old_res->limits_exceeded && rmsummary_get(old_res->limits_exceeded, res_name) == -1)) {
-				/* if this resource is a newly added resource, predict a new value */
-				if (old_val == -1)
-					pred_val = bucketing_predict(state, old_val);
-
-				/* otherwise this resource doesn't exceed limit so return the same value */
-				else
-					pred_val = old_val;
+			// get info on whether this task has been run before
+			int *is_task_already_run = hash_table_lookup(m->task_id_to_is_task_already_run, task_id_str);
+			if (!is_task_already_run) {
+				fatal("Expect pointer about is_task_already_run to have a value\n");
 			}
 
-			/* if it does exceed then predict */
-			else {
-				pred_val = bucketing_predict(state, old_val);
+			/* if this resource is a newly added resource, predict a new value */
+			if (old_val == -1) {
+				pred_val = bucketing_predict(state, -1);
+			} else {
+				// if this task has never been run, predict a value
+				if (!(*is_task_already_run)) {
+					pred_val = bucketing_predict(state, -1);
+				} else {
+					// if task limits are not exceeded, then we respect the previous value and keep it
+					if (!old_res->limits_exceeded) {
+						pred_val = old_val;
+					} else {
+						// if it is not this resource, we either respect the default value
+						// while taking into account the max seen value mapped to the next interval
+						// in the sampling phase,
+						// or we map the
+						// max seen value to our prediction model and use it as pred_val
+						// in the stable phase.
+						if (rmsummary_get(old_res->limits_exceeded, res_name) == -1) {
+							struct rmsummary *max_seen = hash_table_lookup(m->task_id_to_task_max_seen_res, task_id_str);
+							if (!max_seen) {
+								fatal("There must be a max seen value\n");
+							}
+
+							double max_seen_val = rmsummary_get(max_seen, res_name);
+
+							if (state->in_sampling_phase) {
+								pred_val = max(bucketing_predict(state, max_seen_val), bucketing_predict(state, -1));
+							} else {
+								pred_val = bucketing_predict(state, max_seen_val);
+							}
+						}
+						// if it is this resource, we predict a new one based on the old val
+						else {
+							pred_val = bucketing_predict(state, old_val);
+						}
+					}
+				}
 			}
 		}
-
 		if (pred_val == -1) {
 			fatal("Problem predicting value in bucketing\n");
 			return 0;
@@ -238,13 +299,13 @@ struct rmsummary *bucketing_manager_predict(bucketing_manager_t *m, int task_id)
 
 	/* replace the old resource report with the predicted one */
 	if (old_res) {
-		hash_table_remove(m->task_id_to_task_rmsummary, task_id_str);
+		hash_table_remove(m->task_id_to_task_res_report, task_id_str);
 		rmsummary_delete(old_res);
 	}
 
 	/* bucketing manager keeps its own copy of datum */
 	struct rmsummary *pred_res_copy = rmsummary_copy(pred_res, 1);
-	hash_table_insert(m->task_id_to_task_rmsummary, task_id_str, pred_res_copy);
+	hash_table_insert(m->task_id_to_task_res_report, task_id_str, pred_res_copy);
 
 	free(task_id_str);
 
@@ -258,19 +319,65 @@ void bucketing_manager_add_resource_report(bucketing_manager_t *m, int task_id, 
 		return;
 	}
 
-	struct rmsummary *old_r;
-	char *task_id_str = int_to_string(task_id);
-	struct rmsummary *new_r = rmsummary_copy(r, 1);
-
-	/* replace the old report with new one if possible */
-	if ((old_r = hash_table_lookup(m->task_id_to_task_rmsummary, task_id_str))) {
-		hash_table_remove(m->task_id_to_task_rmsummary, task_id_str);
-		rmsummary_delete(old_r);
+	if ((success != 0) && (success != 1)) {
+		fatal("Invalid success code when add resource report\n");
 	}
 
-	hash_table_insert(m->task_id_to_task_rmsummary, task_id_str, new_r);
+	char *task_id_str = int_to_string(task_id);
 
-	/* if task successfully finishes then clear out its index in internal table */
+	// signal that this task has been run as it has a resource report
+	int *is_task_already_run = hash_table_lookup(m->task_id_to_is_task_already_run, task_id_str);
+	if (!is_task_already_run) {
+		is_task_already_run = malloc(sizeof(int));
+		*is_task_already_run = 1;
+		hash_table_insert(m->task_id_to_is_task_already_run, task_id_str, is_task_already_run);
+	} else {
+		*is_task_already_run = 1;
+	}
+
+	// we remove this entry if this task succeeds as we don't need it anymore
+	if (success == 1) {
+		int *is_task_already_run = hash_table_remove(m->task_id_to_is_task_already_run, task_id_str);
+		if (is_task_already_run) {
+			free(is_task_already_run);
+		}
+	}
+
+	struct rmsummary *max_seen_r;
+
+	/* merge the old max seen res with new res report if possible */
+	/* this means resources in the new max seen res must be at least as those in the old max seen
+	 * res and the new report as we should record the max tasks' consumptions of all times */
+	if ((max_seen_r = hash_table_lookup(m->task_id_to_task_max_seen_res, task_id_str))) {
+		struct hash_table *ht = m->res_type_to_bucketing_state;
+		char *res_name;
+		bucketing_state_t *state;
+		double old_val, new_val;
+
+		int iteration = hash_table_firstkey(ht);
+		while (hash_table_nextkey(ht, iteration, &res_name, (void **)&state)) {
+			old_val = rmsummary_get(max_seen_r, res_name);
+			new_val = rmsummary_get(r, res_name);
+			rmsummary_set(max_seen_r, res_name, max(old_val, new_val));
+		}
+	} else {
+		max_seen_r = rmsummary_copy(r, 0);
+		hash_table_insert(m->task_id_to_task_max_seen_res, task_id_str, max_seen_r);
+	}
+
+	// if the task succeeds, we just clean up the entry as we don't need it anymore
+	if (success == 1) {
+		max_seen_r = hash_table_remove(m->task_id_to_task_max_seen_res, task_id_str);
+		rmsummary_delete(max_seen_r);
+	}
+
+	// we simply replace the old report with this new one
+	struct rmsummary *task_res_report = hash_table_remove(m->task_id_to_task_res_report, task_id_str);
+	rmsummary_delete(task_res_report);
+	struct rmsummary *new_r = rmsummary_copy(r, 1);
+	hash_table_insert(m->task_id_to_task_res_report, task_id_str, new_r);
+
+	/* if task successfully finishes then add its resource data and clear out its index in internal table */
 	if (success == 1) {
 		int iteration;
 		struct hash_table *ht = m->res_type_to_bucketing_state;
@@ -285,7 +392,7 @@ void bucketing_manager_add_resource_report(bucketing_manager_t *m, int task_id, 
 		}
 
 		rmsummary_delete(new_r);
-		hash_table_remove(m->task_id_to_task_rmsummary, task_id_str);
+		hash_table_remove(m->task_id_to_task_res_report, task_id_str);
 	}
 
 	free(task_id_str);

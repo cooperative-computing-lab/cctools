@@ -456,9 +456,9 @@ static int submit_worker( struct batch_queue *queue )
 	/* The basic command differs whether using a project name or simple host:port. */
 	
 	if(using_catalog) {
-		cmd = string_format("./%s -M %s", worker, submission_regex);
+		cmd = string_format("%s -M %s", worker, submission_regex);
 	} else {
-		cmd = string_format("./%s %s %d", worker, manager_host, manager_port);
+		cmd = string_format("%s %s %d", worker, manager_host, manager_port);
 	}
 
 	/* Add a formatted argument to a string s, reallocating and returning s. */
@@ -520,6 +520,8 @@ static int submit_worker( struct batch_queue *queue )
 	}
 
 	batch_job_add_output_file(task,"output.log",0);
+
+	batch_job_set_envlist(task, batch_env);
 	
 	debug(D_WQ,"submitting worker: %s",cmd);
 

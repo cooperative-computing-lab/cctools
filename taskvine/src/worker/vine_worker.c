@@ -8,7 +8,6 @@ See the file COPYING for details.
 #include "vine_cache_file.h"
 #include "vine_catalog.h"
 #include "vine_file.h"
-#include "vine_gpus.h"
 #include "vine_manager.h"
 #include "vine_mount.h"
 #include "vine_process.h"
@@ -56,6 +55,7 @@ See the file COPYING for details.
 #include "trash.h"
 #include "unlink_recursive.h"
 #include "url_encode.h"
+#include "xpu_tracker.h"
 #include "xxmalloc.h"
 
 #include <assert.h>
@@ -124,6 +124,10 @@ static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
+
+/* Trackers for specific cores and gpus units in use. */
+struct xpu_tracker *gpu_tracker = 0;
+struct xpu_tracker *core_tracker = 0;
 
 /***************************************************************/
 /*     State of Interactions Between Manager and Worker        */
@@ -434,7 +438,11 @@ static void measure_worker_resources()
 	r->disk.inuse = measure_worker_disk();
 	r->tag = last_task_received;
 
-	vine_gpus_init(r->gpus.total);
+	/* Create a tracker for specific gpus and cores, if not already created. */
+	if (!gpu_tracker)
+		gpu_tracker = xpu_tracker_create("gpus", r->gpus.total);
+	if (!core_tracker)
+		core_tracker = xpu_tracker_create("cores", r->cores.total);
 
 	last_resources_measurement = time(0);
 }
@@ -636,8 +644,14 @@ static int start_process(struct vine_process *p, struct link *manager)
 	memory_allocated += t->resources_requested->memory;
 	disk_allocated += t->resources_requested->disk;
 	gpus_allocated += t->resources_requested->gpus;
+
+	/* Mark which specific cores and gpus are assigned. */
+	if (t->resources_requested->cores > 0) {
+		xpu_tracker_alloc(core_tracker, t->resources_requested->cores, t->task_id);
+	}
+
 	if (t->resources_requested->gpus > 0) {
-		vine_gpus_allocate(t->resources_requested->gpus, t->task_id);
+		xpu_tracker_alloc(gpu_tracker, t->resources_requested->gpus, t->task_id);
 	}
 
 	/* Now start the process (or function) running. */
@@ -679,7 +693,8 @@ static void reap_process(struct vine_process *p, struct link *manager)
 	disk_allocated -= p->task->resources_requested->disk;
 	gpus_allocated -= p->task->resources_requested->gpus;
 
-	vine_gpus_free(p->task->task_id);
+	xpu_tracker_free(gpu_tracker, p->task->task_id);
+	xpu_tracker_free(core_tracker, p->task->task_id);
 
 	if (manager) {
 		vine_sandbox_stageout(p, cache_manager, manager);
@@ -1513,13 +1528,13 @@ static int enforce_worker_limits(struct link *manager)
 {
 	if (options->disk_total > 0 && total_resources->disk.inuse > options->disk_total) {
 		fprintf(stderr,
-				"vine_worker: %s used more than declared disk space (--disk - < disk used) %" PRIu64 " < %" PRIu64 " MB\n",
+				"vine_worker: %s used more than declared disk space (--disk - < disk used) %" PRIu64 " < %lf MB\n",
 				workspace->workspace_dir,
 				options->disk_total,
 				total_resources->disk.inuse);
 
 		if (manager) {
-			send_message(manager, "info disk_exhausted %lld\n", (long long)total_resources->disk.inuse);
+			send_message(manager, "info disk_exhausted %lf\n", total_resources->disk.inuse);
 		}
 
 		return 0;
@@ -1527,12 +1542,12 @@ static int enforce_worker_limits(struct link *manager)
 
 	if (options->memory_total > 0 && total_resources->memory.inuse > options->memory_total) {
 		fprintf(stderr,
-				"vine_worker: used more than declared memory (--memory < memory used) %" PRIu64 " < %" PRIu64 " MB\n",
+				"vine_worker: used more than declared memory (--memory < memory used) %" PRIu64 " < %lf MB\n",
 				options->memory_total,
 				total_resources->memory.inuse);
 
 		if (manager) {
-			send_message(manager, "info memory_exhausted %lld\n", (long long)total_resources->memory.inuse);
+			send_message(manager, "info memory_exhausted %lf\n", total_resources->memory.inuse);
 		}
 
 		return 0;
@@ -1557,12 +1572,12 @@ static int enforce_worker_promises(struct link *manager)
 
 	if (options->disk_total > 0 && total_resources->disk.total < options->disk_total) {
 		fprintf(stderr,
-				"vine_worker: has less than the promised disk space (--disk > disk total) %" PRIu64 " < %" PRIu64 " MB\n",
+				"vine_worker: has less than the promised disk space (--disk > disk total) %" PRIu64 " < %lf MB\n",
 				options->disk_total,
 				total_resources->disk.total);
 
 		if (manager) {
-			send_message(manager, "info disk_error %lld\n", (long long)total_resources->disk.total);
+			send_message(manager, "info disk_error %lf\n", total_resources->disk.total);
 		}
 
 		return 0;
@@ -2339,7 +2354,7 @@ int main(int argc, char *argv[])
 
 	/* Display the available resources once at startup. */
 	measure_worker_resources();
-	printf("vine_worker: using %" PRId64 " cores, %" PRId64 " MB memory, %" PRId64 " MB disk, %" PRId64 " gpus\n",
+	printf("vine_worker: using %lf cores, %lf MB memory, %lf MB disk, %lf gpus\n",
 			total_resources->cores.total,
 			total_resources->memory.total,
 			total_resources->disk.total,

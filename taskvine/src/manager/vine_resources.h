@@ -11,8 +11,8 @@ See the file COPYING for details.
 #include "jx.h"
 
 struct vine_resource {
-	int64_t inuse;
-	int64_t total;
+	double inuse;
+	double total;
 };
 
 struct vine_resources {
