@@ -264,3 +264,43 @@ jobs:
           ref: ${{ github.event.inputs.tag }}
       - name: lint code
         run: ${GITHUB_WORKSPACE}/packaging/lint/lint.sh
+
+  static-analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: checkout CCTools from branch head
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/checkout@v4
+      - name: checkout CCTools from tag
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      - name: install clang static analyzer
+        run: sudo apt-get update && (sudo apt-get install -y clang-tools || sudo apt-get install -y clang-tools-18)
+      - name: configure
+        run: ./configure --strict --without-system-parrot --without-system-prune --without-system-umbrella --without-system-weaver --with-readline-path no --with-fuse-path no --with-perl-path no
+      - name: static analysis (clang scan-build) on all C packages
+        run: ${GITHUB_WORKSPACE}/packaging/lint/scan-build.sh
+
+  valgrind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: checkout CCTools from branch head
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/checkout@v4
+      - name: checkout CCTools from tag
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      - name: install valgrind
+        run: sudo apt-get update && sudo apt-get install -y valgrind
+      - name: configure
+        run: ./configure --strict --without-system-parrot --without-system-prune --without-system-umbrella --without-system-weaver --with-readline-path no --with-fuse-path no --with-perl-path no
+      - name: build packages covered by a valgrind regression test (dttools, taskvine, work_queue, makeflow, resource_monitor)
+        run: make dttools taskvine work_queue makeflow resource_monitor
+      - name: run valgrind regression tests
+        run: ${GITHUB_WORKSPACE}/packaging/valgrind/run-valgrind-tests.sh

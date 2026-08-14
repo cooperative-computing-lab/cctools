@@ -1,35 +1,37 @@
 # Baseline suppressions for packaging/lint/scan-build.sh.
 
 # These are pre-existing clang static analyzer (scan-build) findings across
-# all C packages as of the CI job's introduction (see the taskvine
-# tech-debt audit's "static analysis" item). Captured by checker:file:line
-# so that standing up scan-build in CI doesn't fail on day one over debt
-# that predates it. A NEW finding at a different location is not covered
-# by these entries and will fail the build.
+# all C packages (see the taskvine tech-debt audit's "static analysis"
+# item). Captured by checker:file:line so that standing up scan-build in CI
+# doesn't fail on day one over debt that predates it. A NEW finding at a
+# different location is not covered by these entries and will fail the
+# build.
 
-# A handful are worth a closer look rather than being pure baseline noise:
-#   - bt_security_return_value_is_not_checked_in_call_to_setuid_ and
-#     _setgid_ in dttools/src/username.c:68-69 (username_set()) -- an
-#     unchecked setuid()/setgid() pair. If either call silently fails, the
-#     process can end up still running with elevated privileges while the
-#     caller believes it has dropped them.
-#   - bt_memory_error_use-after-free in
-#     makeflow/src/makeflow_alloc.c:440 (makeflow_alloc_release_space()).
-#   - bt_memory_error_double_free (x2) in
-#     chirp/src/chirp_client.c:880,930 (chirp_client_ticket_get()/
-#     chirp_client_ticket_list()).
-#   - bt_memory_error_bad_free in
-#     batch_job/src/batch_file.c:184 (batch_file_generate_id_dir()).
-#   - bt_api_argument_with_nonnull_attribute_passed_null in
-#     work_queue/src/work_queue_worker.c:2171 (interfaces_to_list()) -- a
-#     host-alias JSON entry missing its "address" field passes a NULL
-#     `address` to strncpy(), which is undefined behavior. The nearby
-#     `found_canonical` check already guards on `address` being non-NULL;
-#     the strncpy() call a few lines later doesn't.
-#   - The 63 bt_memory_error_memory_leak findings are almost all in
-#     one-shot CLI tools and error/exit paths (leaked memory reclaimed by
-#     process exit), not long-running manager/worker loops -- lower
-#     urgency, but not individually triaged here.
+# Confirmed real, but low-impact (left as-is, not fixed):
+#   - taskvine/src/manager/vine_manager_get.c:68 -- reads an uninitialized
+#     total_bytes before writing it in one call path, but the value is
+#     discarded by the caller either way.
+#   - makeflow/src/makeflow.c:2245 -- reachable only if rmsummary_create()'s
+#     unchecked malloc() fails (OOM).
+#   - dttools/src/bitmap.c:615 -- a truncated/malformed SGI RGB image file
+#     can leave trailing scanline bytes uninitialized before they're OR'd
+#     into pixel data; corrupts displayed pixels, not a crash or OOB access.
+#   - resource_monitor/src/rmonitor_helper.c:307,350 -- the START() timing
+#     macro reads msg.type before it's set; msg.type is unconditionally
+#     overwritten shortly after in every actual call site, so this is inert.
+#   - dttools/src/luapatt.c:48,57,65,72,147,265 -- the vendored Lua pattern
+#     engine always passes an uninitialized MatchState.L to luaL_error();
+#     reachable via a malformed pattern, but the local luaL_error() wrapper
+#     ignores that argument and just aborts(). One-line fix available
+#     (initialize ms.L in pattern_vmatch(), dttools/src/pattern.c) but not
+#     applied yet -- low priority given six identical low-impact instances.
+
+# Left unresolved -- needs deeper tracing than a source read could settle:
+#   - dttools/src/bucketing_greedy.c:363 and
+#     dttools/src/bucketing_det_greedy.c:373 -- couldn't fully rule out an
+#     edge case (a top bucket range coming back "unbreakable" and being
+#     omitted from the break-point list) without tracing the full
+#     recursive splitting logic.
 
 # Regenerate after a source change that shifts these locations by
 # re-running packaging/lint/scan-build.sh locally and diffing its output
@@ -37,83 +39,52 @@
 # hand-editing entries.
 
 bt_api_argument_with_nonnull_attribute_passed_null:batch_job/src/work_queue_factory.c:1709
-bt_api_argument_with_nonnull_attribute_passed_null:dttools/src/buffer.c:206
 bt_api_argument_with_nonnull_attribute_passed_null:dttools/src/catalog_query.c:60
-bt_api_argument_with_nonnull_attribute_passed_null:dttools/src/category_test.c:73
-bt_api_argument_with_nonnull_attribute_passed_null:dttools/src/chunk.c:95
-bt_api_argument_with_nonnull_attribute_passed_null:dttools/src/getopt_aux.c:24
+bt_api_argument_with_nonnull_attribute_passed_null:dttools/src/chunk.c:99
 bt_api_argument_with_nonnull_attribute_passed_null:dttools/src/http_query.c:73
 bt_api_argument_with_nonnull_attribute_passed_null:dttools/src/pattern.c:60
-bt_api_argument_with_nonnull_attribute_passed_null:dttools/src/stringtools.c:671
-bt_api_argument_with_nonnull_attribute_passed_null:makeflow/src/lexer.c:278
 bt_api_argument_with_nonnull_attribute_passed_null:makeflow/src/makeflow_hook.c:97
-bt_api_argument_with_nonnull_attribute_passed_null:makeflow/src/makeflow_module_enforcement.c:200
-bt_api_argument_with_nonnull_attribute_passed_null:resource_monitor/src/rmonitor_file_watch.c:299
 bt_api_argument_with_nonnull_attribute_passed_null:taskvine/src/manager/vine_manager.c:4093
 bt_api_argument_with_nonnull_attribute_passed_null:taskvine/src/manager/vine_manager.c:4095
-bt_api_argument_with_nonnull_attribute_passed_null:taskvine/src/tools/vine_benchmark.c:185
-bt_api_argument_with_nonnull_attribute_passed_null:taskvine/src/worker/vine_cache.c:112
 bt_api_argument_with_nonnull_attribute_passed_null:taskvine/src/worker/vine_worker.c:2002
 bt_api_argument_with_nonnull_attribute_passed_null:taskvine/src/worker/vine_worker_options.c:98
 bt_api_argument_with_nonnull_attribute_passed_null:work_queue/src/work_queue.c:5870
 bt_api_argument_with_nonnull_attribute_passed_null:work_queue/src/work_queue.c:5872
-bt_api_argument_with_nonnull_attribute_passed_null:work_queue/src/work_queue_process.c:225
 bt_api_argument_with_nonnull_attribute_passed_null:work_queue/src/work_queue_status.c:313
-bt_api_argument_with_nonnull_attribute_passed_null:work_queue/src/work_queue_test_main.c:79
-bt_api_argument_with_nonnull_attribute_passed_null:work_queue/src/work_queue_worker.c:2171
-bt_api_argument_with_nonnull_attribute_passed_null:work_queue/src/work_queue_worker.c:2370
+bt_api_argument_with_nonnull_attribute_passed_null:work_queue/src/work_queue_worker.c:2378
 bt_logic_error_assigned_value_is_garbage_or_undefined:chirp/src/chirp_fs_local.c:1013
-bt_logic_error_assigned_value_is_garbage_or_undefined:chirp/src/chirp_matrix.c:127
+bt_logic_error_assigned_value_is_garbage_or_undefined:chirp/src/chirp_matrix.c:145
 bt_logic_error_assigned_value_is_garbage_or_undefined:dttools/src/bitmap.c:615
 bt_logic_error_assigned_value_is_garbage_or_undefined:dttools/src/bucketing_det_greedy.c:355
 bt_logic_error_assigned_value_is_garbage_or_undefined:dttools/src/bucketing_greedy.c:348
 bt_logic_error_assigned_value_is_garbage_or_undefined:dttools/src/category.c:449
 bt_logic_error_assigned_value_is_garbage_or_undefined:dttools/src/rmonitor_poll.c:538
 bt_logic_error_assigned_value_is_garbage_or_undefined:taskvine/src/manager/vine_manager_get.c:68
-bt_logic_error_branch_condition_evaluates_to_a_garbage_value:dttools/src/hdfs_library.c:147
 bt_logic_error_called_function_pointer_is_null_null_dereference_:resource_monitor/src/rminimonitor_helper.c:154
 bt_logic_error_called_function_pointer_is_null_null_dereference_:resource_monitor/src/rminimonitor_helper.c:168
-bt_logic_error_dangerous_variable-length_array_vla_declaration:chirp/src/chirp_distribute.c:586
 bt_logic_error_dereference_of_null_pointer:batch_job/src/work_queue_factory.c:1424
 bt_logic_error_dereference_of_null_pointer:batch_job/src/work_queue_factory.c:1430
 bt_logic_error_dereference_of_null_pointer:batch_job/src/work_queue_factory.c:1433
 bt_logic_error_dereference_of_null_pointer:batch_job/src/work_queue_factory.c:1436
-bt_logic_error_dereference_of_null_pointer:chirp/src/chirp_alloc.c:290
 bt_logic_error_dereference_of_null_pointer:dttools/src/bucketing_det_greedy.c:135
 bt_logic_error_dereference_of_null_pointer:dttools/src/bucketing_greedy.c:127
-bt_logic_error_dereference_of_null_pointer:dttools/src/bucketing_manager.c:257
 bt_logic_error_dereference_of_null_pointer:dttools/src/jx_eval.c:413
-bt_logic_error_dereference_of_null_pointer:dttools/src/rmsummary.c:128
 bt_logic_error_dereference_of_null_pointer:dttools/src/rmsummary.c:138
-bt_logic_error_dereference_of_null_pointer:makeflow/src/dag_variable.c:62
-bt_logic_error_dereference_of_null_pointer:makeflow/src/lexer.c:166
-bt_logic_error_dereference_of_null_pointer:makeflow/src/makeflow.c:2206
 bt_logic_error_dereference_of_null_pointer:makeflow/src/makeflow.c:2245
-bt_logic_error_dereference_of_null_pointer:makeflow/src/makeflow.c:2544
 bt_logic_error_dereference_of_null_pointer:makeflow/src/makeflow_alloc.c:25
-bt_logic_error_dereference_of_null_pointer:makeflow/src/makeflow_analyze.c:189
-bt_logic_error_dereference_of_null_pointer:makeflow/src/makeflow_analyze.c:62
-bt_logic_error_dereference_of_null_pointer:taskvine/src/manager/vine_manager.c:2697
-bt_logic_error_dereference_of_null_pointer:taskvine/src/manager/vine_manager.c:2715
 bt_logic_error_dereference_of_null_pointer:taskvine/src/worker/vine_worker.c:2309
-bt_logic_error_dereference_of_null_pointer:work_queue/src/work_queue.c:3248
-bt_logic_error_dereference_of_null_pointer:work_queue/src/work_queue.c:3273
-bt_logic_error_dereference_of_null_pointer:work_queue/src/work_queue_worker.c:2916
+bt_logic_error_dereference_of_null_pointer:work_queue/src/work_queue_worker.c:2924
 bt_logic_error_dereference_of_null_pointer:work_queue/src/work_queue_worker.c:357
 bt_logic_error_dereference_of_undefined_pointer_value:dttools/src/skip_list.c:711
-bt_logic_error_division_by_zero:chirp/src/chirp_multi.c:158
-bt_logic_error_division_by_zero:makeflow/src/dag_visitors.c:1060
-bt_logic_error_division_by_zero:makeflow/src/dag_visitors.c:1069
+bt_logic_error_division_by_zero:makeflow/src/dag_visitors.c:1086
+bt_logic_error_result_of_operation_is_garbage_or_undefined:chirp/src/chirp_distribute.c:798
 bt_logic_error_result_of_operation_is_garbage_or_undefined:dttools/src/bitmap.c:615
 bt_logic_error_result_of_operation_is_garbage_or_undefined:dttools/src/category.c:337
 bt_logic_error_result_of_operation_is_garbage_or_undefined:dttools/src/category.c:342
 bt_logic_error_result_of_operation_is_garbage_or_undefined:dttools/src/category.c:381
-bt_logic_error_result_of_operation_is_garbage_or_undefined:dttools/src/host_disk_info.c:41
-bt_logic_error_result_of_operation_is_garbage_or_undefined:dttools/src/host_disk_info.c:50
 bt_logic_error_result_of_operation_is_garbage_or_undefined:ftp_lite/src/network.c:330
 bt_logic_error_result_of_operation_is_garbage_or_undefined:resource_monitor/src/rmonitor_helper.c:307
 bt_logic_error_result_of_operation_is_garbage_or_undefined:resource_monitor/src/rmonitor_helper.c:350
-bt_logic_error_result_of_operation_is_garbage_or_undefined:resource_monitor/src/rmonitor_helper_comm.c:234
 bt_logic_error_uninitialized_argument_value:chirp/src/chirp_acl.c:130
 bt_logic_error_uninitialized_argument_value:chirp/src/chirp_acl.c:552
 bt_logic_error_uninitialized_argument_value:chirp/src/chirp_acl.c:591
@@ -130,22 +101,20 @@ bt_logic_error_uninitialized_argument_value:dttools/src/luapatt.c:72
 bt_logic_error_uninitialized_argument_value:dttools/src/set.c:569
 bt_logic_error_uninitialized_argument_value:ftp_lite/src/network.c:309
 bt_logic_error_uninitialized_argument_value:makeflow/src/makeflow_mounts.c:297
-bt_memory_error_bad_free:batch_job/src/batch_file.c:184
-bt_memory_error_double_free:chirp/src/chirp_client.c:880
-bt_memory_error_double_free:chirp/src/chirp_client.c:930
-bt_memory_error_memory_leak:batch_job/src/batch_queue_amazon.c:710
-bt_memory_error_memory_leak:batch_job/src/batch_queue_amazon.c:712
+bt_memory_error_memory_leak:batch_job/src/batch_queue_amazon.c:719
 bt_memory_error_memory_leak:batch_job/src/batch_queue_cluster.c:309
 bt_memory_error_memory_leak:batch_job/src/batch_queue_condor.c:224
 bt_memory_error_memory_leak:batch_job/src/batch_queue_condor.c:318
 bt_memory_error_memory_leak:batch_job/src/batch_queue_dryrun.c:58
 bt_memory_error_memory_leak:batch_job/src/batch_queue_flux.c:140
-bt_memory_error_memory_leak:batch_job/src/batch_queue_k8s.c:246
-bt_memory_error_memory_leak:batch_job/src/batch_queue_k8s.c:249
+bt_memory_error_memory_leak:batch_job/src/batch_queue_k8s.c:262
+bt_memory_error_memory_leak:batch_job/src/batch_queue_k8s.c:265
 bt_memory_error_memory_leak:batch_job/src/batch_queue_local.c:41
 bt_memory_error_memory_leak:chirp/src/chirp_audit.c:76
 bt_memory_error_memory_leak:chirp/src/chirp_distribute.c:436
 bt_memory_error_memory_leak:chirp/src/chirp_distribute.c:490
+bt_memory_error_memory_leak:chirp/src/chirp_distribute.c:648
+bt_memory_error_memory_leak:chirp/src/chirp_distribute.c:827
 bt_memory_error_memory_leak:chirp/src/chirp_stats.c:53
 bt_memory_error_memory_leak:chirp/src/chirp_stream_files.c:149
 bt_memory_error_memory_leak:chirp/src/chirp_stream_files.c:209
@@ -154,29 +123,24 @@ bt_memory_error_memory_leak:deltadb/src/catalog_server.c:868
 bt_memory_error_memory_leak:deltadb/src/deltadb_reduction.c:110
 bt_memory_error_memory_leak:dttools/src/bucketing_manager.c:221
 bt_memory_error_memory_leak:dttools/src/bucketing_manager.c:339
-bt_memory_error_memory_leak:dttools/src/chunk.c:132
-bt_memory_error_memory_leak:dttools/src/chunk.c:89
 bt_memory_error_memory_leak:dttools/src/copy_tree.c:261
 bt_memory_error_memory_leak:dttools/src/hash_cache.c:71
 bt_memory_error_memory_leak:dttools/src/histogram.c:162
 bt_memory_error_memory_leak:dttools/src/histogram.c:230
 bt_memory_error_memory_leak:dttools/src/histogram.c:243
 bt_memory_error_memory_leak:dttools/src/jx2json.c:154
-bt_memory_error_memory_leak:dttools/src/rmonitor_poll.c:1064
-bt_memory_error_memory_leak:dttools/src/rmonitor_poll.c:914
+bt_memory_error_memory_leak:dttools/src/rmonitor_poll.c:1076
 bt_memory_error_memory_leak:makeflow/src/dag_variable.c:117
 bt_memory_error_memory_leak:makeflow/src/dag_visitors.c:404
-bt_memory_error_memory_leak:makeflow/src/dag_visitors.c:567
-bt_memory_error_memory_leak:makeflow/src/dag_visitors.c:593
-bt_memory_error_memory_leak:makeflow/src/dag_visitors.c:743
+bt_memory_error_memory_leak:makeflow/src/dag_visitors.c:574
+bt_memory_error_memory_leak:makeflow/src/dag_visitors.c:600
 bt_memory_error_memory_leak:makeflow/src/dag_visitors.c:757
+bt_memory_error_memory_leak:makeflow/src/dag_visitors.c:771
 bt_memory_error_memory_leak:makeflow/src/lexer.c:1218
-bt_memory_error_memory_leak:makeflow/src/makeflow_alloc.c:282
 bt_memory_error_memory_leak:makeflow/src/makeflow_linker.c:122
 bt_memory_error_memory_leak:makeflow/src/makeflow_linker.c:274
 bt_memory_error_memory_leak:makeflow/src/makeflow_linker.c:502
 bt_memory_error_memory_leak:resource_monitor/src/resource_monitor.c:729
-bt_memory_error_memory_leak:resource_monitor/src/rmonitor_file_watch.c:446
 bt_memory_error_memory_leak:taskvine/src/manager/vine_blocklist.c:105
 bt_memory_error_memory_leak:taskvine/src/manager/vine_current_transfers.c:64
 bt_memory_error_memory_leak:taskvine/src/manager/vine_manager.c:4099
@@ -185,33 +149,24 @@ bt_memory_error_memory_leak:work_queue/src/work_queue.c:1656
 bt_memory_error_memory_leak:work_queue/src/work_queue.c:3496
 bt_memory_error_memory_leak:work_queue/src/work_queue.c:3598
 bt_memory_error_memory_leak:work_queue/src/work_queue.c:5601
-bt_memory_error_memory_leak:work_queue/src/work_queue.c:6743
+bt_memory_error_memory_leak:work_queue/src/work_queue.c:6754
 bt_memory_error_memory_leak:work_queue/src/work_queue.c:734
 bt_memory_error_memory_leak:work_queue/src/work_queue_cache.c:107
 bt_memory_error_memory_leak:work_queue/src/work_queue_cache.c:95
-bt_memory_error_use-after-free:makeflow/src/makeflow_alloc.c:440
-bt_security_return_value_is_not_checked_in_call_to_setgid_:dttools/src/username.c:69
-bt_security_return_value_is_not_checked_in_call_to_setuid_:dttools/src/username.c:68
 bt_unused_code_dead_assignment:chirp/src/chirp_distribute.c:490
-bt_unused_code_dead_assignment:chirp/src/chirp_matrix.c:128
-bt_unused_code_dead_assignment:chirp/src/chirp_matrix.c:129
-bt_unused_code_dead_assignment:chirp/src/chirp_matrix.c:130
-bt_unused_code_dead_assignment:chirp/src/chirp_matrix.c:456
-bt_unused_code_dead_assignment:chirp/src/chirp_matrix.c:457
+bt_unused_code_dead_assignment:chirp/src/chirp_matrix.c:493
+bt_unused_code_dead_assignment:chirp/src/chirp_matrix.c:494
 bt_unused_code_dead_assignment:chirp/src/chirp_stream_files.c:200
-bt_unused_code_dead_assignment:deltadb/src/deltadb_stream.c:96
 bt_unused_code_dead_assignment:dttools/src/domain_name_cache.c:72
 bt_unused_code_dead_assignment:dttools/src/domain_name_cache.c:99
 bt_unused_code_dead_assignment:dttools/src/priority_queue_test.c:108
 bt_unused_code_dead_assignment:dttools/src/priority_queue_test.c:96
 bt_unused_code_dead_assignment:dttools/src/shell.c:44
-bt_unused_code_dead_assignment:makeflow/src/dag_visitors.c:630
 bt_unused_code_dead_assignment:resource_monitor/src/resource_monitor.c:2452
 bt_unused_code_dead_assignment:taskvine/src/manager/vine_manager.c:1762
 bt_unused_code_dead_increment:dttools/src/path.c:535
-bt_unused_code_dead_increment:taskvine/src/manager/vine_manager.c:5534
 bt_unused_code_dead_initialization:taskvine/src/manager/vine_txn_log.c:330
-bt_unused_code_dead_initialization:work_queue/src/work_queue.c:7817
+bt_unused_code_dead_initialization:work_queue/src/work_queue.c:7831
 bt_unused_code_dead_nested_assignment:chirp/src/chirp_tool.c:1041
 bt_unused_code_dead_nested_assignment:chirp/src/chirp_tool.c:1060
 bt_unused_code_dead_nested_assignment:chirp/src/chirp_tool.c:1066
