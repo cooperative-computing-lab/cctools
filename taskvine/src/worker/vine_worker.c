@@ -214,6 +214,7 @@ __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const ch
 	link_vprintf(l, time(0) + options->active_timeout, fmt, va);
 
 	va_end(va);
+	va_end(debug_va);
 }
 
 /*
