@@ -1057,7 +1057,10 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 	int node_num_rows = 0;
 
 	int max_image_width = 1200;
-	int node_width = max_image_width / max_size;
+	/* max_size stays 0 if the dag has no nodes (an empty Makeflow file);
+	avoid dividing by it -- there's nothing to lay out either way, and the
+	node_width < 5 clamp just below makes the exact value moot here. */
+	int node_width = max_image_width / (max_size > 0 ? max_size : 1);
 	if(node_width < 5)
 		node_width = 5;
 
