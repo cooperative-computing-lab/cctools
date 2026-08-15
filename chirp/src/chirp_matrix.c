@@ -98,7 +98,20 @@ struct chirp_matrix *chirp_matrix_create(const char *host, const char *path, int
 	for(i = 0; (int) i < nhosts; i++) {
 		if(!fgets(line, sizeof(line), file)) {
 			rewind(file);
-			fgets(line, sizeof(line), file);
+			if(!fgets(line, sizeof(line), file)) {
+				/* The hosts file exists but has no lines at all (e.g.
+				empty, or CHIRP_HOSTS points at /dev/null). Bail out
+				instead of strdup()-ing whatever was left in the
+				uninitialized/stale `line` buffer. Since a rewind+retry
+				can only fail here on the very first host (any file with
+				at least one line will keep yielding it), no hosts[]
+				entries have been allocated yet. */
+				debug(D_NOTICE | D_CHIRP, "matrix: host list in %s is empty\n", host_file);
+				free(hosts);
+				fclose(file);
+				errno = EINVAL;
+				return 0;
+			}
 		}
 		hosts[i] = strdup(line);
 		int len = strlen(hosts[i]);
