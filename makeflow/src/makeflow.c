@@ -2537,7 +2537,12 @@ EXIT_WITH_FAILURE:
 	}
 
 	/* delete all files. We do this here are some of these files may be created in clean mode. */
-	{
+	/* d can be NULL here: EXIT_WITH_FAILURE is reachable before the dag is
+	created (e.g. a hook registration conflict like combining --umbrella-spec
+	with --enforcement). Every other d-using call in this cleanup path
+	(makeflow_log_aborted_event/makeflow_log_failed_event, etc.) already
+	guards against that; this block didn't. */
+	if(d) {
 		int iteration;
 		struct dag_node *n;
 		uint64_t key;
