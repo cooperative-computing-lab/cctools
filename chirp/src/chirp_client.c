@@ -876,9 +876,14 @@ failure:
 		free(*ticket);
 		if(*rights != NULL) {
 			char **tmp = *rights;
+			/* tmp must advance past each freed pair -- without it, the
+			loop keeps re-freeing the same (now dangling) tmp[0]/tmp[1]
+			pointers forever, since freeing doesn't change what they
+			point to or the loop condition. */
 			while(tmp[0] && tmp[1]) {
 				free(tmp[0]);
 				free(tmp[1]);
+				tmp += 2;
 			}
 			free(*rights);
 		}
@@ -926,8 +931,12 @@ INT64_T chirp_client_ticket_list(struct chirp_client * c, const char *subject, c
 failure:
 	if(*list != NULL) {
 		char **tmp = *list;
+		/* tmp must advance past each freed entry -- without it, the loop
+		keeps re-freeing the same (now dangling) tmp[0] forever, since
+		freeing doesn't change what it points to or the loop condition. */
 		while(tmp[0]) {
 			free(tmp[0]);
+			tmp++;
 		}
 		free(*list);
 	}
