@@ -886,8 +886,10 @@ struct rmsummary *rmonitor_measure_process(pid_t pid, int include_disk)
 	p.pid = pid;
 
 	err = rmonitor_poll_process_once(&p);
-	if (err != 0)
+	if (err != 0) {
+		rmsummary_delete(tr);
 		return NULL;
+	}
 
 	struct rmonitor_wdir_info *d = NULL;
 
@@ -910,8 +912,18 @@ struct rmsummary *rmonitor_measure_process(pid_t pid, int include_disk)
 
 	uint64_t start;
 	err = rmonitor_get_start_time(pid, &start);
-	if (err != 0)
+	if (err != 0) {
+		/* this is polled repeatedly for the life of a monitored
+		process (taskvine/work_queue resource reporting), so a
+		persistent failure here (e.g. /proc access issue) would leak
+		tr and d on every poll cycle if not freed. */
+		rmsummary_delete(tr);
+		if (d) {
+			path_disk_size_info_delete_state(d->state);
+			free(d);
+		}
 		return NULL;
+	}
 
 	rmonitor_info_to_rmsummary(tr, &p, d, NULL, start);
 	tr->command = rmonitor_get_command_line(pid);
