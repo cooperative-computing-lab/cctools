@@ -5534,6 +5534,11 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		result += shutdown_drained_workers(q);
 		vine_blocklist_unblock_all_by_time(q, time(0));
 		END_ACCUM_TIME(q, time_internal);
+		if (result) {
+			// removed at least one worker
+			events++;
+			continue;
+		}
 
 		// if new workers, connect n of them
 		BEGIN_ACCUM_TIME(q, time_status_msgs);
