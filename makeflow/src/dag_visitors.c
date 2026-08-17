@@ -462,7 +462,7 @@ struct file_node {
 	double size;
 };
 
-void write_node_to_xgmml(FILE *f, char idheader, int id, char* nodename, int process)
+void write_node_to_xgmml(FILE *f, char idheader, int id, char* nodename, int process, double width)
 {
 	//file *f must already be open!
 
@@ -470,6 +470,13 @@ void write_node_to_xgmml(FILE *f, char idheader, int id, char* nodename, int pro
 	fprintf(f,"\t\t<att name=\"shared name\" value=\"%s\" type=\"string\"/>\n", nodename);
 	fprintf(f,"\t\t<att name=\"name\" value=\"%s\" type=\"string\"/>\n", nodename);
 	fprintf(f,"\t\t<att name=\"process\" value=\"%d\" type=\"boolean\"/>\n", process);
+	/* width <= 0 means "no size override" (change_size wasn't requested,
+	or this node has no known size); only emit a graphics size hint when
+	the caller actually computed one, matching how dag_to_dot's file
+	nodes get a size-proportional width. */
+	if(width > 0) {
+		fprintf(f,"\t\t<graphics w=\"%lf\" h=\"%lf\"/>\n", width, width);
+	}
 	fprintf(f,"\t</node>\n");
 }
 
@@ -578,7 +585,7 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 		if(!condense_display || t->print) {
 			t->print = 0;
 		}
-		write_node_to_xgmml(cytograph, 'N', n->nodeid, label,1);
+		write_node_to_xgmml(cytograph, 'N', n->nodeid, label, 1, 0);
 		free(name);
 	}
 
@@ -619,8 +626,13 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 
 	HASH_TABLE_ITERATE(g, iteration, label, e) {
 		fn = e->name;
-		write_node_to_xgmml(cytograph, 'F', e->id, (char *)fn, 0);
 
+		/* compute the size-proportional width (if requested) BEFORE
+		writing the node, so it's actually included in the XGMML
+		output -- previously this was computed after the node was
+		already written and then discarded, silently making
+		change_size a no-op for this output format. */
+		width = 0;
 		if(change_size) {
 			if(e->size >= 0) {
 				width = 5 * (e->size / average);
@@ -630,6 +642,8 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 					width = 25;
 			}
 		}
+
+		write_node_to_xgmml(cytograph, 'F', e->id, (char *)fn, 0, width);
 	}
 
 	for(n = d->nodes; n; n = n->next) {
