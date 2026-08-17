@@ -280,6 +280,12 @@ int makeflow_alloc_commit_space( struct makeflow_alloc *a, struct dag_node *n)
 				|| (n == node1 && set_size(n->descendants) < 2 &&
 					makeflow_alloc_grow_alloc(alloc2, node1->footprint->self_res)))){
 				dynamic_alloc += timestamp_get() - start;
+				/* alloc2 was never linked into alloc1->residuals on
+				this failure path, unlike the success path just below
+				-- free it here instead of leaking it, matching how
+				makeflow_alloc_check_space() already handles the
+				identical failure case. */
+				makeflow_alloc_delete(alloc2);
 				return 0;
 			}
 			list_push_tail(alloc1->residuals, alloc2);
