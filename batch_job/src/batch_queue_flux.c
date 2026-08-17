@@ -242,9 +242,17 @@ static batch_queue_id_t batch_queue_flux_wait_jobid(struct batch_queue *q, struc
 			if (sscanf(convert_output, "%" PRIu64, &flux_job_id) == 1) {
 				struct flux_job_info *job_info = itable_lookup(flux_job_info_table, flux_job_id);
 				if (job_info) {
+					/* This job is done -- retire its entry from both
+					lookup tables now instead of only at queue
+					teardown, so per-task info doesn't accumulate for
+					the whole life of a long-running manager. */
+					batch_queue_id_t completed_job_id = job_info->job_id;
+					itable_remove(flux_job_info_table, flux_job_id);
+					itable_remove(batch_queue_jobid_info_table, completed_job_id);
+					delete_flux_job_info(job_info);
 					pclose(convert_pipe);
 					fill_batch_job_info(info_out, flux_job_id);
-					return job_info->job_id;
+					return completed_job_id;
 				}
 			}
 		}
