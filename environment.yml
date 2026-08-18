@@ -21,6 +21,7 @@ dependencies:
  - gdb                  # optional debugger to match compiler
  - flake8               # optional to lint and format Python code
  - clang-format         # optional to lint and format C code
+ - clang-tools          # optional for static analysis via scan-build
  - m4                   # optional for building man pages
  - doxygen              # optional to make doxygen api docs
  - mkdocs               # optional to make readthedocs online manual

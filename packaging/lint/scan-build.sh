@@ -31,7 +31,7 @@ fi
 
 CCC_ANALYZER=""
 CXX_ANALYZER=""
-for dir in /usr/lib/llvm-*/libexec /usr/share/clang/scan-build*/libexec /usr/libexec
+for dir in "${CONDA_PREFIX:-}/libexec" /usr/lib/llvm-*/libexec /usr/share/clang/scan-build*/libexec /usr/libexec
 do
 	if [ -x "${dir}/ccc-analyzer" ] && [ -x "${dir}/c++-analyzer" ]
 	then
