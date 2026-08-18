@@ -6197,6 +6197,14 @@ void work_queue_delete(struct work_queue *q)
 			remove_factory_info(q, key);
 		}
 
+		{
+			char *blocked_hostname;
+			struct blocklist_host_info *binfo;
+			HASH_TABLE_ITERATE(q->worker_blocklist, iteration, blocked_hostname, binfo) {
+				free(binfo);
+			}
+		}
+
 		log_queue_stats(q, 1);
 
 		if(q->name) {
@@ -6751,8 +6759,7 @@ void work_queue_unblock_host(struct work_queue *q, const char *hostname)
 {
 	struct blocklist_host_info *info = hash_table_remove(q->worker_blocklist, hostname);
 	if(info) {
-		info->blocked = 0;
-		info->release_at  = 0;
+		free(info);
 	}
 }
 

@@ -2161,7 +2161,15 @@ static struct list *interfaces_to_list(const char *canonical_host_or_addr, int p
 		for (void *i = NULL; (host_alias = jx_iterate_array(host_aliases, &i));) {
 			const char *address = jx_lookup_string(host_alias, "address");
 
-			if(address && strcmp(canonical_host_or_addr, address) == 0) {
+			// A malformed/malicious interface entry with no "address" field
+			// has nothing usable to add to the list; skip it rather than
+			// pass a NULL address to strncpy() below (undefined behavior,
+			// and previously crashed the worker on such input).
+			if(!address) {
+				continue;
+			}
+
+			if(strcmp(canonical_host_or_addr, address) == 0) {
 				found_canonical = 1;
 			}
 
