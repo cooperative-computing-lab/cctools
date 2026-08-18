@@ -1699,10 +1699,13 @@ int rmonitor_dispatch_msg(void)
 	int recv_status = recv_monitor_msg(rmonitor_queue_fd, &msg);
 
 	if (recv_status < 0) {
+		/* Nothing was read into msg, so it must not be touched below.
+		EAGAIN just means no message is available right now (not an
+		error); anything else is logged. */
 		if (errno != EAGAIN) {
 			debug(D_RMON, "Error receiving message: %s", strerror(errno));
-			return 1;
 		}
+		return 1;
 	}
 
 	if (((unsigned int)recv_status) < sizeof(msg)) {
