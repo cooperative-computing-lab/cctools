@@ -1,6 +1,12 @@
 #! /bin/bash
 set -e
 
+# sort and comm must agree on collation, or comm spuriously reports
+# "not in sorted order" on perfectly sorted input (locale-dependent
+# collation can disagree with itself across the two calls) and aborts the
+# script via set -e before it can report its outcome.
+export LC_ALL=C
+
 # Find cctools src directory
 CCTOOLS_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")"/../.. && pwd)"
 cd "${CCTOOLS_SRC}"
@@ -48,6 +54,32 @@ then
 fi
 
 echo "=== using ${SCAN_BUILD}, analyzers at $(dirname "${CCC_ANALYZER}") ==="
+
+# --- match the analyzer's "real" compiler to the one this tree is configured with ---
+#
+# ccc-analyzer/c++-analyzer run the static analyzer AND do the actual
+# compile, but if CCC_CC/CCC_CXX aren't set they default to plain gcc/g++
+# off PATH rather than whatever this tree was configured with (see
+# CCTOOLS_CC/CCTOOLS_CXX in config.mk). In an environment where those
+# differ -- e.g. a conda dev shell, where PATH's gcc is the distro's
+# system compiler/glibc but ./configure picked conda's -- that mismatch
+# can trip real compiler warnings-as-errors under --strict that don't
+# occur with the compiler this tree actually builds with, and don't occur
+# in CI either (a plain Ubuntu runner only ever has the one gcc). Pulling
+# the real compiler out of config.mk keeps the analyzer's compile step
+# consistent with the rest of the build.
+CONFIG_MK="${CCTOOLS_SRC}/config.mk"
+if [ -f "${CONFIG_MK}" ]
+then
+	CONFIGURED_CC="$(sed -n 's/^CCTOOLS_CC=.*;//p' "${CONFIG_MK}")"
+	CONFIGURED_CXX="$(sed -n 's/^CCTOOLS_CXX=.*;//p' "${CONFIG_MK}")"
+	if [ -n "${CONFIGURED_CC}" ] && [ -n "${CONFIGURED_CXX}" ]
+	then
+		export CCC_CC="${CONFIGURED_CC}"
+		export CCC_CXX="${CONFIGURED_CXX}"
+		echo "=== analyzer's real compiler set to configured CCTOOLS_CC/CCTOOLS_CXX: ${CCC_CC} / ${CCC_CXX} ==="
+	fi
+fi
 
 # --- run the analysis, twice ---
 #
