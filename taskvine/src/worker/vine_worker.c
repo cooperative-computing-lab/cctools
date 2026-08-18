@@ -214,6 +214,7 @@ __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const ch
 	link_vprintf(l, time(0) + options->active_timeout, fmt, va);
 
 	va_end(va);
+	va_end(debug_va);
 }
 
 /*
@@ -1392,6 +1393,12 @@ static int task_resources_fit_now(struct vine_task *t)
 	       (memory_allocated + t->resources_requested->memory <= total_resources->memory.total) &&
 	       ((t->needs_library || disk_allocated + t->resources_requested->disk <= total_resources->disk.total)) && (gpus_allocated + t->resources_requested->gpus <= total_resources->gpus.total);
 	// XXX Disk is constantly shrinking, and library disk requests are currently static. Once we generate some files things will hang.
+	// Known limitation: the disk check above is skipped entirely whenever t->needs_library is
+	// true, so library/function-call tasks are never weighed against total_resources->disk.total.
+	// As functions write output/temp files, worker disk keeps shrinking with no enforcement for
+	// this task class. A real fix needs a real (even approximate) per-function disk accounting
+	// so this branch can re-enable the disk.total check for library/function tasks instead of
+	// bypassing it. Left as a known gap rather than a tracked issue for now.
 }
 
 /*
