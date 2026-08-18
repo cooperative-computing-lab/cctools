@@ -98,7 +98,20 @@ struct chirp_matrix *chirp_matrix_create(const char *host, const char *path, int
 	for(i = 0; (int) i < nhosts; i++) {
 		if(!fgets(line, sizeof(line), file)) {
 			rewind(file);
-			fgets(line, sizeof(line), file);
+			if(!fgets(line, sizeof(line), file)) {
+				/* The hosts file exists but has no lines at all (e.g.
+				empty, or CHIRP_HOSTS points at /dev/null). Bail out
+				instead of strdup()-ing whatever was left in the
+				uninitialized/stale `line` buffer. Since a rewind+retry
+				can only fail here on the very first host (any file with
+				at least one line will keep yielding it), no hosts[]
+				entries have been allocated yet. */
+				debug(D_NOTICE | D_CHIRP, "matrix: host list in %s is empty\n", host_file);
+				free(hosts);
+				fclose(file);
+				errno = EINVAL;
+				return 0;
+			}
 		}
 		hosts[i] = strdup(line);
 		int len = strlen(hosts[i]);
@@ -123,11 +136,31 @@ struct chirp_matrix *chirp_matrix_create(const char *host, const char *path, int
 	sprintf(datapath2, "/%s/matrixdata", username);
 	sprintf(datapath3, "/%s/matrixdata/%s", username, cookie);
 
-	for(i = 0; (int) i < nfiles; i++) {
+	/* the return value of each mkdir was previously discarded three times
+	in a row here -- a failure creating any of these (remote, per-host)
+	directories went completely unnoticed, unlike the equivalent
+	metapath mkdir retry loop below, which does check. */
+	int mkdir_failed = 0;
+	for(i = 0; (int) i < nfiles && !mkdir_failed; i++) {
 		const char *datahost = hosts[i % nhosts];
 		result = chirp_reli_mkdir(datahost, datapath1, 0700, stoptime);
+		if(result < 0 && errno != EEXIST) {
+			debug(D_CHIRP, "matrix: could not create directory %s on %s: %s\n", datapath1, datahost, strerror(errno));
+			mkdir_failed = 1;
+			break;
+		}
 		result = chirp_reli_mkdir(datahost, datapath2, 0700, stoptime);
+		if(result < 0 && errno != EEXIST) {
+			debug(D_CHIRP, "matrix: could not create directory %s on %s: %s\n", datapath2, datahost, strerror(errno));
+			mkdir_failed = 1;
+			break;
+		}
 		result = chirp_reli_mkdir(datahost, datapath3, 0700, stoptime);
+		if(result < 0 && errno != EEXIST) {
+			debug(D_CHIRP, "matrix: could not create directory %s on %s: %s\n", datapath3, datahost, strerror(errno));
+			mkdir_failed = 1;
+			break;
+		}
 
 		sprintf(&line[strlen(line)], "%s %s/data.%d\n", datahost, datapath3, i);
 	}
@@ -136,6 +169,10 @@ struct chirp_matrix *chirp_matrix_create(const char *host, const char *path, int
 		free(hosts[i]);
 	}
 	free(hosts);
+
+	if(mkdir_failed) {
+		return 0;
+	}
 
 	char metapath[CHIRP_LINE_MAX];
 	strcpy(metapath, path);

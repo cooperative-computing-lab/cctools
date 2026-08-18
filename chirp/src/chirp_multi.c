@@ -153,11 +153,16 @@ struct chirp_volume *chirp_volume_open(const char *volume, time_t stoptime)
 		name = strtok(0, " \t\n");
 	}
 
-	/* randomly initialize the priority of the servers */
-	int i;
-	int n = rand() % v->nservers;
-	for(i = 0; i < n; i++)
-		v->servers[i]->priority++;
+	/* randomly initialize the priority of the servers.
+	v->nservers can legitimately be 0 if the remote "hosts" file was empty
+	or whitespace-only (e.g. server misconfiguration); guard against
+	dividing by it. */
+	if(v->nservers > 0) {
+		int i;
+		int n = rand() % v->nservers;
+		for(i = 0; i < n; i++)
+			v->servers[i]->priority++;
+	}
 
 	free(buffer);
 
