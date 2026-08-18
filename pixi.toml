@@ -9,6 +9,7 @@ version = "0.1.0"
 configure = "./configure --with-base-dir $CONDA_PREFIX --prefix $CONDA_PREFIX"
 build = "make"
 install = "make install"
+test = "make test"
 
 [dependencies]
 python = "3.*"
