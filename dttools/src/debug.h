@@ -169,7 +169,11 @@ Displays a printf-style message, and then forcibly exits the program.
 @param fmt A printf-style formatting string, followed by the necessary arguments.
 */
 
-void fatal(const char *fmt, ...);
+void fatal(const char *fmt, ...)
+#ifndef SWIG
+__attribute__ ((noreturn))
+#endif
+;
 
 
 /** Emit a notice message.
