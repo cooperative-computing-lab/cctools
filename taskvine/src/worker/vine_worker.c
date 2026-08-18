@@ -279,7 +279,9 @@ void send_async_message(struct link *l, const char *fmt, ...)
 	va_list va;
 	char *message = malloc(VINE_LINE_MAX);
 	va_start(va, fmt);
-	vsprintf(message, fmt, va);
+	/* Use vsnprintf (not vsprintf) so an over-length message is truncated
+	 * rather than overflowing this fixed-size heap buffer. */
+	vsnprintf(message, VINE_LINE_MAX, fmt, va);
 	va_end(va);
 
 	list_push_tail(pending_async_messages, message);
