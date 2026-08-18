@@ -1,0 +1,40 @@
+[workspace]
+authors = ["Benjamin Tovar <btovar@nd.edu>"]
+channels = ["conda-forge"]
+name = "cctools-dev"
+platforms = ["linux-64", "osx-64", "osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+configure = "./configure --with-base-dir $CONDA_PREFIX --prefix $CONDA_PREFIX"
+build = "make"
+install = "make install"
+
+[dependencies]
+python = "3.*"
+make = "*"
+zlib = "*"
+swig = "*"
+perl = "*"
+libopenssl-static = "*"
+openssl = "*"
+conda-pack = "*"
+packaging = "*"
+cloudpickle = "*"
+threadpoolctl = "*"
+prometheus_client = "*"
+rich = "*"
+flake8 = "*"
+clang-format = "*"
+m4 = "*"
+doxygen = "*"
+mkdocs = "*"
+pymdown-extensions = "*"
+matplotlib = "*"
+
+# gcc/g++/gdb are only needed (and only resolvable) on Linux; macOS builds
+# use the system/Xcode compiler instead, mirroring packaging/build-conda/setup.sh.
+[target.linux-64.dependencies]
+gcc_linux-64 = "*"
+gxx_linux-64 = "*"
+gdb = "*"

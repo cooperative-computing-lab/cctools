@@ -41,6 +41,26 @@ makeflow -v
 vine_status
 ```
 
+### Build From Source With Pixi
+
+As an alternative to conda, you can use [pixi](https://pixi.sh) to manage the
+build dependencies declared in `pixi.toml` (imported from `environment.yml`):
+
+```
+git clone git://github.com/cooperative-computing-lab/cctools.git cctools-src
+cd cctools-src
+pixi run configure
+pixi run build
+pixi run install
+```
+
+Then run the executables out of the pixi environment like this:
+```
+pixi run makeflow -v
+pixi run vine_status
+```
+or activate the environment directly with `pixi shell`.
+
 ## Copyright and License Notices
 
 ```

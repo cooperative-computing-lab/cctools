@@ -6,6 +6,7 @@ There are several ways to install:
 
 - [Install From Conda](#install-from-conda) is **best for most users** on laptops or clusters.
 - [Install From Github](#install-from-github) is recommended for developers or those trying out the latest features.
+  A [Pixi-based variant](#install-from-github-with-pixi) of this method is also available.
 - [Install From Binary Tarball](#install-from-binary-tarball)
 is recommended for use on specific supported platforms.
 
@@ -88,6 +89,35 @@ conda activate cctools-dev
 
 !!! note
     To use the installed software you will need to set the environment variables `PATH`, and `PYTHONPATH` as explained [here.](#setting-your-environment)
+
+### Install From Github With Pixi
+
+As an alternative to Conda, you can use [pixi](https://pixi.sh) to manage the
+build dependencies. Pixi reads the same dependency list as Conda, but from
+`pixi.toml` (imported from `environment.yml`) instead, and keeps the resulting
+environment local to the repository checkout rather than in your home
+directory.
+
+First [install pixi](https://pixi.sh/latest/#installation) if you don't
+already have it. Then check out the software repository and build it:
+
+```sh
+git clone git://github.com/cooperative-computing-lab/cctools.git cctools-src
+cd cctools-src
+pixi run configure
+pixi run build
+pixi run install
+```
+
+You can then run the installed tools with `pixi run <program>`, for example:
+
+```sh
+$ pixi run makeflow --version
+```
+
+or activate the environment directly with `pixi shell`, after which the
+tools behave as if `PATH` and `PYTHONPATH` were already set as explained
+[here.](#setting-your-environment)
 
 ## Install From Source Tarball
 
