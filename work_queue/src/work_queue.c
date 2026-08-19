@@ -4870,9 +4870,10 @@ static int abort_slow_workers(struct work_queue *q)
 
 					q->stats->workers_fast_aborted++;
 					removed++;
+					/* w was just freed by remove_worker(); do not touch it again */
+				} else {
+					w->fast_abort_alarm = 1;
 				}
-
-				w->fast_abort_alarm = 1;
 			}
 		}
 	}

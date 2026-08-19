@@ -173,6 +173,8 @@ static int log_instance_state(const char *instance_id, const char *config_file, 
 {
 	FILE *fp;
 	fp = fopen(config_file, "a");
+	if (!fp)
+		return 0;
 	fprintf(fp, "%s %s %" PRIu64 "\n", instance_state, instance_id, timestamp_get());
 	fclose(fp);
 	return 1;
