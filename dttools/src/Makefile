@@ -12,7 +12,6 @@ SOURCES = \
 	auth_ticket.c \
 	auth_unix.c \
 	b64.c \
-	bitmap.c \
 	bucketing.c \
 	bucketing_exhaust.c \
 	bucketing_greedy.c \
@@ -140,7 +139,6 @@ HEADERS_PUBLIC = \
 	auth_kerberos.h \
 	auth_ticket.h \
 	auth_unix.h \
-	bitmap.h \
 	bucketing.h \
 	bucketing_exhaust.h \
 	bucketing_greedy.h \
