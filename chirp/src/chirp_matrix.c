@@ -238,7 +238,7 @@ struct chirp_matrix *chirp_matrix_open(const char *host, const char *path, time_
 		if(!matrix->rfiles[i]) {
 			int j;
 			for(j = 0; j < i; j++)
-				chirp_reli_close(matrix->rfiles[i], stoptime);
+				chirp_reli_close(matrix->rfiles[j], stoptime);
 			free(line);
 			return 0;
 		}
