@@ -9,6 +9,10 @@ fresh run's findings against that baseline. Keeping the parsing in one
 script means both call sites can never drift apart on how a finding's
 identity is derived.
 
+Findings under vendored/third-party paths (lua, sqlite) are dropped here
+regardless of caller, so they never enter the baseline or get flagged as
+new -- see EXCLUDED_PATH_SUBSTRINGS below.
+
 Usage:
     scan-build-parse.py <scan-build-output-dir>
 
@@ -31,6 +35,16 @@ ROW_RE = re.compile(
     r'<td class="Q">(\d+)</td>',
     re.S,
 )
+
+# Vendored/third-party code that scan-build should never report findings
+# for, regardless of which package pulls it in. Matched case-insensitively
+# against the finding's file path.
+EXCLUDED_PATH_SUBSTRINGS = ("lua", "sqlite")
+
+
+def is_excluded(file_path):
+    lowered = file_path.lower()
+    return any(substr in lowered for substr in EXCLUDED_PATH_SUBSTRINGS)
 
 
 def find_run_dir(output_dir):
@@ -55,6 +69,8 @@ def parse_index(index_path):
     for checker, file_path, line in ROW_RE.findall(text):
         file_path = html.unescape(file_path).strip()
         if not file_path:
+            continue
+        if is_excluded(file_path):
             continue
         findings.add(f"{checker}:{file_path}:{line}")
 

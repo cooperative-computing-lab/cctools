@@ -134,12 +134,6 @@ bt_logic_error_uninitialized_argument_value:chirp/src/chirp_stream_files.c:172
 bt_logic_error_uninitialized_argument_value:dttools/src/bitmap.c:211
 bt_logic_error_uninitialized_argument_value:dttools/src/bucketing_det_greedy.c:373
 bt_logic_error_uninitialized_argument_value:dttools/src/bucketing_greedy.c:363
-bt_logic_error_uninitialized_argument_value:dttools/src/luapatt.c:147
-bt_logic_error_uninitialized_argument_value:dttools/src/luapatt.c:265
-bt_logic_error_uninitialized_argument_value:dttools/src/luapatt.c:48
-bt_logic_error_uninitialized_argument_value:dttools/src/luapatt.c:57
-bt_logic_error_uninitialized_argument_value:dttools/src/luapatt.c:65
-bt_logic_error_uninitialized_argument_value:dttools/src/luapatt.c:72
 bt_logic_error_uninitialized_argument_value:dttools/src/set.c:569
 bt_logic_error_uninitialized_argument_value:ftp_lite/src/network.c:309
 bt_logic_error_uninitialized_argument_value:makeflow/src/makeflow_mounts.c:297
