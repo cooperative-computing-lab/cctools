@@ -266,7 +266,10 @@ jobs:
         run: ${GITHUB_WORKSPACE}/packaging/lint/lint.sh
 
   static-analysis:
-    runs-on: ubuntu-latest
+    # Pinned to ubuntu-26.04 (rather than ubuntu-latest) because
+    # clang-tools-22 -- see below -- isn't in the apt archive for older
+    # Ubuntu releases (e.g. 24.04), only 26.04+.
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - name: checkout CCTools from branch head
@@ -278,7 +281,11 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag }}
       - name: install clang static analyzer
-        run: sudo apt-get update && (sudo apt-get install -y clang-tools || sudo apt-get install -y clang-tools-18)
+        # Pinned to LLVM 22 (rather than whatever "clang-tools" resolves to
+        # on the runner's Ubuntu release) to match the clang/clang-tools
+        # version pinned in pixi.toml -- see packaging/lint/scan-build-suppressions.txt's
+        # header on how checker names/locations drift across clang versions.
+        run: sudo apt-get update && sudo apt-get install -y clang-tools-22
       - name: configure
         run: ./configure --strict --without-system-parrot --without-system-prune --without-system-umbrella --without-system-weaver --with-readline-path no --with-fuse-path no --with-perl-path no
       - name: static analysis (clang scan-build) on all C packages
