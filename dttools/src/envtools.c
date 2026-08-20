@@ -99,6 +99,14 @@ int env_replace(const char *infile, const char *outfile)
 	return 0;
 }
 
+void setenv_compat(const char *dst, const char *src, int overwrite)
+{
+	const char *value = getenv(src);
+	if (value) {
+		setenv(dst, value, overwrite);
+	}
+}
+
 const char *system_tmp_dir(const char *override_tmp_dir)
 {
 	const char *tmp_dir;
