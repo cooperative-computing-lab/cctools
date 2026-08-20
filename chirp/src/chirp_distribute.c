@@ -305,7 +305,10 @@ int main(int argc, char *argv[])
 	struct chirp_stat buf;
 
 	char home_dir[50];
-	sprintf(home_dir, "%s/.chirp", getenv("HOME"));
+	const char *home = getenv("HOME");
+	if(!home)
+		fatal("HOME environment variable is not set");
+	sprintf(home_dir, "%s/.chirp", home);
 	mkdir(home_dir, 0777);
 
 	result = chirp_reli_stat(sourcehost, sourcepath, &buf, time(0) + 20);
