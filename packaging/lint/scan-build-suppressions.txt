@@ -37,7 +37,6 @@ bt_error_handling_value_of_errno_was_not_checked:chirp/src/chirp_matrix.c:101
 bt_error_handling_value_of_errno_was_not_checked:dttools/src/rmonitor_poll.c:210
 bt_logic_error_assigned_value_is_uninitialized:chirp/src/chirp_fs_local.c:1013
 bt_logic_error_assigned_value_is_uninitialized:chirp/src/chirp_matrix.c:145
-bt_logic_error_assigned_value_is_uninitialized:dttools/src/bitmap.c:615
 bt_logic_error_assigned_value_is_uninitialized:dttools/src/bucketing_det_greedy.c:355
 bt_logic_error_assigned_value_is_uninitialized:dttools/src/bucketing_greedy.c:348
 bt_logic_error_assigned_value_is_uninitialized:dttools/src/category.c:449
@@ -62,7 +61,6 @@ bt_logic_error_function_call_with_invalid_argument:taskvine/src/worker/vine_proc
 bt_logic_error_possibly_undefined_arithmetic_operation_involving_a_null_pointer:dttools/src/change_process_title.c:46
 bt_logic_error_possibly_undefined_arithmetic_operation_involving_a_null_pointer:dttools/src/rmsummary.c:138
 bt_logic_error_result_of_operation_is_garbage_or_undefined:chirp/src/chirp_distribute.c:798
-bt_logic_error_result_of_operation_is_garbage_or_undefined:dttools/src/bitmap.c:615
 bt_logic_error_result_of_operation_is_garbage_or_undefined:dttools/src/category.c:337
 bt_logic_error_result_of_operation_is_garbage_or_undefined:dttools/src/category.c:342
 bt_logic_error_result_of_operation_is_garbage_or_undefined:dttools/src/category.c:381
@@ -72,7 +70,6 @@ bt_logic_error_uninitialized_argument_value:chirp/src/chirp_acl.c:552
 bt_logic_error_uninitialized_argument_value:chirp/src/chirp_acl.c:591
 bt_logic_error_uninitialized_argument_value:chirp/src/chirp_distribute.c:496
 bt_logic_error_uninitialized_argument_value:chirp/src/chirp_stream_files.c:172
-bt_logic_error_uninitialized_argument_value:dttools/src/bitmap.c:211
 bt_logic_error_uninitialized_argument_value:dttools/src/bucketing_det_greedy.c:373
 bt_logic_error_uninitialized_argument_value:dttools/src/bucketing_greedy.c:363
 bt_logic_error_uninitialized_argument_value:dttools/src/set.c:569
@@ -94,7 +91,6 @@ bt_memory_error_memory_leak:chirp/src/chirp_distribute.c:827
 bt_memory_error_memory_leak:chirp/src/chirp_stats.c:53
 bt_memory_error_memory_leak:chirp/src/chirp_stream_files.c:149
 bt_memory_error_memory_leak:chirp/src/chirp_stream_files.c:209
-bt_memory_error_memory_leak:chirp/src/chirp_tool.c:1259
 bt_memory_error_memory_leak:deltadb/src/catalog_server.c:868
 bt_memory_error_memory_leak:deltadb/src/deltadb_reduction.c:110
 bt_memory_error_memory_leak:dttools/src/bucketing_manager.c:221
@@ -146,17 +142,6 @@ bt_memory_error_nullability:makeflow/src/makeflow_linker.c:403
 bt_memory_error_nullability:makeflow/src/makeflow_summary.c:43
 bt_stream_handling_error_invalid_stream_state:batch_job/src/batch_queue_cluster.c:355
 bt_stream_handling_error_invalid_stream_state:batch_job/src/batch_queue_condor.c:267
-bt_stream_handling_error_invalid_stream_state:dttools/src/bitmap.c:210
-bt_stream_handling_error_invalid_stream_state:dttools/src/bitmap.c:216
-bt_stream_handling_error_invalid_stream_state:dttools/src/bitmap.c:353
-bt_stream_handling_error_invalid_stream_state:dttools/src/bitmap.c:354
-bt_stream_handling_error_invalid_stream_state:dttools/src/bitmap.c:355
-bt_stream_handling_error_invalid_stream_state:dttools/src/bitmap.c:394
-bt_stream_handling_error_invalid_stream_state:dttools/src/bitmap.c:399
-bt_stream_handling_error_invalid_stream_state:dttools/src/bitmap.c:455
-bt_stream_handling_error_invalid_stream_state:dttools/src/bitmap.c:456
-bt_stream_handling_error_invalid_stream_state:dttools/src/bitmap.c:457
-bt_stream_handling_error_invalid_stream_state:dttools/src/bitmap.c:612
 bt_stream_handling_error_invalid_stream_state:dttools/src/console_login.c:67
 bt_stream_handling_error_invalid_stream_state:dttools/src/rmonitor_poll.c:210
 bt_stream_handling_error_null_stream_pointer:batch_job/src/batch_queue_flux.c:132
@@ -181,17 +166,6 @@ bt_stream_handling_error_resource_leak:dttools/src/jx_binary_test.c:61
 bt_stream_handling_error_resource_leak:dttools/src/rmonitor_poll.c:815
 bt_stream_handling_error_resource_leak:ftp_lite/src/ftp_lite_copy.c:103
 bt_stream_handling_error_resource_leak:resource_monitor/src/piggybacker.c:56
-bt_stream_handling_error_stream_already_in_eof:dttools/src/bitmap.c:210
-bt_stream_handling_error_stream_already_in_eof:dttools/src/bitmap.c:216
-bt_stream_handling_error_stream_already_in_eof:dttools/src/bitmap.c:353
-bt_stream_handling_error_stream_already_in_eof:dttools/src/bitmap.c:354
-bt_stream_handling_error_stream_already_in_eof:dttools/src/bitmap.c:355
-bt_stream_handling_error_stream_already_in_eof:dttools/src/bitmap.c:394
-bt_stream_handling_error_stream_already_in_eof:dttools/src/bitmap.c:399
-bt_stream_handling_error_stream_already_in_eof:dttools/src/bitmap.c:455
-bt_stream_handling_error_stream_already_in_eof:dttools/src/bitmap.c:456
-bt_stream_handling_error_stream_already_in_eof:dttools/src/bitmap.c:457
-bt_stream_handling_error_stream_already_in_eof:dttools/src/bitmap.c:612
 bt_stream_handling_error_stream_already_in_eof:dttools/src/rmonitor_poll.c:210
 bt_stream_handling_error_stream_already_in_eof:dttools/src/rmonitor_poll.c:464
 bt_suspicious_operation_bitwise_shift:chirp/src/chirp_server.c:2249
@@ -215,5 +189,3 @@ bt_unused_code_dead_nested_assignment:dttools/src/pattern.c:46
 bt_unused_code_dead_nested_assignment:makeflow/src/dag.c:261
 bt_unused_code_dead_nested_assignment:makeflow/src/makeflow_gc.c:366
 bt_unused_code_dead_nested_assignment:taskvine/src/manager/vine_manager.c:3396
-
-# vim: set noexpandtab tabstop=4:
