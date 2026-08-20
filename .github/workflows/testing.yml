@@ -135,6 +135,37 @@ jobs:
           commit: ${{ steps.vars.output.tag_sha }}
           tag: ${{ github.event.inputs.tag }}
 
+  build-pixi-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout CCTools from branch head
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/checkout@v4
+      - name: Checkout CCTools from tag
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      - name: Pixi-Setup
+        uses: prefix-dev/setup-pixi@v0.10.1
+        with:
+          locked: true
+      - name: Configure
+        run: pixi run configure
+      - name: Build
+        run: pixi run build
+      - name: Install
+        run: pixi run install
+      - name: Test
+        run: |
+          if ! pixi run test
+          then
+            echo === Contents of cctools.test.fail ===
+            cat cctools.test.fail
+            exit 1
+          fi
+
   build-conda-macos-x86_64:
     runs-on: ${{ matrix.os-name }}
     strategy:
