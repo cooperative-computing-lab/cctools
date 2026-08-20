@@ -3,15 +3,13 @@
 Parse a clang scan-build run's index.html into a stable, sorted list of
 findings, one per line, formatted as `checker:file:line`.
 
-This is used by packaging/lint/scan-build.sh both to write
-packaging/lint/scan-build-suppressions.txt (the baseline) and to compare a
-fresh run's findings against that baseline. Keeping the parsing in one
-script means both call sites can never drift apart on how a finding's
-identity is derived.
+This is used by packaging/lint/scan-build.sh to turn each of its two
+analysis passes into a comparable list of findings (a finding only gates
+the build if it shows up in both passes -- see scan-build.sh for why).
 
 Findings under vendored/third-party paths (lua, sqlite) are dropped here
-regardless of caller, so they never enter the baseline or get flagged as
-new -- see EXCLUDED_PATH_SUBSTRINGS below.
+regardless of caller, so they never get flagged -- see
+EXCLUDED_PATH_SUBSTRINGS below.
 
 Usage:
     scan-build-parse.py <scan-build-output-dir>

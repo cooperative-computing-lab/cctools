@@ -116,10 +116,9 @@ OUT_DIR_2="$(mktemp -d)"
 FOUND_1="$(mktemp)"
 FOUND_2="$(mktemp)"
 CONFIRMED="$(mktemp)"
-BASELINE="$(mktemp)"
 cleanup()
 {
-	rm -rf "${OUT_DIR_1}" "${OUT_DIR_2}" "${FOUND_1}" "${FOUND_2}" "${CONFIRMED}" "${BASELINE}"
+	rm -rf "${OUT_DIR_1}" "${OUT_DIR_2}" "${FOUND_1}" "${FOUND_2}" "${CONFIRMED}"
 }
 trap cleanup EXIT
 
@@ -133,26 +132,60 @@ run_scan_build "${OUT_DIR_2}"
 python3 "${CCTOOLS_SRC}/packaging/lint/scan-build-parse.py" "${OUT_DIR_2}" | sort -u > "${FOUND_2}"
 echo "=== pass 2/2: $(wc -l < "${FOUND_2}") finding(s) ==="
 
-# --- compare the findings confirmed by both passes against the baseline ---
-
 comm -12 "${FOUND_1}" "${FOUND_2}" > "${CONFIRMED}"
 echo "=== $(wc -l < "${CONFIRMED}") finding(s) confirmed by both passes ==="
 
-SUPPRESSIONS="${CCTOOLS_SRC}/packaging/lint/scan-build-suppressions.txt"
-grep -v '^#' "${SUPPRESSIONS}" | grep -v '^[[:space:]]*$' | sort -u > "${BASELINE}"
-
-NEW_FINDINGS="$(comm -23 "${CONFIRMED}" "${BASELINE}")"
-
-if [ -n "${NEW_FINDINGS}" ]
+# --- gate on findings that land on a line this change touches ---
+#
+# There is no baseline/suppression file: a confirmed finding on a line the
+# change added or modified fails the build outright, including a repeat
+# false positive -- a reviewer evaluates those as they come up rather than
+# them being pre-suppressed. What keeps this from also failing on the
+# repo's large pre-existing backlog of findings is scope, not a baseline:
+# only findings on a touched line are ever compared at all, so a
+# pre-existing finding elsewhere in a file this change happens to touch is
+# never even looked at, no matter where it sits.
+#
+# SCAN_BUILD_DIFF_BASE (set by CI to the PR's base commit or the push's
+# previous commit) is what provides that scope. Without it -- a local run,
+# or a context with no meaningful prior commit to diff against (e.g. a
+# release build with no PR) -- there is nothing to scope to, so findings
+# are reported for visibility only and the run does not fail the build.
+if [ -n "${SCAN_BUILD_DIFF_BASE:-}" ] && [ "${SCAN_BUILD_DIFF_BASE}" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${SCAN_BUILD_DIFF_BASE}^{commit}" 2> /dev/null
 then
-	echo "=== new scan-build findings not in packaging/lint/scan-build-suppressions.txt ==="
-	echo "${NEW_FINDINGS}"
-	echo
-	echo "If each of these is a genuine pre-existing issue you're deliberately not fixing right now,"
-	echo "add it (as checker:file:line) to packaging/lint/scan-build-suppressions.txt. Otherwise, fix it."
-	exit 1
-fi
+	MERGE_BASE="$(git merge-base "${SCAN_BUILD_DIFF_BASE}" HEAD)"
+	echo "=== diff mode: scoping gate to changes since ${MERGE_BASE} ==="
+	TOUCHED_LINES="$(mktemp)"
+	CONFIRMED_SCOPED="$(mktemp)"
+	trap 'rm -f "${TOUCHED_LINES}" "${CONFIRMED_SCOPED}"; cleanup' EXIT
+	# shellcheck disable=SC2086
+	git diff --unified=0 "${MERGE_BASE}" HEAD -- ${C_PACKAGES} \
+		| python3 "${CCTOOLS_SRC}/packaging/lint/diff-touched-lines.py" \
+		| sort -u > "${TOUCHED_LINES}"
+	echo "=== $(wc -l < "${TOUCHED_LINES}") line(s) touched by this change ==="
+	# CONFIRMED entries are checker:file:line; TOUCHED_LINES entries are
+	# file:line. Paths are assumed colon-free.
+	awk -F: 'NR==FNR{touched[$0]=1; next} { if (($2 ":" $3) in touched) print }' "${TOUCHED_LINES}" "${CONFIRMED}" > "${CONFIRMED_SCOPED}"
 
-echo "=== no new scan-build findings ==="
+	if [ -s "${CONFIRMED_SCOPED}" ]
+	then
+		echo "=== scan-build findings on lines this change touches ==="
+		cat "${CONFIRMED_SCOPED}"
+		echo
+		echo "Fix these, or if one is a false positive, leave it for a reviewer to evaluate on the PR."
+		exit 1
+	fi
+
+	echo "=== no scan-build findings on lines this change touches ==="
+else
+	echo "=== SCAN_BUILD_DIFF_BASE not set (or not resolvable): nothing to scope to, not gating ==="
+	if [ -s "${CONFIRMED}" ]
+	then
+		echo "=== scan-build findings (repo-wide, informational only) ==="
+		cat "${CONFIRMED}"
+	else
+		echo "=== no scan-build findings ==="
+	fi
+fi
 
 # vim: set noexpandtab tabstop=4:
