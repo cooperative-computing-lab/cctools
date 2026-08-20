@@ -264,3 +264,64 @@ jobs:
           ref: ${{ github.event.inputs.tag }}
       - name: lint code
         run: ${GITHUB_WORKSPACE}/packaging/lint/lint.sh
+
+  static-analysis:
+    # Pinned to ubuntu-26.04 (rather than ubuntu-latest) because
+    # clang-tools-22 -- see below -- isn't in the apt archive for older
+    # Ubuntu releases (e.g. 24.04), only 26.04+.
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - name: checkout CCTools from branch head
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          # scan-build.sh diffs against the PR's base commit / the push's
+          # previous commit to scope the gate to only the lines this
+          # change touches (see scan-build.sh); that needs real history,
+          # not the single-commit shallow clone actions/checkout defaults to.
+          fetch-depth: 0
+      - name: checkout CCTools from tag
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      - name: install clang static analyzer
+        # Pinned to LLVM 22 (rather than whatever "clang-tools" resolves to
+        # on the runner's Ubuntu release) to match the clang/clang-tools
+        # version pinned in pixi.toml -- an unpinned version drift here can
+        # rename or relocate checkers relative to what scan-build.sh's two
+        # confirmation passes expect.
+        run: sudo apt-get update && sudo apt-get install -y clang-tools-22
+      - name: configure
+        run: ./configure --strict --without-system-parrot --without-system-prune --without-system-umbrella --without-system-weaver --with-readline-path no --with-fuse-path no --with-perl-path no
+      - name: static analysis (clang scan-build) on all C packages
+        # Unset for workflow_dispatch: a release build from an
+        # already-merged tag has no "PR diff" to scope to, and every commit
+        # reaching it already passed this gate diff-scoped at merge time.
+        # scan-build.sh reports findings but doesn't fail the build when
+        # this is unset (see its diff-scoping section).
+        env:
+          SCAN_BUILD_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || '' }}
+        run: ${GITHUB_WORKSPACE}/packaging/lint/scan-build.sh
+
+  valgrind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: checkout CCTools from branch head
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/checkout@v4
+      - name: checkout CCTools from tag
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      - name: install valgrind
+        run: sudo apt-get update && sudo apt-get install -y valgrind
+      - name: configure
+        run: ./configure --strict --without-system-parrot --without-system-prune --without-system-umbrella --without-system-weaver --with-readline-path no --with-fuse-path no --with-perl-path no
+      - name: build packages covered by a valgrind regression test (dttools, taskvine, work_queue, makeflow, resource_monitor)
+        run: make dttools taskvine work_queue makeflow resource_monitor
+      - name: run valgrind regression tests
+        run: ${GITHUB_WORKSPACE}/packaging/valgrind/run-valgrind-tests.sh
