@@ -4095,6 +4095,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	char *runtime_dir = vine_runtime_directory_create();
 	if (!runtime_dir) {
 		debug(D_NOTICE, "Could not create runtime directories");
+		free(q);
 		return 0;
 	}
 
