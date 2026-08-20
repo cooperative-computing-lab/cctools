@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "list.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -40,9 +41,13 @@ void makeflow_summary_create(struct dag *d, const char *filename, const char *em
 
 	if(email_summary_to) {
 		summary_email = popen("sendmail -t", "w");
-		fprintf(summary_email, "To: %s\n", email_summary_to);
-		timestamp_fmt(buffer, 50, "%c", time_completed);
-		fprintf(summary_email, "Subject: Makeflow Run Summary - %s \n", buffer);
+		if(summary_email) {
+			fprintf(summary_email, "To: %s\n", email_summary_to);
+			timestamp_fmt(buffer, 50, "%c", time_completed);
+			fprintf(summary_email, "Subject: Makeflow Run Summary - %s \n", buffer);
+		} else {
+			fprintf(stderr, "could not open sendmail pipe to email summary to %s: %s\n", email_summary_to, strerror(errno));
+		}
 	}
 
 	int i;
@@ -132,7 +137,7 @@ void makeflow_summary_create(struct dag *d, const char *filename, const char *em
 		fclose(summary_file);
 	}
 
-	if(email_summary_to) {
+	if(summary_email) {
 		fprintf(stderr, "emailing summary to %s.\n", email_summary_to);
 		fclose(summary_email);
 	}
