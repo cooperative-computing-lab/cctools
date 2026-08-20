@@ -4089,10 +4089,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	}
 
 	/* compatibility code */
-	if (getenv("VINE_LOW_PORT"))
-		setenv("TCP_LOW_PORT", getenv("VINE_LOW_PORT"), 0);
-	if (getenv("VINE_HIGH_PORT"))
-		setenv("TCP_HIGH_PORT", getenv("VINE_HIGH_PORT"), 0);
+	setenv_compat("TCP_LOW_PORT", "VINE_LOW_PORT", 0);
+	setenv_compat("TCP_HIGH_PORT", "VINE_HIGH_PORT", 0);
 
 	char *runtime_dir = vine_runtime_directory_create();
 	if (!runtime_dir) {

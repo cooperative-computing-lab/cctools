@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "catalog_query.h"
 #include "datagram.h"
 #include "domain_name_cache.h"
+#include "envtools.h"
 #include "hash_table.h"
 #include "interfaces_address.h"
 #include "itable.h"
@@ -5867,10 +5868,8 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	}
 
 	/* compatibility code */
-	if (getenv("WORK_QUEUE_LOW_PORT"))
-		setenv("TCP_LOW_PORT", getenv("WORK_QUEUE_LOW_PORT"), 0);
-	if (getenv("WORK_QUEUE_HIGH_PORT"))
-		setenv("TCP_HIGH_PORT", getenv("WORK_QUEUE_HIGH_PORT"), 0);
+	setenv_compat("TCP_LOW_PORT", "WORK_QUEUE_LOW_PORT", 0);
+	setenv_compat("TCP_HIGH_PORT", "WORK_QUEUE_HIGH_PORT", 0);
 
 	q->manager_link = link_serve(port);
 	if(!q->manager_link) {
