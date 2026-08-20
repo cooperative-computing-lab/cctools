@@ -93,10 +93,12 @@ conda activate cctools-dev
 ### Install From Github With Pixi
 
 As an alternative to Conda, you can use [pixi](https://pixi.sh) to manage the
-build dependencies. Pixi reads the same dependency list as Conda, but from
-`pixi.toml` (imported from `environment.yml`) instead, and keeps the resulting
-environment local to the repository checkout rather than in your home
-directory.
+build dependencies. This is primarily intended for developers: `environment.yml`
+remains the source of truth for dependencies, and `pixi.toml` is derived from it
+and kept in sync manually. Pixi keeps the resulting environment local to the
+repository checkout rather than in your home directory. If you are not
+developing cctools, pixi can still be used as-is to build and run the tools
+(e.g. `pixi add` in place of `conda install`).
 
 First [install pixi](https://pixi.sh/latest/#installation) if you don't
 already have it. Then check out the software repository and build it:

@@ -44,7 +44,10 @@ vine_status
 ### Build From Source With Pixi
 
 As an alternative to conda, you can use [pixi](https://pixi.sh) to manage the
-build dependencies declared in `pixi.toml` (imported from `environment.yml`):
+build dependencies. This is primarily intended for developers: `environment.yml`
+remains the source of truth for dependencies, and `pixi.toml` is derived from it.
+If you are not developing cctools, pixi can still be used as-is to build and run
+the tools (e.g. `pixi add` in place of `conda install`).
 
 ```
 git clone git://github.com/cooperative-computing-lab/cctools.git cctools-src
