@@ -1999,7 +1999,12 @@ static struct list *interfaces_to_list(const char *canonical_host_or_addr, int p
 		for (void *i = NULL; (host_alias = jx_iterate_array(host_aliases, &i));) {
 			const char *address = jx_lookup_string(host_alias, "address");
 
-			if (address && strcmp(canonical_host_or_addr, address) == 0) {
+			if (!address) {
+				warn(D_NOTICE, "Skipping interface entry with missing or invalid 'address' field.");
+				continue;
+			}
+
+			if (strcmp(canonical_host_or_addr, address) == 0) {
 				found_canonical = 1;
 			}
 
