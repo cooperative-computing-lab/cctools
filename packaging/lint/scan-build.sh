@@ -20,14 +20,22 @@ C_PACKAGES="dttools batch_job taskvine grow makeflow work_queue ftp_lite resourc
 # --- locate scan-build and the ccc-analyzer/c++-analyzer wrapper scripts it needs ---
 
 SCAN_BUILD=""
-for candidate in scan-build scan-build-19 scan-build-18 scan-build-17 scan-build-16 scan-build-15
-do
-	if command -v "${candidate}" > /dev/null 2>&1
-	then
-		SCAN_BUILD="${candidate}"
-		break
-	fi
-done
+if command -v scan-build > /dev/null 2>&1
+then
+	SCAN_BUILD="scan-build"
+else
+	# Debian/Ubuntu package versioned scan-build as scan-build-<N> with no
+	# unversioned symlink guaranteed; search newest-first down to the
+	# oldest LLVM release still plausibly present on a runner.
+	for version in $(seq 30 -1 15)
+	do
+		if command -v "scan-build-${version}" > /dev/null 2>&1
+		then
+			SCAN_BUILD="scan-build-${version}"
+			break
+		fi
+	done
+fi
 
 if [ -z "${SCAN_BUILD}" ]
 then
