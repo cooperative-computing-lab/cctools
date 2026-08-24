@@ -12,7 +12,10 @@ from setuptools.dist import Distribution
 ROOT = Path(__file__).resolve().parent
 
 CONFIGURE_ARGS = [
-    "--strict",
+    # No --strict here (it adds -Werror): cibuildwheel's macOS builds target
+    # an older MACOSX_DEPLOYMENT_TARGET than the runner's SDK, which turns
+    # availability warnings (e.g. utimensat needing 10.13+) into hard errors.
+    # --strict is already enforced by this project's own native/conda CI.
     "--without-system-makeflow",
     "--without-system-ftp-lite",
     "--without-system-grow",
@@ -156,8 +159,19 @@ class build_py(_build_py):
         if archflags:
             env["CFLAGS"] = f"{env.get('CFLAGS', '')} {archflags}".strip()
             env["LDFLAGS"] = f"{env.get('LDFLAGS', '')} {archflags}".strip()
-        if not (ROOT / "config.mk").exists():
+        # cibuildwheel reuses this same checkout across every (Python version,
+        # arch) combo it builds on a macOS runner. If the arch changed since
+        # our last build here, stale objects from the previous arch (which
+        # Make has no way to know are for the wrong arch) linger and get
+        # linked alongside freshly-compiled ones -- so force a clean rebuild
+        # whenever ARCHFLAGS differs from what we last built with.
+        arch_marker = ROOT / ".wheel_build_archflags"
+        last_archflags = arch_marker.read_text() if arch_marker.exists() else None
+        if last_archflags != (archflags or ""):
+            if (ROOT / "config.mk").exists():
+                subprocess.check_call(["make", "clean"], cwd=ROOT, env=env)
             subprocess.check_call(["./configure", *CONFIGURE_ARGS], cwd=ROOT, env=env)
+            arch_marker.write_text(archflags or "")
         njobs = str(os.cpu_count() or 1)
         subprocess.check_call(["make", "-j", njobs, *MAKE_PACKAGES], cwd=ROOT, env=env)
 
