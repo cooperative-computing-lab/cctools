@@ -1,0 +1,24 @@
+include configure
+include configure.tools.sh
+include Makefile
+include rules.mk
+include COPYING
+include CREDITS
+include README.md
+
+recursive-include dttools *
+recursive-include batch_job *
+recursive-include chirp *
+recursive-include work_queue *
+recursive-include taskvine *
+recursive-include resource_monitor *
+recursive-include deltadb *
+
+global-exclude *.o
+global-exclude *.a
+global-exclude *.so
+global-exclude *.dylib
+global-exclude __pycache__
+global-exclude *.pyc
+prune build
+prune */.git

@@ -1,0 +1,50 @@
+name: Build wheels
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+  pull_request:
+    paths:
+      - pyproject.toml
+      - setup.py
+      - MANIFEST.in
+      - .github/workflows/wheels.yml
+
+jobs:
+  build_wheels:
+    name: wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU (for linux/aarch64)
+        if: matrix.os == 'ubuntu-latest'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      # Linux/macOS archs are set in pyproject.toml's [tool.cibuildwheel.*] tables.
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.21
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl
+
+  build_sdist:
+    name: sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx run build --sdist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz

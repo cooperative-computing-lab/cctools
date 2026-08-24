@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ndcctools"
+dynamic = ["version"]
+description = "Python bindings and worker/factory/status tools for TaskVine, Work Queue, Chirp, and Resource Monitor (Cooperative Computing Tools)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "GPL-2.0-only"
+# Published under btovar's personal PyPI account for now -- the
+# cooperative-computing-lab organization has not been authorized to publish yet.
+authors = [{ name = "Benjamin Tovar", email = "btovar@nd.edu" }]
+dependencies = ["cloudpickle", "packaging"]
+
+[project.urls]
+Homepage = "https://cctools.readthedocs.io"
+Source = "https://github.com/btovar/cctools"
+
+# Generated from BINARIES + SCRIPTS in setup.py -- keep in sync.
+[project.scripts]
+catalog_update = "ndcctools._bin:catalog_update"
+watchdog = "ndcctools._bin:watchdog"
+disk_allocator = "ndcctools._bin:disk_allocator"
+jx2json = "ndcctools._bin:jx2json"
+jx2env = "ndcctools._bin:jx2env"
+jx_repl = "ndcctools._bin:jx_repl"
+env_replace = "ndcctools._bin:env_replace"
+catalog_query = "ndcctools._bin:catalog_query"
+cctools_gpu_autodetect = "ndcctools._bin:cctools_gpu_autodetect"
+chirp = "ndcctools._bin:chirp"
+chirp_get = "ndcctools._bin:chirp_get"
+chirp_put = "ndcctools._bin:chirp_put"
+chirp_server = "ndcctools._bin:chirp_server"
+chirp_status = "ndcctools._bin:chirp_status"
+chirp_benchmark = "ndcctools._bin:chirp_benchmark"
+chirp_stream_files = "ndcctools._bin:chirp_stream_files"
+chirp_distribute = "ndcctools._bin:chirp_distribute"
+chirp_audit_cluster = "ndcctools._bin:chirp_audit_cluster"
+chirp_server_hdfs = "ndcctools._bin:chirp_server_hdfs"
+work_queue_worker = "ndcctools._bin:work_queue_worker"
+work_queue_status = "ndcctools._bin:work_queue_status"
+work_queue_example = "ndcctools._bin:work_queue_example"
+work_queue_submit_common = "ndcctools._bin:work_queue_submit_common"
+condor_submit_workers = "ndcctools._bin:condor_submit_workers"
+uge_submit_workers = "ndcctools._bin:uge_submit_workers"
+torque_submit_workers = "ndcctools._bin:torque_submit_workers"
+pbs_submit_workers = "ndcctools._bin:pbs_submit_workers"
+slurm_submit_workers = "ndcctools._bin:slurm_submit_workers"
+work_queue_graph_log = "ndcctools._bin:work_queue_graph_log"
+work_queue_graph_workers = "ndcctools._bin:work_queue_graph_workers"
+vine_worker = "ndcctools._bin:vine_worker"
+vine_status = "ndcctools._bin:vine_status"
+vine_benchmark = "ndcctools._bin:vine_benchmark"
+vine_plot_performance = "ndcctools._bin:vine_plot_performance"
+vine_plot_taskgraph = "ndcctools._bin:vine_plot_taskgraph"
+vine_plot_workers = "ndcctools._bin:vine_plot_workers"
+vine_plot_txn_log = "ndcctools._bin:vine_plot_txn_log"
+vine_submit_workers = "ndcctools._bin:vine_submit_workers"
+vine_plot_compose = "ndcctools._bin:vine_plot_compose"
+vine_plot_run = "ndcctools._bin:vine_plot_run"
+work_queue_factory = "ndcctools._bin:work_queue_factory"
+work_queue_pool = "ndcctools._bin:work_queue_pool"
+vine_factory = "ndcctools._bin:vine_factory"
+condor_chaos_monkey = "ndcctools._bin:condor_chaos_monkey"
+resource_monitor = "ndcctools._bin:resource_monitor"
+piggybacker = "ndcctools._bin:piggybacker"
+rmonitor_poll_example = "ndcctools._bin:rmonitor_poll_example"
+rmonitor_snapshot = "ndcctools._bin:rmonitor_snapshot"
+
+[tool.cibuildwheel]
+build = "cp39-* cp310-* cp311-* cp312-* cp313-*"
+skip = "*-musllinux* *-win32 *-manylinux_i686"
+build-verbosity = 1
+
+[tool.cibuildwheel.linux]
+before-all = "yum install -y swig openssl-devel zlib-devel || (apt-get update && apt-get install -y swig libssl-dev zlib1g-dev)"
+archs = ["x86_64", "aarch64"]
+
+[tool.cibuildwheel.macos]
+before-all = "brew install swig openssl@3"
+archs = ["x86_64", "arm64"]
