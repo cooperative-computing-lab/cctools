@@ -106,6 +106,11 @@ from importlib import resources
 
 def _exec(name):
     with resources.as_file(resources.files("ndcctools") / "_bin" / name) as path:
+        if not path.exists():
+            sys.exit(
+                f"{name!r} is not available in this ndcctools build "
+                "(upstream cctools does not build it for this OS/architecture)."
+            )
         os.execv(str(path), [str(path)] + sys.argv[1:])
 
 '''
@@ -158,6 +163,12 @@ class build_py(_build_py):
         bindir.mkdir(parents=True, exist_ok=True)
         for rel, name in [*BINARIES, *SCRIPTS, *RUNTIME_LIBRARIES]:
             src = ROOT / rel
+            if not src.exists():
+                # e.g. resource_monitor's binaries are only built by upstream's
+                # Makefile on native Linux/x86_64 (see CCTOOLS_LINUX_NATIVE_X86_64
+                # in resource_monitor/src/Makefile) -- absent elsewhere by design.
+                print(f"ndcctools: skipping {rel!r} (not built for this platform)")
+                continue
             target = bindir / name
             shutil.copy2(src, target)
             _make_executable(target)
