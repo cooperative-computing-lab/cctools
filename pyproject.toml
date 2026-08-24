@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=77", "packaging>=24.2", "wheel"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,10 @@ dynamic = ["version"]
 description = "Python bindings and worker/factory/status tools for TaskVine, Work Queue, Chirp, and Resource Monitor (Cooperative Computing Tools)"
 readme = "README.md"
 requires-python = ">=3.9"
-license = "GPL-2.0-only"
+# Classic (deprecated-but-working) form instead of the SPDX `license = "..."`
+# string: the SPDX form makes setuptools>=77 require packaging>=24.2, which
+# conflicts with the packaging==24.1 pin in cibuildwheel's cp39 constraints file.
+license = { text = "GPL-2.0-only" }
 # Published under btovar's personal PyPI account for now -- the
 # cooperative-computing-lab organization has not been authorized to publish yet.
 authors = [{ name = "Benjamin Tovar", email = "btovar@nd.edu" }]
