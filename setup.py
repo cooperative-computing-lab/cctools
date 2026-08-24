@@ -143,10 +143,23 @@ class build_py(_build_py):
         self._write_shims(dest)
 
     def _configure_and_make(self):
+        env = os.environ.copy()
+        # cibuildwheel sets ARCHFLAGS (e.g. "-arch x86_64") to cross-build a
+        # non-native macOS wheel on the runner's host arch; it's only consumed
+        # by Python's own distutils/setuptools build_ext, which our raw
+        # `configure && make` bypasses entirely. Without this, `configure`
+        # (which does seed its ccflags/ldflags from $CFLAGS/$LDFLAGS) compiles
+        # everything for the host's native arch, while the SWIG extension
+        # modules -- built using this venv's python3-config flags -- target
+        # the cross-build arch, and linking the two together fails.
+        archflags = env.get("ARCHFLAGS")
+        if archflags:
+            env["CFLAGS"] = f"{env.get('CFLAGS', '')} {archflags}".strip()
+            env["LDFLAGS"] = f"{env.get('LDFLAGS', '')} {archflags}".strip()
         if not (ROOT / "config.mk").exists():
-            subprocess.check_call(["./configure", *CONFIGURE_ARGS], cwd=ROOT)
+            subprocess.check_call(["./configure", *CONFIGURE_ARGS], cwd=ROOT, env=env)
         njobs = str(os.cpu_count() or 1)
-        subprocess.check_call(["make", "-j", njobs, *MAKE_PACKAGES], cwd=ROOT)
+        subprocess.check_call(["make", "-j", njobs, *MAKE_PACKAGES], cwd=ROOT, env=env)
 
     def _stage_python(self, dest):
         dest.mkdir(parents=True, exist_ok=True)
