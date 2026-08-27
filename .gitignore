@@ -14,6 +14,7 @@ config.mk
 site/
 work_queue/src/work_queue_example
 dttools/src/jx_repl
+.wheel_build_archflags
 # pixi environments
 .pixi/*
 !.pixi/config.toml
