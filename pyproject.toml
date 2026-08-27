@@ -76,6 +76,12 @@ rmonitor_snapshot = "ndcctools._bin:rmonitor_snapshot"
 build = "cp39-* cp310-* cp311-* cp312-* cp313-*"
 skip = "*-musllinux* *-win32 *-manylinux_i686"
 build-verbosity = 1
+# Actually load every bundled extension module post-repair (auditwheel/delocate),
+# so a broken link (missing/mismatched libssl, libz, glibc symbol skew, etc.) fails
+# the build here instead of only surfacing as a user's `pip install` breaking.
+# cibuildwheel skips this automatically for wheels it can't run natively (e.g. a
+# cross-compiled macOS arm64 wheel built on an x86_64 runner).
+test-command = "python -c \"import ndcctools.taskvine; import ndcctools.work_queue; import ndcctools.chirp; import ndcctools.resource_monitor\""
 
 [tool.cibuildwheel.linux]
 before-all = "yum install -y swig openssl-devel zlib-devel || (apt-get update && apt-get install -y swig libssl-dev zlib1g-dev)"
