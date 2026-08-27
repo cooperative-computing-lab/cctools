@@ -4089,14 +4089,13 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	}
 
 	/* compatibility code */
-	if (getenv("VINE_LOW_PORT"))
-		setenv("TCP_LOW_PORT", getenv("VINE_LOW_PORT"), 0);
-	if (getenv("VINE_HIGH_PORT"))
-		setenv("TCP_HIGH_PORT", getenv("VINE_HIGH_PORT"), 0);
+	setenv_compat("TCP_LOW_PORT", "VINE_LOW_PORT", 0);
+	setenv_compat("TCP_HIGH_PORT", "VINE_HIGH_PORT", 0);
 
 	char *runtime_dir = vine_runtime_directory_create();
 	if (!runtime_dir) {
 		debug(D_NOTICE, "Could not create runtime directories");
+		free(q);
 		return 0;
 	}
 
@@ -5552,6 +5551,11 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		result += shutdown_drained_workers(q);
 		vine_blocklist_unblock_all_by_time(q, time(0));
 		END_ACCUM_TIME(q, time_internal);
+		if (result) {
+			// removed at least one worker
+			events++;
+			continue;
+		}
 
 		// if new workers, connect n of them
 		BEGIN_ACCUM_TIME(q, time_status_msgs);

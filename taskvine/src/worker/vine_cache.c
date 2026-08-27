@@ -108,8 +108,11 @@ void vine_cache_load(struct vine_cache *c)
 			free(meta_path);
 			free(data_path);
 		}
+		/* Only close dir if opendir() actually succeeded -- closedir(NULL)
+		is undefined behavior and would crash on a missing/inaccessible
+		cache directory. */
+		closedir(dir);
 	}
-	closedir(dir);
 }
 
 /*

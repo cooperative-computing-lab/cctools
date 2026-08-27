@@ -866,6 +866,8 @@ int main(int argc, char *argv[])
 			case 'h':
 			default:
 				show_help(argv[0]);
+				free(pidfile);
+				free(interface);
 				return 1;
 			case 'l':
 				lifetime = string_time_parse(optarg);
@@ -924,6 +926,8 @@ int main(int argc, char *argv[])
 				break;
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
+				free(pidfile);
+				free(interface);
 				return 0;
 			case 'Y':
 				ssl_port_file = optarg;

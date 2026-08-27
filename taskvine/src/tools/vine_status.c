@@ -391,7 +391,10 @@ int find_child_relations(int spaces, const char *host, int port, struct jx_table
 	}
 
 	char *port_str = string_format(":%d", port);
-	strcat(full_address, port_str);
+	/* strncat, not strcat: full_address is already populated by
+	 * domain_name_cache_lookup above, so bound the append to what's left
+	 * in the buffer rather than trusting it to fit. */
+	strncat(full_address, port_str, sizeof(full_address) - strlen(full_address) - 1);
 	free(port_str);
 
 	while(global_catalog[i] != NULL)

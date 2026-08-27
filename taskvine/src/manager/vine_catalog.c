@@ -34,7 +34,9 @@ struct list *vine_catalog_query(const char *catalog_host, int catalog_port, cons
 	struct catalog_query *q;
 
 	if (catalog_port > 0) {
-		sprintf(hostport, "%s:%d", catalog_host, catalog_port);
+		/* snprintf, not sprintf: catalog_host comes from user/config input
+		 * and could exceed this buffer's DOMAIN_NAME_MAX-based size. */
+		snprintf(hostport, sizeof(hostport), "%s:%d", catalog_host, catalog_port);
 		q = catalog_query_create(hostport, 0, stoptime);
 	} else {
 		q = catalog_query_create(catalog_host, 0, stoptime);

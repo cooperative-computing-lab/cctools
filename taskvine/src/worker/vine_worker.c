@@ -214,6 +214,7 @@ __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const ch
 	link_vprintf(l, time(0) + options->active_timeout, fmt, va);
 
 	va_end(va);
+	va_end(debug_va);
 }
 
 /*
@@ -278,7 +279,9 @@ void send_async_message(struct link *l, const char *fmt, ...)
 	va_list va;
 	char *message = malloc(VINE_LINE_MAX);
 	va_start(va, fmt);
-	vsprintf(message, fmt, va);
+	/* Use vsnprintf (not vsprintf) so an over-length message is truncated
+	 * rather than overflowing this fixed-size heap buffer. */
+	vsnprintf(message, VINE_LINE_MAX, fmt, va);
 	va_end(va);
 
 	list_push_tail(pending_async_messages, message);
@@ -1392,6 +1395,12 @@ static int task_resources_fit_now(struct vine_task *t)
 	       (memory_allocated + t->resources_requested->memory <= total_resources->memory.total) &&
 	       ((t->needs_library || disk_allocated + t->resources_requested->disk <= total_resources->disk.total)) && (gpus_allocated + t->resources_requested->gpus <= total_resources->gpus.total);
 	// XXX Disk is constantly shrinking, and library disk requests are currently static. Once we generate some files things will hang.
+	// Known limitation: the disk check above is skipped entirely whenever t->needs_library is
+	// true, so library/function-call tasks are never weighed against total_resources->disk.total.
+	// As functions write output/temp files, worker disk keeps shrinking with no enforcement for
+	// this task class. A real fix needs a real (even approximate) per-function disk accounting
+	// so this branch can re-enable the disk.total check for library/function tasks instead of
+	// bypassing it. Left as a known gap rather than a tracked issue for now.
 }
 
 /*
@@ -1990,7 +1999,12 @@ static struct list *interfaces_to_list(const char *canonical_host_or_addr, int p
 		for (void *i = NULL; (host_alias = jx_iterate_array(host_aliases, &i));) {
 			const char *address = jx_lookup_string(host_alias, "address");
 
-			if (address && strcmp(canonical_host_or_addr, address) == 0) {
+			if (!address) {
+				warn(D_NOTICE, "Skipping interface entry with missing or invalid 'address' field.");
+				continue;
+			}
+
+			if (strcmp(canonical_host_or_addr, address) == 0) {
 				found_canonical = 1;
 			}
 

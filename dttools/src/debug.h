@@ -42,6 +42,25 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #include <stdarg.h>
 #include <stdio.h>
 
+/*
+Tells the clang static analyzer (scan-build) specifically that a function
+never returns, on top of (and independently of) the standard noreturn
+attribute below. The analyzer's path-sensitive checkers do not always
+trust a custom noreturn function to end a path, which otherwise produces
+a false-positive null-deref/uninitialized-value/etc finding at every call
+site guarded by fatal() -- one that would need a fresh suppression-file
+entry each time someone adds another fatal() call. See CCTOOLS_ANALYZER_NORETURN
+below on fatal() itself.
+*/
+#if defined(__has_attribute)
+#if __has_attribute(analyzer_noreturn)
+#define CCTOOLS_ANALYZER_NORETURN __attribute__((analyzer_noreturn))
+#endif
+#endif
+#ifndef CCTOOLS_ANALYZER_NORETURN
+#define CCTOOLS_ANALYZER_NORETURN
+#endif
+
 /* priority */
 #define D_INFO     (0LL)     /**< Indicates a message that is of general interest to the user. (the default) */
 #define D_FATAL    (1LL<<0)  /**< Indicates a message that is fatal. */
@@ -169,7 +188,12 @@ Displays a printf-style message, and then forcibly exits the program.
 @param fmt A printf-style formatting string, followed by the necessary arguments.
 */
 
-void fatal(const char *fmt, ...);
+void fatal(const char *fmt, ...)
+#ifndef SWIG
+__attribute__ ((noreturn))
+CCTOOLS_ANALYZER_NORETURN
+#endif
+;
 
 
 /** Emit a notice message.

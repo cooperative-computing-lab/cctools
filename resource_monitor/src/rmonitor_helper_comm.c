@@ -132,7 +132,7 @@ int find_localhost_addr(int port, struct addrinfo **addr)
 	return status;
 }
 
-int rmonitor_server_open_socket(int *fd, int *port)
+int rmonitor_server_open_socket(int *fd)
 {
 	struct addrinfo *addr;
 
@@ -157,13 +157,13 @@ int rmonitor_server_open_socket(int *fd, int *port)
 		return 0;
 	}
 
-	for (*port = low; *port <= high; *port += 1) {
-		int status = find_localhost_addr(*port, &addr);
+	for (int port = low; port <= high; port += 1) {
+		int status = find_localhost_addr(port, &addr);
 
 		if (!bind(*fd, addr->ai_addr, addr->ai_addrlen)) {
 			free(addr);
-			debug(D_RMON, "socket open at port %d\n", *port);
-			return *port;
+			debug(D_RMON, "socket open at port %d\n", port);
+			return port;
 		}
 
 		if (status == 0)
@@ -225,7 +225,7 @@ int rmonitor_helper_init(char *lib_default_path, int *fd, int stop_short_running
 
 	if (access(helper_absolute, R_OK | X_OK) == 0) {
 		debug(D_RMON, "found helper in %s\n", helper_absolute);
-		rmonitor_server_open_socket(fd, &port);
+		port = rmonitor_server_open_socket(fd);
 	} else {
 		debug(D_RMON, "couldn't find helper library %s but continuing anyway.", helper_path);
 		port = -1;

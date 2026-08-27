@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "catalog_query.h"
 #include "datagram.h"
 #include "domain_name_cache.h"
+#include "envtools.h"
 #include "hash_table.h"
 #include "interfaces_address.h"
 #include "itable.h"
@@ -395,6 +396,8 @@ static void delete_feature(struct work_queue_task *t, const char *name);
 
 static struct work_queue_factory_info *create_factory_info(struct work_queue *q, const char *name);
 static void remove_factory_info(struct work_queue *q, const char *name);
+
+void work_queue_file_delete(struct work_queue_file *tf);
 
 static void fill_deprecated_queue_stats(struct work_queue *q, struct work_queue_stats *s);
 static void fill_deprecated_tasks_stats(struct work_queue_task *t);
@@ -992,7 +995,11 @@ static struct work_queue_factory_info *create_factory_info(struct work_queue *q,
 	f->connected_workers = 0;
 	f->max_workers = INT_MAX;
 	f->seen_at_catalog = 0;
-	hash_table_insert(q->factory_table, name, f);
+	if(!hash_table_insert(q->factory_table, name, f)) {
+		free(f->name);
+		free(f);
+		return hash_table_lookup(q->factory_table, name);
+	}
 	return f;
 }
 
@@ -1647,7 +1654,9 @@ static work_queue_result_code_t get_output_file( struct work_queue *q, struct wo
 		struct stat local_info;
 		if (stat(f->payload,&local_info) == 0) {
 			struct remote_file_info *remote_info = remote_file_info_create(f->type,local_info.st_size,local_info.st_mtime);
-			hash_table_insert(w->current_files, f->cached_name, remote_info);
+			if(!hash_table_insert(w->current_files, f->cached_name, remote_info)) {
+				free(remote_info);
+			}
 		} else {
 			debug(D_NOTICE, "Cannot stat file %s: %s", f->payload, strerror(errno));
 		}
@@ -3490,7 +3499,9 @@ static work_queue_result_code_t send_item_if_not_cached( struct work_queue *q, s
 
 		if(result == WQ_SUCCESS && tf->flags & WORK_QUEUE_CACHE) {
 			remote_info = remote_file_info_create(tf->type,local_info.st_size,local_info.st_mtime);
-			hash_table_insert(w->current_files, tf->cached_name, remote_info);
+			if(!hash_table_insert(w->current_files, tf->cached_name, remote_info)) {
+				free(remote_info);
+			}
 		}
 
 		return result;
@@ -3592,7 +3603,9 @@ static work_queue_result_code_t send_special_if_not_cached( struct work_queue *q
 
 	if(tf->flags & WORK_QUEUE_CACHE) {
 		struct remote_file_info *remote_info = remote_file_info_create(tf->type,tf->length,time(0));
-		hash_table_insert(w->current_files,tf->cached_name,remote_info);
+		if(!hash_table_insert(w->current_files,tf->cached_name,remote_info)) {
+			free(remote_info);
+		}
 	}
 
 	return WQ_SUCCESS;
@@ -4870,9 +4883,10 @@ static int abort_slow_workers(struct work_queue *q)
 
 					q->stats->workers_fast_aborted++;
 					removed++;
+					/* w was just freed by remove_worker(); do not touch it again */
+				} else {
+					w->fast_abort_alarm = 1;
 				}
-
-				w->fast_abort_alarm = 1;
 			}
 		}
 	}
@@ -5599,6 +5613,7 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 	tf->payload = malloc(length);
 	if(!tf->payload) {
 		fprintf(stderr, "Error: failed to allocate memory for buffer with remote name %s and length %d bytes.\n", remote_name, length);
+		work_queue_file_delete(tf);
 		return 0;
 	}
 
@@ -5866,10 +5881,8 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	}
 
 	/* compatibility code */
-	if (getenv("WORK_QUEUE_LOW_PORT"))
-		setenv("TCP_LOW_PORT", getenv("WORK_QUEUE_LOW_PORT"), 0);
-	if (getenv("WORK_QUEUE_HIGH_PORT"))
-		setenv("TCP_HIGH_PORT", getenv("WORK_QUEUE_HIGH_PORT"), 0);
+	setenv_compat("TCP_LOW_PORT", "WORK_QUEUE_LOW_PORT", 0);
+	setenv_compat("TCP_HIGH_PORT", "WORK_QUEUE_HIGH_PORT", 0);
 
 	q->manager_link = link_serve(port);
 	if(!q->manager_link) {
@@ -6195,6 +6208,14 @@ void work_queue_delete(struct work_queue *q)
 		int iteration;
 		HASH_TABLE_ITERATE(q->factory_table, iteration, key, f) {
 			remove_factory_info(q, key);
+		}
+
+		{
+			char *blocked_hostname;
+			struct blocklist_host_info *binfo;
+			HASH_TABLE_ITERATE(q->worker_blocklist, iteration, blocked_hostname, binfo) {
+				free(binfo);
+			}
 		}
 
 		log_queue_stats(q, 1);
@@ -6716,6 +6737,7 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 void work_queue_block_host_with_timeout(struct work_queue *q, const char *hostname, time_t timeout)
 {
 	struct blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, hostname);
+	int is_new = !info;
 
 	if(!info) {
 		info = malloc(sizeof(struct blocklist_host_info));
@@ -6739,7 +6761,9 @@ void work_queue_block_host_with_timeout(struct work_queue *q, const char *hostna
 		info->release_at = -1;
 	}
 
-	hash_table_insert(q->worker_blocklist, hostname, (void *) info);
+	if(is_new) {
+		hash_table_insert(q->worker_blocklist, hostname, (void *) info);
+	}
 }
 
 void work_queue_block_host(struct work_queue *q, const char *hostname)
@@ -6751,8 +6775,7 @@ void work_queue_unblock_host(struct work_queue *q, const char *hostname)
 {
 	struct blocklist_host_info *info = hash_table_remove(q->worker_blocklist, hostname);
 	if(info) {
-		info->blocked = 0;
-		info->release_at  = 0;
+		free(info);
 	}
 }
 

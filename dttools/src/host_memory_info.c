@@ -60,9 +60,12 @@ int host_memory_usage_get(UINT64_T *rssp, UINT64_T *totalp)
 	if (!file)
 		return 0;
 
-	fscanf(file, "%lu %lu %lu %lu %lu %lu %lu", &total, &rss, &shared, &text, &libs, &data, &dirty);
+	int n = fscanf(file, "%lu %lu %lu %lu %lu %lu %lu", &total, &rss, &shared, &text, &libs, &data, &dirty);
 
 	fclose(file);
+
+	if (n != 7)
+		return 0;
 
 	*rssp = (UINT64_T)rss * getpagesize();
 	*totalp = (UINT64_T)total * getpagesize();

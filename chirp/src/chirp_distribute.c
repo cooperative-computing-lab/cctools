@@ -305,7 +305,10 @@ int main(int argc, char *argv[])
 	struct chirp_stat buf;
 
 	char home_dir[50];
-	sprintf(home_dir, "%s/.chirp", getenv("HOME"));
+	const char *home = getenv("HOME");
+	if(!home)
+		fatal("HOME environment variable is not set");
+	sprintf(home_dir, "%s/.chirp", home);
 	mkdir(home_dir, 0777);
 
 	result = chirp_reli_stat(sourcehost, sourcepath, &buf, time(0) + 20);
@@ -583,8 +586,17 @@ int main(int argc, char *argv[])
 		}
 	}
 	//set inital cluster state
-	int c_State[cluster_count];
-	for(i = 0; i < cluster_count; i++) {
+	/* cluster ids assigned above are 1..cluster_count (cluster_count is
+	incremented *before* being stamped onto servers[].cid, and the "unknown
+	servers" fallback below explicitly uses cid 0), so valid indices into
+	c_State run 0..cluster_count inclusive -- cluster_count+1 slots, not
+	cluster_count. A c_State[cluster_count]-sized array (the original code)
+	is one short and also degenerates to a zero-length VLA whenever
+	cluster_count is 0 (missing/empty clusterFile), both of which mean an
+	out-of-bounds write on c_State[...] = 1 further down. */
+	int c_state_size = cluster_count + 1;
+	int c_State[c_state_size];
+	for(i = 0; i < c_state_size; i++) {
 		c_State[i] = -1;	//-1: cluster does not have files, does not need files
 	}
 

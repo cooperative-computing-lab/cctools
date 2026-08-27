@@ -11,6 +11,7 @@ check_needed()
 		return 1
 	fi
 
+	import_config_val CCTOOLS_OPSYS
 	[ "${CCTOOLS_OPSYS}" = LINUX ] || return 1
 
 	return 0
@@ -27,7 +28,10 @@ run()
 	then
 		echo "valgrind found errors with the resource_monitor"
 		[ -f rmontior.valgrind ] && cat rmontior.valgrind
+		return 1
 	fi
+
+	return 0
 }
 
 clean()

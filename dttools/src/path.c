@@ -364,9 +364,8 @@ int path_within_dir(const char *path, const char *dir)
 	if (!realpath(dir, absolute_dir))
 		return 0;
 
-	char *p;
 	if (path[0] == '/') {
-		p = strstr(path, absolute_dir);
+		const char *p = strstr(path, absolute_dir);
 		if (p != path) {
 			return 0;
 		}
@@ -376,6 +375,7 @@ int path_within_dir(const char *path, const char *dir)
 	char *tmp_path = xxstrdup(path);
 
 	int rv = 1;
+	char *p;
 	while ((p = strrchr(tmp_path, '/')) != NULL) {
 		*p = '\0';
 		if (realpath(tmp_path, absolute_path)) {

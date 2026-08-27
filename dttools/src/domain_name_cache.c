@@ -70,6 +70,8 @@ int domain_name_cache_lookup(const char *name, char *addr)
 		return 1;
 
 	success = hash_cache_insert(name_to_addr, name, copy, DOMAIN_NAME_CACHE_LIFETIME);
+	if (!success)
+		free(copy);
 
 	return 1;
 }
@@ -97,6 +99,8 @@ int domain_name_cache_lookup_reverse(const char *addr, char *name)
 		return 1;
 
 	success = hash_cache_insert(addr_to_name, addr, copy, DOMAIN_NAME_CACHE_LIFETIME);
+	if (!success)
+		free(copy);
 
 	return 1;
 }
