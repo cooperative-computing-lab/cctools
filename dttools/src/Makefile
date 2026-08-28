@@ -129,6 +129,10 @@ SOURCES = \
 	uuid.c \
 	xpu_tracker.c \
 	xxmalloc.c \
+	gpu_commons.c \
+	nvidia_nvml_library.c \
+	gpu.c \
+
 
 HEADERS_PUBLIC = \
 	auth.h \
@@ -185,6 +189,9 @@ HEADERS_PUBLIC = \
 	unlink_recursive.h \
 	xpu_tracker.h \
 	xxmalloc.h \
+	gpu_commons.h \
+	nvidia_nvml_library.h \
+	gpu.h \
 
 LIBRARIES = libdttools.a
 
