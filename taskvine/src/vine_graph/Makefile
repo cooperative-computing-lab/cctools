@@ -15,13 +15,17 @@ OBJECTS   := $(SOURCES:%.c=%.o)
 SWIG_WRAP := vine_graph_wrap.c
 WRAP_OBJ  := vine_graph_wrap.o
 PYMODULE  := _$(MODULE_NAME).$(CCTOOLS_DYNAMIC_SUFFIX)
+PYMODULE_BINDING := $(PY_MODULE_DIR)/$(PYMODULE)
 
 LOCAL_LINKAGE += $(CCTOOLS_HOME)/dttools/src/progress_bar.o
 LOCAL_CCFLAGS += -I $(CCTOOLS_HOME)/taskvine/src/manager -I $(SOURCE_DIR)
 
 .PHONY: all install clean lint format test
 
-all: $(PYMODULE)
+all: $(PYMODULE_BINDING)
+
+$(PYMODULE_BINDING): $(PYMODULE)
+	cp $(PYMODULE) $(PYMODULE_BINDING)
 
 $(SWIG_WRAP): vine_graph.i vine_graph.h vine_graph_executor.h
 	$(CCTOOLS_SWIG) -python -threads -relativeimport \
@@ -59,7 +63,7 @@ install: all
 clean:
 	rm -f *.o
 	rm -rf __pycache__
-	rm -f $(SWIG_WRAP) $(WRAP_OBJ) $(PYMODULE) $(MODULE_NAME).py
+	rm -f $(SWIG_WRAP) $(WRAP_OBJ) $(PYMODULE) $(PYMODULE_BINDING) $(MODULE_NAME).py
 
 lint:
 	clang-format -Werror --dry-run --style='file:$(CCTOOLS_HOME)/.clang-format' $(SOURCE_DIR)/*.[ch]
