@@ -1658,6 +1658,7 @@ static void check_libraries_ready(struct link *manager)
 	uint64_t library_task_id;
 	struct vine_process *library_process;
 	int iteration;
+	struct list *failed_libraries = list_create();
 
 	struct link_info library_link_info;
 	library_link_info.events = LINK_READ;
@@ -1678,12 +1679,12 @@ static void check_libraries_ready(struct link *manager)
 				debug(D_VINE, "Library %s reports ready to execute functions.", library_process->task->provides_library);
 				library_process->library_ready = 1;
 			} else {
-				/* Kill library if it fails the startup check. */
+				/* Collect failed libraries so procs_running is not re-iterated here. */
 				debug(D_VINE,
 						"Library %s task id %" PRIu64 " verification failed (unexpected response). Killing it.",
 						library_process->task->provides_library,
 						library_task_id);
-				handle_failed_library_process(library_process, manager);
+				list_push_tail(failed_libraries, library_process);
 			}
 		} else {
 			/* The library is running and the link has no readable data, do nothing until the
@@ -1692,6 +1693,12 @@ static void check_libraries_ready(struct link *manager)
 
 		library_link_info.revents = 0;
 	}
+
+	while ((library_process = list_pop_head(failed_libraries))) {
+		handle_failed_library_process(library_process, manager);
+	}
+
+	list_delete(failed_libraries);
 }
 
 /* Start working for the (newly connected) manager on this given link. */
