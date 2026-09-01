@@ -4,23 +4,6 @@ Vine Graph describes a directed acyclic graph (DAG) of Python function calls and
 runs it with TaskVine. A `Workflow` records the tasks and their dependencies;
 `VineGraph` runs the graph and returns the requested results.
 
-## Build from source
-
-From the root of the CCTools source tree:
-
-```bash
-./configure --prefix="$PWD/install"
-make -j8
-export PYTHONPATH="$PWD/test_support/python_modules/python3${PYTHONPATH:+:$PYTHONPATH}"
-export PATH="$PWD/taskvine/src/worker:$PATH"
-```
-
-The extension is built in the source tree, so `make install` is not needed when
-working from a checkout.
-
-Vine Graph requires Python support, SWIG, and `cloudpickle`. The Dask adaptor
-also requires Dask.
-
 ## The programming model
 
 The main objects are:
@@ -341,9 +324,8 @@ create every file declared with `task.file()` before it exits successfully.
 
 ## Troubleshooting
 
-- An import error for `_vine_graph_capi` usually means the source tree was not
-  built after configuration, or `PYTHONPATH` does not point to the matching
-  in-tree bindings.
+- An import error for `_vine_graph_capi` usually means Python is loading the
+  wrong CCTools installation.
 - A manager that remains at zero completed tasks normally has no connected
   worker, or the worker cannot reach the manager port.
 - A task-runner library failure often means a task function refers to a module,
