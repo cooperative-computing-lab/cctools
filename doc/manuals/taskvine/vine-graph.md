@@ -1,13 +1,8 @@
-# Vine Graph User Manual
+# Vine Graph
 
-Vine Graph is a Python interface for describing a directed acyclic graph (DAG)
-of function calls and executing it with TaskVine. A `Workflow` records tasks and
-their dependencies, while `VineGraph` manages execution and returns only the
-results that the application requests.
-
-This manual covers the current API on the `task-graph` branch. Every complete
-example and command sequence in this document is exercised as part of the
-manual's acceptance test.
+Vine Graph describes a directed acyclic graph (DAG) of Python function calls and
+runs it with TaskVine. A `Workflow` records the tasks and their dependencies;
+`VineGraph` runs the graph and returns the requested results.
 
 ## Build from source
 
@@ -20,8 +15,8 @@ export PYTHONPATH="$PWD/test_support/python_modules/python3${PYTHONPATH:+:$PYTHO
 export PATH="$PWD/taskvine/src/worker:$PATH"
 ```
 
-The build places the Vine Graph extension in the in-tree Python package. A
-separate `make install` is not required for development-tree testing.
+The extension is built in the source tree, so `make install` is not needed when
+working from a checkout.
 
 Vine Graph requires Python support, SWIG, and `cloudpickle`. The Dask adaptor
 also requires Dask.
@@ -43,8 +38,9 @@ returned dictionary is keyed by the target handles supplied by the caller.
 
 ## First workflow: local execution
 
-Local execution is useful for learning, debugging functions, and checking graph
-construction without starting a worker. Save this as `vine_graph_local.py`:
+Local execution runs the graph in the manager process and does not need a
+worker. It is handy for checking graph construction and task functions. Create
+`vine_graph_local.py`:
 
 ```python
 from ndcctools.taskvine.vine_graph import VineGraph, Workflow
@@ -102,7 +98,8 @@ Use `workflow.file(path)` for an existing frontend file. Use
 `task.file(relative_path)` for a file that the task will create inside its
 sandbox. A consumer receives either kind of handle as a local path string.
 
-Save this as `vine_graph_files.py`:
+For example, `vine_graph_files.py` passes a frontend file to one task and its
+output file to another:
 
 ```python
 from pathlib import Path
@@ -152,7 +149,7 @@ belong to one `Workflow` and cannot be passed into another workflow.
 ## Distributed execution with a worker
 
 Distributed mode is the default. The manager creates a TaskVine task-runner
-library and waits for workers to execute graph nodes. Save this as
+library, and workers execute the graph nodes. Create
 `vine_graph_distributed.py`:
 
 ```python
@@ -192,8 +189,7 @@ assert results[total] == 55
 print(results[total])
 ```
 
-The following sequence starts the manager, waits for its port file, starts one
-local worker, and waits for both processes to finish:
+Run the manager and one local worker:
 
 ```bash
 python vine_graph_distributed.py vine.port &
@@ -209,14 +205,13 @@ modules, constants, or helper functions from the application module.
 `env_files` maps frontend paths to names made available in the task-runner
 environment.
 
-To scale beyond one local worker, start workers with the usual TaskVine tools
-for the target batch system and point them at the same manager address or name.
+For more workers, use the usual TaskVine tools for the target batch system and
+point them at the same manager address or name.
 
 ## Dask graphs
 
-Set `from_dask=True` to convert a Dask-style graph. This supports low-level task
-dictionaries and common Dask collection forms. Save this as
-`vine_graph_dask.py`:
+Set `from_dask=True` to convert a Dask-style graph. Low-level task dictionaries
+and common Dask collection forms are supported. For example:
 
 ```python
 from ndcctools.taskvine.vine_graph import VineGraph
@@ -256,8 +251,8 @@ collection and non-collection values in that dictionary.
 ## Static Graphed plans
 
 `VineGraphGraphedAdaptor` converts a static plan that provides `process`,
-`combine`, `empty`, and `tasks`. Each task must have `key` and `partition`
-attributes. Save this protocol example as `vine_graph_graphed.py`:
+`combine`, `empty`, and `tasks`. Each task needs `key` and `partition`
+attributes. The following example shows the protocol:
 
 ```python
 from dataclasses import dataclass
@@ -359,7 +354,7 @@ create every file declared with `task.file()` before it exits successfully.
 
 ## Run the project regression tests
 
-From the repository root, run the enabled Vine Graph regression tests with:
+From the repository root:
 
 ```bash
 cd taskvine/test
@@ -371,6 +366,5 @@ cd taskvine/test
 ./TR_vine_graph_task_group.sh run
 ```
 
-These tests cover distributed execution, structured arguments, frontend and
-task-produced files, target selection, Dask conversion, task grouping, and
-result equivalence.
+The tests exercise distributed execution, structured arguments, file passing,
+target selection, Dask conversion, and task grouping.
