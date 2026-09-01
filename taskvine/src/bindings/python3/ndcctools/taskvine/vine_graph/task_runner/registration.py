@@ -5,11 +5,14 @@
 import os
 import uuid
 import cloudpickle
+import copy
+import dataclasses
 import types
 import time
 import random
 import hashlib
 import collections
+import collections.abc
 
 from ..workflow import FileHandle, TaskHandle, TaskOutputHandle, TaskOutputWrapper, Workflow, _TaskOutputAttribute
 from .execution import run_scheduler_keys
@@ -27,8 +30,8 @@ class TaskRunnerRegistration:
 
         # These modules are included in the generated function context so task calls can execute directly.
         self.hoisting_modules = [
-            os, cloudpickle, Workflow, FileHandle, TaskHandle, TaskOutputHandle, TaskOutputWrapper, _TaskOutputAttribute,
-            uuid, hashlib, random, types, collections, time,
+            os, cloudpickle, copy, dataclasses, uuid, hashlib, random, types, collections, collections.abc, time,
+            Workflow, FileHandle, TaskHandle, TaskOutputHandle, TaskOutputWrapper, _TaskOutputAttribute,
             load_variable_from_library, run_scheduler_keys
         ]
 

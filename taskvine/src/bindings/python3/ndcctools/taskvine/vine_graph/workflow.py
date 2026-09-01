@@ -2,8 +2,8 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-from collections import defaultdict, deque
-from collections.abc import Mapping
+import collections
+import collections.abc
 import copy
 import dataclasses
 import cloudpickle
@@ -135,17 +135,17 @@ class Workflow:
 
         self.task_dict = {}
 
-        self.parents_of = defaultdict(set)     # workflow_key -> set of workflow_keys
-        self.children_of = defaultdict(set)    # workflow_key -> set of workflow_keys
+        self.parents_of = collections.defaultdict(set)     # workflow_key -> set of workflow_keys
+        self.children_of = collections.defaultdict(set)    # workflow_key -> set of workflow_keys
 
         self.input_files = {}                  # file_id -> absolute frontend path
         self.output_files = {}                 # file_id -> (producer task id, task-relative path)
-        self.output_files_by_task = defaultdict(dict)  # task id -> relative path -> file_id
-        self.file_consumers = defaultdict(set) # file_id -> consumer task ids
+        self.output_files_by_task = collections.defaultdict(dict)  # task id -> relative path -> file_id
+        self.file_consumers = collections.defaultdict(set) # file_id -> consumer task ids
         self._local_execute = False
         self._local_file_paths = {}
 
-        self.outfile_remote_name = defaultdict(lambda: None)   # workflow_key -> remote outfile name, will be set by the executor graph
+        self.outfile_remote_name = collections.defaultdict(lambda: None)   # workflow_key -> remote outfile name, will be set by the executor graph
 
         self.task_id_to_scheduler_key = {}                  # workflow_key -> scheduler key (C node id)
         self.scheduler_key_to_task_id = {}                  # scheduler key -> workflow_key
@@ -176,12 +176,12 @@ class Workflow:
             seen.add(oid)
             if dataclasses.is_dataclass(key) and not isinstance(key, type):
                 return any(dict_key_contains_ref(getattr(key, f.name), seen) for f in dataclasses.fields(key))
-            if isinstance(key, Mapping):
+            if isinstance(key, collections.abc.Mapping):
                 return any(
                     dict_key_contains_ref(k, seen) or dict_key_contains_ref(v, seen)
                     for k, v in key.items()
                 )
-            if isinstance(key, (list, tuple, set, frozenset, deque)):
+            if isinstance(key, (list, tuple, set, frozenset, collections.deque)):
                 return any(dict_key_contains_ref(v, seen) for v in key)
             try:
                 state = vars(key)
@@ -217,7 +217,7 @@ class Workflow:
             if not rewrite:
                 memo[oid] = None
 
-            if isinstance(x, Mapping):
+            if isinstance(x, collections.abc.Mapping):
                 for k in x.keys():
                     if dict_key_contains_ref(k, set()):
                         raise ValueError("dependency handles cannot be used as dict keys")
@@ -248,12 +248,12 @@ class Workflow:
                 out.extend(rec(v) for v in x)
                 return out
 
-            if isinstance(x, deque):
+            if isinstance(x, collections.deque):
                 if not rewrite:
                     for v in x:
                         rec(v)
                     return None
-                out = deque(maxlen=x.maxlen)
+                out = collections.deque(maxlen=x.maxlen)
                 memo[oid] = out
                 out.extend(rec(v) for v in x)
                 return out
@@ -453,7 +453,7 @@ class Workflow:
         for workflow_key in self.task_dict:
             indegree[workflow_key] = len(self.parents_of.get(workflow_key, ()))
 
-        q = deque(t for t, d in indegree.items() if d == 0)
+        q = collections.deque(t for t, d in indegree.items() if d == 0)
         order = []
 
         while q:
