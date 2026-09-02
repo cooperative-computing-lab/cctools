@@ -155,7 +155,7 @@ workflow = Workflow()
 squares = [workflow.add_task(square, value) for value in range(1, 6)]
 total = workflow.add_task(add_all, *(task.output() for task in squares))
 
-with VineGraph(port=0) as manager:
+with VineGraph(port=0, name="vine-graph-example") as manager:
     port_file.write_text(str(manager.port))
     results = manager.run(
         workflow,
@@ -180,8 +180,72 @@ vine_worker --single-shot localhost "$(tr -d '[:space:]' < vine.port)"
 wait "$manager_pid"
 ```
 
-For more workers, use the usual TaskVine tools for the target batch system and
-point them at the same manager address or name.
+The manager name is used by remote workers to find the manager through the
+TaskVine catalog.
+
+## HTCondor workers
+
+Start the manager:
+
+```bash
+python vine_graph_distributed.py vine.port
+```
+
+In another shell, submit workers to HTCondor:
+
+```bash
+vine_submit_workers -T condor -M vine-graph-example \
+  --cores 4 --timeout 60 5
+```
+
+This submits five workers with four cores each. They exit after being idle for
+60 seconds. Use `condor_q` to check their status.
+
+## Using a factory
+
+A factory adds and removes workers as the workload changes. Keep the manager
+running, then start the factory in another shell:
+
+```bash
+vine_factory -T condor -M vine-graph-example \
+  --min-workers 1 --max-workers 10 --cores 4 \
+  --factory-timeout 60
+```
+
+The factory exits after it has not seen the manager for 60 seconds. It can also
+be stopped with `Ctrl-C`.
+
+## Using a Poncho environment
+
+Activate the conda environment that contains CCTools and the packages used by
+the task functions, then pack it:
+
+```bash
+poncho_package_create --ignore-editable-packages \
+  "$CONDA_PREFIX" vine-graph-env.tar.gz
+poncho_package_run -e vine-graph-env.tar.gz -- \
+  python -c 'from ndcctools.taskvine.vine_graph import VineGraph'
+```
+
+Editable packages are not included. Install any package needed by the tasks
+normally before creating the tarball.
+
+Pass the package when submitting workers:
+
+```bash
+vine_submit_workers -T condor -M vine-graph-example \
+  --cores 4 --timeout 60 \
+  --poncho-env vine-graph-env.tar.gz 5
+```
+
+The same package can be used with a factory:
+
+```bash
+vine_factory -T condor -M vine-graph-example \
+  --min-workers 1 --max-workers 10 --cores 4 \
+  --poncho-env vine-graph-env.tar.gz \
+  --factory-timeout 60
+```
 
 ## Dask graphs
 
