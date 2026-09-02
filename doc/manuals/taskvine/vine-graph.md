@@ -164,8 +164,6 @@ with VineGraph(port=0) as manager:
             "libcores": 4,
             "output-dir": "./vine-graph-distributed-output",
         },
-        hoisting_modules=[sys.modules[__name__]],
-        env_files={__file__: Path(__file__).name},
     )
 
 assert results[total] == 55
@@ -181,12 +179,6 @@ while [ ! -s vine.port ]; do sleep 1; done
 vine_worker --single-shot localhost "$(tr -d '[:space:]' < vine.port)"
 wait "$manager_pid"
 ```
-
-`hoisting_modules` makes module-level definitions available in the generated
-task-runner library. Use it when task functions depend on classes, imported
-modules, constants, or helper functions from the application module.
-`env_files` maps frontend paths to names made available in the task-runner
-environment.
 
 For more workers, use the usual TaskVine tools for the target batch system and
 point them at the same manager address or name.
@@ -230,63 +222,6 @@ print(results["answer"])
 
 For Dask collections, pass a dictionary of Dask collection objects. Do not mix
 collection and non-collection values in that dictionary.
-
-## Static Graphed plans
-
-`VineGraphGraphedAdaptor` converts a static plan that provides `process`,
-`combine`, `empty`, and `tasks`. Each task needs `key` and `partition`
-attributes. The following example shows the protocol:
-
-```python
-from dataclasses import dataclass
-
-from ndcctools.taskvine.vine_graph import VineGraph, VineGraphGraphedAdaptor
-
-
-@dataclass
-class PlanTask:
-    key: str
-    partition: tuple
-
-
-class StaticPlan:
-    next_tasks = None
-    stop = None
-
-    def __init__(self):
-        self.tasks = [
-            PlanTask("left", (1, 2)),
-            PlanTask("right", (3, 4)),
-        ]
-
-    def empty(self):
-        return 0
-
-    def process(self, partition, resources):
-        return sum(partition)
-
-    def combine(self, left, right):
-        return left + right
-
-
-adapted = VineGraphGraphedAdaptor(StaticPlan())
-
-with VineGraph(port=0) as manager:
-    results = manager.run(
-        adapted.converted,
-        targets=adapted.targets,
-        params={
-            "local-execute": 1,
-            "output-dir": "./vine-graph-graphed-output",
-        },
-    )
-
-assert results[adapted.target] == 10
-print(results[adapted.target])
-```
-
-Only static plans are supported. Plans with `next_tasks` or a stop condition are
-rejected.
 
 ## Execution parameters
 
