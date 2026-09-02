@@ -136,9 +136,6 @@ library, and workers execute the graph nodes. Create
 `vine_graph_distributed.py`:
 
 ```python
-from pathlib import Path
-import sys
-
 from ndcctools.taskvine.vine_graph import VineGraph, Workflow
 
 
@@ -150,13 +147,11 @@ def add_all(*values):
     return sum(values)
 
 
-port_file = Path(sys.argv[1])
 workflow = Workflow()
 squares = [workflow.add_task(square, value) for value in range(1, 6)]
 total = workflow.add_task(add_all, *(task.output() for task in squares))
 
 with VineGraph(port=0, name="vine-graph-example") as manager:
-    port_file.write_text(str(manager.port))
     results = manager.run(
         workflow,
         targets=[total],
@@ -170,14 +165,16 @@ assert results[total] == 55
 print(results[total])
 ```
 
-Run the manager and one local worker:
+Run the manager in one terminal:
 
 ```bash
-python vine_graph_distributed.py vine.port &
-manager_pid=$!
-while [ ! -s vine.port ]; do sleep 1; done
-vine_worker --single-shot localhost "$(tr -d '[:space:]' < vine.port)"
-wait "$manager_pid"
+python vine_graph_distributed.py
+```
+
+Start a worker in another terminal:
+
+```bash
+vine_worker -M vine-graph-example --single-shot
 ```
 
 The manager name is used by remote workers to find the manager through the
@@ -188,7 +185,7 @@ TaskVine catalog.
 Start the manager:
 
 ```bash
-python vine_graph_distributed.py vine.port
+python vine_graph_distributed.py
 ```
 
 In another shell, submit workers to HTCondor:
