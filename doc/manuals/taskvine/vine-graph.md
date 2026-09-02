@@ -297,6 +297,3 @@ cd taskvine/test
 ./TR_vine_graph_dask_adaptor.sh prepare
 ./TR_vine_graph_dask_adaptor.sh run
 ```
-
-The tests exercise distributed execution, structured arguments, file passing,
-target selection, and Dask conversion.
