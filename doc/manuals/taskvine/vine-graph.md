@@ -286,17 +286,6 @@ Useful parameters include:
 The `repeats` argument to `run()` can replicate a graph for throughput tests.
 It cannot be combined with `FileHandle` dependencies.
 
-## Supported argument structures
-
-Task output and file handles can appear inside lists, tuples, dictionaries,
-sets, frozen sets, deques, named tuples, and dataclass instances. Shared
-references and cycles in mutable containers are preserved. Dependency handles
-cannot be dictionary keys, and handles hidden inside arbitrary custom objects
-are rejected; use a dataclass for structured arguments.
-
-Task functions and arguments must be serializable by `cloudpickle`. A task must
-create every file declared with `task.file()` before it exits successfully.
-
 ## Run the project regression tests
 
 From the repository root:
