@@ -174,11 +174,14 @@ python vine_graph_distributed.py
 Start a worker in another terminal:
 
 ```bash
-vine_worker -M vine-graph-example
+vine_worker -M vine-graph-example --cores 4
 ```
 
 The manager name is used by remote workers to find the manager through the
 TaskVine catalog. Stop the worker with `Ctrl-C`.
+
+`--cores` on `vine_worker`, `vine_submit_workers`, and `vine_factory` must match
+the manager's `libcores`. All examples here use 4.
 
 ## HTCondor workers
 
@@ -279,11 +282,6 @@ Useful parameters include:
 | `output-dir` | Store serialized results; local mode also stores task sandboxes here. |
 | `checkpoint-dir` | Store executor checkpoints here. |
 | `libcores` | Number of cores assigned to the task-runner library. |
-| `task-priority-mode` | Select graph scheduling order. |
-| `progress-bar-update-interval-sec` | Control progress refresh frequency. |
-
-Valid priority modes are `random`, `depth-first`, `breadth-first`, `fifo`,
-`lifo`, `largest-input-first`, and `largest-storage-footprint-first`.
 
 The `repeats` argument to `run()` can replicate a graph for throughput tests.
 It cannot be combined with `FileHandle` dependencies.
