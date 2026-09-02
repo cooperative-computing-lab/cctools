@@ -283,9 +283,6 @@ Useful parameters include:
 | `checkpoint-dir` | Store executor checkpoints here. |
 | `libcores` | Number of cores assigned to the task-runner library. |
 
-The `repeats` argument to `run()` can replicate a graph for throughput tests.
-It cannot be combined with `FileHandle` dependencies.
-
 ## Run the project regression tests
 
 From the repository root:
