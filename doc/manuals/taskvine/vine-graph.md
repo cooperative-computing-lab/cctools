@@ -301,7 +301,6 @@ Useful parameters include:
 | `output-dir` | Store serialized results; local mode also stores task sandboxes here. |
 | `checkpoint-dir` | Store executor checkpoints here. |
 | `libcores` | Number of cores assigned to the task-runner library. |
-| `task-group` | Merge eligible linear chains when set to `1`. |
 | `task-priority-mode` | Select graph scheduling order. |
 | `progress-bar-update-interval-sec` | Control progress refresh frequency. |
 
@@ -332,9 +331,7 @@ cd taskvine/test
 ./TR_vine_graph_workflow_examples.sh run
 ./TR_vine_graph_dask_adaptor.sh prepare
 ./TR_vine_graph_dask_adaptor.sh run
-./TR_vine_graph_task_group.sh prepare
-./TR_vine_graph_task_group.sh run
 ```
 
 The tests exercise distributed execution, structured arguments, file passing,
-target selection, Dask conversion, and task grouping.
+target selection, and Dask conversion.
