@@ -322,18 +322,6 @@ are rejected; use a dataclass for structured arguments.
 Task functions and arguments must be serializable by `cloudpickle`. A task must
 create every file declared with `task.file()` before it exits successfully.
 
-## Troubleshooting
-
-- An import error for `_vine_graph_capi` usually means Python is loading the
-  wrong CCTools installation.
-- A manager that remains at zero completed tasks normally has no connected
-  worker, or the worker cannot reach the manager port.
-- A task-runner library failure often means a task function refers to a module,
-  class, constant, or helper that was not included in `hoisting_modules`.
-- Use a unique `output-dir` and `checkpoint-dir` for concurrent workflows.
-- Use `local-execute` first to separate graph/function errors from worker or
-  network errors.
-
 ## Run the project regression tests
 
 From the repository root:
