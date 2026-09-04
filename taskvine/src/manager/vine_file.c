@@ -373,6 +373,20 @@ const char *vine_file_source(struct vine_file *f)
 	return f->source;
 }
 
+const char *vine_file_cached_name(struct vine_file *f)
+{
+	return f ? f->cached_name : NULL;
+}
+
+int vine_file_is_recovering(struct vine_file *f)
+{
+	if (!f || f->type != VINE_TEMP || !f->recovery_task) {
+		return 0;
+	}
+
+	return f->recovery_task->state != VINE_TASK_INITIAL && f->recovery_task->state != VINE_TASK_DONE;
+}
+
 void vine_file_set_mode(struct vine_file *f, int mode)
 {
 	/* The mode must contain, at a minimum, owner-rw (0600) (so that we can delete it) */
