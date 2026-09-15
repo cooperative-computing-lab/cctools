@@ -3721,7 +3721,6 @@ static int send_one_task(struct vine_manager *q)
 
 	if (q->hungry_internal) {
 		skip_list_seek(q->ready_tasks_cr, 0);
-		q->attempt_schedule_depth = vine_hungry(q);
 
 	}
 

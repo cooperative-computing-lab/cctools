@@ -328,6 +328,14 @@ class Task(object):
         return cvine.vine_task_set_category(self._task, name)
 
     ##
+    # Label the task with the given semantic category. Tasks in the same semantic category
+    # are related and may possess data locality and parallelism opportunities.
+    # @param self       Reference to the current task object.
+    # @param name       The name of the category
+    def set_semantic_category(self, name):
+        return cvine.vine_task_set_category(self._task, name)
+
+    ##
     # Label the task with the given user-defined feature. Tasks with the
     # feature will only run on workers that provide it (see worker's
     # --feature option).
