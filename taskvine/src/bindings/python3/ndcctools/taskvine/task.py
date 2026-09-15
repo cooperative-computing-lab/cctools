@@ -333,7 +333,7 @@ class Task(object):
     # @param self       Reference to the current task object.
     # @param name       The name of the category
     def set_semantic_category(self, name):
-        return cvine.vine_task_set_category(self._task, name)
+        return cvine.vine_task_set_semantic_category(self._task, name)
 
     ##
     # Label the task with the given user-defined feature. Tasks with the
