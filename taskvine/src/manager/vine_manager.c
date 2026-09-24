@@ -455,6 +455,14 @@ static vine_msg_code_t handle_cache_update(struct vine_manager *q, struct vine_w
 
 		vine_txn_log_write_cache_update(q, w, size, transfer_time, start_time, cachename);
 
+		/* process_replica_on_eventt may have deleted the replica,
+		 * so we check here again and return if there's nothing
+		 * more to update */
+		replica = vine_file_replica_table_lookup(w, cachename);
+		if (!replica) {
+			return VINE_MSG_PROCESSED;
+		}
+
 		w->resources->disk.inuse += BYTES_TO_MEGABYTES(size);
 
 		/* If the replica corresponds to a declared file. */
