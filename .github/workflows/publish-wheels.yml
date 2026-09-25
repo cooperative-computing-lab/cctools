@@ -1,0 +1,68 @@
+name: Publish wheels to PyPI
+
+# Only release/* *tags* trigger a publish (not release/* branches, which also
+# exist in this repo). Building on every PR/push (to catch a PR that breaks
+# packaging) happens separately in testing.yml's build-wheels/build-sdist jobs
+# -- this workflow only runs at actual release time.
+on:
+  push:
+    tags:
+      - 'release/*'
+
+jobs:
+  build_wheels:
+    name: wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU (for linux/aarch64)
+        if: matrix.os == 'ubuntu-latest'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      # Linux/macOS archs are set in pyproject.toml's [tool.cibuildwheel.*] tables.
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.21
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl
+
+  build_sdist:
+    name: sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx run build --sdist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  publish:
+    name: Publish to PyPI
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/ndcctools
+    permissions:
+      id-token: write # required for PyPI trusted publishing (OIDC) -- no API token/secret needed
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1

@@ -325,3 +325,55 @@ jobs:
         run: make dttools taskvine work_queue makeflow resource_monitor
       - name: run valgrind regression tests
         run: ${GITHUB_WORKSPACE}/packaging/valgrind/run-valgrind-tests.sh
+
+  # Build-only (no publish): validates that pyproject.toml/setup.py still
+  # produce working wheels/sdist on every PR and push, so a change that
+  # breaks packaging is caught here rather than only at release time.
+  # Publishing to PyPI happens from a separate workflow (publish-wheels.yml),
+  # triggered only by pushing a release/* tag.
+  build-wheels:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+    steps:
+      - name: checkout CCTools from branch head
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/checkout@v4
+      - name: checkout CCTools from tag
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      - name: Set up QEMU (for linux/aarch64)
+        if: matrix.os == 'ubuntu-latest'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      # Linux/macOS archs are set in pyproject.toml's [tool.cibuildwheel.*] tables.
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.21
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl
+
+  build-sdist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: checkout CCTools from branch head
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/checkout@v4
+      - name: checkout CCTools from tag
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      - run: pipx run build --sdist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
