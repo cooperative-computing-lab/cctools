@@ -4479,10 +4479,13 @@ static void delete_task_at_exit(struct vine_task *t)
 		return;
 	}
 
+	/* t may be freed by the next delete, so remember its type. */
+	vine_task_type_t type = t->type;
+
 	/* Each task in q->tasks has one reference that was added by the vine_manager. */
 	vine_task_delete(t);
 
-	switch (t->type) {
+	switch (type) {
 	case VINE_TASK_TYPE_STANDARD:
 		/* The user created, and the user must delete. */
 		break;
