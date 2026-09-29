@@ -293,6 +293,11 @@ struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, 
 
 void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason);
 
+/* Mark a worker to be removed at the next disconnect_failed_workers in the wait loop. Use instead of
+ * vine_manager_remove_worker outside of the wait loop, where the caller may still use the worker, or its
+ * link may still be in the poll table. Only the first reason is kept. The reason cannot be VINE_WORKER_DISCONNECT_UNKNOWN. */
+void vine_manager_mark_worker_for_removal(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason);
+
 /* Check if the worker is able to transfer the necessary files for this task. */
 int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);
 

@@ -33,7 +33,7 @@ static int worker_can_peer_transfer(struct vine_worker_info *w)
 	if (!w->transfer_port_active) {
 		return 0;
 	}
-	if (w->draining) {
+	if (w->draining || w->pending_removal) {
 		return 0;
 	}
 	if (!w->resources) {
@@ -361,6 +361,17 @@ void vine_temp_clean_redundant_replicas(struct vine_manager *q, struct vine_file
 	 * Therefore, we must wait until all replicas are confirmed ready before proceeding. */
 	if (vine_file_replica_table_count_replicas(q, f->cached_name, VINE_FILE_REPLICA_STATE_READY) != set_size(source_workers)) {
 		return;
+	}
+
+	/* A worker that is going to be removed still counts as a replica, so we could end up
+	 * removing the replicas that will not be lost. Wait until the worker is removed. */
+	struct vine_worker_info *pending_worker = NULL;
+	int pending_iteration;
+	SET_ITERATE(source_workers, pending_iteration, pending_worker)
+	{
+		if (pending_worker->pending_removal) {
+			return;
+		}
 	}
 
 	struct priority_queue *clean_replicas_from_workers = priority_queue_create(0);

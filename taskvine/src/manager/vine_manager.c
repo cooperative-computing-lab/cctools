@@ -165,7 +165,7 @@ void vine_disable_monitoring(struct vine_manager *q);
 static void aggregate_workers_resources(
 		struct vine_manager *q, struct vine_resources *rtotal, struct vine_resources *rmin, struct vine_resources *rmax, int64_t *inuse_cache, struct hash_table *features);
 static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout, const char *tag, int task_id);
-static void release_all_workers(struct vine_manager *q);
+static void disconnect_all_workers(struct vine_manager *q);
 
 static int vine_manager_check_inputs_available(struct vine_manager *q, struct vine_task *t);
 static void vine_manager_consider_recovery_task(struct vine_manager *q, struct vine_file *lost_file, struct vine_task *rt);
@@ -833,6 +833,11 @@ vine_msg_code_t vine_manager_recv(struct vine_manager *q, struct vine_worker_inf
 
 	do {
 		result = vine_manager_recv_no_retry(q, w, line, length);
+
+		/* A handler marked the worker for removal, do not wait for more messages from it. */
+		if (result == VINE_MSG_PROCESSED && w->pending_removal) {
+			return VINE_MSG_FAILURE;
+		}
 	} while (result == VINE_MSG_PROCESSED);
 
 	return result;
@@ -1036,7 +1041,7 @@ int vine_manager_release_random_worker(struct vine_manager *q)
 
 	HASH_TABLE_ITERATE_RANDOM_START(q->worker_table, iteration, offset_bookkeep, key, w)
 	{
-		if (!w) {
+		if (!w || w->pending_removal) {
 			continue;
 		}
 
@@ -1183,16 +1188,50 @@ void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info 
 	debug(D_VINE, "%d workers connected in total now", count_workers(q, VINE_WORKER_TYPE_WORKER));
 }
 
-/* Gently release a worker by sending it a release message, and then removing it. */
+/* Mark a worker for removal. The worker is actually removed in disconnect_failed_workers. */
+
+void vine_manager_mark_worker_for_removal(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason)
+{
+	if (!q || !w || w->pending_removal)
+		return;
+
+	debug(D_VINE, "worker %s (%s) marked for removal", w->hostname, w->addrport);
+
+	w->pending_removal = reason;
+}
+
+/* Remove the workers marked with vine_manager_mark_worker_for_removal.
+ * Must not be called from a message handler, or from other iterations that may use the workers. */
+
+static int disconnect_failed_workers(struct vine_manager *q)
+{
+	int removed = 0;
+
+	char *key;
+	struct vine_worker_info *w;
+	int iteration;
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
+	{
+		if (w->pending_removal) {
+			/* removing the current entry is safe, as it is only marked as deleted in the table. */
+			vine_manager_remove_worker(q, w, w->pending_removal);
+			removed++;
+		}
+	}
+
+	return removed;
+}
+
+/* Gently release a worker by sending it a release message, and then marking it for removal. */
 
 static int release_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
-	if (!w)
+	if (!w || w->pending_removal)
 		return 0;
 
 	vine_manager_send(q, w, "release\n");
 
-	vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_EXPLICIT);
+	vine_manager_mark_worker_for_removal(q, w, VINE_WORKER_DISCONNECT_EXPLICIT);
 
 	q->stats->workers_released++;
 
@@ -1581,7 +1620,7 @@ static void handle_app_failure(struct vine_manager *q, struct vine_worker_info *
 
 /*
 Failures happen in the manager-worker interactions. In this case,
-we remove the worker and retry the tasks dispatched to it elsewhere.
+we mark the worker to be removed, and its tasks are retried elsewhere when it is.
 */
 
 static void handle_worker_failure(struct vine_manager *q, struct vine_worker_info *w)
@@ -1591,7 +1630,7 @@ static void handle_worker_failure(struct vine_manager *q, struct vine_worker_inf
 		reason = VINE_WORKER_DISCONNECT_IDLE_OUT;
 	}
 
-	vine_manager_remove_worker(q, w, reason);
+	vine_manager_mark_worker_for_removal(q, w, reason);
 	return;
 }
 
@@ -2655,7 +2694,7 @@ static vine_result_code_t handle_worker(struct vine_manager *q, struct link *l)
 
 	case VINE_MSG_PROCESSED_DISCONNECT:
 		// A status query was received and processed, so disconnect.
-		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_STATUS_WORKER);
+		vine_manager_mark_worker_for_removal(q, w, VINE_WORKER_DISCONNECT_STATUS_WORKER);
 		// It was not really a failure, but signals to the calling code that the worker
 		// is not available anymore.
 		return VINE_WORKER_FAILURE;
@@ -2664,14 +2703,14 @@ static vine_result_code_t handle_worker(struct vine_manager *q, struct link *l)
 	case VINE_MSG_NOT_PROCESSED:
 		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		q->stats->workers_lost++;
-		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
+		handle_worker_failure(q, w);
 		return VINE_WORKER_FAILURE;
 		break;
 
 	case VINE_MSG_FAILURE:
 		debug(D_VINE, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
 		q->stats->workers_lost++;
-		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAILURE);
+		handle_worker_failure(q, w);
 		return VINE_WORKER_FAILURE;
 		break;
 	}
@@ -2718,6 +2757,11 @@ static int build_poll_table(struct vine_manager *q)
 				// if we can't allocate a poll table, we can't do anything else.
 				fatal("reallocating memory for poll table failed.");
 			}
+		}
+
+		/* workers pending removal are not read anymore. */
+		if (w->pending_removal) {
+			continue;
 		}
 
 		q->poll_table[n].link = w->link;
@@ -3199,7 +3243,12 @@ static vine_result_code_t commit_task_group_to_worker(struct vine_manager *q, st
 		}
 		result = commit_task_to_worker(q, w, t);
 		counter++;
-	} while ((l && (t = list_pop_head(l))));
+
+		if (w->pending_removal) {
+			/* BUG: we need to uncommit the task from the group */
+			return VINE_WORKER_FAILURE;
+		}
+	} while (l && (t = list_pop_head(l)));
 
 	debug(D_VINE, "Sent batch of %d tasks to worker %s", counter, w->hostname);
 	return result;
@@ -3783,6 +3832,9 @@ static void ask_for_workers_updates(struct vine_manager *q)
 
 	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
 	{
+		if (w->pending_removal) {
+			continue;
+		}
 
 		if (q->keepalive_interval > 0) {
 
@@ -3904,7 +3956,7 @@ static int disconnect_slow_workers(struct vine_manager *q)
 
 		if (runtime >= (average_task_time * (multiplier + t->workers_slow))) {
 			w = t->worker;
-			if (w && (w->type == VINE_WORKER_TYPE_WORKER)) {
+			if (w && (w->type == VINE_WORKER_TYPE_WORKER) && !w->pending_removal) {
 				debug(D_VINE, "Task %d is taking too long. Removing from worker.", t->task_id);
 				reset_task_to_state(q, t, VINE_TASK_READY);
 				t->workers_slow++;
@@ -3926,7 +3978,7 @@ static int disconnect_slow_workers(struct vine_manager *q)
 							runtime / 1000000.0,
 							average_task_time / 1000000.0);
 					vine_block_host_with_timeout(q, w->hostname, q->option_blocklist_slow_workers_timeout);
-					vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_FAST_ABORT);
+					vine_manager_mark_worker_for_removal(q, w, VINE_WORKER_DISCONNECT_FAST_ABORT);
 
 					q->stats->workers_slow++;
 					removed++;
@@ -3940,15 +3992,15 @@ static int disconnect_slow_workers(struct vine_manager *q)
 	return removed;
 }
 
-/* Forcibly shutdown a worker by telling it to exit, then disconnect it. */
+/* Forcibly shutdown a worker by telling it to exit, then mark it for removal. */
 
 int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
-	if (!w)
+	if (!w || w->pending_removal)
 		return 0;
 
 	vine_manager_send(q, w, "exit\n");
-	vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_EXPLICIT);
+	vine_manager_mark_worker_for_removal(q, w, VINE_WORKER_DISCONNECT_EXPLICIT);
 	q->stats->workers_released++;
 
 	return 1;
@@ -3964,7 +4016,7 @@ static int shutdown_drained_workers(struct vine_manager *q)
 	int iteration;
 	HASH_TABLE_ITERATE(q->worker_table, iteration, worker_hashkey, w)
 	{
-		if (w->draining && w->tasks_committed == 0) {
+		if (w->draining && w->tasks_committed == 0 && !w->pending_removal) {
 			list_push_tail(workers_to_remove, w);
 		}
 	}
@@ -4512,7 +4564,9 @@ void vine_delete(struct vine_manager *q)
 
 	vine_fair_write_workflow_info(q);
 
-	release_all_workers(q);
+	disconnect_failed_workers(q);
+
+	disconnect_all_workers(q);
 
 	vine_perf_log_write_update(q, 1);
 
@@ -5413,6 +5467,11 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	// time left?
 	while ((stoptime == 0) || (time(0) < stoptime)) {
 
+		// remove workers that were marked since the last cycle.
+		if (disconnect_failed_workers(q) > 0) {
+			events++;
+		}
+
 		BEGIN_ACCUM_TIME(q, time_internal);
 		// update catalog if appropriate
 		if (q->name) {
@@ -5447,6 +5506,11 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			// returning and retrieving tasks.
 		}
 
+		// remove workers that message handlers marked for removal.
+		if (disconnect_failed_workers(q) > 0) {
+			events++;
+		}
+
 		// get updates for watched files.
 		if (hash_table_size(q->workers_with_watched_file_updates)) {
 
@@ -5455,7 +5519,9 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			int iteration;
 			HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) // should this be workers_with_watched_file_updates?
 			{
-				get_watched_file_updates(q, w);
+				if (!w->pending_removal) {
+					get_watched_file_updates(q, w);
+				}
 				hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
 			}
 		}
@@ -5489,6 +5555,10 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 
 			struct vine_worker_info *w = head->worker;
+			if (w->pending_removal) {
+				// its tasks are reclaimed when the worker is removed at the start of next cycle.
+				break;
+			}
 			int retrieved_from_worker = receive_tasks_from_worker(q, w, retrieved_this_cycle);
 			retrieved_this_cycle += retrieved_from_worker;
 			events += retrieved_from_worker;
@@ -5784,7 +5854,7 @@ int vine_workers_shutdown(struct vine_manager *q, int n)
 	{
 		if (i >= n)
 			break;
-		if (w->tasks_committed == 0) {
+		if (w->tasks_committed == 0 && !w->pending_removal) {
 			vine_manager_shut_down_worker(q, w);
 			i++;
 		}
@@ -5912,12 +5982,15 @@ int vine_cancel_all(struct vine_manager *q)
 	return count;
 }
 
-static void release_all_workers(struct vine_manager *q)
+static void disconnect_all_workers(struct vine_manager *q)
 {
 	struct vine_worker_info *w;
 
+	/* the manager is shutting down, so workers are removed right away. */
 	while ((w = hash_table_pop(q->worker_table))) {
-		release_worker(q, w);
+		vine_manager_send(q, w, "release\n");
+		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_EXPLICIT);
+		q->stats->workers_released++;
 	}
 }
 

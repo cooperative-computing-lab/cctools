@@ -212,8 +212,8 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		return 0;
 	}
 
-	/* Don't send tasks to this worker if it is in draining mode (no more tasks). */
-	if (w->draining) {
+	/* Don't send tasks to this worker if it is in draining mode (no more tasks), or it is going to be removed. */
+	if (w->draining || w->pending_removal) {
 		return 0;
 	}
 
@@ -383,7 +383,7 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
 	{
 		/* briefly skip uninitialized workers, more detailed checks are performed in @check_worker_against_task */
-		if (!w || !w->resources || w->type != VINE_WORKER_TYPE_WORKER || w->draining) {
+		if (!w || !w->resources || w->type != VINE_WORKER_TYPE_WORKER || w->draining || w->pending_removal) {
 			continue;
 		}
 
