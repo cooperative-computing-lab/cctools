@@ -398,7 +398,7 @@ void vine_temp_clean_redundant_replicas(struct vine_manager *q, struct vine_file
 		}
 
 		// given the priorities, replicas from workers pending removal are counted first
-	 	skip_list_insert(clean_replicas_from_workers, source_worker, source_worker->pending_removal ? 1.0 : 0.0, (double)source_worker->inuse_cache);
+		skip_list_insert(clean_replicas_from_workers, source_worker, source_worker->pending_removal ? 1.0 : 0.0, (double)source_worker->inuse_cache);
 	}
 
 	while (excess_replicas > 0) {
