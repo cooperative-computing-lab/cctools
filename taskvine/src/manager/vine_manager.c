@@ -3257,7 +3257,7 @@ static int should_resubmit_task_on_sandbox_exhaustion(struct vine_manager *q, st
 	double sandbox = t->resources_allocated->disk;
 
 	/* grow sandbox by given factor (default is two) */
-	sandbox *= q->sandbox_grow_factor * sandbox;
+	sandbox *= q->sandbox_grow_factor;
 
 	/* take the MAX in case min_vine_sandbox was updated before th result of this task was processed */
 	c->min_vine_sandbox = MAX(c->min_vine_sandbox, sandbox);
