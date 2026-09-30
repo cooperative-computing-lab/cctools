@@ -6208,7 +6208,7 @@ char *vine_get_status(struct vine_manager *q, const char *request)
 	struct jx *a = construct_status_message(q, request);
 
 	if (!a) {
-		return "[]";
+		return xxstrdup("[]");
 	}
 
 	char *result = jx_print_string(a);
