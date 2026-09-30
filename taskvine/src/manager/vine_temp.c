@@ -9,6 +9,7 @@
 #include "vine_mount.h"
 
 #include "priority_queue.h"
+#include "skip_list.h"
 #include "macros.h"
 #include "stringtools.h"
 #include "debug.h"
@@ -363,18 +364,9 @@ void vine_temp_clean_redundant_replicas(struct vine_manager *q, struct vine_file
 		return;
 	}
 
-	/* A worker that is going to be removed still counts as a replica, so we could end up
-	 * removing the replicas that will not be lost. Wait until the worker is removed. */
-	struct vine_worker_info *pending_worker = NULL;
-	int pending_iteration;
-	SET_ITERATE(source_workers, pending_iteration, pending_worker)
-	{
-		if (pending_worker->pending_removal) {
-			return;
-		}
-	}
-
-	struct priority_queue *clean_replicas_from_workers = priority_queue_create(0);
+	/* Candidates ordered by (pending_removal, inuse_cache), highest first: workers about to be removed anyway,
+	 * then the workers using the most cache space. */
+	struct skip_list *clean_replicas_from_workers = skip_list_create(2, 0.5);
 
 	struct vine_worker_info *source_worker = NULL;
 	int iteration;
@@ -405,11 +397,12 @@ void vine_temp_clean_redundant_replicas(struct vine_manager *q, struct vine_file
 			continue;
 		}
 
-		priority_queue_push(clean_replicas_from_workers, source_worker, source_worker->inuse_cache);
+		// given the priorities, replicas from workers pending removal are counted first
+	 	skip_list_insert(clean_replicas_from_workers, source_worker, source_worker->pending_removal ? 1.0 : 0.0, (double)source_worker->inuse_cache);
 	}
 
 	while (excess_replicas > 0) {
-		source_worker = priority_queue_pop(clean_replicas_from_workers);
+		source_worker = skip_list_pop_head(clean_replicas_from_workers);
 		if (!source_worker) {
 			break;
 		}
@@ -417,7 +410,9 @@ void vine_temp_clean_redundant_replicas(struct vine_manager *q, struct vine_file
 		excess_replicas--;
 	}
 
-	priority_queue_delete(clean_replicas_from_workers);
+	/* the workers are owned by the manager, so only remove them from the list. */
+	skip_list_clear(clean_replicas_from_workers, NULL);
+	skip_list_delete(clean_replicas_from_workers);
 
 	return;
 }
