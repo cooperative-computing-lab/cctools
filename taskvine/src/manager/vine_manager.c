@@ -1406,6 +1406,7 @@ void exit_debug_message(struct vine_manager *q, struct vine_worker_info *w, stru
 			w->addrport,
 			(t->time_when_done - t->time_when_commit_start) / 1000000.0,
 			(long long)w->total_tasks_complete,
+			w->total_tasks_complete > 0 ? (double)w->total_task_time / w->total_tasks_complete / 1e6 : 0.0,
 			w->total_task_time / w->total_tasks_complete / 1000000.0);
 
 	return;
