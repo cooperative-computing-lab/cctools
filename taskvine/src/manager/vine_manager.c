@@ -1406,8 +1406,7 @@ void exit_debug_message(struct vine_manager *q, struct vine_worker_info *w, stru
 			w->addrport,
 			(t->time_when_done - t->time_when_commit_start) / 1000000.0,
 			(long long)w->total_tasks_complete,
-			w->total_tasks_complete > 0 ? (double)w->total_task_time / w->total_tasks_complete / 1e6 : 0.0,
-			w->total_task_time / w->total_tasks_complete / 1000000.0);
+			w->total_tasks_complete > 0 ? (double)w->total_task_time / w->total_tasks_complete / 1e6 : 0.0);
 
 	return;
 }
@@ -1832,7 +1831,7 @@ static vine_result_code_t get_stdout(struct vine_manager *q, struct vine_worker_
 		actual = link_read(w->link, t->output, retrieved_output_length, stoptime);
 		if (actual != retrieved_output_length) {
 			debug(D_VINE, "Failure: actual received stdout size (%" PRId64 " bytes) is different from expected (%" PRId64 " bytes).", actual, retrieved_output_length);
-			actual = MAX(actual, 0);    // if link_read error, actual is -1. Clamp here to protect array assignment below.
+			actual = MAX(actual, 0); // if link_read error, actual is -1. Clamp here to protect array assignment below.
 			t->output[actual] = '\0';
 			return VINE_WORKER_FAILURE;
 		}
