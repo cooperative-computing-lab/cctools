@@ -91,6 +91,7 @@ char *vine_runtime_directory_create()
 
 	setenv("VINE_RUNTIME_INFO_DIR", runtime_dir, 1);
 	if (!create_dir(runtime_dir, 0755)) {
+		free(runtime_dir);
 		return NULL;
 	}
 
@@ -101,12 +102,16 @@ char *vine_runtime_directory_create()
 
 	char *tmp = string_format("%s/vine-logs", runtime_dir);
 	if (!create_dir(tmp, 0755)) {
+		free(tmp);
+		free(runtime_dir);
 		return NULL;
 	}
 	free(tmp);
 
 	tmp = string_format("%s/staging", runtime_dir);
 	if (!create_dir(tmp, 0755)) {
+		free(tmp);
+		free(runtime_dir);
 		return NULL;
 	}
 	register_staging_dir(tmp);
@@ -114,12 +119,16 @@ char *vine_runtime_directory_create()
 
 	tmp = string_format("%s/../vine-cache", runtime_dir);
 	if (!create_dir(tmp, 0755)) {
+		free(tmp);
+		free(runtime_dir);
 		return NULL;
 	}
 	free(tmp);
 
 	tmp = string_format("%s/library-logs", runtime_dir);
 	if (!create_dir(tmp, 0755)) {
+		free(tmp);
+		free(runtime_dir);
 		return NULL;
 	}
 	free(tmp);

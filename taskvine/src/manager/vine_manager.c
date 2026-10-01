@@ -1167,6 +1167,7 @@ void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info 
 
 	hash_table_remove(q->worker_table, w->hashkey);
 	hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
+	hash_table_remove(q->workers_idle_disconnecting, w->hashkey);
 
 	if (q->transfer_temps_recovery) {
 		recall_worker_lost_temp_files(q, w);
@@ -4120,6 +4121,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->manager_link = link_serve(port);
 	if (!q->manager_link) {
 		debug(D_NOTICE, "Could not create manager on port %i.", port);
+		free(runtime_dir);
 		free(q);
 		return 0;
 	} else {
@@ -4307,6 +4309,7 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 		char *series_file = vine_get_path_log(q, "time-series");
 		if (!create_dir(series_file, 0777)) {
 			warn(D_VINE, "could not create monitor output directory - %s (%s)", series_file, strerror(errno));
+			free(series_file);
 			return 0;
 		}
 		free(series_file);
@@ -4466,6 +4469,7 @@ void vine_set_property(struct vine_manager *m, const char *name, const char *val
 
 void vine_set_password(struct vine_manager *q, const char *password)
 {
+	free(q->password);
 	q->password = xxstrdup(password);
 }
 
@@ -5132,7 +5136,7 @@ static void print_password_warning(struct vine_manager *q)
 #define BEGIN_ACCUM_TIME(q, stat) \
 	{ \
 		if (q->stats_measure->stat != 0) { \
-			fatal("Double-counting stat %s. This should not happen, and it is a taskvine bug."); \
+			fatal("Double-counting stat %s. This should not happen, and it is a taskvine bug.", #stat); \
 		} else { \
 			q->stats_measure->stat = timestamp_get(); \
 		} \
@@ -5773,12 +5777,12 @@ int vine_workers_shutdown(struct vine_manager *q, int n)
 	int iteration;
 	int i = 0;
 
+	if (!q)
+		return -1;
+
 	/* by default, remove all workers. */
 	if (n < 1)
 		n = hash_table_size(q->worker_table);
-
-	if (!q)
-		return -1;
 
 	// send worker the "exit" msg
 	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
