@@ -451,7 +451,7 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 			break;
 		case VINE_SCHEDULE_TIME:
 			/* Find the worker that produced the fastest runtime of prior tasks. */
-			priority = w->total_tasks_complete == 0 ? HUGE_VAL : -(w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
+			priority = w->total_tasks_complete == 0 ? HUGE_VAL : -(double)(w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
 			break;
 		case VINE_SCHEDULE_FCFS:
 			/* Deprecated, same as random */
