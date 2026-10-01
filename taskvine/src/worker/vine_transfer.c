@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "vine_transfer.h"
 #include "vine_protocol.h"
+#include "vine_worker.h"
 
 #include "debug.h"
 #include "host_disk_info.h"
@@ -164,7 +165,19 @@ Send a cached object of any type down the wire.
 int vine_transfer_put_any(struct link *lnk, struct vine_cache *cache, const char *filename, vine_transfer_mode_t xfer_mode, time_t stoptime)
 {
 	char *cached_path = vine_cache_data_path(cache, filename);
-	int r = vine_transfer_put_internal(lnk, cached_path, path_basename(filename), xfer_mode, stoptime);
+	int r;
+
+	if (path_within_dir(cached_path, workspace->cache_dir)) {
+		r = vine_transfer_put_internal(lnk, cached_path, path_basename(filename), xfer_mode, stoptime);
+	} else {
+		/* Same reply as an unreadable file in vine_transfer_put_internal. */
+		debug(D_VINE, "refusing to send %s: not within %s", cached_path, workspace->cache_dir);
+		char filename_encoded[VINE_LINE_MAX];
+		url_encode(path_basename(filename), filename_encoded, sizeof(filename_encoded));
+		send_message(lnk, "error %s %d\n", filename_encoded, EACCES);
+		r = 1;
+	}
+
 	free(cached_path);
 	return r;
 }

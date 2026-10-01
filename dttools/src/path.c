@@ -349,8 +349,22 @@ out:
 	return rc;
 }
 
+int path_has_dir_prefix(const char *path, const char *dir, int allow_equal)
+{
+	size_t n = strlen(dir);
+	if (n > 0 && dir[n - 1] == '/')
+		n--;
+
+	if (strncmp(path, dir, n))
+		return 0;
+
+	return path[n] == '/' || (allow_equal && path[n] == '\0');
+}
+
 /*
 Return true if the given path resolves within the tree below dir.
+The path is collapsed first, so "." and ".." cannot walk out of dir.
+dir is assumed to be collapsed already.
 This implementation was factored out of work_queue_worker and
 can probably be made simpler.
 */
@@ -364,23 +378,29 @@ int path_within_dir(const char *path, const char *dir)
 	if (!realpath(dir, absolute_dir))
 		return 0;
 
-	if (path[0] == '/') {
-		const char *p = strstr(path, absolute_dir);
-		if (p != path) {
-			return 0;
-		}
+	char *tmp_path = xxmalloc(strlen(path) + 2);
+	path_collapse(path, tmp_path, 1);
+	path_remove_trailing_slashes(tmp_path);
+
+	const char *leaf = path_basename(tmp_path);
+	if (!strcmp(leaf, ".") || !strcmp(leaf, "..")) {
+		free(tmp_path);
+		return 0;
+	}
+
+	if (tmp_path[0] == '/' && !path_has_dir_prefix(tmp_path, dir, 0)) {
+		free(tmp_path);
+		return 0;
 	}
 
 	char absolute_path[PATH_MAX + 1];
-	char *tmp_path = xxstrdup(path);
 
 	int rv = 1;
 	char *p;
 	while ((p = strrchr(tmp_path, '/')) != NULL) {
 		*p = '\0';
 		if (realpath(tmp_path, absolute_path)) {
-			p = strstr(absolute_path, absolute_dir);
-			if (p != absolute_path) {
+			if (!path_has_dir_prefix(absolute_path, absolute_dir, 1)) {
 				rv = 0;
 			}
 			break;
