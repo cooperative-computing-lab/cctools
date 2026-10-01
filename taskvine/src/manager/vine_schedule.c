@@ -513,7 +513,7 @@ static vine_resource_bitmask_t is_task_larger_than_worker(struct vine_manager *q
 
 	if ((double)w->resources->disk.total < l->disk) {
 		set = set | DISK_BIT;
-	} else if ((double)w->resources->disk.total - w->resources->disk.inuse && itable_size(w->current_tasks) < 1) {
+	} else if ((double)w->resources->disk.total - w->resources->disk.inuse < l->disk && itable_size(w->current_tasks) < 1) {
 		/* also trigger disk if worker's cache does not allow to run any task anymore */
 		set = set | DISK_BIT;
 	}
