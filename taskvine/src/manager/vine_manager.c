@@ -3266,7 +3266,7 @@ static int should_resubmit_task_on_sandbox_exhaustion(struct vine_manager *q, st
 	debug(D_VINE, "Task %d exhausted disk sandbox on %s (%s).\n", t->task_id, w->hostname, w->addrport);
 	double max_allowed_disk = MAX(t->resources_requested->disk, c->max_allocation->disk);
 
-	if (max_allowed_disk > -1 && c->min_vine_sandbox < max_allowed_disk) {
+	if (max_allowed_disk > -1 && c->min_vine_sandbox > max_allowed_disk) {
 		debug(D_VINE, "Task %d failed given max disk limit for sandbox.\n", t->task_id);
 		return 0;
 	}
