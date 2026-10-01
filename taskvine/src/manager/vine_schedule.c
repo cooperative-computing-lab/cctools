@@ -143,7 +143,8 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 			continue;
 		}
 
-		available -= m->file->size;
+		/* available is in MB, file sizes are in bytes. */
+		available -= BYTES_TO_MEGABYTES(m->file->size);
 
 		if (available < 0) {
 			ok = 0;
