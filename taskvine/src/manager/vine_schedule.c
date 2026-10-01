@@ -146,7 +146,7 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 		available -= m->file->size;
 
 		if (available < 0) {
-			ok = 1;
+			ok = 0;
 			break;
 		}
 	}
