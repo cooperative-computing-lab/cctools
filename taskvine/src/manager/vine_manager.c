@@ -455,6 +455,14 @@ static vine_msg_code_t handle_cache_update(struct vine_manager *q, struct vine_w
 
 		vine_txn_log_write_cache_update(q, w, size, transfer_time, start_time, cachename);
 
+		/* process_replica_on_eventt may have deleted the replica,
+		 * so we check here again and return if there's nothing
+		 * more to update */
+		replica = vine_file_replica_table_lookup(w, cachename);
+		if (!replica) {
+			return VINE_MSG_PROCESSED;
+		}
+
 		w->resources->disk.inuse += BYTES_TO_MEGABYTES(size);
 
 		/* If the replica corresponds to a declared file. */
@@ -1159,6 +1167,7 @@ void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info 
 
 	hash_table_remove(q->worker_table, w->hashkey);
 	hash_table_remove(q->workers_with_watched_file_updates, w->hashkey);
+	hash_table_remove(q->workers_idle_disconnecting, w->hashkey);
 
 	if (q->transfer_temps_recovery) {
 		recall_worker_lost_temp_files(q, w);
@@ -1398,7 +1407,7 @@ void exit_debug_message(struct vine_manager *q, struct vine_worker_info *w, stru
 			w->addrport,
 			(t->time_when_done - t->time_when_commit_start) / 1000000.0,
 			(long long)w->total_tasks_complete,
-			w->total_task_time / w->total_tasks_complete / 1000000.0);
+			w->total_tasks_complete > 0 ? (double)w->total_task_time / w->total_tasks_complete / 1e6 : 0.0);
 
 	return;
 }
@@ -1823,6 +1832,7 @@ static vine_result_code_t get_stdout(struct vine_manager *q, struct vine_worker_
 		actual = link_read(w->link, t->output, retrieved_output_length, stoptime);
 		if (actual != retrieved_output_length) {
 			debug(D_VINE, "Failure: actual received stdout size (%" PRId64 " bytes) is different from expected (%" PRId64 " bytes).", actual, retrieved_output_length);
+			actual = MAX(actual, 0); // if link_read error, actual is -1. Clamp here to protect array assignment below.
 			t->output[actual] = '\0';
 			return VINE_WORKER_FAILURE;
 		}
@@ -3249,7 +3259,7 @@ static int should_resubmit_task_on_sandbox_exhaustion(struct vine_manager *q, st
 	double sandbox = t->resources_allocated->disk;
 
 	/* grow sandbox by given factor (default is two) */
-	sandbox *= q->sandbox_grow_factor * sandbox;
+	sandbox *= q->sandbox_grow_factor;
 
 	/* take the MAX in case min_vine_sandbox was updated before th result of this task was processed */
 	c->min_vine_sandbox = MAX(c->min_vine_sandbox, sandbox);
@@ -3257,7 +3267,7 @@ static int should_resubmit_task_on_sandbox_exhaustion(struct vine_manager *q, st
 	debug(D_VINE, "Task %d exhausted disk sandbox on %s (%s).\n", t->task_id, w->hostname, w->addrport);
 	double max_allowed_disk = MAX(t->resources_requested->disk, c->max_allocation->disk);
 
-	if (max_allowed_disk > -1 && c->min_vine_sandbox < max_allowed_disk) {
+	if (max_allowed_disk > -1 && c->min_vine_sandbox > max_allowed_disk) {
 		debug(D_VINE, "Task %d failed given max disk limit for sandbox.\n", t->task_id);
 		return 0;
 	}
@@ -4111,6 +4121,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->manager_link = link_serve(port);
 	if (!q->manager_link) {
 		debug(D_NOTICE, "Could not create manager on port %i.", port);
+		free(runtime_dir);
 		free(q);
 		return 0;
 	} else {
@@ -4298,6 +4309,7 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 		char *series_file = vine_get_path_log(q, "time-series");
 		if (!create_dir(series_file, 0777)) {
 			warn(D_VINE, "could not create monitor output directory - %s (%s)", series_file, strerror(errno));
+			free(series_file);
 			return 0;
 		}
 		free(series_file);
@@ -4471,6 +4483,7 @@ void vine_set_property(struct vine_manager *m, const char *name, const char *val
 
 void vine_set_password(struct vine_manager *q, const char *password)
 {
+	free(q->password);
 	q->password = xxstrdup(password);
 }
 
@@ -4485,10 +4498,13 @@ static void delete_task_at_exit(struct vine_task *t)
 		return;
 	}
 
+	/* t may be freed by the next delete, so remember its type. */
+	vine_task_type_t type = t->type;
+
 	/* Each task in q->tasks has one reference that was added by the vine_manager. */
 	vine_task_delete(t);
 
-	switch (t->type) {
+	switch (type) {
 	case VINE_TASK_TYPE_STANDARD:
 		/* The user created, and the user must delete. */
 		break;
@@ -5134,7 +5150,7 @@ static void print_password_warning(struct vine_manager *q)
 #define BEGIN_ACCUM_TIME(q, stat) \
 	{ \
 		if (q->stats_measure->stat != 0) { \
-			fatal("Double-counting stat %s. This should not happen, and it is a taskvine bug."); \
+			fatal("Double-counting stat %s. This should not happen, and it is a taskvine bug.", #stat); \
 		} else { \
 			q->stats_measure->stat = timestamp_get(); \
 		} \
@@ -5779,12 +5795,12 @@ int vine_workers_shutdown(struct vine_manager *q, int n)
 	int iteration;
 	int i = 0;
 
+	if (!q)
+		return -1;
+
 	/* by default, remove all workers. */
 	if (n < 1)
 		n = hash_table_size(q->worker_table);
-
-	if (!q)
-		return -1;
 
 	// send worker the "exit" msg
 	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
@@ -6215,7 +6231,7 @@ char *vine_get_status(struct vine_manager *q, const char *request)
 	struct jx *a = construct_status_message(q, request);
 
 	if (!a) {
-		return "[]";
+		return xxstrdup("[]");
 	}
 
 	char *result = jx_print_string(a);

@@ -186,7 +186,10 @@ void vine_manager_factory_update_all(struct vine_manager *q, time_t stoptime)
 		}
 		catalog_query_delete(cq);
 	} else {
+		// No factory was marked as seen, so do not consider them outdated.
 		debug(D_VINE, "Failed to retrieve factory info from catalog server(s) at %s.", q->catalog_hosts);
+		jx_delete(jexpr);
+		return;
 	}
 
 	// Remove outdated factories
