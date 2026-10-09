@@ -169,25 +169,28 @@ void vine_task_reset(struct vine_task *t)
 	retract_mounts_on_reset(t->output_mounts);
 }
 
+/* The copy helpers walk the source list with a cursor of their own. LIST_ITERATE would move the cursor stored in the
+ * list, which ends any walk of the same list that a caller of vine_task_copy() is in the middle of. */
 static void vine_task_mount_list_copy(struct list *destination, struct list *list)
 {
-	struct vine_mount *old_mount, *new_mount;
+	struct list_cursor *cur = list_cursor_create(list);
+	struct vine_mount *mount;
 
-	LIST_ITERATE(list, old_mount)
-	{
-		new_mount = vine_mount_copy(old_mount);
-		list_push_tail(destination, new_mount);
+	for (list_seek(cur, 0); list_get(cur, (void **)&mount); list_next(cur)) {
+		list_push_tail(destination, vine_mount_copy(mount));
 	}
+	list_cursor_destroy(cur);
 }
 
 static void vine_task_string_list_copy(struct list *destination, struct list *string_list)
 {
+	struct list_cursor *cur = list_cursor_create(string_list);
 	char *var;
 
-	LIST_ITERATE(string_list, var)
-	{
+	for (list_seek(cur, 0); list_get(cur, (void **)&var); list_next(cur)) {
 		list_push_tail(destination, xxstrdup(var));
 	}
+	list_cursor_destroy(cur);
 }
 
 struct vine_task *vine_task_addref(struct vine_task *t)
