@@ -1229,6 +1229,8 @@ class LibraryTask(Task):
     # @param library_name       The name of this Library.
     def __init__(self, fn, library_name):
         Task.__init__(self, fn)
+        # Code files generated for this library, which remove_library undeclares.
+        self._library_files = []
         self.provides_library(library_name)
 
 
