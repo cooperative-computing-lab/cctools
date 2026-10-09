@@ -119,7 +119,7 @@ void set_throttle(struct vine_manager *m, struct vine_worker_info *w, int is_des
 	if (good <= bad) {
 		/* this worker has failed more often than not, release it. */
 		notice(D_VINE, "Releasing worker %s because of repeated %s transfer failures: %d/%d", dir, w->addrport, bad, bad + good);
-		vine_manager_remove_worker(m, w, VINE_WORKER_DISCONNECT_XFER_ERRORS);
+		vine_manager_mark_worker_for_removal(m, w, VINE_WORKER_DISCONNECT_XFER_ERRORS);
 	}
 }
 

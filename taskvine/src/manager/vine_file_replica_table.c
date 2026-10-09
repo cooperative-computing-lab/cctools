@@ -125,7 +125,7 @@ struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager
 	SET_ITERATE_RANDOM_START(workers, offset_bookkeep, iteration, peer)
 	{
 		random_index--;
-		if (!peer->transfer_port_active)
+		if (!peer->transfer_port_active || peer->pending_removal)
 			continue;
 
 		timestamp_t current_time = timestamp_get();
