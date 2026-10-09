@@ -1230,6 +1230,8 @@ class LibraryTask(Task):
     def __init__(self, fn, library_name):
         Task.__init__(self, fn)
         self._manager_will_free = True
+        # Code files generated for this library, which remove_library undeclares.
+        self._library_files = []
         self.provides_library(library_name)
 
 
