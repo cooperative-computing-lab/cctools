@@ -12,6 +12,8 @@ See the file COPYING for details.
 #include "vine_manager.h"
 #include "xxmalloc.h"
 
+#include <string.h>
+
 #include "debug.h"
 
 struct vine_transfer_pair {
@@ -200,8 +202,10 @@ int vine_current_transfers_url_in_use(struct vine_manager *q, const char *source
 	int c = 0;
 	HASH_TABLE_ITERATE(q->current_transfer_table, iteration, id, t)
 	{
-		if (source == t->source_url)
+		/* Each transfer owns a copy of its source URL, so compare contents. */
+		if (source && t->source_url && !strcmp(source, t->source_url)) {
 			c++;
+		}
 	}
 	return c;
 }
