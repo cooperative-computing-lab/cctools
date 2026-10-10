@@ -829,6 +829,27 @@ const char *vine_task_get_state(struct vine_task *t)
 	return vine_task_state_to_string(t->state);
 }
 
+int vine_task_get_recovery_source_task_id(struct vine_task *t)
+{
+	if (!t || t->type != VINE_TASK_TYPE_RECOVERY) {
+		return 0;
+	}
+
+	/*
+	Recovery tasks are copies of original tasks and keep the same output file objects.
+	The file records the original producer so the task does not need duplicate state.
+	*/
+	struct vine_mount *m;
+	LIST_ITERATE(t->output_mounts, m)
+	{
+		if (m && m->file && m->file->original_producer_task_id > 0) {
+			return m->file->original_producer_task_id;
+		}
+	}
+
+	return 0;
+}
+
 #define METRIC(x) \
 	if (!strcmp(name, #x)) \
 		return t->x;
