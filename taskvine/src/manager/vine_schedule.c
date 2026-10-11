@@ -136,6 +136,9 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 	int ok = 1;
 	double available = w->resources->disk.total - MAX(0, t->resources_requested->disk) - w->resources->disk.inuse;
 
+	/* available is in MB, file sizes are in bytes. The missing inputs are summed before rounding up, so that many
+	 * small inputs do not count as a megabyte each. */
+	int64_t missing = 0;
 	struct vine_mount *m;
 	LIST_ITERATE(t->input_mounts, m)
 	{
@@ -143,10 +146,9 @@ int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vin
 			continue;
 		}
 
-		/* available is in MB, file sizes are in bytes. */
-		available -= BYTES_TO_MEGABYTES(m->file->size);
+		missing += m->file->size;
 
-		if (available < 0) {
+		if (BYTES_TO_MEGABYTES(missing) > available) {
 			ok = 0;
 			break;
 		}
