@@ -5054,6 +5054,9 @@ void vine_manager_install_library(struct vine_manager *q, struct vine_task *t, c
 
 void vine_manager_remove_library(struct vine_manager *q, const char *name)
 {
+	/* Cancelling a task can iterate the worker table, for example to write the performance log, so the instances
+	 * are collected before any is cancelled. */
+	struct list *instances = list_create();
 	char *worker_key;
 	struct vine_worker_info *w;
 	int iteration;
@@ -5061,16 +5064,30 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 	HASH_TABLE_ITERATE(q->worker_table, iteration, worker_key, w)
 	{
 		/* A worker might contain multiple library instances */
-		struct vine_task *library = vine_schedule_find_library(q, w, name);
-		while (library) {
-			vine_cancel_by_task_id(q, library->task_id);
-			itable_remove(w->current_libraries, library->task_id);
-			library = vine_schedule_find_library(q, w, name);
+		uint64_t task_id;
+		struct vine_task *library;
+		int library_iteration;
+		ITABLE_ITERATE(w->current_libraries, library_iteration, task_id, library)
+		{
+			if (!strcmp(library->provides_library, name) && library->function_slots_inuse < library->function_slots_total) {
+				list_push_tail(instances, library);
+			}
 		}
-		hash_table_remove(q->library_templates, name);
-
-		debug(D_VINE, "All instances and the template for library %s have been removed", name);
 	}
+
+	struct vine_task *library;
+	while ((library = list_pop_head(instances))) {
+		w = library->worker;
+		uint64_t task_id = library->task_id;
+		vine_cancel_by_task_id(q, task_id);
+		if (w) {
+			itable_remove(w->current_libraries, task_id);
+		}
+	}
+	list_delete(instances);
+
+	hash_table_remove(q->library_templates, name);
+	debug(D_VINE, "All instances and the template for library %s have been removed", name);
 }
 
 struct vine_task *vine_manager_find_library_template(struct vine_manager *q, const char *library_name)
