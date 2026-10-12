@@ -151,7 +151,6 @@ static vine_msg_code_t handle_manager_status(struct vine_manager *q, struct vine
 static vine_msg_code_t handle_resources(struct vine_manager *q, struct vine_worker_info *w, time_t stoptime);
 static vine_msg_code_t handle_feature(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 static void handle_library_update(struct vine_manager *q, struct vine_worker_info *w, const char *line);
-static struct vine_task *remove_library_instances(struct vine_manager *q, const char *name);
 static void log_manager_start_timezone();
 
 static struct jx *manager_to_jx(struct vine_manager *q);
@@ -4984,8 +4983,7 @@ struct vine_task *send_library_to_worker(struct vine_manager *q, struct vine_wor
 	then remove it and notify the user that this template might be broken
 	*/
 	if (original->library_failed_count > q->max_library_retries) {
-		/* The application may still hold this template, so it is retired without being freed. */
-		remove_library_instances(q, name);
+		vine_manager_remove_library(q, name);
 		debug(D_VINE | D_NOTICE, "library %s has reached the maximum failure count %d, it has been removed\n", name, q->max_library_retries);
 		return 0;
 	}
@@ -5054,8 +5052,7 @@ void vine_manager_install_library(struct vine_manager *q, struct vine_task *t, c
 	t->time_when_submitted = timestamp_get();
 }
 
-/* Cancel every instance of a library and remove its template from the table. Return the template, or NULL. */
-static struct vine_task *remove_library_instances(struct vine_manager *q, const char *name)
+void vine_manager_remove_library(struct vine_manager *q, const char *name)
 {
 	/* Cancelling a task can iterate the worker table, for example to write the performance log, so the instances
 	 * are collected before any is cancelled. */
@@ -5089,17 +5086,9 @@ static struct vine_task *remove_library_instances(struct vine_manager *q, const 
 	}
 	list_delete(instances);
 
+	/* The manager owns a template once it is installed, so removing the library frees it. */
+	vine_task_delete(hash_table_remove(q->library_templates, name));
 	debug(D_VINE, "All instances and the template for library %s have been removed", name);
-	return hash_table_remove(q->library_templates, name);
-}
-
-void vine_manager_remove_library(struct vine_manager *q, const char *name)
-{
-	/* The manager owns an installed template. */
-	struct vine_task *library_template = remove_library_instances(q, name);
-	if (library_template) {
-		vine_task_delete(library_template);
-	}
 }
 
 struct vine_task *vine_manager_find_library_template(struct vine_manager *q, const char *library_name)
