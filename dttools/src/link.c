@@ -87,6 +87,7 @@ void link_window_set(int send_buffer, int recv_buffer)
 {
 	link_send_window = send_buffer;
 	link_recv_window = recv_buffer;
+	link_override_window = 1;
 }
 
 void link_window_get(struct link *l, int *send_buffer, int *recv_buffer)
