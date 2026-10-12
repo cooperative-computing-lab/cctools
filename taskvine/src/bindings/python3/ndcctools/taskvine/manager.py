@@ -1106,6 +1106,8 @@ class Manager(object):
     def remove_library(self, name):
         libtask = self._library_table.pop(name)
         cvine.vine_manager_remove_library(self._taskvine, name)
+        # The manager freed the installed library task, so the Python object must not reach it again.
+        libtask._task = None
         for f in libtask._library_files:
             self.undeclare_file(f)
         libtask._library_files = []

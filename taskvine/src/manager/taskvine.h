@@ -1006,7 +1006,9 @@ The library is expected to run on all workers until they disconnect from the man
 */
 void vine_manager_install_library(struct vine_manager *m, struct vine_task *t, const char *name);
 
-/** Indicate the library to be removed from all connected workers
+/** Indicate the library to be removed from all connected workers.
+The manager deletes the library task that was installed with @ref vine_manager_install_library,
+so the caller must not use it afterwards.
 @param m A manager object
 @param name The library to be removed
 */
