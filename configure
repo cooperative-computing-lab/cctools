@@ -724,6 +724,8 @@ then
 	if [ "${fuse_avail}" = yes ] && ! check_function fuse_new fuse3/fuse.h -DFUSE_USE_VERSION=31 ${fuse_ccflags}
 	then
 		fuse_avail=no
+		fuse_ccflags=""
+		fuse_ldflags=""
 	fi
 fi
 
