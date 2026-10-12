@@ -2,10 +2,14 @@
 # Rules for building various sorts of files
 #
 
-# Internal compiler flags include -MMD -MP, which write the headers that each object includes to a .d file next to it.
-# Including those files rebuilds an object when one of its headers changes. The rules in them must not become the
-# default goal, so the goal is cleared and the first target of the Makefile becomes the default again.
+# Internal compiler flags include -MMD -MP, which write the headers that each object includes to a .d file next to it,
+# as a rule such as "address.o: address.c address.h". Including those files rebuilds an object when one of its headers
+# changes. The .d files exist only after the first build, and the wildcard skips them until then.
 -include $(wildcard *.d)
+
+# This file is included before the first target of each Makefile, so make sets .DEFAULT_GOAL to the first rule in the
+# .d files, and a plain "make" would build only that object. Clearing it makes the Makefile's first target, usually
+# "all", the default goal again.
 .DEFAULT_GOAL :=
 
 %.o: %.c
