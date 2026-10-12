@@ -134,6 +134,10 @@ void vine_process_delete(struct vine_process *p)
 	if (p->tmpdir)
 		free(p->tmpdir);
 
+	if (p->disk_measurement_state) {
+		path_disk_size_info_delete_state(p->disk_measurement_state);
+	}
+
 	free(p);
 }
 
