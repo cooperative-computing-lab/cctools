@@ -277,15 +277,19 @@ void send_async_message(struct link *l, const char *fmt, ...)
 	assert(l);
 
 	va_list va;
-	char *message = malloc(VINE_LINE_MAX);
 	va_start(va, fmt);
-	int length = vsnprintf(message, VINE_LINE_MAX, fmt, va);
+	int length = vsnprintf(NULL, 0, fmt, va);
 	va_end(va);
 
 	/* Abort if the message is longer than VINE_LINE_MAX. */
 	if (length >= VINE_LINE_MAX) {
-		fatal("message to the manager is %d bytes, more than VINE_LINE_MAX: %.64s", length, message);
+		fatal("message to the manager is %d bytes, more than VINE_LINE_MAX", length);
 	}
+
+	char *message = xxmalloc(length + 1);
+	va_start(va, fmt);
+	vsnprintf(message, length + 1, fmt, va);
+	va_end(va);
 
 	list_push_tail(pending_async_messages, message);
 	deliver_async_messages(l); // attempt to deliver message, will be delivered later if buffer is full.
