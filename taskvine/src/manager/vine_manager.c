@@ -5528,7 +5528,9 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		}
 
 		sent_in_previous_cycle = 0;
-		if (q->wait_for_workers <= hash_table_size(q->worker_table)) {
+		// no task is dispatched until wait_for_workers workers are connected.
+		int waiting_for_workers = q->wait_for_workers > hash_table_size(q->worker_table);
+		if (!waiting_for_workers) {
 			if (q->wait_for_workers > 0) {
 				debug(D_VINE, "Target number of workers reached (%d).", q->wait_for_workers);
 				q->wait_for_workers = 0;
@@ -5623,9 +5625,10 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 		// if we got here, no events were triggered this time around.
 		// if we went through the entire ready list without finding a task to dispatch,
+		// or we are still waiting for workers,
 		// we set the nothing_happened_last_wait_cycle flag so that link_poll waits for some time
 		// the next time around, or return retrieved tasks if there some available.
-		if (!skip_list_get(q->ready_tasks_cr, NULL) && list_size(q->retrieved_list) < 1) {
+		if ((!skip_list_get(q->ready_tasks_cr, NULL) || waiting_for_workers) && list_size(q->retrieved_list) < 1) {
 			q->nothing_happened_last_wait_cycle = 1;
 		}
 	}
