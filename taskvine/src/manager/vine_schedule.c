@@ -133,26 +133,20 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
  * taking into account that some files may be already at the worker. */
 int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	int ok = 1;
 	double available = w->resources->disk.total - MAX(0, t->resources_requested->disk) - w->resources->disk.inuse;
 
+	int64_t missing = 0;
 	struct vine_mount *m;
 	LIST_ITERATE(t->input_mounts, m)
 	{
-		if (hash_table_lookup(w->current_files, m->file->cached_name)) {
-			continue;
-		}
-
-		/* available is in MB, file sizes are in bytes. */
-		available -= BYTES_TO_MEGABYTES(m->file->size);
-
-		if (available < 0) {
-			ok = 0;
-			break;
+		if (!hash_table_lookup(w->current_files, m->file->cached_name)) {
+			missing += m->file->size;
 		}
 	}
 
-	return ok;
+	/* available is in MB, file sizes are in bytes. Rounding the sum once keeps many small inputs from counting as a
+	 * megabyte each. */
+	return BYTES_TO_MEGABYTES(missing) <= available;
 }
 
 /* Check if this worker has committable resources for any type of task.
