@@ -5069,7 +5069,7 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 		int library_iteration;
 		ITABLE_ITERATE(w->current_libraries, library_iteration, task_id, library)
 		{
-			if (!strcmp(library->provides_library, name) && library->function_slots_inuse < library->function_slots_total) {
+			if (!strcmp(library->provides_library, name)) {
 				list_push_tail(instances, library);
 			}
 		}
