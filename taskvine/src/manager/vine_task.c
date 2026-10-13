@@ -471,12 +471,12 @@ void vine_task_set_category(struct vine_task *t, const char *category)
 	t->category = xxstrdup(category ? category : "default");
 }
 
-void vine_task_set_semantic_category(struct vine_task *t, const char *category)
+void vine_task_set_semantic_category(struct vine_task *t, const char *semantic_category)
 {
-	if (t->category)
-		free(t->category);
+	if (t->semantic_category)
+		free(t->semantic_category);
 
-	t->semantic_category = xxstrdup(category ? category : "default");
+	t->semantic_category = xxstrdup(semantic_category ? semantic_category : "default");
 
 	unsigned int hash_prio = 12345U;
 	char *category_string = xxstrdup(t->semantic_category);
