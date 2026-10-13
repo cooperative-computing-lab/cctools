@@ -5069,7 +5069,10 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 		int library_iteration;
 		ITABLE_ITERATE(w->current_libraries, library_iteration, task_id, library)
 		{
-			if (!strcmp(library->provides_library, name) && library->function_slots_inuse < library->function_slots_total) {
+			/* Cancel busy instances as well. Otherwise they stay on their workers, and a library installed again with
+			 * the same name would run function calls on them. Function calls running in a cancelled instance are
+			 * forsaken, and they return to the application with a missing library. */
+			if (!strcmp(library->provides_library, name)) {
 				list_push_tail(instances, library);
 			}
 		}
