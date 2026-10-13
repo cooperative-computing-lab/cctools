@@ -55,7 +55,8 @@ condor_show_help()
 slurm_show_help()
 {
     echo "SLURM:"
-    echo "  -p <parameters>          SLURM sbatch parameters."
+    echo "  -p <parameters>          SLURM sbatch parameters. If they include a time limit"
+    echo "                           (--time or -t), it is passed to the worker as --wall-time."
     echo ""
 }
 
@@ -277,6 +278,106 @@ EOF
 }
 
 # SLURM specific
+
+# Print a non-negative decimal (possibly with leading zeros) in canonical form.
+slurm_to_int()
+{
+    case $1 in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    int=${1#"${1%%[!0]*}"}
+    echo "${int:-0}"
+}
+
+# Convert a slurm time specification to seconds. Accepted formats are:
+# minutes, minutes:seconds, hours:minutes:seconds, days-hours,
+# days-hours:minutes, and days-hours:minutes:seconds.
+# Prints nothing and returns 1 if the spec is invalid or means unlimited.
+slurm_time_to_seconds()
+{
+    spec=$1
+    days=0
+    with_days=0
+
+    case $spec in
+        *-*)
+            days=$(slurm_to_int "${spec%%-*}") || return 1
+            spec=${spec#*-}
+            with_days=1
+        ;;
+    esac
+
+    old_ifs=$IFS
+    IFS=:
+    set -f
+    set -- $spec
+    set +f
+    IFS=$old_ifs
+
+    if [ $# -lt 1 ] || [ $# -gt 3 ]
+    then
+        return 1
+    fi
+
+    f1=$(slurm_to_int "$1") || return 1
+    f2=0
+    f3=0
+    if [ $# -ge 2 ]; then f2=$(slurm_to_int "$2") || return 1; fi
+    if [ $# -ge 3 ]; then f3=$(slurm_to_int "$3") || return 1; fi
+
+    if [ "$with_days" = 1 ]
+    then
+        # days-hours[:minutes[:seconds]]
+        seconds=$((days*86400 + f1*3600 + f2*60 + f3))
+    else
+        case $# in
+            1) seconds=$((f1*60)) ;;                 # minutes
+            2) seconds=$((f1*60 + f2)) ;;            # minutes:seconds
+            3) seconds=$((f1*3600 + f2*60 + f3)) ;;  # hours:minutes:seconds
+        esac
+    fi
+
+    # A limit of 0 means unlimited for slurm.
+    if [ "$seconds" -le 0 ]
+    then
+        return 1
+    fi
+
+    echo "$seconds"
+}
+
+# Print the job time limit (--time or -t) given in the slurm parameters, if any.
+slurm_find_time_limit()
+{
+    time_limit=
+
+    set -f
+    set -- $slurm_parameters
+    set +f
+
+    while [ $# -gt 0 ]
+    do
+        case $1 in
+            --time=*)
+                time_limit=${1#--time=}
+            ;;
+            --time|-t)
+                shift
+                time_limit=${1:-}
+            ;;
+            -t?*)
+                time_limit=${1#-t}
+            ;;
+        esac
+        if [ $# -gt 0 ]
+        then
+            shift
+        fi
+    done
+
+    echo "$time_limit"
+}
+
 slurm_setup()
 {
     if [ -z "$cores" ] || [ "$cores" = 0 ]
@@ -285,6 +386,27 @@ slurm_setup()
     else
         slurm_parameters="$slurm_parameters --cpus-per-task $cores"
     fi
+
+    # Reflect the job time limit in the worker, unless it was set explicitly.
+    case " $arguments " in
+        *" --wall-time "*|*" --wall-time="*)
+        ;;
+        *)
+            slurm_time=$(slurm_find_time_limit)
+            case $slurm_time in
+                ''|[Uu][Nn][Ll][Ii][Mm][Ii][Tt][Ee][Dd]|[Ii][Nn][Ff][Ii][Nn][Ii][Tt][Ee])
+                ;;
+                *)
+                    if wall_time=$(slurm_time_to_seconds "$slurm_time")
+                    then
+                        arguments="$arguments --wall-time $wall_time"
+                    else
+                        echo "$script_name: could not convert slurm time limit '$slurm_time' to seconds. Not setting --wall-time for the worker." 1>&2
+                    fi
+                ;;
+            esac
+        ;;
+    esac
 }
 
 slurm_parse_arguments()
