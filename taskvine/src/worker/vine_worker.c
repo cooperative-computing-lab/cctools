@@ -277,14 +277,15 @@ void send_async_message(struct link *l, const char *fmt, ...)
 	assert(l);
 
 	va_list va;
+	char *message = malloc(VINE_LINE_MAX);
 	va_start(va, fmt);
-	int length = vsnprintf(NULL, 0, fmt, va);
+	int length = vsnprintf(message, VINE_LINE_MAX, fmt, va);
 	va_end(va);
 
-	char *message = xxmalloc(length + 1);
-	va_start(va, fmt);
-	vsnprintf(message, length + 1, fmt, va);
-	va_end(va);
+	/* Abort if the message is longer than VINE_LINE_MAX. */
+	if (length >= VINE_LINE_MAX) {
+		fatal("message to the manager is %d bytes, more than VINE_LINE_MAX: %.64s", length, message);
+	}
 
 	list_push_tail(pending_async_messages, message);
 	deliver_async_messages(l); // attempt to deliver message, will be delivered later if buffer is full.
@@ -1567,7 +1568,7 @@ static int enforce_worker_limits(struct link *manager)
 				total_resources->disk.inuse);
 
 		if (manager) {
-			send_async_message(manager, "info disk_exhausted %lf\n", total_resources->disk.inuse);
+			send_message(manager, "info disk_exhausted %lf\n", total_resources->disk.inuse);
 		}
 
 		return 0;
@@ -1580,7 +1581,7 @@ static int enforce_worker_limits(struct link *manager)
 				total_resources->memory.inuse);
 
 		if (manager) {
-			send_async_message(manager, "info memory_exhausted %lf\n", total_resources->memory.inuse);
+			send_message(manager, "info memory_exhausted %lf\n", total_resources->memory.inuse);
 		}
 
 		return 0;
@@ -1598,7 +1599,7 @@ static int enforce_worker_promises(struct link *manager)
 	if (options->end_time > 0 && timestamp_get() > ((uint64_t)options->end_time)) {
 		warn(D_NOTICE, "vine_worker: reached the wall time limit %" PRIu64 " s\n", (uint64_t)options->manual_wall_time_option);
 		if (manager) {
-			send_async_message(manager, "info wall_time_exhausted %" PRIu64 "\n", (uint64_t)options->manual_wall_time_option);
+			send_message(manager, "info wall_time_exhausted %" PRIu64 "\n", (uint64_t)options->manual_wall_time_option);
 		}
 		return 0;
 	}
@@ -1610,7 +1611,7 @@ static int enforce_worker_promises(struct link *manager)
 				total_resources->disk.total);
 
 		if (manager) {
-			send_async_message(manager, "info disk_error %lf\n", total_resources->disk.total);
+			send_message(manager, "info disk_error %lf\n", total_resources->disk.total);
 		}
 
 		return 0;
@@ -1937,7 +1938,7 @@ static int vine_worker_serve_manager_by_hostport(const char *host, int port, con
 	if (verify_project) {
 		char line[VINE_LINE_MAX];
 		debug(D_VINE, "verifying manager's project name");
-		send_async_message(manager, "name\n");
+		send_message(manager, "name\n");
 		if (!recv_message(manager, line, sizeof(line), options->idle_stoptime)) {
 			debug(D_VINE, "no response from manager while verifying name");
 			link_close(manager);
