@@ -1093,6 +1093,8 @@ class Manager(object):
             raise TypeError(f"Given task is of type {type(task)}. Please provide a LibraryTask as the task argument.")
         self._library_table[task.get_libray_provided()] = task
         cvine.vine_manager_install_library(self._taskvine, task._task, task.get_libray_provided())
+        # The manager owns the task from now on, while a library task that is never installed is freed by Python.
+        task._manager_will_free = True
 
     ##
     # Remove a library from all connected workers

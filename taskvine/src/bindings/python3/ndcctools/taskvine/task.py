@@ -1229,7 +1229,6 @@ class LibraryTask(Task):
     # @param library_name       The name of this Library.
     def __init__(self, fn, library_name):
         Task.__init__(self, fn)
-        self._manager_will_free = True
         self.provides_library(library_name)
 
 
