@@ -66,7 +66,7 @@ OPTION_ARG_LONG(docker-universe,image)Run worker inside PARAM(image) using condo
 
 SECTION(SLURM)
 OPTION_ARG(j)Use job array to submit workers.
-OPTION_ARG(p, parameters)SLURM sbatch parameters.
+OPTION_ARG(p, parameters)SLURM sbatch parameters. If they include a time limit (--time or -t), it is passed to the worker as --wall-time (in seconds).
 
 SECTION(UGE)
 OPTION_ARG(j)Use job array to submit workers.
