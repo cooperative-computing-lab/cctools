@@ -766,6 +766,29 @@ static void finish_running_tasks(vine_result_t result)
 }
 
 /*
+Reap the functions running in a library process that ends. They run in children of the library and end with it, so
+they are forsaken, and the manager runs them again. A function thus never runs without its library, and no process
+refers to a library process after it is gone.
+*/
+
+static void reap_library_functions(struct vine_process *library)
+{
+	struct vine_process *p;
+	uint64_t task_id;
+	int iteration;
+
+	ITABLE_ITERATE(procs_running, iteration, task_id, p)
+	{
+		if (p->library_process == library) {
+			debug(D_VINE, "killing function task %d running on library task %d", (int)task_id, library->task->task_id);
+			finish_running_task(p, VINE_RESULT_FORSAKEN);
+			reap_process(p, /* do not stage out */ NULL);
+			p->library_process = NULL;
+		}
+	}
+}
+
+/*
 Kill a failed library process.
 This library process may either not existent or no longer responses.
 */
@@ -784,19 +807,7 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 
 	/* Forsake the tasks that are running on this library */
 	/* It no available libraries on this worker, tasks waiting for this library will be forsaken */
-
-	struct vine_process *p_running;
-	uint64_t task_id;
-	int iteration;
-
-	ITABLE_ITERATE(procs_running, iteration, task_id, p_running)
-	{
-		if (p_running->library_process == p) {
-			debug(D_VINE, "killing function task %d running on library task %d", (int)task_id, p->task->task_id);
-			finish_running_task(p_running, VINE_RESULT_FORSAKEN);
-			reap_process(p_running, /* do not stage out */ NULL);
-		}
-	}
+	reap_library_functions(p);
 
 	reap_process(p, manager);
 }
@@ -1116,6 +1127,10 @@ static int do_kill(int task_id)
 	}
 
 	if (itable_remove(procs_running, task_id)) {
+		/* The functions of a library end with it, so they are reaped while the library process still exists. */
+		if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
+			reap_library_functions(p);
+		}
 		vine_process_kill_and_wait(p);
 		reap_process(p, /* do not stage out */ NULL);
 	}
