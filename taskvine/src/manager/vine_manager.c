@@ -5779,7 +5779,7 @@ int vine_hungry(struct vine_manager *q)
 
 	timestamp_t current_time = timestamp_get();
 
-	if (current_time - q->time_last_hungry + q->hungry_check_interval > 0) {
+	if (current_time - q->time_last_hungry > q->hungry_check_interval) {
 		q->time_last_hungry = current_time;
 		q->tasks_waiting_last_hungry = skip_list_size(q->ready_tasks);
 		q->tasks_to_sate_hungry = vine_hungry_computation(q);
@@ -6006,9 +6006,11 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if (!strcmp(name, "hungry-minimum")) {
 		q->hungry_minimum = MAX(1, (int)value);
+		q->time_last_hungry = 0;
 
 	} else if (!strcmp(name, "hungry-minimum-factor")) {
 		q->hungry_minimum_factor = MAX(1, (int)value);
+		q->time_last_hungry = 0;
 
 	} else if (!strcmp(name, "immediate-recovery")) {
 		q->immediate_recovery = !!((int)value);
