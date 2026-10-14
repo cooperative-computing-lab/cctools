@@ -169,15 +169,14 @@ void vine_task_reset(struct vine_task *t)
 	retract_mounts_on_reset(t->output_mounts);
 }
 
-/* Copy one item of a mount list or a string list, for list_copy(). */
-static void *vine_task_mount_copy(const void *mount)
+static void vine_task_mount_list_copy(struct list *destination, struct list *list)
 {
-	return vine_mount_copy((struct vine_mount *)mount);
+	list_copy(destination, list, (void *)vine_mount_copy);
 }
 
-static void *vine_task_string_copy(const void *string)
+static void vine_task_string_list_copy(struct list *destination, struct list *string_list)
 {
-	return xxstrdup(string);
+	list_copy(destination, string_list, (void *)xxstrdup);
 }
 
 struct vine_task *vine_task_addref(struct vine_task *t)
@@ -221,16 +220,10 @@ struct vine_task *vine_task_copy(const struct vine_task *task)
 		vine_task_set_snapshot_file(new, task->monitor_snapshot_file);
 	}
 
-	/* list_copy() walks each list with a cursor of its own, so a caller in the middle of a walk of these lists, such as
-	 * over the outputs of the task, continues where it was. */
-	list_delete(new->input_mounts);
-	new->input_mounts = list_copy(task->input_mounts, vine_task_mount_copy);
-	list_delete(new->output_mounts);
-	new->output_mounts = list_copy(task->output_mounts, vine_task_mount_copy);
-	list_delete(new->env_list);
-	new->env_list = list_copy(task->env_list, vine_task_string_copy);
-	list_delete(new->feature_list);
-	new->feature_list = list_copy(task->feature_list, vine_task_string_copy);
+	vine_task_mount_list_copy(new->input_mounts, task->input_mounts);
+	vine_task_mount_list_copy(new->output_mounts, task->output_mounts);
+	vine_task_string_list_copy(new->env_list, task->env_list);
+	vine_task_string_list_copy(new->feature_list, task->feature_list);
 	new->function_slots_requested = task->function_slots_requested;
 
 	/* Scheduling features of task are copied. */
