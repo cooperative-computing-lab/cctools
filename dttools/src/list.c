@@ -689,9 +689,10 @@ struct list *list_duplicate(struct list *src)
 	return dst;
 }
 
-void list_copy(struct list *dst, struct list *src, void *(*copy)(void *item))
+struct list *list_copy(struct list *src, void *(*copy)(void *item))
 {
 	void *item;
+	struct list *dst = list_create();
 	struct list_cursor *cur = list_cursor_create(src);
 
 	for (list_seek(cur, 0); list_get(cur, &item); list_next(cur)) {
@@ -699,6 +700,7 @@ void list_copy(struct list *dst, struct list *src, void *(*copy)(void *item))
 	}
 
 	list_cursor_destroy(cur);
+	return dst;
 }
 
 struct list *list_sort(struct list *list, int (*comparator)(const void *, const void *))

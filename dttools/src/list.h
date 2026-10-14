@@ -241,15 +241,13 @@ pointers in both lists point to the same places.
 
 struct list *list_duplicate(struct list *list);
 
-/** Append a copy of each item of a list to another list.
-The source list is walked with a cursor of its own, so a walk of it that is in progress,
-such as one with @ref LIST_ITERATE, continues where it was.
-@param dst The list to append to.
-@param src The list to copy.
-@param copy A function that returns a copy of one item.
+/** Copy a list and its items.
+@param list The list to copy.
+@param copy A function that copies one item.
+@return A new list with a copy of each item.
 */
 
-void list_copy(struct list *dst, struct list *src, void *(*copy)(void *item));
+struct list *list_copy(struct list *list, void *(*copy)(void *item));
 
 /** Delete a linked list.
 Note that this function only deletes the list itself,
