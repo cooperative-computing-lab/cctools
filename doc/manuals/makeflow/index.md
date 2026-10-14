@@ -113,12 +113,14 @@ Use the `--clean` option to clean everything up before trying it again:
 $ makeflow --clean example.makeflow
 ```
 
-If you have access to a batch system like Condor, UGE, or Torque, or a cloud
+If you have access to a batch system like Condor, SLURM, UGE, or Torque, or a cloud
 service provider like Amazon, you can direct Makeflow to run your jobs there
 by using the `-T` option:
 
 ```sh
 $ makeflow -T condor example.makeflow
+
+$ makeflow -T slurm example.makeflow
 
 $ makeflow -T uge example.makeflow
 
