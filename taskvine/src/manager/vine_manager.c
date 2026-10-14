@@ -5785,7 +5785,7 @@ int vine_hungry(struct vine_manager *q)
 		q->tasks_to_sate_hungry = vine_hungry_computation(q);
 	}
 
-	int change = q->tasks_waiting_last_hungry - skip_list_size(q->ready_tasks);
+	int change = skip_list_size(q->ready_tasks) - q->tasks_waiting_last_hungry;
 
 	return MAX(0, q->tasks_to_sate_hungry - change);
 }
